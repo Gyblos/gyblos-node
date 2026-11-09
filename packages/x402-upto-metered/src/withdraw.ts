@@ -134,6 +134,8 @@ async function channelAt(
       context.slot < bank.minContextSlot)
   )
     throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+  if (bank.minContextSlot !== undefined && context)
+    bank.minContextSlot = context.slot;
   if (!value) return undefined;
   const [found] = await discoverChannelsByRentPayer(
     {

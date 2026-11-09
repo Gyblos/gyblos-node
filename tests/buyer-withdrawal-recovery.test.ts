@@ -169,10 +169,18 @@ void test('a settled row with pending control survives retention pruning', () =>
       chargedAtomic: '0',
     });
     value.now(OPENING_NOW + BUYER_JOURNAL.settledRetentionMs + 1);
+    await assert.rejects(
+      value.journal.put({
+        ...original,
+        requestDigest: 'cd'.repeat(32),
+        channelId: null,
+      }),
+      { code: PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE },
+    );
     await value.journal.put({
-      ...original,
-      requestDigest: 'cd'.repeat(32),
-      channelId: null,
+      ...pending,
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: '0',
     });
     assert.ok(await value.journal.get(OPENING_DIGEST));
   }));

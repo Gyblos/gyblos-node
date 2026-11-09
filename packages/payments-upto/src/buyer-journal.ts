@@ -342,6 +342,8 @@ export async function openUptoBuyerJournal(options: {
       if (!entries.has(value.requestDigest) && entries.size >= maxEntries)
         unavailable();
       const held = entries.get(value.requestDigest);
+      if (!held?.channelId && [...entries.values()].some(hasPendingWithdrawal))
+        unavailable();
       const next = entry({ ...value, updatedAt: now() }, BUYER_JOURNAL.version);
       retainOpeningIdentity(held, next);
       entries.set(value.requestDigest, next);

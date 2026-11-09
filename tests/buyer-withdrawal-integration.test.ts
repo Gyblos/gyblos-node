@@ -13,14 +13,19 @@ import {
 } from 'x402-upto-metered';
 
 import {
+  createUptoPaymentClient,
   createUptoWithdrawal,
   openUptoBuyerJournal,
   withdrawUptoBuyer,
 } from '@gyblos/payments-upto';
-import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
+import {
+  PAYMENT_CHANNEL_STATES,
+  PAYMENT_ERROR_CODES,
+} from '@gyblos/protocol/constants';
 
 import { withdrawalFixture } from './support/buyer-withdrawal-recovery';
 import { OPENING_DIGEST, OPENING_NOW } from './support/opening';
+import { signatureOf } from './support/upto-chain-history';
 
 async function isolated(
   run: (value: Awaited<ReturnType<typeof withdrawalFixture>>) => Promise<void>,
@@ -34,6 +39,101 @@ async function isolated(
     await rm(root, { recursive: true, force: true });
   }
 }
+
+void test('an already-settled row can resolve its original pending control without a new send', () =>
+  isolated(async (value) => {
+    const context = await value.context();
+    await context.save(value.attempt(signatureOf(1)));
+    const entry = await value.journal.get(OPENING_DIGEST);
+    assert.ok(entry);
+    await value.journal.put({
+      ...entry,
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: '0',
+    });
+    await value.update({
+      status: UPTO_CHANNEL_ACCOUNT.statuses.CLOSING,
+      closureStartedAt: value.state.blockTime,
+    });
+    value.state.outcome = {
+      err: null,
+      confirmationStatus: UPTO_FINAL_COMMITMENT,
+      slot: value.state.slot,
+    };
+    const [done] = await withdrawUptoBuyer({
+      journal: value.journal,
+      network: value.terms.network,
+      withdrawal: createUptoWithdrawal(value.rpc, {
+        payer: value.payer,
+        network: value.terms.network,
+        tokenProgram: value.options.settings.tokenProgram,
+      }),
+      mint: value.terms.mint,
+      treasury: value.terms.treasury,
+      protocolFeeBps: value.terms.protocolFeeBps,
+      maxTimeoutSeconds: value.options.settings.maxTimeoutSeconds,
+      now: () => OPENING_NOW,
+      report: async () => {},
+    });
+    assert.equal(done?.transaction, signatureOf(1));
+    assert.equal(done?.confirmed, true);
+    assert.equal(
+      (await value.journal.get(OPENING_DIGEST))?.withdrawal?.pending,
+      false,
+    );
+    assert.equal(
+      (await value.journal.get(OPENING_DIGEST))?.state,
+      PAYMENT_CHANNEL_STATES.SETTLED,
+    );
+    assert.equal(value.sent.length, 0);
+  }));
+
+void test('a settled financial row rejects a new withdrawal prepared from an older open snapshot', () =>
+  isolated(async (value) => {
+    const context = await value.context();
+    const entry = await value.journal.get(OPENING_DIGEST);
+    assert.ok(entry);
+    await value.journal.put({
+      ...entry,
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: '0',
+    });
+    await assert.rejects(value.run(context), {
+      code: UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE,
+    });
+    assert.equal(value.sent.length, 0);
+    assert.equal(
+      (await value.journal.get(OPENING_DIGEST))?.withdrawal,
+      undefined,
+    );
+  }));
+
+void test('pending control introduced during opening preparation blocks the new payer signature', () =>
+  isolated(async (value) => {
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const client = createUptoPaymentClient({
+      ...value.options,
+      hints: async () => {
+        entered.resolve();
+        await release.promise;
+        return value.hints;
+      },
+    });
+    const before = value.calls();
+    const signing = client.authorize({
+      ...value.terms,
+      requestDigest: 'cd'.repeat(32),
+    });
+    await entered.promise;
+    const context = await value.context();
+    await context.save(value.attempt(signatureOf(1)));
+    release.resolve();
+    await assert.rejects(signing, {
+      code: PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE,
+    });
+    assert.equal(value.calls(), before);
+  }));
 
 void test('product withdrawal recovers a lost send/report reply from the same private journal', () =>
   isolated(async (value) => {

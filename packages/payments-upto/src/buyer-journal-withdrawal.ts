@@ -82,6 +82,12 @@ export function recordJournalWithdrawal(
   )
     unavailable();
   if (
+    next.pending &&
+    !expected?.pending &&
+    entry.state !== PAYMENT_CHANNEL_STATES.OPEN
+  )
+    unavailable();
+  if (
     expected?.pending &&
     (next.transaction !== expected.transaction ||
       next.step !== expected.step ||

@@ -131,7 +131,15 @@ async function originalStatus(
   if (
     status &&
     (!Object.hasOwn(status, 'err') ||
-      !Object.hasOwn(status, 'confirmationStatus'))
+      !Object.hasOwn(status, 'confirmationStatus') ||
+      (status.err !== null &&
+        !(typeof status.err === 'string' && status.err.length > 0) &&
+        !(
+          typeof status.err === 'object' &&
+          status.err !== null &&
+          !Array.isArray(status.err) &&
+          Object.keys(status.err).length === 1
+        )))
   )
     throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
   return status;
@@ -164,7 +172,11 @@ export async function recoverWithdrawal<Channel extends { status: number }>(
     };
   const status = await originalStatus(rpc, previous, tip.absoluteSlot);
   if (status?.confirmationStatus === UPTO_FINAL_COMMITMENT) {
-    if (typeof status.slot !== 'bigint' || !Object.hasOwn(status, 'err'))
+    if (
+      typeof status.slot !== 'bigint' ||
+      status.slot < 0n ||
+      status.slot > UPTO_U64_MAX
+    )
       throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
     if (status.slot > bank.minContextSlot) bank.minContextSlot = status.slot;
   } else if (

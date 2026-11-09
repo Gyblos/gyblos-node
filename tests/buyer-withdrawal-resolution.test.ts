@@ -39,6 +39,61 @@ async function pending(
   }
 }
 
+void test('a newer finalized account context becomes the durable recovery watermark', () =>
+  pending(async (value) => {
+    value.state.outcome = null;
+    value.state.height = 901n;
+    const actualSlot = value.state.slot + 100n;
+    await value.update({
+      status: UPTO_CHANNEL_ACCOUNT.statuses.CLOSING,
+      closureStartedAt: value.state.blockTime,
+    });
+    const read = value.rpc.getAccountInfo;
+    value.rpc.getAccountInfo = (...args) => ({
+      async send(options) {
+        return {
+          ...(await read(...args).send(options)),
+          context: { slot: actualSlot },
+        };
+      },
+    });
+    await value.run(await value.context());
+    assert.equal(
+      (await value.journal.get(OPENING_DIGEST))?.withdrawal?.checkedSlot,
+      String(actualSlot),
+    );
+    value.rpc.getAccountInfo = read;
+    value.state.slot++;
+    await value.update({ status: UPTO_CHANNEL_ACCOUNT.statuses.OPEN });
+    await assert.rejects(value.run(await value.context()), {
+      code: UPTO_ERROR_CODES.UNAVAILABLE,
+    });
+    assert.equal(value.signatures(), 0);
+    assert.equal(value.sent.length, 0);
+  }));
+
+void test('malformed finalized status cannot retire the original pending transaction', async () => {
+  for (const status of [
+    { err: false, confirmationStatus: UPTO_FINAL_COMMITMENT, slot: 400000000n },
+    { err: null, confirmationStatus: UPTO_FINAL_COMMITMENT, slot: -1n },
+  ])
+    await pending(async (value) => {
+      await value.update({
+        status: UPTO_CHANNEL_ACCOUNT.statuses.CLOSING,
+        closureStartedAt: value.state.blockTime,
+      });
+      value.state.outcome = status;
+      await assert.rejects(value.run(await value.context()), {
+        code: UPTO_ERROR_CODES.UNAVAILABLE,
+      });
+      assert.equal(
+        (await value.journal.get(OPENING_DIGEST))?.withdrawal?.pending,
+        true,
+      );
+      assert.equal(value.sent.length, 0);
+    });
+});
+
 void test('unknown and nonfinal original status never ask for another signer or send', () =>
   pending(async (value) => {
     for (const status of [
