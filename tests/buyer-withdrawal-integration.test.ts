@@ -27,6 +27,14 @@ import { withdrawalFixture } from './support/buyer-withdrawal-recovery';
 import { OPENING_DIGEST, OPENING_NOW } from './support/opening';
 import { signatureOf } from './support/upto-chain-history';
 
+function barrier() {
+  let resolve = () => {};
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve: () => resolve() };
+}
+
 async function isolated(
   run: (value: Awaited<ReturnType<typeof withdrawalFixture>>) => Promise<void>,
 ) {
@@ -110,8 +118,8 @@ void test('a settled financial row rejects a new withdrawal prepared from an old
 
 void test('pending control introduced during opening preparation blocks the new payer signature', () =>
   isolated(async (value) => {
-    const entered = Promise.withResolvers<void>();
-    const release = Promise.withResolvers<void>();
+    const entered = barrier();
+    const release = barrier();
     const client = createUptoPaymentClient({
       ...value.options,
       hints: async () => {
