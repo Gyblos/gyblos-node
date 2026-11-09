@@ -9,6 +9,7 @@ import {
   SidebarSimple,
   Wallet,
   Wrench,
+  X,
 } from '@phosphor-icons/react';
 import { useId, type ReactNode } from 'react';
 
@@ -16,6 +17,7 @@ import { SIDEBAR_ACTION, SIDEBAR_TYPING_POSITIONS } from './constants';
 
 const GLYPHS = {
   [SIDEBAR_ACTION.CREATE]: Plus,
+  [SIDEBAR_ACTION.CLEAR]: X,
   [SIDEBAR_ACTION.PANEL]: SidebarSimple,
   [SIDEBAR_ACTION.STATUS]: Heartbeat,
   [SIDEBAR_ACTION.SETTINGS]: GearSix,
@@ -93,8 +95,14 @@ function IconParts({
     return <WalletParts id={id} artwork={artwork} />;
   if (kind === SIDEBAR_ACTION.PANEL)
     return <PanelParts id={id} artwork={artwork} />;
-  if (kind === SIDEBAR_ACTION.CREATE)
-    return <CreateParts id={id} artwork={artwork} />;
+  if (kind === SIDEBAR_ACTION.CREATE || kind === SIDEBAR_ACTION.CLEAR)
+    return (
+      <CreateParts
+        id={id}
+        artwork={artwork}
+        clear={kind === SIDEBAR_ACTION.CLEAR}
+      />
+    );
   if (kind === SIDEBAR_ACTION.LINK)
     return (
       <>
@@ -164,7 +172,15 @@ export function SidebarActionIcon({ kind }: { kind: Kind }) {
   );
 }
 
-function CreateParts({ id, artwork }: { id: string; artwork: ReactNode }) {
+function CreateParts({
+  clear = false,
+  id,
+  artwork,
+}: {
+  clear?: boolean;
+  id: string;
+  artwork: ReactNode;
+}) {
   return (
     <>
       <defs>
@@ -178,12 +194,12 @@ function CreateParts({ id, artwork }: { id: string; artwork: ReactNode }) {
           <g stroke="white" strokeWidth="24" strokeLinecap="round">
             <path
               className="sidebar-create-horizontal"
-              d="M32 128H224"
+              d={clear ? 'M48 48L208 208' : 'M32 128H224'}
               pathLength="1"
             />
             <path
               className="sidebar-create-vertical"
-              d="M128 32V224"
+              d={clear ? 'M208 48L48 208' : 'M128 32V224'}
               pathLength="1"
             />
           </g>

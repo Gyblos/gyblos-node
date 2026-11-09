@@ -3,8 +3,7 @@ import { useState } from 'react';
 
 import type { ActivityEntry } from '../activity-model';
 import type { PaypalPaymentReference } from '../payment-reference-model';
-import { paypalDollars } from '../paypal-model';
-import { activityDate, sessionOutcome } from './activity-presentation';
+import { sessionOutcome } from './activity-presentation';
 import { DataCell } from './DataTable';
 import {
   FINANCIAL_TONE,
@@ -17,7 +16,12 @@ import {
   type HistoryPeriod,
   type HistorySource,
 } from './history-constants';
-import { filterHistory, referenceHeading } from './history-presentation';
+import {
+  filterHistory,
+  historyDate,
+  paymentAmount,
+  referenceHeading,
+} from './history-presentation';
 import { HistorySummary } from './HistorySummary';
 import { ChoiceMenu, FinancialValue, Section, StatePanel } from './Management';
 import { Pagination } from './Pagination';
@@ -70,6 +74,12 @@ export function SpendingHistory({ activity, onActivity }: Props) {
         title="Payment history"
         action={<Button onClick={() => onActivity()}>View activity</Button>}
       >
+        {source !== HISTORY_SOURCE.ALL && (
+          <p className="ui-help-text">
+            Totals show {source} usage. Each history row shows the entire shared
+            session payment.
+          </p>
+        )}
         <PaymentHistoryResults
           activity={activity}
           rows={rows}
@@ -107,8 +117,10 @@ function PaymentRow({
   return (
     <tr>
       <th scope="row">
-        <strong>{activityDate(entry.updatedAt)}</strong>
-        <span className="activity-row-meta">Observed on this device</span>
+        <strong>{historyDate(entry.updatedAt)}</strong>
+        <span className="activity-row-meta">
+          {new Date(entry.updatedAt).getFullYear()}
+        </span>
       </th>
       <DataCell label="Method">PayPal</DataCell>
       <DataCell label="Type">
@@ -130,8 +142,8 @@ function PaymentRow({
           }
         >
           {entry.capturedCents !== null
-            ? '− ' + paypalDollars(entry.capturedCents)
-            : paypalDollars(entry.recordedCents || entry.limitCents)}
+            ? '− ' + paymentAmount(entry.capturedCents)
+            : paymentAmount(entry.recordedCents || entry.limitCents)}
         </FinancialValue>
         {kind === HISTORY_KIND.AUTHORIZATION && (
           <span className="activity-row-meta">Session limit</span>

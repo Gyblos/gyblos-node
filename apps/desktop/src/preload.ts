@@ -38,6 +38,11 @@ contextBridge.exposeInMainWorld('desktopConversations', {
 });
 
 contextBridge.exposeInMainWorld('desktopActivity', {
+  copyReference: async (sessionId: string) =>
+    (await ipcRenderer.invoke(
+      DESKTOP_ACTIVITY.COPY_REFERENCE_CHANNEL,
+      sessionId,
+    )) === true,
   references: async () =>
     parsePaymentReferences(
       await ipcRenderer.invoke(DESKTOP_ACTIVITY.REFERENCES_CHANNEL),

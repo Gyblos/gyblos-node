@@ -274,11 +274,15 @@ export function DesktopApp() {
     );
   }
   function changePaymentMethod(next: PaymentMethod) {
-    if (canSwitchPaymentMethod(paymentMethod, next, paypalBusy, chatBusy))
-      setPaymentMethod(next);
+    if (!canSwitchPaymentMethod(paymentMethod, next, paypalBusy, chatBusy)) {
+      setToast('Finish the current response before switching payment methods.');
+      return false;
+    }
+    setPaymentMethod(next);
+    return true;
   }
   function reviewPaypalPayments() {
-    changePaymentMethod(PAYMENT_METHOD.PAYPAL);
+    if (!changePaymentMethod(PAYMENT_METHOD.PAYPAL)) return;
     setManagePaypal(true);
     navigate(UI_VIEW.PAYMENTS);
   }

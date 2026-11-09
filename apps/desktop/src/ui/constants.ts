@@ -310,6 +310,7 @@ export const WORKSPACE_BREAKPOINT = { SIDEBAR: 900, CONTEXT: 1200 } as const;
 
 export const SIDEBAR_ACTION = {
   CREATE: 'create',
+  CLEAR: 'clear',
   PANEL: 'panel',
   STATUS: 'status',
   SETTINGS: 'settings',

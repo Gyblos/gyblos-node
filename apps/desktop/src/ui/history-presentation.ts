@@ -1,10 +1,12 @@
 // Pure local-history selection and financial summaries. Never performs payments or invents records.
+import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import { PAYPAL_SESSION_PHASE } from '@gyblos/node/constants';
 
 import type { ActivityEntry } from '../activity-model';
 import type { PaypalPaymentReference } from '../payment-reference-model';
 import { sessionOutcome } from './activity-presentation';
 import {
+  FINANCIAL_TONE,
   HISTORY,
   HISTORY_METHOD,
   HISTORY_PERIOD,
@@ -102,4 +104,25 @@ export function shortReference(value: string) {
         '…' +
         value.slice(-HISTORY.REFERENCE_SUFFIX)
     : value;
+}
+
+export function displayDollars(cents: number) {
+  return '$' + (cents / PAYPAL_SANDBOX.centsPerDollar).toFixed(2);
+}
+export function paymentAmount(cents: number) {
+  return displayDollars(cents) + ' USD';
+}
+export function historyDate(at: number) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(at);
+}
+export function activityTone(entry: ActivityEntry) {
+  return entry.needsReview ||
+    (entry.phase !== PAYPAL_SESSION_PHASE.COMPLETED &&
+      entry.phase !== PAYPAL_SESSION_PHASE.VOIDED &&
+      entry.recordedCents > (entry.capturedCents ?? 0))
+    ? FINANCIAL_TONE.PENDING
+    : FINANCIAL_TONE.NEUTRAL;
 }

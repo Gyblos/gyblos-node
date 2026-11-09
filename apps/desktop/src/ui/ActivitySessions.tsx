@@ -2,11 +2,16 @@
 import type { ActivityEntry } from '../activity-model';
 import { DESKTOP_ACTIVITY } from '../constants';
 import type { PaypalPaymentReference } from '../payment-reference-model';
-import { paypalDollars } from '../paypal-model';
-import { activityDate, sessionOutcome } from './activity-presentation';
+import { sessionOutcome } from './activity-presentation';
 import { DataCell } from './DataTable';
-import type { HistoryMethod } from './history-constants';
-import { referenceHeading } from './history-presentation';
+import { type HistoryMethod } from './history-constants';
+import {
+  activityTone,
+  historyDate,
+  paymentAmount,
+  referenceHeading,
+} from './history-presentation';
+import { FinancialValue } from './Management';
 import { PaymentReference } from './PaymentReference';
 import { ScrollTable } from './ScrollTable';
 import { Button } from './UI';
@@ -46,29 +51,33 @@ export function ActivitySessions({
               {entry.id.slice(0, DESKTOP_ACTIVITY.DISPLAY_ID_CHARACTERS)}
             </strong>
             <span className="activity-row-meta">
-              PayPal · {activityDate(entry.firstObservedAt)}
+              PayPal · {historyDate(entry.firstObservedAt)}
             </span>
           </th>
           <DataCell label="Chat">
-            {paypalDollars(entry.chatCents)}
+            {paymentAmount(entry.chatCents)}
             <span className="activity-row-meta">{entry.chatCount} replies</span>
           </DataCell>
           <DataCell label="Agents">
-            {paypalDollars(entry.agentCents)}
+            {paymentAmount(entry.agentCents)}
             <span className="activity-row-meta">
               {entry.agentCount} inferences
             </span>
           </DataCell>
           <DataCell label="Usage">
-            {paypalDollars(entry.recordedCents)}
+            {paymentAmount(entry.recordedCents)}
           </DataCell>
           <DataCell label="Paid">
             <strong>
               {entry.capturedCents === null
                 ? '—'
-                : '− ' + paypalDollars(entry.capturedCents)}
+                : '− ' + paymentAmount(entry.capturedCents)}
             </strong>
-            <span className="activity-row-meta">{sessionOutcome(entry)}</span>
+            <span className="activity-row-meta">
+              <FinancialValue tone={activityTone(entry)}>
+                {sessionOutcome(entry)}
+              </FinancialValue>
+            </span>
           </DataCell>
           <DataCell label={referenceHeading(method)}>
             <PaymentReference

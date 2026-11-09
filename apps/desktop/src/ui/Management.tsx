@@ -50,8 +50,18 @@ export function Pair({ label, value }: { label: string; value: ReactNode }) {
     </div>
   );
 }
-export function Facts({ children }: { children: ReactNode }) {
-  return <dl className="ui-facts">{children}</dl>;
+export function Facts({
+  children,
+  compact = false,
+}: {
+  children: ReactNode;
+  compact?: boolean;
+}) {
+  return (
+    <dl className={compact ? 'ui-facts ui-facts--compact' : 'ui-facts'}>
+      {children}
+    </dl>
+  );
 }
 export function Section({
   title,

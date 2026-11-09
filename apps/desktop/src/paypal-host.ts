@@ -147,6 +147,7 @@ export function registerDesktopPaypal(window: BrowserWindow) {
       destroyed: () => window.isDestroyed(),
     },
     () => activity.references(),
+    (value) => clipboard.writeText(value),
   );
   // Observation never starts the sandbox or makes provider calls.
   const activityTimer = setInterval(() => {
@@ -214,6 +215,10 @@ export function registerDesktopPaypal(window: BrowserWindow) {
     },
     runtime.current,
     (text) => clipboard.writeText(text),
+  );
+  ipcMain.handle(
+    DESKTOP_ACTIVITY.COPY_REFERENCE_CHANNEL,
+    (event, ...args: unknown[]) => activityHandlers.copy(event, args),
   );
   ipcMain.handle(DESKTOP_ACTIVITY.CHANNEL, (event, ...args: unknown[]) =>
     activityHandlers.summary(event, args),

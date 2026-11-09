@@ -201,6 +201,8 @@ export function SearchField({
   onValueChange,
   className = '',
   compact = false,
+  leading,
+  clearIcon,
   ...props
 }: Omit<ComponentPropsWithoutRef<'input'>, 'value' | 'onChange' | 'size'> & {
   label: string;
@@ -208,13 +210,15 @@ export function SearchField({
   onValueChange: (value: string) => void;
   className?: string;
   compact?: boolean;
+  leading?: ReactNode;
+  clearIcon?: ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <div
       className={`ui-search${compact ? ' ui-search--compact' : ''} ${className}`}
     >
-      <MagnifyingGlass size={16} aria-hidden="true" />
+      {leading ?? <MagnifyingGlass size={16} aria-hidden="true" />}
       <input
         {...props}
         ref={input}
@@ -225,12 +229,13 @@ export function SearchField({
       {value && (
         <IconButton
           label={`Clear ${label.toLowerCase()}`}
+          className={clearIcon ? 'ui-sidebar-motion-control' : undefined}
           onClick={() => {
             onValueChange('');
             input.current?.focus();
           }}
         >
-          <X size={16} />
+          {clearIcon ?? <X size={16} />}
         </IconButton>
       )}
     </div>

@@ -1,8 +1,8 @@
 // Projects a known local payment reference without provider I/O or journal mutation.
 // Usage activity remains identifier-free; references are a separate explicit local view.
 import {
-PAYPAL_PAYMENT_REFERENCE_KIND,
-PAYPAL_SESSION_PHASE,
+  PAYPAL_PAYMENT_REFERENCE_KIND,
+  PAYPAL_SESSION_PHASE,
 } from './constants';
 import { paypalSessionActivity } from './paypal-session-activity';
 import type { PaypalSessionRecord } from './paypal-session-record';

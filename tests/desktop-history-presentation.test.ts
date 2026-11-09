@@ -4,14 +4,14 @@ import { test } from 'node:test';
 
 import { ActivityHistory } from '@gyblos/desktop/activity-history';
 import {
-filterHistory,
-financialSummary,
-HISTORY_METHOD,
-HISTORY_PERIOD,
-HISTORY_SOURCE,
+  filterHistory,
+  financialSummary,
+  HISTORY_METHOD,
+  HISTORY_PERIOD,
+  HISTORY_SOURCE,
 } from '@gyblos/desktop/history-presentation';
 
-import { fixture,start } from './support/paypal-session-fixture';
+import { fixture, start } from './support/paypal-session-fixture';
 
 async function entry() {
   const session = await start(fixture());

@@ -381,3 +381,13 @@ export function parsePaypalResult(value: unknown): PaypalResult {
     ...(activityId(item.sessionId) ? { sessionId: item.sessionId } : {}),
   };
 }
+
+// Coordinates navigation only; approval and settlement remain separate guarded actions.
+export function managePaypal(
+  select: (method: typeof PAYMENT_METHOD.PAYPAL) => boolean,
+  open: () => void,
+) {
+  if (!select(PAYMENT_METHOD.PAYPAL)) return false;
+  open();
+  return true;
+}

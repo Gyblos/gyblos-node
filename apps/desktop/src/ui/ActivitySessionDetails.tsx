@@ -30,6 +30,7 @@ import {
 type Props = {
   entry: ActivityEntry;
   reference?: PaypalPaymentReference;
+  onCopyReference(): Promise<boolean>;
   conversations: ChatSession[];
   close(): void;
   onOpenChat(id: string): void;
@@ -39,6 +40,7 @@ type Props = {
 export function ActivitySessionDetails({
   entry,
   reference,
+  onCopyReference,
   conversations,
   close,
   onOpenChat,
@@ -67,7 +69,7 @@ export function ActivitySessionDetails({
         />
       </div>
       <SessionPayment entry={entry} />
-      <PaymentReferenceDetails reference={reference} />
+      <PaymentReferenceDetails reference={reference} copy={onCopyReference} />
       {entry.needsReview && (
         <Note>
           An unfinished operation needs review. An uncertain inference may be

@@ -86,6 +86,8 @@ function ConversationList({
       aria-hidden={collapsed || undefined}
     >
       <SearchField
+        leading={<SidebarActionIcon kind={SIDEBAR_ACTION.SEARCH} />}
+        clearIcon={<SidebarActionIcon kind={SIDEBAR_ACTION.CLEAR} />}
         className="ui-sidebar-motion-control"
         label="Search conversations"
         placeholder="Search conversations"

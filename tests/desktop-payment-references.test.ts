@@ -206,3 +206,34 @@ void test('read-only reference loading never initializes a payment runtime or ow
   });
   await storage.close(async () => {});
 });
+
+void test('reference copying uses the known full reference and rejects unowned or arbitrary clipboard input', async () => {
+  const { createActivityHandlers } =
+    await import('@gyblos/desktop/activity-handlers');
+  const session = await start(fixture());
+  const reference = session.paymentReference()!;
+  const contents = {};
+  const frame = {};
+  const copied: string[] = [];
+  const handlers = createActivityHandlers(
+    async () => ({ available: true, currentSessionId: null, sessions: [] }),
+    { contents, mainFrame: () => frame, destroyed: () => false },
+    async () => ({ available: true, references: [reference] }),
+    (value) => {
+      copied.push(value);
+    },
+  );
+  const event = { sender: contents, senderFrame: frame };
+  assert.equal(await handlers.copy(event, ['arbitrary text']), false);
+  assert.equal(
+    await handlers.copy({ ...event, senderFrame: {} }, [reference.sessionId]),
+    false,
+  );
+  assert.equal(
+    await handlers.copy(event, [reference.sessionId, 'extra']),
+    false,
+  );
+  assert.deepEqual(copied, []);
+  assert.equal(await handlers.copy(event, [reference.sessionId]), true);
+  assert.deepEqual(copied, ['AUTH1']);
+});

@@ -22,8 +22,10 @@ export function PaymentReference({
 }
 export function PaymentReferenceDetails({
   reference,
+  copy,
 }: {
   reference?: PaypalPaymentReference;
+  copy(): Promise<boolean>;
 }) {
   const [notice, setNotice] = useState('');
   if (!reference)
@@ -44,9 +46,14 @@ export function PaymentReferenceDetails({
         value={reference.id}
         actionLabel={'Copy ' + label}
         onCopy={() => {
-          void navigator.clipboard
-            .writeText(reference.id)
-            .then(() => setNotice('Payment ID copied.'))
+          void copy()
+            .then((ok) =>
+              setNotice(
+                ok
+                  ? 'Payment ID copied.'
+                  : 'Could not copy. Select the ID to copy it manually.',
+              ),
+            )
             .catch(() =>
               setNotice('Could not copy. Select the ID to copy it manually.'),
             );

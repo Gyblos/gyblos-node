@@ -1,6 +1,5 @@
 // Keeps currencies and uncertain financial outcomes separate in shared summaries.
 import type { ActivityEntry } from '../activity-model';
-import { paypalDollars } from '../paypal-model';
 import {
   FINANCIAL_TONE,
   HISTORY_METHOD,
@@ -8,7 +7,7 @@ import {
   type HistoryMethod,
   type HistorySource,
 } from './history-constants';
-import { financialSummary } from './history-presentation';
+import { financialSummary, paymentAmount } from './history-presentation';
 import { Facts, FinancialValue, Pair } from './Management';
 
 export function HistorySummary({
@@ -38,7 +37,7 @@ export function HistorySummary({
           {method === HISTORY_METHOD.ALL && (
             <h3>{item === HISTORY_METHOD.PAYPAL ? 'PayPal · USD' : 'USDC'}</h3>
           )}
-          <Facts>
+          <Facts compact>
             <Pair
               label={spending ? 'Paid' : 'Recorded usage'}
               value={
@@ -47,8 +46,8 @@ export function HistorySummary({
                   : spending
                     ? summary.paid === null
                       ? 'Unconfirmed'
-                      : paypalDollars(summary.paid)
-                    : paypalDollars(
+                      : paymentAmount(summary.paid)
+                    : paymentAmount(
                         entries.reduce(
                           (sum, row) => sum + row.recordedCents,
                           0,
@@ -66,7 +65,7 @@ export function HistorySummary({
                 ) : summary.paid === null ? (
                   'Unconfirmed'
                 ) : (
-                  paypalDollars(summary.paid)
+                  paymentAmount(summary.paid)
                 )
               }
             />
@@ -92,7 +91,7 @@ function PendingAmount({ value }: { value: number | null }) {
           : FINANCIAL_TONE.NEUTRAL
       }
     >
-      {value === null ? 'Needs review' : paypalDollars(value)}
+      {value === null ? 'Needs review' : paymentAmount(value)}
     </FinancialValue>
   );
 }

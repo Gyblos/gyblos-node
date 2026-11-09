@@ -1417,3 +1417,15 @@
   opacity: 0;
   overflow: hidden;
 }
+
+/* Own-brand controls and generation artwork use the single approved blue family. */
+.desktop-frame .ui-button--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  color: var(--primary-ink);
+}
+.desktop-frame :is(.signal-foil-stop, .signal-trail-stop) {
+  stop-color: var(--accent);
+}
+.desktop-frame :is(.signal-foil-stop, .signal-trail-stop):nth-child(2n) {
+  stop-color: var(--blue);
+}

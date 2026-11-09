@@ -117,6 +117,7 @@ export function Activity({
       {selected && (
         <ActivitySessionDetails
           entry={selected}
+          onCopyReference={() => activity.copyReference(selected.id)}
           reference={references.find((row) => row.sessionId === selected.id)}
           conversations={conversations}
           close={() => onSelectSession(null)}

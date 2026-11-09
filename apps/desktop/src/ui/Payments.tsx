@@ -3,14 +3,20 @@ import { PaypalLogo } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import {
+  PAYPAL_SESSION_PHASE,
+  PAYPAL_SESSION_STATUS,
+} from '@gyblos/node/constants';
+
+import {
+  managePaypal,
   PAYMENT_METHOD,
-  paypalDollars,
   paypalPaymentSummary,
   paypalSessionCanConnectAgent,
 } from '../paypal-model';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
 import { CopyField, FormActions } from './Form';
+import { displayDollars } from './history-presentation';
 import { Modal } from './Modal';
 import { PaypalSessionPanel } from './PaypalSessionPanel';
 import { SpendingHistory } from './SpendingHistory';
@@ -30,7 +36,7 @@ type Props = {
   onActivity(id?: string): void;
   onBackup(): void;
   onAddFunds(): void;
-  onPaymentMethod(method: typeof PAYMENT_METHOD.PAYPAL): void;
+  onPaymentMethod(method: typeof PAYMENT_METHOD.PAYPAL): boolean;
 };
 export function Payments(props: Props) {
   const [walletOpen, setWalletOpen] = useState(false);
@@ -43,8 +49,7 @@ export function Payments(props: Props) {
       <PaypalSummary
         session={props.session}
         onManage={() => {
-          props.onPaymentMethod(PAYMENT_METHOD.PAYPAL);
-          props.onManagePaypal(true);
+          managePaypal(props.onPaymentMethod, () => props.onManagePaypal(true));
         }}
       />
       <SpendingHistory
@@ -79,7 +84,10 @@ export function Payments(props: Props) {
               setWalletOpen(false);
               props.onBackup();
             }}
-            onAddFunds={props.onAddFunds}
+            onAddFunds={() => {
+              setWalletOpen(false);
+              props.onAddFunds();
+            }}
           />
         </Modal>
       )}
@@ -197,20 +205,40 @@ function PaypalSummary({
             ? 'One approval for multiple replies and tool requests.'
             : (summary.usedCents === null
                 ? 'Unconfirmed usage'
-                : paypalDollars(summary.usedCents)) +
+                : displayDollars(summary.usedCents)) +
               ' recorded · ' +
-              paypalDollars(summary.limitCents) +
+              displayDollars(summary.limitCents) +
               ' limit'}
         </p>
       </div>
       <Button
         variant={BUTTON_VARIANT.SECONDARY}
-        onClick={() => {
-          onManage();
-        }}
+        disabled={session.state.busy}
+        onClick={onManage}
       >
-        Manage session
+        {paypalManageLabel(session)}
       </Button>
     </section>
   );
+}
+
+function paypalManageLabel(session: PaypalSessionView) {
+  const phase = session.state.statusFresh
+    ? session.state.status?.phase
+    : undefined;
+  if (
+    phase === PAYPAL_SESSION_STATUS.READY ||
+    phase === PAYPAL_SESSION_PHASE.COMPLETED ||
+    phase === PAYPAL_SESSION_PHASE.VOIDED ||
+    phase === PAYPAL_SESSION_PHASE.CANCELLED
+  )
+    return 'Authorize';
+  if (phase === PAYPAL_SESSION_PHASE.CREATED) return 'Finish approval';
+  return paypalSessionCanConnectAgent(
+    session.state.status,
+    session.state.statusFresh,
+    session.state.busy,
+  )
+    ? 'Manage session'
+    : 'Review session';
 }

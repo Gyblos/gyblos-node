@@ -130,6 +130,7 @@ export const LOCAL_NODE = {
 export const DESKTOP_ACTIVITY = {
   REFERENCE_VERSION: 2,
   REFERENCES_CHANNEL: 'desktop:activity-references',
+  COPY_REFERENCE_CHANNEL: 'desktop:activity-copy-reference',
   CHANNEL: 'desktop:activity:summary',
   IO_TIMEOUT_MS: 1000,
   VERSION: 1,

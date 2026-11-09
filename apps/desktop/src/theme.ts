@@ -56,6 +56,7 @@ export function themeStyle(light: boolean): ThemeStyle {
     // stronger secondary gray instead of its dim gray on those surfaces.
     '--dim': light ? colors.dimLight : colors.mutedDark,
     '--accent': colors.blue,
+    '--accent-hover': 'color-mix(in srgb, var(--accent), black 8%)',
     '--blue': light
       ? colors.blue
       : 'color-mix(in srgb, var(--accent), white 35%)',

@@ -18,6 +18,7 @@ declare global {
     desktopActivity?: {
       summary(): Promise<ActivityResult>;
       references?(): Promise<PaymentReferenceResult>;
+      copyReference?(sessionId: string): Promise<boolean>;
     };
   }
 }
@@ -53,6 +54,13 @@ export function useActivity() {
       window.clearInterval(timer);
     };
   }, [refresh]);
-  return { state, references, refresh };
+  return {
+    state,
+    references,
+    refresh,
+    copyReference: (sessionId: string) =>
+      window.desktopActivity?.copyReference?.(sessionId).catch(() => false) ??
+      Promise.resolve(false),
+  };
 }
 export type ActivityView = ReturnType<typeof useActivity>;
