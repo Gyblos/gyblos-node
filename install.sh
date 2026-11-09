@@ -268,7 +268,8 @@ write_config() {
 # The seller daemon in Docker (compose.yaml): the pinned Qwen3 0.6B with reasoning off on the compose
 # Ollama, given away free within daily token caps. Copy it next to compose.yaml as gyblos.toml; the seller
 # shares Ollama's network namespace, so 127.0.0.1:11434 is that Ollama (docs/running-a-node.md#docker).
-# Paid offers are refused at startup until paid selling returns (docs/configuration.md).
+# Free by default. To charge, give an offer `price = {...}` instead of `free` (docs/configuration.md) and
+# fund the fee payer `gyblos doctor` prints with devnet SOL.
 
 version = 1
 

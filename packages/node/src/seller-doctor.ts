@@ -67,7 +67,8 @@ type Result = Omit<DoctorCheck, 'check'>;
 export interface DoctorReport {
   checks: DoctorCheck[];
   configIssues: NodeConfigIssue[];
-  seller: { nodeId: string; owner: string } | undefined;
+  // feePayer: the key that pays paid offers' transactions, when the role has payment keys.
+  seller: { nodeId: string; owner: string; feePayer?: string } | undefined;
   // gyblos.toml [[offers]] in order, once every entry is servable.
   offers: SellerCatalogOffer[] | undefined;
   publication: string | undefined;
@@ -200,7 +201,11 @@ async function roleChecks(environment: HomeEnvironment) {
     keys,
     sequence,
     config,
-    seller: { nodeId: config.nodeId, owner: config.owner },
+    seller: {
+      nodeId: config.nodeId,
+      owner: config.owner,
+      ...(config.facilitator ? { feePayer: config.facilitator } : {}),
+    },
   };
 }
 
