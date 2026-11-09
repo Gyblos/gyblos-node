@@ -187,11 +187,12 @@ void test(
         await readFile(join(sellerDirectory, ROLE_FILES.nodeKey), 'utf8'),
         nodeKey,
       );
+      // Earlier releases read the payment fields only with a buyer, so the file keeps one: the owner.
       assert.deepEqual(
         JSON.parse(
           await readFile(join(sellerDirectory, ROLE_FILES.roleConfig), 'utf8'),
         ),
-        upgraded,
+        { ...upgraded, buyer: upgraded.owner },
       );
       await roleSigner(P2P_ROLES.SELLER, 'facilitator');
       assert.deepEqual(
@@ -238,6 +239,11 @@ void test(
       assert.equal(printed.nodeId, saved.nodeId);
       assert.equal(printed.owner, saved.owner);
       assert.equal(saved.payTo, saved.owner);
+      // All four fields earlier releases require, so an older image still loads it.
+      for (const field of ['authorizer', 'facilitator', 'payTo', 'buyer'])
+        assert.equal(typeof saved[field], 'string', field);
+      assert.equal(saved.buyer, saved.owner);
+      assert.equal('buyer' in printed, false);
       assert.equal(printed.payTo, saved.owner);
       const repeat = setup(home, ['--role', 'seller', '--mint', MINT]);
       assert.equal(repeat.status, 0, repeat.stderr);

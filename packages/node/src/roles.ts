@@ -60,6 +60,18 @@ export const SELLER_PAYMENT_FIELDS = [
 ] as const;
 // Written into seller roles by earlier releases' paid setup (`--buyer`); accepted and ignored.
 const LEGACY_SELLER_FIELDS = ['buyer'] as const;
+
+// role.json as written: a seller with payment fields also carries `buyer` (its owner, unused) because
+// earlier releases read payment fields only as a set of four, so an older image the seller still runs
+// (an update that stopped before recreating it, or a rollback) keeps loading the role.
+function saveRole(path: string, config: RoleConfig) {
+  return saveJson(
+    path,
+    config.role === P2P_ROLES.SELLER && config.payTo !== undefined
+      ? { ...config, buyer: config.owner }
+      : config,
+  );
+}
 type SellerPayment = Record<(typeof SELLER_PAYMENT_FIELDS)[number], string>;
 
 export type RoleConfig = CommonRole &
@@ -247,7 +259,7 @@ export async function setupRole(options: SetupOptions) {
         ...existing,
         ...(await sellerPayment(existing.owner)),
       };
-      await saveJson(path, upgraded);
+      await saveRole(path, upgraded);
       return upgraded;
     }
     return existing;
@@ -297,7 +309,7 @@ export async function setupRole(options: SetupOptions) {
       ...(await sellerPayment(owner)),
     };
   }
-  await saveJson(path, config);
+  await saveRole(path, config);
   return config;
 }
 

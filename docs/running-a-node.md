@@ -132,8 +132,10 @@ so any offer can be free or priced. Running setup again on a seller created
 without payment keys (earlier releases) adds them, keeping its NodeId, owner and
 registration; the installer does this on every run. Existing roles with a
 different payout are preserved and receive a warning at registration. `--buyer`
-and `--pay-to` are no longer used and are refused; a `buyer` field earlier
-releases wrote into a seller role is ignored.
+and `--pay-to` are no longer used and are refused. A seller `role.json` with
+payment fields also keeps `buyer` (the owner, unused) so that an earlier image
+still loads it; the `buyer` field is ignored. Running an earlier `install.sh`
+after the upgrade is not supported.
 
 | File                                             | Role   | Contents                                                                                                               |
 | ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
