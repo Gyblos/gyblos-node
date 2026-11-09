@@ -39,11 +39,6 @@ function NewSessionActions(props: SessionProps) {
   const { state } = props;
   return (
     <div className="payment-new-session">
-      <h3>
-        {state.status?.phase === PAYPAL_SESSION_STATUS.READY
-          ? 'Choose a session limit'
-          : 'Start another session'}
-      </h3>
       <NewSessionTerms state={state} limitCents={props.limitCents} />
       <div className="payment-start-actions">
         <StartPaypalSession {...props} />

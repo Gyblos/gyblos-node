@@ -1,5 +1,10 @@
 // Presents checkout actions without holding payment credentials or provider URLs.
-import { PAYPAL_SANDBOX_LIMIT_OPTIONS } from '@gyblos/config/constants';
+import { useState } from 'react';
+
+import {
+  PAYPAL_SANDBOX,
+  PAYPAL_SANDBOX_LIMIT_OPTIONS,
+} from '@gyblos/config/constants';
 
 import type { PaypalChatController } from '../paypal-chat';
 import {
@@ -9,6 +14,9 @@ import {
   paypalUsageSummary,
 } from '../paypal-model';
 import { BUTTON_VARIANT } from './constants';
+import { FormActions, FormField, FormInput } from './Form';
+import { displayDollars } from './history-presentation';
+import { sessionLimitCents } from './paypal-limit';
 import { Button } from './UI';
 
 export function SessionLimitSelector({
@@ -22,7 +30,7 @@ export function SessionLimitSelector({
 }) {
   return (
     <fieldset className="chat-payment-options" aria-label="Session limit">
-      <legend>Limit</legend>
+      <legend className="sr-only">Limit</legend>
       {PAYPAL_SANDBOX_LIMIT_OPTIONS.map((limit) => (
         <label className="chat-payment-option" key={limit}>
           <input
@@ -32,7 +40,7 @@ export function SessionLimitSelector({
             disabled={disabled}
             onChange={() => onChange(limit)}
           />
-          <span>{paypalDollars(limit)}</span>
+          <span>{displayDollars(limit)}</span>
         </label>
       ))}
     </fieldset>
@@ -50,23 +58,53 @@ export function StartPaypalSession({
   limitCents: number;
   setLimitCents: (value: number) => void;
 }) {
+  const [draft, setDraft] = useState(() =>
+    String(limitCents / PAYPAL_SANDBOX.centsPerDollar),
+  );
+  const selected = sessionLimitCents(draft);
   return (
-    <>
+    <div className="ui-form ui-form--limited">
+      <FormField label="Session limit · USD" htmlFor="paypal-session-limit">
+        <FormInput
+          id="paypal-session-limit"
+          type="number"
+          min={PAYPAL_SANDBOX_LIMIT_OPTIONS[0] / PAYPAL_SANDBOX.centsPerDollar}
+          step="1"
+          value={draft}
+          disabled={state.busy}
+          aria-invalid={selected === null}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            const next = sessionLimitCents(event.target.value);
+            if (next !== null) setLimitCents(next);
+          }}
+        />
+      </FormField>
       <SessionLimitSelector
         value={limitCents}
         disabled={state.busy}
-        onChange={setLimitCents}
-      />
-      <Button
-        variant={BUTTON_VARIANT.PRIMARY}
-        disabled={state.busy}
-        onClick={() => {
-          void chat.startCheckout(limitCents);
+        onChange={(next) => {
+          setDraft(String(next / PAYPAL_SANDBOX.centsPerDollar));
+          setLimitCents(next);
         }}
-      >
-        Continue with PayPal
-      </Button>
-    </>
+      />
+      {selected === null && (
+        <p className="ui-help-text" role="alert">
+          Choose {PAYPAL_SANDBOX_LIMIT_OPTIONS.map(displayDollars).join(', ')}.
+        </p>
+      )}
+      <FormActions align="start">
+        <Button
+          variant={BUTTON_VARIANT.PRIMARY}
+          disabled={state.busy || selected === null}
+          onClick={() => {
+            if (selected !== null) void chat.startCheckout(selected);
+          }}
+        >
+          Authorize with PayPal
+        </Button>
+      </FormActions>
+    </div>
   );
 }
 
