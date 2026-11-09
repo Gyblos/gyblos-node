@@ -229,11 +229,12 @@ These fixtures do not change product transport, payment or logging limits.
 journal recovery across real SIGKILL/restart. The authoritative LiteSVM and
 synthetic keys stay in the parent; a killed buyer cannot roll back the chain. An
 owned private IPC bridge supplies all signer/RPC ports, including decoded native
-pre/post SPL observations for financial reconciliation. No real RPC or keys are
-used. The synthetic SDK testnet label matches the pinned SBF treasury; it does
-not enable product mainnet or prove deployed devnet compatibility. Same-host
-dead-owner locks recover normally; ambiguous locks stay blocked. See
-[recovery.md](../docs/recovery.md#offline-abrupt-exit-acceptance) for limits.
+pre/post SPL observations for financial reconciliation. No public RPC or
+pre-existing keys are used. The synthetic SDK testnet label matches the pinned
+SBF treasury; it does not enable product mainnet or prove deployed devnet
+compatibility. Same-host dead-owner locks recover normally; ambiguous locks stay
+blocked. See [recovery.md](../docs/recovery.md#offline-abrupt-exit-acceptance)
+for limits.
 
 `tests/lab/paid-native.test.ts` executes the installed metered SDK's signed open
 and claim transactions in LiteSVM, using the bundled, hash-checked official

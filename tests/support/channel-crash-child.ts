@@ -30,6 +30,7 @@ import {
   CRASH_CUTS,
   CRASH_FAILURE,
   CRASH_MESSAGES,
+  type CrashCut,
 } from './channel-crash-constants';
 import {
   parseCrashInput,
@@ -72,7 +73,7 @@ function instrument(
   input: CrashInput,
   call: CrashCallPort,
 ): UptoBuyerJournal {
-  const pause = async (cuts: readonly string[]) => {
+  const pause = async (cuts: readonly CrashCut[]) => {
     if (input.cut && cuts.includes(input.cut)) await call(CRASH_CALLS.CUT, []);
   };
   return {
