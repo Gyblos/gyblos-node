@@ -132,8 +132,6 @@ export function homeLayout(environment: HomeEnvironment) {
   } as const;
 }
 
-export type HomeLayout = ReturnType<typeof homeLayout>;
-
 export function rolePathIn(
   environment: HomeEnvironment,
   role: HomeRole,
@@ -162,8 +160,6 @@ export function labLayout(environment: HomeEnvironment) {
     ),
   } as const;
 }
-
-export type LabLayout = ReturnType<typeof labLayout>;
 
 // Desktop library paths are isolated from node role homes; identities are public base58 addresses.
 export const DESKTOP_WALLET_LIBRARY = {

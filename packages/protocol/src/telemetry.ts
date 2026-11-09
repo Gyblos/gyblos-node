@@ -20,8 +20,6 @@ export const TELEMETRY_EVENTS = {
   REFUSED: 'refused',
   UNSERVED: 'unserved',
 } as const;
-export type TelemetryEventType =
-  (typeof TELEMETRY_EVENTS)[keyof typeof TELEMETRY_EVENTS];
 export const TELEMETRY_REFUSALS = {
   SELLER_BUSY: 'seller_busy',
   DAILY_CAP: 'daily_cap',
