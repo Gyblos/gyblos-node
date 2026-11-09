@@ -1,6 +1,18 @@
-// The payer side: builds and signs the channel open with the x402 upto client, offline given the
-// recent-block hints, and carries the SDK payload as opaque base64.
-import type { TransactionSigner } from '@solana/kit';
+// Builds an SDK channel open offline; an optional durable checkpoint precedes the real signature.
+// Recovery tracks this one opening, never builds a second channel or broadcasts from here.
+import {
+  assertIsTransactionWithinSizeLimit,
+  blockhash,
+  createNoopSigner,
+  getBase64EncodedWireTransaction,
+  getCompiledTransactionMessageDecoder,
+  getPublicKeyFromAddress,
+  getTransactionDecoder,
+  isTransactionPartialSigner,
+  verifySignature,
+  type TransactionPartialSigner,
+  type TransactionSigner,
+} from '@solana/kit';
 import { UptoSvmScheme as UptoClientScheme } from '@x402/svm/upto/client';
 
 import { UPTO, UPTO_CLAIM_LIMITS, UPTO_ERROR_CODES } from './constants';
@@ -49,27 +61,112 @@ function isPayload(
   );
 }
 
+type OpeningCheckpoint = {
+  channelId: string;
+  openSlot: string;
+  lastValidBlockHeight: string;
+};
+type BeforeSign = (opening: OpeningCheckpoint) => Promise<void>;
+
+async function signPrepared(
+  payer: TransactionPartialSigner,
+  payload: Record<string, unknown> & UptoPayloadFields,
+  hints: UptoClientHints,
+  beforeSign: BeforeSign,
+): Promise<string> {
+  if (typeof payload.openTransaction !== 'string')
+    throw new UptoError(UPTO_ERROR_CODES.INTERNAL);
+  const original = payload.openTransaction;
+  const decode = () =>
+    getTransactionDecoder().decode(Buffer.from(original, 'base64'));
+  const transaction = decode();
+  const expected = Buffer.from(transaction.messageBytes);
+  if (
+    getCompiledTransactionMessageDecoder().decode(transaction.messageBytes)
+      .lifetimeToken !== hints.recentBlockhash ||
+    payload.openSlot !== hints.recentSlot
+  )
+    throw new UptoError(UPTO_ERROR_CODES.INTERNAL);
+  const request = {
+    ...transaction,
+    lifetimeConstraint: {
+      blockhash: blockhash(hints.recentBlockhash),
+      lastValidBlockHeight: BigInt(hints.lastValidBlockHeight),
+    },
+  };
+  assertIsTransactionWithinSizeLimit(request);
+  await beforeSign({
+    channelId: payload.channelId,
+    openSlot: payload.openSlot,
+    lastValidBlockHeight: hints.lastValidBlockHeight,
+  });
+  const dictionaries = await payer.signTransactions([request]);
+  const signature = dictionaries[0]?.[payer.address];
+  if (
+    dictionaries.length !== 1 ||
+    !signature ||
+    !Buffer.from(request.messageBytes).equals(expected)
+  )
+    throw new UptoError(UPTO_ERROR_CODES.INTERNAL);
+  // Encode from fresh original bytes; neither a mutable wallet input nor signature aliases escape.
+  const wire = getBase64EncodedWireTransaction({
+    ...decode(),
+    signatures: { ...decode().signatures, [payer.address]: signature },
+  });
+  const signed = getTransactionDecoder().decode(Buffer.from(wire, 'base64'));
+  const checked = signed.signatures[payer.address];
+  if (
+    !checked ||
+    !(await verifySignature(
+      await getPublicKeyFromAddress(payer.address),
+      checked,
+      signed.messageBytes,
+    ))
+  )
+    throw new UptoError(UPTO_ERROR_CODES.INTERNAL);
+  return wire;
+}
+
 export async function createUptoAuthorization(
   payer: TransactionSigner,
   terms: UptoTerms,
   hints: UptoClientHints,
-  _beforeSign?: (opening: {
-    channelId: string;
-    openSlot: string;
-    lastValidBlockHeight: string;
-  }) => Promise<void>,
+  beforeSign?: BeforeSign,
 ): Promise<UptoAuthorization> {
-  const created = await new UptoClientScheme(payer).createPaymentPayload(
-    UPTO.x402Version,
-    uptoRequirements(terms, hints),
-  );
+  // A recoverable open signs only the prepared bytes: sending/modifying signers cannot promise that.
+  const partial = isTransactionPartialSigner(payer)
+    ? {
+        address: payer.address,
+        signTransactions: payer.signTransactions.bind(payer),
+      }
+    : undefined;
+  if (beforeSign && !partial)
+    throw new UptoError(UPTO_ERROR_CODES.INVALID_TERMS);
+  const fixed = { ...hints };
+  const requested = {
+    ...terms,
+    ...(terms.splits
+      ? { splits: terms.splits.map((split) => ({ ...split })) }
+      : {}),
+  };
+  const created = await new UptoClientScheme(
+    beforeSign ? createNoopSigner(payer.address) : payer,
+  ).createPaymentPayload(UPTO.x402Version, uptoRequirements(requested, fixed));
   if (!isPayload(created.payload))
     throw new UptoError(UPTO_ERROR_CODES.INTERNAL);
+  const payload = { ...created.payload };
+  if (beforeSign && partial)
+    payload.openTransaction = await signPrepared(
+      partial,
+      payload,
+      fixed,
+      beforeSign,
+    );
   return {
-    channelId: created.payload.channelId,
-    payer: created.payload.from,
-    maxAtomic: created.payload.maxAmount,
-    payload: Buffer.from(JSON.stringify(created.payload)).toString('base64'),
+    channelId: payload.channelId,
+    payer: payload.from,
+    maxAtomic: payload.maxAmount,
+    payload: Buffer.from(JSON.stringify(payload)).toString('base64'),
   };
 }
 

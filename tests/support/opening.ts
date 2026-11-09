@@ -9,6 +9,7 @@ import {
 import {
   buyerJournalPathsIn,
   DEVNET,
+  PROTOCOL_FEE,
   UPTO_CHANNEL_SETTINGS,
 } from '@gyblos/config';
 import {
@@ -48,7 +49,7 @@ export async function openingFixture(root: string) {
       network: DEVNET,
       mint: mint.address,
       treasury: treasury.address,
-      protocolFeeBps: 300,
+      protocolFeeBps: PROTOCOL_FEE.bps,
       maxAtomic: '1000',
     },
     settings: UPTO_CHANNEL_SETTINGS,

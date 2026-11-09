@@ -4,6 +4,34 @@ When a paid call fails halfway, the buyer cannot know whether money moved. The
 rule is simple: **an uncertain payment blocks new payments until it is proven
 on-chain.** Nothing is retried automatically.
 
+## Paid v2 opening recovery
+
+The paid v2 buyer journals an intent, then prepares one SDK channel open without
+asking the wallet to sign. Before the real payer signature, it durably records
+that exact channel ID, its original slot, blockhash lifetime and accepted
+payment policy. The signer receives the same prepared message. A failed wallet
+call or uncertain checkpoint write conservatively retains a known channel: it
+does not prove that nothing was signed or sent.
+
+Restart with the same buyer home. The existing read-only command is:
+
+```sh
+pnpm buyer:reconcile:paid
+```
+
+It inspects the original channel and finalized history. It can classify an open
+as never created only after its original blockhash lifetime has passed, with
+complete history and account evidence. Quote expiry, an absent account alone,
+incomplete history or an unavailable RPC do not unblock it. New calls remain
+blocked while that opening is unresolved; no prompt or authorization is retried.
+The checkpoint does not store a signed payload to retransmit.
+
+This adds no journal migration: the existing v4 format and paths are retained.
+It does not recover a stale paid-v2 process lock automatically, request closure,
+refund an open deposit or make a channel reusable between requests. A retained
+lock still requires investigation; never delete it to bypass an uncertain
+payment. The sections below describe the separate legacy paid-v1 recovery path.
+
 ## What blocks new payments
 
 - `authorization.json` (the buyer journal in `.local/gyblos/buyer/`, or the gate

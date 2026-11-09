@@ -5,7 +5,6 @@ import { isAddress, type TransactionSigner } from '@solana/kit';
 import {
   createUptoAuthorization,
   createUptoReceiptReader,
-  decodeUptoPayload,
   UPTO_ERROR_CODES,
   UptoError,
   type UptoClientHints,
@@ -162,39 +161,34 @@ async function signOpen(
     state: PAYMENT_CHANNEL_STATES.OPEN,
     chargedAtomic: null,
   };
-  // Durable before the only signature for this request exists.
+  // Intent is durable before preparation; the exact channel is checkpointed before signing.
   await journaled(() => options.journal.put(entry));
-  // On any failure below the open never leaves the buyer, so its unsigned entry is dropped (or
-  // pruned once the terms expire, if dropping fails too).
+  // Only an unprepared entry may be dropped. A non-null checkpoint is retained on uncertainty.
   const abandon = async (code: PaymentErrorCode): Promise<never> => {
     await options.journal.remove(terms.requestDigest).catch(() => undefined);
     return fail(code);
   };
-  let signed: Awaited<ReturnType<typeof createUptoAuthorization>>;
+  let checkpointed = false;
   try {
-    signed = await createUptoAuthorization(options.payer, channel, hints);
-  } catch {
-    return abandon(PAYMENT_ERROR_CODES.UNAVAILABLE);
+    const signed = await createUptoAuthorization(
+      options.payer,
+      channel,
+      hints,
+      async (opening) => {
+        await journaled(() => options.journal.put({ ...entry, ...opening }));
+        checkpointed = true;
+      },
+    );
+    return { ...signed, requestDigest: terms.requestDigest };
+  } catch (error) {
+    const code =
+      error instanceof PaymentError
+        ? error.code
+        : PAYMENT_ERROR_CODES.UNAVAILABLE;
+    if (checkpointed) return fail(code);
+    // A checkpoint write can land and report a sync failure: remove without channelId refuses it.
+    return abandon(code);
   }
-  const authorization = { ...signed, requestDigest: terms.requestDigest };
-  try {
-    // The slot the open itself names, which its channel address derives from.
-    const { openSlot } = decodeUptoPayload(signed);
-    await options.journal.put({
-      ...entry,
-      channelId: signed.channelId,
-      openSlot,
-    });
-  } catch {
-    // A write can land and still report failure (the directory sync after the rename); the open is
-    // then journaled and must be returned rather than stranded as a signed entry nobody holds.
-    const held = await options.journal
-      .get(terms.requestDigest)
-      .catch(() => undefined);
-    if (held?.channelId === signed.channelId) return authorization;
-    return abandon(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE);
-  }
-  return authorization;
 }
 
 // A policy the buyer could never honor is a configuration error, refused at construction.

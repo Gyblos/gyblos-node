@@ -16,7 +16,14 @@ example a QUIC peer-to-peer stream).
 ## What exists today
 
 - `createUptoAuthorization(payer, terms, hints)`: the payer signs the channel
-  open with the x402 upto client, offline given recent-block hints.
+  open with the x402 upto client, offline given recent-block hints. An optional
+  fourth argument, `beforeSign({ channelId, openSlot, lastValidBlockHeight })`,
+  checkpoints that exact prepared open before invoking the payer. Await durable
+  storage in this callback and retain the checkpoint if signing later fails.
+  Checkpoint mode accepts partial signers only, signs the original message once
+  and verifies the returned payer signature; modifying or sending signers are
+  refused. Without the callback, the existing SDK signer behavior is preserved.
+  The callback neither broadcasts nor stores a reusable authorization payload.
 - `createUptoVerifier(feePayerAddress, currentSlot)`: the x402 upto facilitator
   verifies an open against the terms with no network call other than the
   current-slot source; it needs only the fee payer's address.

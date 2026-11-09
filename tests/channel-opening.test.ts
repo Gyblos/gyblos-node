@@ -199,8 +199,8 @@ void test('prepared opening identity survives quote expiry and is resolved only 
           mint: value.terms.mint,
           treasury: value.terms.treasury,
           rpc: chainDouble(state).rpc,
-          expected: () => null,
-          report: () => {},
+          expected: () => undefined,
+          report: async () => {},
         });
       assert.equal((await inspect())[0]?.outcome, RECONCILE_OUTCOMES.OPEN);
       assert.equal(
