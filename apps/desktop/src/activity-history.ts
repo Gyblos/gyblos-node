@@ -6,6 +6,10 @@ import {
   type SessionActivity,
 } from './activity-model';
 import { DESKTOP_ACTIVITY } from './constants';
+import {
+  parsePaymentReferences,
+  type PaypalPaymentReference,
+} from './payment-reference-model';
 
 type Files = {
   read(): Promise<string | undefined>;
@@ -13,6 +17,7 @@ type Files = {
 };
 export class ActivityHistory {
   private entries: ActivityEntry[] = [];
+  private paymentReferences: PaypalPaymentReference[] = [];
   private loaded = false;
   private available = true;
   private pending = Promise.resolve();
@@ -31,8 +36,11 @@ export class ActivityHistory {
         throw new Error('Invalid history');
       const record = Object.fromEntries(Object.entries(value));
       if (
-        Object.keys(record).sort().join(',') !== 'sessions,version' ||
-        record.version !== DESKTOP_ACTIVITY.VERSION
+        record.version === DESKTOP_ACTIVITY.VERSION
+          ? Object.keys(record).sort().join(',') !== 'sessions,version'
+          : record.version !== DESKTOP_ACTIVITY.REFERENCE_VERSION ||
+            Object.keys(record).sort().join(',') !==
+              'references,sessions,version'
       )
         throw new Error('Invalid history');
       const result = parseActivityResult({
@@ -42,19 +50,58 @@ export class ActivityHistory {
       });
       if (!result.available) throw new Error('Invalid history');
       this.entries = result.sessions;
+      if (record.version === DESKTOP_ACTIVITY.REFERENCE_VERSION) {
+        const references = parsePaymentReferences({
+          available: true,
+          references: record.references,
+        });
+        if (
+          !references.available ||
+          references.references.some(
+            (reference) =>
+              !this.entries.some((entry) => entry.id === reference.sessionId),
+          )
+        )
+          throw new Error('Invalid references');
+        this.paymentReferences = references.references;
+      }
     } catch {
       this.available = false;
     }
   }
-  observe(value: SessionActivity | null) {
+  observe(
+    value: SessionActivity | null,
+    reference?: PaypalPaymentReference | null,
+  ) {
     const captured = value ? { ...value } : null;
+    const received = reference ? { ...reference } : reference;
     this.pending = this.pending
       .then(async () => {
         await this.load();
         if (!captured) return;
         const old = this.entries.find((entry) => entry.id === captured.id);
+        const oldReference = this.paymentReferences.find(
+          (item) => item.sessionId === captured.id,
+        );
+        const referenceChanged =
+          received !== undefined &&
+          JSON.stringify(oldReference ?? null) !== JSON.stringify(received);
+        if (
+          received &&
+          (!parsePaymentReferences({ available: true, references: [received] })
+            .available ||
+            received.sessionId !== captured.id)
+        )
+          throw new Error('Invalid reference');
+        if (received !== undefined) {
+          this.paymentReferences = this.paymentReferences.filter(
+            (item) => item.sessionId !== captured.id,
+          );
+          if (received) this.paymentReferences.push(received);
+        }
         if (
           old &&
+          !referenceChanged &&
           Object.entries(captured).every(([key, value]) =>
             Object.entries(old).some(
               ([oldKey, oldValue]) => key === oldKey && value === oldValue,
@@ -80,7 +127,10 @@ export class ActivityHistory {
         try {
           await this.files.write(
             JSON.stringify({
-              version: DESKTOP_ACTIVITY.VERSION,
+              version: DESKTOP_ACTIVITY.REFERENCE_VERSION,
+              references: this.paymentReferences.filter((reference) =>
+                this.entries.some((entry) => entry.id === reference.sessionId),
+              ),
               sessions: this.entries,
             }),
           );
@@ -92,6 +142,16 @@ export class ActivityHistory {
         this.available = false;
       });
     return this.pending;
+  }
+  async references() {
+    await this.pending;
+    await this.load();
+    return {
+      available: this.available,
+      references: this.available
+        ? this.paymentReferences.map((reference) => ({ ...reference }))
+        : [],
+    };
   }
   async summary(currentSessionId: string | null): Promise<ActivityResult> {
     await this.pending;

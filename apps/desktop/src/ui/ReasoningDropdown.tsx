@@ -1,5 +1,5 @@
 // Shared menu for declared preview reasoning levels; no live inference or payment calls.
-import { Brain, Check } from '@phosphor-icons/react';
+import { Check } from '@phosphor-icons/react';
 
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 import type { ReasoningSupport } from '@gyblos/protocol/models';
@@ -20,10 +20,12 @@ export function ReasoningDropdown({
   return (
     <Dropdown
       label="Choose thinking level"
-      searchLabel="Search thinking levels"
+      menuTitle="Thinking"
+      className="ui-thinking-trigger"
+      panelClassName="ui-thinking-menu"
       trigger={
         <>
-          <Brain size={16} aria-hidden="true" />
+          <span className="ui-menu-context">Thinking</span>
           {reasoningLabel(support, value)}
         </>
       }
@@ -41,7 +43,6 @@ export function ReasoningDropdown({
                 key={level}
                 role="menuitemradio"
                 label={reasoningLabel(support, level)}
-                detail="Preview setting"
                 checked={value === level}
                 trailing={value === level && <Check size={16} />}
                 onClick={() => {

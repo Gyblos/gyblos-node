@@ -323,7 +323,11 @@ export function createDesktopPaypalSession(
   options: DesktopPaypalSessionOptions = {},
 ) {
   let awaitingAcknowledgement = false;
-  const agent = initialAgentReadiness();
+  const agent: AgentReadiness = {
+    prepared: false,
+    unavailable: false,
+    scope: undefined,
+  };
   const state: CheckoutState = {
     approvalUrl: undefined,
     opened: false,
@@ -357,6 +361,7 @@ export function createDesktopPaypalSession(
   return {
     status,
     activity: () => session.activity(),
+    paymentReference: () => session.paymentReference(),
     isBusy,
     isCloseBlocked: () => isBusy() || awaitingAcknowledgement || state.opened,
     ...checkoutEntryActions(checkout),
@@ -393,8 +398,4 @@ export function createDesktopPaypalSession(
       }),
     close,
   };
-}
-
-function initialAgentReadiness(): AgentReadiness {
-  return { prepared: false, unavailable: false, scope: undefined };
 }

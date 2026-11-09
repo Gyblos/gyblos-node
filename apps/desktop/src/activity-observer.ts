@@ -6,6 +6,11 @@ import {
   type SessionActivity,
 } from './activity-model';
 import { DESKTOP_ACTIVITY } from './constants';
+import {
+  unavailablePaymentReferences,
+  type PaymentReferenceResult,
+  type PaypalPaymentReference,
+} from './payment-reference-model';
 
 export class ActivityObserver {
   private lastSnapshot = '';
@@ -15,14 +20,18 @@ export class ActivityObserver {
     private readonly readOnly: () => Promise<ActivityResult>,
     private readonly dispose: () => Promise<void> = async () => {},
     private readonly timeoutMs: number = DESKTOP_ACTIVITY.IO_TIMEOUT_MS,
+    private readonly currentReference?: () => PaypalPaymentReference | null,
+    private readonly readOnlyReferences: () => Promise<PaymentReferenceResult> = async () =>
+      unavailablePaymentReferences(),
   ) {}
   capture = () => {
     const snapshot = this.current();
     if (!snapshot) return;
-    const key = JSON.stringify(snapshot);
+    const reference = this.currentReference?.();
+    const key = JSON.stringify({ snapshot, reference });
     if (key === this.lastSnapshot) return;
     this.lastSnapshot = key;
-    void this.history.observe(snapshot);
+    void this.history.observe(snapshot, reference);
   };
   async run<T>(work: () => Promise<T>): Promise<T> {
     this.capture();
@@ -38,6 +47,13 @@ export class ActivityObserver {
     return this.limit(
       current ? this.history.summary(current.id) : this.readOnly(),
       unavailableActivity(),
+    );
+  }
+  async references() {
+    this.capture();
+    return this.limit(
+      this.current() ? this.history.references() : this.readOnlyReferences(),
+      unavailablePaymentReferences(),
     );
   }
   async close(closeRuntime: () => Promise<void>) {

@@ -1,168 +1,128 @@
-# Buyer desktop UI
+# Buyer desktop design system
 
-This guide describes the implementation of the buyer desktop's shared visual
-primitives. The Gyblos brand reference remains the design document in the
-maintainer vault. A mockup is a proposal, not evidence that a payment or a
-network capability is available.
+The buyer uses one compact visual system across Chat, Connections, Models,
+Applications, Activity, Payments and Settings. A visual state never proves a
+payment, model or remote service is available. Render capabilities from the
+existing controllers and validated host bridges.
 
 ## Shared sources
 
-- `src/theme.ts` owns the light and dark color values used by the Electron
-  window and renderer. Use the semantic variables it supplies instead of
-  adding color literals to a screen.
-- `src/ui/geometry.css` owns the radius tokens and assigns the common panel,
-  control, option and badge shapes. Do not add a second radius scale.
-- `src/ui/ui.css` owns the shared component classes and spacing tokens. Start
-  with these classes and the primitives in `src/ui/UI.tsx` before adding a
-  route-specific selector.
-- `src/ui/Form.tsx` owns shared labeled inputs and form action alignment. The
-  matching `ui-form`, `ui-field`, `ui-input` and `ui-form-actions` classes
-  also support native selects and other form controls.
-- `src/ui/DesignSystem.tsx` is a safe, local component preview in Settings. It
-  does not change payment settings or create sessions.
+- `src/theme.ts`: light/dark semantic colors. The primary accent is `#0a28f0`.
+- `src/mockup-base.css`: bundled Instrument Sans, monospace and element defaults.
+- `src/ui/geometry.css`: panel 16 px, control 10 px, option 8 px and badge radii.
+- `src/ui/ui.css`: shared primitives and spacing tokens.
+- `src/ui/buyer-design.css`: compact buyer composition, shell motion, shared
+  management controls, financial tables and sidebar choreography. Loaded after
+  the component foundations so every route receives the same scale.
+- `UI`, `Form`, `Management`, `Dropdown`, `ScrollTable`, `Pagination` and
+  `WorkspaceLayout`: reusable component anatomy. Route components compose them;
+  they do not introduce a separate control or page scale.
 
-## Composition
+## Scale and composition
 
-Use the desktop shell, `PageBody`, `PagePanel`, `SectionTitle`, `List`, `ListRow`, `Button`,
-`Badge` and `ChoiceCard` for buyer screens. Use `ui-section` and
-`ui-subheading` for visible groups, `ui-choice-grid` for selections and
-`ui-help-text` for supporting copy. Use the `--space-*` variables for new
-spacing. Align related controls and keep primary actions easy to identify.
+| Role                                | Value                                  |
+| ----------------------------------- | -------------------------------------- |
+| Interface / supporting text         | 14 / 12 px                             |
+| Section / metric text               | 18 / 22 px                             |
+| Control / icon                      | 32 / 16 px                             |
+| Header                              | 40 px                                  |
+| Navigation / collapsed rail         | 224 / 56 px                            |
+| Context panel                       | 260 px, capped at 40% of its workspace |
+| Management / reading column maximum | 1120 / 760 px                          |
+| Page inset                          | 24 px; 16 px below 900 px              |
+| Section / group / related gap       | 24 / 16 / 8 px                         |
 
-`PageBody` owns scrolling and the responsive page inset (12–40 px). `PagePanel`
-and the chat root share the 1440 px maximum width and centered alignment.
-Sections use a 24 px gap. `DataTable` and `DataCell` keep tables readable as
-labeled session cards below 700 px of body width, including the payment column. Do not add an independent page width or padding to a
-route's first section, or align its footnotes outside this shared column.
-Payment columns respond to the body's available width, including sidebar size.
+`PageBody` owns scrolling and the outer inset. `PagePanel` and the connection
+workspace align to that inset. Internal sections add no second page gutter.
+The header owns the route title; do not repeat the same heading or a route icon
+in the body. Contextual journeys have a labeled back button; primary sidebar
+navigation starts a new journey.
 
-Use visible sections, pages or dialogs instead of accordions or disclosure
-triangles. A selected application is not necessarily connected; a connected
-local gateway does not by itself verify an individual application. Keep keys
-masked and preserve the existing clipboard and session boundaries.
+Both side panels are layout columns. Opening either displaces the main content;
+closing reverses the same 300 ms easing. The collapsed sidebar retains its icons.
+Labels and conversation history fade during motion; hidden interactive content
+is inert immediately. Honor reduced motion. Animate only sidebar icons, using
+meaningful parts (link halves, strokes, wallet lid, gear and graph), never a
+scale-up of the whole glyph. No accordions.
 
-Keep the buyer navigation stable: Applications describes optional web services,
-Connections configures supported clients and standard API access, and Payments holds wallet and payment
-settings. Without a usable approved session, agent setup offers Go to Payments
-in the primary action position. The link selects the PayPal view and navigates;
-it never creates an order, approves payment or connects an agent. Existing
-connections retain their review and disconnect actions. Mark services that are not implemented as previews rather than
-connected. Use `ChatPaymentSelector` for the next message's payment method in
-one Chat screen. Switching between USDC preview and PayPal Sandbox preserves
-the conversation, history and draft. Each response retains its original method;
-switching never changes earlier usage or creates another authorization.
+## Controls
 
-Contextual links (for example Chat to Payments or Applications) show a labeled
-back arrow beside the page title. Back returns through that journey without
-changing drafts or payment state. Sidebar destinations start a new journey. The header holds the route title,
-sidebar/back controls and contextual operation notices, not model/payment
-selectors. Remind someone about PayPal only when an unfinished session is known;
-an unchecked initial status is not evidence of an open session. Once an
-unfinished session is known, retain that reminder across failed checks until a
-fresh result confirms it is closed or ready; keep stale amounts hidden.
-Use the same searchable `Dropdown` for Models, Tools and the Chat payment
-method, with logos and explicit availability. Payment choices are exclusive
-menu radio items; unavailable method changes stay disabled during operations.
-Unimplemented tools remain disabled previews; the menu does not
-connect them or accept credentials. Do not add disclosure triangles.
+Use shared primary, secondary and ghost buttons. Otherwise-transparent body
+actions have a subtle outline and surface. Sidebar, header, footer and composer
+controls are exceptions: quiet controls blend into their surface and use the
+shared hover/focus treatment. Never add a one-off button size, padding or radius.
+All controls keep accessible names and keyboard focus; color is never the only
+state indicator.
 
-Use `ModelImage` and the bundled source-attributed artwork for known model
-families. An artwork is a visual label, not evidence of a model's provenance or
-of provider availability. Unknown families use the neutral Gyblos icon.
-Use `ChatUserMessage`, `AssistantProgress` and
-`ChatComposer` in the unified chat so people can distinguish messages,
-recognize generation and use the same keyboard controls.
+Copy fields place a button labeled Copy beside the input, with a specific
+accessible name. Keep API keys masked. Host-owned API clipboard operations copy
+the current connection without requiring disclosure. Model names stay visible
+in the composer. Tools and payment use icon-only triggers. Thinking uses a quiet
+text selector and only the levels supported by the selected model; preview
+reasoning settings do not enable unsupported live engine capabilities.
 
-## Payment and accessibility states
+## Navigation and screens
 
-Identify the active payment method with its composer icon and checked
-menu item. USDC preview balances and activity are
-simulated. PayPal Sandbox has an authorization limit and recorded usage; neither
-is a confirmed capture. Do not start, repeat or settle an uncertain payment
-from a visual component. Preserve the underlying session and recovery guards.
-If a status refresh fails, present the session as unavailable rather than
-showing the last known amount as current, and provide a way to check it again.
-Do not allow switching away from PayPal during an operation or while a response
-awaits acknowledgment; keep the method fixed during a preview response too.
-Amounts shown for an uncertain session remain recorded
-usage, not a confirmed capture.
+The sidebar groups New chat, Connections, Models and Applications above local
+conversation history. Activity, Payments, Settings and System status stay below
+it. System status opens a dialog with actual node and wallet readiness; there is
+no persistent status footer.
 
-Controls must have accessible names and visible keyboard focus. Use text as well
-as color for selection, loading, error and unavailable states. Test narrow
-windows, light and dark themes and reduced motion when changing shared styles.
+Chat has one transcript and draft across payment methods. Only user messages
+have bubbles, with time, copy and edit actions below them. Assistant responses
+use the page background without a model/payment heading. Preserve the Gyblos
+progress signal. The composer owns model, thinking, tools and payment choices;
+Chat has no payment footer or duplicate History/New chat toolbar. Editing only
+prefills the draft. Navigation and method selection never send a request.
 
-## Payments and Chat
+Connections gives API key and Base URL priority. Model is not a connection form
+field. Four named setup guides use the same key and URL; Other tools is a
+secondary action. Guide selection does not establish a connection. Use the
+existing readiness guards: missing authorization leads to Payments, unknown
+status stays visible, and invalid/stale connections never gain copy or request
+permission through a visual state. Disconnect all tools requires confirmation
+and keeps the payment session separate. The context panel contains local access
+and fresh shared-session information.
 
-Payments owns session limits, approval, closure and recovery actions. Chat places
-its compact payment selector beside Models and Tools in the
-composer. Payments owns usage summaries and management; Chat has no payment
-footer. Responses use the workspace background without an enclosing card or a
-model/payment heading. Only user messages have a conversation bubble. Keep the
-Gyblos generation signal visible while waiting; response details retain the model
-and original payment method on demand. User messages show their send time and
-copy/edit actions below the bubble. Editing prefills the composer; it never
-resends or changes a recorded request automatically. Models, Tools and payment
-use the shared `Dropdown`, `Button` and icon-button size. History, + and all
-selectors inherit the same ghost hover/open styling from `ui.css`; never add a
-composer-specific hover, border, padding or radius. The model keeps its logo, name and availability visible;
-Tools and payment use square icon-only triggers without tooltips. Menus retain
-names, pricing and availability. Keep the chat
-free of a permanent preview banner. The browser preview uses the desktop's
-renderer build and stylesheet rather than a separate implementation.
-Both routes share one renderer controller
-so navigation retains
-drafts and never creates a second session. Changing routes does not approve,
-capture or retry a payment. A USDC-only view still does not start PayPal.
+Models uses a searchable list with laboratory artwork, a filter menu and a
+network-check dialog. Artwork does not establish availability. Applications
+shows unavailable web services as such, without pretend connection actions.
+Settings holds Appearance, the visual-system preview and version information.
 
-Reasoning choices come from the shared protocol model catalog. Preview models
-carry an explicit catalog ID; unknown, unverified and non-thinking models have
-no selector. Qwen/Gemma offer Off/On; gpt-oss offers Low/Medium/High using the
-catalog default. A model change cannot inherit an unsupported level. Each
-preview response saves its setting in local display history. This does not
-enable thinking in the current PayPal/Ollama route or prove that a network
-seller supports it; live selection requires the offered capabilities and engine
-support first.
+Payments prioritizes the USDC wallet with its public address and funding
+availability, followed by a compact PayPal summary and a session-management
+dialog. Spending filters are independent from Chat's selected payment method.
+Preserve all existing checkout, capture and uncertain-payment guards. Visiting
+a route or opening a dialog never starts, approves or settles a payment.
 
-On wide windows, payment management and wallet details use two columns. They
-stack on narrow windows. Show the authorized ceiling separately from recorded
-usage. A captured amount appears only for a fresh completed session; available
-authorization appears only for an active, unexpired session with attempts left.
-Hide current amounts while checking, processing or when status is unavailable.
+Activity separates Chat consumption, agent inference and confirmed payments.
+Shared tables preserve tabular structure at narrow widths, scroll internally,
+keep their header/identity column visible, and put pagination outside the scroll
+region. Reset the page when filtering. Loading/error states hide stale totals.
+Detail dialogs preserve linked conversations and full provider references.
 
-## Connections and buyer navigation
+## Financial accuracy and references
 
-Connections sits beside New chat above the searchable local conversation history.
-Models and Applications stay in the primary group; Activity, Payments and Settings
-stay below the history. The shared navigation row owns selection, hover, focus
-and geometry. Its default width is 307 px, resizable from 240 to 360 px. Narrow
-windows use a collapsible overlay sidebar. New chat and history selection never
-send a message, change a payment method or discard a stored conversation.
+- Incoming funds use green and a plus sign; paid outgoing amounts use neutral
+  ink and a minus sign. Pending/review uses amber. Red denotes failures.
+- Recorded consumption and authorization limits are not captured payments.
+  Unknown or uncertain amounts remain unknown. Keep USD and USDC separate.
+- This desktop version has public wallet metadata but no live USDC balance or
+  transaction-history source. Show unavailable instead of synthetic balances,
+  deposits or transaction hashes. Simulated chat replies are not payments.
+- Display validated, locally saved PayPal authorization/capture IDs through the
+  separate read-only reference bridge. Usage activity stays identifier-free.
+  Never substitute an order ID for a payment ID. Legacy history may lack IDs.
+- Tables abbreviate references and label PayPal columns Payment ID. Row-level
+  Copy buttons are omitted; details show the full reference and Copy action.
+- A future real USDC payment record must include its actual transaction hash and
+  network. Its abbreviated hash must open an allowlisted explorer through a
+  host-owned action. Never accept arbitrary renderer URLs or fabricate a hash.
+- Local activity dates describe when this device observed the record, not a
+  provider transaction timestamp. Saving failure/corruption is visible and does
+  not overwrite an unreadable record or retry a payment.
 
-The shared control size is 40 px, with 18 px icons and 52 px navigation rows.
-Use the shared compact ChoiceCard grid for client setup guides. Do not introduce
-button-specific hover, padding or radius rules.
-
-Connections uses WorkspaceLayout: a main surface and an optional 363 px context
-panel. Each scrolls within the shared body. On narrow bodies the context becomes
-an overlay, with its header toggle and close button retained. The panel contains
-local access and freshly checked payment-session context. It is not an accordion.
-
-The entry action is Create API connection only when the existing guards confirm
-a usable authorization and known connection status. Otherwise Go to Payments
-retains the payment-readiness journey. API key, Base URL and Model use shared
-CopyField controls. The host copies from its current connection; the key stays
-masked and does not have to be revealed. The model is informational, not a picker.
-
-Other app / API precedes the named setup guides. Guides open a dialog, never an
-accordion. Their configurations use the same connection; selecting a guide is
-not evidence that a client has connected. Local API ready describes the local
-listener only. Request examples keep the key in GYBLOS_API_KEY and are never run
-automatically. They can consume the approved shared limit if the user runs them.
-
-The browser review uses the exact desktop renderer and stylesheet, with an
-external synthetic bridge for example data. That bridge is not product code,
-does not run a model, and cannot approve, capture or void a PayPal payment.
-
-Connection failures and unusable session reasons stay visible in the main
-pane when the context panel is closed. Short windows use the shared compact
-sidebar scale and a scroll fallback so Settings and history remain reachable.
+Verify wide and narrow windows, both themes, keyboard navigation, reduced
+motion, all connection/payment states and full tables when changing the shared
+system. Web review and desktop load the same renderer and styles; example data
+belongs only in an isolated visual fixture, never in the shipped controllers.

@@ -137,12 +137,17 @@ export function registerDesktopPaypal(window: BrowserWindow) {
   const activity = createDesktopActivityStorage(
     process.env.PAYPAL_SANDBOX_STATE_DIRECTORY,
     () => runtime.current()?.service.activity() ?? null,
+    () => runtime.current()?.service.paymentReference() ?? null,
   );
-  const activityHandlers = createActivityHandlers(() => activity.summary(), {
-    contents: window.webContents,
-    mainFrame: () => window.webContents.mainFrame,
-    destroyed: () => window.isDestroyed(),
-  });
+  const activityHandlers = createActivityHandlers(
+    () => activity.summary(),
+    {
+      contents: window.webContents,
+      mainFrame: () => window.webContents.mainFrame,
+      destroyed: () => window.isDestroyed(),
+    },
+    () => activity.references(),
+  );
   // Observation never starts the sandbox or makes provider calls.
   const activityTimer = setInterval(() => {
     activity.capture();
@@ -212,6 +217,10 @@ export function registerDesktopPaypal(window: BrowserWindow) {
   );
   ipcMain.handle(DESKTOP_ACTIVITY.CHANNEL, (event, ...args: unknown[]) =>
     activityHandlers.summary(event, args),
+  );
+  ipcMain.handle(
+    DESKTOP_ACTIVITY.REFERENCES_CHANNEL,
+    (event, ...args: unknown[]) => activityHandlers.references(event, args),
   );
   ipcMain.handle(DESKTOP_PAYPAL.CHANNEL, (event, ...args: unknown[]) =>
     activityHandlers.accepts(event, [])

@@ -71,12 +71,13 @@ export function CopyField({
           value={value}
         />
         <Button
-          variant={BUTTON_VARIANT.PRIMARY}
+          variant={BUTTON_VARIANT.GHOST}
+          aria-label={actionLabel}
           disabled={disabled}
           onClick={onCopy}
         >
           <Copy size={16} />
-          {actionLabel}
+          Copy
         </Button>
       </div>
     </div>

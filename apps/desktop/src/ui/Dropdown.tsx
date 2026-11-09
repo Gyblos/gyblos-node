@@ -17,13 +17,17 @@ export function Dropdown({
   className = '',
   iconOnly = false,
   searchLabel,
+  menuTitle,
+  panelClassName = '',
   children,
 }: {
   label: string;
   trigger: ReactNode;
   className?: string;
   iconOnly?: boolean;
-  searchLabel: string;
+  searchLabel?: string;
+  menuTitle?: string;
+  panelClassName?: string;
   children: (close: () => void, query: string) => ReactNode;
 }) {
   const id = useId();
@@ -72,7 +76,11 @@ export function Dropdown({
     position();
     const observer = new ResizeObserver(position);
     if (content.current) observer.observe(content.current);
-    menu.querySelector<HTMLElement>("input, [role^='menuitem']")?.focus();
+    (searchLabel
+      ? menu.querySelector<HTMLElement>('input')
+      : (menu.querySelector<HTMLElement>('[aria-checked="true"]') ??
+        menu.querySelector<HTMLElement>("[role^='menuitem']"))
+    )?.focus();
     window.addEventListener('resize', position);
     window.addEventListener('scroll', position, true);
     return () => {
@@ -107,7 +115,7 @@ export function Dropdown({
         inert={!open}
         role="menu"
         aria-label={label}
-        className="compact-dropdown"
+        className={`compact-dropdown ${panelClassName}`}
         onToggle={(event) => setOpen(event.newState === 'open')}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
@@ -145,15 +153,18 @@ export function Dropdown({
           items[next]?.focus();
         }}
       >
-        <SearchField
-          compact
-          label={searchLabel}
-          placeholder={`${searchLabel}…`}
-          value={query}
-          onValueChange={setQuery}
-          className="dropdown-search"
-        />
+        {searchLabel && (
+          <SearchField
+            compact
+            label={searchLabel}
+            placeholder={`${searchLabel}…`}
+            value={query}
+            onValueChange={setQuery}
+            className="dropdown-search"
+          />
+        )}
         <div ref={content} className="dropdown-content">
+          {menuTitle && <p className="ui-menu-caption">{menuTitle}</p>}
           {children(close, query)}
         </div>
       </div>

@@ -1,16 +1,15 @@
 @font-face {
-  font-family: Geist;
-  src: url('/assets/geist-400.ttf');
+  font-family: 'Instrument Sans';
+  src: url('/assets/InstrumentSans-Variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: swap;
 }
 @font-face {
-  font-family: Geist;
-  src: url('/assets/geist-500.ttf');
-  font-weight: 500;
-}
-@font-face {
-  font-family: Geist;
-  src: url('/assets/geist-600.ttf');
-  font-weight: 600;
+  font-family: 'Instrument Sans';
+  src: url('/assets/InstrumentSans-Italic-Variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
 }
 @font-face {
   font-family: GeistMono;
@@ -22,7 +21,7 @@
 body {
   margin: 0;
   font:
-    14px Geist,
+    14px 'Instrument Sans',
     Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;

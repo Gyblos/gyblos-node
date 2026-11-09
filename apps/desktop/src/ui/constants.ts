@@ -275,7 +275,7 @@ export const ROUTE_ORDER = [
   UI_VIEW.PAYMENTS,
   UI_VIEW.SETTINGS,
 ] as const;
-export const SIDEBAR_MOTION_MS = 620;
+export const SIDEBAR_MOTION_MS = 300;
 
 export const NETWORK_STATE = {
   CONNECTING: 'connecting',
@@ -305,5 +305,19 @@ export const DEMO_ACCOUNT = {
   TOAST_MS: 3000,
   SAMPLE_REQUESTS: 4,
 } as const;
-export const NAVIGATION_WIDTH = { MIN: 240, DEFAULT: 307, MAX: 360 } as const;
+export const NAVIGATION_WIDTH = { MIN: 224, DEFAULT: 224, MAX: 360 } as const;
 export const WORKSPACE_BREAKPOINT = { SIDEBAR: 900, CONTEXT: 1200 } as const;
+
+export const SIDEBAR_ACTION = {
+  CREATE: 'create',
+  PANEL: 'panel',
+  STATUS: 'status',
+  SETTINGS: 'settings',
+  WALLET: 'wallet',
+  TOOLS: 'tools',
+  LINK: 'link',
+  CHAT: 'chat',
+  SEARCH: 'search',
+} as const;
+
+export const SIDEBAR_TYPING_POSITIONS = [88, 128, 168] as const;

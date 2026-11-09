@@ -9,6 +9,7 @@ import {
   paypalPaymentSummary,
 } from '../paypal-model';
 import { BUTTON_VARIANT } from './constants';
+import { Facts, Pair } from './Management';
 import {
   CheckStatus,
   NewSessionTerms,
@@ -16,7 +17,7 @@ import {
   StartPaypalSession,
   VoidCheckAction,
 } from './PaypalCheckoutActions';
-import { Badge, Button, StatCard } from './UI';
+import { Badge, Button } from './UI';
 import type { PaypalSessionView } from './usePaypalSession';
 
 type SessionProps = PaypalSessionView;
@@ -181,39 +182,23 @@ function SessionAmounts({
 }: {
   summary: ReturnType<typeof paypalPaymentSummary>;
 }) {
-  return (
-    <>
-      {' '}
-      {summary.limitCents !== null && (
-        <div className="payment-session-stats">
-          <StatCard
-            label="Session limit"
-            value={dollars(summary.limitCents)}
-            detail="Maximum for this session"
-          />
-          <StatCard
-            label={
-              summary.capturedCents !== null
-                ? 'Payment captured'
-                : 'Recorded usage'
-            }
-            value={dollars(summary.capturedCents ?? summary.usedCents ?? 0)}
-            detail={
-              summary.capturedCents !== null
-                ? 'Confirmed by PayPal'
-                : 'Not yet a confirmed payment'
-            }
-          />
-          {summary.remainingCents !== null && (
-            <StatCard
-              label="Remaining limit"
-              value={dollars(summary.remainingCents)}
-              detail="Available within this session"
-            />
-          )}
-        </div>
+  return summary.limitCents === null ? null : (
+    <Facts>
+      <Pair label="Session limit" value={dollars(summary.limitCents)} />
+      <Pair
+        label={summary.capturedCents !== null ? 'Paid' : 'Recorded usage'}
+        value={
+          summary.capturedCents !== null
+            ? dollars(summary.capturedCents)
+            : summary.usedCents === null
+              ? 'Unconfirmed'
+              : dollars(summary.usedCents)
+        }
+      />
+      {summary.remainingCents !== null && (
+        <Pair label="Remaining" value={dollars(summary.remainingCents)} />
       )}
-    </>
+    </Facts>
   );
 }
 
@@ -232,22 +217,13 @@ export function PaypalSessionPanel({
   );
   return (
     <section
-      className="payment-session ui-settings-group"
+      className="payment-session ui-section"
       aria-label="PayPal Sandbox session"
     >
-      <header className="payment-session-heading">
-        <div>
-          <h2>PayPal session</h2>
-          <p>
-            Approve a limit once. Pay for recorded usage when you end the
-            session.
-          </p>
-        </div>
-        <Badge>Sandbox · test funds</Badge>
-      </header>
       <div className="payment-session-state" role="status">
         <span className="payment-state-dot" aria-hidden="true" />
         <strong>{summary.label}</strong>
+        <Badge>Sandbox · test funds</Badge>
         {summary.rateCents !== null && (
           <span className="payment-session-rate">
             {dollars(summary.rateCents)} per inference
@@ -262,8 +238,7 @@ export function PaypalSessionPanel({
           {state.notice}
         </p>
       )}
-      <div className="payment-session-footer">
-        <span>Chat and connected agents share this session.</span>
+      <div className="ui-inline-actions">
         <Button variant={BUTTON_VARIANT.TONAL} onClick={onChat}>
           Go to chat
         </Button>

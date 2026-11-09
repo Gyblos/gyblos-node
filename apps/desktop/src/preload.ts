@@ -9,6 +9,7 @@ import {
 } from './chat-archive-model';
 import { CHAT_STORAGE, DESKTOP, DESKTOP_ACTIVITY } from './constants';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
+import { parsePaymentReferences } from './payment-reference-model';
 import {
   DESKTOP_PAYPAL_AGENT,
   parsePaypalAgentResult,
@@ -37,6 +38,10 @@ contextBridge.exposeInMainWorld('desktopConversations', {
 });
 
 contextBridge.exposeInMainWorld('desktopActivity', {
+  references: async () =>
+    parsePaymentReferences(
+      await ipcRenderer.invoke(DESKTOP_ACTIVITY.REFERENCES_CHANNEL),
+    ),
   summary: async () =>
     parseActivityResult(await ipcRenderer.invoke(DESKTOP_ACTIVITY.CHANNEL)),
 });

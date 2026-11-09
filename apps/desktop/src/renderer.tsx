@@ -9,18 +9,19 @@ import { StartupSplash } from './ui/StartupSplash';
 import { DesktopWalletProvider } from './ui/WalletState';
 
 import './mockup-base.css';
-import './ui/motion.css';
-import './ui/ui.css';
-import './ui/geometry.css';
-import './ui/chat.css';
 import './ui/activity.css';
+import './ui/appearance.css';
+import './ui/buyer-design.css';
+import './ui/chat.css';
+import './ui/dropdown.css';
+import './ui/geometry.css';
+import './ui/icon-motion.css';
+import './ui/motion.css';
+import './ui/network-status.css';
 import './ui/paypal-agent.css';
 import './ui/signal.css';
-import './ui/dropdown.css';
-import './ui/appearance.css';
-import './ui/network-status.css';
-import './ui/icon-motion.css';
 import './ui/startup-splash.css';
+import './ui/ui.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing desktop root.');

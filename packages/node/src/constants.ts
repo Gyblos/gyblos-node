@@ -383,3 +383,7 @@ export const PAID_VERDICTS = {
   INTERRUPTED: 'interrupted',
 } as const;
 export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];
+export const PAYPAL_PAYMENT_REFERENCE_KIND = {
+  AUTHORIZATION: 'authorization',
+  CAPTURE: 'capture',
+} as const;

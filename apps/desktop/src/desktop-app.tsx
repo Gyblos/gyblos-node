@@ -2,22 +2,9 @@
 // USDC Chat and Connect remain simulated; Wallet receives public local metadata only.
 import {
   ArrowLeft,
-  ArrowUp,
-  ChartBar,
   Check,
   CheckCircle,
-  Clock,
-  Code,
-  CreditCard,
-  GearSix,
-  Globe,
-  Palette,
-  Plus,
-  ShieldCheck,
   SidebarSimple,
-  Sparkle,
-  TerminalWindow,
-  Wallet,
   X,
 } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -36,17 +23,14 @@ import { themeStyle } from './theme';
 import { Activity } from './ui/Activity';
 import { AddFunds } from './ui/AddFunds';
 import { announcedModels } from './ui/announced-models';
-import { Appearance } from './ui/Appearance';
+import { Applications } from './ui/Applications';
 import { BuyerSidebar } from './ui/BuyerSidebar';
-import { matchesCatalog, type ModelFilter } from './ui/catalog-state';
 import { Chat, type ChatHandle } from './ui/Chat';
 import { ChatController } from './ui/chat-controller';
 import { ChatPaymentSelector } from './ui/ChatPaymentSelector';
-import { ToolConnections } from './ui/ChatTools';
 import {
   BUTTON_VARIANT,
   MAIN_NAV,
-  MODEL_FILTER,
   MODEL_SOURCE,
   MODELS,
   NAVIGATION_WIDTH,
@@ -61,7 +45,8 @@ import { DesignSystem } from './ui/DesignSystem';
 import { FormField, FormInput } from './ui/Form';
 import { Modal } from './ui/Modal';
 import type { CatalogModel as Model, View } from './ui/model-types';
-import { ModelImage, type ModelArtwork } from './ui/ModelImage';
+import { ModelImage } from './ui/ModelImage';
+import { Models } from './ui/Models';
 import {
   animateChange,
   MotionPresence,
@@ -73,47 +58,22 @@ import {
   createNavigation,
   navigate as navigateState,
 } from './ui/navigation-state';
-import { NetworkCatalogPanel, useNetworkCatalog } from './ui/NetworkCatalog';
-import { NetworkStatus, useLocalNode } from './ui/NetworkStatus';
+import { useNetworkCatalog } from './ui/NetworkCatalog';
+import { useLocalNode } from './ui/NetworkStatus';
 import { PageBody } from './ui/PageBody';
-import { PaymentMethodSelector } from './ui/PaymentMethodSelector';
+import { Payments } from './ui/Payments';
 import { PaypalAgentConnection } from './ui/PaypalAgentConnection';
-import { PaypalSessionPanel } from './ui/PaypalSessionPanel';
-import { ResizeHandle } from './ui/ResizeHandle';
+import { Settings } from './ui/Settings';
+import { SystemStatus } from './ui/SystemStatus';
 import type { ToolId } from './ui/tools';
-import {
-  Avatar,
-  Badge,
-  Button,
-  EmptyState,
-  IconButton,
-  InfoBar,
-  List,
-  ListRow,
-  Note,
-  PagePanel,
-  RowCopy,
-  SearchField,
-  SectionTitle,
-  SettingsGroup,
-} from './ui/UI';
+import { Button, IconButton } from './ui/UI';
 import { useActivity } from './ui/useActivity';
 import { useChatArchive } from './ui/useChatArchive';
 import { usePaypalSession } from './ui/usePaypalSession';
 import { WalletBackup } from './ui/WalletBackup';
-import { WalletDetails } from './ui/WalletDetails';
 import { useDesktopWallet } from './ui/WalletState';
-import { WALLET_STATUS } from './wallet/model';
 
 const money = (value: number) => '$' + value.toFixed(2);
-function ModelIcon({ model }: { model: Pick<Model, 'name' | 'image'> }) {
-  return (
-    <Avatar>
-      <ModelImage artwork={model.image} name={model.name} />
-    </Avatar>
-  );
-}
-
 export function DesktopApp() {
   const [route, setRoute] = useState(createNavigation);
   const view = route.current;
@@ -139,15 +99,11 @@ export function DesktopApp() {
       SLIDE_SURFACE.WORKSPACE,
     );
   }
-  const [navigationWidth, setNavigationWidth] = useState<number>(
-    NAVIGATION_WIDTH.DEFAULT,
-  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR,
   );
-  const [contextOpen, setContextOpen] = useState(
-    () => window.innerWidth >= WORKSPACE_BREAKPOINT.CONTEXT,
-  );
+  const [contextOpen, setContextOpen] = useState(false);
+  const [managePaypal, setManagePaypal] = useState(false);
   const [sidebarMoving, setSidebarMoving] = useState(false);
   function toggleSidebar() {
     setSidebarMoving(true);
@@ -205,7 +161,7 @@ export function DesktopApp() {
     };
   }, []);
   const frameStyle: CSSProperties & { '--navigation-width': string } = {
-    '--navigation-width': navigationWidth + 'px',
+    '--navigation-width': NAVIGATION_WIDTH.DEFAULT + 'px',
     ...themeStyle(light),
   };
   const network = useLocalNode();
@@ -234,8 +190,6 @@ export function DesktopApp() {
     (typeof UI_DIALOG)[keyof typeof UI_DIALOG] | null
   >(null);
   const [paidModel, setPaidModel] = useState<Model | null>(null);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<ModelFilter>(MODEL_FILTER.ALL);
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
   const [chatController] = useState(() => new ChatController('first-chat'));
@@ -325,6 +279,7 @@ export function DesktopApp() {
   }
   function reviewPaypalPayments() {
     changePaymentMethod(PAYMENT_METHOD.PAYPAL);
+    setManagePaypal(true);
     navigate(UI_VIEW.PAYMENTS);
   }
   return (
@@ -339,17 +294,6 @@ export function DesktopApp() {
     >
       <header className="topbar">
         <div className="breadcrumb">
-          {sidebarCollapsed && (
-            <IconButton
-              className="sidebar-toggle"
-              label="Expand sidebar"
-              aria-controls="app-sidebar"
-              aria-expanded={false}
-              onClick={toggleSidebar}
-            >
-              <SidebarSimple size={18} />
-            </IconButton>
-          )}
           {route.history.length > 0 && (
             <IconButton
               label={`Back to ${navigation.find((item) => item.name === route.history.at(-1))?.label ?? route.history.at(-1)}`}
@@ -397,6 +341,13 @@ export function DesktopApp() {
         </div>
       </header>
       <BuyerSidebar
+        systemStatus={
+          <SystemStatus
+            state={network.state}
+            onRetry={network.retry}
+            onPayments={() => navigate(UI_VIEW.PAYMENTS)}
+          />
+        }
         view={view}
         collapsed={sidebarCollapsed}
         chat={chatController}
@@ -404,38 +355,16 @@ export function DesktopApp() {
         onCollapse={toggleSidebar}
         navigate={(next) => {
           navigate(next, false);
-          if (window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR)
-            setSidebarCollapsed(true);
         }}
         onNewChat={() => {
           chatRef.current?.newChat();
           navigate(UI_VIEW.CHAT, false);
-          if (window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR)
-            setSidebarCollapsed(true);
         }}
         onOpenChat={(id) => {
           chatRef.current?.openChat(id);
           navigate(UI_VIEW.CHAT, false);
-          if (window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR)
-            setSidebarCollapsed(true);
         }}
       />
-      <div
-        className="navigation-resizer"
-        inert={sidebarCollapsed}
-        aria-hidden={sidebarCollapsed || undefined}
-      >
-        <ResizeHandle
-          label="Resize navigation"
-          orientation="vertical"
-          value={navigationWidth}
-          min={NAVIGATION_WIDTH.MIN}
-          max={NAVIGATION_WIDTH.MAX}
-          initial={NAVIGATION_WIDTH.DEFAULT}
-          controls="app-sidebar app-workspace"
-          onChange={setNavigationWidth}
-        />
-      </div>
       <div id="app-workspace" className="app-body">
         <PageBody
           ref={content}
@@ -453,7 +382,7 @@ export function DesktopApp() {
                 navigate(UI_VIEW.ACTIVITY);
               }}
               active={view === UI_VIEW.CHAT}
-              showToolbar={sidebarCollapsed}
+              showToolbar={false}
               paymentMethod={paymentMethod}
               paymentControl={paymentSelector()}
               paypal={paypal}
@@ -470,119 +399,17 @@ export function DesktopApp() {
               }}
               onBrowseModels={() => navigate(UI_VIEW.MODELS)}
               onReviewPaypal={() => {
-                changePaymentMethod(PAYMENT_METHOD.PAYPAL);
-                navigate(UI_VIEW.PAYMENTS);
+                reviewPaypalPayments();
               }}
             />
           </div>
           {view === UI_VIEW.MODELS && (
-            <PagePanel>
-              <NetworkCatalogPanel
-                snapshot={announcements.snapshot}
-                onLookup={announcements.lookup}
-                onSelect={
-                  canSelectPreviewModel(paymentMethod) ? choose : undefined
-                }
-                selected={model.id}
-              />
-              <section aria-label="Preview models" className="ui-section">
-                {!canSelectPreviewModel(paymentMethod) && (
-                  <Note>
-                    This catalog is a USDC preview. PayPal Sandbox uses its
-                    configured local model.
-                  </Note>
-                )}
-                <div className="ui-toolbar">
-                  <SearchField
-                    label="Search catalog"
-                    placeholder="Search models or families"
-                    value={search}
-                    onValueChange={setSearch}
-                  />
-                  <div
-                    className="ui-segmented"
-                    role="group"
-                    aria-label="Filter models"
-                  >
-                    {Object.values(MODEL_FILTER).map((value) => (
-                      <Button
-                        key={value}
-                        aria-pressed={filter === value}
-                        onClick={() => setFilter(value)}
-                      >
-                        {value}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                <SectionTitle>Preview catalog</SectionTitle>
-                <List label="Model catalog">
-                  {MODELS.filter((item) =>
-                    matchesCatalog(item, search, filter),
-                  ).map((item) => (
-                    <ListRow
-                      key={item.id}
-                      leading={<ModelIcon model={item} />}
-                      onActivate={
-                        canSelectPreviewModel(paymentMethod)
-                          ? () => choose(item)
-                          : undefined
-                      }
-                      selected={
-                        canSelectPreviewModel(paymentMethod) &&
-                        model.id === item.id
-                      }
-                      trailing={
-                        <>
-                          <div className="ui-price">
-                            <strong>
-                              {item.free
-                                ? 'Free'
-                                : `$${item.input.toFixed(2)} / $${item.output.toFixed(2)}`}
-                            </strong>
-                            <small>
-                              {item.free
-                                ? 'Community supported'
-                                : 'In / out per 1M tokens'}
-                            </small>
-                          </div>
-                          {canSelectPreviewModel(paymentMethod) &&
-                            model.id === item.id && <Check size={16} />}
-                        </>
-                      }
-                    >
-                      <RowCopy
-                        title={item.name}
-                        detail={`${item.family} · ${item.context} context · ${item.providers} providers`}
-                      />
-                    </ListRow>
-                  ))}
-                  {!MODELS.some((item) =>
-                    matchesCatalog(item, search, filter),
-                  ) && (
-                    <p className="ui-list-empty">
-                      No models found. Try another name or filter.
-                    </p>
-                  )}
-                </List>
-              </section>
-              <InfoBar
-                leading={<Globe size={16} />}
-                trailing={
-                  <Button
-                    variant={BUTTON_VARIANT.SECONDARY}
-                    onClick={() => navigate(UI_VIEW.CHAT)}
-                  >
-                    Back to chat
-                  </Button>
-                }
-              >
-                <span>
-                  USDC Chat and Connect use simulated responses. PayPal Sandbox
-                  uses its local model.
-                </span>
-              </InfoBar>
-            </PagePanel>
+            <Models
+              selected={model.id}
+              canSelect={canSelectPreviewModel(paymentMethod)}
+              onSelect={choose}
+              catalog={announcements}
+            />
           )}
           {view === UI_VIEW.CONNECT && (
             <PaypalAgentConnection
@@ -599,135 +426,30 @@ export function DesktopApp() {
               onPayments={reviewPaypalPayments}
             />
           )}
-          {view === UI_VIEW.TOOLS && (
-            <PagePanel>
-              <ToolConnections />
-            </PagePanel>
-          )}
+          {view === UI_VIEW.TOOLS && <Applications />}
           {view === UI_VIEW.PAYMENTS && (
-            <PagePanel>
-              <div className="payments-method">
-                <div>
-                  <h2>How would you like to pay?</h2>
-                  <p>
-                    Select the method for chat. PayPal sessions also cover
-                    connected agents.
-                  </p>
-                </div>
-                <PaymentMethodSelector
-                  name="payment-method"
-                  value={paymentMethod}
-                  lockChange={
-                    chatBusy ||
-                    !canSwitchPaymentMethod(
-                      paymentMethod,
-                      PAYMENT_METHOD.USDC,
-                      paypalBusy,
-                    )
-                  }
-                  onChange={changePaymentMethod}
-                />
-                {paypalBusy && paymentMethod === PAYMENT_METHOD.PAYPAL && (
-                  <p role="status">
-                    Finish the current operation or confirm its response before
-                    switching.
-                  </p>
-                )}
-              </div>
-              <div className="payments-layout">
-                <div className="payments-primary">
-                  {paymentMethod === PAYMENT_METHOD.PAYPAL ? (
-                    <PaypalSessionPanel
-                      session={paypal}
-                      onChat={() => navigate(UI_VIEW.CHAT)}
-                    />
-                  ) : (
-                    <SettingsGroup
-                      leading={<CreditCard size={18} aria-hidden="true" />}
-                      title="PayPal"
-                      description="A session limit for chat and agents, separate from your USDC wallet."
-                    >
-                      <p className="ui-help-text">
-                        Use Sandbox test funds to approve a limit and send
-                        multiple messages.
-                      </p>
-                      <Button
-                        variant={BUTTON_VARIANT.TONAL}
-                        onClick={() =>
-                          changePaymentMethod(PAYMENT_METHOD.PAYPAL)
-                        }
-                      >
-                        Review or start a PayPal session
-                      </Button>
-                    </SettingsGroup>
-                  )}
-                </div>
-                <div className="payments-wallet">
-                  <SettingsGroup
-                    leading={<Wallet size={18} aria-hidden="true" />}
-                    title="USDC wallet"
-                    description="Your wallet, recovery backup and funding status."
-                  >
-                    <WalletDetails
-                      onBackup={() => setModal(UI_DIALOG.BACKUP)}
-                      onAddFunds={() => setModal(UI_DIALOG.ADD_FUNDS)}
-                    />
-                  </SettingsGroup>
-                  <SettingsGroup
-                    leading={<ChartBar size={18} aria-hidden="true" />}
-                    title="USDC spending"
-                    description="Chat preview only. PayPal has its own session limit."
-                  >
-                    <List label="Chat spending limit">
-                      <ListRow
-                        leading={null}
-                        trailing={
-                          <Button
-                            variant={BUTTON_VARIANT.TONAL}
-                            onClick={() => setModal(UI_DIALOG.BUDGET)}
-                          >
-                            Edit limit
-                          </Button>
-                        }
-                      >
-                        <RowCopy
-                          title="Daily limit"
-                          detail={money(budget) + ' per day'}
-                        />
-                      </ListRow>
-                    </List>
-                  </SettingsGroup>
-                </div>
-              </div>
-              <p className="payments-footnote">
-                PayPal does not add USDC to your wallet. Switching methods keeps
-                an open PayPal session and its connected agents active. The
-                selected method resets when Gyblos closes.
-              </p>
-            </PagePanel>
+            <Payments
+              session={paypal}
+              activity={activity}
+              managePaypal={managePaypal}
+              onManagePaypal={setManagePaypal}
+              onPaymentMethod={changePaymentMethod}
+              onChat={() => navigate(UI_VIEW.CHAT)}
+              onConnections={() => navigate(UI_VIEW.CONNECT)}
+              onActivity={(id) => {
+                setActivitySession(id ?? null);
+                navigate(UI_VIEW.ACTIVITY);
+              }}
+              onBackup={() => setModal(UI_DIALOG.BACKUP)}
+              onAddFunds={() => setModal(UI_DIALOG.ADD_FUNDS)}
+            />
           )}
           {view === UI_VIEW.SETTINGS && (
-            <PagePanel>
-              <div className="ui-section">
-                <SettingsGroup
-                  leading={<Palette size={18} aria-hidden="true" />}
-                  title="Appearance"
-                  description="Choose a light or dark interface."
-                >
-                  <Appearance
-                    light={light}
-                    onLightChange={setLight}
-                    label="Theme"
-                  />
-                  <Button
-                    variant={BUTTON_VARIANT.SECONDARY}
-                    onClick={() => setModal(UI_DIALOG.DESIGN_SYSTEM)}
-                  >
-                    Preview design system
-                  </Button>
-                </SettingsGroup>
-              </div>
-            </PagePanel>
+            <Settings
+              light={light}
+              onLightChange={setLight}
+              version={manifest.version}
+            />
           )}
           {view === UI_VIEW.ACTIVITY && (
             <Activity
@@ -736,8 +458,7 @@ export function DesktopApp() {
               selectedSession={activitySession}
               onSelectSession={setActivitySession}
               onPayments={() => {
-                changePaymentMethod(PAYMENT_METHOD.PAYPAL);
-                navigate(UI_VIEW.PAYMENTS);
+                reviewPaypalPayments();
               }}
               onOpenChat={(id) => {
                 chatController.openChat(id);
@@ -747,24 +468,6 @@ export function DesktopApp() {
           )}
         </PageBody>
       </div>
-      <footer className="app-footer" aria-label="Application status">
-        <NetworkStatus state={network.state} onRetry={network.retry} />
-        <Button
-          title="Wallet settings"
-          onClick={() => navigate(UI_VIEW.PAYMENTS)}
-        >
-          <Wallet size={14} />
-          {wallet.status === WALLET_STATUS.READY && !wallet.backupVerified
-            ? 'Wallet · Backup needed'
-            : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED ||
-                wallet.status === WALLET_STATUS.UNAVAILABLE
-              ? 'Wallet · Needs attention'
-              : 'Wallet'}
-        </Button>
-        <span className="footer-version" title="Gyblos version">
-          v{manifest.version}
-        </span>
-      </footer>
       <MotionPresence>
         {modal === UI_DIALOG.DESIGN_SYSTEM && (
           <Modal
@@ -839,7 +542,7 @@ export function DesktopApp() {
         {paidModel && (
           <Modal title="Use a paid model?" close={() => setPaidModel(null)}>
             <div className="paid-model-summary">
-              <ModelIcon model={paidModel} />
+              <ModelImage name={paidModel.name} artwork={paidModel.image} />
               <strong>{paidModel.name}</strong>
             </div>
             <div className="paid-terms">

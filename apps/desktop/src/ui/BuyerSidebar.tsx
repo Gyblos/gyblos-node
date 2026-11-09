@@ -1,17 +1,11 @@
 // Buyer navigation and local conversation history; never starts inference or payments.
-import {
-  ChatCircle,
-  GearSix,
-  Link,
-  Plus,
-  SidebarSimple,
-} from '@phosphor-icons/react';
-import { useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 
 import { CHAT_STORAGE_STATE, type ChatArchiveState } from '../constants';
 import type { ChatController } from './chat-controller';
-import { MAIN_NAV, UI_VIEW } from './constants';
+import { MAIN_NAV, SIDEBAR_ACTION, UI_VIEW } from './constants';
 import type { View } from './model-types';
+import { SidebarActionIcon } from './SidebarActionIcon';
 import { SidebarIcon } from './SidebarIcon';
 import { Badge, Button, IconButton, SearchField } from './UI';
 
@@ -24,6 +18,7 @@ type Props = {
   onNewChat: () => void;
   onOpenChat: (id: string) => void;
   onCollapse: () => void;
+  systemStatus: ReactNode;
 };
 
 function NavigationItem({
@@ -37,12 +32,17 @@ function NavigationItem({
 }) {
   return (
     <Button
-      className="ui-nav-row"
+      className="ui-nav-row ui-sidebar-motion-control"
+      aria-label={item.label}
       aria-current={view === item.name ? 'page' : undefined}
       onClick={() => navigate(item.name)}
     >
       {item.name === UI_VIEW.CONNECT ? (
-        <Link size={20} />
+        <SidebarActionIcon kind={SIDEBAR_ACTION.LINK} />
+      ) : item.name === UI_VIEW.PAYMENTS ? (
+        <SidebarActionIcon kind={SIDEBAR_ACTION.WALLET} />
+      ) : item.name === UI_VIEW.TOOLS ? (
+        <SidebarActionIcon kind={SIDEBAR_ACTION.TOOLS} />
       ) : (
         <SidebarIcon name={item.name} />
       )}
@@ -57,7 +57,8 @@ function ConversationList({
   view,
   onOpenChat,
   storageState,
-}: Pick<Props, 'chat' | 'view' | 'onOpenChat' | 'storageState'>) {
+  collapsed,
+}: Pick<Props, 'chat' | 'view' | 'onOpenChat' | 'storageState' | 'collapsed'>) {
   const { sessions, activeId } = useSyncExternalStore(
     chat.subscribe,
     chat.getSnapshot,
@@ -78,8 +79,14 @@ function ConversationList({
     .slice()
     .reverse();
   return (
-    <section className="ui-sidebar-history" aria-label="Conversation history">
+    <section
+      className="ui-sidebar-history"
+      aria-label="Conversation history"
+      inert={collapsed}
+      aria-hidden={collapsed || undefined}
+    >
       <SearchField
+        className="ui-sidebar-motion-control"
         label="Search conversations"
         placeholder="Search conversations"
         value={search}
@@ -90,7 +97,7 @@ function ConversationList({
         {history.map((session) => (
           <Button
             key={session.id}
-            className="ui-nav-row"
+            className="ui-nav-row ui-sidebar-motion-control"
             disabled={loading}
             aria-current={
               view === UI_VIEW.CHAT && activeId === session.id
@@ -99,7 +106,7 @@ function ConversationList({
             }
             onClick={() => onOpenChat(session.id)}
           >
-            <ChatCircle size={18} />
+            <SidebarActionIcon kind={SIDEBAR_ACTION.CHAT} />
             <span>{session.title}</span>
           </Button>
         ))}
@@ -119,31 +126,30 @@ function ConversationList({
 
 export function BuyerSidebar(props: Props) {
   return (
-    <aside
-      id="app-sidebar"
-      className="sidebar buyer-sidebar"
-      inert={props.collapsed}
-      aria-hidden={props.collapsed || undefined}
-    >
+    <aside id="app-sidebar" className="sidebar buyer-sidebar">
       <div className="ui-sidebar-brand">
-        <img
-          src="./assets/brand/gyblos-icon.png"
-          alt=""
-          width="32"
-          height="32"
-        />
+        <code className="ui-brand-mark" aria-hidden="true">
+          [g]
+        </code>
         <strong>Gyblos</strong>
-        <IconButton label="Collapse sidebar" onClick={props.onCollapse}>
-          <SidebarSimple size={18} />
+        <IconButton
+          label={props.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!props.collapsed}
+          aria-controls="app-sidebar"
+          className="ui-sidebar-motion-control"
+          onClick={props.onCollapse}
+        >
+          <SidebarActionIcon kind={SIDEBAR_ACTION.PANEL} />
         </IconButton>
       </div>
       <nav aria-label="Main navigation" className="ui-sidebar-primary">
         <Button
-          className="ui-nav-row"
+          className="ui-nav-row ui-sidebar-motion-control"
+          aria-label="New chat"
           disabled={props.storageState === CHAT_STORAGE_STATE.LOADING}
           onClick={props.onNewChat}
         >
-          <Plus size={20} />
+          <SidebarActionIcon kind={SIDEBAR_ACTION.CREATE} />
           <span>New chat</span>
         </Button>
         {MAIN_NAV.filter(
@@ -174,13 +180,15 @@ export function BuyerSidebar(props: Props) {
           />
         ))}
         <Button
-          className="ui-nav-row"
+          className="ui-nav-row ui-sidebar-motion-control"
+          aria-label="Settings"
           aria-current={props.view === UI_VIEW.SETTINGS ? 'page' : undefined}
           onClick={() => props.navigate(UI_VIEW.SETTINGS)}
         >
-          <GearSix size={20} />
+          <SidebarActionIcon kind={SIDEBAR_ACTION.SETTINGS} />
           <span>Settings</span>
         </Button>
+        {props.systemStatus}
       </nav>
     </aside>
   );

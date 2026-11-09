@@ -1,99 +1,85 @@
-// Lists session-level usage without treating an authorization or consumption as a payment.
-import { ArrowRight } from '@phosphor-icons/react';
-import { useState } from 'react';
-
+// Presents actual locally observed sessions in the shared, bounded table.
 import type { ActivityEntry } from '../activity-model';
 import { DESKTOP_ACTIVITY } from '../constants';
+import type { PaypalPaymentReference } from '../payment-reference-model';
 import { paypalDollars } from '../paypal-model';
 import { activityDate, sessionOutcome } from './activity-presentation';
-import { DataCell, DataTable } from './DataTable';
-import { Button, SearchField } from './UI';
+import { DataCell } from './DataTable';
+import type { HistoryMethod } from './history-constants';
+import { referenceHeading } from './history-presentation';
+import { PaymentReference } from './PaymentReference';
+import { ScrollTable } from './ScrollTable';
+import { Button } from './UI';
 
 export function ActivitySessions({
   entries,
+  references,
+  method,
+  resetKey,
   onSelect,
 }: {
   entries: ActivityEntry[];
-  onSelect(id: string): void;
-}) {
-  const [query, setQuery] = useState('');
-  const ordered = [...entries].sort(
-    (left, right) => right.updatedAt - left.updatedAt,
-  );
-  const visible = ordered.filter((entry) =>
-    `${entry.id} ${sessionOutcome(entry)}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
-  return (
-    <>
-      <SearchField
-        label="Search sessions"
-        value={query}
-        onValueChange={setQuery}
-        placeholder="Session or status…"
-      />
-      <DataTable
-        caption="Recorded consumption and captured payments for locally observed PayPal Sandbox sessions"
-        headings={['Session', 'Chat', 'Agents', 'Recorded', 'Payment']}
-      >
-        {visible.map((entry) => (
-          <SessionRow key={entry.id} entry={entry} onSelect={onSelect} />
-        ))}
-      </DataTable>
-      {!visible.length && (
-        <p className="ui-list-empty">No sessions match your search.</p>
-      )}
-      <p className="activity-footnote">
-        Recorded usage is consumption, not a payment. Capture is shown only
-        after Gyblos records a successful capture. Dates show when this device
-        observed a session; earlier sessions may be unavailable.
-      </p>
-    </>
-  );
-}
-function SessionRow({
-  entry,
-  onSelect,
-}: {
-  entry: ActivityEntry;
+  references: PaypalPaymentReference[];
+  method: HistoryMethod;
+  resetKey: string;
   onSelect(id: string): void;
 }) {
   return (
-    <tr role="row">
-      <th scope="row" role="rowheader">
-        <Button onClick={() => onSelect(entry.id)} title="View session details">
-          Session {entry.id.slice(0, DESKTOP_ACTIVITY.DISPLAY_ID_CHARACTERS)}
-          <ArrowRight size={14} />
-        </Button>
-        <span className="activity-row-meta">
-          Observed {activityDate(entry.firstObservedAt)}
-        </span>
-      </th>
-      <DataCell label="Chat">
-        {paypalDollars(entry.chatCents)}
-        <span className="activity-row-meta">{entry.chatCount} replies</span>
-      </DataCell>
-      <DataCell label="Agents">
-        {paypalDollars(entry.agentCents)}
-        <span className="activity-row-meta">{entry.agentCount} inferences</span>
-      </DataCell>
-      <DataCell label="Recorded">
-        {paypalDollars(entry.recordedCents)}
-        {entry.unconfirmedCents > 0 && (
-          <span className="activity-row-meta">
-            {paypalDollars(entry.unconfirmedCents)} unconfirmed
-          </span>
-        )}
-      </DataCell>
-      <DataCell label="Payment">
-        <strong>
-          {entry.capturedCents === null
-            ? '—'
-            : paypalDollars(entry.capturedCents)}
-        </strong>
-        <span className="activity-row-meta">{sessionOutcome(entry)}</span>
-      </DataCell>
-    </tr>
+    <ScrollTable
+      caption="Session usage and confirmed payments observed on this device"
+      headings={[
+        'Session',
+        'Chat',
+        'Agents',
+        'Usage',
+        'Paid',
+        referenceHeading(method),
+        'Details',
+      ]}
+      resetKey={resetKey}
+    >
+      {entries.map((entry) => (
+        <tr key={entry.id} role="row">
+          <th scope="row">
+            <strong>
+              Session{' '}
+              {entry.id.slice(0, DESKTOP_ACTIVITY.DISPLAY_ID_CHARACTERS)}
+            </strong>
+            <span className="activity-row-meta">
+              PayPal · {activityDate(entry.firstObservedAt)}
+            </span>
+          </th>
+          <DataCell label="Chat">
+            {paypalDollars(entry.chatCents)}
+            <span className="activity-row-meta">{entry.chatCount} replies</span>
+          </DataCell>
+          <DataCell label="Agents">
+            {paypalDollars(entry.agentCents)}
+            <span className="activity-row-meta">
+              {entry.agentCount} inferences
+            </span>
+          </DataCell>
+          <DataCell label="Usage">
+            {paypalDollars(entry.recordedCents)}
+          </DataCell>
+          <DataCell label="Paid">
+            <strong>
+              {entry.capturedCents === null
+                ? '—'
+                : '− ' + paypalDollars(entry.capturedCents)}
+            </strong>
+            <span className="activity-row-meta">{sessionOutcome(entry)}</span>
+          </DataCell>
+          <DataCell label={referenceHeading(method)}>
+            <PaymentReference
+              reference={references.find((row) => row.sessionId === entry.id)}
+            />
+          </DataCell>
+          <DataCell label="Details">
+            <Button onClick={() => onSelect(entry.id)}>View</Button>
+          </DataCell>
+        </tr>
+      ))}
+    </ScrollTable>
   );
 }

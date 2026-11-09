@@ -13,10 +13,12 @@ import { ActivityHistory } from './activity-history';
 import type { SessionActivity } from './activity-model';
 import { ActivityObserver } from './activity-observer';
 import { DESKTOP_ACTIVITY } from './constants';
+import type { PaypalPaymentReference } from './payment-reference-model';
 
 export function createDesktopActivityStorage(
   directory: string | undefined,
   current: () => SessionActivity | null,
+  currentReference?: () => PaypalPaymentReference | null,
 ) {
   const paths =
     directory && isAbsolute(directory) ? desktopActivityPaths(directory) : null;
@@ -48,5 +50,8 @@ export function createDesktopActivityStorage(
       const lock = await ownership?.catch(() => null);
       await lock?.release();
     },
+    DESKTOP_ACTIVITY.IO_TIMEOUT_MS,
+    currentReference,
+    () => new ActivityHistory({ read, write: files.write }).references(),
   );
 }

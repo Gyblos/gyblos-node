@@ -60,7 +60,8 @@
     "./buyer-paid-error": "./src/buyer-paid-error.ts",
     "./buyer-reconcile": "./src/buyer-reconcile.ts",
     "./buyer-withdraw": "./src/buyer-withdraw.ts",
-    "./seller-chain": "./src/seller-chain.ts"
+    "./seller-chain": "./src/seller-chain.ts",
+    "./paypal-payment-reference": "./src/paypal-payment-reference.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

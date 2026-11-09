@@ -1,26 +1,25 @@
-// Presents local consumption and payment outcomes without initiating financial work.
-import { ChatCircle, CreditCard } from '@phosphor-icons/react';
-import { useSyncExternalStore } from 'react';
+// Reads consumption and payments without initiating financial work or showing stale totals.
+import { useState, useSyncExternalStore } from 'react';
 
-import { activityDate } from './activity-presentation';
+import type { ActivityEntry } from '../activity-model';
+import type { PaypalPaymentReference } from '../payment-reference-model';
 import { ActivitySessionDetails } from './ActivitySessionDetails';
 import { ActivitySessions } from './ActivitySessions';
-import { ActivityStats } from './ActivityStats';
 import type { ChatController } from './chat-controller';
-import { conversationSummary } from './chat-history';
-import type { ChatSession } from './chat-state';
 import { BUTTON_VARIANT } from './constants';
 import {
-  Badge,
-  Button,
-  EmptyState,
-  List,
-  ListRow,
-  Note,
-  PagePanel,
-  RowCopy,
-  SectionTitle,
-} from './UI';
+  FINANCIAL_TONE,
+  HISTORY,
+  HISTORY_METHOD,
+  HISTORY_PERIOD,
+  HISTORY_SOURCE,
+  type HistoryMethod,
+} from './history-constants';
+import { filterHistory } from './history-presentation';
+import { HistorySummary } from './HistorySummary';
+import { ChoiceMenu, StatePanel } from './Management';
+import { Pagination } from './Pagination';
+import { Badge, Button, PagePanel, SearchField } from './UI';
 import type { ActivityView } from './useActivity';
 
 type Props = {
@@ -43,15 +42,52 @@ export function Activity({
     chat.subscribe,
     chat.getSnapshot,
   );
-  const entries = activity.state?.sessions ?? [];
+  const [query, setQuery] = useState('');
+  const [method, setMethod] = useState<HistoryMethod>(HISTORY_METHOD.ALL);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(HISTORY.PAGE_SIZES[0]);
+  const available = activity.state?.available === true;
+  const entries = activity.state?.available ? activity.state.sessions : [];
+  const references = activity.references.available
+    ? activity.references.references
+    : [];
+  const visible = filterHistory(
+    entries,
+    {
+      method,
+      period: HISTORY_PERIOD.ALL,
+      source: HISTORY_SOURCE.ALL,
+      query,
+      now: Date.now(),
+    },
+    references,
+  );
+  const currentPage = Math.min(
+    page,
+    Math.max(1, Math.ceil(visible.length / pageSize)),
+  );
   const selected = entries.find((entry) => entry.id === selectedSession);
   return (
     <PagePanel>
-      <div className="activity-heading">
-        <div>
-          <h2>Activity</h2>
-          <p>Consumption and payments, session by session.</p>
-        </div>
+      <div className="ui-toolbar">
+        <SearchField
+          label="Search sessions"
+          placeholder="Search sessions"
+          value={query}
+          onValueChange={(value) => {
+            setQuery(value);
+            setPage(1);
+          }}
+        />
+        <ChoiceMenu
+          label="Payment method filter"
+          value={method}
+          options={Object.values(HISTORY_METHOD)}
+          onChange={(value) => {
+            setMethod(value);
+            setPage(1);
+          }}
+        />
         <Button
           variant={BUTTON_VARIANT.SECONDARY}
           onClick={() => {
@@ -60,41 +96,28 @@ export function Activity({
         >
           Refresh
         </Button>
+        <Badge>Sandbox</Badge>
       </div>
-      {activity.state === null ? (
-        <Note>Loading activity…</Note>
-      ) : (
-        <>
-          {!activity.state.available && (
-            <Note>
-              History is incomplete: local storage could not be read or saved.
-              Visible totals cover only the records available here. Review
-              Payments for the current session.
-            </Note>
-          )}
-          <ActivityStats entries={entries} />
-          <SectionTitle trailing={<Badge>Test funds</Badge>}>
-            PayPal sessions
-          </SectionTitle>
-          {entries.length ? (
-            <ActivitySessions entries={entries} onSelect={onSelectSession} />
-          ) : (
-            <NoPaypalActivity onPayments={onPayments} />
-          )}
-        </>
-      )}
-      <PreviewActivity conversations={conversations} onOpenChat={onOpenChat} />
-      {selectedSession && !selected && activity.state !== null && (
-        <Note>
-          This session is not available in the local payment history.{' '}
-          <Button onClick={() => onSelectSession(null)}>
-            Show all sessions
-          </Button>
-        </Note>
-      )}
+      {available && <HistorySummary entries={visible} method={method} />}
+      <ActivityResults
+        activity={activity}
+        available={available}
+        entries={entries}
+        visible={visible}
+        references={references}
+        method={method}
+        query={query}
+        currentPage={currentPage}
+        pageSize={pageSize}
+        onSelectSession={onSelectSession}
+        setPage={setPage}
+        setPageSize={setPageSize}
+        onPayments={onPayments}
+      />
       {selected && (
         <ActivitySessionDetails
           entry={selected}
+          reference={references.find((row) => row.sessionId === selected.id)}
           conversations={conversations}
           close={() => onSelectSession(null)}
           onOpenChat={onOpenChat}
@@ -108,58 +131,94 @@ export function Activity({
     </PagePanel>
   );
 }
-function PreviewActivity({
-  conversations,
-  onOpenChat,
+
+function ActivityResults({
+  activity,
+  available,
+  entries,
+  visible,
+  references,
+  method,
+  query,
+  currentPage,
+  pageSize,
+  onSelectSession,
+  setPage,
+  setPageSize,
+  onPayments,
 }: {
-  conversations: ChatSession[];
-  onOpenChat(id: string): void;
+  activity: ActivityView;
+  available: boolean;
+  entries: ActivityEntry[];
+  visible: ActivityEntry[];
+  references: PaypalPaymentReference[];
+  method: HistoryMethod;
+  query: string;
+  currentPage: number;
+  pageSize: number;
+  onSelectSession(id: string | null): void;
+  setPage(page: number): void;
+  setPageSize(size: number): void;
+  onPayments(): void;
 }) {
-  const previews = conversations
-    .map((session) => ({ session, summary: conversationSummary(session) }))
-    .filter((item) => item.summary.previewReplies > 0);
-  return (
+  if (!available) return <ActivityUnavailable activity={activity} />;
+  return visible.length ? (
     <>
-      <SectionTitle trailing={<Badge>Simulated · no payment</Badge>}>
-        USDC preview
-      </SectionTitle>
-      <List label="USDC preview conversations">
-        {previews.map(({ session, summary }) => (
-          <ListRow
-            key={session.id}
-            leading={<ChatCircle size={18} />}
-            onActivate={() => onOpenChat(session.id)}
-            trailing={<Badge>{summary.previewReplies} simulated replies</Badge>}
-          >
-            <RowCopy
-              title={session.title}
-              detail={
-                summary.lastSentAt === null
-                  ? 'Time unavailable'
-                  : activityDate(summary.lastSentAt)
-              }
-            />
-          </ListRow>
-        ))}
-        {!previews.length && (
-          <p className="ui-list-empty">No saved preview replies.</p>
+      <ActivitySessions
+        entries={visible.slice(
+          (currentPage - 1) * pageSize,
+          currentPage * pageSize,
         )}
-      </List>
+        references={references}
+        method={method}
+        resetKey={[currentPage, pageSize, query, method].join('|')}
+        onSelect={onSelectSession}
+      />
+      <Pagination
+        page={currentPage}
+        pageSize={pageSize}
+        total={visible.length}
+        onPage={setPage}
+        onPageSize={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
     </>
+  ) : (
+    <StatePanel
+      title={entries.length ? 'No matching sessions' : 'No activity yet'}
+      description={
+        method === HISTORY_METHOD.USDC
+          ? 'USDC payment history is not available in this version. Simulated chat replies are not payments.'
+          : 'Chat and agent usage will appear here.'
+      }
+      action={<Button onClick={onPayments}>Go to Payments</Button>}
+    />
   );
 }
 
-function NoPaypalActivity({ onPayments }: { onPayments(): void }) {
-  return (
-    <div>
-      <EmptyState
-        icon={<CreditCard size={24} />}
-        title="No recorded PayPal sessions"
-        description="Authorize a session in Payments. Chat and Agents will share its limit and appear here."
-      />
-      <Button variant={BUTTON_VARIANT.SECONDARY} onClick={onPayments}>
-        Go to Payments
-      </Button>
-    </div>
+function ActivityUnavailable({ activity }: { activity: ActivityView }) {
+  return activity.state === null ? (
+    <StatePanel
+      title="Loading activity…"
+      description="Reading sessions and payments on this device."
+      loading
+    />
+  ) : (
+    <StatePanel
+      title="Activity unavailable"
+      tone={FINANCIAL_TONE.FAILED}
+      description="Your local history could not be checked."
+      action={
+        <Button
+          onClick={() => {
+            void activity.refresh();
+          }}
+        >
+          Try again
+        </Button>
+      }
+    />
   );
 }

@@ -128,6 +128,8 @@ export const LOCAL_NODE = {
 
 // Local activity is descriptive metadata, never payment authority.
 export const DESKTOP_ACTIVITY = {
+  REFERENCE_VERSION: 2,
+  REFERENCES_CHANNEL: 'desktop:activity-references',
   CHANNEL: 'desktop:activity:summary',
   IO_TIMEOUT_MS: 1000,
   VERSION: 1,

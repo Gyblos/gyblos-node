@@ -19,6 +19,7 @@ import {
   preparePaypalAgentRequest,
   validatePaypalAgentResult,
 } from './paypal-agent-validation';
+import { paypalPaymentReference } from './paypal-payment-reference';
 import { paypalSessionActivity } from './paypal-session-activity';
 import {
   parsePaypalSessionState,
@@ -41,8 +42,10 @@ import {
 import { checkVoid, fail } from './paypal-session-void-check';
 
 export type { PaypalSessionRecord } from './paypal-session-record';
-export type { PaypalReviewJournal } from './paypal-session-review';
-export type { PaypalWaiverArchive } from './paypal-session-review';
+export type {
+  PaypalReviewJournal,
+  PaypalWaiverArchive,
+} from './paypal-session-review';
 export type { PaypalSessionDependencies } from './paypal-session-support';
 class PaypalSession {
   private busy = false;
@@ -95,6 +98,7 @@ class PaypalSession {
     );
   }
   activity = () => paypalSessionActivity(this.active, this.status());
+  paymentReference = () => paypalPaymentReference(this.active, this.status());
   checkVoidedAuthorization = () =>
     checkVoid(this.check(PHASE.VOIDING), this.deps, this.exclusive, (busy) => {
       this.busy = busy;

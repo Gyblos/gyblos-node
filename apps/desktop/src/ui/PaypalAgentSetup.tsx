@@ -1,6 +1,4 @@
 // Local API fields and setup guides; credentials and clipboard remain owned by the host.
-import { Key, Link } from '@phosphor-icons/react';
-
 import {
   canCreatePaypalAgent,
   PAYPAL_AGENT_ACTION,
@@ -20,6 +18,7 @@ import {
   type ConnectionPreset,
 } from './constants';
 import { CopyField, FormActions } from './Form';
+import { StatePanel } from './Management';
 import { Modal } from './Modal';
 import { Button } from './UI';
 
@@ -69,19 +68,7 @@ function ConnectionFields({
           void copy(PAYPAL_AGENT_COPY.URL, 'URL');
         }}
       />
-      <CopyField
-        id="agent-model"
-        label="Model"
-        value={connection.model}
-        actionLabel="Copy model"
-        disabled={disabled}
-        onCopy={() => {
-          void copy(PAYPAL_AGENT_COPY.MODEL, 'Model');
-        }}
-      />
-      <p className="ui-help-text">
-        Use these details in your app's provider settings.
-      </p>
+      <p className="ui-help-text">One shared connection for your tools.</p>
     </section>
   );
 }
@@ -103,15 +90,19 @@ export function PaypalAgentSetup(props: SetupProps) {
     sessionReady,
   );
   return (
-    <section className="ui-connection-entry" aria-label="Create API connection">
-      <div className="ui-entry-art" aria-hidden="true">
-        <Key size={40} />
-        <Link size={40} />
-      </div>
-      <div className="ui-section">
-        <h3>Your local API connection</h3>
-        <p className="ui-help-text">One connection for your tools.</p>
-        {paymentsNeeded ? (
+    <StatePanel
+      title={
+        paymentsNeeded
+          ? 'Authorize a session to connect'
+          : 'Create your API connection'
+      }
+      description={
+        paymentsNeeded
+          ? 'Approve a session in Payments, then return here to connect your tools.'
+          : 'Generate an API key and Base URL for your tools.'
+      }
+      action={
+        paymentsNeeded ? (
           <Button variant={BUTTON_VARIANT.PRIMARY} onClick={onPayments}>
             Go to Payments
           </Button>
@@ -133,17 +124,9 @@ export function PaypalAgentSetup(props: SetupProps) {
           >
             Create API connection
           </Button>
-        )}
-        <div className="ui-inline-actions">
-          <span className="ui-help-text">
-            {sessionReady
-              ? 'Payment session ready'
-              : 'Prepare a payment session to connect.'}
-          </span>
-          <Button onClick={onPayments}>View payments</Button>
-        </div>
-      </div>
-    </section>
+        )
+      }
+    />
   );
 }
 

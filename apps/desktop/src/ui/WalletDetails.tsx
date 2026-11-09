@@ -77,14 +77,14 @@ export function WalletDetails({
       </div>
       <div className="settings-restriction wallet-balance">
         <div>
-          <span>Balance preview</span>
+          <span>Available balance</span>
           <strong>
-            0.0 <small>USDC</small>
+            — <small>USDC</small>
           </strong>
         </div>
         <Button
           variant={BUTTON_VARIANT.PRIMARY}
-          disabled={!ready || busy}
+          disabled={!wallet.fundingEnabled || busy}
           onClick={onAddFunds}
         >
           <Plus size={16} aria-hidden="true" /> Add funds

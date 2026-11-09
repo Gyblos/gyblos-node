@@ -1,5 +1,5 @@
 // Guides API clients to one existing local connection, without changing payment authorization.
-import { Code } from '@phosphor-icons/react';
+import { CheckCircle } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import {
@@ -11,10 +11,12 @@ import {
 import type { PaypalResult } from '../paypal-model';
 import { ConnectionContext, connectionUsageMessage } from './ConnectionContext';
 import {
+  BUTTON_VARIANT,
   CONNECTION_PRESET,
   PAYPAL_AGENT_CARDS,
   type ConnectionPreset,
 } from './constants';
+import { Modal } from './Modal';
 import { usePaypalAgentConnection } from './paypal-agent-connection-hook';
 import { ConnectionGuide, PaypalAgentSetup } from './PaypalAgentSetup';
 import { ServiceLogo } from './ServiceLogo';
@@ -30,11 +32,13 @@ function ClientSelector({
 }) {
   return (
     <div
-      className="ui-choice-grid ui-choice-grid--compact"
+      className="ui-choice-grid ui-choice-grid--compact ui-choice-grid--four"
       role="radiogroup"
       aria-label="Choose a setup guide"
     >
-      {PAYPAL_AGENT_CARDS.map((item) => (
+      {PAYPAL_AGENT_CARDS.filter(
+        (item) => item.client !== CONNECTION_PRESET.GENERIC,
+      ).map((item) => (
         <ChoiceCard
           key={item.client}
           name="connection-preset"
@@ -44,13 +48,7 @@ function ClientSelector({
               <Badge>Experimental</Badge>
             ) : undefined
           }
-          leading={
-            item.client === CONNECTION_PRESET.GENERIC ? (
-              <Code size={24} />
-            ) : (
-              <ServiceLogo service={item.client} />
-            )
-          }
+          leading={<ServiceLogo service={item.client} />}
           selected={preset === item.client}
           onSelect={() => select(item.client)}
           stacked
@@ -79,22 +77,24 @@ function SetupGuides({
   preset: ConnectionPreset;
   setPreset: (preset: ConnectionPreset) => void;
   connected: boolean;
-  onGuide: () => void;
+  onGuide: (preset: ConnectionPreset) => void;
 }) {
   return (
     <section className="ui-separated-section" aria-label="Setup guides">
-      <h3>{connected ? 'Set up your tool' : 'Setup guides'}</h3>
+      <h3>{connected ? 'Set up your tool' : 'Explore setup guides'}</h3>
       <ClientSelector preset={preset} select={setPreset} />
       <div className="ui-guide-actions">
-        <p className="ui-help-text">
-          {preset === CONNECTION_PRESET.GENERIC
-            ? 'OpenAI-compatible · Chat Completions'
-            : 'A setup guide for this shared connection.'}
-        </p>
-        <Button onClick={onGuide}>
-          {preset === CONNECTION_PRESET.GENERIC
-            ? 'View example request'
-            : `Set up ${preset}`}
+        <Button
+          variant={
+            connected ? BUTTON_VARIANT.PRIMARY : BUTTON_VARIANT.SECONDARY
+          }
+          aria-haspopup="dialog"
+          onClick={() => onGuide(preset)}
+        >
+          Set up {preset}
+        </Button>
+        <Button onClick={() => onGuide(CONNECTION_PRESET.GENERIC)}>
+          Other tools
         </Button>
       </div>
     </section>
@@ -112,22 +112,23 @@ function ConnectionFooter({
   'connection' | 'busy' | 'run' | 'statusUnavailable'
 > &
   Pick<Props, 'onPayments'>) {
+  const [confirm, setConfirm] = useState(false);
   if (!connection) return null;
   const failed =
     connection.usageState === PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED;
   return (
-    <div className="ui-connection-footer">
+    <section className="ui-separated-section" aria-label="Connection access">
+      <h3>Connection access</h3>
+      <p className="ui-help-text">Stop new requests from connected tools.</p>
       <Button
         disabled={busy || connection.disconnecting}
-        onClick={() => {
-          void run(PAYPAL_AGENT_ACTION.DISCONNECT);
-        }}
+        onClick={() => setConfirm(true)}
       >
         {failed
           ? 'Retry disconnect'
           : connection.disconnecting
             ? 'Disconnecting…'
-            : 'Disconnect'}
+            : 'Disconnect all tools'}
       </Button>
       <p className="ui-help-text">
         Shared by all tools. An inference already running can finish and count.
@@ -135,7 +136,30 @@ function ConnectionFooter({
       {(connection.usageUncertain || statusUnavailable) && (
         <Button onClick={onPayments}>Review payments</Button>
       )}
-    </div>
+      {confirm && (
+        <Modal title="Disconnect all tools?" close={() => setConfirm(false)}>
+          <div className="ui-section">
+            <p className="ui-help-text">
+              Stops new requests from every tool using this connection. An
+              inference already running can finish and count. Your payment
+              session stays open.
+            </p>
+            <div className="ui-inline-actions">
+              <Button onClick={() => setConfirm(false)}>Keep connection</Button>
+              <Button
+                variant={BUTTON_VARIANT.SECONDARY}
+                onClick={() => {
+                  setConfirm(false);
+                  void run(PAYPAL_AGENT_ACTION.DISCONNECT);
+                }}
+              >
+                Disconnect all tools
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </section>
   );
 }
 
@@ -151,16 +175,12 @@ function ConnectionHeading({
   const ready = paypalAgentIsReady(connection, busy, statusUnavailable);
   return (
     <>
-      <header className="ui-page-heading">
-        <h2>Use Gyblos in your tools</h2>
-        <p>
-          {ready
-            ? 'Your API details, ready for a compatible app.'
-            : connection
-              ? 'Review this connection before starting another request.'
-              : 'Create an API key and local URL for compatible apps.'}
-        </p>
-      </header>
+      {ready && (
+        <div className="ui-connection-state-label">
+          <CheckCircle size={18} aria-hidden="true" />
+          <span>Connection ready</span>
+        </div>
+      )}
       {!ready && (connection || statusUnavailable || busy) && (
         <p className="ui-inline-notice" role="status">
           {statusUnavailable
@@ -195,9 +215,9 @@ export function PaypalAgentConnection({
   const endpoint = usePaypalAgentConnection();
   const { connection, busy, notice, statusUnavailable, run } = endpoint;
   const [preset, setPreset] = useState<ConnectionPreset>(
-    CONNECTION_PRESET.GENERIC,
+    PAYPAL_AGENT_CLIENT.OPENCODE,
   );
-  const [guideOpen, setGuideOpen] = useState(false);
+  const [guidePreset, setGuidePreset] = useState<ConnectionPreset | null>(null);
   const setup = { ...endpoint, onlyConnected, sessionReady, onPayments };
   const context = (
     <ConnectionContext
@@ -221,7 +241,7 @@ export function PaypalAgentConnection({
           preset={preset}
           setPreset={setPreset}
           connected={!!connection}
-          onGuide={() => setGuideOpen(true)}
+          onGuide={setGuidePreset}
         />
         <ConnectionFooter
           connection={connection}
@@ -235,11 +255,11 @@ export function PaypalAgentConnection({
             {notice}
           </p>
         )}
-        {guideOpen && (
+        {guidePreset && (
           <ConnectionGuide
             {...endpoint}
-            preset={preset}
-            close={() => setGuideOpen(false)}
+            preset={guidePreset}
+            close={() => setGuidePreset(null)}
           />
         )}
       </div>

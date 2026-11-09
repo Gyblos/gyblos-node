@@ -45,7 +45,7 @@ export function ModelDropdown({
     <Dropdown
       searchLabel="Search models"
       label={label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')}
-      className={toolbar ? 'model-picker' : undefined}
+      className={toolbar ? 'model-picker' : 'ui-model-trigger'}
       trigger={
         <>
           <ModelImage artwork={model.image} name={model.name} />

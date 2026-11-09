@@ -8,12 +8,14 @@ import {
 
 import type { ActivityEntry } from '../activity-model';
 import { DESKTOP_ACTIVITY } from '../constants';
+import type { PaypalPaymentReference } from '../payment-reference-model';
 import { paypalDollars } from '../paypal-model';
 import { activityDate, sessionOutcome } from './activity-presentation';
 import { conversationSummary } from './chat-history';
 import type { ChatSession } from './chat-state';
 import { BUTTON_VARIANT } from './constants';
 import { Modal } from './Modal';
+import { PaymentReferenceDetails } from './PaymentReference';
 import {
   Badge,
   Button,
@@ -27,6 +29,7 @@ import {
 
 type Props = {
   entry: ActivityEntry;
+  reference?: PaypalPaymentReference;
   conversations: ChatSession[];
   close(): void;
   onOpenChat(id: string): void;
@@ -35,6 +38,7 @@ type Props = {
 };
 export function ActivitySessionDetails({
   entry,
+  reference,
   conversations,
   close,
   onOpenChat,
@@ -63,6 +67,7 @@ export function ActivitySessionDetails({
         />
       </div>
       <SessionPayment entry={entry} />
+      <PaymentReferenceDetails reference={reference} />
       {entry.needsReview && (
         <Note>
           An unfinished operation needs review. An uncertain inference may be
