@@ -77,6 +77,15 @@ introduced. OTel destinations and consent configuration remain separate work.
   attest transport delivery. Buyer `completed` means its execution client
   returned a verified result and cancellation did not win. Buyer usage is the
   verified response's usage, not a new independent tokenizer recount.
+- Seller `completed` and `failed` on an Iroh data channel carry `path`: `route`
+  is the last direct (`iroh-direct`) or relay (`iroh-relay`) path the seller's
+  connection had selected during the request, and `routeChanged` is true when an
+  earlier sample saw the other one (usually relay, then direct). `unknown` means
+  neither was ever selected and is a defect, not a normal route. Seller
+  `completed` also carries `generationMs`, the engine's own generation time for
+  the output tokens, when the engine reports it (Ollama does); output tokens per
+  second is `outputTokens / generationMs × 1000`. Neither field is in the signed
+  receipt yet, and paid executions do not emit telemetry yet.
 - Busy, exhausted caps, invalid policy and stale readiness are static refusals
   before generation. A started execution failure or cancellation emits `failed`.
   Provider messages and arbitrary exception text are never included.

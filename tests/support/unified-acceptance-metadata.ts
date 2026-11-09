@@ -189,6 +189,8 @@ function telemetryMetadata(value: unknown) {
     'network',
     'asset',
     'receipt',
+    'path',
+    'generationMs',
   ];
   const keys = Object.keys(value);
   assert.ok(keys.every((key) => allowed.includes(key)));

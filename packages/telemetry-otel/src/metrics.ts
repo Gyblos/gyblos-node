@@ -1,5 +1,10 @@
 // Maps validated telemetry into a fixed aggregate schema; no identities, model strings or receipts escape.
-import { ROOT_CONTEXT, type Meter } from '@opentelemetry/api';
+import {
+  ROOT_CONTEXT,
+  type Attributes,
+  type Counter,
+  type Meter,
+} from '@opentelemetry/api';
 
 import { TELEMETRY_EVENTS } from '@gyblos/protocol/telemetry';
 
@@ -9,11 +14,17 @@ import {
   metricAttributes,
   metricNumber,
   metricObject,
+  metricOutputRate,
   metricReasoning,
+  metricRoute,
   metricType,
   refusalAttributes,
 } from './projection';
 
+function recordRoute(routes: Counter, record: object, attributes: Attributes) {
+  const path = metricRoute(record);
+  if (path) routes.add(1, { ...attributes, ...path }, ROOT_CONTEXT);
+}
 export function createMeasurements(meter: Meter) {
   const counter = (name: OtelMetricName, unit: string) =>
     meter.createCounter(name, { unit });
@@ -30,6 +41,12 @@ export function createMeasurements(meter: Meter) {
     unit: 'ms',
   });
   const duration = meter.createHistogram(OTEL_METRICS.DURATION, { unit: 'ms' });
+  const outputRate = meter.createHistogram(OTEL_METRICS.OUTPUT_RATE, {
+    unit: '{token}/s',
+  });
+  const routes = counter(OTEL_METRICS.ROUTES, '{request}');
+  const route = (record: object, attributes: Attributes) =>
+    recordRoute(routes, record, attributes);
   return (record: object) => {
     const attributes = metricAttributes(record);
     switch (metricType(record)) {
@@ -60,6 +77,9 @@ export function createMeasurements(meter: Meter) {
           attributes,
           ROOT_CONTEXT,
         );
+        const rate = metricOutputRate(record, usage);
+        if (rate !== null) outputRate.record(rate, attributes, ROOT_CONTEXT);
+        route(record, { ...attributes, outcome: 'completed' });
         break;
       }
       case TELEMETRY_EVENTS.FAILED: {
@@ -72,6 +92,7 @@ export function createMeasurements(meter: Meter) {
             failure,
             ROOT_CONTEXT,
           );
+        route(record, { ...attributes, outcome: 'failed' });
         break;
       }
       case TELEMETRY_EVENTS.REFUSED:

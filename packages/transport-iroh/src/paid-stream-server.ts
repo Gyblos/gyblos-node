@@ -18,6 +18,8 @@ import {
   PAID_STREAM,
 } from '@gyblos/protocol/paid/constants';
 
+import type { RouteProbe } from './types';
+
 export interface PaidExecutionService {
   // Resolves only once the charge was settled or recorded as pending, even when the signal
   // aborts: the buyer leaving stops generation, never settlement. It must bound its own
@@ -28,6 +30,7 @@ export interface PaidExecutionService {
     peer: string,
     signal: AbortSignal,
     onDelta: (text: string) => Promise<void>,
+    route?: RouteProbe,
   ): Promise<PaidExecutionResponse>;
 }
 

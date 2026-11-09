@@ -23,12 +23,12 @@ export function createSellerPaidRouter(
   offers: () => Iterable<PaidOffer>,
 ): PaidExecutionService {
   return {
-    async stream(value, peer, signal, onDelta) {
+    async stream(value, peer, signal, onDelta, probe) {
       const request = parsePaidExecutionRequest(value);
       const wanted = canonicalJson(request.quote.offer.selection);
       for (const offer of offers())
         if (canonicalJson(offer.selection) === wanted)
-          return offer.service.stream(request, peer, signal, onDelta);
+          return offer.service.stream(request, peer, signal, onDelta, probe);
       return {
         version: PAID_EXECUTION.version,
         requestId: request.requestId,

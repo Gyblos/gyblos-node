@@ -3,6 +3,8 @@ import { TRANSPORT_ROUTES } from './constants';
 
 export type TransportRoute =
   (typeof TRANSPORT_ROUTES)[keyof typeof TRANSPORT_ROUTES];
+// Samples the selected path of the connection serving one request; never opens or closes anything.
+export type RouteProbe = () => TransportRoute;
 
 export interface HttpMessage {
   headers: Record<string, string>;

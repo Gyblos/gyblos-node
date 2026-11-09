@@ -43,6 +43,7 @@ import {
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import type { RouteProbe } from '@gyblos/transport-iroh';
 
 import { createFreeStreamOutput } from './free-execution-stream';
 import type { FreeMeter } from './free-meter';
@@ -115,14 +116,19 @@ export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
     options.ledger,
   );
   return {
-    respond: (value: unknown, peer: string, signal: AbortSignal) =>
-      respond(value, peer, signal, options, admission),
+    respond: (
+      value: unknown,
+      peer: string,
+      signal: AbortSignal,
+      probe?: RouteProbe,
+    ) => respond(value, peer, signal, options, admission, undefined, probe),
     stream: (
       value: unknown,
       peer: string,
       signal: AbortSignal,
       onDelta: (text: string) => Promise<void>,
-    ) => respond(value, peer, signal, options, admission, onDelta),
+      probe?: RouteProbe,
+    ) => respond(value, peer, signal, options, admission, onDelta, probe),
   };
 }
 function freeInputTokens(
@@ -166,6 +172,7 @@ async function respond(
   options: SellerFreeExecutionOptions,
   admission: FreeExecutionAdmission,
   onDelta?: (text: string) => Promise<void>,
+  probe?: RouteProbe,
 ): Promise<FreeExecutionResponse> {
   const request = parseFreeExecutionRequest(value);
   const header = {
@@ -176,6 +183,7 @@ async function respond(
   let observer: ReturnType<typeof sellerExecutionTelemetry>;
   let started = false;
   let receipt: ReturnType<typeof sellerReceiptObservation>;
+  const streaming = Boolean(onDelta);
   try {
     checkSignal(signal);
     const verifiedAt = options.now();
@@ -186,14 +194,14 @@ async function respond(
       now: verifiedAt,
     });
     checkSignal(signal);
-    observer = sellerExecutionTelemetry(request, options, Boolean(onDelta));
+    observer = sellerExecutionTelemetry(request, options, streaming, probe);
     const prompt = supportedInput(request, options);
     receipt = sellerReceiptObservation(
       request,
       header.requestDigest,
       options.meter,
       options.receipts,
-      Boolean(onDelta),
+      streaming,
       verifiedAt,
     );
     ready(options);
@@ -213,6 +221,7 @@ async function respond(
         options,
         signal,
         observedOutput(onDelta, receipt, observer, signal),
+        observer,
       );
       if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
       // A declared count never returns reserved tokens: the provider's word alone cannot stretch the caps.
@@ -295,17 +304,19 @@ export function prepareSellerFreeExecution(
   return createSellerFreeRouter(() => [{ selection, service }]);
 }
 
+type ResponseHeader = Pick<
+  FreeExecutionResponse,
+  'version' | 'requestId' | 'requestDigest'
+>;
 async function generateResponse(
   request: FreeExecutionRequest,
   prompt: string,
   inputTokens: number,
-  header: Pick<
-    FreeExecutionResponse,
-    'version' | 'requestId' | 'requestDigest'
-  >,
+  header: ResponseHeader,
   options: SellerFreeExecutionOptions,
   signal: AbortSignal,
-  onDelta?: (text: string) => Promise<void>,
+  onDelta: ((text: string) => Promise<void>) | undefined,
+  observer: ReturnType<typeof sellerExecutionTelemetry>,
 ): Promise<FreeExecutionResponse> {
   const streaming = onDelta
     ? createFreeStreamOutput(
@@ -326,6 +337,7 @@ async function generateResponse(
       ...(streaming ? { onText: streaming.onText } : {}),
     });
     checkSignal(signal);
+    observer?.generated(output.usage.outputDurationNs);
     streaming?.complete(output.text);
   } catch (error) {
     if (error instanceof EngineError && !signal.aborted)
