@@ -145,7 +145,7 @@ void test('payment admission failure retains replay protection and releases its 
 void test(
   'an interrupted generation hands off its frozen charge without another engine call',
   { timeout: 15000 },
-  async () => {
+  async (context) => {
     const seller = await paidSellerFixture();
     const settle = seller.payment.server.settle;
     const charges: string[] = [];
@@ -173,7 +173,8 @@ void test(
     try {
       const request = await seller.request();
       const terminal = (await seller.execute(request)).terminal;
-      while (retry.health().queued !== 0) await yieldTurn();
+      while (retry.health().queued !== 0)
+        await yieldTurn(undefined, { signal: context.signal });
       assert.deepEqual(terminal.error, {
         code: PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
         reason: FREE_EXECUTION_STOP_REASONS.ENGINE_INTERRUPTED,
