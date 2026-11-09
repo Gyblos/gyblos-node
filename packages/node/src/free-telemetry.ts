@@ -2,6 +2,7 @@
 import {
   createExecutionTelemetry,
   telemetrySizes,
+  type RouteProbe,
 } from '@gyblos/core/telemetry';
 import { FREE_EXECUTION_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
 import type {
@@ -33,12 +34,14 @@ export function sellerExecutionTelemetry(
   request: FreeExecutionRequest,
   options: SellerFreeExecutionOptions,
   streaming: boolean,
+  route?: RouteProbe,
 ) {
   const telemetry = options.telemetry;
   if (!telemetry) return undefined;
   const observer = createExecutionTelemetry({
     sink: telemetry.sink,
     now: telemetry.now ?? Date.now,
+    ...(route ? { route } : {}),
     context: {
       role: P2P_ROLES.SELLER,
       buyerNodeId: request.quote.offer.buyerNodeId,

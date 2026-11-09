@@ -9,15 +9,21 @@ import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 import type { ReceiptSizes, ReceiptUsage } from '@gyblos/protocol/receipt';
 import {
+  EXECUTION_ROUTES,
   TELEMETRY_EVENTS,
+  type ExecutionPath,
+  type ExecutionRoute,
   type TelemetryEvent,
   type TelemetryRefusal,
   type TelemetrySink,
 } from '@gyblos/protocol/telemetry';
 
+// Reads the connection's currently selected path; the transport owns the connection, this only samples it.
+export type RouteProbe = () => string;
 export interface ExecutionTelemetryOptions {
   sink: TelemetrySink;
   now: () => number;
+  route?: RouteProbe;
   context: {
     role: TelemetryEvent['role'];
     buyerNodeId: string;
@@ -48,9 +54,47 @@ export function telemetrySizes(input: string, output: string): ReceiptSizes {
     outputChars: output.length,
   };
 }
-function executionPublisher(options: ExecutionTelemetryOptions) {
+const NANOSECONDS_PER_MILLISECOND = 1_000_000;
+// Whole milliseconds of the engine's own generation time, or nothing when the engine reports none.
+export function generationMilliseconds(nanoseconds: number) {
+  if (!Number.isSafeInteger(nanoseconds) || nanoseconds <= 0) return undefined;
+  return Math.max(1, Math.round(nanoseconds / NANOSECONDS_PER_MILLISECOND));
+}
+// Keeps the last direct or relay route seen during one execution. A path switch mid-execution (the
+// usual relay-then-direct upgrade) is reported, and a probe that never saw a known route yields unknown.
+export function createRouteTracker(probe: RouteProbe) {
+  let last: ExecutionRoute | undefined;
+  let changed = false;
+  const sample = () => {
+    try {
+      const value = probe();
+      if (value !== EXECUTION_ROUTES.DIRECT && value !== EXECUTION_ROUTES.RELAY)
+        return;
+      if (last !== undefined && last !== value) changed = true;
+      last = value;
+    } catch {
+      /* A closed or broken connection leaves the last observation in place. */
+    }
+  };
+  return {
+    sample,
+    path(): ExecutionPath {
+      sample();
+      return {
+        route: last ?? EXECUTION_ROUTES.UNKNOWN,
+        routeChanged: changed,
+      };
+    },
+  };
+}
+// Every published event first samples the route, so the path seen at each lifecycle step counts.
+function executionPublisher(
+  options: ExecutionTelemetryOptions,
+  sample: () => void,
+) {
   let startedAt: number | undefined;
   return (fields: (at: number, elapsed: number) => TelemetryEvent) => {
+    sample();
     try {
       const at = controlInteger(options.now());
       startedAt ??= at;
@@ -80,13 +124,29 @@ function executionContext(
     },
   };
 }
+// The optional route and engine-timing observations of one execution; absent ones add no fields.
+function observations(probe: RouteProbe | undefined) {
+  const tracker = probe && createRouteTracker(probe);
+  let generationMs: number | undefined;
+  return {
+    sample: () => tracker?.sample(),
+    path: () => (tracker ? { path: tracker.path() } : {}),
+    // The engine's own generation time, reported once its result is in; kept for the completion.
+    generated(nanoseconds: number) {
+      generationMs = generationMilliseconds(nanoseconds);
+    },
+    generation: () => (generationMs === undefined ? {} : { generationMs }),
+  };
+}
 export function createExecutionTelemetry(options: ExecutionTelemetryOptions) {
   let received = false;
   let first = false;
   let terminal = false;
-  const publish = executionPublisher(options);
+  const observed = observations(options.route);
+  const publish = executionPublisher(options, observed.sample);
   const common = (at: number) => executionContext(options.context, at);
   return {
+    generated: observed.generated,
     received() {
       if (received || terminal) return;
       received = true;
@@ -127,6 +187,8 @@ export function createExecutionTelemetry(options: ExecutionTelemetryOptions) {
         },
         totalMs: elapsed,
         finishReason: finish,
+        ...observed.path(),
+        ...observed.generation(),
       }));
     },
     failed(code: FreeExecutionCode, stop: FreeExecutionStop = {}) {
@@ -141,6 +203,7 @@ export function createExecutionTelemetry(options: ExecutionTelemetryOptions) {
         ...(stop.delivered
           ? { delivered: { outputTokens: stop.delivered.outputTokens } }
           : {}),
+        ...observed.path(),
       }));
     },
     refused(refusal: TelemetryRefusal) {

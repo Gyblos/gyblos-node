@@ -7,6 +7,7 @@ import { FREE_EXECUTION } from '@gyblos/protocol/constants';
 import { parseFreeExecutionResponse } from '@gyblos/protocol/free-execution';
 import type { ControlStream } from '@gyblos/transport-iroh/control-io';
 import {
+  routedFreeService,
   serveFreeExecutionStream,
   type FreeExecutionService,
 } from '@gyblos/transport-iroh/free-server';
@@ -228,4 +229,37 @@ void test('free stream does not finish a response after a timed-out native write
   await running;
   assert.equal(finishes, 0);
   assert.equal(state.releases(), 1);
+});
+void test('a routed free service hands every request its connection route probe', async () => {
+  for (const streaming of [false, true]) {
+    const state = await fixture();
+    const seen: unknown[] = [];
+    const service: FreeExecutionService = {
+      respond: async (value, peer, signal, route) => {
+        seen.push(route?.());
+        return state.service.respond(value, peer, signal);
+      },
+      stream: async (value, peer, signal, _onDelta, route) => {
+        seen.push(route?.());
+        return state.service.respond(value, peer, signal);
+      },
+    };
+    await serveFreeExecutionStream(
+      state.stream,
+      routedFreeService(service, () => 'iroh-direct'),
+      'peer',
+      state.close,
+      new AbortController().signal,
+      state.enter,
+      () => true,
+      {},
+      streaming,
+    );
+    assert.deepEqual(seen, ['iroh-direct']);
+  }
+  const plain = await fixture();
+  assert.equal(
+    routedFreeService(plain.service, () => 'iroh-direct').stream,
+    undefined,
+  );
 });

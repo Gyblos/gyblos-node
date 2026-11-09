@@ -23,8 +23,21 @@ import {
   streamPaidResponse,
   type PaidExecutionService,
 } from './paid-stream-server';
+import { selectedRoute } from './paths';
+import type { RouteProbe } from './types';
 
 export type { PaidExecutionService } from './paid-stream-server';
+
+// Hands every request on one connection that connection's route probe; nothing else changes.
+export function routedPaidService(
+  service: PaidExecutionService,
+  route: RouteProbe,
+): PaidExecutionService {
+  return {
+    stream: (value, peer, signal, onDelta) =>
+      service.stream(value, peer, signal, onDelta, route),
+  };
+}
 
 export interface PaidStreamDeadlines {
   ingressMs?: number;
@@ -165,12 +178,13 @@ export async function handlePaidExecutionConnection(
 ) {
   const peer = connection.remoteId().toString();
   const close = () => connection.close(HTTP_OVER_IROH.streamCloseCode, []);
+  const routed = routedPaidService(service, () => selectedRoute(connection));
   await handleIrohConnection(
     connection,
     (stream) =>
       servePaidExecutionStream(
         stream,
-        service,
+        routed,
         peer,
         close,
         signal,

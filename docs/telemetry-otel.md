@@ -30,6 +30,16 @@ Recording uses the root context, so surrounding traces cannot supply exemplars.
 | `unserved`           | `gyblos.unserved` counter                                                                                                                  | `{request}`                  |
 | `receipt`, `charged` | No metrics                                                                                                                                 | —                            |
 
+A seller `completed` or `failed` event that carries its network path also adds
+one `gyblos.routes` counter point (`{request}`) with `route` (`iroh-direct`,
+`iroh-relay` or `unknown`), `route_changed` and `outcome` (`completed` or
+`failed`). `unknown` means no direct or relay path was seen during the request:
+treat any such count as a defect to investigate, not a normal route. A
+`completed` event with the engine's generation time also records
+`gyblos.output_tokens_per_second` (`{token}/s`): output tokens divided by that
+generation time, without queueing, prompt evaluation or network time. Engines
+that report no generation time record no rate.
+
 Missing reasoning usage is unknown, not an observed zero. Partial output on
 failure is separate from completed output. Duration includes `code` on failure,
 so successful and failed latencies are distinguishable. The adapter validates

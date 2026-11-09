@@ -97,17 +97,11 @@ void test('free startup refuses a selection the seller does not serve before che
     },
     input: { ...signed.input, selection: other },
   };
-  for (const run of [service.respond, service.stream])
-    assert.equal(
-      (
-        await run(
-          unsigned,
-          signed.quote.offer.buyerNodeId,
-          freeSellerSignal(),
-          async () => {},
-        )
-      ).error?.code,
-      FREE_EXECUTION_CODES.UNSUPPORTED,
-    );
+  const buyer = signed.quote.offer.buyerNodeId;
+  for (const response of [
+    await service.respond(unsigned, buyer, freeSellerSignal()),
+    await service.stream(unsigned, buyer, freeSellerSignal(), async () => {}),
+  ])
+    assert.equal(response.error?.code, FREE_EXECUTION_CODES.UNSUPPORTED);
   assert.equal(state.calls(), 0);
 });
