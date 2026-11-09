@@ -19,6 +19,39 @@ async function files(directory: string): Promise<string[]> {
   return nested.flat();
 }
 
+void test('docs brand: supplied artwork and font files match the kit checksums', async () => {
+  const manifest: unknown = JSON.parse(
+    await readFile(join(ROOT, 'brand-assets.json'), 'utf8'),
+  );
+  assert.ok(
+    manifest &&
+      typeof manifest === 'object' &&
+      'version' in manifest &&
+      'files' in manifest,
+  );
+  assert.equal(manifest.version, '3.0.0');
+  assert.ok(Array.isArray(manifest.files));
+  for (const asset of manifest.files) {
+    assert.ok(
+      asset &&
+        typeof asset === 'object' &&
+        'file' in asset &&
+        'sha256' in asset,
+    );
+    assert.equal(typeof asset.file, 'string');
+    assert.ok(
+      /^(?:app\/brand\/|public\/)/.test(asset.file) &&
+        !asset.file.includes('..'),
+    );
+    const bytes = await readFile(join(ROOT, asset.file));
+    assert.equal(
+      createHash('sha256').update(bytes).digest('hex'),
+      asset.sha256,
+      asset.file,
+    );
+  }
+});
+
 void test('docs brand: both locales use official wordmarks and the new favicon', async () => {
   for (const locale of ['en', 'es']) {
     const html = await readFile(join(OUTPUT, `${locale}.html`), 'utf8');
