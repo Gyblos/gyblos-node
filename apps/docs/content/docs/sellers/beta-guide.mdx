@@ -84,9 +84,18 @@ ask the team through your invitation channel if you need help arranging a free e
 
 ## Next steps [#finish-onboarding]
 
-Your node starts **unlisted**. The installer ends with the three steps to start selling: send a little
-devnet SOL to the owner it names, run `docker compose exec seller gyblos seller register` with your invite
-code, then `sh install.sh publish`. While the seller runs, `gyblos seller status` shows the next one. Follow
+Your node starts **unlisted**. Run in a terminal, the installer then finishes onboarding with you, asking
+before each step:
+
+1. **Register.** Paste the `gyb_` invite code from your invitation. If the owner it names has too little
+   devnet SOL, the command says how much to send and waits until it arrives, then asks you to confirm the
+   one-time registration with `y`.
+2. **Publish.** Press Enter (or `y`) to list your offer in the discovery index.
+
+Press Ctrl+C at any step and run `sh install.sh` again later: it keeps what is done and continues. Without a
+terminal, or with `GYBLOS_GUIDED=0`, it only prints the three steps instead: send a little devnet SOL to the
+owner it names, run `docker compose exec seller gyblos seller register` with your invite code, then
+`sh install.sh publish`. While the seller runs, `gyblos seller status` shows the next one. Follow
 [Register and publish](/en/sellers/register-publish) for the details. If Solana enrollment is missing, interactive registration estimates its
 devnet SOL cost and asks before a new signed submission; review that guide before continuing. The default offer allows 200,000 input plus output tokens per UTC day,
 with 5,000 per buyer; see [Models and offers](/en/sellers/models-offers) before changing limits.

@@ -13,6 +13,12 @@ import {
 } from '@gyblos/discovery-http';
 import { NODE_ERROR_CODES, type NodeErrorCode } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
+import {
+  FUNDS_WAIT,
+  SELLER_FUNDS,
+  waitForOwnerFunds,
+  type FundsWaitResult,
+} from '@gyblos/node/seller-funds';
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
@@ -111,6 +117,41 @@ function registrationUnavailableHint(
       ? `registration simulation failed; send devnet SOL to the owner ${owner} (${FAUCET}), then run this again to estimate the cost`
       : 'registration is not confirmed; check the wallet and retry later without deleting its local state';
 }
+// Waits for the owner to hold the lamports, calling onWaiting once if it has to wait.
+export type FundsWait = (
+  owner: string,
+  lamports: bigint,
+  onWaiting: () => void,
+) => Promise<FundsWaitResult>;
+const STOPPED_WAITING: Partial<Record<FundsWaitResult, string>> = {
+  [FUNDS_WAIT.STOPPED]: 'Stopped waiting for SOL.\n',
+  [FUNDS_WAIT.UNREADABLE]:
+    "Could not read the owner's balance from the configured RPC; check rpc in the seller role or try again later.\n",
+};
+
+// The balance to wait for when registration stopped for want of SOL; undefined for any other stop.
+function fundingTarget(error: RegistrationUnavailable) {
+  if (
+    error.code === NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED &&
+    error.requiredLamports !== undefined
+  )
+    return error.requiredLamports;
+  return error.code === NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED
+    ? REGISTER.simulationFundingLamports
+    : undefined;
+}
+function waitingMessage(
+  error: RegistrationUnavailable,
+  owner: string,
+  target: bigint,
+) {
+  const need =
+    error.missingLamports !== undefined
+      ? `needs ${registrationSol(error.missingLamports)} more SOL for the estimated ${registrationSol(target)} SOL registration`
+      : `needs devnet SOL (about ${registrationSol(target)} SOL) before the registration can be estimated`;
+  return `The owner ${owner} ${need}.\n  Send devnet SOL to it (${FAUCET}).\n  Waiting for it to arrive, checking every ${SELLER_FUNDS.pollText}. Press Ctrl+C to stop; run this again later and nothing is lost.\n`;
+}
+
 async function registerWithIdentity(
   attempt: () => Promise<
     (typeof REGISTRATION_RESULTS)[keyof typeof REGISTRATION_RESULTS]
@@ -142,13 +183,83 @@ async function registerWithIdentity(
   }
 }
 
+// Registers; on a terminal, a registration stopped for want of SOL waits for the owner's SOL and tries
+// again (it asks for confirmation again with the new estimate).
+async function registerWaitingForFunds(
+  register: () => ReturnType<typeof registerWithIdentity>,
+  owner: string,
+  output: SellerOutput,
+  waitForFunds: FundsWait | undefined,
+) {
+  for (let waits = 0; ; waits += 1) {
+    try {
+      return await register();
+    } catch (error) {
+      const target =
+        error instanceof RegistrationUnavailable
+          ? fundingTarget(error)
+          : undefined;
+      if (
+        !waitForFunds ||
+        target === undefined ||
+        waits >= REGISTER.fundWaits ||
+        !(error instanceof RegistrationUnavailable)
+      )
+        throw error;
+      const result = await waitForFunds(owner, target, () =>
+        output.stdout(waitingMessage(error, owner, target)),
+      );
+      if (result === FUNDS_WAIT.ARRIVED)
+        output.stdout('SOL received; continuing the registration.\n');
+      // Already funded: a funds shortfall resolved meanwhile is retried; a failed simulation is not
+      // about SOL, so it stops with its own hint.
+      else if (
+        result !== FUNDS_WAIT.FUNDED ||
+        error.code !== NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED
+      ) {
+        const told = STOPPED_WAITING[result];
+        if (told) output.stdout(told);
+        throw error;
+      }
+    }
+  }
+}
+
+// Waiting needs someone watching: only on a terminal.
+function fundsWait(
+  system: {
+    prompt?: Prompt;
+    waitForFunds?: FundsWait;
+    interrupt?: AbortSignal;
+  },
+  rpcUrl: string,
+): FundsWait | undefined {
+  if (!system.prompt) return undefined;
+  return (
+    system.waitForFunds ??
+    ((owner, lamports, onWaiting) =>
+      waitForOwnerFunds({
+        rpcUrl,
+        owner,
+        lamports,
+        onWaiting,
+        signal: system.interrupt,
+      }))
+  );
+}
+
+export interface RegisterSystem {
+  fetch: DiscoveryFetch;
+  prompt?: Prompt;
+  registerIdentity?: () => Promise<boolean>;
+  waitForFunds?: FundsWait;
+  // Aborted by Ctrl+C on the terminal the prompt reads.
+  interrupt?: AbortSignal;
+}
+
 export async function registerCommand(
   output: SellerOutput,
-  system: {
-    fetch: DiscoveryFetch;
-    prompt?: Prompt;
-    registerIdentity?: () => Promise<boolean>;
-  },
+  system: RegisterSystem,
 ) {
   const fail = (code: string, hint: string) => {
     output.stderr(`${code}: ${hint}\n`);
@@ -185,7 +296,12 @@ export async function registerCommand(
     });
   let result;
   try {
-    result = await registerWithIdentity(attempt, registerIdentity);
+    result = await registerWaitingForFunds(
+      () => registerWithIdentity(attempt, registerIdentity),
+      identity.owner,
+      output,
+      fundsWait(system, identity.rpcUrl),
+    );
   } catch (error) {
     if (error instanceof RegistrationDeclined)
       return fail(
