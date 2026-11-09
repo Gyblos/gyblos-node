@@ -1,20 +1,9 @@
 // One buyer entry: verify a signed quote first, then execute free or prepare its paid channel.
 import { isMain } from '@gyblos/runtime';
 
+import { startBuyer } from './buyer-startup';
 import { main } from './free-main';
-import { startFreeBuyer } from './free-startup';
-import type { PaidBuyerHost, startPaidBuyer } from './paid-startup';
-import { quoteBuyerExecution } from './quote-startup';
 
-type BuyerHost = PaidBuyerHost & Awaited<ReturnType<typeof startFreeBuyer>>;
-
-export async function startBuyer(
-  options: Parameters<typeof startPaidBuyer>[0] = {},
-): Promise<BuyerHost> {
-  return startFreeBuyer({
-    ...options,
-    execution: quoteBuyerExecution(options),
-  });
-}
+export { startBuyer } from './buyer-startup';
 
 if (isMain(import.meta.url)) await main(startBuyer);
