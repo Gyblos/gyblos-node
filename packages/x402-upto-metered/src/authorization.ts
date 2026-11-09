@@ -53,6 +53,11 @@ export async function createUptoAuthorization(
   payer: TransactionSigner,
   terms: UptoTerms,
   hints: UptoClientHints,
+  _beforeSign?: (opening: {
+    channelId: string;
+    openSlot: string;
+    lastValidBlockHeight: string;
+  }) => Promise<void>,
 ): Promise<UptoAuthorization> {
   const created = await new UptoClientScheme(payer).createPaymentPayload(
     UPTO.x402Version,
