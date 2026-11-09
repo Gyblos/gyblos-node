@@ -13,7 +13,12 @@ import {
 } from '@gyblos/discovery-http';
 import { NODE_ERROR_CODES, type NodeErrorCode } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
-import { SELLER_FUNDS, waitForOwnerFunds } from '@gyblos/node/seller-funds';
+import {
+  FUNDS_WAIT,
+  SELLER_FUNDS,
+  waitForOwnerFunds,
+  type FundsWaitResult,
+} from '@gyblos/node/seller-funds';
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
@@ -112,8 +117,17 @@ function registrationUnavailableHint(
       ? `registration simulation failed; send devnet SOL to the owner ${owner} (${FAUCET}), then run this again to estimate the cost`
       : 'registration is not confirmed; check the wallet and retry later without deleting its local state';
 }
-// Resolves true once the owner holds the lamports; false when no SOL arrived in time.
-export type FundsWait = (owner: string, lamports: bigint) => Promise<boolean>;
+// Waits for the owner to hold the lamports, calling onWaiting once if it has to wait.
+export type FundsWait = (
+  owner: string,
+  lamports: bigint,
+  onWaiting: () => void,
+) => Promise<FundsWaitResult>;
+const STOPPED_WAITING: Partial<Record<FundsWaitResult, string>> = {
+  [FUNDS_WAIT.STOPPED]: 'Stopped waiting for SOL.\n',
+  [FUNDS_WAIT.UNREADABLE]:
+    "Could not read the owner's balance from the configured RPC; check rpc in the seller role or try again later.\n",
+};
 
 // The balance to wait for when registration stopped for want of SOL; undefined for any other stop.
 function fundingTarget(error: RegistrationUnavailable) {
@@ -192,34 +206,60 @@ async function registerWaitingForFunds(
         !(error instanceof RegistrationUnavailable)
       )
         throw error;
-      output.stdout(waitingMessage(error, owner, target));
-      if (!(await waitForFunds(owner, target))) throw error;
-      output.stdout('SOL received; continuing the registration.\n');
+      const result = await waitForFunds(owner, target, () =>
+        output.stdout(waitingMessage(error, owner, target)),
+      );
+      if (result === FUNDS_WAIT.ARRIVED)
+        output.stdout('SOL received; continuing the registration.\n');
+      // Already funded: a funds shortfall resolved meanwhile is retried; a failed simulation is not
+      // about SOL, so it stops with its own hint.
+      else if (
+        result !== FUNDS_WAIT.FUNDED ||
+        error.code !== NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED
+      ) {
+        const told = STOPPED_WAITING[result];
+        if (told) output.stdout(told);
+        throw error;
+      }
     }
   }
 }
 
 // Waiting needs someone watching: only on a terminal.
 function fundsWait(
-  prompt: Prompt | undefined,
-  injected: FundsWait | undefined,
+  system: {
+    prompt?: Prompt;
+    waitForFunds?: FundsWait;
+    interrupt?: AbortSignal;
+  },
   rpcUrl: string,
 ): FundsWait | undefined {
-  if (!prompt) return undefined;
+  if (!system.prompt) return undefined;
   return (
-    injected ??
-    ((owner, lamports) => waitForOwnerFunds({ rpcUrl, owner, lamports }))
+    system.waitForFunds ??
+    ((owner, lamports, onWaiting) =>
+      waitForOwnerFunds({
+        rpcUrl,
+        owner,
+        lamports,
+        onWaiting,
+        signal: system.interrupt,
+      }))
   );
+}
+
+export interface RegisterSystem {
+  fetch: DiscoveryFetch;
+  prompt?: Prompt;
+  registerIdentity?: () => Promise<boolean>;
+  waitForFunds?: FundsWait;
+  // Aborted by Ctrl+C on the terminal the prompt reads.
+  interrupt?: AbortSignal;
 }
 
 export async function registerCommand(
   output: SellerOutput,
-  system: {
-    fetch: DiscoveryFetch;
-    prompt?: Prompt;
-    registerIdentity?: () => Promise<boolean>;
-    waitForFunds?: FundsWait;
-  },
+  system: RegisterSystem,
 ) {
   const fail = (code: string, hint: string) => {
     output.stderr(`${code}: ${hint}\n`);
@@ -260,7 +300,7 @@ export async function registerCommand(
       () => registerWithIdentity(attempt, registerIdentity),
       identity.owner,
       output,
-      fundsWait(prompt, system.waitForFunds, identity.rpcUrl),
+      fundsWait(system, identity.rpcUrl),
     );
   } catch (error) {
     if (error instanceof RegistrationDeclined)

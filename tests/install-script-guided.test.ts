@@ -143,7 +143,7 @@ void test('GYBLOS_GUIDED=0, no terminal or publishing already on asks nothing', 
   const invalid = await guided('\n', { GYBLOS_GUIDED: 'yes' });
   try {
     assert.equal(invalid.result.status, 1);
-    assert.match(invalid.result.stderr, /GYBLOS_GUIDED must be 0 or unset/);
+    assert.match(invalid.result.stderr, /GYBLOS_GUIDED must be 0 or 1/);
   } finally {
     await invalid.install.cleanup();
   }

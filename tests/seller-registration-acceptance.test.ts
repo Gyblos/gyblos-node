@@ -200,9 +200,10 @@ void test('unfunded registration shows a funding estimate and missing SOL before
           return 'yes';
         },
         // On a terminal it waits for the SOL; here none arrives.
-        waitForFunds: async (_owner, lamports) => {
+        waitForFunds: async (_owner, lamports, onWaiting) => {
           waited.push(lamports);
-          return false;
+          onWaiting();
+          return 'timeout';
         },
         fetch: async () =>
           new Response(JSON.stringify({ error: 'IDENTITY_NOT_REGISTERED' }), {

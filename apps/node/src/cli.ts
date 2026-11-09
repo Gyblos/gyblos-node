@@ -52,6 +52,8 @@ export interface CliContext {
   registerIdentity?: () => Promise<boolean>;
   // How `seller register` waits for the owner's SOL on a terminal; tests inject a fake.
   waitForFunds?: FundsWait;
+  // Ctrl+C on the terminal the prompt reads; stops a wait for SOL.
+  interrupt?: AbortSignal;
 }
 
 const USAGE =
@@ -266,6 +268,7 @@ function runRegister(context: CliContext) {
       prompt: context.prompt,
       registerIdentity: context.registerIdentity,
       waitForFunds: context.waitForFunds,
+      interrupt: context.interrupt,
     },
   );
 }
@@ -360,6 +363,7 @@ export async function main(args = process.argv.slice(2)) {
       stdout: (text) => process.stdout.write(text),
       stderr: (text) => process.stderr.write(text),
       prompt: terminal?.prompt,
+      interrupt: terminal?.signal,
     });
   } finally {
     terminal?.close();

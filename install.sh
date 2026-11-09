@@ -65,7 +65,7 @@ guided=${GYBLOS_GUIDED:-1}
 case "$guided" in
   0 | 1) ;;
   *)
-    printf 'gyblos install: GYBLOS_GUIDED must be 0 or unset.\n' >&2
+    printf 'gyblos install: GYBLOS_GUIDED must be 0 or 1 (unset means 1).\n' >&2
     exit 1
     ;;
 esac
