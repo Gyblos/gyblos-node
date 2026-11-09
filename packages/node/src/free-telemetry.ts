@@ -30,9 +30,17 @@ function refusal(code: FreeExecutionResponse['error']): TelemetryRefusal {
       return TELEMETRY_REFUSALS.QUOTE_REJECTED;
   }
 }
+// The identifiers a seller observation needs; free and paid requests both carry them.
+export interface ObservedRequest {
+  requestId: string;
+  quote: { offer: { buyerNodeId: string } };
+  input: { selection: FreeExecutionRequest['input']['selection'] };
+}
 export function sellerExecutionTelemetry(
-  request: FreeExecutionRequest,
-  options: SellerFreeExecutionOptions,
+  request: ObservedRequest,
+  options: Pick<SellerFreeExecutionOptions, 'telemetry' | 'nodeId'> & {
+    meter: Pick<SellerFreeExecutionOptions['meter'], 'mode'>;
+  },
   streaming: boolean,
   route?: RouteProbe,
 ) {
