@@ -7,6 +7,7 @@ import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 
 import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import {
+  BUYER_JOURNAL,
   openUptoBuyerJournal,
   reconcileUptoBuyer,
   withdrawUptoBuyer,
@@ -38,7 +39,7 @@ void test('journal records network with the policy and persists it after restart
           'utf8',
         ),
       );
-      assert.equal(raw.version, 4);
+      assert.equal(raw.version, BUYER_JOURNAL.version);
     } finally {
       await reopened.close();
     }

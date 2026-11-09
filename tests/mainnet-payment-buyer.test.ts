@@ -8,6 +8,7 @@ import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 
 import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import {
+  BUYER_JOURNAL,
   createUptoPaymentClient,
   openUptoBuyerJournal,
   openUptoBuyerPayments,
@@ -290,7 +291,7 @@ void test('settled version 3 entries allow reconciliation and a new simulated pa
       );
       const saved: unknown = JSON.parse(await readFile(paths.state, 'utf8'));
       assert.ok(saved && typeof saved === 'object' && 'version' in saved);
-      assert.equal(saved.version, 4);
+      assert.equal(saved.version, BUYER_JOURNAL.version);
       const channels = await journal.list();
       assert.equal(channels.length, 5);
       assert.deepEqual(channels.slice(0, 4), snapshot);
