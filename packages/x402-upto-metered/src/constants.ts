@@ -16,6 +16,7 @@ export const UPTO_ERROR_CODES = {
 
 export type UptoErrorCode =
   (typeof UPTO_ERROR_CODES)[keyof typeof UPTO_ERROR_CODES];
+export const UPTO_U64_MAX = (1n << 64n) - 1n;
 
 export const UPTO = {
   scheme: 'upto',

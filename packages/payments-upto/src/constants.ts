@@ -51,8 +51,9 @@ export const UPTO_SELLER = {
 // The buyer's journal of authorized channels: one small private document. Settled entries are kept
 // long past any channel's lifetime, then pruned; open ones are never dropped.
 export const BUYER_JOURNAL = {
-  // 4 records the network; 3 records mint, fee treasury and rate; 2 records slot and lifetime.
-  version: 4,
+  // 5 adds withdrawal attempts; 4 records network; 3 policy; 2 slot and lifetime.
+  version: 5,
+  networkVersion: 4,
   policyVersion: 3,
   slotVersion: 2,
   legacyVersion: 1,

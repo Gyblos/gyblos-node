@@ -12,6 +12,8 @@ import {
 import {
   createUptoWithdrawal,
   UPTO_COMMITMENT,
+  UPTO_FINAL_COMMITMENT,
+  type UptoWithdrawalRecovery,
   type UptoWithdrawQuery,
   type UptoWithdrawRpc,
 } from 'x402-upto-metered';
@@ -31,20 +33,33 @@ export function nativeWithdrawal(
   let lastSignature: string | undefined;
   return {
     signature: () => lastSignature,
-    async withdraw(query: UptoWithdrawQuery, fault: NativeWithdrawFault = {}) {
+    async withdraw(
+      query: UptoWithdrawQuery,
+      fault: NativeWithdrawFault = {},
+      recovery?: UptoWithdrawalRecovery,
+    ) {
       const rpc: UptoWithdrawRpc = {
         getAccountInfo: (account) => ({
           async send() {
             const found = await vm.accountInfo(account, vm.network);
-            if (!found) return { value: null };
+            if (!found) return { value: null, context: { slot: vm.slot() } };
             assert.ok(
               Array.isArray(found.data) && typeof found.data[0] === 'string',
             );
             const data: [string, 'base64'] = [found.data[0], 'base64'];
-            return { value: { owner: address(found.owner), data } };
+            return {
+              value: { owner: address(found.owner), data },
+              context: { slot: vm.slot() },
+            };
           },
         }),
         getSlot: () => ({ send: async () => vm.slot() }),
+        getEpochInfo: () => ({
+          send: async () => ({
+            absoluteSlot: vm.slot(),
+            blockHeight: BigInt(vm.hints().lastValidBlockHeight),
+          }),
+        }),
         getBlockTime: () => ({
           send: async () => fault.blockTime ?? vm.blockTime(),
         }),
@@ -85,11 +100,18 @@ export function nativeWithdrawal(
             return signature(sent);
           },
         }),
-        getSignatureStatuses: (signatures) => ({
+        getSignatureStatuses: (signatures, config) => ({
           send: async () => ({
+            context: { slot: vm.slot() },
             value: signatures.map((value) =>
               vm.signatureSucceeded(value)
-                ? { err: null, confirmationStatus: UPTO_COMMITMENT }
+                ? {
+                    err: null,
+                    confirmationStatus: config?.searchTransactionHistory
+                      ? UPTO_FINAL_COMMITMENT
+                      : UPTO_COMMITMENT,
+                    slot: vm.slot(),
+                  }
                 : null,
             ),
           }),
@@ -101,7 +123,7 @@ export function nativeWithdrawal(
         network: vm.network,
         tokenProgram,
         sleep: async () => {},
-      }).withdraw(query);
+      }).withdraw(query, recovery);
     },
   };
 }

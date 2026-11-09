@@ -10,6 +10,7 @@ import {
   createUptoSdkChain,
   createUptoSeller,
   createUptoVerifier,
+  decodeUptoPayload,
   distributeInstruction,
   memoryUptoChainStore,
   memoryUptoStore,
@@ -21,11 +22,16 @@ import {
   type UptoChannelOnChain,
   type UptoSettlement,
   type UptoTerms,
+  type UptoWithdrawalRecovery,
   type UptoWithdrawResult,
 } from 'x402-upto-metered';
 
 import { PROTOCOL_FEE, UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
-import { PAYMENT_BINDING } from '@gyblos/protocol/constants';
+import type { UptoJournalEntry } from '@gyblos/payments-upto';
+import {
+  PAYMENT_BINDING,
+  PAYMENT_CHANNEL_STATES,
+} from '@gyblos/protocol/constants';
 
 import { nativeVm } from './paid-native-vm';
 import {
@@ -42,13 +48,17 @@ export interface NativeBalances {
 }
 
 export interface NativeChannel {
+  entry: Omit<UptoJournalEntry, 'updatedAt'>;
   expiresAt: number;
   sends(): number;
   open(): Promise<void>;
   close(): Promise<void>;
   seal(): Promise<void>;
   closeRefundAccount(): Promise<void>;
-  withdraw(fault?: NativeWithdrawFault): Promise<UptoWithdrawResult>;
+  withdraw(
+    fault?: NativeWithdrawFault,
+    recovery?: UptoWithdrawalRecovery,
+  ): Promise<UptoWithdrawResult>;
   withdrawalSignature(): string | undefined;
   claim(amount: string): Promise<UptoSettlement>;
   balances(): Promise<NativeBalances>;
@@ -94,6 +104,7 @@ export async function nativeChannel(options: {
     terms,
     vm.hints(),
   );
+  const payload = decodeUptoPayload(authorization);
   const readers = createUptoChannelReaders(
     {
       async getAccountInfo(channelId) {
@@ -143,6 +154,24 @@ export async function nativeChannel(options: {
   });
   const withdrawal = nativeWithdrawal(vm, terms.tokenProgram);
   return {
+    entry: {
+      requestDigest: 'ab'.repeat(32),
+      channelId: authorization.channelId,
+      payTo: terms.payTo,
+      feePayer: terms.feePayer,
+      maxAtomic: terms.maxAtomic,
+      policy: {
+        network: terms.network,
+        mint: terms.asset,
+        treasury: vm.fee.address,
+        protocolFeeBps: PROTOCOL_FEE.bps,
+      },
+      openSlot: String(payload.openSlot),
+      lastValidBlockHeight: vm.hints().lastValidBlockHeight,
+      expiresAt: terms.expiresAt,
+      state: PAYMENT_CHANNEL_STATES.OPEN,
+      chargedAtomic: null,
+    },
     expiresAt: uptoClaimUntil(authorization) / 1000,
     sends: vm.sends,
     open: async () => {
@@ -163,7 +192,7 @@ export async function nativeChannel(options: {
           owner: vm.payer,
         }),
       ]),
-    withdraw: (fault) =>
+    withdraw: (fault, recovery) =>
       withdrawal.withdraw(
         {
           channelId: authorization.channelId,
@@ -173,6 +202,7 @@ export async function nativeChannel(options: {
           splits: terms.splits ?? [],
         },
         fault,
+        recovery,
       ),
     withdrawalSignature: withdrawal.signature,
     claim: (amount) => seller.settle(authorization.channelId, amount),

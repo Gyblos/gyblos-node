@@ -26,11 +26,13 @@ incomplete history or an unavailable RPC do not unblock it. New calls remain
 blocked while that opening is unresolved; no prompt or authorization is retried.
 The checkpoint does not store a signed payload to retransmit.
 
-This adds no journal migration: the existing v4 format and paths are retained.
-It does not recover a stale paid-v2 process lock automatically, request closure,
-refund an open deposit or make a channel reusable between requests. A retained
-lock still requires investigation; never delete it to bypass an uncertain
-payment.
+The journal reads v1–v4 and writes v5, which also records closure/refund
+attempts. Its private path and original opening terms stay unchanged. Older
+binaries refuse v5; do not downgrade while channels are pending. Opening
+reconciliation does not request closure, refund an open deposit or make a
+channel reusable between requests. It does not recover a stale paid-v2 process
+lock. A retained lock still requires investigation; never delete it to bypass an
+uncertain payment.
 
 ## Paid v2 closure and refund results
 
@@ -41,19 +43,33 @@ is separate from read-only reconciliation. It checks the accepted channel and
 reconstructs the distribution from the original terms. The payer's token account
 is created idempotently before distribution to receive the refund.
 
-The locally signed transaction determines its signature before sending. A lost
-send reply or a different RPC-returned signature keeps that local signature with
-`confirmed: false`; the call does not sign or broadcast again. A definite
-preflight or observed chain rejection remains `UPTO_CHAIN_REJECTED`.
+Before broadcast, the buyer atomically checkpoints the locally signed signature,
+original blockhash lifetime and finalized observation slot in that same journal.
+A failed checkpoint prevents broadcast, including when a write may have landed
+but its reply was lost. Concurrent attempts cannot replace a pending signature.
+A lost send reply or a different RPC-returned signature keeps that local
+signature with `confirmed: false`; the call does not sign or broadcast again. A
+definite preflight or observed chain rejection remains `UPTO_CHAIN_REJECTED`.
 
 `distributed` names the attempted operation, not a verified refund amount. Use
 `buyer:reconcile:paid` for finalized financial evidence; neither a missing
 channel nor a transport error proves a refund. The withdrawal leaves the buyer
-journal unresolved until reconciliation. Repeated invocations read channel state
-again; a stale RPC view can still cause a redundant rejected transaction and
-fees. Pending closure/refund signatures are not yet persisted before sending, so
-automatic hard-crash recovery remains incomplete. Do not clear a lock or
-journal, retry a prompt or authorize a replacement channel to bypass this state.
+journal unresolved until reconciliation. A pending control attempt independently
+blocks new payments, even if financial reconciliation already settled its row.
+
+After a controlled stop/reopen, withdrawal first queries the original signature
+in historical statuses and reads context-bound finalized channel state. It does
+not sign or send a replacement while the result is live, nonfinal or
+unavailable. Strict expiry requires finalized block height greater than the
+original lifetime and a valid channel observation; it is not proof of success or
+refund. Resolving a pending attempt returns without another send in that call. A
+later invocation can progress from the verified channel state. Resolved metadata
+retains its observation slot to reject older bank views.
+
+Automatic hard-crash lock recovery and protection against restoring an old
+journal remain separate. Tests cover controlled reopen, not those guarantees. Do
+not clear a lock or journal, retry a prompt or authorize a replacement channel
+to bypass uncertainty.
 
 The remaining sections describe the separate legacy paid-v1 recovery path.
 

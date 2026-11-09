@@ -24,6 +24,7 @@ export {
 } from './constants';
 export { UptoError, uptoError } from './errors';
 export { createUptoHintReader, type UptoHintRpc } from './hints';
+export { parseUptoWithdrawalAttempt } from './withdraw-recovery';
 export { createUptoChannelHistory, type UptoSignaturesRpc } from './history';
 export {
   createUptoReceiptReader,
@@ -43,6 +44,8 @@ export {
 } from './channel-readers';
 export {
   createUptoWithdrawal,
+  type UptoWithdrawalAttempt,
+  type UptoWithdrawalRecovery,
   type UptoWithdrawOptions,
   type UptoWithdrawQuery,
   type UptoWithdrawResult,

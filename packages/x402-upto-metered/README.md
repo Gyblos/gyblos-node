@@ -55,9 +55,15 @@ signature from the signed bytes before broadcast. A lost or mismatched RPC send
 reply returns that signature unconfirmed, without resending. A definitive
 preflight/chain rejection still throws `UPTO_CHAIN_REJECTED`. Confirmation
 describes transaction status, not a verified refund amount; use finalized
-receipt/history verification for that. Control attempts are not durably
-checkpointed by this package, so process-loss recovery and stale-view duplicate
-fee protection remain host responsibilities. The same sender serves
+receipt/history verification for that. An optional per-call recovery context
+supplies a durable `save` callback and the last `UptoWithdrawalAttempt`. The SDK
+saves the local signature and original blockhash lifetime before broadcast; a
+failed save prevents sending. Recovery reads historical signature status and
+finalized, context-bound channel state, and never sends a replacement in the
+same call that resolves a pending attempt. Nonfinal or unavailable observations
+remain uncertain. Hosts retain resolved metadata to prevent stale bank views,
+and must serialize compare-and-set writes. Durable mode requires a partial
+signer; modifying/sending-only wallets are refused. The same sender serves
 recipient-account creation, where an unconfirmed send still refuses admission.
 
 Planned: a durable file store and the host wiring.

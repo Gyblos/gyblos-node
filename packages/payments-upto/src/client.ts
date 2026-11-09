@@ -26,6 +26,7 @@ import {
 } from '@gyblos/protocol/payment';
 
 import type { UptoBuyerJournal } from './buyer-journal';
+import { hasPendingWithdrawal } from './buyer-journal-withdrawal';
 import { UPTO_BUYER_DISTINCT_PARTIES } from './constants';
 import {
   networkRecoveryBlock,
@@ -325,6 +326,11 @@ export function createUptoPaymentClient(
         fail(PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED);
       reserved.add(terms.requestDigest);
       try {
+        const entries = await fixed.journal
+          .list()
+          .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
+        if (entries.some(hasPendingWithdrawal))
+          fail(PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED);
         const known = await fixed.journal
           .get(terms.requestDigest)
           .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
@@ -341,9 +347,19 @@ export function createUptoPaymentClient(
         .list()
         .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
       // An entry without a channel never left the buyer: there is nothing to reconcile.
-      return entries.flatMap(
-        ({ channelId, requestDigest, state, chargedAtomic }) =>
-          channelId ? [{ channelId, requestDigest, state, chargedAtomic }] : [],
+      return entries.flatMap((entry) =>
+        entry.channelId
+          ? [
+              {
+                channelId: entry.channelId,
+                requestDigest: entry.requestDigest,
+                state: hasPendingWithdrawal(entry)
+                  ? PAYMENT_CHANNEL_STATES.OPEN
+                  : entry.state,
+                chargedAtomic: entry.chargedAtomic,
+              },
+            ]
+          : [],
       );
     },
     discard: (authorization) =>
