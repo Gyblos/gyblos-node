@@ -289,3 +289,10 @@ export function desktopChatPaths(profile: string) {
     lock: join(directory, DESKTOP_CHAT_FILES.lock),
   };
 }
+// Separate desktop chat permission and confirmed payment references, never wallet keys.
+export function desktopX402Paths(profile: string) {
+  return {
+    state: join(profile, 'desktop-x402-v1.json'),
+    lock: join(profile, 'desktop-x402-v1.lock'),
+  };
+}

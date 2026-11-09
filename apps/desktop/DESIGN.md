@@ -107,17 +107,23 @@ Detail dialogs preserve linked conversations and full provider references.
   ink and a minus sign. Pending/review uses amber. Red denotes failures.
 - Recorded consumption and authorization limits are not captured payments.
   Unknown or uncertain amounts remain unknown. Keep USD and USDC separate.
-- This desktop version has public wallet metadata but no live USDC balance or
-  transaction-history source. Show unavailable instead of synthetic balances,
-  deposits or transaction hashes. Simulated chat replies are not payments.
+- The protected desktop wallet has public metadata but no live balance source.
+  x402 uses the selected buyer role wallet, explicitly identified in Payments.
+  Its verified per-inference receipts are separate from protected-wallet data.
+  Simulated historical replies are never counted as payments.
 - Display validated, locally saved PayPal authorization/capture IDs through the
   separate read-only reference bridge. Usage activity stays identifier-free.
   Never substitute an order ID for a payment ID. Legacy history may lack IDs.
 - Tables abbreviate references and label PayPal columns Payment ID. Row-level
   Copy buttons are omitted; details show the full reference and Copy action.
-- A future real USDC payment record must include its actual transaction hash and
+- A real x402 payment record includes its actual transaction hash and
   network. Its abbreviated hash must open an allowlisted explorer through a
   host-owned action. Never accept arbitrary renderer URLs or fabricate a hash.
+- x402 authorizes a local Chat budget, reserves before sending and settles each
+  response through the existing buyer. Finish closes spending permission, not
+  a deferred aggregate payment. Unknown outcomes show review, not a remaining
+  balance. Free quotes show no transaction. Unknown test assets use atomic
+  units; only the known devnet USDC mint uses the USDC label.
 - Local activity dates describe when this device observed the record, not a
   provider transaction timestamp. Saving failure/corruption is visible and does
   not overwrite an unreadable record or retry a payment.

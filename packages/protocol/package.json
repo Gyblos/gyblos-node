@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
+    "./buyer-api": "./src/buyer-api.ts",
     "./engine": "./src/engine.ts",
     "./errors": "./src/errors.ts",
     "./models": "./src/models.ts",

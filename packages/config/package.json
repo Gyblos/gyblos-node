@@ -8,6 +8,7 @@
     "./constants": "./src/constants.ts",
     "./home": "./src/home.ts",
     "./hosts": "./src/hosts.ts",
+    "./network": "./src/network.ts",
     "./limits": "./src/limits.ts",
     "./paths": "./src/paths.ts",
     "./paypal": "./src/paypal.ts",

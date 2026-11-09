@@ -15,6 +15,7 @@ import {
   TRANSPORT_LIMITS,
   UNITS,
 } from '@gyblos/config';
+import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
@@ -37,6 +38,11 @@ import {
   PAID_BUYER,
   PAID_BUYER_CODES,
 } from './constants';
+import {
+  createDesktopApi,
+  desktopApiPolicy,
+  type BuyerDesktopOptions,
+} from './desktop-api';
 import { FreeBuyerError, invalidChat, parseFreeChat } from './free-chat';
 import { FreeSelectionFailure } from './free-execution';
 import {
@@ -178,6 +184,7 @@ function replyError(
       error: {
         // A refused request explains itself; every other error keeps its code as the message.
         message: view.detail || code,
+        [BUYER_API.NEVER_SENT_FIELD]: view.neverSent,
         type: FREE_BUYER.errorType,
         param: view.param ?? null,
         code,
@@ -264,16 +271,14 @@ export function freeBuyerHandler(
   stream?: FreeChatStreamExecutor,
   classify?: ChatErrorClassifier,
   authorize?: (request: IncomingMessage) => boolean,
+  desktopPolicy?: BuyerApiPolicy,
 ) {
+  const desktop = createDesktopApi(desktopPolicy, authorize !== undefined);
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
     if (!acceptCaller(request, response, authorize)) return;
-    if (
-      request.method !== 'POST' ||
-      request.url !== ROUTES.inference ||
-      request.headers.origin !== undefined ||
-      !isJson(request)
-    ) {
+    if (desktop.handled(request, response)) return;
+    if (!desktop.accepts(request, isJson(request))) {
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
       return;
     }
@@ -348,9 +353,7 @@ export async function startFreeBuyerHttp(
     requestMs?: number;
     stream?: FreeChatStreamExecutor;
     classify?: ChatErrorClassifier;
-    // Paid mode only: the bearer token every request must carry.
-    token?: string;
-  } = {},
+  } & BuyerDesktopOptions = {},
 ) {
   const server = createServer(
     {
@@ -365,6 +368,7 @@ export async function startFreeBuyerHttp(
       options.stream,
       options.classify,
       options.token === undefined ? undefined : bearerAuthorizer(options.token),
+      desktopApiPolicy(options, settings),
     ),
   );
   await new Promise<void>((resolve, reject) => {

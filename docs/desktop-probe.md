@@ -1,90 +1,92 @@
-# Desktop preview and compatibility probe
+# Desktop buyer and compatibility probe
 
-An experimental Electron app, targeting macOS, Windows and Linux. Local
-packaging currently supports macOS Apple Silicon only; other installers are not
-provided. The normal window reuses the approved mockup's Chat, shared controls,
-searchable model/tool dropdowns, history, motion, SVG signature, palette and
-local artwork. Connect reuses its tool list and model/budget editor; no external
-tool is launched. Models, Activity, full-page Settings, appearance, the
-adjustable sidebar and full-width status footer use the same mockup components
-and styles. The personal wallet is local and protected; USDC Chat and Connect
-remain simulated. An opt-in [PayPal Sandbox session](paypal-sandbox.md) runs a
-pinned local Ollama model with test payments for one local seller.
+An experimental Electron buyer for macOS, Windows and Linux. Local packaging
+currently supports macOS Apple Silicon only. Chat, Connections, Models,
+Applications, Activity, Payments and Settings share the approved compact visual
+system, Instrument Sans and reusable controls.
 
-Chat keeps one in-memory conversation and draft when switching USDC preview and
-PayPal Sandbox. The method applies to the next message only. Previous responses
-retain their payment-method label. PayPal still uses the configured local model
-and does not send previous messages as context. Switching method never opens a
-checkout or settles a session. Payment selection stays locked during responses
-and pending PayPal acknowledgments. Models and Tools use the same searchable
-menu with artwork; unimplemented web tools remain disabled previews. Contextual
-links show a back arrow, while sidebar destinations reset that journey.
+Native Chat supports two independent payment coordinators: an authenticated
+local x402 buyer and the opt-in [PayPal Sandbox session](paypal-sandbox.md).
+Switching payment method keeps the conversation and draft and never starts a
+payment. Historical simulated responses retain their original provenance. The
+web mockup's sample replies are not payment or live-inference evidence.
 
-The USDC preview streams synthetic text independently per conversation. New
-chats, history selection and switching Chat/Connect leave other responses
-running and preserve separate drafts. Stop affects only the visible conversation
-and keeps its generated prefix. Local-node availability does not authorize
-inference or stop synthetic responses. Blocked sends explain missing credits or
-a daily limit inside the chat instead of opening wallet settings. Choosing a
-free model clears only the corresponding paid-model block. Conversations and
-drafts are saved locally in a private conversation file in the persistent
-desktop profile, including model and payment-method labels and opaque links to
-shared PayPal sessions. This is display history, not payment authority. Loading
-never resumes inference, acknowledges a response, or creates an authorization;
-incomplete responses reopen as interrupted. API keys, live execution state and
-payment identifiers are excluded. Files have owner-only permissions; this is
-local storage, not cloud synchronization or a claim of content encryption.
-Corrupt, oversized or inaccessible history is preserved and reported as
-unavailable instead of being replaced with an empty chat. Accepted snapshots are
-coalesced in the host; graceful exit drains them with a bounded wait, so abrupt
-exit or storage failure may lose unsaved changes. Theme choices and connection
-budgets remain in memory and clear when the app closes.
+## x402 chat
 
-Activity separately saves descriptive PayPal Sandbox session metadata in a
-private file beside the sandbox state. It contains no chat text, credentials or
-payment identifiers, and is never used to authorize or retry payments. Each
-observed session separates acknowledged Chat replies, completed agent
-inferences, unconfirmed consumption and successful captures. Dates are local
-observation times, not transaction dates. Earlier sessions that predate
-collection may be unavailable. Storage failures remain visible and do not block,
-change or retry financial work. Observation queues metadata independently of
-payment IPC. Shutdown closes financial resources before a bounded history flush;
-a separate metadata lock protects late writes without holding the payment
-journal open. Abrupt exit can lose unsaved descriptive history. USDC preview
-activity lists only completed simulated replies in saved conversations; it never
-appears as a real payment. Conversation history links new PayPal turns to their
-shared payment session; shared totals can include other chats and agents.
+The desktop stages the buyer-owned utility executable and runs the same inert
+buyer composition as the CLI. It does not import another app into its renderer.
+Signed-quote selection decides whether a response is free or paid: a zero-price
+offer never creates a transaction, regardless of the budget. Paid execution
+retains its existing devnet, model, reasoning, identity, recount and journal
+checks. The current paid runtime supports the pinned Qwen3-0.6B configuration
+with reasoning off.
 
-The five sample models and their prices remain visible in the Preview catalog;
-connection budgets are illustrative, not enforced tool spending limits. Models
-also supports an explicit exact-ID lookup of signed free announcements from the
-public discovery index. This reads one bounded page and only retains listings
-with zero input and output prices. Signature/lifetime checks reuse the discovery
-adapter. Announcements do not establish registry identity, latest withdrawal
-state, provider availability or a usable inference offer. The chat daily-limit
-check uses demo credits only. The footer shows actual local-node state, wallet
-backup reminder and app version. “Node ready” means the local Iroh endpoint is
-bound, not that providers or the public network are reachable. The visible 0.0
-balance is a placeholder, not a queried or funded balance. Preview credits are
-not the personal wallet balance. The renderer remains network-denied. Only an
-explicit model lookup allows the host to issue an anonymous GET to the fixed
-public index in an ephemeral, cookieless session, with redirects denied and a
-deadline. The PayPal Sandbox host separately connects to the local Ollama engine
-and PayPal Sandbox. The preview does not connect web tools, a gateway, a remote
-inference provider or existing node configuration.
+Before starting, prepare the buyer using the existing CLI setup, including its
+selection, identity configuration and public tokenizer for paid execution. Stop
+any other buyer using the same home. In Payments:
 
-Network lookup is lazy: opening the app or Models makes no discovery request.
-The current index searches by exact model ID, not a global model enumeration.
-The UI distinguishes loading, empty, failed and expired results, reports local
-check time and marks a partial first page. It preserves the last submitted ID
-when returning to Models. Results stay in memory, are pruned on signed expiry
-and are cancelled on replacement or quit. Only sanitized model fields reach the
-renderer; no owner, NodeId, signature, endpoint or raw network error crosses the
-catalog bridge. The fixed IPC authenticates the current window/main frame and
-validates arity and bounded identifiers. Announced entries reuse the model rows
-and chat selector with an explicit Chat preview label; selection remains
-simulated and does not enable wallet funding. Connect continues using its sample
-models. No fallback sample is presented as a network announcement.
+1. Choose the **GYBLOS_HOME root**, containing buyer/selection.json.
+2. Enter the relay token in the password field, or provide GYBLOS_RELAY_TOKEN in
+   the app's launch environment.
+3. Start the local buyer. The app uses an ephemeral loopback port and keeps its
+   generated bearer credential in the trusted host.
+4. Authorize a Chat budget in the displayed asset. Each request reserves the
+   configured maximum before transmission; the remaining budget must cover that
+   maximum. No funds move merely by approving this local permission.
+5. Continue in Chat. Each independent message uses actual buyer execution.
+   Positive-price responses settle automatically through x402.
+6. Finish the session to close this desktop's permission. Confirmed payment
+   references remain in Payments and Activity.
+
+An alternative dialog connects an already running compatible local buyer with
+its URL and bearer key. Only literal 127.0.0.1 HTTP endpoints are accepted.
+Metadata and the desktop chat route require bearer authentication, reject any
+Origin, and bind each request to the buyer process's policy identifier. A
+restarted or reconfigured buyer cannot silently execute under an old approval.
+There is no automatic prompt retry.
+
+The paying account is the selected buyer role wallet, not necessarily the
+separate protected desktop wallet. Only the known devnet USDC mint is labelled
+USDC; other test assets display atomic units. This version does not query the
+protected desktop wallet's balance or fund it.
+
+The host saves a separate private Chat permission and reservation before each
+send. Unfinished or unverified payments block messages and closure, including
+after restart. Only explicit buyer proof that a request was never sent can
+release its unsent reservation; this never removes or retries a financial
+journal entry. Reconciliation remains the existing buyer workflow. Successful
+receipts are recorded only after the buyer's chain verification. Their
+abbreviated signatures open the fixed Solana devnet explorer through an
+owning-main-frame action; the renderer cannot supply arbitrary explorer URLs.
+
+The budget applies to this desktop Chat, not other clients or agents using the
+same buyer or wallet. Current x402 settlement is per inference. Finish does not
+submit a deferred aggregate payment or independently prove a refund.
+
+## Local history and previews
+
+Conversations and drafts are saved privately in the persistent desktop profile,
+including model/payment labels and opaque PayPal or x402 session links.
+Restoring never resumes inference, acknowledges a response or authorizes
+spending. Incomplete responses reopen as interrupted. Credentials and signed
+payment payloads are excluded. Storage is local, not cloud-synchronized or
+claimed to encrypt conversation content.
+
+PayPal's descriptive session history remains separate from its financial
+journal. x402 history contains verified references and amounts, or an explicit
+free result without a fabricated hash. Uncertain values are not displayed as
+confirmed spending or available balance. Local dates are observation times, not
+necessarily the chain's block time.
+
+The sample model catalog and unimplemented web tools remain previews. Exact-ID
+lookup reads bounded signed free announcements from the public index; an
+announcement alone is not registry identity, availability or inference proof.
+Real x402 Chat uses the selected buyer's model and policy, rather than silently
+applying a sample model selection.
+
+The renderer remains network-denied. The host owns the buyer connection,
+configuration chooser, credentials and allowlisted explorer action. The PayPal
+coordinator continues using its configured local Ollama model and test session.
 
 ## Navigation and wallet settings
 
@@ -93,11 +95,11 @@ owns its full-height divider; the header rule starts at that edge. Settings is
 above the appearance switch. Chat-only web tools are separate from inference
 applications in Connect; model artwork and compact selectors are shared.
 
-Both the corner balance and footer backup reminder navigate to Settings. Only
-its explicit Back up wallet action opens the existing backup flow. Copy address
-uses a narrow host action: only the currently selected wallet's public address
-can be copied, from the owning main frame while its lifecycle is active. No
-arbitrary clipboard access, private key or signing capability is exposed.
+Payments owns the protected desktop wallet and backup actions. The sidebar
+provides system status without a permanent footer. Copy address uses a narrow
+host action: only the currently selected wallet's public address can be copied,
+from the owning main frame while its lifecycle is active. No arbitrary clipboard
+access, private key or signing capability is exposed.
 
 Add funds opens a local amount form. It rejects an unavailable wallet or missing
 verified backup, then always reports payment unavailable. It cannot authorize
@@ -202,15 +204,15 @@ pnpm desktop:start
 ```
 
 The app creates fresh temporary Chromium session data and retains renderer
-isolation and network denial. Normal Chat does not invoke inference services.
-The normal host also starts a resident utility process with the existing
-loopback-only Iroh binder and `@gyblos/node/lifecycle`. It uses an ephemeral
-identity, no relays/discovery, and no operational configuration or wallet. The
-footer reads fixed sanitized host states; readiness requires worker
-acknowledgement, errors permit a single-process retry, and quit waits for
-process exit. Startup and stop deadlines request termination; a forced exit is
-never a clean stop. There is no hard exit bound if the OS refuses process
-termination.
+isolation and network denial. Real inference requires an explicitly configured
+and authorized buyer or PayPal session. The normal host also starts a resident
+utility process with the existing loopback-only Iroh binder and
+`@gyblos/node/lifecycle`. It uses an ephemeral identity, no relays/discovery,
+and no operational configuration or wallet. The footer reads fixed sanitized
+host states; readiness requires worker acknowledgement, errors permit a
+single-process retry, and quit waits for process exit. Startup and stop
+deadlines request termination; a forced exit is never a clean stop. There is no
+hard exit bound if the OS refuses process termination.
 
 The separate `--smoke` mode mounts the compatibility view and its one fixed IPC
 operation. A utility process imports the pinned Iroh binding and

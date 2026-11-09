@@ -1830,6 +1830,15 @@
   color: var(--muted);
   font-size: var(--ui-detail);
 }
+.desktop-frame .ui-data-table a {
+  color: var(--text);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.desktop-frame .ui-data-table a:hover {
+  text-decoration-thickness: 2px;
+}
 .desktop-frame .ui-data-table tr:last-child td,
 .desktop-frame .ui-data-table tr:last-child th {
   border-bottom: 0;

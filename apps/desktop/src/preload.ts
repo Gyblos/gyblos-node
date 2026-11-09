@@ -23,6 +23,7 @@ import {
   parseWalletSettingsResult,
   WALLET_SETTINGS,
 } from './wallet/settings-model';
+import { DESKTOP_X402, parseX402Result } from './x402-model';
 
 contextBridge.exposeInMainWorld('desktopConversations', {
   load: async () =>
@@ -35,6 +36,10 @@ contextBridge.exposeInMainWorld('desktopConversations', {
     parseChatArchiveStatus(
       await ipcRenderer.invoke(CHAT_STORAGE.STATUS_CHANNEL),
     ),
+});
+contextBridge.exposeInMainWorld('desktopX402', {
+  run: async (request: unknown) =>
+    parseX402Result(await ipcRenderer.invoke(DESKTOP_X402.CHANNEL, request)),
 });
 
 contextBridge.exposeInMainWorld('desktopActivity', {

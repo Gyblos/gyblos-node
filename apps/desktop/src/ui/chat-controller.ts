@@ -3,7 +3,7 @@
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 
 import { restoreChatArchive, type ChatArchive } from '../chat-archive-model';
-import { PAYMENT_METHOD } from '../paypal-model';
+import { PAYMENT_METHOD, type PaymentMethod } from '../paypal-model';
 import {
   advanceRun,
   createSession,
@@ -168,6 +168,7 @@ export class ChatController {
     model: ChatModel,
     id: string,
     paymentSessionId?: string,
+    method: PaymentMethod = PAYMENT_METHOD.PAYPAL,
   ) {
     if (this.restoring) return null;
     const session = this.snapshot.sessions.find(
@@ -192,7 +193,7 @@ export class ChatController {
           model: { ...model },
           state: MESSAGE_STATE.COMPLETE,
           tools: [],
-          paymentMethod: PAYMENT_METHOD.PAYPAL,
+          paymentMethod: method,
           ...(paymentSessionId ? { paymentSessionId } : {}),
           sentAt: this.now(),
         },
@@ -203,7 +204,7 @@ export class ChatController {
           model: { ...model },
           state: MESSAGE_STATE.PENDING,
           tools: [],
-          paymentMethod: PAYMENT_METHOD.PAYPAL,
+          paymentMethod: method,
           ...(paymentSessionId ? { paymentSessionId } : {}),
           sentAt: null,
         },

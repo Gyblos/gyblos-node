@@ -21,6 +21,7 @@ import { BRAND_COLORS } from './theme';
 import { WALLET } from './wallet/constants';
 import { registerDesktopWallet } from './wallet/host';
 import { focusExistingWindow, prepareWalletProfile } from './wallet/lifecycle';
+import { registerDesktopX402 } from './x402-host';
 
 function createProbeWindow(startup = false) {
   const window = new BrowserWindow({
@@ -91,7 +92,39 @@ type DesktopServices = {
   node: ReturnType<typeof registerDesktopNode> | null;
   paypal: ReturnType<typeof registerDesktopPaypal> | null;
   chats: ReturnType<typeof registerChatArchive> | null;
+  x402: ReturnType<typeof registerDesktopX402> | null;
 };
+function createDesktopServices(): DesktopServices {
+  return {
+    wallet: undefined,
+    node: null,
+    paypal: null,
+    chats: null,
+    x402: null,
+  };
+}
+function installDesktopServices(
+  services: DesktopServices,
+  window: BrowserWindow,
+  walletRoot: string,
+  smoke: boolean,
+  signal: AbortSignal,
+) {
+  const wallet = registerDesktopWallet(window, walletRoot, smoke, signal);
+  services.wallet = wallet;
+  if (!smoke) {
+    registerNetworkCatalog(window, signal);
+    services.paypal = registerDesktopPaypal(window);
+    services.chats = registerChatArchive(window, app.getPath('userData'));
+    services.x402 = registerDesktopX402(
+      window,
+      app.getPath('userData'),
+      __dirname,
+    );
+    services.node = registerDesktopNode(window, __dirname, signal);
+  }
+  return wallet.ready;
+}
 
 function registerDesktopQuit(
   controller: AbortController,
@@ -103,12 +136,13 @@ function registerDesktopQuit(
       (event) => services().paypal?.guard(event) ?? false,
       async () => {
         controller.abort();
-        const { wallet, node, paypal, chats } = services();
+        const { wallet, node, paypal, chats, x402 } = services();
         await Promise.allSettled([
           wallet?.settled() ?? Promise.resolve(),
           node?.close() ?? Promise.resolve(),
           paypal?.close() ?? Promise.resolve(),
           chats?.close() ?? Promise.resolve(),
+          x402?.close() ?? Promise.resolve(),
         ]);
       },
       () => app.quit(),
@@ -130,16 +164,13 @@ async function main() {
     }
   }
   const controller = new AbortController();
-  let wallet: ReturnType<typeof registerDesktopWallet> | undefined;
-  let node: ReturnType<typeof registerDesktopNode> | null = null;
-  let paypal: ReturnType<typeof registerDesktopPaypal> | null = null;
-  let chats: ReturnType<typeof registerChatArchive> | null = null;
+  const services = createDesktopServices();
   const fail = () => {
     process.stdout.write(`${JSON.stringify(failedProbe())}\n`);
     app.exit(1);
   };
   const cancelWatchdog = smoke ? armSmokeWatchdog(fail) : () => {};
-  registerDesktopQuit(controller, () => ({ wallet, node, paypal, chats }));
+  registerDesktopQuit(controller, () => services);
   app.on('quit', () => {
     cancelWatchdog();
     controller.abort();
@@ -156,13 +187,13 @@ async function main() {
   app.dock?.setIcon(join(__dirname, 'renderer', DESKTOP.ICON_FILE));
   const window = createProbeWindow();
   const loading = smoke ? null : createProbeWindow(true);
-  wallet = registerDesktopWallet(window, walletRoot, smoke, controller.signal);
-  if (!smoke) registerNetworkCatalog(window, controller.signal);
-  if (!smoke) paypal = registerDesktopPaypal(window);
-  if (!smoke) chats = registerChatArchive(window, app.getPath('userData'));
-  node = smoke
-    ? null
-    : registerDesktopNode(window, __dirname, controller.signal);
+  const preparation = installDesktopServices(
+    services,
+    window,
+    walletRoot,
+    smoke,
+    controller.signal,
+  );
   app.on('second-instance', () => {
     focusExistingWindow(loading && !loading.isDestroyed() ? loading : window);
   });
@@ -192,8 +223,8 @@ async function main() {
     app.quit();
   });
   await settleDesktopStartup(
-    loadDesktopWindows(window, loading, wallet.ready, controller.signal),
-    () => node?.close() ?? Promise.resolve(),
+    loadDesktopWindows(window, loading, preparation, controller.signal),
+    () => services.node?.close() ?? Promise.resolve(),
   );
 }
 void main().catch(() => {

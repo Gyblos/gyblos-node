@@ -41,6 +41,8 @@ export interface ChatPayment {
   refundedAtomic: string | null;
   // Whether the buyer kept a record for reconciliation; false for a settled request.
   recorded: boolean;
+  // Present only after the buyer verified the settlement, never a raw seller claim.
+  transaction?: string;
 }
 export type ChatResult = FreeExecutionResult & {
   payment?: ChatPayment;

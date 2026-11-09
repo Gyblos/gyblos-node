@@ -1,4 +1,5 @@
 // Bounded local conversation data only; excludes execution, credentials and payment authority.
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 
 import { activityId } from './activity-model';
@@ -99,6 +100,11 @@ function parseMessage(value: unknown): ArchivedMessage | null {
   const method: PaymentMethod | undefined = Object.values(PAYMENT_METHOD).find(
     (entry) => entry === item.paymentMethod,
   );
+  const paymentId =
+    activityId(item.paymentSessionId) ||
+    (method === PAYMENT_METHOD.USDC &&
+      typeof item.paymentSessionId === 'string' &&
+      BUYER_API.POLICY_PATTERN.test(item.paymentSessionId));
   if (
     !id(item.id) ||
     !model ||
@@ -112,8 +118,7 @@ function parseMessage(value: unknown): ArchivedMessage | null {
     (item.sentAt !== null &&
       (!integer(item.sentAt) ||
         !Number.isFinite(new Date(item.sentAt).getTime()))) ||
-    ('paymentSessionId' in item &&
-      (!activityId(item.paymentSessionId) || method !== PAYMENT_METHOD.PAYPAL))
+    ('paymentSessionId' in item && !paymentId)
   )
     return null;
   const tools: ChatMessage['tools'] = [];
@@ -132,7 +137,7 @@ function parseMessage(value: unknown): ArchivedMessage | null {
     paymentMethod: method,
     sentAt: item.sentAt,
     ...(reasoning ? { reasoning } : {}),
-    ...(activityId(item.paymentSessionId)
+    ...(paymentId && typeof item.paymentSessionId === 'string'
       ? { paymentSessionId: item.paymentSessionId }
       : {}),
   };

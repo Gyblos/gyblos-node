@@ -1,5 +1,5 @@
 // Hosts the buyer desktop, including the local PayPal Sandbox inference session.
-// USDC Chat and Connect remain simulated; Wallet receives public local metadata only.
+// Native chat uses the buyer bridge for x402 or the separate PayPal coordinator.
 import {
   ArrowLeft,
   Check,
@@ -70,6 +70,7 @@ import { Button, IconButton } from './ui/UI';
 import { useActivity } from './ui/useActivity';
 import { useChatArchive } from './ui/useChatArchive';
 import { usePaypalSession } from './ui/usePaypalSession';
+import { useX402 } from './ui/useX402';
 import { WalletBackup } from './ui/WalletBackup';
 import { useDesktopWallet } from './ui/WalletState';
 
@@ -141,6 +142,7 @@ export function DesktopApp() {
           view === UI_VIEW.CONNECT,
       ));
   const paypal = usePaypalSession(monitorPaypal);
+  const x402 = useX402();
   const paypalStatus = paypal.state.status;
   const paypalBusy =
     paypal.state.busy ||
@@ -169,7 +171,7 @@ export function DesktopApp() {
   const announcements = useNetworkCatalog();
   const networkModels = announcedModels(announcements.snapshot, Date.now());
   const chatModels = [MODELS[0], ...networkModels, ...MODELS.slice(1)];
-  // Chat and Connect remain simulated independently of local endpoint readiness.
+  // Transport readiness and spending permission are independently enforced by each real coordinator.
   const online = true;
   const [model, setModel] = useState(MODELS[0]);
   useEffect(() => {
@@ -390,6 +392,8 @@ export function DesktopApp() {
               paymentMethod={paymentMethod}
               paymentControl={paymentSelector()}
               paypal={paypal}
+              x402={x402}
+              onReviewX402={() => navigate(UI_VIEW.PAYMENTS)}
               onBusyChange={setChatBusy}
               model={model}
               online={online}
@@ -433,6 +437,7 @@ export function DesktopApp() {
           {view === UI_VIEW.TOOLS && <Applications />}
           {view === UI_VIEW.PAYMENTS && (
             <Payments
+              x402={x402}
               session={paypal}
               activity={activity}
               managePaypal={managePaypal}
@@ -457,6 +462,7 @@ export function DesktopApp() {
           )}
           {view === UI_VIEW.ACTIVITY && (
             <Activity
+              x402={x402}
               activity={activity}
               chat={chatController}
               selectedSession={activitySession}

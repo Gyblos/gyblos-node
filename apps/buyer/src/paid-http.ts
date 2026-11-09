@@ -8,6 +8,7 @@ import {
   type PaidBuyerDependencies,
   type PaidBuyerOutcome,
 } from '@gyblos/node/buyer-paid-execution';
+import { PAID_VERDICTS } from '@gyblos/node/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   PAID_EXECUTION_CODES,
@@ -46,6 +47,9 @@ export function paidSummary(outcome: PaidBuyerOutcome): ChatPayment {
     feeAtomic: settled?.feeAtomic ?? null,
     refundedAtomic: settled?.refundedAtomic ?? null,
     recorded: outcome.recorded,
+    ...(outcome.verdict === PAID_VERDICTS.SETTLED && settled
+      ? { transaction: settled.transaction }
+      : {}),
   };
 }
 

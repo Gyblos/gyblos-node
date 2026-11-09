@@ -20,7 +20,14 @@ export function conversationSummary(session: ChatSession) {
       (message) => message.paymentMethod === PAYMENT_METHOD.PAYPAL,
     ).length,
     previewReplies: replies.filter(
-      (message) => message.paymentMethod === PAYMENT_METHOD.USDC,
+      (message) =>
+        message.paymentMethod === PAYMENT_METHOD.USDC &&
+        !message.paymentSessionId,
+    ).length,
+    x402Replies: replies.filter(
+      (message) =>
+        message.paymentMethod === PAYMENT_METHOD.USDC &&
+        !!message.paymentSessionId,
     ).length,
     paymentSessionIds: [
       ...new Set(

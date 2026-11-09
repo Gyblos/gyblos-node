@@ -1,5 +1,5 @@
 // One buyer conversation surface with a shared draft, history and payment provenance.
-// USDC remains simulated; real Sandbox requests use the guarded PayPal coordinator.
+// Native x402 requests use the authenticated buyer bridge; PayPal retains its separate coordinator.
 import {
   ArrowDown,
   ArrowUp,
@@ -30,6 +30,7 @@ import {
   paypalDollars,
   type PaymentMethod,
 } from '../paypal-model';
+import { X402_ACTION } from '../x402-model';
 import { activityDate, sessionOutcome } from './activity-presentation';
 import { modelArtwork } from './announced-models';
 import type { ChatController } from './chat-controller';
@@ -73,6 +74,8 @@ export type ChatHandle = {
   openChat: (id: string) => void;
 };
 type Props = {
+  x402?: import('./useX402').X402View;
+  onReviewX402?(): void;
   ref?: Ref<ChatHandle>;
   chat: ChatController;
   storageState: (typeof CHAT_STORAGE_STATE)[keyof typeof CHAT_STORAGE_STATE];
@@ -129,6 +132,8 @@ function groupTurns(messages: readonly ChatMessage[]): ChatTurn[] {
   return turns;
 }
 export function Chat({
+  x402,
+  onReviewX402,
   ref,
   chat,
   storageState,
@@ -164,6 +169,13 @@ export function Chat({
   const [copied, setCopied] = useState('');
   const [reasoning, setReasoning] = useState<ReasoningSelection | null>(null);
   const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
+  const usingX402 = !usingPaypal && !!x402;
+  const x402Ready =
+    x402 &&
+    x402.state.summary.active &&
+    !x402.state.summary.blocked &&
+    !x402.busy &&
+    x402.state.summary.policy?.policyId === x402.state.policy?.policyId;
   const notice = usingPaypal
     ? paypal.state.notice || session.notice
     : session.notice;
@@ -194,8 +206,22 @@ export function Chat({
     input: 0,
     output: 0,
   };
-  const composerModel = usingPaypal ? sandboxModel : model;
-  const thinking = chatReasoningChoice(composerModel, paymentMethod, reasoning);
+  const buyerModel: ModelOption = {
+    id: x402?.state.policy?.model ?? model.id,
+    name: x402?.state.policy?.model ?? model.name,
+    image: modelArtwork(x402?.state.policy?.model ?? model.id),
+    free: false,
+    input: 0,
+    output: 0,
+  };
+  const composerModel = usingPaypal
+    ? sandboxModel
+    : usingX402
+      ? buyerModel
+      : model;
+  const thinking = usingX402
+    ? null
+    : chatReasoningChoice(composerModel, paymentMethod, reasoning);
   const chosenTools = selectedTools.filter((id) => connectedTools.includes(id));
   const lastUser = [...session.messages]
     .reverse()
@@ -340,6 +366,43 @@ export function Chat({
   }
   function submit() {
     if (!canSend || !session.draft.trim()) return;
+    if (usingX402 && x402) {
+      if (!x402Ready) {
+        onReviewX402?.();
+        return;
+      }
+      if (!session.messages.length) captureComposer();
+      follow.current = true;
+      setNearBottom(true);
+      const id = crypto.randomUUID();
+      const conversation = chat.startPaypal(
+        session.draft,
+        buyerModel,
+        id,
+        x402.state.summary.sessionId ?? undefined,
+        PAYMENT_METHOD.USDC,
+      );
+      if (!conversation) return;
+      void x402
+        .run({ action: X402_ACTION.SEND, id, prompt: session.draft })
+        .then((result) => {
+          if (result?.reply)
+            chat.completePaypal(
+              conversation,
+              id,
+              result.reply.text,
+              buyerModel,
+            );
+          else
+            chat.failPaypal(
+              conversation,
+              id,
+              result?.error ??
+                'Response unavailable. Review the chat budget in Payments before trying again.',
+            );
+        });
+      return;
+    }
     if (usingPaypal) {
       if (!session.messages.length) captureComposer();
       follow.current = true;
@@ -556,10 +619,16 @@ export function Chat({
             <div className="composer-leading">
               <ModelDropdown
                 model={composerModel}
-                models={usingPaypal ? [sandboxModel] : models}
+                models={
+                  usingPaypal
+                    ? [sandboxModel]
+                    : usingX402
+                      ? [buyerModel]
+                      : models
+                }
                 onSelect={onSelectModel}
                 onBrowse={onBrowseModels}
-                showBrowse={!usingPaypal}
+                showBrowse={!usingPaypal && !usingX402}
                 contextLabel={
                   usingPaypal ? 'Local model · PayPal Sandbox' : undefined
                 }
@@ -576,7 +645,7 @@ export function Chat({
               <ToolsDropdown
                 selected={selectedTools}
                 connected={connectedTools}
-                unavailable={usingPaypal}
+                unavailable={usingPaypal || usingX402}
                 onToggle={(id) =>
                   setSelectedTools((previous) =>
                     toggleToolSelection(previous, connectedTools, id),
@@ -590,15 +659,19 @@ export function Chat({
               <span>
                 {session.paypalRun
                   ? 'Generating…'
-                  : usingPaypal
-                    ? canSendPaypal(paypal.state)
-                      ? 'PayPal Sandbox'
-                      : 'Set up in Payments'
-                    : busy
-                      ? 'Esc to stop'
-                      : model.free
-                        ? 'No credits needed'
-                        : 'Uses wallet balance'}
+                  : usingX402
+                    ? x402Ready
+                      ? 'x402 · devnet'
+                      : 'Authorize in Payments'
+                    : usingPaypal
+                      ? canSendPaypal(paypal.state)
+                        ? 'PayPal Sandbox'
+                        : 'Set up in Payments'
+                      : busy
+                        ? 'Esc to stop'
+                        : model.free
+                          ? 'No credits needed'
+                          : 'Uses wallet balance'}
               </span>
               <IconButton
                 variant={run ? 'secondary' : 'primary'}
@@ -688,7 +761,16 @@ export function Chat({
                     >
                       <RowCopy
                         title={item.title}
-                        detail={`${summary.prompts} prompts · ${summary.paypalReplies} PayPal replies · ${summary.previewReplies} simulated replies`}
+                        detail={
+                          summary.prompts +
+                          ' prompts · ' +
+                          summary.paypalReplies +
+                          ' PayPal replies · ' +
+                          summary.x402Replies +
+                          ' x402 replies · ' +
+                          summary.previewReplies +
+                          ' simulated replies'
+                        }
                       />
                       {summary.lastSentAt !== null && (
                         <small className="chat-history-date">
@@ -769,7 +851,9 @@ export function Chat({
                   <p>
                     {message.paymentMethod === PAYMENT_METHOD.PAYPAL
                       ? 'PayPal Sandbox · local inference'
-                      : 'USDC preview · simulated response'}
+                      : message.paymentSessionId
+                        ? 'x402 · Solana devnet'
+                        : 'USDC preview · simulated response'}
                   </p>
                   {message.reasoning && (
                     <p>

@@ -12,6 +12,7 @@ import {
   PAYMENT_METHOD,
   paypalPaymentSummary,
   paypalSessionCanConnectAgent,
+  type PaymentMethod,
 } from '../paypal-model';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
@@ -23,10 +24,13 @@ import { SpendingHistory } from './SpendingHistory';
 import { Badge, Button, PagePanel } from './UI';
 import type { ActivityView } from './useActivity';
 import type { PaypalSessionView } from './usePaypalSession';
+import type { X402View } from './useX402';
 import { WalletDetails } from './WalletDetails';
 import { useDesktopWallet } from './WalletState';
+import { X402Payments } from './X402Payments';
 
 type Props = {
+  x402?: X402View;
   session: PaypalSessionView;
   activity: ActivityView;
   managePaypal: boolean;
@@ -36,12 +40,20 @@ type Props = {
   onActivity(id?: string): void;
   onBackup(): void;
   onAddFunds(): void;
-  onPaymentMethod(method: typeof PAYMENT_METHOD.PAYPAL): boolean;
+  onPaymentMethod(method: PaymentMethod): boolean;
 };
 export function Payments(props: Props) {
   const [walletOpen, setWalletOpen] = useState(false);
   return (
     <PagePanel>
+      {props.x402 && (
+        <X402Payments
+          buyer={props.x402}
+          onChat={() => {
+            if (props.onPaymentMethod(PAYMENT_METHOD.USDC)) props.onChat();
+          }}
+        />
+      )}
       <WalletOverview
         onAddFunds={props.onAddFunds}
         onDetails={() => setWalletOpen(true)}

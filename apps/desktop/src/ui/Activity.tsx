@@ -21,8 +21,11 @@ import { ChoiceMenu, StatePanel } from './Management';
 import { Pagination } from './Pagination';
 import { Badge, Button, PagePanel, SearchField } from './UI';
 import type { ActivityView } from './useActivity';
+import type { X402View } from './useX402';
+import { X402History } from './X402Payments';
 
 type Props = {
+  x402?: X402View;
   activity: ActivityView;
   chat: ChatController;
   onPayments(): void;
@@ -31,6 +34,7 @@ type Props = {
   onSelectSession(id: string | null): void;
 };
 export function Activity({
+  x402,
   activity,
   chat,
   onPayments,
@@ -69,6 +73,7 @@ export function Activity({
   const selected = entries.find((entry) => entry.id === selectedSession);
   return (
     <PagePanel>
+      {x402 && <X402History buyer={x402} />}
       <div className="ui-toolbar">
         <SearchField
           label="Search sessions"

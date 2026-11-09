@@ -24,6 +24,7 @@ import {
   FREE_BUYER_STARTUP,
   type FreeBuyerStartupReason,
 } from './constants';
+import { configuredBuyerAccess } from './desktop-api';
 import { executeBuyerFree, type FreeBuyerDependencies } from './free-execution';
 import { startFreeBuyerHttp, type ChatErrorClassifier } from './free-http';
 import { freeBuyerDependencies } from './free-selection';
@@ -202,6 +203,7 @@ function buyerHttp(
   request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
+  role?: RoleConfig,
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
@@ -210,7 +212,7 @@ function buyerHttp(
       {
         port,
         stream: run,
-        token: execution?.token,
+        ...configuredBuyerAccess(request, role, execution?.token),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
       },
@@ -316,7 +318,7 @@ export async function startFreeBuyer(
       execution?.execute ??
       ((input, signal, onDelta) =>
         executeBuyerFree(input, dependencies, signal, onDelta));
-    const host = await buyerHttp(run, request, options.port, execution);
+    const host = await buyerHttp(run, request, options.port, execution, role);
     return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
     await closeBuyerResources(

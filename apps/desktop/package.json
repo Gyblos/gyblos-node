@@ -6,6 +6,11 @@
   "main": "dist/main.cjs",
   "exports": {
     "./modal-model": "./src/ui/modal-model.ts",
+    "./x402-budget": "./src/x402-budget.ts",
+    "./x402-client": "./src/x402-client.ts",
+    "./x402-model": "./src/x402-model.ts",
+    "./x402-handlers": "./src/x402-handlers.ts",
+    "./x402-managed": "./src/x402-managed.ts",
     "./backup-feedback": "./src/ui/backup-feedback.ts",
     "./probe-model": "./src/probe-model.ts",
     "./probe-session": "./src/probe-session.ts",
