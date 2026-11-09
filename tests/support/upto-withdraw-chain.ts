@@ -117,7 +117,8 @@ export interface SentInstruction {
   data: number[];
 }
 export interface SentTransaction {
-  signature: string;
+  // A partially signed SDK wire can still be inspected before its fee payer signs.
+  signature: string | null;
   feePayer: string;
   signers: string[];
   writableSigners: number;
@@ -133,8 +134,11 @@ export function decodeSent(wire: string): SentTransaction {
     decoded.messageBytes,
   );
   const keys = message.staticAccounts.map(String);
+  const payerSignature = decoded.signatures[message.staticAccounts[0]!];
   return {
-    signature: getSignatureFromTransaction(decoded),
+    signature: payerSignature
+      ? getBase58Decoder().decode(payerSignature)
+      : null,
     feePayer: keys[0]!,
     signers: keys.slice(0, message.header.numSignerAccounts),
     writableSigners:

@@ -10,7 +10,8 @@ import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import {
   generateKeyPairSigner,
   getBase58Decoder,
-  signature,
+  getSignatureFromTransaction,
+  getTransactionDecoder,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
   SolanaError,
   type Address,
@@ -115,7 +116,9 @@ function chainDouble(state: Chain) {
               owner: TOKEN_PROGRAM,
               data: INITIALIZED,
             });
-        return signature(transaction.signature);
+        return getSignatureFromTransaction(
+          getTransactionDecoder().decode(Buffer.from(wire, 'base64')),
+        );
       }),
     getSignatureStatuses: () =>
       call(() => ({
