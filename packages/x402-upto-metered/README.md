@@ -49,6 +49,17 @@ example a QUIC peer-to-peer stream).
   `@x402/svm@2.28.0` (`patches/@x402__svm@2.28.0.patch`); not yet proposed
   upstream.
 
+The payer's `createUptoWithdrawal` selects request-close, wait, seal/distribute
+from confirmed native channel state. Its shared transaction sender derives the
+signature from the signed bytes before broadcast. A lost or mismatched RPC send
+reply returns that signature unconfirmed, without resending. A definitive
+preflight/chain rejection still throws `UPTO_CHAIN_REJECTED`. Confirmation
+describes transaction status, not a verified refund amount; use finalized
+receipt/history verification for that. Control attempts are not durably
+checkpointed by this package, so process-loss recovery and stale-view duplicate
+fee protection remain host responsibilities. The same sender serves
+recipient-account creation, where an unconfirmed send still refuses admission.
+
 Planned: a durable file store and the host wiring.
 
 ## Rules

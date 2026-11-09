@@ -339,13 +339,10 @@ void test('an unconfirmed send is rechecked later; a landed error or a preflight
   assert.equal(kept.confirmed, false);
 
   const unsent = await setup({}, { sendError: true });
-  await assert.rejects(
-    unsent.withdrawal().withdraw(unsent.query),
-    (error) =>
-      error instanceof UptoError &&
-      error.code === UPTO_ERROR_CODES.UNAVAILABLE &&
-      !error.message.includes('rpc.example'),
-  );
+  const uncertain = await unsent.withdrawal().withdraw(unsent.query);
+  assert.equal(uncertain.confirmed, false);
+  assert.equal(typeof uncertain.transaction, 'string');
+  assert.ok(!JSON.stringify(uncertain).includes('rpc.example'));
 
   const down = await setup({}, { failing: true });
   await assert.rejects(

@@ -30,7 +30,32 @@ This adds no journal migration: the existing v4 format and paths are retained.
 It does not recover a stale paid-v2 process lock automatically, request closure,
 refund an open deposit or make a channel reusable between requests. A retained
 lock still requires investigation; never delete it to bypass an uncertain
-payment. The sections below describe the separate legacy paid-v1 recovery path.
+payment.
+
+## Paid v2 closure and refund results
+
+With the buyer stopped and the original home intact, `pnpm buyer:withdraw:paid`
+can request closure, wait for the chain's grace period, then seal and distribute
+an unclaimed channel. This command signs transactions and spends buyer fees; it
+is separate from read-only reconciliation. It checks the accepted channel and
+reconstructs the distribution from the original terms. The payer's token account
+is created idempotently before distribution to receive the refund.
+
+The locally signed transaction determines its signature before sending. A lost
+send reply or a different RPC-returned signature keeps that local signature with
+`confirmed: false`; the call does not sign or broadcast again. A definite
+preflight or observed chain rejection remains `UPTO_CHAIN_REJECTED`.
+
+`distributed` names the attempted operation, not a verified refund amount. Use
+`buyer:reconcile:paid` for finalized financial evidence; neither a missing
+channel nor a transport error proves a refund. The withdrawal leaves the buyer
+journal unresolved until reconciliation. Repeated invocations read channel state
+again; a stale RPC view can still cause a redundant rejected transaction and
+fees. Pending closure/refund signatures are not yet persisted before sending, so
+automatic hard-crash recovery remains incomplete. Do not clear a lock or
+journal, retry a prompt or authorize a replacement channel to bypass this state.
+
+The remaining sections describe the separate legacy paid-v1 recovery path.
 
 ## What blocks new payments
 

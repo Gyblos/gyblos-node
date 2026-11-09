@@ -280,6 +280,7 @@ export async function nativeVm(now: () => number) {
       assert.ok(await tokenAccount(owner));
     },
     time,
+    blockTime: () => svm.getClock().unixTimestamp,
     slot: () => svm.getClock().slot,
     hints: () => ({
       recentBlockhash: String(svm.latestBlockhash()),
@@ -313,7 +314,12 @@ export async function nativeVm(now: () => number) {
       );
       return !(
         execute(
-          await partiallySignTransaction([feePayer.keyPair], transaction),
+          await partiallySignTransaction(
+            [payer, feePayer]
+              .filter((signer) => signer.address in transaction.signatures)
+              .map((signer) => signer.keyPair),
+            transaction,
+          ),
         ) instanceof FailedTransactionMetadata
       );
     },

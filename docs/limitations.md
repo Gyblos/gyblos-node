@@ -100,6 +100,18 @@ only; never import mainnet keys.
   resolves the same channel. It neither saves a signed payload for
   retransmission nor recovers stale process locks. Journal v4 and private paths
   are unchanged; this is not reusable-channel closure or refund recovery.
+- Closure/refund sends keep the locally signed transaction signature after a
+  lost or mismatched RPC reply and report it unconfirmed. They do not resend
+  inside the call or report refund amounts as verified. The existing read-only
+  finalized reconciliation remains required; absence of an account is not proof
+  of refund. Pending control signatures are not durably checkpointed yet, and a
+  stale RPC state on a later invocation may incur another rejected-transaction
+  fee. Full buyer/journal crash recovery remains separate.
+- Local native withdrawal acceptance drives the actual adapter through closing,
+  grace, seal and distribution. It checks token balances, recreation of the
+  payer's refund account, response loss, signed replay refusal, a rejected early
+  seal and an already-paid channel. The source-built SBF fixture and synthetic
+  mint do not establish deployed-program equivalence or a live product run.
 - Opening checkpoint regressions use the product payment client with synthetic
   signers and finalized-history replies. A separate standalone-SDK test executes
   the pinned native program in LiteSVM, loses confirmation and recovers the same

@@ -1,6 +1,7 @@
 // Contract for the offline SDK/native-program acceptance fixture. No RPC or product startup.
 import assert from 'node:assert/strict';
 
+import { getCloseAccountInstruction } from '@solana-program/token';
 import { address } from '@solana/kit';
 import {
   createUptoAuthorization,
@@ -16,15 +17,21 @@ import {
   sealInstruction,
   UPTO_PROGRAM,
   uptoClaimUntil,
+  uptoTokenAccount,
   type UptoChannelOnChain,
   type UptoSettlement,
   type UptoTerms,
+  type UptoWithdrawResult,
 } from 'x402-upto-metered';
 
 import { PROTOCOL_FEE, UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
 import { PAYMENT_BINDING } from '@gyblos/protocol/constants';
 
 import { nativeVm } from './paid-native-vm';
+import {
+  nativeWithdrawal,
+  type NativeWithdrawFault,
+} from './paid-native-withdrawal';
 
 export interface NativeBalances {
   payer: bigint;
@@ -39,6 +46,10 @@ export interface NativeChannel {
   sends(): number;
   open(): Promise<void>;
   close(): Promise<void>;
+  seal(): Promise<void>;
+  closeRefundAccount(): Promise<void>;
+  withdraw(fault?: NativeWithdrawFault): Promise<UptoWithdrawResult>;
+  withdrawalSignature(): string | undefined;
   claim(amount: string): Promise<UptoSettlement>;
   balances(): Promise<NativeBalances>;
   channel(): Promise<UptoChannelOnChain | undefined>;
@@ -53,6 +64,7 @@ export interface NativeChannel {
 export async function nativeChannel(options: {
   now: () => number;
   grace?: number;
+  deposit?: string;
 }): Promise<NativeChannel> {
   const vm = await nativeVm(options.now);
 
@@ -63,7 +75,7 @@ export async function nativeChannel(options: {
     feePayer: vm.feePayer.address,
     authorizer: vm.authorizer.address,
     tokenProgram: UPTO_CHANNEL_SETTINGS.tokenProgram,
-    maxAtomic: '1000',
+    maxAtomic: options.deposit ?? '1000',
     expiresAt: options.now() + 30_000,
     memo: 'synthetic-native-acceptance',
     withdrawDelaySeconds:
@@ -129,6 +141,7 @@ export async function nativeChannel(options: {
     now: options.now,
     own: terms,
   });
+  const withdrawal = nativeWithdrawal(vm, terms.tokenProgram);
   return {
     expiresAt: uptoClaimUntil(authorization) / 1000,
     sends: vm.sends,
@@ -137,6 +150,31 @@ export async function nativeChannel(options: {
     },
     close: () =>
       vm.send([requestCloseInstruction(vm.payer, authorization.channelId)]),
+    seal: () => vm.send([sealInstruction(authorization.channelId)]),
+    closeRefundAccount: async () =>
+      vm.send([
+        getCloseAccountInstruction({
+          account: await uptoTokenAccount(
+            vm.payer.address,
+            vm.mint.address,
+            terms.tokenProgram,
+          ),
+          destination: vm.payer.address,
+          owner: vm.payer,
+        }),
+      ]),
+    withdraw: (fault) =>
+      withdrawal.withdraw(
+        {
+          channelId: authorization.channelId,
+          mint: vm.mint.address,
+          rentPayer: vm.feePayer.address,
+          maxAtomic: terms.maxAtomic,
+          splits: terms.splits ?? [],
+        },
+        fault,
+      ),
+    withdrawalSignature: withdrawal.signature,
     claim: (amount) => seller.settle(authorization.channelId, amount),
     async balances() {
       const [payer, sellerBalance, fee, program, escrow] = await Promise.all(
