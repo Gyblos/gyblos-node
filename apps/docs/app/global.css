@@ -17,7 +17,7 @@
   --color-fd-card: #f4f5f6;
   --color-fd-card-foreground: #1c1c1c;
   --color-fd-border: #e4e6e8;
-  /* Primary is also used as text (active links), so light mode takes the readable sky text. */
+  /* The shared blue is for actions; reading styles below keep navigation text neutral. */
   --color-fd-primary: var(--brand-blue);
   --color-fd-primary-foreground: #ffffff;
   --color-fd-secondary: #f4f5f6;
@@ -46,7 +46,7 @@
   --color-fd-ring: var(--brand-blue);
 }
 
-.dark #nd-sidebar {
+.dark :is(#nd-sidebar, #nd-sidebar-mobile) {
   --color-fd-muted: #151515;
   --color-fd-secondary: #222222;
   --color-fd-muted-foreground: #b8b8b8;
@@ -241,18 +241,18 @@ body {
    In particular, blue-on-charcoal active text would lose contrast. */
 .text-fd-primary,
 .prose a:not(.docs-quickstart),
-#nd-sidebar a[data-active='true'],
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true'],
 #nd-toc a[data-active='true'],
 [data-toc-popover] a[data-active='true'] {
   color: var(--color-fd-foreground);
   text-decoration-color: currentColor;
 }
 
-#nd-sidebar a[data-active='true'] {
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true'] {
   background: var(--color-fd-accent);
 }
 
-#nd-sidebar a[data-active='true']::before,
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true']::before,
 #nd-toc .bg-fd-primary,
 [data-toc-popover] .bg-fd-primary {
   background: var(--color-fd-foreground);
