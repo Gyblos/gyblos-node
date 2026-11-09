@@ -54,15 +54,22 @@ changed Compose environment file. Never display that file in logs, screenshots o
 
 ## Update the seller [#update-the-beta-image]
 
-Each update is a new signed release in the installer. Record the installed image, then download the
-current installer and run it again (with the same `GYBLOS_DIR`, if you set one):
+Each update is a new signed release in the installer. When one exists, `gyblos seller status` ends with an
+`Update:` line naming it. Record the installed image, then run the update from where you saved
+`install.sh` (with the same `GYBLOS_DIR`, if you set one):
 
 ```sh
 cd ~/gyblos-seller
 docker compose images seller
-curl -fsSL https://gyblos.com/install.sh -o install.sh
-sh install.sh
+sh install.sh update
 ```
+
+`update` downloads the latest release's installer with its checksum and signature bundle, checks the
+checksum and, with cosign installed, the release signature (`GYBLOS_REQUIRE_SIGNATURE=1` makes that
+mandatory), replaces your `install.sh` with it and runs it. When your installer already pins the latest release, it runs it again, which also completes an update that stopped halfway. An `install.sh` from before this command does not know `update`: download the
+current one with `curl -fsSL https://gyblos.com/install.sh -o install.sh` and run `sh install.sh`.
+`GYBLOS_UPDATE_CHECK=0` in `seller.env` turns off the status check, which only asks GitHub for the latest
+release.
 
 It keeps `gyblos.toml`, `seller.env`, the keys and your other Compose edits. It changes only the Gyblos
 seller `image:` line in `compose.yaml` to the new release, checks its signature when cosign is installed

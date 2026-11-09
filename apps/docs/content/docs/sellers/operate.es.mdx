@@ -54,15 +54,23 @@ del archivo de entorno de Compose. Nunca muestres ese archivo en logs, capturas 
 
 ## Actualiza el vendedor [#actualiza-la-imagen-beta]
 
-Cada actualización es una nueva versión firmada en el instalador. Registra la imagen instalada y después
-descarga el instalador actual y ejecútalo de nuevo (con el mismo `GYBLOS_DIR`, si definiste uno):
+Cada actualización es una nueva versión firmada en el instalador. Cuando hay una, `gyblos seller status`
+termina con una línea `Update:` que la nombra. Registra la imagen instalada y después ejecuta la
+actualización donde guardaste `install.sh` (con el mismo `GYBLOS_DIR`, si definiste uno):
 
 ```sh
 cd ~/gyblos-seller
 docker compose images seller
-curl -fsSL https://gyblos.com/install.sh -o install.sh
-sh install.sh
+sh install.sh update
 ```
+
+`update` descarga el instalador de la última versión con su checksum y su firma, comprueba el checksum y,
+si cosign está instalado, la firma de la versión (`GYBLOS_REQUIRE_SIGNATURE=1` la hace obligatoria),
+reemplaza tu `install.sh` por él y lo ejecuta. Si tu instalador ya fija la última versión, lo vuelve a ejecutar, lo que también completa una actualización que se detuvo a mitad. Un
+`install.sh` anterior a este comando no conoce `update`: descarga el actual con
+`curl -fsSL https://gyblos.com/install.sh -o install.sh` y ejecuta `sh install.sh`.
+`GYBLOS_UPDATE_CHECK=0` en `seller.env` desactiva la comprobación de status, que solo pregunta a GitHub por
+la última versión.
 
 Conserva `gyblos.toml`, `seller.env`, las llaves y tus demás cambios de Compose. Solo cambia la línea
 `image:` del vendedor de Gyblos en `compose.yaml` a la nueva versión, comprueba su firma si cosign está

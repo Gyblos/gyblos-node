@@ -58,6 +58,7 @@ docker buildx build \
   --label "org.opencontainers.image.source=$SOURCE" \
   --label "org.opencontainers.image.revision=$revision" \
   --label "org.opencontainers.image.version=$version" \
+  --build-arg "GYBLOS_VERSION=$version" \
   --tag "$REPOSITORY:$version" \
   --tag "$REPOSITORY:$short" \
   --metadata-file "$context.json" \

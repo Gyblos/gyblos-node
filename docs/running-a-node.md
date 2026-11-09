@@ -436,6 +436,20 @@ sh install.sh
   stops for want of it: it reads the owner's balance every 15 seconds, for up to
   30 minutes, then tries again (at most three waits). It never signs while
   waiting. Without a terminal it stops with the funding hint.
+- `sh install.sh update` downloads the latest release's `install.sh`,
+  `install.sh.sha256` and `install.sh.sigstore.json` with curl, checks the
+  checksum and, with cosign, the release signature (required with
+  `GYBLOS_REQUIRE_SIGNATURE=1`), renames the new installer over this one (when
+  it is a writable file; otherwise to `install.sh` in the install directory) and
+  runs it with the same `GYBLOS_DIR`. Cosign older than 3 cannot read the
+  bundle, so the check is skipped (refused in strict mode). An installer pinning
+  the same image runs this one again, which completes an update that stopped
+  halfway.
+- The release build sets `GYBLOS_VERSION` in the image. `gyblos seller status`
+  then asks GitHub for the latest release (one bounded HTTPS request, nothing
+  about the seller) and, when it is newer, ends with an `Update:` line;
+  `GYBLOS_UPDATE_CHECK=0` turns it off, and a build without `GYBLOS_VERSION`
+  checks nothing.
 - `sh install.sh publish` (or `unpublish`) sets `publish` in the installed
   `gyblos.toml` (`GYBLOS_DIR` names a non-default install), validates it and
   recreates the seller; an invalid result or an interruption restores the file.
