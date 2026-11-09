@@ -22,7 +22,8 @@ body {
   margin: 0;
   font:
     14px 'Instrument Sans',
-    Arial,
+    system-ui,
+    -apple-system,
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -1606,7 +1607,8 @@ nav {
 kbd {
   font:
     10px Geist,
-    Arial,
+    system-ui,
+    -apple-system,
     sans-serif;
   border: 1px solid var(--line);
   border-bottom-width: 2px;
