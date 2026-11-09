@@ -46,7 +46,7 @@ function payment(value: unknown, verdict: PaidVerdict) {
     'feeAtomic',
     'refundedAtomic',
     'recorded',
-    'transaction',
+    ...(verdict === PAID_VERDICTS.SETTLED ? ['transaction'] : []),
   ]);
   assert.equal(row.verdict, verdict);
   assert.equal(row.maxAtomic, PAID_ACCEPTANCE.maxAtomic);
