@@ -24,6 +24,7 @@ export {
 } from './constants';
 export { UptoError, uptoError } from './errors';
 export { createUptoHintReader, type UptoHintRpc } from './hints';
+export { parseUptoWithdrawalAttempt } from './withdraw-recovery';
 export { createUptoChannelHistory, type UptoSignaturesRpc } from './history';
 export {
   createUptoReceiptReader,

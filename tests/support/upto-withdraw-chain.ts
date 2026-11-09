@@ -193,6 +193,12 @@ export function withdrawChain(state: WithdrawChainState) {
     getAccountInfo: (account, config) =>
       call('account', config.commitment, () => ({
         value: state.accounts.get(String(account)) ?? null,
+        context: { slot: 500n },
+      }))(),
+    getEpochInfo: (config) =>
+      call('epoch', config.commitment, () => ({
+        absoluteSlot: 500n,
+        blockHeight: 900n,
       }))(),
     getSlot: (config) => call('slot', config.commitment, () => 500n)(),
     getBlockTime: () =>
@@ -235,9 +241,14 @@ export function withdrawChain(state: WithdrawChainState) {
         if (state.statusError)
           throw new Error('status failed at https://rpc.example/?key=s');
         return {
+          context: { slot: 500n },
           value: [
             state.outcome === undefined
-              ? { err: null, confirmationStatus: 'confirmed' as const }
+              ? {
+                  err: null,
+                  confirmationStatus: 'confirmed' as const,
+                  slot: 500n,
+                }
               : state.outcome,
           ],
         };

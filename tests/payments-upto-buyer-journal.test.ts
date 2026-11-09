@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { UPTO_WITHDRAW_STEPS } from 'x402-upto-metered';
+
 import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import {
   BUYER_JOURNAL,
@@ -19,6 +21,8 @@ import {
   PUBLIC_RECORD_LIMITS,
 } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
+
+import { signatureOf } from './support/upto-chain-history';
 
 const NOW = 1_800_000_000_000;
 const DIGEST = 'ab'.repeat(32);
@@ -252,6 +256,13 @@ void test('a full journal of the widest entries still fits its byte bound', () =
       state: PAYMENT_CHANNEL_STATES.SETTLED,
       chargedAtomic: atomic,
       updatedAt: Number.MAX_SAFE_INTEGER,
+      withdrawal: {
+        step: UPTO_WITHDRAW_STEPS.CLOSE_REQUESTED,
+        transaction: signatureOf(255),
+        lastValidBlockHeight: PUBLIC_RECORD_LIMITS.maxAtomic,
+        checkedSlot: PUBLIC_RECORD_LIMITS.maxAtomic,
+        pending: true,
+      },
     });
     const entries = Array.from({ length: BUYER_JOURNAL.maxEntries }, (_, i) =>
       widest(i),

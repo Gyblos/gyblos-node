@@ -1,5 +1,4 @@
-// Tracks opening intents and conservatively retained prepared channels in private, versioned JSON.
-// Strict atomic writes under a process lock; recovery never broadcasts or restores locks.
+// Private, versioned opening/control journal under a process lock; recovery never broadcasts.
 import { lstat } from 'node:fs/promises';
 
 import { isAddress } from '@solana/kit';
@@ -22,6 +21,15 @@ import {
   type ProcessLock,
 } from '@gyblos/runtime/private-file';
 
+import {
+  blocksBuyerPayments,
+  hasPendingWithdrawal,
+  journalWithdrawal,
+  matchesJournalFields,
+  sameWithdrawal,
+  withdrawalWriter,
+  type WithdrawalJournal,
+} from './buyer-journal-withdrawal';
 import { BUYER_JOURNAL } from './constants';
 import type { UptoLedgerPaths } from './file-ledger';
 import { isJournalNetwork } from './journal-network';
@@ -40,7 +48,6 @@ export interface UptoJournalEntry {
   requestDigest: string;
   // Null until the SDK open is prepared; non-null means signing may have happened.
   channelId: string | null;
-  // Accepted payout and fee payer, immutable once this opening is prepared.
   payTo: string;
   feePayer: string;
   maxAtomic: string;
@@ -53,17 +60,11 @@ export interface UptoJournalEntry {
   expiresAt: number;
   state: PaymentChannelState;
   chargedAtomic: string | null;
-  // Stamped by the journal on every write.
+  // Control checkpoints preserve this opening/settlement write time.
   updatedAt: number;
 }
 
-export interface UptoBuyerJournal {
-  recordWithdrawal?(
-    requestDigest: string,
-    channelId: string,
-    expected: UptoWithdrawalAttempt | undefined,
-    next: UptoWithdrawalAttempt,
-  ): Promise<void>;
+export interface UptoBuyerJournal extends WithdrawalJournal {
   get(requestDigest: string): Promise<UptoJournalEntry | undefined>;
   put(entry: Omit<UptoJournalEntry, 'updatedAt'>): Promise<void>;
   // Removing a prepared open known to be unsent also requires its exact channelId.
@@ -77,7 +78,6 @@ function unavailable(): never {
 }
 
 const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;
-// The chain's u64 ceiling for any atomic amount.
 const U64_MAX = BigInt(PUBLIC_RECORD_LIMITS.maxAtomic);
 const DIGEST = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9]{1,128}$/;
@@ -107,17 +107,14 @@ function text(value: unknown, pattern: RegExp): string {
     ? value
     : unavailable();
 }
-// A Solana address, as the buyer journaled it from trusted terms.
 function address(value: unknown): string {
   return typeof value === 'string' && isAddress(value) ? value : unavailable();
 }
-// A canonical atomic amount that fits the chain's u64.
 function atomic(value: unknown): string {
   const amount = text(value, ATOMIC);
   return BigInt(amount) <= U64_MAX ? amount : unavailable();
 }
 
-// A fee rate any terms may carry.
 function feeBps(value: unknown): number {
   return Number.isInteger(value) &&
     typeof value === 'number' &&
@@ -130,15 +127,15 @@ const LEGACY_POLICY_FIELDS = ['mint', 'treasury', 'protocolFeeBps'] as const;
 const POLICY_FIELDS = [...LEGACY_POLICY_FIELDS, 'network'] as const;
 function policy(value: unknown, version: number): UptoJournalPolicy | null {
   if (value === null) return null;
-  const fields =
-    version === BUYER_JOURNAL.version ? POLICY_FIELDS : LEGACY_POLICY_FIELDS;
+  const networked = version >= BUYER_JOURNAL.networkVersion;
+  const fields = networked ? POLICY_FIELDS : LEGACY_POLICY_FIELDS;
   if (
     !isRecord(value) ||
     Object.keys(value).length !== fields.length ||
     !fields.every((field) => Object.hasOwn(value, field))
   )
     unavailable();
-  const network = version === BUYER_JOURNAL.version ? value.network : null;
+  const network = networked ? value.network : null;
   if (network !== null && !isJournalNetwork(network)) unavailable();
   return {
     network,
@@ -148,16 +145,15 @@ function policy(value: unknown, version: number): UptoJournalPolicy | null {
   };
 }
 
-// Version 2 entries had no policy; version 1 entries had no open slot or blockhash lifetime either.
 const V2_FIELDS = FIELDS.filter((field) => field !== 'policy');
 const V1_FIELDS = V2_FIELDS.filter(
   (field) => field !== 'openSlot' && field !== 'lastValidBlockHeight',
 );
-// A version 1 entry has unknown blockhash lifetime, so it is read as never expiring. Signed entries
-// also lack a network and remain blocked from automatic recovery.
+// v1 has unknown lifetime; v1/v2 lack policy and v1–v3 lack network provenance.
 const V1_UNKNOWN = { openSlot: '0', lastValidBlockHeight: String(U64_MAX) };
 const READ = new Map<number, { fields: readonly string[]; missing: object }>([
   [BUYER_JOURNAL.version, { fields: FIELDS, missing: {} }],
+  [BUYER_JOURNAL.networkVersion, { fields: FIELDS, missing: {} }],
   [BUYER_JOURNAL.policyVersion, { fields: FIELDS, missing: {} }],
   [BUYER_JOURNAL.slotVersion, { fields: V2_FIELDS, missing: { policy: null } }],
   [
@@ -168,11 +164,7 @@ const READ = new Map<number, { fields: readonly string[]; missing: object }>([
 
 function entry(value: unknown, version: number): UptoJournalEntry {
   const read = READ.get(version) ?? unavailable();
-  if (
-    !isRecord(value) ||
-    Object.keys(value).length !== read.fields.length ||
-    !read.fields.every((field) => Object.hasOwn(value, field))
-  )
+  if (!isRecord(value) || !matchesJournalFields(value, version, read.fields))
     return unavailable();
   return checked({ ...value, ...read.missing }, version);
 }
@@ -189,6 +181,7 @@ function checked(
   )
     unavailable();
   return {
+    ...journalWithdrawal(value.withdrawal, channelId !== null),
     requestDigest: text(value.requestDigest, DIGEST),
     channelId: channelId === null ? null : text(channelId, IDENTIFIER),
     payTo: address(value.payTo),
@@ -204,7 +197,6 @@ function checked(
   };
 }
 
-// The whole document, or a refusal: another version, an unknown field or a malformed entry.
 function parseJournal(source: string): {
   entries: Map<string, UptoJournalEntry>;
   version: number;
@@ -239,12 +231,11 @@ function parseJournal(source: string): {
   return { entries, version };
 }
 
-function serialize(entries: Map<string, UptoJournalEntry>): string {
-  return JSON.stringify({
+const serialize = (entries: Map<string, UptoJournalEntry>) =>
+  JSON.stringify({
     version: BUYER_JOURNAL.version,
     entries: [...entries.values()],
   });
-}
 
 function retainOpeningIdentity(
   held: UptoJournalEntry | undefined,
@@ -259,7 +250,8 @@ function retainOpeningIdentity(
       next.payTo !== held.payTo ||
       next.feePayer !== held.feePayer ||
       next.maxAtomic !== held.maxAtomic ||
-      JSON.stringify(next.policy) !== JSON.stringify(held.policy))
+      JSON.stringify(next.policy) !== JSON.stringify(held.policy) ||
+      !sameWithdrawal(held.withdrawal, next.withdrawal))
   )
     unavailable();
 }
@@ -279,6 +271,7 @@ function prune(entries: Map<string, UptoJournalEntry>, at: number) {
   for (const [digest, held] of entries)
     if (
       (held.state === PAYMENT_CHANNEL_STATES.SETTLED &&
+        !hasPendingWithdrawal(held) &&
         held.updatedAt <= cutoff) ||
       (held.channelId === null && held.expiresAt <= at)
     )
@@ -305,7 +298,6 @@ function checkLegacyWrite(loaded: {
 export async function openUptoBuyerJournal(options: {
   paths: UptoLedgerPaths;
   now: () => number;
-  // Defaults to BUYER_JOURNAL.maxEntries.
   maxEntries?: number;
 }): Promise<UptoBuyerJournal> {
   const { paths, now } = options;
@@ -359,14 +351,15 @@ export async function openUptoBuyerJournal(options: {
       const held = entries.get(requestDigest);
       if (
         held?.channelId &&
-        (held.channelId !== channelId ||
+        (hasPendingWithdrawal(held) ||
+          held.channelId !== channelId ||
           held.state !== PAYMENT_CHANNEL_STATES.OPEN)
       )
         unavailable();
       entries.delete(requestDigest);
     });
   return {
-    recordWithdrawal: async () => {},
+    recordWithdrawal: withdrawalWriter(mutate),
     get: async (requestDigest) => (await load()).entries.get(requestDigest),
     put,
     remove,
@@ -400,10 +393,6 @@ export async function hasUnresolvedBuyerPayments(
     const entries =
       source === undefined ? [] : [...parseJournal(source).entries.values()];
     await unlocked();
-    return entries.some(
-      (entry) =>
-        entry.channelId !== null &&
-        entry.state !== PAYMENT_CHANNEL_STATES.SETTLED,
-    );
+    return entries.some(blocksBuyerPayments);
   });
 }

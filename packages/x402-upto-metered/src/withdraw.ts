@@ -15,6 +15,7 @@ import { discoverChannelsByRentPayer } from '@x402/svm';
 import {
   UPTO_CHANNEL_ACCOUNT,
   UPTO_ERROR_CODES,
+  UPTO_FINAL_COMMITMENT,
   UPTO_WITHDRAW,
   UPTO_WITHDRAW_STEPS,
   type UptoCommitment,
@@ -38,6 +39,7 @@ import {
   uptoDistributionHash,
   type UptoProgramInstruction,
 } from './withdraw-instructions';
+import { recoverWithdrawal } from './withdraw-recovery';
 
 // The slice of a @solana/kit RPC the withdrawal uses.
 export interface UptoWithdrawRpc extends UptoSendRpc {
@@ -53,7 +55,7 @@ export interface UptoWithdrawRpc extends UptoSendRpc {
     context?: { slot: bigint };
   }>;
   getEpochInfo?(config: {
-    commitment: typeof import('./constants').UPTO_FINAL_COMMITMENT;
+    commitment: typeof UPTO_FINAL_COMMITMENT;
   }): Call<{ absoluteSlot: bigint; blockHeight: bigint }>;
   getSlot(config: Confirmed): Call<bigint>;
   // Unix seconds of the block at that slot; a node may not know it yet.
@@ -119,11 +121,19 @@ async function channelAt(
   rpc: UptoWithdrawRpc,
   network: string,
   query: UptoWithdrawQuery,
+  bank: { commitment: UptoCommitment; minContextSlot?: bigint } = confirmed,
 ) {
   const channelId = address(query.channelId);
-  const { value } = await read(
-    rpc.getAccountInfo(channelId, { ...confirmed, encoding: 'base64' }),
+  const { value, context } = await read(
+    rpc.getAccountInfo(channelId, { ...bank, encoding: 'base64' }),
   );
+  if (
+    bank.minContextSlot !== undefined &&
+    (!context ||
+      typeof context.slot !== 'bigint' ||
+      context.slot < bank.minContextSlot)
+  )
+    throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
   if (!value) return undefined;
   const [found] = await discoverChannelsByRentPayer(
     {
@@ -156,13 +166,6 @@ const ours = (channel: Channel, payer: string, query: UptoWithdrawQuery) =>
     (known) => known === channel.status,
   );
 
-// Signed and paid by the payer.
-const send = (
-  rpc: UptoWithdrawRpc,
-  options: UptoWithdrawOptions,
-  instructions: readonly UptoProgramInstruction[],
-) => uptoSend(rpc, options.payer, instructions, options.sleep);
-
 const result = (
   step: UptoWithdrawStep,
   retryAfterSeconds: number | null = null,
@@ -188,8 +191,15 @@ const sent = (
 
 // Seconds until the grace period has elapsed by the chain's own clock, or a recheck when the node
 // does not know the block's time yet.
-async function graceLeft(rpc: UptoWithdrawRpc, due: bigint): Promise<number> {
-  const slot = await read(rpc.getSlot(confirmed));
+async function graceLeft(
+  rpc: UptoWithdrawRpc,
+  due: bigint,
+  observedSlot?: string,
+): Promise<number> {
+  const slot =
+    observedSlot === undefined
+      ? await read(rpc.getSlot(confirmed))
+      : BigInt(observedSlot);
   let now: bigint | null;
   try {
     now = await rpc
@@ -204,6 +214,50 @@ async function graceLeft(rpc: UptoWithdrawRpc, due: bigint): Promise<number> {
   return now < due ? Number(due - now) : 0;
 }
 
+async function withdrawalView(
+  rpc: UptoWithdrawRpc,
+  options: UptoWithdrawOptions,
+  query: UptoWithdrawQuery,
+  recovery?: UptoWithdrawalRecovery,
+) {
+  if (!recovery)
+    return { channel: await channelAt(rpc, options.network, query) };
+  return recoverWithdrawal(rpc, recovery, async (bank) => {
+    const found = await channelAt(rpc, options.network, query, bank);
+    if (found === null || (found && !ours(found, options.payer.address, query)))
+      throw new UptoError(UPTO_ERROR_CODES.AUTHORIZATION_MISMATCH);
+    return found;
+  });
+}
+
+type ControlView = Exclude<
+  Awaited<ReturnType<typeof withdrawalView>>,
+  { result: UptoWithdrawResult }
+>;
+const publishWithdrawal = (
+  rpc: UptoWithdrawRpc,
+  options: UptoWithdrawOptions,
+  view: ControlView,
+  step: UptoWithdrawalAttempt['step'],
+  instructions: readonly UptoProgramInstruction[],
+) =>
+  uptoSend(
+    rpc,
+    options.payer,
+    instructions,
+    options.sleep,
+    'save' in view
+      ? async (attempt) => {
+          await view.save({
+            ...attempt,
+            step,
+            checkedSlot: view.slot,
+            pending: true,
+          });
+        }
+      : undefined,
+  );
+
 export function createUptoWithdrawal(
   rpc: UptoWithdrawRpc,
   options: UptoWithdrawOptions,
@@ -211,10 +265,22 @@ export function createUptoWithdrawal(
   const statuses = UPTO_CHANNEL_ACCOUNT.statuses;
   return {
     async withdraw(
-      query: UptoWithdrawQuery,
-      _recovery?: UptoWithdrawalRecovery,
+      input: UptoWithdrawQuery,
+      recovery?: UptoWithdrawalRecovery,
     ): Promise<UptoWithdrawResult> {
-      const channel = await channelAt(rpc, options.network, query);
+      const query = {
+        ...input,
+        splits: input.splits.map((split) => ({ ...split })),
+      };
+      const view = await withdrawalView(rpc, options, query, recovery);
+      if ('result' in view) return view.result;
+      const channel = view.channel;
+      const publish = (
+        step: UptoWithdrawalAttempt['step'],
+        instructions: readonly UptoProgramInstruction[],
+      ) => publishWithdrawal(rpc, options, view, step, instructions);
+      if ('readOnly' in view && view.readOnly)
+        return result(UPTO_WITHDRAW_STEPS.NOTHING);
       if (channel === undefined) return result(UPTO_WITHDRAW_STEPS.NOTHING);
       if (!channel || !ours(channel, options.payer.address, query))
         return result(UPTO_WITHDRAW_STEPS.REFUSED);
@@ -225,7 +291,7 @@ export function createUptoWithdrawal(
         return sent(
           UPTO_WITHDRAW_STEPS.CLOSE_REQUESTED,
           grace,
-          await send(rpc, options, [
+          await publish(UPTO_WITHDRAW_STEPS.CLOSE_REQUESTED, [
             requestCloseInstruction(options.payer, query.channelId),
           ]),
         );
@@ -233,6 +299,7 @@ export function createUptoWithdrawal(
         const left = await graceLeft(
           rpc,
           channel.closureStartedAt + BigInt(grace),
+          'slot' in view ? view.slot : undefined,
         );
         if (left > 0) return result(UPTO_WITHDRAW_STEPS.WAITING, left);
       }
@@ -254,9 +321,8 @@ export function createUptoWithdrawal(
       return sent(
         UPTO_WITHDRAW_STEPS.DISTRIBUTED,
         null,
-        await send(
-          rpc,
-          options,
+        await publish(
+          UPTO_WITHDRAW_STEPS.DISTRIBUTED,
           channel.status === statuses.SEALED
             ? [refundTo, distribute]
             : [refundTo, sealInstruction(query.channelId), distribute],

@@ -5,6 +5,7 @@ import {
   UPTO_ERROR_CODES,
   uptoError,
   type UptoErrorCode,
+  type UptoWithdrawalRecovery,
   type UptoWithdrawQuery,
   type UptoWithdrawResult,
 } from 'x402-upto-metered';
@@ -17,6 +18,10 @@ import { PaymentError } from '@gyblos/protocol/payment';
 import { paymentSplits } from '@gyblos/protocol/payment-binding';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
+import {
+  hasPendingWithdrawal,
+  withdrawalCheckpoint,
+} from './buyer-journal-withdrawal';
 import {
   BUYER_WITHDRAW,
   WITHDRAW_STEPS,
@@ -51,7 +56,10 @@ export interface UptoBuyerWithdrawOptions {
   // The network already established by the caller's RPC check.
   network: string;
   withdrawal: {
-    withdraw(query: UptoWithdrawQuery): Promise<UptoWithdrawResult>;
+    withdraw(
+      query: UptoWithdrawQuery,
+      recovery?: UptoWithdrawalRecovery,
+    ): Promise<UptoWithdrawResult>;
   };
   // The buyer's policy: its mint and the network's fee treasury and rate. Each channel is withdrawn
   // with the policy its open accepted; this one only for an entry journaled without it.
@@ -73,6 +81,8 @@ function withdrawalFailure(error: unknown): UptoErrorCode {
       return UPTO_ERROR_CODES.UNAVAILABLE;
     if (error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS)
       return UPTO_ERROR_CODES.INVALID_TERMS;
+    if (error.code === PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE)
+      return UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE;
   }
   return uptoError(error).code;
 }
@@ -93,7 +103,7 @@ async function stepFor(
   options: UptoBuyerWithdrawOptions,
 ): Promise<Omit<UptoBuyerWithdrawResult, 'requestDigest' | 'channelId'>> {
   const left = claimableUntil(entry, options) - options.now();
-  if (left >= 0)
+  if (left >= 0 && !hasPendingWithdrawal(entry))
     return {
       step: WITHDRAW_STEPS.CLAIMABLE,
       transaction: null,
@@ -103,13 +113,16 @@ async function stepFor(
     };
   const { mint, treasury, protocolFeeBps } = entry.policy ?? options;
   try {
-    const done = await options.withdrawal.withdraw({
-      channelId: entry.channelId,
-      mint,
-      rentPayer: entry.feePayer,
-      maxAtomic: entry.maxAtomic,
-      splits: paymentSplits({ payTo: entry.payTo, treasury, protocolFeeBps }),
-    });
+    const done = await options.withdrawal.withdraw(
+      {
+        channelId: entry.channelId,
+        mint,
+        rentPayer: entry.feePayer,
+        maxAtomic: entry.maxAtomic,
+        splits: paymentSplits({ payTo: entry.payTo, treasury, protocolFeeBps }),
+      },
+      withdrawalCheckpoint(options.journal, entry),
+    );
     return { ...done, failure: null };
   } catch (error) {
     return {
@@ -146,7 +159,12 @@ export async function withdrawUptoBuyer(
   const results: UptoBuyerWithdrawResult[] = [];
   for (const entry of entries) {
     const { channelId } = entry;
-    if (!channelId || entry.state !== PAYMENT_CHANNEL_STATES.OPEN) continue;
+    if (
+      !channelId ||
+      (entry.state !== PAYMENT_CHANNEL_STATES.OPEN &&
+        !hasPendingWithdrawal(entry))
+    )
+      continue;
     const networkBlock = networkRecoveryBlock(entry, fixed.network);
     const result: UptoBuyerWithdrawResult = networkBlock
       ? {

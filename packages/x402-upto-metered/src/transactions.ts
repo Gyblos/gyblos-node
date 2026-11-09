@@ -4,10 +4,14 @@
 // confirmMs bound both.
 import {
   appendTransactionMessageInstructions,
+  assertIsFullySignedTransaction,
+  assertIsTransactionWithinSizeLimit,
+  compileTransaction,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
   isSolanaError,
+  isTransactionPartialSigner,
   pipe,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
@@ -17,7 +21,9 @@ import {
   type Blockhash,
   type Instruction,
   type Signature,
+  type Transaction,
   type TransactionSigner,
+  type TransactionWithLifetime,
 } from '@solana/kit';
 
 import {
@@ -57,6 +63,31 @@ export interface UptoSendRpc {
 
 export const uptoConfirmed: UptoConfirmed = { commitment: UPTO_COMMITMENT };
 const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
+async function signControl(
+  payer: TransactionSigner,
+  transaction: Transaction & TransactionWithLifetime,
+) {
+  if (!isTransactionPartialSigner(payer))
+    throw new UptoError(UPTO_ERROR_CODES.INVALID_TERMS);
+  const expected = Buffer.from(transaction.messageBytes);
+  assertIsTransactionWithinSizeLimit(transaction);
+  const dictionaries = await payer.signTransactions([transaction]);
+  if (
+    dictionaries.length !== 1 ||
+    !Buffer.from(transaction.messageBytes).equals(expected)
+  )
+    throw new UptoError(UPTO_ERROR_CODES.INVALID_TERMS);
+  const signed = {
+    ...transaction,
+    signatures: {
+      ...transaction.signatures,
+      [payer.address]: dictionaries[0]?.[payer.address] ?? null,
+    },
+  };
+  assertIsFullySignedTransaction(signed);
+  return signed;
+}
 
 // One RPC call under its own deadline; any failure is UNAVAILABLE, never the RPC's own text.
 export async function uptoRead<T>(call: UptoCall<T>): Promise<T> {
@@ -99,23 +130,41 @@ export async function uptoSend(
   feePayer: TransactionSigner,
   instructions: readonly Instruction[],
   sleep: (ms: number) => Promise<void> = pause,
+  beforeSend?: (attempt: {
+    transaction: string;
+    lastValidBlockHeight: string;
+  }) => Promise<void>,
 ): Promise<{ transaction: string; confirmed: boolean }> {
   const { value: lifetime } = await uptoRead(
     rpc.getLatestBlockhash(uptoConfirmed),
   );
+  const lastValidBlockHeight = String(lifetime.lastValidBlockHeight);
   const message = pipe(
     createTransactionMessage({ version: 0 }),
     (draft) => setTransactionMessageFeePayerSigner(feePayer, draft),
     (draft) => setTransactionMessageLifetimeUsingBlockhash(lifetime, draft),
     (draft) => appendTransactionMessageInstructions(instructions, draft),
   );
-  const signed = await signTransactionMessageWithSigners(message);
+  const signed = beforeSend
+    ? await signControl(feePayer, compileTransaction(message))
+    : await signTransactionMessageWithSigners(message);
   const signature = getSignatureFromTransaction(signed);
+  const wire = getBase64EncodedWireTransaction(signed);
+  if (beforeSend) {
+    try {
+      await beforeSend({
+        transaction: String(signature),
+        lastValidBlockHeight,
+      });
+    } catch {
+      throw new UptoError(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE);
+    }
+  }
   // The signed bytes already determine the identity, even when the RPC loses its send reply.
   const uncertain = { transaction: String(signature), confirmed: false };
   try {
     const returned = await rpc
-      .sendTransaction(getBase64EncodedWireTransaction(signed), {
+      .sendTransaction(wire, {
         encoding: 'base64',
         preflightCommitment: UPTO_COMMITMENT,
       })

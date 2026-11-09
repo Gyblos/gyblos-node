@@ -6,7 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { UPTO_ERROR_CODES } from 'x402-upto-metered';
+import {
+  parseUptoWithdrawalAttempt,
+  UPTO_ERROR_CODES,
+  UPTO_WITHDRAW_STEPS,
+} from 'x402-upto-metered';
 
 import {
   BUYER_JOURNAL,
@@ -35,6 +39,29 @@ async function isolated(
     await rm(root, { recursive: true, force: true });
   }
 }
+
+void test('withdrawal metadata strictly rejects ambiguous, oversized and unknown fields', () => {
+  const valid = {
+    step: UPTO_WITHDRAW_STEPS.CLOSE_REQUESTED,
+    transaction: signatureOf(1),
+    lastValidBlockHeight: '900',
+    checkedSlot: '100',
+    pending: true,
+  };
+  assert.deepEqual(parseUptoWithdrawalAttempt(valid), valid);
+  for (const invalid of [
+    { ...valid, extra: true },
+    { ...valid, lastValidBlockHeight: '0900' },
+    { ...valid, checkedSlot: '-1' },
+    { ...valid, checkedSlot: '18446744073709551616' },
+    { ...valid, transaction: 'invalid' },
+    { ...valid, pending: 'true' },
+    { ...valid, step: UPTO_WITHDRAW_STEPS.NOTHING },
+  ])
+    assert.throws(() => parseUptoWithdrawalAttempt(invalid), {
+      code: UPTO_ERROR_CODES.INVALID_TERMS,
+    });
+});
 
 void test('a control checkpoint is durable across reopen and preserves opening time and policy', () =>
   isolated(async (value) => {

@@ -11,13 +11,23 @@ import {
   uptoDistributionHash,
   type UptoWithdrawalAttempt,
   type UptoWithdrawalRecovery,
+  type UptoWithdrawRpc,
 } from 'x402-upto-metered';
 
 import type { UptoBuyerJournal } from '@gyblos/payments-upto';
 import { paymentSplits } from '@gyblos/protocol/payment-binding';
 
 import { OPENING_DIGEST, openingFixture } from './opening';
-import { channelAccount, withdrawChain } from './upto-withdraw-chain';
+import {
+  channelAccount,
+  withdrawChain,
+  type ChannelFields,
+  type WithdrawChainState,
+} from './upto-withdraw-chain';
+
+type Status = Awaited<
+  ReturnType<ReturnType<UptoWithdrawRpc['getSignatureStatuses']>['send']>
+>['value'][number];
 
 export async function withdrawalFixture(root: string) {
   const opening = await openingFixture(root);
@@ -25,7 +35,7 @@ export async function withdrawalFixture(root: string) {
   const payload = decodeUptoPayload(authorization);
   assert.equal(typeof payload.nonce, 'string');
   const splits = paymentSplits(opening.terms);
-  const fields = {
+  const fields: ChannelFields = {
     payer: opening.payer.address,
     payee: address(opening.terms.feePayer),
     authorizedSigner: address(opening.terms.authorizer),
@@ -42,15 +52,25 @@ export async function withdrawalFixture(root: string) {
   };
   const channel = await channelAccount(fields);
   assert.equal(channel.channelId, authorization.channelId);
-  const state = {
+  const state: {
+    accounts: WithdrawChainState['accounts'];
+    blockTime: bigint;
+    slot: bigint;
+    height: bigint;
+    outcome: Status;
+  } = {
     accounts: new Map([[channel.channelId, channel.account]]),
     blockTime: 1800000000n,
     slot: 400000000n,
     height: 900n,
     outcome: { err: null, confirmationStatus: 'confirmed', slot: 400000000n },
   };
-  const chain = withdrawChain(state);
-  const rpc = {
+  const chain = withdrawChain({
+    accounts: state.accounts,
+    blockTime: state.blockTime,
+  });
+  const lookups: { signatures: string[]; search: boolean }[] = [];
+  const rpc: typeof chain.rpc = {
     ...chain.rpc,
     getEpochInfo: () => ({
       send: async () => ({
@@ -59,18 +79,21 @@ export async function withdrawalFixture(root: string) {
       }),
     }),
     getAccountInfo: (...args: Parameters<typeof chain.rpc.getAccountInfo>) => ({
-      async send(options?: { abortSignal?: AbortSignal }) {
+      async send(options) {
         return {
-          ...(await chain.rpc.getAccountInfo(...args).send(options!)),
+          ...(await chain.rpc.getAccountInfo(...args).send(options)),
           context: { slot: state.slot },
         };
       },
     }),
-    getSignatureStatuses: () => ({
-      send: async () => ({
-        value: [state.outcome],
-        context: { slot: state.slot },
-      }),
+    getSignatureStatuses: (signatures, config) => ({
+      send: async () => {
+        lookups.push({
+          signatures: signatures.map(String),
+          search: config?.searchTransactionHistory === true,
+        });
+        return { value: [state.outcome], context: { slot: state.slot } };
+      },
     }),
   };
   let signatures = 0;
@@ -119,6 +142,11 @@ export async function withdrawalFixture(root: string) {
     checkedSlot: String(state.slot),
     pending: true,
   });
+  const update = async (change: Partial<ChannelFields>) => {
+    Object.assign(fields, change);
+    const next = await channelAccount(fields);
+    state.accounts.set(next.channelId, next.account);
+  };
   return {
     ...opening,
     ...chain,
@@ -128,6 +156,8 @@ export async function withdrawalFixture(root: string) {
     run,
     context,
     attempt,
+    update,
+    lookups,
     signatures: () => signatures,
   };
 }

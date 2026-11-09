@@ -8,6 +8,7 @@ import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
+import { journalWithdrawal } from './buyer-journal-withdrawal';
 import {
   NETWORK_RECOVERY_BLOCKS,
   type NetworkRecoveryBlock,
@@ -45,6 +46,7 @@ export function snapshotJournalEntry(
 ): UptoJournalEntry {
   const policy = entry.policy;
   return {
+    ...journalWithdrawal(entry.withdrawal),
     requestDigest: entry.requestDigest,
     channelId: entry.channelId,
     payTo: entry.payTo,
@@ -70,6 +72,9 @@ export function snapshotJournalEntry(
 // Keep caller-supplied method references stable throughout asynchronous recovery.
 export function snapshotJournal(journal: UptoBuyerJournal): UptoBuyerJournal {
   return {
+    ...(journal.recordWithdrawal
+      ? { recordWithdrawal: journal.recordWithdrawal.bind(journal) }
+      : {}),
     get: journal.get.bind(journal),
     put: journal.put.bind(journal),
     remove: journal.remove.bind(journal),
