@@ -440,8 +440,11 @@ sh install.sh
   `install.sh.sha256` and `install.sh.sigstore.json` with curl, checks the
   checksum and, with cosign, the release signature (required with
   `GYBLOS_REQUIRE_SIGNATURE=1`), renames the new installer over this one (when
-  it is a writable file) and runs it with the same `GYBLOS_DIR`. An installer
-  pinning the same image changes nothing.
+  it is a writable file; otherwise to `install.sh` in the install directory) and
+  runs it with the same `GYBLOS_DIR`. Cosign older than 3 cannot read the
+  bundle, so the check is skipped (refused in strict mode). An installer pinning
+  the same image runs this one again, which completes an update that stopped
+  halfway.
 - The release build sets `GYBLOS_VERSION` in the image. `gyblos seller status`
   then asks GitHub for the latest release (one bounded HTTPS request, nothing
   about the seller) and, when it is newer, ends with an `Update:` line;

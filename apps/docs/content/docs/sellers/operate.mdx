@@ -66,8 +66,7 @@ sh install.sh update
 
 `update` downloads the latest release's installer with its checksum and signature bundle, checks the
 checksum and, with cosign installed, the release signature (`GYBLOS_REQUIRE_SIGNATURE=1` makes that
-mandatory), replaces your `install.sh` with it and runs it. It says so and changes nothing when you already
-run the latest release. An `install.sh` from before this command does not know `update`: download the
+mandatory), replaces your `install.sh` with it and runs it. When your installer already pins the latest release, it runs it again, which also completes an update that stopped halfway. An `install.sh` from before this command does not know `update`: download the
 current one with `curl -fsSL https://gyblos.com/install.sh -o install.sh` and run `sh install.sh`.
 `GYBLOS_UPDATE_CHECK=0` in `seller.env` turns off the status check, which only asks GitHub for the latest
 release.

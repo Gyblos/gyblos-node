@@ -464,6 +464,12 @@ verify_installer() {
     unchecked 'cosign is not installed, so the installer signature was not checked (docs: image signature).'
     return
   fi
+  # Releases carry cosign 3 bundles, which older cosign cannot read.
+  major=$(cosign version 2>/dev/null | sed -n 's/^GitVersion: *v\{0,1\}\([0-9][0-9]*\)\..*/\1/p')
+  if [ -z "$major" ] || [ "$major" -lt "$COSIGN_MAJOR" ]; then
+    unchecked "cosign $COSIGN_MAJOR or later is needed to check the installer signature; it was not checked."
+    return
+  fi
   cosign verify-blob "$work/install.sh" --bundle "$work/install.sh.sigstore.json" \
     --certificate-identity-regexp "$RELEASE_IDENTITY" --certificate-oidc-issuer "$RELEASE_ISSUER" \
     >/dev/null 2>&1 ||
@@ -471,8 +477,9 @@ verify_installer() {
   say 'Verified the Gyblos release signature of the installer.'
 }
 
-# Downloads the latest release's installer, checks it, keeps it in place of this one (when this one is a
-# file) and runs it for the same install; an installer pinning this one's image means nothing to do.
+# Downloads the latest release's installer, checks it, keeps it in place of this one (or, when this one is
+# not a writable file, in the install directory) and runs it for the same install. When it pins this one's
+# image, this installer runs again instead: a rerun completes an earlier update that stopped halfway.
 update_installer() {
   command -v curl >/dev/null 2>&1 || die 'curl is needed to download the update.'
   [ -f "$dir/compose.yaml" ] ||
@@ -486,15 +493,18 @@ update_installer() {
   latest=$(sed -n 's/^DEFAULT_IMAGE=//p' "$work/install.sh")
   [ -n "$latest" ] || die 'The downloaded installer names no release image; nothing was changed.'
   if [ "$latest" = "$DEFAULT_IMAGE" ]; then
-    say "Already the latest release: $DEFAULT_IMAGE"
+    say "This installer already pins the latest release ($DEFAULT_IMAGE); running it again to apply it."
+    main
     return
   fi
   say "Updating to $latest"
-  target=$work/install.sh
   # Renamed into place, never rewritten: this shell is still reading the old file.
+  target=$dir/install.sh
   if [ -f "$0" ] && [ -w "$0" ] && [ ! -L "$0" ]; then
-    cp "$work/install.sh" "$0.update.$$" && mv -f "$0.update.$$" "$0" && target=$0
+    target=$0
   fi
+  cp "$work/install.sh" "$target.update.$$"
+  mv -f "$target.update.$$" "$target"
   GYBLOS_DIR=$dir sh "$target"
 }
 

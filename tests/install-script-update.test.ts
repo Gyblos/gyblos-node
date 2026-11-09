@@ -4,7 +4,7 @@
 // curl, cosign and docker from install-harness.ts, and a stand-in for the new installer.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -139,7 +139,7 @@ void test('a checksum mismatch, a strict run without cosign or a failed download
   }
 });
 
-void test('an installer for the same release, a missing install or extra arguments run nothing', async () => {
+void test('an installer for the same release runs again, which completes an update that stopped', async () => {
   const current = await harness({ curl: true, copy: true });
   const image = /^DEFAULT_IMAGE=(.*)$/m.exec(
     readFileSync(current.script, 'utf8'),
@@ -147,14 +147,25 @@ void test('an installer for the same release, a missing install or extra argumen
   await current.cleanup();
   const same = await updating({ image });
   try {
-    const result = same.install.run({}, ['update']);
+    const result = same.install.run(
+      { GYBLOS_RELAY_TOKEN: 'x'.repeat(40), GYBLOS_GUIDED: '0' },
+      ['update'],
+    );
     assert.equal(result.status, 0, result.output);
-    assert.match(result.stdout, /^Already the latest release: /m);
+    assert.match(
+      result.stdout,
+      /^This installer already pins the latest release \(.*\); running it again to apply it\.$/m,
+    );
+    assert.ok(same.install.calls().includes('compose pull'));
+    assert.match(result.stdout, /^The seller is running\./m);
     assert.equal(readFileSync(same.install.script, 'utf8'), same.before);
     assert.doesNotMatch(result.stdout, /NEW INSTALLER/);
   } finally {
     await same.install.cleanup();
   }
+});
+
+void test('a missing install or extra arguments run nothing', async () => {
   const missing = await harness({ curl: true, copy: true });
   try {
     const result = missing.run({}, ['update']);
@@ -169,5 +180,39 @@ void test('an installer for the same release, a missing install or extra argumen
     );
   } finally {
     await missing.cleanup();
+  }
+});
+
+void test('update with cosign older than 3 notes the skipped check instead of failing', async () => {
+  const { install, body } = await updating({ cosign: true });
+  try {
+    const result = install.run({ FAKE_COSIGN_VERSION: '2.4.1' }, ['update']);
+    assert.equal(result.status, 0, result.output);
+    assert.match(
+      result.stdout,
+      /cosign 3 or later is needed to check the installer signature; it was not checked/,
+    );
+    assert.deepEqual(install.signatureChecks(), []);
+    assert.equal(readFileSync(install.script, 'utf8'), body);
+  } finally {
+    await install.cleanup();
+  }
+});
+
+void test('an installer that cannot be replaced leaves the new one in the install directory', async () => {
+  const { install, body, before } = await updating();
+  try {
+    chmodSync(install.script, 0o444);
+    const result = install.run({}, ['update']);
+    assert.equal(result.status, 0, result.output);
+    assert.equal(readFileSync(install.script, 'utf8'), before);
+    assert.equal(
+      readFileSync(join(install.directory, 'install.sh'), 'utf8'),
+      body,
+    );
+    assert.match(result.stdout, /^NEW INSTALLER ran for /m);
+  } finally {
+    chmodSync(install.script, 0o644);
+    await install.cleanup();
   }
 });
