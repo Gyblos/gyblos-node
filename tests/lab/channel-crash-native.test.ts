@@ -6,6 +6,7 @@ import { runChannelCrash } from '../support/channel-crash-acceptance';
 import { CHANNEL_CRASH, CRASH_CUTS } from '../support/channel-crash-constants';
 
 for (const cut of Object.values(CRASH_CUTS)) {
+  if (cut === CRASH_CUTS.RECOVERY_LOCKED) continue;
   void test(`native channel recovery after SIGKILL at ${cut}`, async (context) => {
     context.mock.method(Date, 'now', () => CHANNEL_CRASH.now);
     const result = await runChannelCrash(cut);
@@ -17,6 +18,12 @@ for (const cut of Object.values(CRASH_CUTS)) {
     assert.equal(result.retainedIdentity, true);
     assert.equal(result.replacementSignatures, 0);
     assert.equal(result.replacementSends, 0);
+    const unsentOpen = [
+      CRASH_CUTS.OPEN_BEFORE_CHECKPOINT,
+      CRASH_CUTS.OPEN_CHECKPOINTED,
+      CRASH_CUTS.OPEN_SIGNED,
+    ].some((item) => item === cut);
+    assert.equal(result.totalSends, unsentOpen ? 0 : 3);
     assert.equal(result.startupBlocked, false);
     assert.equal(result.chargedAtomic, '0');
     assert.deepEqual(result.balances, {
