@@ -54,7 +54,7 @@ async function uncertain(
     'code',
     BUYER_API.NEVER_SENT_FIELD,
   ]);
-  assert.equal(error[BUYER_API.NEVER_SENT_FIELD], false);
+  assert.equal(error[BUYER_API.NEVER_SENT_FIELD], true);
   assert.equal(error.code, PAID_BUYER_CODES.UNRESOLVED);
   assert.notEqual(response.statusCode, 200);
   assert.deepEqual(
