@@ -1,4 +1,6 @@
 // Public spending metadata only; no credentials, signed payloads or RPC configuration.
+import { isSignature } from '@solana/kit';
+
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import {
   BUYER_API,
@@ -56,9 +58,11 @@ export function x402Policy(input: unknown) {
   return policy;
 }
 export function x402Explorer(transaction: string) {
-  if (!BUYER_API.SIGNATURE_PATTERN.test(transaction))
-    throw new Error('Invalid transaction');
+  if (!x402Signature(transaction)) throw new Error('Invalid transaction');
   return DESKTOP_X402.EXPLORER + transaction + '?cluster=devnet';
+}
+export function x402Signature(value: string) {
+  return isSignature(value);
 }
 export function parseX402Summary(input: unknown): X402Summary {
   if (!input || typeof input !== 'object') throw new Error('Invalid session');
@@ -88,7 +92,7 @@ export function parseX402Summary(input: unknown): X402Summary {
       typeof record.free !== 'boolean' ||
       (record.transaction !== null &&
         (typeof record.transaction !== 'string' ||
-          !BUYER_API.SIGNATURE_PATTERN.test(record.transaction))) ||
+          !x402Signature(record.transaction))) ||
       (record.free
         ? record.transaction !== null || record.chargeAtomic !== '0'
         : record.transaction === null)
@@ -106,7 +110,25 @@ export function parseX402Summary(input: unknown): X402Summary {
   });
   if (
     BigInt(value.spentAtomic) > BigInt(value.limitAtomic) ||
-    (value.active && (!policy || value.sessionId === null))
+    ((value.active || value.sessionId !== null) && !policy) ||
+    (value.active && value.sessionId === null) ||
+    new Set(records.map((record) => record.id)).size !== records.length ||
+    records.some(
+      (record) => BigInt(record.chargeAtomic) > BigInt(record.policy.maxAtomic),
+    )
+  )
+    throw new Error('Invalid budget');
+  const currentRecords = records.filter(
+    (record) => record.sessionId === value.sessionId,
+  );
+  if (
+    currentRecords.some(
+      (record) => JSON.stringify(record.policy) !== JSON.stringify(policy),
+    ) ||
+    currentRecords.reduce(
+      (total, record) => total + BigInt(record.chargeAtomic),
+      0n,
+    ) !== BigInt(value.spentAtomic)
   )
     throw new Error('Invalid budget');
   return {
@@ -119,6 +141,14 @@ export function parseX402Summary(input: unknown): X402Summary {
     spentAtomic: value.spentAtomic,
     records,
   };
+}
+export function effectiveX402Policy(
+  summary: X402Summary,
+  connected: BuyerApiPolicy | null,
+) {
+  return summary.active || summary.blocked
+    ? (summary.policy ?? connected)
+    : connected;
 }
 export function x402Asset(policy: BuyerApiPolicy) {
   return policy.mint === DEVNET_USDC

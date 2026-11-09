@@ -14,7 +14,7 @@ import {
 } from '@gyblos/protocol/constants';
 
 import { X402Budget } from './x402-budget';
-import { DESKTOP_X402, x402Policy } from './x402-model';
+import { DESKTOP_X402, x402Policy, x402Signature } from './x402-model';
 
 export function buyerEndpoint(input: unknown) {
   if (typeof input !== 'string') throw new Error('Enter a local buyer URL');
@@ -94,7 +94,7 @@ export function parseBuyerReply(input: unknown, policy: BuyerApiPolicy) {
   if (
     paid.verdict !== PAID_VERDICTS.SETTLED ||
     typeof paid.transaction !== 'string' ||
-    !BUYER_API.SIGNATURE_PATTERN.test(paid.transaction) ||
+    !x402Signature(paid.transaction) ||
     !buyerAtomic(paid.maxAtomic) ||
     !buyerAtomic(paid.expectedAtomic) ||
     !buyerAtomic(paid.chargedAtomic) ||

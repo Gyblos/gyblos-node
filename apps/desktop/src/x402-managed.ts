@@ -1,7 +1,59 @@
 // Owns one buyer utility until actual exit; never auto-restarts it or clears financial locks.
+import {
+  BUYER_RELAY_ONLY_ENV,
+  ENVIRONMENT_SWITCH,
+  NODE_ENVIRONMENT,
+} from '@gyblos/config';
 import { BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 
 import { DESKTOP_X402 } from './x402/constants';
+
+export function buyerEnvironment(
+  home: string,
+  relayToken: string,
+  environment: Readonly<NodeJS.ProcessEnv>,
+) {
+  if (
+    environment.GYBLOS_RELAYS &&
+    (environment.GYBLOS_RELAYS.length > DESKTOP_X402.MAX_RELAYS_LENGTH ||
+      /[\r\n]/.test(environment.GYBLOS_RELAYS))
+  )
+    throw new Error('Invalid relay configuration');
+  const relayOnly = environment[BUYER_RELAY_ONLY_ENV];
+  if (
+    relayOnly !== undefined &&
+    relayOnly !== ENVIRONMENT_SWITCH.off &&
+    relayOnly !== ENVIRONMENT_SWITCH.on
+  )
+    throw new Error('Invalid relay mode');
+  const addresses: NodeJS.ProcessEnv = {};
+  for (const key of [
+    NODE_ENVIRONMENT.irohBind,
+    NODE_ENVIRONMENT.irohExternalAddress,
+  ]) {
+    const value = environment[key];
+    if (value !== undefined) {
+      if (
+        value.length > DESKTOP_X402.MAX_TRANSPORT_ADDRESS ||
+        /[\r\n]/.test(value)
+      )
+        throw new Error('Invalid transport address');
+      addresses[key] = value;
+    }
+  }
+  return {
+    ...(environment.PATH ? { PATH: environment.PATH } : {}),
+    ...(environment.HOME ? { HOME: environment.HOME } : {}),
+    ...(environment.TMPDIR ? { TMPDIR: environment.TMPDIR } : {}),
+    ...(environment.GYBLOS_RELAYS
+      ? { GYBLOS_RELAYS: environment.GYBLOS_RELAYS }
+      : {}),
+    ...(relayOnly !== undefined ? { [BUYER_RELAY_ONLY_ENV]: relayOnly } : {}),
+    ...addresses,
+    GYBLOS_HOME: home,
+    GYBLOS_RELAY_TOKEN: relayToken,
+  };
+}
 
 export interface BuyerWorker {
   on(event: 'spawn', callback: () => void): unknown;

@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { getBase58Decoder, isSignature } from '@solana/kit';
+
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { X402Budget } from '@gyblos/desktop/x402-budget';
 import {
@@ -9,6 +11,7 @@ import {
   parseBuyerReply,
   X402Client,
 } from '@gyblos/desktop/x402-client';
+import { x402Explorer } from '@gyblos/desktop/x402-model';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 const policy: BuyerApiPolicy = {
@@ -158,4 +161,36 @@ void test('x402 releases a reservation only when the buyer explicitly proves the
   assert.equal((await ledger.summary()).blocked, false);
   assert.equal((await ledger.summary()).spentAtomic, '0');
   await ledger.finish();
+});
+
+void test('x402 accepts a valid short Solana signature through reply, persistence and explorer', async () => {
+  const bytes = new Uint8Array(64).fill(1);
+  bytes[0] = 0;
+  const signature = getBase58Decoder().decode(bytes);
+  assert.equal(signature.length, 86);
+  assert.ok(isSignature(signature));
+  const value = reply();
+  value[BUYER_API.PAYMENT_FIELD].transaction = signature;
+  const parsed = parseBuyerReply(value, policy);
+  let saved: string | undefined;
+  const files = {
+    read: async () => saved,
+    write: async (text: string) => {
+      saved = text;
+    },
+  };
+  const ledger = new X402Budget(files);
+  await ledger.authorize(policy, '100');
+  await ledger.reserve('short-signature');
+  await ledger.complete('short-signature', parsed);
+  assert.equal(
+    (await new X402Budget(files).summary()).records[0]?.transaction,
+    signature,
+  );
+  assert.equal(
+    x402Explorer(signature),
+    'https://explorer.solana.com/tx/' + signature + '?cluster=devnet',
+  );
+  for (const invalid of ['0'.repeat(88), '2'.repeat(80), '2'.repeat(89)])
+    assert.throws(() => x402Explorer(invalid));
 });

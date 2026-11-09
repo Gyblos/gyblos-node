@@ -789,7 +789,9 @@ export function Chat({
                               key={id}
                               onClick={() => {
                                 setHistoryOpen(false);
-                                onActivity(id);
+                                if (summary.x402SessionIds.includes(id))
+                                  onReviewX402?.();
+                                else onActivity(id);
                               }}
                               title="View shared session consumption and payment"
                             >
@@ -803,7 +805,9 @@ export function Chat({
                               <small>
                                 {entry
                                   ? `${sessionOutcome(entry)} · ${paypalDollars(entry.recordedCents)} shared usage`
-                                  : 'View in Activity'}
+                                  : summary.x402SessionIds.includes(id)
+                                    ? 'View x402 payments'
+                                    : 'View in Activity'}
                               </small>
                             </Button>
                           );

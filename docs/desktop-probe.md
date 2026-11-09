@@ -208,7 +208,7 @@ isolation and network denial. Real inference requires an explicitly configured
 and authorized buyer or PayPal session. The normal host also starts a resident
 utility process with the existing loopback-only Iroh binder and
 `@gyblos/node/lifecycle`. It uses an ephemeral identity, no relays/discovery,
-and no operational configuration or wallet. The footer reads fixed sanitized
+and no operational configuration or wallet. The sidebar reads fixed sanitized
 host states; readiness requires worker acknowledgement, errors permit a
 single-process retry, and quit waits for process exit. Startup and stop
 deadlines request termination; a forced exit is never a clean stop. There is no

@@ -11,6 +11,7 @@ import {
 } from '@gyblos/lab-harness/acceptance/constants';
 import { AcceptanceError } from '@gyblos/lab-harness/acceptance/errors';
 import { assertAcceptanceTempBase } from '@gyblos/lab-harness/acceptance/workspace';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { OFFER_PRICING_KINDS, P2P_ROLES } from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
 import { isMain } from '@gyblos/runtime';
@@ -46,7 +47,14 @@ async function uncertain(
   const response = await paidHttp(run, signal);
   const value: unknown = JSON.parse(await paidBody(response));
   const body = controlObject(value, ['error']);
-  const error = controlObject(body.error, ['message', 'type', 'param', 'code']);
+  const error = controlObject(body.error, [
+    'message',
+    'type',
+    'param',
+    'code',
+    BUYER_API.NEVER_SENT_FIELD,
+  ]);
+  assert.equal(error[BUYER_API.NEVER_SENT_FIELD], false);
   assert.equal(error.code, PAID_BUYER_CODES.UNRESOLVED);
   assert.notEqual(response.statusCode, 200);
   assert.deepEqual(

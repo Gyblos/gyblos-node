@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { projectChatArchive } from '@gyblos/desktop/chat-archive-model';
 import { ChatController } from '@gyblos/desktop/chat-controller';
+import { conversationSummary } from '@gyblos/desktop/chat-history';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 
 void test('x402 conversation is retained with its actual payment session', () => {
@@ -24,6 +25,10 @@ void test('x402 conversation is retained with its actual payment session', () =>
   );
   chat.completePaypal('conversation', 'request', 'Real response', model);
   const archive = projectChatArchive(chat.getSnapshot());
+  assert.deepEqual(
+    conversationSummary(chat.getSnapshot().sessions[0]!).x402SessionIds,
+    [paymentSession],
+  );
   assert.notEqual(archive, null);
   assert.equal(
     archive?.sessions[0]?.messages[1]?.paymentSessionId,

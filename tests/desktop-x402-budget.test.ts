@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { X402Budget } from '@gyblos/desktop/x402-budget';
+import type { X402Summary } from '@gyblos/desktop/x402-model';
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 const policy: BuyerApiPolicy = {
@@ -78,4 +79,44 @@ void test('x402 free execution releases reservation without a transaction', asyn
   assert.equal(state.spentAtomic, '0');
   assert.equal(state.blocked, false);
   assert.equal(state.records[0]?.transaction, null);
+});
+
+void test('x402 rejects inconsistent saved totals, policies and duplicate records without overwriting', async () => {
+  const changes: Array<(summary: X402Summary) => void> = [
+    (summary) => {
+      summary.spentAtomic = '0';
+    },
+    (summary) => {
+      summary.records.push(structuredClone(summary.records[0]!));
+      summary.spentAtomic = '160';
+      summary.limitAtomic = '200';
+    },
+    (summary) => {
+      summary.records[0]!.policy = { ...policy, model: 'other-model' };
+    },
+    (summary) => {
+      summary.records[0]!.chargeAtomic = '101';
+      summary.spentAtomic = '101';
+      summary.limitAtomic = '200';
+    },
+  ];
+  for (const change of changes) {
+    const files = memory();
+    const ledger = new X402Budget(files);
+    await ledger.authorize(policy, '100');
+    await ledger.reserve('confirmed-request');
+    await ledger.complete('confirmed-request', {
+      chargeAtomic: '80',
+      transaction: '2'.repeat(88),
+      free: false,
+    });
+    const summary = await ledger.summary();
+    change(summary);
+    const corrupted = JSON.stringify({ version: 1, pending: null, summary });
+    await files.write(corrupted);
+    const restored = new X402Budget(files);
+    await assert.rejects(() => restored.summary());
+    await assert.rejects(() => restored.reserve('another-request'));
+    assert.equal(await files.read(), corrupted);
+  }
 });

@@ -36,6 +36,16 @@ export function conversationSummary(session: ChatSession) {
         ),
       ),
     ],
+    x402SessionIds: [
+      ...new Set(
+        session.messages.flatMap((message) =>
+          message.paymentMethod === PAYMENT_METHOD.USDC &&
+          message.paymentSessionId
+            ? [message.paymentSessionId]
+            : [],
+        ),
+      ),
+    ],
     lastSentAt: sent.length ? Math.max(...sent) : null,
   };
 }

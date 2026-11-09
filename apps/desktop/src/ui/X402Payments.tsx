@@ -7,6 +7,7 @@ import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 import {
   DESKTOP_X402,
+  effectiveX402Policy,
   X402_ACTION,
   x402Amount,
   x402Asset,
@@ -30,13 +31,13 @@ export function X402Payments({
   onChat(): void;
 }) {
   const { summary, policy } = buyer.state;
-  const activePolicy = summary.policy ?? policy;
+  const activePolicy = effectiveX402Policy(summary, policy);
   const [copyError, setCopyError] = useState('');
   const copy = (
     action: typeof X402_ACTION.COPY_PAYER | typeof X402_ACTION.COPY_MINT,
   ) => {
     void buyer
-      .run({ action })
+      .run({ action, policyId: activePolicy?.policyId })
       .then((result) =>
         setCopyError(result && !result.error ? '' : 'Copy unavailable'),
       );
@@ -74,6 +75,14 @@ export function X402Payments({
       ) : (
         policy && <X402Authorize buyer={buyer} policy={policy} />
       )}
+      {summary.active &&
+        policy &&
+        summary.policy?.policyId !== policy.policyId && (
+          <p role="status">
+            The connected buyer changed. Finish the previous chat budget before
+            authorizing a new one.
+          </p>
+        )}
       {(buyer.state.error || copyError || summary.blocked) && (
         <p role="status">
           {copyError ||

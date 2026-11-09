@@ -2,6 +2,7 @@
 import type { X402Budget } from './x402-budget';
 import type { X402Client } from './x402-client';
 import {
+  effectiveX402Policy,
   X402_ACTION,
   x402Explorer,
   x402Id,
@@ -40,8 +41,9 @@ async function referenceAction(
     input.action === X402_ACTION.COPY_PAYER ||
     input.action === X402_ACTION.COPY_MINT
   ) {
-    const policy = client.policy() ?? (await budget.summary()).policy;
-    if (!policy) throw new Error('Buyer wallet unavailable');
+    const policy = effectiveX402Policy(await budget.summary(), client.policy());
+    if (!policy || input.policyId !== policy.policyId)
+      throw new Error('Buyer wallet changed. Review Payments before copying.');
     copy(input.action === X402_ACTION.COPY_PAYER ? policy.payer : policy.mint);
     return true;
   }

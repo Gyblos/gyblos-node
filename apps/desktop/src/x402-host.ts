@@ -10,7 +10,6 @@ import {
   type BrowserWindow,
 } from 'electron';
 
-import { BUYER_RELAY_ONLY_ENV } from '@gyblos/config';
 import { desktopX402Paths } from '@gyblos/config/home';
 import {
   acquireProcessLock,
@@ -22,7 +21,7 @@ import {
 import { X402Budget } from './x402-budget';
 import { X402Client } from './x402-client';
 import { createX402Handlers } from './x402-handlers';
-import { ManagedBuyer } from './x402-managed';
+import { buyerEnvironment, ManagedBuyer } from './x402-managed';
 import { DESKTOP_X402 } from './x402-model';
 
 function managedBuyer(
@@ -36,14 +35,7 @@ function managedBuyer(
       utilityProcess.fork(join(directory, DESKTOP_X402.SERVICE_FILE), [], {
         cwd: home,
         stdio: 'ignore',
-        env: {
-          ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
-          ...(process.env.HOME ? { HOME: process.env.HOME } : {}),
-          ...(process.env.TMPDIR ? { TMPDIR: process.env.TMPDIR } : {}),
-          GYBLOS_HOME: home,
-          GYBLOS_RELAY_TOKEN: relayToken,
-          [BUYER_RELAY_ONLY_ENV]: '1',
-        },
+        env: buyerEnvironment(home, relayToken, process.env),
       }),
     () => client.disconnect(),
   );

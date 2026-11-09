@@ -2,13 +2,7 @@
 import { cp } from 'node:fs/promises';
 import { join } from 'node:path';
 
-const DESKTOP_ASSETS = [
-  'main.cjs',
-  'preload.cjs',
-  'worker.cjs',
-  'node-worker.cjs',
-  'renderer',
-] as const;
+import { DESKTOP_ASSETS } from './constants';
 
 export async function stageDesktopAssets(dist: string, stage: string) {
   for (const file of DESKTOP_ASSETS)

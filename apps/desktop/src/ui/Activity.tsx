@@ -196,7 +196,7 @@ function ActivityResults({
       title={entries.length ? 'No matching sessions' : 'No activity yet'}
       description={
         method === HISTORY_METHOD.USDC
-          ? 'USDC payment history is not available in this version. Simulated chat replies are not payments.'
+          ? 'Verified x402 Chat payments are listed separately. Simulated chat replies are not payments.'
           : 'Chat and agent usage will appear here.'
       }
       action={<Button onClick={onPayments}>Go to Payments</Button>}
