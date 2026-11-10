@@ -17,6 +17,7 @@ import {
 } from '@gyblos/runtime/private-file';
 
 import { doctor } from './cli-doctor';
+import { commandsFor } from './cli-next';
 import {
   EXIT,
   SERVICE,
@@ -52,7 +53,7 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
   [SERVICE_ERRORS.ENVIRONMENT_INVALID]:
     'each line must be NAME=value: no spaces, quotes, `$`, backticks, backslashes, `#`, `~` or shell operators in the value',
   [SERVICE_ERRORS.ENVIRONMENT_RESERVED]:
-    'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, PATH, HOME, shell variables (UID, IFS, BASH*, …) or NODE_*/LD_*/DYLD_*/TSX_*/OPENSSL_* variables',
+    'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, GYBLOS_CONTAINER, GYBLOS_PACKAGED, GYBLOS_LAUNCHER, PATH, HOME, shell variables (UID, IFS, BASH*, …) or NODE_*/LD_*/DYLD_*/TSX_*/OPENSSL_* variables',
   [SERVICE_ERRORS.ALREADY_INSTALLED]:
     'run `gyblos seller service uninstall` first',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
@@ -293,7 +294,9 @@ export async function serviceCommand(
     return EXIT.ok;
   } catch (error) {
     if (!(error instanceof ServiceError)) throw error;
-    output.stderr(`${error.code}: ${HINTS[error.code]}\n`);
+    output.stderr(
+      `${error.code}: ${commandsFor(runMode(output.env), HINTS[error.code])}\n`,
+    );
     return EXIT.failure;
   }
 }

@@ -56,6 +56,10 @@ export const SERVICE = {
 export const SERVICE_RESERVED_VARIABLES = [
   'GYBLOS_HOME',
   'GYBLOS_CONFIG',
+  // How the seller was installed is the installer's and the launcher's to say, not seller.env's.
+  'GYBLOS_CONTAINER',
+  'GYBLOS_PACKAGED',
+  'GYBLOS_LAUNCHER',
   'PATH',
   'HOME',
   'UID',

@@ -1,6 +1,7 @@
 // `gyblos doctor`: prints the seller preflight as one line per check with a static code and a hint, then
 // the public NodeId and owner to share for discovery enrollment. Never prints the home location, the RPC
 // URL, the relay token or any key material.
+import { runMode } from '@gyblos/config';
 import {
   DOCTOR_CHECKS,
   DOCTOR_CODES,
@@ -10,6 +11,7 @@ import { sellerDoctor, type DoctorProbes } from '@gyblos/node/seller-doctor';
 
 import { issueLine, urlOrigin } from './cli-format';
 import { codeHint } from './cli-hints';
+import { commandsFor } from './cli-next';
 
 const STATUS_COLUMN = 4;
 const CHECK_COLUMN = 10;
@@ -56,7 +58,10 @@ export async function doctor(
     stdout(`        ${issueLine(issue)}`);
   if (report.seller) {
     stdout(
-      'Seller identity (public; `gyblos seller register` enrolls it in discovery):\n',
+      commandsFor(
+        runMode(options.env),
+        'Seller identity (public; `gyblos seller register` enrolls it in discovery):\n',
+      ),
     );
     stdout(`  nodeId  ${report.seller.nodeId}\n`);
     stdout(`  owner   ${report.seller.owner}\n`);
