@@ -3,8 +3,11 @@
 // bytes. Key contents never appear in errors.
 import { constants } from 'node:fs';
 import { lstat, open } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 import { FILE_MODES, KEY_LIMITS } from '@gyblos/config';
+import { hasPrivateMode, WINDOWS } from '@gyblos/runtime/private-mode';
+import { directoryIsPrivate } from '@gyblos/runtime/windows-acl';
 
 // A regular, non-symlinked file owned by this user with mode 0600; checked from metadata only.
 export function privateKeyMetadata(
@@ -16,9 +19,7 @@ export function privateKeyMetadata(
   return (
     metadata.isFile() &&
     !metadata.isSymbolicLink() &&
-    (Number(metadata.mode) & FILE_MODES.permissionMask) ===
-      FILE_MODES.privateFile &&
-    (!process.getuid || Number(metadata.uid) === process.getuid())
+    hasPrivateMode(metadata, FILE_MODES.privateFile)
   );
 }
 
@@ -38,7 +39,18 @@ async function privateKeyText(path: string) {
   }
   try {
     const metadata = await handle.stat();
-    if (!privateKeyMetadata(metadata)) throw invalid();
+    // The descriptor still names `path` with a single link, also where O_NOFOLLOW does not exist.
+    const named = await lstat(path);
+    if (
+      !privateKeyMetadata(metadata) ||
+      metadata.nlink !== 1 ||
+      named.isSymbolicLink() ||
+      named.dev !== metadata.dev ||
+      named.ino !== metadata.ino
+    )
+      throw invalid();
+    // Windows has no mode bits: the folder's ACL must keep everyone else out.
+    if (WINDOWS && !(await directoryIsPrivate(dirname(path)))) throw invalid();
     if (metadata.size > KEY_LIMITS.fileBytes)
       throw new Error('Invalid role key.');
     return await handle.readFile('utf8');

@@ -17,7 +17,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [DOCTOR_CODES.KEYS_MISSING]:
     'a key file is missing; rerun `gyblos setup` (keys are never replaced)',
   [DOCTOR_CODES.KEY_PERMISSIONS]:
-    'key files must be regular files owned by you, mode 0600',
+    'key files must be regular files owned by you, mode 0600 (on Windows, in a folder only your account can open: run `gyblos setup` again to restrict it)',
   [DOCTOR_CODES.SEQUENCE_LOCK_PRESENT]:
     'a leftover public-sequence lock blocks publishing; stop other sellers, then inspect it (docs/discovery.md)',
   [NODE_ERROR_CODES.PUBLIC_SEQUENCE_UNAVAILABLE]:

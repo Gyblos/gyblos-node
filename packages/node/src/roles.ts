@@ -4,7 +4,7 @@
 // keeping its NodeId, owner and registration. The paid fields exist all together or not at all.
 import { generateKeyPairSync } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 import { SecretKey } from '@number0/iroh';
 import {
@@ -27,6 +27,11 @@ import {
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 import { saveJson } from '@gyblos/runtime';
+import { WINDOWS } from '@gyblos/runtime/private-mode';
+import {
+  directoryIsPrivate,
+  restrictDirectory,
+} from '@gyblos/runtime/windows-acl';
 
 import {
   configurationAddress,
@@ -274,6 +279,12 @@ export async function setupRole(options: SetupOptions) {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
+  // Windows has no mode bits: the home (with seller.env) and the role folder keep everyone else out by
+  // their ACL, inherited by the keys written next. Rerunning setup restores it.
+  if (WINDOWS) {
+    await restrictDirectory(dirname(roleDirectory(role)));
+    await restrictDirectory(roleDirectory(role));
+  }
   try {
     await lstat(file(role, ROLE_FILES.nodeKey));
   } catch (error) {
@@ -330,6 +341,13 @@ export async function roleKeyFilesStatus(
     }
     if (!privateKeyMetadata(metadata)) invalid = true;
   }
+  // Windows has no mode bits: the keys' folder must keep everyone else out by its ACL.
+  if (
+    WINDOWS &&
+    names.length > 0 &&
+    !(await directoryIsPrivate(dirname(file(role, names[0]!, environment))))
+  )
+    invalid = true;
   return invalid ? 'invalid' : 'ok';
 }
 

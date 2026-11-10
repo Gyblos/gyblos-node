@@ -23,6 +23,7 @@ import { basename, dirname, join, parse, resolve, sep } from 'node:path';
 import { FILE_MODES } from '@gyblos/config';
 
 import { PRIVATE_FILE_CODES, PROCESS_LOCK } from './constants';
+import { hasPrivateMode, WINDOWS } from './private-mode';
 
 export class PrivateFileError extends Error {
   readonly code = PRIVATE_FILE_CODES.UNAVAILABLE;
@@ -45,11 +46,7 @@ async function guarded<T>(run: () => Promise<T>): Promise<T> {
 }
 
 function owned(info: Stats, mode: number) {
-  if (
-    (process.getuid && info.uid !== process.getuid()) ||
-    (info.mode & FILE_MODES.permissionMask) !== mode
-  )
-    fail();
+  if (!hasPrivateMode(info, mode)) fail();
 }
 
 const NEW_FILE =
@@ -86,7 +83,8 @@ async function privateDirectory(
       if (!info) return false;
       // Only the system's own links (macOS /var, /tmp) are followed; any other link is refused.
       if (info.isSymbolicLink()) {
-        if (info.uid !== 0 || current === absolute) fail();
+        // Windows reports uid 0 for every file, so no link is trusted there.
+        if (info.uid !== 0 || WINDOWS || current === absolute) fail();
         if (!(await stat(current)).isDirectory()) fail();
         continue;
       }
