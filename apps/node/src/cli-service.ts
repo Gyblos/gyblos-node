@@ -7,7 +7,12 @@ import { lstat, mkdir, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
-import { NODE_ENVIRONMENT, RUN_MODES, runMode } from '@gyblos/config';
+import {
+  ENVIRONMENT_SWITCH,
+  NODE_ENVIRONMENT,
+  RUN_MODES,
+  runMode,
+} from '@gyblos/config';
 import { homeLayout } from '@gyblos/config/home';
 import { nodeConfigPath } from '@gyblos/node/node-config-file';
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
@@ -226,6 +231,10 @@ async function install(
         ...values,
         GYBLOS_HOME: input.home,
         GYBLOS_CONFIG: input.config,
+        // Its hints spell commands as the packaged release types them.
+        ...(input.launcher === undefined
+          ? {}
+          : { [NODE_ENVIRONMENT.packaged]: ENVIRONMENT_SWITCH.on }),
       },
       cwd: output.cwd,
       probes: output.doctor,
