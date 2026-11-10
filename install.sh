@@ -62,6 +62,7 @@ RELEASE_TAGS=https://github.com/Gyblos/gyblos-node/releases/download
 NATIVE_OLLAMA=http://127.0.0.1:11434
 
 dir=${GYBLOS_DIR:-$HOME/gyblos-seller}
+docker_dir=$dir
 native_home=${GYBLOS_HOME:-$HOME/.gyblos}
 bin_dir=$HOME/.local/bin
 mode=${GYBLOS_MODE:-}
@@ -152,6 +153,7 @@ cleanup() {
   [ -z "${restore:-}" ] || cat "$original" >gyblos.toml
   [ -z "${tmp:-}" ] || rm -f "$tmp"
   [ -z "${work:-}" ] || rm -rf "$work"
+  [ -z "${unpack:-}" ] || rm -rf "$unpack"
   [ -z "${prompting:-}" ] || stty echo </dev/tty 2>/dev/null || true
 }
 
@@ -375,9 +377,17 @@ seller_cli() {
   fi
 }
 # The same, as the operator types it.
+# What a packaged seller's commands need besides `gyblos`: its home when not the default, and the mode
+# when a Docker install is also here (which would otherwise win).
+native_env() {
+  [ "$native_home" = "$HOME/.gyblos" ] || printf 'GYBLOS_HOME=%s ' "$(quoted "$native_home")"
+}
+native_mode_env() {
+  [ ! -f "$docker_dir/compose.yaml" ] || printf 'GYBLOS_MODE=native '
+}
 seller_typed() {
   if [ "$mode" = native ]; then
-    printf 'gyblos %s' "$1"
+    printf '%sgyblos %s' "$(native_env)" "$1"
   else
     printf 'cd %s && docker compose exec seller gyblos %s' "$(quoted "$dir")" "$1"
   fi
@@ -388,11 +398,7 @@ seller_typed() {
 quoted() { printf "'%s'" "$1"; }
 publish_command() {
   if [ "$mode" = native ]; then
-    if [ "$native_home" = "$HOME/.gyblos" ]; then
-      printf 'sh %s%s' "$(quoted "$self")" "${1:+ $1}"
-    else
-      printf 'GYBLOS_HOME=%s sh %s%s' "$(quoted "$native_home")" "$(quoted "$self")" "${1:+ $1}"
-    fi
+    printf '%s%ssh %s%s' "$(native_mode_env)" "$(native_env)" "$(quoted "$self")" "${1:+ $1}"
   elif [ "$dir" = "$HOME/gyblos-seller" ]; then
     printf 'sh %s%s' "$(quoted "$self")" "${1:+ $1}"
   else
@@ -466,7 +472,8 @@ validate_config() {
 }
 restart_seller() {
   if [ "$mode" = native ]; then
-    restart_service
+    restart_service ||
+      die "gyblos.toml is changed, but the seller service did not restart; restart it (or run $(seller_typed 'seller service install')) for the change to apply."
   else
     docker compose up -d --force-recreate seller
   fi
@@ -583,13 +590,13 @@ update_installer() {
   fi
   say "Updating to $latest"
   # Renamed into place, never rewritten: this shell is still reading the old file.
-  target=$dir/install.sh
+  destination=$dir/install.sh
   if [ -f "$0" ] && [ -w "$0" ] && [ ! -L "$0" ]; then
-    target=$0
+    destination=$0
   fi
-  cp "$work/install.sh" "$target.update.$$"
-  mv -f "$target.update.$$" "$target"
-  GYBLOS_MODE=$mode GYBLOS_DIR=$dir GYBLOS_HOME=$native_home sh "$target"
+  cp "$work/install.sh" "$destination.update.$$"
+  mv -f "$destination.update.$$" "$destination"
+  GYBLOS_MODE=$mode GYBLOS_DIR=$docker_dir GYBLOS_HOME=$native_home sh "$destination"
 }
 
 # The packaged seller for this machine: its target and the checksum this installer pins for it.
@@ -615,14 +622,15 @@ native_target() {
     die 'This installer has no packaged seller (only a release installer does): install Docker, or download https://gyblos.com/install.sh.'
 }
 
-# Downloads, checks and unpacks this release's packaged seller next to earlier ones, points app/current
-# at it and links ~/.local/bin/gyblos; keeps only the previous release for rollback.
+# Downloads, checks and unpacks this release's packaged seller beside earlier ones. It is unpacked on the
+# same file system and renamed into place with a marker, so an interrupted run never leaves a release a
+# rerun would trust; a rerun downloads it again.
 install_native() {
   command -v curl >/dev/null 2>&1 || die 'curl is needed to download the seller.'
   app=$native_home/app
   name=gyblos-$NATIVE_VERSION-$target
   mkdir -p "$app"
-  if [ ! -x "$app/$name/bin/gyblos" ]; then
+  if [ ! -f "$app/$name/.complete" ]; then
     work=$(mktemp -d)
     say "Downloading the Gyblos seller $NATIVE_VERSION for $target…"
     for file in "$name.tar.gz" "$name.tar.gz.sigstore.json"; do
@@ -632,19 +640,33 @@ install_native() {
     [ "$(sha256_of "$work/$name.tar.gz")" = "$sha" ] ||
       die 'The downloaded seller does not match the checksum this installer pins; nothing was changed.'
     verify_signature "$work/$name.tar.gz" seller
-    tar -xzf "$work/$name.tar.gz" -C "$work" "$name"
-    [ -x "$work/$name/bin/gyblos" ] || die 'The downloaded seller has no bin/gyblos; nothing was changed.'
-    mv "$work/$name" "$app/$name"
+    unpack=$(mktemp -d "$app/.unpack.XXXXXX")
+    tar -xzf "$work/$name.tar.gz" -C "$unpack" "$name"
+    [ -x "$unpack/$name/bin/gyblos" ] || die 'The downloaded seller has no bin/gyblos; nothing was changed.'
+    : >"$unpack/$name/.complete"
+    rm -rf "${app:?}/$name"
+    mv "$unpack/$name" "$app/$name"
+    rm -rf "$unpack"
+    unpack=
   fi
+  gyblos=$app/$name/bin/gyblos
+}
+
+# Once the release passed doctor: points app/current at it, links ~/.local/bin/gyblos and keeps only the
+# release it replaced, for rollback.
+switch_native() {
   previous=
   [ ! -L "$app/current" ] || previous=$(readlink "$app/current")
   ln -sfn "$name" "$app/current"
-  for old in "$app"/gyblos-*; do
-    case "${old##*/}" in
-      "$name" | "$previous" | 'gyblos-*') ;;
-      *) rm -rf "$old" ;;
-    esac
-  done
+  # Rerunning the same release keeps everything: the release it replaced earlier is still the rollback.
+  if [ "$previous" != "$name" ]; then
+    for old in "$app"/gyblos-*; do
+      case "${old##*/}" in
+        "$name" | "$previous" | 'gyblos-*') ;;
+        *) rm -rf "$old" ;;
+      esac
+    done
+  fi
   mkdir -p "$bin_dir"
   ln -sfn "$app/current/bin/gyblos" "$bin_dir/gyblos"
   say "Installed the Gyblos seller $NATIVE_VERSION as $bin_dir/gyblos"
@@ -667,7 +689,7 @@ check_ollama() {
 pull_model() {
   say "Pulling $MODEL into Ollama…"
   if command -v ollama >/dev/null 2>&1; then
-    ollama pull "$MODEL"
+    OLLAMA_HOST=127.0.0.1:11434 ollama pull "$MODEL"
   else
     curl -fsS --proto '=http' -X POST "$NATIVE_OLLAMA/api/pull" \
       -d "{\"model\":\"$MODEL\",\"stream\":false}" >/dev/null ||
@@ -738,7 +760,6 @@ main_native() {
   fi
   cd "$dir"
   install_native
-  gyblos=$app/current/bin/gyblos
   write_native_config
   write_environment
   check_ollama
@@ -752,20 +773,21 @@ main_native() {
   [ -n "$ready" ] ||
     die "The seller is not ready; fix the failures above, then run this script again."
   owner=$(printf '%s\n' "$doctor" | sed -n 's/^  owner  *\([1-9A-HJ-NP-Za-km-z]\{32,44\}\)[[:space:]]*$/\1/p' | sed -n 1p)
+  switch_native
   # Reinstalled so a rerun or an update runs this release with the current gyblos.toml and seller.env;
-  # removing the service stops the seller first (it withdraws within 120 s).
-  "$gyblos" seller service uninstall >/dev/null 2>&1 || true
-  "$gyblos" seller service install ||
+  # removing the service stops the seller first (it withdraws within 120 s). It runs app/current.
+  seller_cli seller service uninstall >/dev/null 2>&1 || true
+  seller_cli seller service install ||
     die 'The background service could not be installed; fix what it says, then run this script again.'
   say ''
   say "The seller is running as a background service. Its home is $dir."
-  say '  gyblos seller status              is it serving?'
+  say "  $(seller_typed 'seller status')   is it serving?"
   if [ "$target" = darwin-arm64 ]; then
     say "  tail -f $(quoted "$dir/service.log")   follow it"
   else
     say '  journalctl --user -u gyblos-seller -f   follow it'
   fi
-  say '  gyblos seller service uninstall   stop it and remove the service'
+  say "  $(seller_typed 'seller service uninstall')   stop it and remove the service"
   say "  $(publish_command update)   update it to the latest release"
   case ":$PATH:" in
     *":$bin_dir:"*) ;;
@@ -773,7 +795,7 @@ main_native() {
   esac
   if publishing; then
     say 'Publishing is on. Check that the index lists it:'
-    say '  gyblos seller status --online'
+    say "  $(seller_typed 'seller status --online')"
   elif ! guided_setup; then
     next_steps
   fi
@@ -784,20 +806,27 @@ choose_mode() {
   if [ -z "$mode" ]; then
     if [ -f "$dir/compose.yaml" ]; then
       mode=docker
-    elif [ -e "$native_home/app/current" ]; then
+    elif [ -d "$native_home/app" ]; then
+      # Also a packaged install that stopped before its first start (for Ollama, say).
       mode=native
     elif [ -z "$NATIVE_VERSION" ]; then
       # The repository's copy has no packaged seller: Docker, which says what is missing.
       mode=docker
     elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
       mode=docker
-      [ "$(uname -s)-$(uname -m)" != Darwin-arm64 ] || [ -z "$NATIVE_VERSION" ] ||
+      [ "$(uname -s)-$(uname -m)" != Darwin-arm64 ] ||
         say 'Note: Docker on a Mac cannot use its GPU. GYBLOS_MODE=native sh install.sh installs the packaged seller on this Mac'\''s own Ollama instead.'
     else
       mode=native
+      ! command -v docker >/dev/null 2>&1 ||
+        say 'Docker is installed but not usable by this account (not running, or no permission), so this installs the packaged seller. GYBLOS_MODE=docker sh install.sh uses Docker instead.'
     fi
   fi
   [ "$mode" = docker ] || {
+    case "$native_home" in
+      /*) ;;
+      *) die 'GYBLOS_HOME must be an absolute path.' ;;
+    esac
     dir=$native_home
     # publish, unpublish and update need the platform to restart the service.
     native_target
@@ -858,17 +887,21 @@ main() {
   fi
 }
 
-choose_mode
 case "${1:-}" in
-  '') install ;;
+  '')
+    choose_mode
+    install
+    ;;
   publish | unpublish)
     [ "$#" -eq 1 ] || die "Usage: sh install.sh [publish|unpublish|update]"
+    choose_mode
     trap cleanup EXIT
     trap 'exit 130' INT TERM HUP
     if [ "$1" = publish ]; then set_publish true; else set_publish false; fi
     ;;
   update)
     [ "$#" -eq 1 ] || die "Usage: sh install.sh [publish|unpublish|update]"
+    choose_mode
     trap cleanup EXIT
     trap 'exit 130' INT TERM HUP
     update_installer

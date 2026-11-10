@@ -3,7 +3,7 @@
 # (.github/workflows/release-seller-image.yml), after scripts/release-image.sh has pushed and signed the
 # image. Pins a copy of install.sh to that image, signs the copy keyless with the workflow's GitHub
 # identity and creates the GitHub release of the pushed tag with install.sh, its SHA-256 and its
-# Sigstore bundle. With NATIVE_PINS and NATIVE_DIR (from scripts/release-native.sh) it also checks the
+# Sigstore bundle. From NATIVE_PINS and NATIVE_DIR (scripts/release-native.sh, required) it also checks the
 # packaged sellers' signatures and checksums, pins install.sh to them and attaches them. Only a version newer than the latest release becomes latest (what
 # https://gyblos.com/install.sh serves) and moves `beta`, so an older line's patch never replaces it.
 # Re-running it finishes a partial publish: an existing release gets its files replaced, and a release
@@ -42,8 +42,10 @@ cd "$(git rev-parse --show-toplevel)"
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 native_files=
+# Every release carries its packaged sellers: an installer without them would strand native installs.
+[ -n "${NATIVE_PINS:-}" ] && [ -d "${NATIVE_DIR:-}" ] ||
+  die 'NATIVE_PINS and NATIVE_DIR (from the native job) are required.'
 if [ -n "${NATIVE_PINS:-}" ]; then
-  [ -d "${NATIVE_DIR:-}" ] || die 'NATIVE_PINS needs NATIVE_DIR with the packaged sellers.'
   for pin in $NATIVE_PINS; do
     archive=$NATIVE_DIR/gyblos-$version-${pin%%=*}.tar.gz
     [ "$(sha256sum "$archive" | cut -d ' ' -f 1)" = "${pin#*=}" ] ||
