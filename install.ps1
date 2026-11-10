@@ -272,11 +272,11 @@ function Pull-Model {
   $ollama = Get-Command ollama -ErrorAction SilentlyContinue
   if ($ollama) {
     & $ollama.Source pull $Model
-    if ($LASTEXITCODE -ne 0) { Die "Ollama could not pull $Model; run: ollama pull $Model" }
+    if ($LASTEXITCODE -ne 0) { Die "Ollama ($($ollama.Source)) could not pull $Model; run: ollama pull $Model" }
   } else {
     try {
-      Invoke-RestMethod -UseBasicParsing -Method Post -Uri "$Ollama/api/pull" -Body "{`"model`":`"$Model`",`"stream`":false}" | Out-Null
-    } catch { Die "Ollama could not pull $Model; run: ollama pull $Model" }
+      Invoke-RestMethod -UseBasicParsing -Method Post -ContentType 'application/json' -Uri "$Ollama/api/pull" -Body "{`"model`":`"$Model`",`"stream`":false}" -ErrorAction Stop | Out-Null
+    } catch { Die "Ollama could not pull $Model ($($_.Exception.Message)); run: ollama pull $Model" }
   }
 }
 
