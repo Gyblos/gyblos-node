@@ -71,11 +71,11 @@ void test('seller status: an active service with a ready daemon is RUNNING, with
     assert.match(result.stdout, /discovery\s+off/);
     assert.match(
       result.stdout,
-      /last 24h\s+1 completed, 1 failed, 0 cancelled; 5 output tokens/,
+      /last 24h\s+1 completed, 1 failed, 0 cancelled; 5 output tokens; ~166\.7 output tokens\/s$/m,
     );
     assert.match(
       result.stdout,
-      /last 7 days\s+2 completed, 1 failed, 1 cancelled; 15 output tokens/,
+      /last 7 days\s+2 completed, 1 failed, 1 cancelled; 15 output tokens; ~166\.7 output tokens\/s$/m,
     );
     assert.match(
       result.stdout,
@@ -166,7 +166,7 @@ void test('seller status: a seller that never ran or stored a receipt reports so
     assert.match(result.stdout, /daemon\s+never started in this home/);
     assert.match(
       result.stdout,
-      /last 7 days\s+0 completed, 0 failed, 0 cancelled; 0 output tokens/,
+      /last 7 days\s+0 completed, 0 failed, 0 cancelled; 0 output tokens$/m,
     );
     assert.match(result.stdout, /last request\s+none/);
     assert.deepEqual(await snapshot(home.root), before);
