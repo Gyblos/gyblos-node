@@ -191,6 +191,12 @@ export async function startSeller(
         nodeId: config.nodeId,
         startedAt,
         offers: () => offers.all(),
+        telemetry: telemetry.sink
+          ? {
+              sink: telemetry.sink,
+              engineKind: (index) => settings.offers[index]!.engine.engine.kind,
+            }
+          : undefined,
       });
       disposers.push(paid.close);
     }
