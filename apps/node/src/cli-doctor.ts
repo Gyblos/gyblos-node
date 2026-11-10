@@ -17,6 +17,12 @@ const STATUS_COLUMN = 4;
 const CHECK_COLUMN = 10;
 const CODE_COLUMN = 34;
 
+const identityHeading = (env: Readonly<Record<string, string | undefined>>) =>
+  commandsFor(
+    runMode(env),
+    'Seller identity (public; `gyblos seller register` enrolls it in discovery):\n',
+  );
+
 export async function doctor(
   options: {
     env: Readonly<Record<string, string | undefined>>;
@@ -57,12 +63,7 @@ export async function doctor(
   for (const issue of report.configIssues)
     stdout(`        ${issueLine(issue)}`);
   if (report.seller) {
-    stdout(
-      commandsFor(
-        runMode(options.env),
-        'Seller identity (public; `gyblos seller register` enrolls it in discovery):\n',
-      ),
-    );
+    stdout(identityHeading(options.env));
     stdout(`  nodeId  ${report.seller.nodeId}\n`);
     stdout(`  owner   ${report.seller.owner}\n`);
     if (report.seller.feePayer)
