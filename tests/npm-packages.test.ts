@@ -235,7 +235,7 @@ void test('npm installs are updated with npm, and a service never runs from the 
 
 void test(
   'npm wrapper: a stop signal reaches the seller, and the seller’s signal is the wrapper’s',
-  { skip: hostTarget() === undefined },
+  { skip: hostTarget() === undefined, timeout: 30_000 },
   async () => {
     const target = hostTarget()!;
     const root = await mkdtemp(join(tmpdir(), 'gyblos-npm-signal-'));
@@ -247,10 +247,11 @@ void test(
         join(seller, 'package.json'),
         JSON.stringify({ name: platformPackage(target), version: VERSION }),
       );
-      // A seller that records the signal it got, then stops by it.
+      // A seller that records the signal it got, then stops by it. Node, not sh: a shell started with a
+      // signal ignored (as CI may start it) can never trap that signal.
       await writeFile(
         join(seller, 'bin/gyblos'),
-        `#!/bin/sh\ntrap 'echo got-$1 >"${join(root, 'signal')}"; trap - TERM INT; kill -TERM $$' TERM\ntrap 'echo got-INT >"${join(root, 'signal')}"; trap - INT; kill -INT $$' INT\necho ready\nwhile :; do sleep 0.1; done\n`,
+        `#!${process.execPath}\nconst { writeFileSync } = require('node:fs');\nfor (const signal of ['SIGINT', 'SIGTERM'])\n  process.on(signal, () => {\n    writeFileSync(${JSON.stringify(join(root, 'signal'))}, 'got-' + signal);\n    process.removeAllListeners(signal);\n    process.kill(process.pid, signal);\n  });\nprocess.stdout.write('ready\\n');\nsetInterval(() => {}, 1000);\n`,
       );
       await chmod(join(seller, 'bin/gyblos'), 0o755);
       const wrapper = join(modules, NPM.main, 'bin/gyblos.js');
@@ -267,9 +268,9 @@ void test(
           string,
         ];
         assert.equal(ended, signal);
-        assert.match(
+        assert.equal(
           await readFile(join(root, 'signal'), 'utf8'),
-          signal === 'SIGTERM' ? /got-/ : /got-INT/,
+          `got-${signal}`,
         );
       }
     } finally {
