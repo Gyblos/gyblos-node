@@ -241,7 +241,10 @@ void test('the pin script pins the packaged sellers only with all three targets,
       assert.match(result.stderr, error);
       assert.equal(readFileSync(file, 'utf8'), original);
     }
-    const pinned = pin(`darwin-arm64=${b} linux-x64=${c} linux-arm64=${d}`);
+    // install.sh does not install on Windows: the release's win32-x64 pin is install.ps1's.
+    const pinned = pin(
+      `darwin-arm64=${b} win32-x64=${'e'.repeat(64)} linux-x64=${c} linux-arm64=${d}`,
+    );
     assert.equal(pinned.status, 0, pinned.stderr);
     assert.equal(
       readFileSync(file, 'utf8'),
@@ -256,6 +259,46 @@ void test('the pin script pins the packaged sellers only with all three targets,
       'NATIVE_SHA256_LINUX_ARM64=',
     ])
       assert.ok(installer.includes(`\n${line}\n`), line);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+void test('install.ps1 is pinned to one Windows seller: its version and checksum, nothing else', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-pin-windows-'));
+  try {
+    const file = join(directory, 'install.ps1');
+    const original = read('install.ps1');
+    writeFileSync(file, original);
+    const pin = (...args: string[]) =>
+      spawnSync(
+        'sh',
+        [
+          join(REPOSITORY_ROOT, 'scripts/pin-installer-windows.sh'),
+          ...args,
+          file,
+        ],
+        { encoding: 'utf8', env: { PATH: process.env.PATH } },
+      );
+    for (const [args, error] of [
+      [['0.1', 'a'.repeat(64)], /not a semantic version/],
+      [['0.1.0-beta.9', 'xyz'], /not a SHA-256/],
+    ] as const) {
+      const result = pin(...args);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, error);
+      assert.equal(readFileSync(file, 'utf8'), original);
+    }
+    assert.equal(pin('0.1.0-beta.9', 'b'.repeat(64)).status, 0);
+    // Pinning again replaces the earlier pin.
+    const pinned = pin('0.1.0-beta.10', 'c'.repeat(64));
+    assert.equal(pinned.status, 0, pinned.stderr);
+    assert.equal(
+      readFileSync(file, 'utf8'),
+      original
+        .replace("$NativeVersion = ''", "$NativeVersion = '0.1.0-beta.10'")
+        .replace("$NativeSha256 = ''", `$NativeSha256 = '${'c'.repeat(64)}'`),
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

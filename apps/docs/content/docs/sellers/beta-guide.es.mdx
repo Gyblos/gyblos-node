@@ -9,7 +9,7 @@ la mayor parte de la instalación; el tiempo depende de tu conexión y equipo.
 
 ## Antes de empezar
 
-Necesitas una invitación con `install.sh` y un token privado de relay, Linux o macOS,
+Necesitas una invitación con `install.sh` y un token privado de relay, Linux, macOS o Windows (ver [Windows](#windows)),
 Docker con Compose v2.17 o posterior, al menos 4 GB de memoria e internet saliente.
 Revisa los [requisitos completos](/es/getting-started/beta), incluido el margen de memoria, antes de instalar.
 
@@ -42,6 +42,21 @@ empaquetado: comprueba la descarga con la suma de verificación y la firma del r
 iniciarlo, y al volver a ejecutar el script continúa. En un Mac, Docker no puede usar la GPU, así que esta
 es la opción más rápida aunque tengas Docker: ejecuta `GYBLOS_MODE=native sh install.sh`. Después, escribe
 `gyblos …` donde esta guía dice `docker compose exec seller gyblos …`. Los Mac con Intel usan Docker.
+
+### Windows
+
+En Windows 10 u 11 (x64), usa `install.ps1` en su lugar, en PowerShell:
+
+```powershell
+irm https://github.com/Gyblos/gyblos-node/releases/latest/download/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+Hace lo mismo que en un Mac sin Docker: comprueba la descarga con la suma de verificación del release,
+guarda los archivos del vendedor en `%USERPROFILE%\.gyblos` (solo tu cuenta puede leerlos), usa tu propio
+[Ollama para Windows](https://ollama.com/download/windows) y deja el vendedor funcionando en segundo plano,
+sin ventana, mientras tienes la sesión iniciada. Después abre una terminal nueva para escribir `gyblos …`.
+Donde esta guía dice `sh install.sh`, usa `powershell -ExecutionPolicy Bypass -File install.ps1`.
 
 ### Identidad pública
 

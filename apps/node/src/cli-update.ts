@@ -88,18 +88,22 @@ export async function updateNotice(
   environment: Readonly<Record<string, string | undefined>>,
   fetch: DiscoveryFetch,
   mode: RunMode,
+  platform: NodeJS.Platform = process.platform,
 ): Promise<string | undefined> {
   const current = environment[UPDATE.versionEnv];
   if (!current || !parse(current) || environment[UPDATE.switchEnv] === '0')
     return undefined;
   const latest = await latestRelease(fetch);
   if (!latest || !newerVersion(latest, current)) return undefined;
-  // The image and the packaged release are installed and updated by install.sh, or npm's package by npm.
-  const how =
-    mode === RUN_MODES.SOURCE
-      ? 'install the new release'
-      : environment[NODE_ENVIRONMENT.installedBy] === INSTALLERS.npm
-        ? 'run `npm install -g gyblos@latest`, then restart the seller (`gyblos seller service uninstall`, then `gyblos seller service install`)'
-        : 'run `sh install.sh update` where you installed the seller';
+  // The image and the packaged release are installed and updated by install.sh (install.ps1 on Windows),
+  // or npm's package by npm.
+  let how = 'run `sh install.sh update` where you installed the seller';
+  if (mode === RUN_MODES.SOURCE) how = 'install the new release';
+  else if (environment[NODE_ENVIRONMENT.installedBy] === INSTALLERS.npm)
+    how =
+      'run `npm install -g gyblos@latest`, then restart the seller (`gyblos seller service uninstall`, then `gyblos seller service install`)';
+  else if (platform === 'win32')
+    how =
+      'run `powershell -ExecutionPolicy Bypass -File install.ps1 update` where you saved install.ps1';
   return `v${latest} is available (this seller runs v${current}); ${how}.`;
 }

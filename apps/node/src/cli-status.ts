@@ -227,7 +227,12 @@ export async function statusCommand(
   if (!identity) return EXIT.failure;
   const now = system.now();
   // Started first so the request overlaps the local reads.
-  const update = updateNotice(output.env, system.fetch, runMode(output.env));
+  const update = updateNotice(
+    output.env,
+    system.fetch,
+    runMode(output.env),
+    system.platform,
+  );
   const [service, daemon, discovery] = await Promise.all([
     serviceState(system, output.env),
     readDaemonStatus(homeEnvironment),
