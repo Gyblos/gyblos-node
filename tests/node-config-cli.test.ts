@@ -202,7 +202,8 @@ void test('missing files, usage errors and invalid environment values exit 1', a
   ]) {
     const usage = await run(args);
     assert.equal(usage.code, 1, args.join(' '));
-    assert.match(usage.stderr, /Usage: gyblos config validate/);
+    assert.match(usage.stderr, /^Usage: gyblos start/);
+    assert.match(usage.stderr, /gyblos config validate/);
   }
   await withFile(BASE, async (path) => {
     const result = await run(['config', 'validate', '--config', path], {
@@ -223,7 +224,7 @@ void test('the gyblos script entry sets the process exit code', async () => {
     [
       '--import',
       'tsx',
-      'apps/node/src/cli.ts',
+      'apps/node/src/bin.ts',
       'config',
       'validate',
       '--config',
@@ -243,7 +244,7 @@ void test('the gyblos script entry sets the process exit code', async () => {
       [
         '--import',
         'tsx',
-        'apps/node/src/cli.ts',
+        'apps/node/src/bin.ts',
         'config',
         'validate',
         '--config',

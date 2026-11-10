@@ -64,7 +64,7 @@ function probeCommand(argv: readonly string[]) {
 
 const PROCESS_ID = /^[0-9]+$/;
 
-// Another process in this PID namespace whose arguments include the daemon's entry; `docker compose exec`
+// Another process in this PID namespace whose arguments run the daemon's entry with `start`; `docker compose exec`
 // shares the seller container's namespace, and its own CLI process is skipped.
 export async function daemonProcess(
   procRoot = '/proc',
@@ -79,7 +79,10 @@ export async function daemonProcess(
     } catch {
       continue;
     }
-    if (cmdline.split('\0').includes(SERVICE.entry)) return true;
+    const argv = cmdline.split('\0');
+    const at = argv.indexOf(SERVICE.entry);
+    // The daemon is the entry's `start`; other `gyblos` commands run through the same entry.
+    if (at !== -1 && argv[at + 1] === SERVICE.start) return true;
   }
   return false;
 }
@@ -111,6 +114,28 @@ export const inContainer = (
   environment: Readonly<Record<string, string | undefined>>,
 ) => environment[NODE_ENVIRONMENT.container] === ENVIRONMENT_SWITCH.on;
 
+function serviceKind(system: StatusSystem) {
+  if (system.uid === undefined || system.uid === 0) return undefined;
+  if (system.platform === 'linux') return SERVICE_KINDS.SYSTEMD_USER;
+  if (system.platform === 'darwin') return SERVICE_KINDS.LAUNCHD;
+  return undefined;
+}
+
+// Units and agents installed from a checkout before bin.ts run this file, kept only as a compatibility
+// shim (apps/node/src/main.ts); status asks their operators to reinstall.
+export const LEGACY_SERVICE_ENTRY = 'apps/node/src/main.ts';
+
+export async function legacyService(system: StatusSystem) {
+  const kind = serviceKind(system);
+  if (!kind || system.uid === undefined) return false;
+  try {
+    const path = serviceLocation(kind, system.accountHome, system.uid).path;
+    return (await readFile(path, 'utf8')).includes(LEGACY_SERVICE_ENTRY);
+  } catch {
+    return false;
+  }
+}
+
 // The seller image's container, else the unit or agent `gyblos seller service install` writes, and whether
 // its process runs now.
 export async function serviceState(
@@ -126,14 +151,8 @@ export async function serviceState(
       return SERVICE_STATES.UNKNOWN;
     }
   }
-  const kind =
-    system.platform === 'linux'
-      ? SERVICE_KINDS.SYSTEMD_USER
-      : system.platform === 'darwin'
-        ? SERVICE_KINDS.LAUNCHD
-        : undefined;
-  if (!kind || system.uid === undefined || system.uid === 0)
-    return SERVICE_STATES.UNKNOWN;
+  const kind = serviceKind(system);
+  if (!kind || system.uid === undefined) return SERVICE_STATES.UNKNOWN;
   try {
     if (
       !(await installed(

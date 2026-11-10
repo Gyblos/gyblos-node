@@ -26,8 +26,10 @@ export const SERVICE = {
   unit: 'gyblos-seller.service',
   label: 'com.gyblos.seller',
   description: 'Gyblos seller',
-  // Relative to the repository, which is also the working directory so `--import tsx` resolves.
-  entry: 'apps/node/src/main.ts',
+  // Relative to the repository, which is also the working directory so `--import tsx` resolves; the
+  // daemon is its `start` command.
+  entry: 'apps/node/src/bin.ts',
+  start: 'start',
   systemdUserDirectory: '.config/systemd/user',
   launchAgentsDirectory: 'Library/LaunchAgents',
   // The daemon withdraws its listing and writes its public sequence after the first SIGINT.
@@ -54,6 +56,10 @@ export const SERVICE = {
 export const SERVICE_RESERVED_VARIABLES = [
   'GYBLOS_HOME',
   'GYBLOS_CONFIG',
+  // How the seller was installed is the installer's and the launcher's to say, not seller.env's.
+  'GYBLOS_CONTAINER',
+  'GYBLOS_PACKAGED',
+  'GYBLOS_LAUNCHER',
   'PATH',
   'HOME',
   'UID',

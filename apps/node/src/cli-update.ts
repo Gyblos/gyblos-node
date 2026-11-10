@@ -1,7 +1,8 @@
-// Tells the operator of a released seller image when a newer release exists, for `gyblos seller status`.
-// The image carries its version in GYBLOS_VERSION (set by the release build); a build without it, or with
+// Tells the operator of a released seller (image or packaged) when a newer release exists, for `gyblos
+// seller status`. Both carry their version in GYBLOS_VERSION (set by the release build); a build without it, or with
 // GYBLOS_UPDATE_CHECK=0, checks nothing. The check is one bounded HTTPS request for the latest release of
 // the public repository, sending nothing about the seller; any failure is silent.
+import { RUN_MODES, type RunMode } from '@gyblos/config';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 
 export const UPDATE = {
@@ -81,15 +82,17 @@ async function latestRelease(fetch: DiscoveryFetch) {
 export async function updateNotice(
   environment: Readonly<Record<string, string | undefined>>,
   fetch: DiscoveryFetch,
-  container: boolean,
+  mode: RunMode,
 ): Promise<string | undefined> {
   const current = environment[UPDATE.versionEnv];
   if (!current || !parse(current) || environment[UPDATE.switchEnv] === '0')
     return undefined;
   const latest = await latestRelease(fetch);
   if (!latest || !newerVersion(latest, current)) return undefined;
-  const how = container
-    ? 'run `sh install.sh update` where you installed the seller'
-    : 'install the new release';
+  // The image and the packaged release are both installed and updated by install.sh.
+  const how =
+    mode === RUN_MODES.SOURCE
+      ? 'install the new release'
+      : 'run `sh install.sh update` where you installed the seller';
   return `v${latest} is available (this seller runs v${current}); ${how}.`;
 }

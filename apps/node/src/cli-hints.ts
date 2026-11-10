@@ -1,25 +1,28 @@
 // Short operator hints by static code, shared by `gyblos doctor`, `gyblos seller status` and the daemon's
-// one-line startup failure. Kept apart from the doctor command so the daemon entry does not load it.
+// one-line startup failure, written as `gyblos <command>` (from a checkout, `pnpm gyblos <command>`).
+// Kept apart from the doctor command so the daemon entry does not load it.
+import { runMode } from '@gyblos/config';
 import { DOCTOR_CODES, NODE_ERROR_CODES } from '@gyblos/node/constants';
 import type { DoctorResultCode } from '@gyblos/node/seller-doctor';
 import { ENGINE_ERROR_CODES } from '@gyblos/protocol/constants';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
+import { commandsFor } from './cli-next';
+
 const SEE_STARTUP = 'see docs/configuration.md#seller-startup';
 // Short operator hints by code; codes without one are explained in the docs.
 const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
-  [DOCTOR_CODES.ROLE_MISSING]:
-    'run `pnpm node:setup --role seller --mint MINT`',
+  [DOCTOR_CODES.ROLE_MISSING]: 'run `gyblos setup --role seller --mint MINT`',
   [DOCTOR_CODES.ROLE_NOT_SELLER]: 'this home holds a buyer role',
   [DOCTOR_CODES.KEYS_MISSING]:
-    'a key file is missing; rerun node:setup (keys are never replaced)',
+    'a key file is missing; rerun `gyblos setup` (keys are never replaced)',
   [DOCTOR_CODES.KEY_PERMISSIONS]:
     'key files must be regular files owned by you, mode 0600',
   [DOCTOR_CODES.SEQUENCE_LOCK_PRESENT]:
     'a leftover public-sequence lock blocks publishing; stop other sellers, then inspect it (docs/discovery.md)',
   [NODE_ERROR_CODES.PUBLIC_SEQUENCE_UNAVAILABLE]:
     'the seller directory must be mode 0700 and its public-sequence file valid',
-  [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm node:tokenizer`',
+  [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `gyblos tokenizer`',
   [ENGINE_ERROR_CODES.UNAVAILABLE]:
     'start the engine at the offer URL with its model; for Ollama, `ollama pull qwen3:0.6b`, and `ollama list` must show ID 7df6b6e09427; for an API, check upstream_model is listed',
   [ENGINE_ERROR_CODES.TIMEOUT]:
@@ -32,7 +35,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'the API is rate limiting this key; try again later or raise its limit',
   [DOCTOR_CODES.NOT_CHECKED]: 'fix the failures above first',
   [DOCTOR_CODES.REMOTE_ENGINE_NOT_CHECKED]:
-    'remote engine; `pnpm gyblos doctor --online` lists its models (some providers list them without checking the key)',
+    'remote engine; `gyblos doctor --online` lists its models (some providers list them without checking the key)',
   [NODE_ERROR_CODES.SELLER_OFFER_API_KEY_MISSING]:
     'set the variable named by api_key_env',
   [NODE_ERROR_CODES.SELLER_OFFER_API_KEY_UNSAFE]:
@@ -44,7 +47,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED]:
     'a paid offer needs a model recounted with its pinned public tokenizer (qwen3-0.6b)',
   [NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING]:
-    'this seller has no payment keys yet: run `pnpm node:setup --role seller --mint <mint>` again (installed with install.sh: rerun it); it keeps the NodeId and owner. Then fund the fee payer with devnet SOL',
+    'this seller has no payment keys yet: run `gyblos setup --role seller --mint <mint>` again (installed with install.sh: rerun it); it keeps the NodeId and owner. Then fund the fee payer with devnet SOL',
   [NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH]:
     'paid selling runs on devnet only; set the role up with a devnet RPC',
   [NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE]:
@@ -58,7 +61,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID]:
     'the payout must differ from the fee payer and authorizer keys',
   [NODE_ERROR_CODES.NODE_CONFIG_INVALID]:
-    'run `pnpm gyblos config validate --config <file>` on the GYBLOS_CONFIG file',
+    'run `gyblos config validate --config <file>` on the GYBLOS_CONFIG file',
   [NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT]:
     'move the old .local layout first (docs/running-a-node.md)',
   [RELAY_CONFIGURATION_CODES.MISSING_TOKEN]:
@@ -76,10 +79,17 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'the discovery index did not report its time quickly; check the connection and run doctor again',
 };
 
-// Own keys only, so a crafted code such as "constructor" read from status.json gets no hint.
-export const codeHint = (code: string) =>
-  Object.hasOwn(HINTS, code)
-    ? (HINTS[code as DoctorResultCode] ?? '')
-    : code.startsWith('SELLER_')
-      ? SEE_STARTUP
-      : '';
+// Own keys only, so a crafted code such as "constructor" read from status.json gets no hint. Commands are
+// spelled for how this seller was installed.
+export const codeHint = (
+  code: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+) =>
+  commandsFor(
+    runMode(environment),
+    Object.hasOwn(HINTS, code)
+      ? (HINTS[code as DoctorResultCode] ?? '')
+      : code.startsWith('SELLER_')
+        ? SEE_STARTUP
+        : '',
+  );

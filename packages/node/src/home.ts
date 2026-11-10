@@ -5,6 +5,8 @@ import { lstat } from 'node:fs/promises';
 import {
   homeLayout,
   LEGACY_LOCAL_PATHS,
+  RUN_MODES,
+  runMode,
   type HomeEnvironment,
   type HomeRole,
 } from '@gyblos/config';
@@ -62,10 +64,15 @@ export async function assertNoLegacyState(
       throw new LegacyLayoutError(legacyPath, homePath, 'holds no lab state');
 }
 
+// The packaged release never used the .local layout, so it never looks for one in the working directory.
+const packagedHome = (environment: HomeEnvironment) =>
+  runMode(environment) === RUN_MODES.PACKAGED;
+
 export function assertRoleHome(
   role: HomeRole,
   environment: HomeEnvironment = process.env,
 ) {
+  if (packagedHome(environment)) return Promise.resolve();
   return assertNoLegacyLayout(homeLayout(environment).roles[role], [
     LEGACY_LOCAL_PATHS.roles,
   ]);
@@ -74,6 +81,7 @@ export function assertRoleHome(
 export function assertTokenizerHome(
   environment: HomeEnvironment = process.env,
 ) {
+  if (packagedHome(environment)) return Promise.resolve();
   return assertNoLegacyLayout(homeLayout(environment).artifacts.tokenizer, [
     LEGACY_LOCAL_PATHS.tokenizer,
   ]);
@@ -82,6 +90,7 @@ export function assertTokenizerHome(
 export function assertOllamaModelsHome(
   environment: HomeEnvironment = process.env,
 ) {
+  if (packagedHome(environment)) return Promise.resolve();
   return assertNoLegacyLayout(homeLayout(environment).artifacts.ollamaModels, [
     LEGACY_LOCAL_PATHS.ollamaModels,
   ]);

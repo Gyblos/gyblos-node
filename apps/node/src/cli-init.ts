@@ -3,8 +3,11 @@
 // ./gyblos.toml), checks it with startup's own offer rules, never replaces one without --force, never
 // follows a symlink, and handles no secret: API keys and the relay token stay in seller.env, so only their
 // variable names appear.
+import { mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { createInterface, type Interface } from 'node:readline/promises';
 
+import { FILE_MODES, RUN_MODES, runMode } from '@gyblos/config';
 import { NodeError } from '@gyblos/node/errors';
 import { parseNodeConfig, type NodeConfig } from '@gyblos/node/node-config';
 import { nodeConfigPath } from '@gyblos/node/node-config-file';
@@ -12,6 +15,7 @@ import { sellerSettings } from '@gyblos/node/seller-settings';
 import { ENGINE_KINDS, type EngineKind } from '@gyblos/protocol/constants';
 
 import { issueLine, urlOrigin } from './cli-format';
+import { commandsFor } from './cli-next';
 import {
   EXIT,
   INIT_DEFAULTS,
@@ -240,7 +244,7 @@ function nextSteps(answers: InitAnswers) {
       `Pull the model into that Ollama: OLLAMA_HOST=${new URL(answers.url).host} ollama pull ${ollamaTag(answers.model)}`,
     );
   steps.push(
-    'Run `pnpm gyblos doctor`, then `pnpm node:start` or `pnpm gyblos seller service install`.',
+    'Run `gyblos doctor`, then `gyblos start` or `gyblos seller service install`.',
   );
   return steps.map((step, index) => `  ${index + 1}. ${step}\n`).join('');
 }
@@ -250,7 +254,7 @@ export async function initCommand(
   output: InitOutput,
   prompt?: Prompt,
 ) {
-  const { path } = nodeConfigPath(output.env, output.cwd);
+  const { path, explicit } = nodeConfigPath(output.env, output.cwd);
   try {
     await checkTarget(path, options.force);
     let answers: InitAnswers;
@@ -276,9 +280,15 @@ export async function initCommand(
     }
     // Checked again: the file may have appeared or changed while the operator was answering.
     await checkTarget(path, options.force);
+    // The packaged release's home may not exist yet when init is its first command.
+    if (!explicit && runMode(output.env) === RUN_MODES.PACKAGED)
+      await mkdir(dirname(path), {
+        recursive: true,
+        mode: FILE_MODES.privateDirectory,
+      });
     await writeConfigFile(path, text, options.force);
     output.stdout(
-      `Wrote ${path}: free offer ${answers.model} via ${answers.engine} ${urlOrigin(answers.url)}; discovery ${answers.publish ? 'on' : 'off'}\nNext:\n${nextSteps(answers)}`,
+      `Wrote ${path}: free offer ${answers.model} via ${answers.engine} ${urlOrigin(answers.url)}; discovery ${answers.publish ? 'on' : 'off'}\nNext:\n${commandsFor(runMode(output.env), nextSteps(answers))}`,
     );
     return EXIT.ok;
   } catch (error) {

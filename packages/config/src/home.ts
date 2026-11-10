@@ -1,19 +1,28 @@
 // Owns the local data layout: the product home (one directory per role plus shared public artifacts),
 // the separate lab home and the legacy paths they replace. Pure path computation; never touches files.
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { CONFIG_PATH_ERROR } from './constants';
+import { RUN_MODES, runMode } from './environment';
 
 export const HOME_ENVIRONMENT = {
   product: 'GYBLOS_HOME',
   lab: 'GYBLOS_LAB_HOME',
 } as const;
 
-// Relative defaults resolve against the working directory, as the former .local paths did.
+// Relative defaults resolve against the working directory, as the former .local paths did. The packaged
+// release has no checkout to live in, so its product home is this directory under the account's home.
 export const DEFAULT_HOMES = {
   product: '.local/gyblos',
   lab: '.local/lab',
+  packaged: '.gyblos',
 } as const;
+
+function defaultProductHome(environment: HomeEnvironment) {
+  if (runMode(environment) !== RUN_MODES.PACKAGED) return DEFAULT_HOMES.product;
+  return join(environment.HOME || homedir(), DEFAULT_HOMES.packaged);
+}
 
 export const ROLE_DIRECTORIES = { buyer: 'buyer', seller: 'seller' } as const;
 
@@ -106,7 +115,7 @@ function configuredRoot(value: string | undefined, fallback: string) {
 export function homeLayout(environment: HomeEnvironment) {
   const root = configuredRoot(
     environment[HOME_ENVIRONMENT.product],
-    DEFAULT_HOMES.product,
+    defaultProductHome(environment),
   );
   const artifacts = join(root, ARTIFACT_DIRECTORIES.root);
   const tokenizer = join(artifacts, ARTIFACT_DIRECTORIES.tokenizer);

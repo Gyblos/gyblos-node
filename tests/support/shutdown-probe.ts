@@ -51,7 +51,7 @@ function childSource(options: ShutdownProbeOptions) {
   const resolverUrl = 'data:text/javascript,' + encodeURIComponent(resolver);
   const entry =
     options.entry === SHUTDOWN_PROBE_ENTRIES.SELLER
-      ? '@gyblos/node-app/main'
+      ? '@gyblos/node-app/daemon'
       : '@gyblos/buyer/free-main';
   const invoke =
     options.entry === SHUTDOWN_PROBE_ENTRIES.HELPER

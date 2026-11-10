@@ -2,6 +2,7 @@
 // the index only the invite and this home's public NodeId; the index checks the NodeId's 8004 registration
 // on chain itself. The invite comes from GYBLOS_INVITE or a terminal question, never from the command line,
 // and is never printed; the index's origin is printed before anything is sent to it.
+import { runMode } from '@gyblos/config';
 import {
   DISCOVERY_ERROR_CODES,
   DiscoveryError,
@@ -22,7 +23,7 @@ import {
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
-import { FAUCET, PUBLISH_STEP } from './cli-next';
+import { commandsFor, FAUCET, PUBLISH_STEP } from './cli-next';
 import {
   registerOnChain,
   RegistrationDeclined,
@@ -271,7 +272,10 @@ export async function registerCommand(
   if (!discovery)
     return fail(
       REGISTER_ERRORS.CONFIG_INVALID,
-      'configuration invalid; run `pnpm gyblos doctor`',
+      commandsFor(
+        runMode(output.env),
+        'configuration invalid; run `gyblos doctor`',
+      ),
     );
   const invite = await checkedInvite(output, system.prompt);
   if ('code' in invite) return fail(invite.code, invite.hint);

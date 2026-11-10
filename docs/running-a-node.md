@@ -15,9 +15,10 @@ forwards local requests to it. Both are devnet-only and experimental.
 ## Local home
 
 All node data lives under one local home, `GYBLOS_HOME` (default `.local/gyblos`
-in the working directory; a container image would use `/data`). Each role has
-its own directory, so one machine can hold a buyer and a seller side by side
-without sharing keys or journals:
+in the working directory; the seller image uses `/data`, and the packaged
+release `~/.gyblos`, where it also reads `gyblos.toml`). Each role has its own
+directory, so one machine can hold a buyer and a seller side by side without
+sharing keys or journals:
 
 | Path                              | Contents                                                    |
 | --------------------------------- | ----------------------------------------------------------- |

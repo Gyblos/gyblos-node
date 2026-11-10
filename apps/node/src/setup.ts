@@ -6,7 +6,6 @@ import { parseArgs } from 'node:util';
 import { isSolanaAddress } from '@gyblos/node/configuration';
 import { publicRole, setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
 
 export async function main(args = process.argv.slice(2)) {
   const { values } = parseArgs({
@@ -36,5 +35,3 @@ export async function main(args = process.argv.slice(2)) {
   await setupRole({ role: values.role, mint: values.mint });
   console.log(JSON.stringify(await publicRole(values.role)));
 }
-
-if (isMain(import.meta.url)) await main();

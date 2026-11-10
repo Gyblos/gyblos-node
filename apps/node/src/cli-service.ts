@@ -7,6 +7,7 @@ import { lstat, mkdir, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
+import { NODE_ENVIRONMENT, RUN_MODES, runMode } from '@gyblos/config';
 import { homeLayout } from '@gyblos/config/home';
 import { nodeConfigPath } from '@gyblos/node/node-config-file';
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
@@ -16,6 +17,7 @@ import {
 } from '@gyblos/runtime/private-file';
 
 import { doctor } from './cli-doctor';
+import { commandsFor } from './cli-next';
 import {
   EXIT,
   SERVICE,
@@ -51,7 +53,7 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
   [SERVICE_ERRORS.ENVIRONMENT_INVALID]:
     'each line must be NAME=value: no spaces, quotes, `$`, backticks, backslashes, `#`, `~` or shell operators in the value',
   [SERVICE_ERRORS.ENVIRONMENT_RESERVED]:
-    'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, PATH, HOME, shell variables (UID, IFS, BASH*, …) or NODE_*/LD_*/DYLD_*/TSX_*/OPENSSL_* variables',
+    'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, GYBLOS_CONTAINER, GYBLOS_PACKAGED, GYBLOS_LAUNCHER, PATH, HOME, shell variables (UID, IFS, BASH*, …) or NODE_*/LD_*/DYLD_*/TSX_*/OPENSSL_* variables',
   [SERVICE_ERRORS.ALREADY_INSTALLED]:
     'run `gyblos seller service uninstall` first',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
@@ -67,6 +69,8 @@ export interface ServiceSystem {
   accountHome: string;
   nodePath: string;
   repository: string;
+  // Set when running as the packaged release: the service runs this launcher instead of Node and tsx.
+  launcher?: string;
   run: (argv: readonly string[]) => Promise<number>;
 }
 
@@ -93,13 +97,20 @@ function runCommand(argv: readonly string[]) {
   });
 }
 
-export function defaultServiceSystem(): ServiceSystem {
+export function defaultServiceSystem(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): ServiceSystem {
+  // Packaged without its launcher's path fails as an unsafe path instead of writing a checkout's unit.
+  const packaged = runMode(environment) === RUN_MODES.PACKAGED;
   return {
     platform: process.platform,
     uid: process.getuid?.(),
     accountHome: homedir(),
     nodePath: process.execPath,
     repository: resolve(import.meta.dirname, '../../..'),
+    ...(packaged
+      ? { launcher: environment[NODE_ENVIRONMENT.launcher] ?? '' }
+      : {}),
     run: runCommand,
   };
 }
@@ -127,6 +138,7 @@ function serviceInput(
     ...account(system),
     nodePath: system.nodePath,
     repository: system.repository,
+    ...(system.launcher === undefined ? {} : { launcher: system.launcher }),
     home: layout.root,
     config: nodeConfigPath(output.env, output.cwd).path,
     environmentFile: layout.files.sellerEnvironment,
@@ -282,7 +294,9 @@ export async function serviceCommand(
     return EXIT.ok;
   } catch (error) {
     if (!(error instanceof ServiceError)) throw error;
-    output.stderr(`${error.code}: ${HINTS[error.code]}\n`);
+    output.stderr(
+      `${error.code}: ${commandsFor(runMode(output.env), HINTS[error.code])}\n`,
+    );
     return EXIT.failure;
   }
 }

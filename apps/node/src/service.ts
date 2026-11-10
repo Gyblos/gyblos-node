@@ -29,9 +29,11 @@ export const DEFAULT_MEMORY_MAX = `${MINIMUM_MEMORY_BYTES / MEBIBYTE}M`;
 
 export interface ServiceInput {
   kind: ServiceKind;
-  // Absolute paths, all checked for characters a unit or plist would misread.
+  // Absolute paths, all checked for characters a unit or plist would misread. From a checkout the service
+  // runs this Node with tsx in the repository; the packaged release runs its launcher from its home.
   nodePath: string;
   repository: string;
+  launcher?: string;
   home: string;
   config: string;
   environmentFile: string;
@@ -73,8 +75,9 @@ export function memoryBytes(value: string) {
 
 function checkInput(input: ServiceInput) {
   for (const path of [
-    input.nodePath,
-    input.repository,
+    ...(input.launcher === undefined
+      ? [input.nodePath, input.repository]
+      : [input.launcher]),
     input.home,
     input.config,
     input.environmentFile,
@@ -92,7 +95,24 @@ const quoted = (value: string) => `"${value}"`;
 const nodeBin = (nodePath: string) =>
   nodePath.slice(0, nodePath.lastIndexOf('/'));
 
+// What the service executes, where and with which PATH: the packaged launcher needs no Node on PATH.
+function program(input: ServiceInput) {
+  if (input.launcher !== undefined)
+    return {
+      argv: [input.launcher, SERVICE.start],
+      workingDirectory: input.home,
+      path: SERVICE.systemPath,
+    };
+  return {
+    argv: [input.nodePath, '--import', 'tsx', SERVICE.entry, SERVICE.start],
+    workingDirectory: input.repository,
+    path: `${nodeBin(input.nodePath)}:${SERVICE.systemPath}`,
+  };
+}
+
 function systemdUnit(input: ServiceInput) {
+  const run = program(input);
+  const [executable, ...args] = run.argv;
   return [
     '[Unit]',
     `Description=${SERVICE.description}`,
@@ -104,14 +124,14 @@ function systemdUnit(input: ServiceInput) {
     '[Service]',
     'Type=simple',
     // A path setting: systemd takes it verbatim and refuses quotes.
-    `WorkingDirectory=${input.repository}`,
+    `WorkingDirectory=${run.workingDirectory}`,
     // Optional: the relay token and API keys live here, never in the unit. systemd lets it override the
     // Environment= lines below, so install refuses those names in the file.
     `EnvironmentFile=-${input.environmentFile}`,
     `Environment=${quoted(`GYBLOS_HOME=${input.home}`)}`,
     `Environment=${quoted(`GYBLOS_CONFIG=${input.config}`)}`,
-    `Environment=${quoted(`PATH=${nodeBin(input.nodePath)}:${SERVICE.systemPath}`)}`,
-    `ExecStart=${quoted(input.nodePath)} --import tsx ${SERVICE.entry}`,
+    `Environment=${quoted(`PATH=${run.path}`)}`,
+    `ExecStart=${quoted(executable!)} ${args.join(' ')}`,
     'KillSignal=SIGINT',
     `TimeoutStopSec=${SERVICE.stopTimeoutSeconds}`,
     'Restart=on-failure',
@@ -138,13 +158,14 @@ const plistString = (value: string) => `<string>${xml(value)}</string>`;
 // arguments so they are never parsed as shell text. Install accepts only lines that sh and systemd read
 // the same way.
 const LAUNCH_SCRIPT =
-  'set -a; if [ -f "$0" ]; then . "$0"; fi; set +a; exec "$1" --import tsx "$2"';
+  'set -a; if [ -f "$0" ]; then . "$0"; fi; set +a; exec "$@"';
 
 function launchAgent(input: ServiceInput) {
+  const run = program(input);
   const environment = {
     GYBLOS_HOME: input.home,
     GYBLOS_CONFIG: input.config,
-    PATH: `${nodeBin(input.nodePath)}:${SERVICE.systemPath}`,
+    PATH: run.path,
   };
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -155,17 +176,12 @@ function launchAgent(input: ServiceInput) {
     `  ${plistString(SERVICE.label)}`,
     '  <key>ProgramArguments</key>',
     '  <array>',
-    ...[
-      '/bin/sh',
-      '-c',
-      LAUNCH_SCRIPT,
-      input.environmentFile,
-      input.nodePath,
-      SERVICE.entry,
-    ].map((argument) => `    ${plistString(argument)}`),
+    ...['/bin/sh', '-c', LAUNCH_SCRIPT, input.environmentFile, ...run.argv].map(
+      (argument) => `    ${plistString(argument)}`,
+    ),
     '  </array>',
     '  <key>WorkingDirectory</key>',
-    `  ${plistString(input.repository)}`,
+    `  ${plistString(run.workingDirectory)}`,
     '  <key>EnvironmentVariables</key>',
     '  <dict>',
     ...Object.entries(environment).flatMap(([key, value]) => [

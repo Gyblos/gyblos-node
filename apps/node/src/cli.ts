@@ -21,7 +21,6 @@ import {
 } from '@gyblos/node/node-config-resolve';
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
 
 import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
@@ -57,7 +56,7 @@ export interface CliContext {
 }
 
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n';
+  'Usage: gyblos start   (runs the seller daemon)\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or gyblos.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n';
 // `seller init`'s flags, declared once for parsing and for refusing them on other commands.
 const INIT_OPTIONS = {
   engine: { type: 'string' },
@@ -369,5 +368,3 @@ export async function main(args = process.argv.slice(2)) {
     terminal?.close();
   }
 }
-
-if (isMain(import.meta.url)) await main();
