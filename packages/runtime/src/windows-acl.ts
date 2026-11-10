@@ -64,14 +64,17 @@ function accountSid(tools: AclTools) {
   return currentSid;
 }
 
-// Replaces inherited access with full control for this account, SYSTEM and Administrators, inherited by
-// files and folders created inside.
+// Replaces every rule with full control for this account, SYSTEM and Administrators, inherited by files and
+// folders created inside.
 export async function restrictDirectory(
   path: string,
   tools: AclTools = defaultTools,
 ) {
   const sid = await accountSid(tools);
   const grant = (who: string) => `*${who}:(OI)(CI)F`;
+  // /reset first drops every explicit rule (another account's included); what is left is inherited, which
+  // /inheritance:r then removes, so only the three grants remain.
+  await tools.run(join(system32(), 'icacls.exe'), [path, '/reset', '/Q']);
   await tools.run(join(system32(), 'icacls.exe'), [
     path,
     '/inheritance:r',

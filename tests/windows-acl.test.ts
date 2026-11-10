@@ -47,8 +47,11 @@ void test('windows acl: restricting replaces inherited access with this account,
     'whoami.exe': `"DESKTOP\\ana","${SID}"`,
   });
   await restrictDirectory('C:\\Users\\ana\\.gyblos', fake);
-  const icacls = calls.find((call) => call.file.endsWith('icacls.exe'))!;
-  assert.deepEqual(icacls.args, [
+  const [reset, icacls] = calls.filter((call) =>
+    call.file.endsWith('icacls.exe'),
+  );
+  assert.deepEqual(reset!.args, ['C:\\Users\\ana\\.gyblos', '/reset', '/Q']);
+  assert.deepEqual(icacls!.args, [
     'C:\\Users\\ana\\.gyblos',
     '/inheritance:r',
     '/grant:r',
