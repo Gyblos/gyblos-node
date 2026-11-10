@@ -166,16 +166,18 @@ function paidClosers(
   };
 }
 
+interface BuyerStartupOptions {
+  batch?: (role: RoleConfig) => Promise<BuyerSessionBackend>;
+  bind?: typeof bindEndpoint;
+  port?: number;
+  onSellerFailure?: SellerFailureReporter;
+  chain?: ReturnType<typeof buyerChainPayments>;
+  // Tests inject a tokenizer; the default loads the pinned one from the home.
+  meter?: () => Promise<RecountTokenizer>;
+}
+
 export async function startPaidBuyer(
-  options: {
-    batch?: (role: RoleConfig) => Promise<BuyerSessionBackend>;
-    bind?: typeof bindEndpoint;
-    port?: number;
-    onSellerFailure?: SellerFailureReporter;
-    chain?: ReturnType<typeof buyerChainPayments>;
-    // Tests inject a tokenizer; the default loads the pinned one from the home.
-    meter?: () => Promise<RecountTokenizer>;
-  } = {},
+  options: BuyerStartupOptions = {},
 ): Promise<PaidBuyerHost> {
   const role = await buyerRole();
   if (role.role !== P2P_ROLES.BUYER)
