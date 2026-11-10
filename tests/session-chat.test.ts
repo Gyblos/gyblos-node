@@ -84,3 +84,44 @@ void test('chat displays approved totals and permits the next question within th
     /Maximum deposit: 200.*per request|Payment: settled/,
   );
 });
+
+for (const confirmed of [false, true]) {
+  void test(`chat explicit close ${confirmed ? 'reports independent settlement' : 'retains pending channel'} without a prompt`, async () => {
+    let output = '';
+    let closes = 0;
+    await chatSession({
+      model: 'synthetic',
+      maxTokens: 10,
+      maxAtomic: '200',
+      automatic: true,
+      session: {
+        depositAtomic: '1000',
+        lifetimeMs: 3600000,
+        withdrawDelaySeconds: 900,
+        settle: async () => {
+          closes++;
+          return confirmed
+            ? {
+                channelId: '11111111111111111111111111111111',
+                chargedAtomic: '80',
+                refundedAtomic: '920',
+                transaction: 'synthetic-confirmation',
+              }
+            : undefined;
+        },
+      },
+      request: async () => assert.fail('close never sends a prompt'),
+      read: async () => '/settle',
+      write: (text) => {
+        output += text;
+      },
+    });
+    assert.equal(closes, 1);
+    assert.match(
+      output,
+      confirmed
+        ? /finalized charge 80; refunded 920/
+        : /pending; the original channel is retained/,
+    );
+  });
+}

@@ -86,32 +86,48 @@ async function openCurrent<Remote extends BatchDestination>(
       options.now(),
     );
   signal.throwIfAborted();
-  state.backend ??= options.backend();
+  const destination = options.destination(terms);
+  if (!state.backend) {
+    const pending = options.backend();
+    state.backend = pending;
+    void pending.catch(() => {
+      if (state.backend === pending) state.backend = undefined;
+    });
+  }
   const backend = await bounded(state.backend, signal);
   signal.throwIfAborted();
   const financial = await backend.create(terms);
-  if (signal.aborted || state.lifetime.signal.aborted) {
-    await financial.dispose();
-    return sessionFail(SESSION_CODES.UNAVAILABLE);
-  }
-  return {
-    terms,
-    financial,
-    host: createBuyerBatchSession({
-      ...options,
+  try {
+    if (signal.aborted || state.lifetime.signal.aborted)
+      return sessionFail(SESSION_CODES.UNAVAILABLE);
+    return {
       terms,
-      buyer: financial,
-      destination: options.destination(terms),
-      observe: backend.observe,
-    }),
-  };
+      financial,
+      host: createBuyerBatchSession({
+        ...options,
+        terms,
+        buyer: financial,
+        destination,
+        observe: backend.observe,
+      }),
+    };
+  } catch (error) {
+    await financial.dispose();
+    throw error;
+  }
 }
 function current<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2 | undefined,
   signal: AbortSignal,
 ) {
-  state.current ??= openCurrent(state, quote, signal);
+  if (!state.current) {
+    const pending = openCurrent(state, quote, signal);
+    state.current = pending;
+    void pending.catch(() => {
+      if (state.current === pending) state.current = undefined;
+    });
+  }
   return bounded(state.current, signal);
 }
 async function run<Remote extends BatchDestination>(
@@ -164,9 +180,13 @@ async function unresolved<Remote extends BatchDestination>(
       state.lifetime.signal,
       AbortSignal.timeout(BATCH_SESSION_DEFAULTS.operationMs),
     ]);
-    await (
-      await current(state, undefined, signal)
-    ).host.recoverApproval(signal);
+    try {
+      await (
+        await current(state, undefined, signal)
+      ).host.recoverApproval(signal);
+    } catch {
+      // A disconnected seller may already have settled; only independent proof can clear uncertainty.
+    }
     stored = await state.options.inspect();
   }
   if (stored?.pending) {

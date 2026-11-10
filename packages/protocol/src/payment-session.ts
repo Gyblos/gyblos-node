@@ -80,7 +80,7 @@ export interface SessionSeller {
   dispose(): Promise<void>;
 }
 export interface SessionBuyer {
-  open(): Promise<string>;
+  open(check?: () => void): Promise<string>;
   begin(request: SessionRequest): Promise<void>;
   acknowledge(requestId: string): Promise<void>;
   reconcile(

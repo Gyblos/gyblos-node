@@ -130,7 +130,15 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   matchBatchTerms(prepared.terms, terms);
   await verify(signal);
   signal.throwIfAborted();
-  await bounded(options.buyer.open(), signal);
+  await bounded(
+    options.buyer.open(() => {
+      signal.throwIfAborted();
+      validateOfferV2Time(quote.offer, options.now());
+      if (options.now() >= terms.expiresAt)
+        return batchFail(SESSION_CODES.LIMIT);
+    }),
+    signal,
+  );
   signal.throwIfAborted();
   const channelId = options.buyer.snapshot().channelId;
   const request = buildBatchExecutionRequest(channelId, quote, input);

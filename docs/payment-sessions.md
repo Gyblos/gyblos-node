@@ -2,10 +2,54 @@
 
 The shared buyer and seller session services use the pinned Solana x402
 `batch-settlement` client-signature mode. Trusted hosts can compose them over
-the opt-in `gyblos/session/1` Iroh channel. The default buyer CLI and seller
-daemon still use their existing per-request path until a host explicitly
-supplies the session services and a capped session policy. No existing execution
-wire changes and no public gateway is enabled by this composition.
+the opt-in `gyblos/session/1` Iroh channel. The buyer CLI and seller daemon can
+activate this path explicitly. Without that policy, the existing per-request
+path remains available. No public gateway is enabled by this composition.
+
+## Explicit startup policy
+
+Add a `session` object to the buyer's existing `buyer/selection.json`:
+
+```json
+{
+  "session": {
+    "depositAtomic": "1000000",
+    "lifetimeMs": 3600000,
+    "withdrawDelaySeconds": 900
+  }
+}
+```
+
+This is an additional field in the existing document, not a replacement for its
+selection, identity and per-request budget fields. Deposit must be positive and
+at most 1000000 atomic units (1 USDC); lifetime is five minutes to 24 hours;
+withdrawal grace is 900 to 3600 seconds (900 if omitted). `maxAtomic` still
+limits each question. A request cannot exceed the session's remaining unreserved
+funds. The canonical protocol fee and treasury still come from `PROTOCOL_FEE`;
+the remote peer cannot change them.
+
+The seller opts in by setting `GYBLOS_SESSION_BUYER_NODE_ID` to the one
+permitted buyer's lowercase NodeId before normal startup. Only a seller with a
+priced execution service exposes this ALPN. There is one private session per
+role, not one slot per arbitrary remote peer. Preparation is stateless; only a
+valid SDK opening proof can assign that slot. Restart restores its original
+terms, absolute expiry, pending operations and worker. Changing selection or
+limits does not replace that session. Remove neither its files nor its lock to
+unblock a request. A completed channel is retained; automatic rotation is not
+provided. Reusable financial startup is currently unavailable on Windows until
+the payment subtree has equivalent ACL validation. Existing paths retain their
+behavior.
+
+Start the buyer normally with `pnpm buyer:chat`. It distinguishes the session
+deposit, each question's ceiling and its independently verified **approved**
+cumulative usage. Approval is not a finalized on-chain charge. `/exit` closes
+the local connection; the seller worker continues. `/settle` requests final
+closure and prints amounts only after independent finalized evidence; if closure
+already happened it reads that evidence without requiring the seller to be
+online. A missing proof remains pending. A lost approval acknowledgment blocks
+new inference until the exact financial approval is recovered; recovery never
+sends the prompt again. A free signed quote uses the existing free path and
+constructs no financial backend, even with session policy present.
 
 ## Ownership and trust
 
@@ -30,15 +74,16 @@ observers. The buyer checks the unresolved-payment barrier before any opening.
 These are trusted ports, never callbacks supplied by discovery. This initial
 composition does not negotiate arbitrary deposits or create per-peer journals
 for unknown buyers. Before the buyer calls its opening/signing port, it uses
-`prepare` to check that the authenticated seller supports the session channel
-and has exactly the same provisioned terms. Every field must match the buyer's
-independently authorized and persisted terms, including deposit, expiry,
-withdrawal delay, treasury and fee. A different term or unsupported peer fails
-before a new opening signature. The seller's preparation reply performs no
-financial operation or engine call. Policy, quote time and cancellation are
-checked again after the reply; preparation cannot replace a prior uncertain
-opening or approval. This is a compatibility/agreement check, not automatic
-public-buyer provisioning or startup activation.
+`prepare` with its full independently authorized terms to check that the
+authenticated seller supports the session channel and agrees to those exact
+terms. Every field must match the buyer's independently authorized and persisted
+terms, including deposit, expiry, withdrawal delay, treasury and fee. A
+different term or unsupported peer fails before a new opening signature. The
+seller's preparation reply performs no financial operation or engine call.
+Policy, quote time and cancellation are checked again after the reply;
+preparation cannot replace a prior uncertain opening or approval. This is a
+compatibility/agreement check; it does not authorize public buyers or reserve
+the seller slot.
 
 Each session fixes buyer wallet and NodeId, seller owner and NodeId, network,
 asset, payout, fee payer, receiver authorizer, fee distribution, deposit and
@@ -142,15 +187,17 @@ not the connection; closing the buyer's connection does not stop autonomous
 settlement.
 
 This channel returns a complete response for one user message with reasoning
-off. Unsupported inputs are refused before the buyer signs an opening; there is
-no fallback to another seller or payment path after possible prompt
-transmission. The buyer recounts usage and charges at the signed quote's
-existing per-million rates before signing. A partial or missing terminal
-produces no new approval; the seller can collect only its earlier accepted
-total. Existing free/paid stream channels remain independently available; no
-streaming or full agent-API compatibility is newly claimed for this session RPC.
+off. The local chat receives one complete verified answer, exposed as one
+awaited SSE delta; this is not token streaming. Unsupported inputs are refused
+before the buyer signs an opening; there is no fallback to another seller or
+payment path after possible prompt transmission. The buyer recounts usage and
+charges at the signed quote's existing per-million rates before signing. A
+partial or missing terminal produces no new approval; the seller can collect
+only its earlier accepted total. Existing free/paid stream channels remain
+independently available; no streaming or full agent-API compatibility is newly
+claimed for this session RPC.
 
-Current application startup/configuration does not turn this on automatically.
-Multiple sellers/concurrent requests, automatic session rotation/topup,
-restored-journal rollback defense, abrupt host/power-loss acceptance and live
+Explicit application startup activates the single permitted pair only. Multiple
+sellers/concurrent requests, automatic session rotation/topup, restored-journal
+rollback defense, abrupt host/power-loss acceptance and live
 network/deployed-program validation remain separate work.

@@ -47,7 +47,7 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
-    open: () => exclusive(() => openBuyer(options, store)),
+    open: (check) => exclusive(() => openBuyer(options, store, check)),
     begin: (request) => exclusive(() => reserve(store, request, options.now())),
     approve: (inputBill, verifiedAtomic) =>
       exclusive(() => approveBuyer(options, store, inputBill, verifiedAtomic)),
@@ -91,7 +91,17 @@ export async function createBatchBuyer(
   };
 }
 
-async function openBuyer(options: BatchBuyerOptions, store: BatchStore) {
+async function openBuyer(
+  options: BatchBuyerOptions,
+  store: BatchStore,
+  check?: () => void,
+) {
+  const beforeSign = () => {
+    check?.();
+    if (options.now() >= options.terms.expiresAt)
+      return sessionFail(SESSION_CODES.CLOSED);
+  };
+  beforeSign();
   const current = store.read();
   if (options.now() >= options.terms.expiresAt)
     sessionFail(SESSION_CODES.CLOSED);
@@ -116,7 +126,17 @@ async function openBuyer(options: BatchBuyerOptions, store: BatchStore) {
   if (!hints) return sessionFail(SESSION_CODES.UNAVAILABLE);
   const requirements = await requirementsFor(options.terms);
   const built = await buildDepositPayload({
-    payer: options.payer,
+    payer: {
+      address: options.payer.address,
+      signMessages: (...args) => {
+        beforeSign();
+        return options.payer.signMessages(...args);
+      },
+      signTransactions: (...args) => {
+        beforeSign();
+        return options.payer.signTransactions(...args);
+      },
+    },
     receiver: options.terms.payTo,
     receiverAuthorizer: options.terms.authorizer,
     mint: options.terms.mint,

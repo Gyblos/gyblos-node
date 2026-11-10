@@ -7,6 +7,7 @@ import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
 import { startSellerSessions } from '@gyblos/node/seller-sessions';
 import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { batchOfferFixture } from './support/batch-iroh-offer';
 import { batchLoopback } from './support/batch-loopback';
@@ -20,6 +21,7 @@ void test('shared startup manager executes three prompts with one capped deposit
   });
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   let created = 0;
+  let failFirst = true;
   const seller = await startSellerSessions({
     buyerNodeId: rig.terms.buyerNodeId,
     owner: rig.terms.owner,
@@ -46,6 +48,10 @@ void test('shared startup manager executes three prompts with one capped deposit
       inspect,
       create: async () => {
         created++;
+        if (failFirst) {
+          failFirst = false;
+          return sessionFail(SESSION_CODES.UNAVAILABLE);
+        }
         return rig.buyer;
       },
       observe: rig.sellerOptions.observe,
@@ -78,6 +84,14 @@ void test('shared startup manager executes three prompts with one capped deposit
     0,
     'unsupported input must not construct financial services',
   );
+  await assert.rejects(
+    manager.execute(
+      await offers.quote(98),
+      offers.input,
+      new AbortController().signal,
+    ),
+    { code: SESSION_CODES.UNAVAILABLE },
+  );
   for (let index = 1; index <= 3; index++) {
     const result = await manager.execute(
       await offers.quote(index),
@@ -89,7 +103,7 @@ void test('shared startup manager executes three prompts with one capped deposit
     assert.equal(result.approval.approvedAtomic, '40');
     assert.equal(result.approval.cumulativeAtomic, String(index * 40));
   }
-  assert.equal(created, 1);
+  assert.equal(created, 2);
   assert.equal(offers.generations(), 3);
   assert.deepEqual(rig.calls, ['deposit']);
 });
