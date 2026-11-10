@@ -9,6 +9,12 @@ import { createNodeLifecycle } from '@gyblos/node/lifecycle';
 import { assertImportsInert } from './support/inertness';
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 
+void test('the executable seller compatibility shim is not a public import', () => {
+  assert.throws(() => import.meta.resolve('@gyblos/node-app/main'), {
+    code: 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+  });
+});
+
 void test('all executable modules are inert when imported', async (context) => {
   let starts = 0;
   let stops = 0;
