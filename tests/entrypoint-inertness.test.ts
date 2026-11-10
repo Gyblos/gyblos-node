@@ -100,7 +100,7 @@ void test('all executable modules are inert when imported', async (context) => {
       'native role setup entry is inert when imported',
       { skip: NATIVE_CAPABILITY.bindingSkip },
       async () => {
-        await import('@gyblos/node-app/main');
+        await import('@gyblos/node-app/daemon');
         await import('@gyblos/node-app/setup');
         await import('@gyblos/buyer/main');
         await import('@gyblos/buyer/free-main');

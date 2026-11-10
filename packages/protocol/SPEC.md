@@ -980,3 +980,160 @@ It persists its first signed pair before confirming and reuses that exact pair
 after a lost acknowledgment. Conflicting buyer attestations never overwrite it.
 A failed or missing receipt never retries inference, changes the selected seller
 after prompt transmission, discards successful output or enables a payment.
+
+## Reusable buyer-authorized payment session port
+
+`payment-session` is an additive library contract over the existing pinned
+Solana x402 `batch-settlement` wire, not a replacement for existing paid execution.
+The financial port itself defines no ALPN; the opt-in transport is specified below. Session terms bind both wallet/NodeId pairs,
+network, asset, receiver, fee payer, receiver authorizer, fee policy, bounded
+deposit, host expiry and withdrawal grace. The opening memo is
+`gyblos/payment-session/v1:` followed by SHA-256 of
+`gyblos/payment-session/v1\n` and the canonical JSON of all session terms.
+
+An opening has a zero-charge buyer voucher. Each request reserves its ceiling
+under a unique 128-bit lowercase-hex request ID and a 256-bit digest already
+verified by its host. A bill binds those fields, its actual charge and the new
+cumulative total. Only independently verified usage is eligible for buyer
+approval. The native SDK voucher signs channel ID, cumulative amount and expiry,
+not Gyblos request metadata. Its expiry is the SDK zero sentinel; request and
+quote correlation must therefore be enforced in both local journals and the
+authenticated host protocol, never inferred from the native voucher alone.
+
+Finalization freezes the highest accepted voucher and stops new admissions.
+The seller can present it without the buyer remaining online. The SDK's
+receiver close authorization is distinct from buyer spending authority.
+Retries retain the same buyer voucher and financial amount. A local deadline
+or disconnected HTTP stream does not itself execute settlement or a refund.
+No existing offer, free/paid execution or golden vector is modified by this port.
+[Session composition and limitations](../../docs/payment-sessions.md).
+
+## Reusable single-seller session channel v1
+
+`gyblos/session/1` is a separate, opt-in Iroh ALPN. It is registered only by a host
+that supplies a matching session service. Existing control, free, paid-stream,
+receipt and reserved HTTP ALPNs, signed quote formats and vectors are unchanged.
+A quote's existing protocol field does not advertise this optional channel.
+The host independently pins both identities and financial session terms; the
+index and remote peer never choose those policies.
+
+Each RPC uses one bidirectional stream: four-byte big-endian length, canonical
+UTF-8 JSON and sender EOF, followed by one similarly framed reply and EOF.
+Requests and replies are each at most 1 MiB excluding the prefix; an opaque SDK
+opening is at most 512 KiB at the RPC boundary. The pinned financial adapter
+additionally restricts its known-field SDK opening to 8 KiB and its transaction
+to the SDK Solana packet bound before persistence, with initial proof verification.
+The existing depth limit of 16 applies. Oversized
+lengths are rejected before body allocation; invalid UTF-8, duplicate fields,
+noncanonical JSON, trailing data, multiple messages and unknown fields fail.
+Response JSON escaping counts against the frame bound: a legal text whose
+encoded reply would be too large produces a correlated static LIMIT reply,
+not a partial result. Invalid unparsed requests close without a reply.
+
+The envelope is `{version: 1, requestId, method, params}`. RPC request IDs are
+128-bit lowercase hex. The reply includes `version`, the same `requestId`,
+`requestDigest` and exactly one `result` or static `error.code`.
+`requestDigest` is SHA-256 of `gyblos/session-rpc/v1\n` plus the entire parsed
+canonical request. Existing session and paid-execution error catalogs are used;
+provider messages, input, private SDK payloads and network addresses are never
+reflected. Remote errors are marked separately by the local client API.
+
+| Method     | Params                                                                             | Result                                     |
+| ---------- | ---------------------------------------------------------------------------------- | ------------------------------------------ |
+| `prepare`  | fresh signed `quote`, optional full proposed `terms`                               | full provisioned `terms`, no side effects  |
+| `open`     | `payload` (opaque SDK opening string), fresh signed `quote`, optional same `terms` | `snapshot`                                 |
+| `execute`  | `channelId`, quote-bound `requestId`, fresh signed `quote`, `input`                | complete `value` and `bill`                |
+| `approve`  | `bill`, buyer-signed cumulative `voucher`                                          | exact acknowledged `snapshot`              |
+| `snapshot` | `channelId`                                                                        | `snapshot` metadata                        |
+| `close`    | `channelId`                                                                        | independently verified seller `settlement` |
+
+`prepare` is an additive capability and terms-agreement operation on this ALPN;
+all earlier methods, digests and vector bytes remain unchanged. A seller that
+does not implement it rejects the method. The current shared buyer requires a
+successful correlated preparation reply before calling its opening/signing
+port; an older seller therefore fails before any new opening signature. An
+earlier provisioned buyer can still use the unchanged `open` contract.
+
+Preparation accepts the quote and optionally the full proposed terms: no prompt
+or SDK opening. A provisioned host may omit terms exactly as before. An
+unassigned startup host requires the proposal, checks its locally allowed buyer
+and financial policy, and allocates no resource until OPEN presents a valid SDK
+proof whose memo binds those identical terms. OPEN repeats the proposal so a
+prior stateless preparation is never a reservation. Unknown fields are rejected.
+After authenticating the buyer and checking the fresh signed priced
+quote, exact warmed model and live readiness, the seller returns the exactly matching terms. It calls no financial-session or engine methods and creates
+no journal, reservation, channel or background worker. This reply is metadata,
+not an offer signature, independent identity proof or finalized-chain proof.
+
+The result is exactly `{terms}`. Terms have exactly `buyer`, `buyerNodeId`,
+`owner`, `sellerNodeId`, `network`, `mint`, `payTo`, `feePayer`, `authorizer`,
+`treasury`, `protocolFeeBps`, `depositAtomic`, `expiresAt` and
+`withdrawDelaySeconds`. Addresses and NodeIds use the existing strict control
+primitives; deposit is a positive canonical bounded decimal, host expiry and
+withdrawal delay are positive safe integers, and basis points are an integer
+within the existing denominator. Adapter-specific network, grace and party
+policy remains enforced by the financial constructor.
+
+The buyer strictly parses both remote terms and its independently authorized,
+persisted local terms and requires exact canonical equality of every field.
+Remote terms never raise the deposit, extend expiry/grace or alter parties or
+fees. The existing request ID and whole-request digest bind the reply to the
+specific preparation quote. Identity, quote policy, zero-skew time and
+cancellation are rechecked after preparation and before the opening port. A
+failed preparation does not discard or replace any earlier uncertain opening
+or financial approval. Hosts must still restore the original terms and attempt
+before new execution; arbitrary-peer provisioning and implicit application
+activation are not authorized by preparation alone. The independent
+`batch-prepare-v1.json` and `batch-startup-v1.json` vectors supplement the unchanged
+earlier fixtures. The latter pins the optional-terms PREPARE and OPEN encodings.
+
+The inner execution request signs no new payment authorization. Its session
+request digest is SHA-256 of `gyblos/session-request/v1\n` plus the canonical
+`{channelId, requestId, quote, input}`. The persisted financial reservation/bill
+binds that digest, quote request ID and quote budget. The full prompt is never
+written into the session journal. The SDK cumulative voucher retains its native
+signing format; the journals and authenticated channel enforce request binding.
+Inference IDs/digests are single-use; the same accepted financial approval may
+be acknowledged again without new inference or charge.
+
+Before any engine call the seller checks its authenticated buyer NodeId, its own
+quote signature and zero-skew validity, all pinned financial identities/terms,
+exact warmed selection/model/capabilities, implemented reasoning, supported
+input, live nonbusy readiness, context/output limits and affordable budget. This
+version supports one user message, reasoning `off` and a complete response.
+Input/output prices must not both be zero and the quote budget must be positive;
+free quotes keep the existing transaction-free path. The session reserves the
+request ceiling before generation and forbids another active request.
+
+Before signing, the buyer independently verifies seller identity and selected
+catalog/quote policy, validates response correlation and bounds, recounts
+received input/output, and recomputes the charge at the signed per-million
+prices. It signs only that verified amount. An approval ACK must match the
+channel, exact cumulative voucher amount and zero remaining reservation. A
+reported settlement is not proof for the buyer: its independent finalized-chain
+observer must confirm the actual amounts/transaction before local reconciliation.
+
+Transport connection-open rate, global/per-peer connection and request budgets
+apply first; the host's one-active-session operation budget applies separately.
+Existing ingress/egress deadlines and absolute inference deadline apply. Cancel
+closes the connection, suppresses late publication and drains native operations
+before releasing admission. The client marks possible transmission before its
+first write, never retries inference and closes late-arriving connections.
+Quote time is rechecked immediately before sending. Financial approval recovery
+is explicit and reuses the original approved bill; it never sends a prompt.
+
+The seller's financial worker persists independently of the Iroh connection and
+can finalize the highest accepted voucher while the buyer is offline. Both sides
+offline still means no submission. This channel changes no fee, journal format,
+mainnet restriction or restored-state guarantee. Arbitrary-peer provisioning,
+concurrent requests, multiple sellers, implicit activation, a public gateway and
+streaming on this new ALPN remain separately scoped. The normal seller daemon
+and buyer chat can explicitly enable one pinned pair as described in the
+[session startup policy](../../docs/payment-sessions.md#explicit-startup-policy). New canonical/digest/frame
+vectors are in `vectors/batch-channel-v1.json`; older vectors are unchanged.
+
+The local buyer opening port accepts an optional synchronous operation guard.
+The SDK adapter invokes it immediately before each new transaction/message
+signature, rechecking cancellation and quote/host expiry after delayed hints or
+private writes. A signature already in progress may finish internally, but its
+result is not transmitted after cancellation. This changes no signing bytes.

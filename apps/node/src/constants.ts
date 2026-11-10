@@ -9,6 +9,7 @@ export const EXIT = { ok: 0, failure: 1, interrupted: 130 } as const;
 export const SERVICE_KINDS = {
   SYSTEMD_USER: 'systemd-user',
   LAUNCHD: 'launchd',
+  SCHEDULED_TASK: 'scheduled-task',
 } as const;
 export type ServiceKind = (typeof SERVICE_KINDS)[keyof typeof SERVICE_KINDS];
 
@@ -26,8 +27,10 @@ export const SERVICE = {
   unit: 'gyblos-seller.service',
   label: 'com.gyblos.seller',
   description: 'Gyblos seller',
-  // Relative to the repository, which is also the working directory so `--import tsx` resolves.
-  entry: 'apps/node/src/main.ts',
+  // Relative to the repository, which is also the working directory so `--import tsx` resolves; the
+  // daemon is its `start` command.
+  entry: 'apps/node/src/bin.ts',
+  start: 'start',
   systemdUserDirectory: '.config/systemd/user',
   launchAgentsDirectory: 'Library/LaunchAgents',
   // The daemon withdraws its listing and writes its public sequence after the first SIGINT.
@@ -45,6 +48,20 @@ export const SERVICE = {
   // systemd's UMask= spelling of the same value.
   umaskOctal: SERVICE_UMASK.toString(8).padStart(4, '0'),
   environmentMaxBytes: 64 * 1024,
+  // Windows: a per-user scheduled task started at logon runs `service-run`, a supervisor that keeps the
+  // daemon running and stops it gracefully when asked through its named pipe.
+  taskName: 'Gyblos\\Seller',
+  taskDirectory: 'AppData/Local/Gyblos',
+  taskFile: 'seller-task.xml',
+  taskScript: 'seller-service.cmd',
+  run: 'service-run',
+  pipePrefix: '\\\\.\\pipe\\gyblos-seller-',
+  stopRequest: 'stop',
+  logMode: 0o600,
+  taskHashCharacters: 16,
+  // <home>/service-pipe: the random part of the supervisor's pipe name, 32 hex characters.
+  pipeFile: 'service-pipe',
+  pipeSecretBytes: 16,
 } as const;
 
 // Names seller.env may not set: the unit and launch agent set these themselves, and systemd's
@@ -54,6 +71,10 @@ export const SERVICE = {
 export const SERVICE_RESERVED_VARIABLES = [
   'GYBLOS_HOME',
   'GYBLOS_CONFIG',
+  // How the seller was installed is the installer's and the launcher's to say, not seller.env's.
+  'GYBLOS_CONTAINER',
+  'GYBLOS_PACKAGED',
+  'GYBLOS_LAUNCHER',
   'PATH',
   'HOME',
   'UID',
@@ -70,6 +91,13 @@ export const SERVICE_RESERVED_VARIABLES = [
   'OPTIND',
   'OPTARG',
   'POSIXLY_CORRECT',
+  // Windows: where programs, PowerShell modules and the account's folders are found.
+  'SYSTEMROOT',
+  'WINDIR',
+  'COMSPEC',
+  'PATHEXT',
+  'USERPROFILE',
+  'PSMODULEPATH',
 ] as const;
 // Prefixes that change how the runtime or the agent's shell loads code.
 export const SERVICE_RESERVED_PREFIXES = [
@@ -94,6 +122,7 @@ export const SERVICE_ERRORS = {
   ALREADY_INSTALLED: 'SERVICE_ALREADY_INSTALLED',
   DOCTOR_NOT_READY: 'SERVICE_DOCTOR_NOT_READY',
   COMMAND_FAILED: 'SERVICE_COMMAND_FAILED',
+  EPHEMERAL_INSTALL: 'SERVICE_EPHEMERAL_INSTALL',
 } as const;
 export type ServiceErrorCode =
   (typeof SERVICE_ERRORS)[keyof typeof SERVICE_ERRORS];
@@ -129,6 +158,7 @@ export type InitErrorCode = (typeof INIT_ERRORS)[keyof typeof INIT_ERRORS];
 // bounds and how far it pages the discovery index.
 export const STATUS = {
   dayMs: 86_400_000,
+  secondMs: 1000,
   maxOffers: 64,
   statusFileBytes: 64 * 1024,
   probeTimeoutMs: 5_000,

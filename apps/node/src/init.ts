@@ -63,7 +63,7 @@ export function ollamaTag(model: string) {
 export function initToml(answers: InitAnswers) {
   const custom = isCustom(answers.model);
   return [
-    '# Written by `gyblos seller init`. Check it with `pnpm gyblos doctor`; docs/configuration.md lists every key.',
+    '# Written by `gyblos seller init`. Check it with `gyblos doctor`; docs/configuration.md lists every key.',
     '',
     'version = 1',
     '',

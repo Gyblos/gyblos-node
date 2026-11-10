@@ -1,5 +1,7 @@
 // Exposes a buyer's own loopback endpoint and startup policy without exposing its bearer token.
 import { LOCALHOST, ROUTES } from '@gyblos/config';
+import type { BuyerSessionPolicy } from '@gyblos/node/session-policy';
+import type { SessionSettlement } from '@gyblos/protocol/payment-session';
 
 import { PAID_BUYER } from './constants';
 
@@ -9,6 +11,9 @@ export function ownedChat(
   maxAtomic: string,
   endpoint: string,
   token?: string,
+  session?: BuyerSessionPolicy & {
+    settle?: () => Promise<SessionSettlement | undefined>;
+  },
 ) {
   const url = new URL(endpoint);
   if (
@@ -28,5 +33,11 @@ export function ownedChat(
       headers.set('authorization', `${PAID_BUYER.authScheme} ${token}`);
     return fetch(endpoint, { ...init, headers, redirect: 'error' });
   };
-  return { model, maxTokens, maxAtomic, request };
+  return {
+    model,
+    maxTokens,
+    maxAtomic,
+    request,
+    ...(session ? { session } : {}),
+  };
 }

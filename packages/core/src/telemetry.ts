@@ -18,6 +18,7 @@ import {
   controlNetwork,
 } from '@gyblos/protocol/control-validation';
 import {
+  EXECUTION_ROUTES,
   TELEMETRY_EVENTS,
   TELEMETRY_REFUSALS,
   type TelemetryEvent,
@@ -58,6 +59,22 @@ function numbers(
       : controlInteger(field);
   }
   return result;
+}
+// Optional observations stay absent when the producer had none; present ones are fully validated.
+function executionPath(event: TelemetryEvent) {
+  if (!Object.hasOwn(event, 'path')) return {};
+  const path = telemetryField(event, 'path');
+  return {
+    path: {
+      route: member(telemetryField(path, 'route'), EXECUTION_ROUTES),
+      routeChanged: bool(telemetryField(path, 'routeChanged')),
+    },
+  };
+}
+function generation(event: TelemetryEvent) {
+  if (!Object.hasOwn(event, 'generationMs')) return {};
+  const generationMs = controlInteger(telemetryField(event, 'generationMs'));
+  return generationMs > 0 ? { generationMs } : controlFail();
 }
 export function toTelemetryRecord(event: TelemetryEvent): object {
   const type = member(telemetryField(event, 'type'), TELEMETRY_EVENTS);
@@ -141,6 +158,8 @@ function eventFields(
           telemetryField(event, 'finishReason'),
           ENGINE_DONE_REASONS,
         ),
+        ...executionPath(event),
+        ...generation(event),
       };
     case TELEMETRY_EVENTS.FAILED:
       return {
@@ -156,6 +175,7 @@ function eventFields(
               ]),
             }
           : {}),
+        ...executionPath(event),
       };
     case TELEMETRY_EVENTS.CHARGED:
       return {
@@ -231,7 +251,10 @@ export function fanOut(sinks: readonly TelemetrySink[]): TelemetrySink {
 
 export {
   createExecutionTelemetry,
+  createRouteTracker,
   emitTelemetry,
+  generationMilliseconds,
   telemetrySizes,
   type ExecutionTelemetryOptions,
+  type RouteProbe,
 } from './telemetry-execution';

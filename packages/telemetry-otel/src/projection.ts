@@ -12,6 +12,7 @@ import {
   controlInteger,
 } from '@gyblos/protocol/control-validation';
 import {
+  EXECUTION_ROUTES,
   TELEMETRY_EVENTS,
   TELEMETRY_REFUSALS,
 } from '@gyblos/protocol/telemetry';
@@ -68,6 +69,26 @@ export function refusalAttributes(
   return {
     ...common,
     refusal: member(field(record, 'refusal'), TELEMETRY_REFUSALS),
+  };
+}
+const MILLISECONDS_PER_SECOND = 1000;
+// Output tokens per second of engine generation; null when the engine reported no generation time.
+export function metricOutputRate(record: object, usage: object) {
+  if (!Object.hasOwn(record, 'generationMs')) return null;
+  const generationMs = controlInteger(field(record, 'generationMs'));
+  const outputTokens = metricNumber(usage, 'outputTokens');
+  if (generationMs <= 0 || outputTokens <= 0) return null;
+  return (outputTokens * MILLISECONDS_PER_SECOND) / generationMs;
+}
+// The route attributes of one execution, or null when its producer observed none.
+export function metricRoute(record: object): Attributes | null {
+  if (!Object.hasOwn(record, 'path')) return null;
+  const path = metricObject(record, 'path');
+  const changed = field(path, 'routeChanged');
+  if (typeof changed !== 'boolean') return controlFail();
+  return {
+    route: member(field(path, 'route'), EXECUTION_ROUTES),
+    route_changed: changed,
   };
 }
 export function metricReasoning(record: object) {

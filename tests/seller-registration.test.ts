@@ -177,7 +177,6 @@ void test('registration checks the on-chain owner, node binding and payout walle
         payTo: (await generateKeyPairSigner()).address,
         authorizer: (await generateKeyPairSigner()).address,
         facilitator: (await generateKeyPairSigner()).address,
-        buyer: (await generateKeyPairSigner()).address,
       },
     });
     assert.equal(await paid.lookup(asset.address), true);

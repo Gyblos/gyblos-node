@@ -111,7 +111,10 @@ void test(
       authorizer: ADDRESS,
       payTo: ADDRESS,
     };
-    assert.deepEqual(parseRoleConfig(seller), seller);
+    // Earlier releases wrote a buyer field into paid seller roles; it is accepted and dropped.
+    const { buyer: legacyBuyer, ...current } = seller;
+    void legacyBuyer;
+    assert.deepEqual(parseRoleConfig(seller), current);
     for (const value of [
       null,
       [],

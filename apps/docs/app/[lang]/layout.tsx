@@ -2,7 +2,6 @@
 import { i18nProvider } from 'fumadocs-ui/i18n';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 
 import { Provider } from '../../components/provider';
@@ -12,9 +11,6 @@ import { appName, siteUrl } from '../../lib/shared';
 import { source } from '../../lib/source';
 
 import '../global.css';
-
-const sans = Geist({ subsets: ['latin'], variable: '--font-geist' });
-const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -36,11 +32,7 @@ export default async function Layout({
   const { lang } = await params;
 
   return (
-    <html
-      lang={lang}
-      className={`${sans.variable} ${mono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang={lang} suppressHydrationWarning>
       <head>
         <link rel="describedby" href="/llms.txt" />
       </head>

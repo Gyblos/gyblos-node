@@ -1,9 +1,10 @@
 // P2P role setup and loading: per-role key files and role config in <home>/<role>/ with private file modes.
-// Never overwrites existing keys; seller payout defaults to its owner and no buyer key is stored.
-// A free seller has only owner and node keys; the paid fields and keys exist all together or not at all.
+// Never overwrites existing keys. Every seller gets its payment keys (authorizer and fee payer) with its
+// owner as payout, so any offer can be free or priced; setup adds them to a seller created without them,
+// keeping its NodeId, owner and registration. The paid fields exist all together or not at all.
 import { generateKeyPairSync } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 import { SecretKey } from '@number0/iroh';
 import {
@@ -42,6 +43,7 @@ import {
 import { NodeError } from './errors';
 import { assertRoleHome } from './home';
 import { privateBytes, privateKeyMetadata } from './role-key-file';
+import { windowsKeysPrivate, windowsRoleAccess } from './role-windows';
 
 interface CommonRole {
   schemaVersion: typeof ROLE_CONFIG_SCHEMA_VERSION;
@@ -51,13 +53,26 @@ interface CommonRole {
   nodeId: string;
 }
 
-// Paid selling's role fields, in role.json order; free selling uses none of them.
+// Paid selling's role fields, in role.json order.
 export const SELLER_PAYMENT_FIELDS = [
   'authorizer',
   'facilitator',
   'payTo',
-  'buyer',
 ] as const;
+// Written into seller roles by earlier releases' paid setup (`--buyer`); accepted and ignored.
+const LEGACY_SELLER_FIELDS = ['buyer'] as const;
+
+// role.json as written: a seller with payment fields also carries `buyer` (its owner, unused) because
+// earlier releases read payment fields only as a set of four, so an older image the seller still runs
+// (an update that stopped before recreating it, or a rollback) keeps loading the role.
+function saveRole(path: string, config: RoleConfig) {
+  return saveJson(
+    path,
+    config.role === P2P_ROLES.SELLER && config.payTo !== undefined
+      ? { ...config, buyer: config.owner }
+      : config,
+  );
+}
 type SellerPayment = Record<(typeof SELLER_PAYMENT_FIELDS)[number], string>;
 
 export type RoleConfig = CommonRole &
@@ -71,8 +86,6 @@ export type RoleConfig = CommonRole &
 export interface SetupOptions {
   role: P2PRole;
   mint: string;
-  buyer?: string;
-  payTo?: string;
 }
 
 function file(
@@ -130,7 +143,7 @@ export function parseRoleConfig(value: unknown): RoleConfig {
     'assetLabel',
     'nodeId',
     ...(config.role === P2P_ROLES.SELLER
-      ? ['owner', ...SELLER_PAYMENT_FIELDS]
+      ? ['owner', ...SELLER_PAYMENT_FIELDS, ...LEGACY_SELLER_FIELDS]
       : ['buyer']),
   ]);
   const common: CommonRole = {
@@ -160,7 +173,6 @@ export function parseRoleConfig(value: unknown): RoleConfig {
     authorizer: configurationAddress(config.authorizer, code),
     facilitator: configurationAddress(config.facilitator, code),
     payTo: configurationAddress(config.payTo, code),
-    buyer: configurationAddress(config.buyer, code),
   };
 }
 
@@ -207,35 +219,55 @@ export async function nodeSecret(role: P2PRole, home?: HomeEnvironment) {
   ];
 }
 
+// The payment fields for a seller whose payout is its owner: creates (or reuses) the authorizer and fee
+// payer keys, which must differ from the payout and from the node key.
+async function sellerPayment(owner: string): Promise<SellerPayment> {
+  const payoutBytes = getAddressEncoder().encode(address(owner));
+  if (
+    Buffer.from(payoutBytes).equals(
+      Buffer.from(
+        SecretKey.fromBytes(await nodeSecret(P2P_ROLES.SELLER))
+          .public()
+          .toBytes(),
+      ),
+    )
+  )
+    throw new Error('Payout cannot be the hot node key.');
+  const authorizer = await wallet(P2P_ROLES.SELLER, 'authorizer');
+  const facilitator = await wallet(P2P_ROLES.SELLER, 'facilitator');
+  if ([authorizer.address, facilitator.address].includes(address(owner)))
+    throw new Error('Payout must differ from payment signing keys.');
+  return {
+    authorizer: authorizer.address,
+    facilitator: facilitator.address,
+    payTo: owner,
+  };
+}
+
 export async function setupRole(options: SetupOptions) {
   address(options.mint);
-  if (options.role === P2P_ROLES.SELLER) {
-    if (options.buyer === undefined && options.payTo !== undefined)
-      throw new Error('A payout requires --buyer for paid seller keys.');
-    // Checked before anything is written, so a bad paid address leaves no keys behind.
-    if (options.payTo !== undefined) address(options.payTo);
-    if (options.buyer !== undefined) address(options.buyer);
-  }
   const role = options.role;
   const path = file(role, ROLE_FILES.roleConfig);
+  const restrict = await windowsRoleAccess(roleDirectory(role));
   try {
     const existing = await loadRole(role);
-    if (
-      existing.role !== options.role ||
-      existing.mint !== options.mint ||
-      (existing.role === P2P_ROLES.SELLER &&
-        ((options.payTo !== undefined && existing.payTo !== options.payTo) ||
-          existing.buyer !== options.buyer))
-    )
+    if (existing.role !== options.role || existing.mint !== options.mint)
       throw new Error(
-        'Existing role configuration does not match; keys preserved. A different mint, payout or buyer needs a new GYBLOS_HOME.',
+        'Existing role configuration does not match; keys preserved. A different mint needs a new GYBLOS_HOME.',
       );
+    // A seller set up without payment keys gets them now; its NodeId, owner and registration stay.
+    if (existing.role === P2P_ROLES.SELLER && existing.payTo === undefined) {
+      const upgraded: RoleConfig = {
+        ...existing,
+        ...(await sellerPayment(existing.owner)),
+      };
+      await saveRole(path, upgraded);
+      return upgraded;
+    }
     return existing;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
-  if (options.role === P2P_ROLES.SELLER && options.payTo !== undefined)
-    throw new Error('New seller payout must use its owner wallet.');
   const rpcUrl = configurationRpcUrl(
     process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
     NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
@@ -244,6 +276,7 @@ export async function setupRole(options: SetupOptions) {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
+  await restrict();
   try {
     await lstat(file(role, ROLE_FILES.nodeKey));
   } catch (error) {
@@ -270,42 +303,16 @@ export async function setupRole(options: SetupOptions) {
       role: P2P_ROLES.BUYER,
       buyer: (await wallet(role, 'buyer')).address,
     };
-  // A buyer enables the paid role; new sellers use their owner wallet for payout.
-  else if (options.buyer === undefined)
-    config = {
-      ...common,
-      role: P2P_ROLES.SELLER,
-      owner: (await wallet(role, 'owner')).address,
-    };
   else {
-    const owner = await wallet(role, 'owner');
-    const payTo = owner.address;
-    const payoutBytes = getAddressEncoder().encode(address(payTo));
-    if (
-      Buffer.from(payoutBytes).equals(
-        Buffer.from(
-          SecretKey.fromBytes(await nodeSecret(role))
-            .public()
-            .toBytes(),
-        ),
-      )
-    )
-      throw new Error('Payout cannot be the hot node key.');
-    const authorizer = await wallet(role, 'authorizer');
-    const facilitator = await wallet(role, 'facilitator');
-    if ([authorizer.address, facilitator.address].includes(address(payTo)))
-      throw new Error('Payout must differ from payment signing keys.');
+    const owner = (await wallet(role, 'owner')).address;
     config = {
       ...common,
       role: P2P_ROLES.SELLER,
-      owner: owner.address,
-      authorizer: authorizer.address,
-      facilitator: facilitator.address,
-      payTo,
-      buyer: options.buyer,
+      owner,
+      ...(await sellerPayment(owner)),
     };
   }
-  await saveJson(path, config);
+  await saveRole(path, config);
   return config;
 }
 
@@ -326,6 +333,13 @@ export async function roleKeyFilesStatus(
     }
     if (!privateKeyMetadata(metadata)) invalid = true;
   }
+  if (
+    !(await windowsKeysPrivate(
+      resolve(homeLayout(environment).root),
+      names.map((name) => file(role, name, environment)),
+    ))
+  )
+    invalid = true;
   return invalid ? 'invalid' : 'ok';
 }
 
@@ -369,6 +383,5 @@ export async function publicRole(
     authorizer: config.authorizer,
     facilitator: config.facilitator,
     payTo: config.payTo,
-    buyer: config.buyer,
   };
 }

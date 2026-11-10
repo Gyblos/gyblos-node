@@ -12,7 +12,8 @@
     "./limits": "./src/limits.ts",
     "./paths": "./src/paths.ts",
     "./paypal": "./src/paypal.ts",
-    "./lock": "./src/lock.ts"
+    "./lock": "./src/lock.ts",
+    "./batch-session": "./src/batch-session.ts"
   },
   "dependencies": {
     "@x402/core": "2.29.0",

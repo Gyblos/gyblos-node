@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { startupFailure } from '@gyblos/node-app/main';
+import { startupFailure } from '@gyblos/node-app/daemon';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { previousFailure } from '@gyblos/node/seller-status';
@@ -201,7 +201,6 @@ void test(
       await setupRole({
         role: P2P_ROLES.SELLER,
         mint,
-        buyer: (await generateKeyPairSigner()).address,
       });
       const error: unknown = await createNode()
         .start()

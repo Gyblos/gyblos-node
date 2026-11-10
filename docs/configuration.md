@@ -52,22 +52,22 @@ For each setting, the first source that sets it wins:
 3. `gyblos.toml`.
 4. Built-in defaults.
 
-| Setting                | Flag                   | Environment                 | File key                  | Default                           |
-| ---------------------- | ---------------------- | --------------------------- | ------------------------- | --------------------------------- |
-| network                |                        |                             | `node.network`            | `devnet`                          |
-| home                   | `--home`               | `GYBLOS_HOME`               | `node.data_dir`           | `.local/gyblos`                   |
-| RPC URL                | `--rpc-url`            | `GYBLOS_RPC_URL`            | `node.rpc_url`            | `https://api.devnet.solana.com`   |
-| payout wallet          | `--payout-wallet`      |                             | `node.payout_wallet`      | unset                             |
-| relays                 | `--relay` (repeated)   | `GYBLOS_RELAYS`             | `relays.urls`             | `https://na1.relay.gyblos.com/`   |
-| relay token variable   |                        |                             | `relays.relay_token_env`  | `GYBLOS_RELAY_TOKEN`              |
-| seller relay-only      | `--relay-only`         | `GYBLOS_RELAY_ONLY`         | `transport.relay_only`    | off                               |
-| Iroh bind address      | `--iroh-bind`          | `GYBLOS_IROH_BIND`          | `transport.bind`          | unset                             |
-| Iroh external address  | `--iroh-external-addr` | `GYBLOS_IROH_EXTERNAL_ADDR` | `transport.external_addr` | unset                             |
-| buyer relay-only       | `--buyer-relay-only`   | `GYBLOS_BUYER_RELAY_ONLY`   | `buyer.relay_only`        | off                               |
-| discovery publication  | `--discovery-publish`  | `GYBLOS_DISCOVERY_PUBLISH`  | `discovery.publish`       | off                               |
-| discovery index URL    | `--discovery-url`      | `GYBLOS_DISCOVERY_URL`      | `discovery.url`           | `https://discovery.gyblos.com/v1` |
-| private file telemetry |                        |                             | `telemetry.file`          | off                               |
-| offers                 |                        |                             | `[[offers]]`              | none                              |
+| Setting                | Flag                   | Environment                 | File key                  | Default                                 |
+| ---------------------- | ---------------------- | --------------------------- | ------------------------- | --------------------------------------- |
+| network                |                        |                             | `node.network`            | `devnet`                                |
+| home                   | `--home`               | `GYBLOS_HOME`               | `node.data_dir`           | `.local/gyblos` (packaged: `~/.gyblos`) |
+| RPC URL                | `--rpc-url`            | `GYBLOS_RPC_URL`            | `node.rpc_url`            | `https://api.devnet.solana.com`         |
+| payout wallet          | `--payout-wallet`      |                             | `node.payout_wallet`      | unset                                   |
+| relays                 | `--relay` (repeated)   | `GYBLOS_RELAYS`             | `relays.urls`             | `https://na1.relay.gyblos.com/`         |
+| relay token variable   |                        |                             | `relays.relay_token_env`  | `GYBLOS_RELAY_TOKEN`                    |
+| seller relay-only      | `--relay-only`         | `GYBLOS_RELAY_ONLY`         | `transport.relay_only`    | off                                     |
+| Iroh bind address      | `--iroh-bind`          | `GYBLOS_IROH_BIND`          | `transport.bind`          | unset                                   |
+| Iroh external address  | `--iroh-external-addr` | `GYBLOS_IROH_EXTERNAL_ADDR` | `transport.external_addr` | unset                                   |
+| buyer relay-only       | `--buyer-relay-only`   | `GYBLOS_BUYER_RELAY_ONLY`   | `buyer.relay_only`        | off                                     |
+| discovery publication  | `--discovery-publish`  | `GYBLOS_DISCOVERY_PUBLISH`  | `discovery.publish`       | off                                     |
+| discovery index URL    | `--discovery-url`      | `GYBLOS_DISCOVERY_URL`      | `discovery.url`           | `https://discovery.gyblos.com/v1`       |
+| private file telemetry |                        |                             | `telemetry.file`          | off                                     |
+| offers                 |                        |                             | `[[offers]]`              | none                                    |
 
 Environment variables keep exactly their current meaning. The seller still needs
 a file, because only `[[offers]]` lists what it serves:
@@ -315,7 +315,7 @@ stop this daemon. Today it honors:
 | `[[offers]]`: any model, engine `openai` at an https or literal loopback URL with `context_tokens`, reasoning `["off"]`                           | yes                                                                                                                       |
 | `[[offers]]`: any model, engine `anthropic` at an https or literal loopback API root with `api_key_env` and `context_tokens`, reasoning `["off"]` | yes                                                                                                                       |
 | `free = {...}` on that offer                                                                                                                      | served over the free channel with daily total and per-buyer token caps                                                    |
-| `price = {...}` on that offer                                                                                                                     | sold over the paid stream on devnet; needs a seller role with a payout                                                    |
+| `price = {...}` on that offer                                                                                                                     | sold over the paid stream on devnet; the fee payer needs devnet SOL                                                       |
 | `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                                   | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
 | `[buyer]`                                                                                                                                         | ignored by the seller                                                                                                     |
 
@@ -503,13 +503,15 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
   a valid result also carries `warnings`.
 - `@gyblos/node/node-config-file`: `nodeConfigPath` and `readStartupConfig`, the
   one rule for which file is read (`GYBLOS_CONFIG`, else an optional
-  `./gyblos.toml`).
+  `./gyblos.toml`, or `~/.gyblos/gyblos.toml` for the packaged release).
 - `@gyblos/node/node-config-resolve`: `resolveNodeConfig({ file, env, flags })`,
   returning settings, origins, secret references and warnings, or issues.
-- `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`);
-  `apps/node/src/cli-init.ts`, `init.ts` and `init-file.ts` hold
-  `gyblos seller init`, and `cli-status.ts`, `status.ts` and `status-system.ts`
-  hold `gyblos seller status`.
+- `apps/node/src/bin.ts`: the one seller entry point (`pnpm gyblos` from a
+  checkout, the image's entrypoint and the packaged launcher); `entry.ts` routes
+  `start`, `setup`, `tokenizer` and `--version`, and `cli.ts` is the rest of the
+  `gyblos` command; `apps/node/src/cli-init.ts`, `init.ts` and `init-file.ts`
+  hold `gyblos seller init`, and `cli-status.ts`, `status.ts` and
+  `status-system.ts` hold `gyblos seller status`.
 
 ## Local telemetry
 

@@ -25,6 +25,7 @@ const FAKE_DOCKER = `#!/bin/sh
 printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"
 case "$*" in
   'compose version --short') printf '%s\\n' "\${FAKE_COMPOSE_VERSION:-2.29.1}" ;;
+  info) exit "\${FAKE_DOCKER_INFO_EXIT:-0}" ;;
   'compose run --rm seller gyblos doctor')
     [ -z "\${FAKE_DOCTOR_OUTPUT:-}" ] || printf '%s\\n' "$FAKE_DOCTOR_OUTPUT"
     exit "\${FAKE_DOCTOR_EXIT:-0}" ;;
@@ -58,6 +59,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 printf '%s\\n' "$url" >>"$FAKE_CURL_LOG"
+# The machine's Ollama, for the packaged seller: FAKE_OLLAMA_EXIT makes it not answer.
+case "$url" in http://127.0.0.1:11434/*) exit "\${FAKE_OLLAMA_EXIT:-0}" ;; esac
 [ "\${FAKE_CURL_EXIT:-0}" = 0 ] || exit "$FAKE_CURL_EXIT"
 cp "$FAKE_RELEASE_DIR/\${url##*/}" "$out"
 `;

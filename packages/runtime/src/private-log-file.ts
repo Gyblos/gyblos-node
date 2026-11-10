@@ -8,6 +8,7 @@ import { FILE_MODES, PRIVATE_LOG_LIMITS } from '@gyblos/config';
 
 import { PRIVATE_LOG_CODES, type PrivateLogCode } from './constants';
 import { reclaimOldestSlot } from './private-log-reclaim';
+import { hasPrivateMode } from './private-mode';
 
 // Inodes of journals this process holds open; reclamation never removes them.
 const OPEN_LOG_FILES = new Set<string>();
@@ -99,9 +100,7 @@ async function directories(path: string, create: boolean) {
     if (!info.isDirectory() || info.isSymbolicLink()) rejectUnsafe();
     if (
       current === absolute &&
-      ((process.getuid && info.uid !== process.getuid()) ||
-        (info.mode & (constants.S_IRWXG | constants.S_IRWXO)) !== 0 ||
-        (info.mode & constants.S_IRWXU) !== FILE_MODES.privateDirectory)
+      !hasPrivateMode(info, FILE_MODES.privateDirectory)
     )
       rejectUnsafe();
   }
@@ -115,10 +114,10 @@ async function sameFile(handle: FileHandle, path: string, directory = false) {
     named.isSymbolicLink() ||
     opened.dev !== named.dev ||
     opened.ino !== named.ino ||
-    (process.getuid && opened.uid !== process.getuid()) ||
-    (opened.mode & (constants.S_IRWXG | constants.S_IRWXO)) !== 0 ||
-    (opened.mode & constants.S_IRWXU) !==
-      (directory ? FILE_MODES.privateDirectory : FILE_MODES.privateFile) ||
+    !hasPrivateMode(
+      opened,
+      directory ? FILE_MODES.privateDirectory : FILE_MODES.privateFile,
+    ) ||
     (directory ? !opened.isDirectory() : !opened.isFile() || opened.nlink !== 1)
   )
     rejectUnsafe();

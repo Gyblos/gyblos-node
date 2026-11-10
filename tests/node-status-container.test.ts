@@ -28,7 +28,7 @@ import {
 } from './support/status-fixture';
 
 const CONTAINER = { GYBLOS_CONTAINER: '1' };
-const DAEMON = ['node', '--import', 'tsx', 'apps/node/src/main.ts'];
+const DAEMON = ['node', '--import', 'tsx', 'apps/node/src/bin.ts', 'start'];
 
 async function withProc(
   processes: Record<string, string[] | null>,
@@ -99,8 +99,17 @@ void test('daemonProcess finds the daemon entry among other processes, never cou
     {
       '1': ['/sbin/docker-init', '--', '/app/docker/entrypoint.sh', 'start'],
       '99': DAEMON,
-      // Only an argument equal to the entry counts, not one that merely contains it.
-      '12': ['node', 'apps/node/src/main.ts.bak'],
+      // Only an argument equal to the entry counts, not one that merely contains it, and only its `start`:
+      // other `gyblos` commands run through the same entry.
+      '12': ['node', 'apps/node/src/bin.ts.bak', 'start'],
+      '13': [
+        'node',
+        '--import',
+        'tsx',
+        'apps/node/src/bin.ts',
+        'seller',
+        'status',
+      ],
     },
     async (root) => assert.equal(await daemonProcess(root, 99), false),
   );

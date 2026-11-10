@@ -8,6 +8,7 @@
     "./constants": "./src/constants.ts",
     "./buyer-api": "./src/buyer-api.ts",
     "./engine": "./src/engine.ts",
+    "./execution-policy": "./src/execution-policy.ts",
     "./errors": "./src/errors.ts",
     "./models": "./src/models.ts",
     "./offer": "./src/offer.ts",
@@ -44,6 +45,11 @@
     "./paid-execution": "./src/paid-execution.ts",
     "./paid/constants": "./src/paid/constants.ts",
     "./paid-stream": "./src/paid-stream.ts",
-    "./vectors/paid-execution-v1.json": "./vectors/paid-execution-v1.json"
+    "./vectors/paid-execution-v1.json": "./vectors/paid-execution-v1.json",
+    "./payment-session": "./src/payment-session.ts",
+    "./batch-channel": "./src/batch-channel.ts",
+    "./vectors/batch-channel-v1.json": "./vectors/batch-channel-v1.json",
+    "./vectors/batch-prepare-v1.json": "./vectors/batch-prepare-v1.json",
+    "./vectors/batch-startup-v1.json": "./vectors/batch-startup-v1.json"
   }
 }

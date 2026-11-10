@@ -14,7 +14,7 @@ import {
   type TelemetrySink,
 } from '@gyblos/protocol/telemetry';
 
-import { OTEL_SETTINGS } from './constants';
+import { OTEL_METRICS, OTEL_SETTINGS } from './constants';
 import { createMeasurements } from './metrics';
 import { metricType } from './projection';
 import { ExplicitMetricReader } from './reader';
@@ -32,15 +32,19 @@ function initialize(exporter: PushMetricExporter) {
         aggregationCardinalityLimit: OTEL_SETTINGS.cardinality,
         instrumentType: InstrumentType.COUNTER,
       },
-      {
-        instrumentName: 'gyblos.*',
+      ...[
+        [OTEL_METRICS.FIRST_TOKEN, OTEL_SETTINGS.latencyBoundaries],
+        [OTEL_METRICS.DURATION, OTEL_SETTINGS.latencyBoundaries],
+        [OTEL_METRICS.OUTPUT_RATE, OTEL_SETTINGS.rateBoundaries],
+      ].map(([instrumentName, boundaries]) => ({
+        instrumentName: instrumentName as string,
         instrumentType: InstrumentType.HISTOGRAM,
         aggregationCardinalityLimit: OTEL_SETTINGS.cardinality,
         aggregation: {
-          type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-          options: { boundaries: [...OTEL_SETTINGS.latencyBoundaries] },
+          type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM as const,
+          options: { boundaries: [...(boundaries as readonly number[])] },
         },
-      },
+      })),
     ],
   });
   return {

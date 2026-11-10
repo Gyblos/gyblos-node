@@ -22,6 +22,8 @@ import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import type { ControlStream } from './control-io';
 import { streamFreeResponse } from './free-stream-server';
 import { handleIrohConnection } from './iroh-connection';
+import { selectedRoute } from './paths';
+import type { RouteProbe } from './types';
 
 export interface FreeExecutionService {
   stream?(
@@ -29,12 +31,31 @@ export interface FreeExecutionService {
     peer: string,
     signal: AbortSignal,
     onDelta: (text: string) => Promise<void>,
+    route?: RouteProbe,
   ): Promise<FreeExecutionResponse>;
   respond(
     value: unknown,
     peer: string,
     signal: AbortSignal,
+    route?: RouteProbe,
   ): Promise<FreeExecutionResponse>;
+}
+// Hands every request on one connection that connection's route probe; nothing else changes.
+export function routedFreeService(
+  service: FreeExecutionService,
+  route: RouteProbe,
+): FreeExecutionService {
+  const { stream } = service;
+  return {
+    respond: (value, peer, signal) =>
+      service.respond(value, peer, signal, route),
+    ...(stream
+      ? {
+          stream: (value, peer, signal, onDelta) =>
+            stream.call(service, value, peer, signal, onDelta, route),
+        }
+      : {}),
+  };
 }
 interface FreeStreamDeadlines {
   ingressMs?: number;
@@ -245,12 +266,13 @@ export async function handleFreeExecutionConnection(
 ) {
   const peer = connection.remoteId().toString();
   const close = () => connection.close(HTTP_OVER_IROH.streamCloseCode, []);
+  const routed = routedFreeService(service, () => selectedRoute(connection));
   await handleIrohConnection(
     connection,
     (stream) =>
       serveFreeExecutionStream(
         stream,
-        service,
+        routed,
         peer,
         close,
         signal,

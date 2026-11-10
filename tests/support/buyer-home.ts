@@ -13,7 +13,8 @@ export async function setupBuyer(home: string, mint: string) {
     [
       '--import',
       'tsx',
-      'apps/node/src/setup.ts',
+      'apps/node/src/bin.ts',
+      'setup',
       '--role',
       'buyer',
       '--mint',

@@ -20,12 +20,38 @@ export const spawnChild = (
 export const isMain = (moduleUrl: string) =>
   !!process.argv[1] && pathToFileURL(process.argv[1]).href === moduleUrl;
 
-export function onShutdown(handler: () => void) {
-  process.once('SIGINT', handler);
-  process.once('SIGTERM', handler);
+// Windows also stops a console program with Ctrl+Break (SIGBREAK); SIGTERM never arrives there.
+const STOP_SIGNALS: readonly NodeJS.Signals[] =
+  process.platform === 'win32'
+    ? ['SIGINT', 'SIGTERM', 'SIGBREAK']
+    : ['SIGINT', 'SIGTERM'];
+
+// What a supervising parent sends over the IPC channel to stop its child like a first SIGINT: Windows has
+// no signal one process can send another to stop it gracefully.
+export const STOP_MESSAGE = 'gyblos:stop';
+
+// Listens for STOP_MESSAGE, and for the channel's end, when this process has an IPC channel; the returned
+// function stops listening.
+// The channel never keeps the process alive: the daemon's own work does.
+function onStopMessage(handler: () => void) {
+  if (!process.send) return () => {};
+  const listener = (message: unknown) => {
+    if (message === STOP_MESSAGE) handler();
+  };
+  process.on('message', listener);
+  // A supervisor that is gone can no longer stop this process: stop as if it had asked.
+  process.once('disconnect', handler);
+  process.channel?.unref();
   return () => {
-    process.removeListener('SIGINT', handler);
-    process.removeListener('SIGTERM', handler);
+    process.removeListener('message', listener);
+    process.removeListener('disconnect', handler);
+  };
+}
+
+export function onShutdown(handler: () => void) {
+  for (const signal of STOP_SIGNALS) process.once(signal, handler);
+  return () => {
+    for (const signal of STOP_SIGNALS) process.removeListener(signal, handler);
   };
 }
 
@@ -35,7 +61,7 @@ function writeShutdownNotice(text: string) {
   write(process.stderr.fd, text, () => undefined);
 }
 
-// Resolves `signalled` on the first SIGINT/SIGTERM and keeps a listener installed until `dispose()`, so
+// Resolves `signalled` on the first SIGINT/SIGTERM (or STOP_MESSAGE from a supervisor) and keeps a listener installed until `dispose()`, so
 // a repeated Ctrl-C while the caller stops prints a notice instead of killing the process mid-write.
 export function shutdownSignal(
   notice: (text: string) => void = writeShutdownNotice,
@@ -58,13 +84,14 @@ export function shutdownSignal(
       }
     }
   };
-  process.on('SIGINT', handler);
-  process.on('SIGTERM', handler);
+  for (const signal of STOP_SIGNALS) process.on(signal, handler);
+  const stopListening = onStopMessage(handler);
   return {
     signalled,
     dispose() {
-      process.removeListener('SIGINT', handler);
-      process.removeListener('SIGTERM', handler);
+      for (const signal of STOP_SIGNALS)
+        process.removeListener(signal, handler);
+      stopListening();
     },
   };
 }

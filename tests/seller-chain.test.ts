@@ -38,7 +38,6 @@ void test('a seller set up with a payout gets a payment server for its own keys 
     await setupRole({
       role: P2P_ROLES.SELLER,
       mint: await address(),
-      buyer: await address(),
     });
     const role = await loadRole(P2P_ROLES.SELLER);
     assert.ok(role.role === P2P_ROLES.SELLER && role.facilitator);
@@ -61,10 +60,13 @@ void test('a seller set up with a payout gets a payment server for its own keys 
     }
   }));
 
-void test('a seller set up without a payout cannot sell paid', () =>
+void test('a seller role without payment fields (earlier free setup) cannot sell paid', () =>
   withHome(async () => {
     await setupRole({ role: P2P_ROLES.SELLER, mint: await address() });
-    const role = await loadRole(P2P_ROLES.SELLER);
+    const loaded = await loadRole(P2P_ROLES.SELLER);
+    if (loaded.role !== P2P_ROLES.SELLER) throw new Error('unexpected role');
+    const { authorizer, facilitator, payTo, ...role } = loaded;
+    void [authorizer, facilitator, payTo];
     await assert.rejects(
       sellerChainPayments(async () => DEVNET_GENESIS, offline().rpc)(role),
       (error) =>
@@ -78,7 +80,6 @@ void test('a role whose RPC is not devnet, or cannot answer, never opens payment
     await setupRole({
       role: P2P_ROLES.SELLER,
       mint: await address(),
-      buyer: await address(),
     });
     const role = await loadRole(P2P_ROLES.SELLER);
     for (const genesis of [
@@ -106,7 +107,6 @@ void test('a seller whose payout, fee or fee payer token account cannot be creat
     await setupRole({
       role: P2P_ROLES.SELLER,
       mint: await address(),
-      buyer: await address(),
     });
     const role = await loadRole(P2P_ROLES.SELLER);
     await assert.rejects(

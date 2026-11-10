@@ -3,6 +3,7 @@
 // --online it also looks the NodeId up in the discovery index, sending only the model. Prints counts,
 // codes, public identifiers and URL origins; never a prompt, a buyer, a key, the home location or a value
 // from the environment.
+import { runMode } from '@gyblos/config';
 import { fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
 import { listReceipts } from '@gyblos/node/receipts';
@@ -10,7 +11,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { urlOrigin } from './cli-format';
 import { codeHint } from './cli-hints';
-import { LISTING, nextStep } from './cli-next';
+import { commandsFor, LISTING, nextStep, sellerCommand } from './cli-next';
 import { updateNotice } from './cli-update';
 import {
   EXIT,
@@ -27,6 +28,7 @@ import {
   type SellerOutput,
 } from './seller-home';
 import {
+  outputRate,
   receiptActivity,
   type ActivityWindow,
   type DaemonStatus,
@@ -34,6 +36,7 @@ import {
 import {
   defaultStatusSystem,
   inContainer,
+  legacyService,
   readDaemonStatus,
   serviceState,
   type DaemonFile,
@@ -118,7 +121,7 @@ async function discoveryLine(
 ) {
   if (!discovery)
     return {
-      text: 'configuration invalid; run `pnpm gyblos doctor`',
+      text: 'configuration invalid; run `gyblos doctor`',
       listing: LISTING.UNKNOWN,
     };
   if (!discovery.publish) return { text: 'off', listing: LISTING.OFF };
@@ -141,13 +144,12 @@ async function discoveryLine(
   };
 }
 
-function windowLine({
-  completed,
-  failed,
-  cancelled,
-  outputTokens,
-}: ActivityWindow) {
-  return `${completed} completed, ${failed} failed, ${cancelled} cancelled; ${outputTokens} output tokens`;
+function windowLine(window: ActivityWindow) {
+  const { completed, failed, cancelled, outputTokens } = window;
+  const rate = outputRate(window);
+  const speed =
+    rate === undefined ? '' : `; ~${rate.toFixed(1)} output tokens/s`;
+  return `${completed} completed, ${failed} failed, ${cancelled} cancelled; ${outputTokens} output tokens${speed}`;
 }
 
 async function activityLines(
@@ -228,7 +230,8 @@ export async function statusCommand(
   const update = updateNotice(
     output.env,
     system.fetch,
-    inContainer(output.env),
+    runMode(output.env),
+    system.platform,
   );
   const [service, daemon, discovery] = await Promise.all([
     serviceState(system, output.env),
@@ -244,6 +247,10 @@ export async function statusCommand(
       inContainer(output.env) ? `${service} (container)` : service,
     ),
   );
+  if (await legacyService(system))
+    output.stdout(
+      `  This service was installed by an older release: reinstall it with \`${sellerCommand(runMode(output.env), 'seller service uninstall')}\`, then \`${sellerCommand(runMode(output.env), 'seller service install')}\`.\n`,
+    );
   output.stdout(line('daemon', daemonLine(daemon)));
   for (const offer of status?.offers ?? [])
     output.stdout(
@@ -259,7 +266,9 @@ export async function statusCommand(
     status,
     identity.nodeId,
   );
-  output.stdout(line('discovery', listing.text));
+  output.stdout(
+    line('discovery', commandsFor(runMode(output.env), listing.text)),
+  );
   output.stdout(
     `Activity, from signed receipts (at most ${RECEIPT_STORAGE.maxEntries} kept):\n`,
   );
@@ -270,17 +279,13 @@ export async function statusCommand(
   if (verdict === STATUS_RESULTS.FAILING && failure) {
     const where = failure.phase ? ` at ${failure.phase}` : '';
     const code = failure.code ?? 'no static code; see the daemon log';
-    const help = failure.code ? codeHint(failure.code) : '';
+    const help = failure.code ? codeHint(failure.code, output.env) : '';
     output.stdout(
       `  The last start failed${where}: ${code}${help ? ` (${help})` : ''}\n`,
     );
   }
   if (verdict === STATUS_RESULTS.RUNNING) {
-    const next = nextStep(
-      listing.listing,
-      identity.owner,
-      inContainer(output.env),
-    );
+    const next = nextStep(listing.listing, identity.owner, runMode(output.env));
     if (listing.listing === LISTING.LISTED)
       output.stdout('Selling: buyers can find this seller in the index.\n');
     else if (next) output.stdout(`Next: ${next}\n`);

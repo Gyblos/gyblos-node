@@ -93,7 +93,10 @@ void test('doctor: an empty home fails the role check with a setup hint and exit
     assert.equal(result.code, 1);
     assert.match(line(result.output, 'role'), /FAIL\s+role\s+ROLE_MISSING/);
     assert.match(line(result.output, 'keys'), /WARN\s+keys\s+NOT_CHECKED/);
-    assert.match(result.output, /pnpm node:setup --role seller --mint MINT`/);
+    assert.match(
+      result.output,
+      /`pnpm gyblos setup --role seller --mint MINT`/,
+    );
     assert.doesNotMatch(result.output, /--pay-to/);
     assert.match(result.output, /NOT READY/);
   }));
@@ -254,7 +257,7 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
     );
     assert.match(
       line(stopped.output, 'tokenizer'),
-      /FAIL\s+tokenizer\s+TOKENIZER_UNAVAILABLE\s+run `pnpm node:tokenizer`/,
+      /FAIL\s+tokenizer\s+TOKENIZER_UNAVAILABLE\s+run `pnpm gyblos tokenizer`/,
     );
     // The engine is checked by describing it only: the model list, never a generation.
     const ollama = await withOllama(run);
@@ -314,7 +317,7 @@ void test('doctor: the gyblos script entry sets exit code 1 for an empty home', 
   const home = join(tmpdir(), `gyblos-doctor-empty-${process.pid}`);
   const result = spawnSync(
     process.execPath,
-    ['--import', 'tsx', 'apps/node/src/cli.ts', 'doctor'],
+    ['--import', 'tsx', 'apps/node/src/bin.ts', 'doctor'],
     {
       cwd: REPOSITORY_ROOT,
       env: {

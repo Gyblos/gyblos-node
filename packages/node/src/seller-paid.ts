@@ -11,11 +11,16 @@ import type { PaidExecutionService } from '@gyblos/transport-iroh/paid-server';
 
 import { NODE_ERROR_CODES, PAID_SETTLEMENT } from './constants';
 import { NodeError } from './errors';
-import { createSellerPaidOffers } from './paid-offers';
+import {
+  createSellerPaidOffers,
+  type SellerPaidOffersOptions,
+} from './paid-offers';
 import { createPaidRetry, type PaidRetryHealth } from './paid-retry';
 import type { LiveSellerOffer } from './seller-offer-set';
+import type { SellerSessionBackend } from './session-backend';
 
 export interface SellerPayments {
+  sessions?: { buyerNodeId: string; backend: SellerSessionBackend };
   server: PaymentServer;
   // Re-drives claims the payment server recorded before a restart, each with its recorded charge.
   recover?(): Promise<void>;
@@ -32,6 +37,7 @@ export interface SellerPaidHealth extends PaidRetryHealth {
 }
 
 export interface SellerPaid {
+  sessions?: SellerPayments['sessions'];
   description: PaymentDescription;
   service: PaidExecutionService;
   health(): SellerPaidHealth;
@@ -66,6 +72,7 @@ export async function startSellerPaid(
     startedAt: number;
     now?: () => number;
     offers: () => readonly LiveSellerOffer[];
+    telemetry?: SellerPaidOffersOptions['telemetry'];
     settlement?: { waitMs: number; retryDelaysMs: readonly number[] };
   },
 ): Promise<SellerPaid> {
@@ -87,6 +94,7 @@ export async function startSellerPaid(
   });
   const service = createSellerPaidOffers(options.offers, {
     owner: options.owner,
+    telemetry: options.telemetry,
     nodeId: options.nodeId,
     now: options.now ?? Date.now,
     ledger: new PaidSellerLedger(options.startedAt),
@@ -103,6 +111,7 @@ export async function startSellerPaid(
   });
   return {
     description,
+    sessions: payments.sessions,
     service,
     health: () => ({ ...retry.health(), refusedClaims, recoveryFailed }),
     // Stops waiting on claims first, then retries, then gives recovery up to one claim wait (a hung

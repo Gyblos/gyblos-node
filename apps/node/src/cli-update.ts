@@ -1,7 +1,13 @@
-// Tells the operator of a released seller image when a newer release exists, for `gyblos seller status`.
-// The image carries its version in GYBLOS_VERSION (set by the release build); a build without it, or with
+// Tells the operator of a released seller (image or packaged) when a newer release exists, for `gyblos
+// seller status`. Both carry their version in GYBLOS_VERSION (set by the release build); a build without it, or with
 // GYBLOS_UPDATE_CHECK=0, checks nothing. The check is one bounded HTTPS request for the latest release of
 // the public repository, sending nothing about the seller; any failure is silent.
+import {
+  INSTALLERS,
+  NODE_ENVIRONMENT,
+  RUN_MODES,
+  type RunMode,
+} from '@gyblos/config';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 
 export const UPDATE = {
@@ -81,15 +87,23 @@ async function latestRelease(fetch: DiscoveryFetch) {
 export async function updateNotice(
   environment: Readonly<Record<string, string | undefined>>,
   fetch: DiscoveryFetch,
-  container: boolean,
+  mode: RunMode,
+  platform: NodeJS.Platform = process.platform,
 ): Promise<string | undefined> {
   const current = environment[UPDATE.versionEnv];
   if (!current || !parse(current) || environment[UPDATE.switchEnv] === '0')
     return undefined;
   const latest = await latestRelease(fetch);
   if (!latest || !newerVersion(latest, current)) return undefined;
-  const how = container
-    ? 'run `sh install.sh update` where you installed the seller'
-    : 'install the new release';
+  // The image and the packaged release are installed and updated by install.sh (install.ps1 on Windows),
+  // or npm's package by npm.
+  let how = 'run `sh install.sh update` where you installed the seller';
+  if (mode === RUN_MODES.SOURCE) how = 'install the new release';
+  else if (environment[NODE_ENVIRONMENT.installedBy] === INSTALLERS.npm)
+    how =
+      'run `npm install -g gyblos@latest`, then restart the seller (`gyblos seller service uninstall`, then `gyblos seller service install`)';
+  else if (platform === 'win32')
+    how =
+      'run `powershell -ExecutionPolicy Bypass -File install.ps1 update` where you saved install.ps1';
   return `v${latest} is available (this seller runs v${current}); ${how}.`;
 }

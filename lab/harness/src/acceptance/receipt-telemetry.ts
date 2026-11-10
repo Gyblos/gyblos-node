@@ -11,7 +11,7 @@ import {
 } from '@gyblos/config';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
-import { TELEMETRY_EVENTS } from '@gyblos/protocol/telemetry';
+import { EXECUTION_ROUTES, TELEMETRY_EVENTS } from '@gyblos/protocol/telemetry';
 
 import { acceptanceAssert } from './errors';
 import { RECEIPT_ACCEPTANCE } from './receipt-constants';
@@ -83,6 +83,8 @@ export async function receiptTelemetry(
           'delivered',
           'refusal',
           'firstTokenMs',
+          'path',
+          'generationMs',
         ];
         const keys = Object.keys(value);
         acceptanceAssert(keys.every((key) => allowed.includes(key)));
@@ -109,6 +111,17 @@ export async function receiptTelemetry(
         )
           row.terminal++;
         if (event.type === TELEMETRY_EVENTS.COMPLETED) completed++;
+        // A real seller completion over Iroh names the path it travelled; unknown is a defect.
+        if (
+          role === P2P_ROLES.SELLER &&
+          event.type === TELEMETRY_EVENTS.COMPLETED
+        ) {
+          const path = controlObject(event.path, ['route', 'routeChanged']);
+          acceptanceAssert(
+            path.route === EXECUTION_ROUTES.DIRECT ||
+              path.route === EXECUTION_ROUTES.RELAY,
+          );
+        }
         if (event.type === TELEMETRY_EVENTS.FAILED) failed++;
         if (event.type === TELEMETRY_EVENTS.FIRST_TOKEN) first++;
         counts.set(event.requestId, row);

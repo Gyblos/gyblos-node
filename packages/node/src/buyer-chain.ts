@@ -8,13 +8,16 @@ import {
   PROTOCOL_FEE,
   UPTO_CHANNEL_SETTINGS,
 } from '@gyblos/config';
+import { batchSessionPathsIn } from '@gyblos/config/home';
 import {
   hasUnresolvedBuyerPayments,
   openUptoBuyerPayments,
   type UptoBuyerPayments,
   type UptoBuyerPaymentsOptions,
 } from '@gyblos/payments-upto';
+import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { SESSION_STATES } from '@gyblos/protocol/payment-session';
 
 import { NODE_ERROR_CODES } from './constants';
 import { NodeError } from './errors';
@@ -55,5 +58,14 @@ export function buyerChainPayments(
 }
 
 // Free quotes still respect unresolved signed payments, without starting the paid client or RPC.
-export const buyerPaymentsUnresolved = () =>
-  hasUnresolvedBuyerPayments(buyerJournalPathsIn(process.env));
+export async function buyerPaymentsUnresolved(includeSession = true) {
+  if (await hasUnresolvedBuyerPayments(buyerJournalPathsIn(process.env)))
+    return true;
+  if (!includeSession) return false;
+  const session = await inspectBatchSession(
+    batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+  );
+  return (
+    session !== undefined && session.snapshot.state !== SESSION_STATES.CLOSED
+  );
+}

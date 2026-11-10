@@ -30,9 +30,9 @@ The journal reads v1–v4 and writes v5, which also records closure/refund
 attempts. Its private path and original opening terms stay unchanged. Older
 binaries refuse v5; do not downgrade while channels are pending. Opening
 reconciliation does not request closure, refund an open deposit or make a
-channel reusable between requests. It does not recover a stale paid-v2 process
-lock. A retained lock still requires investigation; never delete it to bypass an
-uncertain payment.
+channel reusable between requests. Lock acquisition can reclaim a complete lock
+whose owner is dead on the same host and PID namespace. Ambiguous ownership
+requires investigation; never delete a lock to bypass an uncertain payment.
 
 ## Paid v2 closure and refund results
 
@@ -57,19 +57,48 @@ channel nor a transport error proves a refund. The withdrawal leaves the buyer
 journal unresolved until reconciliation. A pending control attempt independently
 blocks new payments, even if financial reconciliation already settled its row.
 
-After a controlled stop/reopen, withdrawal first queries the original signature
-in historical statuses and reads context-bound finalized channel state. It does
-not sign or send a replacement while the result is live, nonfinal or
-unavailable. Strict expiry requires finalized block height greater than the
-original lifetime and a valid channel observation; it is not proof of success or
-refund. Resolving a pending attempt returns without another send in that call. A
-later invocation can progress from the verified channel state. Resolved metadata
-retains its observation slot to reject older bank views.
+After restart, withdrawal first queries the original signature in historical
+statuses and reads context-bound finalized channel state. It does not sign or
+send a replacement while the result is live, nonfinal or unavailable. Strict
+expiry requires finalized block height greater than the original lifetime and a
+valid channel observation; it is not proof of success or refund. Resolving a
+pending attempt returns without another send in that call. A later invocation
+can progress from the verified channel state. Resolved metadata retains its
+observation slot to reject older bank views.
 
-Automatic hard-crash lock recovery and protection against restoring an old
-journal remain separate. Tests cover controlled reopen, not those guarantees. Do
-not clear a lock or journal, retry a prompt or authorize a replacement channel
-to bypass uncertainty.
+Same-host process-death recovery is exercised with actual SIGKILL and normal
+lock acquisition. Incomplete owner records, another host, a live PID or an
+orphan takeover guard beside an existing lock remain refused. The lock does not
+detect process-start identity or provide cross-host/PID-namespace coordination.
+Do not clear a lock or journal, retry a prompt or authorize a replacement
+channel to bypass uncertainty.
+
+## Offline abrupt-exit acceptance
+
+The native crash suites run the actual payment client, journal, withdrawal and
+financial reconciliation modules in a disposable child. A parent retains the
+official-source payment-channel program in LiteSVM and synthetic wallet custody.
+Private IPC carries signer/RPC requests; keys never leave the parent. Explicit
+barriers surround checkpoints, signatures, inclusion and financial/control
+resolution. The test kills and reaps the child before reopening the same home,
+without deleting a journal or lock. An accepted send can land after the child
+dies; the simulated chain is never rolled back with the buyer.
+
+Financial observations are derived from decoded SPL accounts before/after native
+execution and projected onto the SDK's existing RPC reader contracts. The
+acceptance checks both those observations and direct native balances. Missing
+financial evidence keeps the buyer blocked even after control confirmation.
+
+The injected backend consistently uses the SDK's testnet identifier, whose
+program treasury matches the pinned SBF. It contacts no public network and does
+not change the mainnet guard. This validates payment modules over a synthetic
+backend, not the node's devnet startup, a deployed binary, network finality or
+public RPC behavior. Simulated inclusion is treated as finalized locally.
+
+Process death is not OS/drive power loss: fsync does not provide F_FULLFSYNC on
+macOS. Restoration of an old home/journal can still erase later checkpoints;
+independent rollback protection remains separate. Reusable multi-request
+channels and background channel management are not enabled by this acceptance.
 
 The remaining sections describe the separate legacy paid-v1 recovery path.
 

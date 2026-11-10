@@ -60,7 +60,8 @@ void test('buyer:free explains each startup failure without printing the home pa
     );
     assert.match(noRole.stderr, /pnpm node:setup --role buyer/);
 
-    const setup = run('apps/node/src/setup.ts', home, [
+    const setup = run('apps/node/src/bin.ts', home, [
+      'setup',
       '--role',
       'buyer',
       '--mint',

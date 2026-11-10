@@ -15,9 +15,10 @@ forwards local requests to it. Both are devnet-only and experimental.
 ## Local home
 
 All node data lives under one local home, `GYBLOS_HOME` (default `.local/gyblos`
-in the working directory; a container image would use `/data`). Each role has
-its own directory, so one machine can hold a buyer and a seller side by side
-without sharing keys or journals:
+in the working directory; the seller image uses `/data`, and the packaged
+release `~/.gyblos`, where it also reads `gyblos.toml`). Each role has its own
+directory, so one machine can hold a buyer and a seller side by side without
+sharing keys or journals:
 
 | Path                              | Contents                                                    |
 | --------------------------------- | ----------------------------------------------------------- |
@@ -126,18 +127,22 @@ rewrite leaves the moved config and original backup for manual recovery.
 `pnpm node:setup --role` creates the role directory, the role file, the Iroh
 node key (`node.key`) and the role's Solana keys with private permissions. It
 never overwrites existing keys; a mismatched existing role stops with an error.
-A seller needs only `--mint`: it gets an owner key and a node key. The paid
-seller keys (authorizer and facilitator) and fields (`payTo`, allowed `buyer`)
-are created when `--buyer` is given. For a new paid seller, `payTo` is the owner
-wallet; `--buyer` can be any address you control (v2 does not use it). Existing
-roles with a different payout are preserved and receive a warning at
-registration. New roles reject an explicit `--pay-to`; free sellers omit both.
+A seller needs only `--mint`: it gets an owner key, a node key and the payment
+keys (authorizer and facilitator, the fee payer), with `payTo` set to the owner,
+so any offer can be free or priced. Running setup again on a seller created
+without payment keys (earlier releases) adds them, keeping its NodeId, owner and
+registration; the installer does this on every run. Existing roles with a
+different payout are preserved and receive a warning at registration. `--buyer`
+and `--pay-to` are no longer used and are refused. A seller `role.json` with
+payment fields also keeps `buyer` (the owner, unused) so that an earlier image
+still loads it; the `buyer` field is ignored. Running an earlier `install.sh`
+after the upgrade is not supported.
 
 | File                                             | Role   | Contents                                                                                                               |
 | ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
 | `role.json`                                      | both   | Role, mint, NodeId and public addresses.                                                                               |
 | `node.key`                                       | both   | Iroh secret key (private).                                                                                             |
-| `*.json` keys                                    | both   | Buyer key, or seller owner key (paid keys are added with `--buyer`).                                                   |
+| `*.json` keys                                    | both   | Buyer key, or seller owner, authorizer and fee payer (facilitator) keys.                                               |
 | `offer.json`                                     | buyer  | A paid v1 seller's signed offer (lab gates only).                                                                      |
 | `trust.json`                                     | buyer  | Which seller and limits the buyer accepts.                                                                             |
 | `status.json`                                    | both   | `starting` with a phase, then `ready`; a seller lists each offer's index, model, engine kind and whether it is listed. |
@@ -173,13 +178,12 @@ pnpm node:start
   the environment or `seller.env`, and it prints only their variable names.
   `examples/seller-daemon.toml` is an equivalent file to copy instead.
 - The seller serves configured free and paid offers in `gyblos.toml`; it needs
-  at least one offer to start (`SELLER_OFFERS_MISSING`). A paid offer is sold on
-  devnet over the paid stream when the seller role was set up with a payout
-  (`pnpm node:setup --role seller --mint <mint> --buyer <address>` in a new
-  `GYBLOS_HOME`; `--buyer` is still required by the v1 setup). The fee payer key
-  needs devnet SOL for transaction fees, channel rent and, once, the rent of any
-  missing payout, fee, fee payer or buyer token account, which the seller
-  creates so that no claim is redirected to the payment program
+  at least one offer to start (`SELLER_OFFERS_MISSING`). A paid offer
+  (`price = {...}` instead of `free`) is sold on devnet over the paid stream.
+  The fee payer key (`fee payer` in `gyblos doctor`'s identity) needs devnet SOL
+  for transaction fees, channel rent and, once, the rent of any missing payout,
+  fee, fee payer or buyer token account, which the seller creates so that no
+  claim is redirected to the payment program
   ([Seller startup](configuration.md#seller-startup)). Paid v2 has settled on
   devnet only in a controlled run; the v1 paid path remains in the lab gates
   only.
@@ -252,6 +256,17 @@ pnpm gyblos seller service uninstall           # stops and removes it
 - macOS: a launch agent (`~/Library/LaunchAgents/com.gyblos.seller.plist`) that
   runs while you are logged in and logs to `<home>/service.log`. launchd has no
   memory or CPU limit; the startup headroom check still applies.
+- Windows (packaged release only, from `install.ps1` or npm): a scheduled task
+  `Gyblos\Seller-<id>` of your account (its XML and the script it runs are kept
+  in `%LOCALAPPDATA%\Gyblos`) that starts at your logon, with least privilege
+  and no window (`conhost --headless`), and runs `gyblos service-run`. That
+  supervisor loads `seller.env` (Notepad's CRLF lines are accepted; names are
+  reserved whatever their case, also `SystemRoot`, `ComSpec`, `PATHEXT`,
+  `USERPROFILE` and `PSModulePath`), appends the seller's output to
+  `<home>/service.log`, restarts it on failure with the same 5-in-10-minutes
+  limit and, on uninstall, stops it like a first Ctrl-C through its named pipe
+  before removing the task. It stops when you log out. Windows has no
+  per-service memory or CPU limit; the startup headroom check still applies.
 - The engine is not part of the service: run Ollama as its own service (its
   Linux installer creates one) on the offer URL.
 - Installing again refuses while a unit exists; uninstall first. The unit runs
@@ -343,9 +358,11 @@ It prints the NodeId and owner, then:
   stopped after 2000 sellers, `index unreachable`, or that no offer was serving
   to look up;
 - counts from the seller's signed receipts for the last 24 hours and 7 days
-  (completed, failed, cancelled, output tokens), the last request time and
-  failure codes. Receipts keep at most 256 records for 7 days, so busy sellers
-  see a lower bound.
+  (completed, failed, cancelled, output tokens, and the approximate output
+  tokens per second of completed sales: time after the first token when
+  streamed, the whole request otherwise), the last request time and failure
+  codes. Receipts keep at most 256 records for 7 days, so busy sellers see a
+  lower bound.
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon;
 `STARTING`, `FAILING`, `STOPPED` and `NOT_CONFIRMED` (no service to confirm the
@@ -407,9 +424,11 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 #### Install script
 
 `install.sh` sets up the same seller from a signed release of the published
-image without a checkout. It needs only Docker with Compose v2.17 or later.
-Sellers download it from the official address, which redirects to the copy
-attached to the latest GitHub release
+image without a checkout. It needs only Docker with Compose v2.17 or later; on
+macOS Apple Silicon and Linux (x64, arm64, glibc) without Docker it installs the
+packaged seller instead (see [Without Docker](#without-docker)). Sellers
+download it from the official address, which redirects to the copy attached to
+the latest GitHub release
 (`https://github.com/Gyblos/gyblos-node/releases/latest/download/install.sh`):
 
 ```sh
@@ -505,6 +524,92 @@ cosign verify-blob install.sh --bundle install.sh.sigstore.json \
   --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 ```
 
+##### Without Docker
+
+When Docker does not run for this account (it says so when Docker is installed
+but not usable) or with `GYBLOS_MODE=native`, a release's `install.sh` installs
+the packaged seller of the same release on macOS Apple Silicon or Linux (x64,
+arm64, glibc). Intel Macs and musl Linux are told to use Docker, and Windows to
+use [`install.ps1`](#windows). With Docker running, a new install uses Docker;
+on Apple Silicon it notes that Docker cannot use the Mac's GPU, and
+`GYBLOS_MODE=native sh install.sh` installs the packaged seller instead. An
+existing install keeps its mode.
+
+- It downloads `gyblos-<version>-<target>.tar.gz` and its `.sigstore.json` from
+  the release, checks the SHA-256 the installer pins (`NATIVE_SHA256_<TARGET>`)
+  and, with cosign, the release signature, then unpacks it into `~/.gyblos/app/`
+  beside the previous release (on the same file system, marked complete, so an
+  interrupted download is fetched again). Once doctor passes it points
+  `app/current` at it and links `~/.local/bin/gyblos`; the release it replaced
+  stays for rollback, also across reruns.
+- It uses the machine's own Ollama at `127.0.0.1:11434` and never installs it:
+  when Ollama does not answer it says how to install and start it (the Ollama
+  app on a Mac) and stops; a rerun continues. It pulls the model with `ollama`.
+- It writes `gyblos.toml` and `seller.env` into `~/.gyblos` (`GYBLOS_HOME`
+  changes it), creates the keys, downloads the tokenizer, runs `gyblos doctor`
+  with `seller.env` and installs the user service
+  (`gyblos seller service install`: a launch agent on macOS, a systemd user unit
+  on Linux), replacing an earlier one so a rerun or update runs the current
+  release.
+- Registering, `publish`, `unpublish` and `update` work as with Docker, with
+  `gyblos` in place of `docker compose exec seller gyblos`; `publish` restarts
+  the service. `update` compares the pinned `NATIVE_VERSION`.
+
+##### Windows
+
+A release's `install.ps1` installs the same release's packaged seller on Windows
+10 (1803) or later, x64, from PowerShell:
+
+```powershell
+irm https://github.com/Gyblos/gyblos-node/releases/latest/download/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1   # also: publish, unpublish, update
+```
+
+- It downloads `gyblos-<version>-win32-x64.tar.gz`, checks the SHA-256 the
+  installer pins (`$NativeSha256`, set by `scripts/pin-installer-windows.sh` in
+  the release) and, with cosign, the release signature, and unpacks it with
+  Windows' own `tar` into `%LOCALAPPDATA%\Gyblos\app\` the same way as
+  `install.sh`. Once doctor passes it points the `app\current` junction at it,
+  writes `%LOCALAPPDATA%\Gyblos\bin\gyblos.cmd` and adds that folder to your
+  user `PATH` (not with `GYBLOS_MODIFY_PATH=0`).
+- The home is `%USERPROFILE%\.gyblos` (`GYBLOS_HOME`), created readable only by
+  your account, SYSTEM and Administrators, which `gyblos setup` and doctor
+  check. `gyblos.toml` and `seller.env` are written there once, as UTF-8 without
+  a byte order mark.
+- Ollama, the keys, the tokenizer, doctor, the service (the scheduled task
+  above), registering and `publish` work as in
+  [Without Docker](#without-docker). `update` downloads the latest
+  `install.ps1`, checks its checksum (and signature, with cosign) and runs it.
+  `GYBLOS_RELEASE_URL` changes where releases are downloaded from (a mirror);
+  the pinned checksum still applies.
+
+##### npm package
+
+The same packaged sellers are published to npm, for anyone who already uses it:
+`npm install -g gyblos` installs a small `gyblos` wrapper and, as an optional
+dependency, only this machine's `@gyblos/seller-<target>` (macOS arm64, Linux
+x64 and arm64 glibc, Windows x64). That package is the release archive, with its
+own Node runtime, so the seller never runs on the user's Node; npm installs the
+pinned iroh binding as its dependency. Then `gyblos seller init`,
+`gyblos setup --role seller --mint <mint>`, `gyblos tokenizer`, `gyblos doctor`
+and `gyblos seller service install`, with the machine's own Ollama as in
+[Without Docker](#without-docker). `gyblos seller status` says to update with
+`npm install -g gyblos@latest` and then reinstall the service, so it restarts on
+the new code (a service from an nvm-managed Node follows that Node version).
+`npx gyblos` runs commands, but the service refuses to run from a temporary
+cache (npx, pnpm dlx, bunx).
+
+`pnpm build:npm --version <v>` packs them from `pnpm build:native` archives of
+the same version. The release builds them in its `native` job; its `npm` job
+publishes them with provenance only when the repository variable `NPM_PUBLISH`
+is `true`. One-time setup: the npm organization `gyblos`, then an `NPM_TOKEN`
+secret that can publish `gyblos` and `@gyblos/seller-<target>` (npm sets up
+trusted publishing only on a package that already exists, so the first release
+needs the token; afterwards this workflow can be their trusted publisher). A
+version already on npm is skipped, so the job can be re-run. As on GitHub,
+`latest` moves only to a newer version; an older line's release is tagged
+`previous`.
+
 ##### Releasing the seller image
 
 A release is a version tag pushed from a commit on `main`, one tag at a time.
@@ -553,6 +658,36 @@ One-time GitHub setup, by an organization owner:
   authentication for every member.
 
 The package is public, so the image exposes the node's source.
+
+##### Building the packaged seller
+
+The packaged seller (for installs without Docker) is a folder with its own Node
+runtime, so the seller's machine needs no checkout, pnpm or Node:
+
+| Path                   | Contents                                                   |
+| ---------------------- | ---------------------------------------------------------- |
+| `bin/gyblos`           | Launcher: sets the packaged mode and runs the bundle.      |
+| `runtime/node`         | The official Node release binary (and its `LICENSE`).      |
+| `lib/gyblos.mjs`       | One bundle of `apps/node/src/bin.ts` and its dependencies. |
+| `lib/node_modules/...` | The iroh binding for the target (the only native module).  |
+
+```sh
+pnpm build:native --version 0.1.0-beta.8 --target darwin-arm64 --target linux-x64 --target linux-arm64
+```
+
+Targets are `darwin-arm64`, `linux-x64` and `linux-arm64` (glibc), and
+`win32-x64`, whose folder has `bin/gyblos.cmd` and `runtime/node.exe` (Node's
+Windows zip, unpacked with `unzip`; Windows 10 and later unpack the archive with
+their own `tar`). Intel Macs and musl Linux keep Docker. Each archive,
+`dist/native/gyblos-<version>-<target>.tar.gz`, comes with a `.sha256`. The Node
+archive is checked against the SHA-256 pinned in `tooling/native-build.ts` and
+the iroh binding against `pnpm-lock.yaml`. `--node "$(command -v node)"` reuses
+this machine's Node and installed binding for a local build of this machine's
+target, with no download.
+
+The packaged seller keeps its home and `gyblos.toml` in `~/.gyblos` and runs as
+`gyblos start`; `gyblos seller service install` makes the service run the
+launcher.
 
 ## Buyer
 

@@ -7,7 +7,8 @@
 #   OLLAMA_HOST=127.0.0.1:11435 ollama pull qwen3:0.6b
 # Never expose it to the network (no OLLAMA_HOST=0.0.0.0, no "Expose Ollama" app setting). Start with
 #   GYBLOS_CONFIG=examples/seller-daemon.toml pnpm node:start
-# Paid offers are refused at startup until paid selling returns (docs/configuration.md).
+# Free by default. To charge, give an offer `price = {...}` instead of `free` (docs/configuration.md) and
+# fund the fee payer `gyblos doctor` prints with devnet SOL.
 
 version = 1
 

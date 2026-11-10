@@ -44,18 +44,18 @@ export function createSellerFreeRouter(
     return undefined;
   };
   return {
-    async respond(value, peer, signal) {
+    async respond(value, peer, signal, probe) {
       const request = parseFreeExecutionRequest(value);
       const service = route(request);
       return service
-        ? service.respond(request, peer, signal)
+        ? service.respond(request, peer, signal, probe)
         : unsupported(request);
     },
-    async stream(value, peer, signal, onDelta) {
+    async stream(value, peer, signal, onDelta, probe) {
       const request = parseFreeExecutionRequest(value);
       const service = route(request);
       return service
-        ? service.stream(request, peer, signal, onDelta)
+        ? service.stream(request, peer, signal, onDelta, probe)
         : unsupported(request);
     },
   };

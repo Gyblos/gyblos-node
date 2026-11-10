@@ -1,8 +1,20 @@
 diff --git a/dist/cjs/batch-settlement/client/index.d.ts b/dist/cjs/batch-settlement/client/index.d.ts
-index 82df8720d3312a6524a081321a29683adeaaf0a5..cd68390a5a6f5a266120f7b68b9d52cb5bb53bdb 100644
+index 82df8720d3312a6524a081321a29683adeaaf0a5..d84fe83595eb8afd5da763c8e864ab939c0b3c7c 100644
 --- a/dist/cjs/batch-settlement/client/index.d.ts
 +++ b/dist/cjs/batch-settlement/client/index.d.ts
-@@ -268,6 +268,14 @@ interface BatchClientChannelStorage {
+@@ -63,7 +63,11 @@ interface BuildDepositArgs {
+     };
+     openSlot: bigint;
+     depositAmount: bigint;
++    /** Optional distribution, already validated by the host before constructing the channel. */
++    splits?: ReadonlyArray<{ recipient: string; bps: number }> | undefined;
+     firstCharge: bigint;
++    /** Opt in to a zero initial charge for client-signed metered sessions. */
++    allowZeroFirstCharge?: boolean | undefined;
+     withdrawDelay: number;
+     memo?: string | undefined;
+     /** Channel-derivation salt; random when omitted. */
+@@ -268,6 +272,14 @@ interface BatchClientChannelStorage {
      delete(key: string): Promise<void>;
  }
  interface BatchSvmClientConfig extends ClientSvmConfig {
@@ -18,10 +30,10 @@ index 82df8720d3312a6524a081321a29683adeaaf0a5..cd68390a5a6f5a266120f7b68b9d52cb
      depositAmount?: bigint | string | undefined;
      /** Policy used to size deposits when `depositAmount` is not set. */
 diff --git a/dist/cjs/batch-settlement/client/index.js b/dist/cjs/batch-settlement/client/index.js
-index 5440c1945c3c1d0d97553a9613dabb57dc6078c3..77e2e0d2b993fa01046ed5a6c60e4f8baaafcac8 100644
+index 5440c1945c3c1d0d97553a9613dabb57dc6078c3..fe328e0bda97e26ada21b08678921f86aee9dd1b 100644
 --- a/dist/cjs/batch-settlement/client/index.js
 +++ b/dist/cjs/batch-settlement/client/index.js
-@@ -1275,6 +1275,29 @@ async function credentialFor(mode, tracker, charge, authorization, refund = fals
+@@ -1275,8 +1275,31 @@ async function credentialFor(mode, tracker, charge, authorization, refund = fals
      }
    }
  }
@@ -49,8 +61,11 @@ index 5440c1945c3c1d0d97553a9613dabb57dc6078c3..77e2e0d2b993fa01046ed5a6c60e4f8b
 +  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
 +}
  async function buildDepositPayload(args) {
-   if (args.firstCharge <= 0n || args.firstCharge > args.depositAmount) {
+-  if (args.firstCharge <= 0n || args.firstCharge > args.depositAmount) {
++  if (args.firstCharge < 0n || args.firstCharge === 0n && (args.allowZeroFirstCharge !== true || args.voucherSigner === "server") || args.firstCharge > args.depositAmount) {
      throw new Error("first charge must be positive and no greater than the deposit");
+   }
+   if (args.openSlot > BigInt(Number.MAX_SAFE_INTEGER)) {
 @@ -1305,7 +1328,7 @@ async function buildDepositPayload(args) {
      openSlot: args.openSlot,
      payee: args.feePayer,
@@ -60,6 +75,15 @@ index 5440c1945c3c1d0d97553a9613dabb57dc6078c3..77e2e0d2b993fa01046ed5a6c60e4f8b
      ...args.salt !== void 0 ? { salt: args.salt } : {},
      tokenProgram: args.tokenProgram
    });
+@@ -1321,7 +1344,7 @@ async function buildDepositPayload(args) {
+     ...voucherSigner === "server" ? { voucherSigner } : {}
+   };
+   const tracker = new BatchChannelTracker(open.channelId, channelConfig, args.payer);
+-  const credential = pendingAuthorization ? await credentialFor("server", tracker, args.firstCharge, pendingAuthorization) : await credentialFor("client", tracker, args.firstCharge);
++  const credential = args.firstCharge === 0n ? { voucher: await signBatchVoucher(args.payer, { channelId: open.channelId, maxClaimableAmount: 0n, expiresAt: 0 }) } : pendingAuthorization ? await credentialFor("server", tracker, args.firstCharge, pendingAuthorization) : await credentialFor("client", tracker, args.firstCharge);
+   return {
+     channelId: open.channelId,
+     payload: {
 @@ -1625,6 +1648,14 @@ function untrustedOperatorMessage(...operators) {
  
  // src/batch-settlement/client/scheme.ts
@@ -230,7 +254,7 @@ index d92523458e9417acb4d8eb89540a4edc5e427d7c..40f954544bd02eb5b371c6b0e90d22ed
              withdrawDelay: raw.channelConfig.withdrawDelay
            });
 diff --git a/dist/cjs/index.js b/dist/cjs/index.js
-index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..b71d4611a2370ff2a36b6722f3efb2ecde193923 100644
+index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..e846978dccf088caa2eee6ae867d66bd13e6dc90 100644
 --- a/dist/cjs/index.js
 +++ b/dist/cjs/index.js
 @@ -1192,6 +1192,27 @@ function requireTokenProgramHint(extra, invalid) {
@@ -270,6 +294,15 @@ index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..b71d4611a2370ff2a36b6722f3efb2ec
    return { feePayer, receiverAuthorizer, splits, withdrawDelay };
  }
  
+@@ -1778,7 +1799,7 @@ async function credentialFor(mode, tracker, charge, authorization, refund = fals
+   }
+ }
+ async function buildDepositPayload(args) {
+-  if (args.firstCharge <= 0n || args.firstCharge > args.depositAmount) {
++  if (args.firstCharge < 0n || args.firstCharge === 0n && (args.allowZeroFirstCharge !== true || args.voucherSigner === "server") || args.firstCharge > args.depositAmount) {
+     throw new Error("first charge must be positive and no greater than the deposit");
+   }
+   if (args.openSlot > BigInt(Number.MAX_SAFE_INTEGER)) {
 @@ -1807,7 +1828,7 @@ async function buildDepositPayload(args) {
      openSlot: args.openSlot,
      payee: args.feePayer,
@@ -279,6 +312,15 @@ index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..b71d4611a2370ff2a36b6722f3efb2ec
      ...args.salt !== void 0 ? { salt: args.salt } : {},
      tokenProgram: args.tokenProgram
    });
+@@ -1823,7 +1844,7 @@ async function buildDepositPayload(args) {
+     ...voucherSigner === "server" ? { voucherSigner } : {}
+   };
+   const tracker = new BatchChannelTracker(open.channelId, channelConfig, args.payer);
+-  const credential = pendingAuthorization ? await credentialFor("server", tracker, args.firstCharge, pendingAuthorization) : await credentialFor("client", tracker, args.firstCharge);
++  const credential = args.firstCharge === 0n ? { voucher: await signBatchVoucher(args.payer, { channelId: open.channelId, maxClaimableAmount: 0n, expiresAt: 0 }) } : pendingAuthorization ? await credentialFor("server", tracker, args.firstCharge, pendingAuthorization) : await credentialFor("client", tracker, args.firstCharge);
+   return {
+     channelId: open.channelId,
+     payload: {
 @@ -2126,7 +2147,38 @@ function untrustedOperatorMessage(...operators) {
  }
  
@@ -498,10 +540,22 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..8c78727e26e43c1f4e6184ef4976797f
      const blockhashPromise = this.signer.getLatestBlockhash(network);
      let channel;
 diff --git a/dist/esm/batch-settlement/client/index.d.mts b/dist/esm/batch-settlement/client/index.d.mts
-index 421e5ac1b699810c8ce4064f9a5db51076e4eaa8..85f1b22fc8cffbee85b1916439e7668f72739e58 100644
+index 421e5ac1b699810c8ce4064f9a5db51076e4eaa8..fa11abf76f13dd0c97acb26e9c6e8c54fe755b05 100644
 --- a/dist/esm/batch-settlement/client/index.d.mts
 +++ b/dist/esm/batch-settlement/client/index.d.mts
-@@ -268,6 +268,14 @@ interface BatchClientChannelStorage {
+@@ -63,7 +63,11 @@ interface BuildDepositArgs {
+     };
+     openSlot: bigint;
+     depositAmount: bigint;
++    /** Optional distribution, already validated by the host before constructing the channel. */
++    splits?: ReadonlyArray<{ recipient: string; bps: number }> | undefined;
+     firstCharge: bigint;
++    /** Opt in to a zero initial charge for client-signed metered sessions. */
++    allowZeroFirstCharge?: boolean | undefined;
+     withdrawDelay: number;
+     memo?: string | undefined;
+     /** Channel-derivation salt; random when omitted. */
+@@ -268,6 +272,14 @@ interface BatchClientChannelStorage {
      delete(key: string): Promise<void>;
  }
  interface BatchSvmClientConfig extends ClientSvmConfig {
@@ -695,10 +749,10 @@ index 3aa59423ae02244da7b6db5ab944755a4e3d4677..12270c1cdf2508aa245a7393e3086520
  }
  
 diff --git a/dist/esm/chunk-FVK5QHJM.mjs b/dist/esm/chunk-FVK5QHJM.mjs
-index a26ec87f5643d4b0bd8564a8068109bae15c8948..a5522e17f2abbce516f3d85b62db7c66ae56ccad 100644
+index a26ec87f5643d4b0bd8564a8068109bae15c8948..38a0fe65eb78e72eab538648f64b32127f02d091 100644
 --- a/dist/esm/chunk-FVK5QHJM.mjs
 +++ b/dist/esm/chunk-FVK5QHJM.mjs
-@@ -158,6 +158,29 @@ async function credentialFor(mode, tracker, charge, authorization, refund = fals
+@@ -158,8 +158,31 @@ async function credentialFor(mode, tracker, charge, authorization, refund = fals
      }
    }
  }
@@ -726,8 +780,11 @@ index a26ec87f5643d4b0bd8564a8068109bae15c8948..a5522e17f2abbce516f3d85b62db7c66
 +  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
 +}
  async function buildDepositPayload(args) {
-   if (args.firstCharge <= 0n || args.firstCharge > args.depositAmount) {
+-  if (args.firstCharge <= 0n || args.firstCharge > args.depositAmount) {
++  if (args.firstCharge < 0n || args.firstCharge === 0n && (args.allowZeroFirstCharge !== true || args.voucherSigner === "server") || args.firstCharge > args.depositAmount) {
      throw new Error("first charge must be positive and no greater than the deposit");
+   }
+   if (args.openSlot > BigInt(Number.MAX_SAFE_INTEGER)) {
 @@ -188,7 +211,7 @@ async function buildDepositPayload(args) {
      openSlot: args.openSlot,
      payee: args.feePayer,
@@ -737,6 +794,15 @@ index a26ec87f5643d4b0bd8564a8068109bae15c8948..a5522e17f2abbce516f3d85b62db7c66
      ...args.salt !== void 0 ? { salt: args.salt } : {},
      tokenProgram: args.tokenProgram
    });
+@@ -204,7 +227,7 @@ async function buildDepositPayload(args) {
+     ...voucherSigner === "server" ? { voucherSigner } : {}
+   };
+   const tracker = new BatchChannelTracker(open.channelId, channelConfig, args.payer);
+-  const credential = pendingAuthorization ? await credentialFor("server", tracker, args.firstCharge, pendingAuthorization) : await credentialFor("client", tracker, args.firstCharge);
++  const credential = args.firstCharge === 0n ? { voucher: await signBatchVoucher(args.payer, { channelId: open.channelId, maxClaimableAmount: 0n, expiresAt: 0 }) } : pendingAuthorization ? await credentialFor("server", tracker, args.firstCharge, pendingAuthorization) : await credentialFor("client", tracker, args.firstCharge);
+   return {
+     channelId: open.channelId,
+     payload: {
 @@ -515,6 +538,14 @@ var OPERATION_KEY_SEPARATOR = "\0";
  
  // src/batch-settlement/client/scheme.ts

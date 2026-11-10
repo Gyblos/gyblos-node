@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./session-policy": "./src/session-policy.ts",
+    "./session-backend": "./src/session-backend.ts",
+    "./seller-sessions": "./src/seller-sessions.ts",
+    "./buyer-session": "./src/buyer-session.ts",
+    "./buyer-session-chain": "./src/buyer-session-chain.ts",
+    "./session-accounting": "./src/session-accounting.ts",
     ".": "./src/index.ts",
     "./artifacts": "./src/artifacts.ts",
     "./constants": "./src/constants.ts",
@@ -42,6 +48,7 @@
     "./free-meter": "./src/free-meter.ts",
     "./free-router": "./src/free-router.ts",
     "./paid-execution": "./src/paid-execution.ts",
+    "./policy-x402": "./src/policy-x402.ts",
     "./paid-router": "./src/paid-router.ts",
     "./paypal-inference": "./src/paypal-inference.ts",
     "./paypal-session": "./src/paypal-session.ts",
@@ -70,7 +77,10 @@
     "./buyer-operation": "./src/buyer-operation.ts",
     "./buyer-init": "./src/buyer-init.ts",
     "./buyer-init-constants": "./src/buyer-init-constants.ts",
-    "./paid-stream-output": "./src/paid-stream-output.ts"
+    "./paid-stream-output": "./src/paid-stream-output.ts",
+    "./batch-session": "./src/batch-session.ts",
+    "./batch-buyer": "./src/batch-buyer.ts",
+    "./batch-seller": "./src/batch-seller.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

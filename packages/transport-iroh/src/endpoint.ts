@@ -3,6 +3,7 @@
 import { Endpoint } from '@number0/iroh';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
@@ -29,6 +30,7 @@ export interface BindEndpointOptions {
   freeExecution?: boolean;
   // Accepts the paid stream; payment and settlement belong to the caller's service.
   paidExecution?: boolean;
+  batchSessions?: boolean;
   http?: boolean;
   bindAddress?: string;
   externalAddress?: string;
@@ -56,6 +58,7 @@ export async function bindEndpoint(
       ...(options.receipts ? [RECEIPT_CHANNEL.alpn] : []),
       ...(options.freeExecution ? [FREE_EXECUTION.alpn, FREE_STREAM.alpn] : []),
       ...(options.paidExecution ? [PAID_STREAM.alpn] : []),
+      ...(options.batchSessions ? [BATCH_CHANNEL.alpn] : []),
     ].map((alpn) => [...Buffer.from(alpn)]),
   );
   if (options.relayOnly) {

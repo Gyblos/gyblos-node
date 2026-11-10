@@ -59,7 +59,10 @@ function contentFree(text: string) {
   ])
     assert.equal(text.includes(content), false);
 }
-export async function unifiedPrivateEvidence(receipts: ReceiptV1[]) {
+export async function unifiedPrivateEvidence(
+  receipts: ReceiptV1[],
+  requirePaid = false,
+) {
   let completed = 0;
   for (const role of [P2P_ROLES.BUYER, P2P_ROLES.SELLER]) {
     const paths = receiptPathsIn(process.env, role);
@@ -109,6 +112,39 @@ export async function unifiedPrivateEvidence(receipts: ReceiptV1[]) {
         const event = telemetryMetadata(value);
         assert.equal(event.role, role);
         events.push(event);
+      }
+    }
+    if (requirePaid && role === P2P_ROLES.SELLER) {
+      const charged = events.filter(
+        (event) => event.type === TELEMETRY_EVENTS.CHARGED,
+      );
+      assert.ok(
+        charged.length > 0,
+        'paid startup must persist confirmed-charge observations',
+      );
+      for (const charge of charged) {
+        const selected = events.filter(
+          (event) => event.requestId === charge.requestId,
+        );
+        assert.equal(
+          selected.filter(
+            (event) => event.type === TELEMETRY_EVENTS.REQUEST_RECEIVED,
+          ).length,
+          1,
+        );
+        assert.equal(
+          selected.filter(
+            (event) =>
+              event.type === TELEMETRY_EVENTS.COMPLETED ||
+              event.type === TELEMETRY_EVENTS.FAILED,
+          ).length,
+          1,
+        );
+        assert.equal(
+          selected.filter((event) => event.type === TELEMETRY_EVENTS.CHARGED)
+            .length,
+          1,
+        );
       }
     }
     for (const receipt of receipts) {
@@ -189,6 +225,8 @@ function telemetryMetadata(value: unknown) {
     'network',
     'asset',
     'receipt',
+    'path',
+    'generationMs',
   ];
   const keys = Object.keys(value);
   assert.ok(keys.every((key) => allowed.includes(key)));

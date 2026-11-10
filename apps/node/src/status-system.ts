@@ -7,7 +7,7 @@ import { constants, lstat, open, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 
 import { ENVIRONMENT_SWITCH, NODE_ENVIRONMENT } from '@gyblos/config';
-import { ROLE_FILES, rolePathIn } from '@gyblos/config/home';
+import { homeLayout, ROLE_FILES, rolePathIn } from '@gyblos/config/home';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
@@ -20,6 +20,7 @@ import {
   type ServiceState,
 } from './constants';
 import { serviceLocation } from './service';
+import { windowsServiceRunning } from './service-run';
 import { parseDaemonStatus, type DaemonStatus } from './status';
 
 export interface ProbeResult {
@@ -37,6 +38,8 @@ export interface StatusSystem {
   daemonInContainer: () => Promise<boolean>;
   fetch: DiscoveryFetch;
   now: () => number;
+  // Windows: whether the home's service supervisor answers on its pipe.
+  windowsServiceRunning?: (home: string) => Promise<boolean>;
 }
 
 // The job's own state line, one tab deep, reads running only while its process is alive; nested sections
@@ -64,7 +67,7 @@ function probeCommand(argv: readonly string[]) {
 
 const PROCESS_ID = /^[0-9]+$/;
 
-// Another process in this PID namespace whose arguments include the daemon's entry; `docker compose exec`
+// Another process in this PID namespace whose arguments run the daemon's entry with `start`; `docker compose exec`
 // shares the seller container's namespace, and its own CLI process is skipped.
 export async function daemonProcess(
   procRoot = '/proc',
@@ -79,7 +82,10 @@ export async function daemonProcess(
     } catch {
       continue;
     }
-    if (cmdline.split('\0').includes(SERVICE.entry)) return true;
+    const argv = cmdline.split('\0');
+    const at = argv.indexOf(SERVICE.entry);
+    // The daemon is the entry's `start`; other `gyblos` commands run through the same entry.
+    if (at !== -1 && argv[at + 1] === SERVICE.start) return true;
   }
   return false;
 }
@@ -93,6 +99,7 @@ export function defaultStatusSystem(): StatusSystem {
     daemonInContainer: () => daemonProcess(),
     fetch: (input, init) => fetch(input, init),
     now: Date.now,
+    windowsServiceRunning,
   };
 }
 
@@ -111,6 +118,32 @@ export const inContainer = (
   environment: Readonly<Record<string, string | undefined>>,
 ) => environment[NODE_ENVIRONMENT.container] === ENVIRONMENT_SWITCH.on;
 
+// Windows has no uid; its service is the account's scheduled task.
+const NO_UID = -1;
+
+function serviceKind(system: StatusSystem) {
+  if (system.platform === 'win32') return SERVICE_KINDS.SCHEDULED_TASK;
+  if (system.uid === undefined || system.uid === 0) return undefined;
+  if (system.platform === 'linux') return SERVICE_KINDS.SYSTEMD_USER;
+  if (system.platform === 'darwin') return SERVICE_KINDS.LAUNCHD;
+  return undefined;
+}
+
+// Units and agents installed from a checkout before bin.ts run this file, kept only as a compatibility
+// shim (apps/node/src/main.ts); status asks their operators to reinstall.
+export const LEGACY_SERVICE_ENTRY = 'apps/node/src/main.ts';
+
+export async function legacyService(system: StatusSystem) {
+  const kind = serviceKind(system);
+  if (!kind || system.uid === undefined) return false;
+  try {
+    const path = serviceLocation(kind, system.accountHome, system.uid).path;
+    return (await readFile(path, 'utf8')).includes(LEGACY_SERVICE_ENTRY);
+  } catch {
+    return false;
+  }
+}
+
 // The seller image's container, else the unit or agent `gyblos seller service install` writes, and whether
 // its process runs now.
 export async function serviceState(
@@ -126,23 +159,23 @@ export async function serviceState(
       return SERVICE_STATES.UNKNOWN;
     }
   }
-  const kind =
-    system.platform === 'linux'
-      ? SERVICE_KINDS.SYSTEMD_USER
-      : system.platform === 'darwin'
-        ? SERVICE_KINDS.LAUNCHD
-        : undefined;
-  if (!kind || system.uid === undefined || system.uid === 0)
-    return SERVICE_STATES.UNKNOWN;
+  const kind = serviceKind(system);
+  if (!kind) return SERVICE_STATES.UNKNOWN;
   try {
     if (
       !(await installed(
-        serviceLocation(kind, system.accountHome, system.uid).path,
+        serviceLocation(kind, system.accountHome, system.uid ?? NO_UID).path,
       ))
     )
       return SERVICE_STATES.NOT_INSTALLED;
   } catch {
     return SERVICE_STATES.UNKNOWN;
+  }
+  if (kind === SERVICE_KINDS.SCHEDULED_TASK) {
+    if (!system.windowsServiceRunning) return SERVICE_STATES.UNKNOWN;
+    return (await system.windowsServiceRunning(homeLayout(environment).root))
+      ? SERVICE_STATES.ACTIVE
+      : SERVICE_STATES.INACTIVE;
   }
   if (kind === SERVICE_KINDS.LAUNCHD) {
     const { code, output } = await system.probe([

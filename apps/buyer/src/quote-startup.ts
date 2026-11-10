@@ -28,6 +28,7 @@ import {
   tokenizer,
   type startPaidBuyer,
 } from './paid-startup';
+import { startSessionQuoteRuntime } from './session-startup';
 
 type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
 type Context = Parameters<BuyerExecutionFactory>[0];
@@ -209,7 +210,9 @@ async function startQuoteRuntime(
   context: Context,
   options: Options,
 ): Promise<Runtime> {
-  if (!context.role.buyer)
+  if (context.prepared.config.session)
+    return startSessionQuoteRuntime(context, options);
+  if (context.role.role !== P2P_ROLES.BUYER || !context.role.buyer)
     throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
   const buyer = context.role.buyer;
   const token = await endpointToken();

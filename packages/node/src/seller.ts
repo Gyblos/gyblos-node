@@ -58,6 +58,7 @@ import {
   type SellerPaid,
   type SellerPayments,
 } from './seller-paid';
+import { startSellerSessions } from './seller-sessions';
 import { loadSellerSettings, type SellerSettings } from './seller-settings';
 import { previousFailure } from './seller-status';
 import { serveSellerTransport } from './seller-transport';
@@ -191,9 +192,26 @@ export async function startSeller(
         nodeId: config.nodeId,
         startedAt,
         offers: () => offers.all(),
+        telemetry: telemetry.sink
+          ? {
+              sink: telemetry.sink,
+              engineKind: (index) => settings.offers[index]!.engine.engine.kind,
+            }
+          : undefined,
       });
       disposers.push(paid.close);
     }
+    const sessions = paid?.sessions
+      ? await startSellerSessions({
+          ...paid.sessions,
+          description: paid.description,
+          owner: owner.address,
+          nodeId: config.nodeId,
+          offers: () => offers.all(),
+          now: Date.now,
+        })
+      : undefined;
+    if (sessions) disposers.push(sessions.close);
     await stage('iroh-endpoint');
     const { relayOnly } = settings;
     const endpoint = await (options.bind ?? bindEndpoint)(
@@ -203,6 +221,7 @@ export async function startSeller(
         control: true,
         freeExecution: true,
         paidExecution: paid !== undefined,
+        batchSessions: sessions !== undefined,
         receipts: true,
         http: false,
         bindAddress: settings.irohBind,
@@ -297,6 +316,7 @@ export async function startSeller(
           ),
         }),
         paid: paid?.service,
+        batchSessions: sessions?.service,
       },
       { relayOnly, limits: settings.limits },
     );

@@ -208,3 +208,126 @@ void test('only a newer version by semantic-version precedence becomes latest', 
   ])
     assert.equal(newer(candidate!, current!), 2, `${candidate} ? ${current}`);
 });
+
+void test('the pin script pins the packaged sellers only with all three targets, each once', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-pin-native-'));
+  try {
+    const file = join(directory, 'install.sh');
+    const original =
+      'DEFAULT_IMAGE=x\nNATIVE_VERSION=\nNATIVE_SHA256_DARWIN_ARM64=\nNATIVE_SHA256_LINUX_X64=\nNATIVE_SHA256_LINUX_ARM64=\n';
+    const reference = `ghcr.io/gyblos/seller:0.1.0-beta.9@sha256:${'a'.repeat(64)}`;
+    const [b, c, d] = ['b', 'c', 'd'].map((letter) => letter.repeat(64));
+    const pin = (pins: string) => {
+      writeFileSync(file, original);
+      return spawnSync('sh', [PIN, reference, file], {
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH, NATIVE_PINS: pins },
+      });
+    };
+    for (const [pins, error] of [
+      [
+        `darwin-arm64=${b} linux-x64=${c}`,
+        /needs darwin-arm64, linux-x64 and linux-arm64/,
+      ],
+      [`darwin-arm64=${b} darwin-arm64=${c} linux-arm64=${d}`, /pinned twice/],
+      [
+        `darwin-x64=${b} linux-x64=${c} linux-arm64=${d}`,
+        /not a packaged seller target/,
+      ],
+      [`darwin-arm64=${b} linux-x64=xyz linux-arm64=${d}`, /not a SHA-256/],
+    ] as const) {
+      const result = pin(pins);
+      assert.equal(result.status, 1, pins);
+      assert.match(result.stderr, error);
+      assert.equal(readFileSync(file, 'utf8'), original);
+    }
+    // install.sh does not install on Windows: the release's win32-x64 pin is install.ps1's.
+    const pinned = pin(
+      `darwin-arm64=${b} win32-x64=${'e'.repeat(64)} linux-x64=${c} linux-arm64=${d}`,
+    );
+    assert.equal(pinned.status, 0, pinned.stderr);
+    assert.equal(
+      readFileSync(file, 'utf8'),
+      `DEFAULT_IMAGE=${reference}\nNATIVE_VERSION=0.1.0-beta.9\nNATIVE_SHA256_DARWIN_ARM64=${b}\nNATIVE_SHA256_LINUX_X64=${c}\nNATIVE_SHA256_LINUX_ARM64=${d}\n`,
+    );
+    // The repository's installer carries every line the release pins.
+    const installer = read('install.sh');
+    for (const line of [
+      'NATIVE_VERSION=',
+      'NATIVE_SHA256_DARWIN_ARM64=',
+      'NATIVE_SHA256_LINUX_X64=',
+      'NATIVE_SHA256_LINUX_ARM64=',
+    ])
+      assert.ok(installer.includes(`\n${line}\n`), line);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+void test('install.ps1 is pinned to one Windows seller: its version and checksum, nothing else', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-pin-windows-'));
+  try {
+    const file = join(directory, 'install.ps1');
+    const original = read('install.ps1');
+    writeFileSync(file, original);
+    const pin = (...args: string[]) =>
+      spawnSync(
+        'sh',
+        [
+          join(REPOSITORY_ROOT, 'scripts/pin-installer-windows.sh'),
+          ...args,
+          file,
+        ],
+        { encoding: 'utf8', env: { PATH: process.env.PATH } },
+      );
+    for (const [args, error] of [
+      [['0.1', 'a'.repeat(64)], /not a semantic version/],
+      [['0.1.0-beta.9', 'xyz'], /not a SHA-256/],
+    ] as const) {
+      const result = pin(...args);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, error);
+      assert.equal(readFileSync(file, 'utf8'), original);
+    }
+    assert.equal(pin('0.1.0-beta.9', 'b'.repeat(64)).status, 0);
+    // Pinning again replaces the earlier pin.
+    const pinned = pin('0.1.0-beta.10', 'c'.repeat(64));
+    assert.equal(pinned.status, 0, pinned.stderr);
+    assert.equal(
+      readFileSync(file, 'utf8'),
+      original
+        .replace("$NativeVersion = ''", "$NativeVersion = '0.1.0-beta.10'")
+        .replace("$NativeSha256 = ''", `$NativeSha256 = '${'c'.repeat(64)}'`),
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+void test('the packaged sellers are built and signed only in the release workflow, after the image', () => {
+  const outside = spawnSync(
+    'sh',
+    [join(REPOSITORY_ROOT, 'scripts/release-native.sh'), '0.1.0-beta.9'],
+    { encoding: 'utf8', env: { PATH: process.env.PATH } },
+  );
+  assert.equal(outside.status, 1);
+  assert.match(outside.stderr, /releases only in the release workflow/);
+  const workflow = read(WORKFLOW);
+  assert.match(workflow, /native:\n {4}needs: release\n/);
+  assert.match(workflow, /publish:\n {4}needs: \[release, native\]\n/);
+});
+
+void test('npm packages are published only by the release workflow, and only when turned on', () => {
+  const outside = spawnSync(
+    'sh',
+    [join(REPOSITORY_ROOT, 'scripts/publish-npm.sh'), '0.1.0-beta.9'],
+    { encoding: 'utf8', env: { PATH: process.env.PATH } },
+  );
+  assert.equal(outside.status, 1);
+  assert.match(outside.stderr, /publishes only in the release workflow/);
+  const workflow = read(WORKFLOW);
+  assert.match(
+    workflow,
+    /npm:\n(?: {4}#.*\n)* {4}if: vars\.NPM_PUBLISH == 'true'\n {4}needs: \[native, publish\]\n/,
+  );
+});

@@ -93,6 +93,25 @@ the sidebar on wide screens. Check desktop, tablet and mobile, both languages,
 light/dark themes, search, clipboard feedback and keyboard focus after layout
 changes.
 
+## Brand assets
+
+The docs use the official Gyblos brand kit **3.0.0**: outlined light/dark
+wordmarks, the terminal-symbol favicon, Instrument Sans 400/500/600 and
+JetBrains Mono 400/500. Fonts are bundled locally from `app/brand`, including on
+the bilingual 404 page; no Google Fonts request or build-time font download is
+needed. Original font licenses and attribution ship in `public/brand`.
+
+The supplied `gyblos-brand-tokens.css` owns the single blue, `#0a28f0`. Other
+styles reference that variable; reading and navigation text stay neutral in both
+themes, and primary blue actions use white text. Semantic warning/error colors
+and code syntax colors retain their meaning. Wordmark SVGs keep their supplied
+geometry and aspect ratio rather than recreating the logo with typed characters.
+
+`brand-assets.json` records the kit checksums for the copied assets. Only the
+generated stylesheet is normalized by Prettier; its original source checksum is
+also recorded. When adopting a new kit, replace the official files and checksums
+together, retain the font licenses and run the export tests and visual checks.
+
 ## Layout
 
 - `app/[lang]` — the docs layout and pages; every URL carries its locale

@@ -21,6 +21,7 @@ import {
 } from '@gyblos/protocol/paid/constants';
 import type { ControlStream } from '@gyblos/transport-iroh/control-io';
 import {
+  routedPaidService,
   servePaidExecutionStream,
   type PaidExecutionService,
 } from '@gyblos/transport-iroh/paid-server';
@@ -374,4 +375,25 @@ void test('a zero-length request frame is refused without a body read', async ()
   assert.equal(value.counts.reads, 1);
   assert.equal(value.frames.length, 0);
   assert.equal(value.counts.closed, 1);
+});
+void test('a routed paid service hands every request its connection route probe', async () => {
+  const value = await fixture();
+  const seen: unknown[] = [];
+  await servePaidExecutionStream(
+    value.stream,
+    routedPaidService(
+      {
+        async stream(request, peer, signal, onDelta, route) {
+          seen.push(route?.());
+          return value.service.stream(request, peer, signal, onDelta);
+        },
+      },
+      () => 'iroh-relay',
+    ),
+    'synthetic',
+    value.close,
+    new AbortController().signal,
+    value.enter,
+  );
+  assert.deepEqual(seen, ['iroh-relay']);
 });

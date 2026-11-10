@@ -84,11 +84,14 @@ export async function writeConfigFile(
         if (!NO_HARD_LINKS.has(String(errorCode(error)))) throw error;
         await writeNew(path, text);
       });
-    const parent = await open(dirname(path), constants.O_RDONLY);
-    try {
-      await parent.sync();
-    } finally {
-      await parent.close();
+    // Windows cannot flush a directory handle; its rename is already durable there.
+    if (process.platform !== 'win32') {
+      const parent = await open(dirname(path), constants.O_RDONLY);
+      try {
+        await parent.sync();
+      } finally {
+        await parent.close();
+      }
     }
   } catch (error) {
     if (errorCode(error) === 'EEXIST')

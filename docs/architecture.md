@@ -66,10 +66,41 @@ historical record of past runs, and the archived Docker/NAT lab lives only at
 tag `archive/poc-lab-2026-10`. `tests/` and `tooling/` verify everything and may
 import any layer.
 
-The experimental `apps/desktop` hosts a simulated Chat/Connect renderer plus a
-separate sandboxed compatibility view and a loopback-only Iroh utility probe,
-reusing the node lifecycle. It does not start the buyer or seller app; see
-[desktop-probe.md](desktop-probe.md).
+The experimental `apps/desktop` hosts the buyer renderer, a separate sandboxed
+compatibility view and a loopback-only Iroh utility probe. For x402 Chat it can
+start a separately bundled, buyer-owned utility process with an explicitly
+selected configuration directory and a private authenticated loopback API. The
+desktop budget currently accepts free responses or individually settled payments
+with verified transaction signatures; reusable-session approvals and their final
+settlement are not yet integrated into this flow. It does not start the seller
+app; see [desktop-probe.md](desktop-probe.md).
+
+## Seller execution policies
+
+The existing free and paid ALPN adapters keep their parsers, authenticated peer
+checks, signing domains, response shapes and error codes. Both use the
+SDK-independent `ExecutionPolicy` port and `node/src/execution.ts` lifecycle:
+admit, generate within the permit, measure delivered output, finish once and
+release the generation slot. Releasing capacity never clears a financial
+obligation, and cancelling the prompt does not cancel financial completion.
+
+`policy-free.ts` preserves replay protection, concurrency and token caps.
+`policy-x402.ts` wraps the existing `PaymentServer`, using the pure allowance
+and charge calculations in core. It preserves admission order, the claim-time
+reserve, zero charge when nothing is delivered and fixed-charge settlement
+retry. It still settles each inference; this extraction does not enable
+multi-request channel reuse or change prices, fees, journals or payment wires.
+Paid output tracking remains responsible for its existing wire and budget
+bounds; the common lifecycle does not interpret payment state.
+
+Both adapters emit through the same optional `TelemetrySink`. Paid failures map
+to the existing observation categories without changing their paid wire codes. A
+`CHARGED` observation uses a confirmed settlement's amounts, never a pending or
+lapsed claim. A later background retry or restart recovery does not
+retroactively add that request-path event; these observations are not a complete
+financial ledger. Paid receipts and additional telemetry destinations are
+separate work. No content, authorization payload or new channel identifier is
+added to telemetry.
 
 ## Where `@gyblos/*` comes from
 
@@ -206,3 +237,24 @@ storage-agnostic. The protocol owns wire records, the core owns receipt policy
 and the node owns signers, lifecycle and private files. Neither receipt failures
 nor metadata RPCs enter inference failover. No collector or payment service is
 involved.
+
+## Reusable payment session composition
+
+The optional `@gyblos/node/batch-session` service composes the shared execution
+lifecycle with `@gyblos/payments-upto/batch-session`: one capped
+buyer-authorized deposit, post-usage cumulative signatures and autonomous seller
+finalization. The protocol port is `@gyblos/protocol/payment-session`. Trusted
+hosts retain identity, signed quote/input verification, transport authentication
+and the unresolved-payment barrier. Existing app startup and execution wires
+remain unchanged. See [payment-sessions.md](payment-sessions.md) for lifecycle,
+private persistence, defaults, failure exposure and the remaining host
+integration.
+
+The optional reusable-session channel is owned by `protocol/batch-channel`
+(wire, parsing and separate inference/RPC digests) and
+`transport-iroh/batch-{client,server}` (Iroh I/O and existing admission).
+`node/batch-buyer` and `node/batch-seller` compose the financial session ports
+with independent verification/recounting and the common execution lifecycle.
+`serveSellerTransport` accepts the session service without changing existing
+channels; endpoint advertisement is explicit. The existing CLI/startup path is
+not switched automatically. See [session composition](payment-sessions.md).

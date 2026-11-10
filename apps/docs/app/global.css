@@ -1,64 +1,65 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+@import './brand/gyblos-brand-tokens.css';
 
-/* Gyblos palette (gyblos-brain DESIGN.md §3): charcoal grays, one calm sky-blue accent. */
+/* Brand kit 3.0.0 supplies the one blue and local typefaces; surfaces follow DESIGN.md. */
 @theme {
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   --color-fd-background: #fcfcfc;
   --color-fd-foreground: #1c1c1c;
   --color-fd-muted: #f4f5f6;
-  --color-fd-muted-foreground: #5f6368;
+  --color-fd-muted-foreground: #636363;
   --color-fd-popover: #fcfcfc;
   --color-fd-popover-foreground: #1c1c1c;
   --color-fd-card: #f4f5f6;
   --color-fd-card-foreground: #1c1c1c;
   --color-fd-border: #e4e6e8;
-  /* Primary is also used as text (active links), so light mode takes the readable sky text. */
-  --color-fd-primary: #0369a1;
-  --color-fd-primary-foreground: #fcfcfc;
+  /* The shared blue is for actions; reading styles below keep navigation text neutral. */
+  --color-fd-primary: var(--brand-blue);
+  --color-fd-primary-foreground: #ffffff;
   --color-fd-secondary: #f4f5f6;
   --color-fd-secondary-foreground: #1c1c1c;
   --color-fd-accent: #e4e6e8;
   --color-fd-accent-foreground: #1c1c1c;
-  --color-fd-ring: #0369a1;
+  --color-fd-ring: var(--brand-blue);
 }
 
 .dark {
-  --color-fd-background: #171717;
-  --color-fd-foreground: #ededed;
-  --color-fd-muted: #1f1f1f;
-  --color-fd-muted-foreground: #a1a1a1;
-  --color-fd-popover: #1f1f1f;
-  --color-fd-popover-foreground: #ededed;
-  --color-fd-card: #1f1f1f;
-  --color-fd-card-foreground: #ededed;
-  --color-fd-border: #2e2e2e;
-  --color-fd-primary: #7dcef0;
-  --color-fd-primary-foreground: #0b1a22;
-  --color-fd-secondary: #1f1f1f;
-  --color-fd-secondary-foreground: #ededed;
-  --color-fd-accent: #2e2e2e;
-  --color-fd-accent-foreground: #ededed;
-  --color-fd-ring: #6cc6ec;
+  --color-fd-background: #090909;
+  --color-fd-foreground: #f5f5f5;
+  --color-fd-muted: #151515;
+  --color-fd-muted-foreground: #b8b8b8;
+  --color-fd-popover: #151515;
+  --color-fd-popover-foreground: #f5f5f5;
+  --color-fd-card: #151515;
+  --color-fd-card-foreground: #f5f5f5;
+  --color-fd-border: #303030;
+  --color-fd-primary: var(--brand-blue);
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #151515;
+  --color-fd-secondary-foreground: #f5f5f5;
+  --color-fd-accent: #303030;
+  --color-fd-accent-foreground: #f5f5f5;
+  --color-fd-ring: var(--brand-blue);
 }
 
-.dark #nd-sidebar {
-  --color-fd-muted: #1f1f1f;
-  --color-fd-secondary: #242424;
-  --color-fd-muted-foreground: #a1a1a1;
+.dark :is(#nd-sidebar, #nd-sidebar-mobile) {
+  --color-fd-muted: #151515;
+  --color-fd-secondary: #222222;
+  --color-fd-muted-foreground: #b8b8b8;
 }
 
 @theme static {
-  --color-fd-info: #0369a1;
+  --color-fd-info: var(--color-fd-foreground);
   --color-fd-warning: #b45309;
   --color-fd-error: #d61f4f;
 }
 
 .dark {
-  --color-fd-info: #7dcef0;
+  --color-fd-info: var(--color-fd-foreground);
   --color-fd-warning: #f2c26b;
   --color-fd-error: #f27b93;
 }
@@ -192,7 +193,7 @@ html > body[data-scroll-locked] {
 }
 
 :where(a, button, input):focus-visible {
-  outline: 2px solid var(--color-fd-ring);
+  outline: 2px solid var(--color-fd-foreground);
   outline-offset: 3px;
 }
 
@@ -214,4 +215,50 @@ html > body[data-scroll-locked] {
   height: 1rem;
   flex-shrink: 0;
   color: var(--color-fd-muted-foreground);
+}
+
+/* The official outlined wordmark keeps its supplied aspect ratio in both themes. */
+.docs-wordmark {
+  width: 160px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+body {
+  font-synthesis: none;
+}
+
+#nd-page h1 {
+  font-weight: 500;
+}
+
+#nd-page :is(strong, b),
+.font-bold {
+  font-weight: 600;
+}
+
+/* Reading text stays neutral; the single brand blue belongs to actions and artwork.
+   In particular, blue-on-charcoal active text would lose contrast. */
+.text-fd-primary,
+.prose a:not(.docs-quickstart),
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true'],
+#nd-toc a[data-active='true'],
+[data-toc-popover] a[data-active='true'] {
+  color: var(--color-fd-foreground);
+  text-decoration-color: currentColor;
+}
+
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true'] {
+  background: var(--color-fd-accent);
+}
+
+:is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true']::before,
+#nd-toc .bg-fd-primary,
+[data-toc-popover] .bg-fd-primary {
+  background: var(--color-fd-foreground);
+}
+
+#nd-toc .stroke-fd-primary,
+[data-toc-popover] .stroke-fd-primary {
+  stroke: var(--color-fd-foreground);
 }

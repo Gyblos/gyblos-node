@@ -2,6 +2,7 @@
 import {
   createExecutionTelemetry,
   telemetrySizes,
+  type RouteProbe,
 } from '@gyblos/core/telemetry';
 import { FREE_EXECUTION_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
 import type {
@@ -29,16 +30,26 @@ function refusal(code: FreeExecutionResponse['error']): TelemetryRefusal {
       return TELEMETRY_REFUSALS.QUOTE_REJECTED;
   }
 }
+// The identifiers a seller observation needs; free and paid requests both carry them.
+export interface ObservedRequest {
+  requestId: string;
+  quote: { offer: { buyerNodeId: string } };
+  input: { selection: FreeExecutionRequest['input']['selection'] };
+}
 export function sellerExecutionTelemetry(
-  request: FreeExecutionRequest,
-  options: SellerFreeExecutionOptions,
+  request: ObservedRequest,
+  options: Pick<SellerFreeExecutionOptions, 'telemetry' | 'nodeId'> & {
+    meter: Pick<SellerFreeExecutionOptions['meter'], 'mode'>;
+  },
   streaming: boolean,
+  route?: RouteProbe,
 ) {
   const telemetry = options.telemetry;
   if (!telemetry) return undefined;
   const observer = createExecutionTelemetry({
     sink: telemetry.sink,
     now: telemetry.now ?? Date.now,
+    ...(route ? { route } : {}),
     context: {
       role: P2P_ROLES.SELLER,
       buyerNodeId: request.quote.offer.buyerNodeId,

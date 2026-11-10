@@ -19,6 +19,9 @@ packageExtensions:
 # @x402/svm release supports both. Also adds allowClosingClaims (not yet proposed
 # upstream), opt-in only on the upto claim path: native settle_and_seal accepts
 # Closing before grace expires. Default/deposit validation stays Open-only.
+# Reusable client-signed sessions additionally opt in to a zero first charge,
+# with a zero voucher; upstream not yet proposed. Default positive-charge
+# validation and the program stay unchanged. Remove when upstream supports it.
 patchedDependencies:
   '@x402/svm@2.28.0': patches/@x402__svm@2.28.0.patch
 

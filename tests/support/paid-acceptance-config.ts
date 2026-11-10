@@ -29,7 +29,6 @@ export async function paidAcceptanceRoles() {
   const seller = await setupRole({
     role: P2P_ROLES.SELLER,
     mint: DEVNET_USDC,
-    buyer: buyer.buyer,
   });
   if (seller.role !== P2P_ROLES.SELLER || buyer.role !== P2P_ROLES.BUYER)
     throw new Error('Synthetic role mismatch');

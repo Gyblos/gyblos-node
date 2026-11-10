@@ -9,7 +9,7 @@ of the installation time; the duration depends on your connection and machine.
 
 ## Before you start
 
-You need an invitation with `install.sh` and a private relay token, Linux or macOS,
+You need an invitation with `install.sh` and a private relay token, Linux, macOS or Windows (see [Windows](#windows)),
 Docker with Compose v2.17 or later, at least 4 GB of memory and outbound internet access.
 Check the [full requirements](/en/getting-started/beta), including memory headroom, before installing.
 
@@ -32,6 +32,31 @@ The relay token is hidden while you enter it. The script works in `~/gyblos-sell
 set another installation directory. It creates `compose.yaml`, `gyblos.toml` and private `seller.env`,
 downloads Ollama and `qwen3:0.6b`, creates seller keys in a Docker volume, installs the tokenizer,
 runs `gyblos doctor` and starts the seller.
+
+### Without Docker
+
+On a Mac with Apple Silicon or on Linux (x64 or arm64) without Docker, the same installer sets up the
+packaged seller: it checks the download against the release's checksum and signature, keeps everything
+in `~/.gyblos` and runs the seller as a background service. It uses your own
+[Ollama](https://ollama.com/download), which it never installs: if Ollama is not running it says how to
+start it, and running the script again continues. On a Mac, Docker cannot use the GPU, so this is the
+faster choice even with Docker installed: run `GYBLOS_MODE=native sh install.sh`. Afterwards, type
+`gyblos …` where this guide says `docker compose exec seller gyblos …`. Intel Macs use Docker.
+
+### Windows
+
+On Windows 10 or 11 (x64), use `install.ps1` instead, in PowerShell:
+
+```powershell
+irm https://github.com/Gyblos/gyblos-node/releases/latest/download/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+It does the same as on a Mac without Docker: it checks the download against the release's checksum,
+keeps the seller's files in `%USERPROFILE%\.gyblos` (readable only by your account), uses your own
+[Ollama for Windows](https://ollama.com/download/windows) and runs the seller in the background, without
+a window, while you are logged in. Open a new terminal afterwards to type `gyblos …`. Replace
+`sh install.sh` in this guide with `powershell -ExecutionPolicy Bypass -File install.ps1`.
 
 ### Public identity
 

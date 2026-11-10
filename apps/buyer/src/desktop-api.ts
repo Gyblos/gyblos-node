@@ -9,6 +9,7 @@ import {
   parseBuyerApiPolicy,
   type BuyerApiPolicy,
 } from '@gyblos/protocol/buyer-api';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import type { BuyerSelectionConfig } from './selection-config';
 
@@ -21,13 +22,13 @@ export interface BuyerDesktopOptions {
 }
 export function configuredBuyerAccess(
   request: BuyerSelectionConfig['request'],
-  role: Pick<RoleConfig, 'buyer'> | undefined,
+  role: RoleConfig | undefined,
   token: string | undefined,
 ): BuyerDesktopOptions {
   return {
     token,
     desktopPolicy:
-      token && role?.buyer
+      token && role?.role === P2P_ROLES.BUYER
         ? {
             network: request.network,
             mint: request.asset,

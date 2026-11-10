@@ -20,8 +20,6 @@ export const TELEMETRY_EVENTS = {
   REFUSED: 'refused',
   UNSERVED: 'unserved',
 } as const;
-export type TelemetryEventType =
-  (typeof TELEMETRY_EVENTS)[keyof typeof TELEMETRY_EVENTS];
 export const TELEMETRY_REFUSALS = {
   SELLER_BUSY: 'seller_busy',
   DAILY_CAP: 'daily_cap',
@@ -32,6 +30,20 @@ export const TELEMETRY_REFUSALS = {
 } as const;
 export type TelemetryRefusal =
   (typeof TELEMETRY_REFUSALS)[keyof typeof TELEMETRY_REFUSALS];
+// The network path one execution travelled, as the seller's transport last saw it. Unknown means no
+// direct or relay path was ever observed and is counted as a defect, never as a normal route.
+export const EXECUTION_ROUTES = {
+  DIRECT: 'iroh-direct',
+  RELAY: 'iroh-relay',
+  UNKNOWN: 'unknown',
+} as const;
+export type ExecutionRoute =
+  (typeof EXECUTION_ROUTES)[keyof typeof EXECUTION_ROUTES];
+export interface ExecutionPath {
+  route: ExecutionRoute;
+  // A different known route was observed earlier in the same execution (usually relay, then direct).
+  routeChanged: boolean;
+}
 interface CommonEvent {
   at: number;
   role: P2PRole;
@@ -55,6 +67,9 @@ type LocatedEvent = SellerEvent &
         sizes: ReceiptSizes;
         totalMs: number;
         finishReason: EngineDoneReason;
+        path?: ExecutionPath;
+        // The engine's own generation time for the output tokens, when it reports one.
+        generationMs?: number;
       }
     | {
         type: typeof TELEMETRY_EVENTS.FAILED;
@@ -62,6 +77,7 @@ type LocatedEvent = SellerEvent &
         reason: FreeExecutionStopReason | null;
         totalMs: number;
         delivered?: { outputTokens: number };
+        path?: ExecutionPath;
       }
     | {
         type: typeof TELEMETRY_EVENTS.CHARGED;

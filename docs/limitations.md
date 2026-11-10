@@ -98,7 +98,8 @@ only; never import mainnet keys.
   before the payer signs. A wallet refusal or storage failure after that
   checkpoint conservatively blocks new payments until read-only reconciliation
   resolves the same channel. It neither saves a signed payload for
-  retransmission nor recovers stale process locks. Private paths are unchanged.
+  retransmission. Private paths are unchanged; lock takeover is limited to a
+  readable dead owner on the same host/PID namespace.
 - Closure/refund sends keep the locally signed transaction signature after a
   lost or mismatched RPC reply and report it unconfirmed. They do not resend
   inside the call or report refund amounts as verified. The existing read-only
@@ -110,10 +111,12 @@ only; never import mainnet keys.
   context-bound channel state. Clearing a control attempt does not settle the
   financial row; read-only reconciliation still verifies charges and refunds.
   Journal v1–v4 remain readable; after a v5 write, older binaries refuse the
-  file. Do not downgrade with pending channels. Tests cover controlled journal
-  reopen, not automatic stale-lock recovery after a hard crash. Restoring an old
-  journal can still lose later checkpoints; independent rollback protection is
-  separate.
+  file. Do not downgrade with pending channels. Local acceptance also kills real
+  buyer children at opening/closure/refund checkpoints, keeps the native VM in
+  the parent and recovers through normal APIs without deleting locks. Ambiguous
+  owners and takeover guards remain refused. This is same-host process recovery,
+  not power-loss, cross-namespace or restored-backup protection. Restoring an
+  old journal can still lose later checkpoints.
 - Local native withdrawal acceptance drives the actual adapter through closing,
   grace, seal and distribution. It checks token balances, recreation of the
   payer's refund account, response loss, signed replay refusal, a rejected early

@@ -1,5 +1,5 @@
-// Renders the seller's background service for the account that installs it: a systemd user unit or a macOS
-// launch agent, plus the commands that enable and remove it. Pure text; never touches the file system,
+// Renders the seller's background service for the account that installs it: a systemd user unit, a macOS
+// launch agent or a Windows scheduled task (service-windows.ts), plus the commands that enable and remove it. Pure text; never touches the file system,
 // runs a command or reads the environment file it names.
 import { join } from 'node:path';
 
@@ -12,6 +12,7 @@ import {
   type ServiceErrorCode,
   type ServiceKind,
 } from './constants';
+import { taskLocation, taskPlan } from './service-windows';
 
 export class ServiceError extends Error {
   constructor(readonly code: ServiceErrorCode) {
@@ -29,9 +30,11 @@ export const DEFAULT_MEMORY_MAX = `${MINIMUM_MEMORY_BYTES / MEBIBYTE}M`;
 
 export interface ServiceInput {
   kind: ServiceKind;
-  // Absolute paths, all checked for characters a unit or plist would misread.
+  // Absolute paths, all checked for characters a unit or plist would misread. From a checkout the service
+  // runs this Node with tsx in the repository; the packaged release runs its launcher from its home.
   nodePath: string;
   repository: string;
+  launcher?: string;
   home: string;
   config: string;
   environmentFile: string;
@@ -40,18 +43,26 @@ export interface ServiceInput {
   accountHome: string;
   // The account's uid: launchd's GUI domain is per uid.
   uid: number;
+  // Windows: the account's SID, which the scheduled task runs as.
+  windowsUser?: string;
   memoryMax: string;
   cpuQuota: string;
 }
 
 export interface ServiceLocation {
   path: string;
+  // Other files the service owns, removed with it.
+  files?: string[];
   disable: string[][];
   reload: string[][];
 }
 
 export interface ServicePlan extends ServiceLocation {
   contents: string;
+  // How the file is written; Task Scheduler reads its XML as UTF-16.
+  encoding?: 'utf16le';
+  // Files written with it (the Windows task's script), replaced on every install.
+  extra?: { path: string; contents: string }[];
   enable: string[][];
   notes: string[];
 }
@@ -73,8 +84,9 @@ export function memoryBytes(value: string) {
 
 function checkInput(input: ServiceInput) {
   for (const path of [
-    input.nodePath,
-    input.repository,
+    ...(input.launcher === undefined
+      ? [input.nodePath, input.repository]
+      : [input.launcher]),
     input.home,
     input.config,
     input.environmentFile,
@@ -92,7 +104,24 @@ const quoted = (value: string) => `"${value}"`;
 const nodeBin = (nodePath: string) =>
   nodePath.slice(0, nodePath.lastIndexOf('/'));
 
+// What the service executes, where and with which PATH: the packaged launcher needs no Node on PATH.
+function program(input: ServiceInput) {
+  if (input.launcher !== undefined)
+    return {
+      argv: [input.launcher, SERVICE.start],
+      workingDirectory: input.home,
+      path: SERVICE.systemPath,
+    };
+  return {
+    argv: [input.nodePath, '--import', 'tsx', SERVICE.entry, SERVICE.start],
+    workingDirectory: input.repository,
+    path: `${nodeBin(input.nodePath)}:${SERVICE.systemPath}`,
+  };
+}
+
 function systemdUnit(input: ServiceInput) {
+  const run = program(input);
+  const [executable, ...args] = run.argv;
   return [
     '[Unit]',
     `Description=${SERVICE.description}`,
@@ -104,14 +133,14 @@ function systemdUnit(input: ServiceInput) {
     '[Service]',
     'Type=simple',
     // A path setting: systemd takes it verbatim and refuses quotes.
-    `WorkingDirectory=${input.repository}`,
+    `WorkingDirectory=${run.workingDirectory}`,
     // Optional: the relay token and API keys live here, never in the unit. systemd lets it override the
     // Environment= lines below, so install refuses those names in the file.
     `EnvironmentFile=-${input.environmentFile}`,
     `Environment=${quoted(`GYBLOS_HOME=${input.home}`)}`,
     `Environment=${quoted(`GYBLOS_CONFIG=${input.config}`)}`,
-    `Environment=${quoted(`PATH=${nodeBin(input.nodePath)}:${SERVICE.systemPath}`)}`,
-    `ExecStart=${quoted(input.nodePath)} --import tsx ${SERVICE.entry}`,
+    `Environment=${quoted(`PATH=${run.path}`)}`,
+    `ExecStart=${quoted(executable!)} ${args.join(' ')}`,
     'KillSignal=SIGINT',
     `TimeoutStopSec=${SERVICE.stopTimeoutSeconds}`,
     'Restart=on-failure',
@@ -138,13 +167,14 @@ const plistString = (value: string) => `<string>${xml(value)}</string>`;
 // arguments so they are never parsed as shell text. Install accepts only lines that sh and systemd read
 // the same way.
 const LAUNCH_SCRIPT =
-  'set -a; if [ -f "$0" ]; then . "$0"; fi; set +a; exec "$1" --import tsx "$2"';
+  'set -a; if [ -f "$0" ]; then . "$0"; fi; set +a; exec "$@"';
 
 function launchAgent(input: ServiceInput) {
+  const run = program(input);
   const environment = {
     GYBLOS_HOME: input.home,
     GYBLOS_CONFIG: input.config,
-    PATH: `${nodeBin(input.nodePath)}:${SERVICE.systemPath}`,
+    PATH: run.path,
   };
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -155,17 +185,12 @@ function launchAgent(input: ServiceInput) {
     `  ${plistString(SERVICE.label)}`,
     '  <key>ProgramArguments</key>',
     '  <array>',
-    ...[
-      '/bin/sh',
-      '-c',
-      LAUNCH_SCRIPT,
-      input.environmentFile,
-      input.nodePath,
-      SERVICE.entry,
-    ].map((argument) => `    ${plistString(argument)}`),
+    ...['/bin/sh', '-c', LAUNCH_SCRIPT, input.environmentFile, ...run.argv].map(
+      (argument) => `    ${plistString(argument)}`,
+    ),
     '  </array>',
     '  <key>WorkingDirectory</key>',
-    `  ${plistString(input.repository)}`,
+    `  ${plistString(run.workingDirectory)}`,
     '  <key>EnvironmentVariables</key>',
     '  <dict>',
     ...Object.entries(environment).flatMap(([key, value]) => [
@@ -203,6 +228,7 @@ export function serviceLocation(
   accountHome: string,
   uid: number,
 ): ServiceLocation {
+  if (kind === SERVICE_KINDS.SCHEDULED_TASK) return taskLocation(accountHome);
   if (kind === SERVICE_KINDS.LAUNCHD) {
     const path = join(
       checkPath(accountHome),
@@ -227,6 +253,7 @@ export function serviceLocation(
 }
 
 export function servicePlan(input: ServiceInput): ServicePlan {
+  if (input.kind === SERVICE_KINDS.SCHEDULED_TASK) return taskPlan(input);
   checkInput(input);
   const location = serviceLocation(input.kind, input.accountHome, input.uid);
   if (input.kind === SERVICE_KINDS.LAUNCHD)

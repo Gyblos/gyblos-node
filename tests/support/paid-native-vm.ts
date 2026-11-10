@@ -37,9 +37,14 @@ import {
 } from '@solana/kit';
 import { SOLANA_MAINNET_CAIP2, type FacilitatorSvmSigner } from '@x402/svm';
 import { FailedTransactionMetadata, LiteSVM } from 'litesvm';
-import { UPTO_PROGRAM, uptoTokenAccount } from 'x402-upto-metered';
+import {
+  UPTO_PROGRAM,
+  uptoTokenAccount,
+  type UptoTerms,
+} from 'x402-upto-metered';
 
 import manifest from '../fixtures/payment-channels-native.json';
+import { nativeHistory } from './paid-native-history';
 
 const NATIVE_FUNDS = 100_000n;
 
@@ -73,7 +78,10 @@ function nativeCode(failure: FailedTransactionMetadata): number | undefined {
     : undefined;
 }
 
-export async function nativeVm(now: () => number) {
+export async function nativeVm(
+  now: () => number,
+  requestedNetwork: UptoTerms['network'] = SOLANA_MAINNET_CAIP2,
+) {
   const bytes = await readFile(
     new URL('../fixtures/payment-channels-native.so', import.meta.url),
   );
@@ -82,7 +90,7 @@ export async function nativeVm(now: () => number) {
     createHash('sha256').update(bytes).digest('hex'),
     manifest.sha256,
   );
-  const [namespace, reference] = SOLANA_MAINNET_CAIP2.split(':');
+  const [namespace, reference] = requestedNetwork.split(':');
   assert.ok(namespace && reference);
   const network: `${string}:${string}` = `${namespace}:${reference}`;
   const svm = new LiteSVM()
@@ -94,6 +102,9 @@ export async function nativeVm(now: () => number) {
   clock.slot = 400_000_000n;
   clock.unixTimestamp = BigInt(now() / 1000);
   svm.setClock(clock);
+  const history = nativeHistory(svm);
+  let blockHeight = 1000n;
+  let lastValidBlockHeight = 500_000_000n;
   const payer = await generateKeyPairSigner();
   const feePayer = await generateKeyPairSigner();
   const authorizer = await generateKeyPairSigner();
@@ -117,7 +128,9 @@ export async function nativeVm(now: () => number) {
     svm.setClock(current);
   };
   function execute(transaction: Transaction) {
+    const before = history.before(transaction);
     const result = svm.sendTransaction(transaction);
+    history.after(before, result);
     lastFailure =
       result instanceof FailedTransactionMetadata ? result : undefined;
     return result;
@@ -162,7 +175,7 @@ export async function nativeVm(now: () => number) {
     getAccountInfo: accountInfo,
     getLatestBlockhash: async () => ({
       blockhash: blockhash(String(svm.latestBlockhash())),
-      lastValidBlockHeight: 500_000_000n,
+      lastValidBlockHeight,
     }),
     getSlot: async () => svm.getClock().slot,
     async signTransaction(wire) {
@@ -275,6 +288,16 @@ export async function nativeVm(now: () => number) {
     signer,
     send,
     accountInfo,
+    history,
+    height: () => blockHeight,
+    expire() {
+      svm.expireBlockhash();
+      blockHeight = lastValidBlockHeight + 1n;
+      lastValidBlockHeight = blockHeight + 150n;
+      const current = svm.getClock();
+      current.slot = blockHeight + 1n;
+      svm.setClock(current);
+    },
     balance,
     requireAccount: async (owner: string) => {
       assert.ok(await tokenAccount(owner));
@@ -284,7 +307,7 @@ export async function nativeVm(now: () => number) {
     slot: () => svm.getClock().slot,
     hints: () => ({
       recentBlockhash: String(svm.latestBlockhash()),
-      lastValidBlockHeight: '500000000',
+      lastValidBlockHeight: String(lastValidBlockHeight),
       recentSlot: String(svm.getClock().slot),
     }),
     network,
