@@ -256,6 +256,17 @@ pnpm gyblos seller service uninstall           # stops and removes it
 - macOS: a launch agent (`~/Library/LaunchAgents/com.gyblos.seller.plist`) that
   runs while you are logged in and logs to `<home>/service.log`. launchd has no
   memory or CPU limit; the startup headroom check still applies.
+- Windows (packaged release only, from `install.ps1` or npm): a scheduled task
+  `Gyblos\Seller-<id>` of your account (its XML and the script it runs are kept
+  in `%LOCALAPPDATA%\Gyblos`) that starts at your logon, with least privilege
+  and no window (`conhost --headless`), and runs `gyblos service-run`. That
+  supervisor loads `seller.env` (Notepad's CRLF lines are accepted; names are
+  reserved whatever their case, also `SystemRoot`, `ComSpec`, `PATHEXT`,
+  `USERPROFILE` and `PSModulePath`), appends the seller's output to
+  `<home>/service.log`, restarts it on failure with the same 5-in-10-minutes
+  limit and, on uninstall, stops it like a first Ctrl-C through its named pipe
+  before removing the task. It stops when you log out. Windows has no
+  per-service memory or CPU limit; the startup headroom check still applies.
 - The engine is not part of the service: run Ollama as its own service (its
   Linux installer creates one) on the offer URL.
 - Installing again refuses while a unit exists; uninstall first. The unit runs
@@ -518,10 +529,11 @@ cosign verify-blob install.sh --bundle install.sh.sigstore.json \
 When Docker does not run for this account (it says so when Docker is installed
 but not usable) or with `GYBLOS_MODE=native`, a release's `install.sh` installs
 the packaged seller of the same release on macOS Apple Silicon or Linux (x64,
-arm64, glibc). Intel Macs, musl Linux and Windows are told to use Docker. With
-Docker running, a new install uses Docker; on Apple Silicon it notes that Docker
-cannot use the Mac's GPU, and `GYBLOS_MODE=native sh install.sh` installs the
-packaged seller instead. An existing install keeps its mode.
+arm64, glibc). Intel Macs and musl Linux are told to use Docker, and Windows to
+use [`install.ps1`](#windows). With Docker running, a new install uses Docker;
+on Apple Silicon it notes that Docker cannot use the Mac's GPU, and
+`GYBLOS_MODE=native sh install.sh` installs the packaged seller instead. An
+existing install keeps its mode.
 
 - It downloads `gyblos-<version>-<target>.tar.gz` and its `.sigstore.json` from
   the release, checks the SHA-256 the installer pins (`NATIVE_SHA256_<TARGET>`)
@@ -543,6 +555,34 @@ packaged seller instead. An existing install keeps its mode.
   `gyblos` in place of `docker compose exec seller gyblos`; `publish` restarts
   the service. `update` compares the pinned `NATIVE_VERSION`.
 
+##### Windows
+
+A release's `install.ps1` installs the same release's packaged seller on Windows
+10 (1803) or later, x64, from PowerShell:
+
+```powershell
+irm https://github.com/Gyblos/gyblos-node/releases/latest/download/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1   # also: publish, unpublish, update
+```
+
+- It downloads `gyblos-<version>-win32-x64.tar.gz`, checks the SHA-256 the
+  installer pins (`$NativeSha256`, set by `scripts/pin-installer-windows.sh` in
+  the release) and, with cosign, the release signature, and unpacks it with
+  Windows' own `tar` into `%LOCALAPPDATA%\Gyblos\app\` the same way as
+  `install.sh`. Once doctor passes it points the `app\current` junction at it,
+  writes `%LOCALAPPDATA%\Gyblos\bin\gyblos.cmd` and adds that folder to your
+  user `PATH` (not with `GYBLOS_MODIFY_PATH=0`).
+- The home is `%USERPROFILE%\.gyblos` (`GYBLOS_HOME`), created readable only by
+  your account, SYSTEM and Administrators, which `gyblos setup` and doctor
+  check. `gyblos.toml` and `seller.env` are written there once, as UTF-8 without
+  a byte order mark.
+- Ollama, the keys, the tokenizer, doctor, the service (the scheduled task
+  above), registering and `publish` work as in
+  [Without Docker](#without-docker). `update` downloads the latest
+  `install.ps1`, checks its checksum (and signature, with cosign) and runs it.
+  `GYBLOS_RELEASE_URL` changes where releases are downloaded from (a mirror);
+  the pinned checksum still applies.
+
 ##### npm package
 
 The same packaged sellers are published to npm, for anyone who already uses it:
@@ -557,9 +597,7 @@ and `gyblos seller service install`, with the machine's own Ollama as in
 `npm install -g gyblos@latest` and then reinstall the service, so it restarts on
 the new code (a service from an nvm-managed Node follows that Node version).
 `npx gyblos` runs commands, but the service refuses to run from a temporary
-cache (npx, pnpm dlx, bunx). On Windows the seller runs in a terminal with
-`gyblos start` for now; the background service and a Windows installer come
-next.
+cache (npx, pnpm dlx, bunx).
 
 `pnpm build:npm --version <v>` packs them from `pnpm build:native` archives of
 the same version. The release builds them in its `native` job; its `npm` job

@@ -26,6 +26,28 @@ const STOP_SIGNALS: readonly NodeJS.Signals[] =
     ? ['SIGINT', 'SIGTERM', 'SIGBREAK']
     : ['SIGINT', 'SIGTERM'];
 
+// What a supervising parent sends over the IPC channel to stop its child like a first SIGINT: Windows has
+// no signal one process can send another to stop it gracefully.
+export const STOP_MESSAGE = 'gyblos:stop';
+
+// Listens for STOP_MESSAGE, and for the channel's end, when this process has an IPC channel; the returned
+// function stops listening.
+// The channel never keeps the process alive: the daemon's own work does.
+function onStopMessage(handler: () => void) {
+  if (!process.send) return () => {};
+  const listener = (message: unknown) => {
+    if (message === STOP_MESSAGE) handler();
+  };
+  process.on('message', listener);
+  // A supervisor that is gone can no longer stop this process: stop as if it had asked.
+  process.once('disconnect', handler);
+  process.channel?.unref();
+  return () => {
+    process.removeListener('message', listener);
+    process.removeListener('disconnect', handler);
+  };
+}
+
 export function onShutdown(handler: () => void) {
   for (const signal of STOP_SIGNALS) process.once(signal, handler);
   return () => {
@@ -39,7 +61,7 @@ function writeShutdownNotice(text: string) {
   write(process.stderr.fd, text, () => undefined);
 }
 
-// Resolves `signalled` on the first SIGINT/SIGTERM and keeps a listener installed until `dispose()`, so
+// Resolves `signalled` on the first SIGINT/SIGTERM (or STOP_MESSAGE from a supervisor) and keeps a listener installed until `dispose()`, so
 // a repeated Ctrl-C while the caller stops prints a notice instead of killing the process mid-write.
 export function shutdownSignal(
   notice: (text: string) => void = writeShutdownNotice,
@@ -63,11 +85,13 @@ export function shutdownSignal(
     }
   };
   for (const signal of STOP_SIGNALS) process.on(signal, handler);
+  const stopListening = onStopMessage(handler);
   return {
     signalled,
     dispose() {
       for (const signal of STOP_SIGNALS)
         process.removeListener(signal, handler);
+      stopListening();
     },
   };
 }

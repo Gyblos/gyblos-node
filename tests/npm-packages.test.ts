@@ -186,7 +186,7 @@ void test(
   },
 );
 
-void test('npm installs are updated with npm, and a service never runs from the npx cache', async () => {
+void test('npm installs are updated with npm, Windows installs with install.ps1, and a service never runs from the npx cache', async () => {
   const environment = {
     GYBLOS_VERSION: '0.1.0-beta.5',
     GYBLOS_INSTALLED_BY: 'npm',
@@ -206,6 +206,20 @@ void test('npm installs are updated with npm, and a service never runs from the 
       RUN_MODES.PACKAGED,
     )) ?? '',
     /sh install\.sh update/,
+  );
+  // Windows installs come from install.ps1, or from npm.
+  assert.match(
+    (await updateNotice(
+      { GYBLOS_VERSION: '0.1.0-beta.5' },
+      newer,
+      RUN_MODES.PACKAGED,
+      'win32',
+    )) ?? '',
+    /-File install\.ps1 update/,
+  );
+  assert.match(
+    (await updateNotice(environment, newer, RUN_MODES.PACKAGED, 'win32')) ?? '',
+    /npm install -g gyblos@latest/,
   );
   const npx = defaultServiceSystem({
     GYBLOS_PACKAGED: '1',
