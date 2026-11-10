@@ -1038,14 +1038,14 @@ canonical request. Existing session and paid-execution error catalogs are used;
 provider messages, input, private SDK payloads and network addresses are never
 reflected. Remote errors are marked separately by the local client API.
 
-| Method     | Params                                                              | Result                                     |
-| ---------- | ------------------------------------------------------------------- | ------------------------------------------ |
-| `prepare`  | fresh signed `quote`                                                | full provisioned `terms`, no side effects  |
-| `open`     | `payload` (opaque SDK opening string), fresh signed `quote`         | `snapshot`                                 |
-| `execute`  | `channelId`, quote-bound `requestId`, fresh signed `quote`, `input` | complete `value` and `bill`                |
-| `approve`  | `bill`, buyer-signed cumulative `voucher`                           | exact acknowledged `snapshot`              |
-| `snapshot` | `channelId`                                                         | `snapshot` metadata                        |
-| `close`    | `channelId`                                                         | independently verified seller `settlement` |
+| Method     | Params                                                                             | Result                                     |
+| ---------- | ---------------------------------------------------------------------------------- | ------------------------------------------ |
+| `prepare`  | fresh signed `quote`, optional full proposed `terms`                               | full provisioned `terms`, no side effects  |
+| `open`     | `payload` (opaque SDK opening string), fresh signed `quote`, optional same `terms` | `snapshot`                                 |
+| `execute`  | `channelId`, quote-bound `requestId`, fresh signed `quote`, `input`                | complete `value` and `bill`                |
+| `approve`  | `bill`, buyer-signed cumulative `voucher`                                          | exact acknowledged `snapshot`              |
+| `snapshot` | `channelId`                                                                        | `snapshot` metadata                        |
+| `close`    | `channelId`                                                                        | independently verified seller `settlement` |
 
 `prepare` is an additive capability and terms-agreement operation on this ALPN;
 all earlier methods, digests and vector bytes remain unchanged. A seller that
@@ -1054,10 +1054,14 @@ successful correlated preparation reply before calling its opening/signing
 port; an older seller therefore fails before any new opening signature. An
 earlier provisioned buyer can still use the unchanged `open` contract.
 
-Preparation accepts only the quote: no prompt, SDK opening or proposed spending
-authority. After authenticating the buyer and checking the fresh signed priced
-quote, exact warmed model and live readiness, the seller returns its existing
-provisioned terms. It calls no financial-session or engine methods and creates
+Preparation accepts the quote and optionally the full proposed terms: no prompt
+or SDK opening. A provisioned host may omit terms exactly as before. An
+unassigned startup host requires the proposal, checks its locally allowed buyer
+and financial policy, and allocates no resource until OPEN presents a valid SDK
+proof whose memo binds those identical terms. OPEN repeats the proposal so a
+prior stateless preparation is never a reservation. Unknown fields are rejected.
+After authenticating the buyer and checking the fresh signed priced
+quote, exact warmed model and live readiness, the seller returns the exactly matching terms. It calls no financial-session or engine methods and creates
 no journal, reservation, channel or background worker. This reply is metadata,
 not an offer signature, independent identity proof or finalized-chain proof.
 
@@ -1078,9 +1082,10 @@ specific preparation quote. Identity, quote policy, zero-skew time and
 cancellation are rechecked after preparation and before the opening port. A
 failed preparation does not discard or replace any earlier uncertain opening
 or financial approval. Hosts must still restore the original terms and attempt
-before new execution; arbitrary-peer provisioning and default application
-activation are not provided by this operation. The new independent
-`batch-prepare-v1.json` vector supplements the unchanged earlier fixtures.
+before new execution; arbitrary-peer provisioning and implicit application
+activation are not authorized by preparation alone. The independent
+`batch-prepare-v1.json` and `batch-startup-v1.json` vectors supplement the unchanged
+earlier fixtures. The latter pins the optional-terms PREPARE and OPEN encodings.
 
 The inner execution request signs no new payment authorization. Its session
 request digest is SHA-256 of `gyblos/session-request/v1\n` plus the canonical
@@ -1120,7 +1125,15 @@ is explicit and reuses the original approved bill; it never sends a prompt.
 The seller's financial worker persists independently of the Iroh connection and
 can finalize the highest accepted voucher while the buyer is offline. Both sides
 offline still means no submission. This channel changes no fee, journal format,
-mainnet restriction or restored-state guarantee. Dynamic session provisioning,
-concurrent requests, multiple sellers, default CLI/gateway activation and
-streaming on this new ALPN remain separately scoped. New canonical/digest/frame
+mainnet restriction or restored-state guarantee. Arbitrary-peer provisioning,
+concurrent requests, multiple sellers, implicit activation, a public gateway and
+streaming on this new ALPN remain separately scoped. The normal seller daemon
+and buyer chat can explicitly enable one pinned pair as described in the
+[session startup policy](../../docs/payment-sessions.md#explicit-startup-policy). New canonical/digest/frame
 vectors are in `vectors/batch-channel-v1.json`; older vectors are unchanged.
+
+The local buyer opening port accepts an optional synchronous operation guard.
+The SDK adapter invokes it immediately before each new transaction/message
+signature, rechecking cancellation and quote/host expiry after delayed hints or
+private writes. A signature already in progress may finish internally, but its
+result is not transmitted after cancellation. This changes no signing bytes.

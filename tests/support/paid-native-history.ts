@@ -8,6 +8,7 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from '@solana-program/token';
 import {
+  getBase64EncodedWireTransaction,
   getCompiledTransactionMessageDecoder,
   getSignatureFromTransaction,
   type Address,
@@ -46,6 +47,7 @@ export function nativeHistory(vm: Pick<LiteSVM, 'getAccount' | 'getClock'>) {
       signature: getSignatureFromTransaction(transaction),
       keys: message.staticAccounts,
       message: Buffer.from(transaction.messageBytes),
+      wire: getBase64EncodedWireTransaction(transaction),
       pre: balances(message.staticAccounts),
       slot: vm.getClock().slot,
     };
@@ -57,6 +59,7 @@ export function nativeHistory(vm: Pick<LiteSVM, 'getAccount' | 'getClock'>) {
   const records = new Map<Signature, Observed>();
   return {
     oldestSlot: vm.getClock().slot,
+    encodedTransaction: (signature: Signature) => records.get(signature)?.wire,
     message: (signature: Signature) => {
       const record = records.get(signature);
       return record ? Buffer.from(record.message) : undefined;

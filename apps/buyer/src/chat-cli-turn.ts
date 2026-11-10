@@ -1,6 +1,11 @@
 // Performs one bounded interactive request to the local buyer, never retries or follows redirects.
 import { LOCALHOST, PORTS, ROUTES, UNITS } from '@gyblos/config';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import {
+  sessionApproval,
+  type SessionApproval,
+} from '@gyblos/node/session-accounting';
 import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION_CODES,
@@ -9,6 +14,7 @@ import {
   PAYMENT_ERROR_CODES,
 } from '@gyblos/protocol/constants';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import {
   BUYER_EXECUTION_FIELD,
@@ -36,6 +42,7 @@ export interface ChatTurnResult {
   code?: string;
   usage?: { input: number; output: number };
   payment?: {
+    session?: SessionApproval;
     verdict: string;
     charged: string | null;
     refunded: string | null;
@@ -61,6 +68,17 @@ const amount = (value: unknown): value is string | null =>
   (typeof value === 'string' && /^(0|[1-9][0-9]{0,19})$/.test(value));
 
 function paymentResult(payment: Record<string, unknown>) {
+  if (payment.verdict === SESSION_VERDICTS.APPROVED) {
+    if (payment.chargedAtomic !== null || payment.refundedAtomic !== null)
+      throw new Error('payment');
+    return {
+      verdict: SESSION_VERDICTS.APPROVED,
+      charged: null,
+      refunded: null,
+      session: sessionApproval(payment.session),
+    };
+  }
+  if (payment.session !== undefined) throw new Error('payment');
   if (
     !Object.values(PAID_VERDICTS).some((value) => value === payment.verdict) ||
     !amount(payment.chargedAtomic) ||
@@ -79,6 +97,7 @@ function errorResult(value: unknown): ChatTurnResult {
   const result: ChatTurnResult = { status: 'uncertain' };
   if (!error) return result;
   const codes = [
+    ...Object.values(SESSION_CODES),
     ...Object.values(FREE_BUYER_CODES),
     ...Object.values(PAID_BUYER_CODES),
     ...Object.values(FREE_EXECUTION_CODES),
@@ -127,7 +146,10 @@ function completeResult(
   } else if (options.paid && !payment) throw new Error('payment');
   if (payment) {
     terminal.payment = paymentResult(payment);
-    if (payment.verdict !== PAID_VERDICTS.SETTLED)
+    if (
+      payment.verdict !== PAID_VERDICTS.SETTLED &&
+      payment.verdict !== SESSION_VERDICTS.APPROVED
+    )
       terminal.status = 'uncertain';
   }
   return terminal;

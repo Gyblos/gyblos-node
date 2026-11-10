@@ -3,6 +3,7 @@ import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
 
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { isMain } from '@gyblos/runtime';
 
 import { startBuyer } from './buyer-main';
@@ -11,10 +12,12 @@ import {
   type ChatTurnOptions,
   type ChatTurnResult,
 } from './chat-cli-turn';
+import type { ownedChat } from './chat-owned';
 import { isFreeAtomic, PAID_VERDICTS } from './constants';
 import { startupMessage } from './free-main';
 
 export interface ChatSessionOptions {
+  session?: ReturnType<typeof ownedChat>['session'];
   model: string;
   maxTokens: number;
   maxAtomic: string;
@@ -27,6 +30,7 @@ export interface ChatSessionOptions {
 }
 type ChatStarter = (options: { port: number }) => Promise<{
   chat: {
+    session?: ChatSessionOptions['session'];
     model: string;
     maxTokens: number;
     maxAtomic: string;
@@ -112,7 +116,7 @@ export async function runOwnedChat(
       const payment = attempted ? observed : await inspect?.(digest);
       if (payment) {
         write(
-          `Configured RPC reports finalized charge ${payment.chargedAtomic}; refunded ${payment.refundedAtomic} atomic units. Check the journal with buyer:reconcile:paid before continuing.\n`,
+          `Configured RPC reports finalized charge ${payment.chargedAtomic}; refunded ${payment.refundedAtomic} atomic units.${host.chat.session ? ' The session is closed.' : ' Check the journal with buyer:reconcile:paid before continuing.'}\n`,
         );
         return;
       }
@@ -134,11 +138,26 @@ export async function chatSession(options: ChatSessionOptions) {
       ? 'paid (devnet)'
       : 'free';
   options.write(
-    `Model: ${options.model}\nMode: ${mode}\nMaximum deposit: ${options.maxAtomic} atomic units per request\nType /exit to quit. Each question is independent.\n`,
+    `Model: ${options.model}\nMode: ${mode}\n${options.session ? `Session deposit limit: ${options.session.depositAtomic} atomic units\nMaximum per question: ${options.maxAtomic} atomic units\nType /settle to close the channel, or /exit to leave it to the seller.\n` : `Maximum deposit: ${options.maxAtomic} atomic units per request\n`}Type /exit to quit. Each question is independent.\n`,
   );
   while (!options.signal?.aborted) {
     const prompt = await options.read();
     if (prompt === undefined || prompt.trim() === '/exit') return;
+    if (prompt.trim() === '/settle' && options.session) {
+      try {
+        const settled = await options.session.settle?.();
+        options.write(
+          settled
+            ? `Configured RPC reports finalized charge ${settled.chargedAtomic}; refunded ${settled.refundedAtomic} atomic units.\n`
+            : 'Settlement is pending; the original channel is retained.\n',
+        );
+      } catch {
+        options.write(
+          'Settlement could not be verified; the original channel is retained.\n',
+        );
+      }
+      return;
+    }
     const input = {
       model: options.model,
       maxTokens: options.maxTokens,
@@ -164,9 +183,11 @@ export async function chatSession(options: ChatSessionOptions) {
     if (result.payment) {
       const { verdict, charged, refunded } = result.payment;
       options.write(
-        verdict === PAID_VERDICTS.SETTLED
-          ? `Payment: ${verdict}; charged: ${charged ?? 'unknown'}; refunded: ${refunded ?? 'unknown'} atomic units\n`
-          : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
+        verdict === SESSION_VERDICTS.APPROVED && result.payment.session
+          ? `Approved this question: ${result.payment.session.approvedAtomic}; cumulative: ${result.payment.session.cumulativeAtomic} of ${result.payment.session.depositAtomic} atomic units; settlement pending.\n`
+          : verdict === PAID_VERDICTS.SETTLED
+            ? `Payment: ${verdict}; charged: ${charged ?? 'unknown'}; refunded: ${refunded ?? 'unknown'} atomic units\n`
+            : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
       );
     }
     if (result.status === 'uncertain') {

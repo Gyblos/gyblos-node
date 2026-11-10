@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, UNITS } from '@gyblos/config';
+import type { SessionApproval } from '@gyblos/node/session-accounting';
 import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
@@ -17,6 +18,7 @@ import type {
   FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
 import type { PaidExecutionCode } from '@gyblos/protocol/paid/constants';
+import type { SessionCode } from '@gyblos/protocol/payment-session';
 
 import {
   BUYER_EXECUTION_FIELD,
@@ -32,6 +34,7 @@ import type { SelectionDecision } from './selection';
 // What a paid request cost, as the buyer counted it and as the seller claimed; amounts are atomic
 // units of the test token. A free request carries none.
 export interface ChatPayment {
+  session?: SessionApproval;
   verdict: string;
   maxAtomic: string;
   expectedAtomic: string;
@@ -50,6 +53,7 @@ export const executionFields = (result: ChatResult) =>
   result.execution ? { [BUYER_EXECUTION_FIELD]: result.execution } : {};
 
 export type ChatErrorCode =
+  | SessionCode
   | FreeBuyerCode
   | PaidBuyerCode
   | FreeExecutionCode

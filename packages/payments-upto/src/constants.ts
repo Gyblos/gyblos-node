@@ -7,6 +7,8 @@ export const PAYMENT_PHASES = { ADMIT: 'admit', SETTLE: 'settle' } as const;
 export const BUYER_OBSERVATION = { maxResponseBytes: 1024 * 1024 } as const;
 export const UPTO_BUYER_DISTINCT_PARTIES = 4;
 export const BUYER_OBSERVATION_RPC_METHODS = [
+  'getLatestBlockhash',
+  'getSlot',
   'getGenesisHash',
   'getEpochInfo',
   'getSignaturesForAddress',

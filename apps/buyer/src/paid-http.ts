@@ -8,12 +8,14 @@ import {
   type PaidBuyerDependencies,
   type PaidBuyerOutcome,
 } from '@gyblos/node/buyer-paid-execution';
+import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   PAID_EXECUTION_CODES,
   type PaidExecutionCode,
 } from '@gyblos/protocol/paid/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
+import { PaymentSessionError } from '@gyblos/protocol/payment-session';
 import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
@@ -87,6 +89,11 @@ const unavailable = (
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  if (
+    error instanceof PaymentSessionError ||
+    error instanceof BatchChannelError
+  )
+    return unavailable(error.code, false);
   if (error instanceof PaidOutcomeError)
     return {
       ...unavailable(error.code, false),

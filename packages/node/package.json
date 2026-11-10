@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./session-policy": "./src/session-policy.ts",
+    "./session-backend": "./src/session-backend.ts",
+    "./seller-sessions": "./src/seller-sessions.ts",
+    "./buyer-session": "./src/buyer-session.ts",
+    "./buyer-session-chain": "./src/buyer-session-chain.ts",
+    "./session-accounting": "./src/session-accounting.ts",
     ".": "./src/index.ts",
     "./artifacts": "./src/artifacts.ts",
     "./constants": "./src/constants.ts",

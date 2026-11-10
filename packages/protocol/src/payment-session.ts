@@ -6,7 +6,7 @@ import {
   type SessionState,
 } from './sessions/constants';
 
-export type { SessionState } from './sessions/constants';
+export type { SessionState, SessionCode } from './sessions/constants';
 export {
   PAYMENT_SESSION,
   SESSION_CODES,
@@ -80,7 +80,7 @@ export interface SessionSeller {
   dispose(): Promise<void>;
 }
 export interface SessionBuyer {
-  open(): Promise<string>;
+  open(check?: () => void): Promise<string>;
   begin(request: SessionRequest): Promise<void>;
   acknowledge(requestId: string): Promise<void>;
   reconcile(

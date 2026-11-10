@@ -2,6 +2,7 @@
 import { Endpoint, RelayMode } from '@number0/iroh';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
@@ -17,6 +18,7 @@ import { acceptanceAssert, AcceptanceError } from './errors';
 import type { ReceiptProvider } from './receipt-provider';
 
 type AcceptanceAlpn =
+  | typeof BATCH_CHANNEL.alpn
   | typeof PAID_STREAM.alpn
   | typeof CONTROL_ALPN
   | typeof FREE_EXECUTION.alpn
@@ -43,6 +45,7 @@ export function receiptNativeBinding(provider: Pick<ReceiptProvider, 'calls'>) {
       if (options.freeExecution)
         alpns.push(FREE_EXECUTION.alpn, FREE_STREAM.alpn);
       if (options.paidExecution) alpns.push(PAID_STREAM.alpn);
+      if (options.batchSessions) alpns.push(BATCH_CHANNEL.alpn);
       if (options.receipts) alpns.push(RECEIPT_CHANNEL.alpn);
       builder.alpns(alpns.map((value) => [...Buffer.from(value)]));
       protocols.push(alpns);
