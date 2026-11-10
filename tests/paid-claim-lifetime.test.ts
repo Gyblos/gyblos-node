@@ -144,3 +144,16 @@ void test('invalid payment deadline metadata starts no engine and cannot charge 
     assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.INTERNAL);
   }
 });
+
+void test('a valid claim cutoff exhausted by its reserve remains a timeout, not invalid metadata', async () => {
+  for (const claimUntil of [1, 49, 50, 51]) {
+    const seller = await paidSellerFixture();
+    seller.payment.control.claimUntil = claimUntil;
+    const { terminal } = await seller.execute(await seller.request());
+    assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.TIMEOUT);
+    assert.equal(seller.engineCalls.length, 0);
+    assert.equal(terminal.charge?.chargedAtomic, '0');
+    assert.equal(terminal.payment?.settlement?.refundedAtomic, '20');
+    assert.equal(seller.payment.calls.settle.length, 1);
+  }
+});

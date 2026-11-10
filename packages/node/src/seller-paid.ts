@@ -11,7 +11,10 @@ import type { PaidExecutionService } from '@gyblos/transport-iroh/paid-server';
 
 import { NODE_ERROR_CODES, PAID_SETTLEMENT } from './constants';
 import { NodeError } from './errors';
-import { createSellerPaidOffers } from './paid-offers';
+import {
+  createSellerPaidOffers,
+  type SellerPaidOffersOptions,
+} from './paid-offers';
 import { createPaidRetry, type PaidRetryHealth } from './paid-retry';
 import type { LiveSellerOffer } from './seller-offer-set';
 
@@ -66,6 +69,7 @@ export async function startSellerPaid(
     startedAt: number;
     now?: () => number;
     offers: () => readonly LiveSellerOffer[];
+    telemetry?: SellerPaidOffersOptions['telemetry'];
     settlement?: { waitMs: number; retryDelaysMs: readonly number[] };
   },
 ): Promise<SellerPaid> {
@@ -87,6 +91,7 @@ export async function startSellerPaid(
   });
   const service = createSellerPaidOffers(options.offers, {
     owner: options.owner,
+    telemetry: options.telemetry,
     nodeId: options.nodeId,
     now: options.now ?? Date.now,
     ledger: new PaidSellerLedger(options.startedAt),

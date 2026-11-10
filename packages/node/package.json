@@ -42,6 +42,7 @@
     "./free-meter": "./src/free-meter.ts",
     "./free-router": "./src/free-router.ts",
     "./paid-execution": "./src/paid-execution.ts",
+    "./policy-x402": "./src/policy-x402.ts",
     "./paid-router": "./src/paid-router.ts",
     "./paid-retry": "./src/paid-retry.ts",
     "./paid-offers": "./src/paid-offers.ts",

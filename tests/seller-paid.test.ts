@@ -11,13 +11,19 @@ import type { LiveSellerOffer } from '@gyblos/node/seller-offer-set';
 import { openSellerPaid, startSellerPaid } from '@gyblos/node/seller-paid';
 import {
   CONTROL_METERING_MODES,
+  ENGINE_KINDS,
   OFFER_PRICING_KINDS,
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
+import { EXECUTION_ROUTES, TELEMETRY_EVENTS } from '@gyblos/protocol/telemetry';
 
+import { localTelemetry } from './support/local-telemetry';
 import { PAID_PRICES, paidSellerFixture } from './support/paid-seller';
 
-async function wired(waitMs = 20) {
+async function wired(
+  waitMs = 20,
+  telemetry?: Parameters<typeof startSellerPaid>[1]['telemetry'],
+) {
   const seller = await paidSellerFixture();
   const own = await seller.payment.server.describe();
   seller.payment.control.description = {
@@ -58,11 +64,58 @@ async function wired(waitMs = 20) {
       startedAt: options.now() - 1,
       now: options.now,
       offers: () => [live],
+      telemetry,
       settlement: { waitMs, retryDelaysMs: [5] },
     },
   );
   return { seller, paid, events };
 }
+
+void test('paid daemon forwards the shared sink and per-offer engine through its router', async () => {
+  const telemetry = localTelemetry();
+  const { seller, paid } = await wired(20, {
+    sink: telemetry.sink,
+    now: telemetry.now,
+    engineKind: (index) => {
+      assert.equal(index, 0);
+      return ENGINE_KINDS.OLLAMA;
+    },
+  });
+  try {
+    const request = await seller.request();
+    const response = await paid.service.stream(
+      request,
+      request.quote.offer.buyerNodeId,
+      new AbortController().signal,
+      async () => {},
+      () => EXECUTION_ROUTES.DIRECT,
+    );
+    assert.equal(response.payment?.settlement?.chargedAtomic, '10');
+    assert.deepEqual(
+      telemetry.events.map(({ type }) => type),
+      [
+        TELEMETRY_EVENTS.REQUEST_RECEIVED,
+        TELEMETRY_EVENTS.FIRST_TOKEN,
+        TELEMETRY_EVENTS.COMPLETED,
+        TELEMETRY_EVENTS.CHARGED,
+      ],
+    );
+    assert.ok(
+      telemetry.events.every(
+        (event) => event.engineKind === ENGINE_KINDS.OLLAMA,
+      ),
+    );
+    const completed = telemetry.events.find(
+      (event) => event.type === TELEMETRY_EVENTS.COMPLETED,
+    );
+    assert.deepEqual(completed?.path, {
+      route: EXECUTION_ROUTES.DIRECT,
+      routeChanged: false,
+    });
+  } finally {
+    await paid.close();
+  }
+});
 
 void test('a description off the network fee, network, asset or payout refuses paid selling', async () => {
   const { seller } = await wired();
