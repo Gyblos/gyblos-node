@@ -1,10 +1,11 @@
 # Reusable buyer-authorized payment sessions
 
 The shared buyer and seller session services use the pinned Solana x402
-`batch-settlement` client-signature mode. They are library composition ports for
-trusted hosts. The default buyer CLI and seller daemon still use their existing
-per-request payment path; this module does not register another inference ALPN,
-change an existing execution wire, or expose a public gateway.
+`batch-settlement` client-signature mode. Trusted hosts can compose them over
+the opt-in `gyblos/session/1` Iroh channel. The default buyer CLI and seller
+daemon still use their existing per-request path until a host explicitly
+supplies the session services and a capped session policy. No existing execution
+wire changes and no public gateway is enabled by this composition.
 
 ## Ownership and trust
 
@@ -13,9 +14,22 @@ change an existing execution wire, or expose a public gateway.
 synthetic-independent signers, bounded private journals, and the seller timer.
 `@gyblos/node/batch-session` composes admission, the existing execution
 lifecycle, independent buyer usage verification and post-delivery approval.
-Hosts provide existing identity/quote/input verification and authenticated
-transport. They must also enforce the existing unresolved-payment barrier. These
-are trusted ports, not untrusted callbacks obtained from discovery.
+`@gyblos/node/batch-buyer` connects an already chosen seller to independent
+quote verification, recounting and the session buyer. It plugs into the shared
+`executeBuyerQuote` paid port; zero-price offers still use its free port.
+`@gyblos/node/batch-seller` selects an exact warmed paid offer and runs its
+engine through the shared lifecycle. `serveSellerTransport` accepts this service
+as `batchSessions`; `bindEndpoint` advertises it only with
+`batchSessions: true`. `@gyblos/transport-iroh/batch-client` and `batch-server`
+own authenticated, bounded Iroh I/O and existing endpoint admission, without
+payment SDKs or engines.
+
+Hosts provision one matching buyer/seller session and provide the existing
+independent identity/catalog/request/budget verification and finalized-chain
+observers. The buyer checks the unresolved-payment barrier before any opening.
+These are trusted ports, never callbacks supplied by discovery. This initial
+composition does not negotiate arbitrary deposits or create per-peer journals
+for unknown buyers.
 
 Each session fixes buyer wallet and NodeId, seller owner and NodeId, network,
 asset, payout, fee payer, receiver authorizer, fee distribution, deposit and
@@ -83,8 +97,12 @@ The existing canonical protocol fee and split arithmetic remain unchanged.
 Journals are private, size-bounded, atomically replaced and process-locked in
 the role's payments directory, with 0700 directories and 0600 files. They retain
 SDK pending operations and the highest voucher, without prompts, answers or
-keys. An unavailable write poisons that handle; ambiguity is never cleared to
-proceed.
+keys. Before persisting a first remote opening, the adapter rejects unknown SDK
+fields, enforces an 8 KiB opening bound and the SDK Solana transaction-size
+bound, and verifies the buyer's initial SDK proof. Invalid data cannot pin or
+overflow the journal; legitimate lost-opening recovery retains its original
+checkpoint. An unavailable write poisons that handle; ambiguity is never cleared
+to proceed.
 
 If the buyer disappears before approving the final response, the seller can
 collect only the previous signed total. Exposure is bounded to one request.
@@ -93,8 +111,37 @@ restart generation. The seller may renew its own expired close authorization,
 keeping the buyer voucher, cumulative amount and SDK pending transaction records
 unchanged.
 
-Host transport must bound frames, authenticate the chosen peers, propagate
-cancellation and expose uncertainty. This library is not a new transport or an
-assertion of coding-agent API compatibility. Multiple sellers/concurrent
-requests, restored-journal rollback defense, abrupt host/power-loss acceptance
-and live network/deployed-program validation remain separate work.
+The optional Iroh composition authenticates the chosen peers, bounds frames and
+absolute deadlines, propagates cancellation and marks possible transmission
+before the first write. Native reads/writes retain their admission lease until
+settled after cancellation. An expired quote is refused again immediately before
+transmission. A transport error never retries the prompt. Explicit approval
+recovery resends only the already independently verified cumulative financial
+approval; its ACK must name the exact cumulative total and zero reservation.
+Remote status is metadata, and a remote close response becomes financial proof
+only after the buyer's own chain observation.
+
+## Iroh execution scope
+
+One bidirectional stream carries one canonical request/reply; the connection can
+serve sequential RPCs while the financial session survives disconnection. The
+operations are `open`, `execute`, `approve`, `snapshot` and `close`, defined in
+the [wire specification](../packages/protocol/SPEC.md). Both endpoint
+connection/rate admission and request quotas apply before the session's own
+single-active-call budget. The seller worker belongs to the financial service,
+not the connection; closing the buyer's connection does not stop autonomous
+settlement.
+
+This channel returns a complete response for one user message with reasoning
+off. Unsupported inputs are refused before the buyer signs an opening; there is
+no fallback to another seller or payment path after possible prompt
+transmission. The buyer recounts usage and charges at the signed quote's
+existing per-million rates before signing. A partial or missing terminal
+produces no new approval; the seller can collect only its earlier accepted
+total. Existing free/paid stream channels remain independently available; no
+streaming or full agent-API compatibility is newly claimed for this session RPC.
+
+Current application startup/configuration does not turn this on automatically.
+Multiple sellers/concurrent requests, automatic session rotation/topup,
+restored-journal rollback defense, abrupt host/power-loss acceptance and live
+network/deployed-program validation remain separate work.

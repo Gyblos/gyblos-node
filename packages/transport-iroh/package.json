@@ -26,7 +26,9 @@
     "./paid-client": "./src/paid-client.ts",
     "./receipt-client": "./src/receipt-client.ts",
     "./receipt-server": "./src/receipt-server.ts",
-    "./receipt-service": "./src/receipt-service.ts"
+    "./receipt-service": "./src/receipt-service.ts",
+    "./batch-server": "./src/batch-server.ts",
+    "./batch-client": "./src/batch-client.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

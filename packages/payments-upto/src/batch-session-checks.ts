@@ -3,7 +3,6 @@ import type { PaymentRequirements } from '@x402/core/types';
 import {
   BATCH_SETTLEMENT_SCHEME,
   isBatchFacilitatorPayload,
-  isBatchPayload,
   SOLANA_DEVNET_CAIP2,
   SOLANA_TESTNET_CAIP2,
   TOKEN_PROGRAM_ADDRESS,
@@ -33,6 +32,7 @@ import {
 } from '@gyblos/protocol/payment-session';
 
 import { coherentRecord } from './batch-session-consistency';
+import { strictBatchOpening } from './batch-session-opening';
 import type { BatchRecord } from './batch-session-types';
 import { UPTO_BUYER_DISTINCT_PARTIES } from './constants';
 
@@ -168,9 +168,8 @@ export async function requirementsFor(
     },
   };
 }
-export function openingFor(value: unknown, terms: PaymentSessionTerms) {
-  if (!isBatchPayload(value) || value.type !== 'deposit' || !value.voucher)
-    return sessionFail();
+export function openingFor(input: unknown, terms: PaymentSessionTerms) {
+  const value = strictBatchOpening(input);
   const config = value.channelConfig;
   if (
     config.payer !== terms.buyer ||

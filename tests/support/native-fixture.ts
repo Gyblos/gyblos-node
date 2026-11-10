@@ -28,7 +28,10 @@ interface FixtureOptions {
   dropPaidResponse?: boolean;
 }
 
-export async function endpoint(secret?: number[]) {
+export async function endpoint(
+  secret?: number[],
+  alpns: readonly string[] = [GYBLOS_ALPN],
+) {
   assert.ok(
     NATIVE_CAPABILITY.sdk,
     'Native Iroh capability must be checked before endpoint creation.',
@@ -39,7 +42,7 @@ export async function endpoint(secret?: number[]) {
   builder.relayMode(RelayMode.disabled());
   builder.bindAddr(`${LOCALHOST}:0`);
   builder.bindAddr(`${IPV6_LOOPBACK}:0`);
-  builder.alpns([[...Buffer.from(GYBLOS_ALPN)]]);
+  builder.alpns(alpns.map((alpn) => [...Buffer.from(alpn)]));
   if (secret) builder.secretKey(secret);
   return builder.bind();
 }

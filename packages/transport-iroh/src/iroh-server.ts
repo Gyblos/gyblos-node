@@ -8,6 +8,7 @@ import {
   TRANSPORT_TIMEOUTS,
   type TransportLimits,
 } from '@gyblos/config';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
@@ -22,6 +23,10 @@ import {
   connectionSource,
   createConnectionAdmission,
 } from './admission';
+import {
+  handleBatchChannelConnection,
+  type BatchChannelService,
+} from './batch-server';
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import { handleControlConnection, type ControlService } from './control-server';
 import { withDeadline } from './deadline';
@@ -54,6 +59,7 @@ export function serveIroh(
   limits: TransportLimits = TRANSPORT_LIMITS,
   receipts?: ReceiptService,
   paidExecution?: PaidExecutionService,
+  batchSessions?: BatchChannelService,
 ) {
   const receiptServer = receipts ? createReceiptServer(receipts) : undefined;
   const limiter = createPeerLimiter(Date.now, limits);
@@ -154,6 +160,38 @@ export function serveIroh(
     );
   }
 
+  async function batchConnection(
+    connection: Connection,
+    signal: AbortSignal,
+    peer: string,
+  ) {
+    if (!batchSessions) return;
+    await handleBatchChannelConnection(
+      connection,
+      batchSessions,
+      signal,
+      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+      () => closed,
+      () => routeAllowed(connection),
+    );
+  }
+
+  async function paidConnection(
+    connection: Connection,
+    signal: AbortSignal,
+    peer: string,
+  ) {
+    if (!paidExecution) return;
+    await handlePaidExecutionConnection(
+      connection,
+      paidExecution,
+      signal,
+      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+      () => closed,
+      () => routeAllowed(connection),
+    );
+  }
+
   async function handle(connection: Connection) {
     const peer = connection.remoteId().toString();
     const alpn = Buffer.from(connection.alpn()).toString();
@@ -207,15 +245,12 @@ export function serveIroh(
         );
         return;
       }
+      if (alpn === BATCH_CHANNEL.alpn && batchSessions) {
+        await batchConnection(connection, controller.signal, peer);
+        return;
+      }
       if (alpn === PAID_STREAM.alpn && paidExecution) {
-        await handlePaidExecutionConnection(
-          connection,
-          paidExecution,
-          controller.signal,
-          () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
-          () => closed,
-          () => routeAllowed(connection),
-        );
+        await paidConnection(connection, controller.signal, peer);
         return;
       }
       if (alpn !== GYBLOS_ALPN) {
