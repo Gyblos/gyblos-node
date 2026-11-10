@@ -102,8 +102,8 @@ Seller node $version.
 - Image: \`$reference\`, signed by \`$GITHUB_SERVER_URL/$GITHUB_WORKFLOW_REF\` ([release run]($run)).
 - \`install.sh\` installs exactly this image, or without Docker the packaged seller
   \`gyblos-$version-<target>.tar.gz\` (macOS arm64, Linux x64 and arm64) pinned by checksum and signed by
-  the same workflow. \`install.sh.sigstore.json\` is its signature by the same
-  workflow and \`install.sh.sha256\` its checksum.
+  the same workflow. \`gyblos-$version-win32-x64.tar.gz\` is the same seller for Windows x64, also on
+  npm. \`install.sh.sigstore.json\` is the installer's signature by the same workflow and \`install.sh.sha256\` its checksum.
 - Install or update: \`curl -fsSL https://gyblos.com/install.sh -o install.sh && sh install.sh\`
   (gyblos.com serves the installer of the latest release).
 EOF

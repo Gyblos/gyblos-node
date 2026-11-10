@@ -548,16 +548,18 @@ packaged seller instead. An existing install keeps its mode.
 The same packaged sellers are published to npm, for anyone who already uses it:
 `npm install -g gyblos` installs a small `gyblos` wrapper and, as an optional
 dependency, only this machine's `@gyblos/seller-<target>` (macOS arm64, Linux
-x64 and arm64 glibc). That package is the release archive, with its own Node
-runtime, so the seller never runs on the user's Node; npm installs the pinned
-iroh binding as its dependency. Then `gyblos seller init`,
+x64 and arm64 glibc, Windows x64). That package is the release archive, with its
+own Node runtime, so the seller never runs on the user's Node; npm installs the
+pinned iroh binding as its dependency. Then `gyblos seller init`,
 `gyblos setup --role seller --mint <mint>`, `gyblos tokenizer`, `gyblos doctor`
 and `gyblos seller service install`, with the machine's own Ollama as in
 [Without Docker](#without-docker). `gyblos seller status` says to update with
 `npm install -g gyblos@latest` and then reinstall the service, so it restarts on
 the new code (a service from an nvm-managed Node follows that Node version).
 `npx gyblos` runs commands, but the service refuses to run from a temporary
-cache (npx, pnpm dlx, bunx).
+cache (npx, pnpm dlx, bunx). On Windows the seller runs in a terminal with
+`gyblos start` for now; the background service and a Windows installer come
+next.
 
 `pnpm build:npm --version <v>` packs them from `pnpm build:native` archives of
 the same version. The release builds them in its `native` job; its `npm` job
@@ -635,8 +637,10 @@ runtime, so the seller's machine needs no checkout, pnpm or Node:
 pnpm build:native --version 0.1.0-beta.8 --target darwin-arm64 --target linux-x64 --target linux-arm64
 ```
 
-Targets are `darwin-arm64`, `linux-x64` and `linux-arm64` (glibc); Intel Macs,
-musl Linux and Windows keep Docker for now. Each archive,
+Targets are `darwin-arm64`, `linux-x64` and `linux-arm64` (glibc), and
+`win32-x64`, whose folder has `bin/gyblos.cmd` and `runtime/node.exe` (Node's
+Windows zip, unpacked with `unzip`; Windows 10 and later unpack the archive with
+their own `tar`). Intel Macs and musl Linux keep Docker. Each archive,
 `dist/native/gyblos-<version>-<target>.tar.gz`, comes with a `.sha256`. The Node
 archive is checked against the SHA-256 pinned in `tooling/native-build.ts` and
 the iroh binding against `pnpm-lock.yaml`. `--node "$(command -v node)"` reuses

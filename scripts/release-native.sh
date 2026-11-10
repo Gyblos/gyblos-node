@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds and signs the packaged sellers of one release; runs only in the release workflow
 # (.github/workflows/release-seller-image.yml, job `native`). Builds gyblos-<version>-<target>.tar.gz for
-# every target with pinned inputs (tooling/native-build.ts), signs each archive keyless with the
+# every target (Windows included, for npm) with pinned inputs (tooling/native-build.ts), signs each archive keyless with the
 # workflow's GitHub identity (the identity install.sh verifies) and verifies it. Writes the archives,
 # their .sha256 and .sigstore.json files to dist/native, and the `native` output: one
 # `<target>=<sha256>` per target, which scripts/publish-installer.sh pins into install.sh. Then packs the
@@ -10,7 +10,7 @@
 #   sh scripts/release-native.sh <version>
 set -eu
 
-TARGETS='darwin-arm64 linux-x64 linux-arm64'
+TARGETS='darwin-arm64 linux-x64 linux-arm64 win32-x64'
 ISSUER=https://token.actions.githubusercontent.com
 OUT=dist/native
 

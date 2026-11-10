@@ -2,7 +2,8 @@
 # Pins install.sh (or the given file) to one signed seller release, as the release workflow does after
 # publishing it. Accepts only ghcr.io/gyblos/seller:<version>@sha256:<64 hex>. With NATIVE_PINS
 # (`<target>=<sha256>` for darwin-arm64, linux-x64 and linux-arm64, space-separated) it also pins the
-# release's packaged sellers: NATIVE_VERSION and one NATIVE_SHA256_<TARGET> line each.
+# release's packaged sellers: NATIVE_VERSION and one NATIVE_SHA256_<TARGET> line each. install.sh does not
+# install on Windows, so a win32-x64 pin is skipped.
 #
 #   [NATIVE_PINS='darwin-arm64=<sha256> …'] sh scripts/pin-installer.sh <reference> [file]
 set -eu
@@ -31,6 +32,7 @@ if [ -n "${NATIVE_PINS:-}" ]; then
     sha=${pin#*=}
     case "$target" in
       darwin-arm64 | linux-x64 | linux-arm64) ;;
+      win32-x64) continue ;;
       *) die "not a packaged seller target: '$target'" ;;
     esac
     case " ${seen:-} " in

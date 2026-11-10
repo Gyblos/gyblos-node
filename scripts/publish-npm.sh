@@ -9,7 +9,7 @@
 set -eu
 
 MAIN=gyblos
-PLATFORMS='darwin-arm64 linux-x64 linux-arm64'
+PLATFORMS='darwin-arm64 linux-x64 linux-arm64 win32-x64'
 DIR=dist/npm
 
 die() {
