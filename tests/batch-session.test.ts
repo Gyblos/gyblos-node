@@ -199,16 +199,18 @@ void test('seller worker closes autonomously while the buyer is offline', async 
   t.after(rig.dispose);
   await rig.open();
   await rig.serve(1, '145');
+  t.mock.timers.enable({ apis: ['setInterval'] });
   rig.sellerOptions.pollMs = 5;
   await rig.restart();
   await rig.buyer.dispose();
   rig.time(rig.now() + 1001);
-  await t.waitFor(
-    () => rig.seller().snapshot().state === SESSION_STATES.CLOSED,
-    { interval: 5, timeout: 2000 },
-  );
+  t.mock.timers.tick(5);
+  // Disposal drains the task scheduled by the timer; it never performs financial closure itself.
+  await rig.seller().dispose();
+  assert.equal(rig.seller().snapshot().state, SESSION_STATES.CLOSED);
   assert.deepEqual(rig.calls, ['deposit', 'refund']);
 });
+
 void test('a slow deposit is bounded and cannot admit inference after timing out', async (t) => {
   const rig = await sessionRig();
   t.after(rig.dispose);
