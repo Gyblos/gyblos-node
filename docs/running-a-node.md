@@ -560,6 +560,34 @@ One-time GitHub setup, by an organization owner:
 
 The package is public, so the image exposes the node's source.
 
+##### Building the packaged seller
+
+The packaged seller (for installs without Docker) is a folder with its own Node
+runtime, so the seller's machine needs no checkout, pnpm or Node:
+
+| Path                   | Contents                                                   |
+| ---------------------- | ---------------------------------------------------------- |
+| `bin/gyblos`           | Launcher: sets the packaged mode and runs the bundle.      |
+| `runtime/node`         | The official Node release binary (and its `LICENSE`).      |
+| `lib/gyblos.mjs`       | One bundle of `apps/node/src/bin.ts` and its dependencies. |
+| `lib/node_modules/...` | The iroh binding for the target (the only native module).  |
+
+```sh
+pnpm build:native --version 0.1.0-beta.8 --target darwin-arm64 --target linux-x64 --target linux-arm64
+```
+
+Targets are `darwin-arm64`, `linux-x64` and `linux-arm64` (glibc); Intel Macs,
+musl Linux and Windows keep Docker for now. Each archive,
+`dist/native/gyblos-<version>-<target>.tar.gz`, comes with a `.sha256`. The Node
+archive is checked against the SHA-256 pinned in `tooling/native-build.ts` and
+the iroh binding against `pnpm-lock.yaml`. `--node "$(command -v node)"` reuses
+this machine's Node and installed binding for a local build of this machine's
+target, with no download.
+
+The packaged seller keeps its home and `gyblos.toml` in `~/.gyblos` and runs as
+`gyblos start`; `gyblos seller service install` makes the service run the
+launcher.
+
 ## Buyer
 
 Free inference uses `pnpm buyer:free`
