@@ -186,8 +186,6 @@ export const SELLER_DAEMON_STATES = {
 
 // Mainnet is recognized only so the validator can refuse it with a specific code.
 export const NODE_NETWORKS = { DEVNET: 'devnet', MAINNET: 'mainnet' } as const;
-export type NodeNetwork = (typeof NODE_NETWORKS)[keyof typeof NODE_NETWORKS];
-
 export const OFFER_CURRENCIES = { USDC: 'USDC' } as const;
 export type OfferCurrency =
   (typeof OFFER_CURRENCIES)[keyof typeof OFFER_CURRENCIES];

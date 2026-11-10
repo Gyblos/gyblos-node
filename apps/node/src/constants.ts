@@ -129,6 +129,7 @@ export type InitErrorCode = (typeof INIT_ERRORS)[keyof typeof INIT_ERRORS];
 // bounds and how far it pages the discovery index.
 export const STATUS = {
   dayMs: 86_400_000,
+  secondMs: 1000,
   maxOffers: 64,
   statusFileBytes: 64 * 1024,
   probeTimeoutMs: 5_000,

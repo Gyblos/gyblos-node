@@ -27,6 +27,7 @@ import {
   type SellerOutput,
 } from './seller-home';
 import {
+  outputRate,
   receiptActivity,
   type ActivityWindow,
   type DaemonStatus,
@@ -141,13 +142,12 @@ async function discoveryLine(
   };
 }
 
-function windowLine({
-  completed,
-  failed,
-  cancelled,
-  outputTokens,
-}: ActivityWindow) {
-  return `${completed} completed, ${failed} failed, ${cancelled} cancelled; ${outputTokens} output tokens`;
+function windowLine(window: ActivityWindow) {
+  const { completed, failed, cancelled, outputTokens } = window;
+  const rate = outputRate(window);
+  const speed =
+    rate === undefined ? '' : `; ~${rate.toFixed(1)} output tokens/s`;
+  return `${completed} completed, ${failed} failed, ${cancelled} cancelled; ${outputTokens} output tokens${speed}`;
 }
 
 async function activityLines(
