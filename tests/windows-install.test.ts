@@ -86,9 +86,15 @@ async function fixture(root: string) {
       },
     );
   });
+  // Answers once the request's body is read, as Windows PowerShell expects.
   const ollama = createServer((request, response) => {
-    response.setHeader('content-type', 'application/json');
-    response.end(request.url === '/api/version' ? '{"version":"0.0.0"}' : '{}');
+    request.resume();
+    request.on('end', () => {
+      response.setHeader('content-type', 'application/json');
+      response.end(
+        request.url === '/api/version' ? '{"version":"0.0.0"}' : '{}',
+      );
+    });
   });
   const port = await listen(files, 0);
   await listen(ollama, 11434);

@@ -90,7 +90,7 @@ void test(
       await run(schtasks, ['/Create', '/TN', name, '/XML', file]);
       try {
         const { stdout } = await run(schtasks, ['/Query', '/TN', name, '/XML']);
-        assert.ok(stdout.includes('service-run'));
+        assert.ok(stdout.includes('seller-service.cmd'), stdout);
       } finally {
         await run(schtasks, ['/Delete', '/TN', name, '/F']);
       }
