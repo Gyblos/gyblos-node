@@ -23,7 +23,9 @@ import {
   hostTarget,
   lockedPackage,
   NATIVE,
+  nativeLayout,
 } from '../tooling/native-build';
+import { windowsLauncherScript } from '../tooling/native-launchers';
 
 const run = promisify(execFile);
 const VERSION = '0.0.0-test.1';
@@ -39,9 +41,39 @@ void test('every native target pins its iroh binding in the lockfile', async () 
   }
 });
 
+void test('the Windows launcher runs its own node.exe with the package’s environment, in CRLF lines', () => {
+  assert.deepEqual(nativeLayout('win32-x64'), {
+    launcher: 'bin/gyblos.cmd',
+    runtime: 'runtime/node.exe',
+  });
+  assert.deepEqual(nativeLayout('linux-x64'), {
+    launcher: 'bin/gyblos',
+    runtime: 'runtime/node',
+  });
+  const script = windowsLauncherScript(VERSION);
+  assert.ok(
+    script
+      .split('\n')
+      .slice(0, -1)
+      .every((line) => line.endsWith('\r')),
+  );
+  const lines = script.split('\r\n');
+  for (const line of [
+    'set "GYBLOS_PACKAGED=1"',
+    'set "GYBLOS_LAUNCHER=%~f0"',
+    `set "GYBLOS_VERSION=${VERSION}"`,
+    'set "GYBLOS_CONTAINER="',
+    'set "NODE_OPTIONS="',
+    '"%~dp0..\\runtime\\node.exe" "%~dp0..\\lib\\gyblos.mjs" %*',
+    'exit /b %ERRORLEVEL%',
+  ])
+    assert.ok(lines.includes(line), line);
+});
+
 void test(
   'the packaged seller runs init, setup and doctor from ~/.gyblos through a linked launcher',
-  { skip: hostTarget() === undefined },
+  // Windows has its own: tests/windows-package.test.ts.
+  { skip: hostTarget() === undefined || process.platform === 'win32' },
   async () => {
     const target = hostTarget()!;
     const root = await mkdtemp(join(tmpdir(), 'gyblos-native-test-'));
