@@ -100,6 +100,10 @@ void test('windows acl: private means owned by this account and opened by no one
     true,
   );
   assert.equal(aclIsPrivate({ owner: OTHER, rules }, SID), false);
+  assert.equal(
+    aclIsPrivate({ owner: WINDOWS_SIDS.administrators, rules }, SID),
+    true,
+  );
 });
 
 void test('mode bits decide privacy on POSIX only', () => {

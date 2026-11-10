@@ -11,7 +11,9 @@ import { promisify } from 'node:util';
 
 import {
   directoryIsPrivate,
+  readAcl,
   restrictDirectory,
+  userSid,
 } from '@gyblos/runtime/windows-acl';
 
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
@@ -34,7 +36,14 @@ void test(
       const restricted = join(root, 'restricted');
       await mkdir(restricted);
       await restrictDirectory(restricted);
-      assert.equal(await directoryIsPrivate(restricted), true);
+      assert.equal(
+        await directoryIsPrivate(restricted),
+        true,
+        JSON.stringify({
+          sid: await userSid(),
+          acl: await readAcl(restricted),
+        }),
+      );
       const shared = join(root, 'shared');
       await mkdir(shared);
       await restrictDirectory(shared);

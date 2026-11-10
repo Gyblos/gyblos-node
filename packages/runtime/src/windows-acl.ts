@@ -1,5 +1,5 @@
 // Windows' owner-only directory: its ACL grants access only to this account, SYSTEM and Administrators,
-// inherited by everything created inside, and this account owns it. Restricting runs icacls once when a
+// inherited by everything created inside, and one of them owns it. Restricting runs icacls once when a
 // private directory is created; checking reads the ACL by SID with PowerShell (locale-independent), once
 // per directory and process. The tools are called by absolute path, never through PATH.
 import { execFile } from 'node:child_process';
@@ -91,8 +91,9 @@ export function aclIsPrivate(report: AclReport, sid: string) {
     WINDOWS_SIDS.system,
     WINDOWS_SIDS.administrators,
   ]);
+  // An elevated account creates folders owned by Administrators, who can open them anyway.
   return (
-    report.owner === sid &&
+    allowed.has(report.owner) &&
     report.rules.every((rule) => rule.type !== ALLOW || allowed.has(rule.sid))
   );
 }
