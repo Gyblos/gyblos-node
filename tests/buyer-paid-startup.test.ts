@@ -127,7 +127,8 @@ void test('paid startup names each refusal and answers in paid mode once started
       [
         '--import',
         'tsx',
-        'apps/node/src/setup.ts',
+        'apps/node/src/bin.ts',
+        'setup',
         '--role',
         'buyer',
         '--mint',

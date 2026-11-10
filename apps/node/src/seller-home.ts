@@ -19,7 +19,7 @@ export interface SellerOutput {
 }
 
 const ROLE_HINT =
-  'no usable seller role in this home; `pnpm gyblos doctor` explains why';
+  'no usable seller role in this home; `gyblos doctor` explains why';
 
 // A relative GYBLOS_HOME is the working directory's, as for node:start.
 export const homeEnvironmentOf = (

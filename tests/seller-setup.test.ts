@@ -67,7 +67,7 @@ async function paidRole() {
 function setup(home: string, args: string[]) {
   return spawnSync(
     process.execPath,
-    ['--import', 'tsx', 'apps/node/src/setup.ts', ...args],
+    ['--import', 'tsx', 'apps/node/src/bin.ts', 'setup', ...args],
     {
       cwd: REPOSITORY_ROOT,
       env: {

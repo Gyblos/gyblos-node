@@ -21,7 +21,6 @@ import {
 } from '@gyblos/node/node-config-resolve';
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
 
 import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
@@ -369,5 +368,3 @@ export async function main(args = process.argv.slice(2)) {
     terminal?.close();
   }
 }
-
-if (isMain(import.meta.url)) await main();

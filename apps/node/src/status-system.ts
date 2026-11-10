@@ -64,7 +64,7 @@ function probeCommand(argv: readonly string[]) {
 
 const PROCESS_ID = /^[0-9]+$/;
 
-// Another process in this PID namespace whose arguments include the daemon's entry; `docker compose exec`
+// Another process in this PID namespace whose arguments run the daemon's entry with `start`; `docker compose exec`
 // shares the seller container's namespace, and its own CLI process is skipped.
 export async function daemonProcess(
   procRoot = '/proc',
@@ -79,7 +79,10 @@ export async function daemonProcess(
     } catch {
       continue;
     }
-    if (cmdline.split('\0').includes(SERVICE.entry)) return true;
+    const argv = cmdline.split('\0');
+    const at = argv.indexOf(SERVICE.entry);
+    // The daemon is the entry's `start`; other `gyblos` commands run through the same entry.
+    if (at !== -1 && argv[at + 1] === SERVICE.start) return true;
   }
   return false;
 }

@@ -213,7 +213,7 @@ A crash during an update may leave a lock: the node never automatically breaks
 it. Operator inspection/repair is required without resetting the high-water
 mark. Recovery: `pnpm gyblos doctor` reports `SEQUENCE_LOCK_PRESENT`; confirm no
 seller is running with this `GYBLOS_HOME` (the daemon, or a lab harness using
-it; for example `pgrep -fl apps/node/src/main.ts`), then remove only
+it; for example `pgrep -fl 'gyblos|bin.ts start'`), then remove only
 `public-sequence-v2.lock` and any `public-sequence-v2.json.*.tmp` left beside it
 in the seller directory. Never edit or delete `public-sequence-v2.json`. Since
 the first signal after startup starts a stop that ignores further Ctrl-C until

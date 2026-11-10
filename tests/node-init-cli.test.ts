@@ -40,7 +40,7 @@ void test('seller init: without a terminal it writes the default free Ollama off
       result.stdout,
       /GYBLOS_RELAY_TOKEN=<your token> in seller\.env/,
     );
-    assert.match(result.stdout, /pnpm gyblos doctor/);
+    assert.match(result.stdout, /`gyblos doctor`/);
   }));
 
 void test('seller init: on a terminal it asks each missing value, in order, and writes the answers', () =>
@@ -232,7 +232,7 @@ void test('seller init: the script entry takes defaults without a terminal and s
     const script = (args: string[]) =>
       spawnSync(
         process.execPath,
-        ['--import', 'tsx', 'apps/node/src/cli.ts', ...INIT, ...args],
+        ['--import', 'tsx', 'apps/node/src/bin.ts', ...INIT, ...args],
         {
           cwd: REPOSITORY_ROOT,
           env: { ...process.env, GYBLOS_CONFIG: path },

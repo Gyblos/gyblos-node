@@ -240,7 +240,7 @@ function nextSteps(answers: InitAnswers) {
       `Pull the model into that Ollama: OLLAMA_HOST=${new URL(answers.url).host} ollama pull ${ollamaTag(answers.model)}`,
     );
   steps.push(
-    'Run `pnpm gyblos doctor`, then `pnpm node:start` or `pnpm gyblos seller service install`.',
+    'Run `gyblos doctor`, then `gyblos start` or `gyblos seller service install`.',
   );
   return steps.map((step, index) => `  ${index + 1}. ${step}\n`).join('');
 }

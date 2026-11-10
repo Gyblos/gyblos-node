@@ -271,7 +271,7 @@ export async function registerCommand(
   if (!discovery)
     return fail(
       REGISTER_ERRORS.CONFIG_INVALID,
-      'configuration invalid; run `pnpm gyblos doctor`',
+      'configuration invalid; run `gyblos doctor`',
     );
   const invite = await checkedInvite(output, system.prompt);
   if ('code' in invite) return fail(invite.code, invite.hint);

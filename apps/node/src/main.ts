@@ -2,7 +2,7 @@
 // Seller composition belongs to the node library.
 import { createNode } from '@gyblos/node';
 import { NodeError } from '@gyblos/node/errors';
-import { isMain, shutdownSignal } from '@gyblos/runtime';
+import { shutdownSignal } from '@gyblos/runtime';
 
 import { codeHint } from './cli-hints';
 
@@ -33,14 +33,14 @@ export function startupFailure(error: unknown) {
   return `gyblos seller: startup failed${offer}: ${error.code}${help ? ` (${help})` : ''}\n`;
 }
 
-if (isMain(import.meta.url)) {
+// `gyblos start`: a startup refusal with a static code exits like the unhandled rejection it replaces, so a
+// handle startup left open must not keep the container or service up without restarting it.
+export async function start() {
   try {
     await main();
   } catch (error) {
     const line = startupFailure(error);
     if (!line) throw error;
-    // Exits like the unhandled rejection it replaces: a handle startup left open must not keep the
-    // container up without restarting it.
     process.stderr.write(line, () => process.exit(1));
   }
 }

@@ -5,6 +5,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { RUN_MODES } from '@gyblos/config';
+
 import {
   newerVersion,
   UPDATE,
@@ -63,7 +65,11 @@ const latest = (body: unknown, statusCode = 200) => {
 void test('updateNotice names a newer release only for a released image that checks', async () => {
   const newer = latest({ tag_name: 'v0.1.0-beta.6' });
   assert.equal(
-    await updateNotice({ GYBLOS_VERSION: '0.1.0-beta.5' }, newer.fetch, true),
+    await updateNotice(
+      { GYBLOS_VERSION: '0.1.0-beta.5' },
+      newer.fetch,
+      RUN_MODES.CONTAINER,
+    ),
     'v0.1.0-beta.6 is available (this seller runs v0.1.0-beta.5); run `sh install.sh update` where you installed the seller.',
   );
   assert.deepEqual(
@@ -83,7 +89,7 @@ void test('updateNotice names a newer release only for a released image that che
     ],
   ] as const) {
     assert.equal(
-      await updateNotice(environment, answer.fetch, true),
+      await updateNotice(environment, answer.fetch, RUN_MODES.CONTAINER),
       undefined,
     );
     assert.equal(answer.requests.length, 0, JSON.stringify(environment));
@@ -101,7 +107,7 @@ void test('updateNotice names a newer release only for a released image that che
       await updateNotice(
         { GYBLOS_VERSION: '0.1.0-beta.5' },
         answer.fetch,
-        true,
+        RUN_MODES.CONTAINER,
       ),
       undefined,
     );
@@ -111,7 +117,7 @@ void test('updateNotice names a newer release only for a released image that che
       async () => {
         throw new Error('offline');
       },
-      true,
+      RUN_MODES.CONTAINER,
     ),
     undefined,
   );

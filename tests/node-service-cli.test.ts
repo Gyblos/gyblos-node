@@ -68,7 +68,7 @@ void test('a user unit runs the seller with limits, SIGINT, a start limit and th
     'EnvironmentFile=-/srv/gyblos-home/seller.env',
     'Environment="GYBLOS_HOME=/srv/gyblos-home"',
     'Environment="GYBLOS_CONFIG=/srv/gyblos-home/gyblos.toml"',
-    'ExecStart="/opt/node24/bin/node" --import tsx apps/node/src/main.ts',
+    'ExecStart="/opt/node24/bin/node" --import tsx apps/node/src/bin.ts start',
     'KillSignal=SIGINT',
     'TimeoutStopSec=120',
     'Restart=on-failure',

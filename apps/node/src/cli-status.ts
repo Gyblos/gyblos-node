@@ -3,6 +3,7 @@
 // --online it also looks the NodeId up in the discovery index, sending only the model. Prints counts,
 // codes, public identifiers and URL origins; never a prompt, a buyer, a key, the home location or a value
 // from the environment.
+import { runMode } from '@gyblos/config';
 import { fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
 import { listReceipts } from '@gyblos/node/receipts';
@@ -119,7 +120,7 @@ async function discoveryLine(
 ) {
   if (!discovery)
     return {
-      text: 'configuration invalid; run `pnpm gyblos doctor`',
+      text: 'configuration invalid; run `gyblos doctor`',
       listing: LISTING.UNKNOWN,
     };
   if (!discovery.publish) return { text: 'off', listing: LISTING.OFF };
@@ -225,11 +226,7 @@ export async function statusCommand(
   if (!identity) return EXIT.failure;
   const now = system.now();
   // Started first so the request overlaps the local reads.
-  const update = updateNotice(
-    output.env,
-    system.fetch,
-    inContainer(output.env),
-  );
+  const update = updateNotice(output.env, system.fetch, runMode(output.env));
   const [service, daemon, discovery] = await Promise.all([
     serviceState(system, output.env),
     readDaemonStatus(homeEnvironment),
@@ -276,11 +273,7 @@ export async function statusCommand(
     );
   }
   if (verdict === STATUS_RESULTS.RUNNING) {
-    const next = nextStep(
-      listing.listing,
-      identity.owner,
-      inContainer(output.env),
-    );
+    const next = nextStep(listing.listing, identity.owner, runMode(output.env));
     if (listing.listing === LISTING.LISTED)
       output.stdout('Selling: buyers can find this seller in the index.\n');
     else if (next) output.stdout(`Next: ${next}\n`);

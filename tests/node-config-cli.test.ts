@@ -223,7 +223,7 @@ void test('the gyblos script entry sets the process exit code', async () => {
     [
       '--import',
       'tsx',
-      'apps/node/src/cli.ts',
+      'apps/node/src/bin.ts',
       'config',
       'validate',
       '--config',
@@ -243,7 +243,7 @@ void test('the gyblos script entry sets the process exit code', async () => {
       [
         '--import',
         'tsx',
-        'apps/node/src/cli.ts',
+        'apps/node/src/bin.ts',
         'config',
         'validate',
         '--config',

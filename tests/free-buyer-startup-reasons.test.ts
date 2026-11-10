@@ -75,7 +75,8 @@ void test('buyer:free names state, role, key, reasoning and port failures separa
       [
         '--import',
         'tsx',
-        'apps/node/src/setup.ts',
+        'apps/node/src/bin.ts',
+        'setup',
         '--role',
         'buyer',
         '--mint',
@@ -198,7 +199,8 @@ void test('free startup uses one validated selection snapshot if the file change
       [
         '--import',
         'tsx',
-        'apps/node/src/setup.ts',
+        'apps/node/src/bin.ts',
+        'setup',
         '--role',
         'buyer',
         '--mint',

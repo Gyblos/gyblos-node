@@ -7,6 +7,7 @@ import { lstat, mkdir, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
+import { NODE_ENVIRONMENT, RUN_MODES, runMode } from '@gyblos/config';
 import { homeLayout } from '@gyblos/config/home';
 import { nodeConfigPath } from '@gyblos/node/node-config-file';
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
@@ -67,6 +68,8 @@ export interface ServiceSystem {
   accountHome: string;
   nodePath: string;
   repository: string;
+  // Set when running as the packaged release: the service runs this launcher instead of Node and tsx.
+  launcher?: string;
   run: (argv: readonly string[]) => Promise<number>;
 }
 
@@ -93,13 +96,20 @@ function runCommand(argv: readonly string[]) {
   });
 }
 
-export function defaultServiceSystem(): ServiceSystem {
+export function defaultServiceSystem(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): ServiceSystem {
+  const launcher =
+    runMode(environment) === RUN_MODES.PACKAGED
+      ? environment[NODE_ENVIRONMENT.launcher]
+      : undefined;
   return {
     platform: process.platform,
     uid: process.getuid?.(),
     accountHome: homedir(),
     nodePath: process.execPath,
     repository: resolve(import.meta.dirname, '../../..'),
+    ...(launcher ? { launcher } : {}),
     run: runCommand,
   };
 }
@@ -127,6 +137,7 @@ function serviceInput(
     ...account(system),
     nodePath: system.nodePath,
     repository: system.repository,
+    ...(system.launcher ? { launcher: system.launcher } : {}),
     home: layout.root,
     config: nodeConfigPath(output.env, output.cwd).path,
     environmentFile: layout.files.sellerEnvironment,
