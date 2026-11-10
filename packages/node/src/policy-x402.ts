@@ -56,7 +56,9 @@ function deadline(admission: PaymentAdmission, reserve: number) {
     admission.claimUntil > 0 &&
     Number.isSafeInteger(reserve) &&
     reserve > 0
-    ? admission.claimUntil - reserve
+    ? // A verified quote is admitted at a positive epoch. Keep an exhausted valid cutoff expired,
+      // while satisfying the common window's positive-deadline shape; it must remain TIMEOUT.
+      Math.max(1, admission.claimUntil - reserve)
     : Number.NaN;
 }
 
