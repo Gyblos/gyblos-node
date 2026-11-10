@@ -7,18 +7,20 @@ import { dirname } from 'node:path';
 
 import { FILE_MODES, KEY_LIMITS } from '@gyblos/config';
 import { hasPrivateMode, WINDOWS } from '@gyblos/runtime/private-mode';
-import { directoryIsPrivate } from '@gyblos/runtime/windows-acl';
+import { ACL_VERDICTS, pathsArePrivate } from '@gyblos/runtime/windows-acl';
 
 // A regular, non-symlinked file owned by this user with mode 0600; checked from metadata only.
 export function privateKeyMetadata(
   metadata: Pick<
     Awaited<ReturnType<typeof lstat>>,
-    'isFile' | 'isSymbolicLink' | 'mode' | 'uid'
+    'isFile' | 'isSymbolicLink' | 'mode' | 'uid' | 'nlink'
   >,
 ) {
   return (
     metadata.isFile() &&
     !metadata.isSymbolicLink() &&
+    // A second link would let the key be read or replaced through another name.
+    Number(metadata.nlink) === 1 &&
     hasPrivateMode(metadata, FILE_MODES.privateFile)
   );
 }
@@ -43,14 +45,20 @@ async function privateKeyText(path: string) {
     const named = await lstat(path);
     if (
       !privateKeyMetadata(metadata) ||
-      metadata.nlink !== 1 ||
       named.isSymbolicLink() ||
       named.dev !== metadata.dev ||
       named.ino !== metadata.ino
     )
       throw invalid();
-    // Windows has no mode bits: the folder's ACL must keep everyone else out.
-    if (WINDOWS && !(await directoryIsPrivate(dirname(path)))) throw invalid();
+    // Windows has no mode bits: the key and its folder must keep everyone else out by their ACLs.
+    if (WINDOWS) {
+      const verdict = await pathsArePrivate([dirname(path), path]);
+      if (verdict === ACL_VERDICTS.UNREADABLE)
+        throw new Error(
+          'Could not read the Windows permissions of the role keys (PowerShell missing or blocked); the keys are not used.',
+        );
+      if (verdict !== ACL_VERDICTS.PRIVATE) throw invalid();
+    }
     if (metadata.size > KEY_LIMITS.fileBytes)
       throw new Error('Invalid role key.');
     return await handle.readFile('utf8');

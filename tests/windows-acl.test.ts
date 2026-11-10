@@ -7,8 +7,11 @@ import test from 'node:test';
 
 import { hasPrivateMode } from '@gyblos/runtime/private-mode';
 import {
+  ACL_VERDICTS,
   aclIsPrivate,
-  readAcl,
+  parseAcls,
+  pathsArePrivate,
+  readAcls,
   restrictDirectory,
   userSid,
   WINDOWS_SIDS,
@@ -55,28 +58,57 @@ void test('windows acl: restricting replaces inherited access with this account,
   ]);
 });
 
-void test('windows acl: the path reaches PowerShell in its environment, and its lines parse', async () => {
-  const path = "C:\\Users\\ana\\.gyblos'; Remove-Item C:\\ -Recurse #";
-  const single = tools({
-    'powershell.exe': `owner ${SID}\r\nrule ${SID} Allow\r\nrule S-1-1-0 Deny\r\n`,
+void test('windows acl: paths reach PowerShell in its environment, and each item parses', async () => {
+  const paths = [
+    "C:\\Users\\ana\\.gyblos'; Remove-Item C:\\ -Recurse #",
+    'C:\\Users\\ana\\.gyblos\\seller\\node.key',
+  ];
+  const fake = tools({
+    'powershell.exe': `item 0\r\nowner ${SID}\r\nrule ${SID} Allow\r\nrule S-1-1-0 Deny\r\nitem 1\r\nowner ${SID}\r\n`,
   });
-  const report = await readAcl(path, single.fake);
-  assert.deepEqual(report, {
-    owner: SID,
-    rules: [
-      { sid: SID, type: 'Allow' },
-      { sid: 'S-1-1-0', type: 'Deny' },
-    ],
+  assert.deepEqual(await readAcls(paths, fake.fake), [
+    {
+      owner: SID,
+      rules: [
+        { sid: SID, type: 'Allow' },
+        { sid: 'S-1-1-0', type: 'Deny' },
+      ],
+    },
+    { owner: SID, rules: [] },
+  ]);
+  const call = fake.calls[0]!;
+  assert.deepEqual(call.env, {
+    GYBLOS_ACL_PATHS: paths.join('\n'),
+    PSModulePath: '',
   });
-  const call = single.calls[0]!;
-  assert.deepEqual(call.env, { GYBLOS_ACL_PATH: path, PSModulePath: '' });
   assert.ok(!call.args.some((argument) => argument.includes('Remove-Item')));
-  assert.deepEqual(
-    (await readAcl('C:\\x', tools({ 'powershell.exe': `owner ${SID}` }).fake))
-      .rules,
-    [],
+  // A missing item or owner is unreadable, never private.
+  assert.throws(() => parseAcls(`item 0\nowner ${SID}`, 2));
+  assert.throws(() => parseAcls('item 0', 1));
+});
+
+void test('windows acl: one verdict for many paths, and unreadable is its own answer', async () => {
+  const whoami = `"DESKTOP\\ana","${SID}"`;
+  const run = (powershell: string) =>
+    pathsArePrivate(
+      ['C:\\a', 'C:\\a\\b'],
+      tools({ 'whoami.exe': whoami, 'powershell.exe': powershell }).fake,
+    );
+  const own = `owner ${SID}\nrule ${SID} Allow`;
+  assert.equal(
+    await run(`item 0\n${own}\nitem 1\n${own}`),
+    ACL_VERDICTS.PRIVATE,
   );
-  await assert.rejects(readAcl('C:\\x', tools({ 'powershell.exe': '' }).fake));
+  assert.equal(
+    await run(`item 0\n${own}\nitem 1\n${own}\nrule S-1-5-11 Allow`),
+    ACL_VERDICTS.EXPOSED,
+  );
+  assert.equal(await run(''), ACL_VERDICTS.UNREADABLE);
+  const blocked: AclTools = { run: () => Promise.reject(new Error('blocked')) };
+  assert.equal(
+    await pathsArePrivate(['C:\\a'], blocked),
+    ACL_VERDICTS.UNREADABLE,
+  );
 });
 
 void test('windows acl: private means owned by this account and opened by no one else', () => {
@@ -108,8 +140,17 @@ void test('windows acl: private means owned by this account and opened by no one
   );
 });
 
-void test('mode bits decide privacy on POSIX only', () => {
+void test('mode bits decide privacy on POSIX only; the public sequence never judged the owner', () => {
   const loose = { mode: 0o100666, uid: 0 };
-  assert.equal(hasPrivateMode(loose, 0o600, 'win32'), true);
-  assert.equal(hasPrivateMode(loose, 0o600, 'linux'), false);
+  const strangers = { mode: 0o100600, uid: (process.getuid?.() ?? 0) + 1 };
+  assert.equal(
+    hasPrivateMode(strangers, 0o600, { platform: 'linux' }),
+    !process.getuid,
+  );
+  assert.equal(
+    hasPrivateMode(strangers, 0o600, { platform: 'linux', owner: false }),
+    true,
+  );
+  assert.equal(hasPrivateMode(loose, 0o600, { platform: 'win32' }), true);
+  assert.equal(hasPrivateMode(loose, 0o600, { platform: 'linux' }), false);
 });

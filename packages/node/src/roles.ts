@@ -27,11 +27,6 @@ import {
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 import { saveJson } from '@gyblos/runtime';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
-import {
-  directoryIsPrivate,
-  restrictDirectory,
-} from '@gyblos/runtime/windows-acl';
 
 import {
   configurationAddress,
@@ -48,6 +43,7 @@ import {
 import { NodeError } from './errors';
 import { assertRoleHome } from './home';
 import { privateBytes, privateKeyMetadata } from './role-key-file';
+import { windowsKeysPrivate, windowsRoleAccess } from './role-windows';
 
 interface CommonRole {
   schemaVersion: typeof ROLE_CONFIG_SCHEMA_VERSION;
@@ -252,6 +248,7 @@ export async function setupRole(options: SetupOptions) {
   address(options.mint);
   const role = options.role;
   const path = file(role, ROLE_FILES.roleConfig);
+  const restrict = await windowsRoleAccess(roleDirectory(role));
   try {
     const existing = await loadRole(role);
     if (existing.role !== options.role || existing.mint !== options.mint)
@@ -279,12 +276,7 @@ export async function setupRole(options: SetupOptions) {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
-  // Windows has no mode bits: the home (with seller.env) and the role folder keep everyone else out by
-  // their ACL, inherited by the keys written next. Rerunning setup restores it.
-  if (WINDOWS) {
-    await restrictDirectory(dirname(roleDirectory(role)));
-    await restrictDirectory(roleDirectory(role));
-  }
+  await restrict();
   try {
     await lstat(file(role, ROLE_FILES.nodeKey));
   } catch (error) {
@@ -341,11 +333,11 @@ export async function roleKeyFilesStatus(
     }
     if (!privateKeyMetadata(metadata)) invalid = true;
   }
-  // Windows has no mode bits: the keys' folder must keep everyone else out by its ACL.
   if (
-    WINDOWS &&
-    names.length > 0 &&
-    !(await directoryIsPrivate(dirname(file(role, names[0]!, environment))))
+    !(await windowsKeysPrivate(
+      resolve(homeLayout(environment).root),
+      names.map((name) => file(role, name, environment)),
+    ))
   )
     invalid = true;
   return invalid ? 'invalid' : 'ok';

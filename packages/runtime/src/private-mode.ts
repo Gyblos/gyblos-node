@@ -6,14 +6,20 @@ import { FILE_MODES } from '@gyblos/config';
 
 export const WINDOWS = process.platform === 'win32';
 
+export interface PrivateModeOptions {
+  // Whether this process's uid must own it too (every caller but the public sequence, which never did).
+  owner?: boolean;
+  platform?: NodeJS.Platform;
+}
+
 export function hasPrivateMode(
   info: { mode: number | bigint; uid: number | bigint },
   expected: number,
-  platform: NodeJS.Platform = process.platform,
+  { owner = true, platform = process.platform }: PrivateModeOptions = {},
 ) {
   if (platform === 'win32') return true;
   return (
     (Number(info.mode) & FILE_MODES.permissionMask) === expected &&
-    (!process.getuid || Number(info.uid) === process.getuid())
+    (!owner || !process.getuid || Number(info.uid) === process.getuid())
   );
 }

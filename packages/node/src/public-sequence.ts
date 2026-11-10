@@ -35,7 +35,7 @@ async function assertPrivateDirectory(directory: string) {
   if (
     !info.isDirectory() ||
     info.isSymbolicLink() ||
-    !hasPrivateMode(info, FILE_MODES.privateDirectory)
+    !hasPrivateMode(info, FILE_MODES.privateDirectory, { owner: false })
   )
     unavailable();
 }
@@ -57,7 +57,7 @@ async function readSequence(
       if (
         !info.isFile() ||
         info.size > PUBLIC_SEQUENCE.maxBytes ||
-        !hasPrivateMode(info, FILE_MODES.privateFile)
+        !hasPrivateMode(info, FILE_MODES.privateFile, { owner: false })
       )
         unavailable();
       const value: unknown = JSON.parse(await file.readFile('utf8'));

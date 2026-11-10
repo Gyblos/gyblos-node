@@ -10,8 +10,9 @@ import test from 'node:test';
 import { promisify } from 'node:util';
 
 import {
-  directoryIsPrivate,
-  readAcl,
+  ACL_VERDICTS,
+  pathsArePrivate,
+  readAcls,
   restrictDirectory,
   userSid,
 } from '@gyblos/runtime/windows-acl';
@@ -19,6 +20,7 @@ import {
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 
 const run = promisify(execFile);
+// The ACL cache lives per process: each check here is a fresh process or a fresh path.
 const WINDOWS = process.platform === 'win32';
 const MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const ICACLS = join(
@@ -37,11 +39,11 @@ void test(
       await mkdir(restricted);
       await restrictDirectory(restricted);
       assert.equal(
-        await directoryIsPrivate(restricted),
-        true,
+        await pathsArePrivate([restricted]),
+        ACL_VERDICTS.PRIVATE,
         JSON.stringify({
           sid: await userSid(),
-          acl: await readAcl(restricted),
+          acl: await readAcls([restricted]),
         }),
       );
       const shared = join(root, 'shared');
@@ -49,7 +51,7 @@ void test(
       await restrictDirectory(shared);
       // Everyone may read it now.
       await run(ICACLS, [shared, '/grant', '*S-1-1-0:(OI)(CI)R']);
-      assert.equal(await directoryIsPrivate(shared), false);
+      assert.equal(await pathsArePrivate([shared]), ACL_VERDICTS.EXPOSED);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -80,7 +82,13 @@ void test(
       const setup = gyblos('setup', '--role', 'seller', '--mint', MINT);
       assert.equal(setup.status, 0, setup.stderr);
       assert.match(setup.stdout, /"nodeId":"[0-9a-f]{64}"/);
-      assert.equal(await directoryIsPrivate(join(home, 'seller')), true);
+      assert.equal(
+        await pathsArePrivate([
+          join(home, 'seller'),
+          join(home, 'seller', 'node.key'),
+        ]),
+        ACL_VERDICTS.PRIVATE,
+      );
       const init = gyblos('seller', 'init');
       assert.equal(init.status, 0, init.stderr);
       const doctor = gyblos('doctor');
@@ -95,6 +103,24 @@ void test(
       ]);
       const exposed = gyblos('doctor');
       assert.doesNotMatch(exposed.stdout, /OK\s+keys/);
+      // Rerunning setup restores the folder and the keys, and doctor accepts them again.
+      assert.equal(
+        gyblos('setup', '--role', 'seller', '--mint', MINT).status,
+        0,
+      );
+      assert.match(gyblos('doctor').stdout, /OK\s+keys/);
+      // A key given its own permissions is refused, and setup resets it too.
+      await run(ICACLS, [
+        join(home, 'seller', 'node.key'),
+        '/grant',
+        '*S-1-5-32-545:R',
+      ]);
+      assert.doesNotMatch(gyblos('doctor').stdout, /OK\s+keys/);
+      assert.equal(
+        gyblos('setup', '--role', 'seller', '--mint', MINT).status,
+        0,
+      );
+      assert.match(gyblos('doctor').stdout, /OK\s+keys/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
