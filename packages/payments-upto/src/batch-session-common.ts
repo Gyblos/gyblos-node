@@ -35,13 +35,22 @@ export function initialRecord(
   };
 }
 export function reserved(record: BatchRecord): bigint {
+  if (record.state === SESSION_STATES.CLOSED) return 0n;
   return Object.values(record.requests)
     .filter((request) => !request.accepted)
-    .reduce((total, request) => total + BigInt(request.maxAtomic), 0n);
+    .reduce((total, request) => {
+      const signed =
+        request.bill &&
+        BigInt(request.bill.cumulativeAtomic) <=
+          BigInt(record.cumulativeAtomic);
+      return total + (signed ? 0n : BigInt(request.maxAtomic));
+    }, 0n);
 }
+
 export function snapshot(store: BatchStore): SessionSnapshot {
   const state = store.read();
   return {
+    expiresAt: state.terms.expiresAt,
     channelId: state.channelId,
     state: state.state,
     cumulativeAtomic: state.cumulativeAtomic,

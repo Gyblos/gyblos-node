@@ -45,6 +45,7 @@ export function nativeHistory(vm: Pick<LiteSVM, 'getAccount' | 'getClock'>) {
     return {
       signature: getSignatureFromTransaction(transaction),
       keys: message.staticAccounts,
+      message: Buffer.from(transaction.messageBytes),
       pre: balances(message.staticAccounts),
       slot: vm.getClock().slot,
     };
@@ -56,6 +57,10 @@ export function nativeHistory(vm: Pick<LiteSVM, 'getAccount' | 'getClock'>) {
   const records = new Map<Signature, Observed>();
   return {
     oldestSlot: vm.getClock().slot,
+    message: (signature: Signature) => {
+      const record = records.get(signature);
+      return record ? Buffer.from(record.message) : undefined;
+    },
     before,
     after(
       observed: ReturnType<typeof before>,

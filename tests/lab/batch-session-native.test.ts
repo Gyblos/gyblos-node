@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { address } from '@solana/kit';
+import { address, getTransactionDecoder } from '@solana/kit';
 import { SOLANA_TESTNET_CAIP2 } from '@x402/svm';
 import {
   createUptoChannelReaders,
@@ -21,6 +21,7 @@ import {
   batchFacilitatorFor,
   createBatchBuyer,
   createBatchSeller,
+  type BatchSellerOptions,
 } from '@gyblos/payments-upto/batch-session';
 import { settlementShares } from '@gyblos/protocol/payment-binding';
 import type {
@@ -30,7 +31,12 @@ import type {
 
 import { nativeVm } from '../support/paid-native-vm';
 
-for (const scenario of ['idle', 'forced-close', 'lost-confirmation'] as const)
+for (const scenario of [
+  'idle',
+  'forced-close',
+  'lost-confirmation',
+  'lost-opening',
+] as const)
   void test(`batch native: one deposit and post-usage vouchers survive ${scenario} and seller restart`, async (t) => {
     let now = 1_800_000_000_000;
     t.mock.method(Date, 'now', () => now);
@@ -53,6 +59,7 @@ for (const scenario of ['idle', 'forced-close', 'lost-confirmation'] as const)
       expiresAt: now + 3_600_000,
     };
     let forcedClose = false;
+    let loseOpening = scenario === 'lost-opening';
     const before = await vm.balance(vm.payer.address);
     const confirm = async (result: SessionSettlement) => {
       const shares = settlementShares(result.chargedAtomic, PROTOCOL_FEE.bps);
@@ -111,7 +118,7 @@ for (const scenario of ['idle', 'forced-close', 'lost-confirmation'] as const)
         slot: vm.hints().recentSlot,
       }),
     });
-    const options = {
+    const options: BatchSellerOptions = {
       terms,
       authorizer: vm.authorizer,
       paths: batchSessionPathsIn({ GYBLOS_HOME: root }, 'seller'),
@@ -124,6 +131,14 @@ for (const scenario of ['idle', 'forced-close', 'lost-confirmation'] as const)
           verify: sdk.verify.bind(sdk),
           settle: async (...call: Parameters<typeof sdk.settle>) => {
             const result = await sdk.settle(...call);
+            if (
+              call[0].payload.type === 'deposit' &&
+              result.success &&
+              loseOpening
+            ) {
+              loseOpening = false;
+              throw new Error('synthetic opening response lost');
+            }
             assert.ok(
               result.success,
               result.errorReason ?? 'synthetic SDK failure',
@@ -134,6 +149,24 @@ for (const scenario of ['idle', 'forced-close', 'lost-confirmation'] as const)
       },
       observe,
       closing: async () => forcedClose,
+      observeOpening: async (opening) => {
+        const channel = await readers.channelState(opening.voucher!.channelId);
+        if (
+          channel?.status !== UPTO_CHANNEL_ACCOUNT.statuses.OPEN ||
+          channel.depositAtomic !== terms.depositAtomic
+        )
+          return false;
+        const message = getTransactionDecoder().decode(
+          Buffer.from(opening.deposit.transaction, 'base64'),
+        ).messageBytes;
+        return vm.history
+          .signatures(opening.voucher!.channelId)
+          .some(
+            (entry) =>
+              vm.signatureSucceeded(entry.signature) &&
+              vm.history.message(entry.signature)?.equals(Buffer.from(message)),
+          );
+      },
       minSettlementAtomic: '100',
       idleMs: 1000,
     };
@@ -143,6 +176,11 @@ for (const scenario of ['idle', 'forced-close', 'lost-confirmation'] as const)
       await seller.dispose();
     });
     const beforeOpen = vm.sends();
+    if (scenario === 'lost-opening') {
+      await assert.rejects(seller.open(await buyer.open()));
+      await seller.dispose();
+      seller = await createBatchSeller(options);
+    }
     await seller.open(await buyer.open());
     assert.equal(await vm.balance(vm.payer.address), before - 1000n);
     assert.equal(await vm.balance(vm.seller.address), 0n);

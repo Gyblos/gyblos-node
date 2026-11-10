@@ -53,6 +53,7 @@ export interface SessionVoucher {
   signature: string;
 }
 export interface SessionSnapshot {
+  expiresAt: number;
   channelId: string;
   state: SessionState;
   cumulativeAtomic: string;

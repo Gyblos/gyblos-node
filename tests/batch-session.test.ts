@@ -245,3 +245,58 @@ void test('buyer records a verified final refund without opening a replacement c
   await assert.rejects(rig.buyer.open(), { code: SESSION_CODES.CLOSED });
   assert.deepEqual(rig.calls, ['deposit', 'refund']);
 });
+
+void test('returned vouchers and bills cannot mutate the live durable session', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  const request = rig.request(1);
+  await rig.buyer.begin(request);
+  await rig.seller().reserve(request, rig.terms.buyerNodeId);
+  const bill = await rig.seller().finish(request.requestId, '145');
+  const original = structuredClone(bill);
+  bill.requestDigest = 'ff'.repeat(32);
+  const voucher = await rig.buyer.approve(original, '145');
+  const expected = structuredClone(voucher);
+  voucher.signature = '1'.repeat(88);
+  assert.deepEqual((await rig.buyer.recoverApproval())?.voucher, expected);
+  await rig.seller().accept(original, expected, rig.terms.buyerNodeId);
+});
+void test('forced close switches an existing unconfirmed refund into seal immediately', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  await rig.serve(1, '145');
+  rig.confirmed(false);
+  await assert.rejects(rig.seller().close());
+  rig.closing(true);
+  await assert.rejects(rig.seller().close());
+  assert.deepEqual(rig.calls, ['deposit', 'refund', 'seal']);
+});
+void test('signed but unacknowledged usage is not reserved a second time', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  const request = rig.request(1, '1000');
+  await rig.buyer.begin(request);
+  await rig.seller().reserve(request, rig.terms.buyerNodeId);
+  const bill = await rig.seller().finish(request.requestId, '1000');
+  await rig.buyer.approve(bill, '1000');
+  const snapshot = rig.buyer.snapshot();
+  assert.ok(
+    BigInt(snapshot.cumulativeAtomic) + BigInt(snapshot.reservedAtomic) <=
+      1000n,
+  );
+});
+void test('record exhaustion does not close the last active inference', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  for (let index = 1; index < 128; index++) await rig.serve(index, '0');
+  await rig.seller().reserve(rig.request(128), rig.terms.buyerNodeId);
+  assert.equal(await rig.seller().tick(), undefined);
+  assert.equal(
+    (await rig.seller().finish(rig.request(128).requestId, '1')).chargedAtomic,
+    '1',
+  );
+});

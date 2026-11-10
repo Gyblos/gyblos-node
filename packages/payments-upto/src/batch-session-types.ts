@@ -87,6 +87,11 @@ export interface BatchSellerOptions extends BatchCommonOptions {
   ) => Promise<BatchFacilitator>;
   // Trusted chain observation, not the remote buyer's claim or an HTTP success flag.
   observe: (channelId: string) => Promise<SessionSettlement | undefined>;
+  // True only for the finalized original opening message plus exact live channel bindings.
+  observeOpening: (
+    opening: BatchDepositPayload,
+    terms: Readonly<PaymentSessionTerms>,
+  ) => Promise<boolean>;
   closing: (channelId: string) => Promise<boolean>;
   idleMs?: number;
   minSettlementAtomic?: string;

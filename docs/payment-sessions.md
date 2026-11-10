@@ -21,18 +21,24 @@ Each session fixes buyer wallet and NodeId, seller owner and NodeId, network,
 asset, payout, fee payer, receiver authorizer, fee distribution, deposit and
 host expiry. The buyer signs these terms in the opening memo. The SDK's on-chain
 voucher authorizer is the buyer, not the seller's receiver-authorizer key.
-Mainnet is refused by this first implementation. Native tests use synthetic keys
-and an isolated test-network label with the source-pinned program in LiteSVM.
+Mainnet terms are refused by this first implementation. Hosts must independently
+verify RPC genesis before providing chain signers or observations. Native tests
+use synthetic keys and an isolated test-network label with the source-pinned
+program in LiteSVM.
 
 ## Lifecycle
 
-1. Persist the original opening hints and salt before any opening signature.
-   Open one bounded deposit with a buyer-signed zero voucher and no advance
-   charge. The narrowly opt-in SDK helper patch preserves default behavior.
-2. Reserve a request's ceiling before generating. Request identifiers/digests
-   are single-use. Stage one admits one unfinished request per session;
-   reservations are individual records, rather than an embedded single-request
-   channel.
+1. Persist the original opening hints and salt before any opening signature. On
+   a lost opening response, the trusted host must prove the finalized original
+   signed opening message and exact live channel bindings; mere account
+   existence is insufficient. The SDK then verifies the live buyer voucher
+   before recovery. Open one bounded deposit with a buyer-signed zero voucher
+   and no advance charge. The narrowly opt-in SDK helper patch preserves default
+   behavior.
+2. Verify the live funded channel with the SDK, then reserve a request's ceiling
+   before generating. Request identifiers/digests are single-use. Stage one
+   admits one unfinished request per session; reservations are individual
+   records, rather than an embedded single-request channel.
 3. Measure delivered usage through the common seller execution lifecycle. Save a
    bill containing the request binding, actual charge and cumulative amount.
 4. Independently verify received usage and prices on the buyer. Persist the

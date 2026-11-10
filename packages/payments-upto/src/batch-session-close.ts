@@ -22,9 +22,13 @@ async function prepareClose(context: BatchSellerContext) {
   const seconds = Math.floor(
     options.now() / BATCH_SESSION_DEFAULTS.millisecondsPerSecond,
   );
+  const closing = await waitBatch(
+    options.closing(previous.channelId),
+    options.operationMs,
+  );
   if (
     previous.closing &&
-    (previous.closing.type === 'refund' || previous.closing.type === 'seal') &&
+    previous.closing.type === (closing ? 'seal' : 'refund') &&
     (previous.closing.closeAuthorization?.validBefore ?? 0) > seconds
   )
     return;
@@ -37,10 +41,6 @@ async function prepareClose(context: BatchSellerContext) {
       validBefore: seconds + requirements.maxTimeoutSeconds,
       voucherExpiresAt: BigInt(previous.voucher.expiresAt),
     }),
-    options.operationMs,
-  );
-  const closing = await waitBatch(
-    options.closing(previous.channelId),
     options.operationMs,
   );
   await store.update((state) => {
@@ -117,7 +117,9 @@ export async function tickBatch(context: BatchSellerContext) {
     state.state === SESSION_STATES.CLOSING ||
     options.now() >= options.terms.expiresAt ||
     BigInt(state.cumulativeAtomic) >= BigInt(options.terms.depositAtomic) ||
-    Object.keys(state.requests).length >= BATCH_SESSION_DEFAULTS.maxRequests ||
+    (Object.keys(state.requests).length >= BATCH_SESSION_DEFAULTS.maxRequests &&
+      !generating &&
+      !unsigned) ||
     (await waitBatch(options.closing(state.channelId), options.operationMs)) ||
     (idle &&
       !generating &&

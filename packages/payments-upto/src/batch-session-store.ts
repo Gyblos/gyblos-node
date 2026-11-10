@@ -43,9 +43,9 @@ export async function openBatchStore(
     const writing = queue.then(async () => {
       if (disposed || poisoned) sessionFail(SESSION_CODES.UNAVAILABLE);
       await lock.verify();
-      const next = structuredClone(current);
-      change(next);
-      parseRecord(next, options.terms);
+      const draft = structuredClone(current);
+      change(draft);
+      const next = parseRecord(structuredClone(draft), options.terms);
       try {
         await writePrivateFile(
           options.paths.state,

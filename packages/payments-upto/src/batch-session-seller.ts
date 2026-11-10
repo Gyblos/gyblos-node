@@ -85,11 +85,7 @@ export async function createBatchSeller(
   return {
     open: (payload) => exclusive(() => openSeller(context, payload)),
     reserve: (request, peer) =>
-      exclusive(async () => {
-        if (peer !== options.terms.buyerNodeId)
-          sessionFail(SESSION_CODES.BINDING);
-        await reserve(store, request, options.now());
-      }),
+      exclusive(() => reserveSeller(context, request, peer)),
     finish: (requestId, chargedAtomic) =>
       exclusive(() => finishSeller(context, requestId, chargedAtomic)),
     accept: (bill, voucher, peer) =>
@@ -124,6 +120,38 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     state.channelId = opening.voucher!.channelId;
     state.voucher = opening.voucher!;
   });
+  if (
+    await waitBatch(
+      options.observeOpening(
+        structuredClone(opening),
+        structuredClone(options.terms),
+      ),
+      options.operationMs,
+    )
+  ) {
+    const verdict = await waitBatch(
+      facilitator.verify(
+        {
+          x402Version: 2,
+          accepted: requirements,
+          payload: {
+            type: 'voucher',
+            channelConfig: opening.channelConfig,
+            voucher: opening.voucher,
+          },
+        },
+        requirements,
+      ),
+      options.operationMs,
+    );
+    if (!verdict.isValid || verdict.payer !== options.terms.buyer)
+      sessionFail(SESSION_CODES.UNVERIFIED);
+    await store.update((state) => {
+      state.state = SESSION_STATES.OPEN;
+      state.lastActivity = options.now();
+    });
+    return snapshot(store);
+  }
   const response = await waitBatch(
     facilitator.settle(
       { x402Version: 2, accepted: requirements, payload: opening },
@@ -219,4 +247,35 @@ async function acceptSeller(
     state.requests[bill.requestId]!.accepted = true;
     state.lastActivity = options.now();
   });
+}
+
+async function reserveSeller(
+  context: BatchSellerContext,
+  request: Parameters<SessionSeller['reserve']>[0],
+  peer: string,
+) {
+  const { options, store, facilitator, requirements } = context;
+
+  if (peer !== options.terms.buyerNodeId) sessionFail(SESSION_CODES.BINDING);
+  const state = store.read();
+  active(state, options.now());
+  if (!state.opening || !state.voucher) sessionFail(SESSION_CODES.UNAVAILABLE);
+  const verdict = await waitBatch(
+    facilitator.verify(
+      {
+        x402Version: 2,
+        accepted: requirements,
+        payload: {
+          type: 'voucher',
+          channelConfig: state.opening.channelConfig,
+          voucher: state.voucher,
+        },
+      },
+      requirements,
+    ),
+    options.operationMs,
+  );
+  if (!verdict.isValid || verdict.payer !== options.terms.buyer)
+    sessionFail(SESSION_CODES.UNVERIFIED);
+  await reserve(store, request, options.now());
 }

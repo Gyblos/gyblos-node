@@ -1,5 +1,6 @@
 // Shared reusable-session orchestration for trusted buyer/seller hosts; no HTTP, SDK or wallet logic.
 // Hosts authenticate peers and verify quote/input policy. A possibly sent prompt is never retried here.
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import type { ExecutionOutcome } from '@gyblos/protocol/execution-policy';
 import {
   SESSION_CODES,
@@ -90,7 +91,11 @@ export async function runBatchSellerExecution<T>(
     ...execution,
     permit: {
       outputTokens: execution.outputTokens,
-      deadline: execution.deadline,
+      deadline: Math.min(
+        execution.deadline,
+        execution.seller.snapshot().expiresAt -
+          BATCH_SESSION_DEFAULTS.operationMs,
+      ),
       state: execution.request.requestId,
     },
     policy: {

@@ -59,6 +59,7 @@ export async function sessionRig() {
   const calls: string[] = [];
   let confirmed = true;
   let closing = false;
+  let opened = false;
   let chainSettlement: SessionSettlement | undefined;
   const sellerOptions: BatchSellerOptions = {
     terms,
@@ -68,6 +69,7 @@ export async function sessionRig() {
     minSettlementAtomic: '100',
     idleMs: 1000,
     closing: async () => closing,
+    observeOpening: async () => opened,
     observe: async () => (confirmed ? chainSettlement : undefined),
     facilitator: async () => ({
       async verify(payment) {
@@ -90,6 +92,7 @@ export async function sessionRig() {
       async settle(payment, requirements) {
         const raw = payment.payload;
         calls.push(String(raw.type));
+        if (raw.type === 'deposit') opened = true;
         if (raw.type === 'refund' || raw.type === 'seal') {
           const voucher = raw.voucher as {
             channelId: string;

@@ -148,3 +148,41 @@ void test('verification refusal happens before opening a channel or sending a pr
   assert.equal(attempts, 0);
   assert.deepEqual(rig.calls, []);
 });
+
+void test('shared seller reserves completion time before the host session expires', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  rig.time(rig.terms.expiresAt - 1000);
+  let generations = 0;
+  const run = await runBatchSellerExecution({
+    seller: rig.seller(),
+    request: rig.request(1),
+    peer: rig.terms.buyerNodeId,
+    verify: async () => {},
+    outputTokens: 10,
+    deadline: rig.terms.expiresAt + 1000,
+    now: rig.now,
+    signal: new AbortController().signal,
+    errors: {
+      timeout: () => new Error('synthetic timeout'),
+      cancelled: () => new Error('synthetic cancellation'),
+    },
+    open: () => ({
+      generate: async () => {
+        generations++;
+        return 'must not run';
+      },
+      measure: (generated) => ({
+        inputTokens: 1,
+        outputTokens: 'value' in generated ? 1 : 0,
+        completed: 'value' in generated,
+      }),
+    }),
+    nothing: { inputTokens: 1, outputTokens: 0, completed: false },
+    charge: (outcome) => (outcome.outputTokens ? '40' : '0'),
+  });
+  assert.equal(generations, 0);
+  assert.equal(run.settlement.chargedAtomic, '0');
+  assert.ok('error' in run.generated);
+});
