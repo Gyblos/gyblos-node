@@ -40,7 +40,7 @@ void test('seller init: without a terminal it writes the default free Ollama off
       result.stdout,
       /GYBLOS_RELAY_TOKEN=<your token> in seller\.env/,
     );
-    assert.match(result.stdout, /`gyblos doctor`/);
+    assert.match(result.stdout, /`pnpm gyblos doctor`/);
   }));
 
 void test('seller init: on a terminal it asks each missing value, in order, and writes the answers', () =>

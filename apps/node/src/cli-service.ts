@@ -99,17 +99,17 @@ function runCommand(argv: readonly string[]) {
 export function defaultServiceSystem(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): ServiceSystem {
-  const launcher =
-    runMode(environment) === RUN_MODES.PACKAGED
-      ? environment[NODE_ENVIRONMENT.launcher]
-      : undefined;
+  // Packaged without its launcher's path fails as an unsafe path instead of writing a checkout's unit.
+  const packaged = runMode(environment) === RUN_MODES.PACKAGED;
   return {
     platform: process.platform,
     uid: process.getuid?.(),
     accountHome: homedir(),
     nodePath: process.execPath,
     repository: resolve(import.meta.dirname, '../../..'),
-    ...(launcher ? { launcher } : {}),
+    ...(packaged
+      ? { launcher: environment[NODE_ENVIRONMENT.launcher] ?? '' }
+      : {}),
     run: runCommand,
   };
 }
@@ -137,7 +137,7 @@ function serviceInput(
     ...account(system),
     nodePath: system.nodePath,
     repository: system.repository,
-    ...(system.launcher ? { launcher: system.launcher } : {}),
+    ...(system.launcher === undefined ? {} : { launcher: system.launcher }),
     home: layout.root,
     config: nodeConfigPath(output.env, output.cwd).path,
     environmentFile: layout.files.sellerEnvironment,

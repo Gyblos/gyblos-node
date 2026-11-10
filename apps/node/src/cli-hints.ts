@@ -1,10 +1,13 @@
 // Short operator hints by static code, shared by `gyblos doctor`, `gyblos seller status` and the daemon's
 // one-line startup failure, written as `gyblos <command>` (from a checkout, `pnpm gyblos <command>`).
 // Kept apart from the doctor command so the daemon entry does not load it.
+import { runMode } from '@gyblos/config';
 import { DOCTOR_CODES, NODE_ERROR_CODES } from '@gyblos/node/constants';
 import type { DoctorResultCode } from '@gyblos/node/seller-doctor';
 import { ENGINE_ERROR_CODES } from '@gyblos/protocol/constants';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
+
+import { commandsFor } from './cli-next';
 
 const SEE_STARTUP = 'see docs/configuration.md#seller-startup';
 // Short operator hints by code; codes without one are explained in the docs.
@@ -76,10 +79,17 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'the discovery index did not report its time quickly; check the connection and run doctor again',
 };
 
-// Own keys only, so a crafted code such as "constructor" read from status.json gets no hint.
-export const codeHint = (code: string) =>
-  Object.hasOwn(HINTS, code)
-    ? (HINTS[code as DoctorResultCode] ?? '')
-    : code.startsWith('SELLER_')
-      ? SEE_STARTUP
-      : '';
+// Own keys only, so a crafted code such as "constructor" read from status.json gets no hint. Commands are
+// spelled for how this seller was installed.
+export const codeHint = (
+  code: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+) =>
+  commandsFor(
+    runMode(environment),
+    Object.hasOwn(HINTS, code)
+      ? (HINTS[code as DoctorResultCode] ?? '')
+      : code.startsWith('SELLER_')
+        ? SEE_STARTUP
+        : '',
+  );

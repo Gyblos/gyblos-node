@@ -2,6 +2,7 @@
 // role (or why there is none, as a static code) and the discovery settings node:start would use.
 import { resolve } from 'node:path';
 
+import { runMode } from '@gyblos/config';
 import { homeLayout } from '@gyblos/config/home';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
 import { readStartupConfig } from '@gyblos/node/node-config-file';
@@ -9,6 +10,7 @@ import { resolveNodeConfig } from '@gyblos/node/node-config-resolve';
 import { loadRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
+import { commandsFor } from './cli-next';
 import { SELLER_ROLE_ERRORS, type SellerRoleErrorCode } from './constants';
 
 export interface SellerOutput {
@@ -35,7 +37,9 @@ export async function sellerIdentity(
   output: Pick<SellerOutput, 'stderr'>,
 ) {
   const refuse = (code: SellerRoleErrorCode) => {
-    output.stderr(`${code}: ${ROLE_HINT}\n`);
+    output.stderr(
+      `${code}: ${commandsFor(runMode(homeEnvironment), ROLE_HINT)}\n`,
+    );
     return undefined;
   };
   let identity: Awaited<ReturnType<typeof loadRole>>;

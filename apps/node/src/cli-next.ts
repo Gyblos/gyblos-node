@@ -26,6 +26,12 @@ export function sellerCommand(mode: RunMode, command: string) {
   return `pnpm gyblos ${command}`;
 }
 
+// Hints write commands as `gyblos <command>`; this spells them the way this seller was installed.
+export const commandsFor = (mode: RunMode, text: string) =>
+  mode === RUN_MODES.PACKAGED
+    ? text
+    : text.replaceAll('`gyblos ', `\`${sellerCommand(mode, '')}`);
+
 export function nextStep(
   listing: Listing,
   owner: string,

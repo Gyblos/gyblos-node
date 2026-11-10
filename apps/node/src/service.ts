@@ -75,7 +75,9 @@ export function memoryBytes(value: string) {
 
 function checkInput(input: ServiceInput) {
   for (const path of [
-    ...(input.launcher ? [input.launcher] : [input.nodePath, input.repository]),
+    ...(input.launcher === undefined
+      ? [input.nodePath, input.repository]
+      : [input.launcher]),
     input.home,
     input.config,
     input.environmentFile,
@@ -95,7 +97,7 @@ const nodeBin = (nodePath: string) =>
 
 // What the service executes, where and with which PATH: the packaged launcher needs no Node on PATH.
 function program(input: ServiceInput) {
-  if (input.launcher)
+  if (input.launcher !== undefined)
     return {
       argv: [input.launcher, SERVICE.start],
       workingDirectory: input.home,

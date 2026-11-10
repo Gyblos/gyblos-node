@@ -1,15 +1,22 @@
 // Owns the packaged release's differences from a checkout: the run mode, the home and gyblos.toml under the
 // account's ~/.gyblos, a service that runs the launcher from that home with no Node on PATH, the commands
-// printed to the operator, and the one entry point's `--version`.
+// printed to the operator, and the one entry point's `--version`; also the reinstall notice for services
+// written before the one entry point.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { homeLayout, RUN_MODES, runMode } from '@gyblos/config';
+import { DOCTOR_CODES } from '@gyblos/node/constants';
+import { assertRoleHome } from '@gyblos/node/home';
 import { nodeConfigPath } from '@gyblos/node/node-config-file';
 
-import { sellerCommand } from '../apps/node/src/cli-next';
+import { runCli } from '../apps/node/src/cli';
+import { codeHint } from '../apps/node/src/cli-hints';
+import { commandsFor, sellerCommand } from '../apps/node/src/cli-next';
 import { defaultServiceSystem } from '../apps/node/src/cli-service';
 import { SERVICE_ERRORS, SERVICE_KINDS } from '../apps/node/src/constants';
 import {
@@ -19,6 +26,14 @@ import {
   type ServiceInput,
 } from '../apps/node/src/service';
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
+import {
+  daemonReady,
+  installUnit,
+  status,
+  system,
+  UNIT,
+  withHome,
+} from './support/status-fixture';
 
 const PACKAGED = {
   GYBLOS_PACKAGED: '1',
@@ -145,3 +160,88 @@ void test('the one entry point prints the release version, or source from a chec
   assert.equal(version({ GYBLOS_VERSION: '0.1.0-beta.8' }), '0.1.0-beta.8\n');
   assert.equal(version({}), 'source\n');
 });
+
+void test('packaged: without its launcher path the service refuses instead of writing a checkout unit', () => {
+  const system = defaultServiceSystem({ GYBLOS_PACKAGED: '1' });
+  assert.equal(system.launcher, '');
+  assert.throws(
+    () => servicePlan({ ...INPUT, launcher: '' }),
+    (error) =>
+      error instanceof ServiceError &&
+      error.code === SERVICE_ERRORS.UNSAFE_PATH,
+  );
+});
+
+void test('hints and next steps spell commands for how the seller was installed', () => {
+  const hint = 'run `gyblos setup --role seller --mint MINT`';
+  assert.equal(commandsFor(RUN_MODES.PACKAGED, hint), hint);
+  assert.equal(
+    commandsFor(RUN_MODES.SOURCE, hint),
+    'run `pnpm gyblos setup --role seller --mint MINT`',
+  );
+  assert.equal(
+    commandsFor(RUN_MODES.CONTAINER, hint),
+    'run `docker compose exec seller gyblos setup --role seller --mint MINT`',
+  );
+  assert.equal(
+    codeHint(DOCTOR_CODES.TOKENIZER_UNAVAILABLE, {}),
+    'run `pnpm gyblos tokenizer`',
+  );
+  assert.equal(
+    codeHint(DOCTOR_CODES.TOKENIZER_UNAVAILABLE, PACKAGED),
+    'run `gyblos tokenizer`',
+  );
+});
+
+void test('packaged: the legacy .local guard does not apply, and init creates the home it writes into', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gyblos-packaged-'));
+  try {
+    const environment = { GYBLOS_PACKAGED: '1', HOME: join(root, 'account') };
+    // An old checkout's layout in the working directory would refuse a checkout's setup.
+    await mkdir(join(root, '.local/p2p'), { recursive: true });
+    const cwd = process.cwd();
+    process.chdir(root);
+    try {
+      await assertRoleHome('seller', environment);
+      await assert.rejects(assertRoleHome('seller', {}));
+    } finally {
+      process.chdir(cwd);
+    }
+    let stdout = '';
+    const code = await runCli(['seller', 'init'], {
+      env: environment,
+      cwd: root,
+      stdout: (text) => {
+        stdout += text;
+      },
+      stderr: () => {},
+    });
+    assert.equal(code, 0);
+    assert.match(stdout, /`gyblos doctor`/);
+    const home = await stat(join(root, 'account/.gyblos'));
+    assert.equal(home.mode & 0o777, 0o700);
+    await stat(join(root, 'account/.gyblos/gyblos.toml'));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('seller status asks to reinstall a service written by an older release', () =>
+  withHome(async (home) => {
+    await daemonReady(home);
+    await mkdir(join(home.account, UNIT, '..'), { recursive: true });
+    await writeFile(
+      join(home.account, UNIT),
+      'ExecStart="/usr/bin/node" --import tsx apps/node/src/main.ts\n',
+    );
+    const old = await status(home, system(home));
+    assert.match(
+      old.stdout,
+      /installed by an older release: reinstall it with `pnpm gyblos seller service uninstall`/,
+    );
+    await installUnit(home);
+    assert.doesNotMatch(
+      (await status(home, system(home))).stdout,
+      /older release/,
+    );
+  }));

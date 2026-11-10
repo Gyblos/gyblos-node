@@ -44,7 +44,9 @@ export async function doctor(
         ? ''
         : `[[offers]] entry ${check.offer + 1}: `;
     const help =
-      check.code === DOCTOR_CODES.READY ? '' : where + codeHint(check.code);
+      check.code === DOCTOR_CODES.READY
+        ? ''
+        : where + codeHint(check.code, options.env);
     stdout(
       `  ${check.status.padEnd(STATUS_COLUMN)}  ${name.padEnd(CHECK_COLUMN)} ${shown.padEnd(CODE_COLUMN)}${help}`.trimEnd() +
         '\n',

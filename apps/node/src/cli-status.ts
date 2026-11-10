@@ -11,7 +11,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { urlOrigin } from './cli-format';
 import { codeHint } from './cli-hints';
-import { LISTING, nextStep } from './cli-next';
+import { commandsFor, LISTING, nextStep, sellerCommand } from './cli-next';
 import { updateNotice } from './cli-update';
 import {
   EXIT,
@@ -36,6 +36,7 @@ import {
 import {
   defaultStatusSystem,
   inContainer,
+  legacyService,
   readDaemonStatus,
   serviceState,
   type DaemonFile,
@@ -241,6 +242,10 @@ export async function statusCommand(
       inContainer(output.env) ? `${service} (container)` : service,
     ),
   );
+  if (await legacyService(system))
+    output.stdout(
+      `  This service was installed by an older release: reinstall it with \`${sellerCommand(runMode(output.env), 'seller service uninstall')}\`, then \`${sellerCommand(runMode(output.env), 'seller service install')}\`.\n`,
+    );
   output.stdout(line('daemon', daemonLine(daemon)));
   for (const offer of status?.offers ?? [])
     output.stdout(
@@ -256,7 +261,9 @@ export async function statusCommand(
     status,
     identity.nodeId,
   );
-  output.stdout(line('discovery', listing.text));
+  output.stdout(
+    line('discovery', commandsFor(runMode(output.env), listing.text)),
+  );
   output.stdout(
     `Activity, from signed receipts (at most ${RECEIPT_STORAGE.maxEntries} kept):\n`,
   );
@@ -267,7 +274,7 @@ export async function statusCommand(
   if (verdict === STATUS_RESULTS.FAILING && failure) {
     const where = failure.phase ? ` at ${failure.phase}` : '';
     const code = failure.code ?? 'no static code; see the daemon log';
-    const help = failure.code ? codeHint(failure.code) : '';
+    const help = failure.code ? codeHint(failure.code, output.env) : '';
     output.stdout(
       `  The last start failed${where}: ${code}${help ? ` (${help})` : ''}\n`,
     );

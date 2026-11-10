@@ -6,7 +6,14 @@ command=${1:-start}
 [ "$#" -gt 0 ] && shift
 case "$command" in
   start | setup | tokenizer) exec node --import tsx apps/node/src/bin.ts "$command" "$@" ;;
-  gyblos) exec node --import tsx apps/node/src/bin.ts "$@" ;;
+  gyblos)
+    # `docker compose exec seller gyblos start` would run a second daemon on the same home.
+    if [ "${1:-}" = start ]; then
+      echo "the seller already runs in this container; use: docker compose restart seller" >&2
+      exit 64
+    fi
+    exec node --import tsx apps/node/src/bin.ts "$@"
+    ;;
   *)
     echo "usage: start | gyblos <args> | setup <args> | tokenizer" >&2
     exit 64
