@@ -30,7 +30,8 @@ const STOP_SIGNALS: readonly NodeJS.Signals[] =
 // no signal one process can send another to stop it gracefully.
 export const STOP_MESSAGE = 'gyblos:stop';
 
-// Listens for STOP_MESSAGE when this process has an IPC channel; the returned function stops listening.
+// Listens for STOP_MESSAGE, and for the channel's end, when this process has an IPC channel; the returned
+// function stops listening.
 // The channel never keeps the process alive: the daemon's own work does.
 function onStopMessage(handler: () => void) {
   if (!process.send) return () => {};
@@ -38,8 +39,13 @@ function onStopMessage(handler: () => void) {
     if (message === STOP_MESSAGE) handler();
   };
   process.on('message', listener);
+  // A supervisor that is gone can no longer stop this process: stop as if it had asked.
+  process.once('disconnect', handler);
   process.channel?.unref();
-  return () => process.removeListener('message', listener);
+  return () => {
+    process.removeListener('message', listener);
+    process.removeListener('disconnect', handler);
+  };
 }
 
 export function onShutdown(handler: () => void) {

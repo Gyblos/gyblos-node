@@ -40,7 +40,7 @@ import {
   type ServiceInput,
 } from './service';
 import { readEnvironmentFile } from './service-environment';
-import { stopWindowsService } from './service-run';
+import { servicePipe, stopWindowsService } from './service-run';
 
 const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
   [SERVICE_ERRORS.UNSAFE_PATH]:
@@ -91,9 +91,10 @@ export interface ServiceSystem {
   // Set when running as the packaged release: the service runs this launcher instead of Node and tsx.
   launcher?: string;
   run: (argv: readonly string[]) => Promise<number>;
-  // Windows: the account's SID, and a graceful stop of a running supervisor (false when none runs).
+  // Windows: the account's SID, and a graceful stop of the home's running supervisor (false when none
+  // runs).
   windowsUser: () => Promise<string>;
-  stopWindowsService: (accountHome: string) => Promise<boolean>;
+  stopWindowsService: (home: string) => Promise<boolean>;
 }
 
 export interface ServiceOptions {
@@ -155,6 +156,10 @@ function account(system: ServiceSystem): { kind: ServiceKind; uid: number } {
   return { kind, uid: system.uid };
 }
 
+// The seller home the service uses, absolute from where the command runs.
+const sellerHome = (output: ServiceOutput) =>
+  resolve(output.cwd, homeLayout(output.env).root);
+
 async function serviceInput(
   system: ServiceSystem,
   options: ServiceOptions,
@@ -167,9 +172,7 @@ async function serviceInput(
   // From a checkout Windows has no launcher for the task to run.
   if (owner.kind === SERVICE_KINDS.SCHEDULED_TASK && !system.launcher)
     throw new ServiceError(SERVICE_ERRORS.PLATFORM_UNSUPPORTED);
-  const layout = homeLayout({
-    GYBLOS_HOME: resolve(output.cwd, homeLayout(output.env).root),
-  });
+  const layout = homeLayout({ GYBLOS_HOME: sellerHome(output) });
   return {
     ...owner,
     ...(owner.kind === SERVICE_KINDS.SCHEDULED_TASK
@@ -262,6 +265,9 @@ async function install(
       : plan.contents,
     { flag: 'wx', mode: SERVICE.unitMode },
   );
+  // The supervisor's pipe secret, kept in the private home.
+  if (input.kind === SERVICE_KINDS.SCHEDULED_TASK)
+    await servicePipe(input.home, true);
   await runAll(plan.enable, system, output);
   output.stdout(`Installed and started: ${plan.path}\n`);
   for (const note of plan.notes) output.stdout(`Note: ${note}\n`);
@@ -284,7 +290,7 @@ async function uninstall(
   }
   // Windows: the supervisor stops the seller gracefully first; removing the task would not.
   if (kind === SERVICE_KINDS.SCHEDULED_TASK)
-    await system.stopWindowsService(system.accountHome);
+    await system.stopWindowsService(sellerHome(output));
   // Stopping may fail when the service is already stopped; removal proceeds either way.
   for (const command of location.disable) await system.run(command);
   await rm(location.path);

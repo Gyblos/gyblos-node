@@ -7,7 +7,7 @@ import { constants, lstat, open, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 
 import { ENVIRONMENT_SWITCH, NODE_ENVIRONMENT } from '@gyblos/config';
-import { ROLE_FILES, rolePathIn } from '@gyblos/config/home';
+import { homeLayout, ROLE_FILES, rolePathIn } from '@gyblos/config/home';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
@@ -38,8 +38,8 @@ export interface StatusSystem {
   daemonInContainer: () => Promise<boolean>;
   fetch: DiscoveryFetch;
   now: () => number;
-  // Windows: whether the service's supervisor answers on its pipe.
-  windowsServiceRunning?: () => Promise<boolean>;
+  // Windows: whether the home's service supervisor answers on its pipe.
+  windowsServiceRunning?: (home: string) => Promise<boolean>;
 }
 
 // The job's own state line, one tab deep, reads running only while its process is alive; nested sections
@@ -99,7 +99,7 @@ export function defaultStatusSystem(): StatusSystem {
     daemonInContainer: () => daemonProcess(),
     fetch: (input, init) => fetch(input, init),
     now: Date.now,
-    windowsServiceRunning: () => windowsServiceRunning(homedir()),
+    windowsServiceRunning,
   };
 }
 
@@ -173,7 +173,7 @@ export async function serviceState(
   }
   if (kind === SERVICE_KINDS.SCHEDULED_TASK) {
     if (!system.windowsServiceRunning) return SERVICE_STATES.UNKNOWN;
-    return (await system.windowsServiceRunning())
+    return (await system.windowsServiceRunning(homeLayout(environment).root))
       ? SERVICE_STATES.ACTIVE
       : SERVICE_STATES.INACTIVE;
   }

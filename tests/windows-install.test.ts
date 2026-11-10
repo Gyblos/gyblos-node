@@ -142,6 +142,7 @@ void test(
               TEMP: process.env.TEMP,
               TMP: process.env.TMP,
               OS: 'Windows_NT',
+              PATHEXT: process.env.PATHEXT,
               PROCESSOR_ARCHITECTURE: 'AMD64',
               USERPROFILE: account,
               LOCALAPPDATA: local,
@@ -160,6 +161,15 @@ void test(
           }),
         );
 
+      // A home made by hand that every user can read: the installer restricts it before seller.env.
+      const home = join(account, '.gyblos');
+      await mkdir(home, { recursive: true });
+      await run(
+        join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'icacls.exe'),
+        [home, '/grant', '*S-1-5-32-545:(OI)(CI)R'],
+      );
+      assert.equal(await pathsArePrivate([home]), false);
+
       const wrong = await installer(await pinned(root, 'a'.repeat(64)));
       assert.equal(wrong.code, 1, wrong.output);
       assert.match(wrong.output, /does not match the checksum/);
@@ -174,8 +184,10 @@ void test(
       assert.ok(!first.output.includes(TOKEN));
       assert.match(first.output, new RegExp(`owner\\s+${OWNER}`));
       assert.match(first.output, /Next steps, to start selling/);
-      const home = join(account, '.gyblos');
-      assert.equal(await pathsArePrivate([home]), true);
+      assert.equal(
+        await pathsArePrivate([home, join(home, 'seller.env')]),
+        true,
+      );
       const config = await readFile(join(home, 'gyblos.toml'));
       assert.notEqual(config[0], 0xef);
       assert.match(config.toString(), /^publish = false$/m);

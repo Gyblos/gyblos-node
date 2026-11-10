@@ -22,12 +22,17 @@ import {
   type ServiceInput,
 } from '@gyblos/node-app/service';
 import { parseEnvironmentFile } from '@gyblos/node-app/service-environment';
-import { requestStop, serviceRun } from '@gyblos/node-app/service-run';
-import { pipeName } from '@gyblos/node-app/service-windows';
+import {
+  requestStop,
+  servicePipe,
+  serviceRun,
+} from '@gyblos/node-app/service-run';
+import { taskName } from '@gyblos/node-app/service-windows';
 import { STOP_MESSAGE } from '@gyblos/runtime';
 
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 
+const TASK = taskName('C:\\Users\\ana');
 const SID = 'S-1-5-21-1004336348-1177238915-682003330-1001';
 const INPUT: ServiceInput = {
   kind: SERVICE_KINDS.SCHEDULED_TASK,
@@ -80,14 +85,14 @@ void test('the scheduled task runs the launcher’s supervisor at the account’
       'schtasks.exe',
       '/Create',
       '/TN',
-      'Gyblos\\Seller',
+      TASK,
       '/XML',
       'C:\\Users\\ana\\AppData\\Local\\Gyblos\\seller-task.xml',
     ],
-    ['schtasks.exe', '/Run', '/TN', 'Gyblos\\Seller'],
+    ['schtasks.exe', '/Run', '/TN', TASK],
   ]);
   assert.deepEqual(plan.disable, [
-    ['schtasks.exe', '/Delete', '/TN', 'Gyblos\\Seller', '/F'],
+    ['schtasks.exe', '/Delete', '/TN', TASK, '/F'],
   ]);
   assert.match(plan.notes[0]!, /log is C:\\Users\\ana\\.gyblos\\service\.log/);
 });
@@ -109,7 +114,7 @@ void test('the scheduled task refuses paths Task Scheduler or cmd would misread,
   refused(checkout, SERVICE_ERRORS.PLATFORM_UNSUPPORTED);
 });
 
-void test('seller.env on Windows: CRLF lines are read, names are reserved whatever their case', () => {
+void test('seller.env on Windows: a byte order mark and CRLF lines are read, names are reserved whatever their case', () => {
   assert.deepEqual(
     parseEnvironmentFile(
       '# relay\r\nGYBLOS_RELAY_TOKEN=abc\r\n\r\nOPENAI_API_KEY=k1\r\n',
@@ -136,13 +141,22 @@ void test('seller.env on Windows: CRLF lines are read, names are reserved whatev
   assert.deepEqual(parseEnvironmentFile('Path=x\n', false), { Path: 'x' });
 });
 
-void test('pipes are per account home, whatever its case', () => {
-  assert.equal(pipeName('C:\\Users\\Ana'), pipeName('c:\\users\\ana'));
-  assert.notEqual(pipeName('C:\\Users\\ana'), pipeName('C:\\Users\\bob'));
-  assert.match(
-    pipeName('C:\\Users\\ana'),
-    /^\\\\\.\\pipe\\gyblos-seller-[0-9a-f]{16}$/,
-  );
+void test('tasks are per account, whatever the case of its home; the pipe name is a secret in the home', async () => {
+  assert.equal(taskName('C:\\Users\\Ana'), taskName('c:\\users\\ana'));
+  assert.notEqual(taskName('C:\\Users\\ana'), taskName('C:\\Users\\bob'));
+  assert.match(TASK, /^Gyblos\\Seller-[0-9a-f]{16}$/);
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-pipe-'));
+  try {
+    assert.equal(await servicePipe(home), undefined);
+    const pipe = await servicePipe(home, true);
+    assert.match(pipe ?? '', /^\\\\\.\\pipe\\gyblos-seller-[0-9a-f]{32}$/);
+    assert.equal(await servicePipe(home), pipe);
+    assert.equal(await servicePipe(home, true), pipe);
+    await writeFile(join(home, 'service-pipe'), 'not-a-secret\n');
+    assert.equal(await servicePipe(home), undefined);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });
 
 void test(
@@ -206,10 +220,11 @@ void test(
       );
       const config = join(home, 'gyblos.toml');
       const program = join(root, 'seller.mjs');
-      // A seller that records how it was started and stops on the supervisor's message.
+      // A seller that records how it was started and stops on the supervisor's message, which it listens
+      // for only after a startup of a few seconds, as the daemon does: the supervisor resends it.
       await writeFile(
         program,
-        `import { appendFileSync } from 'node:fs';\nconst record = (text) => appendFileSync(${JSON.stringify(join(root, 'seller.txt'))}, text + '\\n');\nrecord([process.argv[2], process.env.GYBLOS_HOME, process.env.GYBLOS_CONFIG, process.env.GYBLOS_RELAY_TOKEN].join(' '));\nprocess.stdout.write('seller output\\n');\nprocess.on('message', (message) => {\n  if (message === ${JSON.stringify(STOP_MESSAGE)}) { record('stopping'); process.exit(0); }\n});\n`,
+        `import { appendFileSync } from 'node:fs';\nconst record = (text) => appendFileSync(${JSON.stringify(join(root, 'seller.txt'))}, text + '\\n');\nrecord([process.argv[2], process.env.GYBLOS_HOME, process.env.GYBLOS_CONFIG, process.env.GYBLOS_RELAY_TOKEN].join(' '));\nprocess.stdout.write('seller output\\n');\nsetTimeout(() => process.on('message', (message) => {\n  if (message === ${JSON.stringify(STOP_MESSAGE)}) { record('stopping'); process.exit(0); }\n}), 3000);\n`,
       );
       const pipe =
         process.platform === 'win32'
@@ -230,7 +245,7 @@ void test(
       const log = await readFile(join(home, 'service.log'), 'utf8');
       for (const text of [
         'gyblos service: started',
-        'gyblos service: already running for this account',
+        'gyblos service: already running for this home',
         'seller output',
         'gyblos service: stop requested',
         'gyblos service: stopped',

@@ -57,7 +57,10 @@ export const SERVICE = {
   pipePrefix: '\\\\.\\pipe\\gyblos-seller-',
   stopRequest: 'stop',
   logMode: 0o600,
-  pipeHashCharacters: 16,
+  taskHashCharacters: 16,
+  // <home>/service-pipe: the random part of the supervisor's pipe name, 32 hex characters.
+  pipeFile: 'service-pipe',
+  pipeSecretBytes: 16,
 } as const;
 
 // Names seller.env may not set: the unit and launch agent set these themselves, and systemd's

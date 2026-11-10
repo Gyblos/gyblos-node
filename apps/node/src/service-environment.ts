@@ -26,12 +26,15 @@ function reserved(name: string, windows: boolean) {
 // Only lines that systemd's EnvironmentFile and the launch agent's `set -a; . file` read identically:
 // NAME=value with a non-empty value of printable characters and none that either expands, quotes,
 // escapes or comments. Blank lines and whole-line comments are skipped. On Windows, where only the
-// supervisor (service-run.ts) reads it, Notepad's CRLF line ends are accepted.
+// supervisor (service-run.ts) reads it, Notepad's CRLF line ends and byte order mark are accepted.
 export function parseEnvironmentFile(
   source: string,
   windows = process.platform === 'win32',
 ) {
-  const text = windows ? source.replaceAll('\r\n', '\n') : source;
+  // Notepad may also save a UTF-8 byte order mark.
+  const text = windows
+    ? source.replace(/^\uFEFF/, '').replaceAll('\r\n', '\n')
+    : source;
   // systemd continues a line, even a comment, after a trailing backslash and ends one at a carriage return.
   if (/[\\\r]/.test(text))
     throw new ServiceError(SERVICE_ERRORS.ENVIRONMENT_INVALID);

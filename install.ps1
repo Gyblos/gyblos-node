@@ -82,13 +82,21 @@ function Check-Platform {
   }
 }
 
-# The home, created readable only by this account, SYSTEM and Administrators, as `gyblos setup` checks.
-function Ensure-Home {
-  if (Test-Path -LiteralPath $SellerHome) { return }
-  New-Item -ItemType Directory -Path $SellerHome | Out-Null
+# The home, readable only by this account, SYSTEM and Administrators, as `gyblos setup` checks: also an
+# existing one (a GYBLOS_HOME made by hand inherits its parent's access), before seller.env is written.
+function Restrict-Home {
+  if (-not (Test-Path -LiteralPath $SellerHome)) { New-Item -ItemType Directory -Path $SellerHome | Out-Null }
   $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-  & $Icacls $SellerHome /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' /Q | Out-Null
+  & $Icacls $SellerHome /reset /Q | Out-Null
+  if ($LASTEXITCODE -eq 0) {
+    & $Icacls $SellerHome /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' /Q | Out-Null
+  }
   if ($LASTEXITCODE -ne 0) { Die "Could not restrict $SellerHome to this account." }
+  # What is inside follows the folder again, also a file someone gave its own access.
+  if (Get-ChildItem -LiteralPath $SellerHome -Force | Select-Object -First 1) {
+    & $Icacls (Join-Path $SellerHome '*') /reset /T /C /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) { Die "Could not restrict the files in $SellerHome to this account." }
+  }
 }
 
 function Download([string]$Url, [string]$Path) {
@@ -259,6 +267,7 @@ function Check-Ollama {
 }
 
 function Pull-Model {
+  $ErrorActionPreference = 'Continue'
   Say "Pulling $Model into Ollama..."
   $ollama = Get-Command ollama -ErrorAction SilentlyContinue
   if ($ollama) {
@@ -288,6 +297,8 @@ function With-SellerEnv([scriptblock]$Block) {
 }
 
 function Reinstall-Service {
+  # Windows PowerShell may stop at a native command's error output under 'Stop'; exit codes decide here.
+  $ErrorActionPreference = 'Continue'
   # Removing the service stops the seller first (it withdraws within 120 s); installing starts this release.
   Gyblos seller service uninstall | Out-Null
   Gyblos seller service install
@@ -316,9 +327,11 @@ function Confirm([string]$Question) {
 }
 
 # In a console, registers the seller (the command asks for the invite and confirms before signing), then
-# publishes it once the operator agrees. Returns $false without asking when it cannot or must not ask.
+# publishes it once the operator agrees. Called as a statement, never inside an expression, so the
+# register command's questions reach the console.
+function Can-Guide { $Guided -and -not [Console]::IsInputRedirected -and [Environment]::UserInteractive }
+
 function Guided-Setup {
-  if (-not $Guided -or [Console]::IsInputRedirected -or -not [Environment]::UserInteractive) { return $false }
   Say ''
   Say 'Next: register this seller and publish it, so buyers can find it.'
   Say 'Each step asks before it does anything. Press Ctrl+C at any time; run this script again to continue.'
@@ -330,18 +343,17 @@ function Guided-Setup {
     Say ''
     Say 'Registration did not finish. Fix what it says, then run this script again to continue:'
     Say "  $(Installer '')"
-    return $true
+    return
   }
   Say ''
   if (-not (Confirm 'Step 2 of 2: publish this seller to the discovery index now?')) {
     Say 'Not published. When you are ready:'
     Say "  $(Installer 'publish')"
-    return $true
+    return
   }
   Set-Publish 'true'
   Say ''
   Say 'Done: this seller is registered and published. Buyers can find it within about two minutes.'
-  return $true
 }
 
 # Turns publishing on or off in gyblos.toml, checks the result with the seller and restarts it; an invalid
@@ -401,19 +413,25 @@ function Update-Installer {
   exit $LASTEXITCODE
 }
 
+# Keys and tokenizer; exit codes decide, not error output.
+function Prepare-Seller {
+  $ErrorActionPreference = 'Continue'
+  & $Release setup --role seller --mint $Mint | Out-Null
+  if ($LASTEXITCODE -ne 0) { Die 'Creating the seller keys failed; fix what it says, then run this script again.' }
+  & $Release tokenizer
+  if ($LASTEXITCODE -ne 0) { Die 'Preparing the tokenizer failed; run this script again.' }
+}
+
 function Main {
   Check-Platform
-  Ensure-Home
+  Restrict-Home
   Install-Native
   Write-Config
   Write-Environment
   Check-Ollama
   Pull-Model
   Say 'Creating the seller keys (kept if they exist)...'
-  & $Release setup --role seller --mint $Mint | Out-Null
-  if ($LASTEXITCODE -ne 0) { Die 'Creating the seller keys failed; fix what it says, then run this script again.' }
-  & $Release tokenizer
-  if ($LASTEXITCODE -ne 0) { Die 'Preparing the tokenizer failed; run this script again.' }
+  Prepare-Seller
   $doctor = With-SellerEnv { & $Release doctor 2>&1 }
   $ready = $LASTEXITCODE -eq 0
   $doctor | ForEach-Object { Say "$_" }
@@ -433,7 +451,9 @@ function Main {
   if (Publishing) {
     Say 'Publishing is on. Check that the index lists it:'
     Say "  $(Typed 'seller status --online')"
-  } elseif (-not (Guided-Setup)) {
+  } elseif (Can-Guide) {
+    Guided-Setup
+  } else {
     Next-Steps
   }
 }

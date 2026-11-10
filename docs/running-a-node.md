@@ -257,7 +257,7 @@ pnpm gyblos seller service uninstall           # stops and removes it
   runs while you are logged in and logs to `<home>/service.log`. launchd has no
   memory or CPU limit; the startup headroom check still applies.
 - Windows (packaged release only, from `install.ps1` or npm): a scheduled task
-  `Gyblos\Seller` of your account (its XML is kept in
+  `Gyblos\Seller-<id>` of your account (its XML is kept in
   `%LOCALAPPDATA%\Gyblos\seller-task.xml`) that starts at your logon, with least
   privilege and no window (`conhost --headless`), and runs `gyblos service-run`.
   That supervisor loads `seller.env` (Notepad's CRLF lines are accepted; names

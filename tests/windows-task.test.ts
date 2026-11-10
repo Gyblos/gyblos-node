@@ -23,6 +23,7 @@ import { promisify } from 'node:util';
 import { SERVICE_KINDS } from '@gyblos/node-app/constants';
 import { DEFAULT_MEMORY_MAX, servicePlan } from '@gyblos/node-app/service';
 import {
+  servicePipe,
   stopWindowsService,
   windowsServiceRunning,
 } from '@gyblos/node-app/service-run';
@@ -43,7 +44,8 @@ void test(
   async () => {
     const root = await mkdtemp(join(tmpdir(), 'gyblos-wintask-'));
     try {
-      const account = join(root, 'account');
+      // A profile path with a space, as `C:\Users\Ana Perez`: cmd /s /c must keep each quoted path whole.
+      const account = join(root, 'the account');
       const home = join(account, '.gyblos');
       const app = join(home, 'app');
       await mkdir(app, { recursive: true });
@@ -93,6 +95,8 @@ void test(
         await run(schtasks, ['/Delete', '/TN', name, '/F']);
       }
 
+      // `gyblos seller service install` makes the pipe's secret before starting the task.
+      await servicePipe(home, true);
       // The task's action, exactly as Task Scheduler would start it.
       const command = /<Command>(.*)<\/Command>/.exec(plan.contents)![1]!;
       const args = /<Arguments>(.*)<\/Arguments>/
@@ -111,13 +115,13 @@ void test(
       const exited = once(supervisor, 'exit');
       let running = false;
       for (let attempt = 0; attempt < 120 && !running; attempt++) {
-        running = await windowsServiceRunning(account);
+        running = await windowsServiceRunning(home);
         if (!running) await delay(250);
       }
       assert.ok(running, 'the supervisor never answered on its pipe');
-      assert.equal(await stopWindowsService(account), true);
+      assert.equal(await stopWindowsService(home), true);
       await exited;
-      assert.equal(await windowsServiceRunning(account), false);
+      assert.equal(await windowsServiceRunning(home), false);
       const log = await readFile(join(home, 'service.log'), 'utf8');
       for (const text of [
         'gyblos service: started',
