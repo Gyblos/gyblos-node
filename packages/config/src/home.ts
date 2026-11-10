@@ -254,3 +254,16 @@ export function batchSessionPathsIn(
     lock: join(directory, BATCH_SESSION_FILES.lock),
   };
 }
+
+// A buyer-wide budget catalog and deterministic private per-seller slots; legacy root files stay in place.
+export const BATCH_POOL_FILES = { state: 'batch-pool-v1.json', lock: 'batch-pool.lock', channels: 'batch-channels' } as const;
+export function batchPoolPathsIn(environment: HomeEnvironment) {
+  const legacy = batchSessionPathsIn(environment, 'buyer');
+  return { directory: legacy.directory, state: join(legacy.directory, BATCH_POOL_FILES.state), lock: join(legacy.directory, BATCH_POOL_FILES.lock), legacy };
+}
+export type BatchPoolPaths = ReturnType<typeof batchPoolPathsIn>;
+export function batchPoolChannelPaths(paths: BatchPoolPaths, nodeId: string) {
+  if (!/^[a-f0-9]+$/.test(nodeId)) throw new TypeError('Invalid session slot');
+  const directory = join(paths.directory, BATCH_POOL_FILES.channels, nodeId);
+  return { directory, state: join(directory, BATCH_SESSION_FILES.state), lock: join(directory, BATCH_SESSION_FILES.lock) };
+}

@@ -90,3 +90,11 @@ void test('prepare and open carry proposed full terms without changing existing 
     assert.deepEqual(parseBatchChannelRequest(proposed), proposed);
   }
 });
+
+void test('session policy authorizes a separate total deposit ceiling without changing per-channel authority', () => {
+  const policy = parseBuyerSessionPolicy({ depositAtomic: '1000', totalDepositAtomic: '2000', lifetimeMs: 3600000 });
+  assert.equal(policy.totalDepositAtomic, '2000');
+  assert.equal(policy.depositAtomic, '1000');
+  for (const totalDepositAtomic of ['0', '02000', '-1'])
+    assert.throws(() => parseBuyerSessionPolicy({ ...policy, totalDepositAtomic }), { code: SESSION_CODES.INVALID });
+});
