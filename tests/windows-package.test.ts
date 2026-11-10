@@ -24,6 +24,9 @@ const CMD = join(
   'System32',
   'cmd.exe',
 );
+// A container flag and Node options from the caller's shell change nothing in the packaged seller; the
+// npm wrapper itself runs on the caller's Node, so only the container flag reaches it.
+const HOSTILE = { GYBLOS_CONTAINER: '1', NODE_OPTIONS: '--no-such-option' };
 const skip = process.platform !== 'win32' || !PACKAGE || !VERSION;
 
 interface Result {
@@ -38,6 +41,7 @@ function cmd(
   args: string[],
   account: string,
   cwd: string,
+  extra: Record<string, string> = {},
 ): Promise<Result> {
   return run(CMD, ['/d', '/c', script, ...args], {
     cwd,
@@ -47,9 +51,7 @@ function cmd(
       TEMP: process.env.TEMP,
       TMP: process.env.TMP,
       USERPROFILE: account,
-      // A container flag and Node options from the caller's shell change nothing.
-      GYBLOS_CONTAINER: '1',
-      NODE_OPTIONS: '--no-such-option',
+      ...extra,
     },
   }).then(
     (result) => ({ code: 0, stdout: result.stdout, stderr: result.stderr }),
@@ -92,7 +94,9 @@ void test(
       const launcher = join(app, 'current', nativeLayout(TARGET).launcher);
       const work = join(root, 'work');
       await mkdir(work);
-      await sellerRuns((...args) => cmd(launcher, args, account, work));
+      await sellerRuns((...args) =>
+        cmd(launcher, args, account, work, HOSTILE),
+      );
       // Everything stays in ~/.gyblos: nothing in the working directory.
       assert.deepEqual(await readdir(work), []);
       assert.deepEqual((await readdir(join(account, '.gyblos'))).sort(), [
@@ -141,7 +145,9 @@ void test(
       const account = join(root, 'account');
       await mkdir(account);
       await sellerRuns((...args) =>
-        cmd(join(prefix, 'gyblos.cmd'), args, account, root),
+        cmd(join(prefix, 'gyblos.cmd'), args, account, root, {
+          GYBLOS_CONTAINER: '1',
+        }),
       );
     } finally {
       await rm(root, { recursive: true, force: true });
