@@ -1125,9 +1125,11 @@ is explicit and reuses the original approved bill; it never sends a prompt.
 The seller's financial worker persists independently of the Iroh connection and
 can finalize the highest accepted voucher while the buyer is offline. Both sides
 offline still means no submission. This channel changes no fee, journal format,
-mainnet restriction or restored-state guarantee. Dynamic session provisioning,
-concurrent requests, multiple sellers, default CLI/gateway activation and
-streaming on this new ALPN remain separately scoped. New canonical/digest/frame
+mainnet restriction or restored-state guarantee. Arbitrary-peer provisioning,
+concurrent requests, multiple sellers, implicit activation, a public gateway and
+streaming on this new ALPN remain separately scoped. The normal seller daemon
+and buyer chat can explicitly enable one pinned pair as described in the
+[session startup policy](../../docs/payment-sessions.md#explicit-startup-policy). New canonical/digest/frame
 vectors are in `vectors/batch-channel-v1.json`; older vectors are unchanged.
 
 The local buyer opening port accepts an optional synchronous operation guard.

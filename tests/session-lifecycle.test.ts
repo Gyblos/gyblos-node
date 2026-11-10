@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
 import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
-import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
+import { sessionFail } from '@gyblos/protocol/payment-session';
 
 import { batchLoopback } from './support/batch-loopback';
 import { sessionRig } from './support/batch-session';
