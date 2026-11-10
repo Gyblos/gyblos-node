@@ -13,6 +13,8 @@ import { parseNodeConfig, type NodeConfig } from '@gyblos/node/node-config';
 import { nodeConfigPath } from '@gyblos/node/node-config-file';
 import { sellerSettings } from '@gyblos/node/seller-settings';
 import { ENGINE_KINDS, type EngineKind } from '@gyblos/protocol/constants';
+import { WINDOWS } from '@gyblos/runtime/private-mode';
+import { restrictDirectory } from '@gyblos/runtime/windows-acl';
 
 import { issueLine, urlOrigin } from './cli-format';
 import { commandsFor } from './cli-next';
@@ -281,11 +283,14 @@ export async function initCommand(
     // Checked again: the file may have appeared or changed while the operator was answering.
     await checkTarget(path, options.force);
     // The packaged release's home may not exist yet when init is its first command.
-    if (!explicit && runMode(output.env) === RUN_MODES.PACKAGED)
-      await mkdir(dirname(path), {
+    if (!explicit && runMode(output.env) === RUN_MODES.PACKAGED) {
+      const created = await mkdir(dirname(path), {
         recursive: true,
         mode: FILE_MODES.privateDirectory,
       });
+      // On Windows a home it creates is restricted to this account, as setup's would be.
+      if (created && WINDOWS) await restrictDirectory(dirname(path));
+    }
     await writeConfigFile(path, text, options.force);
     output.stdout(
       `Wrote ${path}: free offer ${answers.model} via ${answers.engine} ${urlOrigin(answers.url)}; discovery ${answers.publish ? 'on' : 'off'}\nNext:\n${commandsFor(runMode(output.env), nextSteps(answers))}`,

@@ -12,6 +12,7 @@ import {
 import { dirname, join, parse, resolve, sep } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
+import { hasPrivateMode } from '@gyblos/runtime/private-mode';
 
 import { NODE_ERROR_CODES, RECEIPT_STORAGE } from './constants';
 import { NodeError } from './errors';
@@ -24,9 +25,10 @@ export function receiptSignal(signal?: AbortSignal) {
 }
 function privateMode(info: Stats, directory: boolean) {
   if (
-    (process.getuid && info.uid !== process.getuid()) ||
-    (info.mode & FILE_MODES.permissionMask) !==
-      (directory ? FILE_MODES.privateDirectory : FILE_MODES.privateFile)
+    !hasPrivateMode(
+      info,
+      directory ? FILE_MODES.privateDirectory : FILE_MODES.privateFile,
+    )
   )
     receiptUnavailable();
 }

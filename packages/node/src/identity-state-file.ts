@@ -13,13 +13,11 @@ import {
 import { dirname, join, parse, resolve, sep } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
+import { hasPrivateMode } from '@gyblos/runtime/private-mode';
 
 import { IDENTITY_STATE } from './constants';
 import { identityStateUnavailable } from './identity-state-schema';
 
-function owned(info: Stats) {
-  return !process.getuid || info.uid === process.getuid();
-}
 export async function identityDirectory(directory: string) {
   const absolute = resolve(directory);
   let current = parse(absolute).root;
@@ -38,8 +36,7 @@ export async function identityDirectory(directory: string) {
       identityStateUnavailable();
     if (
       current === absolute &&
-      (!owned(info) ||
-        (info.mode & FILE_MODES.permissionMask) !== FILE_MODES.privateDirectory)
+      !hasPrivateMode(info, FILE_MODES.privateDirectory)
     )
       identityStateUnavailable();
   }
@@ -51,11 +48,10 @@ async function checkedFile(file: FileHandle, path: string) {
   if (
     !info.isFile() ||
     info.nlink !== 1 ||
-    !owned(info) ||
+    !hasPrivateMode(info, FILE_MODES.privateFile) ||
     named.isSymbolicLink() ||
     info.dev !== named.dev ||
     info.ino !== named.ino ||
-    (info.mode & FILE_MODES.permissionMask) !== FILE_MODES.privateFile ||
     info.size > IDENTITY_STATE.maxBytes
   )
     identityStateUnavailable();

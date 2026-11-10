@@ -7,8 +7,7 @@ import { join } from 'node:path';
 
 import { FILE_MODES, PRIVATE_LOG_LIMITS } from '@gyblos/config';
 
-const PERMISSION_BITS =
-  constants.S_IRWXU | constants.S_IRWXG | constants.S_IRWXO;
+import { hasPrivateMode } from './private-mode';
 
 export interface ReclaimPolicy {
   directory: string;
@@ -49,8 +48,7 @@ function ownedPrivateFile(info: Stats, policy: ReclaimPolicy) {
     info.isFile() &&
     !info.isSymbolicLink() &&
     info.nlink === 1 &&
-    (!process.getuid || info.uid === process.getuid()) &&
-    (info.mode & PERMISSION_BITS) === FILE_MODES.privateFile &&
+    hasPrivateMode(info, FILE_MODES.privateFile) &&
     !policy.isOpen(info)
   );
 }

@@ -3,22 +3,25 @@
 // bytes. Key contents never appear in errors.
 import { constants } from 'node:fs';
 import { lstat, open } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 import { FILE_MODES, KEY_LIMITS } from '@gyblos/config';
+import { hasPrivateMode, WINDOWS } from '@gyblos/runtime/private-mode';
+import { ACL_VERDICTS, pathsArePrivate } from '@gyblos/runtime/windows-acl';
 
 // A regular, non-symlinked file owned by this user with mode 0600; checked from metadata only.
 export function privateKeyMetadata(
   metadata: Pick<
     Awaited<ReturnType<typeof lstat>>,
-    'isFile' | 'isSymbolicLink' | 'mode' | 'uid'
+    'isFile' | 'isSymbolicLink' | 'mode' | 'uid' | 'nlink'
   >,
 ) {
   return (
     metadata.isFile() &&
     !metadata.isSymbolicLink() &&
-    (Number(metadata.mode) & FILE_MODES.permissionMask) ===
-      FILE_MODES.privateFile &&
-    (!process.getuid || Number(metadata.uid) === process.getuid())
+    // A second link would let the key be read or replaced through another name.
+    Number(metadata.nlink) === 1 &&
+    hasPrivateMode(metadata, FILE_MODES.privateFile)
   );
 }
 
@@ -38,7 +41,24 @@ async function privateKeyText(path: string) {
   }
   try {
     const metadata = await handle.stat();
-    if (!privateKeyMetadata(metadata)) throw invalid();
+    // The descriptor still names `path` with a single link, also where O_NOFOLLOW does not exist.
+    const named = await lstat(path);
+    if (
+      !privateKeyMetadata(metadata) ||
+      named.isSymbolicLink() ||
+      named.dev !== metadata.dev ||
+      named.ino !== metadata.ino
+    )
+      throw invalid();
+    // Windows has no mode bits: the key and its folder must keep everyone else out by their ACLs.
+    if (WINDOWS) {
+      const verdict = await pathsArePrivate([dirname(path), path]);
+      if (verdict === ACL_VERDICTS.UNREADABLE)
+        throw new Error(
+          'Could not read the Windows permissions of the role keys (PowerShell missing or blocked); the keys are not used.',
+        );
+      if (verdict !== ACL_VERDICTS.PRIVATE) throw invalid();
+    }
     if (metadata.size > KEY_LIMITS.fileBytes)
       throw new Error('Invalid role key.');
     return await handle.readFile('utf8');

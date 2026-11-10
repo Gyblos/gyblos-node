@@ -4,7 +4,7 @@
 // keeping its NodeId, owner and registration. The paid fields exist all together or not at all.
 import { generateKeyPairSync } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 import { SecretKey } from '@number0/iroh';
 import {
@@ -43,6 +43,7 @@ import {
 import { NodeError } from './errors';
 import { assertRoleHome } from './home';
 import { privateBytes, privateKeyMetadata } from './role-key-file';
+import { windowsKeysPrivate, windowsRoleAccess } from './role-windows';
 
 interface CommonRole {
   schemaVersion: typeof ROLE_CONFIG_SCHEMA_VERSION;
@@ -247,6 +248,7 @@ export async function setupRole(options: SetupOptions) {
   address(options.mint);
   const role = options.role;
   const path = file(role, ROLE_FILES.roleConfig);
+  const restrict = await windowsRoleAccess(roleDirectory(role));
   try {
     const existing = await loadRole(role);
     if (existing.role !== options.role || existing.mint !== options.mint)
@@ -274,6 +276,7 @@ export async function setupRole(options: SetupOptions) {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
+  await restrict();
   try {
     await lstat(file(role, ROLE_FILES.nodeKey));
   } catch (error) {
@@ -330,6 +333,13 @@ export async function roleKeyFilesStatus(
     }
     if (!privateKeyMetadata(metadata)) invalid = true;
   }
+  if (
+    !(await windowsKeysPrivate(
+      resolve(homeLayout(environment).root),
+      names.map((name) => file(role, name, environment)),
+    ))
+  )
+    invalid = true;
   return invalid ? 'invalid' : 'ok';
 }
 

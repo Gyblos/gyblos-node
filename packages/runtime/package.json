@@ -11,7 +11,9 @@
     "./private-log": "./src/private-log.ts",
     "./private-log-file": "./src/private-log-file.ts",
     "./process": "./src/process.ts",
-    "./private-file": "./src/private-file.ts"
+    "./private-file": "./src/private-file.ts",
+    "./private-mode": "./src/private-mode.ts",
+    "./windows-acl": "./src/windows-acl.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*"

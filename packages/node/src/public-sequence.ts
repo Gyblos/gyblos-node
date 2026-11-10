@@ -21,6 +21,7 @@ import {
   controlInteger,
   controlObject,
 } from '@gyblos/protocol/control-validation';
+import { hasPrivateMode } from '@gyblos/runtime/private-mode';
 
 import { NODE_ERROR_CODES, PUBLIC_SEQUENCE } from './constants';
 import { NodeError } from './errors';
@@ -34,7 +35,7 @@ async function assertPrivateDirectory(directory: string) {
   if (
     !info.isDirectory() ||
     info.isSymbolicLink() ||
-    (info.mode & FILE_MODES.permissionMask) !== FILE_MODES.privateDirectory
+    !hasPrivateMode(info, FILE_MODES.privateDirectory, { owner: false })
   )
     unavailable();
 }
@@ -56,7 +57,7 @@ async function readSequence(
       if (
         !info.isFile() ||
         info.size > PUBLIC_SEQUENCE.maxBytes ||
-        (info.mode & FILE_MODES.permissionMask) !== FILE_MODES.privateFile
+        !hasPrivateMode(info, FILE_MODES.privateFile, { owner: false })
       )
         unavailable();
       const value: unknown = JSON.parse(await file.readFile('utf8'));

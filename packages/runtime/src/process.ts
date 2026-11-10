@@ -20,12 +20,16 @@ export const spawnChild = (
 export const isMain = (moduleUrl: string) =>
   !!process.argv[1] && pathToFileURL(process.argv[1]).href === moduleUrl;
 
+// Windows also stops a console program with Ctrl+Break (SIGBREAK); SIGTERM never arrives there.
+const STOP_SIGNALS: readonly NodeJS.Signals[] =
+  process.platform === 'win32'
+    ? ['SIGINT', 'SIGTERM', 'SIGBREAK']
+    : ['SIGINT', 'SIGTERM'];
+
 export function onShutdown(handler: () => void) {
-  process.once('SIGINT', handler);
-  process.once('SIGTERM', handler);
+  for (const signal of STOP_SIGNALS) process.once(signal, handler);
   return () => {
-    process.removeListener('SIGINT', handler);
-    process.removeListener('SIGTERM', handler);
+    for (const signal of STOP_SIGNALS) process.removeListener(signal, handler);
   };
 }
 
@@ -58,13 +62,12 @@ export function shutdownSignal(
       }
     }
   };
-  process.on('SIGINT', handler);
-  process.on('SIGTERM', handler);
+  for (const signal of STOP_SIGNALS) process.on(signal, handler);
   return {
     signalled,
     dispose() {
-      process.removeListener('SIGINT', handler);
-      process.removeListener('SIGTERM', handler);
+      for (const signal of STOP_SIGNALS)
+        process.removeListener(signal, handler);
     },
   };
 }
