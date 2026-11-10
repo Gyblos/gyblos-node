@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 
 import { signBatchVoucher } from '@x402/svm/batch-settlement/client';
 
-import { batchSessionPathsIn, DEVNET, PROTOCOL_FEE } from '@gyblos/config';
+import {
+  batchPoolPathsIn,
+  batchSessionPathsIn,
+  DEVNET,
+  PROTOCOL_FEE,
+} from '@gyblos/config';
 import { roleSigner } from '@gyblos/node/roles';
 import type { SellerPayments } from '@gyblos/node/seller-paid';
 import type {
@@ -41,14 +46,16 @@ export async function sessionProductPayments(
       ? sessions.inspectBatchSession(paths(role))
       : Promise.resolve(undefined);
   const observe = async (id: string) => settled.get(id);
-  const buyer: BuyerSessionBackend = {
-    inspect: () => inspect(P2P_ROLES.BUYER),
+  const buyerAt = (
+    child: ReturnType<typeof batchSessionPathsIn>,
+  ): BuyerSessionBackend => ({
+    inspect: () => sessions.inspectBatchSession(child),
     observe,
     create: async (terms) => {
       buyerCreates++;
       return sessions.createBatchBuyer({
         terms,
-        paths: paths(P2P_ROLES.BUYER),
+        paths: child,
         payer,
         now,
         hints: async () => ({
@@ -58,7 +65,7 @@ export async function sessionProductPayments(
         }),
       });
     },
-  };
+  });
   const seller: SellerSessionBackend = {
     inspect: () => inspect(P2P_ROLES.SELLER),
     async create(terms: PaymentSessionTerms) {
@@ -107,14 +114,14 @@ export async function sessionProductPayments(
                 refundedAtomic: String(
                   BigInt(terms.depositAtomic) - BigInt(raw.maxClaimableAmount),
                 ),
-                transaction: 'synthetic-confirmed-close',
+                transaction: 'syntheticConfirmedClose',
               });
             return {
               success: true,
               transaction:
                 payment.payload.type === 'deposit'
                   ? 'synthetic-open'
-                  : 'synthetic-confirmed-close',
+                  : 'syntheticConfirmedClose',
               network: DEVNET,
               payer: terms.buyer,
             };
@@ -135,7 +142,14 @@ export async function sessionProductPayments(
     },
   };
   return {
-    buyer: async () => buyer,
+    buyer: async () => buyerAt(paths(P2P_ROLES.BUYER)),
+    pool: async (_role: unknown, totalDepositAtomic: string) =>
+      sessions.openBatchBuyerPool({
+        paths: batchPoolPathsIn(process.env),
+        totalDepositAtomic,
+        now,
+        backend: async (child) => buyerAt(child),
+      }),
     seller: async (): Promise<SellerPayments> => ({
       server: {
         describe: async () => ({

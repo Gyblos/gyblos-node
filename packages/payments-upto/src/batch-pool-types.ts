@@ -10,8 +10,9 @@ export interface BatchPoolEntry {
   terms: PaymentSessionTerms;
   legacy: boolean;
   requestId: string | null;
+  uncertain: boolean;
   refundedAtomic: string;
-  stored: BatchStoredSession;
+  stored: BatchStoredSession | undefined;
 }
 export interface BatchPoolOptions {
   paths: BatchPoolPaths;
@@ -27,4 +28,17 @@ export interface BatchBuyerPool {
   backend(nodeId: string): Promise<ReturnType<typeof openBatchBuyerBackend>>;
   budget(): Promise<{ committedAtomic: string; availableAtomic: string }>;
   dispose(): Promise<void>;
+}
+
+export interface PoolRow {
+  terms: PaymentSessionTerms;
+  legacy: boolean;
+  ready: boolean;
+  requestId: string | null;
+  uncertain: boolean;
+  refundedAtomic: string;
+}
+export interface PoolRecord {
+  version: number;
+  entries: PoolRow[];
 }

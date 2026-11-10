@@ -109,3 +109,6 @@ export const BATCH_OPENING_LIMITS = {
   transactionBytes: TRANSACTION_SIZE_LIMIT,
   transactionBase64Chars: Math.ceil(TRANSACTION_SIZE_LIMIT / 3) * 4,
 } as const;
+
+// Private catalog format, independent of wire/session record versions.
+export const BATCH_POOL_VERSION = 1;

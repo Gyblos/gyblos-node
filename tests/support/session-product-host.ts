@@ -28,6 +28,7 @@ import { sessionProductPayments } from './session-product-payments';
 
 export async function sessionProductHost(
   pricing: OfferPricingKind = OFFER_PRICING_KINDS.PAID,
+  totalDepositAtomic?: string,
 ) {
   const workspace = await createAcceptanceWorkspace();
   const previous = new Map(
@@ -116,6 +117,7 @@ export async function sessionProductHost(
     delete selection.identity;
     selection.sellers[0]!.manualTrust = true;
     selection.session = {
+      ...(totalDepositAtomic ? { totalDepositAtomic } : {}),
       depositAtomic: '100000',
       lifetimeMs: 3600000,
       withdrawDelaySeconds: 900,
@@ -129,6 +131,7 @@ export async function sessionProductHost(
         bind: binding.bind,
         meter: async () => paidAcceptanceMeter,
         batch: finance.buyer,
+        pool: finance.pool,
         chain: async () => assert.fail('legacy chain construction forbidden'),
       });
       return buyer;

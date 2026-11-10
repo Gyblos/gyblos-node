@@ -24,10 +24,13 @@ export async function sessionRig(nodes?: {
   buyerNodeId: string;
   sellerNodeId: string;
   treasury?: string;
+  transaction?: string;
+  payer?: Awaited<ReturnType<typeof generateKeyPairSigner>>;
+  mint?: string;
 }) {
   const root = await mkdtemp(join(tmpdir(), 'gyb-batch-session-test-'));
   let now = 1_800_000_000_000;
-  const payer = await generateKeyPairSigner();
+  const payer = nodes?.payer ?? (await generateKeyPairSigner());
   const authorizer = await generateKeyPairSigner();
   const feePayer = await generateKeyPairSigner();
   const seller = await generateKeyPairSigner();
@@ -39,7 +42,7 @@ export async function sessionRig(nodes?: {
     owner: seller.address,
     sellerNodeId: nodes?.sellerNodeId ?? '34'.repeat(32),
     network: SOLANA_TESTNET_CAIP2,
-    mint: mint.address,
+    mint: nodes?.mint ?? mint.address,
     payTo: seller.address,
     feePayer: feePayer.address,
     authorizer: authorizer.address,
@@ -108,14 +111,17 @@ export async function sessionRig(nodes?: {
             refundedAtomic: String(
               BigInt(terms.depositAtomic) - BigInt(voucher.maxClaimableAmount),
             ),
-            transaction: 'synthetic-confirmed-close',
+            transaction:
+              nodes?.transaction ??
+              nodes?.transaction ??
+              'synthetic-confirmed-close',
           };
         }
         return {
           success: true,
           transaction:
             raw.type === 'refund'
-              ? 'synthetic-confirmed-close'
+              ? (nodes?.transaction ?? 'synthetic-confirmed-close')
               : 'synthetic-open',
           network: requirements.network,
           payer: terms.buyer,

@@ -13,6 +13,7 @@ import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { rolePath, type RoleConfig } from '@gyblos/node/roles';
 import type { BuyerSessionBackend } from '@gyblos/node/session-backend';
+import type { BatchBuyerPool } from '@gyblos/payments-upto/batch-session';
 import {
   MODEL_IDS,
   P2P_ROLES,
@@ -167,6 +168,10 @@ function paidClosers(
 }
 
 interface BuyerStartupOptions {
+  pool?: (
+    role: RoleConfig,
+    totalDepositAtomic: string,
+  ) => Promise<BatchBuyerPool>;
   batch?: (role: RoleConfig) => Promise<BuyerSessionBackend>;
   bind?: typeof bindEndpoint;
   port?: number;

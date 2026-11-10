@@ -12,7 +12,9 @@ export function ownedChat(
   endpoint: string,
   token?: string,
   session?: BuyerSessionPolicy & {
-    settle?: () => Promise<SessionSettlement | undefined>;
+    settle?: () => Promise<
+      Pick<SessionSettlement, 'chargedAtomic' | 'refundedAtomic'> | undefined
+    >;
   },
 ) {
   const url = new URL(endpoint);
