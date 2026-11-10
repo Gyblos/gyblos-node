@@ -93,7 +93,10 @@ void test('doctor: an empty home fails the role check with a setup hint and exit
     assert.equal(result.code, 1);
     assert.match(line(result.output, 'role'), /FAIL\s+role\s+ROLE_MISSING/);
     assert.match(line(result.output, 'keys'), /WARN\s+keys\s+NOT_CHECKED/);
-    assert.match(result.output, /`pnpm gyblos setup --role seller --mint MINT`/);
+    assert.match(
+      result.output,
+      /`pnpm gyblos setup --role seller --mint MINT`/,
+    );
     assert.doesNotMatch(result.output, /--pay-to/);
     assert.match(result.output, /NOT READY/);
   }));
