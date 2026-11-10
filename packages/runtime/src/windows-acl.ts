@@ -79,11 +79,24 @@ interface AclReport {
   rules: { sid: string; type: string }[];
 }
 
-// The ACL by SID, as JSON, so neither the language of Windows nor account names change the answer.
-const ACL_SCRIPT = `$a = Get-Acl -LiteralPath $env:GYBLOS_ACL_PATH
-$sid = [Security.Principal.SecurityIdentifier]
-@{ owner = $a.GetOwner($sid).Value; rules = @($a.GetAccessRules($true, $true, $sid) | ForEach-Object {
-  @{ sid = $_.IdentityReference.Value; type = $_.AccessControlType.ToString() } }) } | ConvertTo-Json -Compress -Depth 3`;
+// The ACL by SID, one line each (`owner <sid>`, `rule <sid> <Allow|Deny>`), so neither the language of
+// Windows nor account names change the answer. Only .NET calls: no PowerShell module has to load.
+const ACL_SCRIPT = `$sid = [Security.Principal.SecurityIdentifier]
+$a = (New-Object System.IO.DirectoryInfo $env:GYBLOS_ACL_PATH).GetAccessControl()
+'owner ' + $a.GetOwner($sid).Value
+foreach ($r in $a.GetAccessRules($true, $true, $sid)) { 'rule ' + $r.IdentityReference.Value + ' ' + $r.AccessControlType }`;
+
+export function parseAcl(output: string): AclReport {
+  let owner = '';
+  const rules: AclReport['rules'] = [];
+  for (const line of output.split(/\r?\n/)) {
+    const [kind, sid, type] = line.trim().split(' ');
+    if (kind === 'owner' && sid) owner = sid;
+    else if (kind === 'rule' && sid && type) rules.push({ sid, type });
+  }
+  if (!owner) throw new Error('Could not read the folder ACL.');
+  return { owner, rules };
+}
 
 export function aclIsPrivate(report: AclReport, sid: string) {
   const allowed = new Set<string>([
@@ -109,17 +122,9 @@ export async function readAcl(path: string, tools: AclTools = defaultTools) {
   const output = await tools.run(
     powershell,
     ['-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT],
-    { GYBLOS_ACL_PATH: path },
+    { GYBLOS_ACL_PATH: path, PSModulePath: '' },
   );
-  const parsed = JSON.parse(output) as {
-    owner: string;
-    rules: AclReport['rules'] | AclReport['rules'][number] | null;
-  };
-  const rules = parsed.rules ?? [];
-  return {
-    owner: parsed.owner,
-    rules: Array.isArray(rules) ? rules : [rules],
-  };
+  return parseAcl(output);
 }
 
 const checked = new Map<string, Promise<boolean>>();

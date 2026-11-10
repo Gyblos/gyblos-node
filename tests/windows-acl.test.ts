@@ -55,26 +55,28 @@ void test('windows acl: restricting replaces inherited access with this account,
   ]);
 });
 
-void test('windows acl: the path reaches PowerShell in its environment, and one rule or none parses', async () => {
+void test('windows acl: the path reaches PowerShell in its environment, and its lines parse', async () => {
   const path = "C:\\Users\\ana\\.gyblos'; Remove-Item C:\\ -Recurse #";
   const single = tools({
-    'powershell.exe': JSON.stringify({
-      owner: SID,
-      rules: { sid: SID, type: 'Allow' },
-    }),
+    'powershell.exe': `owner ${SID}\r\nrule ${SID} Allow\r\nrule S-1-1-0 Deny\r\n`,
   });
   const report = await readAcl(path, single.fake);
   assert.deepEqual(report, {
     owner: SID,
-    rules: [{ sid: SID, type: 'Allow' }],
+    rules: [
+      { sid: SID, type: 'Allow' },
+      { sid: 'S-1-1-0', type: 'Deny' },
+    ],
   });
   const call = single.calls[0]!;
-  assert.deepEqual(call.env, { GYBLOS_ACL_PATH: path });
+  assert.deepEqual(call.env, { GYBLOS_ACL_PATH: path, PSModulePath: '' });
   assert.ok(!call.args.some((argument) => argument.includes('Remove-Item')));
-  const none = tools({
-    'powershell.exe': JSON.stringify({ owner: SID, rules: null }),
-  });
-  assert.deepEqual((await readAcl('C:\\x', none.fake)).rules, []);
+  assert.deepEqual(
+    (await readAcl('C:\\x', tools({ 'powershell.exe': `owner ${SID}` }).fake))
+      .rules,
+    [],
+  );
+  await assert.rejects(readAcl('C:\\x', tools({ 'powershell.exe': '' }).fake));
 });
 
 void test('windows acl: private means owned by this account and opened by no one else', () => {
