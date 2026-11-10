@@ -543,6 +543,33 @@ packaged seller instead. An existing install keeps its mode.
   `gyblos` in place of `docker compose exec seller gyblos`; `publish` restarts
   the service. `update` compares the pinned `NATIVE_VERSION`.
 
+##### npm package
+
+The same packaged sellers are published to npm, for anyone who already uses it:
+`npm install -g gyblos` installs a small `gyblos` wrapper and, as an optional
+dependency, only this machine's `@gyblos/seller-<target>` (macOS arm64, Linux
+x64 and arm64 glibc). That package is the release archive, with its own Node
+runtime, so the seller never runs on the user's Node; npm installs the pinned
+iroh binding as its dependency. Then `gyblos seller init`,
+`gyblos setup --role seller --mint <mint>`, `gyblos tokenizer`, `gyblos doctor`
+and `gyblos seller service install`, with the machine's own Ollama as in
+[Without Docker](#without-docker). `gyblos seller status` says to update with
+`npm install -g gyblos@latest` and then reinstall the service, so it restarts on
+the new code (a service from an nvm-managed Node follows that Node version).
+`npx gyblos` runs commands, but the service refuses to run from a temporary
+cache (npx, pnpm dlx, bunx).
+
+`pnpm build:npm --version <v>` packs them from `pnpm build:native` archives of
+the same version. The release builds them in its `native` job; its `npm` job
+publishes them with provenance only when the repository variable `NPM_PUBLISH`
+is `true`. One-time setup: the npm organization `gyblos`, then an `NPM_TOKEN`
+secret that can publish `gyblos` and `@gyblos/seller-<target>` (npm sets up
+trusted publishing only on a package that already exists, so the first release
+needs the token; afterwards this workflow can be their trusted publisher). A
+version already on npm is skipped, so the job can be re-run. As on GitHub,
+`latest` moves only to a newer version; an older line's release is tagged
+`previous`.
+
 ##### Releasing the seller image
 
 A release is a version tag pushed from a commit on `main`, one tag at a time.

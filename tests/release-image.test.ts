@@ -273,3 +273,18 @@ void test('the packaged sellers are built and signed only in the release workflo
   assert.match(workflow, /native:\n {4}needs: release\n/);
   assert.match(workflow, /publish:\n {4}needs: \[release, native\]\n/);
 });
+
+void test('npm packages are published only by the release workflow, and only when turned on', () => {
+  const outside = spawnSync(
+    'sh',
+    [join(REPOSITORY_ROOT, 'scripts/publish-npm.sh'), '0.1.0-beta.9'],
+    { encoding: 'utf8', env: { PATH: process.env.PATH } },
+  );
+  assert.equal(outside.status, 1);
+  assert.match(outside.stderr, /publishes only in the release workflow/);
+  const workflow = read(WORKFLOW);
+  assert.match(
+    workflow,
+    /npm:\n(?: {4}#.*\n)* {4}if: vars\.NPM_PUBLISH == 'true'\n {4}needs: \[native, publish\]\n/,
+  );
+});

@@ -2,7 +2,12 @@
 // seller status`. Both carry their version in GYBLOS_VERSION (set by the release build); a build without it, or with
 // GYBLOS_UPDATE_CHECK=0, checks nothing. The check is one bounded HTTPS request for the latest release of
 // the public repository, sending nothing about the seller; any failure is silent.
-import { RUN_MODES, type RunMode } from '@gyblos/config';
+import {
+  INSTALLERS,
+  NODE_ENVIRONMENT,
+  RUN_MODES,
+  type RunMode,
+} from '@gyblos/config';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 
 export const UPDATE = {
@@ -89,10 +94,12 @@ export async function updateNotice(
     return undefined;
   const latest = await latestRelease(fetch);
   if (!latest || !newerVersion(latest, current)) return undefined;
-  // The image and the packaged release are both installed and updated by install.sh.
+  // The image and the packaged release are installed and updated by install.sh, or npm's package by npm.
   const how =
     mode === RUN_MODES.SOURCE
       ? 'install the new release'
-      : 'run `sh install.sh update` where you installed the seller';
+      : environment[NODE_ENVIRONMENT.installedBy] === INSTALLERS.npm
+        ? 'run `npm install -g gyblos@latest`, then restart the seller (`gyblos seller service uninstall`, then `gyblos seller service install`)'
+        : 'run `sh install.sh update` where you installed the seller';
   return `v${latest} is available (this seller runs v${current}); ${how}.`;
 }

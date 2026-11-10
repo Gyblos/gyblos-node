@@ -18,7 +18,11 @@ export const NODE_ENVIRONMENT = {
   packaged: 'GYBLOS_PACKAGED',
   // The packaged launcher's own path, which the service runs; only read when packaged.
   launcher: 'GYBLOS_LAUNCHER',
+  // Set to INSTALLERS.npm by the npm package's wrapper: updates come from npm, not install.sh.
+  installedBy: 'GYBLOS_INSTALLED_BY',
 } as const;
+
+export const INSTALLERS = { npm: 'npm' } as const;
 
 // Value an operator sets to turn an environment switch on; today's readers compare against it exactly.
 export const ENVIRONMENT_SWITCH = { on: '1', off: '0' } as const;

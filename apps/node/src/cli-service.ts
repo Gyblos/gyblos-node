@@ -3,9 +3,10 @@
 // doctor with exactly the environment the service will have (seller.env, GYBLOS_HOME and GYBLOS_CONFIG), so
 // a unit that cannot start is never enabled. Prints paths and variable names, never a value from the file.
 import { spawn } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { lstat, mkdir, rm, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, resolve, sep } from 'node:path';
 
 import {
   ENVIRONMENT_SWITCH,
@@ -63,9 +64,24 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
     'run `gyblos seller service uninstall` first',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
     'the service sees only the environment file, GYBLOS_HOME and GYBLOS_CONFIG; fix the failures above',
+  [SERVICE_ERRORS.EPHEMERAL_INSTALL]:
+    'this gyblos runs from a temporary cache (npx, pnpm dlx, bunx) the service could not rely on: install it with `npm install -g gyblos`, then run `gyblos seller service install`',
   [SERVICE_ERRORS.COMMAND_FAILED]:
     'see the error above; `gyblos seller service uninstall` removes the unit',
 };
+
+// Where one-off runners unpack packages (npx, pnpm dlx, bunx), or any temporary directory: a service
+// started from there would lose its program when the cache or temp is cleared.
+function ephemeral(launcher: string) {
+  const parts = launcher.split(sep);
+  return (
+    parts.includes('_npx') ||
+    parts.includes('dlx') ||
+    parts.some((part) => part.startsWith('bunx-')) ||
+    launcher.startsWith(realpathSync(tmpdir()) + sep) ||
+    launcher.startsWith(tmpdir() + sep)
+  );
+}
 
 // Everything that touches the operating system; tests replace it.
 export interface ServiceSystem {
@@ -136,6 +152,9 @@ function serviceInput(
   options: ServiceOptions,
   output: ServiceOutput,
 ): ServiceInput {
+  // npx unpacks into a cache it may clear; a service must run an installed copy.
+  if (system.launcher && ephemeral(system.launcher))
+    throw new ServiceError(SERVICE_ERRORS.EPHEMERAL_INSTALL);
   const layout = homeLayout({
     GYBLOS_HOME: resolve(output.cwd, homeLayout(output.env).root),
   });
@@ -220,6 +239,10 @@ async function install(
 ) {
   const input = serviceInput(system, options, output);
   const plan = servicePlan(input);
+  if (input.launcher?.includes(`${sep}.nvm${sep}versions${sep}`))
+    output.stdout(
+      'Note: this gyblos belongs to one nvm Node version; removing that version, or updating gyblos under another, leaves the service on the old copy. Reinstall the service after updating.\n',
+    );
   const values = await readEnvironmentFile(input.environmentFile);
   if (!values)
     output.stdout(

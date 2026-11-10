@@ -4,7 +4,8 @@
 # every target with pinned inputs (tooling/native-build.ts), signs each archive keyless with the
 # workflow's GitHub identity (the identity install.sh verifies) and verifies it. Writes the archives,
 # their .sha256 and .sigstore.json files to dist/native, and the `native` output: one
-# `<target>=<sha256>` per target, which scripts/publish-installer.sh pins into install.sh.
+# `<target>=<sha256>` per target, which scripts/publish-installer.sh pins into install.sh. Then packs the
+# same archives as npm packages into dist/npm (tooling/npm-packages.ts), for scripts/publish-npm.sh.
 #
 #   sh scripts/release-native.sh <version>
 set -eu
@@ -46,5 +47,7 @@ for target in $TARGETS; do
     die "the signature of $archive does not verify."
   pins="$pins${pins:+ }$target=$sha"
 done
+rm -rf dist/npm
+pnpm -s build:npm --version "$version" --archives "$OUT" --out dist/npm >/dev/null
 printf 'native=%s\n' "$pins" >>"${GITHUB_OUTPUT:-/dev/null}"
 printf 'Built and signed %s\n' "$pins"
