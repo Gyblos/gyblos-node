@@ -267,12 +267,13 @@ function Check-Ollama {
 }
 
 function Pull-Model {
+  # PowerShell names ignore case: the command is $cli, never $ollama, which would replace the $Ollama URL.
   $ErrorActionPreference = 'Continue'
   Say "Pulling $Model into Ollama..."
-  $ollama = Get-Command ollama -ErrorAction SilentlyContinue
-  if ($ollama) {
-    & $ollama.Source pull $Model
-    if ($LASTEXITCODE -ne 0) { Die "Ollama ($($ollama.Source)) could not pull $Model; run: ollama pull $Model" }
+  $cli = Get-Command ollama -ErrorAction SilentlyContinue
+  if ($cli) {
+    & $cli.Source pull $Model
+    if ($LASTEXITCODE -ne 0) { Die "Ollama ($($cli.Source)) could not pull $Model; run: ollama pull $Model" }
   } else {
     try {
       Invoke-RestMethod -UseBasicParsing -Method Post -ContentType 'application/json' -Uri "$Ollama/api/pull" -Body "{`"model`":`"$Model`",`"stream`":false}" -ErrorAction Stop | Out-Null
