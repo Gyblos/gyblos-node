@@ -5,7 +5,7 @@
 import { spawn } from 'node:child_process';
 import { lstat, mkdir, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 
 import {
   ENVIRONMENT_SWITCH,
@@ -63,9 +63,14 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
     'run `gyblos seller service uninstall` first',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
     'the service sees only the environment file, GYBLOS_HOME and GYBLOS_CONFIG; fix the failures above',
+  [SERVICE_ERRORS.EPHEMERAL_INSTALL]:
+    'npx runs gyblos from a temporary cache the service could not rely on: install it with `npm install -g gyblos`, then run `gyblos seller service install`',
   [SERVICE_ERRORS.COMMAND_FAILED]:
     'see the error above; `gyblos seller service uninstall` removes the unit',
 };
+
+// The directory npm's npx unpacks packages into, under its cache.
+const NPX_CACHE = '_npx';
 
 // Everything that touches the operating system; tests replace it.
 export interface ServiceSystem {
@@ -136,6 +141,9 @@ function serviceInput(
   options: ServiceOptions,
   output: ServiceOutput,
 ): ServiceInput {
+  // npx unpacks into a cache it may clear; a service must run an installed copy.
+  if (system.launcher?.split(sep).includes(NPX_CACHE))
+    throw new ServiceError(SERVICE_ERRORS.EPHEMERAL_INSTALL);
   const layout = homeLayout({
     GYBLOS_HOME: resolve(output.cwd, homeLayout(output.env).root),
   });
