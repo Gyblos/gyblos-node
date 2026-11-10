@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./batch-session": "./src/batch-session.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

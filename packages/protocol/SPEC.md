@@ -980,3 +980,30 @@ It persists its first signed pair before confirming and reuses that exact pair
 after a lost acknowledgment. Conflicting buyer attestations never overwrite it.
 A failed or missing receipt never retries inference, changes the selected seller
 after prompt transmission, discards successful output or enables a payment.
+
+## Reusable buyer-authorized payment session port
+
+`payment-session` is an additive library contract over the existing pinned
+Solana x402 `batch-settlement` wire, not a replacement for paid execution or
+newly advertised Iroh support. Session terms bind both wallet/NodeId pairs,
+network, asset, receiver, fee payer, receiver authorizer, fee policy, bounded
+deposit, host expiry and withdrawal grace. The opening memo is
+`gyblos/payment-session/v1:` followed by SHA-256 of
+`gyblos/payment-session/v1\n` and the canonical JSON of all session terms.
+
+An opening has a zero-charge buyer voucher. Each request reserves its ceiling
+under a unique 128-bit lowercase-hex request ID and a 256-bit digest already
+verified by its host. A bill binds those fields, its actual charge and the new
+cumulative total. Only independently verified usage is eligible for buyer
+approval. The native SDK voucher signs channel ID, cumulative amount and expiry,
+not Gyblos request metadata. Its expiry is the SDK zero sentinel; request and
+quote correlation must therefore be enforced in both local journals and the
+authenticated host protocol, never inferred from the native voucher alone.
+
+Finalization freezes the highest accepted voucher and stops new admissions.
+The seller can present it without the buyer remaining online. The SDK's
+receiver close authorization is distinct from buyer spending authority.
+Retries retain the same buyer voucher and financial amount. A local deadline
+or disconnected HTTP stream does not itself execute settlement or a refund.
+No existing offer, free/paid execution or golden vector is modified by this port.
+[Session composition and limitations](../../docs/payment-sessions.md).
