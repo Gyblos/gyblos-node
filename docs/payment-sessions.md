@@ -97,8 +97,12 @@ The existing canonical protocol fee and split arithmetic remain unchanged.
 Journals are private, size-bounded, atomically replaced and process-locked in
 the role's payments directory, with 0700 directories and 0600 files. They retain
 SDK pending operations and the highest voucher, without prompts, answers or
-keys. An unavailable write poisons that handle; ambiguity is never cleared to
-proceed.
+keys. Before persisting a first remote opening, the adapter rejects unknown SDK
+fields, enforces an 8 KiB opening bound and the SDK Solana transaction-size
+bound, and verifies the buyer's initial SDK proof. Invalid data cannot pin or
+overflow the journal; legitimate lost-opening recovery retains its original
+checkpoint. An unavailable write poisons that handle; ambiguity is never cleared
+to proceed.
 
 If the buyer disappears before approving the final response, the seller can
 collect only the previous signed total. Exposure is bounded to one request.

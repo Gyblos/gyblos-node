@@ -99,6 +99,22 @@ export async function createBatchSeller(
     },
   };
 }
+// SDK deposit verification reads/validates authority; it does not submit or simulate a payment.
+async function verifyFirstOpening(
+  context: BatchSellerContext,
+  opening: ReturnType<typeof openingFor>,
+) {
+  const { options, facilitator, requirements } = context;
+  const verified = await waitBatch(
+    facilitator.verify(
+      { x402Version: 2, accepted: requirements, payload: opening },
+      requirements,
+    ),
+    options.operationMs,
+  );
+  if (!verified.isValid || verified.payer !== options.terms.buyer)
+    sessionFail(SESSION_CODES.UNVERIFIED);
+}
 async function openSeller(context: BatchSellerContext, payload: string) {
   const { options, store, facilitator, requirements } = context;
   if (options.now() >= options.terms.expiresAt)
@@ -115,6 +131,7 @@ async function openSeller(context: BatchSellerContext, payload: string) {
   )
     sessionFail(SESSION_CODES.CLOSED);
   if (state.state === SESSION_STATES.OPEN) return snapshot(store);
+  if (!state.opening) await verifyFirstOpening(context, opening);
   await store.update((state) => {
     state.opening = opening;
     state.channelId = opening.voucher!.channelId;

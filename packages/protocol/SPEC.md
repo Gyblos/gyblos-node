@@ -1020,7 +1020,10 @@ index and remote peer never choose those policies.
 Each RPC uses one bidirectional stream: four-byte big-endian length, canonical
 UTF-8 JSON and sender EOF, followed by one similarly framed reply and EOF.
 Requests and replies are each at most 1 MiB excluding the prefix; an opaque SDK
-opening is at most 512 KiB. The existing depth limit of 16 applies. Oversized
+opening is at most 512 KiB at the RPC boundary. The pinned financial adapter
+additionally restricts its known-field SDK opening to 8 KiB and its transaction
+to the SDK Solana packet bound before persistence, with initial proof verification.
+The existing depth limit of 16 applies. Oversized
 lengths are rejected before body allocation; invalid UTF-8, duplicate fields,
 noncanonical JSON, trailing data, multiple messages and unknown fields fail.
 Response JSON escaping counts against the frame bound: a legal text whose

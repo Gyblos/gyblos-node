@@ -17,11 +17,12 @@ import {
   SESSION_STATES,
 } from '@gyblos/protocol/payment-session';
 
+import { batchDeferred } from './support/batch-deferred';
 import { batchOfferFixture } from './support/batch-iroh-offer';
 import { batchLoopback } from './support/batch-loopback';
 import { sessionRig } from './support/batch-session';
 
-async function fixture() {
+async function fixture(input: { verify?: () => Promise<void> } = {}) {
   const rig = await sessionRig();
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const service = createSellerBatchSession({
@@ -51,6 +52,7 @@ async function fixture() {
     unresolved: async () => false,
     verify: async (quote) => {
       verifications++;
+      await input.verify?.();
       assert.equal(quote.offer.owner, rig.terms.owner);
     },
     observe: rig.sellerOptions.observe,
@@ -271,4 +273,28 @@ void test('zero price remains on the transaction-free route and cannot enter a b
   });
   assert.deepEqual(f.rig.calls, []);
   assert.equal(f.offers.generations(), 0);
+});
+
+void test('disconnect during identity verification forbids a late opening signature', async (t) => {
+  const entered = batchDeferred<void>();
+  const release = batchDeferred<void>();
+  const f = await fixture({
+    verify: async () => {
+      entered.resolve();
+      await release.promise;
+    },
+  });
+  t.after(f.close);
+  const opening = t.mock.method(f.rig.buyer, 'open');
+  const run = f.buyer.execute(await f.offers.quote(1), f.offers.input);
+  const rejected = assert.rejects(run, {
+    code: PAID_EXECUTION_CODES.CANCELLED,
+  });
+  await entered.promise;
+  await f.buyer.disconnect();
+  release.resolve();
+  await rejected;
+  assert.equal(opening.mock.callCount(), 0);
+  assert.equal(f.offers.generations(), 0);
+  assert.deepEqual(f.rig.calls, []);
 });

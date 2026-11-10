@@ -35,6 +35,7 @@ export interface BuyerBatchContext<Remote extends BatchDestination> {
     typeof import('@gyblos/transport-iroh/batch-client').createBatchChannelClient<Remote>
   >;
   active: boolean;
+  lifetime: AbortController;
   rpc: (
     method: import('@gyblos/protocol/batch-channel').BatchMethod,
     params: unknown,

@@ -64,6 +64,7 @@ function createContext<Remote extends BatchDestination>(
     terms,
     client,
     active: false,
+    lifetime: new AbortController(),
     rpc,
     approve: async (bill, voucher, signal) => {
       const snapshot = batchBuyerSnapshot(
@@ -82,11 +83,13 @@ async function exclusive<T, Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
   operation: (signal: AbortSignal) => Promise<T>,
   external?: AbortSignal,
+  network = true,
 ) {
   if (context.active) return batchFail(SESSION_CODES.BUSY);
   context.active = true;
   const signal = AbortSignal.any([
     AbortSignal.timeout(TRANSPORT_TIMEOUTS.requestMs),
+    ...(network ? [context.lifetime.signal] : []),
     ...(external ? [external] : []),
   ]);
   const running = Promise.resolve().then(() => {
@@ -182,8 +185,12 @@ export function createBuyerBatchSession<Remote extends BatchDestination>(
             bounded(options.observe(id), current),
           ),
         signal,
+        false,
       ),
-    disconnect: () => context.client.close(),
+    disconnect: () => {
+      context.lifetime.abort();
+      return context.client.close();
+    },
     settled: () => context.client.settled(),
   };
 }

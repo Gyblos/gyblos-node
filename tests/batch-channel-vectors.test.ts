@@ -7,7 +7,10 @@ import { test } from 'node:test';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   BATCH_CHANNEL,
+  BATCH_METHODS,
   batchChannelDigest,
+  batchExecutionDigest,
+  batchSessionRequest,
   matchBatchChannelResponse,
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
@@ -18,6 +21,9 @@ import {
 import { signingBytes } from '@gyblos/protocol/signing';
 
 interface Vector {
+  execution: unknown;
+  executionSigningHex: string;
+  executionDigest: string;
   request: unknown;
   response: unknown;
   canonicalRequest: string;
@@ -55,5 +61,37 @@ void test('batch RPC canonical bytes and digest match independent native crypto 
   assert.deepEqual(
     await matchBatchChannelResponse(reader.finish(), request),
     fixture.response,
+  );
+});
+
+void test('the persisted execution digest has its own independent canonical golden vector', async () => {
+  const fixture: Vector = JSON.parse(
+    await readFile(
+      new URL(
+        import.meta.resolve('@gyblos/protocol/vectors/batch-channel-v1.json'),
+      ),
+      'utf8',
+    ),
+  );
+  assert.ok(fixture.execution, 'The execution-domain golden vector must exist');
+  const rpc = parseBatchChannelRequest({
+    version: BATCH_CHANNEL.version,
+    requestId: '12'.repeat(16),
+    method: BATCH_METHODS.EXECUTE,
+    params: fixture.execution,
+  });
+  assert.equal(rpc.method, BATCH_METHODS.EXECUTE);
+  if (rpc.method !== BATCH_METHODS.EXECUTE)
+    return assert.fail('execution vector required');
+  const bytes = signingBytes(BATCH_CHANNEL.requestDomain, rpc.params);
+  assert.equal(Buffer.from(bytes).toString('hex'), fixture.executionSigningHex);
+  assert.equal(
+    createHash('sha256').update(bytes).digest('hex'),
+    fixture.executionDigest,
+  );
+  assert.equal(await batchExecutionDigest(rpc.params), fixture.executionDigest);
+  assert.equal(
+    (await batchSessionRequest(rpc.params)).requestDigest,
+    fixture.executionDigest,
   );
 });

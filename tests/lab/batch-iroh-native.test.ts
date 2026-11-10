@@ -181,6 +181,12 @@ void test(
     await rejected;
     await f.buyer().settled();
     await waitFor(() => aborted, 3500, 'remote engine abort');
+    // The engine abort precedes the durable zero-charge bill. Advance time only after financial finish.
+    await waitFor(
+      () => f.financial.seller().snapshot().reservedAtomic === '0',
+      3500,
+      'zero-charge bill persisted',
+    );
     assert.equal(f.offers.generations(), 1);
     assert.equal(await f.financial.buyer.recoverApproval(), undefined);
     now += 1001;
