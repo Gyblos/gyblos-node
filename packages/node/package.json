@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./session-policy": "./src/session-policy.ts",
     ".": "./src/index.ts",
     "./artifacts": "./src/artifacts.ts",
     "./constants": "./src/constants.ts",
