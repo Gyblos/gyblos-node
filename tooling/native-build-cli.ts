@@ -18,9 +18,13 @@ const { values } = parseArgs({
 const version = values.version ?? '';
 if (!VERSION.test(version)) throw new Error('--version takes a semver');
 const targets = values.target ?? [hostTarget() ?? ''];
-for (const target of targets) {
+for (const target of targets)
   if (!isNativeTarget(target))
     throw new Error(`unsupported target: ${target || 'this machine'}`);
+if (values.node && targets.some((target) => target !== hostTarget()))
+  throw new Error("--node builds only this machine's target");
+for (const target of targets) {
+  if (!isNativeTarget(target)) continue;
   const built = await buildNative({
     version,
     target,

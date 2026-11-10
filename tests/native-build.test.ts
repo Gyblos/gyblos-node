@@ -72,13 +72,26 @@ void test(
       const gyblos = (...args: string[]) =>
         run(link, args, {
           cwd: root,
-          env: { HOME: account, PATH: '/usr/bin:/bin' },
+          // A container flag, CDPATH and Node variables from the caller's shell change nothing.
+          env: {
+            HOME: account,
+            PATH: '/usr/bin:/bin',
+            GYBLOS_CONTAINER: '1',
+            CDPATH: root,
+            NODE_OPTIONS: '--no-such-option',
+          },
         }).then(
           (result) => ({ code: 0, stdout: result.stdout }),
           (error: { code: number; stdout: string }) => error,
         );
 
       assert.equal((await gyblos('--version')).stdout, `${VERSION}\n`);
+      // Only what runs is shipped: no binding sources, and the bundle's license notices.
+      const irohFiles = await readdir(
+        join(installed, 'lib/node_modules/@number0/iroh'),
+      );
+      assert.ok(!irohFiles.includes('src') && irohFiles.includes('index.js'));
+      await readFile(join(installed, 'lib/gyblos.mjs.LEGAL.txt'), 'utf8');
       const init = await gyblos('seller', 'init');
       assert.match(init.stdout, /`gyblos doctor`/);
       const setup = await gyblos('setup', '--role', 'seller', '--mint', MINT);
