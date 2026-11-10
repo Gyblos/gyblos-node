@@ -33,6 +33,16 @@ que hayas elegido otro directorio. Crea `compose.yaml`, `gyblos.toml` y el archi
 descarga Ollama y `qwen3:0.6b`, crea las llaves en un volumen de Docker, instala el tokenizador,
 ejecuta `gyblos doctor` e inicia el vendedor.
 
+### Sin Docker
+
+En un Mac con Apple Silicon o en Linux (x64 o arm64) sin Docker, el mismo instalador instala el vendedor
+empaquetado: comprueba la descarga con la suma de verificación y la firma del release, guarda todo en
+`~/.gyblos` y deja el vendedor como servicio en segundo plano. Usa tu propio
+[Ollama](https://ollama.com/download), que nunca instala: si Ollama no está corriendo, te dice cómo
+iniciarlo, y al volver a ejecutar el script continúa. En un Mac, Docker no puede usar la GPU, así que esta
+es la opción más rápida aunque tengas Docker: ejecuta `GYBLOS_MODE=native sh install.sh`. Después, escribe
+`gyblos …` donde esta guía dice `docker compose exec seller gyblos …`. Los Mac con Intel usan Docker.
+
 ### Identidad pública
 
 Cuando muestre `The seller is running`, comprueba el estado. Guarda la identidad pública que muestra doctor:

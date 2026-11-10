@@ -413,9 +413,11 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 #### Install script
 
 `install.sh` sets up the same seller from a signed release of the published
-image without a checkout. It needs only Docker with Compose v2.17 or later.
-Sellers download it from the official address, which redirects to the copy
-attached to the latest GitHub release
+image without a checkout. It needs only Docker with Compose v2.17 or later; on
+macOS Apple Silicon and Linux (x64, arm64, glibc) without Docker it installs the
+packaged seller instead (see [Without Docker](#without-docker)). Sellers
+download it from the official address, which redirects to the copy attached to
+the latest GitHub release
 (`https://github.com/Gyblos/gyblos-node/releases/latest/download/install.sh`):
 
 ```sh
@@ -510,6 +512,34 @@ cosign verify-blob install.sh --bundle install.sh.sigstore.json \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 ```
+
+##### Without Docker
+
+When Docker does not run (or with `GYBLOS_MODE=native`), a release's
+`install.sh` installs the packaged seller of the same release on macOS Apple
+Silicon or Linux (x64, arm64, glibc). Intel Macs, musl Linux and Windows are
+told to use Docker. With Docker running, a new install uses Docker; on Apple
+Silicon it notes that Docker cannot use the Mac's GPU, and
+`GYBLOS_MODE=native sh install.sh` installs the packaged seller instead. An
+existing install keeps its mode.
+
+- It downloads `gyblos-<version>-<target>.tar.gz` and its `.sigstore.json` from
+  the release, checks the SHA-256 the installer pins (`NATIVE_SHA256_<TARGET>`)
+  and, with cosign, the release signature, then unpacks it into `~/.gyblos/app/`
+  beside the previous release, points `app/current` at it and links
+  `~/.local/bin/gyblos`.
+- It uses the machine's own Ollama at `127.0.0.1:11434` and never installs it:
+  when Ollama does not answer it says how to install and start it (the Ollama
+  app on a Mac) and stops; a rerun continues. It pulls the model with `ollama`.
+- It writes `gyblos.toml` and `seller.env` into `~/.gyblos` (`GYBLOS_HOME`
+  changes it), creates the keys, downloads the tokenizer, runs `gyblos doctor`
+  with `seller.env` and installs the user service
+  (`gyblos seller service install`: a launch agent on macOS, a systemd user unit
+  on Linux), replacing an earlier one so a rerun or update runs the current
+  release.
+- Registering, `publish`, `unpublish` and `update` work as with Docker, with
+  `gyblos` in place of `docker compose exec seller gyblos`; `publish` restarts
+  the service. `update` compares the pinned `NATIVE_VERSION`.
 
 ##### Releasing the seller image
 
