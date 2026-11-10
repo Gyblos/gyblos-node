@@ -150,6 +150,7 @@ async function requestReply<Remote extends BatchDestination>(
   const stream = await track(state, current.openBi());
   route(state, current, signal);
   if (
+    request.method === BATCH_METHODS.PREPARE ||
     request.method === BATCH_METHODS.OPEN ||
     request.method === BATCH_METHODS.EXECUTE
   )

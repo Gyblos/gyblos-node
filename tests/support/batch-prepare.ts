@@ -19,14 +19,18 @@ export async function batchPrepareFixture() {
     now: rig.now,
   });
   let intercept: BatchChannelService['exchange'] | undefined;
-  let replied: ((result: BatchChannelResult) => Promise<BatchChannelResult>) | undefined;
-  const wire = await batchLoopback({
-    async exchange(...args) {
-      if (intercept) return intercept(...args);
-      const result = await service.exchange(...args);
-      return replied ? replied(result) : result;
+  let replied:
+    ((result: BatchChannelResult) => Promise<BatchChannelResult>) | undefined;
+  const wire = await batchLoopback(
+    {
+      async exchange(...args) {
+        if (intercept) return intercept(...args);
+        const result = await service.exchange(...args);
+        return replied ? replied(result) : result;
+      },
     },
-  }, rig.terms);
+    rig.terms,
+  );
   let verified = 0;
   let verification: (() => Promise<void>) | undefined;
   const buyer = createBuyerBatchSession({
@@ -36,15 +40,28 @@ export async function batchPrepareFixture() {
     meter: offers.meter,
     now: rig.now,
     unresolved: async () => false,
-    verify: async () => { verified++; await verification?.(); },
+    verify: async () => {
+      verified++;
+      await verification?.();
+    },
     observe: rig.sellerOptions.observe,
   });
   return {
-    rig, offers, session, service, buyer,
+    rig,
+    offers,
+    session,
+    service,
+    buyer,
     verified: () => verified,
-    verification: (next: typeof verification) => { verification = next; },
-    intercept: (next: typeof intercept) => { intercept = next; },
-    replied: (next: typeof replied) => { replied = next; },
+    verification: (next: typeof verification) => {
+      verification = next;
+    },
+    intercept: (next: typeof intercept) => {
+      intercept = next;
+    },
+    replied: (next: typeof replied) => {
+      replied = next;
+    },
     async close() {
       await buyer.disconnect();
       await buyer.settled();

@@ -3,6 +3,7 @@ import {
   batchChannelDigest,
   batchSessionRequest,
 } from './batch-channel-request';
+import { batchTerms } from './batch-channel-terms';
 import type {
   BatchChannelRequest,
   BatchChannelResponse,
@@ -27,6 +28,10 @@ import { PAID_EXECUTION, PAID_EXECUTION_CODES } from './paid/constants';
 import { PAYMENT_SESSION, SESSION_CODES } from './payment-session';
 
 function parsedResult(value: unknown, request: BatchChannelRequest) {
+  if (request.method === BATCH_METHODS.PREPARE) {
+    const row = controlObject(value, ['terms']);
+    return { terms: batchTerms(row.terms) };
+  }
   if (request.method === BATCH_METHODS.EXECUTE) {
     const row = controlObject(value, ['value', 'bill']);
     const result = parseExecutionResult(row.value);

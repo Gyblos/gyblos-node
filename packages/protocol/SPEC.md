@@ -1040,11 +1040,47 @@ reflected. Remote errors are marked separately by the local client API.
 
 | Method     | Params                                                              | Result                                     |
 | ---------- | ------------------------------------------------------------------- | ------------------------------------------ |
+| `prepare`  | fresh signed `quote`                                                | full provisioned `terms`, no side effects  |
 | `open`     | `payload` (opaque SDK opening string), fresh signed `quote`         | `snapshot`                                 |
 | `execute`  | `channelId`, quote-bound `requestId`, fresh signed `quote`, `input` | complete `value` and `bill`                |
 | `approve`  | `bill`, buyer-signed cumulative `voucher`                           | exact acknowledged `snapshot`              |
 | `snapshot` | `channelId`                                                         | `snapshot` metadata                        |
 | `close`    | `channelId`                                                         | independently verified seller `settlement` |
+
+`prepare` is an additive capability and terms-agreement operation on this ALPN;
+all earlier methods, digests and vector bytes remain unchanged. A seller that
+does not implement it rejects the method. The current shared buyer requires a
+successful correlated preparation reply before calling its opening/signing
+port; an older seller therefore fails before any new opening signature. An
+earlier provisioned buyer can still use the unchanged `open` contract.
+
+Preparation accepts only the quote: no prompt, SDK opening or proposed spending
+authority. After authenticating the buyer and checking the fresh signed priced
+quote, exact warmed model and live readiness, the seller returns its existing
+provisioned terms. It calls no financial-session or engine methods and creates
+no journal, reservation, channel or background worker. This reply is metadata,
+not an offer signature, independent identity proof or finalized-chain proof.
+
+The result is exactly `{terms}`. Terms have exactly `buyer`, `buyerNodeId`,
+`owner`, `sellerNodeId`, `network`, `mint`, `payTo`, `feePayer`, `authorizer`,
+`treasury`, `protocolFeeBps`, `depositAtomic`, `expiresAt` and
+`withdrawDelaySeconds`. Addresses and NodeIds use the existing strict control
+primitives; deposit is a positive canonical bounded decimal, host expiry and
+withdrawal delay are positive safe integers, and basis points are an integer
+within the existing denominator. Adapter-specific network, grace and party
+policy remains enforced by the financial constructor.
+
+The buyer strictly parses both remote terms and its independently authorized,
+persisted local terms and requires exact canonical equality of every field.
+Remote terms never raise the deposit, extend expiry/grace or alter parties or
+fees. The existing request ID and whole-request digest bind the reply to the
+specific preparation quote. Identity, quote policy, zero-skew time and
+cancellation are rechecked after preparation and before the opening port. A
+failed preparation does not discard or replace any earlier uncertain opening
+or financial approval. Hosts must still restore the original terms and attempt
+before new execution; arbitrary-peer provisioning and default application
+activation are not provided by this operation. The new independent
+`batch-prepare-v1.json` vector supplements the unchanged earlier fixtures.
 
 The inner execution request signs no new payment authorization. Its session
 request digest is SHA-256 of `gyblos/session-request/v1\n` plus the canonical

@@ -29,7 +29,16 @@ independent identity/catalog/request/budget verification and finalized-chain
 observers. The buyer checks the unresolved-payment barrier before any opening.
 These are trusted ports, never callbacks supplied by discovery. This initial
 composition does not negotiate arbitrary deposits or create per-peer journals
-for unknown buyers.
+for unknown buyers. Before the buyer calls its opening/signing port, it uses
+`prepare` to check that the authenticated seller supports the session channel
+and has exactly the same provisioned terms. Every field must match the buyer's
+independently authorized and persisted terms, including deposit, expiry,
+withdrawal delay, treasury and fee. A different term or unsupported peer fails
+before a new opening signature. The seller's preparation reply performs no
+financial operation or engine call. Policy, quote time and cancellation are
+checked again after the reply; preparation cannot replace a prior uncertain
+opening or approval. This is a compatibility/agreement check, not automatic
+public-buyer provisioning or startup activation.
 
 Each session fixes buyer wallet and NodeId, seller owner and NodeId, network,
 asset, payout, fee payer, receiver authorizer, fee distribution, deposit and
@@ -125,8 +134,8 @@ only after the buyer's own chain observation.
 
 One bidirectional stream carries one canonical request/reply; the connection can
 serve sequential RPCs while the financial session survives disconnection. The
-operations are `open`, `execute`, `approve`, `snapshot` and `close`, defined in
-the [wire specification](../packages/protocol/SPEC.md). Both endpoint
+operations are `prepare`, `open`, `execute`, `approve`, `snapshot` and `close`,
+defined in the [wire specification](../packages/protocol/SPEC.md). Both endpoint
 connection/rate admission and request quotas apply before the session's own
 single-active-call budget. The seller worker belongs to the financial service,
 not the connection; closing the buyer's connection does not stop autonomous

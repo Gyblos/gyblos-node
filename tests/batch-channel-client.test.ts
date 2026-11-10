@@ -183,3 +183,32 @@ void test('batch client refuses a quote that expired while opening the stream be
   await client.close();
   await client.settled();
 });
+
+void test('batch PREPARE refuses expiry during stream opening before any write', async () => {
+  const f = fixture();
+  const source = await paidSource();
+  let now = source.now();
+  const open = f.connection.openBi.bind(f.connection);
+  f.connection.openBi = async () => {
+    now = source.paid.quote.offer.expiresAt;
+    return open();
+  };
+  const client = createBatchChannelClient(f.endpoint, destination, seller, {
+    now: () => now,
+  });
+  await assert.rejects(
+    client.exchange({
+      version: BATCH_CHANNEL.version,
+      requestId: '12'.repeat(16),
+      method: BATCH_METHODS.PREPARE,
+      params: { quote: source.paid.quote },
+    }),
+    (error) =>
+      error instanceof BatchClientError &&
+      !error.sent &&
+      error.code === PAID_EXECUTION_CODES.EXPIRED,
+  );
+  assert.equal(f.writes(), 0);
+  await client.close();
+  await client.settled();
+});

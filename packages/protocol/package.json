@@ -46,6 +46,7 @@
     "./vectors/paid-execution-v1.json": "./vectors/paid-execution-v1.json",
     "./payment-session": "./src/payment-session.ts",
     "./batch-channel": "./src/batch-channel.ts",
-    "./vectors/batch-channel-v1.json": "./vectors/batch-channel-v1.json"
+    "./vectors/batch-channel-v1.json": "./vectors/batch-channel-v1.json",
+    "./vectors/batch-prepare-v1.json": "./vectors/batch-prepare-v1.json"
   }
 }

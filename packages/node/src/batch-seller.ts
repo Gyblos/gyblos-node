@@ -4,6 +4,7 @@ import {
   BatchChannelError,
   batchFail,
   batchSessionRequest,
+  matchBatchTerms,
   verifyBatchQuote,
   type BatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
@@ -33,6 +34,7 @@ async function exchange(
   signal.throwIfAborted();
   const session = options.session;
   if (
+    request.method === BATCH_METHODS.PREPARE ||
     request.method === BATCH_METHODS.OPEN ||
     request.method === BATCH_METHODS.EXECUTE
   ) {
@@ -45,6 +47,8 @@ async function exchange(
     );
     signal.throwIfAborted();
     const live = batchLiveOffer(offer, options.offers(), options.now());
+    if (request.method === BATCH_METHODS.PREPARE)
+      return { terms: structuredClone(options.terms) };
     if (request.method === BATCH_METHODS.OPEN)
       return { snapshot: await session.open(request.params.payload) };
     if (request.params.channelId !== session.snapshot().channelId)
@@ -76,7 +80,10 @@ async function exchange(
 export function createSellerBatchSession(
   input: SellerBatchSessionOptions,
 ): BatchChannelService {
-  const options = { ...input, terms: structuredClone(input.terms) };
+  const options = {
+    ...input,
+    terms: matchBatchTerms(input.terms, input.terms),
+  };
   let active = false;
   return {
     async exchange(request, peer, signal) {
