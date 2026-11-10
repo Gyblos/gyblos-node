@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { createSellerBatchSession } from '@gyblos/node/batch-seller';
 import {
   BATCH_CHANNEL,
   BATCH_METHODS,
@@ -60,13 +61,14 @@ void test('PREPARE strictly parses remote and locally authorized terms, includin
 void test('PREPARE request refuses unknown params before reaching the service', async (t) => {
   const f = await batchPrepareFixture();
   t.after(f.close);
+  const quote = await f.offers.quote(1);
   assert.throws(
     () =>
       parseBatchChannelRequest({
         version: BATCH_CHANNEL.version,
         requestId: '12'.repeat(16),
         method: BATCH_METHODS.PREPARE,
-        params: { quote: f.offers.base, depositAtomic: '999999999' },
+        params: { quote, depositAtomic: '999999999' },
       }),
     { code: SESSION_CODES.INVALID },
   );
@@ -125,3 +127,53 @@ void test('PREPARE refuses wrong peer, signatures, expired quote, busy and stale
   assert.equal(f.offers.generations(), 0);
   assert.deepEqual(f.rig.calls, []);
 });
+
+for (const expires of ['quote', 'session'] as const) {
+  void test(`PREPARE seller rejects ${expires} expiry during signature verification`, async (t) => {
+    const f = await batchPrepareFixture();
+    t.after(f.close);
+    const quote = await f.offers.quote(1);
+    const terms = { ...f.rig.terms, expiresAt: f.rig.now() + 1 };
+    const service =
+      expires === 'quote'
+        ? f.service
+        : createSellerBatchSession({
+            session: f.session,
+            terms,
+            offers: () => [f.offers.live],
+            now: f.rig.now,
+          });
+    const original = crypto.subtle.verify.bind(crypto.subtle);
+    t.mock.method(
+      crypto.subtle,
+      'verify',
+      async (...args: Parameters<typeof original>) => {
+        const valid = await original(...args);
+        f.rig.time(
+          expires === 'quote' ? quote.offer.expiresAt : terms.expiresAt,
+        );
+        return valid;
+      },
+    );
+    await assert.rejects(
+      service.exchange(
+        parseBatchChannelRequest({
+          version: BATCH_CHANNEL.version,
+          requestId: '12'.repeat(16),
+          method: BATCH_METHODS.PREPARE,
+          params: { quote },
+        }),
+        terms.buyerNodeId,
+        new AbortController().signal,
+      ),
+      {
+        code:
+          expires === 'quote'
+            ? PAID_EXECUTION_CODES.EXPIRED
+            : SESSION_CODES.LIMIT,
+      },
+    );
+    assert.equal(f.offers.generations(), 0);
+    assert.deepEqual(f.rig.calls, []);
+  });
+}
