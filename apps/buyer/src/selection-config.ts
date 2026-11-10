@@ -11,6 +11,10 @@ import {
 } from '@gyblos/core/seller-selection';
 import { assertRoleHome } from '@gyblos/node/home';
 import {
+  parseBuyerSessionPolicy,
+  type BuyerSessionPolicy,
+} from '@gyblos/node/session-policy';
+import {
   DATA_RETENTION,
   P2P_ROLES,
   PUBLIC_RECORD_KINDS,
@@ -57,6 +61,7 @@ export interface StaticControlSeller {
   manualTrust?: boolean;
 }
 export interface BuyerSelectionConfig {
+  session?: BuyerSessionPolicy;
   request: SellerRequest;
   sellers: StaticControlSeller[];
   pinnedNodeId?: string;
@@ -163,7 +168,7 @@ export function parseBuyerSelectionConfig(
     const row = optionalObject(
       value,
       ['request', 'sellers'],
-      ['pinnedNodeId', 'discovery', 'identity', 'quoteWindowMs'],
+      ['pinnedNodeId', 'discovery', 'identity', 'quoteWindowMs', 'session'],
     );
     const request = parseRequest(row.request);
     const validation = selectSellers({
@@ -185,6 +190,9 @@ export function parseBuyerSelectionConfig(
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
     return {
       request,
+      ...(row.session === undefined
+        ? {}
+        : { session: parseBuyerSessionPolicy(row.session) }),
       sellers,
       ...(row.identity === undefined
         ? {}

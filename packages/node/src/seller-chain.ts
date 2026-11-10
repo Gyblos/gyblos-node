@@ -11,12 +11,18 @@ import {
   PROTOCOL_FEE,
   UPTO_CHANNEL_SETTINGS,
 } from '@gyblos/config';
+import { SELLER_SESSION_BUYER_ENV } from '@gyblos/config/batch-session';
+import { batchSessionPathsIn } from '@gyblos/config/home';
 import {
   openUptoSellerPayments,
   type UptoSellerPaymentsOptions,
 } from '@gyblos/payments-upto';
+import { openBatchSellerBackend } from '@gyblos/payments-upto/batch-session';
 import { P2P_ROLES, PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
+import { controlHex } from '@gyblos/protocol/control-validation';
 import { PaymentError } from '@gyblos/protocol/payment';
+import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
+import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { GENESIS_READ_MS, NODE_ERROR_CODES } from './constants';
 import { NodeError } from './errors';
@@ -39,6 +45,11 @@ export function sellerChainPayments(
   rpc?: UptoSellerPaymentsOptions['rpc'],
 ): (role: RoleConfig) => Promise<SellerPayments> {
   return async (role) => {
+    const pinned = process.env[SELLER_SESSION_BUYER_ENV];
+    if (pinned !== undefined) {
+      controlHex(pinned);
+      if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
+    }
     if (
       role.role !== P2P_ROLES.SELLER ||
       role.payTo === undefined ||
@@ -50,7 +61,21 @@ export function sellerChainPayments(
     const served = await genesis(role.rpcUrl).catch(() => undefined);
     if (served !== DEVNET_GENESIS)
       throw new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH);
-    return openUptoSellerPayments({
+    const feePayer = await roleSigner(P2P_ROLES.SELLER, 'facilitator');
+    const authorizer = await roleSigner(P2P_ROLES.SELLER, 'authorizer');
+    const sessions =
+      pinned === undefined
+        ? undefined
+        : {
+            buyerNodeId: pinned,
+            backend: openBatchSellerBackend({
+              rpcUrl: role.rpcUrl,
+              feePayer,
+              authorizer,
+              paths: batchSessionPathsIn(process.env, P2P_ROLES.SELLER),
+            }),
+          };
+    const paid = await openUptoSellerPayments({
       rpcUrl: role.rpcUrl,
       ...(rpc ? { rpc } : {}),
       description: {
@@ -63,8 +88,8 @@ export function sellerChainPayments(
         treasury: PROTOCOL_FEE.treasury,
       },
       settings: UPTO_CHANNEL_SETTINGS,
-      feePayer: await roleSigner(P2P_ROLES.SELLER, 'facilitator'),
-      authorizer: await roleSigner(P2P_ROLES.SELLER, 'authorizer'),
+      feePayer,
+      authorizer,
       paths: paymentPathsIn(process.env, P2P_ROLES.SELLER),
       cleanup: {
         intervalSecs: CLEANUP.intervalSeconds,
@@ -77,5 +102,6 @@ export function sellerChainPayments(
         ? new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE)
         : error;
     });
+    return { ...paid, sessions };
   };
 }

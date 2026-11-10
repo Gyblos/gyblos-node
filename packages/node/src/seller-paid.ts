@@ -17,8 +17,10 @@ import {
 } from './paid-offers';
 import { createPaidRetry, type PaidRetryHealth } from './paid-retry';
 import type { LiveSellerOffer } from './seller-offer-set';
+import type { SellerSessionBackend } from './session-backend';
 
 export interface SellerPayments {
+  sessions?: { buyerNodeId: string; backend: SellerSessionBackend };
   server: PaymentServer;
   // Re-drives claims the payment server recorded before a restart, each with its recorded charge.
   recover?(): Promise<void>;
@@ -35,6 +37,7 @@ export interface SellerPaidHealth extends PaidRetryHealth {
 }
 
 export interface SellerPaid {
+  sessions?: SellerPayments['sessions'];
   description: PaymentDescription;
   service: PaidExecutionService;
   health(): SellerPaidHealth;
@@ -108,6 +111,7 @@ export async function startSellerPaid(
   });
   return {
     description,
+    sessions: payments.sessions,
     service,
     health: () => ({ ...retry.health(), refusedClaims, recoveryFailed }),
     // Stops waiting on claims first, then retries, then gives recovery up to one claim wait (a hung

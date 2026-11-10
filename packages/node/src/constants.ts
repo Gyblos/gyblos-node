@@ -389,6 +389,7 @@ export const PAID_VERDICTS = {
   INTERRUPTED: 'interrupted',
 } as const;
 export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];
+export const SESSION_VERDICTS = { APPROVED: 'approved' } as const;
 
 // Durable seller registration state is private and limited to one active identity.
 export const SELLER_REGISTRATION_STATE = {

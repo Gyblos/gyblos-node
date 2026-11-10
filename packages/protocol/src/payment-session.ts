@@ -6,7 +6,7 @@ import {
   type SessionState,
 } from './sessions/constants';
 
-export type { SessionState } from './sessions/constants';
+export type { SessionState, SessionCode } from './sessions/constants';
 export {
   PAYMENT_SESSION,
   SESSION_CODES,

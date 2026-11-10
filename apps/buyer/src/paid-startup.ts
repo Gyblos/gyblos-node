@@ -12,6 +12,7 @@ import { buyerChainPayments } from '@gyblos/node/buyer-chain';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { rolePath, type RoleConfig } from '@gyblos/node/roles';
+import type { BuyerSessionBackend } from '@gyblos/node/session-backend';
 import {
   MODEL_IDS,
   P2P_ROLES,
@@ -167,6 +168,7 @@ function paidClosers(
 
 export async function startPaidBuyer(
   options: {
+    batch?: (role: RoleConfig) => Promise<BuyerSessionBackend>;
     bind?: typeof bindEndpoint;
     port?: number;
     onSellerFailure?: SellerFailureReporter;

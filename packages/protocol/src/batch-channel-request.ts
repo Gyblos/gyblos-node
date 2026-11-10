@@ -1,4 +1,5 @@
 // Canonical session requests and separate inference/RPC digests; no live policy or side effects.
+import { batchTerms } from './batch-channel-terms';
 import type {
   BatchChannelRequest,
   BatchExecutionRequest,
@@ -34,6 +35,18 @@ function quoteFor(value: unknown): SignedOfferV2 {
     signature: parseOfferSignatureV2(row.signature),
   };
 }
+function preparation(value: unknown, opening = false) {
+  const hasTerms =
+    value !== null &&
+    typeof value === 'object' &&
+    Object.hasOwn(value, 'terms');
+  const row = controlObject(value, [
+    'quote',
+    ...(opening ? ['payload'] : []),
+    ...(hasTerms ? ['terms'] : []),
+  ]);
+  return { row, terms: hasTerms ? { terms: batchTerms(row.terms) } : {} };
+}
 function executionFor(value: unknown): BatchExecutionRequest {
   const row = controlObject(value, [
     'channelId',
@@ -64,15 +77,15 @@ function parse(value: unknown): BatchChannelRequest {
   };
   switch (row.method) {
     case BATCH_METHODS.PREPARE: {
-      const params = controlObject(row.params, ['quote']);
+      const { row: params, terms } = preparation(row.params);
       return {
         ...header,
         method: row.method,
-        params: { quote: quoteFor(params.quote) },
+        params: { quote: quoteFor(params.quote), ...terms },
       };
     }
     case BATCH_METHODS.OPEN: {
-      const params = controlObject(row.params, ['payload', 'quote']);
+      const { row: params, terms } = preparation(row.params, true);
       if (
         typeof params.payload !== 'string' ||
         !params.payload.length ||
@@ -83,7 +96,11 @@ function parse(value: unknown): BatchChannelRequest {
       return {
         ...header,
         method: row.method,
-        params: { payload: params.payload, quote: quoteFor(params.quote) },
+        params: {
+          payload: params.payload,
+          quote: quoteFor(params.quote),
+          ...terms,
+        },
       };
     }
     case BATCH_METHODS.EXECUTE:

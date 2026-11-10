@@ -30,11 +30,15 @@ export type BatchChannelRequest = Header &
   (
     | {
         method: typeof BATCH_METHODS.PREPARE;
-        params: { quote: SignedOfferV2 };
+        params: { quote: SignedOfferV2; terms?: PaymentSessionTerms };
       }
     | {
         method: typeof BATCH_METHODS.OPEN;
-        params: { payload: string; quote: SignedOfferV2 };
+        params: {
+          payload: string;
+          quote: SignedOfferV2;
+          terms?: PaymentSessionTerms;
+        };
       }
     | { method: typeof BATCH_METHODS.EXECUTE; params: BatchExecutionRequest }
     | {

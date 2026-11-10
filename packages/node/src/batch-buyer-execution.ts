@@ -125,7 +125,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     current.throwIfAborted();
   };
   await verify(signal);
-  const prepared = await rpc(BATCH_METHODS.PREPARE, { quote }, signal);
+  const prepared = await rpc(BATCH_METHODS.PREPARE, { quote, terms }, signal);
   if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
   matchBatchTerms(prepared.terms, terms);
   await verify(signal);
@@ -140,7 +140,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       verify,
       open: async (payload) => {
         const snapshot = batchBuyerSnapshot(
-          await rpc(BATCH_METHODS.OPEN, { payload, quote }, signal),
+          await rpc(BATCH_METHODS.OPEN, { payload, quote, terms }, signal),
           channelId,
         );
         if (snapshot.expiresAt !== terms.expiresAt)

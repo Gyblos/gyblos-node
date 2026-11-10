@@ -41,6 +41,8 @@ async function exchange(
     request.method === BATCH_METHODS.EXECUTE
   ) {
     const quote = request.params.quote;
+    if ('terms' in request.params && request.params.terms)
+      matchBatchTerms(request.params.terms, options.terms);
     const offer = await verifyBatchQuote(
       quote,
       options.terms,

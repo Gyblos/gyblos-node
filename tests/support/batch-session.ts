@@ -23,6 +23,7 @@ import type {
 export async function sessionRig(nodes?: {
   buyerNodeId: string;
   sellerNodeId: string;
+  treasury?: string;
 }) {
   const root = await mkdtemp(join(tmpdir(), 'gyb-batch-session-test-'));
   let now = 1_800_000_000_000;
@@ -42,7 +43,7 @@ export async function sessionRig(nodes?: {
     payTo: seller.address,
     feePayer: feePayer.address,
     authorizer: authorizer.address,
-    treasury: treasury.address,
+    treasury: nodes?.treasury ?? treasury.address,
     protocolFeeBps: PROTOCOL_FEE.bps,
     depositAtomic: '1000',
     withdrawDelaySeconds: 900,
