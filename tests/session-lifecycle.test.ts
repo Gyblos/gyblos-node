@@ -55,3 +55,48 @@ void test('startup cleans a financial handle when host composition rejects its e
   await manager.close();
   assert.equal(disposed, 1);
 });
+
+void test('lowering the configured deposit cannot block read-only recovery of the original session', async (t) => {
+  const rig = await sessionRig();
+  await rig.buyer.open();
+  const wire = await batchLoopback(
+    { exchange: async () => sessionFail() },
+    rig.terms,
+  );
+  let created = 0;
+  const inspect = () => inspectBatchSession(rig.buyerOptions.paths);
+  const manager = createBuyerSessionManager({
+    ...wire,
+    policy: {
+      depositAtomic: '500',
+      lifetimeMs: 300000,
+      withdrawDelaySeconds: 900,
+    },
+    inspect,
+    backend: async () => ({
+      inspect,
+      observe: async () => undefined,
+      create: async (terms) => {
+        created++;
+        assert.deepEqual(terms, rig.terms);
+        return rig.buyer;
+      },
+    }),
+    destination: () => wire.destination,
+    meter: { input: () => 0, count: () => 0 },
+    now: rig.now,
+    unresolved: async () => false,
+    verify: async () => {},
+  });
+  t.after(async () => {
+    await manager.close();
+    await wire.close();
+    await rig.dispose();
+  });
+  assert.equal(
+    await manager.reconcile(new AbortController().signal),
+    undefined,
+  );
+  assert.equal(created, 1);
+  assert.deepEqual(rig.calls, []);
+});

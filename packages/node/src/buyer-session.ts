@@ -73,11 +73,6 @@ async function openCurrent<Remote extends BatchDestination>(
     stored?.terms ??
     (quote ? sessionTerms(quote, options.policy, options.now()) : undefined);
   if (!terms) return sessionFail(SESSION_CODES.UNAVAILABLE);
-  if (
-    BigInt(terms.depositAtomic) > BigInt(options.policy.depositAtomic) ||
-    terms.withdrawDelaySeconds > options.policy.withdrawDelaySeconds
-  )
-    return sessionFail(SESSION_CODES.LIMIT);
   if (quote)
     await verifyBatchQuote(
       quote,
@@ -150,6 +145,10 @@ async function run<Remote extends BatchDestination>(
     return sessionFail(SESSION_CODES.UNVERIFIED);
   const opened = await current(state, quote, signal);
   if (
+    BigInt(opened.terms.depositAtomic) >
+      BigInt(state.options.policy.depositAtomic) ||
+    opened.terms.withdrawDelaySeconds >
+      state.options.policy.withdrawDelaySeconds ||
     opened.terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
     opened.terms.treasury !== PROTOCOL_FEE.treasury ||
     opened.terms.expiresAt - state.options.now() >
