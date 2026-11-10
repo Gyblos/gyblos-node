@@ -63,6 +63,14 @@ function parse(value: unknown): BatchChannelRequest {
     requestId: controlHex(row.requestId, PAYMENT_SESSION.requestIdBytes),
   };
   switch (row.method) {
+    case BATCH_METHODS.PREPARE: {
+      const params = controlObject(row.params, ['quote']);
+      return {
+        ...header,
+        method: row.method,
+        params: { quote: quoteFor(params.quote) },
+      };
+    }
     case BATCH_METHODS.OPEN: {
       const params = controlObject(row.params, ['payload', 'quote']);
       if (

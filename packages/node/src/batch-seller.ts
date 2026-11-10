@@ -2,11 +2,14 @@
 import {
   BATCH_METHODS,
   BatchChannelError,
+  batchError,
   batchFail,
   batchSessionRequest,
+  matchBatchTerms,
   verifyBatchQuote,
   type BatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
+import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
   SESSION_CODES,
@@ -33,6 +36,7 @@ async function exchange(
   signal.throwIfAborted();
   const session = options.session;
   if (
+    request.method === BATCH_METHODS.PREPARE ||
     request.method === BATCH_METHODS.OPEN ||
     request.method === BATCH_METHODS.EXECUTE
   ) {
@@ -44,7 +48,19 @@ async function exchange(
       options.now(),
     );
     signal.throwIfAborted();
+    if (request.method === BATCH_METHODS.PREPARE) {
+      try {
+        const checkedAt = options.now();
+        validateOfferV2Time(offer, checkedAt);
+        if (checkedAt >= options.terms.expiresAt)
+          return batchFail(SESSION_CODES.LIMIT);
+      } catch (error) {
+        throw batchError(error);
+      }
+    }
     const live = batchLiveOffer(offer, options.offers(), options.now());
+    if (request.method === BATCH_METHODS.PREPARE)
+      return { terms: structuredClone(options.terms) };
     if (request.method === BATCH_METHODS.OPEN)
       return { snapshot: await session.open(request.params.payload) };
     if (request.params.channelId !== session.snapshot().channelId)
@@ -76,7 +92,10 @@ async function exchange(
 export function createSellerBatchSession(
   input: SellerBatchSessionOptions,
 ): BatchChannelService {
-  const options = { ...input, terms: structuredClone(input.terms) };
+  const options = {
+    ...input,
+    terms: matchBatchTerms(input.terms, input.terms),
+  };
   let active = false;
   return {
     async exchange(request, peer, signal) {

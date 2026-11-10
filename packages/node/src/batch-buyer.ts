@@ -9,6 +9,7 @@ import {
   BatchChannelError,
   batchError,
   batchFail,
+  matchBatchTerms,
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
@@ -34,7 +35,10 @@ export type { BuyerBatchSessionOptions } from './batch-buyer-types';
 function createContext<Remote extends BatchDestination>(
   input: BuyerBatchSessionOptions<Remote>,
 ): BuyerBatchContext<Remote> {
-  const options = { ...input, terms: structuredClone(input.terms) };
+  const options = {
+    ...input,
+    terms: matchBatchTerms(input.terms, input.terms),
+  };
   const terms = options.terms;
   if (options.endpoint.id().toString() !== terms.buyerNodeId)
     return batchFail(PAID_EXECUTION_CODES.PEER);

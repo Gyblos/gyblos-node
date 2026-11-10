@@ -20,3 +20,4 @@ export {
   batchChannelResponse,
 } from './batch-channel-response';
 export { verifyBatchQuote } from './batch-channel-quote';
+export { matchBatchTerms } from './batch-channel-terms';

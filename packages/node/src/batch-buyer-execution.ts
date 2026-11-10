@@ -8,6 +8,7 @@ import {
   batchFail,
   batchSessionRequest,
   buildBatchExecutionRequest,
+  matchBatchTerms,
   verifyBatchQuote,
   type BatchChannelResult,
 } from '@gyblos/protocol/batch-channel';
@@ -20,7 +21,11 @@ import type {
   FreeExecutionBuildInput,
   FreeExecutionResult,
 } from '@gyblos/protocol/free-execution';
-import { parseOfferSignatureV2, parseOfferV2 } from '@gyblos/protocol/offer-v2';
+import {
+  parseOfferSignatureV2,
+  parseOfferV2,
+  validateOfferV2Time,
+} from '@gyblos/protocol/offer-v2';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
@@ -114,9 +119,17 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       options.endpoint.id().toString(),
       options.now(),
     );
+    const checkedAt = options.now();
+    validateOfferV2Time(quote.offer, checkedAt);
+    if (checkedAt >= terms.expiresAt) return batchFail(SESSION_CODES.LIMIT);
     current.throwIfAborted();
   };
   await verify(signal);
+  const prepared = await rpc(BATCH_METHODS.PREPARE, { quote }, signal);
+  if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
+  matchBatchTerms(prepared.terms, terms);
+  await verify(signal);
+  signal.throwIfAborted();
   await bounded(options.buyer.open(), signal);
   signal.throwIfAborted();
   const channelId = options.buyer.snapshot().channelId;
