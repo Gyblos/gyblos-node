@@ -9,6 +9,7 @@ export const EXIT = { ok: 0, failure: 1, interrupted: 130 } as const;
 export const SERVICE_KINDS = {
   SYSTEMD_USER: 'systemd-user',
   LAUNCHD: 'launchd',
+  SCHEDULED_TASK: 'scheduled-task',
 } as const;
 export type ServiceKind = (typeof SERVICE_KINDS)[keyof typeof SERVICE_KINDS];
 
@@ -47,6 +48,20 @@ export const SERVICE = {
   // systemd's UMask= spelling of the same value.
   umaskOctal: SERVICE_UMASK.toString(8).padStart(4, '0'),
   environmentMaxBytes: 64 * 1024,
+  // Windows: a per-user scheduled task started at logon runs `service-run`, a supervisor that keeps the
+  // daemon running and stops it gracefully when asked through its named pipe.
+  taskName: 'Gyblos\\Seller',
+  taskDirectory: 'AppData/Local/Gyblos',
+  taskFile: 'seller-task.xml',
+  taskScript: 'seller-service.cmd',
+  run: 'service-run',
+  pipePrefix: '\\\\.\\pipe\\gyblos-seller-',
+  stopRequest: 'stop',
+  logMode: 0o600,
+  taskHashCharacters: 16,
+  // <home>/service-pipe: the random part of the supervisor's pipe name, 32 hex characters.
+  pipeFile: 'service-pipe',
+  pipeSecretBytes: 16,
 } as const;
 
 // Names seller.env may not set: the unit and launch agent set these themselves, and systemd's
@@ -76,6 +91,13 @@ export const SERVICE_RESERVED_VARIABLES = [
   'OPTIND',
   'OPTARG',
   'POSIXLY_CORRECT',
+  // Windows: where programs, PowerShell modules and the account's folders are found.
+  'SYSTEMROOT',
+  'WINDIR',
+  'COMSPEC',
+  'PATHEXT',
+  'USERPROFILE',
+  'PSMODULEPATH',
 ] as const;
 // Prefixes that change how the runtime or the agent's shell loads code.
 export const SERVICE_RESERVED_PREFIXES = [

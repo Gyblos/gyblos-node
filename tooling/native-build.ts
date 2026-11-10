@@ -1,7 +1,8 @@
 // Builds the packaged seller release for one platform: a folder with its own Node runtime, one bundle of the
 // seller and the iroh native binding, packed as gyblos-<version>-<target>.tar.gz. Every download is pinned:
 // Node by the SHA-256 in NATIVE, iroh by the lockfile's integrity. A host build may reuse this machine's
-// Node and installed binding instead of downloading them.
+// Node and installed binding instead of downloading them. Windows gets node.exe and a gyblos.cmd launcher;
+// Windows 10 and later unpack the archive with their own tar.
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -21,6 +22,8 @@ import { promisify } from 'node:util';
 
 import { build } from 'esbuild';
 
+import { launcherScript, windowsLauncherScript } from './native-launchers';
+
 const run = promisify(execFile);
 const REPOSITORY = resolve(import.meta.dirname, '..');
 
@@ -33,6 +36,8 @@ export const NATIVE = {
   bundle: 'lib/gyblos.mjs',
   launcher: 'bin/gyblos',
   runtime: 'runtime/node',
+  windowsLauncher: 'bin/gyblos.cmd',
+  windowsRuntime: 'runtime/node.exe',
   executableMode: 0o755,
   // Bounds every download (200 MiB, 5 minutes); Node's archives are about 50 MB.
   maxDownloadBytes: 209_715_200,
@@ -56,6 +61,13 @@ export const NATIVE = {
         '33c37be234ba8bee041961047b19160f4d7d0f164e8e246f78bdd10feff148b3',
       iroh: 'iroh-linux-arm64-gnu',
     },
+    // Node publishes Windows as a zip only.
+    'win32-x64': {
+      node: 'win-x64',
+      nodeSha256:
+        'd2046d28c2c3dcd211ac5145c0bf30e2047ef9dfb306693c8c6e2eccd8b95fa5',
+      iroh: 'iroh-win32-x64-msvc',
+    },
   },
 } as const;
 
@@ -72,30 +84,21 @@ export const hostTarget = () => {
 export const archiveName = (version: string, target: NativeTarget) =>
   `gyblos-${version}-${target}.tar.gz`;
 
-// The launcher: follows the ~/.local/bin link to the installed bin/gyblos without resolving the
-// app/current link, so a service keeps working across updates; then runs the bundle on its own Node.
-export function launcherScript(version: string) {
-  return `#!/bin/sh
-# Gyblos seller ${version}: runs the bundled seller on its own Node runtime.
-set -eu
-self=$0
-while [ -L "$self" ]; do
-  link=$(readlink "$self")
-  case $link in
-    /*) self=$link ;;
-    *) self=$(dirname "$self")/$link ;;
-  esac
-done
-root=$(CDPATH= cd -- "$(dirname -- "$self")/.." && pwd -L)
-GYBLOS_PACKAGED=1
-GYBLOS_LAUNCHER=$root/${NATIVE.launcher}
-GYBLOS_VERSION=${version}
-export GYBLOS_PACKAGED GYBLOS_LAUNCHER GYBLOS_VERSION
-# Only this package decides its run mode, its Node options and where its modules come from.
-unset GYBLOS_CONTAINER NODE_OPTIONS NODE_PATH NAPI_RS_NATIVE_LIBRARY_PATH
-exec "$root/${NATIVE.runtime}" "$root/${NATIVE.bundle}" "$@"
-`;
-}
+export const isWindowsTarget = (target: NativeTarget) =>
+  target.startsWith('win32-');
+
+// Where a target's launcher and Node runtime are inside its folder.
+export const nativeLayout = (target: NativeTarget) =>
+  isWindowsTarget(target)
+    ? { launcher: NATIVE.windowsLauncher, runtime: NATIVE.windowsRuntime }
+    : { launcher: NATIVE.launcher, runtime: NATIVE.runtime };
+
+// Windows' own tar (bsdtar, Windows 10 and later), not a Git or MSYS tar earlier on PATH that would read
+// `C:` as a remote host.
+export const TAR =
+  process.platform === 'win32'
+    ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+    : 'tar';
 
 // Reads the body in chunks so the size bound holds without a Content-Length.
 export async function download(url: string) {
@@ -164,7 +167,15 @@ async function extract(scratch: string, archive: Buffer, members: string[]) {
   const directory = await mkdtemp(join(scratch, 'download-'));
   const file = join(directory, 'archive.tgz');
   await writeFile(file, archive);
-  await run('tar', ['-xzf', file, '-C', directory, ...members]);
+  await run(TAR, ['-xzf', file, '-C', directory, ...members]);
+  return directory;
+}
+
+async function extractZip(scratch: string, archive: Buffer, members: string[]) {
+  const directory = await mkdtemp(join(scratch, 'download-'));
+  const file = join(directory, 'archive.zip');
+  await writeFile(file, archive);
+  await run('unzip', ['-q', file, ...members, '-d', directory]);
   return directory;
 }
 
@@ -177,24 +188,35 @@ async function hostNode(node: string) {
   return binary;
 }
 
+// Node's own archive for a target: a tar.gz with bin/node, or on Windows a zip with node.exe.
+async function downloadNode(scratch: string, target: NativeTarget) {
+  const { node: platform, nodeSha256 } = NATIVE.targets[target];
+  const name = `node-v${NATIVE.nodeVersion}-${platform}`;
+  const windows = isWindowsTarget(target);
+  const archive = await download(
+    `${NATIVE.nodeDist}/v${NATIVE.nodeVersion}/${name}.${windows ? 'zip' : 'tar.gz'}`,
+  );
+  checkDigest(archive, 'sha256', nodeSha256, 'hex');
+  const binary = `${name}/${windows ? 'node.exe' : 'bin/node'}`;
+  const members = [binary, `${name}/LICENSE`];
+  const directory = windows
+    ? await extractZip(scratch, archive, members)
+    : await extract(scratch, archive, members);
+  return {
+    binary: join(directory, binary),
+    license: join(directory, name, 'LICENSE'),
+  };
+}
+
 async function stageNode(stage: string, target: NativeTarget, node?: string) {
-  const runtime = join(stage, NATIVE.runtime);
+  const runtime = join(stage, nativeLayout(target).runtime);
   await mkdir(dirname(runtime), { recursive: true });
   if (node) {
     await cp(await hostNode(node), runtime);
   } else {
-    const { node: platform, nodeSha256 } = NATIVE.targets[target];
-    const name = `node-v${NATIVE.nodeVersion}-${platform}`;
-    const archive = await download(
-      `${NATIVE.nodeDist}/v${NATIVE.nodeVersion}/${name}.tar.gz`,
-    );
-    checkDigest(archive, 'sha256', nodeSha256, 'hex');
-    const directory = await extract(dirname(stage), archive, [
-      `${name}/bin/node`,
-      `${name}/LICENSE`,
-    ]);
-    await cp(join(directory, name, 'bin/node'), runtime);
-    await cp(join(directory, name, 'LICENSE'), `${dirname(runtime)}/LICENSE`);
+    const downloaded = await downloadNode(dirname(stage), target);
+    await cp(downloaded.binary, runtime);
+    await cp(downloaded.license, `${dirname(runtime)}/LICENSE`);
   }
   await chmod(runtime, NATIVE.executableMode);
 }
@@ -273,7 +295,7 @@ async function pack(
   archive: string,
   release: boolean,
 ) {
-  const { stdout } = await run('tar', ['--version']);
+  const { stdout } = await run(TAR, ['--version']);
   const gnu = stdout.includes('GNU tar');
   if (release && !gnu) throw new Error('a release build needs GNU tar');
   const deterministic = gnu
@@ -286,7 +308,7 @@ async function pack(
         '--mode=go-w',
       ]
     : [];
-  await run('tar', [...deterministic, '-czf', archive, '-C', stage, root], {
+  await run(TAR, [...deterministic, '-czf', archive, '-C', stage, root], {
     env: { ...process.env, GZIP: '-n' },
   });
 }
@@ -310,9 +332,14 @@ export async function buildNative(options: NativeBuild) {
     await bundle(root);
     await stageNode(root, options.target, options.node);
     await stageIroh(root, options.target, host && Boolean(options.node));
-    const launcher = join(root, NATIVE.launcher);
+    const launcher = join(root, nativeLayout(options.target).launcher);
     await mkdir(dirname(launcher), { recursive: true });
-    await writeFile(launcher, launcherScript(options.version));
+    await writeFile(
+      launcher,
+      isWindowsTarget(options.target)
+        ? windowsLauncherScript(options.version)
+        : launcherScript(options.version),
+    );
     await chmod(launcher, NATIVE.executableMode);
     await mkdir(options.out, { recursive: true });
     const archive = join(

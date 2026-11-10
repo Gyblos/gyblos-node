@@ -12,6 +12,7 @@ import {
   archiveName,
   lockedPackage,
   NATIVE,
+  TAR,
   type NativeTarget,
 } from './native-build';
 
@@ -25,6 +26,7 @@ const PLATFORMS: Readonly<
   'darwin-arm64': { os: 'darwin', cpu: 'arm64' },
   'linux-x64': { os: 'linux', cpu: 'x64' },
   'linux-arm64': { os: 'linux', cpu: 'arm64' },
+  'win32-x64': { os: 'win32', cpu: 'x64' },
 };
 
 export const NPM = {
@@ -39,7 +41,9 @@ export const platformPackage = (target: NativeTarget) =>
 
 // The wrapper npm links as `gyblos`. It runs on the user's Node only to find and start this machine's
 // packaged seller. Ctrl-C at a terminal reaches the seller from the terminal itself; any other stop signal
-// (a process manager, `timeout`) is passed on, and the seller's own exit or signal is the wrapper's.
+// (a process manager, `timeout`) is passed on, and the seller's own exit or signal is the wrapper's. On
+// Windows, where Node cannot start a .cmd without a shell, it runs the package's own node.exe with the
+// environment gyblos.cmd would set.
 export function wrapperScript(version: string) {
   const packages = Object.fromEntries(
     (Object.keys(NPM.platforms) as NativeTarget[]).map((target) => [
@@ -74,10 +78,21 @@ try {
 }
 if (manifest.version !== VERSION)
   fail(name + ' is ' + manifest.version + ', not ' + VERSION + ': reinstall (npm install -g gyblos@' + VERSION + ')');
-const child = spawn(join(root, 'bin', 'gyblos'), process.argv.slice(2), {
-  stdio: 'inherit',
-  env: { ...process.env, GYBLOS_INSTALLED_BY: 'npm' },
-});
+const env = { ...process.env, GYBLOS_INSTALLED_BY: 'npm' };
+let command = join(root, 'bin', 'gyblos');
+let args = process.argv.slice(2);
+if (process.platform === 'win32') {
+  for (const key of Object.keys(env))
+    if (/^(GYBLOS_CONTAINER|NODE_OPTIONS|NODE_PATH|NAPI_RS_NATIVE_LIBRARY_PATH)$/i.test(key)) delete env[key];
+  Object.assign(env, {
+    GYBLOS_PACKAGED: '1',
+    GYBLOS_LAUNCHER: join(root, 'bin', 'gyblos.cmd'),
+    GYBLOS_VERSION: VERSION,
+  });
+  command = join(root, 'runtime', 'node.exe');
+  args = [join(root, 'lib', 'gyblos.mjs'), ...args];
+}
+const child = spawn(command, args, { stdio: 'inherit', env });
 // At a terminal Ctrl-C already reaches the seller, which treats a second SIGINT as \"still stopping\".
 const fromTerminal = process.stdin.isTTY;
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
@@ -141,7 +156,7 @@ async function platformDirectory(
   const directory = join(out, `seller-${target}`);
   await rm(directory, { recursive: true, force: true });
   await mkdir(directory, { recursive: true });
-  await run('tar', [
+  await run(TAR, [
     '-xzf',
     join(archives, archiveName(version, target)),
     '-C',
