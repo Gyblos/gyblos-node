@@ -10,6 +10,7 @@ import { canonicalJson } from '@gyblos/protocol';
 import {
   CONTROL_METERING_MODES,
   FREE_CHAT_ROLES,
+  type EngineKind,
 } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import type {
@@ -34,6 +35,7 @@ import type {
   PaymentServer,
   PaymentTerms,
 } from '@gyblos/protocol/payment';
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import type { PaidExecutionService } from '@gyblos/transport-iroh/paid-server';
 
 import type { FreeMeter } from './free-meter';
@@ -48,6 +50,11 @@ import {
 import { createPaidStreamOutput, type PaidHeader } from './paid-stream-output';
 
 export interface SellerPaidExecutionOptions {
+  telemetry?: {
+    sink: TelemetrySink;
+    engineKind: EngineKind;
+    now?: () => number;
+  };
   owner: string;
   nodeId: string;
   selection: ModelSelection;
