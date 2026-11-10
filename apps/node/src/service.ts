@@ -1,5 +1,5 @@
-// Renders the seller's background service for the account that installs it: a systemd user unit or a macOS
-// launch agent, plus the commands that enable and remove it. Pure text; never touches the file system,
+// Renders the seller's background service for the account that installs it: a systemd user unit, a macOS
+// launch agent or a Windows scheduled task (service-windows.ts), plus the commands that enable and remove it. Pure text; never touches the file system,
 // runs a command or reads the environment file it names.
 import { join } from 'node:path';
 
@@ -12,6 +12,7 @@ import {
   type ServiceErrorCode,
   type ServiceKind,
 } from './constants';
+import { taskLocation, taskPlan } from './service-windows';
 
 export class ServiceError extends Error {
   constructor(readonly code: ServiceErrorCode) {
@@ -42,6 +43,8 @@ export interface ServiceInput {
   accountHome: string;
   // The account's uid: launchd's GUI domain is per uid.
   uid: number;
+  // Windows: the account's SID, which the scheduled task runs as.
+  windowsUser?: string;
   memoryMax: string;
   cpuQuota: string;
 }
@@ -54,6 +57,8 @@ export interface ServiceLocation {
 
 export interface ServicePlan extends ServiceLocation {
   contents: string;
+  // How the file is written; Task Scheduler reads its XML as UTF-16.
+  encoding?: 'utf16le';
   enable: string[][];
   notes: string[];
 }
@@ -219,6 +224,7 @@ export function serviceLocation(
   accountHome: string,
   uid: number,
 ): ServiceLocation {
+  if (kind === SERVICE_KINDS.SCHEDULED_TASK) return taskLocation(accountHome);
   if (kind === SERVICE_KINDS.LAUNCHD) {
     const path = join(
       checkPath(accountHome),
@@ -243,6 +249,7 @@ export function serviceLocation(
 }
 
 export function servicePlan(input: ServiceInput): ServicePlan {
+  if (input.kind === SERVICE_KINDS.SCHEDULED_TASK) return taskPlan(input);
   checkInput(input);
   const location = serviceLocation(input.kind, input.accountHome, input.uid);
   if (input.kind === SERVICE_KINDS.LAUNCHD)

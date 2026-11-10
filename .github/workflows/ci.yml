@@ -93,7 +93,7 @@ jobs:
         with:
           name: windows-package
           path: ${{ runner.temp }}/windows-package
-      - run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts
+      - run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts tests/windows-service.test.ts tests/windows-task.test.ts
         env:
           GYBLOS_WINDOWS_PACKAGE: ${{ runner.temp }}/windows-package
           GYBLOS_WINDOWS_VERSION: 0.0.0-ci.1

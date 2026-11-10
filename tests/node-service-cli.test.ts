@@ -16,10 +16,7 @@ import test from 'node:test';
 
 import { DIAGNOSTICS } from '@gyblos/config';
 import { runCli } from '@gyblos/node-app/cli';
-import {
-  parseEnvironmentFile,
-  type ServiceSystem,
-} from '@gyblos/node-app/cli-service';
+import { type ServiceSystem } from '@gyblos/node-app/cli-service';
 import {
   SERVICE_ERRORS,
   SERVICE_KINDS,
@@ -32,6 +29,7 @@ import {
   servicePlan,
   type ServiceInput,
 } from '@gyblos/node-app/service';
+import { parseEnvironmentFile } from '@gyblos/node-app/service-environment';
 
 import {
   freeToml,
@@ -189,6 +187,11 @@ function fakeSystem(run: Fixture, platform: NodeJS.Platform = 'linux') {
     run: async (argv) => {
       commands.push([...argv]);
       return 0;
+    },
+    windowsUser: async () => 'S-1-5-21-1-2-3-1001',
+    stopWindowsService: async () => {
+      commands.push(['stop-windows-service']);
+      return true;
     },
   };
   return { system, commands };

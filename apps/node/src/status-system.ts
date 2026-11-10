@@ -20,6 +20,7 @@ import {
   type ServiceState,
 } from './constants';
 import { serviceLocation } from './service';
+import { windowsServiceRunning } from './service-run';
 import { parseDaemonStatus, type DaemonStatus } from './status';
 
 export interface ProbeResult {
@@ -37,6 +38,8 @@ export interface StatusSystem {
   daemonInContainer: () => Promise<boolean>;
   fetch: DiscoveryFetch;
   now: () => number;
+  // Windows: whether the service's supervisor answers on its pipe.
+  windowsServiceRunning?: () => Promise<boolean>;
 }
 
 // The job's own state line, one tab deep, reads running only while its process is alive; nested sections
@@ -96,6 +99,7 @@ export function defaultStatusSystem(): StatusSystem {
     daemonInContainer: () => daemonProcess(),
     fetch: (input, init) => fetch(input, init),
     now: Date.now,
+    windowsServiceRunning: () => windowsServiceRunning(homedir()),
   };
 }
 
@@ -114,7 +118,11 @@ export const inContainer = (
   environment: Readonly<Record<string, string | undefined>>,
 ) => environment[NODE_ENVIRONMENT.container] === ENVIRONMENT_SWITCH.on;
 
+// Windows has no uid; its service is the account's scheduled task.
+const NO_UID = -1;
+
 function serviceKind(system: StatusSystem) {
+  if (system.platform === 'win32') return SERVICE_KINDS.SCHEDULED_TASK;
   if (system.uid === undefined || system.uid === 0) return undefined;
   if (system.platform === 'linux') return SERVICE_KINDS.SYSTEMD_USER;
   if (system.platform === 'darwin') return SERVICE_KINDS.LAUNCHD;
@@ -152,16 +160,22 @@ export async function serviceState(
     }
   }
   const kind = serviceKind(system);
-  if (!kind || system.uid === undefined) return SERVICE_STATES.UNKNOWN;
+  if (!kind) return SERVICE_STATES.UNKNOWN;
   try {
     if (
       !(await installed(
-        serviceLocation(kind, system.accountHome, system.uid).path,
+        serviceLocation(kind, system.accountHome, system.uid ?? NO_UID).path,
       ))
     )
       return SERVICE_STATES.NOT_INSTALLED;
   } catch {
     return SERVICE_STATES.UNKNOWN;
+  }
+  if (kind === SERVICE_KINDS.SCHEDULED_TASK) {
+    if (!system.windowsServiceRunning) return SERVICE_STATES.UNKNOWN;
+    return (await system.windowsServiceRunning())
+      ? SERVICE_STATES.ACTIVE
+      : SERVICE_STATES.INACTIVE;
   }
   if (kind === SERVICE_KINDS.LAUNCHD) {
     const { code, output } = await system.probe([
