@@ -29,8 +29,6 @@ export type PrivateLogCode =
 export const PRIVATE_FILE_CODES = {
   UNAVAILABLE: 'PRIVATE_FILE_UNAVAILABLE',
 } as const;
-export type PrivateFileCode =
-  (typeof PRIVATE_FILE_CODES)[keyof typeof PRIVATE_FILE_CODES];
 // A process lock file holds only its owner record; the guard beside it serializes takeovers.
 export const PROCESS_LOCK = {
   maxBytes: 1024,
