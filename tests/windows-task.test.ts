@@ -15,7 +15,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
@@ -95,7 +95,11 @@ void test(
         await run(schtasks, ['/Delete', '/TN', name, '/F']);
       }
 
-      // `gyblos seller service install` makes the pipe's secret before starting the task.
+      // `gyblos seller service install` writes the task's script and the pipe's secret before starting it.
+      for (const extra of plan.extra ?? []) {
+        await mkdir(dirname(extra.path), { recursive: true });
+        await writeFile(extra.path, extra.contents);
+      }
       await servicePipe(home, true);
       // The task's action, exactly as Task Scheduler would start it.
       const command = /<Command>(.*)<\/Command>/.exec(plan.contents)![1]!;
@@ -118,7 +122,10 @@ void test(
         running = await windowsServiceRunning(home);
         if (!running) await delay(250);
       }
-      assert.ok(running, 'the supervisor never answered on its pipe');
+      assert.ok(
+        running,
+        `the supervisor never answered on its pipe: ${await readFile(join(home, 'service.log'), 'utf8').catch(() => 'no service.log')}`,
+      );
       assert.equal(await stopWindowsService(home), true);
       await exited;
       assert.equal(await windowsServiceRunning(home), false);

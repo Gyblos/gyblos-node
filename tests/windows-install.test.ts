@@ -23,7 +23,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
-import { pathsArePrivate } from '@gyblos/runtime/windows-acl';
+import { ACL_VERDICTS, pathsArePrivate } from '@gyblos/runtime/windows-acl';
 
 import { TAR } from '../tooling/native-build';
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
@@ -168,7 +168,7 @@ void test(
         join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'icacls.exe'),
         [home, '/grant', '*S-1-5-32-545:(OI)(CI)R'],
       );
-      assert.equal(await pathsArePrivate([home]), false);
+      assert.equal(await pathsArePrivate([home]), ACL_VERDICTS.EXPOSED);
 
       const wrong = await installer(await pinned(root, 'a'.repeat(64)));
       assert.equal(wrong.code, 1, wrong.output);
@@ -186,7 +186,7 @@ void test(
       assert.match(first.output, /Next steps, to start selling/);
       assert.equal(
         await pathsArePrivate([home, join(home, 'seller.env')]),
-        true,
+        ACL_VERDICTS.PRIVATE,
       );
       const config = await readFile(join(home, 'gyblos.toml'));
       assert.notEqual(config[0], 0xef);

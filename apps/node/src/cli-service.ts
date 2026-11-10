@@ -250,7 +250,10 @@ async function install(
   );
   if (!ready) throw new ServiceError(SERVICE_ERRORS.DOCTOR_NOT_READY);
   if (options.dryRun) {
-    output.stdout(`Unit file: ${plan.path}\n${plan.contents}Commands:\n`);
+    output.stdout(`Unit file: ${plan.path}\n${plan.contents}`);
+    for (const file of plan.extra ?? [])
+      output.stdout(`File: ${file.path}\n${file.contents}`);
+    output.stdout('Commands:\n');
     for (const command of plan.enable)
       output.stdout(`  ${command.join(' ')}\n`);
     return;
@@ -258,6 +261,8 @@ async function install(
   if (await exists(plan.path))
     throw new ServiceError(SERVICE_ERRORS.ALREADY_INSTALLED);
   await mkdir(dirname(plan.path), { recursive: true });
+  for (const file of plan.extra ?? [])
+    await writeFile(file.path, file.contents, { mode: SERVICE.unitMode });
   await writeFile(
     plan.path,
     plan.encoding
@@ -294,6 +299,7 @@ async function uninstall(
   // Stopping may fail when the service is already stopped; removal proceeds either way.
   for (const command of location.disable) await system.run(command);
   await rm(location.path);
+  for (const file of location.files ?? []) await rm(file, { force: true });
   await runAll(location.reload, system, output);
   output.stdout(`Removed: ${location.path}\n`);
 }

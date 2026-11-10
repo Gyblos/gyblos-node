@@ -53,6 +53,7 @@ export const SERVICE = {
   taskName: 'Gyblos\\Seller',
   taskDirectory: 'AppData/Local/Gyblos',
   taskFile: 'seller-task.xml',
+  taskScript: 'seller-service.cmd',
   run: 'service-run',
   pipePrefix: '\\\\.\\pipe\\gyblos-seller-',
   stopRequest: 'stop',

@@ -23,13 +23,17 @@ export const pipeName = (secret: string) => `${SERVICE.pipePrefix}${secret}`;
 export const taskName = (accountHome: string) =>
   `${SERVICE.taskName}-${createHash('sha256').update(accountHome.toLowerCase()).digest('hex').slice(0, SERVICE.taskHashCharacters)}`;
 
+const taskFile = (accountHome: string, file: string) =>
+  win32.join(
+    checkWindowsPath(accountHome),
+    ...SERVICE.taskDirectory.split('/'),
+    file,
+  );
+
 export function taskLocation(accountHome: string) {
   return {
-    path: win32.join(
-      checkWindowsPath(accountHome),
-      ...SERVICE.taskDirectory.split('/'),
-      SERVICE.taskFile,
-    ),
+    path: taskFile(accountHome, SERVICE.taskFile),
+    files: [taskFile(accountHome, SERVICE.taskScript)],
     disable: [['schtasks.exe', '/Delete', '/TN', taskName(accountHome), '/F']],
     reload: [],
   };
@@ -41,13 +45,22 @@ const xml = (value: string) =>
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;');
 
-// conhost --headless gives the seller a console without a window; cmd /s /c runs the launcher with the
-// quoted line as is.
+// The script the task runs: the launcher's supervisor for this home. A file, because conhost splits and
+// rejoins its command line, which keeps a lone quoted path but not quotes nested inside another.
+function taskScript(input: ServiceInput) {
+  return [
+    '@echo off',
+    `rem Gyblos seller service, started by the scheduled task ${taskName(input.accountHome)}.`,
+    `"${input.launcher}" ${SERVICE.run} --home "${input.home}" --config "${input.config}"`,
+    '',
+  ].join('\r\n');
+}
+
+// conhost --headless gives the seller a console without a window.
 function action(input: ServiceInput) {
-  const line = `"${input.launcher}" ${SERVICE.run} --home "${input.home}" --config "${input.config}"`;
   return {
     command: '%SystemRoot%\\System32\\conhost.exe',
-    arguments: `--headless cmd.exe /d /s /c "${line}"`,
+    arguments: `--headless cmd.exe /d /c "${taskFile(input.accountHome, SERVICE.taskScript)}"`,
   };
 }
 
@@ -102,6 +115,12 @@ export function taskPlan(input: ServiceInput): ServicePlan {
     ...location,
     contents: taskXml(input),
     encoding: 'utf16le',
+    extra: [
+      {
+        path: taskFile(input.accountHome, SERVICE.taskScript),
+        contents: taskScript(input),
+      },
+    ],
     enable: [
       [
         'schtasks.exe',

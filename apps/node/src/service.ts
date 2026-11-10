@@ -51,6 +51,8 @@ export interface ServiceInput {
 
 export interface ServiceLocation {
   path: string;
+  // Other files the service owns, removed with it.
+  files?: string[];
   disable: string[][];
   reload: string[][];
 }
@@ -59,6 +61,8 @@ export interface ServicePlan extends ServiceLocation {
   contents: string;
   // How the file is written; Task Scheduler reads its XML as UTF-16.
   encoding?: 'utf16le';
+  // Files written with it (the Windows task's script), replaced on every install.
+  extra?: { path: string; contents: string }[];
   enable: string[][];
   notes: string[];
 }

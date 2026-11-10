@@ -73,7 +73,7 @@ void test('the scheduled task runs the launcher’s supervisor at the account’
     '<StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>',
     '<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>',
     '<Command>%SystemRoot%\\System32\\conhost.exe</Command>',
-    '<Arguments>--headless cmd.exe /d /s /c ""C:\\Users\\ana\\.gyblos\\app\\current\\bin\\gyblos.cmd" service-run --home "C:\\Users\\ana\\.gyblos" --config "C:\\Users\\ana\\.gyblos\\gyblos.toml""</Arguments>',
+    '<Arguments>--headless cmd.exe /d /c "C:\\Users\\ana\\AppData\\Local\\Gyblos\\seller-service.cmd"</Arguments>',
     '<WorkingDirectory>C:\\Users\\ana\\.gyblos</WorkingDirectory>',
   ])
     assert.ok(
@@ -93,6 +93,13 @@ void test('the scheduled task runs the launcher’s supervisor at the account’
   ]);
   assert.deepEqual(plan.disable, [
     ['schtasks.exe', '/Delete', '/TN', TASK, '/F'],
+  ]);
+  // The script holds the quoted launcher line conhost would not pass through nested in its own.
+  assert.deepEqual(plan.extra, [
+    {
+      path: 'C:\\Users\\ana\\AppData\\Local\\Gyblos\\seller-service.cmd',
+      contents: `@echo off\r\nrem Gyblos seller service, started by the scheduled task ${TASK}.\r\n"C:\\Users\\ana\\.gyblos\\app\\current\\bin\\gyblos.cmd" service-run --home "C:\\Users\\ana\\.gyblos" --config "C:\\Users\\ana\\.gyblos\\gyblos.toml"\r\n`,
+    },
   ]);
   assert.match(plan.notes[0]!, /log is C:\\Users\\ana\\.gyblos\\service\.log/);
 });
