@@ -30,15 +30,17 @@ the remote peer cannot change them.
 
 The seller opts in by setting `GYBLOS_SESSION_BUYER_NODE_ID` to the one
 permitted buyer's lowercase NodeId before normal startup. Only a seller with a
-priced execution service exposes this ALPN. There is one private session per
-role, not one slot per arbitrary remote peer. Preparation is stateless; only a
-valid SDK opening proof can assign that slot. Restart restores its original
-terms, absolute expiry, pending operations and worker. Changing selection or
-limits does not replace that session. Remove neither its files nor its lock to
-unblock a request. A completed channel is retained; automatic rotation is not
-provided. Reusable financial startup is currently unavailable on Windows until
-the payment subtree has equivalent ACL validation. Existing paths retain their
-behavior.
+priced execution service exposes this ALPN. Without total authority there is one
+private session per role; the optional
+[shared-authority mode](#sequential-multiple-sellers-and-shared-authority) keeps
+one bounded slot per chosen seller, not per arbitrary remote buyer. Preparation
+is stateless; only a valid SDK opening proof can assign that slot. Restart
+restores its original terms, absolute expiry, pending operations and worker.
+Changing selection or limits does not replace that session. Remove neither its
+files nor its lock to unblock a request. A completed channel is retained;
+automatic rotation is not provided. Reusable financial startup is currently
+unavailable on Windows until the payment subtree has equivalent ACL validation.
+Existing paths retain their behavior.
 
 Start the buyer normally with `pnpm buyer:chat`. It distinguishes the session
 deposit, each question's ceiling and its independently verified **approved**
@@ -201,3 +203,56 @@ Explicit application startup activates the single permitted pair only. Multiple
 sellers/concurrent requests, automatic session rotation/topup, restored-journal
 rollback defense, abrupt host/power-loss acceptance and live
 network/deployed-program validation remain separate work.
+
+## Sequential multiple sellers and shared authority
+
+Add `totalDepositAtomic` to the existing buyer `session` policy to enable the
+private multi-seller catalog. `depositAtomic` remains the fixed amount per new
+seller channel; `totalDepositAtomic` is the authorization shared by all of them.
+For example, a per-channel deposit of `"100000"` and total authority of
+`"200000"` can fund two sellers. Omitting the total retains the existing
+single-channel mode; no larger authority is inferred from the candidate list.
+Both amounts use canonical atomic decimal strings. The per-channel pilot cap,
+finite lifetime and withdrawal grace remain unchanged.
+
+The normal verified selector chooses a seller, and the shared buyer routes its
+signed quote to that seller's persistent slot. Returning A → B → A reuses A's
+original channel and cumulative total, including after restarting the buyer.
+Changing a seller's owner, payment identities, network, asset or channel terms
+cannot replace the old slot. All slots share the same buyer, buyer NodeId,
+network and asset. There are at most sixteen slots, including retained closed
+ones. Requests remain sequential; simultaneous financial operations are refused.
+This does not add automatic topup, channel rotation or new model/API formats.
+
+Committed authority is the sum of each allocated deposit minus its independently
+verified refund. An idle, expired, opening or uncertain channel still occupies
+its full allocation. Actual charges remain consumed after settlement; refunds
+are credited once, survive restart and cannot reset prior spending. Lowering the
+configured total below commitments blocks new use, while recovery and closure
+under original terms remain available. `/settle` tries every retained seller and
+reports aggregate charge/refund amounts only when all required independent
+proofs exist. A failed/offline peer cannot fabricate a successful aggregate or
+prevent attempts to close the other slots.
+
+The adapter holds one buyer-wide process lock and writes an allocation before
+financial construction or signing. It seeds a private child journal before
+marking that slot ready, so an interrupted pre-sign allocation can finish under
+the same immutable reservation. A missing ready journal fails closed. A durable
+request intent precedes execution: ambiguity blocks new free and paid routing
+across all sellers until original financial approval recovery or independent
+finality resolves it. A provably pristine pre-sign child may clear a failed
+intent without releasing its allocation. Prompt content is never replayed.
+
+The catalog and deterministic child paths live under the buyer's private
+payments home, using 0700 directories, 0600 files, bounded atomic writes and
+strict parsers. A pre-existing root single-channel journal is adopted in place
+and counted before another allocation; it is never moved or overwritten.
+Removing pool configuration cannot bypass non-finalized obligations. Updated
+applications must exclusively own this home; running an older binary against the
+same financial state is unsupported. This is not protection against restoring a
+complete older backup; that remains separate work.
+
+Zero-price signed quotes still use transaction-free execution. A fresh free-only
+buyer with pool policy constructs no financial backend, loads no signing key and
+makes no financial RPC call. Identity/discovery checks retain their existing
+policy. Windows reusable financial activation remains unavailable.

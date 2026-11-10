@@ -93,7 +93,8 @@ async function unresolved<Remote extends BatchDestination>(
       if (!(await pool.resolve(entry.terms.sellerNodeId))) pending = true;
       if (
         (await pool.list()).find(
-          (entry) => entry.terms.sellerNodeId === entry.terms.sellerNodeId,
+          (candidate) =>
+            candidate.terms.sellerNodeId === entry.terms.sellerNodeId,
         )?.stored?.pending
       )
         pending = true;
