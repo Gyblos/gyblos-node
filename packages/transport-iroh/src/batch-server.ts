@@ -18,9 +18,9 @@ import { encodeControlFrame } from '@gyblos/protocol/control-framing';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
+import { batchDeadline, readBatchFrame } from './batch-io';
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
-import { readControlFrame, type ControlStream } from './control-io';
-import { withDeadline } from './deadline';
+import type { ControlStream } from './control-io';
 import { handleIrohConnection } from './iroh-connection';
 
 export interface BatchChannelService {
@@ -55,8 +55,8 @@ async function respond(
   cancel: () => void,
   limits: BatchStreamLimits,
 ) {
-  const raw = await withDeadline(
-    readControlFrame(stream, BATCH_CHANNEL.requestBytes),
+  const raw = await batchDeadline(
+    readBatchFrame(stream, BATCH_CHANNEL.requestBytes, check),
     limits.ingressMs ?? IROH_DEADLINES.ingressMs,
     cancel,
   );
@@ -81,7 +81,7 @@ async function respond(
       BATCH_CHANNEL.responseBytes,
     );
   }
-  await withDeadline(
+  await batchDeadline(
     (async () => {
       check();
       await stream.send.writeAll([...bytes]);
@@ -121,7 +121,7 @@ export async function serveBatchChannelStream(
   if (external.aborted) cancel();
   const check = () => {
     if (controller.signal.aborted || !allowed())
-      throw new Error(PAID_EXECUTION_CODES.CANCELLED);
+      throw new BatchChannelError(PAID_EXECUTION_CODES.CANCELLED);
   };
   const operation = Promise.resolve().then(() => {
     check();
@@ -136,7 +136,7 @@ export async function serveBatchChannelStream(
     );
   });
   try {
-    await withDeadline(
+    await batchDeadline(
       operation,
       limits.requestMs ?? TRANSPORT_TIMEOUTS.requestMs,
       cancel,

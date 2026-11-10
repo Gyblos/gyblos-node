@@ -68,3 +68,46 @@ void test('batch RPC rejects unknown fields and unsupported methods with static 
     { code: SESSION_CODES.INVALID },
   );
 });
+
+void test('batch approval rejects a correlated ACK for an older cumulative total', async () => {
+  const approve: BatchChannelRequest = {
+    version: BATCH_CHANNEL.version,
+    requestId: '56'.repeat(16),
+    method: BATCH_METHODS.APPROVE,
+    params: {
+      bill: {
+        requestId: '12'.repeat(16),
+        requestDigest: '34'.repeat(32),
+        maxAtomic: '100',
+        chargedAtomic: '40',
+        cumulativeAtomic: '40',
+      },
+      voucher: {
+        channelId: request.params.channelId,
+        maxClaimableAmount: '40',
+        expiresAt: 0,
+        signature: '1'.repeat(88),
+      },
+    },
+  };
+  await assert.rejects(
+    matchBatchChannelResponse(
+      {
+        version: BATCH_CHANNEL.version,
+        requestId: approve.requestId,
+        requestDigest: await batchChannelDigest(approve),
+        result: {
+          snapshot: {
+            channelId: request.params.channelId,
+            state: SESSION_STATES.OPEN,
+            expiresAt: 1800000000000,
+            cumulativeAtomic: '0',
+            reservedAtomic: '0',
+          },
+        },
+      },
+      approve,
+    ),
+    { code: SESSION_CODES.BINDING },
+  );
+});

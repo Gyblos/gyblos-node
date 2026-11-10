@@ -20,7 +20,10 @@ import type {
   SessionSettlement,
 } from '@gyblos/protocol/payment-session';
 
-export async function sessionRig() {
+export async function sessionRig(nodes?: {
+  buyerNodeId: string;
+  sellerNodeId: string;
+}) {
   const root = await mkdtemp(join(tmpdir(), 'gyb-batch-session-test-'));
   let now = 1_800_000_000_000;
   const payer = await generateKeyPairSigner();
@@ -31,9 +34,9 @@ export async function sessionRig() {
   const mint = await generateKeyPairSigner();
   const terms: PaymentSessionTerms = {
     buyer: payer.address,
-    buyerNodeId: '12'.repeat(32),
+    buyerNodeId: nodes?.buyerNodeId ?? '12'.repeat(32),
     owner: seller.address,
-    sellerNodeId: '34'.repeat(32),
+    sellerNodeId: nodes?.sellerNodeId ?? '34'.repeat(32),
     network: SOLANA_TESTNET_CAIP2,
     mint: mint.address,
     payTo: seller.address,
@@ -139,6 +142,7 @@ export async function sessionRig() {
   };
   return {
     root,
+    owner: seller,
     terms,
     buyer,
     buyerOptions,

@@ -74,6 +74,12 @@ function parsedResult(value: unknown, request: BatchChannelRequest) {
         : undefined;
   if (channel && snapshot.channelId !== channel)
     return batchFail(SESSION_CODES.BINDING);
+  if (
+    request.method === BATCH_METHODS.APPROVE &&
+    (snapshot.cumulativeAtomic !== request.params.voucher.maxClaimableAmount ||
+      snapshot.reservedAtomic !== '0')
+  )
+    return batchFail(SESSION_CODES.BINDING);
   return { snapshot };
 }
 export async function batchChannelResponse(

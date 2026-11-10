@@ -8,6 +8,7 @@ import {
   TRANSPORT_TIMEOUTS,
   type TransportLimits,
 } from '@gyblos/config';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
@@ -22,6 +23,10 @@ import {
   connectionSource,
   createConnectionAdmission,
 } from './admission';
+import {
+  handleBatchChannelConnection,
+  type BatchChannelService,
+} from './batch-server';
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import { handleControlConnection, type ControlService } from './control-server';
 import { withDeadline } from './deadline';
@@ -54,6 +59,7 @@ export function serveIroh(
   limits: TransportLimits = TRANSPORT_LIMITS,
   receipts?: ReceiptService,
   paidExecution?: PaidExecutionService,
+  batchSessions?: BatchChannelService,
 ) {
   const receiptServer = receipts ? createReceiptServer(receipts) : undefined;
   const limiter = createPeerLimiter(Date.now, limits);
@@ -204,6 +210,17 @@ export function serveIroh(
           () => closed,
           () => routeAllowed(connection),
           alpn === FREE_STREAM.alpn,
+        );
+        return;
+      }
+      if (alpn === BATCH_CHANNEL.alpn && batchSessions) {
+        await handleBatchChannelConnection(
+          connection,
+          batchSessions,
+          controller.signal,
+          () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+          () => closed,
+          () => routeAllowed(connection),
         );
         return;
       }

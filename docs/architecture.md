@@ -244,3 +244,12 @@ and the unresolved-payment barrier. Existing app startup and execution wires
 remain unchanged. See [payment-sessions.md](payment-sessions.md) for lifecycle,
 private persistence, defaults, failure exposure and the remaining host
 integration.
+
+The optional reusable-session channel is owned by `protocol/batch-channel`
+(wire, parsing and separate inference/RPC digests) and
+`transport-iroh/batch-{client,server}` (Iroh I/O and existing admission).
+`node/batch-buyer` and `node/batch-seller` compose the financial session ports
+with independent verification/recounting and the common execution lifecycle.
+`serveSellerTransport` accepts the session service without changing existing
+channels; endpoint advertisement is explicit. The existing CLI/startup path is
+not switched automatically. See [session composition](payment-sessions.md).

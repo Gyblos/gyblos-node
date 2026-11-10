@@ -144,3 +144,36 @@ export async function batchSessionRequest(
     maxAtomic: request.quote.offer.maxAtomic,
   };
 }
+
+// Validate the supported input before any opening signature or financial transmission.
+export function batchExecutionInput(
+  quote: SignedOfferV2,
+  input: import('./free-execution-types').FreeExecutionBuildInput,
+) {
+  return batchBoundary(() =>
+    parseExecutionInput(
+      {
+        messages: input.messages,
+        maxTokens: input.maxTokens,
+        selection: quote.offer.selection,
+        reasoning: quote.offer.reasoning,
+      },
+      quote.offer.requestId,
+      quote.offer,
+    ),
+  );
+}
+export function buildBatchExecutionRequest(
+  channelId: string,
+  quote: SignedOfferV2,
+  input: import('./free-execution-types').FreeExecutionBuildInput,
+): BatchExecutionRequest {
+  return batchBoundary(() =>
+    executionFor({
+      channelId,
+      requestId: quote.offer.requestId,
+      quote,
+      input: batchExecutionInput(quote, input),
+    }),
+  );
+}
