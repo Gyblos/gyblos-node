@@ -17,9 +17,11 @@ const STATUS_COLUMN = 4;
 const CHECK_COLUMN = 10;
 const CODE_COLUMN = 34;
 
-const identityHeading = (env: Readonly<Record<string, string | undefined>>) =>
+const identityHeading = (
+  environment: Readonly<Record<string, string | undefined>>,
+) =>
   commandsFor(
-    runMode(env),
+    runMode(environment),
     'Seller identity (public; `gyblos seller register` enrolls it in discovery):\n',
   );
 
