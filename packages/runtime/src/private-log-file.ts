@@ -168,7 +168,8 @@ export async function openPrivateLogFile(
     OPEN_LOG_FILES.add(key);
     try {
       await fileHandle.sync();
-      await directoryHandle.sync();
+      // Windows refuses fsync on a directory handle, as private-file.ts and the receipt files note.
+      if (process.platform !== 'win32') await directoryHandle.sync();
     } catch (error) {
       OPEN_LOG_FILES.delete(key);
       throw error;

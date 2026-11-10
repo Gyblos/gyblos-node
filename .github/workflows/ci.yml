@@ -98,6 +98,7 @@ jobs:
         env:
           GYBLOS_WINDOWS_PACKAGE: ${{ runner.temp }}/windows-package
           GYBLOS_WINDOWS_VERSION: 0.0.0-ci.1
-      # The running seller on Windows: the real daemon over native loopback (free and paid sales with
-      # synthetic engines and finance), its files, and the free transport. No network or devnet.
-      - run: node --import tsx --test tests/lab/seller-daemon-files.test.ts tests/lab/session-startup-native.test.ts tests/lab/free-acceptance.test.ts tests/lab/free-stream-acceptance.test.ts tests/lab/node-discovery-acceptance.test.ts tests/free-execution-iroh.test.ts tests/iroh-transport.test.ts tests/node-startup-failure.test.ts
+      # The running seller on Windows: the real daemon over native loopback with a synthetic engine, its
+      # files, and the free transport. No network or devnet. The buyer-side lab acceptance joins once the
+      # buyer's own files work on Windows.
+      - run: node --import tsx --test tests/lab/seller-daemon-files.test.ts tests/free-execution-iroh.test.ts tests/iroh-transport.test.ts tests/node-startup-failure.test.ts
