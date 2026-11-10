@@ -84,24 +84,23 @@ export function baseOptions(locale: string): BaseLayoutProps {
   return {
     nav: {
       title: (
-        <span className="flex items-center gap-2 font-mono font-medium">
+        <span className="docs-brand flex items-center gap-2 font-medium">
+          <span className="sr-only">Gyblos</span>
           <img
-            src="/gyblos-mark-holographic-dark.svg"
+            src="/brand/gyblos-wordmark-solid-dark.svg"
             alt=""
-            width={28}
-            height={28}
-            className="hidden dark:block"
+            width={160}
+            height={43}
+            className="docs-wordmark hidden dark:block"
           />
           <img
-            src="/gyblos-mark-holographic-light.svg"
+            src="/brand/gyblos-wordmark-solid-light.svg"
             alt=""
-            width={28}
-            height={28}
-            className="dark:hidden"
+            width={160}
+            height={43}
+            className="docs-wordmark dark:hidden"
           />
-          <span>
-            gyblos <span className="text-fd-muted-foreground">docs</span>
-          </span>
+          <span className="text-sm text-fd-muted-foreground">docs</span>
         </span>
       ),
       url: `/${locale}`,

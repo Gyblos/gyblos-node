@@ -1,0 +1,59 @@
+{
+  "version": "3.0.0",
+  "source": "Gyblos brand kit 3.0.0 (gyblos-brain/50 Brand)",
+  "files": [
+    {
+      "file": "app/brand/gyblos-brand-tokens.css",
+      "sha256": "9c97a06436f468e45c87ac41f427cb7669ad1d36749ee7f239160b7cb4406074",
+      "sourceSha256": "430006051e93c890b7490077b3a2d15391649de35e7744f29bd685e5c3708458"
+    },
+    {
+      "file": "app/brand/InstrumentSans-Regular.ttf",
+      "sha256": "01689ad055025ff1891607b077513c9389f73360d471dcffa036e326af179b00"
+    },
+    {
+      "file": "app/brand/InstrumentSans-Medium.ttf",
+      "sha256": "a7bcb84cb01f6e33eecdd2cbff3f97ff1674c0e8e37c6921b6cd717b8c854d98"
+    },
+    {
+      "file": "app/brand/InstrumentSans-Semibold.ttf",
+      "sha256": "5e39a358a65a72b6b74b56b384bbe17a61d8899d33cc255d49112e6522e3df0d"
+    },
+    {
+      "file": "app/brand/JetBrainsMono-Regular.woff2",
+      "sha256": "a9cb1cd82332b23a47e3a1239d25d13c86d16c4220695e34b243effa999f45f2"
+    },
+    {
+      "file": "app/brand/JetBrainsMono-Medium.woff2",
+      "sha256": "086c48dfbea9ddaff1320f7e09399b8e2924e88ce67453721255db3bdbb5a353"
+    },
+    {
+      "file": "public/brand/gyblos-wordmark-solid-dark.svg",
+      "sha256": "a47f8d76770fdb99356386876b99ed423a62e18ee011fe69d676b5330950d217"
+    },
+    {
+      "file": "public/brand/gyblos-wordmark-solid-light.svg",
+      "sha256": "fb9cbb0e977b2e1184d02b6170c06970bb4e328edc75083dab9d43a3f1d52a94"
+    },
+    {
+      "file": "public/favicon.svg",
+      "sha256": "4c59e327728475105078875d507771365be202378a974ef9caea87e985126ee7"
+    },
+    {
+      "file": "public/brand/InstrumentSans-OFL.txt",
+      "sha256": "bc29b497c4e8316b2d248322a9cea670c2f0afc24ae0eb7bbaa54e02e00eebab"
+    },
+    {
+      "file": "public/brand/JetBrainsMono-OFL.txt",
+      "sha256": "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697"
+    },
+    {
+      "file": "public/brand/GeistMono-OFL.txt",
+      "sha256": "1781d2806a07d91c4edf4740b88449fab7d0eadad53f7c351b94cd4d4eb8c00f"
+    },
+    {
+      "file": "public/brand/gyblos-brand-attribution.txt",
+      "sha256": "eb7e5be1634bc597228eb945fee8c09d6eccd0ddf63d17635f1e84ca34e95e50"
+    }
+  ]
+}
