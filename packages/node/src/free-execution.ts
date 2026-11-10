@@ -45,6 +45,7 @@ import {
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import type { RouteProbe } from '@gyblos/transport-iroh';
 
+import { runFreeAdmitted } from './free-admitted';
 import { createFreeStreamOutput } from './free-execution-stream';
 import type { FreeMeter } from './free-meter';
 import { createSellerFreeRouter } from './free-router';
@@ -52,6 +53,7 @@ import {
   finishSellerTelemetry,
   sellerExecutionTelemetry,
 } from './free-telemetry';
+import { createFreePolicy, type FreePolicy } from './policy-free';
 import {
   sellerReceiptObservation,
   type SellerReceiptOptions,
@@ -111,9 +113,9 @@ function ready(options: SellerFreeExecutionOptions) {
     return fail(FREE_EXECUTION_CODES.ENGINE);
 }
 export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
-  const admission = new FreeExecutionAdmission(
-    options.offer.caps,
-    options.ledger,
+  const policy = createFreePolicy(
+    new FreeExecutionAdmission(options.offer.caps, options.ledger),
+    options.meter,
   );
   return {
     respond: (
@@ -121,14 +123,14 @@ export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
       peer: string,
       signal: AbortSignal,
       probe?: RouteProbe,
-    ) => respond(value, peer, signal, options, admission, undefined, probe),
+    ) => respond(value, peer, signal, options, policy, undefined, probe),
     stream: (
       value: unknown,
       peer: string,
       signal: AbortSignal,
       onDelta: (text: string) => Promise<void>,
       probe?: RouteProbe,
-    ) => respond(value, peer, signal, options, admission, onDelta, probe),
+    ) => respond(value, peer, signal, options, policy, onDelta, probe),
   };
 }
 function freeInputTokens(
@@ -170,7 +172,7 @@ async function respond(
   peer: string,
   signal: AbortSignal,
   options: SellerFreeExecutionOptions,
-  admission: FreeExecutionAdmission,
+  policy: FreePolicy,
   onDelta?: (text: string) => Promise<void>,
   probe?: RouteProbe,
 ): Promise<FreeExecutionResponse> {
@@ -206,36 +208,33 @@ async function respond(
     );
     ready(options);
     const inputTokens = freeInputTokens(request, prompt, options);
-    const lease = admission.enter(request, inputTokens, options.now());
-    let actual: number | undefined;
-    let completed: FreeExecutionResponse | undefined;
-    try {
-      checkSignal(signal);
-      started = true;
-      receipt?.started(inputTokens);
-      const response = await generateResponse(
-        request,
-        prompt,
-        inputTokens,
-        header,
-        options,
-        signal,
-        observedOutput(onDelta, receipt, observer, signal),
-        observer,
-      );
-      if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
-      // A declared count never returns reserved tokens: the provider's word alone cannot stretch the caps.
-      if (options.meter.refunds)
-        actual =
-          response.result.usage.inputTokens +
-          response.result.usage.outputTokens;
-      finishSellerTelemetry(observer, request, response, started);
-      completed = response;
-      return response;
-    } finally {
-      lease.complete(actual);
-      if (completed) receipt?.finish(completed);
-    }
+    const response = await runFreeAdmitted(
+      policy,
+      request,
+      inputTokens,
+      options.now,
+      signal,
+      async (window) => {
+        started = true;
+        receipt?.started(inputTokens);
+        const response = await generateResponse(
+          request,
+          prompt,
+          inputTokens,
+          header,
+          options,
+          window,
+          observedOutput(onDelta, receipt, observer, window),
+          observer,
+        );
+        if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
+        // Before the policy finishes, so a sale is reported before its tokens return to the caps.
+        finishSellerTelemetry(observer, request, response, started);
+        return response;
+      },
+    );
+    receipt?.finish(response);
+    return response;
   } catch (error) {
     const response: FreeExecutionResponse = {
       ...header,
