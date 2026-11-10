@@ -160,6 +160,38 @@ export function serveIroh(
     );
   }
 
+  async function batchConnection(
+    connection: Connection,
+    signal: AbortSignal,
+    peer: string,
+  ) {
+    if (!batchSessions) return;
+    await handleBatchChannelConnection(
+      connection,
+      batchSessions,
+      signal,
+      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+      () => closed,
+      () => routeAllowed(connection),
+    );
+  }
+
+  async function paidConnection(
+    connection: Connection,
+    signal: AbortSignal,
+    peer: string,
+  ) {
+    if (!paidExecution) return;
+    await handlePaidExecutionConnection(
+      connection,
+      paidExecution,
+      signal,
+      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+      () => closed,
+      () => routeAllowed(connection),
+    );
+  }
+
   async function handle(connection: Connection) {
     const peer = connection.remoteId().toString();
     const alpn = Buffer.from(connection.alpn()).toString();
@@ -214,25 +246,11 @@ export function serveIroh(
         return;
       }
       if (alpn === BATCH_CHANNEL.alpn && batchSessions) {
-        await handleBatchChannelConnection(
-          connection,
-          batchSessions,
-          controller.signal,
-          () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
-          () => closed,
-          () => routeAllowed(connection),
-        );
+        await batchConnection(connection, controller.signal, peer);
         return;
       }
       if (alpn === PAID_STREAM.alpn && paidExecution) {
-        await handlePaidExecutionConnection(
-          connection,
-          paidExecution,
-          controller.signal,
-          () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
-          () => closed,
-          () => routeAllowed(connection),
-        );
+        await paidConnection(connection, controller.signal, peer);
         return;
       }
       if (alpn !== GYBLOS_ALPN) {

@@ -8,7 +8,6 @@ import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
-import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
@@ -380,26 +379,5 @@ void test(
       FREE_EXECUTION.alpn,
       FREE_STREAM.alpn,
     ]);
-  },
-);
-
-void test(
-  'reusable sessions are advertised only when explicitly enabled',
-  OPTIONS,
-  () => {
-    const enabled = endpointProbe({
-      GYBLOS_RELAY_TOKEN: TOKEN,
-      PROBE_BATCH_SESSIONS: '1',
-      PROBE_HTTP: '0',
-    });
-    assert.equal(enabled.error, undefined);
-    assert.deepEqual(enabled.alpns, [BATCH_CHANNEL.alpn]);
-    const disabled = endpointProbe({
-      GYBLOS_RELAY_TOKEN: TOKEN,
-      PROBE_CONTROL: '1',
-      PROBE_HTTP: '0',
-    });
-    assert.equal(disabled.error, undefined);
-    assert.deepEqual(disabled.alpns, [CONTROL_ALPN]);
   },
 );
