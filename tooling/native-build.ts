@@ -93,8 +93,7 @@ GYBLOS_VERSION=${version}
 export GYBLOS_PACKAGED GYBLOS_LAUNCHER GYBLOS_VERSION
 # Only this package decides its run mode, its Node options and where its modules come from.
 unset GYBLOS_CONTAINER NODE_OPTIONS NODE_PATH NAPI_RS_NATIVE_LIBRARY_PATH
-# The npm package installs the binding from its registry package, whose manifest names a missing main.
-exec "$root/${NATIVE.runtime}" --disable-warning=DEP0128 "$root/${NATIVE.bundle}" "$@"
+exec "$root/${NATIVE.runtime}" "$root/${NATIVE.bundle}" "$@"
 `;
 }
 

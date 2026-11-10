@@ -4,8 +4,18 @@
 // its package is missing, and marks npm as the installer for update notices. The service refuses an npx
 // cache. Built for this machine with its own Node; offline.
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { execFile, spawn } from 'node:child_process';
+import { once } from 'node:events';
+import {
+  chmod,
+  cp,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -24,6 +34,7 @@ import {
   buildNpmPackages,
   NPM,
   platformPackage,
+  wrapperScript,
 } from '../tooling/npm-packages';
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 
@@ -44,13 +55,28 @@ void test(
         out: archives,
         node: process.execPath,
       });
-      const tarballs = await buildNpmPackages({
-        version: VERSION,
-        targets: [target],
-        archives,
-        out: join(root, 'npm'),
-      });
+      // Relative paths, as the release passes them: npm pack runs inside each package.
+      const cwd = process.cwd();
+      process.chdir(root);
+      let tarballs: string[];
+      try {
+        tarballs = await buildNpmPackages({
+          version: VERSION,
+          targets: [target],
+          archives: 'native',
+          out: 'npm',
+        });
+      } finally {
+        process.chdir(cwd);
+      }
       assert.equal(tarballs.length, 2);
+      // Only the tarballs are left.
+      assert.deepEqual(
+        (await readdir(join(root, 'npm'))).filter(
+          (name) => !name.endsWith('.tgz'),
+        ),
+        [],
+      );
       // A global install's layout: each tarball unpacked under node_modules, the binding as npm would add it.
       const modules = join(root, 'prefix/lib/node_modules');
       const unpack = async (tarball: string, name: string) => {
@@ -84,7 +110,7 @@ void test(
       assert.deepEqual(Object.keys(platform.dependencies), [
         NATIVE.irohPackage,
       ]);
-      assert.deepEqual(platform.files, ['bin', 'lib', 'runtime']);
+      assert.deepEqual(platform.files, ['bin', 'lib', 'runtime', 'LICENSE']);
       await assert.rejects(
         readFile(
           join(
@@ -203,6 +229,51 @@ void test('npm installs are updated with npm, and a service never runs from the 
   assert.notEqual(code, 0);
   assert.match(
     stderr,
-    /SERVICE_EPHEMERAL_INSTALL: npx runs gyblos from a temporary cache/,
+    /SERVICE_EPHEMERAL_INSTALL: this gyblos runs from a temporary cache/,
   );
 });
+
+void test(
+  'npm wrapper: a stop signal reaches the seller, and the seller’s signal is the wrapper’s',
+  { skip: hostTarget() === undefined },
+  async () => {
+    const target = hostTarget()!;
+    const root = await mkdtemp(join(tmpdir(), 'gyblos-npm-signal-'));
+    try {
+      const modules = join(root, 'node_modules');
+      const seller = join(modules, platformPackage(target));
+      await mkdir(join(seller, 'bin'), { recursive: true });
+      await writeFile(
+        join(seller, 'package.json'),
+        JSON.stringify({ name: platformPackage(target), version: VERSION }),
+      );
+      // A seller that records the signal it got, then stops by it.
+      await writeFile(
+        join(seller, 'bin/gyblos'),
+        `#!/bin/sh\ntrap 'echo got-$1 >"${join(root, 'signal')}"; trap - TERM INT; kill -TERM $$' TERM\ntrap 'echo got-INT >"${join(root, 'signal')}"; trap - INT; kill -INT $$' INT\necho ready\nwhile :; do sleep 0.1; done\n`,
+      );
+      await chmod(join(seller, 'bin/gyblos'), 0o755);
+      const wrapper = join(modules, NPM.main, 'bin/gyblos.js');
+      await mkdir(dirname(wrapper), { recursive: true });
+      await writeFile(wrapper, wrapperScript(VERSION));
+      for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+        const child = spawn(process.execPath, [wrapper], {
+          stdio: ['ignore', 'pipe', 'inherit'],
+        });
+        await new Promise((ready) => child.stdout.once('data', ready));
+        child.kill(signal);
+        const [, ended] = (await once(child, 'exit')) as [
+          number | null,
+          string,
+        ];
+        assert.equal(ended, signal);
+        assert.match(
+          await readFile(join(root, 'signal'), 'utf8'),
+          signal === 'SIGTERM' ? /got-/ : /got-INT/,
+        );
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);

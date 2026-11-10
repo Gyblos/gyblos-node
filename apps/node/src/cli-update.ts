@@ -99,7 +99,7 @@ export async function updateNotice(
     mode === RUN_MODES.SOURCE
       ? 'install the new release'
       : environment[NODE_ENVIRONMENT.installedBy] === INSTALLERS.npm
-        ? 'run `npm install -g gyblos@latest`'
+        ? 'run `npm install -g gyblos@latest`, then restart the seller (`gyblos seller service uninstall`, then `gyblos seller service install`)'
         : 'run `sh install.sh update` where you installed the seller';
   return `v${latest} is available (this seller runs v${current}); ${how}.`;
 }
