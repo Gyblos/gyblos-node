@@ -12,7 +12,7 @@ import { runAdmittedExecution } from './execution';
 import type { FreeLease, FreePolicy } from './policy-free';
 
 const FREE_WINDOW_ERRORS = {
-  timeout: new FreeExecutionError(FREE_EXECUTION_CODES.TIMEOUT),
+  timeout: () => new FreeExecutionError(FREE_EXECUTION_CODES.TIMEOUT),
   cancelled: () => new FreeExecutionError(FREE_EXECUTION_CODES.CANCELLED),
 };
 

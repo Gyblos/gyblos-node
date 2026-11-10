@@ -43,7 +43,7 @@ async function freeFixture() {
 void test('free policy: the permit is the request ceiling, and only a completed refunding sale returns tokens', async () => {
   const { now, request } = await freeFixture();
   const admission = FreeExecutionAdmission.standalone(
-    { dailyTokenCap: 28, perBuyerCap: 28 },
+    { dailyTokenCap: 27, perBuyerCap: 27 },
     now - 1,
   );
   const policy = createFreePolicy(admission, { refunds: true });
@@ -54,7 +54,7 @@ void test('free policy: the permit is the request ceiling, and only a completed 
   await assert.rejects(policy.admit(request(2), context), {
     code: FREE_EXECUTION_CODES.BUSY,
   });
-  // Completed with 4 + 2 of the 14 reserved: 8 tokens return, so a second 14 still fits in 28.
+  // Completed with 4 + 2 of the 14 reserved: 8 tokens return, so a second 14 fits in 27 (without the refund, 14 + 14 would not).
   await policy.finish(first, {
     inputTokens: 4,
     outputTokens: 2,
@@ -63,7 +63,7 @@ void test('free policy: the permit is the request ceiling, and only a completed 
   policy.release(first);
   policy.release(first);
   const second = await policy.admit(request(3), context);
-  // A failed sale keeps its whole reservation: 6 + 14 + 14 > 28.
+  // A failed sale keeps its whole reservation: 6 + 14 + 14 > 27.
   await policy.finish(second, {
     inputTokens: 4,
     outputTokens: 2,

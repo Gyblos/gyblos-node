@@ -19,7 +19,7 @@ import {
 class Timeout extends Error {}
 class Cancelled extends Error {}
 const ERRORS = {
-  timeout: new Timeout('timeout'),
+  timeout: () => new Timeout('timeout'),
   cancelled: () => new Cancelled('cancelled'),
 };
 const NOTHING: ExecutionOutcome = {
