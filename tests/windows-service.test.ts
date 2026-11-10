@@ -178,7 +178,8 @@ void test(
       ).href;
       await writeFile(
         child,
-        `import { shutdownSignal } from ${JSON.stringify(runtime)};\nconst shutdown = shutdownSignal();\nprocess.send?.('ready');\nawait shutdown.signalled;\nshutdown.dispose();\nprocess.stdout.write('stopped\\n');\n`,
+        // Real daemon work keeps the process alive; the intentionally unreferenced IPC channel does not.
+        `import { shutdownSignal } from ${JSON.stringify(runtime)};\nconst work = setInterval(() => {}, 1000);\nconst shutdown = shutdownSignal();\nprocess.send?.('ready');\nawait shutdown.signalled;\nshutdown.dispose();\nclearInterval(work);\nprocess.stdout.write('stopped\\n');\n`,
       );
       const daemon = fork(child, [], {
         execArgv: ['--import', 'tsx'],
