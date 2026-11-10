@@ -3,7 +3,8 @@
 # (.github/workflows/release-seller-image.yml), after scripts/release-image.sh has pushed and signed the
 # image. Pins a copy of install.sh to that image, signs the copy keyless with the workflow's GitHub
 # identity and creates the GitHub release of the pushed tag with install.sh, its SHA-256 and its
-# Sigstore bundle. Only a version newer than the latest release becomes latest (what
+# Sigstore bundle. From NATIVE_PINS and NATIVE_DIR (scripts/release-native.sh, required) it also checks the
+# packaged sellers' signatures and checksums, pins install.sh to them and attaches them. Only a version newer than the latest release becomes latest (what
 # https://gyblos.com/install.sh serves) and moves `beta`, so an older line's patch never replaces it.
 # Re-running it finishes a partial publish: an existing release gets its files replaced, and a release
 # that is already latest still moves `beta`. Nothing is committed to the repository
@@ -40,6 +41,24 @@ tag=${GITHUB_REF_NAME:-}
 cd "$(git rev-parse --show-toplevel)"
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
+native_files=
+# Every release carries its packaged sellers: an installer without them would strand native installs.
+[ -n "${NATIVE_PINS:-}" ] && [ -d "${NATIVE_DIR:-}" ] ||
+  die 'NATIVE_PINS and NATIVE_DIR (from the native job) are required.'
+if [ -n "${NATIVE_PINS:-}" ]; then
+  for pin in $NATIVE_PINS; do
+    archive=$NATIVE_DIR/gyblos-$version-${pin%%=*}.tar.gz
+    [ "$(sha256sum "$archive" | cut -d ' ' -f 1)" = "${pin#*=}" ] ||
+      die "$archive does not match its pinned checksum."
+    cosign verify-blob \
+      --bundle "$archive.sigstore.json" \
+      --certificate-identity "$GITHUB_SERVER_URL/$GITHUB_WORKFLOW_REF" \
+      --certificate-oidc-issuer "$ISSUER" \
+      "$archive" >/dev/null ||
+      die "the signature of $archive does not verify."
+    native_files="$native_files $archive $archive.sha256 $archive.sigstore.json"
+  done
+fi
 cp install.sh "$out/install.sh"
 sh scripts/pin-installer.sh "$reference" "$out/install.sh" >/dev/null
 (cd "$out" && sha256sum install.sh >install.sh.sha256)
@@ -81,14 +100,16 @@ cat >"$out/notes.md" <<EOF
 Seller node $version.
 
 - Image: \`$reference\`, signed by \`$GITHUB_SERVER_URL/$GITHUB_WORKFLOW_REF\` ([release run]($run)).
-- \`install.sh\` installs exactly this image. \`install.sh.sigstore.json\` is its signature by the same
+- \`install.sh\` installs exactly this image, or without Docker the packaged seller
+  \`gyblos-$version-<target>.tar.gz\` (macOS arm64, Linux x64 and arm64) pinned by checksum and signed by
+  the same workflow. \`install.sh.sigstore.json\` is its signature by the same
   workflow and \`install.sh.sha256\` its checksum.
 - Install or update: \`curl -fsSL https://gyblos.com/install.sh -o install.sh && sh install.sh\`
   (gyblos.com serves the installer of the latest release).
 EOF
-files="$out/install.sh $out/install.sh.sha256 $out/install.sh.sigstore.json"
+files="$out/install.sh $out/install.sh.sha256 $out/install.sh.sigstore.json$native_files"
 if [ -z "$existing" ]; then
-  # shellcheck disable=SC2086 # three paths without spaces
+  # shellcheck disable=SC2086 # paths without spaces
   gh release create "$tag" $files \
     --verify-tag \
     --title "Seller $version" \
