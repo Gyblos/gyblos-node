@@ -7,6 +7,7 @@ import type {
 } from './free-execution-types';
 import type { PaidExecutionCode } from './paid/constants';
 import type {
+  PaymentSessionTerms,
   SessionBill,
   SessionSettlement,
   SessionSnapshot,
@@ -28,6 +29,10 @@ interface Header {
 export type BatchChannelRequest = Header &
   (
     | {
+        method: typeof BATCH_METHODS.PREPARE;
+        params: { quote: SignedOfferV2 };
+      }
+    | {
         method: typeof BATCH_METHODS.OPEN;
         params: { payload: string; quote: SignedOfferV2 };
       }
@@ -42,6 +47,7 @@ export type BatchChannelRequest = Header &
       }
   );
 export type BatchChannelResult =
+  | { terms: PaymentSessionTerms }
   | { snapshot: SessionSnapshot }
   | { value: FreeExecutionResult; bill: SessionBill }
   | { settlement: SessionSettlement };

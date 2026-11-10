@@ -9,6 +9,7 @@ export const BATCH_CHANNEL = {
   replyDomain: 'gyblos/session-rpc/v1\n',
 } as const;
 export const BATCH_METHODS = {
+  PREPARE: 'prepare',
   OPEN: 'open',
   EXECUTE: 'execute',
   APPROVE: 'approve',
