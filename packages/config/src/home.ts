@@ -237,3 +237,20 @@ export function paymentPathsIn(environment: HomeEnvironment, role: HomeRole) {
     lock: join(directory, PAYMENT_FILES.lock),
   };
 }
+
+// One bounded reusable channel journal per role; no prompts, answers or signing keys.
+export const BATCH_SESSION_FILES = {
+  state: 'batch-session-v1.json',
+  lock: 'batch-session.lock',
+} as const;
+export function batchSessionPathsIn(
+  environment: HomeEnvironment,
+  role: HomeRole,
+) {
+  const directory = rolePathIn(environment, role, ROLE_FILES.payments);
+  return {
+    directory,
+    state: join(directory, BATCH_SESSION_FILES.state),
+    lock: join(directory, BATCH_SESSION_FILES.lock),
+  };
+}

@@ -232,3 +232,15 @@ storage-agnostic. The protocol owns wire records, the core owns receipt policy
 and the node owns signers, lifecycle and private files. Neither receipt failures
 nor metadata RPCs enter inference failover. No collector or payment service is
 involved.
+
+## Reusable payment session composition
+
+The optional `@gyblos/node/batch-session` service composes the shared execution
+lifecycle with `@gyblos/payments-upto/batch-session`: one capped
+buyer-authorized deposit, post-usage cumulative signatures and autonomous seller
+finalization. The protocol port is `@gyblos/protocol/payment-session`. Trusted
+hosts retain identity, signed quote/input verification, transport authentication
+and the unresolved-payment barrier. Existing app startup and execution wires
+remain unchanged. See [payment-sessions.md](payment-sessions.md) for lifecycle,
+private persistence, defaults, failure exposure and the remaining host
+integration.

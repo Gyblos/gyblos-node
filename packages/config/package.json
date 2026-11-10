@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
     "./home": "./src/home.ts",
-    "./lock": "./src/lock.ts"
+    "./lock": "./src/lock.ts",
+    "./batch-session": "./src/batch-session.ts"
   },
   "dependencies": {
     "@x402/core": "2.29.0",
