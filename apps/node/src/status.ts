@@ -110,7 +110,12 @@ function add(window: ActivityWindow, receipt: StoredReceipt) {
   else window.cancelled++;
   window.outputTokens += record.usage.outputTokens;
   const { firstTokenMs, totalMs } = record.timing;
-  const ms = totalMs - (firstTokenMs ?? 0);
+  // A streamed sale's time after its first token; a non-streamed sale records its first token at the
+  // end, so it counts the whole request.
+  const ms =
+    record.streaming && firstTokenMs !== null
+      ? totalMs - firstTokenMs
+      : totalMs;
   if (
     record.outcome === RECEIPT_OUTCOMES.COMPLETED &&
     record.usage.outputTokens > 0 &&

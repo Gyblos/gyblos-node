@@ -34,7 +34,8 @@ void test('status rate: streamed sales count the time after the first token, oth
   const activity = receiptActivity(
     [
       stored({ ...timing(100, 1100), ...usage(50) }),
-      stored({ ...timing(null, 1000), ...usage(30), streaming: false }),
+      // A non-streamed sale records its first token at the end of the request.
+      stored({ ...timing(1000, 1000), ...usage(30), streaming: false }),
     ],
     NOW,
   );
