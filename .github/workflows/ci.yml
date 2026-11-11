@@ -73,7 +73,8 @@ jobs:
           if-no-files-found: error
 
   # The seller on Windows (#235): private files and keys protected by the folder ACL, setup, init and
-  # doctor, and the packaged seller from its archive and from npm. Windows runners bill at twice Linux, so
+  # doctor, the packaged seller from its archive and from npm, its service and installer, and the
+  # running daemon. Windows runners bill at twice Linux, so
   # only the Windows-specific tests run here.
   windows:
     needs: windows-package
@@ -97,3 +98,7 @@ jobs:
         env:
           GYBLOS_WINDOWS_PACKAGE: ${{ runner.temp }}/windows-package
           GYBLOS_WINDOWS_VERSION: 0.0.0-ci.1
+      # The running seller on Windows: the real daemon over native loopback with a synthetic engine, its
+      # files, and the free transport. No network or devnet. The buyer-side lab acceptance joins once the
+      # buyer's own files work on Windows.
+      - run: node --import tsx --test tests/lab/seller-daemon-files.test.ts tests/free-execution-iroh.test.ts tests/iroh-transport.test.ts tests/node-startup-failure.test.ts
