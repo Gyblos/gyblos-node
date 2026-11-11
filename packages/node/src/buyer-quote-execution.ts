@@ -24,6 +24,15 @@ export interface BuyerQuoteDependencies<T> {
   free(winner: BuyerQuoteWinner, signal: AbortSignal): Promise<T | undefined>;
   paid(winner: BuyerQuoteWinner, signal: AbortSignal): Promise<T | undefined>;
 }
+export function buyerQuoteKind(quote: SignedOfferV2) {
+  const offer = parseOfferV2(quote.offer);
+  const free =
+    offer.prices.inputAtomicPerMtok === '0' &&
+    offer.prices.outputAtomicPerMtok === '0';
+  if (free !== (offer.maxAtomic === '0'))
+    throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
+  return free ? OFFER_PRICING_KINDS.FREE : OFFER_PRICING_KINDS.PAID;
+}
 export async function executeBuyerQuote<T>(
   dependencies: BuyerQuoteDependencies<T>,
   external?: AbortSignal,
@@ -46,13 +55,8 @@ export async function executeBuyerQuote<T>(
       signal.throwIfAborted();
       if (excluded.has(winner.nodeId)) break;
       excluded.add(winner.nodeId);
-      const offer = parseOfferV2(winner.quote.offer);
-      const free =
-        offer.prices.inputAtomicPerMtok === '0' &&
-        offer.prices.outputAtomicPerMtok === '0';
-      if (free !== (offer.maxAtomic === '0'))
-        throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-      const kind = free ? OFFER_PRICING_KINDS.FREE : OFFER_PRICING_KINDS.PAID;
+      const kind = buyerQuoteKind(winner.quote);
+      const free = kind === OFFER_PRICING_KINDS.FREE;
       const result = await (free ? dependencies.free : dependencies.paid)(
         winner,
         signal,

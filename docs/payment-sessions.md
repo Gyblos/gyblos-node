@@ -278,7 +278,8 @@ Settings UI is included here. Configuration is loaded at buyer startup.
   "routing": {
     "onBusy": "reroute",
     "allowPinnedFallback": false,
-    "allowHigherPriceFallback": false
+    "allowHigherPriceFallback": false,
+    "queueWaitMs": 30000
   }
 }
 ```
@@ -286,8 +287,8 @@ Settings UI is included here. Configuration is loaded at buyer startup.
 `reroute` is the default. `reject` returns busy without another execution. A
 fixed seller is replaced only when `allowPinnedFallback` is explicitly true.
 These options govern a seller already chosen or pinned, not the initial ranking.
-There is no waiting queue in this version; `wait` is rejected until supported.
-Without shared total session authority, existing buyer modes retain their
+The third option, `wait`, waits for that same seller with a bounded in-memory
+queue. Without shared total session authority, existing buyer modes retain their
 behavior.
 
 Before rerouting, both replacement prices must be no higher than the original
@@ -313,3 +314,42 @@ never reconstructs live ownership from a pending journal: original recovery is
 required. Settlement/reconciliation refuse while requests are active. Shutdown
 closes admission and drains actual operations before releasing private journal
 ownership.
+
+## Waiting for the selected seller
+
+`routing.onBusy: "wait"` never reroutes. It admits at most one waiter per seller
+within the existing two-request total admission, including waiting HTTP calls.
+Two running calls therefore leave no third queue slot; one running A call can
+have one waiter. This does not increase HTTP, Iroh, engine or financial
+capacity. Waiting occupies neither an execution connection nor a new financial
+reservation. Existing channel deposits remain committed. Queue data, including
+its captured input, exists only in memory and is never restored or replayed
+after restart.
+
+The default wait is 30000 milliseconds. `queueWaitMs` must be a positive integer
+no greater than the existing request deadline, and the original caller deadline
+may end the wait sooner. A waiter is removed on disconnect, cancellation,
+uncertainty, shutdown or expiry; timeout has a static typed local error. FIFO
+ownership is handed to the waiter before a newcomer can acquire that seller.
+
+After admission, the buyer obtains a new quote for the same seller and repeats
+identity, freshness, model/reasoning and budget checks. When a quote was already
+selected, its input and output prices also bound the renewed quote unless
+higher-price fallback was explicitly authorized. Waiting never silently turns a
+free choice into a paid one. Only a known busy cooldown is ignored for this
+explicit retry; hard filters still apply. No deposit or request authorization
+starts while the request is still queued. If the remote peer remains busy,
+bounded control-only polls share the original wait deadline. A non-busy failure
+ends the call; it never changes sellers or retries a prompt.
+
+The trusted execution port receives a synchronous `sending` callback. Product
+free and session transports invoke it at the actual first possible prompt write,
+after checks. It ends the queue clock, preserving the original remaining
+response deadline without extending it. Preparation and quote renewal remain
+bounded by queue time. A failed/partial write is still a possible send and never
+retried. Usage approval and final settlement retain their existing independent
+checks.
+
+Settings controls belong to the separate host/UI integration. The canonical
+parser and behavior below apps are reusable; this implementation changes no
+desktop panel, seller CLI, fee calculation, wire bytes or journal format.

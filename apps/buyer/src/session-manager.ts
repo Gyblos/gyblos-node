@@ -42,6 +42,7 @@ type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
   selections: Map<string, Winner>;
+  sending: Map<string, () => void>;
   meterLoading?: Promise<RecountTokenizer>;
   meter?: RecountTokenizer;
 }
@@ -114,7 +115,12 @@ export function makeManager(
         return state.meter.count(text);
       },
     },
-    transport: { relayOnly, relayAllowed },
+    transport: {
+      relayOnly,
+      relayAllowed,
+      beforeExecute: (request) =>
+        state.sending.get(request.quote.offer.requestId)?.(),
+    },
     unresolved: async () => {
       if (await buyerPaymentsUnresolved(false)) return true;
       if (policy.totalDepositAtomic !== undefined) return false;

@@ -101,7 +101,9 @@ export function classifyPaidError(error: unknown): ChatErrorView | undefined {
       status:
         error.code === BUYER_ROUTING_CODES.BUSY
           ? HTTP_STATUS.tooManyRequests
-          : HTTP_STATUS.badRequest,
+          : error.code === BUYER_ROUTING_CODES.QUEUE_TIMEOUT
+            ? HTTP_STATUS.gatewayTimeout
+            : HTTP_STATUS.badRequest,
     };
   if (
     error instanceof PaymentSessionError ||

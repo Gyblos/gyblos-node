@@ -14,6 +14,7 @@ import {
 void test('routing defaults to reroute without permission to replace a pin or raise prices', () => {
   assert.deepEqual(parseBuyerRoutingPolicy(), {
     onBusy: BUYER_BUSY_POLICIES.REROUTE,
+    queueWaitMs: 30000,
     allowPinnedFallback: false,
     allowHigherPriceFallback: false,
   });
@@ -27,6 +28,7 @@ void test('routing validates every explicit choice and refuses unknown or unimpl
     }),
     {
       onBusy: BUYER_BUSY_POLICIES.REJECT,
+      queueWaitMs: 30000,
       allowPinnedFallback: true,
       allowHigherPriceFallback: true,
     },
@@ -34,7 +36,7 @@ void test('routing validates every explicit choice and refuses unknown or unimpl
   for (const value of [
     null,
     [],
-    { onBusy: 'wait' },
+    { onBusy: 'unsupported' },
     { onBusy: null },
     { allowPinnedFallback: 1 },
     { allowHigherPriceFallback: 'true' },
