@@ -8,7 +8,8 @@
     "./constants": "./src/constants.ts",
     "./home": "./src/home.ts",
     "./lock": "./src/lock.ts",
-    "./batch-session": "./src/batch-session.ts"
+    "./batch-session": "./src/batch-session.ts",
+    "./buyer-routing": "./src/buyer-routing.ts"
   },
   "dependencies": {
     "@x402/core": "2.29.0",

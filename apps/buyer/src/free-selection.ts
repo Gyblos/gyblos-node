@@ -168,7 +168,7 @@ export async function selectWinner(
   excluded: ReadonlySet<string>,
   signal: AbortSignal,
   request: BuyerSelectionConfig['request'],
-  route?: { pinnedNodeId?: string },
+  route?: { pinnedNodeId?: string; waitingFor?: string },
 ): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
@@ -193,6 +193,10 @@ export async function selectWinner(
         )
       : base;
   const stats = new Map(prepared.stats.rows);
+  if (route?.waitingFor && route.waitingFor === route.pinnedNodeId) {
+    const prior = stats.get(route.waitingFor);
+    if (prior) stats.set(route.waitingFor, { ...prior, cooldownUntil: null });
+  }
   const result = await selectBusyAwareBuyerQuote(
     config,
     {

@@ -27,15 +27,18 @@ async function executePaidSession(
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   current: AbortSignal,
   onDelta?: (text: string, requestDigest?: string) => Promise<void>,
+  sending?: () => void,
 ): Promise<ChatResult> {
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
   state.selections.set(id, winner);
+  if (sending) state.sending.set(id, sending);
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {
     result = await manager.execute(winner.quote, input, current);
   } finally {
     state.selections.delete(id);
+    state.sending.delete(id);
   }
   if (onDelta && result.value.text)
     await onDelta(result.value.text, winner.quote.offer.requestDigest);
@@ -80,18 +83,20 @@ function sessionExecutor(
           { ...prepared.config.request, priceCeilings: route.priceCeilings },
           route,
         ),
-      free: (winner, current) =>
+      free: (winner, current, sending) =>
         executeSelectedBuyerFree(
           input,
           context.dependencies,
           winner,
           current,
           onDelta,
-          'checkBeforeExternalExecution' in manager
-            ? manager.checkBeforeExternalExecution
-            : undefined,
+          () => {
+            if ('checkBeforeExternalExecution' in manager)
+              manager.checkBeforeExternalExecution();
+            sending?.();
+          },
         ),
-      paid: async (winner, current) => {
+      paid: async (winner, current, sending) => {
         return executePaidSession(
           manager,
           state,
@@ -99,6 +104,7 @@ function sessionExecutor(
           input,
           current,
           onDelta,
+          sending,
         );
       },
     };
@@ -130,7 +136,7 @@ export async function startSessionQuoteRuntime(
     return sessionFail();
   requireBuyerIdentity(prepared.config, prepared.identity);
   const token = await endpointToken();
-  const state: SessionState = { selections: new Map() };
+  const state: SessionState = { selections: new Map(), sending: new Map() };
   const manager = makeManager(context, options, policy, state);
   const router =
     policy.totalDepositAtomic === undefined

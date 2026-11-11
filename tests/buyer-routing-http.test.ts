@@ -51,3 +51,12 @@ void test('the real loopback buyer endpoint returns a static unsent routing-busy
   assert.equal(result.error.code, BUYER_ROUTING_CODES.BUSY);
   assert.equal(response.headers.get(FREE_BUYER.noRetryHeader), null);
 });
+
+void test('a local queue expiry is a typed unsent gateway timeout', () => {
+  const result = classifyPaidError(
+    new BuyerRoutingError(BUYER_ROUTING_CODES.QUEUE_TIMEOUT),
+  );
+  assert.equal(result?.status, HTTP_STATUS.gatewayTimeout);
+  assert.equal(result?.code, BUYER_ROUTING_CODES.QUEUE_TIMEOUT);
+  assert.equal(result?.neverSent, true);
+});

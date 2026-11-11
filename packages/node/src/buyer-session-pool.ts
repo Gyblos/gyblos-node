@@ -67,9 +67,9 @@ function manager<Remote extends BatchDestination>(
       ...state.options,
       transport: {
         ...state.options.transport,
-        beforeExecute: () => {
-          state.options.transport?.beforeExecute?.();
+        beforeExecute: (request) => {
           state.admission.beforeExecute(id);
+          state.options.transport?.beforeExecute?.(request);
         },
       },
       inspect: async () =>
