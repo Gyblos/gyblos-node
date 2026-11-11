@@ -22,6 +22,17 @@ function createLease(requestId: string): PoolLease {
     controller: new AbortController(),
   };
 }
+function trackOperation<T>(
+  pending: Set<Promise<unknown>>,
+  operation: Promise<T>,
+) {
+  pending.add(operation);
+  void operation.then(
+    () => pending.delete(operation),
+    () => pending.delete(operation),
+  );
+  return operation;
+}
 function forbid(): never {
   return sessionFail(SESSION_CODES.BUSY);
 }
@@ -30,9 +41,11 @@ export function createPoolAdmissions() {
   const pending = new Set<Promise<unknown>>();
   let queue = Promise.resolve();
   let blocked = false;
+  let revision = 0;
   let maintenance = false;
   let closing = false;
   const uncertain = () => {
+    revision++;
     blocked = true;
     for (const lease of leases.values())
       if (!lease.sent)
@@ -40,14 +53,8 @@ export function createPoolAdmissions() {
           new PaymentSessionError(SESSION_CODES.UNVERIFIED),
         );
   };
-  const track = <T>(operation: Promise<T>): Promise<T> => {
-    pending.add(operation);
-    void operation.then(
-      () => pending.delete(operation),
-      () => pending.delete(operation),
-    );
-    return operation;
-  };
+  const track = <T>(operation: Promise<T>) =>
+    trackOperation(pending, operation);
   return {
     leases,
     enter(id: string, requestId: string) {
@@ -76,9 +83,11 @@ export function createPoolAdmissions() {
     check() {
       if (blocked || closing) return sessionFail(SESSION_CODES.UNVERIFIED);
     },
-    block(value: boolean) {
+    revision: () => revision,
+    block(value: boolean, observed = revision) {
       if (value) uncertain();
-      else blocked = false;
+      else if (observed === revision) blocked = false;
+      return blocked;
     },
     serial<T>(run: () => Promise<T>): Promise<T> {
       const task = queue.then(run);

@@ -85,12 +85,13 @@ function manager<Remote extends BatchDestination>(
 async function unresolved<Remote extends BatchDestination>(
   state: State<Remote>,
 ) {
+  const revision = state.admission.revision();
   if (await state.options.unresolved()) {
     state.admission.block(true);
     return true;
   }
   const entries = await state.options.inspect();
-  if (entries.length === 0) return false;
+  if (entries.length === 0) return state.admission.block(false, revision);
   const pool = await catalog(state);
   let pending = false;
   const signal = AbortSignal.any([
@@ -130,8 +131,7 @@ async function unresolved<Remote extends BatchDestination>(
         pending = true;
     }
   }
-  state.admission.block(pending);
-  return pending;
+  return state.admission.block(pending, revision);
 }
 async function execute<Remote extends BatchDestination>(
   state: State<Remote>,

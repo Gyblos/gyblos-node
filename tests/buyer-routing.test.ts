@@ -150,3 +150,28 @@ void test('a possibly sent failure ends the request without fallback', async (t)
   );
   assert.equal(attempts, 1);
 });
+
+void test('a proven-unsent free failure cannot silently become a paid purchase with default fallback prices', async (t) => {
+  const host = await fixture();
+  t.after(host.close);
+  host.quotes[0]!.offer.prices = {
+    inputAtomicPerMtok: '0',
+    outputAtomicPerMtok: '0',
+  };
+  host.quotes[0]!.offer.maxAtomic = '0';
+  let paid = 0;
+  await assert.rejects(
+    host.router.execute(
+      {
+        ...host.ports,
+        free: async () => undefined,
+        paid: async () => {
+          paid++;
+          return 'unexpected paid purchase';
+        },
+      },
+      AbortSignal.timeout(3000),
+    ),
+  );
+  assert.equal(paid, 0);
+});

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, UNITS } from '@gyblos/config';
+import type { BuyerRoutingCode } from '@gyblos/core/constants';
 import type { SessionApproval } from '@gyblos/node/session-accounting';
 import {
   FREE_CHAT_ROLES,
@@ -53,6 +54,7 @@ export const executionFields = (result: ChatResult) =>
   result.execution ? { [BUYER_EXECUTION_FIELD]: result.execution } : {};
 
 export type ChatErrorCode =
+  | BuyerRoutingCode
   | SessionCode
   | FreeBuyerCode
   | PaidBuyerCode

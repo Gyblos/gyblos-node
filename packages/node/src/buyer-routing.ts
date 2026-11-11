@@ -163,7 +163,14 @@ async function attempt<T>(
   }
   state.owners.set(winner.nodeId, request.owner);
   try {
-    return await run(winner, signal);
+    const result = await run(winner, signal);
+    if (result === undefined)
+      request.priceCeilings = fallbackPriceCeilings(
+        state.options.policy,
+        prices,
+        request.priceCeilings,
+      )!;
+    return result;
   } catch (error) {
     if (
       !(error instanceof UnsentSellerBusyError) ||

@@ -72,7 +72,12 @@ export function sessionRouter(
         );
         signal.throwIfAborted();
         if (known.catalog.expiresAt <= Date.now()) return undefined;
-        return listing?.pricing;
+        return listing
+          ? {
+              inputAtomicPerMtok: listing.pricing.inputAtomicPerMtok,
+              outputAtomicPerMtok: listing.pricing.outputAtomicPerMtok,
+            }
+          : undefined;
       } finally {
         await client.close();
       }
