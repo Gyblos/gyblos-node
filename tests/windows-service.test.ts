@@ -178,7 +178,8 @@ void test(
       ).href;
       await writeFile(
         child,
-        `import { shutdownSignal } from ${JSON.stringify(runtime)};\nconst shutdown = shutdownSignal();\nprocess.send?.('ready');\nawait shutdown.signalled;\nshutdown.dispose();\nprocess.stdout.write('stopped\\n');\n`,
+        // Its work keeps it alive until stopped, as the daemon's does; the channel itself never does.
+        `import { shutdownSignal } from ${JSON.stringify(runtime)};\nconst work = setInterval(() => {}, 1000);\nconst shutdown = shutdownSignal();\nprocess.send?.('ready');\nawait shutdown.signalled;\nclearInterval(work);\nshutdown.dispose();\nprocess.stdout.write('stopped\\n');\n`,
       );
       const daemon = fork(child, [], {
         execArgv: ['--import', 'tsx'],
