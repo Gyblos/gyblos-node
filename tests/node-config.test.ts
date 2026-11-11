@@ -229,7 +229,12 @@ void test('the typed config maps snake_case keys, resolves aliases and applies o
         model: { kind: 'catalog', id: 'qwen3-0.6b', requested: 'qwen3-0.6b' },
         engine: { kind: 'ollama', url: 'http://127.0.0.1:11434' },
         reasoning: ['off', 'high'],
-        pricing: { kind: 'free', dailyTokenCap: 200000, perBuyerCap: 5000 },
+        pricing: {
+          kind: 'free',
+          dailyTokenCap: 200000,
+          perBuyerCap: 5000,
+          maxOutputTokens: 4096,
+        },
       },
     ],
   });
@@ -358,6 +363,38 @@ void test('examples follow the reasoning levels each model supports and do not p
   }
 });
 
+void test('a free offer may set its longest answer, and an Ollama engine its context', () => {
+  const result = parseNodeConfig(
+    BASE +
+      offer({
+        engine:
+          '{ kind = "ollama", url = "http://127.0.0.1:11434", context_tokens = 16384 }',
+        pricing:
+          'free = { daily_token_cap = 200000, per_buyer_cap = 50000, max_output_tokens = 2048 }',
+      }),
+  );
+  assert.ok(result.ok, JSON.stringify(result));
+  assert.equal(result.config.offers[0]?.engine.contextTokens, 16384);
+  assert.deepEqual(result.config.offers[0]?.pricing, {
+    kind: 'free',
+    dailyTokenCap: 200000,
+    perBuyerCap: 50000,
+    maxOutputTokens: 2048,
+  });
+  assert.deepEqual(
+    issuesOf(
+      parseNodeConfig(
+        BASE +
+          offer({
+            pricing:
+              'free = { daily_token_cap = 10, per_buyer_cap = 5, max_output_tokens = 0 }',
+          }),
+      ),
+    ),
+    [{ code: 'INVALID_VALUE', path: 'offers[0].free.max_output_tokens' }],
+  );
+});
+
 void test('integer settings come from TOML integers; floats and exponents are refused', () => {
   const result = parseNodeConfig(
     BASE +
@@ -372,6 +409,7 @@ void test('integer settings come from TOML integers; floats and exponents are re
     kind: 'free',
     dailyTokenCap: 1_000_000_000_000,
     perBuyerCap: 16,
+    maxOutputTokens: 4096,
   });
   assert.deepEqual(
     issuesOf(parseNodeConfig(BASE.replace('version = 1', 'version = 1e0'))),

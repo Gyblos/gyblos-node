@@ -1,7 +1,10 @@
 // What control needs from the seller's offers: the ones its catalog lists right now, each with its own
 // quote readiness, and the readiness the catalog itself is bound to. Pure types and mappings.
 import type { QuoteModel, QuoteReadiness } from '@gyblos/core/control-quotes';
-import type { ControlMeteringMode } from '@gyblos/protocol/constants';
+import {
+  OFFER_PRICING_KINDS,
+  type ControlMeteringMode,
+} from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import type {
   EngineCapabilities,
@@ -51,5 +54,9 @@ export function quoteModel(offer: ControlOffer): QuoteModel {
     capabilities: offer.capabilities,
     reasoning: [...offer.offer.reasoning],
     meteringMode: offer.meteringMode,
+    // A free offer refuses a longer answer at quote time, not after the buyer sent its conversation.
+    ...(offer.offer.kind === OFFER_PRICING_KINDS.FREE
+      ? { maxOutputTokens: offer.offer.caps.maxOutputTokens }
+      : {}),
   };
 }

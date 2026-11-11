@@ -10,18 +10,25 @@ import {
   FREE_EXECUTION,
   MODEL_IDS,
   OFFER_PRICING_KINDS,
+  type FreeChatRole,
 } from '@gyblos/protocol/constants';
-import type { EngineResult } from '@gyblos/protocol/engine';
+import type { EngineInput, EngineResult } from '@gyblos/protocol/engine';
 
 import { controlFixture } from './control-fixture';
 
 export async function freeSellerFixture(
-  caps = { dailyTokenCap: 100, perBuyerCap: 50 },
+  // The answer limit defaults to the seller's own default, as gyblos.toml leaves it.
+  caps: {
+    dailyTokenCap: number;
+    perBuyerCap: number;
+    maxOutputTokens?: number;
+  } = { dailyTokenCap: 100, perBuyerCap: 50 },
   overrides: { meter?: FreeMeter } = {},
 ) {
   const api = await import('@gyblos/node/free-execution');
   const source = await controlFixture(true);
   let calls = 0;
+  let lastInput: EngineInput | undefined;
   let now = source.context.now();
   let busy = false;
   let text = 'answer';
@@ -47,7 +54,7 @@ export async function freeSellerFixture(
       kind: OFFER_PRICING_KINDS.FREE,
       modelId: MODEL_IDS.QWEN3_0_6B,
       reasoning: model.reasoning,
-      caps,
+      caps: { maxOutputTokens: 4096, ...caps },
     },
     selection: model.selection,
     model: model.model,
@@ -59,14 +66,19 @@ export async function freeSellerFixture(
       capabilities: () => {
         throw new Error('unexpected capabilities');
       },
-      generate: async () => {
+      generate: async (input) => {
         calls++;
+        lastInput = input;
         return run();
       },
     },
     meter:
       overrides.meter ??
-      recountedMeter({ input: () => inputCount, count: () => outputCount }),
+      recountedMeter({
+        input: () => inputCount,
+        chat: () => inputCount,
+        count: () => outputCount,
+      }),
     readiness: () => ({ ...source.context.readiness(), busy }),
     now: () => now,
     ledger: new FreeSellerLedger(now - 1, sellerLimits().maxFreeBuyers),
@@ -75,11 +87,17 @@ export async function freeSellerFixture(
   async function request(
     sequence = 1,
     peer = source.request.params.buyerNodeId,
+    // A conversation and answer size other than one short user message.
+    input: {
+      messages?: { role: FreeChatRole; content: string }[];
+      maxTokens?: number;
+    } = {},
   ) {
+    const maxTokens = input.maxTokens ?? 10;
     const query = {
       ...source.request,
       requestId: sequence.toString(16).padStart(32, '0'),
-      params: { ...source.request.params, buyerNodeId: peer, maxTokens: 10 },
+      params: { ...source.request.params, buyerNodeId: peer, maxTokens },
     };
     const quote = await createControlQuote(
       query,
@@ -91,10 +109,12 @@ export async function freeSellerFixture(
       requestId: quote.offer.requestId,
       quote,
       input: {
-        messages: [{ role: FREE_CHAT_ROLES.USER, content: 'hello' }],
+        messages: input.messages ?? [
+          { role: FREE_CHAT_ROLES.USER, content: 'hello' },
+        ],
         selection: quote.offer.selection,
         reasoning: quote.offer.reasoning,
-        maxTokens: 10,
+        maxTokens,
       },
     };
   }
@@ -104,6 +124,7 @@ export async function freeSellerFixture(
     source,
     request,
     calls: () => calls,
+    lastInput: () => lastInput,
     setText(value: string) {
       text = value;
     },

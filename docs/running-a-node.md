@@ -926,12 +926,17 @@ action, described in [discovery-index.md](discovery-index.md).
 ## Free v2 seller execution
 
 A supported `gyblos.toml` free offer starts control plus the separate
-`gyblos/free/3` complete-response and `gyblos/free-stream/3` streaming data
+`gyblos/free/4` complete-response and `gyblos/free-stream/4` streaming data
 channels. The daemon has no paid HTTP service or v1 offer; paid v2 offers use
-the separate paid stream described in the protocol spec. This is execution for
-the pinned engine's single user message and `off` reasoning; other engine input
-forms are not enabled. The separate `buyer:free` entry executes free quotes;
-obtaining a control quote alone still does not send a prompt.
+the separate paid stream described in the protocol spec. Free execution serves a
+conversation (an optional system message, then turns alternating user and
+assistant, from and ending with the user's) with `off` reasoning, up to the
+offer's answer limit (`free.max_output_tokens`, 4096 tokens by default, at
+most 32768) within the model's context (a free Ollama offer's
+`engine.context_tokens`, 8192 by default, at most 32768). The engine's deadline
+grows with the requested answer, up to 170 seconds. The separate `buyer:free`
+entry executes free quotes; obtaining a control quote alone still does not send
+a prompt.
 
 The seller reads daily token caps from the prepared offer: `daily_token_cap`
 applies across all buyers and `per_buyer_cap` per authenticated NodeId, both
@@ -1074,7 +1079,7 @@ not the complete OpenAI API. Requests must send
 `Content-Type: application/json`. Invalid UTF-8, foreign Host headers, requests
 with an Origin header and other content types get 400 (a foreign Host gets 421),
 so a web page cannot reach the endpoint; there is no CORS browser interface. A
-body declared larger than 128 KiB gets 413 before it is read; a larger streamed
+body declared larger than 384 KiB gets 413 before it is read; a larger streamed
 body gets the same 413 once it passes the limit. Both close the connection. Use
 a local client, and apply normal trust to local processes.
 
@@ -1134,8 +1139,8 @@ use `error.code`; arbitrary exception contents are never returned. No prompt or
 response is written to logs, journals or selection metadata. A free seller can
 still observe the submitted text; free does not imply private or verified.
 
-Control connections close before execution connects on `gyblos/free/3` or
-`gyblos/free-stream/3`. The client verifies the seller peer, signed quote, local
+Control connections close before execution connects on `gyblos/free/4` or
+`gyblos/free-stream/4`. The client verifies the seller peer, signed quote, local
 buyer NodeId, exact terms and lifetime again before sending (an issue time up to
 5 s ahead is accepted; expiry has no grace). Request/response bounds and
 correlation use the free protocol codec. A query has an absolute 180-second

@@ -1,7 +1,13 @@
 // Ollama HTTP client restricted to a literal loopback origin: checks the pinned model is present and runs
 // bounded, deterministic raw generations. Failures follow the Engine port contract in @gyblos/protocol/engine.
 // It must not know wallets or payments.
-import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
+import {
+  generationDeadlineMs,
+  IPV6_LOOPBACK,
+  LOCALHOST,
+  ROUTES,
+  TIMEOUTS,
+} from '@gyblos/config';
 import {
   BoundFailure,
   callerCallback,
@@ -15,11 +21,15 @@ import {
   ENGINE_ERROR_CODES,
   type EngineDoneReason,
 } from '@gyblos/protocol/constants';
-import { EngineError } from '@gyblos/protocol/engine';
+import {
+  engineConversation,
+  EngineError,
+  type EngineInput,
+} from '@gyblos/protocol/engine';
 import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
 import { GENERATION, MODEL_LIMITS } from './constants';
-import { MODEL, renderChat } from './model';
+import { MODEL, renderConversation } from './model';
 
 export interface InferenceResult {
   text: string;
@@ -28,7 +38,7 @@ export interface InferenceResult {
   doneReason: EngineDoneReason;
 }
 
-export { renderChat } from './model';
+export { renderChat, renderConversation } from './model';
 
 export { createModelTokenizer, type ModelTokenizer } from './tokenizer';
 
@@ -58,14 +68,11 @@ export function localOllamaUrl(base: string): URL {
 export interface OllamaOptions {
   generationTimeoutMs?: number;
   modelCheckTimeoutMs?: number;
+  // The context Ollama allocates for each generation (num_ctx); GENERATION.numCtx by default.
+  contextTokens?: number;
 }
-interface GenerateInput {
-  prompt: string;
-  maxTokens: number;
-  signal?: AbortSignal;
-  onFragment?: () => Promise<void>;
-  onText?: (text: string) => Promise<void>;
-}
+// A lone prompt or a whole conversation, as the Engine port takes it.
+type GenerateInput = EngineInput;
 
 function frameEvent(line: string): Record<string, unknown> {
   let event: unknown;
@@ -230,21 +237,31 @@ export function createOllama(
   const modelCheckTimeoutMs = options.modelCheckTimeoutMs ?? TIMEOUTS.events;
   const assertModel = (signal?: AbortSignal) =>
     checkModel(origin, fetchImpl, modelCheckTimeoutMs, signal);
+  const contextTokens = options.contextTokens ?? GENERATION.numCtx;
+  if (
+    !Number.isSafeInteger(contextTokens) ||
+    contextTokens < MODEL_LIMITS.minContextTokens ||
+    contextTokens > MODEL_LIMITS.maxContextTokens
+  )
+    throw new Error('Invalid Ollama context size.');
   return {
     assertModel,
+    contextTokens,
     async generate(input: GenerateInput): Promise<InferenceResult> {
       if (
         !Number.isSafeInteger(input.maxTokens) ||
         input.maxTokens < 1 ||
-        input.maxTokens > MODEL_LIMITS.adapterMaxOutputTokens
+        input.maxTokens > contextTokens
       )
         throw new Error('Invalid output token limit.');
-      // An unsupported prompt is a programming error, raised before any engine call.
-      const prompt = renderChat(input.prompt);
+      // An unsupported conversation is a programming error, raised before any engine call.
+      const prompt = renderConversation(engineConversation(input));
       input.signal?.throwIfAborted();
       await assertModel(input.signal);
       input.signal?.throwIfAborted();
-      const deadline = AbortSignal.timeout(generationTimeoutMs);
+      const deadline = AbortSignal.timeout(
+        generationDeadlineMs(generationTimeoutMs, input.maxTokens),
+      );
       const attempt: EngineAttempt = {
         caller: input.signal,
         deadline,
@@ -271,7 +288,7 @@ export function createOllama(
                 temperature: GENERATION.temperature,
                 seed: GENERATION.seed,
                 num_predict: input.maxTokens,
-                num_ctx: GENERATION.numCtx,
+                num_ctx: contextTokens,
               },
             }),
             signal,

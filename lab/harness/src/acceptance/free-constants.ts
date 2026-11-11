@@ -32,6 +32,7 @@ export const FREE_ACCEPTANCE = {
   perBuyerCap: 100,
   limitedDailyCap: 5,
   limitedBuyerCap: 3,
+  maxOutputTokens: 4096,
 } as const;
 
 export const FREE_STREAM_ACCEPTANCE = {

@@ -58,15 +58,4 @@ export const ENGINE_FIXTURES: readonly InvalidConfigFixture[] = [
     code: 'WRONG_TYPE',
     path: 'offers[0].engine.context_tokens',
   },
-  {
-    name: 'context size on an ollama engine',
-    toml:
-      BASE +
-      offer({
-        engine:
-          '{ kind = "ollama", url = "http://127.0.0.1:11434", context_tokens = 4096 }',
-      }),
-    code: 'INVALID_VALUE',
-    path: 'offers[0].engine.context_tokens',
-  },
 ];

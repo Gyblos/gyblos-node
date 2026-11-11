@@ -22,7 +22,12 @@ export function streamResult(text = 'answer'): EngineResult {
   };
 }
 export async function freeStreamSellerFixture(
-  caps = { dailyTokenCap: 100, perBuyerCap: 50 },
+  // The answer limit defaults to the seller's own default, as gyblos.toml leaves it.
+  caps: {
+    dailyTokenCap: number;
+    perBuyerCap: number;
+    maxOutputTokens?: number;
+  } = { dailyTokenCap: 100, perBuyerCap: 50 },
   overrides: { meter?: FreeMeter } = {},
 ) {
   const base = await freeSellerFixture(caps, overrides);
@@ -45,6 +50,7 @@ export async function freeStreamSellerFixture(
       overrides.meter ??
       recountedMeter({
         input: () => 4,
+        chat: () => 4,
         count: (text: string) => Math.ceil(text.length / 3),
       }),
   };

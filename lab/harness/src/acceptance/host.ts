@@ -21,7 +21,7 @@ import { createSellerPublisher } from '@gyblos/node/publisher';
 import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
-import type { RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
 import type { AcceptanceClock } from './clock';
@@ -41,7 +41,7 @@ export interface AcceptanceIdentity {
 }
 export interface AcceptanceHostOptions {
   offer?: SellerCatalogOffer;
-  tokenizer?: RecountTokenizer;
+  tokenizer?: ChatTokenizer;
   wire: AcceptanceWire;
   identity: AcceptanceIdentity;
   clock: AcceptanceClock;

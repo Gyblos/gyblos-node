@@ -21,6 +21,7 @@ const usage = (inputTokens: number, outputTokens: number): EngineUsage => ({
 // Three characters per token, and seven prompt tokens for any prompt.
 const tokenizer = {
   input: () => 7,
+  chat: () => 7,
   count: (text: string) => Math.ceil(text.length / 3),
 };
 
@@ -36,9 +37,17 @@ void test('a recounted meter counts with the tokenizer, ignoring what the engine
 });
 
 void test('a recounted stop reports at least one token and never more than the delivered bytes', () => {
-  const meter = recountedMeter({ input: () => 1, count: () => 0 });
+  const meter = recountedMeter({
+    input: () => 1,
+    chat: () => 1,
+    count: () => 0,
+  });
   assert.equal(meter.delivered('a', 10), 1);
-  const wide = recountedMeter({ input: () => 1, count: () => 50 });
+  const wide = recountedMeter({
+    input: () => 1,
+    chat: () => 1,
+    count: () => 50,
+  });
   assert.equal(wide.delivered('héllo', 100), 6);
 });
 

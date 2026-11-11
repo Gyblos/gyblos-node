@@ -1,18 +1,17 @@
 // Composes free quote authentication, admission and one pinned-engine generation for one free offer, and
 // prepares the seller's offer behind the free router on the seller's ledger. No payments, facilitator,
 // No direct config/file/payment access; an injected publisher handles private receipt persistence.
-import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import {
   FreeExecutionAdmission,
   type FreeSellerLedger,
 } from '@gyblos/core/free-admission';
 import { canonicalJson } from '@gyblos/protocol';
+import { isConversation, type ChatMessage } from '@gyblos/protocol/chat';
 import {
   CONTROL_METERING_MODES,
   ENGINE_ERROR_CODES,
   ENGINE_ERROR_STOP_REASON,
-  FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
   OFFER_PRICING_KINDS,
@@ -96,14 +95,11 @@ function supportedInput(
     !options.offer.reasoning.includes(offer.reasoning)
   )
     return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  if (
-    request.input.messages.length !== 1 ||
-    request.input.messages[0]!.role !== FREE_CHAT_ROLES.USER
-  )
+  if (!isConversation(request.input.messages))
     return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  if (request.input.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
+  if (request.input.maxTokens > options.offer.caps.maxOutputTokens)
     return fail(FREE_EXECUTION_CODES.LIMIT);
-  return request.input.messages[0]!.content;
+  return request.input.messages;
 }
 function ready(options: SellerFreeExecutionOptions) {
   const state = options.readiness();
@@ -135,10 +131,16 @@ export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
 }
 function freeInputTokens(
   request: FreeExecutionRequest,
-  prompt: string,
+  messages: readonly ChatMessage[],
   options: SellerFreeExecutionOptions,
 ) {
-  const inputTokens = options.meter.input(prompt);
+  let inputTokens: number;
+  try {
+    inputTokens = options.meter.chat(messages);
+  } catch {
+    // Text the model's template cannot carry (its control tokens, say) is input the offer cannot serve.
+    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
+  }
   if (
     !Number.isSafeInteger(inputTokens) ||
     inputTokens < 0 ||
@@ -197,7 +199,7 @@ async function respond(
     });
     checkSignal(signal);
     observer = sellerExecutionTelemetry(request, options, streaming, probe);
-    const prompt = supportedInput(request, options);
+    const messages = supportedInput(request, options);
     receipt = sellerReceiptObservation(
       request,
       header.requestDigest,
@@ -207,7 +209,7 @@ async function respond(
       verifiedAt,
     );
     ready(options);
-    const inputTokens = freeInputTokens(request, prompt, options);
+    const inputTokens = freeInputTokens(request, messages, options);
     const response = await runFreeAdmitted(
       policy,
       request,
@@ -219,7 +221,7 @@ async function respond(
         receipt?.started(inputTokens);
         const response = await generateResponse(
           request,
-          prompt,
+          messages,
           inputTokens,
           header,
           options,
@@ -309,7 +311,7 @@ type ResponseHeader = Pick<
 >;
 async function generateResponse(
   request: FreeExecutionRequest,
-  prompt: string,
+  messages: readonly ChatMessage[],
   inputTokens: number,
   header: ResponseHeader,
   options: SellerFreeExecutionOptions,
@@ -330,7 +332,7 @@ async function generateResponse(
   let output: EngineResult;
   try {
     output = await options.engine.generate({
-      prompt,
+      messages,
       maxTokens: request.input.maxTokens,
       signal,
       ...(streaming ? { onText: streaming.onText } : {}),

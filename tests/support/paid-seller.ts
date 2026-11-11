@@ -236,6 +236,7 @@ export async function paidSellerFixture(
       overrides.meter ??
       recountedMeter({
         input: () => overrides.inputTokens ?? 4,
+        chat: () => overrides.inputTokens ?? 4,
         count: (text) => [...text].length,
       }),
     readiness: () => ({ ...source.context.readiness(), busy }),

@@ -12,6 +12,21 @@ export const TIMEOUTS = {
   readinessRequest: 500,
 } as const;
 
+// A long answer needs longer than the base generation deadline: past the original 128-token answer, each
+// asked-for token adds time, up to just under the transport's request deadline (180 s).
+const LONG_ANSWER = {
+  baseTokens: 128,
+  msPerToken: 25,
+  ceilingMs: 170_000,
+} as const;
+export function generationDeadlineMs(baseMs: number, maxTokens: number) {
+  const extra = Math.max(0, maxTokens - LONG_ANSWER.baseTokens);
+  return Math.max(
+    baseMs,
+    Math.min(LONG_ANSWER.ceilingMs, baseMs + extra * LONG_ANSWER.msPerToken),
+  );
+}
+
 export const RETRIES = {
   confirmation: 30,
   rpc: 4,

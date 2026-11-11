@@ -6,6 +6,7 @@
 // 2. a failing onText or onFragment callback rejects with that callback's own error;
 // 3. any engine or upstream failure rejects with EngineError;
 // 4. programming errors (invalid maxTokens, unsupported messages) stay plain Error.
+import { isConversation, type ChatMessage } from './chat';
 import type { EngineDoneReason, EngineErrorCode } from './constants';
 import type { EngineWireUsage } from './wire-usage';
 
@@ -48,7 +49,7 @@ export interface EngineResult {
 
 export type EngineInput = (
   | { prompt: string; messages?: never }
-  | { prompt?: never; messages: readonly { role: 'user'; content: string }[] }
+  | { prompt?: never; messages: readonly ChatMessage[] }
 ) & {
   maxTokens: number;
   signal?: AbortSignal;
@@ -62,7 +63,7 @@ export interface Engine {
   describe(): Promise<EngineDescription>;
 }
 
-// The one user message every engine adapter serves today; tools and other roles are programming errors.
+// The one user message the paid and HTTP paths serve; tools and other roles are programming errors there.
 export function singleUserPrompt(input: EngineInput): string {
   if (input.prompt !== undefined) return input.prompt;
   if (
@@ -74,9 +75,24 @@ export function singleUserPrompt(input: EngineInput): string {
   return input.messages[0].content;
 }
 
+// The conversation an engine renders: a lone prompt is one user message. Anything else is a programming
+// error, since the seller checks the conversation before any engine call.
+export function engineConversation(input: EngineInput): readonly ChatMessage[] {
+  if (input.prompt !== undefined)
+    return [{ role: 'user', content: input.prompt }];
+  if (!isConversation(input.messages))
+    throw new Error('Unsupported conversation shape.');
+  return input.messages;
+}
+
 export interface RecountTokenizer {
   count(text: string): number;
   input(prompt: string): number;
+}
+
+// A recount tokenizer that also counts a whole conversation as the model's template renders it.
+export interface ChatTokenizer extends RecountTokenizer {
+  chat(messages: readonly ChatMessage[]): number;
 }
 
 export function inferenceWireUsage(usage: EngineUsage): EngineWireUsage {

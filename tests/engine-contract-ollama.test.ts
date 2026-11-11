@@ -13,6 +13,7 @@ import { ROUTES } from '@gyblos/config';
 import type { OllamaOptions } from '@gyblos/engine-ollama';
 import { MODEL, MODEL_LIMITS } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
+import { renderConversation } from '@gyblos/engine-ollama/model';
 import {
   ENGINE_DONE_REASONS,
   ENGINE_ERROR_CODES,
@@ -97,6 +98,7 @@ const servedTags: Handler = (_request, response) => {
 async function serve(tags: Handler, generate: Handler, options: OllamaOptions) {
   const sockets = new Set<Socket>();
   const calls = { tags: 0, generate: 0 };
+  const bodies: string[] = [];
   const server = createServer((request, response) => {
     if (request.url === ROUTES.ollamaTags) {
       calls.tags++;
@@ -104,7 +106,12 @@ async function serve(tags: Handler, generate: Handler, options: OllamaOptions) {
       return;
     }
     calls.generate++;
-    request.resume();
+    let body = '';
+    request.setEncoding('utf8');
+    request.on('data', (chunk: string) => {
+      body += chunk;
+    });
+    request.on('end', () => bodies.push(body));
     generate(request, response);
   });
   server.on('connection', (socket) => {
@@ -115,6 +122,7 @@ async function serve(tags: Handler, generate: Handler, options: OllamaOptions) {
   const { port } = server.address() as AddressInfo;
   return {
     calls,
+    bodies,
     engine: createOllamaEngine(`http://127.0.0.1:${port}/`, fetch, options),
     close: () =>
       new Promise<void>((resolve) => {
@@ -254,6 +262,37 @@ void test('engine-ollama: a caller abort during the inventory check rejects with
     await started.close();
   }
 });
+void test('engine-ollama: a conversation is rendered with the template and the offer’s context sets num_ctx', async () => {
+  const started = await serve(servedTags, generated, {
+    ...SHORT,
+    contextTokens: 16384,
+  });
+  try {
+    const messages = [
+      { role: 'system' as const, content: 'Answer briefly.' },
+      { role: 'user' as const, content: 'My name is Ana.' },
+      { role: 'assistant' as const, content: 'Hello, Ana.' },
+      { role: 'user' as const, content: 'What is my name?' },
+    ];
+    await started.engine.generate({ messages, maxTokens: 1000 });
+    assert.equal((await started.engine.describe()).contextTokens, 16384);
+    const body = JSON.parse(started.bodies[0]!) as {
+      prompt: string;
+      options: { num_ctx: number; num_predict: number };
+    };
+    assert.equal(body.prompt, renderConversation(messages));
+    assert.equal(body.options.num_ctx, 16384);
+    assert.equal(body.options.num_predict, 1000);
+  } finally {
+    await started.close();
+  }
+  assert.throws(() =>
+    createOllamaEngine('http://127.0.0.1:11434/', fetch, {
+      contextTokens: 65536,
+    }),
+  );
+});
+
 void test('engine-ollama: an unsupported prompt stays a programming error before any request', async () => {
   const started = await serve(servedTags, generated, SHORT);
   try {

@@ -203,13 +203,15 @@ export const MODEL_IDENTITIES = {
 } as const;
 
 // Free execution is a separate data channel; control and reserved HTTP v2 keep their wire contracts.
+// Version 4 carries a whole conversation (an optional system message, then user and assistant turns,
+// ending with the user's); its input is bounded by bytes here and by the model's context at the seller.
 export const FREE_EXECUTION = {
-  alpn: 'gyblos/free/3',
-  version: 3,
-  requestDomain: 'gyblos/free-execution-request/v3\n',
-  requestBytes: 131072,
+  alpn: 'gyblos/free/4',
+  version: 4,
+  requestDomain: 'gyblos/free-execution-request/v4\n',
+  requestBytes: 393216,
   responseBytes: 1048576,
-  inputBytes: 65536,
+  inputBytes: 262144,
   outputBytes: 262144,
   maxMessages: 64,
 } as const;
@@ -238,7 +240,7 @@ export const FREE_EXECUTION_CODES = {
   TIMEOUT: 'FREE_EXECUTION_TIMEOUT',
   CANCELLED: 'FREE_EXECUTION_CANCELLED',
   INTERNAL: 'FREE_EXECUTION_INTERNAL_ERROR',
-  // A started generation stopped on an engine failure; carries a stop reason (v3).
+  // A started generation stopped on an engine failure; carries a stop reason.
   SELLER_CANNOT_CONTINUE: 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE',
 } as const;
 export type FreeExecutionCode =
@@ -252,10 +254,11 @@ export type FreeExecutionMatchMode =
   (typeof FREE_EXECUTION_MATCH_MODES)[keyof typeof FREE_EXECUTION_MATCH_MODES];
 
 export const FREE_STREAM = {
-  alpn: 'gyblos/free-stream/3',
+  alpn: 'gyblos/free-stream/4',
   deltaBytes: 8192,
   eventBytes: FREE_EXECUTION.responseBytes + 1024,
-  maxEvents: 4096,
+  // An engine may send a delta per token: room for the longest answer a context allows.
+  maxEvents: 32768,
   totalBytes: FREE_EXECUTION.responseBytes * 2,
   terminalReserveBytes: 1024,
   events: { DELTA: 'delta', TERMINAL: 'terminal' },

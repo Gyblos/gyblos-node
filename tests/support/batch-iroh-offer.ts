@@ -26,7 +26,11 @@ export async function batchOfferFixture(
   let busy = false;
   let down = false;
   let generate: ((input: EngineInput) => Promise<EngineResult>) | undefined;
-  const meter = { input: () => 2, count: (text: string) => text.length };
+  const meter = {
+    input: () => 2,
+    chat: () => 2,
+    count: (text: string) => text.length,
+  };
   const base: InferenceOfferV2 = {
     ...source.paid.quote.offer,
     owner: terms.owner,
