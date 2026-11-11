@@ -209,6 +209,7 @@ export const MAINNET_PILOT_MAX_USDC_ATOMIC = '1000000';
 
 // Buyer-local routing choices; these are not protocol wire values.
 export const BUYER_BUSY_POLICIES = {
+  WAIT: 'wait',
   REROUTE: 'reroute',
   REJECT: 'reject',
 } as const;
@@ -217,6 +218,7 @@ export type BuyerBusyPolicy =
 export const BUYER_ROUTING_CODES = {
   INVALID: 'BUYER_ROUTING_INVALID',
   BUSY: 'BUYER_ROUTING_BUSY',
+  QUEUE_TIMEOUT: 'BUYER_ROUTING_QUEUE_TIMEOUT',
 } as const;
 export type BuyerRoutingCode =
   (typeof BUYER_ROUTING_CODES)[keyof typeof BUYER_ROUTING_CODES];
