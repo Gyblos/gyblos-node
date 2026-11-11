@@ -146,10 +146,11 @@ void test('docs export: article links resolve to exported pages and existing anc
   }
 });
 
-void test('docs export: all four sidebar groups have decorative icons and localized labels', async () => {
+void test('docs export: all five sidebar groups have decorative icons and localized labels', async () => {
   const groups = [
     { en: 'Get started', es: 'Inicio', icon: 'compass' },
     { en: 'Sellers', es: 'Vendedores', icon: 'server' },
+    { en: 'Buyers', es: 'Compradores', icon: 'plug' },
     { en: 'Reference', es: 'Referencia', icon: 'book-open' },
     { en: 'Help', es: 'Ayuda', icon: 'life-buoy' },
   ];
@@ -198,6 +199,7 @@ void test('docs export: introduction and quickstart lead the sidebar once in bot
       `/${locale}/sellers/models-offers`,
       `/${locale}/sellers/operate`,
       `/${locale}/sellers/identity`,
+      `/${locale}/buyers/use-from-code`,
       `/${locale}/reference/cli`,
       `/${locale}/reference/configuration`,
       `/${locale}/help/troubleshooting`,
