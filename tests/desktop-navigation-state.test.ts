@@ -28,3 +28,15 @@ void test('sidebar destinations reset contextual history and links avoid cycles'
   assert.deepEqual(models.history, []);
   assert.equal(back(models), models);
 });
+
+void test('primary navigation keeps the previous screen available for Back', () => {
+  const payments = navigate(createNavigation(), UI_VIEW.PAYMENTS);
+  const models = navigate(payments, UI_VIEW.MODELS, false);
+  assert.equal(back(models).current, UI_VIEW.PAYMENTS);
+});
+
+void test('revisiting a route preserves chronological visits instead of discarding them', () => {
+  const payments = navigate(createNavigation(), UI_VIEW.PAYMENTS);
+  const chat = navigate(payments, UI_VIEW.CHAT);
+  assert.equal(back(chat).current, UI_VIEW.PAYMENTS);
+});

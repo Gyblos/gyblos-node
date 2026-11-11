@@ -126,6 +126,33 @@ void test('x402 explicit free result needs no invented hash; token-limited resul
   limited.choices[0]!.finish_reason = 'length';
   assert.equal(parseBuyerReply(limited, policy).transaction, '2'.repeat(88));
 });
+
+void test('x402 preserves valid reported token usage without treating it as payment evidence', () => {
+  const value = {
+    ...reply(),
+    usage: { prompt_tokens: 128, completion_tokens: 64, total_tokens: 192 },
+  };
+  assert.deepEqual(parseBuyerReply(value, policy).usage, {
+    inputTokens: 128,
+    outputTokens: 64,
+  });
+  value.gyblos_payment.verdict = 'pending';
+  assert.throws(() => parseBuyerReply(value, policy));
+});
+
+void test('x402 treats malformed or absent telemetry as unknown after a valid settlement', () => {
+  for (const usage of [
+    undefined,
+    { prompt_tokens: -1, completion_tokens: 10, total_tokens: 9 },
+    { prompt_tokens: 5, completion_tokens: 129, total_tokens: 134 },
+    { prompt_tokens: 5, completion_tokens: 10, total_tokens: 99 },
+    { prompt_tokens: Number.MAX_SAFE_INTEGER, completion_tokens: 10 },
+  ]) {
+    const result = parseBuyerReply({ ...reply(), usage }, policy);
+    assert.equal(result.usage, null);
+    assert.equal(result.chargeAtomic, '30');
+  }
+});
 void test('x402 concurrent sends transmit at most one request', async () => {
   let release = () => {};
   const held = new Promise<void>((resolve) => {
