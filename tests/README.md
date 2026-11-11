@@ -301,3 +301,17 @@ with `prepareModelTokenizer`; both artifacts are hash-checked again. The test
 rejects other locations before reading files. With no explicit artifact home it
 is reported as skipped. Synthetic count tests always run; no artifacts are
 committed and no existing operational home is read.
+
+### Reusable paid session streaming
+
+`batch-streaming.test.ts` checks visible text before engine completion, one
+reused deposit, cancellation, conflicting output and financial-only ACK
+recovery. `batch-stream-protocol.test.ts` checks sequence/correlation, EOF,
+backpressure, encoded bounds, uncertain first writes and static LIMIT fallback.
+New v3 vectors are checked independently; all v1/v2 fixture bytes stay frozen.
+`lab/paid-session-streaming.test.ts` exercises actual buyer HTTP and native Iroh
+seller startup with synthetic engines and financial services, in single and pool
+modes, including disconnect before another fragment. No native support means not
+executed, not successful acceptance. Cancellation before a verified terminal
+must not create an approval or retry a prompt; an already-started financial
+approval remains recoverable using its original bytes.

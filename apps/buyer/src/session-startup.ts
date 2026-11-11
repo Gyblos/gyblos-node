@@ -39,13 +39,18 @@ async function executePaidSession(
   if (sending) state.sending.set(id, sending);
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {
-    result = await manager.execute(winner.quote, input, current);
+    result = await manager.execute(
+      winner.quote,
+      input,
+      current,
+      onDelta
+        ? (text) => onDelta(text, winner.quote.offer.requestDigest)
+        : undefined,
+    );
   } finally {
     state.selections.delete(id);
     state.sending.delete(id);
   }
-  if (onDelta && result.value.text)
-    await onDelta(result.value.text, winner.quote.offer.requestDigest);
   return {
     ...result.value,
     payment: {

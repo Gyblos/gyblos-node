@@ -96,6 +96,7 @@ async function operation(
   request: BatchChannelRequest,
   peer: string,
   signal: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
 ) {
   signal.throwIfAborted();
   if (
@@ -135,7 +136,7 @@ async function operation(
     }
   }
   if (!state.current) return batchFail(SESSION_CODES.UNAVAILABLE);
-  return state.current.service.exchange(request, peer, signal);
+  return state.current.service.exchange(request, peer, signal, onDelta);
 }
 export async function startSellerSessions(
   options: SellerSessionOptions,
@@ -154,12 +155,19 @@ export async function startSellerSessions(
   let closed = false;
   return {
     service: {
-      async exchange(request, peer, signal) {
+      async exchange(request, peer, signal, onDelta) {
         if (closed) return batchFail(SESSION_CODES.UNAVAILABLE);
         if (peer !== options.buyerNodeId)
           return batchFail(PAID_EXECUTION_CODES.PEER);
         if (active) return batchFail(SESSION_CODES.BUSY);
-        const running = operation(options, state, request, peer, signal);
+        const running = operation(
+          options,
+          state,
+          request,
+          peer,
+          signal,
+          onDelta,
+        );
         active = running;
         try {
           return await running;

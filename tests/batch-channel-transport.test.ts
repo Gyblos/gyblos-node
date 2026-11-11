@@ -11,6 +11,10 @@ import {
   type BatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
 import {
+  BATCH_STREAM,
+  decodeBatchStreamEvent,
+} from '@gyblos/protocol/batch-stream';
+import {
   ENGINE_DONE_REASONS,
   FREE_EXECUTION,
 } from '@gyblos/protocol/constants';
@@ -301,9 +305,11 @@ void test('a legal response whose JSON escapes exceed the frame produces a stati
     new AbortController().signal,
     () => () => {},
   );
-  const reader = new ControlFrameReader(BATCH_CHANNEL.responseBytes);
-  reader.push(Uint8Array.from(wire.written));
-  await assert.rejects(matchBatchChannelResponse(reader.finish(), call), {
+  const event = decodeBatchStreamEvent(Uint8Array.from(wire.written));
+  assert.equal(event.type, BATCH_STREAM.events.TERMINAL);
+  if (event.type !== BATCH_STREAM.events.TERMINAL)
+    assert.fail('Expected static terminal');
+  await assert.rejects(matchBatchChannelResponse(event.response, call), {
     code: SESSION_CODES.LIMIT,
     remote: true,
   });

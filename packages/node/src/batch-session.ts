@@ -89,6 +89,7 @@ export async function runBatchSellerExecution<T>(
   await execution.seller.reserve(execution.request, execution.peer);
   return runAdmittedExecution({
     ...execution,
+    cancelOnAbort: true,
     permit: {
       outputTokens: execution.outputTokens,
       deadline: Math.min(

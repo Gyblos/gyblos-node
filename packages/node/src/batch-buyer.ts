@@ -52,6 +52,7 @@ function createContext<Remote extends BatchDestination>(
     method,
     params,
     signal,
+    onDelta,
   ) => {
     const request = parseBatchChannelRequest({
       version: BATCH_CHANNEL.version,
@@ -59,7 +60,7 @@ function createContext<Remote extends BatchDestination>(
       method,
       params,
     });
-    const reply = await client.exchange(request, signal);
+    const reply = await client.exchange(request, signal, onDelta);
     if (!reply.result) return batchFail();
     return reply.result;
   };
@@ -157,10 +158,11 @@ export function createBuyerBatchSession<Remote extends BatchDestination>(
       quote: SignedOfferV2,
       input: FreeExecutionBuildInput,
       signal?: AbortSignal,
+      onDelta?: (text: string) => Promise<void>,
     ) =>
       exclusive(
         context,
-        (current) => runBuyerBatch(context, quote, input, current),
+        (current) => runBuyerBatch(context, quote, input, current, onDelta),
         signal,
       ),
     recoverApproval: (signal?: AbortSignal) =>

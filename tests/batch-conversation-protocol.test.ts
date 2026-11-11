@@ -18,11 +18,11 @@ import {
   CONVERSATION_INPUT,
 } from './support/batch-conversation';
 
-void test('paid conversations use session v2 with separate request and reply domains', () => {
-  assert.equal(BATCH_CHANNEL.version, 2);
-  assert.equal(BATCH_CHANNEL.alpn, 'gyblos/session/2');
-  assert.equal(BATCH_CHANNEL.requestDomain, 'gyblos/session-request/v2\n');
-  assert.equal(BATCH_CHANNEL.replyDomain, 'gyblos/session-rpc/v2\n');
+void test('paid conversations use session v3 with separate request and reply domains', () => {
+  assert.equal(BATCH_CHANNEL.version, 3);
+  assert.equal(BATCH_CHANNEL.alpn, 'gyblos/session/3');
+  assert.equal(BATCH_CHANNEL.requestDomain, 'gyblos/session-request/v3\n');
+  assert.equal(BATCH_CHANNEL.replyDomain, 'gyblos/session-rpc/v3\n');
 });
 
 void test('conversation message, content and output bounds are independent of the free profile', async (t) => {

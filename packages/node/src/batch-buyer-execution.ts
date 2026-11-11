@@ -66,6 +66,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   value: SignedOfferV2,
   data: FreeExecutionBuildInput,
   signal: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
 ) {
   const { options, terms, rpc, approve } = context;
   const quote = {
@@ -121,7 +122,12 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
         return snapshot;
       },
       execute: async () => {
-        const result = await rpc(BATCH_METHODS.EXECUTE, request, signal);
+        const result = await rpc(
+          BATCH_METHODS.EXECUTE,
+          request,
+          signal,
+          onDelta,
+        );
         if (!('bill' in result)) return batchFail();
         return result;
       },

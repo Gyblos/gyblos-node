@@ -25,6 +25,7 @@ import type {
 } from '@gyblos/protocol/payment-session';
 
 import { runBatchSellerExecution } from './batch-session';
+import { createPaidStreamOutput } from './paid-stream-output';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export function batchLiveOffer(
@@ -81,6 +82,7 @@ export async function generateBatch(
   live: LiveSellerOffer,
   now: () => number,
   signal: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
 ) {
   const { input, inputTokens } = recountSessionInput(
     request.quote,
@@ -112,27 +114,8 @@ export async function generateBatch(
             ),
           )
         : '0',
-    open: (window) => ({
-      generate: async () => {
-        window.check();
-        const generated = await live.engine.generate({
-          messages: input.messages,
-          maxTokens: request.input.maxTokens,
-          signal: window.signal,
-        });
-        window.check();
-        return recountedResult(
-          live,
-          inputTokens,
-          request.input.maxTokens,
-          generated,
-        );
-      },
-      measure: (generated) =>
-        'value' in generated
-          ? { ...generated.value.usage, completed: true }
-          : { inputTokens, outputTokens: 0, completed: false },
-    }),
+    open: (window) =>
+      batchGeneration(live, input, inputTokens, window, onDelta),
   });
   if ('error' in run.generated) {
     if (run.generated.error instanceof BatchChannelError)
@@ -144,4 +127,47 @@ export async function generateBatch(
     );
   }
   return { value: run.generated.value, bill: run.settlement };
+}
+
+// Reuses the paid delivered-prefix tracker; session billing stays in runBatchSellerExecution.
+function batchGeneration(
+  live: LiveSellerOffer,
+  input: BatchExecutionRequest['input'],
+  inputTokens: number,
+  window: { signal: AbortSignal; check: () => void },
+  onDelta: ((text: string) => Promise<void>) | undefined,
+) {
+  const output = createPaidStreamOutput(
+    live.meter,
+    { inputTokens, allowance: input.maxTokens },
+    window.signal,
+    onDelta ?? (async () => {}),
+    window.check,
+  );
+  let emitted = false;
+  return {
+    stop: output.stop,
+    generate: async () => {
+      window.check();
+      const generated = await live.engine.generate({
+        messages: input.messages,
+        maxTokens: input.maxTokens,
+        signal: window.signal,
+        onText: async (text) => {
+          if (text) emitted = true;
+          await output.onText(text);
+        },
+      });
+      window.check();
+      if (!emitted && generated.text) await output.onText(generated.text);
+      output.complete(generated.text);
+      return recountedResult(live, inputTokens, input.maxTokens, generated);
+    },
+    measure: (
+      generated: import('./execution').Generated<FreeExecutionResult>,
+    ) =>
+      'value' in generated
+        ? { ...generated.value.usage, completed: true }
+        : { inputTokens, outputTokens: 0, completed: false },
+  };
 }

@@ -48,11 +48,16 @@
     "./vectors/paid-execution-v1.json": "./vectors/paid-execution-v1.json",
     "./payment-session": "./src/payment-session.ts",
     "./batch-channel": "./src/batch-channel.ts",
+    "./batch-stream": "./src/batch-stream.ts",
     "./vectors/batch-channel-v1.json": "./vectors/batch-channel-v1.json",
     "./vectors/batch-prepare-v1.json": "./vectors/batch-prepare-v1.json",
     "./vectors/batch-startup-v1.json": "./vectors/batch-startup-v1.json",
     "./vectors/batch-channel-v2.json": "./vectors/batch-channel-v2.json",
+    "./vectors/batch-channel-v3.json": "./vectors/batch-channel-v3.json",
     "./vectors/batch-prepare-v2.json": "./vectors/batch-prepare-v2.json",
-    "./vectors/batch-startup-v2.json": "./vectors/batch-startup-v2.json"
+    "./vectors/batch-prepare-v3.json": "./vectors/batch-prepare-v3.json",
+    "./vectors/batch-startup-v2.json": "./vectors/batch-startup-v2.json",
+    "./vectors/batch-startup-v3.json": "./vectors/batch-startup-v3.json",
+    "./vectors/batch-stream-v3.json": "./vectors/batch-stream-v3.json"
   }
 }

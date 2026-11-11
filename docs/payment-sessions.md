@@ -2,7 +2,7 @@
 
 The shared buyer and seller session services use the pinned Solana x402
 `batch-settlement` client-signature mode. Trusted hosts can compose them over
-the opt-in `gyblos/session/2` Iroh channel. The buyer CLI and seller daemon can
+the opt-in `gyblos/session/3` Iroh channel. The buyer CLI and seller daemon can
 activate this path explicitly. Without that policy, the existing per-request
 path remains available. No public gateway is enabled by this composition.
 
@@ -17,12 +17,33 @@ No server-side conversation history is stored. The existing 64 KiB content,
 1024-message and 128-output-token bounds, signed quote, context and budget all
 apply; unsupported input is rejected rather than trimmed.
 
-The active session transport is v2. An old session-v1 seller must be upgraded;
-failed v2 preparation signs no opening and does not trigger a fallback. The SDK
+The active session transport is v3. Old session-v1/v2 peers must be upgraded;
+failed v3 preparation signs no opening and does not trigger a fallback. The SDK
 channel and private financial journal do not migrate: saved approvals retain
 their original digest and recover without another inference. The per-request
-paid stream remains a separate, single-user path. Free execution is unchanged.
-Session replies are complete responses; incremental token streaming is separate.
+paid stream remains a separate, single-user path. Free wire contracts are
+unchanged. Reusable sessions opt into prompt cancellation of deadline-bounded
+generation, stopping publication even if an engine ignores abort. Legacy free
+and per-request paid paths retain their delivery-measurement timing. Execution
+replies carry ordered text fragments and one correlated complete terminal.
+Streaming API callers receive fragments as the engine produces them;
+complete-response callers drain and verify the same wire without publishing
+fragments. No final text is replayed after streaming. Every frame, the aggregate
+encoded response and the number of events are bounded. Waiting for the next
+engine event uses the original absolute request deadline; after its first byte,
+an incomplete prefix or body keeps the ingress deadline. The terminal's text
+must equal all observed fragments, and EOF is required before usage approval.
+Earlier v1/v2 vectors remain unchanged.
+
+Cancellation before a fully verified terminal creates no new usage approval. It
+stops publication, aborts generation on connection close and preserves the
+pending financial intent; the prompt is never replayed. The seller can collect
+only its highest already accepted cumulative signature, so the last unsigned
+response remains bounded seller exposure. Once independently verified usage
+enters durable approval, cancellation cannot revoke that intent: recover only
+the original bill/voucher, including a lost ACK. Passing time alone does not
+clear uncertainty. Terminal chat history accumulation and tools remain separate
+from this shared streaming transport.
 
 ## Explicit startup policy
 
