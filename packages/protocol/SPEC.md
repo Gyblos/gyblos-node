@@ -1032,6 +1032,59 @@ or disconnected HTTP stream does not itself execute settlement or a refund.
 No existing offer, free/paid execution or golden vector is modified by this port.
 [Session composition and limitations](../../docs/payment-sessions.md).
 
+## Reusable session v3 streaming
+
+The active reusable-session channel is `gyblos/session/3`, envelope version 3,
+with `gyblos/session-request/v3\n` for the canonical inner execution and
+`gyblos/session-rpc/v3\n` for the outer RPC. Both peers upgrade together;
+preparation fails before a new deposit opening on a v1/v2-only peer. Only one
+active session implementation is kept. All previous v1/v2 vectors are frozen;
+SDK cumulative voucher, terms and journal schemas are unchanged. Saved original
+approvals recover over v3 with their exact original digest/bill/voucher, never a
+reconstructed execution request. The historical v2 specification below remains
+an explanation of those frozen bytes, not another active runtime.
+
+PREPARE, OPEN, APPROVE, SNAPSHOT and CLOSE remain one bounded canonical JSON
+frame and EOF. EXECUTE returns zero or more delta frames followed by exactly
+one terminal frame and EOF. Every event contains version 3, the outer requestId,
+the SHA-256 outer requestDigest, a zero-based contiguous sequence and type.
+A delta has type `delta` and nonempty text; a terminal has type `terminal` and
+response containing the existing complete BatchChannelResponse, including the
+inner execution-bound bill or a static typed error. The outer request identifier
+is independent of the quote's inner execution identifier. Unknown/duplicate
+fields, noncanonical JSON, invalid UTF-8, reordered/crossed/replayed events,
+missing terminal and any byte after terminal are refused.
+
+Each delta is at most 8192 UTF-8 bytes, the stream has at most 4096 events
+including the terminal, and total encoded frames including prefixes stay within
+1048576 bytes, the former response budget. Prefixes exceeding the remaining
+aggregate budget are rejected before body allocation. Output content remains
+bounded by 262144 bytes, input 65536 bytes, 1024 messages and 128 output tokens;
+context, signed price/budget, admission and absolute request deadlines are
+unchanged. Deltas reserve 2048 bytes for a static error terminal. JSON escaping
+and the repeated complete terminal text can exhaust the encoded budget earlier
+than content size; return static LIMIT instead of a success that cannot fit.
+Consumers and writes are awaited with existing per-stage deadlines; cancellation
+seals publication even if the engine ignores abort. Quote freshness is checked
+before admission, not required to remain live during generation.
+
+The engine receives intact conversation history. Seller output is bounded and
+recounted over the accumulated text prefix, never by summing separate fragment
+token counts. The final engine text must exactly match emitted text. The buyer
+independently recounts full rendered input and concatenated output, checks the
+terminal/bill, and requires EOF before cumulative signing. Visible fragments are
+provisional until that verification; an error is not a successful answer.
+Cancellation or loss before a verified terminal creates no new approval and
+leaves recovery/closure pending; the seller can collect its previous highest
+accepted signature only, with one unsigned last response as bounded exposure.
+Once verified usage has entered durable approval, an abort cannot revoke an
+already-started signature: recover its exact original financial approval without
+replaying the prompt. No detached post-cancellation approval is introduced.
+
+Independent Node/OpenSSL fixtures are batch-channel-v3.json,
+batch-prepare-v3.json, batch-startup-v3.json and batch-stream-v3.json. Existing
+per-request paid-stream/1 and free-stream contracts remain unchanged.
+
 ## Reusable conversation session channel v2
 
 `gyblos/session/2` replaces the active session v1 transport. Both peers must

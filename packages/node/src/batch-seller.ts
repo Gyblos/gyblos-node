@@ -32,6 +32,7 @@ async function exchange(
   peer: string,
   signal: AbortSignal,
   options: SellerBatchSessionOptions,
+  onDelta?: (text: string) => Promise<void>,
 ) {
   signal.throwIfAborted();
   const session = options.session;
@@ -75,6 +76,7 @@ async function exchange(
       live,
       options.now,
       signal,
+      onDelta,
     );
   }
   const channel =
@@ -100,13 +102,13 @@ export function createSellerBatchSession(
   };
   let active = false;
   return {
-    async exchange(request, peer, signal) {
+    async exchange(request, peer, signal, onDelta) {
       if (peer !== options.terms.buyerNodeId)
         throw new BatchChannelError(PAID_EXECUTION_CODES.PEER);
       if (active) return batchFail(SESSION_CODES.BUSY);
       active = true;
       try {
-        return await exchange(request, peer, signal, options);
+        return await exchange(request, peer, signal, options, onDelta);
       } finally {
         active = false;
       }

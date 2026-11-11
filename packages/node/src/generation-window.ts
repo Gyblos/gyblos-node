@@ -66,18 +66,27 @@ export function generationWindow(
       // late deltas, or after the run ended.
       let started = false;
       let ended = false;
+      const halt = () => {
+        if (started && !ended) {
+          ended = true;
+          try {
+            stop();
+          } catch {
+            /* Publication still ends if a stop hook fails. */
+          }
+        }
+      };
+      let abort = () => {};
+      const cancelled = new Promise<never>((_resolve, reject) => {
+        abort = () => {
+          halt();
+          reject(errors.cancelled());
+        };
+        request.addEventListener('abort', abort, { once: true });
+      });
       const expired = new Promise<never>((_resolve, reject) => {
         expire = () => {
-          if (started && !ended) {
-            ended = true;
-            // A throwing stop must neither crash the timer nor leave the engine running past the
-            // deadline; the request still ends with the timeout.
-            try {
-              stop();
-            } catch {
-              // The abort below stops the engine and the stream regardless.
-            }
-          }
+          halt();
           controller.abort(timeout);
           reject(timeout);
         };
@@ -93,10 +102,11 @@ export function generationWindow(
         return operation();
       });
       try {
-        return await Promise.race([running, expired]);
+        return await Promise.race([running, expired, cancelled]);
       } finally {
         ended = true;
         clearTimeout(timer);
+        request.removeEventListener('abort', abort);
       }
     },
   };

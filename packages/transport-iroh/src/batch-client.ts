@@ -25,6 +25,7 @@ import type {
   BatchEndpoint,
 } from './batch-client-types';
 import { readBatchFrame } from './batch-io';
+import { readBatchStreamResponse } from './batch-stream-client';
 import { HTTP_OVER_IROH } from './constants';
 import { controlDeadline } from './control-io';
 import { withDeadline } from './deadline';
@@ -148,6 +149,7 @@ async function requestReply<Remote extends BatchDestination>(
   bytes: Uint8Array,
   signal: AbortSignal,
   beforeWrite: () => void,
+  onDelta: (text: string) => Promise<void>,
 ) {
   const current = await connect(state, signal);
   const stream = await track(state, current.openBi());
@@ -168,6 +170,23 @@ async function requestReply<Remote extends BatchDestination>(
   route(state, current, signal);
   await track(state, stream.send.finish());
   route(state, current, signal);
+  if (request.method === BATCH_METHODS.EXECUTE)
+    return readBatchStreamResponse(
+      stream,
+      request,
+      () => route(state, current, signal),
+      (operation, milliseconds) =>
+        track(
+          state,
+          controlDeadline(
+            () => operation,
+            milliseconds,
+            () => drop(state),
+            signal,
+          ),
+        ),
+      onDelta,
+    );
   const raw = await track(
     state,
     readBatchFrame(stream, BATCH_CHANNEL.responseBytes, () =>
@@ -183,6 +202,7 @@ async function exchange<Remote extends BatchDestination>(
   state: Context<Remote>,
   value: unknown,
   external?: AbortSignal,
+  onDelta: (text: string) => Promise<void> = async () => {},
 ) {
   if (state.active) throw new BatchClientError(SESSION_CODES.BUSY, false);
   const source = AbortSignal.any([
@@ -199,9 +219,16 @@ async function exchange<Remote extends BatchDestination>(
       (signal) =>
         track(
           state,
-          requestReply(state, request, bytes, signal, () => {
-            sent = true;
-          }),
+          requestReply(
+            state,
+            request,
+            bytes,
+            signal,
+            () => {
+              sent = true;
+            },
+            onDelta,
+          ),
         ),
       request.method === BATCH_METHODS.EXECUTE
         ? (state.options.requestMs ?? TRANSPORT_TIMEOUTS.requestMs)
@@ -238,8 +265,11 @@ export function createBatchChannelClient<Remote extends BatchDestination>(
     active: false,
   };
   return {
-    exchange: (value: unknown, signal?: AbortSignal) =>
-      exchange(state, value, signal),
+    exchange: (
+      value: unknown,
+      signal?: AbortSignal,
+      onDelta?: (text: string) => Promise<void>,
+    ) => exchange(state, value, signal, onDelta),
     async close() {
       state.lifetime.abort();
       drop(state);
