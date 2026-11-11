@@ -92,16 +92,16 @@ importers:
         version: 1.1.0
       '@solana-program/token':
         specifier: 0.9.0
-        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))
       '@solana/kit':
         specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+        version: 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@x402/core':
         specifier: 2.29.0
         version: 2.29.0
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(typescript@5.9.3)
       express:
         specifier: 4.22.3
         version: 4.22.3
@@ -109,12 +109,6 @@ importers:
         specifier: workspace:*
         version: link:packages/x402-upto-metered
     devDependencies:
-      '@solana-program/system':
-        specifier: 0.10.0
-        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
-      litesvm:
-        specifier: 1.6.2
-        version: 1.6.2(typescript@5.9.3)
       '@ianvs/prettier-plugin-sort-imports':
         specifier: 4.7.0
         version: 4.7.0(prettier@3.9.10)
@@ -122,11 +116,14 @@ importers:
         specifier: 1.9.0
         version: 1.9.0
       '@opentelemetry/core':
-        specifier: 2.6.0
-        version: 2.6.0(@opentelemetry/api@1.9.0)
+        specifier: 3.1.0
+        version: 3.1.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-metrics':
         specifier: 2.12.0
         version: 2.12.0(@opentelemetry/api@1.9.0)
+      '@solana-program/system':
+        specifier: 0.10.0
+        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))
       '@types/express':
         specifier: 4.17.21
         version: 4.17.21
@@ -142,6 +139,9 @@ importers:
       eslint:
         specifier: 9.39.1
         version: 9.39.1(jiti@2.7.0)
+      litesvm:
+        specifier: 1.6.2
+        version: 1.6.2(typescript@5.9.3)
       prettier:
         specifier: 3.9.10
         version: 3.9.10
@@ -189,7 +189,7 @@ importers:
         version: 1.1.0
       '@solana/kit':
         specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+        version: 5.1.0(typescript@5.9.3)(ws@8.22.2)
 
   apps/desktop:
     dependencies:
@@ -213,7 +213,7 @@ importers:
         version: 2.1.10(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@solana/kit':
         specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+        version: 5.1.0(typescript@5.9.3)(ws@8.22.2)
       react:
         specifier: 19.2.0
         version: 19.2.0
@@ -431,10 +431,10 @@ importers:
         version: 0.2.0
       '@solana-program/system':
         specifier: 0.10.0
-        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+        version: 0.10.0(@solana/kit@8.6.0(typescript@5.9.3))
       '@solana-program/token':
         specifier: 0.9.0
-        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+        version: 0.9.0(@solana/kit@8.6.0(typescript@5.9.3))
       '@x402/core':
         specifier: 2.29.0
         version: 2.29.0
@@ -509,10 +509,10 @@ importers:
         version: link:../core
       '@solana-program/system':
         specifier: 0.10.0
-        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))
       '@solana/kit':
         specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+        version: 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@solana/rpc-spec-types':
         specifier: 8.6.0
         version: 8.6.0(typescript@5.9.3)
@@ -563,7 +563,7 @@ importers:
         version: 1.1.0
       '@solana/kit':
         specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+        version: 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@x402/core':
         specifier: 2.29.0
         version: 2.29.0
@@ -572,7 +572,7 @@ importers:
         version: 2.29.0(express@4.22.3)(typescript@5.9.3)
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(typescript@5.9.3)
       express:
         specifier: 4.22.3
         version: 4.22.3
@@ -596,13 +596,13 @@ importers:
         version: link:../runtime
       '@solana/kit':
         specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+        version: 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@solana/rpc-spec-types':
         specifier: 8.6.0
         version: 8.6.0(typescript@5.9.3)
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(typescript@5.9.3)
       x402-upto-metered:
         specifier: workspace:*
         version: link:../x402-upto-metered
@@ -620,10 +620,10 @@ importers:
         version: link:../runtime
       '@solana-program/token':
         specifier: 0.9.0
-        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))
       '@solana/kit':
         specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+        version: 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@x402/core':
         specifier: 2.29.0
         version: 2.29.0
@@ -632,7 +632,7 @@ importers:
         version: 2.29.0
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(typescript@5.9.3)
       express:
         specifier: 4.22.3
         version: 4.22.3
@@ -681,8 +681,8 @@ importers:
         specifier: 1.9.0
         version: 1.9.0
       '@opentelemetry/core':
-        specifier: 2.6.0
-        version: 2.6.0(@opentelemetry/api@1.9.0)
+        specifier: 3.1.0
+        version: 3.1.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources':
         specifier: 3.0.0
         version: 3.0.0(@opentelemetry/api@1.9.0)
@@ -709,22 +709,23 @@ importers:
     dependencies:
       '@solana/kit':
         specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+        version: 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@x402/core':
         specifier: 2.29.0
         version: 2.29.0
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(typescript@5.9.3)
     devDependencies:
       '@solana-program/token':
         specifier: 0.9.0
-        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))
       tsx:
         specifier: 4.21.0
         version: 4.21.0
 
 packages:
+
   '@adraffy/ens-normalize@1.11.1':
     resolution: {integrity: sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ==}
 
@@ -1763,14 +1764,14 @@ packages:
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
-  '@opentelemetry/core@2.6.0':
-    resolution: {integrity: sha512-HLM1v2cbZ4TgYN6KEOj+Bbj8rAKriOdkF9Ed3tG25FoprSiQl7kYc+RRT6fUZGOvx0oMi5U67GoFdT+XUn8zEg==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': '>=1.0.0 <1.10.0'
-
   '@opentelemetry/core@3.0.0':
     resolution: {integrity: sha512-whOLlww0R/RLtCWGBXhK1fdvL9t2/TL0fqdjZvcaoUUuNilRPjXecqQdzyVwV68s6XEDA5oYbm7/bZT62GXF4A==}
+    engines: {node: '>=22.15.0'}
+    peerDependencies:
+      '@opentelemetry/api': '>=1.10.0 <1.11.0'
+
+  '@opentelemetry/core@3.1.0':
+    resolution: {integrity: sha512-TS/6jqU5gilzjvjGnsTEKVFF/0MMAtBc2psxaX39IGCBYLat83/iHxYBWn+O6WB+pnyB0SwiH46rvTEp/OeYxA==}
     engines: {node: '>=22.15.0'}
     peerDependencies:
       '@opentelemetry/api': '>=1.10.0 <1.11.0'
@@ -1793,12 +1794,12 @@ packages:
     peerDependencies:
       '@opentelemetry/api': '>=1.9.0 <1.10.0'
 
-  '@opentelemetry/semantic-conventions@1.43.0':
-    resolution: {integrity: sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg==}
-    engines: {node: '>=14'}
-
   '@opentelemetry/semantic-conventions@1.44.0':
     resolution: {integrity: sha512-E3JkOlMBi3N8OGGkbl7tFyqk2MAS6/lySRZBK3Mu7AzjF1fT8oIChH9ChE48SUWzDn9Kdwta+G/p5LJ4xW4CLQ==}
+    engines: {node: '>=14'}
+
+  '@opentelemetry/semantic-conventions@1.45.0':
+    resolution: {integrity: sha512-aOP45mbcOKbQVvFWfQmgoOPT8R2iwbbbgl83k4CujGV9BrJhFr3qG55MFpwFs4YLabpuW3HhzUY9eQxPlDqaZw==}
     engines: {node: '>=14'}
 
   '@phosphor-icons/react@2.1.10':
@@ -5259,6 +5260,7 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
+
   '@adraffy/ens-normalize@1.11.1': {}
 
   '@alloc/quick-lru@5.3.0': {}
@@ -6034,15 +6036,15 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/semantic-conventions': 1.44.0
 
-  '@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@opentelemetry/api': 1.9.0
-      '@opentelemetry/semantic-conventions': 1.43.0
-
   '@opentelemetry/core@3.0.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/semantic-conventions': 1.44.0
+
+  '@opentelemetry/core@3.1.0(@opentelemetry/api@1.9.0)':
+    dependencies:
+      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/semantic-conventions': 1.45.0
 
   '@opentelemetry/resources@2.12.0(@opentelemetry/api@1.9.0)':
     dependencies:
@@ -6062,9 +6064,9 @@ snapshots:
       '@opentelemetry/core': 2.12.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.12.0(@opentelemetry/api@1.9.0)
 
-  '@opentelemetry/semantic-conventions@1.43.0': {}
-
   '@opentelemetry/semantic-conventions@1.44.0': {}
+
+  '@opentelemetry/semantic-conventions@1.45.0': {}
 
   '@phosphor-icons/react@2.1.10(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
     dependencies:
@@ -6214,9 +6216,21 @@ snapshots:
     dependencies:
       '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.21.0)
 
+  '@solana-program/compute-budget@0.11.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))':
+    dependencies:
+      '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.22.2)
+
   '@solana-program/system@0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))':
     dependencies:
       '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.21.0)
+
+  '@solana-program/system@0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))':
+    dependencies:
+      '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.22.2)
+
+  '@solana-program/system@0.10.0(@solana/kit@8.6.0(typescript@5.9.3))':
+    dependencies:
+      '@solana/kit': 8.6.0(typescript@5.9.3)
 
   '@solana-program/system@0.14.1(@solana/kit@8.6.0(typescript@5.9.3))':
     dependencies:
@@ -6227,6 +6241,11 @@ snapshots:
       '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.21.0)
       '@solana/sysvars': 5.1.0(typescript@5.9.3)
 
+  '@solana-program/token-2022@0.6.1(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(@solana/sysvars@5.1.0(typescript@5.9.3))':
+    dependencies:
+      '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.22.2)
+      '@solana/sysvars': 5.1.0(typescript@5.9.3)
+
   '@solana-program/token@0.16.1(@solana/kit@8.6.0(typescript@5.9.3))':
     dependencies:
       '@solana-program/system': 0.14.1(@solana/kit@8.6.0(typescript@5.9.3))
@@ -6235,6 +6254,14 @@ snapshots:
   '@solana-program/token@0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))':
     dependencies:
       '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.21.0)
+
+  '@solana-program/token@0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))':
+    dependencies:
+      '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.22.2)
+
+  '@solana-program/token@0.9.0(@solana/kit@8.6.0(typescript@5.9.3))':
+    dependencies:
+      '@solana/kit': 8.6.0(typescript@5.9.3)
 
   '@solana/accounts@5.1.0(typescript@5.9.3)':
     dependencies:
@@ -6609,6 +6636,33 @@ snapshots:
       - fastestsmallesttextencoderdecoder
       - ws
 
+  '@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2)':
+    dependencies:
+      '@solana/accounts': 5.1.0(typescript@5.9.3)
+      '@solana/addresses': 5.1.0(typescript@5.9.3)
+      '@solana/codecs': 5.1.0(typescript@5.9.3)
+      '@solana/errors': 5.1.0(typescript@5.9.3)
+      '@solana/functional': 5.1.0(typescript@5.9.3)
+      '@solana/instruction-plans': 5.1.0(typescript@5.9.3)
+      '@solana/instructions': 5.1.0(typescript@5.9.3)
+      '@solana/keys': 5.1.0(typescript@5.9.3)
+      '@solana/offchain-messages': 5.1.0(typescript@5.9.3)
+      '@solana/programs': 5.1.0(typescript@5.9.3)
+      '@solana/rpc': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-parsed-types': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-spec-types': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-subscriptions': 5.1.0(typescript@5.9.3)(ws@8.22.2)
+      '@solana/rpc-types': 5.1.0(typescript@5.9.3)
+      '@solana/signers': 5.1.0(typescript@5.9.3)
+      '@solana/sysvars': 5.1.0(typescript@5.9.3)
+      '@solana/transaction-confirmation': 5.1.0(typescript@5.9.3)(ws@8.22.2)
+      '@solana/transaction-messages': 5.1.0(typescript@5.9.3)
+      '@solana/transactions': 5.1.0(typescript@5.9.3)
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - fastestsmallesttextencoderdecoder
+      - ws
+
   '@solana/kit@8.6.0(typescript@5.9.3)':
     dependencies:
       '@solana/accounts': 8.6.0(typescript@5.9.3)
@@ -6957,6 +7011,16 @@ snapshots:
     optionalDependencies:
       ws: 8.21.0
 
+  '@solana/rpc-subscriptions-channel-websocket@5.1.0(typescript@5.9.3)(ws@8.22.2)':
+    dependencies:
+      '@solana/errors': 5.1.0(typescript@5.9.3)
+      '@solana/functional': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-subscriptions-spec': 5.1.0(typescript@5.9.3)
+      '@solana/subscribable': 5.1.0(typescript@5.9.3)
+      typescript: 5.9.3
+    optionalDependencies:
+      ws: 8.22.2
+
   '@solana/rpc-subscriptions-channel-websocket@8.6.0(typescript@5.9.3)':
     dependencies:
       '@solana/errors': 8.6.0(typescript@5.9.3)
@@ -7005,6 +7069,24 @@ snapshots:
       '@solana/rpc-spec-types': 5.1.0(typescript@5.9.3)
       '@solana/rpc-subscriptions-api': 5.1.0(typescript@5.9.3)
       '@solana/rpc-subscriptions-channel-websocket': 5.1.0(typescript@5.9.3)(ws@8.21.0)
+      '@solana/rpc-subscriptions-spec': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-transformers': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-types': 5.1.0(typescript@5.9.3)
+      '@solana/subscribable': 5.1.0(typescript@5.9.3)
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - fastestsmallesttextencoderdecoder
+      - ws
+
+  '@solana/rpc-subscriptions@5.1.0(typescript@5.9.3)(ws@8.22.2)':
+    dependencies:
+      '@solana/errors': 5.1.0(typescript@5.9.3)
+      '@solana/fast-stable-stringify': 5.1.0(typescript@5.9.3)
+      '@solana/functional': 5.1.0(typescript@5.9.3)
+      '@solana/promises': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-spec-types': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-subscriptions-api': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-subscriptions-channel-websocket': 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@solana/rpc-subscriptions-spec': 5.1.0(typescript@5.9.3)
       '@solana/rpc-transformers': 5.1.0(typescript@5.9.3)
       '@solana/rpc-types': 5.1.0(typescript@5.9.3)
@@ -7256,6 +7338,23 @@ snapshots:
       '@solana/promises': 5.1.0(typescript@5.9.3)
       '@solana/rpc': 5.1.0(typescript@5.9.3)
       '@solana/rpc-subscriptions': 5.1.0(typescript@5.9.3)(ws@8.21.0)
+      '@solana/rpc-types': 5.1.0(typescript@5.9.3)
+      '@solana/transaction-messages': 5.1.0(typescript@5.9.3)
+      '@solana/transactions': 5.1.0(typescript@5.9.3)
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - fastestsmallesttextencoderdecoder
+      - ws
+
+  '@solana/transaction-confirmation@5.1.0(typescript@5.9.3)(ws@8.22.2)':
+    dependencies:
+      '@solana/addresses': 5.1.0(typescript@5.9.3)
+      '@solana/codecs-strings': 5.1.0(typescript@5.9.3)
+      '@solana/errors': 5.1.0(typescript@5.9.3)
+      '@solana/keys': 5.1.0(typescript@5.9.3)
+      '@solana/promises': 5.1.0(typescript@5.9.3)
+      '@solana/rpc': 5.1.0(typescript@5.9.3)
+      '@solana/rpc-subscriptions': 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@solana/rpc-types': 5.1.0(typescript@5.9.3)
       '@solana/transaction-messages': 5.1.0(typescript@5.9.3)
       '@solana/transactions': 5.1.0(typescript@5.9.3)
@@ -7703,6 +7802,20 @@ snapshots:
       '@solana-program/token': 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
       '@solana-program/token-2022': 0.6.1(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(@solana/sysvars@5.1.0(typescript@5.9.3))
       '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.21.0)
+      '@solana/program-client-core': 6.10.0(typescript@5.9.3)
+      '@solana/sysvars': 5.1.0(typescript@5.9.3)
+      '@x402/core': 2.29.0
+    transitivePeerDependencies:
+      - fastestsmallesttextencoderdecoder
+      - typescript
+
+  '@x402/svm@2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(typescript@5.9.3)':
+    dependencies:
+      '@noble/hashes': 1.8.0
+      '@solana-program/compute-budget': 0.11.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))
+      '@solana-program/token': 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))
+      '@solana-program/token-2022': 0.6.1(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(@solana/sysvars@5.1.0(typescript@5.9.3))
+      '@solana/kit': 5.1.0(typescript@5.9.3)(ws@8.22.2)
       '@solana/program-client-core': 6.10.0(typescript@5.9.3)
       '@solana/sysvars': 5.1.0(typescript@5.9.3)
       '@x402/core': 2.29.0
