@@ -405,13 +405,17 @@ budget, so the file is refused with `INVALID_LIMIT` on the first key it sets
 among `global_requests_per_minute`, `requests_per_minute` and `max_connections`.
 The editor schema cannot check this rule; `config validate` does.
 
-A free chat usually counts as two requests (its quote and its execution), so 30
-per minute is about 15 free chats per buyer.
+Only executions count as requests: the control queries before one (catalog,
+presence, quote) and the receipt calls after it share the concurrency limits but
+not this budget, and are bounded by their own per-buyer admission. So 30 per
+minute is 30 answers per buyer.
 
-Free execution opens one connection per request, so the connection-attempt
-limits rise with a raised request rate (per buyer and per source to
-`requests_per_minute`, in total to `global_requests_per_minute`) and never fall
-below their built-in values. Up to 8 handshakes are pending at once whatever
+A free request costs up to four connections (control, execution, one or two
+receipt calls), and each is attempted twice before its handshake (QUIC address
+validation). So the connection-attempt limits are four times the request rate
+per buyer (120 by default) and eight times before the handshake (256 per source
+and 2048 in total by default); they rise with a raised rate and never fall below
+their built-in values. Up to 8 handshakes are pending at once whatever
 `max_connections` is, so a large pool fills gradually.
 
 Request concurrency and connections per buyer are not configurable. The seller

@@ -221,7 +221,11 @@ export async function selectWinner(
   prepared.stats.rows.clear();
   for (const [nodeId, row] of stats) prepared.stats.rows.set(nodeId, row);
   await prepared.stats.save();
-  if (!result.ok) throw new FreeSelectionFailure(result);
+  if (!result.ok)
+    throw new FreeSelectionFailure(
+      result,
+      coolingUntil(config.sellers, stats, now()),
+    );
   const winner = {
     nodeId: result.winner.candidate.nodeId,
     quote: result.winner.quote,
@@ -229,6 +233,18 @@ export async function selectWinner(
   if (!(await permitsWinner(prepared, winner, now())))
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   return winner;
+}
+
+// The earliest moment a seller in cooldown can be tried again; undefined when none is cooling down.
+function coolingUntil(
+  sellers: readonly { nodeId: string }[],
+  stats: ReadonlyMap<string, { cooldownUntil: number | null }>,
+  now: number,
+) {
+  const ends = sellers
+    .map((seller) => stats.get(seller.nodeId)?.cooldownUntil ?? null)
+    .filter((end): end is number => end !== null && end > now);
+  return ends.length > 0 ? Math.min(...ends) : undefined;
 }
 
 export async function connectFreeControl(

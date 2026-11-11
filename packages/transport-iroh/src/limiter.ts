@@ -1,4 +1,6 @@
 // Per-peer and global request quotas per window; consumed quota survives reconnects and eviction.
+// Only work a buyer asked for (an execution) counts as a request; the control queries and receipts around it
+// share the concurrency limits but not the quota, and are bounded by their own per-peer admission.
 import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
 
 import type { ConnectionFamily } from './constants';
@@ -134,13 +136,28 @@ export function createPeerLimiter(
       if (window.reserved > 0) window.reserved--;
       globalRequests++;
       active++;
-      let released = false;
-      return () => {
-        if (released) return;
-        released = true;
-        active--;
-        window.active--;
-      };
+      return activeLease(window);
+    },
+    // A control query or receipt: one at a time per buyer within the same concurrency, outside the quota.
+    enterQuery(nodeId: string) {
+      refresh();
+      if (active >= limits.maxConcurrent) return undefined;
+      const window = windowFor(nodeId);
+      if (!window || window.active >= limits.maxPeerConcurrent)
+        return undefined;
+      window.active++;
+      active++;
+      return activeLease(window);
     },
   };
+
+  function activeLease(window: PeerWindow) {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      active--;
+      window.active--;
+    };
+  }
 }

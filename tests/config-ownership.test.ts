@@ -45,9 +45,10 @@ void test('HTTP-over-Iroh wire limits and internal deadlines keep their values',
 
 void test('operator-tunable transport limits, timeouts and ports keep their values', () => {
   assert.deepEqual(TRANSPORT_LIMITS, {
-    connectionAttemptsPerWindow: 256,
-    connectionAttemptsPerSource: 32,
-    connectionAttemptsPerPeer: 30,
+    // A free request costs up to four connections, each attempted twice before its handshake.
+    connectionAttemptsPerWindow: 2048,
+    connectionAttemptsPerSource: 256,
+    connectionAttemptsPerPeer: 120,
     maxConcurrent: 2,
     maxPeerConcurrent: 1,
     maxConnections: 8,

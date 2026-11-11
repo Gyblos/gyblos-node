@@ -153,6 +153,7 @@ export const FREE_BUYER = {
   contentType: 'application/json',
   // Header the official OpenAI SDKs honor to skip their automatic retries.
   noRetryHeader: 'x-should-retry',
+  retryAfterHeader: 'retry-after',
   requestMs: 180000,
   headerMs: 10000,
   headers: 16384,

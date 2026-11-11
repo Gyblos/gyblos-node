@@ -2,7 +2,12 @@
 // ceiling, and together within the global request budget. Request concurrency and per-buyer
 // connections stay fixed: the managed engine runs one generation at a time, so each buyer has one
 // request in flight and the seller at most two (one running, one queued).
-import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
+import {
+  ATTEMPTS_PER_REQUEST,
+  CONNECTIONS_PER_REQUEST,
+  TRANSPORT_LIMITS,
+  type TransportLimits,
+} from '@gyblos/config';
 import { FREE_EXECUTION_ADMISSION } from '@gyblos/core/constants';
 
 import { NODE_CONFIG_ISSUE_CODES, SELLER_LIMIT_CEILINGS } from './constants';
@@ -67,19 +72,19 @@ export function sellerLimits(limits: NodeLimits = {}): SellerLimits {
       maxConnections: limits.maxConnections ?? TRANSPORT_LIMITS.maxConnections,
       requestsPerWindow,
       globalRequestsPerWindow,
-      // Free execution opens one connection per request, so connection attempts must not cap a raised
-      // request rate below what was configured; they never drop below the built-in values.
+      // Connection attempts scale with what one request costs (see CONNECTIONS_PER_REQUEST), so they
+      // never cap a raised request rate below what was configured, nor drop below the built-in values.
       connectionAttemptsPerPeer: Math.max(
         TRANSPORT_LIMITS.connectionAttemptsPerPeer,
-        requestsPerWindow,
+        requestsPerWindow * CONNECTIONS_PER_REQUEST,
       ),
       connectionAttemptsPerSource: Math.max(
         TRANSPORT_LIMITS.connectionAttemptsPerSource,
-        requestsPerWindow,
+        requestsPerWindow * ATTEMPTS_PER_REQUEST,
       ),
       connectionAttemptsPerWindow: Math.max(
         TRANSPORT_LIMITS.connectionAttemptsPerWindow,
-        globalRequestsPerWindow,
+        globalRequestsPerWindow * ATTEMPTS_PER_REQUEST,
       ),
     },
     maxFreeBuyers:

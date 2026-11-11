@@ -64,10 +64,10 @@ void test('[limits] values reach the transport limits the seller serves with', (
       maxConnections: 16,
       requestsPerWindow: 60,
       globalRequestsPerWindow: 1024,
-      // Raised with the request rate: free execution opens one connection per request.
-      connectionAttemptsPerPeer: 60,
-      connectionAttemptsPerSource: 60,
-      connectionAttemptsPerWindow: 1024,
+      // Raised with the request rate: a free request costs up to four connections and eight attempts.
+      connectionAttemptsPerPeer: 240,
+      connectionAttemptsPerSource: 480,
+      connectionAttemptsPerWindow: 8192,
     },
     maxFreeBuyers: 10,
   });
@@ -83,16 +83,16 @@ void test('[limits] values reach the transport limits the seller serves with', (
   }
   assert.equal(admitted, 60);
 
-  // ...and as many connection attempts, so a free buyer is not capped at 30 connections.
+  // ...and four connections for each, so a free buyer is not capped below 60 requests.
   const admission = createConnectionAdmission(() => 0, limits.transport);
   let connections = 0;
-  for (let index = 0; index < 100; index++) {
+  for (let index = 0; index < 300; index++) {
     const release = admission.established('buyer', CONNECTION_FAMILIES.DATA);
     if (!release) break;
     release();
     connections++;
   }
-  assert.equal(connections, 60);
+  assert.equal(connections, 240);
 
   // Every one of the 16 connections can be held by a different buyer.
   assert.equal(connectedBuyers(limits), 16);
