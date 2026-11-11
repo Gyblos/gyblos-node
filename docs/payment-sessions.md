@@ -293,12 +293,17 @@ behavior.
 
 Before rerouting, both replacement prices must be no higher than the original
 verified quote or fresh authenticated catalog, independently for input and
-output. User ceilings are intersected with those prices. Explicit higher-price
-permission still cannot widen the configured price, per-request or total budget.
-With the default price rule, a free quote cannot turn into a paid request. An
-unverifiable or expired reference cannot authorize fallback. Identity, replay,
-exact model, reasoning, network and asset checks remain mandatory for each
-alternative.
+output. An occupied local seller uses the quote held by its active request as
+the reference while that verified quote remains valid; querying its control
+channel would compete with its unchanged per-peer execution admission. An
+expired or missing active reference returns typed busy. This reference only
+bounds prices: the alternative still passes fresh identity, replay, selection
+and quote checks. User ceilings are intersected with those prices. Explicit
+higher-price permission still cannot widen the configured price, per-request or
+total budget. With the default price rule, a free quote cannot turn into a paid
+request. An unverifiable or expired reference cannot authorize fallback.
+Identity, replay, exact model, reasoning, network and asset checks remain
+mandatory for each alternative.
 
 Rerouting ends before the first possible prompt write: a failed or partial
 write, remote execution refusal or lost response never sends that prompt

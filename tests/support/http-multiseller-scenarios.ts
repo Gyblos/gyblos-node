@@ -1,6 +1,231 @@
-// Complete product HTTP acceptance scenarios; synthetic services only and metadata-only results.
-import type { HttpMultiCase, HttpMultiReport } from './http-multiseller-constants';
+// Exercises the real buyer HTTP and seller startup lifecycles; all money and inference remain synthetic.
+import assert from 'node:assert/strict';
+import { setTimeout as delay } from 'node:timers/promises';
 
-export async function httpMultisellerScenario(_kind: HttpMultiCase): Promise<HttpMultiReport | undefined> {
-  return undefined;
+import { PAID_BUYER_CODES } from '@gyblos/buyer/constants';
+import { HTTP_STATUS } from '@gyblos/config';
+import {
+  BUYER_BUSY_POLICIES,
+  BUYER_ROUTING_CODES,
+} from '@gyblos/core/constants';
+import { chargeV2 } from '@gyblos/core/pricing-v2';
+import { ACCEPTANCE } from '@gyblos/lab-harness/acceptance/constants';
+
+import {
+  HTTP_MULTI,
+  HTTP_MULTI_CASES,
+  HTTP_MULTI_METHODS,
+  type HttpMultiCase,
+  type HttpMultiReport,
+} from './http-multiseller-constants';
+import {
+  httpMultisellerHost,
+  type HttpMultisellerHost,
+} from './http-multiseller-host';
+import {
+  httpMultiAnswer,
+  httpMultiChat,
+  httpMultiError,
+  httpMultiText,
+} from './http-multiseller-http';
+import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
+import { paidWait } from './paid-acceptance-host';
+
+function cost(host: HttpMultisellerHost, seller: number) {
+  const price = host.catalogPrices.get(host.sellers[seller]!.role.nodeId)!;
+  return chargeV2(
+    {
+      input: PAID_ACCEPTANCE.inputTokens,
+      output: [...httpMultiText(seller)].length,
+    },
+    {
+      inputAtomicPerMtok: price.inputAtomicPerMtok,
+      outputAtomicPerMtok: price.outputAtomicPerMtok,
+    },
+  );
+}
+
+async function generated(
+  host: HttpMultisellerHost,
+  seller: number,
+  count: number,
+) {
+  await paidWait(
+    async () => (await host.sellers[seller]!.health()).generations === count,
+    host.signal,
+  );
+}
+async function parallel(host: HttpMultisellerHost) {
+  const [a, b] = host.sellers;
+  await a!.call(HTTP_MULTI_METHODS.HOLD);
+  await b!.call(HTTP_MULTI_METHODS.HOLD);
+  const first = httpMultiChat(host);
+  void first.catch(() => {});
+  await generated(host, 0, 1);
+  const second = httpMultiChat(host);
+  await generated(host, 1, 1);
+  assert.equal(
+    (await httpMultiChat(host)).response.status,
+    HTTP_STATUS.tooManyRequests,
+  );
+  assert.equal((await host.inspect()).length, 2);
+  await b!.call(HTTP_MULTI_METHODS.RELEASE);
+  httpMultiAnswer(await second, 1);
+  await a!.call(HTTP_MULTI_METHODS.RELEASE);
+  httpMultiAnswer(await first, 0);
+  const entries = await host.inspect();
+  const original = entries.find(
+    (entry) => entry.terms.sellerNodeId === a!.role.nodeId,
+  )!.stored!.snapshot.channelId;
+  await host.restart();
+  await delay(ACCEPTANCE.controlRefillMs);
+  httpMultiAnswer(await httpMultiChat(host), 0);
+  const reopened = await host.inspect();
+  assert.equal(
+    reopened.find((entry) => entry.terms.sellerNodeId === a!.role.nodeId)!
+      .stored!.snapshot.channelId,
+    original,
+  );
+  assert.equal(
+    host.ledger.calls.filter((call) => call.type === 'deposit').length,
+    2,
+  );
+  const settlement = await host.buyer().chat.session?.settle?.();
+  assert.ok(settlement);
+  const chargeA = cost(host, 0);
+  const chargeB = cost(host, 1);
+  assert.equal(settlement.chargedAtomic, String(chargeA * 2n + chargeB));
+  assert.equal(
+    BigInt(settlement.chargedAtomic) + BigInt(settlement.refundedAtomic),
+    BigInt(HTTP_MULTI.totalAtomic),
+  );
+  assert.equal(
+    host.ledger.calls.filter((call) => call.type === 'refund').length,
+    2,
+  );
+  assert.equal(host.ledger.settled.size, 2);
+  return 3;
+}
+async function queue(host: HttpMultisellerHost) {
+  const a = host.sellers[0]!;
+  await a.call(HTTP_MULTI_METHODS.HOLD);
+  const first = httpMultiChat(host);
+  void first.catch(() => {});
+  await generated(host, 0, 1);
+  const expired = await httpMultiChat(host);
+  httpMultiError(expired, BUYER_ROUTING_CODES.QUEUE_TIMEOUT);
+  assert.equal((await host.inspect()).length, 1);
+  assert.equal(host.ledger.calls.length, 1);
+  const abort = new AbortController();
+  const cancelled = assert.rejects(httpMultiChat(host, abort.signal));
+  // HTTP capacity confirms that the second request has entered before disconnecting it.
+  await paidWait(
+    async () =>
+      (await httpMultiChat(host)).response.status ===
+      HTTP_STATUS.tooManyRequests,
+    host.signal,
+  );
+  abort.abort();
+  await cancelled;
+  await delay(ACCEPTANCE.controlRefillMs);
+  const second = httpMultiChat(host);
+  await a.call(HTTP_MULTI_METHODS.RELEASE);
+  httpMultiAnswer(await first, 0);
+  httpMultiAnswer(await second, 0);
+  assert.equal((await a.health()).generations, 2);
+  assert.equal((await host.sellers[1]!.health()).generations, 0);
+  assert.equal(host.ledger.calls.length, 1);
+  assert.equal(host.wire.quotes.get(a.role.nodeId)?.size, 2);
+  assert.equal(
+    (await host.inspect())[0]!.stored!.snapshot.cumulativeAtomic,
+    String(2n * cost(host, 0)),
+  );
+  return 2;
+}
+async function uncertain(host: HttpMultisellerHost, sent: boolean) {
+  const [a, b] = host.sellers;
+  await a!.call(HTTP_MULTI_METHODS.HOLD);
+  await a!.call(HTTP_MULTI_METHODS.ACK, true);
+  if (sent) await b!.call(HTTP_MULTI_METHODS.HOLD);
+  else host.wire.pause(b!.role.nodeId);
+  const first = httpMultiChat(host);
+  void first.catch(() => {});
+  await generated(host, 0, 1);
+  const second = httpMultiChat(host);
+  if (sent) await generated(host, 1, 1);
+  else await host.wire.paused;
+  await a!.call(HTTP_MULTI_METHODS.RELEASE);
+  const failed = await first;
+  assert.ok(failed.response.status >= HTTP_STATUS.badRequest);
+  host.wire.resume();
+  if (sent) {
+    await b!.call(HTTP_MULTI_METHODS.RELEASE);
+    httpMultiAnswer(await second, 1);
+  } else {
+    const refused = await second;
+    assert.ok(refused.response.status >= HTTP_STATUS.badRequest);
+  }
+  httpMultiError(await httpMultiChat(host), PAID_BUYER_CODES.UNRESOLVED);
+  assert.equal((await a!.health()).generations, 1);
+  assert.equal((await b!.health()).generations, sent ? 1 : 0);
+  assert.equal(host.wire.executions.get(b!.role.nodeId) ?? 0, sent ? 1 : 0);
+  await host.restart();
+  httpMultiError(await httpMultiChat(host), PAID_BUYER_CODES.UNRESOLVED);
+  assert.equal((await a!.health()).generations, 1);
+  assert.equal((await b!.health()).generations, sent ? 1 : 0);
+  return sent ? 1 : 0;
+}
+async function budget(host: HttpMultisellerHost) {
+  const a = host.sellers[0]!;
+  await a.call(HTTP_MULTI_METHODS.HOLD);
+  const first = httpMultiChat(host);
+  void first.catch(() => {});
+  await generated(host, 0, 1);
+  const second = await httpMultiChat(host);
+  assert.ok(second.response.status >= HTTP_STATUS.badRequest);
+  assert.equal(host.ledger.calls.length, 1);
+  assert.equal((await host.inspect()).length, 1);
+  assert.equal((await host.sellers[1]!.health()).generations, 0);
+  await a.call(HTTP_MULTI_METHODS.RELEASE);
+  httpMultiAnswer(await first, 0);
+  return 1;
+}
+export async function httpMultisellerScenario(
+  kind: HttpMultiCase,
+): Promise<HttpMultiReport> {
+  const host = await httpMultisellerHost(
+    kind === HTTP_MULTI_CASES.WAIT
+      ? BUYER_BUSY_POLICIES.WAIT
+      : BUYER_BUSY_POLICIES.REROUTE,
+    kind === HTTP_MULTI_CASES.BUDGET
+      ? HTTP_MULTI.depositAtomic
+      : HTTP_MULTI.totalAtomic,
+  );
+  try {
+    const answers =
+      kind === HTTP_MULTI_CASES.PARALLEL
+        ? await parallel(host)
+        : kind === HTTP_MULTI_CASES.WAIT
+          ? await queue(host)
+          : kind === HTTP_MULTI_CASES.BUDGET
+            ? await budget(host)
+            : await uncertain(host, kind === HTTP_MULTI_CASES.SENT);
+    const generations = (
+      await Promise.all(host.sellers.map((seller) => seller.health()))
+    ).reduce((sum, item) => sum + item.generations, 0);
+    assert.ok(host.index.counts().reads > 0 && host.index.counts().writes >= 4);
+    assert.ok(host.registry.counts().reads >= 2);
+    return {
+      nativeIroh: true,
+      answers,
+      generations,
+      deposits: host.ledger.calls.filter((call) => call.type === 'deposit')
+        .length,
+      externalCalls: host.external(),
+      registryReads: host.registry.counts().reads,
+      forbiddenRpcMethods: host.registry.counts().forbidden,
+    };
+  } finally {
+    await host.close();
+  }
 }

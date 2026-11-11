@@ -13,15 +13,28 @@ export const HTTP_MULTI_CASES = {
   PARALLEL: 'parallel-restart-settlement',
   WAIT: 'wait-expiry-cancellation-renewal',
   SENT: 'uncertainty-with-sent-peer',
+  BUDGET: 'shared-budget-race',
   UNSENT: 'uncertainty-with-unsent-peer',
 } as const;
-export type HttpMultiCase = (typeof HTTP_MULTI_CASES)[keyof typeof HTTP_MULTI_CASES];
+export type HttpMultiCase =
+  (typeof HTTP_MULTI_CASES)[keyof typeof HTTP_MULTI_CASES];
 export const HTTP_MULTI_METHODS = {
-  HELLO: 'hello', INIT: 'init', START: 'start', STOP: 'stop', SIGN: 'sign',
-  HEALTH: 'health', HOLD: 'hold', RELEASE: 'release', ACK: 'ack',
-  VERIFY: 'verify', SETTLE: 'settle', OBSERVE: 'observe', OPENED: 'opened',
+  HELLO: 'hello',
+  INIT: 'init',
+  START: 'start',
+  STOP: 'stop',
+  SIGN: 'sign',
+  HEALTH: 'health',
+  HOLD: 'hold',
+  RELEASE: 'release',
+  ACK: 'ack',
+  VERIFY: 'verify',
+  SETTLE: 'settle',
+  OBSERVE: 'observe',
+  OPENED: 'opened',
 } as const;
-export type HttpMultiMethod = (typeof HTTP_MULTI_METHODS)[keyof typeof HTTP_MULTI_METHODS];
+export type HttpMultiMethod =
+  (typeof HTTP_MULTI_METHODS)[keyof typeof HTTP_MULTI_METHODS];
 export interface HttpMultiReport {
   nativeIroh: true;
   answers: number;
