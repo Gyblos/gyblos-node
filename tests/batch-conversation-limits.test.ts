@@ -188,7 +188,8 @@ void test('a session-v1-only peer fails v2 preparation before opening or signing
 });
 
 void test('quote expiry during whole-history recount refuses seller reservation and generation', async (t) => {
-  const f = await batchConversation(); t.after(f.close);
+  const f = await batchConversation();
+  t.after(f.close);
   const quote = await f.quote(1);
   const chat = f.offers.live.meter.chat;
   f.offers.live.meter.chat = (messages) => {
@@ -197,7 +198,10 @@ void test('quote expiry during whole-history recount refuses seller reservation 
     return count;
   };
   const reserve = t.mock.method(f.rig.seller(), 'reserve');
-  await assert.rejects(f.buyer().execute(quote, CONVERSATION_INPUT, new AbortController().signal), { code: PAID_EXECUTION_CODES.EXPIRED });
+  await assert.rejects(
+    f.buyer().execute(quote, CONVERSATION_INPUT, new AbortController().signal),
+    { code: PAID_EXECUTION_CODES.EXPIRED },
+  );
   assert.equal(reserve.mock.callCount(), 0);
   assert.equal(f.generated.length, 0);
   assert.equal(f.rig.seller().snapshot().cumulativeAtomic, '0');
