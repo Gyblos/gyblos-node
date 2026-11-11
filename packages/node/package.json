@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./buyer-api-keys": "./src/buyer-api-keys.ts",
     "./session-policy": "./src/session-policy.ts",
     "./session-backend": "./src/session-backend.ts",
     "./seller-sessions": "./src/seller-sessions.ts",
