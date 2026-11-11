@@ -2,9 +2,27 @@
 
 The shared buyer and seller session services use the pinned Solana x402
 `batch-settlement` client-signature mode. Trusted hosts can compose them over
-the opt-in `gyblos/session/1` Iroh channel. The buyer CLI and seller daemon can
+the opt-in `gyblos/session/2` Iroh channel. The buyer CLI and seller daemon can
 activate this path explicitly. Without that policy, the existing per-request
 path remains available. No public gateway is enabled by this composition.
+
+## Conversation input and compatibility
+
+Reusable sessions accept the shared text conversation shape: optional system
+first, then alternating user/assistant turns ending with the user's turn. The
+complete history is sent with each request and counted by the model's chat
+template on both peers. Earlier turns are input tokens again on later requests;
+channel reuse avoids a new deposit, not payment for input the engine processes.
+No server-side conversation history is stored. The existing 64 KiB content,
+1024-message and 128-output-token bounds, signed quote, context and budget all
+apply; unsupported input is rejected rather than trimmed.
+
+The active session transport is v2. An old session-v1 seller must be upgraded;
+failed v2 preparation signs no opening and does not trigger a fallback. The SDK
+channel and private financial journal do not migrate: saved approvals retain
+their original digest and recover without another inference. The per-request
+paid stream remains a separate, single-user path. Free execution is unchanged.
+Session replies are complete responses; incremental token streaming is separate.
 
 ## Explicit startup policy
 

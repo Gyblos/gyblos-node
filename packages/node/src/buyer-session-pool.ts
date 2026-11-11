@@ -1,5 +1,6 @@
 // Bounded routing across independently persisted seller sessions; the private catalog owns all budget credit.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
+import { recountSessionInput } from '@gyblos/core/session-input';
 import type {
   BatchBuyerPool,
   BatchPoolEntry,
@@ -23,7 +24,6 @@ import { bounded } from './buyer-operation';
 import { createPoolAdmissions, type PoolLease } from './buyer-pool-admission';
 import { UnsentSellerBusyError } from './buyer-routing';
 import {
-  checkBuyerSessionInput,
   createBuyerSessionManager,
   type BuyerSessionOptions,
 } from './buyer-session';
@@ -140,7 +140,7 @@ async function execute<Remote extends BatchDestination>(
   signal: AbortSignal,
   lease: PoolLease,
 ) {
-  checkBuyerSessionInput(quote, input);
+  recountSessionInput(quote, input, state.options.meter);
   await state.options.verify(quote, signal);
   const entry = await state.admission.serial(async () => {
     if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);

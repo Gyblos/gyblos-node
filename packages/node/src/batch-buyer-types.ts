@@ -1,6 +1,6 @@
 // Buyer host dependencies: verified selection, independent recount and finalized-chain observation.
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
-import type { RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import type {
   PaymentSessionTerms,
   SessionBuyer,
@@ -17,7 +17,7 @@ export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
   terms: Readonly<PaymentSessionTerms>;
   endpoint: BatchEndpoint<Remote>;
   destination: Remote;
-  meter: RecountTokenizer;
+  meter: ChatTokenizer;
   now: () => number;
   transport?: BatchClientOptions;
   // Fail closed on prior unresolved payments; the active authorized session is tracked by its own journal.

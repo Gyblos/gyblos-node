@@ -9,6 +9,7 @@ import {
   sessionTerms,
 } from '@gyblos/node/session-policy';
 import {
+  BATCH_CHANNEL,
   BATCH_METHODS,
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
@@ -77,7 +78,7 @@ void test('prepare and open carry proposed full terms without changing existing 
   const terms = vector.response.result.terms;
   for (const method of [BATCH_METHODS.PREPARE, BATCH_METHODS.OPEN]) {
     const original = {
-      version: 1,
+      version: BATCH_CHANNEL.version,
       requestId: '12'.repeat(16),
       method,
       params: {
