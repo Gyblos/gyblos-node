@@ -22,6 +22,7 @@ async function fixture(policy: unknown = undefined, pinned = false) {
     source.offers.map((offer, index) => offer.quote(index + 1)),
   );
   const router = createBuyerRouter({
+    now: source.a.now,
     policy: parseBuyerRoutingPolicy(policy),
     pinnedNodeId: pinned ? quotes[0]!.offer.nodeId : undefined,
     priceCeilings: {
