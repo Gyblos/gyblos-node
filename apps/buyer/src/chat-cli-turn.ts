@@ -1,13 +1,15 @@
 // Performs one bounded interactive request to the local buyer, never retries or follows redirects.
 import { LOCALHOST, PORTS, ROUTES, UNITS } from '@gyblos/config';
+import { prepareBuyerConversation } from '@gyblos/core/buyer-conversation';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import {
   sessionApproval,
   type SessionApproval,
 } from '@gyblos/node/session-accounting';
+import type { ChatMessage } from '@gyblos/protocol/chat';
 import {
-  FREE_CHAT_ROLES,
+  ENGINE_DONE_REASONS,
   FREE_EXECUTION_CODES,
   FREE_STREAM,
   OFFER_PRICING_KINDS,
@@ -16,9 +18,12 @@ import {
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
+import { createChatText } from './chat-cli-text';
 import {
   BUYER_EXECUTION_FIELD,
   BUYER_SELECTION_CODES,
+  CHAT_INPUT_BYTES,
+  CHAT_TURN_STATUSES,
   FREE_BUYER,
   FREE_BUYER_CODES,
   PAID_BUYER,
@@ -31,13 +36,13 @@ export interface ChatTurnOptions {
   model: string;
   maxTokens: number;
   prompt: string;
+  history?: readonly ChatMessage[];
   paid?: boolean;
   automatic?: boolean;
   write: (text: string) => void;
   signal?: AbortSignal;
 }
-export interface ChatTurnResult {
-  status: 'complete' | 'uncertain' | 'rejected';
+interface ChatAccounting {
   requestDigest?: string;
   code?: string;
   usage?: { input: number; output: number };
@@ -48,9 +53,21 @@ export interface ChatTurnResult {
     refunded: string | null;
   };
 }
+type ChatTerminal = ChatAccounting & {
+  status:
+    typeof CHAT_TURN_STATUSES.COMPLETE | typeof CHAT_TURN_STATUSES.UNCERTAIN;
+};
+export type ChatTurnResult = ChatAccounting &
+  (
+    | { status: typeof CHAT_TURN_STATUSES.COMPLETE; text: string }
+    | {
+        status:
+          | typeof CHAT_TURN_STATUSES.UNCERTAIN
+          | typeof CHAT_TURN_STATUSES.REJECTED;
+      }
+  );
 const SSE_FRAMING = { jsonExpansion: 6, envelopeBytes: 1024 } as const;
 const BOUNDS = {
-  promptBytes: 64_000,
   // A delta may expand to six bytes per character in JSON and each event adds an SSE envelope.
   responseBytes:
     FREE_STREAM.totalBytes * SSE_FRAMING.jsonExpansion +
@@ -92,9 +109,13 @@ function paymentResult(payment: Record<string, unknown>) {
   };
 }
 
-function errorResult(value: unknown): ChatTurnResult {
+function errorResult(
+  value: unknown,
+): ChatAccounting & { status: typeof CHAT_TURN_STATUSES.UNCERTAIN } {
   const error = record(record(value)?.error);
-  const result: ChatTurnResult = { status: 'uncertain' };
+  const result: ChatAccounting & {
+    status: typeof CHAT_TURN_STATUSES.UNCERTAIN;
+  } = { status: CHAT_TURN_STATUSES.UNCERTAIN };
   if (!error) return result;
   const codes = [
     ...Object.values(SESSION_CODES),
@@ -120,17 +141,19 @@ function completeResult(
   choice: Record<string, unknown>,
   body: Record<string, unknown>,
   options: Pick<ChatTurnOptions, 'paid' | 'automatic'>,
-): ChatTurnResult {
+): ChatTerminal {
   const usage = record(body.usage);
   if (
-    typeof choice.finish_reason !== 'string' ||
+    !Object.values(ENGINE_DONE_REASONS).some(
+      (reason) => reason === choice.finish_reason,
+    ) ||
     !usage ||
     !count(usage.prompt_tokens) ||
     !count(usage.completion_tokens)
   )
     throw new Error('usage');
-  const terminal: ChatTurnResult = {
-    status: 'complete',
+  const terminal: ChatTerminal = {
+    status: CHAT_TURN_STATUSES.COMPLETE,
     usage: { input: usage.prompt_tokens, output: usage.completion_tokens },
   };
   const payment = record(body[PAID_BUYER.paymentField]);
@@ -150,7 +173,7 @@ function completeResult(
       payment.verdict !== PAID_VERDICTS.SETTLED &&
       payment.verdict !== SESSION_VERDICTS.APPROVED
     )
-      terminal.status = 'uncertain';
+      terminal.status = CHAT_TURN_STATUSES.UNCERTAIN;
   }
   return terminal;
 }
@@ -183,16 +206,17 @@ export async function chatTurn(
   options: ChatTurnOptions,
   request: typeof fetch,
 ): Promise<ChatTurnResult> {
-  if (
-    !options.prompt.trim() ||
-    Buffer.byteLength(options.prompt) > BOUNDS.promptBytes
-  )
-    return { status: 'rejected' };
+  const messages = prepareBuyerConversation(
+    options.history ?? [],
+    options.prompt,
+    CHAT_INPUT_BYTES,
+  );
+  if (!messages) return { status: CHAT_TURN_STATUSES.REJECTED };
   const signal = AbortSignal.any([
     AbortSignal.timeout(BOUNDS.timeoutMs),
     ...(options.signal ? [options.signal] : []),
   ]);
-  if (signal.aborted) return { status: 'rejected' };
+  if (signal.aborted) return { status: CHAT_TURN_STATUSES.REJECTED };
   try {
     const response = await request(
       `http://${LOCALHOST}:${PORTS.buyerProxy}${ROUTES.inference}`,
@@ -208,23 +232,23 @@ export async function chatTurn(
         },
         body: JSON.stringify({
           model: options.model,
-          messages: [{ role: FREE_CHAT_ROLES.USER, content: options.prompt }],
+          messages,
           max_tokens: options.maxTokens,
           stream: true,
         }),
       },
     );
-    if (!response.body) return { status: 'uncertain' };
+    if (!response.body) return { status: CHAT_TURN_STATUSES.UNCERTAIN };
     if (!response.ok) return await readError(response.body);
     if (
       !response.headers
         .get('content-type')
         ?.startsWith(FREE_BUYER.streamContentType)
     )
-      return { status: 'uncertain' };
+      return { status: CHAT_TURN_STATUSES.UNCERTAIN };
     return await readStream(response.body, options);
   } catch {
-    return { status: 'uncertain' };
+    return { status: CHAT_TURN_STATUSES.UNCERTAIN };
   }
 }
 
@@ -245,7 +269,7 @@ function frameDigest(
   body: Record<string, unknown> | undefined,
   previous: string | undefined,
   paid: boolean | undefined,
-  terminal: ChatTurnResult | undefined,
+  terminal: ChatTerminal | undefined,
 ) {
   const candidate = paid ? body?.[PAID_BUYER.requestDigestField] : undefined;
   if (candidate === undefined) return previous;
@@ -270,13 +294,8 @@ function frameDigest(
 }
 const uncertain = (requestDigest?: string): ChatTurnResult =>
   requestDigest
-    ? { status: 'uncertain', requestDigest }
-    : { status: 'uncertain' };
-
-function writeDelta(options: ChatTurnOptions, value: unknown) {
-  if (typeof value === 'string')
-    options.write(value.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, ''));
-}
+    ? { status: CHAT_TURN_STATUSES.UNCERTAIN, requestDigest }
+    : { status: CHAT_TURN_STATUSES.UNCERTAIN };
 
 async function readStream(
   body: ReadableStream<Uint8Array>,
@@ -287,7 +306,8 @@ async function readStream(
   let pending = '';
   let bytes = 0;
   let done = false;
-  let terminal: ChatTurnResult | undefined;
+  let terminal: ChatTerminal | undefined;
+  const output = createChatText(options.write);
   let requestDigest: string | undefined;
   try {
     while (true) {
@@ -336,7 +356,7 @@ async function readStream(
           const choice = record(body.choices[0]);
           const delta = record(choice?.delta);
           if (!choice || !delta) throw new Error('choice');
-          writeDelta(options, delta.content);
+          output.append(delta.content);
           if (choice.finish_reason !== null) {
             terminal = completeResult(choice, body, options);
           }
@@ -346,13 +366,22 @@ async function readStream(
     }
     pending += decoder.decode();
     if (!done || pending || !terminal) return uncertain(requestDigest);
-    return terminal.status === 'uncertain' && requestDigest
-      ? { ...terminal, requestDigest }
-      : terminal;
+    return verifiedStreamResult(terminal, requestDigest, output.value());
   } catch {
     return uncertain(requestDigest);
   } finally {
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
+}
+function verifiedStreamResult(
+  terminal: ChatTerminal,
+  requestDigest: string | undefined,
+  text: string,
+): ChatTurnResult {
+  if (terminal.status === CHAT_TURN_STATUSES.COMPLETE)
+    return { ...terminal, status: CHAT_TURN_STATUSES.COMPLETE, text };
+  return requestDigest
+    ? { ...terminal, status: CHAT_TURN_STATUSES.UNCERTAIN, requestDigest }
+    : { ...terminal, status: CHAT_TURN_STATUSES.UNCERTAIN };
 }

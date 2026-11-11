@@ -4,7 +4,11 @@ import { test } from 'node:test';
 
 import { chatSession } from '@gyblos/buyer/chat-cli';
 import { chatTurn } from '@gyblos/buyer/chat-cli-turn';
-import { BUYER_EXECUTION_FIELD, PAID_BUYER } from '@gyblos/buyer/constants';
+import {
+  BUYER_EXECUTION_FIELD,
+  CHAT_TURN_STATUSES,
+  PAID_BUYER,
+} from '@gyblos/buyer/constants';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
@@ -62,7 +66,8 @@ void test('chat displays approved totals and permits the next question within th
       output += text;
     },
     turn: async () => ({
-      status: 'complete',
+      status: CHAT_TURN_STATUSES.COMPLETE,
+      text: 'synthetic confirmed answer',
       payment: {
         verdict: SESSION_VERDICTS.APPROVED,
         charged: null,

@@ -58,6 +58,12 @@ canonical atomic amounts; no floating-point conversion is used.
 
 The default total ceiling and both price ceilings are zero. This admits free
 quotes only, and `buyer:chat` labels that automatic setup as `free quotes only`.
+Chat remembers confirmed turns in memory. `/new` starts a new conversation
+without resetting spending limits or payment channels; `/exit` leaves the chat.
+An interrupted answer ends the session without retry. History is not saved to
+disk and is not silently trimmed to fit; use `/new` when the whole conversation
+reaches the existing input/context limits. See
+[conversation and payment-session behavior](payment-sessions.md#terminal-conversation-history).
 A positive total ceiling still allows free quotes: the buyer chooses the
 execution path from the verified signed quote, not from a mode selected by this
 command. Positive-price execution additionally requires the existing devnet
