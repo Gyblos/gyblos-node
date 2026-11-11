@@ -10,6 +10,10 @@ import {
   PAYPAL_ACTION,
   PAYPAL_DESKTOP_ERROR,
 } from '@gyblos/desktop/paypal-model';
+import {
+  RESPONSE_COST_KIND,
+  RESPONSE_COST_UNIT,
+} from '@gyblos/desktop/response-metrics';
 
 import { setup } from './support/desktop-paypal-chat-fixture';
 
@@ -67,6 +71,14 @@ void test('a received response stays visible when acknowledgement fails and cann
     'a synthetic answer',
   );
   assert.ok(paypal.getSnapshot().pendingMessageId);
+  assert.deepEqual(
+    chat.getSnapshot().sessions[0]?.messages.at(-1)?.metrics?.cost,
+    {
+      amount: '0.10',
+      unit: RESPONSE_COST_UNIT.USD,
+      kind: RESPONSE_COST_KIND.RECORDED,
+    },
+  );
   chat.setDraft('Do not send');
   assert.equal(await sendPaypalMessage(chat, paypal, 'blocked'), false);
   assert.equal(chat.getSnapshot().sessions[0]?.messages.length, 2);
@@ -74,20 +86,29 @@ void test('a received response stays visible when acknowledgement fails and cann
 
 void test('received text appears before delayed acknowledgement and another send remains blocked', async () => {
   const { run } = await setup();
+  let now = 100;
   let release: (() => void) | undefined;
   const wait = new Promise<void>((resolve) => {
     release = resolve;
   });
   const paypal = new PaypalChatController(async (request) => {
     if (request.action === PAYPAL_ACTION.ACKNOWLEDGE) await wait;
-    return run(request);
+    const result = await run(request);
+    if (request.action === PAYPAL_ACTION.SEND) now = 1334;
+    return result;
   });
   await paypal.refresh();
   await paypal.create();
   await paypal.approve();
   const chat = new ChatController('one');
   chat.setDraft('First');
-  const pending = sendPaypalMessage(chat, paypal, 'first');
+  const pending = sendPaypalMessage(
+    chat,
+    paypal,
+    'first',
+    undefined,
+    () => now,
+  );
   try {
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(
@@ -96,6 +117,19 @@ void test('received text appears before delayed acknowledgement and another send
     );
     assert.equal(paypal.getSnapshot().busy, true);
     assert.ok(paypal.getSnapshot().pendingMessageId);
+    assert.deepEqual(chat.getSnapshot().sessions[0]?.messages.at(-1)?.metrics, {
+      inputTokens: null,
+      outputTokens: null,
+      firstTokenMs: null,
+      generationMs: null,
+      responseMs: 1234,
+      cost: {
+        amount: '0.10',
+        unit: RESPONSE_COST_UNIT.USD,
+        kind: RESPONSE_COST_KIND.RECORDED,
+      },
+    });
+    now = 5000;
     chat.setDraft('Next draft');
     assert.equal(await sendPaypalMessage(chat, paypal, 'blocked'), false);
   } finally {

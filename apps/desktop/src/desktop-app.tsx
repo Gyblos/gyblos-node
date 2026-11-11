@@ -348,7 +348,9 @@ export function DesktopApp() {
               title="Check PayPal session"
               onClick={reviewPaypalPayments}
             >
-              Review PayPal session
+              <span className="ui-window-action-label">
+                Review PayPal session
+              </span>
             </Button>
           )}
       </WindowTitlebar>

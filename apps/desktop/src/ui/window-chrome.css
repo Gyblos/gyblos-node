@@ -5,6 +5,7 @@
 .desktop-frame > .ui-window-chrome {
   --window-title-inset: 244px;
   --window-controls-right: 0px;
+  --window-title-min-width: 128px;
   grid-area: 1 / 1 / 2 / -1;
   position: relative;
   z-index: 5;
@@ -82,13 +83,23 @@
   margin-left: auto;
   z-index: 1;
   min-width: 0;
-  max-width: 45%;
+  max-width: max(
+    0px,
+    calc(
+      (100vw - var(--window-title-min-width)) / 2 -
+        var(--window-controls-right) - var(--space-3) - var(--space-2)
+    )
+  );
 }
-.ui-window-chrome > .top-actions > .payment-operation-notice {
+.ui-window-chrome .payment-operation-notice,
+.ui-window-chrome .ui-window-action-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ui-window-chrome > .top-actions > .ui-button {
+  min-width: 0;
 }
 .ui-window-chrome button {
   -webkit-app-region: no-drag;
