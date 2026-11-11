@@ -9,9 +9,13 @@ import {
   BATCH_METHODS,
   type BatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
-import { SESSION_STATES } from '@gyblos/protocol/payment-session';
+import {
+  SESSION_CODES,
+  SESSION_STATES,
+} from '@gyblos/protocol/payment-session';
 import { createBatchChannelClient } from '@gyblos/transport-iroh/batch-client';
 
+import { batchStreamFixture } from './support/batch-stream-fixture';
 import { endpoint, within } from './support/native-fixture';
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 
@@ -33,6 +37,8 @@ for (const scenario of ['peer-connection', 'global-request'] as const)
           ? await endpoint(undefined, [BATCH_CHANNEL.alpn])
           : buyer;
       let calls = 0;
+      const fixture = await batchStreamFixture();
+      const call = scenario === 'global-request' ? fixture.request : request;
       const limits = {
         ...TRANSPORT_LIMITS,
         globalRequestsPerWindow:
@@ -45,8 +51,12 @@ for (const scenario of ['peer-connection', 'global-request'] as const)
         {
           free: undefined,
           batchSessions: {
-            async exchange() {
+            async exchange(_request, _peer, _signal, onDelta) {
               calls++;
+              if (scenario === 'global-request') {
+                await onDelta?.(fixture.value.text);
+                return { value: fixture.value, bill: fixture.bill };
+              }
               return {
                 snapshot: {
                   channelId: request.params.channelId,
@@ -65,17 +75,25 @@ for (const scenario of ['peer-connection', 'global-request'] as const)
         buyer,
         seller.addr(),
         seller.id().toString(),
+        { now: () => fixture.request.params.quote.offer.issuedAt },
       );
       const second = createBatchChannelClient(
         other,
         seller.addr(),
         seller.id().toString(),
+        { now: () => fixture.request.params.quote.offer.issuedAt },
       );
       try {
-        await within(first.exchange(request));
-        await assert.rejects(
-          within(second.exchange({ ...request, requestId: '34'.repeat(16) })),
+        await within(first.exchange(call));
+        const repeated = within(
+          second.exchange({ ...call, requestId: '34'.repeat(16) }),
         );
+        if (scenario === 'global-request')
+          await assert.rejects(repeated, {
+            code: SESSION_CODES.LIMIT,
+            remote: true,
+          });
+        else await assert.rejects(repeated);
         assert.equal(calls, 1);
       } finally {
         await first.close();
