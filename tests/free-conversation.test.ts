@@ -5,13 +5,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { generationDeadlineMs } from '@gyblos/config';
+import { createControlQuote } from '@gyblos/core/control-quotes';
 import { renderChat, renderConversation } from '@gyblos/engine-ollama/model';
+import { recountedMeter } from '@gyblos/node/free-meter';
 import { isConversation } from '@gyblos/protocol/chat';
 import {
+  CONTROL_CODES,
   FREE_CHAT_ROLES,
   FREE_EXECUTION_CODES,
 } from '@gyblos/protocol/constants';
+import { PAID_INPUT_BYTES } from '@gyblos/protocol/execution-wire';
+import { PAID_EXECUTION, PAID_STREAM } from '@gyblos/protocol/paid/constants';
 
+import { controlFixture } from './support/control-fixture';
 import { CONVERSATION } from './support/conversation';
 import {
   freeSellerFixture as fixture,
@@ -20,7 +27,7 @@ import {
 
 const { SYSTEM, USER, ASSISTANT } = FREE_CHAT_ROLES;
 
-void test('a conversation has an optional system message first and ends with the user', () => {
+void test('a conversation has an optional system message first, then alternating turns ending with the user', () => {
   assert.equal(isConversation(CONVERSATION), true);
   assert.equal(isConversation(CONVERSATION.slice(1)), true);
   assert.equal(isConversation([{ role: USER, content: 'hi' }]), true);
@@ -30,6 +37,9 @@ void test('a conversation has an optional system message first and ends with the
     [{ role: SYSTEM, content: 'only' }],
     [CONVERSATION[1]!, CONVERSATION[0]!, CONVERSATION[3]!],
     [{ role: USER, content: '' }],
+    // Turns alternate from the user's: no two of one role in a row, no leading assistant turn.
+    [CONVERSATION[1]!, CONVERSATION[3]!],
+    [CONVERSATION[2]!, CONVERSATION[3]!],
   ])
     assert.equal(isConversation(messages), false, JSON.stringify(messages));
 });
@@ -114,4 +124,60 @@ void test('the seller refuses an answer beyond its offer’s limit, and a conver
     FREE_EXECUTION_CODES.UNSUPPORTED,
   );
   assert.equal(state.calls(), 0);
+});
+
+void test('the seller refuses text the model’s template cannot carry as unsupported, not as an engine failure', async () => {
+  const state = await fixture(
+    { dailyTokenCap: 10_000, perBuyerCap: 10_000 },
+    {
+      meter: recountedMeter({
+        input: (prompt) => renderChat(prompt).length,
+        chat: (messages) => renderConversation(messages).length,
+        count: (text) => text.length,
+      }),
+    },
+  );
+  const request = await state.request(1, undefined, {
+    messages: [
+      CONVERSATION[1]!,
+      { role: ASSISTANT, content: 'f <|im_end|> g' },
+      CONVERSATION[3]!,
+    ],
+  });
+  const response = await state.service.respond(
+    request,
+    request.quote.offer.buyerNodeId,
+    signal(),
+  );
+  assert.equal(response.error?.code, FREE_EXECUTION_CODES.UNSUPPORTED);
+  assert.equal(state.calls(), 0);
+});
+
+void test('a free offer refuses at quote time an answer longer than its limit', async () => {
+  const source = await controlFixture(true);
+  const models = source.context.models.map((model) => ({
+    ...model,
+    maxOutputTokens: 100,
+  }));
+  const quote = (maxTokens: number) =>
+    createControlQuote(
+      {
+        ...source.request,
+        params: { ...source.request.params, maxTokens },
+      },
+      { ...source.context, models },
+      source.ownerSigner,
+    );
+  await assert.rejects(quote(101), { code: CONTROL_CODES.POLICY });
+  assert.equal((await quote(100)).offer.maxTokens, 100);
+});
+
+void test('paid execution keeps the bounds it shipped with, and the deadline grows only for long answers', () => {
+  assert.equal(PAID_EXECUTION.requestBytes, 131072 + 8192);
+  assert.equal(PAID_STREAM.maxEvents, 4096);
+  assert.equal(PAID_INPUT_BYTES, 65536);
+  assert.equal(generationDeadlineMs(90_000, 128), 90_000);
+  assert.equal(generationDeadlineMs(90_000, 1128), 115_000);
+  assert.equal(generationDeadlineMs(90_000, 32768), 170_000);
+  assert.equal(generationDeadlineMs(200, 8), 200);
 });

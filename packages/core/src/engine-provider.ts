@@ -1,6 +1,7 @@
 // What every adapter for a hosted provider API shares: routes under the offer's base URL, JSON objects
 // and provider counts that fail as the Engine port classifies them, an error body read only for its
 // type, the generation deadline and the delivery of each visible fragment. Pure; web APIs only.
+import { generationDeadlineMs } from '@gyblos/config';
 import {
   ENGINE_ERROR_CODES,
   type EngineDoneReason,
@@ -101,7 +102,9 @@ export function generationAttempt(
     throw new Error('Invalid output token limit.');
   const messages = engineConversation(input);
   input.signal?.throwIfAborted();
-  const deadline = AbortSignal.timeout(limits.timeoutMs);
+  const deadline = AbortSignal.timeout(
+    generationDeadlineMs(limits.timeoutMs, input.maxTokens),
+  );
   const attempt: EngineAttempt = {
     caller: input.signal,
     deadline,

@@ -8,6 +8,7 @@
     "./constants": "./src/constants.ts",
     "./chat": "./src/chat.ts",
     "./engine": "./src/engine.ts",
+    "./execution-wire": "./src/execution-wire.ts",
     "./execution-policy": "./src/execution-policy.ts",
     "./errors": "./src/errors.ts",
     "./models": "./src/models.ts",

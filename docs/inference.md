@@ -27,8 +27,7 @@ The gate starts its own loopback-only Ollama on port 11436 and a facilitator on
 4022; its inference seller uses an ephemeral loopback port. Model setup
 uses 11437. Stop other gate hosts first. Cloud inference is disabled. Child
 environment values set `OLLAMA_HOST`, `OLLAMA_MODELS` and `OLLAMA_NO_CLOUD`; the
-inference run also sets `OLLAMA_DEBUG=0` and `OLLAMA_CONTEXT_LENGTH` to the
-default context (8192).
+inference run also sets `OLLAMA_DEBUG=0` and `OLLAMA_CONTEXT_LENGTH=2048`.
 
 ## Template and generation
 

@@ -1,7 +1,13 @@
 // Ollama HTTP client restricted to a literal loopback origin: checks the pinned model is present and runs
 // bounded, deterministic raw generations. Failures follow the Engine port contract in @gyblos/protocol/engine.
 // It must not know wallets or payments.
-import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
+import {
+  generationDeadlineMs,
+  IPV6_LOOPBACK,
+  LOCALHOST,
+  ROUTES,
+  TIMEOUTS,
+} from '@gyblos/config';
 import {
   BoundFailure,
   callerCallback,
@@ -253,7 +259,9 @@ export function createOllama(
       input.signal?.throwIfAborted();
       await assertModel(input.signal);
       input.signal?.throwIfAborted();
-      const deadline = AbortSignal.timeout(generationTimeoutMs);
+      const deadline = AbortSignal.timeout(
+        generationDeadlineMs(generationTimeoutMs, input.maxTokens),
+      );
       const attempt: EngineAttempt = {
         caller: input.signal,
         deadline,

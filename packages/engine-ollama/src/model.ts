@@ -24,5 +24,9 @@ export function renderConversation(messages: readonly ChatMessage[]): string {
   return `${rendered}<|im_start|>assistant\n<think>\n\n</think>\n\n`;
 }
 
-export const renderChat = (prompt: string) =>
-  renderConversation([{ role: 'user', content: prompt }]);
+// A lone prompt, as the paid and lab paths send one, within its original bound.
+export function renderChat(prompt: string): string {
+  if (prompt.length > MODEL_LIMITS.maxPromptCharacters)
+    throw new Error('Unsupported prompt for the bounded single-user offer.');
+  return renderConversation([{ role: 'user', content: prompt }]);
+}

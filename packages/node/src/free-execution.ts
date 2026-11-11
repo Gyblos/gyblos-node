@@ -134,7 +134,13 @@ function freeInputTokens(
   messages: readonly ChatMessage[],
   options: SellerFreeExecutionOptions,
 ) {
-  const inputTokens = options.meter.chat(messages);
+  let inputTokens: number;
+  try {
+    inputTokens = options.meter.chat(messages);
+  } catch {
+    // Text the model's template cannot carry (its control tokens, say) is input the offer cannot serve.
+    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
+  }
   if (
     !Number.isSafeInteger(inputTokens) ||
     inputTokens < 0 ||

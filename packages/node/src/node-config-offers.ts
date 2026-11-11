@@ -78,6 +78,8 @@ const UNVERIFIED_DEFAULT_REASONING: readonly ReasoningLevel[] = [
 const ZERO = '0';
 // A free offer's longest answer per request when gyblos.toml does not set free.max_output_tokens.
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+// Free output text is at most 256 KiB; a token is at least a byte, and answers average several.
+const MAX_OUTPUT_TOKENS = 32768;
 
 interface ResolvedOfferModel {
   model: OfferModel;
@@ -246,11 +248,11 @@ function tokenCap(value: unknown, path: ConfigPath, issues: IssueList) {
   return Number(cap);
 }
 
-// A TOML integer from one token to the largest context any offer may have.
+// A TOML integer from one token to the longest answer the free channel's output bounds can carry.
 function outputLimit(value: unknown, path: ConfigPath, issues: IssueList) {
   const tokens = integer(value, path, issues);
   if (tokens === undefined) return undefined;
-  if (tokens < 1n || tokens > BigInt(NODE_CONFIG_LIMITS.maxContextTokens))
+  if (tokens < 1n || tokens > BigInt(MAX_OUTPUT_TOKENS))
     return issues.add(NODE_CONFIG_ISSUE_CODES.INVALID_VALUE, path);
   return Number(tokens);
 }

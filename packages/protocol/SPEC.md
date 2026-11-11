@@ -368,14 +368,19 @@ prompt byte is sent.
 - ALPNs `gyblos/free/4` and `gyblos/free-stream/4`, `version: 4` and request
   digest domain `gyblos/free-execution-request/v4\n`.
 - The request shape is unchanged; the seller now serves a conversation: an
-  optional `system` message first, then `user` and `assistant` turns, ending
-  with a `user` message, each with non-empty text. Any other shape is still
+  optional `system` message first, then turns alternating `user`, `assistant`,
+  from and ending with `user`, each with non-empty text (every engine template
+  accepts that; a buyer merges consecutive turns of one role first). Content
+  the model's template cannot carry is refused as unsupported. Any other shape is still
   refused with `FREE_EXECUTION_UNSUPPORTED` before generation.
 - Message content may total 256 KiB (was 64 KiB) and a request body 384 KiB
   (was 128 KiB); a stream may carry 32768 events (was 4096). The output text
   and response bounds are unchanged.
-- There is no fixed output maximum: the offer's answer limit and the model's
-  context bound `maxTokens` (see Seller runtime scope).
+- There is no fixed token maximum: the offer's answer limit (refused at quote
+  time) and the model's context bound `maxTokens` (see Seller runtime scope);
+  the 256 KiB output text bound still applies.
+- Paid execution v1 keeps its bounds (64 KiB input, 136 KiB requests, 4096
+  stream events) and one user message.
 - Vectors move from the `-v3.json` files to `free-execution-v4.json` and
   `free-stream-v4.json`, derived by an independent Python oracle that first
   reproduced the v3 vectors; the quote envelope and its signature are unchanged.
@@ -418,7 +423,8 @@ Request fields (all required; unknown fields at every level are rejected):
 - `messages`: 1–64 text-only objects with exactly `role` and `content`. Roles
   are `system`, `user`, `assistant`; multiline/empty content is representable
   on the wire. The seller serves a conversation: an optional `system` message
-  first, then `user` and `assistant` turns ending with `user`, each non-empty.
+  first, then turns alternating `user`, `assistant`, from and ending with
+  `user`, each non-empty.
   Tools, attachments, remote URLs, function calls and streaming options are not
   supported. A wire role does not imply a particular engine implements it:
   the seller must refuse unsupported input before generation, without silently
@@ -588,9 +594,11 @@ branch (a lone user message exactly as before); the OpenAI adapter sends the
 messages as they are and the Anthropic adapter sends the system message as its
 `system` field. Other shapes are refused with `FREE_EXECUTION_UNSUPPORTED`
 before generation; no message flattening occurs. `maxTokens` may not exceed the
-offer's answer limit (`free.max_output_tokens` in gyblos.toml, 4096 by default)
-and, with the templated input, must fit the model's context (an Ollama offer's
-`engine.context_tokens`, 8192 by default and at most 32768). Input and output
+offer's answer limit (`free.max_output_tokens` in gyblos.toml, 4096 by default
+and at most 32768; quotes beyond it are refused) and, with the templated input,
+must fit the model's context (a free Ollama offer's `engine.context_tokens`,
+8192 by default and at most 32768). The engine deadline grows by 25 ms per
+requested token past 128, up to 170 seconds. Input and output
 are recounted with the pinned tokenizer over the same rendered conversation,
 rather than trusting engine-reported usage for cap refunds. Admission reserves
 templated input plus maximum output, refunds only a successfully recounted completion and keeps the

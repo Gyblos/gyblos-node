@@ -6,7 +6,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
+import {
+  FREE_CONTEXT_TOKENS,
+  READINESS_GENERATION,
+} from '@gyblos/engine-ollama/constants';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import type {
@@ -137,7 +140,11 @@ void test('creating the ollama engine does no I/O and carries its selection, met
 void test('seller settings carry the engine offer the registry accepted', () => {
   const parsed = parseNodeConfig(BASE + FREE_SELLER_OFFER);
   assert.ok(parsed.ok);
-  assert.deepEqual(sellerSettings(parsed.config, {}).offers[0]!.engine, SERVED);
+  // A free Ollama offer gets room for conversations unless it sets its own context.
+  assert.deepEqual(sellerSettings(parsed.config, {}).offers[0]!.engine, {
+    ...SERVED,
+    engine: { ...SERVED.engine, contextTokens: FREE_CONTEXT_TOKENS },
+  });
 });
 
 void test('control startup and readiness do not know any engine plugin', () => {

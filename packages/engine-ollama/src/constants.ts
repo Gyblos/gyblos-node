@@ -17,7 +17,7 @@ export const MODEL = {
   configSha256:
     'd5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101',
   templateMode:
-    'single-user/no-tools/enable_thinking=false/add_generation_prompt=true',
+    'conversation/no-tools/enable_thinking=false/add_generation_prompt=true',
 } as const;
 
 export const READINESS_GENERATION = {
@@ -27,18 +27,24 @@ export const READINESS_GENERATION = {
 } as const;
 
 export const GENERATION = {
-  // The default context; an offer may set its own up to MODEL_LIMITS.maxContextTokens.
-  numCtx: 8192,
+  // The adapter's default context, which paid offers and the lab's evidence keep; a free offer gets
+  // FREE_CONTEXT_TOKENS unless it sets its own, up to MODEL_LIMITS.maxContextTokens.
+  numCtx: 2048,
   seed: 42,
   temperature: 0,
   keepAlive: `${READINESS_GENERATION.residencyMs}ms`,
 } as const;
 
+// A free offer's default context: room for a conversation and a long answer.
+export const FREE_CONTEXT_TOKENS = 8192;
+
 export const MODEL_LIMITS = {
   // The lab's inference evidence keeps the original bounded request.
   requestMaxOutputTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
   // Qwen3-0.6B's native context; the model card's longer window needs rope scaling Ollama does not set.
-  minContextTokens: 512,
+  minContextTokens: 1024,
+  // A lone prompt on the paid and lab paths keeps its original bound.
+  maxPromptCharacters: INFERENCE_REQUEST_LIMITS.maxPromptCharacters,
   maxContextTokens: 32768,
   // The free channel's input bytes, rendered: the context bounds it again in tokens.
   maxConversationCharacters: 262144,
