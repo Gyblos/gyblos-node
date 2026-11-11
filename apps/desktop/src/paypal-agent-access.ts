@@ -2,6 +2,7 @@
 import { PAYPAL_SESSION_PHASE } from '@gyblos/node/constants';
 
 import { PAYPAL_AGENT_USAGE_STATE as USAGE } from './constants';
+import { validPaypalAgentSpendLimit } from './paypal-agent-limit';
 
 type Endpoint = {
   url: string;
@@ -10,6 +11,7 @@ type Endpoint = {
   isCurrent(): boolean;
   isBusy(): boolean;
   close(): Promise<void>;
+  budget(): { keyLimitCents: number; keySpentCents: number };
 };
 
 type SessionStatus = {
@@ -35,6 +37,9 @@ function usageState(
   if (state.expired) return USAGE.EXPIRED;
   if (state.remainingAttempts === 0) return USAGE.ATTEMPTS_EXHAUSTED;
   if (state.spentCents >= state.limitCents) return USAGE.LIMIT_REACHED;
+  const budget = endpoint.budget();
+  if (budget.keySpentCents >= budget.keyLimitCents)
+    return USAGE.KEY_LIMIT_REACHED;
   return USAGE.AVAILABLE;
 }
 function snapshot(
@@ -55,6 +60,7 @@ function snapshot(
     url: endpoint.url,
     key: endpoint.key,
     model: endpoint.model,
+    ...endpoint.budget(),
     spentCents: state.spentCents,
     limitCents: state.limitCents,
     disconnecting: usage === USAGE.DISCONNECTING,
@@ -136,7 +142,7 @@ function currentSnapshot(
 
 export function createDesktopPaypalAgentAccess(
   status: () => SessionStatus,
-  start: () => Promise<Endpoint>,
+  start: (limitCents: number) => Promise<Endpoint>,
   isSessionBusy: () => boolean = () => false,
 ) {
   const access: EndpointState = {
@@ -165,9 +171,11 @@ export function createDesktopPaypalAgentAccess(
     );
     return result;
   }
-  async function connect() {
+  async function connect(selected?: number) {
     const state = status();
+    const limitCents = selected ?? state.limitCents - state.spentCents;
     if (
+      !validPaypalAgentSpendLimit(limitCents) ||
       closing ||
       busy ||
       access.disconnecting ||
@@ -179,7 +187,7 @@ export function createDesktopPaypalAgentAccess(
     )
       throw new Error('An active sandbox session is required.');
     return snapshot(
-      await ensureEndpoint(access, start),
+      await ensureEndpoint(access, () => start(limitCents)),
       status(),
       access.disconnecting,
       access.disconnectFailed,

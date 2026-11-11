@@ -98,7 +98,11 @@ validated settlement and keeps the actual asset unit. Optional telemetry never
 changes payment decisions. Old local conversations remain readable without it.
 
 Connections gives API key and Base URL priority. Model is not a connection form
-field. Four named setup guides use the same key and URL; Other tools is a
+field. Before generation, an explicit lifetime API key spend limit is required;
+show key limit, usage and remaining using the shared form and stats primitives.
+The key cap is separate from shared-session amounts and has no automatic reset.
+An exhausted key stays visible and cannot silently receive a larger cap.
+Four named setup guides use the same key and URL; Other tools is a
 secondary action. Guide selection does not establish a connection. Use the
 existing readiness guards: missing authorization leads to Payments, unknown
 status stays visible, and invalid/stale connections never gain copy or request

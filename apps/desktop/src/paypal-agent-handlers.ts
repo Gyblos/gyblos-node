@@ -9,7 +9,7 @@ import {
   PAYPAL_AGENT_USAGE_STATE,
   PaypalAgentConnectionError,
   paypalAgentCopyText,
-  type PaypalAgentAction,
+  validPaypalAgentSpendLimit,
   type PaypalAgentCopyTarget,
   type PaypalAgentResult,
 } from './paypal-agent-model';
@@ -18,14 +18,25 @@ type Access = ReturnType<typeof createDesktopPaypalAgentAccess>;
 type Window = { contents: unknown; mainFrame(): unknown; destroyed(): boolean };
 type Sender = { sender: unknown; senderFrame: unknown };
 
-function action(value: unknown): PaypalAgentAction | undefined {
+function action(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return undefined;
   const row = Object.fromEntries(Object.entries(value));
-  if (Object.keys(row).join(',') !== 'action') return undefined;
-  return Object.values(PAYPAL_AGENT_ACTION).find(
+  const selected = Object.values(PAYPAL_AGENT_ACTION).find(
     (entry) => entry === row.action,
   );
+  if (!selected) return undefined;
+  if (selected === PAYPAL_AGENT_ACTION.CONNECT) {
+    if (
+      Object.keys(row).sort().join(',') !== 'action,limitCents' ||
+      !validPaypalAgentSpendLimit(row.limitCents)
+    )
+      return undefined;
+    return { action: selected, limitCents: row.limitCents };
+  }
+  return Object.keys(row).join(',') === 'action'
+    ? { action: selected }
+    : undefined;
 }
 
 function copyTarget(value: unknown): PaypalAgentCopyTarget | undefined {
@@ -79,7 +90,7 @@ export function createDesktopPaypalAgentHandlers(
       if (!accepts(event, args)) return agentFailure(PAYPAL_AGENT_ERROR.DENIED);
       const request = action(args[0]);
       if (!request) return agentFailure(PAYPAL_AGENT_ERROR.INVALID);
-      if (request === PAYPAL_AGENT_ACTION.STATUS)
+      if (request.action === PAYPAL_AGENT_ACTION.STATUS)
         return {
           connection: current?.()?.agentAccess.status() ?? null,
           error: null,
@@ -91,9 +102,9 @@ export function createDesktopPaypalAgentHandlers(
         return agentFailure(PAYPAL_AGENT_ERROR.UNAVAILABLE);
       }
       try {
-        switch (request) {
+        switch (request.action) {
           case PAYPAL_AGENT_ACTION.CONNECT:
-            await access.connect();
+            await access.connect(request.limitCents);
             break;
           case PAYPAL_AGENT_ACTION.DISCONNECT:
             await access.disconnect();

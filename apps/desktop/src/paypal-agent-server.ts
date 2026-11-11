@@ -161,18 +161,12 @@ function closeAgentServer(
   }
   return state.shutdown;
 }
-export async function startDesktopPaypalAgent(service: Service, model: string) {
-  const scope = service.agentScope();
-  if (!scope) throw new Error('A fresh agent session is required.');
-  const state: Lifecycle = {
-    closing: false,
-    inFlight: 0,
-    drained: undefined,
-    shutdown: undefined,
-  };
-  const revoked = new AbortController();
-  const isCurrent = () => !state.closing && service.agentScope() === scope;
-  const scopedService = {
+function scopedAgentService(
+  grant: Awaited<ReturnType<Service['createAgentGrant']>>,
+  revoked: AbortController,
+  isCurrent: () => boolean,
+) {
+  return {
     sendAgent: (
       input: unknown,
       signal?: AbortSignal,
@@ -182,9 +176,27 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
       const cancellation = signal
         ? AbortSignal.any([signal, revoked.signal])
         : revoked.signal;
-      return service.sendAgent(input, cancellation, idempotencyKey);
+      return grant.sendAgent(input, cancellation, idempotencyKey);
     },
   };
+}
+export async function startDesktopPaypalAgent(
+  service: Service,
+  model: string,
+  limitCents?: number,
+) {
+  const scope = service.agentScope();
+  if (!scope) throw new Error('A fresh agent session is required.');
+  const grant = await service.createAgentGrant(limitCents);
+  const state: Lifecycle = {
+    closing: false,
+    inFlight: 0,
+    drained: undefined,
+    shutdown: undefined,
+  };
+  const revoked = new AbortController();
+  const isCurrent = () => !state.closing && service.agentScope() === scope;
+  const scopedService = scopedAgentService(grant, revoked, isCurrent);
   let origin = '';
   let gateway: Gateway | undefined;
   const server = createServer((request, response) => {
@@ -235,6 +247,7 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
     model,
     isCurrent,
     isBusy: gateway.isBusy,
+    budget: grant.budget,
     close: () => closeAgentServer(server, state, revoked),
   };
 }

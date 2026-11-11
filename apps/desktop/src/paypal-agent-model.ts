@@ -13,7 +13,12 @@ import {
   type PaypalAgentUsageState,
 } from './constants';
 import { paypalAgentExample } from './paypal-agent-example';
+import { parsePaypalAgentBudget } from './paypal-agent-limit';
 
+export {
+  paypalAgentLimitCents,
+  validPaypalAgentSpendLimit,
+} from './paypal-agent-limit';
 export { paypalAgentExample } from './paypal-agent-example';
 
 export {
@@ -70,6 +75,8 @@ export type PaypalAgentResult = {
     model: string;
     spentCents: number;
     limitCents: number;
+    keySpentCents: number;
+    keyLimitCents: number;
     usageUncertain: boolean;
     disconnecting: boolean;
     usageState: PaypalAgentUsageState;
@@ -90,7 +97,6 @@ export function canCreatePaypalAgent(
     !connection && !statusUnavailable && !busy && !onlyConnected && sessionReady
   );
 }
-// Navigation remains available without authorizing or creating a connection.
 export function paypalAgentNeedsPayments(
   connection: PaypalAgentResult['connection'],
   onlyConnected: boolean,
@@ -105,6 +111,8 @@ export function paypalAgentConnectionLabel(
 ) {
   if (busy) return 'Checking connection';
   if (statusUnavailable) return 'Connection status unavailable';
+  if (connection?.usageState === PAYPAL_AGENT_USAGE_STATE.KEY_LIMIT_REACHED)
+    return 'API key limit reached';
   if (connection?.usageUncertain) return 'Session needs attention';
   return connection ? 'Local connection active' : 'No local connection';
 }
@@ -317,13 +325,15 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
   if (
     !row ||
     Object.keys(row).sort().join(',') !==
-      'disconnecting,key,limitCents,model,spentCents,url,usageState,usageUncertain'
+      'disconnecting,key,keyLimitCents,keySpentCents,limitCents,model,spentCents,url,usageState,usageUncertain'
   )
     return null;
+  const budget = parsePaypalAgentBudget(row);
   const usageState = Object.values(PAYPAL_AGENT_USAGE_STATE).find(
     (entry) => entry === row.usageState,
   );
   if (
+    !budget ||
     !usageState ||
     row.usageUncertain !==
       (usageState !== PAYPAL_AGENT_USAGE_STATE.AVAILABLE) ||
@@ -368,6 +378,7 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     model: row.model,
     spentCents: row.spentCents,
     limitCents: row.limitCents,
+    ...budget,
     usageUncertain: row.usageUncertain,
     disconnecting: row.disconnecting,
     usageState,

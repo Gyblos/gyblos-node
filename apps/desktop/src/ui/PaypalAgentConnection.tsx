@@ -218,7 +218,14 @@ export function PaypalAgentConnection({
     PAYPAL_AGENT_CLIENT.OPENCODE,
   );
   const [guidePreset, setGuidePreset] = useState<ConnectionPreset | null>(null);
-  const setup = { ...endpoint, onlyConnected, sessionReady, onPayments };
+  const setup = {
+    ...endpoint,
+    onlyConnected,
+    sessionReady,
+    sessionStatus,
+    sessionFresh,
+    onPayments,
+  };
   const context = (
     <ConnectionContext
       {...endpoint}

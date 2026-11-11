@@ -11,6 +11,7 @@ void test('agent access starts once only after a sandbox session is active', asy
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
     isCurrent: () => true,
     isBusy: () => false,
     hasPending: () => false,
@@ -53,6 +54,7 @@ void test('disconnect asks the endpoint to drain a running inference', async () 
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
     isCurrent: () => true,
     isBusy: () => true,
     async close() {
@@ -88,6 +90,7 @@ void test('application shutdown waits for an in-flight disconnect', async () => 
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
     isCurrent: () => true,
     isBusy: () => false,
     hasPending: () => false,
@@ -139,6 +142,7 @@ void test('a new session gets a new connection and the previous endpoint is clos
         url: 'http://127.0.0.1:12345/v1',
         key: `key-${generation}`,
         model: 'synthetic-model',
+        budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
         isCurrent: () => openedGeneration === generation,
         isBusy: () => false,
         hasPending: () => false,
@@ -163,6 +167,7 @@ void test('disconnect closes a busy endpoint', async () => {
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic',
     model: 'synthetic-model',
+    budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
     isCurrent: () => true,
     isBusy: () => true,
     hasPending: () => false,
@@ -198,6 +203,7 @@ void test('the connection reports current shared usage and an uncertain session'
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
     isCurrent: () => true,
     isBusy: () => busy,
     async close() {},
@@ -251,6 +257,7 @@ void test('a connection remains visibly disconnecting while an inference drains'
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
     isCurrent: () => !closing,
     isBusy: () => true,
     async close() {
@@ -289,6 +296,7 @@ void test('connection status explains expiration and attempt exhaustion', async 
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic',
     model: 'synthetic-model',
+    budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
     isCurrent: () => true,
     isBusy: () => false,
     async close() {},
@@ -318,6 +326,7 @@ void test('a failed disconnect stays visible and can be retried', async () => {
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic',
     model: 'synthetic-model',
+    budget: () => ({ keyLimitCents: 100, keySpentCents: 0 }),
     isCurrent: () => false,
     isBusy: () => false,
     async close() {
@@ -348,4 +357,43 @@ void test('a failed disconnect stays visible and can be retried', async () => {
   await access.disconnect();
   assert.equal(access.status(), null);
   assert.equal(calls, 2);
+});
+
+void test('reconnecting an existing key never resets or raises its spend cap', async () => {
+  let spent = 0;
+  let starts = 0;
+  const endpoint = {
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic-key',
+    model: 'synthetic',
+    isCurrent: () => true,
+    isBusy: () => false,
+    async close() {},
+    budget: () => ({ keyLimitCents: 20, keySpentCents: spent }),
+  };
+  const access = createDesktopPaypalAgentAccess(
+    () => ({
+      phase: 'active',
+      expired: false,
+      spentCents: spent,
+      limitCents: 100,
+      remainingAttempts: 30,
+    }),
+    async (limit) => {
+      starts += 1;
+      assert.equal(limit, 20);
+      return endpoint;
+    },
+  );
+  try {
+    await access.connect(20);
+    spent = 20;
+    const repeated = await access.connect(100);
+    assert.equal(starts, 1);
+    assert.equal(repeated.keyLimitCents, 20);
+    assert.equal(repeated.keySpentCents, 20);
+    assert.equal(repeated.usageState, 'key_limit_reached');
+  } finally {
+    await access.close();
+  }
 });

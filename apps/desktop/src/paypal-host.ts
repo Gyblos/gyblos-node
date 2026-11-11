@@ -93,9 +93,13 @@ async function startSandbox(window: BrowserWindow) {
     const activeService = service;
     const agentAccess = createDesktopPaypalAgentAccess(
       activeService.status,
-      async () => {
+      async (limitCents) => {
         await activeService.prepareAgent();
-        return startDesktopPaypalAgent(activeService, opened.agentEngine.model);
+        return startDesktopPaypalAgent(
+          activeService,
+          opened.agentEngine.model,
+          limitCents,
+        );
       },
       activeService.isBusy,
     );

@@ -31,6 +31,8 @@ function fixture(failClipboard = false) {
     model: 'synthetic-model',
     spentCents: 0,
     limitCents: 100,
+    keyLimitCents: 100,
+    keySpentCents: 0,
     usageUncertain: false,
     disconnecting: false,
     usageState: PAYPAL_AGENT_USAGE_STATE.AVAILABLE,

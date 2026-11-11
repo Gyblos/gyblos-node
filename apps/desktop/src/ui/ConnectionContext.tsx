@@ -31,6 +31,8 @@ export function connectionUsageMessage(
       return 'The session expired. Close and settle it in Payments.';
     case PAYPAL_AGENT_USAGE_STATE.ATTEMPTS_EXHAUSTED:
       return 'The attempt limit was reached. Review Payments.';
+    case PAYPAL_AGENT_USAGE_STATE.KEY_LIMIT_REACHED:
+      return 'The API key reached its spend limit. Disconnect it to create a new bounded key.';
     case PAYPAL_AGENT_USAGE_STATE.LIMIT_REACHED:
       return 'The approved spending limit was reached. Review Payments.';
     case PAYPAL_AGENT_USAGE_STATE.DISCONNECTING:

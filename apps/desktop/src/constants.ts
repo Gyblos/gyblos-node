@@ -40,6 +40,7 @@ export const PAYPAL_AGENT_USAGE_STATE = {
   EXPIRED: 'expired',
   ATTEMPTS_EXHAUSTED: 'attempts_exhausted',
   LIMIT_REACHED: 'limit_reached',
+  KEY_LIMIT_REACHED: 'key_limit_reached',
   DISCONNECTING: 'disconnecting',
   DISCONNECT_FAILED: 'disconnect_failed',
 } as const;

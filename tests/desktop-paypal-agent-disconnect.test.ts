@@ -71,6 +71,7 @@ void test('a disconnected client cannot cancel an already dispatched agent infer
     await endpoint.close();
     closed = true;
     assert.equal(desktop.status().spentCents, 10);
+    assert.equal(endpoint.budget().keySpentCents, 10);
     assert.equal(desktop.status().phase, 'active');
     await desktop.finish();
     assert.deepEqual(f.calls, [
@@ -222,6 +223,7 @@ void test('disconnect revokes new agent requests while a started inference finis
     assert.equal((await first).status, 200);
     await stopping;
     assert.equal(desktop.status().spentCents, 10);
+    assert.equal(endpoint.budget().keySpentCents, 10);
     await desktop.finish();
     assert.deepEqual(f.calls, [
       'create',
@@ -272,7 +274,7 @@ void test('disconnect during the model preflight prevents a later inference', as
     {
       checkAgentEngine: async () => {
         checks += 1;
-        if (checks > 1) {
+        if (checks > 2) {
           entered();
           await waiting;
         }

@@ -17,6 +17,7 @@ import {
   PAYPAL_AGENT_ERROR,
   PaypalAgentConnectionError,
 } from './paypal-agent-model';
+import { desktopPaypalAgentOperations } from './paypal-agent-operations';
 import { desktopPaypalFinishActions } from './paypal-finish';
 import { DesktopPaypalReturns, type PaypalReturn } from './paypal-return';
 import { desktopPaypalReviewActions } from './paypal-review';
@@ -137,16 +138,6 @@ function sendChat(session: PaypalSession, id: string, prompt: string) {
   );
 }
 
-function sendAgent(
-  session: PaypalSession,
-  id: string,
-  input: unknown,
-  signal?: AbortSignal,
-  idempotencyKey?: string,
-) {
-  return session.agentMessage(id, input, randomUUID(), signal, idempotencyKey);
-}
-
 function agentCheck(
   options: DesktopPaypalSessionOptions,
   ready: () => boolean,
@@ -166,26 +157,6 @@ function agentCheck(
         PAYPAL_AGENT_ERROR.MODEL_UNAVAILABLE,
       );
     }
-  };
-}
-
-function agentOperations(
-  session: PaypalSession,
-  run: ReturnType<typeof serialOperations>['run'],
-  check: () => Promise<void>,
-  orderId: () => string,
-) {
-  return {
-    sendAgent: (
-      input: unknown,
-      signal?: AbortSignal,
-      idempotencyKey?: string,
-    ) =>
-      run(async () => {
-        await check();
-        return sendAgent(session, orderId(), input, signal, idempotencyKey);
-      }),
-    prepareAgent: () => run(check),
   };
 }
 
@@ -373,7 +344,13 @@ export function createDesktopPaypalSession(
         awaitingAcknowledgement = true;
         return { text: answer.text, messageId: answer.messageId };
       }),
-    ...agentOperations(session, run, checkAgent, orderId),
+    ...desktopPaypalAgentOperations(
+      session,
+      run,
+      checkAgent,
+      orderId,
+      () => agent.scope,
+    ),
     agentScope: () => agent.scope,
     acknowledge: (messageId: string) =>
       run(async () => {

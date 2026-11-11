@@ -163,22 +163,48 @@ seller and does not send paid requests to the network marketplace.
 
 ## Connect an agent
 
-After starting a PayPal session, open **Connections** and choose **Create API
-connection**. Gyblos displays a loopback API URL, a temporary API key and
-`gpt-oss:20b`. Select OpenCode, Pi, Codex or Claude Code for the relevant
-configuration. All four share the authorization and disconnecting revokes the
-shared connection. Never publish the connection URL, key or local settings.
+After starting a PayPal session, open **Connections**, set **API key spend limit
+· USD**, and choose **Create API connection**. Gyblos displays a loopback API
+URL, a temporary API key and `gpt-oss:20b`. Select OpenCode, Pi, Codex or Claude
+Code for the relevant configuration. All four share the authorization and
+disconnecting revokes the shared connection. Never publish the connection URL,
+key or local settings.
+
+### API key spending limit
+
+The owner selects an additional total budget for each generated local API key,
+in USD 0.10 increments, up to the remaining approved session budget. All tools
+and supported API formats using that key share its cap. Chat consumption does
+not reduce the key's recorded usage, but both still consume the same approved
+PayPal session. Connections shows the key limit, recorded usage and remaining
+budget separately from the shared session amounts.
+
+The host checks the cap immediately before inference, inside the serialized
+session operation. Completed inference counts even if delivery fails. Invalid,
+duplicate and cancelled-before-dispatch requests add no completed usage. At
+exhaustion, requests return `PAYPAL_KEY_LIMIT_REACHED` with retry disabled;
+model discovery remains available. Session exhaustion, expiration or uncertain
+accounting can block requests earlier. An exhausted key cannot authorize more
+inference by reconnecting, polling, copying or changing tool guides.
+
+The cap is immutable for that key's lifetime and never resets automatically. To
+allocate a different budget, explicitly disconnect, wait for in-flight requests
+to drain, then create a new key. The previous key is revoked. Keys remain
+ephemeral and local to this desktop's PayPal Sandbox connection; this is not a
+persistent USDC API-key budget. No new financial journal is created: usage comes
+from completed-agent accounting in the existing session record.
 
 ### Standard API access
 
-Connections shows masked API key, Base URL and Model fields, each with its own
-copy action. Copying uses the existing host connection and does not require
-revealing the key. **Other app / API** opens a Chat Completions example with
-`GYBLOS_API_KEY` as an environment variable. Copying or viewing an example never
-runs it; executing it can consume the session's shared limit. The listener is
-local to this computer and Gyblos must stay open. A ready listener does not
-verify any particular client. Images and unsupported API capabilities remain
-outside this prototype's subset.
+Connections shows masked API key and Base URL fields, each with its own copy
+action. The selected model is included in the tool setup configuration. Copying
+uses the existing host connection and does not require revealing the key.
+**Other tools** opens a Chat Completions example with `GYBLOS_API_KEY` as an
+environment variable. Copying or viewing an example never runs it; executing it
+can consume the session's shared limit. The listener is local to this computer
+and Gyblos must stay open. A ready listener does not verify any particular
+client. Images and unsupported API capabilities remain outside this prototype's
+subset.
 
 ### OpenCode
 

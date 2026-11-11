@@ -24,7 +24,10 @@ import {
 declare global {
   interface Window {
     desktopPaypalAgent?: {
-      run(request: { action: PaypalAgentAction }): Promise<PaypalAgentResult>;
+      run(request: {
+        action: PaypalAgentAction;
+        limitCents?: number;
+      }): Promise<PaypalAgentResult>;
       copy?(request: { target: PaypalAgentCopyTarget }): Promise<boolean>;
     };
   }
@@ -118,7 +121,7 @@ export function usePaypalAgentConnection() {
     setResult,
     setStatusUnavailable,
   });
-  async function run(action: PaypalAgentAction) {
+  async function run(action: PaypalAgentAction, limitCents?: number) {
     if (busyRef.current) return;
     busyRef.current = true;
     sequence.current += 1;
@@ -129,7 +132,10 @@ export function usePaypalAgentConnection() {
         : '',
     );
     try {
-      const next = await window.desktopPaypalAgent?.run({ action });
+      const next = await window.desktopPaypalAgent?.run({
+        action,
+        ...(limitCents !== undefined ? { limitCents } : {}),
+      });
       if (!mounted.current) return;
       setResult((previous) => retainPaypalAgentStatus(previous, next).result);
       setStatusUnavailable(

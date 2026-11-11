@@ -12,6 +12,7 @@ import {
   type PaypalAgentCopyTarget,
   type PaypalAgentResult,
 } from '../paypal-agent-model';
+import type { PaypalResult } from '../paypal-model';
 import {
   BUTTON_VARIANT,
   CONNECTION_PRESET,
@@ -20,13 +21,19 @@ import {
 import { CopyField, FormActions } from './Form';
 import { StatePanel } from './Management';
 import { Modal } from './Modal';
+import {
+  CreatePaypalAgentBudget,
+  PaypalAgentBudget,
+} from './PaypalAgentBudget';
 import { Button } from './UI';
 
 type SetupProps = {
   connection: PaypalAgentResult['connection'];
   busy: boolean;
   statusUnavailable: boolean;
-  run: (action: PaypalAgentAction) => Promise<void>;
+  run: (action: PaypalAgentAction, limitCents?: number) => Promise<void>;
+  sessionStatus: PaypalResult['status'];
+  sessionFresh: boolean;
   copy: (target: PaypalAgentCopyTarget, label: string) => Promise<void>;
   onlyConnected: boolean;
   sessionReady: boolean;
@@ -68,7 +75,10 @@ function ConnectionFields({
           void copy(PAYPAL_AGENT_COPY.URL, 'URL');
         }}
       />
-      <p className="ui-help-text">One shared connection for your tools.</p>
+      <PaypalAgentBudget
+        connection={connection}
+        busy={busy || statusUnavailable}
+      />
     </section>
   );
 }
@@ -107,8 +117,13 @@ export function PaypalAgentSetup(props: SetupProps) {
             Go to Payments
           </Button>
         ) : (
-          <Button
-            variant={BUTTON_VARIANT.PRIMARY}
+          <CreatePaypalAgentBudget
+            availableCents={
+              props.sessionFresh && props.sessionStatus
+                ? props.sessionStatus.limitCents -
+                  props.sessionStatus.spentCents
+                : 0
+            }
             disabled={
               !canCreatePaypalAgent(
                 connection,
@@ -118,12 +133,10 @@ export function PaypalAgentSetup(props: SetupProps) {
                 sessionReady,
               )
             }
-            onClick={() => {
-              void run(PAYPAL_AGENT_ACTION.CONNECT);
+            create={(limitCents) => {
+              void run(PAYPAL_AGENT_ACTION.CONNECT, limitCents);
             }}
-          >
-            Create API connection
-          </Button>
+          />
         )
       }
     />

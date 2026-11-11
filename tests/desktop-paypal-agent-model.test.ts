@@ -180,6 +180,8 @@ void test('a failed status check preserves an existing connection until status i
     model: 'synthetic-model',
     spentCents: 20,
     limitCents: 100,
+    keyLimitCents: 100,
+    keySpentCents: 0,
     usageUncertain: false,
     disconnecting: false,
     usageState: PAYPAL_AGENT_USAGE_STATE.AVAILABLE,
@@ -204,6 +206,8 @@ void test('IPC result rejects external connection URLs and malformed keys', () =
     model: 'synthetic-model',
     spentCents: 0,
     limitCents: 100,
+    keyLimitCents: 100,
+    keySpentCents: 0,
     usageUncertain: false,
     disconnecting: false,
     usageState: PAYPAL_AGENT_USAGE_STATE.AVAILABLE,
@@ -226,4 +230,61 @@ void test('IPC result rejects external connection URLs and malformed keys', () =
     }).connection,
     null,
   );
+});
+
+void test('API key limits parse exact decimal cents and reject unsupported or inconsistent IPC amounts', async () => {
+  const { paypalAgentLimitCents } =
+    await import('@gyblos/desktop/paypal-agent-model');
+  for (const [draft, cents] of [
+    ['0.10', 10],
+    ['0.30', 30],
+    ['1', 100],
+    ['9.90', 990],
+    ['10.00', 1000],
+  ] as const)
+    assert.equal(paypalAgentLimitCents(draft), cents);
+  for (const draft of [
+    '',
+    '-1',
+    '1e1',
+    '1.001',
+    '0.09',
+    '0.15',
+    '10.10',
+    'Infinity',
+    '9007199254740991',
+  ])
+    assert.equal(paypalAgentLimitCents(draft), null);
+  const connection = {
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'a'.repeat(43),
+    model: 'synthetic',
+    spentCents: 30,
+    limitCents: 100,
+    keyLimitCents: 20,
+    keySpentCents: 20,
+    usageState: PAYPAL_AGENT_USAGE_STATE.KEY_LIMIT_REACHED,
+    usageUncertain: true,
+    disconnecting: false,
+  };
+  assert.deepEqual(
+    parsePaypalAgentResult({ connection, error: null }).connection,
+    connection,
+  );
+  for (const changed of [
+    { keyLimitCents: 0 },
+    { keyLimitCents: 15 },
+    { keyLimitCents: 110 },
+    { keySpentCents: -10 },
+    { keySpentCents: 30 },
+    { keySpentCents: 1.5 },
+    { spentCents: 10 },
+  ])
+    assert.equal(
+      parsePaypalAgentResult({
+        connection: { ...connection, ...changed },
+        error: null,
+      }).connection,
+      null,
+    );
 });
