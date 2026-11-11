@@ -63,6 +63,7 @@ export const NODE_ERROR_CODES = {
   BUYER_PAYMENT_NETWORK_MISMATCH: 'BUYER_PAYMENT_NETWORK_MISMATCH',
   // The buyer wallet key is missing, unreadable or not the one role.json names.
   BUYER_PAYMENT_KEY_INVALID: 'BUYER_PAYMENT_KEY_INVALID',
+  BUYER_RUNTIME_UNAVAILABLE: 'BUYER_RUNTIME_UNAVAILABLE',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];

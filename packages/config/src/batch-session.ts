@@ -8,6 +8,8 @@ export const BATCH_SESSION_DEFAULTS = {
   pollMs: 15 * 1000,
   operationMs: 20 * 1000,
   maxPendingOperations: 32,
+  maxSessions: 16,
+  poolBytes: 128 * 1024,
   saltBytes: 8,
   maxRequests: 128,
   stateBytes: 512 * 1024,

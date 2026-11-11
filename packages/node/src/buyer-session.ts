@@ -132,14 +132,7 @@ async function run<Remote extends BatchDestination>(
   external: AbortSignal,
 ) {
   const signal = AbortSignal.any([external, state.lifetime.signal]);
-  const checked = batchExecutionInput(quote, input);
-  if (
-    checked.messages.length !== 1 ||
-    checked.messages[0]?.role !== FREE_CHAT_ROLES.USER ||
-    quote.offer.reasoning !== REASONING_LEVELS.OFF ||
-    quote.offer.meteringMode !== CONTROL_METERING_MODES.RECOUNTED
-  )
-    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+  checkBuyerSessionInput(quote, input);
   await bounded(state.options.verify(quote, signal), signal);
   if (await bounded(state.options.unresolved(), signal))
     return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -241,4 +234,18 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
       }
     },
   };
+}
+
+export function checkBuyerSessionInput(
+  quote: SignedOfferV2,
+  input: FreeExecutionBuildInput,
+) {
+  const checked = batchExecutionInput(quote, input);
+  if (
+    checked.messages.length !== 1 ||
+    checked.messages[0]?.role !== FREE_CHAT_ROLES.USER ||
+    quote.offer.reasoning !== REASONING_LEVELS.OFF ||
+    quote.offer.meteringMode !== CONTROL_METERING_MODES.RECOUNTED
+  )
+    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
 }

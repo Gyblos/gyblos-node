@@ -138,7 +138,7 @@ export async function chatSession(options: ChatSessionOptions) {
       ? 'paid (devnet)'
       : 'free';
   options.write(
-    `Model: ${options.model}\nMode: ${mode}\n${options.session ? `Session deposit limit: ${options.session.depositAtomic} atomic units\nMaximum per question: ${options.maxAtomic} atomic units\nType /settle to close the channel, or /exit to leave it to the seller.\n` : `Maximum deposit: ${options.maxAtomic} atomic units per request\n`}Type /exit to quit. Each question is independent.\n`,
+    `Model: ${options.model}\nMode: ${mode}\n${options.session ? `Session deposit limit: ${options.session.depositAtomic} atomic units\n${options.session.totalDepositAtomic ? `Total deposit authority: ${options.session.totalDepositAtomic} atomic units\n` : ''}Maximum per question: ${options.maxAtomic} atomic units\nType /settle to close ${options.session.totalDepositAtomic ? 'all seller channels' : 'the channel'}, or /exit to leave settlement to the seller.\n` : `Maximum deposit: ${options.maxAtomic} atomic units per request\n`}Type /exit to quit. Each question is independent.\n`,
   );
   while (!options.signal?.aborted) {
     const prompt = await options.read();

@@ -1,98 +1,23 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
-import { batchSessionPathsIn } from '@gyblos/config/home';
-import { buyerPaymentsUnresolved } from '@gyblos/node/buyer-chain';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
-import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
-import { buyerSessionChain } from '@gyblos/node/buyer-session-chain';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
-import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
-import { canonicalJson } from '@gyblos/protocol';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { executeSelectedBuyerFree } from './free-execution';
-import {
-  permitsWinner,
-  relayAllowed,
-  selectWinner,
-  sellerAddress,
-} from './free-selection';
+import { selectWinner } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
-import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
+import { requireBuyerIdentity } from './identity';
 import { classifyPaidError } from './paid-http';
-import {
-  checkPaidRequest,
-  endpointToken,
-  tokenizer,
-  type startPaidBuyer,
-} from './paid-startup';
+import { endpointToken, type startPaidBuyer } from './paid-startup';
+import { makeManager, type SessionState } from './session-manager';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
-type Winner = Awaited<ReturnType<typeof selectWinner>>;
-interface SessionState {
-  selected?: Winner;
-  meter?: RecountTokenizer;
-}
-function makeManager(
-  context: Context,
-  options: Options,
-  policy: NonNullable<Context['prepared']['config']['session']>,
-  state: SessionState,
-) {
-  const { prepared, role, endpoint, relayOnly } = context;
-  return createBuyerSessionManager({
-    policy,
-    endpoint,
-    now: Date.now,
-    inspect: () =>
-      inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER)),
-    backend: async () => {
-      checkPaidRequest(prepared, role);
-      state.meter = await (options.meter ?? tokenizer)();
-      return (options.batch ?? buyerSessionChain)(role);
-    },
-    destination: (terms) => {
-      const seller = prepared.config.sellers.find(
-        (candidate) =>
-          candidate.nodeId === terms.sellerNodeId &&
-          candidate.owner === terms.owner,
-      );
-      if (!seller) return sessionFail(SESSION_CODES.BINDING);
-      return sellerAddress(seller, relayOnly);
-    },
-    meter: {
-      input: (text) => {
-        if (!state.meter) return sessionFail();
-        return state.meter.input(text);
-      },
-      count: (text) => {
-        if (!state.meter) return sessionFail();
-        return state.meter.count(text);
-      },
-    },
-    transport: { relayOnly, relayAllowed },
-    unresolved: () => buyerPaymentsUnresolved(false),
-    verify: async (quote, signal) => {
-      const seller = prepared.config.sellers.find(
-        (candidate) => candidate.nodeId === quote.offer.nodeId,
-      );
-      if (
-        !state.selected ||
-        canonicalJson(state.selected.quote) !== canonicalJson(quote) ||
-        !seller ||
-        !(await permitsWinner(prepared, state.selected, Date.now())) ||
-        !(await verifyBuyerIdentity(prepared.identity, seller, signal))
-      )
-        return sessionFail(SESSION_CODES.UNVERIFIED);
-      signal.throwIfAborted();
-    },
-  });
-}
+
 function sessionExecutor(
   context: Context,
   options: Options,

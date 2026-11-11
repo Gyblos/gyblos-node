@@ -9,10 +9,12 @@ import {
 } from '@gyblos/config';
 import { modelTokenizer } from '@gyblos/node/artifacts';
 import { buyerChainPayments } from '@gyblos/node/buyer-chain';
+import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { rolePath, type RoleConfig } from '@gyblos/node/roles';
 import type { BuyerSessionBackend } from '@gyblos/node/session-backend';
+import type { BatchBuyerPool } from '@gyblos/payments-upto/batch-session';
 import {
   MODEL_IDS,
   P2P_ROLES,
@@ -167,6 +169,10 @@ function paidClosers(
 }
 
 interface BuyerStartupOptions {
+  pool?: (
+    role: RoleConfig,
+    totalDepositAtomic: string,
+  ) => Promise<BatchBuyerPool>;
   batch?: (role: RoleConfig) => Promise<BuyerSessionBackend>;
   bind?: typeof bindEndpoint;
   port?: number;
@@ -176,7 +182,7 @@ interface BuyerStartupOptions {
   meter?: () => Promise<RecountTokenizer>;
 }
 
-export async function startPaidBuyer(
+async function startOwnedPaidBuyer(
   options: BuyerStartupOptions = {},
 ): Promise<PaidBuyerHost> {
   const role = await buyerRole();
@@ -249,4 +255,11 @@ export async function startPaidBuyer(
     await closePaidResources(chain, endpoint);
     throw error;
   }
+}
+
+export async function startPaidBuyer(
+  options: BuyerStartupOptions = {},
+): Promise<PaidBuyerHost> {
+  await buyerRole();
+  return withBuyerRuntime(process.env, () => startOwnedPaidBuyer(options));
 }

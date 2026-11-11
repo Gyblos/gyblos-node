@@ -1,5 +1,6 @@
 // Starts the isolated free buyer using local role identity and selection policy, without paid bootstrap.
 import { BUYER_RELAY_ONLY_ENV, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
+import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import {
   createBuyerReceiptRuntime,
@@ -252,7 +253,7 @@ function buyerHost(
   };
 }
 
-export async function startFreeBuyer(
+async function startOwnedFreeBuyer(
   options: {
     bind?: typeof bindEndpoint;
     port?: number;
@@ -328,4 +329,12 @@ export async function startFreeBuyer(
     );
     throw error;
   }
+}
+
+// All executable modes sharing this home take the same lifetime owner before any financial factory.
+export async function startFreeBuyer(
+  options: Parameters<typeof startOwnedFreeBuyer>[0] = {},
+) {
+  await buyerRole();
+  return withBuyerRuntime(process.env, () => startOwnedFreeBuyer(options));
 }
