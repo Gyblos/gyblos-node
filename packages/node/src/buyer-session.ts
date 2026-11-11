@@ -1,19 +1,11 @@
 // One explicitly authorized reusable session for shared buyer hosts; no selection or prompt retry.
 import { PROTOCOL_FEE } from '@gyblos/config';
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
+import { recountSessionInput } from '@gyblos/core/session-input';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
-import {
-  batchExecutionInput,
-  batchFail,
-  verifyBatchQuote,
-} from '@gyblos/protocol/batch-channel';
-import {
-  CONTROL_METERING_MODES,
-  FREE_CHAT_ROLES,
-  REASONING_LEVELS,
-} from '@gyblos/protocol/constants';
+import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
-import type { RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
@@ -44,7 +36,7 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
   backend(): Promise<BuyerSessionBackend>;
   endpoint: BatchEndpoint<Remote>;
   destination(terms: PaymentSessionTerms): Remote;
-  meter: RecountTokenizer;
+  meter: ChatTokenizer;
   now: () => number;
   unresolved(): Promise<boolean>;
   verify(quote: SignedOfferV2, signal: AbortSignal): Promise<void>;
@@ -132,7 +124,7 @@ async function run<Remote extends BatchDestination>(
   external: AbortSignal,
 ) {
   const signal = AbortSignal.any([external, state.lifetime.signal]);
-  checkBuyerSessionInput(quote, input);
+  recountSessionInput(quote, input, state.options.meter);
   await bounded(state.options.verify(quote, signal), signal);
   if (await bounded(state.options.unresolved(), signal))
     return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -234,18 +226,4 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
       }
     },
   };
-}
-
-export function checkBuyerSessionInput(
-  quote: SignedOfferV2,
-  input: FreeExecutionBuildInput,
-) {
-  const checked = batchExecutionInput(quote, input);
-  if (
-    checked.messages.length !== 1 ||
-    checked.messages[0]?.role !== FREE_CHAT_ROLES.USER ||
-    quote.offer.reasoning !== REASONING_LEVELS.OFF ||
-    quote.offer.meteringMode !== CONTROL_METERING_MODES.RECOUNTED
-  )
-    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
 }

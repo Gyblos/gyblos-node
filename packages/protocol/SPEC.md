@@ -1032,6 +1032,53 @@ or disconnected HTTP stream does not itself execute settlement or a refund.
 No existing offer, free/paid execution or golden vector is modified by this port.
 [Session composition and limitations](../../docs/payment-sessions.md).
 
+## Reusable conversation session channel v2
+
+`gyblos/session/2` replaces the active session v1 transport. Both peers must
+upgrade; the buyer requires successful v2 preparation before calling its opening
+or signing port. It never falls back to session v1 or to per-request payment.
+The previous v1 contract below is frozen historical context, not a second
+registered implementation. The independently used `gyblos/paid-stream/1` path
+keeps its single-user semantics and vectors.
+
+The v2 envelope uses `version: 2` and the same six RPC methods, frame bounds,
+strict parsing, authenticated peers and pinned financial terms described below.
+RPC correlation uses `gyblos/session-rpc/v2\n`; execution binding uses
+`gyblos/session-request/v2\n` over the complete canonical inner request,
+including every historical role/content and the signed quote. No fields are
+removed before hashing. v1 envelopes and replies fail closed, and their digests
+cannot authorize a v2 execution.
+
+The input is a nonempty text conversation: an optional nonempty system message
+first, then alternating user/assistant turns beginning and ending with a user.
+Unknown fields, tools, non-text modalities and other reasoning are refused.
+Session bounds are fixed independently of free execution: at most 1024 messages,
+64 KiB total content bytes, and 128 output tokens, additionally constrained by
+the quote, model context, caller policy and request budget. Existing 1 MiB RPC
+frames and depth 16 remain unchanged; JSON escaping counts toward the frame.
+
+Both parties recount the entire rendered conversation with the selected model's
+public `ChatTokenizer.chat` implementation, including the system and historical
+assistant messages. The seller passes the same messages intact to the engine.
+There is no concatenation, last-turn shortcut, declared-usage fallback or silent
+history trimming. Unsupported templates/control tokens, unsafe counts, context
+and worst-case budget violations fail before financial construction on the
+buyer and before reservation/generation on the seller. The buyer recounts the
+received output and verifies full input usage before cumulative signing.
+
+SDK vouchers, financial session terms and the private journal remain v1 and
+unchanged. A saved v1 approval may be acknowledged over v2 with its original
+request ID, digest, bill and voucher; recovery never recalculates that digest or
+reconstructs a prompt. Replay high-water state remains. New executions use v2
+binding. No conversation content is persisted or logged. Possible-send marking,
+uncertainty, cancellation, autonomous finalization and one-active-per-seller
+admission retain their existing behavior. Execution is still one complete
+response; token streaming over reusable sessions is separate work.
+
+Independent Node/OpenSSL vectors are `batch-channel-v2.json`,
+`batch-prepare-v2.json` and `batch-startup-v2.json`. All v1 fixtures remain
+byte-identical and are tested independently along with explicit v1 rejection.
+
 ## Reusable single-seller session channel v1
 
 `gyblos/session/1` is a separate, opt-in Iroh ALPN. It is registered only by a host

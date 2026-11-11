@@ -25,7 +25,8 @@
     "./receipts": "./src/receipts.ts",
     "./receipt-collector": "./src/receipt-collector.ts",
     "./mainnet-pilot": "./src/mainnet-pilot.ts",
-    "./buyer-routing": "./src/buyer-routing.ts"
+    "./buyer-routing": "./src/buyer-routing.ts",
+    "./session-input": "./src/session-input.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

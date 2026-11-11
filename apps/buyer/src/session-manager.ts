@@ -15,8 +15,10 @@ import {
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
+import { batchFail } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import type { RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
   SESSION_CODES,
   SESSION_STATES,
@@ -43,8 +45,8 @@ type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
   selections: Map<string, Winner>;
   sending: Map<string, () => void>;
-  meterLoading?: Promise<RecountTokenizer>;
-  meter?: RecountTokenizer;
+  meterLoading?: Promise<ChatTokenizer>;
+  meter?: ChatTokenizer;
 }
 function trustedQuote(
   context: Context,
@@ -67,6 +69,33 @@ function trustedQuote(
     signal.throwIfAborted();
   };
 }
+function activeMeter(state: SessionState): ChatTokenizer {
+  const current = () => {
+    if (!state.meter) return sessionFail();
+    return state.meter;
+  };
+  return {
+    input: (text) => current().input(text),
+    chat: (messages) => current().chat(messages),
+    count: (text) => current().count(text),
+  };
+}
+function supportsChat(meter: RecountTokenizer): meter is ChatTokenizer {
+  return 'chat' in meter && typeof meter.chat === 'function';
+}
+async function prepareMeter(state: SessionState, options: Options) {
+  state.meterLoading ??= (options.meter ?? tokenizer)()
+    .then((meter) => {
+      if (!supportsChat(meter))
+        return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+      return meter;
+    })
+    .catch((error: unknown) => {
+      state.meterLoading = undefined;
+      throw error;
+    });
+  state.meter = await state.meterLoading;
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -84,7 +113,6 @@ export function makeManager(
       inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER)),
     backend: async () => {
       checkPaidRequest(prepared, role);
-      state.meter = await (options.meter ?? tokenizer)();
       return (options.batch ?? buyerSessionChain)(role);
     },
     destination: (terms) => {
@@ -105,16 +133,7 @@ export function makeManager(
         relayOnly,
       );
     },
-    meter: {
-      input: (text) => {
-        if (!state.meter) return sessionFail();
-        return state.meter.input(text);
-      },
-      count: (text) => {
-        if (!state.meter) return sessionFail();
-        return state.meter.count(text);
-      },
-    },
+    meter: activeMeter(state),
     transport: {
       relayOnly,
       relayAllowed,
@@ -137,20 +156,26 @@ export function makeManager(
     },
     verify: trustedQuote(context, state),
   };
-  if (policy.totalDepositAtomic !== undefined)
-    return createBuyerSessionPool({
-      ...common,
-      inspect: () => inspectBatchPool(batchPoolPathsIn(process.env)),
-      pool: () =>
-        sharedPool(context, options, state, policy.totalDepositAtomic!),
-    });
-  return createBuyerSessionManager(common);
+  const manager =
+    policy.totalDepositAtomic !== undefined
+      ? createBuyerSessionPool({
+          ...common,
+          inspect: () => inspectBatchPool(batchPoolPathsIn(process.env)),
+          pool: () => sharedPool(context, options, policy.totalDepositAtomic!),
+        })
+      : createBuyerSessionManager(common);
+  return {
+    ...manager,
+    prepareMeter: () => {
+      checkPaidRequest(prepared, role);
+      return prepareMeter(state, options);
+    },
+  };
 }
 
 async function sharedPool(
   context: Context,
   options: Options,
-  state: SessionState,
   totalDepositAtomic: string,
 ) {
   const { prepared, role } = context;
@@ -162,13 +187,6 @@ async function sharedPool(
     ...pool,
     backend: async (id: string) => {
       checkPaidRequest(prepared, role);
-      state.meterLoading ??= (options.meter ?? tokenizer)().catch(
-        (error: unknown) => {
-          state.meterLoading = undefined;
-          throw error;
-        },
-      );
-      state.meter = await state.meterLoading;
       return pool.backend(id);
     },
   };

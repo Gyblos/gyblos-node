@@ -276,3 +276,28 @@ Only numeric/status evidence leaves the scenarios; synthetic request/response
 content, keys and financial payloads stay out of output. Existing limits and fee
 arithmetic remain unchanged. This is local composition evidence, not a
 live-chain, deployed-program, real-engine or power-loss acceptance claim.
+
+## Paid session conversations
+
+`tests/batch-conversation*.test.ts` exercises complete-history recounting,
+quote/context/budget bounds, cumulative approvals, cancellation and lost-ACK
+restart. `batch-legacy-vectors.test.ts` independently freezes v1 bytes while
+current vector tests use new v2 fixtures. SDK journal/voucher formats stay
+unchanged, including recovery of an original v1 bill over the v2 RPC.
+
+`tests/lab/paid-conversation-startup.test.ts` runs product buyer HTTP and native
+Iroh seller startup in single-session and pooled modes, with fake engines and
+financial observations. It reuses a deposit across conversational requests and
+peer restart, then checks the synthetic final charge/refund. Native absence is
+explicitly skipped and does not prove acceptance. The delayed-tokenizer case in
+`paid-conversation-loader.test.ts` proves HTTP cancellation frees router
+admission before initialization completes and a late completion starts no
+financial work.
+
+The opt-in `paid-conversation-tokenizer.test.ts` uses the real pinned public BPE
+artifacts without a real engine. Set `GYBLOS_TEST_TOKENIZER_HOME` to an owned
+`/tmp/gyb-paid-chat-tokenizer-*` (or `/private/tmp/...`) artifact home prepared
+with `prepareModelTokenizer`; both artifacts are hash-checked again. The test
+rejects other locations before reading files. With no explicit artifact home it
+is reported as skipped. Synthetic count tests always run; no artifacts are
+committed and no existing operational home is read.

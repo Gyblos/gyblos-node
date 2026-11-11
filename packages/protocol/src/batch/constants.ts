@@ -1,12 +1,15 @@
 // Wire catalog for opt-in reusable sessions; existing inference ALPNs and vectors are unchanged.
 export const BATCH_CHANNEL = {
-  alpn: 'gyblos/session/1',
-  version: 1,
+  alpn: 'gyblos/session/2',
+  version: 2,
   requestBytes: 1048576,
   responseBytes: 1048576,
   openingBytes: 524288,
-  requestDomain: 'gyblos/session-request/v1\n',
-  replyDomain: 'gyblos/session-rpc/v1\n',
+  inputBytes: 65536,
+  maxMessages: 1024,
+  maxOutputTokens: 128,
+  requestDomain: 'gyblos/session-request/v2\n',
+  replyDomain: 'gyblos/session-rpc/v2\n',
 } as const;
 export const BATCH_METHODS = {
   PREPARE: 'prepare',

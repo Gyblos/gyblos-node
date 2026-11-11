@@ -1,4 +1,5 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
+import { bounded } from '@gyblos/node/buyer-operation';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
@@ -29,6 +30,9 @@ async function executePaidSession(
   onDelta?: (text: string, requestDigest?: string) => Promise<void>,
   sending?: () => void,
 ): Promise<ChatResult> {
+  current.throwIfAborted();
+  await bounded(manager.prepareMeter(), current);
+  current.throwIfAborted();
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
   state.selections.set(id, winner);
