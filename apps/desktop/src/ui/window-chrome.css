@@ -101,6 +101,10 @@
 .ui-window-chrome > .top-actions > .ui-button {
   min-width: 0;
 }
+.ui-window-chrome > .top-actions > .ui-button:has(.ui-window-action-label) {
+  flex-shrink: 1;
+  max-width: 100%;
+}
 .ui-window-chrome button {
   -webkit-app-region: no-drag;
 }
