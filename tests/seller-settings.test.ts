@@ -136,8 +136,8 @@ void test('a free offer lists zero prices with its caps', () => {
   });
   // Buyers see the seller's price plus the protocol fee, rounded up.
   assert.deepEqual(listedPrices(PAID_LISTING), {
-    inputAtomicPerMtok: '1030000',
-    outputAtomicPerMtok: '2060000',
+    inputAtomicPerMtok: '1040000',
+    outputAtomicPerMtok: '2080000',
   });
 });
 

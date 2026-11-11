@@ -145,8 +145,8 @@ void test('restart observes an actual native paid settlement without another dep
     const before = await value.balances();
     assert.deepEqual(before, {
       payer: CHANNEL_CRASH.funds - 145n,
-      seller: 140n,
-      fee: 4n,
+      seller: 139n,
+      fee: 5n,
       program: 1n,
       escrow: 0n,
     });
