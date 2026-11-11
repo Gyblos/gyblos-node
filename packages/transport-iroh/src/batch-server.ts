@@ -57,6 +57,7 @@ async function respond(
   check: () => void,
   cancel: () => void,
   limits: BatchStreamLimits,
+  admitExecution: () => boolean,
 ) {
   const raw = await batchDeadline(
     readBatchFrame(stream, BATCH_CHANNEL.requestBytes, check),
@@ -68,7 +69,14 @@ async function respond(
   if (request.method === BATCH_METHODS.EXECUTE) {
     await streamBatchResponse(
       request,
-      service,
+      {
+        async exchange(...args) {
+          check();
+          if (!admitExecution())
+            throw new BatchChannelError(SESSION_CODES.LIMIT);
+          return service.exchange(...args);
+        },
+      },
       peer,
       signal,
       check,
@@ -129,6 +137,7 @@ export async function serveBatchChannelStream(
   enter: () => (() => void) | undefined,
   allowed: () => boolean = () => true,
   limits: BatchStreamLimits = {},
+  admitExecution: () => boolean = () => true,
 ): Promise<void> {
   const release = enter();
   if (!release) {
@@ -160,6 +169,7 @@ export async function serveBatchChannelStream(
       check,
       cancel,
       limits,
+      admitExecution,
     );
   });
   try {
@@ -183,6 +193,7 @@ export function handleBatchChannelConnection(
   enter: () => (() => void) | undefined,
   isClosed: () => boolean,
   allowed: () => boolean,
+  admitExecution: () => boolean,
 ) {
   const controller = new AbortController();
   const current = AbortSignal.any([signal, controller.signal]);
@@ -201,6 +212,8 @@ export function handleBatchChannelConnection(
         current,
         enter,
         allowed,
+        {},
+        admitExecution,
       ),
     isClosed,
     { receiveBytes: BATCH_CHANNEL.requestBytes + CONTROL_LIMITS.prefixBytes },
