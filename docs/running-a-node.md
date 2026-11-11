@@ -1043,12 +1043,14 @@ verified; discovery only supplies signed availability hints for those configured
 identities.
 
 Set `request.reasoning` to `"off"`, `lowestReasoning` to `null`, and `maxTokens`
-to at most 128 (the current engine maximum). For a clear operator policy, set
-`maxAtomic`, `inputAtomicPerMtok` and `outputAtomicPerMtok` ceilings to `"0"`.
-The free entry enforces those zero ceilings/budget even if a shared selection
-file permits paid quotes. `pinnedNodeId`, data-retention filters and configured
-relays still apply; `PINNED_SELLER_IN_COOLDOWN` retains `cooldownUntil` in the
-error object. Badges stay `declared-usage` and `openChannel` stays false.
+to at most 32768 (4096 by default, the sellers' default answer limit; a seller
+refuses to quote above its own `free.max_output_tokens`). Paid mode keeps at
+most 128 for now. For a clear operator policy, set `maxAtomic`,
+`inputAtomicPerMtok` and `outputAtomicPerMtok` ceilings to `"0"`. The free entry
+enforces those zero ceilings/budget even if a shared selection file permits paid
+quotes. `pinnedNodeId`, data-retention filters and configured relays still
+apply; `PINNED_SELLER_IN_COOLDOWN` retains `cooldownUntil` in the error object.
+Badges stay `declared-usage` and `openChannel` stays false.
 
 If startup fails, `buyer:free` prints `FREE_BUYER_CONFIGURATION_REQUIRED` with a
 reason and a next step, for example `BUYER_ROLE_MISSING` (run `node:setup`),
@@ -1059,45 +1061,85 @@ beside it), `SELECTION_MAX_TOKENS_TOO_HIGH`, `SELECTION_REASONING_UNSUPPORTED`,
 `BUYER_NODE_KEY_MISMATCH`, a relay code such as `MISSING_RELAY_TOKEN`, or
 `BUYER_PORT_IN_USE`. No path or file content is printed.
 
-Supported request shape for `POST /v1/chat/completions`:
+The endpoint speaks two chat formats over the same execution, so OpenAI- and
+Anthropic-compatible clients and agents can point at it: set the client's base
+URL to `http://127.0.0.1:4031/v1` (OpenAI) or `http://127.0.0.1:4031`
+(Anthropic). `GET /v1/models` lists the one configured model.
+
+OpenAI format, `POST /v1/chat/completions`:
 
 ```json
 {
   "model": "the-exact-configured-model-id",
-  "messages": [{ "role": "user", "content": "Your text" }],
-  "max_tokens": 64,
+  "messages": [
+    { "role": "system", "content": "Answer briefly." },
+    { "role": "user", "content": "My name is Ana." },
+    { "role": "assistant", "content": "Hello Ana." },
+    { "role": "user", "content": "What is my name?" }
+  ],
+  "max_tokens": 512,
   "stream": false
 }
 ```
 
-`max_tokens` defaults to the configured maximum and cannot exceed it. `model`
-selects the exact configured model/variant/quantization tuple; it is not an
-engine name. Only one text user message is supported. History, system messages,
-tools, sampling options, alternate modalities and unknown options are rejected
-before selection or prompt transmission. This is a limited compatible subset,
-not the complete OpenAI API. Requests must send
-`Content-Type: application/json`. Invalid UTF-8, foreign Host headers, requests
-with an Origin header and other content types get 400 (a foreign Host gets 421),
-so a web page cannot reach the endpoint; there is no CORS browser interface. A
-body declared larger than 384 KiB gets 413 before it is read; a larger streamed
-body gets the same 413 once it passes the limit. Both close the connection. Use
-a local client, and apply normal trust to local processes.
+Anthropic format, `POST /v1/messages`:
 
-Set `stream` to `true` for incremental `text/event-stream` responses. Each
-`data:` event is an OpenAI-compatible `chat.completion.chunk` with a content
-delta. Successful completion sends a finish reason and usage, then `[DONE]`. The
-default (absent or `false`) remains one complete JSON response. Streaming
-supports the same single-user, reasoning-off input and rejects unsupported
-options such as `stream_options` rather than silently dropping them.
+```json
+{
+  "model": "the-exact-configured-model-id",
+  "system": "Answer briefly.",
+  "max_tokens": 512,
+  "messages": [{ "role": "user", "content": "What is my name?" }]
+}
+```
+
+The whole conversation is sent to the seller each time, as these APIs expect.
+Content may be a string or a list of `text` parts. System (and OpenAI
+`developer`) instructions go first; turns of the same role in a row are joined;
+the conversation must start and end with a user turn. It holds at most 1024
+messages and 256 KiB of text, and the seller refuses what does not fit its
+model's context. `max_tokens` (OpenAI also `max_completion_tokens`) is required
+in the Anthropic format and optional in the OpenAI one; a value above the
+buyer's `maxTokens` is served up to it, and the answer then ends with `length`
+(`max_tokens` in the Anthropic format). `model` selects the exact configured
+model/variant/quantization tuple; it is not an engine name.
+
+Options clients send by default and that do not change what is asked
+(`temperature`, `top_p`, `top_k`, penalties, `seed`, `user`, `metadata`,
+`stream_options`, `store`, `parallel_tool_calls`) are accepted and ignored:
+generation is deterministic. Options that would change the answer are refused
+rather than dropped, unless they hold their neutral value: tools and tool
+results, `tool_choice`, `response_format` other than text, `n` above 1, stop
+sequences, logprobs, enabled `thinking`, images and other non-text parts.
+Unknown options are refused. Everything is checked before selection or prompt
+transmission. This is a compatible subset, not the complete OpenAI or Anthropic
+API. Requests must send `Content-Type: application/json`. Invalid UTF-8, foreign
+Host headers, requests with an Origin header and other content types get 400 (a
+foreign Host gets 421), so a web page cannot reach the endpoint; there is no
+CORS browser interface. A body declared larger than 384 KiB gets 413 before it
+is read; a larger streamed body gets the same 413 once it passes the limit. Both
+close the connection. Use a local client, and apply normal trust to local
+processes. When the endpoint requires its token (paid mode), send it as
+`Authorization: Bearer <token>` or, as Anthropic SDKs do with their key,
+`x-api-key: <token>`.
+
+Set `stream` to `true` for incremental `text/event-stream` responses. In the
+OpenAI format each `data:` event is a `chat.completion.chunk` with a content
+delta, and successful completion sends a finish reason and usage, then `[DONE]`.
+In the Anthropic format the stream carries `message_start`, one text block's
+`content_block_start`, `content_block_delta` and `content_block_stop`, then
+`message_delta` with the stop reason and usage, and `message_stop`. The default
+(absent or `false`) remains one complete JSON response.
 
 Fragments are provisional until a verified terminal and clean end of the Iroh
-stream. A failure after SSE starts sends a static error and closes without
-`[DONE]`; an error before SSE starts uses the JSON error response below. The
-stream sets `x-should-retry: false`. A disconnect or deadline cancels execution;
-after possible prompt transmission the buyer never retries or switches seller,
-even before the first fragment. Writes await backpressure. Complete and
-streaming execution share replay/caps; cancellation keeps a conservative full
-token reservation. This free buyer does not invoke the separate paid-v2 path.
+stream. A failure after SSE starts sends a static error (an `error` event in the
+Anthropic format) and closes without `[DONE]` or `message_stop`; an error before
+SSE starts uses the JSON error response below. The stream sets
+`x-should-retry: false`. A disconnect or deadline cancels execution; after
+possible prompt transmission the buyer never retries or switches seller, even
+before the first fragment. Writes await backpressure. Complete and streaming
+execution share replay/caps; cancellation keeps a conservative full token
+reservation. This free buyer does not invoke the separate paid-v2 path.
 
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
 413 for an oversized body, 429 when the endpoint is already running a request
@@ -1105,15 +1147,18 @@ Status codes: 400 for an invalid request or a request beyond the quote's limits,
 endpoint's 180-second deadline expires, and 500 for an unexpected failure.
 Whenever the prompt may already have reached a seller, or the request is the
 caller's fault, the error carries `x-should-retry: false`, the header the
-official OpenAI SDKs honor to skip their automatic retries. Clients that retry
-5xx on their own must check it: retrying would resend the prompt, possibly to
-another seller.
+official OpenAI and Anthropic SDKs honor to skip their automatic retries.
+Clients that retry 5xx on their own must check it: retrying would resend the
+prompt, possibly to another seller.
 
 A refused request (`FREE_BUYER_INVALID_REQUEST`, 400) names the offending field
 in `error.param` (`model`, `messages`, `max_tokens`, `stream`, or an unsupported
-field such as `temperature`) and says why in `error.message`, for example
-`max_tokens must be an integer from 1 to 128`. The reason is fixed text or the
-operator's own limits, never the prompt.
+field such as `tools`) and says why in `error.message`, for example
+`tools is not supported yet; remove it or send its default`. The reason is fixed
+text or the operator's own limits, never the prompt. In the Anthropic format
+errors take that API's shape
+(`{"type":"error","error":{"type": "invalid_request_error","message":...}}`) and
+carry the same `code`.
 
 When a seller drops out of a selection, `buyer:free` prints one stderr line:
 `FREE_BUYER_SELLER_FAILED <first 8 hex of the NodeId> <phase> <code>`. The phase

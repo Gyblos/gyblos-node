@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./anthropic-chat": "./src/anthropic-chat.ts",
     "./chat-cli-turn": "./src/chat-cli-turn.ts",
     "./chat-cli": "./src/chat-cli.ts",
     "./chat-owned": "./src/chat-owned.ts",

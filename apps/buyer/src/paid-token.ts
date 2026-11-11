@@ -67,10 +67,14 @@ export async function paidToken(path: string): Promise<string> {
 
 const digest = (value: string) => createHash('sha256').update(value).digest();
 
-// True only for `Authorization: Bearer <token>`; digests compare in constant time whatever the length.
+// True only for `Authorization: Bearer <token>` or, as Anthropic SDKs send their key, `x-api-key: <token>`
+// alone; digests compare in constant time whatever the length.
 export function bearerAuthorizer(token: string) {
   const expected = digest(token);
   return (request: IncomingMessage) => {
+    const key = request.headers[PAID_BUYER.apiKeyHeader];
+    if (typeof key === 'string' && request.headers.authorization === undefined)
+      return timingSafeEqual(digest(key), expected);
     const header = request.headers.authorization ?? '';
     const space = header.indexOf(' ');
     const scheme = space < 0 ? '' : header.slice(0, space);

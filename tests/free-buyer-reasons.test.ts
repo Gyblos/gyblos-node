@@ -25,22 +25,47 @@ const CHAT = {
 
 void test('a refused free chat names the field and why, never the prompt', async () => {
   const cases: [unknown, string | null, RegExp][] = [
-    [{ ...CHAT, max_tokens: 500 }, 'max_tokens', /from 1 to 128/],
-    [{ ...CHAT, max_tokens: 1.5 }, 'max_tokens', /from 1 to 128/],
+    [{ ...CHAT, max_tokens: 0 }, 'max_tokens', /positive integer/],
+    [{ ...CHAT, max_tokens: 1.5 }, 'max_tokens', /positive integer/],
     [{ ...CHAT, model: 'other' }, 'model', /model must be synthetic/],
-    [{ ...CHAT, temperature: 1 }, 'temperature', /supported fields/],
-    [{ ...CHAT, 'bad key!': 1 }, null, /supported fields/],
+    [{ ...CHAT, tools: [{}] }, 'tools', /tools is not supported yet/],
+    [{ ...CHAT, n: 2 }, 'n', /n is not supported yet/],
+    [{ ...CHAT, 'bad key!': 1 }, null, /does not support/],
     [{ ...CHAT, stream: true }, 'stream', /stream must be false or absent/],
-    [{ model: 'synthetic' }, 'messages', /one user message/],
+    [{ model: 'synthetic' }, 'messages', /non-empty list/],
     [
-      { ...CHAT, messages: [...CHAT.messages, ...CHAT.messages] },
+      {
+        ...CHAT,
+        messages: [...CHAT.messages, { role: 'assistant', content: 'x' }],
+      },
       'messages',
-      /one user message/,
+      /start and end with a user message/,
     ],
     [
       { ...CHAT, messages: [{ role: 'system', content: SECRET_PROMPT }] },
       'messages',
-      /one user message/,
+      /start and end with a user message/,
+    ],
+    [
+      {
+        ...CHAT,
+        messages: [{ role: 'tool', content: SECRET_PROMPT, tool_call_id: 'a' }],
+      },
+      'messages',
+      /tool calls/,
+    ],
+    [
+      {
+        ...CHAT,
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'image_url', image_url: { url: 'x' } }],
+          },
+        ],
+      },
+      'messages',
+      /only text content/,
     ],
     [
       {
@@ -83,16 +108,13 @@ void test('free HTTP returns the field in param and the reason in message', asyn
     const response = await fetch(server.url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...CHAT, max_tokens: 500 }),
+      body: JSON.stringify({ ...CHAT, max_tokens: 0 }),
     });
     assert.equal(response.status, 400);
     const value = await response.json();
     assert.equal(value.error.code, 'FREE_BUYER_INVALID_REQUEST');
     assert.equal(value.error.param, 'max_tokens');
-    assert.match(
-      value.error.message,
-      /max_tokens must be an integer from 1 to 128/,
-    );
+    assert.match(value.error.message, /max_tokens must be a positive integer/);
     const broken = await fetch(server.url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

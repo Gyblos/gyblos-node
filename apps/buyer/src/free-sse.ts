@@ -77,11 +77,11 @@ function active(response: ServerResponse, signal: AbortSignal) {
 }
 async function write(
   response: ServerResponse,
-  data: unknown,
+  data: string,
   signal: AbortSignal,
 ) {
   active(response, signal);
-  if (response.write(`data: ${JSON.stringify(data)}\n\n`)) return;
+  if (response.write(data)) return;
   await new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       response.removeListener('drain', drained);
@@ -103,30 +103,39 @@ async function write(
   });
   active(response, signal);
 }
+// How a stream is spelled on the wire: OpenAI chunks, or Anthropic's named events.
+export interface ChatStreamFormat {
+  // Written once, before the first text; may be empty.
+  open(): string;
+  delta(text: string, first: boolean, requestDigest?: string): string;
+  // Everything after the last text, through the stream's terminal marker.
+  close(result: ChatResult): string;
+  error(
+    code: ChatErrorCode,
+    stop: FreeExecutionStop,
+    payment?: ChatPayment,
+  ): string;
+}
+
 export async function executeFreeSse(
   execute: FreeChatStreamExecutor,
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
   response: ServerResponse,
-  model: string,
-  includeDigest = false,
+  format: ChatStreamFormat,
 ) {
-  const header = {
-    id: `chatcmpl-${randomUUID()}`,
-    object: FREE_BUYER.chunkObject,
-    created: Math.floor(Date.now() / UNITS.millisecondsPerSecond),
-    model,
-  };
   let text = '';
   let initial = true;
-  const begin = () => {
+  const begin = async () => {
     active(response, signal);
-    if (!response.headersSent)
-      response.writeHead(HTTP_STATUS.ok, {
-        'content-type': FREE_BUYER.streamContentType,
-        'cache-control': 'no-cache',
-        [FREE_BUYER.noRetryHeader]: 'false',
-      });
+    if (response.headersSent) return;
+    response.writeHead(HTTP_STATUS.ok, {
+      'content-type': FREE_BUYER.streamContentType,
+      'cache-control': 'no-cache',
+      [FREE_BUYER.noRetryHeader]: 'false',
+    });
+    const opening = format.open();
+    if (opening) await write(response, opening, signal);
   };
   const result = await execute(
     input,
@@ -136,25 +145,10 @@ export async function executeFreeSse(
       if (Buffer.byteLength(text + fragment) > FREE_EXECUTION.outputBytes)
         throw new FreeBuyerError(FREE_BUYER_CODES.TOO_LARGE);
       text += fragment;
-      begin();
+      await begin();
       await write(
         response,
-        {
-          ...header,
-          ...(includeDigest && requestDigest
-            ? { [PAID_BUYER.requestDigestField]: requestDigest }
-            : {}),
-          choices: [
-            {
-              index: 0,
-              delta: {
-                ...(initial ? { role: FREE_CHAT_ROLES.ASSISTANT } : {}),
-                content: fragment,
-              },
-              finish_reason: null,
-            },
-          ],
-        },
+        format.delta(fragment, initial, requestDigest),
         signal,
       );
       initial = false;
@@ -162,43 +156,81 @@ export async function executeFreeSse(
   );
   active(response, signal);
   if (text !== result.text) throw new FreeBuyerError(FREE_BUYER_CODES.INTERNAL);
-  begin();
-  await write(
-    response,
-    {
-      ...header,
-      choices: [{ index: 0, delta: {}, finish_reason: result.finishReason }],
-      usage: {
-        prompt_tokens: result.usage.inputTokens,
-        completion_tokens: result.usage.outputTokens,
-        total_tokens: result.usage.inputTokens + result.usage.outputTokens,
-      },
-      ...paymentFields(result.payment),
-      ...executionFields(result),
-    },
-    signal,
-  );
+  await begin();
+  await write(response, format.close(result), signal);
   active(response, signal);
-  response.end(`data: ${FREE_BUYER.streamDone}\n\n`);
+  response.end();
 }
-// A seller that could not continue adds its reason and, when known, the completion tokens delivered.
+
+const sse = (data: unknown, event?: string) =>
+  `${event ? `event: ${event}\n` : ''}data: ${JSON.stringify(data)}\n\n`;
+
+export function openAiStream(
+  model: string,
+  includeDigest = false,
+): ChatStreamFormat {
+  const header = {
+    id: `chatcmpl-${randomUUID()}`,
+    object: FREE_BUYER.chunkObject,
+    created: Math.floor(Date.now() / UNITS.millisecondsPerSecond),
+    model,
+  };
+  return {
+    open: () => '',
+    delta: (content, first, requestDigest) =>
+      sse({
+        ...header,
+        ...(includeDigest && requestDigest
+          ? { [PAID_BUYER.requestDigestField]: requestDigest }
+          : {}),
+        choices: [
+          {
+            index: 0,
+            delta: {
+              ...(first ? { role: FREE_CHAT_ROLES.ASSISTANT } : {}),
+              content,
+            },
+            finish_reason: null,
+          },
+        ],
+      }),
+    close: (result) =>
+      sse({
+        ...header,
+        choices: [{ index: 0, delta: {}, finish_reason: result.finishReason }],
+        usage: {
+          prompt_tokens: result.usage.inputTokens,
+          completion_tokens: result.usage.outputTokens,
+          total_tokens: result.usage.inputTokens + result.usage.outputTokens,
+        },
+        ...paymentFields(result.payment),
+        ...executionFields(result),
+      }) + `data: ${FREE_BUYER.streamDone}\n\n`,
+    // A seller that could not continue adds its reason and, when known, the completion tokens delivered.
+    error: (code, stop, payment) =>
+      sse({
+        error: {
+          message: code,
+          type: FREE_BUYER.errorType,
+          param: null,
+          code,
+          ...(stop.reason ? { reason: stop.reason } : {}),
+          ...(stop.delivered
+            ? { usage: { completion_tokens: stop.delivered.outputTokens } }
+            : {}),
+          ...paymentFields(payment),
+        },
+      }),
+  };
+}
+
 export function replyFreeSseError(
   response: ServerResponse,
+  format: ChatStreamFormat,
   code: ChatErrorCode,
   stop: FreeExecutionStop = {},
   payment?: ChatPayment,
 ) {
   if (response.destroyed || response.writableEnded) return;
-  const error = {
-    message: code,
-    type: FREE_BUYER.errorType,
-    param: null,
-    code,
-    ...(stop.reason ? { reason: stop.reason } : {}),
-    ...(stop.delivered
-      ? { usage: { completion_tokens: stop.delivered.outputTokens } }
-      : {}),
-    ...paymentFields(payment),
-  };
-  response.end(`data: ${JSON.stringify({ error })}\n\n`);
+  response.end(format.error(code, stop, payment));
 }
