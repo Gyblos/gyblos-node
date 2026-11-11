@@ -78,10 +78,10 @@ curl http://127.0.0.1:4031/v1/chat/completions \
   -d '{
     "model": "qwen3-0.6b",
     "messages": [
-      {"role": "system", "content": "Responde en una frase corta."},
-      {"role": "user", "content": "Me llamo Ana."},
-      {"role": "assistant", "content": "¡Mucho gusto, Ana!"},
-      {"role": "user", "content": "¿Cómo me llamo?"}
+      {"role": "system", "content": "Answer in one short sentence."},
+      {"role": "user", "content": "My name is Ana."},
+      {"role": "assistant", "content": "Nice to meet you, Ana!"},
+      {"role": "user", "content": "What is my name?"}
     ]
   }'
 ```
@@ -102,10 +102,10 @@ const stream = await client.chat.completions.create({
   model: 'qwen3-0.6b',
   stream: true,
   messages: [
-    { role: 'system', content: 'Sé breve.' },
-    { role: 'user', content: 'Mi perro se llama Rocky.' },
-    { role: 'assistant', content: 'Entendido: tu perro es Rocky.' },
-    { role: 'user', content: '¿Cómo se llama mi perro?' },
+    { role: 'system', content: 'Be brief.' },
+    { role: 'user', content: 'My dog is called Rocky.' },
+    { role: 'assistant', content: 'Got it: your dog is Rocky.' },
+    { role: 'user', content: "What is my dog's name?" },
   ],
 });
 for await (const chunk of stream)
@@ -126,11 +126,11 @@ const client = new Anthropic({
 const message = await client.messages.create({
   model: 'qwen3-0.6b',
   max_tokens: 200,
-  system: 'Sé breve.',
+  system: 'Be brief.',
   messages: [
-    { role: 'user', content: 'Mi perro se llama Rocky.' },
-    { role: 'assistant', content: 'Entendido: tu perro es Rocky.' },
-    { role: 'user', content: '¿Cómo se llama mi perro?' },
+    { role: 'user', content: 'My dog is called Rocky.' },
+    { role: 'assistant', content: 'Got it: your dog is Rocky.' },
+    { role: 'user', content: "What is my dog's name?" },
   ],
 });
 console.log(message.content[0].text);

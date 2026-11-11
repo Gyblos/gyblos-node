@@ -19,6 +19,7 @@ const JOURNEY = [
   'sellers/models-offers',
   'sellers/operate',
   'sellers/identity',
+  'buyers/use-from-code',
   'reference/cli',
   'reference/configuration',
   'help/troubleshooting',
