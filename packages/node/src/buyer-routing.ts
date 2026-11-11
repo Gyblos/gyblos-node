@@ -148,7 +148,7 @@ async function waitForSeller<T>(
       request.wait.signal.throwIfAborted();
     }
   }
-  if (await unresolved(state))
+  if (await bounded(unresolved(state), request.wait.signal))
     throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
   request.wait.signal.throwIfAborted();
 }
@@ -218,6 +218,11 @@ async function refreshWaiting<T>(
   signal: AbortSignal,
   remote = false,
 ): Promise<T | undefined> {
+  request.priceCeilings = fallbackPriceCeilings(
+    state.options.policy,
+    winner.quote.offer.prices,
+    request.priceCeilings,
+  )!;
   await waitForSeller(state, request, winner.nodeId, signal, remote);
   const fresh = await select(state, request, new Set(), signal);
   if (fresh.nodeId !== winner.nodeId)
@@ -252,9 +257,9 @@ async function attempt<T>(
     fallback(state, request, winner.nodeId, prices);
     return undefined;
   }
-  if (await unresolved(state))
+  if (await bounded(unresolved(state), request.wait?.signal ?? signal))
     throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
-  signal.throwIfAborted();
+  (request.wait?.signal ?? signal).throwIfAborted();
   if (occupied(state, request, winner.nodeId)) {
     if (state.options.policy.onBusy === BUYER_BUSY_POLICIES.WAIT)
       return refreshWaiting(state, request, winner, signal);
@@ -289,7 +294,9 @@ async function attempt<T>(
       !(error instanceof UnsentSellerBusyError) ||
       error.nodeId !== winner.nodeId
     ) {
-      await unresolved(state);
+      const current = request.wait?.signal ?? signal;
+      await bounded(unresolved(state), current);
+      current.throwIfAborted();
       throw error;
     }
     signal.throwIfAborted();

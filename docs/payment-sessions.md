@@ -333,12 +333,14 @@ uncertainty, shutdown or expiry; timeout has a static typed local error. FIFO
 ownership is handed to the waiter before a newcomer can acquire that seller.
 
 After admission, the buyer obtains a new quote for the same seller and repeats
-identity, freshness, model/reasoning and budget checks. Only a known busy
-cooldown is ignored for this explicit retry; hard filters still apply. No
-deposit or request authorization starts while the request is still queued. If
-the remote peer remains busy, bounded control-only polls share the original wait
-deadline. A non-busy failure ends the call; it never changes sellers or retries
-a prompt.
+identity, freshness, model/reasoning and budget checks. When a quote was already
+selected, its input and output prices also bound the renewed quote unless
+higher-price fallback was explicitly authorized. Waiting never silently turns a
+free choice into a paid one. Only a known busy cooldown is ignored for this
+explicit retry; hard filters still apply. No deposit or request authorization
+starts while the request is still queued. If the remote peer remains busy,
+bounded control-only polls share the original wait deadline. A non-busy failure
+ends the call; it never changes sellers or retries a prompt.
 
 The trusted execution port receives a synchronous `sending` callback. Product
 free and session transports invoke it at the actual first possible prompt write,
