@@ -21,6 +21,7 @@ export async function multisellerSession(
     buyerNodeId: '12'.repeat(32),
     sellers: ['34'.repeat(32), '56'.repeat(32)],
   },
+  totalDepositAtomic = '2000',
 ) {
   const a = await sessionRig({
     buyerNodeId: nodes.buyerNodeId,
@@ -47,7 +48,7 @@ export async function multisellerSession(
   const pool = () =>
     openBatchBuyerPool({
       paths,
-      totalDepositAtomic: '2000',
+      totalDepositAtomic,
       now: a.now,
       backend: async (child) => {
         let sellerId = '';
@@ -91,7 +92,7 @@ export async function multisellerSession(
     options: {
       policy: {
         depositAtomic: '1000',
-        totalDepositAtomic: '2000',
+        totalDepositAtomic,
         lifetimeMs: 3600000,
         withdrawDelaySeconds: 900,
       },
@@ -108,8 +109,8 @@ export async function multisellerSession(
   };
 }
 
-export async function multisellerLoopback() {
-  const fixture = await multisellerSession();
+export async function multisellerLoopback(totalDepositAtomic = '2000') {
+  const fixture = await multisellerSession(undefined, totalDepositAtomic);
   const wires = await Promise.all(
     fixture.rigs.map((rig, index) =>
       batchLoopback(

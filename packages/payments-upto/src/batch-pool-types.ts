@@ -24,7 +24,7 @@ export interface BatchBuyerPool {
   list(): Promise<BatchPoolEntry[]>;
   allocate(terms: PaymentSessionTerms): Promise<BatchPoolEntry>;
   begin(nodeId: string, requestId: string): Promise<void>;
-  resolve(nodeId: string): Promise<boolean>;
+  resolve(nodeId: string, unsentRequestId?: string): Promise<boolean>;
   backend(nodeId: string): Promise<ReturnType<typeof openBatchBuyerBackend>>;
   budget(): Promise<{ committedAtomic: string; availableAtomic: string }>;
   dispose(): Promise<void>;

@@ -17,6 +17,7 @@ import { freeSellerFixture } from './support/free-seller';
 
 async function fixture(
   options: {
+    beforeExecute?: () => void;
     relayOnly?: boolean;
     requestMs?: number;
     relayAllowed?: (origin: string) => boolean;
@@ -346,4 +347,17 @@ void test('free client cuts slow frames at the absolute deadline and suppresses 
   await item.client.settled();
   assert.equal(item.writes(), 1);
   assert.equal(item.closes(), 1);
+});
+
+void test('free client checks the shared uncertainty barrier immediately before the first prompt write', async () => {
+  let checks = 0;
+  const item = await fixture({
+    beforeExecute: () => {
+      checks++;
+      throw new Error('Synthetic uncertainty');
+    },
+  });
+  await assert.rejects(item.client.execute(item.request), { sent: false });
+  assert.equal(checks, 1);
+  assert.equal(item.writes(), 0);
 });

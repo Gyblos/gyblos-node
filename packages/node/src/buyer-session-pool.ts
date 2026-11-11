@@ -1,4 +1,4 @@
-// Sequential routing across independently persisted seller sessions; the private catalog owns all budget credit.
+// Bounded routing across independently persisted seller sessions; the private catalog owns all budget credit.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import type {
   BatchBuyerPool,
@@ -8,14 +8,20 @@ import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
 } from '@gyblos/protocol/payment-session';
-import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
+import {
+  BatchClientError,
+  type BatchDestination,
+} from '@gyblos/transport-iroh/batch-client';
 
 import { bounded } from './buyer-operation';
+import { createPoolAdmissions, type PoolLease } from './buyer-pool-admission';
+import { UnsentSellerBusyError } from './buyer-routing';
 import {
   checkBuyerSessionInput,
   createBuyerSessionManager,
@@ -36,8 +42,8 @@ interface State<Remote extends BatchDestination> {
   lifetime: AbortController;
   pool?: Promise<BatchBuyerPool>;
   managers: Map<string, ReturnType<typeof createBuyerSessionManager<Remote>>>;
-  active: boolean;
-  pending?: Promise<unknown>;
+  admission: ReturnType<typeof createPoolAdmissions>;
+  closing?: Promise<void>;
   operationMs: number;
 }
 function catalog<Remote extends BatchDestination>(state: State<Remote>) {
@@ -59,6 +65,13 @@ function manager<Remote extends BatchDestination>(
   if (!found) {
     found = createBuyerSessionManager({
       ...state.options,
+      transport: {
+        ...state.options.transport,
+        beforeExecute: () => {
+          state.options.transport?.beforeExecute?.();
+          state.admission.beforeExecute(id);
+        },
+      },
       inspect: async () =>
         (await (await catalog(state)).list()).find(
           (entry) => entry.terms.sellerNodeId === id,
@@ -72,7 +85,10 @@ function manager<Remote extends BatchDestination>(
 async function unresolved<Remote extends BatchDestination>(
   state: State<Remote>,
 ) {
-  if (await state.options.unresolved()) return true;
+  if (await state.options.unresolved()) {
+    state.admission.block(true);
+    return true;
+  }
   const entries = await state.options.inspect();
   if (entries.length === 0) return false;
   const pool = await catalog(state);
@@ -83,6 +99,17 @@ async function unresolved<Remote extends BatchDestination>(
   ]);
   for (const entry of await pool.list()) {
     signal.throwIfAborted();
+    const owned = state.admission.leases.get(entry.terms.sellerNodeId);
+    if (
+      owned?.registered &&
+      owned.running &&
+      entry.requestId === owned.requestId
+    )
+      continue;
+    if (owned?.registered && !owned.running) {
+      pending = true;
+      continue;
+    }
     if (entry.stored?.snapshot.state === SESSION_STATES.CLOSED) {
       await pool.resolve(entry.terms.sellerNodeId);
       continue;
@@ -103,6 +130,7 @@ async function unresolved<Remote extends BatchDestination>(
         pending = true;
     }
   }
+  state.admission.block(pending);
   return pending;
 }
 async function execute<Remote extends BatchDestination>(
@@ -110,43 +138,48 @@ async function execute<Remote extends BatchDestination>(
   quote: SignedOfferV2,
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
+  lease: PoolLease,
 ) {
   checkBuyerSessionInput(quote, input);
   await state.options.verify(quote, signal);
-  if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
-  signal.throwIfAborted();
-  const pool = await catalog(state);
-  const existing = (await pool.list()).find(
-    (entry) => entry.terms.sellerNodeId === quote.offer.nodeId,
-  );
-  const terms =
-    existing?.terms ??
-    sessionTerms(quote, state.options.policy, state.options.now());
-  await verifyBatchQuote(
-    quote,
-    terms,
-    state.options.endpoint.id().toString(),
-    state.options.now(),
-  );
-  if (
-    existing?.stored?.snapshot.state === SESSION_STATES.CLOSED ||
-    state.options.now() >= terms.expiresAt
-  )
-    return sessionFail(SESSION_CODES.CLOSED);
-  const budget = await pool.budget();
-  if (
-    BigInt(budget.committedAtomic) >
-    BigInt(
-      state.options.policy.totalDepositAtomic ??
-        state.options.policy.depositAtomic,
+  const entry = await state.admission.serial(async () => {
+    if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
+    signal.throwIfAborted();
+    const pool = await catalog(state);
+    const existing = (await pool.list()).find(
+      (entry) => entry.terms.sellerNodeId === quote.offer.nodeId,
+    );
+    const terms =
+      existing?.terms ??
+      sessionTerms(quote, state.options.policy, state.options.now());
+    await verifyBatchQuote(
+      quote,
+      terms,
+      state.options.endpoint.id().toString(),
+      state.options.now(),
+    );
+    if (
+      existing?.stored?.snapshot.state === SESSION_STATES.CLOSED ||
+      state.options.now() >= terms.expiresAt
     )
-  )
-    return sessionFail(SESSION_CODES.LIMIT);
-  const entry = await pool.allocate(terms);
-  signal.throwIfAborted();
-  await pool.begin(terms.sellerNodeId, quote.offer.requestId);
+      return sessionFail(SESSION_CODES.CLOSED);
+    const budget = await pool.budget();
+    if (
+      BigInt(budget.committedAtomic) >
+      BigInt(
+        state.options.policy.totalDepositAtomic ??
+          state.options.policy.depositAtomic,
+      )
+    )
+      return sessionFail(SESSION_CODES.LIMIT);
+    const entry = await pool.allocate(terms);
+    signal.throwIfAborted();
+    await pool.begin(terms.sellerNodeId, quote.offer.requestId);
+    lease.registered = true;
+    return entry;
+  });
   const result = await manager(state, entry).execute(quote, input, signal);
-  if (!(await pool.resolve(terms.sellerNodeId)))
+  if (!(await (await catalog(state)).resolve(entry.terms.sellerNodeId)))
     return sessionFail(SESSION_CODES.UNVERIFIED);
   return result;
 }
@@ -194,6 +227,59 @@ async function summarize<Remote extends BatchDestination>(
     ? { chargedAtomic: String(charged), refundedAtomic: String(refunded) }
     : undefined;
 }
+async function run<Remote extends BatchDestination>(
+  state: State<Remote>,
+  quote: SignedOfferV2,
+  input: FreeExecutionBuildInput,
+  signal: AbortSignal,
+) {
+  const id = quote.offer.nodeId;
+  const lease = state.admission.enter(id, quote.offer.requestId);
+  const current = AbortSignal.any([
+    signal,
+    state.lifetime.signal,
+    lease.controller.signal,
+  ]);
+  return state.admission.track(
+    Promise.resolve().then(async () => {
+      try {
+        return await execute(state, quote, input, current, lease);
+      } catch (error) {
+        lease.running = false;
+        if (lease.registered) {
+          if (
+            !lease.sent &&
+            error instanceof BatchClientError &&
+            error.remote &&
+            (error.code === SESSION_CODES.BUSY ||
+              error.code === PAID_EXECUTION_CODES.BUSY) &&
+            (await state.admission.serial(async () =>
+              (await catalog(state)).resolve(id, lease.requestId),
+            ))
+          )
+            throw new UnsentSellerBusyError(id);
+          state.admission.uncertain();
+          await state.admission
+            .serial(async () => {
+              await (await catalog(state)).resolve(id);
+            })
+            .catch(() => undefined);
+        }
+        throw error;
+      } finally {
+        state.admission.leave(id, lease);
+      }
+    }),
+  );
+}
+async function close<Remote extends BatchDestination>(state: State<Remote>) {
+  state.lifetime.abort();
+  await state.admission.drain();
+  await Promise.allSettled(
+    [...state.managers.values()].map((host) => host.close()),
+  );
+  await (await state.pool?.catch(() => undefined))?.dispose();
+}
 export function createBuyerSessionPool<Remote extends BatchDestination>(
   options: Options<Remote>,
 ) {
@@ -201,53 +287,26 @@ export function createBuyerSessionPool<Remote extends BatchDestination>(
     options,
     lifetime: new AbortController(),
     managers: new Map(),
-    active: false,
+    admission: createPoolAdmissions(),
     operationMs: controlInteger(
       options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs,
       1,
       BATCH_SESSION_DEFAULTS.operationMs,
     ),
   };
-  const exclusive = async <T>(run: () => Promise<T>) => {
-    if (state.active) return sessionFail(SESSION_CODES.BUSY);
-    state.active = true;
-    const current = Promise.resolve().then(() => {
-      state.lifetime.signal.throwIfAborted();
-      return run();
-    });
-    state.pending = current;
-    try {
-      return await current;
-    } finally {
-      state.active = false;
-    }
-  };
   return {
-    unresolved: () => exclusive(() => unresolved(state)),
+    busyNodeIds: () => new Set(state.admission.leases.keys()),
+    checkBeforeExternalExecution: state.admission.check,
+    unresolved: () => state.admission.serial(() => unresolved(state)),
     execute: (
       quote: SignedOfferV2,
       input: FreeExecutionBuildInput,
       signal: AbortSignal,
-    ) =>
-      exclusive(() =>
-        execute(
-          state,
-          quote,
-          input,
-          AbortSignal.any([signal, state.lifetime.signal]),
-        ),
-      ),
+    ) => run(state, quote, input, signal),
     reconcile: (signal: AbortSignal) =>
-      exclusive(() => summarize(state, signal, false)),
+      state.admission.maintain(() => summarize(state, signal, false)),
     settle: (signal: AbortSignal) =>
-      exclusive(() => summarize(state, signal, true)),
-    async close() {
-      state.lifetime.abort();
-      await state.pending?.catch(() => undefined);
-      await Promise.allSettled(
-        [...state.managers.values()].map((host) => host.close()),
-      );
-      await (await state.pool?.catch(() => undefined))?.dispose();
-    },
+      state.admission.maintain(() => summarize(state, signal, true)),
+    close: () => (state.closing ??= close(state)),
   };
 }

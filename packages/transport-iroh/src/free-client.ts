@@ -71,6 +71,8 @@ async function readResponse(
   return reader.finish();
 }
 interface FreeClientOptions {
+  // Trusted host guard runs synchronously after authentication and immediately before transmission.
+  beforeExecute?(): void;
   onDelta?: (text: string) => Promise<void>;
   now?: () => number;
   requestMs?: number;
@@ -147,6 +149,7 @@ async function runFreeRequest(
   } catch {
     throw new FreeExecutionError(FREE_EXECUTION_CODES.EXPIRED);
   }
+  options.beforeExecute?.();
   state.sent = true;
   await stage(
     (async () => {

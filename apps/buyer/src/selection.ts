@@ -66,7 +66,7 @@ export interface VerifiedSelectionDependencies {
   // Told why each seller dropped out; it never affects which seller wins.
   onSellerFailure?: SellerFailureReporter;
 }
-async function verifiedSeller(
+export async function verifiedSeller(
   client: BuyerControlClient,
   seller: StaticControlSeller,
   now: () => number,
