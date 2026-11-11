@@ -85,6 +85,9 @@ All `[limits]` keys are optional integers, minimum 1, file-only:
 Effective `max_connections × requests_per_minute` must not exceed `global_requests_per_minute`, including
 omitted defaults. Doctor prints effective capacity limits. These are separate from offer token quotas.
 
+A request is one answer the buyer asks for. The quote, catalog and receipt calls around it do not count,
+so 30 per minute is 30 answers per buyer.
+
 ### Offers [#offer-fields]
 
 The seller needs at least one `[[offers]]` entry; at most 32 are allowed. A normalized model can occur

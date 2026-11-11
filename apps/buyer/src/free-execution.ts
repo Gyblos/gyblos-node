@@ -26,7 +26,11 @@ import {
 import type { SelectionDecision } from './selection';
 
 export class FreeSelectionFailure extends Error {
-  constructor(readonly decision: Exclude<SelectionDecision, { ok: true }>) {
+  // retryAt: when no seller is left because every one failed recently, the earliest cooldown end.
+  constructor(
+    readonly decision: Exclude<SelectionDecision, { ok: true }>,
+    readonly retryAt?: number,
+  ) {
     super(decision.code);
     this.name = 'FreeSelectionFailure';
   }
