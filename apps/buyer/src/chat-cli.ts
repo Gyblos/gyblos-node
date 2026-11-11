@@ -165,18 +165,7 @@ export async function chatSession(options: ChatSessionOptions) {
       continue;
     }
     if (prompt.trim() === CHAT_COMMANDS.SETTLE && options.session) {
-      try {
-        const settled = await options.session.settle?.();
-        options.write(
-          settled
-            ? `Configured RPC reports finalized charge ${settled.chargedAtomic}; refunded ${settled.refundedAtomic} atomic units.\n`
-            : 'Settlement is pending; the original channel is retained.\n',
-        );
-      } catch {
-        options.write(
-          'Settlement could not be verified; the original channel is retained.\n',
-        );
-      }
+      await settleChat(options.session, options.write);
       return;
     }
     const messages = prepareBuyerConversation(
@@ -212,22 +201,7 @@ export async function chatSession(options: ChatSessionOptions) {
         ...messages,
         { role: FREE_CHAT_ROLES.ASSISTANT, content: result.text },
       ];
-    options.write('\n');
-    if (result.code) options.write(`Error: ${result.code}\n`);
-    if (result.usage)
-      options.write(
-        `Tokens: ${result.usage.input} input, ${result.usage.output} output\n`,
-      );
-    if (result.payment) {
-      const { verdict, charged, refunded } = result.payment;
-      options.write(
-        verdict === SESSION_VERDICTS.APPROVED && result.payment.session
-          ? `Approved this question: ${result.payment.session.approvedAtomic}; cumulative: ${result.payment.session.cumulativeAtomic} of ${result.payment.session.depositAtomic} atomic units; settlement pending.\n`
-          : verdict === PAID_VERDICTS.SETTLED
-            ? `Payment: ${verdict}; charged: ${charged ?? 'unknown'}; refunded: ${refunded ?? 'unknown'} atomic units\n`
-            : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
-      );
-    }
+    reportTurn(result, options.write);
     if (result.status === CHAT_TURN_STATUSES.UNCERTAIN) {
       options.write(
         'The request may have been sent. No retry was made. Check the buyer and reconcile any uncertain payment before continuing.\n',
@@ -236,6 +210,41 @@ export async function chatSession(options: ChatSessionOptions) {
         ? result.requestDigest
         : undefined;
     }
+  }
+}
+async function settleChat(
+  session: NonNullable<ChatSessionOptions['session']>,
+  write: (text: string) => void,
+) {
+  try {
+    const settled = await session.settle?.();
+    write(
+      settled
+        ? `Configured RPC reports finalized charge ${settled.chargedAtomic}; refunded ${settled.refundedAtomic} atomic units.\n`
+        : 'Settlement is pending; the original channel is retained.\n',
+    );
+  } catch {
+    write(
+      'Settlement could not be verified; the original channel is retained.\n',
+    );
+  }
+}
+function reportTurn(result: ChatTurnResult, write: (text: string) => void) {
+  write('\n');
+  if (result.code) write(`Error: ${result.code}\n`);
+  if (result.usage)
+    write(
+      `Tokens: ${result.usage.input} input, ${result.usage.output} output\n`,
+    );
+  if (result.payment) {
+    const { verdict, charged, refunded } = result.payment;
+    write(
+      verdict === SESSION_VERDICTS.APPROVED && result.payment.session
+        ? `Approved this question: ${result.payment.session.approvedAtomic}; cumulative: ${result.payment.session.cumulativeAtomic} of ${result.payment.session.depositAtomic} atomic units; settlement pending.\n`
+        : verdict === PAID_VERDICTS.SETTLED
+          ? `Payment: ${verdict}; charged: ${charged ?? 'unknown'}; refunded: ${refunded ?? 'unknown'} atomic units\n`
+          : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
+    );
   }
 }
 export async function main(options?: {

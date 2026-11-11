@@ -10,7 +10,6 @@ import {
 import type { ChatMessage } from '@gyblos/protocol/chat';
 import {
   ENGINE_DONE_REASONS,
-  FREE_EXECUTION,
   FREE_EXECUTION_CODES,
   FREE_STREAM,
   OFFER_PRICING_KINDS,
@@ -19,6 +18,7 @@ import {
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
+import { createChatText } from './chat-cli-text';
 import {
   BUYER_EXECUTION_FIELD,
   BUYER_SELECTION_CODES,
@@ -297,11 +297,6 @@ const uncertain = (requestDigest?: string): ChatTurnResult =>
     ? { status: CHAT_TURN_STATUSES.UNCERTAIN, requestDigest }
     : { status: CHAT_TURN_STATUSES.UNCERTAIN };
 
-function writeDelta(options: ChatTurnOptions, value: unknown) {
-  if (typeof value === 'string')
-    options.write(value.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, ''));
-}
-
 async function readStream(
   body: ReadableStream<Uint8Array>,
   options: ChatTurnOptions,
@@ -312,8 +307,7 @@ async function readStream(
   let bytes = 0;
   let done = false;
   let terminal: ChatTerminal | undefined;
-  let text = '';
-  let contentBytes = 0;
+  const output = createChatText(options.write);
   let requestDigest: string | undefined;
   try {
     while (true) {
@@ -362,18 +356,7 @@ async function readStream(
           const choice = record(body.choices[0]);
           const delta = record(choice?.delta);
           if (!choice || !delta) throw new Error('choice');
-          if (delta.content !== undefined) {
-            if (
-              typeof delta.content !== 'string' ||
-              /[\uD800-\uDFFF]/u.test(delta.content)
-            )
-              throw new Error('content');
-            contentBytes += Buffer.byteLength(delta.content);
-            if (contentBytes > FREE_EXECUTION.outputBytes)
-              throw new Error('bound');
-            text += delta.content;
-          }
-          writeDelta(options, delta.content);
+          output.append(delta.content);
           if (choice.finish_reason !== null) {
             terminal = completeResult(choice, body, options);
           }
@@ -383,15 +366,22 @@ async function readStream(
     }
     pending += decoder.decode();
     if (!done || pending || !terminal) return uncertain(requestDigest);
-    if (terminal.status === CHAT_TURN_STATUSES.COMPLETE)
-      return { ...terminal, status: CHAT_TURN_STATUSES.COMPLETE, text };
-    return requestDigest
-      ? { ...terminal, status: CHAT_TURN_STATUSES.UNCERTAIN, requestDigest }
-      : { ...terminal, status: CHAT_TURN_STATUSES.UNCERTAIN };
+    return verifiedStreamResult(terminal, requestDigest, output.value());
   } catch {
     return uncertain(requestDigest);
   } finally {
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
+}
+function verifiedStreamResult(
+  terminal: ChatTerminal,
+  requestDigest: string | undefined,
+  text: string,
+): ChatTurnResult {
+  if (terminal.status === CHAT_TURN_STATUSES.COMPLETE)
+    return { ...terminal, status: CHAT_TURN_STATUSES.COMPLETE, text };
+  return requestDigest
+    ? { ...terminal, status: CHAT_TURN_STATUSES.UNCERTAIN, requestDigest }
+    : { ...terminal, status: CHAT_TURN_STATUSES.UNCERTAIN };
 }
