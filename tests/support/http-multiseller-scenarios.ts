@@ -82,10 +82,13 @@ async function parallel(host: HttpMultisellerHost) {
     HTTP_STATUS.tooManyRequests,
   );
   assert.equal((await host.inspect()).length, 2);
+  // Force the actual publisher's busy withdrawal rather than relying on a fast test run.
+  await host.waitListed(0);
   await b!.call(HTTP_MULTI_METHODS.RELEASE);
   httpMultiAnswer(await second, 1);
   await a!.call(HTTP_MULTI_METHODS.RELEASE);
   httpMultiAnswer(await first, 0);
+  await host.waitListed(2);
   const entries = await host.inspect();
   const original = entries.find(
     (entry) => entry.terms.sellerNodeId === a!.role.nodeId,

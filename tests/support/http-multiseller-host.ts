@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { address } from '@solana/kit';
 
@@ -13,6 +14,7 @@ import {
   DEVNET_USDC,
   FILE_MODES,
   rolePathIn,
+  SELLER_DISCOVERY,
 } from '@gyblos/config';
 import { parseBuyerRoutingPolicy } from '@gyblos/core/buyer-routing';
 import {
@@ -37,7 +39,6 @@ import {
 import { httpMultiWire } from './http-multiseller-wire';
 import { paidBuyerConfiguration } from './paid-acceptance-config';
 import { paidAcceptanceMeter } from './paid-acceptance-engine';
-import { paidWait } from './paid-acceptance-host';
 
 export async function httpMultisellerHost(
   onBusy: BuyerBusyPolicy = BUYER_BUSY_POLICIES.REROUTE,
@@ -152,27 +153,21 @@ export async function httpMultisellerHost(
         IDENTITY_ACCEPTANCE.initialSequence,
       );
     }
-    await paidWait(
-      async () =>
-        (
-          await fetchSellers({
-            baseUrl: index.baseUrl,
-            model: MODEL_IDS.QWEN3_0_6B,
-            signal,
-            fetch: globalThis.fetch,
-            now: Date.now,
-          })
-        ).sellers.length === 2,
-      signal,
-    );
+    const listed = () =>
+      fetchSellers({
+        baseUrl: index.baseUrl,
+        model: MODEL_IDS.QWEN3_0_6B,
+        signal,
+        fetch: globalThis.fetch,
+        now: Date.now,
+      });
+    const waitListed = async (count: number) => {
+      while ((await listed()).sellers.length !== count)
+        await delay(SELLER_DISCOVERY.tickMs / 10, undefined, { signal });
+    };
+    await waitListed(2);
     // Both publications must be fetched from the real handler, not injected into the selector.
-    const published = await fetchSellers({
-      baseUrl: index.baseUrl,
-      model: MODEL_IDS.QWEN3_0_6B,
-      signal,
-      fetch: globalThis.fetch,
-      now: Date.now,
-    });
+    const published = await listed();
     assert.equal(published.sellers.length, 2);
     await paidBuyerConfiguration(
       sellers[0]!.role.owner,
@@ -235,6 +230,7 @@ export async function httpMultisellerHost(
       wire,
       index,
       registry,
+      waitListed,
       signal,
       close,
       buyer: () => {

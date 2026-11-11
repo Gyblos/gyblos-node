@@ -261,6 +261,8 @@ short-deadline phase proves expiry. Native signing and private writes are not
 required to fit the intentionally shortened expiry test deadline. Product
 capacity and deadlines are unchanged.
 
+The parallel case observes actual busy withdrawal and republication before
+starting another prompt; it never assumes a fixed sleep restored availability.
 The cases cover concurrent A/B execution and A reuse after buyer restart,
 independently verified final charge/refund, same-seller queue expiry and HTTP
 disconnect, fresh quote correlation, a shared-budget race, and A uncertainty
