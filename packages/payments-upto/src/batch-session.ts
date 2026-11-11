@@ -17,4 +17,8 @@ export type {
 } from './batch-session-types';
 
 export { openBatchBuyerPool, inspectBatchPool } from './batch-pool';
-export type { BatchBuyerPool, BatchPoolEntry, BatchPoolOptions } from './batch-pool-types';
+export type {
+  BatchBuyerPool,
+  BatchPoolEntry,
+  BatchPoolOptions,
+} from './batch-pool-types';

@@ -199,10 +199,11 @@ only its earlier accepted total. Existing free/paid stream channels remain
 independently available; no streaming or full agent-API compatibility is newly
 claimed for this session RPC.
 
-Explicit application startup activates the single permitted pair only. Multiple
-sellers/concurrent requests, automatic session rotation/topup, restored-journal
-rollback defense, abrupt host/power-loss acceptance and live
-network/deployed-program validation remain separate work.
+Without shared total authority startup retains one pair. Explicit total
+authority enables sequential multiple sellers as described below. Concurrent
+requests, automatic session rotation/topup, restored-journal rollback defense,
+abrupt host/power-loss acceptance and live network/deployed-program validation
+remain separate work.
 
 ## Sequential multiple sellers and shared authority
 
@@ -234,14 +235,19 @@ reports aggregate charge/refund amounts only when all required independent
 proofs exist. A failed/offline peer cannot fabricate a successful aggregate or
 prevent attempts to close the other slots.
 
-The adapter holds one buyer-wide process lock and writes an allocation before
-financial construction or signing. It seeds a private child journal before
-marking that slot ready, so an interrupted pre-sign allocation can finish under
-the same immutable reservation. A missing ready journal fails closed. A durable
-request intent precedes execution: ambiguity blocks new free and paid routing
-across all sellers until original financial approval recovery or independent
-finality resolves it. A provably pristine pre-sign child may clear a failed
-intent without releasing its allocation. Prompt content is never replayed.
+Every product buyer mode (free, per-request, single-session and pool) first
+holds the same buyer-home lifetime ownership guard. Startup failures, final
+inspection and shutdown release it. Raw signing/SDK ports remain trusted host
+primitives; external hosts must honor that ownership contract. The adapter
+additionally holds one buyer-wide catalog process lock and writes an allocation
+before financial construction or signing. It seeds a private child journal
+before marking that slot ready, so an interrupted pre-sign allocation can finish
+under the same immutable reservation. A missing ready journal fails closed. A
+durable request intent precedes execution: ambiguity blocks new free and paid
+routing across all sellers until original financial approval recovery or
+independent finality resolves it. A provably pristine pre-sign child may clear a
+failed intent without releasing its allocation. Prompt content is never
+replayed.
 
 The catalog and deterministic child paths live under the buyer's private
 payments home, using 0700 directories, 0600 files, bounded atomic writes and

@@ -75,7 +75,8 @@
     "./batch-session": "./src/batch-session.ts",
     "./batch-buyer": "./src/batch-buyer.ts",
     "./batch-seller": "./src/batch-seller.ts",
-    "./buyer-session-pool": "./src/buyer-session-pool.ts"
+    "./buyer-session-pool": "./src/buyer-session-pool.ts",
+    "./buyer-runtime": "./src/buyer-runtime.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

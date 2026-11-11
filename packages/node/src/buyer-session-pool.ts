@@ -6,6 +6,7 @@ import type {
 } from '@gyblos/payments-upto/batch-session';
 import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
+import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   SESSION_CODES,
@@ -28,6 +29,7 @@ type Options<Remote extends BatchDestination> = Omit<
 > & {
   inspect(): Promise<BatchPoolEntry[]>;
   pool(): Promise<BatchBuyerPool>;
+  operationMs?: number;
 };
 interface State<Remote extends BatchDestination> {
   options: Options<Remote>;
@@ -36,6 +38,7 @@ interface State<Remote extends BatchDestination> {
   managers: Map<string, ReturnType<typeof createBuyerSessionManager<Remote>>>;
   active: boolean;
   pending?: Promise<unknown>;
+  operationMs: number;
 }
 function catalog<Remote extends BatchDestination>(state: State<Remote>) {
   if (!state.pool) {
@@ -157,12 +160,25 @@ async function summarize<Remote extends BatchDestination>(
   let charged = 0n;
   let refunded = 0n;
   let complete = true;
-  for (const entry of await pool.list()) {
+  const entries = await pool.list();
+  const overall = AbortSignal.any([
+    signal,
+    state.lifetime.signal,
+    AbortSignal.timeout(state.operationMs),
+  ]);
+  const sliceMs = Math.max(
+    1,
+    Math.floor(state.operationMs / Math.max(1, entries.length)),
+  );
+  for (const entry of entries) {
     try {
+      overall.throwIfAborted();
       const host = manager(state, entry);
-      const result = await (close
-        ? host.settle(signal)
-        : host.reconcile(signal));
+      const peer = AbortSignal.any([overall, AbortSignal.timeout(sliceMs)]);
+      const result = await bounded(
+        close ? host.settle(peer) : host.reconcile(peer),
+        peer,
+      );
       if (!result) {
         complete = false;
         continue;
@@ -186,6 +202,11 @@ export function createBuyerSessionPool<Remote extends BatchDestination>(
     lifetime: new AbortController(),
     managers: new Map(),
     active: false,
+    operationMs: controlInteger(
+      options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs,
+      1,
+      BATCH_SESSION_DEFAULTS.operationMs,
+    ),
   };
   const exclusive = async <T>(run: () => Promise<T>) => {
     if (state.active) return sessionFail(SESSION_CODES.BUSY);

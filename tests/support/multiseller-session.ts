@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { PROTOCOL_FEE } from '@gyblos/config';
 import { batchPoolPathsIn } from '@gyblos/config/home';
+import { createSellerBatchSession } from '@gyblos/node/batch-seller';
 import {
   createBatchBuyer,
   inspectBatchPool,
@@ -12,6 +13,7 @@ import {
 } from '@gyblos/payments-upto/batch-session';
 
 import { batchOfferFixture } from './batch-iroh-offer';
+import { batchLoopback } from './batch-loopback';
 import { sessionRig } from './batch-session';
 
 export async function multisellerSession(
@@ -40,6 +42,8 @@ export async function multisellerSession(
   );
   const paths = batchPoolPathsIn({ GYBLOS_HOME: join(a.root, 'multi') });
   let prepared = 0;
+  let stalled: string | undefined;
+  const observations = new Map<string, number>();
   const pool = () =>
     openBatchBuyerPool({
       paths,
@@ -63,10 +67,13 @@ export async function multisellerSession(
               );
             return createBatchBuyer({ ...a.buyerOptions, terms, paths: child });
           },
-          observe: (id) =>
-            (sellerId === a.terms.sellerNodeId ? a : b).sellerOptions.observe(
-              id,
-            ),
+          observe: (id) => {
+            observations.set(sellerId, (observations.get(sellerId) ?? 0) + 1);
+            if (stalled === sellerId) return new Promise(() => {});
+            return (
+              sellerId === a.terms.sellerNodeId ? a : b
+            ).sellerOptions.observe(id);
+          },
         };
       },
     });
@@ -77,6 +84,10 @@ export async function multisellerSession(
     offers,
     paths,
     prepared: () => prepared,
+    observations,
+    stall: (nodeId: string | undefined) => {
+      stalled = nodeId;
+    },
     options: {
       policy: {
         depositAtomic: '1000',
@@ -93,6 +104,46 @@ export async function multisellerSession(
     },
     async close() {
       for (const rig of rigs) await rig.dispose();
+    },
+  };
+}
+
+export async function multisellerLoopback() {
+  const fixture = await multisellerSession();
+  const wires = await Promise.all(
+    fixture.rigs.map((rig, index) =>
+      batchLoopback(
+        createSellerBatchSession({
+          session: rig.seller(),
+          terms: rig.terms,
+          offers: () => [fixture.offers[index]!.live],
+          now: rig.now,
+        }),
+        rig.terms,
+      ),
+    ),
+  );
+  return {
+    ...fixture,
+    options: {
+      ...fixture.options,
+      endpoint: {
+        id: wires[0]!.endpoint.id,
+        connect: (
+          destination: (typeof wires)[0]['destination'],
+          alpn: Parameters<(typeof wires)[0]['endpoint']['connect']>[1],
+        ) =>
+          wires[
+            destination.id().toString() === fixture.a.terms.sellerNodeId ? 0 : 1
+          ]!.endpoint.connect(destination, alpn),
+      },
+      destination: (terms: typeof fixture.a.terms) =>
+        wires[terms.sellerNodeId === fixture.a.terms.sellerNodeId ? 0 : 1]!
+          .destination,
+    },
+    async close() {
+      for (const wire of wires) await wire.close();
+      await fixture.close();
     },
   };
 }

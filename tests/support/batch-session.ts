@@ -111,10 +111,7 @@ export async function sessionRig(nodes?: {
             refundedAtomic: String(
               BigInt(terms.depositAtomic) - BigInt(voucher.maxClaimableAmount),
             ),
-            transaction:
-              nodes?.transaction ??
-              nodes?.transaction ??
-              'synthetic-confirmed-close',
+            transaction: nodes?.transaction ?? 'synthetic-confirmed-close',
           };
         }
         return {
