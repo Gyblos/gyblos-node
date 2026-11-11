@@ -182,7 +182,7 @@ function X402ExternalConnection({ buyer }: { buyer: X402View }) {
           onChange={(event) => setUrl(event.target.value)}
         />
       </FormField>
-      <FormField htmlFor="x402-key" label="Buyer API key">
+      <FormField htmlFor="x402-key" label="Private buyer connection key">
         <FormInput
           id="x402-key"
           type="password"

@@ -1,5 +1,9 @@
 // Starts the isolated free buyer using local role identity and selection policy, without paid bootstrap.
 import { BUYER_RELAY_ONLY_ENV, FREE_OUTPUT_TOKENS } from '@gyblos/config';
+import type {
+  BuyerApiKeyOperation,
+  BuyerApiKeys,
+} from '@gyblos/node/buyer-api-keys';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import {
@@ -46,8 +50,10 @@ export type BuyerExecutionFactory = (context: {
     input: FreeExecutionBuildInput,
     signal: AbortSignal,
     onDelta?: (text: string, requestDigest?: string) => Promise<void>,
+    permission?: BuyerApiKeyOperation,
   ): Promise<ChatResult>;
   token?: string;
+  apiKeys?: BuyerApiKeys;
   requestMs?: number;
   classify?: ChatErrorClassifier;
   chat(url: string): ReturnType<typeof ownedChat> & { automatic?: boolean };
@@ -208,11 +214,13 @@ function buyerHttp(
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
-      (input, signal) => run(input, signal),
+      (input, signal, _onDelta, permission) =>
+        run(input, signal, undefined, permission),
       { selection: request.selection, maxTokens: request.maxTokens },
       {
         port,
         stream: run,
+        apiKeys: execution?.apiKeys,
         ...configuredBuyerAccess(request, role, execution?.token),
         requestMs: execution?.requestMs,
         classify: execution?.classify,

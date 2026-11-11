@@ -46,6 +46,8 @@ export const HOME_FILES = {
 export const ROLE_FILES = {
   roleConfig: 'role.json',
   buyerSelection: 'selection.json',
+  buyerApiKeys: 'api-keys.json',
+  buyerApiKeysLock: 'api-keys.lock',
   buyerInitLock: 'init.lock',
   nodeKey: 'node.key',
   trust: 'trust.json',
@@ -344,5 +346,12 @@ export function batchPoolChannelPaths(paths: BatchPoolPaths, nodeId: string) {
     directory,
     state: join(directory, BATCH_SESSION_FILES.state),
     lock: join(directory, BATCH_SESSION_FILES.lock),
+  };
+}
+
+export function buyerApiKeyPathsIn(environment: HomeEnvironment) {
+  return {
+    state: rolePathIn(environment, 'buyer', ROLE_FILES.buyerApiKeys),
+    lock: rolePathIn(environment, 'buyer', ROLE_FILES.buyerApiKeysLock),
   };
 }

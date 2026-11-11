@@ -151,12 +151,15 @@ export function effectiveX402Policy(
     ? (summary.policy ?? connected)
     : connected;
 }
-export function x402Asset(policy: BuyerApiPolicy) {
+export function x402Asset(policy: Pick<BuyerApiPolicy, 'mint'>) {
   return policy.mint === DEVNET_USDC
     ? 'USDC · devnet'
     : 'test-token atomic units';
 }
-export function x402Amount(atomic: string, policy: BuyerApiPolicy) {
+export function x402Amount(
+  atomic: string,
+  policy: Pick<BuyerApiPolicy, 'mint'>,
+) {
   if (policy.mint !== DEVNET_USDC) return atomic;
   const scale = BigInt(DESKTOP_X402.AMOUNT_SCALE);
   return (
@@ -165,7 +168,10 @@ export function x402Amount(atomic: string, policy: BuyerApiPolicy) {
     String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')
   );
 }
-export function x402BudgetInput(value: string, policy: BuyerApiPolicy) {
+export function x402BudgetInput(
+  value: string,
+  policy: Pick<BuyerApiPolicy, 'mint'>,
+) {
   if (policy.mint !== DEVNET_USDC) {
     if (!buyerAtomic(value))
       throw new Error('Enter a whole number of atomic units');

@@ -65,6 +65,7 @@ import { Settings } from './ui/Settings';
 import { SystemStatus } from './ui/SystemStatus';
 import type { ToolId } from './ui/tools';
 import { Button, IconButton } from './ui/UI';
+import { UsdcApiKeys } from './ui/UsdcApiKeys';
 import { useActivity } from './ui/useActivity';
 import { useChatArchive } from './ui/useChatArchive';
 import { usePaypalSession } from './ui/usePaypalSession';
@@ -426,21 +427,30 @@ export function DesktopApp() {
               catalog={announcements}
             />
           )}
-          {view === UI_VIEW.CONNECT && (
-            <PaypalAgentConnection
-              onlyConnected={paymentMethod !== PAYMENT_METHOD.PAYPAL}
-              sessionReady={paypalSessionCanConnectAgent(
-                paypalStatus,
-                paypalStatusFresh,
-                paypalBusy,
-              )}
-              sessionStatus={paypalStatus}
-              sessionFresh={paypalStatusFresh}
-              contextOpen={contextOpen}
-              onCloseContext={() => setContextOpen(false)}
-              onPayments={reviewPaypalPayments}
-            />
-          )}
+          {view === UI_VIEW.CONNECT &&
+            paymentMethod === PAYMENT_METHOD.USDC && (
+              <UsdcApiKeys
+                contextOpen={contextOpen}
+                onCloseContext={() => setContextOpen(false)}
+                onPayments={() => navigate(UI_VIEW.PAYMENTS)}
+              />
+            )}
+          {view === UI_VIEW.CONNECT &&
+            paymentMethod === PAYMENT_METHOD.PAYPAL && (
+              <PaypalAgentConnection
+                onlyConnected={paymentMethod !== PAYMENT_METHOD.PAYPAL}
+                sessionReady={paypalSessionCanConnectAgent(
+                  paypalStatus,
+                  paypalStatusFresh,
+                  paypalBusy,
+                )}
+                sessionStatus={paypalStatus}
+                sessionFresh={paypalStatusFresh}
+                contextOpen={contextOpen}
+                onCloseContext={() => setContextOpen(false)}
+                onPayments={reviewPaypalPayments}
+              />
+            )}
           {view === UI_VIEW.TOOLS && <Applications />}
           {view === UI_VIEW.PAYMENTS && (
             <Payments

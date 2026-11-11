@@ -403,3 +403,6 @@ export const SELLER_REGISTRATION_STATE = {
   maxBytes: 8192,
   secretBytes: 64,
 } as const;
+
+// Bounded private delegated-key ledger; it never contains inference content or signed payments.
+export const BUYER_API_KEY_STORAGE = { MAX_BYTES: 262144 } as const;

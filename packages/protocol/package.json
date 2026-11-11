@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./buyer-api-keys": "./src/buyer-api-keys.ts",
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
     "./buyer-api": "./src/buyer-api.ts",

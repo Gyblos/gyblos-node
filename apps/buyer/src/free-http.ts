@@ -13,6 +13,10 @@ import {
   ROUTES,
   TRANSPORT_LIMITS,
 } from '@gyblos/config';
+import type {
+  BuyerApiKeyOperation,
+  BuyerApiKeys,
+} from '@gyblos/node/buyer-api-keys';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION,
@@ -24,9 +28,11 @@ import {
   type FreeExecutionBuildInput,
   type FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
-import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
+import { acceptBuyerApiRequest } from './api-key-caller';
+import { buyerApiKeyExecutors } from './api-key-execution';
+import { buyerApiKeyErrorView } from './api-key-http';
 import {
   chatApi,
   defaultChatApi,
@@ -39,7 +45,6 @@ import {
   FREE_BUYER_CODES,
   FREE_CHAT_DETAILS,
   PAID_BUYER,
-  PAID_BUYER_CODES,
 } from './constants';
 import {
   createDesktopApi,
@@ -62,6 +67,8 @@ import { bearerAuthorizer } from './paid-token';
 type FreeChatExecutor = (
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
+  onDelta?: (text: string, requestDigest?: string) => Promise<void>,
+  permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
 // How an error is answered: its code and status, whether the prompt certainly never left this
 // process (only then may a client retry), and the stop and payment it carries.
@@ -127,6 +134,8 @@ function errorStatus(error: unknown, code: string) {
   return HTTP_STATUS.internalServerError;
 }
 function freeErrorView(error: unknown): ChatErrorView {
+  const keyError = buyerApiKeyErrorView(error);
+  if (keyError) return keyError;
   const known =
     error instanceof FreeClientError ||
     error instanceof FreeExecutionError ||
@@ -205,31 +214,6 @@ function replyError(
     ),
   );
 }
-// A loopback Host, then in paid mode the bearer token: loopback is not authentication, and any local
-// process could otherwise spend. The refusal comes before the body is read, and the connection closes
-// rather than draining an unread body.
-function acceptCaller(
-  request: IncomingMessage,
-  response: ServerResponse,
-  authorize?: (request: IncomingMessage) => boolean,
-) {
-  if (!acceptLoopbackHost(request, response)) return false;
-  if (!authorize || authorize(request)) return true;
-  response.shouldKeepAlive = false;
-  const code = PAID_BUYER_CODES.UNAUTHORIZED;
-  response
-    .writeHead(HTTP_STATUS.unauthorized, {
-      'content-type': 'application/json',
-      'www-authenticate': PAID_BUYER.authScheme,
-      [FREE_BUYER.noRetryHeader]: 'false',
-    })
-    .end(
-      JSON.stringify({
-        error: { message: code, type: FREE_BUYER.errorType, param: null, code },
-      }),
-    );
-  return false;
-}
 // Browsers can send "simple" cross-site POSTs only as form or text bodies; requiring JSON forces a
 // preflight, which is refused, on top of the Origin rejection.
 function isJson(request: IncomingMessage) {
@@ -273,6 +257,17 @@ function admit(
   replyError(response, new FreeBuyerError(code), undefined, api);
   return undefined;
 }
+function finishTimedOutRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+) {
+  // Destroying the request ends a stalled body read and releases its admission slot.
+  if (response.writableEnded) response.once('close', () => request.destroy());
+  else {
+    request.destroy();
+    response.destroy();
+  }
+}
 export function freeBuyerHandler(
   execute: FreeChatExecutor,
   settings: ChatSettings,
@@ -281,11 +276,20 @@ export function freeBuyerHandler(
   classify?: ChatErrorClassifier,
   authorize?: (request: IncomingMessage) => boolean,
   desktopPolicy?: BuyerApiPolicy,
+  apiKeys?: BuyerApiKeys,
 ) {
   const desktop = createDesktopApi(desktopPolicy, authorize !== undefined);
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
-    if (!acceptCaller(request, response, authorize)) return;
+    const caller = await acceptBuyerApiRequest(
+      request,
+      response,
+      authorize,
+      apiKeys,
+      desktopPolicy,
+    );
+    if (!caller) return;
+    const scoped = buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream);
     if (desktop.handled(request, response)) return;
     const localApi = desktop.accepts(request, isJson(request))
       ? defaultChatApi
@@ -308,13 +312,7 @@ export function freeBuyerHandler(
         api,
         format,
       );
-      // Destroying the request also ends a stalled body read, so its finally frees the slot.
-      if (response.writableEnded)
-        response.once('close', () => request.destroy());
-      else {
-        request.destroy();
-        response.destroy();
-      }
+      finishTimedOutRequest(request, response);
     }, requestMs);
     response.once('close', cancel);
     try {
@@ -326,14 +324,14 @@ export function freeBuyerHandler(
       );
       const payload = { messages: input.messages, maxTokens: input.maxTokens };
       const model = settings.selection.modelId;
-      if (input.stream && stream) {
+      if (input.stream && scoped.stream) {
         format = api.stream(
           model,
           request.headers[PAID_BUYER.observationHeader] ===
             PAID_BUYER.observationValue,
         );
         await executeFreeSse(
-          stream,
+          scoped.stream,
           payload,
           controller.signal,
           response,
@@ -341,7 +339,7 @@ export function freeBuyerHandler(
         );
         return;
       }
-      const result = await execute(payload, controller.signal);
+      const result = await scoped.execute(payload, controller.signal);
       if (!controller.signal.aborted)
         replyJson(response, api.completion(model, result));
     } catch (error) {
@@ -361,6 +359,7 @@ export async function startFreeBuyerHttp(
     requestMs?: number;
     stream?: FreeChatStreamExecutor;
     classify?: ChatErrorClassifier;
+    apiKeys?: BuyerApiKeys;
   } & BuyerDesktopOptions = {},
 ) {
   const server = createServer(
@@ -377,6 +376,7 @@ export async function startFreeBuyerHttp(
       options.classify,
       options.token === undefined ? undefined : bearerAuthorizer(options.token),
       desktopApiPolicy(options, settings),
+      options.apiKeys,
     ),
   );
   await new Promise<void>((resolve, reject) => {

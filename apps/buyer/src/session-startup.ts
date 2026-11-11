@@ -1,4 +1,5 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
+import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import { bounded } from '@gyblos/node/buyer-operation';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
@@ -6,11 +7,16 @@ import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
+import {
+  executeApiKeyFree,
+  recordApiKeyPayment,
+  reserveApiKey,
+} from './api-key-execution';
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { executeSelectedBuyerFree } from './free-execution';
 import { selectWinner } from './free-selection';
-import type { ChatResult } from './free-sse';
+import type { ChatPayment, ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
 import { requireBuyerIdentity } from './identity';
 import { classifyPaidError } from './paid-http';
@@ -29,10 +35,12 @@ async function executePaidSession(
   current: AbortSignal,
   onDelta?: (text: string, requestDigest?: string) => Promise<void>,
   sending?: () => void,
+  permission?: BuyerApiKeyOperation,
 ): Promise<ChatResult> {
   current.throwIfAborted();
   await bounded(manager.prepareMeter(), current);
   current.throwIfAborted();
+  await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
   state.selections.set(id, winner);
@@ -44,22 +52,21 @@ async function executePaidSession(
     state.selections.delete(id);
     state.sending.delete(id);
   }
+  const payment: ChatPayment = {
+    verdict: SESSION_VERDICTS.APPROVED,
+    maxAtomic: winner.quote.offer.maxAtomic,
+    expectedAtomic: result.approval.approvedAtomic,
+    chargedAtomic: null,
+    sellerAtomic: null,
+    feeAtomic: null,
+    refundedAtomic: null,
+    recorded: true,
+    session: result.approval,
+  };
+  await recordApiKeyPayment(permission, payment);
   if (onDelta && result.value.text)
     await onDelta(result.value.text, winner.quote.offer.requestDigest);
-  return {
-    ...result.value,
-    payment: {
-      verdict: SESSION_VERDICTS.APPROVED,
-      maxAtomic: winner.quote.offer.maxAtomic,
-      expectedAtomic: result.approval.approvedAtomic,
-      chargedAtomic: null,
-      sellerAtomic: null,
-      feeAtomic: null,
-      refundedAtomic: null,
-      recorded: true,
-      session: result.approval,
-    },
-  };
+  return { ...result.value, payment };
 }
 function sessionExecutor(
   context: Context,
@@ -70,7 +77,7 @@ function sessionExecutor(
   router?: ReturnType<typeof sessionRouter>,
 ): Awaited<ReturnType<BuyerExecutionFactory>>['execute'] {
   const { prepared, endpoint, relayOnly } = context;
-  return async (input, signal, onDelta) => {
+  return async (input, signal, onDelta, permission) => {
     const ports: BuyerRoutePorts<ChatResult> = {
       select: (excluded, current, route) =>
         selectWinner(
@@ -84,21 +91,29 @@ function sessionExecutor(
           },
           excluded,
           current,
-          { ...prepared.config.request, priceCeilings: route.priceCeilings },
+          {
+            ...prepared.config.request,
+            priceCeilings: route.priceCeilings,
+            maxAtomic:
+              permission?.ceiling(prepared.config.request.maxAtomic) ??
+              prepared.config.request.maxAtomic,
+          },
           route,
         ),
       free: (winner, current, sending) =>
-        executeSelectedBuyerFree(
-          input,
-          context.dependencies,
-          winner,
-          current,
-          onDelta,
-          () => {
-            if ('checkBeforeExternalExecution' in manager)
-              manager.checkBeforeExternalExecution();
-            sending?.();
-          },
+        executeApiKeyFree(permission, winner.quote, current, () =>
+          executeSelectedBuyerFree(
+            input,
+            context.dependencies,
+            winner,
+            current,
+            onDelta,
+            () => {
+              if ('checkBeforeExternalExecution' in manager)
+                manager.checkBeforeExternalExecution();
+              sending?.();
+            },
+          ),
         ),
       paid: async (winner, current, sending) => {
         return executePaidSession(
@@ -109,6 +124,7 @@ function sessionExecutor(
           current,
           onDelta,
           sending,
+          permission,
         );
       },
     };

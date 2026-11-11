@@ -22,6 +22,7 @@ import { PaymentError } from '@gyblos/protocol/payment';
 import { PaymentSessionError } from '@gyblos/protocol/payment-session';
 import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
+import { buyerApiKeyErrorView } from './api-key-http';
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import type { ChatErrorView } from './free-http';
 import type { ChatPayment, ChatResult } from './free-sse';
@@ -96,6 +97,8 @@ const unavailable = (
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  const keyError = buyerApiKeyErrorView(error);
+  if (keyError) return keyError;
   if (
     error instanceof BuyerRoutingError ||
     error instanceof UnsentSellerBusyError

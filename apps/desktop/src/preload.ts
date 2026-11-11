@@ -16,6 +16,7 @@ import {
 } from './paypal-agent-model';
 import { DESKTOP_PAYPAL, parsePaypalResult } from './paypal-model';
 import { parseProbeResult } from './probe-model';
+import { parseUsdcApiState, USDC_API } from './usdc-api-model';
 import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model';
 import { parseWalletSummary, WALLET } from './wallet/model';
 import {
@@ -41,6 +42,10 @@ contextBridge.exposeInMainWorld('desktopConversations', {
     parseChatArchiveStatus(
       await ipcRenderer.invoke(CHAT_STORAGE.STATUS_CHANNEL),
     ),
+});
+contextBridge.exposeInMainWorld('desktopUsdcApiKeys', {
+  run: async (request: unknown) =>
+    parseUsdcApiState(await ipcRenderer.invoke(USDC_API.CHANNEL, request)),
 });
 contextBridge.exposeInMainWorld('desktopX402', {
   run: async (request: unknown) =>

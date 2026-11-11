@@ -35,3 +35,19 @@ export const X402_ACTION = {
   COPY_PAYER: 'copy-payer',
   COPY_MINT: 'copy-mint',
 } as const;
+
+export const USDC_API = {
+  CHANNEL: 'desktop:usdc-api-keys',
+  POLL_MS: 3000,
+  DEFAULT_LIMIT: '0.01',
+} as const;
+export const USDC_API_ACTION = {
+  STATUS: 'status',
+  CREATE: 'create',
+  REVOKE: 'revoke',
+  COPY_KEY: 'copy-key',
+  COPY_URL: 'copy-url',
+  COPY_EXAMPLE: 'copy-example',
+} as const;
+export type UsdcApiAction =
+  (typeof USDC_API_ACTION)[keyof typeof USDC_API_ACTION];

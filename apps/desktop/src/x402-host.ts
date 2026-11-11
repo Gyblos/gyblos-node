@@ -18,6 +18,8 @@ import {
   type ProcessLock,
 } from '@gyblos/runtime/private-file';
 
+import { createUsdcApiHandlers } from './usdc-api-handlers';
+import { USDC_API } from './usdc-api-model';
 import { X402Budget } from './x402-budget';
 import { X402Client } from './x402-client';
 import { createX402Handlers } from './x402-handlers';
@@ -109,11 +111,25 @@ export function registerDesktopX402(
     managed,
     (value) => clipboard.writeText(value),
   );
+  const apiKeys = createUsdcApiHandlers(
+    client,
+    {
+      contents: window.webContents,
+      mainFrame: () => window.webContents.mainFrame,
+      destroyed: () => window.isDestroyed(),
+    },
+    (text) => clipboard.writeText(text),
+  );
+  ipcMain.handle(USDC_API.CHANNEL, (event, ...args: unknown[]) =>
+    apiKeys.run(event, args),
+  );
   ipcMain.handle(DESKTOP_X402.CHANNEL, (event, ...args: unknown[]) =>
     handle(event, args),
   );
   return {
     async close() {
+      apiKeys.close();
+      ipcMain.removeHandler(USDC_API.CHANNEL);
       await client.close();
       await managed.close();
       ipcMain.removeHandler(DESKTOP_X402.CHANNEL);

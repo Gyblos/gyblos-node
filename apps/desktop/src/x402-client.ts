@@ -8,6 +8,7 @@ import {
   buyerAtomic,
   type BuyerApiPolicy,
 } from '@gyblos/protocol/buyer-api';
+import type { BuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
 import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
@@ -16,6 +17,7 @@ import {
 
 import { RESPONSE_COST_KIND, RESPONSE_COST_UNIT } from './constants';
 import { observedResponse, reportedUsage } from './response-metrics';
+import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
   DESKTOP_X402,
@@ -136,6 +138,7 @@ export class X402Client {
   private closed = false;
   private controller: AbortController | null = null;
   private pending: Promise<unknown> | null = null;
+  private readonly keyRequests = new Map<Promise<unknown>, AbortController>();
   constructor(
     readonly budget: X402Budget,
     private readonly request: typeof fetch = fetch,
@@ -144,11 +147,12 @@ export class X402Client {
     return this.connection ? { ...this.connection.policy } : null;
   }
   disconnect() {
+    for (const controller of this.keyRequests.values()) controller.abort();
     this.connection = null;
     this.controller?.abort();
   }
   async connect(input: unknown, token: unknown) {
-    if (this.busy || this.closed)
+    if (this.busy || this.closed || this.keyRequests.size > 0)
       throw new Error('Wait for the current response');
     const url = buyerEndpoint(input);
     if (
@@ -171,6 +175,28 @@ export class X402Client {
     } finally {
       this.busy = false;
     }
+  }
+  manageApiKeys(command?: BuyerApiKeyCommand) {
+    if (!this.connection || this.closed || (command && this.busy))
+      return Promise.reject(
+        new Error('Connect the local buyer and wait for the current response'),
+      );
+    const connection = this.connection;
+    const controller = new AbortController();
+    const work = requestBuyerApiKeys(
+      connection,
+      this.request,
+      controller.signal,
+      command,
+    ).then((result) => {
+      if (this.closed || this.connection !== connection)
+        throw new Error('Buyer connection changed');
+      return result;
+    });
+    this.keyRequests.set(work, controller);
+    return work.finally(() => {
+      this.keyRequests.delete(work);
+    });
   }
   async authorize(limit: string) {
     if (!this.connection || this.busy || this.closed)
@@ -264,6 +290,8 @@ export class X402Client {
   async close() {
     this.closed = true;
     this.controller?.abort();
+    for (const controller of this.keyRequests.values()) controller.abort();
+    await Promise.allSettled(this.keyRequests.keys());
     await this.pending?.catch(() => {});
   }
 }

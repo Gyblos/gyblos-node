@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./api-key-execution": "./src/api-key-execution.ts",
     "./desktop-service": "./src/desktop-service.ts",
     "./anthropic-chat": "./src/anthropic-chat.ts",
     "./chat-cli-turn": "./src/chat-cli-turn.ts",
