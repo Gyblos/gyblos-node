@@ -50,3 +50,14 @@ export function parsePaypalAgentBudget(row: Record<string, unknown>) {
     return null;
   return { keyLimitCents: keyLimit, keySpentCents: keySpent };
 }
+
+export function paypalAgentBudgetAvailable(
+  state: (typeof PAYPAL_AGENT_USAGE_STATE)[keyof typeof PAYPAL_AGENT_USAGE_STATE],
+  busy: boolean,
+) {
+  return (
+    !busy &&
+    (state === PAYPAL_AGENT_USAGE_STATE.AVAILABLE ||
+      state === PAYPAL_AGENT_USAGE_STATE.KEY_LIMIT_REACHED)
+  );
+}

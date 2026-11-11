@@ -3,14 +3,15 @@ import { useState } from 'react';
 
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 
+import { paypalAgentBudgetAvailable } from '../paypal-agent-limit';
 import {
-  PAYPAL_AGENT_USAGE_STATE,
   paypalAgentLimitCents,
   type PaypalAgentResult,
 } from '../paypal-agent-model';
 import { paypalDollars } from '../paypal-model';
 import { BUTTON_VARIANT } from './constants';
 import { FormActions, FormField, FormInput } from './Form';
+import { Facts, Pair } from './Management';
 import { Button } from './UI';
 
 export function CreatePaypalAgentBudget({
@@ -76,33 +77,31 @@ export function PaypalAgentBudget({
   connection: NonNullable<PaypalAgentResult['connection']>;
   busy: boolean;
 }) {
+  const available = paypalAgentBudgetAvailable(connection.usageState, busy);
   return (
     <section className="ui-section" aria-label="API key spend limit">
-      <dl className="ui-stats">
-        <div>
-          <dt>Key limit</dt>
-          <dd>{paypalDollars(connection.keyLimitCents)}</dd>
-        </div>
-        <div>
-          <dt>Key usage</dt>
-          <dd>
-            {busy ? 'Checking…' : paypalDollars(connection.keySpentCents)}
-          </dd>
-        </div>
-        <div>
-          <dt>Key remaining</dt>
-          <dd>
-            {busy ||
-            (connection.usageUncertain &&
-              connection.usageState !==
-                PAYPAL_AGENT_USAGE_STATE.KEY_LIMIT_REACHED)
-              ? 'Unavailable'
-              : paypalDollars(
+      <Facts compact>
+        <Pair
+          label="Key limit"
+          value={paypalDollars(connection.keyLimitCents)}
+        />
+        <Pair
+          label="Key usage"
+          value={
+            available ? paypalDollars(connection.keySpentCents) : 'Unavailable'
+          }
+        />
+        <Pair
+          label="Key remaining"
+          value={
+            available
+              ? paypalDollars(
                   connection.keyLimitCents - connection.keySpentCents,
-                )}
-          </dd>
-        </div>
-      </dl>
+                )
+              : 'Unavailable'
+          }
+        />
+      </Facts>
       <p className="ui-help-text">
         All connected tools share this cap. The approved session limit also
         applies. To change it, disconnect and create a new key.
