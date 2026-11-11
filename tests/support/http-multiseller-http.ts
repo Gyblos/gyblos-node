@@ -13,6 +13,7 @@ import {
 import { HTTP_STATUS } from '@gyblos/config';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { FREE_CHAT_ROLES, MODEL_IDS } from '@gyblos/protocol/constants';
 import {
   controlArray,
@@ -123,8 +124,16 @@ export function httpMultiError(
 ) {
   assert.ok(result.response.status >= HTTP_STATUS.badRequest);
   const row = controlObject(result.value, ['error']);
-  const error = controlObject(row.error, ['message', 'type', 'param', 'code']);
+  const error = controlObject(row.error, [
+    'message',
+    'type',
+    'param',
+    'code',
+    BUYER_API.NEVER_SENT_FIELD,
+  ]);
   assert.equal(error.code, code);
+  // These refusals precede this new request's send; earlier uncertainty remains blocked.
+  assert.equal(error[BUYER_API.NEVER_SENT_FIELD], true);
 }
 
 // Native HTTP diagnostics observe admission/body consumption and server-side close, never payloads.

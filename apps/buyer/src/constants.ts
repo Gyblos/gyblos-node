@@ -5,10 +5,7 @@ import { BUYER_SELECTION_FILE } from '@gyblos/node/buyer-init-constants';
 import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
-import {
-  FREE_EXECUTION,
-  type ProtocolErrorCode,
-} from '@gyblos/protocol/constants';
+import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
 export const CALL_OUTCOMES = {
