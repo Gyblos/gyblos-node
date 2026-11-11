@@ -7,11 +7,13 @@ import type {
 import {
   batchBill,
   batchBoundary,
+  batchError,
   batchFail,
   batchVoucher,
 } from './batch-channel-validation';
 import { BATCH_CHANNEL, BATCH_METHODS } from './batch/constants';
 import { canonicalJson } from './canonical';
+import { isConversation } from './chat';
 import type { SignedOfferV2 } from './control-types';
 import {
   controlAddress,
@@ -20,6 +22,8 @@ import {
 } from './control-validation';
 import { parseExecutionInput } from './execution-wire';
 import { parseOfferSignatureV2, parseOfferV2 } from './offer-v2';
+import { paidExecutionBoundary } from './paid-execution-validation';
+import { PAID_EXECUTION_CODES } from './paid/constants';
 import {
   PAYMENT_SESSION,
   SESSION_CODES,
@@ -47,6 +51,31 @@ function preparation(value: unknown, opening = false) {
   ]);
   return { row, terms: hasTerms ? { terms: batchTerms(row.terms) } : {} };
 }
+function conversationInput(
+  value: unknown,
+  requestId: string,
+  quote: SignedOfferV2,
+) {
+  try {
+    const input = paidExecutionBoundary(() =>
+      parseExecutionInput(
+        value,
+        requestId,
+        quote.offer,
+        BATCH_CHANNEL.inputBytes,
+        BATCH_CHANNEL.maxMessages,
+      ),
+    );
+    if (!isConversation(input.messages))
+      return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+    if (input.maxTokens > BATCH_CHANNEL.maxOutputTokens)
+      return batchFail(PAID_EXECUTION_CODES.LIMIT);
+    return input;
+  } catch (error) {
+    throw batchError(error);
+  }
+}
+
 function executionFor(value: unknown): BatchExecutionRequest {
   const row = controlObject(value, [
     'channelId',
@@ -60,7 +89,7 @@ function executionFor(value: unknown): BatchExecutionRequest {
     channelId: controlAddress(row.channelId),
     requestId,
     quote,
-    input: parseExecutionInput(row.input, requestId, quote.offer),
+    input: conversationInput(row.input, requestId, quote),
   };
 }
 function parse(value: unknown): BatchChannelRequest {
@@ -176,7 +205,7 @@ export function batchExecutionInput(
   input: import('./free-execution-types').FreeExecutionBuildInput,
 ) {
   return batchBoundary(() =>
-    parseExecutionInput(
+    conversationInput(
       {
         messages: input.messages,
         maxTokens: input.maxTokens,
@@ -184,7 +213,7 @@ export function batchExecutionInput(
         reasoning: quote.offer.reasoning,
       },
       quote.offer.requestId,
-      quote.offer,
+      quote,
     ),
   );
 }

@@ -29,6 +29,9 @@ async function executePaidSession(
   onDelta?: (text: string, requestDigest?: string) => Promise<void>,
   sending?: () => void,
 ): Promise<ChatResult> {
+  current.throwIfAborted();
+  await manager.prepareMeter();
+  current.throwIfAborted();
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
   state.selections.set(id, winner);

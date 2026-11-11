@@ -14,6 +14,7 @@ import {
   P2P_ROLES,
   type OfferPricingKind,
 } from '@gyblos/protocol/constants';
+import type { ChatTokenizer, EngineInput } from '@gyblos/protocol/engine';
 
 import {
   paidAcceptanceRoles,
@@ -29,6 +30,10 @@ import { sessionProductPayments } from './session-product-payments';
 export async function sessionProductHost(
   pricing: OfferPricingKind = OFFER_PRICING_KINDS.PAID,
   totalDepositAtomic?: string,
+  conversation?: {
+    meter: ChatTokenizer;
+    observe: (input: EngineInput) => void;
+  },
 ) {
   const workspace = await createAcceptanceWorkspace();
   const previous = new Map(
@@ -93,7 +98,25 @@ export async function sessionProductHost(
     const startSeller = async () => {
       seller = createNode({
         bind: binding.bind,
-        createEngine: engine.create,
+        createEngine: () => {
+          const prepared = engine.create();
+          if (!conversation) return prepared;
+          const generate = prepared.engine.generate.bind(prepared.engine);
+          return {
+            ...prepared,
+            metering: {
+              ...prepared.metering,
+              tokenizer: async () => conversation.meter,
+            },
+            engine: {
+              ...prepared.engine,
+              generate: (input: EngineInput) => {
+                conversation.observe(input);
+                return generate(input);
+              },
+            },
+          };
+        },
         payments: finance.seller,
       });
       await seller.start();
@@ -129,7 +152,7 @@ export async function sessionProductHost(
       buyer = await startBuyer({
         port: 0,
         bind: binding.bind,
-        meter: async () => paidAcceptanceMeter,
+        meter: async () => conversation?.meter ?? paidAcceptanceMeter,
         batch: finance.buyer,
         pool: finance.pool,
         chain: async () => assert.fail('legacy chain construction forbidden'),

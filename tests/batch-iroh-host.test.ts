@@ -6,6 +6,7 @@ import { createBuyerBatchSession } from '@gyblos/node/batch-buyer';
 import { createSellerBatchSession } from '@gyblos/node/batch-seller';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import {
+  BATCH_CHANNEL,
   BATCH_METHODS,
   BatchChannelError,
   type BatchChannelRequest,
@@ -245,7 +246,7 @@ void test('wrong authenticated peer is rejected before reading any SDK opening',
   await assert.rejects(
     f.service.exchange(
       {
-        version: 1,
+        version: BATCH_CHANNEL.version,
         requestId: '12'.repeat(16),
         method: BATCH_METHODS.OPEN,
         params: {

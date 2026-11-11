@@ -1,10 +1,8 @@
 // Preflight and verified-use approval for one chosen seller; no selection, UI, retries or chain construction.
-import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
-import { paidPrompt } from '@gyblos/core/buyer-paid-recount';
 import { chargeV2 } from '@gyblos/core/pricing-v2';
+import { recountSessionInput } from '@gyblos/core/session-input';
 import {
   BATCH_METHODS,
-  batchExecutionInput,
   batchFail,
   batchSessionRequest,
   buildBatchExecutionRequest,
@@ -12,10 +10,6 @@ import {
   verifyBatchQuote,
   type BatchChannelResult,
 } from '@gyblos/protocol/batch-channel';
-import {
-  CONTROL_METERING_MODES,
-  REASONING_LEVELS,
-} from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type {
   FreeExecutionBuildInput,
@@ -42,49 +36,20 @@ export function batchBuyerSnapshot(
     return batchFail(SESSION_CODES.BINDING);
   return result.snapshot;
 }
-function buyerInput<Remote extends BatchDestination>(
-  context: BuyerBatchContext<Remote>,
-  quote: SignedOfferV2,
-  data: FreeExecutionBuildInput,
-) {
-  const input = batchExecutionInput(quote, data);
-  const prompt = paidPrompt(input, context.options.meter);
-  if (
-    prompt === undefined ||
-    quote.offer.reasoning !== REASONING_LEVELS.OFF ||
-    quote.offer.meteringMode !== CONTROL_METERING_MODES.RECOUNTED
-  )
-    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
-  const count = context.options.meter.input(prompt);
-  if (
-    !Number.isSafeInteger(count) ||
-    count < 0 ||
-    input.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens ||
-    count + input.maxTokens > quote.offer.model.contextTokens
-  )
-    return batchFail(PAID_EXECUTION_CODES.LIMIT);
-  if (
-    chargeV2({ input: count, output: input.maxTokens }, quote.offer.prices) >
-    BigInt(quote.offer.maxAtomic)
-  )
-    return batchFail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
-  return { input, prompt };
-}
 function verifiedCharge<Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
   quote: SignedOfferV2,
-  prompt: string,
-  maxTokens: number,
+  input: FreeExecutionBuildInput,
   result: FreeExecutionResult,
 ) {
-  const inputTokens = context.options.meter.input(prompt);
+  const inputTokens = context.options.meter.chat(input.messages);
   const outputTokens = result.text
     ? context.options.meter.count(result.text)
     : 0;
   if (
     inputTokens !== result.usage.inputTokens ||
     outputTokens !== result.usage.outputTokens ||
-    outputTokens > maxTokens
+    outputTokens > input.maxTokens
   )
     return batchFail(SESSION_CODES.UNVERIFIED);
   return outputTokens
@@ -107,7 +72,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     offer: parseOfferV2(value.offer),
     signature: parseOfferSignatureV2(value.signature),
   };
-  const { input, prompt } = buyerInput(context, quote, data);
+  const { input } = recountSessionInput(quote, data, context.options.meter);
   const verify = async (current: AbortSignal) => {
     current.throwIfAborted();
     if (await bounded(options.unresolved(), current))
@@ -161,7 +126,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
         return result;
       },
       verifyUsage: async (result) =>
-        verifiedCharge(context, quote, prompt, input.maxTokens, result),
+        verifiedCharge(context, quote, input, result),
       accept: approve,
     },
     await batchSessionRequest(request),

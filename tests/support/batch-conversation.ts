@@ -10,9 +10,7 @@ import {
   createBatchBuyer,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
-import {
-  BATCH_METHODS,
-} from '@gyblos/protocol/batch-channel';
+import { BATCH_METHODS } from '@gyblos/protocol/batch-channel';
 import type { ChatMessage } from '@gyblos/protocol/chat';
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import type { ChatTokenizer, EngineInput } from '@gyblos/protocol/engine';
@@ -33,13 +31,15 @@ export const CONVERSATION_INPUT: FreeExecutionBuildInput = {
   maxTokens: 10,
 };
 
-export async function batchConversation() {
+export async function batchConversation(override?: ChatTokenizer) {
   const rig = await sessionRig({
+    buyerNodeId: '12'.repeat(32),
+    sellerNodeId: '34'.repeat(32),
     treasury: PROTOCOL_FEE.treasury,
     transaction: 'syntheticClose',
   });
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
-  const meter: ChatTokenizer = {
+  const meter: ChatTokenizer = override ?? {
     input: (text) => {
       renderChat(text);
       return 2 + text.length;
@@ -138,6 +138,7 @@ export async function batchConversation() {
     },
     async restart() {
       await buyer.close();
+      await financial.dispose();
       financial = await createBatchBuyer(rig.buyerOptions);
       buyer = make();
     },

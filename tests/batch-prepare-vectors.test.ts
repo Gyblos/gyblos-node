@@ -30,7 +30,7 @@ void test('PREPARE canonical frames and SHA-256 match independent Node crypto ve
   const fixture: Vector = JSON.parse(
     await readFile(
       new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/batch-prepare-v1.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/batch-prepare-v2.json'),
       ),
       'utf8',
     ),

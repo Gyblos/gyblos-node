@@ -50,6 +50,9 @@
     "./batch-channel": "./src/batch-channel.ts",
     "./vectors/batch-channel-v1.json": "./vectors/batch-channel-v1.json",
     "./vectors/batch-prepare-v1.json": "./vectors/batch-prepare-v1.json",
-    "./vectors/batch-startup-v1.json": "./vectors/batch-startup-v1.json"
+    "./vectors/batch-startup-v1.json": "./vectors/batch-startup-v1.json",
+    "./vectors/batch-channel-v2.json": "./vectors/batch-channel-v2.json",
+    "./vectors/batch-prepare-v2.json": "./vectors/batch-prepare-v2.json",
+    "./vectors/batch-startup-v2.json": "./vectors/batch-startup-v2.json"
   }
 }

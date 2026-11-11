@@ -1,20 +1,23 @@
 // Recounted complete-response generation on the common lifecycle; no transport or chain access.
-import { INFERENCE_REQUEST_LIMITS, TRANSPORT_TIMEOUTS } from '@gyblos/config';
+import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { chargeV2 } from '@gyblos/core/pricing-v2';
+import { recountSessionInput } from '@gyblos/core/session-input';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   BatchChannelError,
+  batchError,
   batchFail,
   type BatchExecutionRequest,
 } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_METERING_MODES,
-  FREE_CHAT_ROLES,
   OFFER_PRICING_KINDS,
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
+import type { EngineResult } from '@gyblos/protocol/engine';
 import type { FreeExecutionResult } from '@gyblos/protocol/free-execution';
+import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import type {
   SessionRequest,
@@ -29,6 +32,11 @@ export function batchLiveOffer(
   offers: readonly LiveSellerOffer[],
   now: number,
 ) {
+  try {
+    validateOfferV2Time(offer, now);
+  } catch (error) {
+    throw batchError(error);
+  }
   const live = offers.find(
     (value) =>
       canonicalJson(value.selection) === canonicalJson(offer.selection),
@@ -50,26 +58,20 @@ export function batchLiveOffer(
     return batchFail(PAID_EXECUTION_CODES.ENGINE);
   return live;
 }
-function inputFor(request: BatchExecutionRequest, live: LiveSellerOffer) {
-  const [message, ...rest] = request.input.messages;
-  if (!message || rest.length || message.role !== FREE_CHAT_ROLES.USER)
-    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
-  const inputTokens = live.meter.input(message.content);
+function recountedResult(
+  live: LiveSellerOffer,
+  inputTokens: number,
+  maxTokens: number,
+  generated: EngineResult,
+): FreeExecutionResult {
+  const usage = live.meter.usage(generated.text, generated.usage, inputTokens);
   if (
-    !Number.isSafeInteger(inputTokens) ||
-    inputTokens < 0 ||
-    request.input.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens ||
-    inputTokens + request.input.maxTokens > live.model.contextTokens
+    !usage ||
+    usage.outputTokens > maxTokens ||
+    usage.inputTokens + usage.outputTokens > live.model.contextTokens
   )
     return batchFail(PAID_EXECUTION_CODES.LIMIT);
-  if (
-    chargeV2(
-      { input: inputTokens, output: request.input.maxTokens },
-      request.quote.offer.prices,
-    ) > BigInt(request.quote.offer.maxAtomic)
-  )
-    return batchFail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
-  return { prompt: message.content, inputTokens };
+  return { text: generated.text, usage, finishReason: generated.finishReason };
 }
 export async function generateBatch(
   request: BatchExecutionRequest,
@@ -80,7 +82,11 @@ export async function generateBatch(
   now: () => number,
   signal: AbortSignal,
 ) {
-  const { prompt, inputTokens } = inputFor(request, live);
+  const { input, inputTokens } = recountSessionInput(
+    request.quote,
+    request.input,
+    live.meter,
+  );
   const run = await runBatchSellerExecution<FreeExecutionResult>({
     seller: session,
     request: pending,
@@ -110,28 +116,17 @@ export async function generateBatch(
       generate: async () => {
         window.check();
         const generated = await live.engine.generate({
-          prompt,
+          messages: input.messages,
           maxTokens: request.input.maxTokens,
           signal: window.signal,
         });
         window.check();
-        const usage = live.meter.usage(
-          generated.text,
-          generated.usage,
+        return recountedResult(
+          live,
           inputTokens,
+          request.input.maxTokens,
+          generated,
         );
-        if (
-          !usage ||
-          usage.outputTokens > request.input.maxTokens ||
-          usage.inputTokens + usage.outputTokens > live.model.contextTokens
-        )
-          return batchFail(PAID_EXECUTION_CODES.LIMIT);
-        const result: FreeExecutionResult = {
-          text: generated.text,
-          usage,
-          finishReason: generated.finishReason,
-        };
-        return result;
       },
       measure: (generated) =>
         'value' in generated
