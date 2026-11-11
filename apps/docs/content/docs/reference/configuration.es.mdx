@@ -21,7 +21,7 @@ publish = false
 model = "qwen3:0.6b"
 reasoning = ["off"]
 engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
-free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
+free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 ```
 
 Es una oferta local gratuita sin publicar. Conserva tu elección de publicación al editar otro ajuste.
@@ -92,18 +92,19 @@ El vendedor necesita al menos una entrada `[[offers]]`; se admiten hasta 32. Cad
 puede aparecer una vez, incluidos sus alias. Todas las entradas deben superar las comprobaciones del motor;
 al menos un motor debe quedar listo para iniciar y solo se publican las ofertas listas.
 
-| Campo                   | Regla                                                                                                                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`                 | ID o alias del catálogo como `qwen3:0.6b`; un ID desconocido exige `custom = true`                                                                                              |
-| `custom`                | Booleano; no puede ser true para un modelo del catálogo                                                                                                                         |
-| `reasoning`             | Lista no vacía sin duplicados entre `off`, `low`, `medium`, `high`; el valor omitido sigue al catálogo, o `off` en personalizados/no verificados; aquí el motor exige `["off"]` |
-| `engine.kind`           | Obligatorio: `ollama`, `openai` o `anthropic`                                                                                                                                   |
-| `engine.url`            | Base obligatoria; HTTPS, o HTTP solo en loopback / `host.docker.internal` según esquema; restricciones de inicio abajo                                                          |
-| `engine.upstream_model` | Nombre opcional del proveedor, hasta 256 caracteres; por defecto igual al modelo ofrecido                                                                                       |
-| `engine.api_key_env`    | Nombre de variable opcional; obligatorio para Anthropic; no puede empezar por `GYBLOS_` ni reutilizar la variable del token de relay                                            |
-| `engine.context_tokens` | Entero 1024–2.000.000; obligatorio en OpenAI/Anthropic, prohibido en Ollama                                                                                                     |
-| `free.daily_token_cap`  | Obligatorio en oferta gratuita; entero 1–1.000.000.000.000; total de entrada más salida por día UTC                                                                             |
-| `free.per_buyer_cap`    | Mismo intervalo entero; no puede superar la cuota diaria total                                                                                                                  |
+| Campo                    | Regla                                                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                  | ID o alias del catálogo como `qwen3:0.6b`; un ID desconocido exige `custom = true`                                                                                              |
+| `custom`                 | Booleano; no puede ser true para un modelo del catálogo                                                                                                                         |
+| `reasoning`              | Lista no vacía sin duplicados entre `off`, `low`, `medium`, `high`; el valor omitido sigue al catálogo, o `off` en personalizados/no verificados; aquí el motor exige `["off"]` |
+| `engine.kind`            | Obligatorio: `ollama`, `openai` o `anthropic`                                                                                                                                   |
+| `engine.url`             | Base obligatoria; HTTPS, o HTTP solo en loopback / `host.docker.internal` según esquema; restricciones de inicio abajo                                                          |
+| `engine.upstream_model`  | Nombre opcional del proveedor, hasta 256 caracteres; por defecto igual al modelo ofrecido                                                                                       |
+| `engine.api_key_env`     | Nombre de variable opcional; obligatorio para Anthropic; no puede empezar por `GYBLOS_` ni reutilizar la variable del token de relay                                            |
+| `engine.context_tokens`  | Entero 1024–2.000.000; obligatorio en OpenAI/Anthropic; opcional en Ollama, donde fija el contexto (8.192 por defecto, máximo 32.768)                                           |
+| `free.daily_token_cap`   | Obligatorio en oferta gratuita; entero 1–1.000.000.000.000; total de entrada más salida por día UTC                                                                             |
+| `free.per_buyer_cap`     | Mismo intervalo entero; no puede superar la cuota diaria total                                                                                                                  |
+| `free.max_output_tokens` | Opcional; la respuesta más larga que puede pedir un pedido, 4.096 por defecto; el contexto del modelo también la limita                                                         |
 
 Se exige exactamente uno entre `free` y `price`. Los contadores gratuitos se restablecen al reiniciar; no persisten.
 El esquema general admite `price.input_per_mtok` y `price.output_per_mtok` como cadenas decimales en

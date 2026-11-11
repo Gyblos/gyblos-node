@@ -131,6 +131,7 @@ function offerSettings(
       caps: {
         dailyTokenCap: pricing.dailyTokenCap,
         perBuyerCap: pricing.perBuyerCap,
+        maxOutputTokens: pricing.maxOutputTokens,
       },
     },
     engine,

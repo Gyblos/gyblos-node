@@ -28,7 +28,8 @@ void test('seller init: without a terminal it writes the default free Ollama off
     assert.deepEqual(entry!.pricing, {
       kind: 'free',
       dailyTokenCap: 200000,
-      perBuyerCap: 5000,
+      perBuyerCap: 50000,
+      maxOutputTokens: 4096,
     });
     assert.equal((await lstat(path)).mode & 0o777, 0o600);
     assert.deepEqual(await readdir(directory), ['gyblos.toml']);
@@ -67,7 +68,7 @@ void test('seller init: on a terminal it asks each missing value, in order, and 
       'Context window in tokens: ',
       'Variable holding the API key [ANTHROPIC_API_KEY]: ',
       'Free tokens per day, all buyers [200000]: ',
-      'Free tokens per buyer per day [5000]: ',
+      'Free tokens per buyer per day [50000]: ',
       'List this seller in the public discovery index? [y/N]: ',
     ]);
     const { file, settings } = await configOf(join(directory, 'gyblos.toml'));
@@ -85,6 +86,7 @@ void test('seller init: on a terminal it asks each missing value, in order, and 
       kind: 'free',
       dailyTokenCap: 100000,
       perBuyerCap: 2000,
+      maxOutputTokens: 4096,
     });
     assert.match(
       result.stdout,

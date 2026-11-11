@@ -37,7 +37,7 @@ function offerSettings(index: number, modelId: string): SellerOfferSettings {
       modelId,
       reasoning: [REASONING_LEVELS.OFF],
       kind: OFFER_PRICING_KINDS.FREE,
-      caps: { dailyTokenCap: 100, perBuyerCap: 100 },
+      caps: { dailyTokenCap: 100, perBuyerCap: 100, maxOutputTokens: 4096 },
     },
     engine: {
       index,
@@ -56,7 +56,11 @@ function plugins(local = false) {
     selection: { modelId: offer.model.id, variant: null, quantization: 'Q8_0' },
     metering: {
       mode: CONTROL_METERING_MODES.RECOUNTED,
-      tokenizer: async () => ({ count: () => 1, input: () => 1 }),
+      tokenizer: async () => ({
+        count: () => 1,
+        input: () => 1,
+        chat: () => 1,
+      }),
     },
     readiness: {
       warmup: { prompt: 'hi', maxTokens: 1 },

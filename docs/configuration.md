@@ -146,9 +146,10 @@ however many digits it has.
     http only for `127.0.0.1`, `localhost`, `[::1]` or `host.docker.internal`),
     optional `api_key_env` and `upstream_model` (the name the engine expects).
     `openai` and `anthropic` engines also need `context_tokens`, the model's
-    context size (1,024 to 2,000,000), because their APIs do not report it; an
-    `ollama` engine reports its own, so the key is refused there
-    (`INVALID_VALUE`).
+    context size (1,024 to 2,000,000), because their APIs do not report it. On
+    an `ollama` engine it is optional and sets the context Ollama allocates
+    (`num_ctx`): 8,192 by default, at most 32,768 (the pinned model's native
+    window); a larger context uses more memory.
   - `reasoning`: non-empty list of distinct levels from `off`, `low`, `medium`,
     `high` (GYB-DOC-028). For a catalog model with verified levels (see
     [Reasoning levels per model](#reasoning-levels-per-model)) every listed
@@ -165,8 +166,12 @@ however many digits it has.
       empty part (`"1."`, `".5"`) is `NON_CANONICAL_DECIMAL`; more than 4
       integer digits or more than 6 decimals after dropping trailing zeros is
       `PRICE_OUT_OF_RANGE`; both sides zero is `PRICE_ZERO`;
-    - `free = { daily_token_cap, per_buyer_cap }`: positive integers, the
-      per-buyer cap not above the daily cap.
+    - `free = { daily_token_cap, per_buyer_cap, max_output_tokens }`: positive
+      integers, the per-buyer cap not above the daily cap. `max_output_tokens`
+      (optional, 4,096 by default) is the longest answer one request may ask
+      for; the model's context bounds it too, with the conversation's tokens.
+      Requests carry a whole conversation: an optional system message, then user
+      and assistant turns ending with the user's.
 
 At seller startup an offer becomes the node's public v2 listing (see
 [Seller startup](#seller-startup)). Free offers use isolated complete-response

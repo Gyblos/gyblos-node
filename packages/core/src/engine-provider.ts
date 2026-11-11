@@ -6,8 +6,8 @@ import {
   type EngineDoneReason,
 } from '@gyblos/protocol/constants';
 import {
+  engineConversation,
   EngineError,
-  singleUserPrompt,
   type EngineInput,
 } from '@gyblos/protocol/engine';
 
@@ -86,8 +86,9 @@ export function visibleFragment(value: unknown, finished: boolean) {
   return value;
 }
 
-// Checks the output limit and the prompt before any call, then joins the caller's signal with the
-// generation deadline. Programming errors come first, as the Engine port orders them.
+// Checks the output limit (the offer's context) and the conversation before any call, then joins the
+// caller's signal with the generation deadline. Programming errors come first, as the Engine port orders
+// them.
 export function generationAttempt(
   input: EngineInput,
   limits: { maxOutputTokens: number; timeoutMs: number },
@@ -98,7 +99,7 @@ export function generationAttempt(
     input.maxTokens > limits.maxOutputTokens
   )
     throw new Error('Invalid output token limit.');
-  const prompt = singleUserPrompt(input);
+  const messages = engineConversation(input);
   input.signal?.throwIfAborted();
   const deadline = AbortSignal.timeout(limits.timeoutMs);
   const attempt: EngineAttempt = {
@@ -110,7 +111,7 @@ export function generationAttempt(
     deadline,
     ...(input.signal ? [input.signal] : []),
   ]);
-  return { prompt, attempt, signal, started: performance.now() };
+  return { messages, attempt, signal, started: performance.now() };
 }
 
 export const elapsedNanoseconds = (started: number) =>

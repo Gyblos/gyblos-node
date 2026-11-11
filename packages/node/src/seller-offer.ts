@@ -19,6 +19,8 @@ export interface FreeOfferCaps {
   dailyTokenCap: number;
   // Tokens per buyer NodeId per day; best effort, since NodeIds are free to create.
   perBuyerCap: number;
+  // The longest answer one request may ask for; the model's context bounds it too.
+  maxOutputTokens: number;
 }
 
 export type SellerCatalogOffer = {

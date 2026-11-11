@@ -6,7 +6,7 @@ import type {
   ReasoningLevel,
 } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
-import type { Engine, RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer, Engine } from '@gyblos/protocol/engine';
 
 import type { NODE_ERROR_CODES } from './constants';
 import type { OfferEngine, OfferModel } from './node-config';
@@ -30,7 +30,7 @@ export type EngineOfferRefusal =
 export type OfferMetering =
   | {
       mode: typeof CONTROL_METERING_MODES.RECOUNTED;
-      tokenizer: () => Promise<RecountTokenizer>;
+      tokenizer: () => Promise<ChatTokenizer>;
     }
   | { mode: typeof CONTROL_METERING_MODES.DECLARED };
 

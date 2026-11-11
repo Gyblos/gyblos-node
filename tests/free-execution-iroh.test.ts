@@ -69,7 +69,7 @@ async function exchangeTwice(limits: SellerLimits) {
       kind: OFFER_PRICING_KINDS.FREE,
       modelId: MODEL_IDS.QWEN3_0_6B,
       reasoning: model.reasoning,
-      caps: { dailyTokenCap: 1000, perBuyerCap: 1000 },
+      caps: { dailyTokenCap: 1000, perBuyerCap: 1000, maxOutputTokens: 4096 },
     },
     selection: model.selection,
     model: model.model,
@@ -80,7 +80,7 @@ async function exchangeTwice(limits: SellerLimits) {
       limits.maxFreeBuyers,
     ),
     readiness: source.context.readiness,
-    meter: recountedMeter({ input: () => 4, count: () => 2 }),
+    meter: recountedMeter({ input: () => 4, chat: () => 4, count: () => 2 }),
     engine: {
       describe: async () => model.model,
       capabilities: () => model.capabilities,

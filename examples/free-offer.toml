@@ -20,4 +20,4 @@ url = "https://discovery.gyblos.com/v1"
 model = "qwen3:0.6b"              # alias of the catalog id qwen3-0.6b; tiny, good for quick tests
 reasoning = ["off", "high"]       # Qwen3 thinking is on/off (GYB-DOC-028)
 engine = { kind = "ollama", url = "http://host.docker.internal:11434" }
-free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
+free = { daily_token_cap = 200000, per_buyer_cap = 50000 }

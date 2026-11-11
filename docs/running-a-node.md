@@ -926,12 +926,15 @@ action, described in [discovery-index.md](discovery-index.md).
 ## Free v2 seller execution
 
 A supported `gyblos.toml` free offer starts control plus the separate
-`gyblos/free/3` complete-response and `gyblos/free-stream/3` streaming data
+`gyblos/free/4` complete-response and `gyblos/free-stream/4` streaming data
 channels. The daemon has no paid HTTP service or v1 offer; paid v2 offers use
-the separate paid stream described in the protocol spec. This is execution for
-the pinned engine's single user message and `off` reasoning; other engine input
-forms are not enabled. The separate `buyer:free` entry executes free quotes;
-obtaining a control quote alone still does not send a prompt.
+the separate paid stream described in the protocol spec. Free execution serves a
+conversation (an optional system message, then user and assistant turns ending
+with the user's) with `off` reasoning, up to the offer's answer limit
+(`free.max_output_tokens`, 4096 tokens by default) within the model's context
+(an Ollama offer's `engine.context_tokens`, 8192 by default, at most 32768). The
+separate `buyer:free` entry executes free quotes; obtaining a control quote
+alone still does not send a prompt.
 
 The seller reads daily token caps from the prepared offer: `daily_token_cap`
 applies across all buyers and `per_buyer_cap` per authenticated NodeId, both
@@ -1134,8 +1137,8 @@ use `error.code`; arbitrary exception contents are never returned. No prompt or
 response is written to logs, journals or selection metadata. A free seller can
 still observe the submitted text; free does not imply private or verified.
 
-Control connections close before execution connects on `gyblos/free/3` or
-`gyblos/free-stream/3`. The client verifies the seller peer, signed quote, local
+Control connections close before execution connects on `gyblos/free/4` or
+`gyblos/free-stream/4`. The client verifies the seller peer, signed quote, local
 buyer NodeId, exact terms and lifetime again before sending (an issue time up to
 5 s ahead is accepted; expiry has no grace). Request/response bounds and
 correlation use the free protocol codec. A query has an absolute 180-second

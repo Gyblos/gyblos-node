@@ -26,7 +26,7 @@ async function fixture() {
   run.a.live.offer = {
     ...run.a.live.offer,
     kind: OFFER_PRICING_KINDS.FREE,
-    caps: { dailyTokenCap: 20, perBuyerCap: 20 },
+    caps: { dailyTokenCap: 20, perBuyerCap: 20, maxOutputTokens: 4096 },
   };
   const offers: LiveSellerOffer[] = [run.a.live];
   const free = createSellerFreeOffers(() => offers, {

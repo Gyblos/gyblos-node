@@ -101,7 +101,7 @@ void test('a remote offer is prepared and served with declared metering, never g
       modelId: 'acme-chat',
       reasoning: [REASONING_LEVELS.OFF],
       kind: OFFER_PRICING_KINDS.FREE,
-      caps: { dailyTokenCap: 100, perBuyerCap: 100 },
+      caps: { dailyTokenCap: 100, perBuyerCap: 100, maxOutputTokens: 4096 },
     },
     engine: {
       index: 0,

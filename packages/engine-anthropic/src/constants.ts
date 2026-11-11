@@ -1,6 +1,6 @@
 // Routes, headers, bounds and deadlines of the Anthropic Messages API client, and how its stop reasons
 // map to the Engine port's two endings.
-import { INFERENCE_REQUEST_LIMITS, TIMEOUTS } from '@gyblos/config';
+import { TIMEOUTS } from '@gyblos/config';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 // Relative to the offer's base URL, which is the API root (https://api.anthropic.com); a base that
@@ -14,7 +14,6 @@ export const ANTHROPIC_ROUTES = {
 export const ANTHROPIC_VERSION = '2023-06-01';
 
 export const ANTHROPIC_LIMITS = {
-  maxOutputTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
   // One streamed event and the whole stream, the visible output, a model record and an error body read
   // for its type.
   stream: { eventCharacters: 64 * 1024, streamCharacters: 2 * 1024 * 1024 },

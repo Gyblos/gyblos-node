@@ -64,7 +64,7 @@ void test('provider adapters refuse an unsupported prompt before an aborted sign
   const input = {
     messages: [
       { role: 'user' as const, content: 'a' },
-      { role: 'user' as const, content: 'b' },
+      { role: 'assistant' as const, content: 'b' },
     ],
     maxTokens: 8,
     signal: controller.signal,
@@ -92,5 +92,5 @@ void test('provider adapters refuse an unsupported prompt before an aborted sign
       never,
     ),
   ])
-    await assert.rejects(engine.generate(input), /one user message/);
+    await assert.rejects(engine.generate(input), /Unsupported conversation/);
 });

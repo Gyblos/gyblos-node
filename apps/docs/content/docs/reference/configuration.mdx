@@ -21,7 +21,7 @@ publish = false
 model = "qwen3:0.6b"
 reasoning = ["off"]
 engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
-free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
+free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 ```
 
 This is a local free offer with publication off. Keep your existing publication choice when editing
@@ -91,18 +91,19 @@ The seller needs at least one `[[offers]]` entry; at most 32 are allowed. A norm
 only once, including aliases. Every entry must pass plugin compatibility checks; at least one engine
 must become ready to start, and only ready offers are published.
 
-| Field                   | Rule                                                                                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`                 | Catalog ID or alias such as `qwen3:0.6b`; unknown ID requires `custom = true`                                                                                       |
-| `custom`                | Boolean; must not be true for a catalog model                                                                                                                       |
-| `reasoning`             | Nonempty distinct levels from `off`, `low`, `medium`, `high`; omitted value follows catalog, or `off` for custom/unverified models; runtime here requires `["off"]` |
-| `engine.kind`           | Required `ollama`, `openai` or `anthropic`                                                                                                                          |
-| `engine.url`            | Required base URL; HTTPS, or HTTP only for loopback / `host.docker.internal` in schema; runtime restrictions below                                                  |
-| `engine.upstream_model` | Optional provider model name, up to 256 characters; defaults to offered model                                                                                       |
-| `engine.api_key_env`    | Optional variable name; required by Anthropic; must not begin `GYBLOS_` or reuse the relay-token variable                                                           |
-| `engine.context_tokens` | Integer 1024–2,000,000; required for OpenAI/Anthropic, forbidden for Ollama                                                                                         |
-| `free.daily_token_cap`  | Required for a free offer; integer 1–1,000,000,000,000; total input plus output per UTC day                                                                         |
-| `free.per_buyer_cap`    | Same integer range; must not exceed daily total                                                                                                                     |
+| Field                    | Rule                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                  | Catalog ID or alias such as `qwen3:0.6b`; unknown ID requires `custom = true`                                                                                       |
+| `custom`                 | Boolean; must not be true for a catalog model                                                                                                                       |
+| `reasoning`              | Nonempty distinct levels from `off`, `low`, `medium`, `high`; omitted value follows catalog, or `off` for custom/unverified models; runtime here requires `["off"]` |
+| `engine.kind`            | Required `ollama`, `openai` or `anthropic`                                                                                                                          |
+| `engine.url`             | Required base URL; HTTPS, or HTTP only for loopback / `host.docker.internal` in schema; runtime restrictions below                                                  |
+| `engine.upstream_model`  | Optional provider model name, up to 256 characters; defaults to offered model                                                                                       |
+| `engine.api_key_env`     | Optional variable name; required by Anthropic; must not begin `GYBLOS_` or reuse the relay-token variable                                                           |
+| `engine.context_tokens`  | Integer 1024–2,000,000; required for OpenAI/Anthropic; optional for Ollama, where it sets the context (default 8,192, at most 32,768)                               |
+| `free.daily_token_cap`   | Required for a free offer; integer 1–1,000,000,000,000; total input plus output per UTC day                                                                         |
+| `free.per_buyer_cap`     | Same integer range; must not exceed daily total                                                                                                                     |
+| `free.max_output_tokens` | Optional; the longest answer one request may ask for, default 4,096; the model's context bounds it too                                                              |
 
 Exactly one of `free` or `price` is required. Free counters reset on restart; they are not persisted.
 The broader schema accepts `price.input_per_mtok` and `price.output_per_mtok` as decimal strings in

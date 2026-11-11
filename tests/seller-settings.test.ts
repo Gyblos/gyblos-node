@@ -42,7 +42,12 @@ const FREE_LISTING = {
   modelId: 'qwen3-0.6b',
   reasoning: ['off'],
   kind: 'free',
-  caps: { dailyTokenCap: 200000, perBuyerCap: 5000 },
+  caps: { dailyTokenCap: 200000, perBuyerCap: 5000, maxOutputTokens: 4096 },
+} as const;
+// The shipped examples give each buyer 50,000 free tokens a day.
+const EXAMPLE_LISTING = {
+  ...FREE_LISTING,
+  caps: { ...FREE_LISTING.caps, perBuyerCap: 50000 },
 } as const;
 
 function fileConfig(toml: string): NodeConfig {
@@ -300,7 +305,7 @@ void test('the seller-daemon example starts the seller as written', () => {
     ),
     {},
   );
-  assert.deepEqual(settings.offers[0]!.offer, FREE_LISTING);
+  assert.deepEqual(settings.offers[0]!.offer, EXAMPLE_LISTING);
   assert.equal(settings.publication, undefined);
 });
 
@@ -311,7 +316,7 @@ void test('the seller-docker example starts the seller as written', () => {
     ),
     {},
   );
-  assert.deepEqual(settings.offers[0]!.offer, FREE_LISTING);
+  assert.deepEqual(settings.offers[0]!.offer, EXAMPLE_LISTING);
   assert.equal(settings.publication, undefined);
 });
 

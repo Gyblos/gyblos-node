@@ -287,11 +287,6 @@
       "then": {
         "required": ["context_tokens"]
       },
-      "else": {
-        "not": {
-          "required": ["context_tokens"]
-        }
-      },
       "properties": {
         "kind": {
           "description": "API shape of the engine.",
@@ -320,7 +315,7 @@
           "type": "integer",
           "minimum": 1024,
           "maximum": 2000000,
-          "description": "The model's context size in tokens; required for openai and anthropic engines, whose APIs do not report it; not allowed for ollama, which reports its own."
+          "description": "The model's context size in tokens; required for openai and anthropic engines, whose APIs do not report it; optional for ollama, where it sets num_ctx (default 8192, at most 32768)."
         }
       }
     },
@@ -374,6 +369,12 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1000000000000
+        },
+        "max_output_tokens": {
+          "description": "The longest answer one request may ask for (default 4096); the model's context bounds it too.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000000
         }
       }
     },

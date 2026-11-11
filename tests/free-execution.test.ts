@@ -49,8 +49,8 @@ void test('free execution authenticates a free quote and preserves multiline cha
     await api.verifyFreeExecutionRequest(request, trust),
     request,
   );
-  assert.equal(FREE_EXECUTION.alpn, 'gyblos/free/3');
-  assert.equal(FREE_STREAM.alpn, 'gyblos/free-stream/3');
+  assert.equal(FREE_EXECUTION.alpn, 'gyblos/free/4');
+  assert.equal(FREE_STREAM.alpn, 'gyblos/free-stream/4');
 });
 
 void test('free execution refuses either paid price component and a nonzero budget', async () => {

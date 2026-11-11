@@ -57,6 +57,8 @@ export type OfferPricing =
       kind: typeof OFFER_PRICING_KINDS.FREE;
       dailyTokenCap: number;
       perBuyerCap: number;
+      // The longest answer one request may ask for; the model's context bounds it too.
+      maxOutputTokens: number;
     };
 
 export interface NodeOffer {
@@ -68,12 +70,14 @@ export interface NodeOffer {
 
 const OFFER_KEYS = ['model', 'custom', 'engine', 'reasoning', 'price', 'free'];
 const PRICE_KEYS = ['input_per_mtok', 'output_per_mtok', 'currency'];
-const FREE_KEYS = ['daily_token_cap', 'per_buyer_cap'];
+const FREE_KEYS = ['daily_token_cap', 'per_buyer_cap', 'max_output_tokens'];
 // Default for models without verified catalog levels; verified models default to their catalog level.
 const UNVERIFIED_DEFAULT_REASONING: readonly ReasoningLevel[] = [
   REASONING_LEVELS.OFF,
 ];
 const ZERO = '0';
+// A free offer's longest answer per request when gyblos.toml does not set free.max_output_tokens.
+const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 
 interface ResolvedOfferModel {
   model: OfferModel;
@@ -242,6 +246,15 @@ function tokenCap(value: unknown, path: ConfigPath, issues: IssueList) {
   return Number(cap);
 }
 
+// A TOML integer from one token to the largest context any offer may have.
+function outputLimit(value: unknown, path: ConfigPath, issues: IssueList) {
+  const tokens = integer(value, path, issues);
+  if (tokens === undefined) return undefined;
+  if (tokens < 1n || tokens > BigInt(NODE_CONFIG_LIMITS.maxContextTokens))
+    return issues.add(NODE_CONFIG_ISSUE_CODES.INVALID_VALUE, path);
+  return Number(tokens);
+}
+
 function freePricing(
   value: unknown,
   path: ConfigPath,
@@ -264,6 +277,10 @@ function freePricing(
     issues,
     (item, at) => tokenCap(item, at, issues),
   );
+  const maxOutputTokens =
+    optional(free, 'max_output_tokens', path, (item, at) =>
+      outputLimit(item, at, issues),
+    ) ?? DEFAULT_MAX_OUTPUT_TOKENS;
   unknownKeys(free, path, FREE_KEYS, issues);
   if (
     dailyTokenCap !== undefined &&
@@ -277,7 +294,12 @@ function freePricing(
     perBuyerCap === undefined
   )
     return undefined;
-  return { kind: OFFER_PRICING_KINDS.FREE, dailyTokenCap, perBuyerCap };
+  return {
+    kind: OFFER_PRICING_KINDS.FREE,
+    dailyTokenCap,
+    perBuyerCap,
+    maxOutputTokens,
+  };
 }
 
 function offerPricing(entry: ConfigTable, path: ConfigPath, issues: IssueList) {

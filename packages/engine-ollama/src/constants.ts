@@ -27,16 +27,22 @@ export const READINESS_GENERATION = {
 } as const;
 
 export const GENERATION = {
-  numCtx: 2048,
+  // The default context; an offer may set its own up to MODEL_LIMITS.maxContextTokens.
+  numCtx: 8192,
   seed: 42,
   temperature: 0,
   keepAlive: `${READINESS_GENERATION.residencyMs}ms`,
 } as const;
 
 export const MODEL_LIMITS = {
+  // The lab's inference evidence keeps the original bounded request.
   requestMaxOutputTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
-  adapterMaxOutputTokens: 512,
-  maxPromptCharacters: INFERENCE_REQUEST_LIMITS.maxPromptCharacters,
+  // Qwen3-0.6B's native context; the model card's longer window needs rope scaling Ollama does not set.
+  minContextTokens: 512,
+  maxContextTokens: 32768,
+  // The free channel's input bytes, rendered: the context bounds it again in tokens.
+  maxConversationCharacters: 262144,
   maxFrameCharacters: 1_000_000,
-  maxOutputCharacters: 100_000,
+  // The free channel's output bytes.
+  maxOutputCharacters: 262144,
 } as const;
