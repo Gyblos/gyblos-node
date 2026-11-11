@@ -262,6 +262,10 @@ independently verified final charge/refund, same-seller queue expiry and HTTP
 disconnect, fresh quote correlation, a shared-budget race, and A uncertainty
 while B is already sent or still before its first prompt write. The latter
 blocks new requests and survives buyer restart without replaying either prompt.
+The buyer must read discovery after startup, and an unavailable index prevents
+the first prompt. Cancellation waits for the actual server-side HTTP close and
+releases the engine before queue expiry; a request cannot pass by merely timing
+out. Phase watchdog regressions bound missing barriers and early HTTP failure.
 Only numeric/status evidence leaves the scenarios; synthetic request/response
 content, keys and financial payloads stay out of output. Existing limits and fee
 arithmetic remain unchanged. This is local composition evidence, not a

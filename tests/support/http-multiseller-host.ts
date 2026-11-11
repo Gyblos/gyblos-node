@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { address } from '@solana/kit';
 
 import { startBuyer } from '@gyblos/buyer/buyer-main';
-import { BUYER_SELECTION } from '@gyblos/buyer/constants';
+import { BUYER_SELECTION, PAID_BUYER } from '@gyblos/buyer/constants';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import {
   batchPoolPathsIn,
@@ -246,7 +246,11 @@ export async function httpMultisellerHost(
       token: async () =>
         (
           await readFile(
-            rolePathIn(workspace.environment, P2P_ROLES.BUYER, 'api-token'),
+            rolePathIn(
+              workspace.environment,
+              P2P_ROLES.BUYER,
+              PAID_BUYER.tokenFile,
+            ),
             'utf8',
           )
         ).trim(),

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 
 import { DEVNET_USDC } from '@gyblos/config';
+import { ACCEPTANCE } from '@gyblos/lab-harness/acceptance/constants';
 import { receiptNativeBinding } from '@gyblos/lab-harness/acceptance/receipt-native';
 import { assertAcceptanceTempBase } from '@gyblos/lab-harness/acceptance/workspace';
 import { createNode } from '@gyblos/node';
@@ -70,7 +71,7 @@ async function main() {
         const { readFile, writeFile } = await import('node:fs/promises');
         const path = process.env.GYBLOS_CONFIG!;
         const config = await readFile(path, 'utf8');
-        await writeFile(path, config.replace('http://127.0.0.1/v1', indexUrl));
+        await writeFile(path, config.replace(ACCEPTANCE.baseUrl, indexUrl));
         seller = createNode({
           bind: binding.bind,
           createEngine: () => {

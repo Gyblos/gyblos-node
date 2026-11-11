@@ -1,6 +1,7 @@
 // Owns the bounded synthetic multi-seller acceptance vocabulary; no production settings or private data.
 export const HTTP_MULTI = {
   operationMs: 10000,
+  traceHeader: 'x-gyblos-acceptance-id',
   runMs: 60000,
   maxBytes: 262144,
   maxPending: 32,

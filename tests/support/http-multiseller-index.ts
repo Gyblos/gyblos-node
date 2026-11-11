@@ -18,6 +18,7 @@ export async function httpMultiIndex() {
     development: true,
     publishers: { mode: PUBLISH_MODES.ALLOWLIST, nodeIds },
   });
+  let available = true;
   let reads = 0;
   let writes = 0;
   let forbidden = 0;
@@ -40,8 +41,13 @@ export async function httpMultiIndex() {
         assert.ok(size <= HTTP_MULTI.maxBytes);
         body += chunk.toString('utf8');
       }
-      if (incoming.method === 'GET') reads++;
-      else writes++;
+      if (incoming.method === 'GET') {
+        reads++;
+        if (!available) {
+          outgoing.writeHead(HTTP_STATUS.serviceUnavailable).end();
+          return;
+        }
+      } else writes++;
       const result = await app.request(
         new Request(origin + incoming.url, {
           method: incoming.method,
@@ -65,6 +71,9 @@ export async function httpMultiIndex() {
   origin = `http://${LOCALHOST}:${location.port}`;
   return {
     origin,
+    available: (value: boolean) => {
+      available = value;
+    },
     baseUrl: origin + '/v1',
     storage,
     allow: (id: string) => nodeIds.add(id),

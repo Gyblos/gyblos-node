@@ -26,8 +26,10 @@ import {
   httpMultiAnswer,
   httpMultiChat,
   httpMultiError,
+  httpMultiHttpObservation,
   httpMultiText,
 } from './http-multiseller-http';
+import { httpMultiPhase } from './http-multiseller-phase';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import { paidWait } from './paid-acceptance-host';
 
@@ -57,11 +59,22 @@ async function generated(
 }
 async function parallel(host: HttpMultisellerHost) {
   const [a, b] = host.sellers;
+  host.index.available(false);
+  assert.ok(
+    (await httpMultiChat(host)).response.status >= HTTP_STATUS.badRequest,
+  );
+  assert.equal((await a!.health()).generations, 0);
+  assert.equal(host.ledger.calls.length, 0);
+  host.index.available(true);
   await a!.call(HTTP_MULTI_METHODS.HOLD);
   await b!.call(HTTP_MULTI_METHODS.HOLD);
+  const beforeDiscovery = host.index.counts().reads;
   const first = httpMultiChat(host);
-  void first.catch(() => {});
-  await generated(host, 0, 1);
+  await httpMultiPhase(generated(host, 0, 1), first, host.signal);
+  assert.ok(
+    host.index.counts().reads > beforeDiscovery,
+    'The buyer must use discovery after startup',
+  );
   const second = httpMultiChat(host);
   await generated(host, 1, 1);
   assert.equal(
@@ -109,29 +122,41 @@ async function parallel(host: HttpMultisellerHost) {
 async function queue(host: HttpMultisellerHost) {
   const a = host.sellers[0]!;
   await a.call(HTTP_MULTI_METHODS.HOLD);
+  const beforeDiscovery = host.index.counts().reads;
   const first = httpMultiChat(host);
-  void first.catch(() => {});
-  await generated(host, 0, 1);
+  await httpMultiPhase(generated(host, 0, 1), first, host.signal);
+  assert.ok(
+    host.index.counts().reads > beforeDiscovery,
+    'The buyer must use discovery after startup',
+  );
   const expired = await httpMultiChat(host);
   httpMultiError(expired, BUYER_ROUTING_CODES.QUEUE_TIMEOUT);
   assert.equal((await host.inspect()).length, 1);
   assert.equal(host.ledger.calls.length, 1);
   const abort = new AbortController();
-  const cancelled = assert.rejects(httpMultiChat(host, abort.signal));
-  // HTTP capacity confirms that the second request has entered before disconnecting it.
-  await paidWait(
-    async () =>
-      (await httpMultiChat(host)).response.status ===
-      HTTP_STATUS.tooManyRequests,
-    host.signal,
-  );
-  abort.abort();
-  await cancelled;
-  await delay(ACCEPTANCE.controlRefillMs);
-  const second = httpMultiChat(host);
-  await a.call(HTTP_MULTI_METHODS.RELEASE);
-  httpMultiAnswer(await first, 0);
-  httpMultiAnswer(await second, 0);
+  const disconnected = httpMultiHttpObservation(host, 'cancelled-waiter');
+  const next = httpMultiHttpObservation(host, 'fresh-waiter');
+  try {
+    const cancelled = httpMultiChat(host, abort.signal, 'cancelled-waiter');
+    const rejected = assert.rejects(cancelled);
+    await httpMultiPhase(disconnected.bodyRead, cancelled, host.signal);
+    abort.abort();
+    await rejected;
+    await httpMultiPhase(
+      disconnected.closed,
+      new Promise(() => {}),
+      host.signal,
+    );
+    // Release before the cancelled wait can expire; a missing HTTP cancel now causes an orphan execution.
+    const second = httpMultiChat(host, host.signal, 'fresh-waiter');
+    await httpMultiPhase(next.bodyRead, second, host.signal);
+    await a.call(HTTP_MULTI_METHODS.RELEASE);
+    httpMultiAnswer(await first, 0);
+    httpMultiAnswer(await second, 0);
+  } finally {
+    disconnected.dispose();
+    next.dispose();
+  }
   assert.equal((await a.health()).generations, 2);
   assert.equal((await host.sellers[1]!.health()).generations, 0);
   assert.equal(host.ledger.calls.length, 1);
@@ -148,12 +173,16 @@ async function uncertain(host: HttpMultisellerHost, sent: boolean) {
   await a!.call(HTTP_MULTI_METHODS.ACK, true);
   if (sent) await b!.call(HTTP_MULTI_METHODS.HOLD);
   else host.wire.pause(b!.role.nodeId);
+  const beforeDiscovery = host.index.counts().reads;
   const first = httpMultiChat(host);
-  void first.catch(() => {});
-  await generated(host, 0, 1);
+  await httpMultiPhase(generated(host, 0, 1), first, host.signal);
+  assert.ok(
+    host.index.counts().reads > beforeDiscovery,
+    'The buyer must use discovery after startup',
+  );
   const second = httpMultiChat(host);
   if (sent) await generated(host, 1, 1);
-  else await host.wire.paused;
+  else await httpMultiPhase(host.wire.paused, second, host.signal);
   await a!.call(HTTP_MULTI_METHODS.RELEASE);
   const failed = await first;
   assert.ok(failed.response.status >= HTTP_STATUS.badRequest);
@@ -178,9 +207,13 @@ async function uncertain(host: HttpMultisellerHost, sent: boolean) {
 async function budget(host: HttpMultisellerHost) {
   const a = host.sellers[0]!;
   await a.call(HTTP_MULTI_METHODS.HOLD);
+  const beforeDiscovery = host.index.counts().reads;
   const first = httpMultiChat(host);
-  void first.catch(() => {});
-  await generated(host, 0, 1);
+  await httpMultiPhase(generated(host, 0, 1), first, host.signal);
+  assert.ok(
+    host.index.counts().reads > beforeDiscovery,
+    'The buyer must use discovery after startup',
+  );
   const second = await httpMultiChat(host);
   assert.ok(second.response.status >= HTTP_STATUS.badRequest);
   assert.equal(host.ledger.calls.length, 1);

@@ -1,5 +1,7 @@
 // Synthetic calls to the actual authenticated buyer HTTP entry; no content is logged or returned as evidence.
 import assert from 'node:assert/strict';
+import { channel } from 'node:diagnostics_channel';
+import { IncomingMessage, ServerResponse } from 'node:http';
 
 import { BUYER_EXECUTION_FIELD, PAID_BUYER } from '@gyblos/buyer/constants';
 import { HTTP_STATUS } from '@gyblos/config';
@@ -10,18 +12,22 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
+import { batchDeferred } from './batch-deferred';
+import { HTTP_MULTI } from './http-multiseller-constants';
 import type { HttpMultisellerHost } from './http-multiseller-host';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 
 export async function httpMultiChat(
   host: HttpMultisellerHost,
   signal: AbortSignal = host.signal,
+  marker?: string,
 ) {
   const response = await fetch(host.buyer().url, {
     method: 'POST',
     signal,
     headers: {
       'content-type': 'application/json',
+      ...(marker ? { [HTTP_MULTI.traceHeader]: marker } : {}),
       authorization: `${PAID_BUYER.authScheme} ${await host.token()}`,
     },
     body: JSON.stringify({
@@ -93,4 +99,49 @@ export function httpMultiError(
   const row = controlObject(result.value, ['error']);
   const error = controlObject(row.error, ['message', 'type', 'param', 'code']);
   assert.equal(error.code, code);
+}
+
+// Native HTTP diagnostics observe admission/body consumption and server-side close, never payloads.
+export function httpMultiHttpObservation(
+  host: HttpMultisellerHost,
+  marker: string,
+) {
+  const bodyRead = batchDeferred<void>();
+  const closed = batchDeferred<void>();
+  const events = channel('http.server.request.start');
+  let request: IncomingMessage | undefined;
+  let response: ServerResponse | undefined;
+  const incoming = (value: unknown) => {
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      !('request' in value) ||
+      !('response' in value)
+    )
+      return;
+    if (
+      !(value.request instanceof IncomingMessage) ||
+      !(value.response instanceof ServerResponse)
+    )
+      return;
+    if (
+      value.request.headers[HTTP_MULTI.traceHeader] !== marker ||
+      value.request.socket.localPort !== Number(new URL(host.buyer().url).port)
+    )
+      return;
+    request = value.request;
+    response = value.response;
+    request.once('end', bodyRead.resolve);
+    response.once('close', closed.resolve);
+  };
+  events.subscribe(incoming);
+  return {
+    bodyRead: bodyRead.promise,
+    closed: closed.promise,
+    dispose() {
+      events.unsubscribe(incoming);
+      request?.removeListener('end', bodyRead.resolve);
+      response?.removeListener('close', closed.resolve);
+    },
+  };
 }
