@@ -156,6 +156,21 @@ void test('the own pid in a lock it does not hold is stale, as after a container
     await lock.release();
   }));
 
+void test('a lock abandoned and collected never makes a reused inode pass for this process’s own', () => {
+  // Run apart, with the collector exposed, so freed inodes are reused within the run as on Linux CI.
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--expose-gc',
+      '--import',
+      'tsx',
+      join(import.meta.dirname, 'support', 'lock-reuse.ts'),
+    ],
+    { encoding: 'utf8', timeout: 60_000 },
+  );
+  assert.equal(result.stdout.trim(), 'ok', result.stderr);
+});
+
 void test('a takeover guard left by a crash refuses takeover until removed', () =>
   withRoot(async (root) => {
     await ensurePrivateDirectory(root);
