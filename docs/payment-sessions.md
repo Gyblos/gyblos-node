@@ -22,10 +22,11 @@ failed v3 preparation signs no opening and does not trigger a fallback. The SDK
 channel and private financial journal do not migrate: saved approvals retain
 their original digest and recover without another inference. The per-request
 paid stream remains a separate, single-user path. Free wire contracts are
-unchanged. The common deadline-bounded generation window now ends promptly on
-request cancellation, stopping publication even if an engine ignores abort.
-Execution replies carry ordered text fragments and one correlated complete
-terminal. Streaming API callers receive fragments as the engine produces them;
+unchanged. Reusable sessions opt into prompt cancellation of deadline-bounded
+generation, stopping publication even if an engine ignores abort. Legacy free
+and per-request paid paths retain their delivery-measurement timing. Execution
+replies carry ordered text fragments and one correlated complete terminal.
+Streaming API callers receive fragments as the engine produces them;
 complete-response callers drain and verify the same wire without publishing
 fragments. No final text is replayed after streaming. Every frame, the aggregate
 encoded response and the number of events are bounded. The terminal's text must

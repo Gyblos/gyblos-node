@@ -42,6 +42,7 @@ export function generationWindow(
   now: () => number,
   request: AbortSignal,
   errors: GenerationWindowErrors,
+  cancelOnAbort = false,
 ): GenerationWindow {
   if (deadline === undefined) return unbounded(request, errors);
   // A policy bug, not a timeout: the caller reports it as an internal failure that charges nothing.
@@ -82,7 +83,8 @@ export function generationWindow(
           halt();
           reject(errors.cancelled());
         };
-        request.addEventListener('abort', abort, { once: true });
+        if (cancelOnAbort)
+          request.addEventListener('abort', abort, { once: true });
       });
       const expired = new Promise<never>((_resolve, reject) => {
         expire = () => {

@@ -35,6 +35,8 @@ export interface AdmittedExecution<State, Settlement, T> {
   now: () => number;
   signal: AbortSignal;
   errors: GenerationWindowErrors;
+  // Session streaming can release an uncooperative engine without changing legacy delivery measurement.
+  cancelOnAbort?: boolean;
   open: (
     window: Pick<GenerationWindow, 'signal' | 'check'>,
   ) => ExecutionSession<T>;
@@ -56,6 +58,7 @@ async function generateAndMeasure<State, Settlement, T>(
     execution.now,
     execution.signal,
     execution.errors,
+    execution.cancelOnAbort,
   );
   const session = execution.open(window);
   const generated: Generated<T> = await window
