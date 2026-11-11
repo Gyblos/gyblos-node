@@ -103,7 +103,11 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
   return { ...rowFor(checked.sellerNodeId), stored };
 }
 
-async function resolve(context: PoolContext, id: string) {
+async function resolve(
+  context: PoolContext,
+  id: string,
+  unsentRequestId?: string,
+) {
   const { options, store, rowFor } = context;
   const row = rowFor(id);
   const record = await poolChild(options.paths, row);
@@ -115,8 +119,17 @@ async function resolve(context: PoolContext, id: string) {
     record.hints === null &&
     record.opening === null &&
     Object.keys(record.requests).length === 0;
+  const unsent =
+    unsentRequestId === row.requestId &&
+    unsentRequestId !== undefined &&
+    !Object.hasOwn(record.requests, unsentRequestId) &&
+    Object.keys(record.pending).length === 0 &&
+    (pristine ||
+      (record.state === SESSION_STATES.OPEN &&
+        Object.values(record.requests).every((request) => request.accepted)));
   if (
     !closed &&
+    !unsent &&
     (row.uncertain || row.requestId !== null) &&
     !accepted &&
     !pristine
@@ -184,7 +197,8 @@ export async function openBatchBuyerPool(
           row.uncertain = true;
         });
       }),
-    resolve: (id) => exclusive(() => resolve(context, id)),
+    resolve: (id, unsentRequestId) =>
+      exclusive(() => resolve(context, id, unsentRequestId)),
     backend: (id) =>
       exclusive(async () => {
         const row = rowFor(id);

@@ -41,7 +41,8 @@ type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
-  selected?: Winner;
+  selections: Map<string, Winner>;
+  meterLoading?: Promise<RecountTokenizer>;
   meter?: RecountTokenizer;
 }
 function trustedQuote(
@@ -50,14 +51,15 @@ function trustedQuote(
 ): BuyerSessionOptions<ReturnType<typeof sellerAddress>>['verify'] {
   const { prepared } = context;
   return async (quote, signal) => {
+    const selected = state.selections.get(quote.offer.requestId);
     const seller = prepared.config.sellers.find(
       (candidate) => candidate.nodeId === quote.offer.nodeId,
     );
     if (
-      !state.selected ||
-      canonicalJson(state.selected.quote) !== canonicalJson(quote) ||
+      !selected ||
+      canonicalJson(selected.quote) !== canonicalJson(quote) ||
       !seller ||
-      !(await permitsWinner(prepared, state.selected, Date.now())) ||
+      !(await permitsWinner(prepared, selected, Date.now())) ||
       !(await verifyBuyerIdentity(prepared.identity, seller, signal))
     )
       return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -154,7 +156,13 @@ async function sharedPool(
     ...pool,
     backend: async (id: string) => {
       checkPaidRequest(prepared, role);
-      state.meter ??= await (options.meter ?? tokenizer)();
+      state.meterLoading ??= (options.meter ?? tokenizer)().catch(
+        (error: unknown) => {
+          state.meterLoading = undefined;
+          throw error;
+        },
+      );
+      state.meter = await state.meterLoading;
       return pool.backend(id);
     },
   };

@@ -4,6 +4,10 @@ import { lstat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { homeLayout, type HomeEnvironment } from '@gyblos/config/home';
+import {
+  parseBuyerRoutingPolicy,
+  type BuyerRoutingPolicy,
+} from '@gyblos/core/buyer-routing';
 import { SELLER_BADGES, SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import {
   selectSellers,
@@ -61,6 +65,7 @@ export interface StaticControlSeller {
   manualTrust?: boolean;
 }
 export interface BuyerSelectionConfig {
+  routing?: BuyerRoutingPolicy;
   session?: BuyerSessionPolicy;
   request: SellerRequest;
   sellers: StaticControlSeller[];
@@ -168,7 +173,14 @@ export function parseBuyerSelectionConfig(
     const row = optionalObject(
       value,
       ['request', 'sellers'],
-      ['pinnedNodeId', 'discovery', 'identity', 'quoteWindowMs', 'session'],
+      [
+        'pinnedNodeId',
+        'discovery',
+        'identity',
+        'quoteWindowMs',
+        'session',
+        'routing',
+      ],
     );
     const request = parseRequest(row.request);
     const validation = selectSellers({
@@ -190,6 +202,9 @@ export function parseBuyerSelectionConfig(
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
     return {
       request,
+      ...(row.routing === undefined
+        ? {}
+        : { routing: parseBuyerRoutingPolicy(row.routing) }),
       ...(row.session === undefined
         ? {}
         : { session: parseBuyerSessionPolicy(row.session) }),

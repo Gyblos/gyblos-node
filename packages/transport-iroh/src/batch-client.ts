@@ -45,6 +45,8 @@ export class BatchClientError extends BatchChannelError {
   }
 }
 export interface BatchClientOptions {
+  // Trusted host guard, called synchronously immediately before the first prompt write.
+  beforeExecute?(): void;
   now?: () => number;
   requestMs?: number;
   operationMs?: number;
@@ -158,6 +160,7 @@ async function requestReply<Remote extends BatchDestination>(
       request.params.quote.offer,
       (state.options.now ?? Date.now)(),
     );
+  if (request.method === BATCH_METHODS.EXECUTE) state.options.beforeExecute?.();
   beforeWrite(); // Even a rejected write may have transmitted bytes.
   await track(state, stream.send.writeAll([...bytes]));
   route(state, current, signal);

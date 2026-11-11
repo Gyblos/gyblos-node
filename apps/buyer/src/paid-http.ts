@@ -2,12 +2,15 @@
 // seller's stop or refusal carries its code and the payment summary, and every paid error answers
 // whether the prompt certainly never left this process. No keys, RPC URLs or prompts reach a reply.
 import { HTTP_STATUS } from '@gyblos/config';
+import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
+import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import {
   executeBuyerPaid,
   type PaidBuyerDependencies,
   type PaidBuyerOutcome,
 } from '@gyblos/node/buyer-paid-execution';
+import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
@@ -89,6 +92,17 @@ const unavailable = (
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  if (
+    error instanceof BuyerRoutingError ||
+    error instanceof UnsentSellerBusyError
+  )
+    return {
+      ...unavailable(error.code, true),
+      status:
+        error.code === BUYER_ROUTING_CODES.BUSY
+          ? HTTP_STATUS.tooManyRequests
+          : HTTP_STATUS.badRequest,
+    };
   if (
     error instanceof PaymentSessionError ||
     error instanceof BatchChannelError
