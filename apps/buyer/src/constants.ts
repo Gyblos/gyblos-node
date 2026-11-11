@@ -7,6 +7,18 @@ import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
+export const CHAT_COMMANDS = {
+  NEW: '/new',
+  EXIT: '/exit',
+  SETTLE: '/settle',
+} as const;
+export const CHAT_TURN_STATUSES = {
+  COMPLETE: 'complete',
+  UNCERTAIN: 'uncertain',
+  REJECTED: 'rejected',
+} as const;
+export const CHAT_INPUT_BYTES = 64_000;
+
 export const CALL_OUTCOMES = {
   CONFIRMED: JOURNAL_STATES.CONFIRMED,
   UNCERTAIN: JOURNAL_STATES.UNCERTAIN,

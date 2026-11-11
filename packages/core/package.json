@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./buyer-conversation": "./src/buyer-conversation.ts",
     "./constants": "./src/constants.ts",
     "./inference-observation": "./src/inference-observation.ts",
     "./metering": "./src/metering.ts",
