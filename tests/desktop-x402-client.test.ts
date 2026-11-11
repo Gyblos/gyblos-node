@@ -12,6 +12,7 @@ import {
   X402Client,
 } from '@gyblos/desktop/x402-client';
 import { parseX402Result, x402Explorer } from '@gyblos/desktop/x402-model';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 const policy: BuyerApiPolicy = {
@@ -98,6 +99,42 @@ void test('x402 changed server policy fails closed without retrying the message'
   await assert.rejects(() => client.send('request-2', 'Hello'));
   assert.equal(posts, 1);
   assert.equal((await ledger.summary()).blocked, true);
+});
+void test('a reusable-session approval remains unresolved rather than becoming a settled desktop payment', async () => {
+  let posts = 0;
+  const ledger = budget();
+  const client = new X402Client(ledger, async (_url, options) => {
+    if (options?.method !== 'POST') return Response.json(policy);
+    posts++;
+    const response = reply();
+    return Response.json({
+      ...response,
+      [BUYER_API.PAYMENT_FIELD]: {
+        ...response[BUYER_API.PAYMENT_FIELD],
+        verdict: SESSION_VERDICTS.APPROVED,
+        chargedAtomic: null,
+        refundedAtomic: null,
+        transaction: undefined,
+        recorded: true,
+      },
+    });
+  });
+  try {
+    await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+    await client.authorize('200');
+    await assert.rejects(
+      () => client.send('approved-request', 'Hello'),
+      /not confirmed/,
+    );
+    await assert.rejects(() => client.send('blocked-request', 'Do not retry'));
+    const summary = await ledger.summary();
+    assert.equal(summary.blocked, true);
+    assert.equal(summary.spentAtomic, '0');
+    assert.deepEqual(summary.records, []);
+    assert.equal(posts, 1);
+  } finally {
+    await client.close();
+  }
 });
 void test('x402 malformed or unverified settlements never produce a confirmed payment', () => {
   for (const verdict of ['pending', 'unverified', 'disputed', 'interrupted']) {

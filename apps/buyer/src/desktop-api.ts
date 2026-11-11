@@ -11,6 +11,7 @@ import {
 } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
+import { CHAT_ROUTES } from './constants';
 import type { BuyerSelectionConfig } from './selection-config';
 
 export interface BuyerDesktopOptions {
@@ -59,11 +60,8 @@ function metadataRequest(
   authenticated: boolean,
 ) {
   if (!authenticated || request.headers.origin !== undefined) return false;
-  if (
-    request.method === 'GET' &&
-    request.url === BUYER_API.STATUS_PATH &&
-    policy
-  ) {
+  const path = request.url?.split('?')[0];
+  if (request.method === 'GET' && path === BUYER_API.STATUS_PATH && policy) {
     response
       .writeHead(HTTP_STATUS.ok, {
         'content-type': 'application/json',
@@ -74,8 +72,10 @@ function metadataRequest(
   }
   if (
     request.method === 'POST' &&
-    (request.url === ROUTES.inference || request.url === BUYER_API.CHAT_PATH) &&
-    (request.url === BUYER_API.CHAT_PATH ||
+    (path === ROUTES.inference ||
+      path === CHAT_ROUTES.messages ||
+      path === BUYER_API.CHAT_PATH) &&
+    (path === BUYER_API.CHAT_PATH ||
       request.headers['if-match'] !== undefined) &&
     (!policy || request.headers['if-match'] !== '"' + policy.policyId + '"')
   ) {
@@ -103,12 +103,13 @@ export function createDesktopApi(
     handled: (request: IncomingMessage, response: ServerResponse) =>
       metadataRequest(request, response, policy, authenticated),
     accepts(request: IncomingMessage, json: boolean) {
+      const path = request.url?.split('?')[0];
       return (
         request.method === 'POST' &&
         request.headers.origin === undefined &&
         json &&
-        (request.url === ROUTES.inference ||
-          (request.url === BUYER_API.CHAT_PATH &&
+        (path === ROUTES.inference ||
+          (path === BUYER_API.CHAT_PATH &&
             policy !== undefined &&
             authenticated))
       );

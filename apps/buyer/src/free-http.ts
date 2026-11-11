@@ -253,13 +253,14 @@ function admit(
   response: ServerResponse,
   settings: ChatSettings,
   active: number,
+  desktopApi?: ChatApi,
 ): ChatApi | undefined {
   const local = request.headers.origin === undefined;
   if (request.method === 'GET' && isModelsRoute(request.url) && local) {
     replyJson(response, modelList(settings.selection));
     return undefined;
   }
-  const api = chatApi(request.url);
+  const api = desktopApi ?? chatApi(request.url);
   const code =
     !api || request.method !== 'POST' || !local || !isJson(request)
       ? FREE_BUYER_CODES.INVALID
@@ -286,7 +287,10 @@ export function freeBuyerHandler(
   return async (request: IncomingMessage, response: ServerResponse) => {
     if (!acceptCaller(request, response, authorize)) return;
     if (desktop.handled(request, response)) return;
-    const api = admit(request, response, settings, active);
+    const localApi = desktop.accepts(request, isJson(request))
+      ? defaultChatApi
+      : undefined;
+    const api = admit(request, response, settings, active, localApi);
     if (!api) return;
     let format: ChatStreamFormat | undefined;
     active++;

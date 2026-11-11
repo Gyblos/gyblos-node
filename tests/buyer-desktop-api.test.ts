@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { CHAT_ROUTES } from '@gyblos/buyer/constants';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
-import { BUYER_API } from '@gyblos/protocol/buyer-api';
+import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
@@ -128,6 +128,52 @@ void test('desktop policy binding cannot be bypassed by query-bearing chat route
       assert.equal(response.status, BUYER_API.POLICY_CHANGED_STATUS, path);
     }
     assert.equal(calls, 0);
+    const policy = parseBuyerApiPolicy(
+      await (
+        await fetch(new URL(BUYER_API.STATUS_PATH, host.url), {
+          headers: {
+            authorization: 'Bearer synthetic-policy-test-bearer-token',
+          },
+        })
+      ).json(),
+    );
+    for (const path of [
+      new URL(host.url).pathname,
+      BUYER_API.CHAT_PATH,
+      CHAT_ROUTES.messages,
+    ]) {
+      const url = new URL(path + '?beta=true', host.url);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer synthetic-policy-test-bearer-token',
+          'content-type': 'application/json',
+          'if-match': '"' + policy.policyId + '"',
+        },
+        body: JSON.stringify({
+          model: MODEL_IDS.QWEN3_0_6B,
+          max_tokens: 16,
+          messages: [
+            { role: FREE_CHAT_ROLES.USER, content: 'Synthetic question' },
+          ],
+        }),
+      });
+      assert.equal(response.status, 200, path);
+    }
+    assert.equal(calls, 3);
+    const missing = await fetch(
+      new URL(BUYER_API.CHAT_PATH + '?beta=true', host.url),
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer synthetic-policy-test-bearer-token',
+          'content-type': 'application/json',
+        },
+        body: '{}',
+      },
+    );
+    assert.equal(missing.status, BUYER_API.POLICY_CHANGED_STATUS);
+    assert.equal(calls, 3);
   } finally {
     await host.close();
   }
