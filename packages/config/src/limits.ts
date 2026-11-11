@@ -100,8 +100,16 @@ export const HTTP_LIMITS = {
   facilitatorBody: '64kb',
 } as const;
 
+// Paid requests and the legacy HTTP path stay small until paid conversations land.
 export const INFERENCE_REQUEST_LIMITS = {
   minOutputTokens: 32,
   maxOutputTokens: 128,
   maxPromptCharacters: 4000,
+} as const;
+
+// A free answer's longest length in tokens: a seller's offer default, and the most any offer or buyer
+// may set. Free output text is at most 256 KiB; a token is at least a byte, and answers average several.
+export const FREE_OUTPUT_TOKENS = {
+  default: 4096,
+  max: 32768,
 } as const;

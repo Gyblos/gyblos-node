@@ -420,7 +420,7 @@ Request fields (all required; unknown fields at every level are rejected):
   quote's exact public `{modelId, variant, quantization}`; the quote already
   binds its internal engine `model` description. Neither identifier is an
   arbitrary engine URL or upstream model override.
-- `messages`: 1–64 text-only objects with exactly `role` and `content`. Roles
+- `messages`: 1–1024 text-only objects with exactly `role` and `content`. Roles
   are `system`, `user`, `assistant`; multiline/empty content is representable
   on the wire. The seller serves a conversation: an optional `system` message
   first, then turns alternating `user`, `assistant`, from and ending with

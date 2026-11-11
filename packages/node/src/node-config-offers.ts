@@ -1,6 +1,7 @@
 // Validates gyblos.toml [[offers]]: catalog or flagged custom model, engine by URL, reasoning levels the
 // model supports (catalog levels, GYB-DOC-028) and either a USDC price (normalized to its canonical
 // decimal) or a capped free offer. Values are checked, never echoed.
+import { FREE_OUTPUT_TOKENS } from '@gyblos/config';
 import {
   PublicRecordError,
   resolveModel,
@@ -77,9 +78,8 @@ const UNVERIFIED_DEFAULT_REASONING: readonly ReasoningLevel[] = [
 ];
 const ZERO = '0';
 // A free offer's longest answer per request when gyblos.toml does not set free.max_output_tokens.
-const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
-// Free output text is at most 256 KiB; a token is at least a byte, and answers average several.
-const MAX_OUTPUT_TOKENS = 32768;
+const DEFAULT_MAX_OUTPUT_TOKENS = FREE_OUTPUT_TOKENS.default;
+const MAX_OUTPUT_TOKENS = FREE_OUTPUT_TOKENS.max;
 
 interface ResolvedOfferModel {
   model: OfferModel;

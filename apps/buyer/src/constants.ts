@@ -4,10 +4,7 @@ import { ROLE_FILES, TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { BUYER_SELECTION_FILE } from '@gyblos/node/buyer-init-constants';
 import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
-import {
-  FREE_EXECUTION,
-  type ProtocolErrorCode,
-} from '@gyblos/protocol/constants';
+import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
 export const CALL_OUTCOMES = {
@@ -229,6 +226,8 @@ export const PAID_BUYER = {
   // A larger file is not one this buyer wrote.
   tokenFileBytes: 256,
   authScheme: 'Bearer',
+  // The header Anthropic SDKs carry their key in; Node lowercases incoming header names.
+  apiKeyHeader: 'x-api-key',
 } as const;
 // The paid endpoint's HTTP deadline: the request, a stream still connecting, then the receipt check
 // and the record, each within its own bound.
@@ -239,30 +238,7 @@ export const PAID_BUYER_HTTP_MS =
 // Preserve the existing buyer entry for shared payment outcomes.
 export { PAID_VERDICTS, type PaidVerdict } from '@gyblos/node/constants';
 // The OpenAI-compatible subset the free buyer accepts, and the fixed reasons it gives for refusing one.
-export const FREE_CHAT_FIELDS = {
-  MODEL: 'model',
-  MESSAGES: 'messages',
-  MAX_TOKENS: 'max_tokens',
-  STREAM: 'stream',
-} as const;
-export type FreeChatField =
-  (typeof FREE_CHAT_FIELDS)[keyof typeof FREE_CHAT_FIELDS];
-export const FREE_CHAT_FIELD_LIST: readonly FreeChatField[] =
-  Object.values(FREE_CHAT_FIELDS);
-// An unsupported field is named back only when it looks like a plain field name.
-export const FREE_CHAT_FIELD_NAME = /^[A-Za-z0-9_]{1,64}$/;
-export const FREE_CHAT_DETAILS = {
-  body: 'the body must be a JSON object with model and messages',
-  fields: `supported fields are ${FREE_CHAT_FIELD_LIST.join(', ')}`,
-  model: (modelId: string) => `model must be ${modelId}`,
-  maxTokens: (maximum: number) =>
-    `max_tokens must be an integer from 1 to ${maximum}`,
-  stream: 'stream must be true or false',
-  noStream: 'stream must be false or absent',
-  messages: 'messages must hold exactly one user message',
-  content: `message content must be text of at most ${FREE_EXECUTION.inputBytes} bytes`,
-  json: 'the body must be valid UTF-8 JSON',
-} as const;
+export * from './chat-constants';
 // Why `buyer:free` could not start; printed after FREE_BUYER_CODES.CONFIG with a next step.
 export const FREE_BUYER_STARTUP = {
   TELEMETRY_CONFIG: 'BUYER_TELEMETRY_CONFIG_INVALID',

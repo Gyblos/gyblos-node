@@ -213,7 +213,8 @@ export const FREE_EXECUTION = {
   responseBytes: 1048576,
   inputBytes: 262144,
   outputBytes: 262144,
-  maxMessages: 64,
+  // Agents resend long histories; bytes bound the input, this only bounds parsing work.
+  maxMessages: 1024,
 } as const;
 export const FREE_CHAT_ROLES = {
   SYSTEM: 'system',
