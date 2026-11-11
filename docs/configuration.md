@@ -297,7 +297,7 @@ stream (x402 upto channels), only when its usage is recounted with the model's
 pinned public tokenizer (`SELLER_PAID_METERING_UNRECOUNTED` otherwise) and the
 seller role was set up with a payout and payment keys
 (`SELLER_PAYMENT_ROLE_MISSING` otherwise). Buyers see and pay the seller's price
-plus the protocol fee (`PROTOCOL_FEE`, 3% on devnet), rounded up. Paid v2 has
+plus the protocol fee (`PROTOCOL_FEE`, 4% on devnet), rounded up. Paid v2 has
 settled on devnet only in a controlled run; see [limitations](limitations.md).
 The v1 paid path remains in the lab gates (`pnpm gate:*`) only.
 [examples/seller-daemon.toml](../examples/seller-daemon.toml) and its Docker
