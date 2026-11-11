@@ -306,6 +306,10 @@ export const DEMO_ACCOUNT = {
   SAMPLE_REQUESTS: 4,
 } as const;
 export const NAVIGATION_WIDTH = { MIN: 224, DEFAULT: 224, MAX: 360 } as const;
+export const HISTORY_KEY = {
+  BACK: 'ArrowLeft',
+  FORWARD: 'ArrowRight',
+} as const;
 export const WORKSPACE_BREAKPOINT = { SIDEBAR: 900, CONTEXT: 1200 } as const;
 
 export const SIDEBAR_ACTION = {

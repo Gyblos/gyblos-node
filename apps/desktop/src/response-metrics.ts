@@ -5,6 +5,8 @@ import {
   RESPONSE_METRICS,
 } from './constants';
 
+export { RESPONSE_COST_UNIT, RESPONSE_COST_KIND } from './constants';
+
 export type ResponseCost = {
   amount: string;
   unit: (typeof RESPONSE_COST_UNIT)[keyof typeof RESPONSE_COST_UNIT];

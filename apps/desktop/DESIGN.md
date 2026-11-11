@@ -47,7 +47,8 @@ The titlebar replaces the separate native title and app header. Keep native
 macOS traffic lights or Windows/Linux caption controls; reserve their space and
 make interactive controls non-draggable. Center one route or conversation title.
 Connections uses an Info action for its context panel, distinct from the left
-sidebar toggle. Startup/probe windows retain their existing native chrome.
+sidebar toggle. Startup windows retain their existing native chrome. The title
+reserves the measured leading and trailing action widths, including notices.
 
 Both side panels are layout columns. Opening either displaces the main content;
 closing reverses the same 300 ms easing. The collapsed sidebar retains its icons.

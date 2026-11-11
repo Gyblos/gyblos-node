@@ -6,9 +6,31 @@ import {
   back,
   createNavigation,
   forward,
+  historyShortcut,
   navigate,
   UI_VIEW,
 } from '@gyblos/desktop/navigation-state';
+
+void test('history shortcuts preserve editing and open dialog keyboard behavior', () => {
+  const event = {
+    key: 'ArrowLeft',
+    altKey: true,
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    defaultPrevented: false,
+  };
+  assert.equal(historyShortcut(event, false), 'ArrowLeft');
+  assert.equal(historyShortcut(event, true), null);
+  assert.equal(historyShortcut({ ...event, key: 'ArrowRight' }, true), null);
+  assert.equal(historyShortcut({ ...event, ctrlKey: true }, false), null);
+  assert.equal(historyShortcut({ ...event, altKey: false }, false), null);
+  assert.equal(historyShortcut({ ...event, shiftKey: true }, false), null);
+  assert.equal(
+    historyShortcut({ ...event, defaultPrevented: true }, false),
+    null,
+  );
+});
 
 void test('a contextual journey can return through Payments and Chat', () => {
   const chat = createNavigation();

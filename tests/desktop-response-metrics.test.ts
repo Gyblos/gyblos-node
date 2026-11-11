@@ -13,6 +13,8 @@ import {
   observedResponse,
   parseResponseMetrics,
   reportedUsage,
+  RESPONSE_COST_KIND,
+  RESPONSE_COST_UNIT,
 } from '@gyblos/desktop/response-metrics';
 
 import { conversation, model } from './support/chat-archive-fixture';
@@ -23,12 +25,20 @@ const metrics = {
   firstTokenMs: null,
   generationMs: null,
   responseMs: 1234,
-  cost: { amount: '0.10', unit: 'USD', kind: 'recorded' },
+  cost: {
+    amount: '0.10',
+    unit: RESPONSE_COST_UNIT.USD,
+    kind: RESPONSE_COST_KIND.RECORDED,
+  },
 };
 void test('buffered response time never masquerades as first-token latency or generation throughput', () => {
   const observation = observedResponse(
     1234,
-    { amount: '0.10', unit: 'USD', kind: 'recorded' },
+    {
+      amount: '0.10',
+      unit: RESPONSE_COST_UNIT.USD,
+      kind: RESPONSE_COST_KIND.RECORDED,
+    },
     reportedUsage(
       { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
       128,
@@ -39,8 +49,11 @@ void test('buffered response time never masquerades as first-token latency or ge
   assert.equal(generationSpeed({ ...observation, generationMs: 200 }), 40);
   assert.equal(generationSpeed({ ...observation, generationMs: 0 }), null);
   assert.equal(
-    observedResponse(-1, { amount: '0', unit: 'atomic units', kind: 'settled' })
-      .responseMs,
+    observedResponse(-1, {
+      amount: '0',
+      unit: RESPONSE_COST_UNIT.ATOMIC,
+      kind: RESPONSE_COST_KIND.SETTLED,
+    }).responseMs,
     null,
   );
 });

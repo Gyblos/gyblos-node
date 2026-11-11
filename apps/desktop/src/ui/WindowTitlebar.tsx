@@ -5,7 +5,12 @@ import {
   Info,
   SidebarSimple,
 } from '@phosphor-icons/react';
-import { useSyncExternalStore, type ReactNode } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 
 import { WINDOW_PLATFORM } from '../constants';
 import { windowPlatform } from '../window-chrome';
@@ -28,6 +33,30 @@ type Props = {
 };
 function screenLabel(view: View | undefined) {
   return MAIN_NAV.find((item) => item.name === view)?.label ?? view;
+}
+function useTitleBounds() {
+  const header = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const element = header.current;
+    const leading = element?.querySelector('.ui-window-leading');
+    const trailing = element?.querySelector('.top-actions');
+    if (!element || !leading || !trailing) return;
+    const measure = () => {
+      const bounds = element.getBoundingClientRect();
+      const gap = parseFloat(getComputedStyle(element).columnGap) || 0;
+      const inset =
+        Math.max(
+          leading.getBoundingClientRect().right - bounds.left,
+          bounds.right - trailing.getBoundingClientRect().left,
+        ) + gap;
+      element.style.setProperty('--window-title-inset', inset + 'px');
+    };
+    const observer = new ResizeObserver(measure);
+    for (const target of [element, leading, trailing]) observer.observe(target);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+  return header;
 }
 function WindowNavigation(props: Props) {
   const previous = props.route.history.at(-1);
@@ -69,6 +98,7 @@ function WindowNavigation(props: Props) {
   );
 }
 export function WindowTitlebar(props: Props) {
+  const header = useTitleBounds();
   const snapshot = useSyncExternalStore(
     props.chat.subscribe,
     props.chat.getSnapshot,
@@ -87,6 +117,7 @@ export function WindowTitlebar(props: Props) {
   );
   return (
     <header
+      ref={header}
       className="topbar ui-window-chrome"
       data-platform={platform}
       data-route={props.route.current}

@@ -52,6 +52,8 @@ import {
   back,
   createNavigation,
   forward,
+  HISTORY_KEY,
+  historyShortcut,
   navigate as navigateState,
 } from './ui/navigation-state';
 import { useNetworkCatalog } from './ui/NetworkCatalog';
@@ -214,15 +216,19 @@ export function DesktopApp() {
   }, [view]);
   useEffect(() => {
     function command(event: KeyboardEvent) {
-      if (
-        event.altKey &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !document.querySelector('dialog[open]') &&
-        (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
-      ) {
+      const editing =
+        event.target instanceof HTMLElement &&
+        (event.target.isContentEditable ||
+          Boolean(
+            event.target.closest('input, textarea, select, [role="textbox"]'),
+          ));
+      const direction = historyShortcut(
+        event,
+        editing || Boolean(document.querySelector('dialog[open]')),
+      );
+      if (direction) {
         event.preventDefault();
-        if (event.key === 'ArrowLeft') goBack();
+        if (direction === HISTORY_KEY.BACK) goBack();
         else goForward();
         return;
       }
