@@ -67,7 +67,11 @@ export async function batchStreamFixture() {
   };
   return { request, value, bill, response, header, delta, terminal };
 }
-export function batchMemoryPeer(bytes: Uint8Array, writeFailure = false) {
+export function batchMemoryPeer(
+  bytes: Uint8Array,
+  writeFailure = false,
+  beforeRead?: (index: number) => Promise<void>,
+) {
   let offset = 0;
   let reads = 0;
   let writes = 0;
@@ -94,6 +98,7 @@ export function batchMemoryPeer(bytes: Uint8Array, writeFailure = false) {
         recv: {
           async readExact(length) {
             reads++;
+            await beforeRead?.(reads);
             if (offset + length > bytes.length)
               throw new Error('Synthetic incomplete frame');
             const out = bytes.slice(offset, offset + length);
@@ -102,6 +107,7 @@ export function batchMemoryPeer(bytes: Uint8Array, writeFailure = false) {
           },
           async read(length) {
             reads++;
+            await beforeRead?.(reads);
             const out = bytes.slice(offset, offset + length);
             offset += out.length;
             return [...out];

@@ -1,4 +1,5 @@
 // Reads session execution events under per-stage and absolute deadlines; EOF precedes any approval.
+import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import {
   BATCH_CHANNEL,
   batchFail,
@@ -25,11 +26,22 @@ export async function readBatchStreamResponse(
   let bytes = 0;
   for (;;) {
     check();
-    const prefix = Uint8Array.from(
+    // Generation may be silent within the original absolute request window. Once
+    // an event begins, a partial prefix or body must meet the ingress deadline.
+    const first = await stage(
+      stream.recv.read(1),
+      TRANSPORT_TIMEOUTS.requestMs,
+    );
+    check();
+    if (first.length !== 1) return batchFail();
+    const prefix = new Uint8Array(CONTROL_LIMITS.prefixBytes);
+    prefix.set(first);
+    prefix.set(
       await stage(
-        stream.recv.readExact(CONTROL_LIMITS.prefixBytes),
+        stream.recv.readExact(CONTROL_LIMITS.prefixBytes - 1),
         IROH_DEADLINES.ingressMs,
       ),
+      1,
     );
     check();
     const length = new DataView(prefix.buffer).getUint32(0);

@@ -1064,6 +1064,8 @@ context, signed price/budget, admission and absolute request deadlines are
 unchanged. Deltas reserve 2048 bytes for a static error terminal. JSON escaping
 and the repeated complete terminal text can exhaust the encoded budget earlier
 than content size; return static LIMIT instead of a success that cannot fit.
+Generation waits between events use the existing absolute request deadline.
+After the first byte, incomplete prefixes and bodies retain the ingress deadline.
 Consumers and writes are awaited with existing per-stage deadlines; cancellation
 seals publication even if the engine ignores abort. Quote freshness is checked
 before admission, not required to remain live during generation.

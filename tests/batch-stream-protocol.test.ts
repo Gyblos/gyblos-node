@@ -1,6 +1,7 @@
 // Session-v3 correlation, terminal equality and bounded framing are verified before any approval.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import {
   BATCH_CHANNEL,
@@ -10,8 +11,10 @@ import {
   BATCH_STREAM,
   createBatchStreamVerifier,
 } from '@gyblos/protocol/batch-stream';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import { createBatchChannelClient } from '@gyblos/transport-iroh/batch-client';
+import { IROH_DEADLINES } from '@gyblos/transport-iroh/constants';
 
 import { batchDeferred } from './support/batch-deferred';
 import { batchLoopback } from './support/batch-loopback';
@@ -80,7 +83,7 @@ void test('session framing refuses oversized prefixes before allocating a body a
     sent: true,
     code: SESSION_CODES.LIMIT,
   });
-  assert.equal(peer.reads(), 1);
+  assert.equal(peer.reads(), 2);
   await client.close();
   await client.settled();
   const broken = batchMemoryPeer(new Uint8Array(), true);
@@ -130,12 +133,12 @@ void test('client awaits each consumer before reading the terminal and verifies 
   });
   try {
     await entered.promise;
-    assert.equal(peer.reads(), 2);
+    assert.equal(peer.reads(), 3);
   } finally {
     release.resolve();
   }
   assert.deepEqual(await run, f.response);
-  assert.equal(peer.reads(), 5);
+  assert.equal(peer.reads(), 7);
   await client.close();
   await client.settled();
 });
@@ -216,11 +219,71 @@ void test('cancellation drains client tracking without waiting for a stalled del
     controller.abort();
     await rejected;
     await within(client.settled(), 1000);
-    assert.equal(peer.reads(), 2);
+    assert.equal(peer.reads(), 3);
   } finally {
     release.resolve();
     controller.abort();
     await rejected;
+    await client.close();
+    await client.settled();
+  }
+});
+
+void test('waiting for generated text uses the absolute request deadline, not partial-frame ingress', async (t) => {
+  const f = await batchStreamFixture();
+  const original = globalThis.setTimeout;
+  t.mock.method(
+    globalThis,
+    'setTimeout',
+    (callback: (...args: unknown[]) => void, ms?: number, ...args: unknown[]) =>
+      original(callback, ms === IROH_DEADLINES.ingressMs ? 1 : ms, ...args),
+  );
+  const peer = batchMemoryPeer(
+    batchStreamBytes(f.delta, f.terminal),
+    false,
+    (index) => (index === 1 ? delay(20) : Promise.resolve()),
+  );
+  const client = createBatchChannelClient(
+    peer.endpoint,
+    peer.destination,
+    peer.destination.id().toString(),
+    { now: () => f.request.params.quote.offer.issuedAt },
+  );
+  try {
+    assert.deepEqual(await client.exchange(f.request), f.response);
+  } finally {
+    await client.close();
+    await client.settled();
+  }
+});
+
+void test('once an event starts, a stalled partial prefix is cut off by the original ingress deadline', async (t) => {
+  const f = await batchStreamFixture();
+  const original = globalThis.setTimeout;
+  t.mock.method(
+    globalThis,
+    'setTimeout',
+    (callback: (...args: unknown[]) => void, ms?: number, ...args: unknown[]) =>
+      original(callback, ms === IROH_DEADLINES.ingressMs ? 1 : ms, ...args),
+  );
+  const peer = batchMemoryPeer(
+    batchStreamBytes(f.delta, f.terminal),
+    false,
+    (index) => (index === 2 ? delay(20) : Promise.resolve()),
+  );
+  const client = createBatchChannelClient(
+    peer.endpoint,
+    peer.destination,
+    peer.destination.id().toString(),
+    { now: () => f.request.params.quote.offer.issuedAt },
+  );
+  try {
+    await assert.rejects(client.exchange(f.request), {
+      code: PAID_EXECUTION_CODES.TIMEOUT,
+      sent: true,
+    });
+    assert.equal(peer.reads(), 2);
+  } finally {
     await client.close();
     await client.settled();
   }
