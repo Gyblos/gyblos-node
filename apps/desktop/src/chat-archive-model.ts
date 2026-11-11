@@ -5,6 +5,7 @@ import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 import { activityId } from './activity-model';
 import { CHAT_STORAGE } from './constants';
 import { PAYMENT_METHOD, type PaymentMethod } from './paypal-model';
+import { parseResponseMetrics } from './response-metrics';
 import { modelArtwork } from './ui/announced-models';
 import {
   createSession,
@@ -79,17 +80,22 @@ function parseMessage(value: unknown): ArchivedMessage | null {
     value && typeof value === 'object' && 'reasoning' in value
       ? 'reasoning,'
       : '';
+  const metricsKey =
+    value !== null && typeof value === 'object' && 'metrics' in value
+      ? 'metrics,'
+      : '';
   const item =
     object(
       value,
-      `id,model,paymentMethod,${reasoningKey}role,sentAt,state,text,tools`,
+      `id,${metricsKey}model,paymentMethod,${reasoningKey}role,sentAt,state,text,tools`,
     ) ??
     object(
       value,
-      `id,model,paymentMethod,paymentSessionId,${reasoningKey}role,sentAt,state,text,tools`,
+      `id,${metricsKey}model,paymentMethod,paymentSessionId,${reasoningKey}role,sentAt,state,text,tools`,
     );
   if (!item) return null;
   const model = parseModel(item.model);
+  const metrics = parseResponseMetrics(item.metrics);
   const reasoning = Object.values(REASONING_LEVELS).find(
     (level) => level === item.reasoning,
   );
@@ -111,6 +117,7 @@ function parseMessage(value: unknown): ArchivedMessage | null {
     !role ||
     !state ||
     !method ||
+    ('metrics' in item && (!metrics || role !== CHAT_ROLE.ASSISTANT)) ||
     ('reasoning' in item && (!reasoning || method !== PAYMENT_METHOD.USDC)) ||
     !text(item.text) ||
     !Array.isArray(item.tools) ||
@@ -136,6 +143,7 @@ function parseMessage(value: unknown): ArchivedMessage | null {
     tools,
     paymentMethod: method,
     sentAt: item.sentAt,
+    ...(metrics ? { metrics } : {}),
     ...(reasoning ? { reasoning } : {}),
     ...(paymentId && typeof item.paymentSessionId === 'string'
       ? { paymentSessionId: item.paymentSessionId }

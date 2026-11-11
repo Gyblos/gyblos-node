@@ -1,6 +1,7 @@
 // Main-process-only connection to an explicitly configured, authenticated loopback buyer.
 // It never retries a transmitted request or treats a seller's unverified claim as a payment.
 import { LOCALHOST, ROUTES } from '@gyblos/config';
+import { DEVNET_USDC } from '@gyblos/config/network';
 import { PAID_BUYER_CODES, PAID_VERDICTS } from '@gyblos/node/constants';
 import {
   BUYER_API,
@@ -13,8 +14,15 @@ import {
   OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 
+import { RESPONSE_COST_KIND, RESPONSE_COST_UNIT } from './constants';
+import { observedResponse, reportedUsage } from './response-metrics';
 import { X402Budget } from './x402-budget';
-import { DESKTOP_X402, x402Policy, x402Signature } from './x402-model';
+import {
+  DESKTOP_X402,
+  x402Amount,
+  x402Policy,
+  x402Signature,
+} from './x402-model';
 
 export function buyerEndpoint(input: unknown) {
   if (typeof input !== 'string') throw new Error('Enter a local buyer URL');
@@ -80,6 +88,7 @@ export function parseBuyerReply(input: unknown, policy: BuyerApiPolicy) {
   )
     throw new Error('Incomplete buyer response');
   const payment = value[BUYER_API.PAYMENT_FIELD];
+  const usage = reportedUsage(value.usage, policy.maxTokens);
   if (
     value[BUYER_API.EXECUTION_FIELD] === OFFER_PRICING_KINDS.FREE &&
     payment === undefined
@@ -89,6 +98,7 @@ export function parseBuyerReply(input: unknown, policy: BuyerApiPolicy) {
       chargeAtomic: '0',
       transaction: null,
       free: true,
+      usage,
     };
   const paid = object(payment);
   if (
@@ -113,6 +123,7 @@ export function parseBuyerReply(input: unknown, policy: BuyerApiPolicy) {
     chargeAtomic: paid.chargedAtomic,
     transaction: paid.transaction,
     free: false,
+    usage,
   };
 }
 export class X402Client {
@@ -200,6 +211,7 @@ export class X402Client {
         'Buyer policy changed. Finish the previous budget before authorizing another.',
       );
     const policy = await this.budget.reserve(id);
+    const started = performance.now();
     const response = await this.request(
       new URL(BUYER_API.CHAT_PATH, connection.url),
       {
@@ -223,6 +235,7 @@ export class X402Client {
       },
     );
     const body = await readJson(response, true);
+    const responseMs = performance.now() - started;
     if (!response.ok) {
       const error = object(object(body).error);
       if (
@@ -234,7 +247,19 @@ export class X402Client {
     }
     const reply = parseBuyerReply(body, policy);
     const summary = await this.budget.complete(id, reply);
-    return { text: reply.text, model: policy.model, summary };
+    const metrics = observedResponse(
+      responseMs,
+      {
+        amount: x402Amount(reply.chargeAtomic, policy),
+        unit:
+          policy.mint === DEVNET_USDC
+            ? RESPONSE_COST_UNIT.USDC
+            : RESPONSE_COST_UNIT.ATOMIC,
+        kind: RESPONSE_COST_KIND.SETTLED,
+      },
+      reply.usage,
+    );
+    return { text: reply.text, model: policy.model, summary, metrics };
   }
   async close() {
     this.closed = true;

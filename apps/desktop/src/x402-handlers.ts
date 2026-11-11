@@ -106,7 +106,11 @@ export function createX402Handlers(
         const reply = await client.send(input.id, input.prompt);
         return {
           ...(await summary()),
-          reply: { text: reply.text, model: reply.model },
+          reply: {
+            text: reply.text,
+            model: reply.model,
+            metrics: reply.metrics,
+          },
         };
       } else if (input.action === X402_ACTION.FINISH) await budget.finish();
       else if (

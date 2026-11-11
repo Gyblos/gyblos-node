@@ -5,6 +5,8 @@
   "type": "module",
   "main": "dist/main.cjs",
   "exports": {
+    "./response-metrics": "./src/response-metrics.ts",
+    "./window-chrome": "./src/window-chrome.ts",
     "./package-assets": "./scripts/package-assets.ts",
     "./modal-model": "./src/ui/modal-model.ts",
     "./x402-budget": "./src/x402-budget.ts",

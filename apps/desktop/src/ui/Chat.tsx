@@ -36,11 +36,7 @@ import { modelArtwork } from './announced-models';
 import type { ChatController } from './chat-controller';
 import { conversationSummary } from './chat-history';
 import { canSendPaypal, sendPaypalMessage } from './chat-paypal';
-import {
-  chatReasoningChoice,
-  reasoningLabel,
-  type ReasoningSelection,
-} from './chat-reasoning';
+import { chatReasoningChoice, type ReasoningSelection } from './chat-reasoning';
 import { toggleToolSelection, type ChatMessage } from './chat-state';
 import { ChatAnswer } from './ChatAnswer';
 import { ChatComposer } from './ChatComposer';
@@ -52,7 +48,8 @@ import { Modal } from './Modal';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
 import { MotionPresence } from './Motion';
 import { ReasoningDropdown } from './ReasoningDropdown';
-import { SIGNAL_STATE, SignalMark, SignalTrace } from './Signal';
+import { ResponseMetrics } from './ResponseMetrics';
+import { SIGNAL_STATE, SignalMark } from './Signal';
 import { toolName, TOOLS, type ToolId } from './tools';
 import {
   Avatar,
@@ -392,6 +389,7 @@ export function Chat({
               id,
               result.reply.text,
               buyerModel,
+              result.reply.metrics,
             );
           else
             chat.failPaypal(
@@ -846,30 +844,10 @@ export function Chat({
             .map((message) => (
               <Modal
                 key={message.id}
-                title="Run details"
+                title="Response metrics"
                 close={() => setDetails(null)}
               >
-                <div className="ui-section ui-help-text">
-                  <SignalTrace model={message.model.name} />
-                  <p>Model route</p>
-                  <p>
-                    {message.paymentMethod === PAYMENT_METHOD.PAYPAL
-                      ? 'PayPal Sandbox · local inference'
-                      : message.paymentSessionId
-                        ? 'x402 · Solana devnet'
-                        : 'USDC preview · simulated response'}
-                  </p>
-                  {message.reasoning && (
-                    <p>
-                      Thinking: {reasoningLabel(null, message.reasoning)} ·
-                      preview setting
-                    </p>
-                  )}
-                  {message.tools.length > 0 && (
-                    <p>Tools: {message.tools.map(toolName).join(', ')}</p>
-                  )}
-                  <p>Review the response before using it.</p>
-                </div>
+                <ResponseMetrics message={message} />
               </Modal>
             ))}
       </MotionPresence>

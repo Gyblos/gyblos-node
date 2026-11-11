@@ -1,33 +1,40 @@
-// Keeps contextual buyer journeys separate from primary sidebar destinations.
+// Keeps chronological screen visits for both sidebar and contextual navigation.
 // This state never affects chat, payment operations or browser history.
 import { UI_VIEW } from './constants';
 import type { View } from './model-types';
 
 export { UI_VIEW } from './constants';
 
-type Navigation = { current: View; history: View[] };
+export type Navigation = { current: View; history: View[]; future: View[] };
 export function createNavigation(): Navigation {
-  return { current: UI_VIEW.CHAT, history: [] };
+  return { current: UI_VIEW.CHAT, history: [], future: [] };
 }
-export function navigate(
-  state: Navigation,
-  next: View,
-  contextual = true,
-): Navigation {
-  if (!contextual) return { current: next, history: [] };
+export function navigate(state: Navigation, next: View): Navigation {
   if (state.current === next) return state;
-  const previous = state.history.indexOf(next);
   return {
     current: next,
-    history:
-      previous < 0
-        ? [...state.history, state.current]
-        : state.history.slice(0, previous),
+    history: [...state.history, state.current],
+    future: [],
   };
 }
 export function back(state: Navigation): Navigation {
   const previous = state.history.at(-1);
   return previous
-    ? { current: previous, history: state.history.slice(0, -1) }
+    ? {
+        current: previous,
+        history: state.history.slice(0, -1),
+        future: [state.current, ...state.future],
+      }
+    : state;
+}
+
+export function forward(state: Navigation): Navigation {
+  const next = state.future[0];
+  return next
+    ? {
+        current: next,
+        history: [...state.history, state.current],
+        future: state.future.slice(1),
+      }
     : state;
 }

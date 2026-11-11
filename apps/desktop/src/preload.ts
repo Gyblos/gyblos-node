@@ -23,7 +23,12 @@ import {
   parseWalletSettingsResult,
   WALLET_SETTINGS,
 } from './wallet/settings-model';
+import { windowPlatform } from './window-chrome';
 import { DESKTOP_X402, parseX402Result } from './x402-model';
+
+contextBridge.exposeInMainWorld('desktopWindow', {
+  platform: windowPlatform(process.platform),
+});
 
 contextBridge.exposeInMainWorld('desktopConversations', {
   load: async () =>

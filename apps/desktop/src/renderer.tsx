@@ -1,5 +1,5 @@
 // Mounts the buyer UI or the existing isolated compatibility smoke.
-// USDC Chat/Connect remain simulated; PayPal Sandbox uses the local inference service.
+// Live Chat paths use the guarded PayPal coordinator or explicitly connected x402 buyer.
 import { createRoot } from 'react-dom/client';
 
 import { CompatibilityView } from './compatibility-view';

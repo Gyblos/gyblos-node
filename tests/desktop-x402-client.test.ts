@@ -11,7 +11,7 @@ import {
   parseBuyerReply,
   X402Client,
 } from '@gyblos/desktop/x402-client';
-import { x402Explorer } from '@gyblos/desktop/x402-model';
+import { parseX402Result, x402Explorer } from '@gyblos/desktop/x402-model';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 const policy: BuyerApiPolicy = {
@@ -152,6 +152,46 @@ void test('x402 treats malformed or absent telemetry as unknown after a valid se
     assert.equal(result.usage, null);
     assert.equal(result.chargeAtomic, '30');
   }
+});
+void test('response observations reach the renderer only after durable settlement and cannot trigger a retry', async () => {
+  let posts = 0;
+  const client = new X402Client(budget(), async (_url, options) => {
+    if (options?.method !== 'POST') return Response.json(policy);
+    posts++;
+    return Response.json({
+      ...reply(),
+      usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
+    });
+  });
+  await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+  await client.authorize('200');
+  const result = await client.send('request-1', 'Hello');
+  const payload = {
+    summary: result.summary,
+    policy,
+    reply: { text: result.text, model: result.model, metrics: result.metrics },
+  };
+  const parsed = parseX402Result(payload);
+  assert.equal(parsed.reply?.metrics?.inputTokens, 12);
+  assert.equal(parsed.reply?.metrics?.outputTokens, 8);
+  assert.deepEqual(parsed.reply?.metrics?.cost, {
+    amount: '0.000030',
+    unit: 'USDC',
+    kind: 'settled',
+  });
+  assert.equal(parsed.reply?.metrics?.firstTokenMs, null);
+  assert.equal(parsed.reply?.metrics?.generationMs, null);
+  assert.equal(typeof parsed.reply?.metrics?.responseMs, 'number');
+  assert.equal(
+    parseX402Result({
+      ...payload,
+      reply: { ...payload.reply, metrics: { responseMs: -1 } },
+    }).reply?.metrics,
+    undefined,
+  );
+  assert.equal(posts, 1);
+  assert.equal(result.summary.blocked, false);
+  await client.close();
 });
 void test('x402 concurrent sends transmit at most one request', async () => {
   let release = () => {};

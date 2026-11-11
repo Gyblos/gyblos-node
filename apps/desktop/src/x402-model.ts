@@ -9,6 +9,7 @@ import {
   type BuyerApiPolicy,
 } from '@gyblos/protocol/buyer-api';
 
+import { parseResponseMetrics, type ResponseMetrics } from './response-metrics';
 import { DESKTOP_X402 } from './x402/constants';
 
 export { DESKTOP_X402, X402_ACTION } from './x402/constants';
@@ -183,7 +184,7 @@ export interface X402Result {
   homeSelected?: boolean;
   summary: X402Summary;
   policy: BuyerApiPolicy | null;
-  reply?: { text: string; model: string };
+  reply?: { text: string; model: string; metrics?: ResponseMetrics };
   error?: string;
 }
 export function parseX402Result(input: unknown): X402Result {
@@ -217,7 +218,12 @@ export function parseX402Result(input: unknown): X402Result {
       reply.model.length > BUYER_API.MAX_MODEL_LENGTH
     )
       throw new Error('Invalid reply');
-    result.reply = { text: reply.text, model: reply.model };
+    const metrics = parseResponseMetrics(reply.metrics);
+    result.reply = {
+      text: reply.text,
+      model: reply.model,
+      ...(metrics ? { metrics } : {}),
+    };
   }
   return result;
 }

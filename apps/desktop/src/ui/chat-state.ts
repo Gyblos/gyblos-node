@@ -3,6 +3,7 @@
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 
 import { PAYMENT_METHOD, type PaymentMethod } from '../paypal-model';
+import type { ResponseMetrics } from '../response-metrics';
 import { chatReasoningChoice } from './chat-reasoning';
 import {
   CHAT_PHASE,
@@ -31,6 +32,7 @@ export type ChatMessage = {
   sentAt: number | null;
   paymentSessionId?: string;
   reasoning?: ReasoningLevel;
+  metrics?: ResponseMetrics;
 };
 export type PaypalChatRun = {
   id: string;

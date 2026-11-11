@@ -7,7 +7,7 @@ import { MAIN_NAV, SIDEBAR_ACTION, UI_VIEW } from './constants';
 import type { View } from './model-types';
 import { SidebarActionIcon } from './SidebarActionIcon';
 import { SidebarIcon } from './SidebarIcon';
-import { Badge, Button, IconButton, SearchField } from './UI';
+import { Badge, Button, SearchField } from './UI';
 
 type Props = {
   view: View;
@@ -17,7 +17,6 @@ type Props = {
   navigate: (view: View) => void;
   onNewChat: () => void;
   onOpenChat: (id: string) => void;
-  onCollapse: () => void;
   systemStatus: ReactNode;
 };
 
@@ -129,21 +128,6 @@ function ConversationList({
 export function BuyerSidebar(props: Props) {
   return (
     <aside id="app-sidebar" className="sidebar buyer-sidebar">
-      <div className="ui-sidebar-brand">
-        <code className="ui-brand-mark" aria-hidden="true">
-          [g]
-        </code>
-        <strong>Gyblos</strong>
-        <IconButton
-          label={props.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-expanded={!props.collapsed}
-          aria-controls="app-sidebar"
-          className="ui-sidebar-motion-control"
-          onClick={props.onCollapse}
-        >
-          <SidebarActionIcon kind={SIDEBAR_ACTION.PANEL} />
-        </IconButton>
-      </div>
       <nav aria-label="Main navigation" className="ui-sidebar-primary">
         <Button
           className="ui-nav-row ui-sidebar-motion-control"

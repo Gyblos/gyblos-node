@@ -1,8 +1,11 @@
 // Sends a shared conversation turn through the existing guarded PayPal coordinator.
 // Transcript updates never authorize, capture, retry or settle payments.
+import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import { PAYPAL_SESSION_PHASE } from '@gyblos/node/constants';
 
+import { RESPONSE_COST_KIND, RESPONSE_COST_UNIT } from '../constants';
 import type { PaypalChatController } from '../paypal-chat';
+import { observedResponse } from '../response-metrics';
 import { modelArtwork } from './announced-models';
 import type { ChatController } from './chat-controller';
 import { CHAT_ROLE } from './constants';
@@ -29,8 +32,13 @@ export async function sendPaypalMessage(
   paypal: PaypalChatController,
   id: string,
   paymentSessionId?: string,
+  now: () => number = () => performance.now(),
 ) {
-  if (!canSendPaypal(paypal.getSnapshot())) return false;
+  const initial = paypal.getSnapshot();
+  if (!canSendPaypal(initial)) return false;
+  const amount = (
+    (initial.status?.messageCents ?? 0) / PAYPAL_SANDBOX.centsPerDollar
+  ).toFixed(2);
   const state = chat.getSnapshot();
   const session = state.sessions.find((item) => item.id === state.activeId)!;
   const origin = chat.startPaypal(
@@ -43,6 +51,7 @@ export async function sendPaypalMessage(
   paypal.setDraft(session.draft);
   const previousCount = paypal.getSnapshot().messages.length;
   let received = false;
+  const started = now();
   const unsubscribe = paypal.subscribe(() => {
     const current = paypal.getSnapshot();
     const user = current.messages[previousCount];
@@ -60,6 +69,11 @@ export async function sendPaypalMessage(
       id,
       answer.text || '(Empty response)',
       localModel(current.model),
+      observedResponse(now() - started, {
+        amount,
+        unit: RESPONSE_COST_UNIT.USD,
+        kind: RESPONSE_COST_KIND.RECORDED,
+      }),
     );
   });
   try {

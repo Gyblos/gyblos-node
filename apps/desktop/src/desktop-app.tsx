@@ -1,16 +1,11 @@
 // Hosts the buyer desktop, including the local PayPal Sandbox inference session.
 // Native chat uses the buyer bridge for x402 or the separate PayPal coordinator.
-import {
-  ArrowLeft,
-  Check,
-  CheckCircle,
-  SidebarSimple,
-  X,
-} from '@phosphor-icons/react';
+import { Check, CheckCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import manifest from '../package.json';
 import { CATALOG_STATE } from './catalog/model';
+import { WINDOW_CHROME } from './constants';
 import {
   canSelectPreviewModel,
   canSwitchPaymentMethod,
@@ -56,6 +51,7 @@ import {
 import {
   back,
   createNavigation,
+  forward,
   navigate as navigateState,
 } from './ui/navigation-state';
 import { useNetworkCatalog } from './ui/NetworkCatalog';
@@ -73,19 +69,20 @@ import { usePaypalSession } from './ui/usePaypalSession';
 import { useX402 } from './ui/useX402';
 import { WalletBackup } from './ui/WalletBackup';
 import { useDesktopWallet } from './ui/WalletState';
+import { WindowTitlebar } from './ui/WindowTitlebar';
 
 const money = (value: number) => '$' + value.toFixed(2);
 export function DesktopApp() {
   const [route, setRoute] = useState(createNavigation);
   const view = route.current;
   const navigation = MAIN_NAV;
-  function navigate(next: View, contextual = true) {
-    if (next === view && contextual) return;
+  function navigate(next: View) {
+    if (next === view) return;
     const currentIndex = ROUTE_ORDER.findIndex((item) => item === view);
     const nextIndex = ROUTE_ORDER.findIndex((item) => item === next);
     animateChange(
       () => {
-        setRoute((current) => navigateState(current, next, contextual));
+        setRoute((current) => navigateState(current, next));
       },
       nextIndex > currentIndex
         ? SLIDE_DIRECTION.FORWARD
@@ -97,6 +94,13 @@ export function DesktopApp() {
     animateChange(
       () => setRoute(back),
       SLIDE_DIRECTION.BACKWARD,
+      SLIDE_SURFACE.WORKSPACE,
+    );
+  }
+  function goForward() {
+    animateChange(
+      () => setRoute(forward),
+      SLIDE_DIRECTION.FORWARD,
       SLIDE_SURFACE.WORKSPACE,
     );
   }
@@ -162,8 +166,12 @@ export function DesktopApp() {
       removeCancel?.();
     };
   }, []);
-  const frameStyle: CSSProperties & { '--navigation-width': string } = {
+  const frameStyle: CSSProperties & {
+    '--navigation-width': string;
+    '--shell-header-height': string;
+  } = {
     '--navigation-width': NAVIGATION_WIDTH.DEFAULT + 'px',
+    '--shell-header-height': WINDOW_CHROME.HEIGHT + 'px',
     ...themeStyle(light),
   };
   const network = useLocalNode();
@@ -207,6 +215,18 @@ export function DesktopApp() {
   useEffect(() => {
     function command(event: KeyboardEvent) {
       if (
+        event.altKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !document.querySelector('dialog[open]') &&
+        (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+      ) {
+        event.preventDefault();
+        if (event.key === 'ArrowLeft') goBack();
+        else goForward();
+        return;
+      }
+      if (
         !(event.metaKey || event.ctrlKey) ||
         event.altKey ||
         document.querySelector('dialog[open]')
@@ -226,7 +246,7 @@ export function DesktopApp() {
         event.preventDefault();
         const destination = navigation[Number(key) - 1]?.name;
         if (!destination) return;
-        navigate(destination, false);
+        navigate(destination);
       }
     }
     window.addEventListener('keydown', command);
@@ -298,54 +318,34 @@ export function DesktopApp() {
         (sidebarMoving ? 'sidebar-moving' : '')
       }
     >
-      <header className="topbar">
-        <div className="breadcrumb">
-          {route.history.length > 0 && (
-            <IconButton
-              label={`Back to ${navigation.find((item) => item.name === route.history.at(-1))?.label ?? route.history.at(-1)}`}
-              onClick={goBack}
-            >
-              <ArrowLeft size={18} aria-hidden="true" />
-            </IconButton>
+      <WindowTitlebar
+        route={route}
+        chat={chatController}
+        collapsed={sidebarCollapsed}
+        contextOpen={contextOpen}
+        onSidebar={toggleSidebar}
+        onBack={goBack}
+        onForward={goForward}
+        onContext={() => setContextOpen((open) => !open)}
+      >
+        {paypalBusy &&
+          paymentMethod === PAYMENT_METHOD.PAYPAL &&
+          view !== UI_VIEW.CHAT && (
+            <span className="payment-operation-notice" role="status">
+              PayPal is checking, processing or needs attention.
+            </span>
           )}
-          <h1 id="route-title">
-            {navigation.find((item) => item.name === view)?.label ?? view}
-          </h1>
-        </div>
-        <div className="top-actions">
-          {view === UI_VIEW.CONNECT && (
-            <IconButton
-              label={
-                contextOpen
-                  ? 'Hide connection context'
-                  : 'Show connection context'
-              }
-              aria-pressed={contextOpen}
-              onClick={() => setContextOpen((open) => !open)}
+        {paymentMethod === PAYMENT_METHOD.USDC &&
+          paypal.chat.hasKnownUnfinishedSession() && (
+            <Button
+              variant={BUTTON_VARIANT.TONAL}
+              title="Check PayPal session"
+              onClick={reviewPaypalPayments}
             >
-              <SidebarSimple size={18} mirrored />
-            </IconButton>
+              Review PayPal session
+            </Button>
           )}
-
-          {paypalBusy &&
-            paymentMethod === PAYMENT_METHOD.PAYPAL &&
-            view !== UI_VIEW.CHAT && (
-              <span className="payment-operation-notice" role="status">
-                PayPal is checking, processing or needs attention.
-              </span>
-            )}
-          {paymentMethod === PAYMENT_METHOD.USDC &&
-            paypal.chat.hasKnownUnfinishedSession() && (
-              <Button
-                variant={BUTTON_VARIANT.TONAL}
-                title="Check PayPal session"
-                onClick={reviewPaypalPayments}
-              >
-                Review PayPal session
-              </Button>
-            )}
-        </div>
-      </header>
+      </WindowTitlebar>
       <BuyerSidebar
         systemStatus={
           <SystemStatus
@@ -358,17 +358,16 @@ export function DesktopApp() {
         collapsed={sidebarCollapsed}
         chat={chatController}
         storageState={conversationStorage}
-        onCollapse={toggleSidebar}
         navigate={(next) => {
-          navigate(next, false);
+          navigate(next);
         }}
         onNewChat={() => {
           chatRef.current?.newChat();
-          navigate(UI_VIEW.CHAT, false);
+          navigate(UI_VIEW.CHAT);
         }}
         onOpenChat={(id) => {
           chatRef.current?.openChat(id);
-          navigate(UI_VIEW.CHAT, false);
+          navigate(UI_VIEW.CHAT);
         }}
       />
       <div id="app-workspace" className="app-body">

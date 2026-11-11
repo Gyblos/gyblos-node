@@ -4,6 +4,7 @@ import type { ReasoningLevel } from '@gyblos/protocol/constants';
 
 import { restoreChatArchive, type ChatArchive } from '../chat-archive-model';
 import { PAYMENT_METHOD, type PaymentMethod } from '../paypal-model';
+import { parseResponseMetrics } from '../response-metrics';
 import {
   advanceRun,
   createSession,
@@ -217,7 +218,9 @@ export class ChatController {
     id: string,
     text: string,
     model: ChatModel,
+    observations?: unknown,
   ) {
+    const metrics = parseResponseMetrics(observations);
     this.updatePaypal(sessionId, id, (session) => ({
       ...session,
       paypalRun: null,
@@ -228,6 +231,7 @@ export class ChatController {
               text,
               model: { ...model },
               state: MESSAGE_STATE.COMPLETE,
+              ...(metrics ? { metrics } : {}),
             }
           : message,
       ),

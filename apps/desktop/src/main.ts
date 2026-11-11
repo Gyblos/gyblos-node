@@ -21,10 +21,12 @@ import { BRAND_COLORS } from './theme';
 import { WALLET } from './wallet/constants';
 import { registerDesktopWallet } from './wallet/host';
 import { focusExistingWindow, prepareWalletProfile } from './wallet/lifecycle';
+import { windowChrome } from './window-chrome';
 import { registerDesktopX402 } from './x402-host';
 
 function createProbeWindow(startup = false) {
   const window = new BrowserWindow({
+    ...windowChrome(process.platform, startup),
     title: DESKTOP.TITLE,
     width: startup ? STARTUP_WINDOW.WIDTH : DESKTOP.WIDTH,
     height: startup ? STARTUP_WINDOW.HEIGHT : DESKTOP.HEIGHT,

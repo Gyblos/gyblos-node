@@ -1,4 +1,19 @@
 // Owns fixed desktop host and compatibility-probe values.
+export const RESPONSE_METRICS = {
+  MAX_DURATION_MS: 86_400_000,
+  MS_PER_SECOND: 1000,
+  MAX_AMOUNT_CHARACTERS: 64,
+  PERCENT_SCALE: 100,
+} as const;
+export const RESPONSE_COST_UNIT = {
+  USD: 'USD',
+  USDC: 'USDC',
+  ATOMIC: 'atomic units',
+} as const;
+export const RESPONSE_COST_KIND = {
+  RECORDED: 'recorded',
+  SETTLED: 'settled',
+} as const;
 export const AGENT_CLIENT = {
   OPENCODE: 'OpenCode',
   CODEX: 'Codex',
@@ -98,6 +113,21 @@ export const DESKTOP = {
   MAX_BYTES: 64,
   PAYLOAD: 'gyblos-desktop-loopback-probe',
   SMOKE_FLAG: '--smoke',
+} as const;
+
+export const WINDOW_PLATFORM = {
+  MAC: 'darwin',
+  WINDOWS: 'win32',
+  LINUX: 'linux',
+  WEB: 'web',
+} as const;
+export const WINDOW_CHROME = {
+  HEIGHT: 44,
+  TRAFFIC_LIGHT_X: 16,
+  TRAFFIC_LIGHT_Y: 15,
+  OVERLAY_COLOR: '#00000000',
+  // Neutral control glyphs remain legible against both approved app themes.
+  OVERLAY_SYMBOL: '#808080',
 } as const;
 
 export const STARTUP_WINDOW = {
