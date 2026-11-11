@@ -21,7 +21,9 @@ The active session transport is v3. Old session-v1/v2 peers must be upgraded;
 failed v3 preparation signs no opening and does not trigger a fallback. The SDK
 channel and private financial journal do not migrate: saved approvals retain
 their original digest and recover without another inference. The per-request
-paid stream remains a separate, single-user path. Free execution is unchanged.
+paid stream remains a separate, single-user path. Free wire contracts are
+unchanged. The common deadline-bounded generation window now ends promptly on
+request cancellation, stopping publication even if an engine ignores abort.
 Execution replies carry ordered text fragments and one correlated complete
 terminal. Streaming API callers receive fragments as the engine produces them;
 complete-response callers drain and verify the same wire without publishing

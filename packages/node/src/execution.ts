@@ -19,7 +19,7 @@ export type Generated<T> = { value: T } | { error: unknown };
 // One generation, opened inside the window so its output can watch the window's signal and deadline.
 export interface ExecutionSession<T> {
   generate: () => Promise<T>;
-  // Stops publication when the deadline expires while the engine still runs.
+  // Stops publication when the deadline expires or the request is cancelled while the engine still runs.
   stop?: () => void;
   // What was delivered, for the result or the failure. If it throws, nothing counts as delivered and
   // the run reports the measuring error instead of the result: a seller bug never charges the buyer.

@@ -4,8 +4,10 @@ import { createHash, webcrypto } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { chargeV2 } from '@gyblos/core/pricing-v2';
 import { canonicalJson } from '@gyblos/protocol';
 import {
+  BATCH_METHODS,
   batchChannelDigest,
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
@@ -51,7 +53,26 @@ void test('session-v3 live event vectors match independent canonical bytes, fram
     assert.equal(canonicalJson(vector.event), vector.canonical);
     assert.deepEqual(Buffer.from(encodeBatchStreamEvent(vector.event)), frame);
     assert.deepEqual(decodeBatchStreamEvent(frame), vector.event);
-    await verifier.accept(vector.event);
+    const accepted = await verifier.accept(vector.event);
+    if (
+      accepted.terminal?.result &&
+      'value' in accepted.terminal.result &&
+      request.method === BATCH_METHODS.EXECUTE
+    ) {
+      const result = accepted.terminal.result;
+      assert.equal(
+        result.bill.chargedAtomic,
+        String(
+          chargeV2(
+            {
+              input: result.value.usage.inputTokens,
+              output: result.value.usage.outputTokens,
+            },
+            request.params.quote.offer.prices,
+          ),
+        ),
+      );
+    }
   }
   verifier.finish();
 });

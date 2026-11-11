@@ -1,6 +1,7 @@
 // Public synthetic vector values exercise session event framing without SDKs, engines or private state.
 import { readFile } from 'node:fs/promises';
 
+import { chargeV2 } from '@gyblos/core/pricing-v2';
 import {
   BATCH_CHANNEL,
   BATCH_METHODS,
@@ -42,7 +43,10 @@ export async function batchStreamFixture() {
     usage: { inputTokens: 12, outputTokens: 3 },
     finishReason: ENGINE_DONE_REASONS.STOP,
   };
-  const bill = { ...pending, chargedAtomic: '15', cumulativeAtomic: '15' };
+  const charge = String(
+    chargeV2({ input: 12, output: 3 }, raw.execution.quote.offer.prices),
+  );
+  const bill = { ...pending, chargedAtomic: charge, cumulativeAtomic: charge };
   const response = await batchChannelResponse(request, { value, bill });
   const header = {
     version: BATCH_CHANNEL.version,
