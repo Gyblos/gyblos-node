@@ -1,10 +1,12 @@
 // Exclusive lifetime ownership of a buyer home across financial modes; no key loading or chain access.
 import { batchPoolPathsIn, type HomeEnvironment } from '@gyblos/config/home';
-import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 import {
   acquireProcessLock,
   ensurePrivateDirectory,
 } from '@gyblos/runtime/private-file';
+
+import { NODE_ERROR_CODES } from './constants';
+import { NodeError } from './errors';
 
 interface BuyerRuntimeHost {
   close(): Promise<void>;
@@ -18,31 +20,43 @@ export async function withBuyerRuntime<Host extends BuyerRuntimeHost>(
   start: () => Promise<Host>,
 ): Promise<Host> {
   const paths = batchPoolPathsIn(environment);
-  await ensurePrivateDirectory(paths.directory);
-  const lock = await acquireProcessLock(paths.runtimeLock).catch(() =>
-    sessionFail(SESSION_CODES.UNAVAILABLE),
-  );
+  const lock = await ensurePrivateDirectory(paths.directory)
+    .then(() => acquireProcessLock(paths.runtimeLock))
+    .catch(() => {
+      throw new NodeError(NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE);
+    });
   try {
     const host = await start();
     const close = host.close.bind(host);
-    host.close = async () => {
-      try {
-        await close();
-      } finally {
-        await lock.release();
-      }
+    type Result = Awaited<
+      ReturnType<NonNullable<BuyerRuntimeHost['inspectAndClose']>>
+    >;
+    let terminal: Promise<Result> | undefined;
+    const finalize = (run: () => Promise<Result>) => {
+      terminal ??= Promise.resolve()
+        .then(run)
+        .finally(() => lock.release());
+      return terminal;
     };
-    if (host.inspectAndClose) {
-      const inspect = host.inspectAndClose.bind(host);
-      host.inspectAndClose = async (...args) => {
-        try {
-          return await inspect(...args);
-        } finally {
-          await lock.release();
-        }
-      };
-    }
-    return host;
+    const inspect = host.inspectAndClose?.bind(host);
+    return {
+      ...host,
+      close: async () => {
+        await finalize(async () => {
+          await close();
+          return undefined;
+        });
+      },
+      ...(inspect
+        ? {
+            inspectAndClose: (
+              ...args: Parameters<
+                NonNullable<BuyerRuntimeHost['inspectAndClose']>
+              >
+            ) => finalize(() => inspect(...args)),
+          }
+        : {}),
+    };
   } catch (error) {
     await lock.release();
     throw error;

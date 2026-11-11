@@ -65,6 +65,11 @@ export function startupReason(
   if (error instanceof FreeBuyerStartupError) return error.reason;
   if (
     error instanceof NodeError &&
+    error.code === NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE
+  )
+    return FREE_BUYER_STARTUP.JOURNAL;
+  if (
+    error instanceof NodeError &&
     error.code === NODE_ERROR_CODES.NODE_CONFIG_INVALID
   )
     return FREE_BUYER_STARTUP.TELEMETRY_CONFIG;

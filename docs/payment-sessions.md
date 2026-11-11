@@ -235,10 +235,10 @@ reports aggregate charge/refund amounts only when all required independent
 proofs exist. A failed/offline peer cannot fabricate a successful aggregate or
 prevent attempts to close the other slots.
 
-Every product buyer mode (free, per-request, single-session and pool) first
-holds the same buyer-home lifetime ownership guard. Startup failures, final
-inspection and shutdown release it. Raw signing/SDK ports remain trusted host
-primitives; external hosts must honor that ownership contract. The adapter
+Every buyer service startup mode (free, per-request, single-session and pool)
+first holds the same buyer-home lifetime ownership guard. Startup failures,
+final inspection and shutdown release it. Raw signing/SDK ports remain trusted
+host primitives; external hosts must honor that ownership contract. The adapter
 additionally holds one buyer-wide catalog process lock and writes an allocation
 before financial construction or signing. It seeds a private child journal
 before marking that slot ready, so an interrupted pre-sign allocation can finish

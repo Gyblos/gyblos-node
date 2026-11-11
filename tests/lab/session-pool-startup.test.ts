@@ -5,8 +5,8 @@ import { test } from 'node:test';
 import { chatSession } from '@gyblos/buyer/chat-cli';
 import { startFreeBuyer } from '@gyblos/buyer/free-startup';
 import { startPaidBuyer } from '@gyblos/buyer/paid-startup';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { NATIVE_CAPABILITY } from '../support/native-runtime';
 import { sessionProductHost } from '../support/session-product-host';
@@ -73,14 +73,14 @@ void test(
         meter: async () => assert.fail('must not load financial meter'),
         chain: async () => assert.fail('must not construct financial backend'),
       }),
-      { code: SESSION_CODES.UNAVAILABLE },
+      { code: NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE },
     );
     await assert.rejects(
       startFreeBuyer({
         port: 0,
         bind: async () => assert.fail('second owner must not bind'),
       }),
-      { code: SESSION_CODES.UNAVAILABLE },
+      { code: NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE },
     );
     await host.restartBuyer();
     assert.equal(host.engine.attempts(), 0);
