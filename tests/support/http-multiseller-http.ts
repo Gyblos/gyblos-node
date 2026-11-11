@@ -3,14 +3,22 @@ import assert from 'node:assert/strict';
 import { channel } from 'node:diagnostics_channel';
 import { IncomingMessage, ServerResponse } from 'node:http';
 
-import { BUYER_EXECUTION_FIELD, PAID_BUYER } from '@gyblos/buyer/constants';
+import {
+  BUYER_EXECUTION_FIELD,
+  BUYER_SELECTION_CODES,
+  FREE_BUYER_CODES,
+  PAID_BUYER,
+  PAID_BUYER_CODES,
+} from '@gyblos/buyer/constants';
 import { HTTP_STATUS } from '@gyblos/config';
+import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { FREE_CHAT_ROLES, MODEL_IDS } from '@gyblos/protocol/constants';
 import {
   controlArray,
   controlObject,
 } from '@gyblos/protocol/control-validation';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 
 import { batchDeferred } from './batch-deferred';
 import { HTTP_MULTI } from './http-multiseller-constants';
@@ -52,7 +60,25 @@ export function httpMultiAnswer(
   result: Awaited<ReturnType<typeof httpMultiChat>>,
   seller: number,
 ) {
-  assert.equal(result.response.status, HTTP_STATUS.ok);
+  if (result.response.status !== HTTP_STATUS.ok) {
+    const codes: ReadonlySet<unknown> = new Set([
+      ...Object.values(BUYER_SELECTION_CODES),
+      ...Object.values(FREE_BUYER_CODES),
+      ...Object.values(PAID_BUYER_CODES),
+      ...Object.values(BUYER_ROUTING_CODES),
+      ...Object.values(PAID_EXECUTION_CODES),
+    ]);
+    const row = controlObject(result.value, ['error']);
+    const error = controlObject(row.error, [
+      'message',
+      'type',
+      'param',
+      'code',
+    ]);
+    assert.fail(
+      codes.has(error.code) ? String(error.code) : 'Synthetic HTTP failure',
+    );
+  }
   const row = controlObject(result.value, [
     'id',
     'object',

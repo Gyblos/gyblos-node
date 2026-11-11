@@ -200,7 +200,6 @@ export async function httpMultisellerHost(
     config.routing = parseBuyerRoutingPolicy({
       onBusy,
       allowPinnedFallback: true,
-      queueWaitMs: HTTP_MULTI.queueWaitMs,
     });
     config.session = {
       depositAtomic: HTTP_MULTI.depositAtomic,
@@ -255,9 +254,16 @@ export async function httpMultisellerHost(
           )
         ).trim(),
       external: () => external,
-      async restart(pin = sellers[0]!.role.nodeId) {
+      async restart(
+        pin = sellers[0]!.role.nodeId,
+        queueWaitMs = config.routing!.queueWaitMs,
+      ) {
         await stopBuyer();
         config.pinnedNodeId = pin;
+        config.routing = parseBuyerRoutingPolicy({
+          ...config.routing,
+          queueWaitMs,
+        });
         await start();
       },
     };

@@ -129,8 +129,6 @@ async function queue(host: HttpMultisellerHost) {
     host.index.counts().reads > beforeDiscovery,
     'The buyer must use discovery after startup',
   );
-  const expired = await httpMultiChat(host);
-  httpMultiError(expired, BUYER_ROUTING_CODES.QUEUE_TIMEOUT);
   assert.equal((await host.inspect()).length, 1);
   assert.equal(host.ledger.calls.length, 1);
   const abort = new AbortController();
@@ -147,7 +145,7 @@ async function queue(host: HttpMultisellerHost) {
       new Promise(() => {}),
       host.signal,
     );
-    // Release before the cancelled wait can expire; a missing HTTP cancel now causes an orphan execution.
+    // Use the normal configured wait; cancellation must free admission before its deadline.
     const second = httpMultiChat(host, host.signal, 'fresh-waiter');
     await httpMultiPhase(next.bodyRead, second, host.signal);
     await a.call(HTTP_MULTI_METHODS.RELEASE);
@@ -161,11 +159,22 @@ async function queue(host: HttpMultisellerHost) {
   assert.equal((await host.sellers[1]!.health()).generations, 0);
   assert.equal(host.ledger.calls.length, 1);
   assert.equal(host.wire.quotes.get(a.role.nodeId)?.size, 2);
+  await host.restart(a.role.nodeId, HTTP_MULTI.queueWaitMs);
+  await a.call(HTTP_MULTI_METHODS.HOLD);
+  const third = httpMultiChat(host);
+  await httpMultiPhase(generated(host, 0, 3), third, host.signal);
+  // A deliberately short expiry is separate from native quote renewal and cancellation.
+  httpMultiError(await httpMultiChat(host), BUYER_ROUTING_CODES.QUEUE_TIMEOUT);
+  assert.equal(host.ledger.calls.length, 1);
+  await a.call(HTTP_MULTI_METHODS.RELEASE);
+  httpMultiAnswer(await third, 0);
+  assert.equal((await a.health()).generations, 3);
+  assert.equal(host.wire.quotes.get(a.role.nodeId)?.size, 3);
   assert.equal(
     (await host.inspect())[0]!.stored!.snapshot.cumulativeAtomic,
-    String(2n * cost(host, 0)),
+    String(3n * cost(host, 0)),
   );
-  return 2;
+  return 3;
 }
 async function uncertain(host: HttpMultisellerHost, sent: boolean) {
   const [a, b] = host.sellers;

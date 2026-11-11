@@ -256,6 +256,10 @@ temporary homes. The actual discovery index uses memory storage over loopback;
 8004 account reads, engines and financial confirmations are synthetic. Native
 Iroh is required, with the ordinary explicit capability skips. No real RPC,
 relay, index, payment, engine, deployment or operational home is used.
+Successful queue renewal uses the existing configured default; a separate
+short-deadline phase proves expiry. Native signing and private writes are not
+required to fit the intentionally shortened expiry test deadline. Product
+capacity and deadlines are unchanged.
 
 The cases cover concurrent A/B execution and A reuse after buyer restart,
 independently verified final charge/refund, same-seller queue expiry and HTTP
