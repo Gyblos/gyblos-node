@@ -289,7 +289,10 @@ unchanged, including recovery of an original v1 bill over the v2 RPC.
 Iroh seller startup in single-session and pooled modes, with fake engines and
 financial observations. It reuses a deposit across conversational requests and
 peer restart, then checks the synthetic final charge/refund. Native absence is
-explicitly skipped and does not prove acceptance.
+explicitly skipped and does not prove acceptance. The delayed-tokenizer case in
+`paid-conversation-loader.test.ts` proves HTTP cancellation frees router
+admission before initialization completes and a late completion starts no
+financial work.
 
 The opt-in `paid-conversation-tokenizer.test.ts` uses the real pinned public BPE
 artifacts without a real engine. Set `GYBLOS_TEST_TOKENIZER_HOME` to an owned

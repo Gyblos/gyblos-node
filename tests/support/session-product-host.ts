@@ -33,6 +33,7 @@ export async function sessionProductHost(
   conversation?: {
     meter: ChatTokenizer;
     observe: (input: EngineInput) => void;
+    loadMeter?: () => Promise<ChatTokenizer>;
   },
 ) {
   const workspace = await createAcceptanceWorkspace();
@@ -152,7 +153,9 @@ export async function sessionProductHost(
       buyer = await startBuyer({
         port: 0,
         bind: binding.bind,
-        meter: async () => conversation?.meter ?? paidAcceptanceMeter,
+        meter:
+          conversation?.loadMeter ??
+          (async () => conversation?.meter ?? paidAcceptanceMeter),
         batch: finance.buyer,
         pool: finance.pool,
         chain: async () => assert.fail('legacy chain construction forbidden'),
