@@ -38,6 +38,7 @@ export const ASSISTANTS = [
 export const SIDEBAR_ICON_IDS = {
   COMPASS: 'compass',
   SERVER: 'server',
+  PLUG: 'plug',
   BOOK_OPEN: 'book-open',
   LIFE_BUOY: 'life-buoy',
 } as const;
