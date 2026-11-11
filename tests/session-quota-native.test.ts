@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
+import { CONTROL_CAPACITY } from '@gyblos/core/constants';
 import { createBuyerBatchSession } from '@gyblos/node/batch-buyer';
 import { createSellerBatchSession } from '@gyblos/node/batch-seller';
 import {
@@ -12,7 +13,11 @@ import {
   BatchChannelError,
   type BatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
+import { encodeControlFrame } from '@gyblos/protocol/control-framing';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import { createBatchChannelClient } from '@gyblos/transport-iroh/batch-client';
+import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { batchOfferFixture } from './support/batch-iroh-offer';
@@ -26,6 +31,7 @@ async function fixture(limits: TransportLimits) {
   const rig = await sessionRig({
     buyerNodeId: peer.id().toString(),
     sellerNodeId: seller.id().toString(),
+    transaction: 'ab'.repeat(32),
   });
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const service = createSellerBatchSession({
@@ -72,6 +78,8 @@ async function fixture(limits: TransportLimits) {
   const buyers = [connect()];
   return {
     rig,
+    peer,
+    seller,
     offers,
     calls,
     buyer: () => buyers.at(-1)!,
@@ -116,10 +124,13 @@ for (const global of [false, true])
       // A fresh execution is still denied; the service must never see its prompt.
       await assert.rejects(
         within(f.buyer().execute(await f.offers.quote(2), f.offers.input)),
-        { code: SESSION_CODES.UNAVAILABLE },
+        { code: SESSION_CODES.LIMIT, remote: true },
       );
       assert.equal(f.offers.generations(), 1);
-      assert.equal(f.calls.filter((method) => method === BATCH_METHODS.EXECUTE).length, 1);
+      assert.equal(
+        f.calls.filter((method) => method === BATCH_METHODS.EXECUTE).length,
+        1,
+      );
       f.rig.time(f.rig.now() + 1000);
       assert.equal((await within(f.buyer().status())).cumulativeAtomic, '40');
       const settlement = await within(f.buyer().close());
@@ -151,10 +162,96 @@ void test(
     await f.reconnect();
     assert.equal(await within(f.buyer().recoverApproval()), true);
     assert.equal(f.offers.generations(), 1);
-    assert.equal(f.calls.filter((method) => method === BATCH_METHODS.APPROVE).length, 2);
+    assert.equal(
+      f.calls.filter((method) => method === BATCH_METHODS.APPROVE).length,
+      2,
+    );
     const settlement = await within(f.buyer().close());
     assert.equal(settlement.chargedAtomic, '40');
     assert.equal(settlement.refundedAtomic, '960');
     assert.deepEqual(f.rig.calls, ['deposit', 'refund']);
+  },
+);
+
+void test(
+  'native session query burst stays bounded without consuming inference quota',
+  NATIVE_TEST_OPTIONS,
+  async (t) => {
+    let time = 0;
+    t.mock.method(performance, 'now', () => time);
+    const f = await fixture(TRANSPORT_LIMITS);
+    t.after(f.close);
+    t.mock.method(Date, 'now', f.rig.now);
+    await within(f.buyer().execute(await f.offers.quote(1), f.offers.input));
+    const initial = f.calls.length;
+    for (let index = initial; index < CONTROL_CAPACITY.peerBurst; index++)
+      await within(f.buyer().status());
+    assert.equal(f.calls.length, CONTROL_CAPACITY.peerBurst);
+    await assert.rejects(within(f.buyer().status()), {
+      code: PAID_EXECUTION_CODES.INTERNAL,
+      remote: false,
+      sent: true,
+    });
+    assert.equal(f.calls.length, CONTROL_CAPACITY.peerBurst);
+    time += CONTROL_CAPACITY.millisecondsPerSecond / CONTROL_CAPACITY.peerRate;
+    assert.equal((await within(f.buyer().status())).cumulativeAtomic, '40');
+    assert.equal(f.offers.generations(), 1);
+  },
+);
+
+void test(
+  'native malformed session streams consume query rate across reconnections, not inference quota',
+  NATIVE_TEST_OPTIONS,
+  async (t) => {
+    let time = 0;
+    t.mock.method(performance, 'now', () => time);
+    const f = await fixture(TRANSPORT_LIMITS);
+    t.after(f.close);
+    t.mock.method(Date, 'now', f.rig.now);
+    for (let index = 0; index < CONTROL_CAPACITY.peerBurst; index++) {
+      const connection = await within(
+        f.peer.connect(f.seller.addr(), [...Buffer.from(BATCH_CHANNEL.alpn)]),
+      );
+      try {
+        const stream = await within(connection.openBi());
+        await stream.send.writeAll([
+          ...encodeControlFrame({ invalid: true }, BATCH_CHANNEL.requestBytes),
+        ]);
+        await stream.send.finish();
+        await within(connection.closed());
+      } finally {
+        connection.close(HTTP_OVER_IROH.streamCloseCode, []);
+      }
+    }
+    assert.equal(f.calls.length, 0);
+    const client = createBatchChannelClient(
+      f.peer,
+      f.seller.addr(),
+      f.seller.id().toString(),
+    );
+    t.after(async () => {
+      await client.close();
+      await client.settled();
+    });
+    const request = {
+      version: BATCH_CHANNEL.version,
+      requestId: 'ab'.repeat(16),
+      method: BATCH_METHODS.SNAPSHOT,
+      params: { channelId: '1'.repeat(32) },
+    };
+    await assert.rejects(within(client.exchange(request)), {
+      code: PAID_EXECUTION_CODES.INTERNAL,
+      remote: false,
+      sent: true,
+    });
+    assert.equal(f.calls.length, 0);
+    time += CONTROL_CAPACITY.millisecondsPerSecond / CONTROL_CAPACITY.peerRate;
+    await assert.rejects(within(client.exchange(request)), {
+      code: SESSION_CODES.BINDING,
+      remote: true,
+    });
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.offers.generations(), 0);
+    assert.deepEqual(f.rig.calls, []);
   },
 );

@@ -1087,6 +1087,35 @@ Independent Node/OpenSSL fixtures are batch-channel-v3.json,
 batch-prepare-v3.json, batch-startup-v3.json and batch-stream-v3.json. Existing
 per-request paid-stream/1 and free-stream contracts remain unchanged.
 
+### Session admission and inference quota
+
+Endpoint connection-open rates, pending/source/global/per-peer connection caps,
+route policy and shared concurrency apply first, with their existing values.
+A session connection stays in the data connection family, but does not reserve
+an inference grant merely by connecting. It remains admissible after the peer
+or global inference quota is exhausted, subject to all those transport caps.
+
+Every session stream, including malformed/incomplete input and EXECUTE, also
+consumes an independent session query-rate budget using the existing
+CONTROL_CAPACITY policy: 5/s with burst 10 per NodeId, 100/s with burst 100
+globally, and a bounded 1024-entry peer table with 60-second idle expiry. This
+budget is shared by all session connections; it is separate from the control
+and receipt budgets. It guards ingress attempts, not an additional execution
+slot or a shorter generation deadline. A refused ingress attempt closes the
+connection before service dispatch. Streams retain the endpoint concurrency
+slot through parsing, service completion, egress and draining cancellation.
+
+Only a complete, canonical, validated EXECUTE consumes the existing per-peer
+and global inference window quota, immediately before dispatch and exactly
+once, even if the service refuses it. An exhausted quota returns a correlated
+static LIMIT terminal without dispatching the prompt. PREPARE, OPEN, APPROVE,
+SNAPSHOT and CLOSE consume no inference quota. Consequently the last accepted
+execution can still approve its verified usage, recover its original approval
+after a lost ACK/reconnection, and request closure. Query-rate exhaustion or
+full transport capacity can still refuse those operations; this is no bypass
+of abuse controls and grants no priority over active work. Reconnection never
+erases spent inference quota, changes a financial intent or retries a prompt.
+
 ## Reusable conversation session channel v2
 
 `gyblos/session/2` replaces the active session v1 transport. Both peers must
