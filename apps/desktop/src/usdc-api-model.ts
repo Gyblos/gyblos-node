@@ -7,6 +7,7 @@ import {
   keyObject,
   parseBuyerApiKeysSnapshot,
   type BuyerApiKeysSnapshot,
+  type BuyerApiKeySummary,
   type BuyerKeyScope,
 } from '@gyblos/protocol/buyer-api-keys';
 
@@ -99,4 +100,13 @@ export function parseUsdcApiState(input: unknown): UsdcApiState {
 
 export function usdcApiAmount(atomic: string, scope: BuyerKeyScope) {
   return `${x402Amount(atomic, scope)} ${scope.mint === DEVNET_USDC ? 'USDC' : 'atomic units'}`;
+}
+export function usdcApiKeyListDetail(
+  state: UsdcApiState,
+  key: BuyerApiKeySummary,
+) {
+  if (!state.snapshot || state.error || state.snapshot.blocked)
+    return 'Status unavailable';
+  const scope = state.snapshot.scope;
+  return `${usdcApiAmount(key.spentAtomic, scope)} / ${usdcApiAmount(key.limitAtomic, scope)} · ${key.revoked ? 'Revoked' : 'Active'}`;
 }

@@ -3,6 +3,7 @@ import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
+import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
 import { PAID_VERDICTS, SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
 import { buyerAtomic } from '@gyblos/protocol/buyer-api';
@@ -50,6 +51,24 @@ export async function executeApiKeyFree(
     else await operation.complete('0', BUYER_KEY_CHARGE.SETTLED);
   }
   return result;
+}
+export async function executeApiKeySession<T>(
+  operation: BuyerApiKeyOperation | undefined,
+  nodeId: string,
+  execute: () => Promise<T>,
+) {
+  try {
+    return await execute();
+  } catch (error) {
+    // Only the pool's durable resolution of an unsent intent authorizes release.
+    if (
+      error instanceof UnsentSellerBusyError &&
+      error.nodeId === nodeId &&
+      operation?.reserved()
+    )
+      await operation.releaseUnsent();
+    throw error;
+  }
 }
 function charge(payment: ChatPayment) {
   if (payment.verdict === SESSION_VERDICTS.APPROVED && payment.session) {

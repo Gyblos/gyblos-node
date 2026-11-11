@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import { buyerApiKeyPathsIn } from '@gyblos/config/home';
 import { openBuyerApiKeys } from '@gyblos/node/buyer-api-key-storage';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
+import { BUYER_KEY_CHARGE } from '@gyblos/protocol/buyer-api-keys';
 
 const scope = {
   network: 'synthetic-network',
@@ -42,14 +43,14 @@ void test('a USDC API key reserves before spending and retains its lifetime cap 
   const first = keys.operation(created.id);
   await first.reserve(quote('60'));
   assert.equal((await keys.snapshot()).keys[0]?.reservedAtomic, '60');
-  await first.complete('30', 'settled');
+  await first.complete('30', BUYER_KEY_CHARGE.SETTLED);
   await keys.close();
   const restored = await createBuyerApiKeys({ files, scope });
   assert.equal(restored.authenticate(created.secret), created.id);
   const next = restored.operation(created.id);
   await assert.rejects(next.reserve(quote('80')), /BUYER_KEY_LIMIT_REACHED/);
   await next.reserve(quote('70'));
-  await next.complete('70', 'approved');
+  await next.complete('70', BUYER_KEY_CHARGE.APPROVED);
   assert.deepEqual(
     (await restored.snapshot()).keys.map((key) => [
       key.spentAtomic,
@@ -65,7 +66,7 @@ void test('a USDC API key reserves before spending and retains its lifetime cap 
   );
   const free = restored.operation(created.id);
   await free.reserve(quote('0'));
-  await free.complete('0', 'settled');
+  await free.complete('0', BUYER_KEY_CHARGE.SETTLED);
   await restored.close();
 });
 void test('unknown paid reservations survive a restart and cannot be bypassed by creating another key', async () => {
@@ -94,7 +95,7 @@ void test('a key cannot change asset binding, reset its cap, or erase a running 
   await running.reserve(quote('50'));
   await keys.revoke(key.id);
   assert.equal(running.signal.aborted, true);
-  await running.complete('40', 'approved');
+  await running.complete('40', BUYER_KEY_CHARGE.APPROVED);
   assert.equal((await keys.snapshot()).keys[0]?.spentAtomic, '40');
   await keys.close();
   await assert.rejects(
@@ -113,12 +114,12 @@ void test('quote authority shrinks with consumption and concurrent reservations,
   assert.equal(second.ceiling('10'), '10');
   await assert.rejects(second.reserve(quote('41')), /BUYER_KEY_LIMIT_REACHED/);
   await second.reserve(quote('40'));
-  await second.complete('40', 'settled');
-  await first.complete('60', 'approved');
+  await second.complete('40', BUYER_KEY_CHARGE.SETTLED);
+  await first.complete('60', BUYER_KEY_CHARGE.APPROVED);
   const free = keys.operation(key.id);
   assert.equal(free.ceiling('1000'), '0');
   await free.reserve(quote('0'));
-  await free.complete('0', 'settled');
+  await free.complete('0', BUYER_KEY_CHARGE.SETTLED);
   await keys.close();
 });
 void test('concurrent requests cannot reserve the same final allowance', async () => {
@@ -147,7 +148,7 @@ void test('failed reservation and failed accounting writes fail closed without d
     };
     await assert.rejects(
       completed
-        ? operation.complete('60', 'settled')
+        ? operation.complete('60', BUYER_KEY_CHARGE.SETTLED)
         : operation.reserve(quote('100')),
       /BUYER_KEY_NEEDS_REVIEW/,
     );
@@ -190,7 +191,7 @@ void test('the private disk ledger locks concurrent hosts and reopens with origi
     const key = await keys.create('Synthetic', '100');
     const operation = keys.operation(key.id);
     await operation.reserve(quote('100'));
-    await operation.complete('30', 'settled');
+    await operation.complete('30', BUYER_KEY_CHARGE.SETTLED);
     const paths = buyerApiKeyPathsIn(environment);
     assert.doesNotMatch(
       await readFile(paths.state, 'utf8'),

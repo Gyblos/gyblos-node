@@ -30,7 +30,7 @@ import {
 } from '@gyblos/protocol/free-execution';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { acceptBuyerApiRequest } from './api-key-caller';
+import { buyerApiCaller } from './api-key-caller';
 import { buyerApiKeyExecutors } from './api-key-execution';
 import { buyerApiKeyErrorView } from './api-key-http';
 import {
@@ -279,15 +279,10 @@ export function freeBuyerHandler(
   apiKeys?: BuyerApiKeys,
 ) {
   const desktop = createDesktopApi(desktopPolicy, authorize !== undefined);
+  const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
-    const caller = await acceptBuyerApiRequest(
-      request,
-      response,
-      authorize,
-      apiKeys,
-      desktopPolicy,
-    );
+    const caller = await accept(request, response);
     if (!caller) return;
     const scoped = buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream);
     if (desktop.handled(request, response)) return;

@@ -9,6 +9,7 @@ import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import {
   executeApiKeyFree,
+  executeApiKeySession,
   recordApiKeyPayment,
   reserveApiKey,
 } from './api-key-execution';
@@ -47,7 +48,9 @@ async function executePaidSession(
   if (sending) state.sending.set(id, sending);
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {
-    result = await manager.execute(winner.quote, input, current);
+    result = await executeApiKeySession(permission, winner.nodeId, () =>
+      manager.execute(winner.quote, input, current),
+    );
   } finally {
     state.selections.delete(id);
     state.sending.delete(id);

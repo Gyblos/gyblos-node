@@ -10,20 +10,26 @@ import { handleBuyerApiKeys } from './api-key-http';
 import { FREE_BUYER, PAID_BUYER, PAID_BUYER_CODES } from './constants';
 import { buyerBearer } from './paid-token';
 
-export async function acceptBuyerApiRequest(
-  request: IncomingMessage,
-  response: ServerResponse,
+export function buyerApiCaller(
   authorize: ((request: IncomingMessage) => boolean) | undefined,
   apiKeys: BuyerApiKeys | undefined,
   policy: BuyerApiPolicy | undefined,
 ) {
-  const caller = acceptBuyerCaller(request, response, authorize, apiKeys);
-  if (
-    !caller ||
-    (await handleBuyerApiKeys(request, response, apiKeys, caller.owner, policy))
-  )
-    return undefined;
-  return caller;
+  return async (request: IncomingMessage, response: ServerResponse) => {
+    const caller = acceptBuyerCaller(request, response, authorize, apiKeys);
+    if (
+      !caller ||
+      (await handleBuyerApiKeys(
+        request,
+        response,
+        apiKeys,
+        caller.owner,
+        policy,
+      ))
+    )
+      return undefined;
+    return caller;
+  };
 }
 
 export function acceptBuyerCaller(

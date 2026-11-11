@@ -7,10 +7,14 @@ import {
   emptyUsdcApi,
   parseUsdcApiState,
   USDC_API_ACTION,
+  usdcApiKeyListDetail,
 } from '@gyblos/desktop/usdc-api-model';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
-import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
+import {
+  BUYER_API_KEYS,
+  BUYER_KEY_ACTION,
+} from '@gyblos/protocol/buyer-api-keys';
 
 void test('USDC key status binds actions to the displayed buyer policy and rejects secret-bearing fields', () => {
   assert.deepEqual(parseUsdcApiState(emptyUsdcApi()), emptyUsdcApi());
@@ -33,6 +37,29 @@ void test('USDC key status binds actions to the displayed buyer policy and rejec
   assert.deepEqual(parseUsdcApiState(state), state);
   assert.throws(() => parseUsdcApiState({ ...state, secret: 'synthetic' }));
   assert.throws(() => parseUsdcApiState({ ...state, policyId: null }));
+});
+void test('the key list hides old consumption and Active status after a failed refresh', async () => {
+  const keys = await createBuyerApiKeys({
+    files: { read: async () => undefined, write: async () => {} },
+    scope: {
+      network: 'synthetic',
+      mint: '1'.repeat(32),
+      payer: '2'.repeat(32),
+    },
+  });
+  try {
+    const key = await keys.create('Synthetic tools', '100');
+    const state = {
+      ...emptyUsdcApi(),
+      snapshot: await keys.snapshot(),
+      error: 'Status unavailable',
+    };
+    const html = usdcApiKeyListDetail(state, state.snapshot.keys[0]!);
+    assert.match(html, /Status unavailable/);
+    assert.doesNotMatch(html, /Active|0 atomic units/);
+  } finally {
+    await keys.close();
+  }
 });
 void test('the owner copies a newly created delegated secret without exposing it to renderer state', async () => {
   const scope = {
@@ -62,10 +89,11 @@ void test('the owner copies a newly created delegated secret without exposing it
       manageApiKeys: async (command) => {
         if (command) commands++;
         const created =
-          command?.action === 'create'
+          command?.action === BUYER_KEY_ACTION.CREATE
             ? await keys.create(command.name, command.limitAtomic)
             : undefined;
-        if (command?.action === 'revoke') await keys.revoke(command.id);
+        if (command?.action === BUYER_KEY_ACTION.REVOKE)
+          await keys.revoke(command.id);
         return {
           snapshot: await keys.snapshot(),
           created,

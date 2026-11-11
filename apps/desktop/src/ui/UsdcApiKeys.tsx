@@ -8,9 +8,9 @@ import {
 } from '@gyblos/protocol/buyer-api-keys';
 
 import {
-  usdcApiAmount as amount,
   USDC_API,
   USDC_API_ACTION,
+  usdcApiKeyListDetail,
   type UsdcApiState,
 } from '../usdc-api-model';
 import { DESKTOP_X402, x402Asset, x402BudgetInput } from '../x402-model';
@@ -105,7 +105,6 @@ function KeyList({
   onSelect: (id: string) => void;
 }) {
   if (!state.snapshot?.keys.length) return null;
-  const scope = state.snapshot.scope;
   return (
     <section className="ui-section" aria-label="Saved API keys">
       <h2>Your API keys</h2>
@@ -125,7 +124,7 @@ function KeyList({
           >
             <RowCopy
               title={key.name}
-              detail={`${amount(key.spentAtomic, scope)} / ${amount(key.limitAtomic, scope)} · ${key.revoked ? 'Revoked' : 'Active'}`}
+              detail={usdcApiKeyListDetail(state, key)}
             />
           </ListRow>
         ))}
