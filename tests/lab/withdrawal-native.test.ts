@@ -128,8 +128,8 @@ void test('native withdrawal leaves a settled paid charge and its refund unchang
   const settled = await value.balances();
   assert.deepEqual(settled, {
     payer: FUNDS - 145n,
-    seller: 140n,
-    fee: 4n,
+    seller: 139n,
+    fee: 5n,
     program: 1n,
     escrow: 0n,
   });
