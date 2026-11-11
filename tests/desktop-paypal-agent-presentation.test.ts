@@ -150,3 +150,29 @@ void test('retained API details are ready only with confirmed usable connection 
     );
   }
 });
+
+void test('key budget amounts stay hidden while the session reports unconfirmed accounting', async () => {
+  const { paypalAgentBudgetAvailable } =
+    await import('@gyblos/desktop/paypal-agent-limit');
+  assert.equal(typeof paypalAgentBudgetAvailable, 'function');
+  assert.equal(
+    paypalAgentBudgetAvailable(PAYPAL_AGENT_USAGE_STATE.AVAILABLE, false),
+    true,
+  );
+  assert.equal(
+    paypalAgentBudgetAvailable(
+      PAYPAL_AGENT_USAGE_STATE.KEY_LIMIT_REACHED,
+      false,
+    ),
+    true,
+  );
+  for (const state of Object.values(PAYPAL_AGENT_USAGE_STATE)) {
+    assert.equal(paypalAgentBudgetAvailable(state, true), false);
+    if (
+      state === PAYPAL_AGENT_USAGE_STATE.AVAILABLE ||
+      state === PAYPAL_AGENT_USAGE_STATE.KEY_LIMIT_REACHED
+    )
+      continue;
+    assert.equal(paypalAgentBudgetAvailable(state, false), false);
+  }
+});

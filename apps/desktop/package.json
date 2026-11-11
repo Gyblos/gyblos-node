@@ -23,6 +23,7 @@
     "./paypal-agent-access": "./src/paypal-agent-access.ts",
     "./paypal-agent-handlers": "./src/paypal-agent-handlers.ts",
     "./paypal-agent-model": "./src/paypal-agent-model.ts",
+    "./paypal-agent-limit": "./src/paypal-agent-limit.ts",
     "./paypal-model": "./src/paypal-model.ts",
     "./paypal-close-guard": "./src/paypal-close-guard.ts",
     "./paypal-handlers": "./src/paypal-handlers.ts",
