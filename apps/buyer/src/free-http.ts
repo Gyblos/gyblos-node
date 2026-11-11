@@ -12,6 +12,7 @@ import {
   PORTS,
   ROUTES,
   TRANSPORT_LIMITS,
+  UNITS,
 } from '@gyblos/config';
 import {
   FREE_EXECUTION,
@@ -143,9 +144,14 @@ function freeErrorView(error: unknown): ChatErrorView {
     cooldownUntil:
       selected && 'cooldownUntil' in selected
         ? selected.cooldownUntil
-        : undefined,
+        : error instanceof FreeSelectionFailure
+          ? error.retryAt
+          : undefined,
   };
 }
+// Seconds until a cooling seller may be tried again, for Retry-After, which SDKs honor when retrying.
+const secondsUntil = (time: number) =>
+  Math.max(1, Math.ceil((time - Date.now()) / UNITS.millisecondsPerSecond));
 function replyError(
   response: ServerResponse,
   error: unknown,
@@ -178,13 +184,20 @@ function replyError(
     (callerFault || !view.neverSent)
   )
     headers[FREE_BUYER.noRetryHeader] = 'false';
+  const retry =
+    view.neverSent && view.cooldownUntil !== undefined
+      ? secondsUntil(view.cooldownUntil)
+      : undefined;
+  if (retry !== undefined) headers[FREE_BUYER.retryAfterHeader] = String(retry);
   response.writeHead(view.status, headers).end(
     JSON.stringify(
       api.error({
         code,
         status: view.status,
         // A refused request explains itself; every other error keeps its code as the message.
-        message: view.detail || code,
+        message:
+          view.detail ||
+          (retry !== undefined ? FREE_CHAT_DETAILS.coolingDown(retry) : code),
         param: view.param ?? null,
         // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
         extra: {

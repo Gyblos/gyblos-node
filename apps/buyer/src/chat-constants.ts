@@ -110,6 +110,8 @@ export const ANTHROPIC_CHAT = {
 } as const;
 
 export const FREE_CHAT_DETAILS = {
+  coolingDown: (seconds: number) =>
+    `no seller is available: every seller failed recently; retry in ${seconds} s`,
   body: 'the body must be a JSON object with model and messages',
   fields: 'the request has a field this endpoint does not support',
   unsupported: (field: string) =>

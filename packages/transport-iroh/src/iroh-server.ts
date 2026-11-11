@@ -151,10 +151,12 @@ export function serveIroh(
     signal: AbortSignal,
     peer: string,
   ) {
+    // Receipts and control queries follow a request the buyer already paid quota for; they keep their own
+    // admission and are not counted as requests again.
     await receiptServer?.handle(
       connection,
       signal,
-      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+      () => (routeAllowed(connection) ? limiter.enterQuery(peer) : undefined),
       () => closed,
       () => routeAllowed(connection),
     );
@@ -223,7 +225,7 @@ export function serveIroh(
           controller.signal,
           () => {
             if (!routeAllowed(connection)) return undefined;
-            return limiter.enter(peer);
+            return limiter.enterQuery(peer);
           },
           () => closed,
           () => routeAllowed(connection),
