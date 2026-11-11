@@ -1,6 +1,6 @@
 // Routes, bounds and deadlines of the OpenAI-compatible chat completions client, and the private warmup
 // a server on the seller's own machine runs before its offer is advertised.
-import { INFERENCE_REQUEST_LIMITS, TIMEOUTS } from '@gyblos/config';
+import { TIMEOUTS } from '@gyblos/config';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 // Relative to the offer's base URL, which ends in the API version (for example https://host/v1).
@@ -10,7 +10,6 @@ export const OPENAI_ROUTES = {
 } as const;
 
 export const OPENAI_LIMITS = {
-  maxOutputTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
   // One streamed event and the whole stream, the visible output, a model listing and an error body read
   // for its code.
   stream: { eventCharacters: 64 * 1024, streamCharacters: 2 * 1024 * 1024 },

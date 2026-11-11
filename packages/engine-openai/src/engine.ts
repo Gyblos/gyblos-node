@@ -194,8 +194,8 @@ async function generate(
   timeoutMs: number,
   input: EngineInput,
 ): Promise<EngineResult> {
-  const { prompt, attempt, signal, started } = generationAttempt(input, {
-    maxOutputTokens: OPENAI_LIMITS.maxOutputTokens,
+  const { messages, attempt, signal, started } = generationAttempt(input, {
+    maxOutputTokens: settings.contextTokens,
     timeoutMs,
   });
   try {
@@ -211,7 +211,7 @@ async function generate(
         },
         body: JSON.stringify({
           model: settings.model,
-          messages: [{ role: 'user', content: prompt }],
+          messages,
           // OpenAI's own API takes the newer name, which its reasoning models require; compatible
           // servers take max_tokens.
           [isOpenAi(settings.base) ? 'max_completion_tokens' : 'max_tokens']:

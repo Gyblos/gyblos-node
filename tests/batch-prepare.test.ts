@@ -75,7 +75,7 @@ const altered: ReadonlyArray<
   ['feePayer', '11111111111111111111111111111111'],
   ['authorizer', '11111111111111111111111111111111'],
   ['treasury', '11111111111111111111111111111111'],
-  ['protocolFeeBps', 400],
+  ['protocolFeeBps', 500],
   ['depositAtomic', '2000'],
   ['expiresAt', 1_800_004_000_000],
   ['withdrawDelaySeconds', 1800],

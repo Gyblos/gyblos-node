@@ -21,7 +21,11 @@ for (const text of ['Hi', 'x'.repeat(PAID_STREAM.deltaBytes + 1)]) {
     { timeout: 15000 },
     async (context) => {
       const seller = await paidSellerFixture({
-        meter: recountedMeter({ input: () => 4, count: () => 1 }),
+        meter: recountedMeter({
+          input: () => 4,
+          chat: () => 4,
+          count: () => 1,
+        }),
       });
       let now = seller.options.now();
       seller.options.now = () => now;

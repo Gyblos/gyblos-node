@@ -11,12 +11,13 @@ import {
   MODEL_IDENTITIES,
   MODEL_IDS,
 } from '@gyblos/protocol/constants';
-import { EngineError, type RecountTokenizer } from '@gyblos/protocol/engine';
+import { EngineError, type ChatTokenizer } from '@gyblos/protocol/engine';
 
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 
-export const paidAcceptanceMeter: RecountTokenizer = {
+export const paidAcceptanceMeter: ChatTokenizer = {
   input: () => PAID_ACCEPTANCE.inputTokens,
+  chat: () => PAID_ACCEPTANCE.inputTokens,
   count: (text) => [...text].length,
 };
 export function paidAcceptanceEngine() {

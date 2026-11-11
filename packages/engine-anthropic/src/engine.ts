@@ -223,10 +223,14 @@ async function generate(
   timeoutMs: number,
   input: EngineInput,
 ): Promise<EngineResult> {
-  const { prompt, attempt, signal, started } = generationAttempt(input, {
-    maxOutputTokens: ANTHROPIC_LIMITS.maxOutputTokens,
+  const { messages, attempt, signal, started } = generationAttempt(input, {
+    maxOutputTokens: settings.contextTokens,
     timeoutMs,
   });
+  // The Messages API takes the system message apart from the turns.
+  const system =
+    messages[0]?.role === 'system' ? messages[0].content : undefined;
+  const turns = system === undefined ? messages : messages.slice(1);
   try {
     const response = await fetchImpl(
       providerRoute(settings.base, ANTHROPIC_ROUTES.messages),
@@ -242,7 +246,8 @@ async function generate(
         body: JSON.stringify({
           model: settings.model,
           max_tokens: input.maxTokens,
-          messages: [{ role: 'user', content: prompt }],
+          ...(system === undefined ? {} : { system }),
+          messages: turns,
           stream: true,
         }),
         signal,

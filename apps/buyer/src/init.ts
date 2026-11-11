@@ -2,7 +2,11 @@
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
-import { DEVNET_USDC, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
+import {
+  DEVNET_USDC,
+  FREE_OUTPUT_TOKENS,
+  INFERENCE_REQUEST_LIMITS,
+} from '@gyblos/config';
 import {
   buildBuyerInit,
   buyerInitDefaults,
@@ -69,7 +73,7 @@ const FIELDS: readonly {
   {
     key: BUYER_INIT_FIELDS.MAX_TOKENS,
     label: 'Maximum output tokens',
-    hint: `Use a whole number from 1 to ${INFERENCE_REQUEST_LIMITS.maxOutputTokens}, without leading zeros.`,
+    hint: `Use a whole number from 1 to ${FREE_OUTPUT_TOKENS.max} (paid requests use at most ${INFERENCE_REQUEST_LIMITS.maxOutputTokens}), without leading zeros. Sellers refuse more than their own limit, ${FREE_OUTPUT_TOKENS.default} by default.`,
   },
   {
     key: BUYER_INIT_FIELDS.MAX_USDC,

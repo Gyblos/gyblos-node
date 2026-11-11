@@ -84,7 +84,7 @@ void test('free seller reports at least one delivered token and refuses codes ou
     .createSellerFreeExecution;
   const zero = service({
     ...state.options,
-    meter: recountedMeter({ input: () => 4, count: () => 0 }),
+    meter: recountedMeter({ input: () => 4, chat: () => 4, count: () => 0 }),
     engine: {
       ...state.options.engine,
       async generate(input) {
@@ -124,6 +124,7 @@ void test('free seller never reports more delivered tokens than delivered bytes'
     // Within maxTokens during delivery, then a normalising recount of the stopped text exceeds its bytes.
     meter: recountedMeter({
       input: () => 4,
+      chat: () => 4,
       count: (text: string) => (text === 'an' ? 9 : 1),
     }),
     engine: {

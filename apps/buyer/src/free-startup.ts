@@ -1,5 +1,5 @@
 // Starts the isolated free buyer using local role identity and selection policy, without paid bootstrap.
-import { BUYER_RELAY_ONLY_ENV, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
+import { BUYER_RELAY_ONLY_ENV, FREE_OUTPUT_TOKENS } from '@gyblos/config';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import {
@@ -268,7 +268,8 @@ async function startOwnedFreeBuyer(
     return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
   const prepared = await buyerSelection();
   const { request } = prepared.config;
-  if (request.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
+  // Paid mode checks its own, smaller bound before it gets here.
+  if (request.maxTokens > FREE_OUTPUT_TOKENS.max)
     refuse(FREE_BUYER_STARTUP.MAX_TOKENS);
   // The free engine serves reasoning off only; checked before any socket is bound.
   if (

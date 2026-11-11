@@ -3,11 +3,12 @@
 // cannot check. The seller then relies on UTF-8 bytes, which never number fewer than tokens, refuses a
 // count below the delivered text's byte floor and never refunds a reservation on the provider's word, so
 // a provider that under-reports cannot stretch the token caps. Pure.
+import type { ChatMessage } from '@gyblos/protocol/chat';
 import {
   CONTROL_METERING_MODES,
   type ControlMeteringMode,
 } from '@gyblos/protocol/constants';
-import type { EngineUsage, RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer, EngineUsage } from '@gyblos/protocol/engine';
 
 import { FREE_METERING } from './constants';
 
@@ -22,6 +23,8 @@ export interface FreeMeter {
   refunds: boolean;
   // Never fewer than the prompt's tokens, so admission reserves enough against the context and caps.
   input(prompt: string): number;
+  // The same for a whole conversation, as the model's template renders it.
+  chat(messages: readonly ChatMessage[]): number;
   // Never more than the text's tokens, so a stream stops before it delivers past maxTokens.
   streamed(text: string): number;
   // What a stop reports as delivered: at least one token for non-empty text, never more than its bytes.
@@ -40,11 +43,12 @@ const bytes = (text: string) => new TextEncoder().encode(text).length;
 const tokenFloor = (text: string) =>
   text ? Math.ceil(bytes(text) / FREE_METERING.declaredMaxTokenBytes) : 0;
 
-export function recountedMeter(tokenizer: RecountTokenizer): FreeMeter {
+export function recountedMeter(tokenizer: ChatTokenizer): FreeMeter {
   return {
     mode: CONTROL_METERING_MODES.RECOUNTED,
     refunds: true,
     input: (prompt) => tokenizer.input(prompt),
+    chat: (messages) => tokenizer.chat(messages),
     streamed: (text) => tokenizer.count(text),
     // A normalising tokenizer could count more tokens than bytes; the stream already bounded maxTokens.
     delivered: (text) =>
@@ -61,6 +65,14 @@ export const DECLARED_METER: FreeMeter = Object.freeze({
   refunds: false,
   input: (prompt: string) =>
     bytes(prompt) + FREE_METERING.declaredTemplateTokens,
+  // Each message's bytes and the template allowance per message, so a lone user message counts as its
+  // prompt does.
+  chat: (messages: readonly ChatMessage[]) =>
+    messages.reduce<number>(
+      (sum, message) =>
+        sum + bytes(message.content) + FREE_METERING.declaredTemplateTokens,
+      0,
+    ),
   streamed: tokenFloor,
   delivered: (text: string, maxTokens: number) =>
     Math.min(bytes(text), maxTokens),

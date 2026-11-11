@@ -349,7 +349,7 @@ The control contract and its admission, framing, trust and rollout constraints
 are described in this section. Broader discovery choices remain proposed; see
 [discovery](../../docs/discovery.md) and [limitations](../../docs/limitations.md).
 
-## Free inference execution v3
+## Free inference execution v4
 
 `@gyblos/protocol/free-execution` and `./free-execution-framing` define a
 non-streaming execution contract for previously verified signed free quotes.
@@ -358,28 +358,40 @@ quote authentication, token admission and its pinned engine. The protocol
 helpers alone do not enforce state or execute work. Buyer wiring is separate;
 no v2 payment path is enabled.
 
-### Changes from free execution v2
+### Changes from free execution v3
 
-Version 3 adds one terminal code and replaces version 2 on both free ALPNs; the
-two versions do not coexist. A v2 peer facing a v3 peer fails ALPN negotiation,
-before any prompt byte is sent.
+Version 4 makes the seller serve whole conversations and replaces version 3 on
+both free ALPNs; the two versions do not coexist (there were no users before
+the seller beta). A v3 peer facing a v4 peer fails ALPN negotiation, before any
+prompt byte is sent.
 
-- ALPNs `gyblos/free/3` and `gyblos/free-stream/3`, `version: 3` and request
-  digest domain `gyblos/free-execution-request/v3\n`.
-- New code `FREE_EXECUTION_SELLER_CANNOT_CONTINUE`: an admitted generation
-  stopped on an engine failure. `FREE_EXECUTION_ENGINE_UNAVAILABLE` keeps its
-  meaning, a refusal before generation (expired engine readiness, or an engine
-  failure that is not a uniform engine error).
-- The error object may carry `reason` and `delivered`; every other field and
-  bound is unchanged.
-- Vectors move from `free-execution-v2.json` and `free-stream-v2.json` to the
-  `-v3.json` files; the quote envelope and its signature are unchanged.
+- ALPNs `gyblos/free/4` and `gyblos/free-stream/4`, `version: 4` and request
+  digest domain `gyblos/free-execution-request/v4\n`.
+- The request shape is unchanged; the seller now serves a conversation: an
+  optional `system` message first, then turns alternating `user`, `assistant`,
+  from and ending with `user`, each with non-empty text (every engine template
+  accepts that; a buyer merges consecutive turns of one role first). Content
+  the model's template cannot carry is refused as unsupported. Any other shape is still
+  refused with `FREE_EXECUTION_UNSUPPORTED` before generation.
+- Message content may total 256 KiB (was 64 KiB) and a request body 384 KiB
+  (was 128 KiB); a stream may carry 32768 events (was 4096). The output text
+  and response bounds are unchanged.
+- There is no fixed token maximum: the offer's answer limit (refused at quote
+  time) and the model's context bound `maxTokens` (see Seller runtime scope);
+  the 256 KiB output text bound still applies.
+- Paid execution v1 keeps its bounds (64 KiB input, 136 KiB requests, 4096
+  stream events) and one user message.
+- Vectors move from the `-v3.json` files to `free-execution-v4.json` and
+  `free-stream-v4.json`, derived by an independent Python oracle that first
+  reproduced the v3 vectors; the quote envelope and its signature are unchanged.
 
-Receipt exchange is not part of v3; it will use its own channel.
+Version 3 added the `FREE_EXECUTION_SELLER_CANNOT_CONTINUE` terminal code (an
+admitted generation stopped on an engine failure) with its `reason` and
+`delivered` fields. Receipt exchange uses its own channel.
 
 ### Separate execution channel
 
-The ALPN is **`gyblos/free/3`**. Reusing `gyblos/control/1` would break its
+The ALPN is **`gyblos/free/4`**. Reusing `gyblos/control/1` would break its
 no-prompt/no-engine invariant, mix long-running inference with short discovery
 queries and make their independent admission budgets ambiguous. A separate
 ALPN preserves that boundary and permits separate execution admission under the
@@ -401,15 +413,18 @@ send EOF. A receiver processes nothing until the full body and EOF arrive.
 
 Request fields (all required; unknown fields at every level are rejected):
 
-- `version: 3`, and `requestId` equal to the quote's validated 128-bit lowercase
+- `version: 4`, and `requestId` equal to the quote's validated 128-bit lowercase
   hexadecimal requestId. A fresh execution identifier cannot make a quote reusable.
 - `quote`: the unmodified seller-signed `SignedOfferV2` envelope.
 - `input`: `messages`, `selection`, `reasoning`, `maxTokens`. `selection` is the
   quote's exact public `{modelId, variant, quantization}`; the quote already
   binds its internal engine `model` description. Neither identifier is an
   arbitrary engine URL or upstream model override.
-- `messages`: 1–64 text-only objects with exactly `role` and `content`. Roles
-  are `system`, `user`, `assistant`; multiline/empty content is representable.
+- `messages`: 1–1024 text-only objects with exactly `role` and `content`. Roles
+  are `system`, `user`, `assistant`; multiline/empty content is representable
+  on the wire. The seller serves a conversation: an optional `system` message
+  first, then turns alternating `user`, `assistant`, from and ending with
+  `user`, each non-empty.
   Tools, attachments, remote URLs, function calls and streaming options are not
   supported. A wire role does not imply a particular engine implements it:
   the seller must refuse unsupported input before generation, without silently
@@ -464,7 +479,7 @@ error codes are eligible for a reply only if raised after successful parsing;
 the error catalog does not promise every rejection has a wire response.
 
 `requestDigest` is SHA-256 of UTF-8
-`"gyblos/free-execution-request/v3\n" + canonicalJson(validatedRequest)`.
+`"gyblos/free-execution-request/v4\n" + canonicalJson(validatedRequest)`.
 It includes the signed quote and the complete chat input, and is distinct from
 the quote's prompt-free control request digest. The buyer matches requestId and
 this digest before acting on either an error or a result. Responses are bound
@@ -481,8 +496,8 @@ not authenticate/consume a quote, flatten chat or change its model.
 
 ### Bounds and admission obligations
 
-Request JSON bodies are at most 128 KiB and response bodies at most 1 MiB.
-Message content totals at most 64 KiB of UTF-8; result text at most 256 KiB.
+Request JSON bodies are at most 384 KiB and response bodies at most 1 MiB.
+Message content totals at most 256 KiB of UTF-8; result text at most 256 KiB.
 The body limit also includes JSON escaping and the quote envelope, so text
 below its own bound can still exceed the frame bound. A response containing
 256 KiB of control characters can JSON-escape beyond 1 MiB; the seller returns
@@ -546,11 +561,12 @@ No handler path may call payments, the facilitator or v1, including failures.
 
 ### Compatibility and rollout
 
-`vectors/free-execution-v3.json` pins the independent Node/OpenSSL quote
+`vectors/free-execution-v4.json` pins the independent Node/OpenSSL quote
 signature, request canonical bytes/domain digest, request framing and
-success/error/seller-cannot-continue response framing. Its request digest,
-canonical bytes and frames come from an independent one-shot Python oracle that
-first reproduced every v2 vector; the oracle is not committed. The v1 vectors,
+success/error/seller-cannot-continue response framing. Its request (a system
+message and a user message) digest, canonical bytes and frames come from an
+independent one-shot Python oracle that first reproduced every v3 vector; the
+oracle is not committed. The v1 vectors,
 control v2 vectors and their domains remain unchanged.
 Each protocol change ships the contract first, then the seller, then the buyer.
 Free offers use their own handler and caps; paid offers use a separate paid
@@ -572,12 +588,20 @@ signature/peer/time checks with that offer's listing and engine;
 `seller-transport` connects those pieces once at startup. Renewing public
 records never recreates the ledger or token counters.
 
-The pinned Ollama adapter currently supports one user message and reasoning
-`off`. Other contract-valid roles/conversations are refused with
-`FREE_EXECUTION_UNSUPPORTED` before generation; no message flattening occurs.
-Input and output are recounted with the pinned tokenizer, rather than trusting
-engine-reported usage for cap refunds. Admission reserves templated input plus
-maximum output, refunds only a successfully recounted completion and keeps the
+The engines serve a conversation with reasoning `off`. The pinned Ollama
+adapter renders it with the pinned Qwen3 template's no-tools, thinking-off
+branch (a lone user message exactly as before); the OpenAI adapter sends the
+messages as they are and the Anthropic adapter sends the system message as its
+`system` field. Other shapes are refused with `FREE_EXECUTION_UNSUPPORTED`
+before generation; no message flattening occurs. `maxTokens` may not exceed the
+offer's answer limit (`free.max_output_tokens` in gyblos.toml, 4096 by default
+and at most 32768; quotes beyond it are refused) and, with the templated input,
+must fit the model's context (a free Ollama offer's `engine.context_tokens`,
+8192 by default and at most 32768). The engine deadline grows by 25 ms per
+requested token past 128, up to 170 seconds. Input and output
+are recounted with the pinned tokenizer over the same rendered conversation,
+rather than trusting engine-reported usage for cap refunds. Admission reserves
+templated input plus maximum output, refunds only a successfully recounted completion and keeps the
 full debit for engine errors, cancellation or uncertain work. UTC-day counters
 reset on restart; per-buyer counters are best effort. The in-memory replay table
 is bounded at 4096 live identifiers and the seller's daily buyer table at 1024
@@ -605,17 +629,17 @@ Synthetic service tests, bounded-stream tests and native loopback execution
 cover this seller slice. No real engine, devnet, deployed index, production
 startup or full publish-to-answer lab acceptance is claimed by these tests.
 
-### Free streaming execution v3
+### Free streaming execution v4
 
-`gyblos/free-stream/3` is a separate execution ALPN. It reuses the unchanged
-`gyblos/free/3` request and its digest domain. This keeps one-shot consumers and
+`gyblos/free-stream/4` is a separate execution ALPN. It reuses the unchanged
+`gyblos/free/4` request and its digest domain. This keeps one-shot consumers and
 all existing vectors intact, without overloading the control ALPN or enabling
 `gyblos/http/2`. The seller shares one policy/admission instance across both
 free execution ALPNs: the buyer-bound quote/requestId is consumed once across
 modes, not once per mode. Free still requires both prices and maxAtomic zero.
 
 Each response event is canonical UTF-8 JSON prefixed with a four-byte big-endian
-length. Events carry version 3, requestId, requestDigest and a zero-based,
+length. Events carry version 4, requestId, requestDigest and a zero-based,
 strictly consecutive sequence. `delta` adds text; `terminal` carries the existing
 complete FreeExecutionResponse. Successful terminal text must equal the exact
 concatenated deltas, and terminal usage/context bounds are checked as for the
@@ -624,13 +648,13 @@ text. A `FREE_EXECUTION_SELLER_CANNOT_CONTINUE` terminal carries `delivered`
 if and only if at least one delta preceded it; every other error terminal,
 for example `LIMIT` after partial text, never carries `delivered`. Its
 `outputTokens` may not exceed the UTF-8 bytes of the delivered deltas, since
-every token covers at least one byte. `vectors/free-stream-v3.json` pins two
+every token covers at least one byte. `vectors/free-stream-v4.json` pins two
 deltas followed by such a terminal with reason `engine_interrupted`. EOF before
 terminal, bytes after terminal, unknown fields, invalid UTF-8, noncanonical or
 duplicate JSON fields, changed bindings and reordered events are rejected. Fragments are provisional until a valid terminal and EOF.
 
 A delta contains at most 8192 UTF-8 bytes; splitting preserves Unicode scalar
-values. There are at most 4096 events including terminal, at most
+values. There are at most 32768 events including terminal, at most
 FREE_EXECUTION.responseBytes+1024 canonical body bytes per event, and at most
 twice FREE_EXECUTION.responseBytes across all framed events. The original
 256 KiB output-text cap also applies across deltas. JSON escaping counts toward
@@ -663,7 +687,7 @@ show delivery before settlement. One bidirectional stream carries one request
 frame, then ordered events, each with a four-byte big-endian length and
 canonical UTF-8 JSON. The free ALPNs are unchanged and never carry payments.
 
-Request: the free v3 request shape with `version: 1`, plus `payment`, a
+Request: the free request shape (unchanged since v3) with `version: 1`, plus `payment`, a
 `PaymentAuthorization` `{channelId, payer, requestDigest, maxAtomic, payload}`:
 
 - `quote` must be priced (`maxAtomic` above `"0"`), otherwise

@@ -2,7 +2,10 @@
 // the engine at the offer's literal loopback URL with recounted metering and the pinned warmup policy.
 // The seller runs Ollama itself; the daemon never starts it.
 import { isLocalOllamaUrl } from '@gyblos/engine-ollama';
-import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
+import {
+  MODEL_LIMITS,
+  READINESS_GENERATION,
+} from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
@@ -39,7 +42,9 @@ function refuse(offer: SellerEngineOffer) {
     // The adapter's own rule; names such as localhost or host.docker.internal wait for gyblos init.
     !isLocalOllamaUrl(engine.url) ||
     engine.apiKeyEnv !== undefined ||
-    engine.contextTokens !== undefined ||
+    (engine.contextTokens !== undefined &&
+      (engine.contextTokens < MODEL_LIMITS.minContextTokens ||
+        engine.contextTokens > MODEL_LIMITS.maxContextTokens)) ||
     (engine.upstreamModel !== undefined && engine.upstreamModel !== MODEL.name)
   )
     return NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED;
@@ -52,7 +57,13 @@ function refuse(offer: SellerEngineOffer) {
 export const OLLAMA_ENGINE_FACTORY: EngineFactory = {
   refuse,
   create: (offer, { fetch, environment }) => ({
-    engine: createOllamaEngine(offer.engine.url, fetch),
+    engine: createOllamaEngine(
+      offer.engine.url,
+      fetch,
+      offer.engine.contextTokens === undefined
+        ? {}
+        : { contextTokens: offer.engine.contextTokens },
+    ),
     selection: ollamaSelection(offer.model.id),
     metering: {
       mode: CONTROL_METERING_MODES.RECOUNTED,

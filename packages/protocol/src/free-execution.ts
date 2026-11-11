@@ -74,7 +74,12 @@ function parseRequest(value: unknown): FreeExecutionRequest {
     version: FREE_EXECUTION.version,
     requestId,
     quote,
-    input: parseExecutionInput(input.input, requestId, offered),
+    input: parseExecutionInput(
+      input.input,
+      requestId,
+      offered,
+      FREE_EXECUTION.inputBytes,
+    ),
   };
   boundedWire(request, FREE_EXECUTION.requestBytes);
   return request;

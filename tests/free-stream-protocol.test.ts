@@ -4,8 +4,10 @@ import test from 'node:test';
 
 import {
   ENGINE_DONE_REASONS,
+  FREE_EXECUTION,
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_STOP_REASONS,
+  FREE_STREAM,
 } from '@gyblos/protocol/constants';
 import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 
@@ -15,7 +17,7 @@ async function messages() {
   const source = await freeSellerFixture();
   const request = await source.request();
   const header = {
-    version: 3,
+    version: FREE_EXECUTION.version,
     requestId: request.requestId,
     requestDigest: await freeExecutionDigest(request),
   };
@@ -95,7 +97,7 @@ void test('free stream golden frames preserve canonical bytes independently of e
     JSON.parse(
       await readFile(
         new URL(
-          import.meta.resolve('@gyblos/protocol/vectors/free-stream-v3.json'),
+          import.meta.resolve('@gyblos/protocol/vectors/free-stream-v4.json'),
         ),
         'utf8',
       ),
@@ -123,7 +125,7 @@ void test('free stream rejects aggregate text, wire and event-count excess', asy
   );
   const wire = await api.createFreeStreamVerifier(fixture.request);
   let exceeded = false;
-  for (let sequence = 0; sequence < 4096; sequence++) {
+  for (let sequence = 0; sequence < FREE_STREAM.maxEvents; sequence++) {
     try {
       await wire.accept({
         ...fixture.delta,
@@ -141,9 +143,12 @@ void test('free stream rejects aggregate text, wire and event-count excess', asy
   }
   assert.equal(exceeded, true);
   const count = await api.createFreeStreamVerifier(fixture.request);
-  await assert.rejects(count.accept({ ...fixture.delta, sequence: 4096 }), {
-    code: FREE_EXECUTION_CODES.LIMIT,
-  });
+  await assert.rejects(
+    count.accept({ ...fixture.delta, sequence: FREE_STREAM.maxEvents }),
+    {
+      code: FREE_EXECUTION_CODES.LIMIT,
+    },
+  );
 });
 void test('free stream rejects ambiguous JSON and preserves remote error provenance', async () => {
   const api = await import('@gyblos/protocol/free-stream');
@@ -181,7 +186,7 @@ async function streamVectors(): Promise<{
   return JSON.parse(
     await readFile(
       new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/free-stream-v3.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/free-stream-v4.json'),
       ),
       'utf8',
     ),
@@ -208,11 +213,11 @@ function cannotContinue(
     },
   };
 }
-void test('free stream v3 golden interrupted frames keep canonical bytes', async () => {
+void test('free stream v4 golden interrupted frames keep canonical bytes', async () => {
   const api = await import('@gyblos/protocol/free-stream');
   const source = await streamVectors();
   const terminal = source.interrupted.at(-1)?.event;
-  assert.equal(Reflect.get(terminal ?? {}, 'version'), 3);
+  assert.equal(Reflect.get(terminal ?? {}, 'version'), FREE_EXECUTION.version);
   for (const row of source.interrupted) {
     assert.equal(
       Buffer.from(api.encodeFreeStreamEvent(row.event)).toString('hex'),

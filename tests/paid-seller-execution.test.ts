@@ -357,6 +357,7 @@ void test('a meter that miscounts delivered output charges nothing rather than g
       meter: {
         ...recountedMeter({
           input: () => 4,
+          chat: () => 4,
           count: (text) => [...text].length,
         }),
         delivered: () => miscount,

@@ -1,6 +1,5 @@
 // Loopback-only complete/streaming chat compatibility; validates input before selection or prompt transmission.
 // Responses and errors contain no transport details; request content is never persisted.
-import { randomUUID } from 'node:crypto';
 import {
   createServer,
   type IncomingMessage,
@@ -13,10 +12,8 @@ import {
   PORTS,
   ROUTES,
   TRANSPORT_LIMITS,
-  UNITS,
 } from '@gyblos/config';
 import {
-  FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
 } from '@gyblos/protocol/constants';
@@ -24,12 +21,18 @@ import type { ModelSelection } from '@gyblos/protocol/control-types';
 import {
   FreeExecutionError,
   type FreeExecutionBuildInput,
-  type FreeExecutionResult,
   type FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
+import {
+  chatApi,
+  defaultChatApi,
+  isModelsRoute,
+  modelList,
+  type ChatApi,
+} from './chat-api';
 import {
   FREE_BUYER,
   FREE_BUYER_CODES,
@@ -37,16 +40,15 @@ import {
   PAID_BUYER,
   PAID_BUYER_CODES,
 } from './constants';
-import { FreeBuyerError, invalidChat, parseFreeChat } from './free-chat';
+import { FreeBuyerError, invalidChat } from './free-chat';
 import { FreeSelectionFailure } from './free-execution';
 import {
   executeFreeSse,
-  executionFields,
-  paymentFields,
   replyFreeSseError,
   type ChatErrorCode,
   type ChatPayment,
   type ChatResult,
+  type ChatStreamFormat,
   type FreeChatStreamExecutor,
 } from './free-sse';
 import { bearerAuthorizer } from './paid-token';
@@ -148,6 +150,8 @@ function replyError(
   response: ServerResponse,
   error: unknown,
   classify?: ChatErrorClassifier,
+  api: ChatApi = defaultChatApi,
+  stream?: ChatStreamFormat,
 ) {
   if (response.destroyed || response.writableEnded) return;
   // A body cut off mid-stream leaves unread bytes, so the connection cannot be reused.
@@ -159,14 +163,15 @@ function replyError(
   const view = classify?.(error) ?? freeErrorView(error);
   const { code, stop } = view;
   if (response.headersSent) {
-    replyFreeSseError(response, code, stop, view.payment);
+    if (stream) replyFreeSseError(response, stream, code, stop, view.payment);
+    else response.destroy();
     return;
   }
   const headers: Record<string, string> = {
     'content-type': 'application/json',
   };
-  // OpenAI SDKs retry 408/409/429/5xx by default; a resend after a possible send would repeat the
-  // prompt, possibly to another seller. Only local BUSY and unsent unavailability stay retryable.
+  // OpenAI and Anthropic SDKs retry 408/409/429/5xx by default; a resend after a possible send would
+  // repeat the prompt, possibly to another seller. Only local BUSY and unsent unavailability stay retryable.
   const callerFault = view.status < HTTP_STATUS.internalServerError;
   if (
     view.status !== HTTP_STATUS.tooManyRequests &&
@@ -174,21 +179,23 @@ function replyError(
   )
     headers[FREE_BUYER.noRetryHeader] = 'false';
   response.writeHead(view.status, headers).end(
-    JSON.stringify({
-      error: {
+    JSON.stringify(
+      api.error({
+        code,
+        status: view.status,
         // A refused request explains itself; every other error keeps its code as the message.
         message: view.detail || code,
-        type: FREE_BUYER.errorType,
         param: view.param ?? null,
-        code,
         // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
-        ...(stop.reason ? { reason: stop.reason } : {}),
-        ...(view.cooldownUntil !== undefined
-          ? { cooldownUntil: view.cooldownUntil }
-          : {}),
-        ...paymentFields(view.payment),
-      },
-    }),
+        extra: {
+          ...(stop.reason ? { reason: stop.reason } : {}),
+          ...(view.cooldownUntil !== undefined
+            ? { cooldownUntil: view.cooldownUntil }
+            : {}),
+        },
+        payment: view.payment,
+      }),
+    ),
   );
 }
 // A loopback Host, then in paid mode the bearer token: loopback is not authentication, and any local
@@ -226,36 +233,37 @@ function declaredTooLarge(request: IncomingMessage) {
   const length = Number(request.headers['content-length']);
   return Number.isFinite(length) && length > FREE_EXECUTION.requestBytes;
 }
-function replyCompletion(
-  response: ServerResponse,
-  model: string,
-  result: ChatResult,
-) {
+function replyJson(response: ServerResponse, body: unknown) {
   if (response.destroyed || response.writableEnded) return;
   response
     .writeHead(HTTP_STATUS.ok, { 'content-type': 'application/json' })
-    .end(
-      JSON.stringify({
-        id: `chatcmpl-${randomUUID()}`,
-        object: FREE_BUYER.completionObject,
-        created: Math.floor(Date.now() / UNITS.millisecondsPerSecond),
-        model,
-        choices: [
-          {
-            index: 0,
-            message: { role: FREE_CHAT_ROLES.ASSISTANT, content: result.text },
-            finish_reason: result.finishReason,
-          },
-        ],
-        usage: {
-          prompt_tokens: result.usage.inputTokens,
-          completion_tokens: result.usage.outputTokens,
-          total_tokens: result.usage.inputTokens + result.usage.outputTokens,
-        },
-        ...paymentFields(result.payment),
-        ...executionFields(result),
-      }),
-    );
+    .end(JSON.stringify(body));
+}
+// The route's format for a request this endpoint can take now; anything else is answered here: the model
+// list, or a refusal before the body is read, so a stalled oversize body holds no slot.
+function admit(
+  request: IncomingMessage,
+  response: ServerResponse,
+  settings: ChatSettings,
+  active: number,
+): ChatApi | undefined {
+  const local = request.headers.origin === undefined;
+  if (request.method === 'GET' && isModelsRoute(request.url) && local) {
+    replyJson(response, modelList(settings.selection));
+    return undefined;
+  }
+  const api = chatApi(request.url);
+  const code =
+    !api || request.method !== 'POST' || !local || !isJson(request)
+      ? FREE_BUYER_CODES.INVALID
+      : declaredTooLarge(request)
+        ? FREE_BUYER_CODES.TOO_LARGE
+        : active >= TRANSPORT_LIMITS.maxConcurrent
+          ? FREE_BUYER_CODES.BUSY
+          : undefined;
+  if (code === undefined) return api;
+  replyError(response, new FreeBuyerError(code), undefined, api);
+  return undefined;
 }
 export function freeBuyerHandler(
   execute: FreeChatExecutor,
@@ -268,24 +276,9 @@ export function freeBuyerHandler(
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
     if (!acceptCaller(request, response, authorize)) return;
-    if (
-      request.method !== 'POST' ||
-      request.url !== ROUTES.inference ||
-      request.headers.origin !== undefined ||
-      !isJson(request)
-    ) {
-      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
-      return;
-    }
-    // Refused before admission and before reading, so a stalled oversize body holds no slot.
-    if (declaredTooLarge(request)) {
-      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.TOO_LARGE));
-      return;
-    }
-    if (active >= TRANSPORT_LIMITS.maxConcurrent) {
-      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.BUSY));
-      return;
-    }
+    const api = admit(request, response, settings, active);
+    if (!api) return;
+    let format: ChatStreamFormat | undefined;
     active++;
     const controller = new AbortController();
     const cancel = () => controller.abort();
@@ -298,6 +291,8 @@ export function freeBuyerHandler(
         response,
         new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
         classify,
+        api,
+        format,
       );
       // Destroying the request also ends a stalled body read, so its finally frees the slot.
       if (response.writableEnded)
@@ -309,30 +304,34 @@ export function freeBuyerHandler(
     }, requestMs);
     response.once('close', cancel);
     try {
-      const input = parseFreeChat(
+      const input = api.parse(
         await readBody(request, controller.signal),
         settings.selection,
         settings.maxTokens,
         stream !== undefined,
       );
       const payload = { messages: input.messages, maxTokens: input.maxTokens };
+      const model = settings.selection.modelId;
       if (input.stream && stream) {
+        format = api.stream(
+          model,
+          request.headers[PAID_BUYER.observationHeader] ===
+            PAID_BUYER.observationValue,
+        );
         await executeFreeSse(
           stream,
           payload,
           controller.signal,
           response,
-          settings.selection.modelId,
-          request.headers[PAID_BUYER.observationHeader] ===
-            PAID_BUYER.observationValue,
+          format,
         );
         return;
       }
       const result = await execute(payload, controller.signal);
       if (!controller.signal.aborted)
-        replyCompletion(response, settings.selection.modelId, result);
+        replyJson(response, api.completion(model, result));
     } catch (error) {
-      replyError(response, error, classify);
+      replyError(response, error, classify, api, format);
     } finally {
       clearTimeout(timer);
       response.removeListener('close', cancel);

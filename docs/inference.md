@@ -20,7 +20,7 @@ The model manifest digest, public model revision, tokenizer/config hashes and
 tokenizer version are pinned in
 [`packages/engine-ollama/src/constants.ts`](../packages/engine-ollama/src/constants.ts).
 Setup verifies the model and artifacts; a mismatch stops inference before
-payment. The single-user chat renderer lives in
+payment. The chat renderer, for a lone prompt or a whole conversation, lives in
 [`model.ts`](../packages/engine-ollama/src/model.ts).
 
 The gate starts its own loopback-only Ollama on port 11436 and a facilitator on
@@ -31,10 +31,13 @@ inference run also sets `OLLAMA_DEBUG=0` and `OLLAMA_CONTEXT_LENGTH=2048`.
 
 ## Template and generation
 
-Only the pinned single-user/no-tools template branch is supported, with hidden
-thinking disabled. The adapter sends the rendered prompt in raw mode, avoiding a
-second implicit Ollama chat template. Generation uses context 2048, seed 42 and
-temperature 0; the gate requests at most 128 output tokens.
+The pinned template's no-tools branch is supported, with hidden thinking
+disabled: an optional system message first, then user and assistant turns ending
+with the user's; a lone user message renders exactly as the single-user branch.
+The adapter sends the rendered prompt in raw mode, avoiding a second implicit
+Ollama chat template. Generation uses seed 42, temperature 0 and the offer's
+context (`engine.context_tokens`, 8192 by default, at most 32768); the gate
+requests at most 128 output tokens.
 
 The buyer counts the rendered input, including template tokens, and the visible
 output independently. It does not add a terminal EOS token to the visible output

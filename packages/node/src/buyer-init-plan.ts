@@ -4,6 +4,7 @@ import {
   DEVNET_RPC_URL,
   DEVNET_USDC,
   DISCOVERY_INDEX_URL,
+  FREE_OUTPUT_TOKENS,
   INFERENCE_REQUEST_LIMITS,
   IROH_RELAYS,
   LOOPBACK_HOST_NAMES,
@@ -75,11 +76,7 @@ export function validateBuyerInitField(
         const text = controlText(value);
         if (!/^[1-9][0-9]*$/.test(text))
           throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
-        controlInteger(
-          Number(text),
-          1,
-          INFERENCE_REQUEST_LIMITS.maxOutputTokens,
-        );
+        controlInteger(Number(text), 1, FREE_OUTPUT_TOKENS.max);
         return text;
       }
       case BUYER_INIT_FIELDS.MAX_USDC:
@@ -112,7 +109,7 @@ export function buyerInitDefaults(): BuyerInitAnswers {
     modelId: MODEL_IDS.QWEN3_0_6B,
     variant: '',
     quantization: MODEL.quantization,
-    maxTokens: String(INFERENCE_REQUEST_LIMITS.maxOutputTokens),
+    maxTokens: String(FREE_OUTPUT_TOKENS.default),
     maxUsdc: '0',
     inputUsdcPerMtok: '0',
     outputUsdcPerMtok: '0',
@@ -150,6 +147,15 @@ function request(row: Record<string, unknown>): SellerRequest {
     validateBuyerInitField(field, row[field]);
   const variant = read(BUYER_INIT_FIELDS.VARIANT);
   const quantization = read(BUYER_INIT_FIELDS.QUANTIZATION);
+  const maxAtomic = atomic(read(BUYER_INIT_FIELDS.MAX_USDC));
+  // Paid requests keep their smaller answer bound until paid conversations land, so a buyer who sets a
+  // spending ceiling gets at most that bound, whatever the free default.
+  const maxTokens = Math.min(
+    Number(read(BUYER_INIT_FIELDS.MAX_TOKENS)),
+    BigInt(maxAtomic) > 0n
+      ? INFERENCE_REQUEST_LIMITS.maxOutputTokens
+      : FREE_OUTPUT_TOKENS.max,
+  );
   return {
     selection: {
       modelId: read(BUYER_INIT_FIELDS.MODEL_ID),
@@ -160,8 +166,8 @@ function request(row: Record<string, unknown>): SellerRequest {
     lowestReasoning: null,
     network: DEVNET,
     asset: DEVNET_USDC,
-    maxTokens: Number(read(BUYER_INIT_FIELDS.MAX_TOKENS)),
-    maxAtomic: atomic(read(BUYER_INIT_FIELDS.MAX_USDC)),
+    maxTokens,
+    maxAtomic,
     priceCeilings: {
       inputAtomicPerMtok: atomic(read(BUYER_INIT_FIELDS.INPUT_PRICE)),
       outputAtomicPerMtok: atomic(read(BUYER_INIT_FIELDS.OUTPUT_PRICE)),

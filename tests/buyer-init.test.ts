@@ -7,6 +7,7 @@ import {
   DEVNET,
   DEVNET_RPC_URL,
   DEVNET_USDC,
+  FREE_OUTPUT_TOKENS,
   INFERENCE_REQUEST_LIMITS,
 } from '@gyblos/config';
 import { SELLER_BADGES } from '@gyblos/core/constants';
@@ -29,10 +30,7 @@ void test('guided defaults admit only free quotes and preserve current bounded m
   const defaults = buyerInitDefaults();
   assert.equal(defaults.modelId, MODEL_IDS.QWEN3_0_6B);
   assert.equal(defaults.quantization, MODEL.quantization);
-  assert.equal(
-    defaults.maxTokens,
-    String(INFERENCE_REQUEST_LIMITS.maxOutputTokens),
-  );
+  assert.equal(defaults.maxTokens, String(FREE_OUTPUT_TOKENS.default));
   assert.equal(defaults.maxUsdc, '0');
   assert.equal(defaults.inputUsdcPerMtok, '0');
   assert.equal(defaults.outputUsdcPerMtok, '0');
@@ -105,7 +103,7 @@ void test('malformed identities, unknown fields and token bounds refuse static t
   for (const input of [
     { ...answers(), sellerNodeId: sellerNodeId.toUpperCase() },
     { ...answers(), sellerOwner: 'private-invalid-value' },
-    { ...answers(), maxTokens: '129' },
+    { ...answers(), maxTokens: String(FREE_OUTPUT_TOKENS.max + 1) },
     { ...answers(), maxTokens: '01' },
     { ...answers(), maxTokens: '1e2' },
     { ...answers(), manualTrust: true },
@@ -119,6 +117,21 @@ void test('malformed identities, unknown fields and token bounds refuse static t
         !error.message.includes('private-invalid-value'),
     );
   }
+});
+void test('free answers may run to the free bound; a spending ceiling keeps the paid one', () => {
+  const free = buildBuyerInit({ ...answers(), maxTokens: '8192' });
+  assert.equal(free.request.maxTokens, 8192);
+  const paid = buildBuyerInit({
+    ...answers(),
+    maxTokens: '8192',
+    maxUsdc: '1',
+    inputUsdcPerMtok: '1',
+    outputUsdcPerMtok: '1',
+  });
+  assert.equal(
+    paid.request.maxTokens,
+    INFERENCE_REQUEST_LIMITS.maxOutputTokens,
+  );
 });
 void test('USDC precision, canonical decimal spelling and overflow are bounded before bigint conversion', () => {
   for (const value of [

@@ -45,6 +45,8 @@ export interface QuoteModel {
   capabilities: EngineCapabilities;
   reasoning: readonly ReasoningLevel[];
   meteringMode: ControlMeteringMode;
+  // The longest answer the offer serves per request; unset, the context alone bounds it.
+  maxOutputTokens?: number;
 }
 export interface QuoteReadiness {
   generation: number;
@@ -154,7 +156,9 @@ async function buildQuote(
   if (!mapped) return controlFail(CONTROL_CODES.MODEL);
   if (
     mapped.model.contextTokens !== listed.contextTokens ||
-    mapped.model.contextTokens < query.params.maxTokens
+    mapped.model.contextTokens < query.params.maxTokens ||
+    (mapped.maxOutputTokens !== undefined &&
+      query.params.maxTokens > mapped.maxOutputTokens)
   )
     return controlFail(CONTROL_CODES.POLICY);
   if (!mapped.reasoning.includes(query.params.reasoning))
