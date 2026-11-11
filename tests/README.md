@@ -247,3 +247,32 @@ product mainnet remains disabled. These are SDK/native-program semantic tests,
 not current-devnet product startup, Iroh, an engine or deployed-binary
 acceptance. See
 [scope, prerequisites and rebuild instructions](../docs/paid-native-acceptance.md).
+
+## Concurrent seller product acceptance
+
+`node --import tsx --test tests/lab/http-multiseller-acceptance.test.ts` runs
+the real buyer HTTP entry and two product seller processes with separate
+temporary homes. The actual discovery index uses memory storage over loopback;
+8004 account reads, engines and financial confirmations are synthetic. Native
+Iroh is required, with the ordinary explicit capability skips. No real RPC,
+relay, index, payment, engine, deployment or operational home is used.
+Successful queue renewal uses the existing configured default; a separate
+short-deadline phase proves expiry. Native signing and private writes are not
+required to fit the intentionally shortened expiry test deadline. Product
+capacity and deadlines are unchanged.
+
+The parallel case observes actual busy withdrawal and republication before
+starting another prompt; it never assumes a fixed sleep restored availability.
+The cases cover concurrent A/B execution and A reuse after buyer restart,
+independently verified final charge/refund, same-seller queue expiry and HTTP
+disconnect, fresh quote correlation, a shared-budget race, and A uncertainty
+while B is already sent or still before its first prompt write. The latter
+blocks new requests and survives buyer restart without replaying either prompt.
+The buyer must read discovery after startup, and an unavailable index prevents
+the first prompt. Cancellation waits for the actual server-side HTTP close and
+releases the engine before queue expiry; a request cannot pass by merely timing
+out. Phase watchdog regressions bound missing barriers and early HTTP failure.
+Only numeric/status evidence leaves the scenarios; synthetic request/response
+content, keys and financial payloads stay out of output. Existing limits and fee
+arithmetic remain unchanged. This is local composition evidence, not a
+live-chain, deployed-program, real-engine or power-loss acceptance claim.

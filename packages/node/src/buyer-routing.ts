@@ -27,6 +27,7 @@ import {
   type BuyerQuoteWinner,
 } from './buyer-quote-execution';
 import { createBuyerQueue, type BuyerWaitScope } from './buyer-routing-queue';
+import { createRoutingReferences } from './buyer-routing-reference';
 import { PAID_BUYER_CODES } from './constants';
 
 export class UnsentSellerBusyError extends Error {
@@ -45,6 +46,7 @@ export interface BuyerRouteSelection {
 }
 export interface BuyerRouteOptions {
   policy: BuyerRoutingPolicy;
+  now?: () => number;
   pinnedNodeId?: string;
   priceCeilings: TokenPricesV2;
   unresolved(): Promise<boolean>;
@@ -77,6 +79,7 @@ export type BuyerRoutePorts<T> = Omit<
 };
 interface State {
   options: BuyerRouteOptions;
+  references: ReturnType<typeof createRoutingReferences>;
   owners: Map<string, symbol>;
   requests: Set<symbol>;
   pending: Set<Promise<unknown>>;
@@ -174,7 +177,7 @@ async function select<T>(
           state,
           request,
           pinned,
-          await state.options.reference(pinned, current),
+          state.references.get(pinned, state.owners.get(pinned)),
         );
     }
     const checking = request.wait?.signal ?? signal;
@@ -269,6 +272,7 @@ async function attempt<T>(
   request.wait?.signal.throwIfAborted();
   request.kind = buyerQuoteKind(winner.quote);
   state.owners.set(winner.nodeId, request.owner);
+  state.references.remember(winner, request.owner);
   try {
     const current = request.wait?.signal ?? signal;
     const result = await run(winner, current, () => {
@@ -305,6 +309,7 @@ async function attempt<T>(
     fallback(state, request, winner.nodeId, prices);
     return undefined;
   } finally {
+    state.references.clear(winner.nodeId, request.owner);
     state.queue.release(winner.nodeId, request.owner);
   }
 }
@@ -344,7 +349,10 @@ function run<T>(
     .finally(() => {
       request.wait?.dispose();
       for (const [nodeId, owner] of [...state.owners])
-        if (owner === request.owner) state.queue.release(nodeId, owner);
+        if (owner === request.owner) {
+          state.references.clear(nodeId, owner);
+          state.queue.release(nodeId, owner);
+        }
     });
   state.pending.add(pending);
   void pending.then(
@@ -357,6 +365,7 @@ export function createBuyerRouter(options: BuyerRouteOptions) {
   const owners = new Map<string, symbol>();
   const state: State = {
     options,
+    references: createRoutingReferences(options.now),
     owners,
     queue: createBuyerQueue(owners),
     requests: new Set(),

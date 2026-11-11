@@ -17,6 +17,7 @@ export async function routingQueueFixture(
   const source = await multisellerSession();
   let quotes = 0;
   const router = createBuyerRouter({
+    now: source.a.now,
     policy: parseBuyerRoutingPolicy({
       onBusy: BUYER_BUSY_POLICIES.WAIT,
       queueWaitMs,
