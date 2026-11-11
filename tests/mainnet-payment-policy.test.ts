@@ -20,7 +20,7 @@ void test('mainnet candidate pins the network, USDC and fee within the pilot cap
       network: SOLANA_MAINNET_CAIP2,
       mint: USDC_MAINNET_ADDRESS,
       treasury,
-      protocolFeeBps: 300,
+      protocolFeeBps: 400,
       maxAtomic,
     });
 });

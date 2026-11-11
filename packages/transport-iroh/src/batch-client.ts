@@ -10,6 +10,7 @@ import {
   parseBatchChannelRequest,
   type BatchChannelCode,
   type BatchChannelRequest,
+  type BatchExecutionRequest,
 } from '@gyblos/protocol/batch-channel';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { encodeControlFrame } from '@gyblos/protocol/control-framing';
@@ -45,6 +46,8 @@ export class BatchClientError extends BatchChannelError {
   }
 }
 export interface BatchClientOptions {
+  // Trusted host guard, called synchronously immediately before the first prompt write.
+  beforeExecute?(request: BatchExecutionRequest): void;
   now?: () => number;
   requestMs?: number;
   operationMs?: number;
@@ -158,6 +161,8 @@ async function requestReply<Remote extends BatchDestination>(
       request.params.quote.offer,
       (state.options.now ?? Date.now)(),
     );
+  if (request.method === BATCH_METHODS.EXECUTE)
+    state.options.beforeExecute?.(request.params);
   beforeWrite(); // Even a rejected write may have transmitted bytes.
   await track(state, stream.send.writeAll([...bytes]));
   route(state, current, signal);

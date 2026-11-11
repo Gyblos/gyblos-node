@@ -62,8 +62,8 @@ SDK's `batch-settlement` scheme and the official payment-channels program
 pays three requests (145, 210 and 95) with metered vouchers signed by the
 seller's operator key, the seller redeems them in one claim and distribution,
 and the buyer gets the rest back with a cooperative refund. The check fails
-unless the seller receives 97% of the 450 charged (rounded down), the treasury
-3% (rounded down), the program treasury the rounding remainder, the refund is
+unless the seller receives 96% of the 450 charged (rounded down), the treasury
+4% (rounded down), the program treasury the rounding remainder, the refund is
 4,550 and the buyer spends no SOL. It is not wired into the buyer or seller.
 
 The protocol fee is committed when the channel opens, through `extra.splits`

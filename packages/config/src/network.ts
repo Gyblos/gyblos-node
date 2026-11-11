@@ -41,7 +41,8 @@ export const DEVNET_GYBLOS_TREASURY =
 // The network's protocol fee, added on top of every seller's price and split on chain to the treasury
 // in the same claim. Buyers and sellers both read it; changing the fee is changing bps here.
 export const PROTOCOL_FEE = {
-  bps: 300,
+  // 4% (founder, 2026-11-10; was 3%).
+  bps: 400,
   treasury: DEVNET_GYBLOS_TREASURY,
 } as const;
 

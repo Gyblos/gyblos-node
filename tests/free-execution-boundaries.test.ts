@@ -17,7 +17,7 @@ async function fixture() {
       await readFile(
         new URL(
           import.meta
-            .resolve('@gyblos/protocol/vectors/free-execution-v3.json'),
+            .resolve('@gyblos/protocol/vectors/free-execution-v4.json'),
         ),
         'utf8',
       ),

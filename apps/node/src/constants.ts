@@ -137,7 +137,7 @@ export const INIT_DEFAULTS = {
   openaiKeyEnv: 'OPENAI_API_KEY',
   anthropicKeyEnv: 'ANTHROPIC_API_KEY',
   dailyTokenCap: '200000',
-  perBuyerCap: '5000',
+  perBuyerCap: '50000',
 } as const;
 // Owner only: an engine URL may carry a provider key in its path.
 export const INIT_FILE_MODE = 0o600;

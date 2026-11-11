@@ -16,6 +16,7 @@ import {
 
 export interface BuyerSessionPolicy {
   depositAtomic: string;
+  totalDepositAtomic?: string;
   lifetimeMs: number;
   withdrawDelaySeconds: number;
 }
@@ -25,9 +26,14 @@ export function parseBuyerSessionPolicy(value: unknown): BuyerSessionPolicy {
       value !== null &&
       typeof value === 'object' &&
       Object.hasOwn(value, 'withdrawDelaySeconds');
+    const hasTotal =
+      value !== null &&
+      typeof value === 'object' &&
+      Object.hasOwn(value, 'totalDepositAtomic');
     const row = controlObject(value, [
       'depositAtomic',
       'lifetimeMs',
+      ...(hasTotal ? ['totalDepositAtomic'] : []),
       ...(optional ? ['withdrawDelaySeconds'] : []),
     ]);
     const depositAtomic = controlAtomic(row.depositAtomic);
@@ -38,6 +44,9 @@ export function parseBuyerSessionPolicy(value: unknown): BuyerSessionPolicy {
       sessionFail();
     return {
       depositAtomic,
+      ...(hasTotal
+        ? { totalDepositAtomic: positiveTotal(row.totalDepositAtomic) }
+        : {}),
       lifetimeMs: controlInteger(
         row.lifetimeMs,
         BATCH_SESSION_DEFAULTS.minLifetimeMs,
@@ -85,4 +94,10 @@ export function sessionTerms(
     withdrawDelaySeconds: policy.withdrawDelaySeconds,
   };
   return matchBatchTerms(terms, terms);
+}
+
+function positiveTotal(value: unknown) {
+  const total = controlAtomic(value);
+  if (total === '0') return sessionFail();
+  return total;
 }

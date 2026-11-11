@@ -32,9 +32,10 @@ export async function createFreeSeller(
           perBuyerCap: limited
             ? FREE_ACCEPTANCE.limitedBuyerCap
             : FREE_ACCEPTANCE.perBuyerCap,
+          maxOutputTokens: FREE_ACCEPTANCE.maxOutputTokens,
         },
       },
-      tokenizer: { input: () => 1, count: () => 1 },
+      tokenizer: { input: () => 1, count: () => 1, chat: () => 1 },
     },
   );
   // The actual startup replay barrier excludes the starting tick; issue fresh quotes after it.

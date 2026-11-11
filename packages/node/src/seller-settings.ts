@@ -6,7 +6,8 @@
 // usage is recounted with the model's pinned public tokenizer.
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
-import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
+import { FREE_CONTEXT_TOKENS } from '@gyblos/engine-ollama/constants';
+import { ENGINE_KINDS, OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import type { RelayEnvironment } from '@gyblos/transport-iroh/endpoint';
 
 import {
@@ -82,7 +83,7 @@ function offerSettings(
   const engine: SellerEngineOffer = {
     index,
     model: offer.model,
-    engine: offer.engine,
+    engine: withFreeContext(offer),
     reasoning: [...offer.reasoning],
   };
   const refuse = (code: NodeErrorCode) => fail(code, { offer: index });
@@ -131,10 +132,23 @@ function offerSettings(
       caps: {
         dailyTokenCap: pricing.dailyTokenCap,
         perBuyerCap: pricing.perBuyerCap,
+        maxOutputTokens: pricing.maxOutputTokens,
       },
     },
     engine,
   };
+}
+
+// A free Ollama offer without engine.context_tokens gets room for conversations and long answers; a paid
+// one keeps the engine's own default context, as paid execution still serves one bounded message.
+function withFreeContext(offer: NodeOffer): NodeOffer['engine'] {
+  if (
+    offer.pricing.kind !== OFFER_PRICING_KINDS.FREE ||
+    offer.engine.kind !== ENGINE_KINDS.OLLAMA ||
+    offer.engine.contextTokens !== undefined
+  )
+    return offer.engine;
+  return { ...offer.engine, contextTokens: FREE_CONTEXT_TOKENS };
 }
 
 // Every entry must be servable: one refused offer refuses startup with its index.

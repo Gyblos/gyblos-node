@@ -314,7 +314,7 @@ publish = false
 model = "qwen3:0.6b"
 reasoning = ["off"]
 engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
-free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
+free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 TOML
   say "Wrote $dir/gyblos.toml"
 }
@@ -727,7 +727,7 @@ publish = false
 model = "qwen3:0.6b"
 reasoning = ["off"]
 engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
-free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
+free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 TOML
   say "Wrote $dir/gyblos.toml"
 }

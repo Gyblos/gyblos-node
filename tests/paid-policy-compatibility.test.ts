@@ -29,6 +29,7 @@ void test('unaffordable input wins over busy and does not spend the request id',
   seller.setBusy(false);
   seller.options.meter = recountedMeter({
     input: () => 4,
+    chat: () => 4,
     count: (text) => [...text].length,
   });
   const accepted = (await seller.execute(request)).terminal;

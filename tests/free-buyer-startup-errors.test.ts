@@ -80,7 +80,7 @@ void test('buyer:free explains each startup failure without printing the home pa
       path,
       JSON.stringify({
         ...SELECTION,
-        request: { ...SELECTION.request, maxTokens: 500 },
+        request: { ...SELECTION.request, maxTokens: 32769 },
       }),
     );
     assert.match(start(home).stderr, /SELECTION_MAX_TOKENS_TOO_HIGH/);

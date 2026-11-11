@@ -42,7 +42,7 @@ async function vector(): Promise<Vector> {
   return JSON.parse(
     await readFile(
       new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/free-execution-v3.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/free-execution-v4.json'),
       ),
       'utf8',
     ),
@@ -174,9 +174,9 @@ void test('free execution reader cannot resume a valid request after a framing v
   assert.throws(() => reader.finish(), { code: FREE_EXECUTION_CODES.INVALID });
 });
 
-void test('free execution v3 pins the seller-cannot-continue terminal and its reason', async () => {
+void test('free execution v4 pins the seller-cannot-continue terminal and its reason', async () => {
   const source = await vector();
-  assert.equal(FREE_EXECUTION.version, 3);
+  assert.equal(FREE_EXECUTION.version, 4);
   assert.equal(
     Buffer.from(encodeFreeExecutionResponse(source.cannotContinue)).toString(
       'hex',

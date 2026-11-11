@@ -30,15 +30,17 @@ the remote peer cannot change them.
 
 The seller opts in by setting `GYBLOS_SESSION_BUYER_NODE_ID` to the one
 permitted buyer's lowercase NodeId before normal startup. Only a seller with a
-priced execution service exposes this ALPN. There is one private session per
-role, not one slot per arbitrary remote peer. Preparation is stateless; only a
-valid SDK opening proof can assign that slot. Restart restores its original
-terms, absolute expiry, pending operations and worker. Changing selection or
-limits does not replace that session. Remove neither its files nor its lock to
-unblock a request. A completed channel is retained; automatic rotation is not
-provided. Reusable financial startup is currently unavailable on Windows until
-the payment subtree has equivalent ACL validation. Existing paths retain their
-behavior.
+priced execution service exposes this ALPN. Without total authority there is one
+private session per role; the optional
+[shared-authority mode](#multiple-sellers-and-shared-authority) keeps one
+bounded slot per chosen seller, not per arbitrary remote buyer. Preparation is
+stateless; only a valid SDK opening proof can assign that slot. Restart restores
+its original terms, absolute expiry, pending operations and worker. Changing
+selection or limits does not replace that session. Remove neither its files nor
+its lock to unblock a request. A completed channel is retained; automatic
+rotation is not provided. Reusable financial startup is currently unavailable on
+Windows until the payment subtree has equivalent ACL validation. Existing paths
+retain their behavior.
 
 Start the buyer normally with `pnpm buyer:chat`. It distinguishes the session
 deposit, each question's ceiling and its independently verified **approved**
@@ -197,7 +199,162 @@ only its earlier accepted total. Existing free/paid stream channels remain
 independently available; no streaming or full agent-API compatibility is newly
 claimed for this session RPC.
 
-Explicit application startup activates the single permitted pair only. Multiple
-sellers/concurrent requests, automatic session rotation/topup, restored-journal
-rollback defense, abrupt host/power-loss acceptance and live
+Without shared total authority startup retains one pair. Explicit total
+authority enables separately owned seller sessions as described below.
+Concurrent requests inside one seller channel, automatic session rotation/topup,
+restored-journal rollback defense, abrupt host/power-loss acceptance and live
 network/deployed-program validation remain separate work.
+
+## Multiple sellers and shared authority
+
+Add `totalDepositAtomic` to the existing buyer `session` policy to enable the
+private multi-seller catalog. `depositAtomic` remains the fixed amount per new
+seller channel; `totalDepositAtomic` is the authorization shared by all of them.
+For example, a per-channel deposit of `"100000"` and total authority of
+`"200000"` can fund two sellers. Omitting the total retains the existing
+single-channel mode; no larger authority is inferred from the candidate list.
+Both amounts use canonical atomic decimal strings. The per-channel pilot cap,
+finite lifetime and withdrawal grace remain unchanged.
+
+The normal verified selector chooses a seller, and the shared buyer routes its
+signed quote to that seller's persistent slot. Returning A → B → A reuses A's
+original channel and cumulative total, including after restarting the buyer.
+Changing a seller's owner, payment identities, network, asset or channel terms
+cannot replace the old slot. All slots share the same buyer, buyer NodeId,
+network and asset. There are at most sixteen slots, including retained closed
+ones. With total authority, at most two requests may execute concurrently
+against different sellers, reusing the existing global limit; each seller
+channel remains single-request. Admissions and durable financial catalog
+mutations are serialized, not generation. This does not add automatic topup,
+channel rotation or new model/API formats.
+
+Committed authority is the sum of each allocated deposit minus its independently
+verified refund. An idle, expired, opening or uncertain channel still occupies
+its full allocation. Actual charges remain consumed after settlement; refunds
+are credited once, survive restart and cannot reset prior spending. Lowering the
+configured total below commitments blocks new use, while recovery and closure
+under original terms remain available. `/settle` tries every retained seller and
+reports aggregate charge/refund amounts only when all required independent
+proofs exist. A failed/offline peer cannot fabricate a successful aggregate or
+prevent attempts to close the other slots.
+
+Every buyer service startup mode (free, per-request, single-session and pool)
+first holds the same buyer-home lifetime ownership guard. Startup failures,
+final inspection and shutdown release it. Raw signing/SDK ports remain trusted
+host primitives; external hosts must honor that ownership contract. The adapter
+additionally holds one buyer-wide catalog process lock and writes an allocation
+before financial construction or signing. It seeds a private child journal
+before marking that slot ready, so an interrupted pre-sign allocation can finish
+under the same immutable reservation. A missing ready journal fails closed. A
+durable request intent precedes execution: ambiguity blocks new free and paid
+routing across all sellers until original financial approval recovery or
+independent finality resolves it. A provably pristine pre-sign child may clear a
+failed intent without releasing its allocation. Prompt content is never
+replayed.
+
+The catalog and deterministic child paths live under the buyer's private
+payments home, using 0700 directories, 0600 files, bounded atomic writes and
+strict parsers. A pre-existing root single-channel journal is adopted in place
+and counted before another allocation; it is never moved or overwritten.
+Removing pool configuration cannot bypass non-finalized obligations. Updated
+applications must exclusively own this home; running an older binary against the
+same financial state is unsupported. This is not protection against restoring a
+complete older backup; that remains separate work.
+
+Zero-price signed quotes still use transaction-free execution. A fresh free-only
+buyer with pool policy constructs no financial backend, loads no signing key and
+makes no financial RPC call. Identity/discovery checks retain their existing
+policy. Windows reusable financial activation remains unavailable.
+
+## Buyer routing when a selected seller is busy
+
+The optional `routing` object in buyer `selection.json` is validated by the
+shared `@gyblos/core/buyer-routing` policy and consumed by the shared session
+runtime. Other hosts can reuse its parser and the node routing service; no
+Settings UI is included here. Configuration is loaded at buyer startup.
+
+```json
+{
+  "routing": {
+    "onBusy": "reroute",
+    "allowPinnedFallback": false,
+    "allowHigherPriceFallback": false,
+    "queueWaitMs": 30000
+  }
+}
+```
+
+`reroute` is the default. `reject` returns busy without another execution. A
+fixed seller is replaced only when `allowPinnedFallback` is explicitly true.
+These options govern a seller already chosen or pinned, not the initial ranking.
+The third option, `wait`, waits for that same seller with a bounded in-memory
+queue. Without shared total session authority, existing buyer modes retain their
+behavior.
+
+Before rerouting, both replacement prices must be no higher than the original
+verified quote or fresh authenticated catalog, independently for input and
+output. An occupied local seller uses the quote held by its active request as
+the reference while that verified quote remains valid; querying its control
+channel would compete with its unchanged per-peer execution admission. An
+expired or missing active reference returns typed busy. This reference only
+bounds prices: the alternative still passes fresh identity, replay, selection
+and quote checks. User ceilings are intersected with those prices. Explicit
+higher-price permission still cannot widen the configured price, per-request or
+total budget. With the default price rule, a free quote cannot turn into a paid
+request. An unverifiable or expired reference cannot authorize fallback.
+Identity, replay, exact model, reasoning, network and asset checks remain
+mandatory for each alternative.
+
+Rerouting ends before the first possible prompt write: a failed or partial
+write, remote execution refusal or lost response never sends that prompt
+elsewhere. Only explicit busy before transmission and a safely unused financial
+intent can be treated as an unsent busy result. A busy response after a prompt
+was written remains terminal. No retries are added to execution.
+
+Live ownership is distinct from unknown financial state. An owned healthy A
+request does not trigger recovery or block B. If A becomes uncertain, new free
+and paid requests stop. B may finish under its original reservation if its
+prompt was already sent; otherwise B is cancelled before transmission. Restart
+never reconstructs live ownership from a pending journal: original recovery is
+required. Settlement/reconciliation refuse while requests are active. Shutdown
+closes admission and drains actual operations before releasing private journal
+ownership.
+
+## Waiting for the selected seller
+
+`routing.onBusy: "wait"` never reroutes. It admits at most one waiter per seller
+within the existing two-request total admission, including waiting HTTP calls.
+Two running calls therefore leave no third queue slot; one running A call can
+have one waiter. This does not increase HTTP, Iroh, engine or financial
+capacity. Waiting occupies neither an execution connection nor a new financial
+reservation. Existing channel deposits remain committed. Queue data, including
+its captured input, exists only in memory and is never restored or replayed
+after restart.
+
+The default wait is 30000 milliseconds. `queueWaitMs` must be a positive integer
+no greater than the existing request deadline, and the original caller deadline
+may end the wait sooner. A waiter is removed on disconnect, cancellation,
+uncertainty, shutdown or expiry; timeout has a static typed local error. FIFO
+ownership is handed to the waiter before a newcomer can acquire that seller.
+
+After admission, the buyer obtains a new quote for the same seller and repeats
+identity, freshness, model/reasoning and budget checks. When a quote was already
+selected, its input and output prices also bound the renewed quote unless
+higher-price fallback was explicitly authorized. Waiting never silently turns a
+free choice into a paid one. Only a known busy cooldown is ignored for this
+explicit retry; hard filters still apply. No deposit or request authorization
+starts while the request is still queued. If the remote peer remains busy,
+bounded control-only polls share the original wait deadline. A non-busy failure
+ends the call; it never changes sellers or retries a prompt.
+
+The trusted execution port receives a synchronous `sending` callback. Product
+free and session transports invoke it at the actual first possible prompt write,
+after checks. It ends the queue clock, preserving the original remaining
+response deadline without extending it. Preparation and quote renewal remain
+bounded by queue time. A failed/partial write is still a possible send and never
+retried. Usage approval and final settlement retain their existing independent
+checks.
+
+Settings controls belong to the separate host/UI integration. The canonical
+parser and behavior below apps are reusable; this implementation changes no
+desktop panel, seller CLI, fee calculation, wire bytes or journal format.

@@ -1,7 +1,7 @@
-// Adapts the Ollama client to the protocol Engine port: one user message, digest identity, recountable usage.
-import { singleUserPrompt, type Engine } from '@gyblos/protocol/engine';
+// Adapts the Ollama client to the protocol Engine port: a conversation, digest identity, recountable usage.
+import type { Engine } from '@gyblos/protocol/engine';
 
-import { GENERATION, MODEL } from './constants';
+import { MODEL } from './constants';
 import { createOllama, type OllamaOptions } from './index';
 
 export function createOllamaEngine(
@@ -23,14 +23,11 @@ export function createOllamaEngine(
       return {
         name: MODEL.name,
         digest: MODEL.digest,
-        contextTokens: GENERATION.numCtx,
+        contextTokens: adapter.contextTokens,
       };
     },
     async generate(input) {
-      const result = await adapter.generate({
-        ...input,
-        prompt: singleUserPrompt(input),
-      });
+      const result = await adapter.generate(input);
       return {
         text: result.text,
         finishReason: result.doneReason,

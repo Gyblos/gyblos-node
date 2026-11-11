@@ -12,6 +12,21 @@ export const TIMEOUTS = {
   readinessRequest: 500,
 } as const;
 
+// A long answer needs longer than the base generation deadline: past the original 128-token answer, each
+// asked-for token adds time, up to just under the transport's request deadline (180 s).
+const LONG_ANSWER = {
+  baseTokens: 128,
+  msPerToken: 25,
+  ceilingMs: 170_000,
+} as const;
+export function generationDeadlineMs(baseMs: number, maxTokens: number) {
+  const extra = Math.max(0, maxTokens - LONG_ANSWER.baseTokens);
+  return Math.max(
+    baseMs,
+    Math.min(LONG_ANSWER.ceilingMs, baseMs + extra * LONG_ANSWER.msPerToken),
+  );
+}
+
 export const RETRIES = {
   confirmation: 30,
   rpc: 4,
@@ -88,6 +103,7 @@ export const HTTP_LIMITS = {
   facilitatorBody: '64kb',
 } as const;
 
+// Paid requests and the legacy HTTP path stay small until paid conversations land.
 export const INFERENCE_REQUEST_LIMITS = {
   minOutputTokens: 32,
   maxOutputTokens: 128,
@@ -97,4 +113,11 @@ export const INFERENCE_REQUEST_LIMITS = {
 export const SANDBOX_AGENT_LIMITS = {
   contextTokens: 16384,
   maxOutputTokens: 512,
+} as const;
+
+// A free answer's longest length in tokens: a seller's offer default, and the most any offer or buyer
+// may set. Free output text is at most 256 KiB; a token is at least a byte, and answers average several.
+export const FREE_OUTPUT_TOKENS = {
+  default: 4096,
+  max: 32768,
 } as const;

@@ -59,6 +59,7 @@ export interface FreeBuyerDependencies {
     request: FreeExecutionRequest,
     signal: AbortSignal,
     onDelta?: (text: string) => Promise<void>,
+    beforeExecute?: () => void,
   ): Promise<FreeExecutionResult>;
 }
 export async function executeBuyerFree(
@@ -107,6 +108,7 @@ export async function executeSelectedBuyerFree(
   winner: FreeWinner,
   signal: AbortSignal,
   onDelta?: (text: string) => Promise<void>,
+  beforeExecute?: () => void,
 ): Promise<FreeExecutionResult | undefined> {
   const request = buildFreeExecutionRequest(winner.quote, input);
   const observer = buyerExecutionTelemetry(
@@ -128,7 +130,13 @@ export async function executeSelectedBuyerFree(
       }
     : undefined;
   try {
-    const result = await dependencies.execute(winner, request, signal, emit);
+    const result = await dependencies.execute(
+      winner,
+      request,
+      signal,
+      emit,
+      beforeExecute,
+    );
     signal.throwIfAborted();
     completeBuyerTelemetry(observer, request, result);
     await receipt?.finish(winner, request, result, signal);

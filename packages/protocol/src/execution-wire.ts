@@ -34,15 +34,17 @@ function role(value: unknown): FreeChatRole {
     if (value === accepted) return accepted;
   return freeExecutionFail();
 }
-function messages(value: unknown) {
+// The paid and batch channels keep the input bound they shipped with; free v4 passes its own.
+export const PAID_INPUT_BYTES = 65536;
+function messages(value: unknown, inputBytes: number) {
   const entries = controlArray(value, FREE_EXECUTION.maxMessages);
   if (!entries.length) return freeExecutionFail();
   let bytes = 0;
   return entries.map((entry) => {
     const input = controlObject(entry, ['role', 'content']);
-    const content = freeExecutionText(input.content, FREE_EXECUTION.inputBytes);
+    const content = freeExecutionText(input.content, inputBytes);
     bytes += new TextEncoder().encode(content).length;
-    if (bytes > FREE_EXECUTION.inputBytes)
+    if (bytes > inputBytes)
       return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
     return { role: role(input.role), content };
   });
@@ -57,6 +59,7 @@ export function parseExecutionInput(
   value: unknown,
   requestId: string,
   offered: InferenceOfferV2,
+  inputBytes: number = PAID_INPUT_BYTES,
 ): FreeExecutionRequest['input'] {
   const params = controlObject(value, [
     'messages',
@@ -80,7 +83,7 @@ export function parseExecutionInput(
   if (maxTokens > offered.maxTokens || maxTokens > offered.model.contextTokens)
     return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
   return {
-    messages: messages(params.messages),
+    messages: messages(params.messages, inputBytes),
     selection,
     reasoning,
     maxTokens,

@@ -243,10 +243,11 @@ interface LockOwner {
 
 // Lock paths this process holds or is acquiring, so it never acquires one twice.
 const HELD = new Set<string>();
-// Lock files (device and inode) this process created, so its own pid in a lock file that is not
-// one of them (an earlier run that reused the pid, such as pid 1 in a restarted container) reads
-// as stale, however the path to it is spelled.
-const OWN_FILES = new Set<string>();
+// Lock files (device and inode) this process created, with their open handles, so its own pid in a
+// lock file that is not one of them (an earlier run that reused the pid, such as pid 1 in a restarted
+// container) reads as stale, however the path to it is spelled. Holding the handle keeps the inode in use,
+// so the file system can never give that inode to another file while it is listed here.
+const OWN_FILES = new Map<string, FileHandle>();
 
 const identity = (info: Stats) => `${info.dev}:${info.ino}`;
 
@@ -259,9 +260,20 @@ function alive(pid: number): boolean {
   }
 }
 
-function stale(owner: LockOwner, inspected: Stats): boolean {
+// Whether the file is one this process created and still holds open.
+async function ownFile(inspected: Stats) {
+  const file = OWN_FILES.get(identity(inspected));
+  if (!file) return false;
+  try {
+    return identity(await file.stat()) === identity(inspected);
+  } catch {
+    return false;
+  }
+}
+
+async function stale(owner: LockOwner, inspected: Stats) {
   if (owner.host !== hostname()) return false;
-  if (owner.pid === process.pid) return !OWN_FILES.has(identity(inspected));
+  if (owner.pid === process.pid) return !(await ownFile(inspected));
   return !alive(owner.pid);
 }
 async function ownerAt(path: string): Promise<LockOwner | undefined> {
@@ -292,7 +304,7 @@ async function takeOver(path: string): Promise<Created | undefined> {
   try {
     const inspected = await lstat(path);
     const owner = await ownerAt(path);
-    if (!owner || !stale(owner, inspected)) fail();
+    if (!owner || !(await stale(owner, inspected))) fail();
     const aside = `${path}.${randomUUID()}.stale`;
     await rename(path, aside);
     const moved = await lstat(aside);
@@ -327,7 +339,7 @@ async function create(path: string): Promise<Created | undefined> {
   let id: string | undefined;
   try {
     id = identity(await file.stat());
-    OWN_FILES.add(id);
+    OWN_FILES.set(id, file);
     await file.writeFile(
       JSON.stringify({ pid: process.pid, host: hostname() }),
     );

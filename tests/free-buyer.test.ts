@@ -11,7 +11,7 @@ import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import { freeSellerFixture } from './support/free-seller';
 
-void test('free chat accepts only the configured model, one user message and bounded non-streaming output', async () => {
+void test('free chat accepts only the configured model, a text conversation and bounded non-streaming output', async () => {
   const api = await import('@gyblos/buyer/free-chat');
   const selection = { modelId: 'synthetic', variant: null, quantization: null };
   const input = {
@@ -22,10 +22,10 @@ void test('free chat accepts only the configured model, one user message and bou
   for (const change of [
     { stream: true },
     { model: 'other' },
-    { temperature: 1 },
-    { max_tokens: 11 },
+    { tools: [{ type: 'function' }] },
+    { max_tokens: 0 },
     { messages: [{ role: 'system', content: 'hello' }] },
-    { messages: [...input.messages, ...input.messages] },
+    { messages: [...input.messages, { role: 'assistant', content: 'hi' }] },
     { messages: [{ role: 'user', content: ['image'] }] },
   ])
     assert.throws(() =>

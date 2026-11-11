@@ -52,7 +52,7 @@ export function fakeLiveOffer(
       modelId,
       reasoning: [REASONING_LEVELS.OFF],
       kind: OFFER_PRICING_KINDS.FREE,
-      caps: { dailyTokenCap: 1000, perBuyerCap: 1000 },
+      caps: { dailyTokenCap: 1000, perBuyerCap: 1000, maxOutputTokens: 4096 },
     },
     model: {
       name: `internal/${modelId}`,
@@ -71,6 +71,8 @@ export function fakeLiveOffer(
     engine,
     meter: recountedMeter({
       input: (text) => text.length,
+      chat: (messages) =>
+        messages.reduce((sum, message) => sum + message.content.length, 0),
       count: (text) => text.length,
     }),
     observation: {

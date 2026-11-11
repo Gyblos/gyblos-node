@@ -19,7 +19,7 @@ import {
   type FreeWinner,
 } from './free-execution';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
-import { selectVerifiedBuyerQuote } from './selection';
+import { selectBusyAwareBuyerQuote } from './selection-busy';
 import type {
   BuyerSelectionConfig,
   StaticControlSeller,
@@ -74,7 +74,7 @@ export function freeBuyerDependencies(
     },
     select: (excluded, signal) =>
       selectFreeWinner(prepared, options, excluded, signal),
-    async execute(winner, request, signal, onDelta) {
+    async execute(winner, request, signal, onDelta, beforeExecute) {
       const seller = sellers.get(winner.nodeId);
       if (
         !seller ||
@@ -87,7 +87,13 @@ export function freeBuyerDependencies(
         options.endpoint,
         address(seller),
         seller,
-        { now, relayOnly: options.relayOnly, relayAllowed, onDelta },
+        {
+          now,
+          relayOnly: options.relayOnly,
+          relayAllowed,
+          onDelta,
+          beforeExecute,
+        },
       );
       try {
         return await client.execute(request, signal);
@@ -105,6 +111,7 @@ export interface FreeSelectionOptions {
   receipts?: ReturnType<typeof createBuyerReceiptRuntime>;
   telemetry?: TelemetrySink;
   onSellerFailure?: SellerFailureReporter;
+  onPinnedBusy?: (nodeId: string) => never;
   endpoint: Endpoint;
   buyer: string;
   relayOnly: boolean;
@@ -161,11 +168,13 @@ export async function selectWinner(
   excluded: ReadonlySet<string>,
   signal: AbortSignal,
   request: BuyerSelectionConfig['request'],
+  route?: { pinnedNodeId?: string; waitingFor?: string },
 ): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
   const base = {
     ...policy,
+    ...(route ? { pinnedNodeId: route.pinnedNodeId } : {}),
     request,
     sellers: policy.sellers.filter((seller) => !excluded.has(seller.nodeId)),
   };
@@ -184,7 +193,11 @@ export async function selectWinner(
         )
       : base;
   const stats = new Map(prepared.stats.rows);
-  const result = await selectVerifiedBuyerQuote(
+  if (route?.waitingFor && route.waitingFor === route.pinnedNodeId) {
+    const prior = stats.get(route.waitingFor);
+    if (prior) stats.set(route.waitingFor, { ...prior, cooldownUntil: null });
+  }
+  const result = await selectBusyAwareBuyerQuote(
     config,
     {
       buyer: options.buyer,
@@ -200,6 +213,7 @@ export async function selectWinner(
         : undefined,
       connect: (seller) => connectFreeControl(seller, options, now),
       onSellerFailure: options.onSellerFailure,
+      onPinnedBusy: options.onPinnedBusy,
     },
     signal,
   );

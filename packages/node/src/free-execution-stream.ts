@@ -2,6 +2,7 @@
 // The final complete engine text must equal the already delivered prefix, never a synthesized fallback.
 import {
   ENGINE_DONE_REASONS,
+  FREE_EXECUTION,
   FREE_EXECUTION_CODES,
 } from '@gyblos/protocol/constants';
 import {
@@ -12,6 +13,34 @@ import {
 } from '@gyblos/protocol/free-execution';
 
 import type { FreeMeter } from './free-meter';
+
+// The exact recount and response bounds of the whole streamed text.
+function checkStreamed(
+  request: FreeExecutionRequest,
+  header: Pick<
+    FreeExecutionResponse,
+    'version' | 'requestId' | 'requestDigest'
+  >,
+  meter: FreeMeter,
+  inputTokens: number,
+  text: string,
+) {
+  const tokens = meter.streamed(text);
+  if (
+    !Number.isSafeInteger(tokens) ||
+    tokens < 0 ||
+    tokens > request.input.maxTokens
+  )
+    return fail(FREE_EXECUTION_CODES.LIMIT);
+  parseFreeExecutionResponse({
+    ...header,
+    result: {
+      text,
+      usage: { inputTokens, outputTokens: tokens },
+      finishReason: ENGINE_DONE_REASONS.STOP,
+    },
+  });
+}
 
 export function createFreeStreamOutput(
   request: FreeExecutionRequest,
@@ -25,6 +54,9 @@ export function createFreeStreamOutput(
   deliver: (text: string) => Promise<void>,
 ) {
   let text = '';
+  // Upper bounds of the text's tokens and of its escaped JSON size, summed per fragment.
+  let tokenBound = 0;
+  let wireBound = 0;
   // Only text whose delivery resolved; text above may hold a fragment still in flight. A delivery that
   // rejected after writing its bytes is not counted, so the buyer then rejects the terminal instead.
   let deliveredText = '';
@@ -46,21 +78,15 @@ export function createFreeStreamOutput(
         entered = true;
         if (!delta) return;
         const combined = text + delta;
-        const tokens = meter.streamed(combined);
+        // Each fragment's own count and escaped size bound the whole text's, so the exact recount and
+        // response check run only once those bounds near a limit: a long answer stays linear.
+        tokenBound += meter.streamed(delta) + 1;
+        wireBound += Buffer.byteLength(JSON.stringify(delta));
         if (
-          !Number.isSafeInteger(tokens) ||
-          tokens < 0 ||
-          tokens > request.input.maxTokens
+          tokenBound > request.input.maxTokens ||
+          wireBound > FREE_EXECUTION.outputBytes
         )
-          return fail(FREE_EXECUTION_CODES.LIMIT);
-        parseFreeExecutionResponse({
-          ...header,
-          result: {
-            text: combined,
-            usage: { inputTokens, outputTokens: tokens },
-            finishReason: ENGINE_DONE_REASONS.STOP,
-          },
-        });
+          checkStreamed(request, header, meter, inputTokens, combined);
         text = combined;
         await deliver(delta);
         deliveredText = combined;

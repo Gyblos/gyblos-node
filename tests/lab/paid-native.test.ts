@@ -35,8 +35,8 @@ void test('native SDK open, early payer close, claim and refund conserve actual 
   const after = await value.balances();
   assert.deepEqual(after, {
     payer: FUNDS - 145n,
-    seller: 140n,
-    fee: 4n,
+    seller: 139n,
+    fee: 5n,
     program: 1n,
     escrow: 0n,
   });

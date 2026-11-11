@@ -25,7 +25,8 @@ export interface OfferEngine {
   url: string;
   apiKeyEnv?: string;
   upstreamModel?: string;
-  // Required for remote engine kinds, whose APIs do not report it; Ollama reports its own.
+  // Required for remote engine kinds, whose APIs do not report it; optional for Ollama, whose num_ctx it
+  // sets.
   contextTokens?: number;
 }
 
@@ -63,15 +64,13 @@ export function offerEngine(
   unknownKeys(engine, path, ENGINE_KEYS, issues);
   if (!issues.cleanSince(mark) || kind === undefined || url === undefined)
     return undefined;
-  const local = kind === ENGINE_KINDS.OLLAMA;
-  // Ollama reports its own context size; remote APIs do not.
-  if (local !== (contextTokens === undefined))
-    return issues.add(
-      local
-        ? NODE_CONFIG_ISSUE_CODES.INVALID_VALUE
-        : NODE_CONFIG_ISSUE_CODES.MISSING_KEY,
-      [...path, 'context_tokens'],
-    );
+  // Remote APIs do not report their context size; Ollama's is the num_ctx the seller chooses, with a
+  // default (engine-ollama GENERATION.numCtx).
+  if (kind !== ENGINE_KINDS.OLLAMA && contextTokens === undefined)
+    return issues.add(NODE_CONFIG_ISSUE_CODES.MISSING_KEY, [
+      ...path,
+      'context_tokens',
+    ]);
   return withoutUndefined({
     kind,
     url,

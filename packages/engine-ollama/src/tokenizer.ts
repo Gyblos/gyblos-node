@@ -1,9 +1,12 @@
-// Builds the recount tokenizer from hash-checked public tokenizer files; counts output and templated input.
+// Builds the recount tokenizer from hash-checked public tokenizer files; counts output and templated input,
+// a lone prompt or a whole conversation.
 import { createHash } from 'node:crypto';
 
 import { Tokenizer } from '@huggingface/tokenizers';
 
-import { MODEL, renderChat } from './model';
+import type { ChatMessage } from '@gyblos/protocol/chat';
+
+import { MODEL, renderChat, renderConversation } from './model';
 
 export type ModelTokenizer = ReturnType<typeof createModelTokenizer>;
 
@@ -25,5 +28,10 @@ export function createModelTokenizer(artifacts: {
   );
   const count = (text: string) =>
     tokenizer.encode(text, { add_special_tokens: false }).ids.length;
-  return { count, input: (prompt: string) => count(renderChat(prompt)) };
+  return {
+    count,
+    input: (prompt: string) => count(renderChat(prompt)),
+    chat: (messages: readonly ChatMessage[]) =>
+      count(renderConversation(messages)),
+  };
 }
