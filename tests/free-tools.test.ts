@@ -79,7 +79,7 @@ void test('a tool conversation answers every call with one result before the mod
     assert.equal(isToolConversation(messages), false, JSON.stringify(messages));
 });
 
-void test('only the free channel takes tools; the paid and session channels keep their text-only input', async () => {
+void test('all execution profiles preserve the same tools and reject malformed definitions', async () => {
   const state = await fixture(
     { dailyTokenCap: 1000, perBuyerCap: 1000 },
     { tools: true },
@@ -92,8 +92,9 @@ void test('only the free channel takes tools; the paid and session channels keep
   const parsed = parseFreeExecutionRequest(request);
   assert.deepEqual(parsed.input.tools, TOOLS);
   assert.deepEqual(parsed.input.messages, LOOP);
-  assert.throws(() =>
+  assert.deepEqual(
     parseExecutionInput(request.input, request.requestId, request.quote.offer),
+    request.input,
   );
   // Malformed tools: arguments that are not a JSON object, a duplicate name, a choice naming no tool.
   for (const change of [

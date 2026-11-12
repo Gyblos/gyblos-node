@@ -1,9 +1,9 @@
 // Observes verified buyer attempts and unavailable selection; never retries, stores content or guesses an engine kind.
+import { emitTelemetry, telemetrySizes } from '@gyblos/core/telemetry';
 import {
-  createExecutionTelemetry,
-  emitTelemetry,
-  telemetrySizes,
-} from '@gyblos/core/telemetry';
+  completeInferenceTelemetry,
+  createInferenceTelemetry,
+} from '@gyblos/inference/observation';
 import { FREE_EXECUTION_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
 import type {
   FreeExecutionRequest,
@@ -14,19 +14,18 @@ import {
   TELEMETRY_REFUSALS,
   type TelemetryRefusal,
 } from '@gyblos/protocol/telemetry';
-import { conversationText, recordedFinishReason } from '@gyblos/protocol/tools';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import type { FreeBuyerDependencies } from './free-execution';
 
 export function buyerExecutionTelemetry(
-  request: FreeExecutionRequest,
+  request: Pick<FreeExecutionRequest, 'requestId' | 'quote' | 'input'>,
   dependencies: FreeBuyerDependencies,
   streaming: boolean,
 ) {
   const telemetry = dependencies.telemetry;
   if (!telemetry) return undefined;
-  const observer = createExecutionTelemetry({
+  const observer = createInferenceTelemetry({
     sink: telemetry.sink,
     now: telemetry.now ?? Date.now,
     context: {
@@ -81,14 +80,10 @@ export function failBuyerTelemetry(
 }
 export function completeBuyerTelemetry(
   observer: ReturnType<typeof buyerExecutionTelemetry>,
-  request: FreeExecutionRequest,
+  request: Pick<FreeExecutionRequest, 'requestId' | 'quote' | 'input'>,
   result: FreeExecutionResult,
 ) {
-  observer?.completed(
-    { ...result.usage, reasoningTokens: null },
-    recordedFinishReason(result.finishReason),
-    telemetrySizes(conversationText(request.input.messages), result.text),
-  );
+  completeInferenceTelemetry(observer, request.input, result);
 }
 export function buyerUnserved(
   dependencies: FreeBuyerDependencies,

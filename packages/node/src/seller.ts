@@ -204,6 +204,13 @@ export async function startSeller(
     const sessions = paid?.sessions
       ? await startSellerSessions({
           ...paid.sessions,
+          telemetry: telemetry.sink
+            ? {
+                sink: telemetry.sink,
+                engineKind: (index) =>
+                  settings.offers[index]!.engine.engine.kind,
+              }
+            : undefined,
           description: paid.description,
           owner: owner.address,
           nodeId: config.nodeId,
@@ -212,6 +219,18 @@ export async function startSeller(
         })
       : undefined;
     if (sessions) disposers.push(sessions.close);
+    const quotedOffers = {
+      readiness: () => offers.readiness(),
+      listed: () =>
+        offers
+          .listed()
+          .map((offer) =>
+            offer.offer.kind === OFFER_PRICING_KINDS.PAID && !sessions
+              ? { ...offer, tools: false }
+              : offer,
+          ),
+    };
+
     await stage('iroh-endpoint');
     const { relayOnly } = settings;
     const endpoint = await (options.bind ?? bindEndpoint)(
@@ -285,7 +304,7 @@ export async function startSeller(
       authorizer: paid?.description.authorizer ?? owner.address,
       endpoint: endpointInfo,
       relayOnly,
-      offers,
+      offers: quotedOffers,
     });
     disposers.push(async () => {
       await control.records.withdraw();

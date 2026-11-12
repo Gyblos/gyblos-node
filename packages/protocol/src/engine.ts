@@ -115,15 +115,6 @@ export function engineToolConversation(
   return input.messages;
 }
 
-// A text-only result, for channels that never offer tools.
-export function textResult(result: EngineResult): EngineResult & {
-  finishReason: EngineDoneReason;
-} {
-  if (result.toolCalls || result.finishReason === 'tool_calls')
-    throw new Error('Unexpected tool calls.');
-  return result as EngineResult & { finishReason: EngineDoneReason };
-}
-
 export interface RecountTokenizer {
   count(text: string): number;
   input(prompt: string): number;
@@ -134,6 +125,7 @@ export interface ChatTokenizer extends RecountTokenizer {
   chat(
     messages: readonly ToolChatMessage[],
     tools?: readonly ToolDefinition[],
+    toolChoice?: ToolChoice,
   ): number;
   // What a result that called tools costs: its text and calls as the template writes an assistant turn.
   output?(text: string, toolCalls?: readonly ToolCall[]): number;

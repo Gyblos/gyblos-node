@@ -16,7 +16,6 @@ import {
   statusFailure,
   type EngineAttempt,
 } from '@gyblos/core/engine-failures';
-import type { ChatMessage } from '@gyblos/protocol/chat';
 import {
   ENGINE_DONE_REASONS,
   ENGINE_ERROR_CODES,
@@ -28,20 +27,18 @@ import {
   type EngineInput,
 } from '@gyblos/protocol/engine';
 import {
-  hasToolTurns,
   TOOL_CALLS_DONE,
-  TOOL_CHOICES,
   type ToolCall,
   type ToolDefinition,
 } from '@gyblos/protocol/tools';
 import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
 import { GENERATION, MODEL_LIMITS } from './constants';
-import { MODEL, renderConversation } from './model';
+import { MODEL } from './model';
 import {
   createToolStreamSplitter,
   parseToolOutput,
-  renderToolConversation,
+  renderInferenceConversation,
 } from './tool-template';
 
 export interface InferenceResult {
@@ -230,18 +227,11 @@ async function finishGeneration(
 // block, so the model is not offered them. An unsupported conversation is a programming error, raised
 // before any engine call.
 function generationPrompt(input: GenerateInput) {
-  const conversation = engineToolConversation(input);
-  const tools =
-    input.tools?.length && input.toolChoice !== TOOL_CHOICES.NONE
-      ? input.tools
-      : undefined;
-  return {
-    tools,
-    prompt:
-      tools || hasToolTurns(conversation)
-        ? renderToolConversation(conversation, tools)
-        : renderConversation(conversation as readonly ChatMessage[]),
-  };
+  return renderInferenceConversation(
+    engineToolConversation(input),
+    input.tools,
+    input.toolChoice,
+  );
 }
 
 // One deterministic raw generation of the rendered prompt.

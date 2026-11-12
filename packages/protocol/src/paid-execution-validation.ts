@@ -16,6 +16,7 @@ import {
   FreeExecutionError,
   freeExecutionStop,
 } from './free-execution-validation';
+import { INFERENCE_CODES, InferenceError } from './inference';
 import { PAID_EXECUTION_CODES, type PaidExecutionCode } from './paid/constants';
 
 export class PaidExecutionError extends Error {
@@ -72,6 +73,14 @@ const FROM_CONTROL: Partial<Record<ControlCode, PaidExecutionCode>> = {
 
 export function rethrowPaidExecution(error: unknown): never {
   if (error instanceof PaidExecutionError) throw error;
+  if (error instanceof InferenceError)
+    return paidExecutionFail(
+      error.code === INFERENCE_CODES.LIMIT
+        ? PAID_EXECUTION_CODES.LIMIT
+        : error.code === INFERENCE_CODES.UNSUPPORTED
+          ? PAID_EXECUTION_CODES.UNSUPPORTED
+          : PAID_EXECUTION_CODES.INTERNAL,
+    );
   if (error instanceof FreeExecutionError)
     return paidExecutionFail(FROM_FREE[error.code]);
   if (error instanceof ControlError)

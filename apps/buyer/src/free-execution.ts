@@ -11,6 +11,7 @@ import {
   type FreeExecutionRequest,
   type FreeExecutionResult,
 } from '@gyblos/protocol/free-execution';
+import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
@@ -83,7 +84,9 @@ export async function executeBuyerFree(
     const excluded = new Set<string>();
     while (!signal.aborted) {
       const winner = await dependencies
-        .select(excluded, signal, { tools: Boolean(input.tools) })
+        .select(excluded, signal, {
+          tools: inferenceNeedsTools(input),
+        })
         .catch((error) => {
           if (!signal.aborted) buyerUnserved(dependencies, Boolean(onDelta));
           throw error;

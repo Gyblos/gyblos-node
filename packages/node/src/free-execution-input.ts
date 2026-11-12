@@ -1,17 +1,17 @@
 // What a free request may ask of this offer, checked before admission: the quoted terms, a conversation
 // the engine can render (with tools only when it serves them) and the input's tokens within the context.
+import {
+  prepareInference,
+  validateInferenceInput,
+} from '@gyblos/inference/conversation';
 import { canonicalJson } from '@gyblos/protocol';
-import { isConversation, type ChatMessage } from '@gyblos/protocol/chat';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import {
   freeExecutionFail as fail,
   type FreeExecutionRequest,
 } from '@gyblos/protocol/free-execution';
-import {
-  hasToolTurns,
-  isToolConversation,
-  type ToolChatMessage,
-} from '@gyblos/protocol/tools';
+import { INFERENCE_CODES, InferenceError } from '@gyblos/protocol/inference';
+import { type ToolChatMessage } from '@gyblos/protocol/tools';
 
 import type { SellerFreeExecutionOptions } from './free-execution';
 
@@ -32,15 +32,12 @@ export function supportedInput(
     !options.offer.reasoning.includes(offer.reasoning)
   )
     return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  const { messages, tools } = request.input;
-  // Tools and tool turns need an engine that renders them; a text conversation keeps its strict shape.
-  const usesTools = Boolean(tools) || hasToolTurns(messages);
-  if (
-    usesTools
-      ? !options.engine.supportsTools?.() || !isToolConversation(messages)
-      : !isConversation(messages as readonly ChatMessage[])
-  )
+  const { messages } = request.input;
+  try {
+    validateInferenceInput(request.input, options.engine, options.meter);
+  } catch {
     return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
+  }
   if (request.input.maxTokens > options.offer.caps.maxOutputTokens)
     return fail(FREE_EXECUTION_CODES.LIMIT);
   return messages;
@@ -51,18 +48,20 @@ export function freeInputTokens(
   messages: readonly ToolChatMessage[],
   options: InputOptions,
 ) {
-  let inputTokens: number;
   try {
-    inputTokens = options.meter.chat(messages, request.input.tools);
-  } catch {
-    // Text the model's template cannot carry (its control tokens, say) is input the offer cannot serve.
-    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
+    return prepareInference(
+      { ...request.input, messages },
+      {
+        engine: options.engine,
+        meter: options.meter,
+        contextTokens: options.model.contextTokens,
+      },
+    );
+  } catch (error) {
+    return fail(
+      error instanceof InferenceError && error.code === INFERENCE_CODES.LIMIT
+        ? FREE_EXECUTION_CODES.LIMIT
+        : FREE_EXECUTION_CODES.UNSUPPORTED,
+    );
   }
-  if (
-    !Number.isSafeInteger(inputTokens) ||
-    inputTokens < 0 ||
-    inputTokens + request.input.maxTokens > options.model.contextTokens
-  )
-    return fail(FREE_EXECUTION_CODES.LIMIT);
-  return inputTokens;
 }

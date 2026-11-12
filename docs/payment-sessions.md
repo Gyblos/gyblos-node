@@ -2,7 +2,7 @@
 
 The shared buyer and seller session services use the pinned Solana x402
 `batch-settlement` client-signature mode. Trusted hosts can compose them over
-the opt-in `gyblos/session/3` Iroh channel. The buyer CLI and seller daemon can
+the opt-in `gyblos/session/4` Iroh channel. The buyer CLI and seller daemon can
 activate this path explicitly. Without that policy, the existing per-request
 path remains available. No public gateway is enabled by this composition.
 
@@ -433,3 +433,26 @@ checks.
 Settings controls belong to the separate host/UI integration. The canonical
 parser and behavior below apps are reusable; this implementation changes no
 desktop panel, seller CLI, fee calculation, wire bytes or journal format.
+
+### Tools on the common execution pipeline
+
+The normal buyer endpoint supports tools for both a zero-price quote and a
+positive-price quote backed by an explicitly configured reusable session. The
+same inference package validates capabilities, preserves system/history/tool
+turns, runs the engine and measures the result. A free choice constructs no
+financial services. A paid choice verifies the whole received result before
+signing its cumulative usage. Tools are run by the API client, never implicitly
+by the node, chat CLI or desktop host.
+
+Configure the session authorization above before using positive-price tools. The
+older individual settlement mode rejects tool requests before opening a payment:
+it cannot safely bill arguments held until a terminal without a buyer
+acknowledgement. It does not silently convert an individual authorization into a
+reusable deposit. Both peers need the active session v4 implementation; original
+saved financial approvals retain their exact bill and voucher through recovery,
+without replaying content.
+
+Tool definitions/results count toward the existing input bound; canonical tool
+output counts toward tokens even if the text is empty. Local telemetry covers
+both prices with the same content-free events and remains configurable. A
+voucher approval is shown as approved usage, not as a confirmed settlement.

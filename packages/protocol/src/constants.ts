@@ -379,3 +379,11 @@ export type ReceiptChannelCode =
 
 // Payment port catalogs live in their own module; re-exported so every caller keeps one import.
 export * from './payments/constants';
+
+// Neutral semantic failures, mapped by each execution wire boundary.
+export const INFERENCE_CODES = {
+  INVALID: 'INFERENCE_INVALID',
+  UNSUPPORTED: 'INFERENCE_UNSUPPORTED',
+  LIMIT: 'INFERENCE_LIMIT',
+  INTERNAL: 'INFERENCE_INTERNAL',
+} as const;

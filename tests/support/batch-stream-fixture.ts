@@ -24,7 +24,7 @@ export async function batchStreamFixture() {
   const raw: { execution: BatchExecutionRequest } = JSON.parse(
     await readFile(
       new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/batch-channel-v3.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/batch-channel-v4.json'),
       ),
       'utf8',
     ),

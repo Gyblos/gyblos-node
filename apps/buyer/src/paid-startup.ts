@@ -169,6 +169,7 @@ function paidClosers(
 }
 
 interface BuyerStartupOptions {
+  telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;
   pool?: (
     role: RoleConfig,
     totalDepositAtomic: string,

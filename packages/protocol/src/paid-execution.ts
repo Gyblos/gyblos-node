@@ -164,13 +164,20 @@ export function buildPaidExecutionRequest(
     const offer = parseOfferV2(
       controlObject(quote, ['offer', 'signature']).offer,
     );
-    const params = controlObject(input, ['messages', 'maxTokens']);
+    const params = controlObject(input, [
+      'messages',
+      'maxTokens',
+      ...(input.tools ? ['tools'] : []),
+      ...(input.toolChoice ? ['toolChoice'] : []),
+    ]);
     return parsePaidExecutionRequest({
       version: PAID_EXECUTION.version,
       requestId: offer.requestId,
       quote,
       input: {
         messages: params.messages,
+        ...(input.tools ? { tools: input.tools } : {}),
+        ...(input.toolChoice ? { toolChoice: input.toolChoice } : {}),
         maxTokens: params.maxTokens,
         selection: offer.selection,
         reasoning: offer.reasoning,

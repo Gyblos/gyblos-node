@@ -2,6 +2,10 @@
 import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { chargeV2 } from '@gyblos/core/pricing-v2';
 import { recountSessionInput } from '@gyblos/core/session-input';
+import {
+  generateInference,
+  validateInferenceInput,
+} from '@gyblos/inference/conversation';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   BatchChannelError,
@@ -15,8 +19,8 @@ import {
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
-import { textResult, type EngineResult } from '@gyblos/protocol/engine';
 import type { ExecutionResult } from '@gyblos/protocol/free-execution';
+import { InferenceError } from '@gyblos/protocol/inference';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import type {
@@ -59,25 +63,6 @@ export function batchLiveOffer(
     return batchFail(PAID_EXECUTION_CODES.ENGINE);
   return live;
 }
-function recountedResult(
-  live: LiveSellerOffer,
-  inputTokens: number,
-  maxTokens: number,
-  generated: EngineResult,
-): ExecutionResult {
-  const usage = live.meter.usage(generated.text, generated.usage, inputTokens);
-  if (
-    !usage ||
-    usage.outputTokens > maxTokens ||
-    usage.inputTokens + usage.outputTokens > live.model.contextTokens
-  )
-    return batchFail(PAID_EXECUTION_CODES.LIMIT);
-  return {
-    text: generated.text,
-    usage,
-    finishReason: textResult(generated).finishReason,
-  };
-}
 export async function generateBatch(
   request: BatchExecutionRequest,
   pending: SessionRequest,
@@ -87,12 +72,18 @@ export async function generateBatch(
   now: () => number,
   signal: AbortSignal,
   onDelta?: (text: string) => Promise<void>,
+  generated?: (duration: number) => void,
 ) {
   const { input, inputTokens } = recountSessionInput(
     request.quote,
     request.input,
     live.meter,
   );
+  try {
+    validateInferenceInput(input, live.engine, live.meter);
+  } catch (error) {
+    throw batchError(error);
+  }
   const run = await runBatchSellerExecution<ExecutionResult>({
     seller: session,
     request: pending,
@@ -119,9 +110,11 @@ export async function generateBatch(
           )
         : '0',
     open: (window) =>
-      batchGeneration(live, input, inputTokens, window, onDelta),
+      batchGeneration(live, input, inputTokens, window, onDelta, generated),
   });
   if ('error' in run.generated) {
+    if (run.generated.error instanceof InferenceError)
+      throw batchError(run.generated.error);
     if (run.generated.error instanceof BatchChannelError)
       throw run.generated.error;
     return batchFail(
@@ -140,6 +133,7 @@ function batchGeneration(
   inputTokens: number,
   window: { signal: AbortSignal; check: () => void },
   onDelta: ((text: string) => Promise<void>) | undefined,
+  onGenerated: ((duration: number) => void) | undefined,
 ) {
   const output = createPaidStreamOutput(
     live.meter,
@@ -153,10 +147,15 @@ function batchGeneration(
     stop: output.stop,
     generate: async () => {
       window.check();
-      const generated = await live.engine.generate({
-        messages: input.messages,
-        maxTokens: input.maxTokens,
+      const generated = await generateInference({
+        engine: live.engine,
+        input,
+        inputTokens,
+        meter: live.meter,
+        contextTokens: live.model.contextTokens,
         signal: window.signal,
+        check: window.check,
+        generated: onGenerated,
         onText: async (text) => {
           if (text) emitted = true;
           await output.onText(text);
@@ -165,7 +164,7 @@ function batchGeneration(
       window.check();
       if (!emitted && generated.text) await output.onText(generated.text);
       output.complete(generated.text);
-      return recountedResult(live, inputTokens, input.maxTokens, generated);
+      return generated;
     },
     measure: (
       generated: import('@gyblos/inference').Generated<ExecutionResult>,

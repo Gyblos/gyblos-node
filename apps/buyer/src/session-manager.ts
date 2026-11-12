@@ -76,7 +76,12 @@ function activeMeter(state: SessionState): ChatTokenizer {
   };
   return {
     input: (text) => current().input(text),
-    chat: (messages) => current().chat(messages),
+    chat: (messages, tools, choice) => current().chat(messages, tools, choice),
+    output: (text, calls) => {
+      const meter = current();
+      if (!meter.output) return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+      return meter.output(text, calls);
+    },
     count: (text) => current().count(text),
   };
 }
@@ -166,9 +171,11 @@ export function makeManager(
       : createBuyerSessionManager(common);
   return {
     ...manager,
-    prepareMeter: () => {
+    prepareMeter: async (tools = false) => {
       checkPaidRequest(prepared, role);
-      return prepareMeter(state, options);
+      await prepareMeter(state, options);
+      if (tools && !state.meter?.output)
+        return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
     },
   };
 }

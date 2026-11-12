@@ -432,8 +432,9 @@ Request fields (required unless marked optional; unknown fields at every level a
 - `maxTokens` is a positive safe integer no greater than the signed output
   maximum or model context. The engine-specific input token count plus the
   requested output maximum must fit the quoted context before generation.
-- Optional tool calling (free channel only; the paid and session channels keep
-  their text-only input and refuse these fields):
+- Optional tool calling uses the common grammar below. Active session v4 also
+  accepts it with its own unchanged bounds; legacy individual settlement refuses
+  it before payment (see [common execution](#active-common-tool-aware-execution)):
   - `input.tools`: 1–128 `{name, description?, parameters}`. `name` matches
     `[A-Za-z0-9_-]{1,64}` and is unique; `description` is non-empty text up to
     8 KiB; `parameters` is JSON text (up to 64 KiB) holding one JSON object, the
@@ -1330,3 +1331,68 @@ The SDK adapter invokes it immediately before each new transaction/message
 signature, rechecking cancellation and quote/host expiry after delayed hints or
 private writes. A signature already in progress may finish internally, but its
 result is not transmitted after cancellation. This changes no signing bytes.
+
+## Active common tool-aware execution
+
+The active execution profiles are free `gyblos/free/4` and
+`gyblos/free-stream/4`, individual paid `gyblos/paid-stream/2` (request version
+2, domain `gyblos/paid-execution-request/v2\n`), and reusable paid
+`gyblos/session/4` (version 4, domains `gyblos/session-request/v4\n` and
+`gyblos/session-rpc/v4\n`). Earlier paid/session descriptions and golden
+vectors document retired wire profiles; they are not additional registered
+ALPNs. Free vectors, existing offers, cumulative SDK voucher signatures and
+financial journals are unchanged. Upgrade both peers together; no downgrade,
+reconstructed old request or automatic prompt replay is supported.
+
+`InferenceInput` and `InferenceResult` own the common conversation, tools,
+choice, output and usage shapes. `@gyblos/inference` owns capability validation,
+generation, output validation and independent usage verification over injected
+engine/meter ports. Economic policies remain outside that package: zero-price
+quotes use caps and construct no financial service; positive-price tool
+execution uses an explicitly authorized reusable session. Selection asks for
+tools for definitions or prior tool turns, regardless of price. Only a seller
+with an implemented engine and the required execution/meter ports may quote
+that capability. Free and paid executions observe the same metadata lifecycle;
+local persistence remains opt-in and no external export is enabled implicitly.
+
+Session v4 accepts tool definitions, choice and tool-result history, and tool
+calls on its complete result or stream terminal. The entire input retains its
+65536-byte bound, 1024 messages and 128 output-token limit; definitions and tool
+JSON consume the existing bound. Framing, deadlines, admission, budgets and
+prices are unchanged. Deltas remain text. Calls are held until the terminal,
+validated against the offered tools and choice, and included in independent
+usage verification before any new cumulative voucher is signed. Incomplete or
+invalid terminals authorize no new charge; prior accepted obligations remain
+recoverable without sending another prompt.
+
+Recounted input includes the model's whole conversation template, tool
+specifications and tool results. Tool choice `none` uses exactly the template
+sent to the engine, excluding the definitions block. Recounted output includes
+canonical assistant text, tool names, arguments and template markup, excluding
+local call identifiers. A tool-only response can therefore have positive usage
+with empty text. This is the agreed public rendering, not a claim that every
+remote provider tokenizes internally in that form. A paid tool request requires
+a tokenizer able to render tool output before financial construction. Declared
+provider usage remains suitable for conservative free caps only.
+
+Individual paid settlement has no buyer acknowledgement for held tool calls:
+it must reject tools and tool-result history with `UNSUPPORTED` before payment
+construction/admission, even after a text runtime was cached. It retains full
+text conversations and the common generator. Hosts must configure a reusable
+session for positive-price tools; they must not silently create a new deposit
+policy. Its v2 wire grammar is common, but this legacy economic policy does not
+admit those inputs. This prevents charging generated arguments before delivery.
+
+Telemetry is observational: failed sinks, clocks and generation callbacks do
+not change inference, caps or billing. Both peers record received, first usable
+output and one completed/failed/refused terminal. Tool-only first output is
+observed with its validated result. A session bill or approved voucher is not a
+confirmed payment; it emits no per-inference `CHARGED`. Existing confirmed
+individual settlement evidence retains that event. Channel totals are not
+attributed to the last request. Existing free signed usage receipts remain
+free-specific; this change does not fabricate paid usage receipts.
+
+New independent Node/OpenSSL vectors are `paid-execution-v2.json`,
+`batch-channel-v4.json`, `batch-prepare-v4.json`, `batch-startup-v4.json`,
+`batch-stream-v4.json` and `batch-tools-v4.json`. All historical vectors stay
+byte-identical and their retired versions are rejected by active parsers.

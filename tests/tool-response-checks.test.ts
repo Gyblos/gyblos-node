@@ -42,6 +42,7 @@ async function called(
   sequence: number,
   name: string,
   input: { tools?: ToolDefinition[]; toolChoice?: ToolChoice },
+  invalid = false,
 ) {
   const state = await fixture(
     { dailyTokenCap: 1000, perBuyerCap: 1000 },
@@ -57,12 +58,29 @@ async function called(
     messages: [{ role: 'user', content: 'time?' }],
     ...input,
   });
-  const response = await state.service.respond(
+  const actual = await state.service.respond(
     request,
     request.quote.offer.buyerNodeId,
     signal(),
   );
-  assert.ok(response.result, JSON.stringify(response.error));
+  if (invalid)
+    assert.equal(
+      actual.error?.code,
+      FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    );
+  else assert.ok(actual.result);
+  // Supply a malicious peer terminal directly: the common seller now refuses these too.
+  const response = {
+    version: actual.version,
+    requestId: actual.requestId,
+    requestDigest: actual.requestDigest,
+    result: {
+      text: '',
+      toolCalls: [{ id: 'call_1', name, arguments: '{}' }],
+      usage: { inputTokens: 4, outputTokens: 2 },
+      finishReason: TOOL_CALLS_DONE,
+    },
+  };
   return { request, response };
 }
 
@@ -80,7 +98,7 @@ const REFUSED = [
 void test('the buyer refuses calls the request did not allow, and accepts the ones it did', async () => {
   let sequence = 1;
   for (const [label, name, input] of REFUSED) {
-    const { request, response } = await called(sequence++, name, input);
+    const { request, response } = await called(sequence++, name, input, true);
     await assert.rejects(
       matchFreeExecutionResponse(response, request),
       { code: FREE_EXECUTION_CODES.INVALID },
@@ -101,7 +119,7 @@ void test('the buyer refuses calls the request did not allow, and accepts the on
 void test('a stream terminal with a call the request did not allow is refused', async () => {
   let sequence = 20;
   for (const [label, name, input] of REFUSED) {
-    const { request, response } = await called(sequence++, name, input);
+    const { request, response } = await called(sequence++, name, input, true);
     const verifier = await createFreeStreamVerifier(request);
     await assert.rejects(
       verifier.accept({

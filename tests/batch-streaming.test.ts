@@ -32,8 +32,8 @@ function result(text: string): EngineResult {
 }
 
 void test('reusable streaming is versioned separately from the complete session-v2 wire', () => {
-  assert.equal(BATCH_CHANNEL.alpn, 'gyblos/session/3');
-  assert.equal(BATCH_CHANNEL.version, 3);
+  assert.equal(BATCH_CHANNEL.alpn, 'gyblos/session/4');
+  assert.equal(BATCH_CHANNEL.version, 4);
 });
 
 void test('live paid deltas precede completion and two requests reuse one deposit', async (t) => {

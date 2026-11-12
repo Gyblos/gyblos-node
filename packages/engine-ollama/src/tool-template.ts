@@ -3,13 +3,19 @@
 // calls back out of what the model writes. Seller and buyer count tokens over the same rendering.
 import { randomUUID } from 'node:crypto';
 
+import type { ChatMessage } from '@gyblos/protocol/chat';
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import {
+  hasToolTurns,
+  TOOL_CHOICES,
   TOOL_ROLE,
   type ToolCall,
   type ToolChatMessage,
+  type ToolChoice,
   type ToolDefinition,
 } from '@gyblos/protocol/tools';
+
+import { renderConversation } from './model';
 
 const TOOLS_HEADER =
   '# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>';
@@ -193,5 +199,22 @@ export function createToolStreamSplitter() {
     raw: () => raw,
     // Whatever was held back and not yet released.
     held: () => raw.slice(released),
+  };
+}
+
+// One input rendering for engine and public recount; choice none excludes the offered definitions.
+export function renderInferenceConversation(
+  messages: readonly ToolChatMessage[],
+  tools?: readonly ToolDefinition[],
+  choice?: ToolChoice,
+) {
+  const offered =
+    tools?.length && choice !== TOOL_CHOICES.NONE ? tools : undefined;
+  return {
+    tools: offered,
+    prompt:
+      offered || hasToolTurns(messages)
+        ? renderToolConversation(messages, offered)
+        : renderConversation(messages as readonly ChatMessage[]),
   };
 }

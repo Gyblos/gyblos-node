@@ -10,9 +10,11 @@ import { executeSelectedBuyerPaid } from '@gyblos/node/buyer-paid-execution';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import { rolePath } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER, PAID_BUYER_CODES, PAID_BUYER_HTTP_MS } from './constants';
+import { observeBuyerExecution } from './execution-observation';
 import { executeSelectedBuyerFree } from './free-execution';
 import { selectWinner } from './free-selection';
 import type { ChatResult } from './free-sse';
@@ -73,10 +75,20 @@ async function preparePaid(
   state: ReturnType<typeof admission>,
   buyer: string,
   signal: AbortSignal,
+  input: import('@gyblos/protocol/free-execution').FreeExecutionBuildInput,
 ) {
   const { prepared, role, endpoint, relayOnly } = context;
   checkPaidRequest(prepared, role);
   const meter = await (options.meter ?? tokenizer)();
+  if (inferenceNeedsTools(input)) {
+    if (
+      !('chat' in meter) ||
+      typeof meter.chat !== 'function' ||
+      !('output' in meter) ||
+      typeof meter.output !== 'function'
+    )
+      throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+  }
   signal.throwIfAborted();
   if (state.closed()) throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
   const chain = await payments(
@@ -114,11 +126,14 @@ function lazyPaid(
   let opened: Awaited<ReturnType<typeof preparePaid>> | undefined;
 
   return {
-    get(signal: AbortSignal) {
+    get(
+      signal: AbortSignal,
+      input: import('@gyblos/protocol/free-execution').FreeExecutionBuildInput,
+    ) {
       signal.throwIfAborted();
       if (state.closed())
         throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-      pending ??= preparePaid(context, options, state, buyer, signal)
+      pending ??= preparePaid(context, options, state, buyer, signal, input)
         .then(async (runtime) => {
           if (state.closed() || signal.aborted) {
             await runtime.chain.close();
@@ -172,7 +187,10 @@ function quoteExecutor(
             },
             excluded,
             selectionSignal,
-            context.prepared.config.request,
+            {
+              ...context.prepared.config.request,
+              ...(inferenceNeedsTools(input) ? { tools: true } : {}),
+            },
           ).catch((error) => {
             if (!selectionSignal.aborted)
               buyerUnserved(context.dependencies, Boolean(onDelta));
@@ -186,20 +204,30 @@ function quoteExecutor(
             executionSignal,
             onDelta,
           ),
-        paid: async (winner, executionSignal) => {
-          const runtime = await paid.get(executionSignal);
-          const outcome = await executeSelectedBuyerPaid(
-            input,
-            runtime.paid,
+        paid: async (winner, executionSignal) =>
+          observeBuyerExecution(
+            context.dependencies,
             winner,
+            input,
             executionSignal,
             onDelta,
-          );
-          if (!outcome) return undefined;
-          const { result, error } = outcome.terminal;
-          if (!result) throw new PaidOutcomeError(error.code, outcome);
-          return { ...result, payment: paidSummary(outcome) };
-        },
+            async (emit) => {
+              if (inferenceNeedsTools(input))
+                throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+              const runtime = await paid.get(executionSignal, input);
+              const outcome = await executeSelectedBuyerPaid(
+                input,
+                runtime.paid,
+                winner,
+                executionSignal,
+                emit,
+              );
+              if (!outcome) return undefined;
+              const { result, error } = outcome.terminal;
+              if (!result) throw new PaidOutcomeError(error.code, outcome);
+              return { ...result, payment: paidSummary(outcome) };
+            },
+          ),
       },
       signal,
     );

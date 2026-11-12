@@ -4,10 +4,12 @@ import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
+import { observeBuyerExecution } from './execution-observation';
 import { executeSelectedBuyerFree } from './free-execution';
 import { selectWinner } from './free-selection';
 import type { ChatResult } from './free-sse';
@@ -31,7 +33,7 @@ async function executePaidSession(
   sending?: () => void,
 ): Promise<ChatResult> {
   current.throwIfAborted();
-  await bounded(manager.prepareMeter(), current);
+  await bounded(manager.prepareMeter(inferenceNeedsTools(input)), current);
   current.throwIfAborted();
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
@@ -66,6 +68,16 @@ async function executePaidSession(
     },
   };
 }
+function freeExecutionGuard(
+  manager: ReturnType<typeof makeManager>,
+  sending?: () => void,
+) {
+  return () => {
+    if ('checkBeforeExternalExecution' in manager)
+      manager.checkBeforeExternalExecution();
+    sending?.();
+  };
+}
 function sessionExecutor(
   context: Context,
   options: Options,
@@ -89,7 +101,11 @@ function sessionExecutor(
           },
           excluded,
           current,
-          { ...prepared.config.request, priceCeilings: route.priceCeilings },
+          {
+            ...prepared.config.request,
+            priceCeilings: route.priceCeilings,
+            ...(inferenceNeedsTools(input) ? { tools: true } : {}),
+          },
           route,
         ),
       free: (winner, current, sending) =>
@@ -99,23 +115,26 @@ function sessionExecutor(
           winner,
           current,
           onDelta,
-          () => {
-            if ('checkBeforeExternalExecution' in manager)
-              manager.checkBeforeExternalExecution();
-            sending?.();
-          },
+          freeExecutionGuard(manager, sending),
         ),
-      paid: async (winner, current, sending) => {
-        return executePaidSession(
-          manager,
-          state,
+      paid: (winner, current, sending) =>
+        observeBuyerExecution(
+          context.dependencies,
           winner,
           input,
           current,
           onDelta,
-          sending,
-        );
-      },
+          (emit) =>
+            executePaidSession(
+              manager,
+              state,
+              winner,
+              input,
+              current,
+              emit,
+              sending,
+            ),
+        ),
     };
     const routed = router
       ? await router.execute(ports, signal)

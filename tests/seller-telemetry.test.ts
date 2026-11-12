@@ -44,9 +44,15 @@ void test('seller emits one request and completion with sizes and metering but n
   assert.ok(response.result);
   assert.deepEqual(
     telemetry.events.map((event) => event.type),
-    [TELEMETRY_EVENTS.REQUEST_RECEIVED, TELEMETRY_EVENTS.COMPLETED],
+    [
+      TELEMETRY_EVENTS.REQUEST_RECEIVED,
+      TELEMETRY_EVENTS.FIRST_TOKEN,
+      TELEMETRY_EVENTS.COMPLETED,
+    ],
   );
-  const completed = telemetry.events[1];
+  const completed = telemetry.events.find(
+    (event) => event.type === TELEMETRY_EVENTS.COMPLETED,
+  );
   assert.equal(completed?.type, TELEMETRY_EVENTS.COMPLETED);
   if (completed?.type !== TELEMETRY_EVENTS.COMPLETED) assert.fail();
   assert.equal(completed.totalMs, 12);

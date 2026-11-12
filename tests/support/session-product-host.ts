@@ -34,6 +34,10 @@ export async function sessionProductHost(
     meter: ChatTokenizer;
     observe: (input: EngineInput) => void;
     loadMeter?: () => Promise<ChatTokenizer>;
+    generate?: (
+      input: EngineInput,
+    ) => Promise<import('@gyblos/protocol/engine').EngineResult>;
+    telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;
   },
 ) {
   const workspace = await createAcceptanceWorkspace();
@@ -99,6 +103,7 @@ export async function sessionProductHost(
     const startSeller = async () => {
       seller = createNode({
         bind: binding.bind,
+        telemetry: conversation?.telemetry,
         createEngine: () => {
           const prepared = engine.create();
           if (!conversation) return prepared;
@@ -111,9 +116,12 @@ export async function sessionProductHost(
             },
             engine: {
               ...prepared.engine,
+              ...(conversation.generate ? { supportsTools: () => true } : {}),
               generate: (input: EngineInput) => {
                 conversation.observe(input);
-                return generate(input);
+                return conversation.generate
+                  ? conversation.generate(input)
+                  : generate(input);
               },
             },
           };
@@ -153,6 +161,7 @@ export async function sessionProductHost(
       buyer = await startBuyer({
         port: 0,
         bind: binding.bind,
+        telemetry: conversation?.telemetry,
         meter:
           conversation?.loadMeter ??
           (async () => conversation?.meter ?? paidAcceptanceMeter),

@@ -22,6 +22,7 @@ import { createToolProvider } from './tools-provider';
 
 const positive = (scenario: ToolAcceptanceCase) =>
   [
+    TOOL_ACCEPTANCE_CASES.AUTOMATIC,
     TOOL_ACCEPTANCE_CASES.OPENAI_JSON,
     TOOL_ACCEPTANCE_CASES.OPENAI_STREAM,
     TOOL_ACCEPTANCE_CASES.ANTHROPIC_JSON,
@@ -95,12 +96,21 @@ export async function toolScenario(
     const url = anthropic
       ? run.buyer().url.replace('/v1/chat/completions', '/v1/messages')
       : run.buyer().url;
+    const token = automatic
+      ? (
+          await readFile(
+            rolePathIn(run.environment, P2P_ROLES.BUYER, PAID_BUYER.tokenFile),
+            'utf8',
+          )
+        ).trim()
+      : undefined;
     if (positive(scenario)) {
       for (const followup of [false, true]) {
         const response = await toolHttp(
           url,
           toolRequest(anthropic, streaming, followup),
           signal,
+          token,
         ).response;
         await verifyToolAnswer(response, anthropic, streaming, followup);
       }

@@ -43,12 +43,12 @@ void test(
           'invalid-provider',
           'cut-before-terminal',
           'cancel-before-terminal',
-          'automatic-refuses-tools',
+          'automatic-free-tools',
         ],
       );
       for (const [index, item] of value.cases.entries())
         await context.test(item.case, () => {
-          const positive = index < 4;
+          const positive = index < 4 || item.case === 'automatic-free-tools';
           const sent = positive
             ? 2
             : [

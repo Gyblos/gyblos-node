@@ -1,6 +1,7 @@
 // Maps paid wire outcomes to the existing observational categories; financial evidence stays explicit.
 // Never changes execution, exposes content or reports a pending claim as a confirmed charge.
-import { emitTelemetry, telemetrySizes } from '@gyblos/core/telemetry';
+import { emitTelemetry } from '@gyblos/core/telemetry';
+import { completeInferenceTelemetry } from '@gyblos/inference/observation';
 import { FREE_EXECUTION_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
 import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 import type {
@@ -51,14 +52,7 @@ export function finishPaidTelemetry(
 ) {
   if (!observer) return;
   if (response.result) {
-    observer.completed(
-      { ...response.result.usage, reasoningTokens: null },
-      response.result.finishReason,
-      telemetrySizes(
-        request.input.messages[0]?.content ?? '',
-        response.result.text,
-      ),
-    );
+    completeInferenceTelemetry(observer, request.input, response.result);
   } else if (
     admitted ||
     response.error.code === PAID_EXECUTION_CODES.CANCELLED

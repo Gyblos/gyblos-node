@@ -17,7 +17,7 @@ import {
   encodeBatchStreamEvent,
 } from '@gyblos/protocol/batch-stream';
 
-void test('session-v3 live event vectors match independent canonical bytes, frames and both SHA-256 implementations', async () => {
+void test('session-v4 live event vectors match independent canonical bytes, frames and both SHA-256 implementations', async () => {
   const fixture: {
     request: unknown;
     requestDigest: string;
@@ -25,14 +25,14 @@ void test('session-v3 live event vectors match independent canonical bytes, fram
   } = JSON.parse(
     await readFile(
       new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/batch-stream-v3.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/batch-stream-v4.json'),
       ),
       'utf8',
     ),
   );
   const request = parseBatchChannelRequest(fixture.request);
   const signing = Buffer.from(
-    'gyblos/session-rpc/v3\n' + canonicalJson(request),
+    'gyblos/session-rpc/v4\n' + canonicalJson(request),
   );
   assert.equal(
     createHash('sha256').update(signing).digest('hex'),

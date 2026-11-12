@@ -14,8 +14,8 @@ const PAID_V1_REQUEST_BYTES = 131072;
 const PAID_V1_MAX_EVENTS = 4096;
 
 export const PAID_EXECUTION = {
-  version: 1,
-  requestDomain: 'gyblos/paid-execution-request/v1\n',
+  version: 2,
+  requestDomain: 'gyblos/paid-execution-request/v2\n',
   requestBytes: PAID_V1_REQUEST_BYTES + AUTHORIZATION_BYTES,
   responseBytes: FREE_EXECUTION.responseBytes + PAYMENT_TERMINAL_BYTES,
   // The scheme's signed channel open, base64; a Solana transaction is at most 1232 bytes.
@@ -26,7 +26,7 @@ export const PAID_EXECUTION = {
 
 // Free stream framing with room for the charge and payment in the terminal.
 export const PAID_STREAM = {
-  alpn: 'gyblos/paid-stream/1',
+  alpn: 'gyblos/paid-stream/2',
   deltaBytes: FREE_STREAM.deltaBytes,
   eventBytes: FREE_STREAM.eventBytes + PAYMENT_TERMINAL_BYTES,
   maxEvents: PAID_V1_MAX_EVENTS,
