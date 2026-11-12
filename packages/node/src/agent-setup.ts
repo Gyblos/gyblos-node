@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 // One source for connecting coding agents to a local Gyblos buyer: OpenCode, pi, Codex CLI and Claude Code.
 // From the endpoint and the models it serves, each tool gets its own configuration text, and the JSON
 // files a tool reads can be merged without touching anything but the `gyblos` provider. Both the buyer
@@ -19,14 +21,15 @@ export const AGENT_SETUP = {
   freeKey: 'gyblos-local',
   // A context size for tools that need one when the buyer does not know the sellers' own.
   contextTokens: 32768,
+  maxContextTokens: 10_000_000,
   maxModels: 32,
   namePattern: /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/,
   envPattern: /^[A-Z_][A-Z0-9_]{0,63}$/,
-  // Where each tool reads its configuration, under the user's home directory.
+  // Where each tool reads its configuration, relative to its own directory (see agentFilePath).
   files: {
-    opencode: '.config/opencode/opencode.json',
-    pi: '.pi/agent/models.json',
-    codex: '.codex/config.toml',
+    opencode: 'opencode.json',
+    pi: 'models.json',
+    codex: 'config.toml',
   },
 } as const;
 
@@ -41,6 +44,32 @@ export interface AgentEndpoint {
   models: readonly AgentModel[];
   // A paid endpoint's bearer token, by environment variable name; absent for a free endpoint.
   tokenEnv?: string;
+}
+
+// The file a tool reads, honoring the variables each tool uses to move its configuration.
+export function agentFilePath(
+  tool: keyof typeof AGENT_SETUP.files,
+  home: string,
+  environment: Readonly<Record<string, string | undefined>> = {},
+) {
+  if (tool === AGENT_TOOLS.CODEX)
+    return join(
+      environment.CODEX_HOME || join(home, '.codex'),
+      AGENT_SETUP.files.codex,
+    );
+  if (tool === AGENT_TOOLS.PI)
+    return join(
+      environment.PI_CODING_AGENT_DIR || join(home, '.pi/agent'),
+      AGENT_SETUP.files.pi,
+    );
+  return (
+    environment.OPENCODE_CONFIG ||
+    join(
+      environment.XDG_CONFIG_HOME || join(home, '.config'),
+      'opencode',
+      AGENT_SETUP.files.opencode,
+    )
+  );
 }
 
 export class AgentSetupError extends Error {
@@ -63,7 +92,11 @@ function checked(endpoint: AgentEndpoint): AgentEndpoint {
       (model) =>
         !AGENT_SETUP.namePattern.test(model.id) ||
         !Number.isSafeInteger(model.maxOutputTokens) ||
-        model.maxOutputTokens < 1,
+        model.maxOutputTokens < 1 ||
+        (model.contextTokens !== undefined &&
+          (!Number.isSafeInteger(model.contextTokens) ||
+            model.contextTokens <= model.maxOutputTokens ||
+            model.contextTokens > AGENT_SETUP.maxContextTokens)),
     ) ||
     (endpoint.tokenEnv !== undefined &&
       !AGENT_SETUP.envPattern.test(endpoint.tokenEnv))
@@ -150,14 +183,22 @@ export function codexBlock(endpoint: AgentEndpoint) {
     'request_max_retries = 0',
     'stream_max_retries = 0',
     ...profile(AGENT_SETUP.provider, models[0]!),
-    ...models.flatMap((model) =>
-      profile(
-        `${AGENT_SETUP.provider}-${model.id.replaceAll(/[^A-Za-z0-9_-]/g, '-')}`,
-        model,
-      ),
+    ...profileNames(models).flatMap((name, index) =>
+      profile(name, models[index]!),
     ),
     CODEX_MARKS.end,
   ].join('\n');
+}
+// One profile name per model: its id with other characters as dashes, numbered when two ids collide.
+export function profileNames(models: readonly AgentModel[]) {
+  const used = new Set<string>([AGENT_SETUP.provider]);
+  return models.map((model) => {
+    const plain = `${AGENT_SETUP.provider}-${model.id.replaceAll(/[^A-Za-z0-9_-]/g, '-')}`;
+    let name = plain;
+    for (let count = 2; used.has(name); count++) name = `${plain}-${count}`;
+    used.add(name);
+    return name;
+  });
 }
 export const CODEX_MARKS = {
   start: '# >>> gyblos (managed by pnpm buyer:agent codex)',
@@ -173,7 +214,14 @@ export function claudeCodeEnvironment(endpoint: AgentEndpoint) {
     `export ANTHROPIC_BASE_URL=${endpoint.origin}`,
     `export ANTHROPIC_AUTH_TOKEN=${key}`,
     `export ANTHROPIC_MODEL=${first.id}`,
-    `export ANTHROPIC_SMALL_FAST_MODEL=${first.id}`,
+    // Claude Code's own aliases (and the subagents that use them) would ask for Anthropic models this
+    // endpoint does not serve; each points at a served one. The others are picked with /model <name>.
+    `export ANTHROPIC_DEFAULT_OPUS_MODEL=${first.id}`,
+    `export ANTHROPIC_DEFAULT_SONNET_MODEL=${first.id}`,
+    `export ANTHROPIC_DEFAULT_HAIKU_MODEL=${first.id}`,
+    ...(models[1]
+      ? [`export ANTHROPIC_CUSTOM_MODEL_OPTION=${models[1].id}`]
+      : []),
     `export CLAUDE_CODE_MAX_OUTPUT_TOKENS=${first.maxOutputTokens}`,
     'export CLAUDE_CODE_DISABLE_THINKING=1',
   ].join('\n');
@@ -241,7 +289,8 @@ export function mergedCodexConfig(
   if (start >= 0 && end > start)
     return `${text.slice(0, start)}${block}${text.slice(end + CODEX_MARKS.end.length)}`;
   if (start >= 0 || end >= 0) throw new AgentSetupError('FILE');
-  if (/^\[model_providers\.gyblos\]/m.test(text))
+  // Tables of the same names outside the block would be defined twice, which breaks the whole file.
+  if (/^\s*\[\s*(model_providers|profiles)\s*\.\s*"?gyblos/m.test(text))
     throw new AgentSetupError('FILE');
   return `${text}${text && !text.endsWith('\n') ? '\n' : ''}${text ? '\n' : ''}${block}\n`;
 }
