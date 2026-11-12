@@ -123,6 +123,93 @@ export const ANTHROPIC_CHAT = {
   ] as readonly string[],
 } as const;
 
+// OpenAI's Responses API, which Codex CLI speaks: a stateless subset. Bookkeeping and hints Codex sends are
+// accepted and ignored; anything that would store state, change the output's shape or call tools a provider
+// runs is refused, never silently dropped.
+export const RESPONSES_CHAT = {
+  fields: {
+    supported: [
+      FREE_CHAT_FIELDS.MODEL,
+      'input',
+      'instructions',
+      'max_output_tokens',
+      FREE_CHAT_FIELDS.STREAM,
+      'tools',
+      'tool_choice',
+    ] as readonly string[],
+    // Reasoning is always off on Gyblos offers; caching keys, metadata and tiers do not change the answer.
+    ignored: [
+      'parallel_tool_calls',
+      'reasoning',
+      'include',
+      'prompt_cache_key',
+      'prompt_cache_options',
+      'client_metadata',
+      'metadata',
+      'service_tier',
+      'stream_options',
+      'temperature',
+      'top_p',
+      'user',
+      'safety_identifier',
+    ],
+    neutral: {
+      // Nothing is stored, so there is nothing to continue from.
+      store: isFalse,
+      background: isFalse,
+      previous_response_id: absent,
+      conversation: absent,
+      truncation: (value: unknown) => absent(value) || value === 'disabled',
+      max_tool_calls: absent,
+      top_logprobs: absent,
+      // Verbosity is a hint; a structured output format would change the answer's shape.
+      text: (value: unknown) => {
+        if (absent(value)) return true;
+        if (typeof value !== 'object' || Array.isArray(value)) return false;
+        const format = (value as { format?: unknown }).format;
+        return (
+          absent(format) ||
+          (typeof format === 'object' &&
+            (format as { type?: unknown }).type === 'text')
+        );
+      },
+    },
+  },
+  // Input items: messages, function calls and their outputs. Message ids, status and phase are bookkeeping.
+  messageFields: [
+    'type',
+    'role',
+    'content',
+    'id',
+    'status',
+    'phase',
+  ] as readonly string[],
+  callFields: [
+    'type',
+    'id',
+    'status',
+    'name',
+    'arguments',
+    'call_id',
+  ] as readonly string[],
+  outputFields: [
+    'type',
+    'id',
+    'call_id',
+    'name',
+    'output',
+  ] as readonly string[],
+  textParts: ['input_text', 'output_text'] as readonly string[],
+  partFields: ['type', 'text', 'annotations', 'logprobs'] as readonly string[],
+  toolFields: [
+    'type',
+    'name',
+    'description',
+    'parameters',
+    'strict',
+  ] as readonly string[],
+} as const;
+
 export const FREE_CHAT_DETAILS = {
   coolingDown: (seconds: number) =>
     `no seller is available: every seller failed recently; retry in ${seconds} s`,
@@ -148,6 +235,12 @@ export const FREE_CHAT_DETAILS = {
     'server tools (web search, code execution and others run by a provider) are not supported',
   noToolSeller: 'no seller offers tools for this model right now',
   paidTools: 'tools are served on free offers only for now',
+  responsesInput:
+    'input must be text or a list of message, function_call and function_call_output items with text content',
+  responsesItem: (type: string) =>
+    `input items of type ${type} are not supported; only message, function_call and function_call_output`,
+  responsesTool: (type: string) =>
+    `tools of type ${type} are not supported; only function tools`,
 } as const;
 
 export const CHAT_MESSAGE_DETAILS = {
@@ -179,4 +272,5 @@ export const CHAT_ROUTES = {
   countTokens: '/v1/messages/count_tokens',
   models: '/v1/models',
   messages: '/v1/messages',
+  responses: '/v1/responses',
 } as const;

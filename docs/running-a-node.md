@@ -1170,6 +1170,20 @@ In the Anthropic format the stream carries `message_start`, one text block's
 arrive whole at the end: in the OpenAI format one chunk with every `tool_calls`
 entry before the finish chunk; in the Anthropic format one `tool_use` block per
 call (its start, one `input_json_delta` with the whole input, its stop).
+OpenAI's Responses API, `POST /v1/responses` (the format Codex CLI speaks),
+takes the same model, conversation and function tools: `instructions` and
+leading `developer` or `system` messages become the system text, later ones
+(Codex sends one when the model changes) are sent as user text, consecutive
+`function_call` items form one assistant turn, and `function_call_output` items
+answer them. It is stateless: `store` must be false, and `previous_response_id`,
+structured `text.format`, reasoning items, custom or provider tools and non-text
+parts are refused with a 400 that names them. `reasoning`, `include`,
+`prompt_cache_key` and similar hints are accepted and ignored. A stream sends
+`response.created`, the message item (`output_item.added`, `content_part.added`,
+`output_text.delta`, then their `done` events) once text starts, each call as a
+`function_call` item (`output_item.added`, `function_call_arguments.done`,
+`output_item.done`), and `response.completed` with usage; a failure after it
+starts is `response.failed`. A cut answer has status `incomplete`.
 `POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
 over system, messages and tools) without contacting a seller. The default
 (absent or `false`) remains one complete JSON response.
