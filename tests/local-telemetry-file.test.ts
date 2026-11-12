@@ -72,7 +72,7 @@ void test('real seller and buyer execution events reach separate private local l
       const filename = join(directory, names[0]!);
       assert.equal((await stat(filename)).mode & 0o777, 0o600);
       const raw = await readFile(filename, 'utf8');
-      assert.equal(raw.trim().split('\n').length, 2);
+      assert.equal(raw.trim().split('\n').length, 3);
       assert.doesNotMatch(
         raw,
         /hello|answer|signature|endpoint|\"messages\"|\"text\"/,
@@ -82,12 +82,12 @@ void test('real seller and buyer execution events reach separate private local l
     }
     assert.equal(source.calls(), 1);
     assert.deepEqual(await sellerSink.close(), {
-      emitted: 2,
+      emitted: 3,
       dropped: 0,
       failed: false,
     });
     assert.deepEqual(await buyerSink.close(), {
-      emitted: 2,
+      emitted: 3,
       dropped: 0,
       failed: false,
     });

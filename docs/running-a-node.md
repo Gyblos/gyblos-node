@@ -1104,7 +1104,7 @@ buyer's `maxTokens` is served up to it, and the answer then ends with `length`
 (`max_tokens` in the Anthropic format). `model` selects the exact configured
 model/variant/quantization tuple; it is not an engine name.
 
-Tools (function calling) work in both formats on the free endpoint:
+Tools (function calling) work in both formats through the normal buyer endpoint:
 
 - OpenAI: `tools` (functions with a JSON Schema in `parameters`), `tool_choice`
   (`auto`, `none`, `required` or one function), assistant `tool_calls` and
@@ -1116,9 +1116,11 @@ Tools (function calling) work in both formats on the free endpoint:
 - An answer that calls tools ends with `finish_reason: "tool_calls"`
   (`stop_reason: "tool_use"`); its calls carry ids the seller assigns. The buyer
   asks only sellers that serve tools (`params.tools` in the quote); when none
-  does, it answers 503 saying so. An endpoint that may route to paid execution
-  (`buyer:start`, sessions) refuses tools with 400, since only free offers serve
-  them for now.
+  does, it answers 503 saying so. A zero-price quote needs no financial
+  services. A positive-price quote requires an explicitly configured reusable
+  session and a tokenizer that can independently recount tool output. The old
+  individual settlement mode refuses tools before opening a payment; it cannot
+  acknowledge arguments held until the response terminal.
 - The pinned qwen3:0.6b handles simple calls; agents that send many tools and
   long instructions (Claude Code) need a seller on a larger model through the
   OpenAI or Anthropic engine. Cursor's agent mode calls from its own cloud and

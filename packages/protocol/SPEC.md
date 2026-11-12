@@ -432,8 +432,9 @@ Request fields (required unless marked optional; unknown fields at every level a
 - `maxTokens` is a positive safe integer no greater than the signed output
   maximum or model context. The engine-specific input token count plus the
   requested output maximum must fit the quoted context before generation.
-- Optional tool calling (free channel only; the paid and session channels keep
-  their text-only input and refuse these fields):
+- Optional tool calling uses the common grammar below. Active session v4 also
+  accepts it with its own unchanged bounds; legacy individual settlement refuses
+  it before payment (see [common execution](#active-common-tool-aware-execution)):
   - `input.tools`: 1–128 `{name, description?, parameters}`. `name` matches
     `[A-Za-z0-9_-]{1,64}` and is unique; `description` is non-empty text up to
     8 KiB; `parameters` is JSON text (up to 64 KiB) holding one JSON object, the
