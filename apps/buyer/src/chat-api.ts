@@ -24,6 +24,7 @@ import {
   type ChatResult,
   type ChatStreamFormat,
 } from './free-sse';
+import type { ModelRoute } from './model-routes';
 
 export interface ChatErrorBody {
   code: ChatErrorCode;
@@ -133,23 +134,23 @@ export function estimatedTokens(body: unknown) {
 const BYTES_PER_TOKEN = 4;
 
 // The one model this buyer asks for, in the OpenAI list shape that SDKs and agents read.
-export function modelList(selection: ModelSelection) {
+export function modelList(routes: readonly ModelRoute[]) {
   return {
     object: 'list',
-    data: [
-      {
-        id: selection.modelId,
-        object: 'model',
-        created: 0,
-        owned_by: 'gyblos',
-        // Anthropic's model list fields, for clients that read that shape.
-        type: 'model',
-        display_name: selection.modelId,
-      },
-    ],
+    data: routes.map((route) => ({
+      id: route.id,
+      object: 'model',
+      created: 0,
+      owned_by: 'gyblos',
+      // Anthropic's model list fields, for clients that read that shape.
+      type: 'model',
+      display_name: route.id,
+      // The longest answer this endpoint asks a seller for on this model.
+      max_output_tokens: route.maxTokens,
+    })),
     has_more: false,
-    first_id: selection.modelId,
-    last_id: selection.modelId,
+    first_id: routes[0]?.id ?? null,
+    last_id: routes.at(-1)?.id ?? null,
   };
 }
 

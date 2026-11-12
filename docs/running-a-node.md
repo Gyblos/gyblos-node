@@ -863,8 +863,18 @@ contains:
 - optional `pinnedNodeId` for “choose myself”. A pinned seller still passes all
   filters; `PINNED_SELLER_IN_COOLDOWN` includes `cooldownUntil` for the UI;
 - optional `quoteWindowMs`, how long quotes may race (integer milliseconds, 100
-  to 10000; default 3000). A seller that has not answered when the window closes
-  is cooled down like one that refused.
+  to 10000; default 3000).
+- optional `models`: the models the local endpoint serves by name, 1 to 32
+  `{ id, aliases?, selection, maxTokens? }`. A client sends `id` (or an alias)
+  as `model`, and the buyer quotes that `selection` with that answer limit
+  (`maxTokens`, default `request.maxTokens`, at most 32768); every other request
+  setting is shared. Names are unique across ids and aliases. `GET /v1/models`
+  lists them (with `max_output_tokens`), and a name the endpoint does not serve
+  gets 404 `FREE_BUYER_MODEL_NOT_FOUND` listing the ones it does. Without
+  `models`, `request.selection` is the one model. Each request carries its whole
+  conversation, so switching models between turns keeps the context. A seller
+  that has not answered when the window closes is cooled down like one that
+  refused.
 
 Without a `discovery` option this is a static candidate list. With optional
 `"discovery": {}` (or

@@ -19,6 +19,7 @@ import {
   type FreeWinner,
 } from './free-execution';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
+import { routedRequest, type RoutedModel } from './model-routes';
 import { selectBusyAwareBuyerQuote } from './selection-busy';
 import type {
   BuyerSelectionConfig,
@@ -73,7 +74,7 @@ export function freeBuyerDependencies(
       };
     },
     select: (excluded, signal, needs) =>
-      selectFreeWinner(prepared, options, excluded, signal, needs?.tools),
+      selectFreeWinner(prepared, options, excluded, signal, needs),
     async execute(winner, request, signal, onDelta, beforeExecute) {
       const seller = sellers.get(winner.nodeId);
       if (
@@ -155,7 +156,7 @@ async function selectFreeWinner(
   options: FreeSelectionOptions,
   excluded: ReadonlySet<string>,
   signal: AbortSignal,
-  tools = false,
+  { tools = false, model }: { tools?: boolean; model?: RoutedModel } = {},
 ) {
   let refusedTools = false;
   const watched: FreeSelectionOptions = {
@@ -167,7 +168,7 @@ async function selectFreeWinner(
   };
   try {
     return await selectWinner(prepared, watched, excluded, signal, {
-      ...prepared.config.request,
+      ...routedRequest(prepared.config.request, model),
       maxAtomic: '0',
       priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
       ...(tools ? { tools: true as const } : {}),

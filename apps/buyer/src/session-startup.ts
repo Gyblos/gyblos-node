@@ -15,6 +15,7 @@ import { selectWinner } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
 import { requireBuyerIdentity } from './identity';
+import { routedRequest } from './model-routes';
 import { classifyPaidError } from './paid-http';
 import { endpointToken, type startPaidBuyer } from './paid-startup';
 import { makeManager, type SessionState } from './session-manager';
@@ -87,7 +88,7 @@ function sessionExecutor(
   router?: ReturnType<typeof sessionRouter>,
 ): Awaited<ReturnType<BuyerExecutionFactory>>['execute'] {
   const { prepared, endpoint, relayOnly } = context;
-  return async (input, signal, onDelta) => {
+  return async (input, signal, onDelta, model) => {
     const ports: BuyerRoutePorts<ChatResult> = {
       select: (excluded, current, route) =>
         selectWinner(
@@ -102,7 +103,7 @@ function sessionExecutor(
           excluded,
           current,
           {
-            ...prepared.config.request,
+            ...routedRequest(prepared.config.request, model),
             priceCeilings: route.priceCeilings,
             ...(inferenceNeedsTools(input) ? { tools: true } : {}),
           },

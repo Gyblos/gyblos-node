@@ -131,6 +131,8 @@ export const FREE_CHAT_DETAILS = {
   unsupported: (field: string) =>
     `${field} is not supported yet; remove it or send its default`,
   model: (modelId: string) => `model must be ${modelId}`,
+  unknownModel: (names: readonly string[]) =>
+    `model must be one of: ${names.join(', ')}`,
   maxTokens: 'max_tokens must be a positive integer',
   anthropicMaxTokens: 'max_tokens is required and must be a positive integer',
   bothMaxTokens:

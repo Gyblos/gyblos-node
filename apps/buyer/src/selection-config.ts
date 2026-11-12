@@ -47,6 +47,11 @@ import {
   parseBuyerIdentityConfig,
   type BuyerIdentityConfig,
 } from './identity-config';
+import {
+  parseModelRoutes,
+  routedRequest,
+  type ModelRoute,
+} from './model-routes';
 
 export class BuyerSelectionError extends Error {
   constructor(
@@ -74,6 +79,8 @@ export interface BuyerSelectionConfig {
   identity?: BuyerIdentityConfig;
   // Milliseconds quotes may race; when absent, the caller's windowMs, else BUYER_SELECTION.windowMs.
   quoteWindowMs?: number;
+  // The models the endpoint serves by name; when absent, request.selection is the one model.
+  models?: ModelRoute[];
 }
 function parseRequest(value: unknown): SellerRequest {
   const row = controlObject(value, [
@@ -180,18 +187,17 @@ export function parseBuyerSelectionConfig(
         'quoteWindowMs',
         'session',
         'routing',
+        'models',
       ],
     );
     const request = parseRequest(row.request);
-    const validation = selectSellers({
-      request,
-      sellers: [],
-      stats: new Map(),
-      now: 0,
-      random: () => 0,
-    });
-    if (!validation.ok && validation.code === SELLER_SELECTION_CODES.INVALID)
-      throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+    const models =
+      row.models === undefined
+        ? undefined
+        : parseModelRoutes(row.models, request);
+    // Every model's request must be one selection accepts, as the single request always had to be.
+    for (const model of models ?? [undefined])
+      validRequest(routedRequest(request, model));
     const sellers = controlArray(row.sellers, BUYER_SELECTION.maxSellers).map(
       parseStaticSeller,
     );
@@ -202,6 +208,7 @@ export function parseBuyerSelectionConfig(
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
     return {
       request,
+      ...(models ? { models } : {}),
       ...(row.routing === undefined
         ? {}
         : { routing: parseBuyerRoutingPolicy(row.routing) }),
@@ -233,6 +240,17 @@ export function parseBuyerSelectionConfig(
   }
 }
 
+function validRequest(request: SellerRequest) {
+  const validation = selectSellers({
+    request,
+    sellers: [],
+    stats: new Map(),
+    now: 0,
+    random: () => 0,
+  });
+  if (!validation.ok && validation.code === SELLER_SELECTION_CODES.INVALID)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+}
 function parseWithdrawal(value: unknown) {
   const record = parsePublicV2(value);
   if (record.kind !== PUBLIC_RECORD_KINDS.WITHDRAWAL)

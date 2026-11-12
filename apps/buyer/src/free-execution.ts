@@ -24,6 +24,7 @@ import {
   completeBuyerTelemetry,
   failBuyerTelemetry,
 } from './free-telemetry';
+import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
 
 export class FreeSelectionFailure extends Error {
@@ -55,11 +56,11 @@ export interface FreeBuyerDependencies {
     now?: () => number;
   };
   enter?(): () => void;
-  // `needs.tools`: only a seller that serves tools may win.
+  // `needs.tools`: only a seller that serves tools may win; `needs.model`: the routed model to quote.
   select(
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
-    needs?: { tools?: boolean },
+    needs?: { tools?: boolean; model?: RoutedModel },
   ): Promise<FreeWinner>;
   execute(
     winner: FreeWinner,
@@ -74,6 +75,7 @@ export async function executeBuyerFree(
   dependencies: FreeBuyerDependencies,
   external?: AbortSignal,
   onDelta?: (text: string) => Promise<void>,
+  model?: RoutedModel,
 ) {
   const release = dependencies.enter?.();
   try {
@@ -86,6 +88,7 @@ export async function executeBuyerFree(
       const winner = await dependencies
         .select(excluded, signal, {
           tools: inferenceNeedsTools(input),
+          ...(model ? { model } : {}),
         })
         .catch((error) => {
           if (!signal.aborted) buyerUnserved(dependencies, Boolean(onDelta));

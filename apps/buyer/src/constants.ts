@@ -87,6 +87,15 @@ export const SELLER_FAILURES = {
   UNKNOWN: 'SELLER_ERROR_UNKNOWN',
   nodeIdChars: 8,
 } as const;
+// The models one endpoint may serve (selection.json `models`): public names clients send as `model`.
+export const BUYER_MODELS = {
+  maxModels: 32,
+  maxAliases: 8,
+  nameCharacters: 128,
+  namePattern: /^[A-Za-z0-9][A-Za-z0-9._:/@-]*$/,
+  // How many names a refusal for an unknown model lists.
+  listedInErrors: 16,
+} as const;
 export const BUYER_SELECTION = {
   configFile: ROLE_FILES.buyerSelection,
   statsFile: 'selection-stats.json',
@@ -178,6 +187,8 @@ export const FREE_BUYER_CODES = {
   INTERNAL: 'FREE_BUYER_INTERNAL',
   TOO_LARGE: 'FREE_BUYER_REQUEST_TOO_LARGE',
   TIMEOUT: 'FREE_BUYER_TIMEOUT',
+  // The request names a model this endpoint does not serve.
+  MODEL: 'FREE_BUYER_MODEL_NOT_FOUND',
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];

@@ -33,6 +33,7 @@
     "./control": "./src/control.ts",
     "./selection": "./src/selection.ts",
     "./selection-config": "./src/selection-config.ts",
+    "./model-routes": "./src/model-routes.ts",
     "./selection-stats": "./src/selection-stats.ts",
     "./selection-proxy": "./src/selection-proxy.ts",
     "./offer-race": "./src/offer-race.ts",

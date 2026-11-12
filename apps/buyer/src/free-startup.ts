@@ -29,6 +29,7 @@ import { executeBuyerFree, type FreeBuyerDependencies } from './free-execution';
 import { startFreeBuyerHttp, type ChatErrorClassifier } from './free-http';
 import { freeBuyerDependencies } from './free-selection';
 import type { ChatResult } from './free-sse';
+import type { RoutedModel } from './model-routes';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
@@ -45,6 +46,8 @@ export type BuyerExecutionFactory = (context: {
     input: FreeExecutionBuildInput,
     signal: AbortSignal,
     onDelta?: (text: string, requestDigest?: string) => Promise<void>,
+    // The model the request named, when the endpoint serves several.
+    model?: RoutedModel,
   ): Promise<ChatResult>;
   token?: string;
   requestMs?: number;
@@ -200,16 +203,17 @@ async function closeBuyerResources(
 
 function buyerHttp(
   run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'],
-  request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
+  { request, models }: Awaited<ReturnType<typeof buyerSelection>>['config'],
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
-      (input, signal) => run(input, signal),
+      (input, signal, _onDelta, model) => run(input, signal, undefined, model),
       {
         selection: request.selection,
         maxTokens: request.maxTokens,
+        ...(models ? { models } : {}),
         // The selected execution policy, not its price, determines admission after capability validation.
         tools: true,
       },
@@ -321,9 +325,9 @@ async function startOwnedFreeBuyer(
     });
     const run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'] =
       execution?.execute ??
-      ((input, signal, onDelta) =>
-        executeBuyerFree(input, dependencies, signal, onDelta));
-    const host = await buyerHttp(run, request, options.port, execution);
+      ((input, signal, onDelta, model) =>
+        executeBuyerFree(input, dependencies, signal, onDelta, model));
+    const host = await buyerHttp(run, prepared.config, options.port, execution);
     return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
     await closeBuyerResources(
