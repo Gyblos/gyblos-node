@@ -59,6 +59,7 @@ void test('streams one answer and reports usage and paid settlement', async () =
   assert.equal(output.join(''), 'Hello');
   assert.deepEqual(result, {
     status: 'complete',
+    text: 'Hello',
     usage: { input: 2, output: 3 },
     payment: { verdict: 'settled', charged: '5', refunded: '7' },
   });

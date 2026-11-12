@@ -42,8 +42,37 @@ only its highest already accepted cumulative signature, so the last unsigned
 response remains bounded seller exposure. Once independently verified usage
 enters durable approval, cancellation cannot revoke that intent: recover only
 the original bill/voucher, including a lost ACK. Passing time alone does not
-clear uncertainty. Terminal chat history accumulation and tools remain separate
-from this shared streaming transport.
+clear uncertainty. Tools remain separate from this shared streaming transport.
+
+## Terminal conversation history
+
+`pnpm buyer:chat` keeps confirmed user/assistant turns in memory and sends the
+whole conversation with the next question. It retains the assistant's exact text
+only after the local stream has a valid completion, its terminal marker and EOF.
+Partial text is provisional. A cut or uncertain result ends the chat; the prompt
+is never resent, including when more input was already queued.
+
+Use `/new` to clear only the current conversation. It sends no request, closes
+no channel, resets no spending authority and clears no pending financial
+operation. `/settle` and `/exit` retain their existing meanings. Starting the
+process again begins with empty conversation history while financial recovery
+still uses its original private state. This feature adds no prompt/answer file
+or content logging.
+
+The existing terminal input limit of 64000 UTF-8 bytes now applies to the entire
+history plus the new question, within the common 1024-message limit. History is
+never silently shortened. If it no longer fits, the terminal rejects the next
+question before making a request and suggests `/new`. A completed answer may fit
+the existing output bound but make the next conversation too large; it is still
+displayed. Full-history tokenization, context and signed budget checks remain
+the shared buyer/seller policy, so previous turns cost input tokens again.
+
+Free offers and reusable paid sessions support this history. The legacy
+per-request paid path still accepts only a single user message: it refuses a
+multi-turn paid request rather than flattening it or falling back. Use `/new`
+for separate questions on that path, or configure the existing reusable-session
+policy for paid conversations. Selection and financial authorization are
+unchanged.
 
 ## Explicit startup policy
 

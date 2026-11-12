@@ -188,6 +188,13 @@ export function createPeerLimiter(
       active++;
       return activeLease(window);
     },
+    // A control query or receipt call: outside the request quota and the generation slots, so a receipt
+    // still finishing never refuses the buyer's next quote. Its own admission (ControlAdmission) bounds its
+    // rate and concurrency per buyer and in total.
+    enterControl() {
+      refresh();
+      return () => {};
+    },
   };
 
   function activeLease(window: PeerWindow) {
