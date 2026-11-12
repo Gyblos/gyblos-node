@@ -25,6 +25,7 @@ const SDK_PATH =
 export const BOUNDARY_LAYERS = {
   PROTOCOL: 'protocol',
   CORE: 'core',
+  INFERENCE: 'inference',
   ADAPTER: 'adapter',
   NODE: 'node',
   CONFIG: 'config',
@@ -49,6 +50,7 @@ export function layerOf(source: string): BoundaryLayer | null {
   if (source.startsWith('apps/')) return BOUNDARY_LAYERS.APPS;
   const name = source.match(/^packages\/([^/]+)\//)?.[1];
   if (name === BOUNDARY_LAYERS.CORE) return BOUNDARY_LAYERS.CORE;
+  if (name === BOUNDARY_LAYERS.INFERENCE) return BOUNDARY_LAYERS.INFERENCE;
   if (STANDALONE_NAMES.includes(name ?? '')) return BOUNDARY_LAYERS.STANDALONE;
   if (ADAPTER_NAME.test(name ?? '')) return BOUNDARY_LAYERS.ADAPTER;
   if (
