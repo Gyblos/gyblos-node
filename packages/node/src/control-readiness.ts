@@ -44,6 +44,9 @@ class SellerReadiness {
     this.engine = {
       describe: () => engine.describe(),
       capabilities: () => engine.capabilities(),
+      ...(engine.supportsTools
+        ? { supportsTools: () => engine.supportsTools!() }
+        : {}),
       generate: async (input) => {
         this.active++;
         this.generation++;

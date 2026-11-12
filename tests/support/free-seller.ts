@@ -13,6 +13,11 @@ import {
   type FreeChatRole,
 } from '@gyblos/protocol/constants';
 import type { EngineInput, EngineResult } from '@gyblos/protocol/engine';
+import type {
+  ToolChatMessage,
+  ToolChoice,
+  ToolDefinition,
+} from '@gyblos/protocol/tools';
 
 import { controlFixture } from './control-fixture';
 
@@ -23,7 +28,8 @@ export async function freeSellerFixture(
     perBuyerCap: number;
     maxOutputTokens?: number;
   } = { dailyTokenCap: 100, perBuyerCap: 50 },
-  overrides: { meter?: FreeMeter } = {},
+  // tools: whether the synthetic engine serves tools (as the Ollama engine does).
+  overrides: { meter?: FreeMeter; tools?: boolean } = {},
 ) {
   const api = await import('@gyblos/node/free-execution');
   const source = await controlFixture(true);
@@ -71,6 +77,7 @@ export async function freeSellerFixture(
         lastInput = input;
         return run();
       },
+      ...(overrides.tools ? { supportsTools: () => true } : {}),
     },
     meter:
       overrides.meter ??
@@ -78,6 +85,7 @@ export async function freeSellerFixture(
         input: () => inputCount,
         chat: () => inputCount,
         count: () => outputCount,
+        output: () => outputCount,
       }),
     readiness: () => ({ ...source.context.readiness(), busy }),
     now: () => now,
@@ -89,8 +97,10 @@ export async function freeSellerFixture(
     peer = source.request.params.buyerNodeId,
     // A conversation and answer size other than one short user message.
     input: {
-      messages?: { role: FreeChatRole; content: string }[];
+      messages?: { role: FreeChatRole; content: string }[] | ToolChatMessage[];
       maxTokens?: number;
+      tools?: ToolDefinition[];
+      toolChoice?: ToolChoice;
     } = {},
   ) {
     const maxTokens = input.maxTokens ?? 10;
@@ -115,6 +125,8 @@ export async function freeSellerFixture(
         selection: quote.offer.selection,
         reasoning: quote.offer.reasoning,
         maxTokens,
+        ...(input.tools ? { tools: input.tools } : {}),
+        ...(input.toolChoice ? { toolChoice: input.toolChoice } : {}),
       },
     };
   }

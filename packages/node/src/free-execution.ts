@@ -42,9 +42,11 @@ import {
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import type { ToolChatMessage } from '@gyblos/protocol/tools';
 import type { RouteProbe } from '@gyblos/transport-iroh';
 
 import { runFreeAdmitted } from './free-admitted';
+import { freeInputTokens, supportedInput } from './free-execution-input';
 import { createFreeStreamOutput } from './free-execution-stream';
 import type { FreeMeter } from './free-meter';
 import { createSellerFreeRouter } from './free-router';
@@ -83,24 +85,6 @@ export interface SellerFreeExecutionOptions {
 function checkSignal(signal: AbortSignal) {
   if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);
 }
-function supportedInput(
-  request: FreeExecutionRequest,
-  options: SellerFreeExecutionOptions,
-) {
-  const offer = request.quote.offer;
-  if (
-    canonicalJson(offer.selection) !== canonicalJson(options.selection) ||
-    canonicalJson(offer.model) !== canonicalJson(options.model) ||
-    canonicalJson(offer.capabilities) !== canonicalJson(options.capabilities) ||
-    !options.offer.reasoning.includes(offer.reasoning)
-  )
-    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  if (!isConversation(request.input.messages))
-    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  if (request.input.maxTokens > options.offer.caps.maxOutputTokens)
-    return fail(FREE_EXECUTION_CODES.LIMIT);
-  return request.input.messages;
-}
 function ready(options: SellerFreeExecutionOptions) {
   const state = options.readiness();
   const now = options.now();
@@ -128,26 +112,6 @@ export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
       probe?: RouteProbe,
     ) => respond(value, peer, signal, options, policy, onDelta, probe),
   };
-}
-function freeInputTokens(
-  request: FreeExecutionRequest,
-  messages: readonly ChatMessage[],
-  options: SellerFreeExecutionOptions,
-) {
-  let inputTokens: number;
-  try {
-    inputTokens = options.meter.chat(messages);
-  } catch {
-    // Text the model's template cannot carry (its control tokens, say) is input the offer cannot serve.
-    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  }
-  if (
-    !Number.isSafeInteger(inputTokens) ||
-    inputTokens < 0 ||
-    inputTokens + request.input.maxTokens > options.model.contextTokens
-  )
-    return fail(FREE_EXECUTION_CODES.LIMIT);
-  return inputTokens;
 }
 function observedOutput(
   deliver: ((text: string) => Promise<void>) | undefined,
@@ -305,13 +269,18 @@ export function prepareSellerFreeExecution(
   return createSellerFreeRouter(() => [{ selection, service }]);
 }
 
+// The tools and tool choice the buyer offered the model, when it offered any.
+const requestedTools = ({ input }: FreeExecutionRequest) => ({
+  ...(input.tools ? { tools: input.tools } : {}),
+  ...(input.toolChoice ? { toolChoice: input.toolChoice } : {}),
+});
 type ResponseHeader = Pick<
   FreeExecutionResponse,
   'version' | 'requestId' | 'requestDigest'
 >;
 async function generateResponse(
   request: FreeExecutionRequest,
-  messages: readonly ChatMessage[],
+  messages: readonly ToolChatMessage[],
   inputTokens: number,
   header: ResponseHeader,
   options: SellerFreeExecutionOptions,
@@ -334,6 +303,7 @@ async function generateResponse(
     output = await options.engine.generate({
       messages,
       maxTokens: request.input.maxTokens,
+      ...requestedTools(request),
       signal,
       ...(streaming ? { onText: streaming.onText } : {}),
     });
@@ -358,6 +328,7 @@ async function generateResponse(
       text: output.text,
       usage: { inputTokens, outputTokens: 0 },
       finishReason: output.finishReason,
+      ...(output.toolCalls ? { toolCalls: output.toolCalls } : {}),
     },
   });
   if (!preliminary.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
@@ -365,6 +336,7 @@ async function generateResponse(
     preliminary.result.text,
     output.usage,
     inputTokens,
+    preliminary.result.toolCalls,
   );
   // The buyer's own bounds. A recounted count beyond them is a limit (admission already prevents it);
   // an implausible or out-of-bounds declared count is the provider's invalid response.

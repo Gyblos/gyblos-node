@@ -3,12 +3,18 @@
 // cannot check. The seller then relies on UTF-8 bytes, which never number fewer than tokens, refuses a
 // count below the delivered text's byte floor and never refunds a reservation on the provider's word, so
 // a provider that under-reports cannot stretch the token caps. Pure.
-import type { ChatMessage } from '@gyblos/protocol/chat';
 import {
   CONTROL_METERING_MODES,
   type ControlMeteringMode,
 } from '@gyblos/protocol/constants';
 import type { ChatTokenizer, EngineUsage } from '@gyblos/protocol/engine';
+import {
+  toolMessageBytes,
+  toolsBytes,
+  type ToolCall,
+  type ToolChatMessage,
+  type ToolDefinition,
+} from '@gyblos/protocol/tools';
 
 import { FREE_METERING } from './constants';
 
@@ -23,8 +29,11 @@ export interface FreeMeter {
   refunds: boolean;
   // Never fewer than the prompt's tokens, so admission reserves enough against the context and caps.
   input(prompt: string): number;
-  // The same for a whole conversation, as the model's template renders it.
-  chat(messages: readonly ChatMessage[]): number;
+  // The same for a whole conversation and any tools offered, as the model's template renders them.
+  chat(
+    messages: readonly ToolChatMessage[],
+    tools?: readonly ToolDefinition[],
+  ): number;
   // Never more than the text's tokens, so a stream stops before it delivers past maxTokens.
   streamed(text: string): number;
   // What a stop reports as delivered: at least one token for non-empty text, never more than its bytes.
@@ -35,6 +44,7 @@ export interface FreeMeter {
     text: string,
     reported: EngineUsage,
     inputTokens: number,
+    toolCalls?: readonly ToolCall[],
   ): FreeUsage | undefined;
 }
 
@@ -48,14 +58,18 @@ export function recountedMeter(tokenizer: ChatTokenizer): FreeMeter {
     mode: CONTROL_METERING_MODES.RECOUNTED,
     refunds: true,
     input: (prompt) => tokenizer.input(prompt),
-    chat: (messages) => tokenizer.chat(messages),
+    chat: (messages, tools) => tokenizer.chat(messages, tools),
     streamed: (text) => tokenizer.count(text),
     // A normalising tokenizer could count more tokens than bytes; the stream already bounded maxTokens.
     delivered: (text) =>
       Math.min(Math.max(1, tokenizer.count(text)), bytes(text)),
-    usage: (text, _reported, inputTokens) => ({
+    // Calls count as the template writes them after the text; a tokenizer that cannot render them
+    // cannot have offered tools.
+    usage: (text, _reported, inputTokens, toolCalls) => ({
       inputTokens,
-      outputTokens: tokenizer.count(text),
+      outputTokens: toolCalls?.length
+        ? tokenizer.output!(text, toolCalls)
+        : tokenizer.count(text),
     }),
   };
 }
@@ -67,20 +81,32 @@ export const DECLARED_METER: FreeMeter = Object.freeze({
     bytes(prompt) + FREE_METERING.declaredTemplateTokens,
   // Each message's bytes and the template allowance per message, so a lone user message counts as its
   // prompt does.
-  chat: (messages: readonly ChatMessage[]) =>
+  chat: (
+    messages: readonly ToolChatMessage[],
+    tools?: readonly ToolDefinition[],
+  ) =>
     messages.reduce<number>(
       (sum, message) =>
-        sum + bytes(message.content) + FREE_METERING.declaredTemplateTokens,
-      0,
+        sum + toolMessageBytes(message) + FREE_METERING.declaredTemplateTokens,
+      toolsBytes(tools),
     ),
   streamed: tokenFloor,
   delivered: (text: string, maxTokens: number) =>
     Math.min(bytes(text), maxTokens),
-  usage: (text: string, reported: EngineUsage) =>
+  usage: (
+    text: string,
+    reported: EngineUsage,
+    _inputTokens: number,
+    toolCalls?: readonly ToolCall[],
+  ) =>
     Number.isSafeInteger(reported.inputTokens) &&
     Number.isSafeInteger(reported.outputTokens) &&
     reported.inputTokens >= 1 &&
-    reported.outputTokens >= tokenFloor(text)
+    reported.outputTokens >=
+      tokenFloor(
+        text +
+          (toolCalls ?? []).map((call) => call.name + call.arguments).join(''),
+      )
       ? {
           inputTokens: reported.inputTokens,
           outputTokens: reported.outputTokens,

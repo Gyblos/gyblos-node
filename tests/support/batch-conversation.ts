@@ -45,7 +45,7 @@ export async function batchConversation(override?: ChatTokenizer) {
       return 2 + text.length;
     },
     chat: (messages) => {
-      renderConversation(messages);
+      renderConversation(messages as readonly ChatMessage[]);
       return messages.reduce(
         (sum, message) => sum + 2 + message.content.length,
         0,

@@ -15,7 +15,9 @@ export function isConversation(messages: readonly ChatMessage[]): boolean {
     messages[0]?.role === FREE_CHAT_ROLES.SYSTEM ? messages.slice(1) : messages;
   if (turns.length % 2 === 0) return false;
   return (
-    messages.every((message) => message.content.length > 0) &&
+    messages.every(
+      (message) => message.content.length > 0 && !('toolCalls' in message),
+    ) &&
     turns.every(
       (turn, index) =>
         turn.role ===

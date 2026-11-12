@@ -1,8 +1,8 @@
 // Paid inference wire shapes only; execution, payment, metering and replay storage belong to callers.
 import type { SignedOfferV2 } from './control-types';
 import type {
-  FreeExecutionRequest,
-  FreeExecutionResult,
+  ExecutionInput,
+  ExecutionResult,
   FreeExecutionStop,
   FreeExecutionTrust,
 } from './free-execution-types';
@@ -13,7 +13,7 @@ export interface PaidExecutionRequest {
   version: typeof PAID_EXECUTION.version;
   requestId: string;
   quote: SignedOfferV2;
-  input: FreeExecutionRequest['input'];
+  input: ExecutionInput;
   payment: PaymentAuthorization;
 }
 
@@ -58,7 +58,7 @@ interface PaidExecutionReply {
 }
 export type PaidExecutionResponse = PaidExecutionReply &
   (
-    | { result: FreeExecutionResult; error?: never }
+    | { result: ExecutionResult; error?: never }
     | { error: PaidExecutionFailure; result?: never }
   );
 

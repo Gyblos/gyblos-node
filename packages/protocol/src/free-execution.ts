@@ -12,8 +12,8 @@ import {
   boundedWire,
   hasField,
   parseExecutionFailure,
-  parseExecutionInput,
-  parseExecutionResult,
+  parseFreeExecutionInput,
+  parseFreeExecutionResult,
 } from './execution-wire';
 import type {
   FreeExecutionBuildInput,
@@ -33,6 +33,8 @@ import { bytesHex } from './public-validation';
 import { signingBytes } from './signing';
 
 export type {
+  ExecutionInput,
+  ExecutionResult,
   FreeChatMessage,
   FreeExecutionBuildInput,
   FreeExecutionDelivered,
@@ -74,12 +76,7 @@ function parseRequest(value: unknown): FreeExecutionRequest {
     version: FREE_EXECUTION.version,
     requestId,
     quote,
-    input: parseExecutionInput(
-      input.input,
-      requestId,
-      offered,
-      FREE_EXECUTION.inputBytes,
-    ),
+    input: parseFreeExecutionInput(input.input, requestId, offered),
   };
   boundedWire(request, FREE_EXECUTION.requestBytes);
   return request;
@@ -145,7 +142,8 @@ export function parseFreeExecutionResponse(
         ...base,
         error: parseExecutionFailure(input.error, FAILURE_RULES),
       };
-    } else response = { ...base, result: parseExecutionResult(input.result) };
+    } else
+      response = { ...base, result: parseFreeExecutionResult(input.result) };
     boundedWire(response, FREE_EXECUTION.responseBytes);
     return response;
   });
@@ -187,7 +185,12 @@ export function buildFreeExecutionRequest(
   return freeExecutionBoundary(() => {
     const envelope = controlObject(quote, ['offer', 'signature']);
     const offer = parseOfferV2(envelope.offer);
-    const params = controlObject(input, ['messages', 'maxTokens']);
+    const params = controlObject(input, [
+      'messages',
+      'maxTokens',
+      ...(hasField(input, 'tools') ? ['tools'] : []),
+      ...(hasField(input, 'toolChoice') ? ['toolChoice'] : []),
+    ]);
     return parseFreeExecutionRequest({
       version: FREE_EXECUTION.version,
       requestId: offer.requestId,
@@ -197,6 +200,10 @@ export function buildFreeExecutionRequest(
         maxTokens: params.maxTokens,
         selection: offer.selection,
         reasoning: offer.reasoning,
+        ...(params.tools !== undefined ? { tools: params.tools } : {}),
+        ...(params.toolChoice !== undefined
+          ? { toolChoice: params.toolChoice }
+          : {}),
       },
     });
   });

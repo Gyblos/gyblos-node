@@ -37,8 +37,9 @@ export const ANTHROPIC_CREDIT = {
   messageCharacters: 512,
 } as const;
 
-// A tool call, a refusal or a paused turn is not a served completion: before any text it is an invalid
-// response, after text an interruption the buyer sees with what it received.
+// A refusal or a paused turn is not a served completion: before any text it is an invalid response, after
+// text an interruption the buyer sees with what it received. A tool call (tool_use) is read apart, and
+// served only when the request offered tools.
 export const ANTHROPIC_STOP_REASONS = {
   end_turn: ENGINE_DONE_REASONS.STOP,
   stop_sequence: ENGINE_DONE_REASONS.STOP,
@@ -49,13 +50,15 @@ export const ANTHROPIC_STOP_REASONS = {
 
 export const ANTHROPIC_EVENTS = {
   MESSAGE_START: 'message_start',
+  BLOCK_START: 'content_block_start',
   BLOCK_DELTA: 'content_block_delta',
   MESSAGE_DELTA: 'message_delta',
   MESSAGE_STOP: 'message_stop',
   ERROR: 'error',
 } as const;
 export const ANTHROPIC_TEXT_DELTA = 'text_delta';
-// Deltas that never carry visible text; any other unknown delta (a tool's JSON) is not served.
+// Deltas that never carry visible text; a tool's input JSON is read apart, any other unknown delta is not
+// served.
 export const ANTHROPIC_HIDDEN_DELTAS = [
   'thinking_delta',
   'signature_delta',

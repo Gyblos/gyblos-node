@@ -43,6 +43,8 @@ export interface ControlOfferParams {
   network: string;
   asset: string;
   catalogDigest: string;
+  // Asked only by a buyer that will offer tools; a seller that cannot serve them refuses the quote.
+  tools?: true;
 }
 interface Query {
   version: typeof CONTROL_VERSION;
