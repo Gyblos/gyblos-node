@@ -1,5 +1,9 @@
 // Starts the isolated free buyer using local role identity and selection policy, without paid bootstrap.
-import { BUYER_RELAY_ONLY_ENV, FREE_OUTPUT_TOKENS } from '@gyblos/config';
+import {
+  BUYER_RELAY_ONLY_ENV,
+  FREE_OUTPUT_TOKENS,
+  TRANSPORT_LIMITS,
+} from '@gyblos/config';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import {
@@ -315,6 +319,8 @@ async function startOwnedFreeBuyer(
       endpoint,
       buyer: role.buyer,
       relayOnly,
+      // Free-only requests may run side by side, each on its own seller; paid modes admit their own.
+      parallel: options.execution ? 1 : TRANSPORT_LIMITS.maxConcurrent,
     });
     execution = await options.execution?.({
       prepared,

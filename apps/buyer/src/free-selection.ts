@@ -18,6 +18,7 @@ import {
   type FreeBuyerDependencies,
   type FreeWinner,
 } from './free-execution';
+import { freeAdmission } from './free-parallel';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
 import { selectBusyAwareBuyerQuote } from './selection-busy';
@@ -33,7 +34,7 @@ export function freeBuyerDependencies(
   options: FreeSelectionOptions,
 ): FreeBuyerDependencies {
   requireBuyerIdentity(prepared.config, prepared.identity);
-  let active = false;
+  const admission = freeAdmission(options.parallel ?? 1);
   const now = options.now ?? Date.now;
   const policy = prepared.config;
   if (
@@ -66,15 +67,12 @@ export function freeBuyerDependencies(
             options.receipts!.exchange(address(seller), evidence, signal);
         }
       : undefined,
-    enter() {
-      if (active) throw new FreeBuyerError(FREE_BUYER_CODES.BUSY);
-      active = true;
-      return () => {
-        active = false;
-      };
-    },
+    enter: () => admission.enter(),
+    done: (winner) => admission.done(winner.nodeId),
     select: (excluded, signal, needs) =>
-      selectFreeWinner(prepared, options, excluded, signal, needs),
+      admission.select(excluded, signal, (skip) =>
+        selectFreeWinner(prepared, options, skip, signal, needs),
+      ),
     async execute(winner, request, signal, onDelta, beforeExecute) {
       const seller = sellers.get(winner.nodeId);
       if (
@@ -118,6 +116,8 @@ export interface FreeSelectionOptions {
   relayOnly: boolean;
   now?: () => number;
   fetch?: DiscoveryFetch;
+  // Free requests that may run side by side, each on its own seller; 1 when absent.
+  parallel?: number;
 }
 export function sellerAddress(seller: StaticControlSeller, relayOnly: boolean) {
   if (seller.relayUrl) assertConfiguredRelay(seller.relayUrl);
@@ -194,6 +194,10 @@ export async function selectWinner(
 ): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
+  const verifyIdentity = onceEachSeller(
+    (seller: StaticControlSeller, querySignal?: AbortSignal) =>
+      verifyBuyerIdentity(prepared.identity, seller, querySignal),
+  );
   const base = {
     ...policy,
     ...(route ? { pinnedNodeId: route.pinnedNodeId } : {}),
@@ -209,8 +213,7 @@ export async function selectWinner(
             fetch: options.fetch ?? globalThis.fetch,
             now,
             signal,
-            verifyIdentity: (seller, querySignal) =>
-              verifyBuyerIdentity(prepared.identity, seller, querySignal),
+            verifyIdentity,
           },
         )
       : base;
@@ -223,8 +226,7 @@ export async function selectWinner(
     config,
     {
       buyer: options.buyer,
-      verifyIdentity: (seller, querySignal) =>
-        verifyBuyerIdentity(prepared.identity, seller, querySignal),
+      verifyIdentity,
       now,
       stats,
       observeVerified: prepared.discovery
@@ -255,6 +257,23 @@ export async function selectWinner(
   if (!(await permitsWinner(prepared, winner, now())))
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   return winner;
+}
+
+// One selection checks each seller's registered identity once, however many steps ask (discovery, catalog,
+// quote): a decision is kept for this selection only, and a check that threw (an abort, an outage that
+// stops the request) is not kept.
+export function onceEachSeller<
+  Seller extends { nodeId: string; owner: string },
+>(verify: (seller: Seller, signal?: AbortSignal) => Promise<boolean>) {
+  const decided = new Map<string, boolean>();
+  return async (seller: Seller, signal?: AbortSignal) => {
+    const key = `${seller.nodeId} ${seller.owner}`;
+    const known = decided.get(key);
+    if (known !== undefined) return known;
+    const ok = await verify(seller, signal);
+    decided.set(key, ok);
+    return ok;
+  };
 }
 
 // The earliest moment a seller in cooldown can be tried again; undefined when none is cooling down.

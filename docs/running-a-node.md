@@ -1184,12 +1184,20 @@ before the first fragment. Writes await backpressure. Complete and streaming
 execution share replay/caps; cancellation keeps a conservative full token
 reservation. This free buyer does not invoke the separate paid-v2 path.
 
+A free-only buyer runs up to two requests at once, each on a different seller,
+since a seller serves one request per buyer at a time: selections take turns,
+each skipping the sellers already serving this buyer. When every candidate is
+busy with this buyer's other request the answer is 429 (the seller is not cooled
+down), and a third request at once gets 429 too. Paid and session modes keep
+their own admission. One selection checks each seller's registered identity
+once, however many steps ask; nothing is kept across requests.
+
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
-413 for an oversized body, 429 when the endpoint is already running a request
-(safe to retry), 503 when no seller could take the request, 504 when the
-endpoint's 180-second deadline expires, and 500 for an unexpected failure.
-Whenever the prompt may already have reached a seller, or the request is the
-caller's fault, the error carries `x-should-retry: false`, the header the
+413 for an oversized body, 429 when the endpoint is already running as many
+requests as it can (safe to retry), 503 when no seller could take the request,
+504 when the endpoint's 180-second deadline expires, and 500 for an unexpected
+failure. Whenever the prompt may already have reached a seller, or the request
+is the caller's fault, the error carries `x-should-retry: false`, the header the
 official OpenAI and Anthropic SDKs honor to skip their automatic retries.
 Clients that retry 5xx on their own must check it: retrying would resend the
 prompt, possibly to another seller.

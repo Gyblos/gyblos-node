@@ -56,6 +56,8 @@ export interface FreeBuyerDependencies {
     now?: () => number;
   };
   enter?(): () => void;
+  // Hands a selected seller back once this request is done with it (free requests side by side).
+  done?(winner: FreeWinner): void;
   // `needs.tools`: only a seller that serves tools may win; `needs.model`: the routed model to quote.
   select(
     excluded: ReadonlySet<string>,
@@ -94,18 +96,22 @@ export async function executeBuyerFree(
           if (!signal.aborted) buyerUnserved(dependencies, Boolean(onDelta));
           throw error;
         });
-      signal.throwIfAborted();
-      if (excluded.has(winner.nodeId))
-        throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
-      excluded.add(winner.nodeId);
-      const result = await executeSelectedBuyerFree(
-        input,
-        dependencies,
-        winner,
-        signal,
-        onDelta,
-      );
-      if (result) return result;
+      try {
+        signal.throwIfAborted();
+        if (excluded.has(winner.nodeId))
+          throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+        excluded.add(winner.nodeId);
+        const result = await executeSelectedBuyerFree(
+          input,
+          dependencies,
+          winner,
+          signal,
+          onDelta,
+        );
+        if (result) return result;
+      } finally {
+        dependencies.done?.(winner);
+      }
     }
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   } finally {
