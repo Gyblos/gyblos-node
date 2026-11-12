@@ -196,6 +196,23 @@ El modelo por defecto, qwen3:0.6b, resuelve llamadas simples como esta. Los agen
 herramientas e instrucciones largas, como Claude Code, necesitan un vendedor con un modelo más grande, a
 través del motor OpenAI o Anthropic.
 
+## Conectar un agente de código [#conectar-un-agente-de-codigo]
+
+Un comando escribe la configuración de OpenCode, pi o Codex CLI con todos los modelos que sirve tu
+comprador. Solo cambia el proveedor `gyblos` y guarda una copia del archivo anterior. Para Claude Code
+muestra las variables que debes definir en tu terminal. Sin `--write`, solo las muestra.
+
+```bash
+pnpm buyer:agent opencode --write
+pnpm buyer:agent pi --write
+pnpm buyer:agent codex --write
+pnpm buyer:agent claude
+```
+
+Después elige un modelo de Gyblos con `/models` (OpenCode), `/model` (pi y Claude Code) o
+`codex --profile gyblos`. Cada pedido lleva la conversación completa, así que cambiar de modelo no pierde
+el contexto.
+
 ## Opciones y errores [#opciones-y-errores]
 
 Las opciones que los clientes envían por defecto y que no cambian la respuesta se aceptan y se ignoran, como
