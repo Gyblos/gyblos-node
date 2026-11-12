@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { generationWindow } from '../packages/node/src/generation-window';
+import { generationWindow } from '@gyblos/inference/generation-window';
 
 class Timeout extends Error {}
 const ERRORS = {

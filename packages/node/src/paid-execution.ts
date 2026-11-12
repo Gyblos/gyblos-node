@@ -3,6 +3,7 @@
 import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import type { PaidSellerLedger } from '@gyblos/core/paid-admission';
+import { runAdmittedExecution } from '@gyblos/inference';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   CONTROL_METERING_MODES,
@@ -36,7 +37,6 @@ import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import type { RouteProbe } from '@gyblos/transport-iroh';
 import type { PaidExecutionService } from '@gyblos/transport-iroh/paid-server';
 
-import { runAdmittedExecution } from './execution';
 import type { FreeMeter } from './free-meter';
 import { sellerExecutionTelemetry } from './free-telemetry';
 import type { PaidSettlementOptions } from './paid-settlement';

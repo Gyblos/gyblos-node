@@ -1,6 +1,7 @@
 // Runs one verified, metered free request through the free policy and the common execution lifecycle:
 // admission with every cap, generation, then finish (refunding a completed recounted sale) and release.
 // Free generation has no deadline; the window only observes the request's cancellation.
+import { runAdmittedExecution } from '@gyblos/inference';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import {
   FreeExecutionError,
@@ -8,7 +9,6 @@ import {
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 
-import { runAdmittedExecution } from './execution';
 import type { FreeLease, FreePolicy } from './policy-free';
 
 const FREE_WINDOW_ERRORS = {

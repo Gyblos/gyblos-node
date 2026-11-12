@@ -167,7 +167,9 @@ function batchGeneration(
       output.complete(generated.text);
       return recountedResult(live, inputTokens, input.maxTokens, generated);
     },
-    measure: (generated: import('./execution').Generated<ExecutionResult>) =>
+    measure: (
+      generated: import('@gyblos/inference').Generated<ExecutionResult>,
+    ) =>
       'value' in generated
         ? { ...generated.value.usage, completed: true }
         : { inputTokens, outputTokens: 0, completed: false },

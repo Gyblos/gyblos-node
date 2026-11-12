@@ -8,12 +8,13 @@
 
 ## Layers and ownership
 
-Dependency direction is protocol → core → adapters → node → apps; config and runtime are shared support above protocol. Package table: [docs/architecture.md](docs/architecture.md).
+Dependency direction is protocol → core → inference/adapters → node → apps; config and runtime are shared support above protocol. Package table: [docs/architecture.md](docs/architecture.md).
 
 - `packages/protocol`: wire contracts, canonical JSON, signing domains and golden vectors (`vectors/`). It owns v1 signed offers and v2 public records, control, offers and paid execution (`paid-execution`, `paid-stream`). Paid v2 is conditionally composed by the seller with a payment server; see [limitations](docs/limitations.md) for validation scope. It also owns plugin ports (`Engine`, `PaymentClient` and `PaymentServer`), payment binding and shared catalogs. No SDKs.
 - `packages/core`: pure policy (metering, offer trust `offers`, `control-admission`, `control-quotes`, `seller-selection*`). No SDKs, filesystem, or clock/random of its own.
 - Adapters (plugins) are the packages matching `payments-*`, `identity`, `engine-*`, `transport-*`, `discovery-*`, `telemetry-*` (`tooling/boundaries/config.ts`). Each implements a port and is chosen by composition in `node`; they never import each other, `node` or apps. Inference knows no wallets; payment code knows no engines.
 - Standalone packages (`STANDALONE_NAMES` in `tooling/boundaries/config.ts`) are meant to leave the monorepo under their own license: they import no workspace package, app, lab or test code, keep their tests in `packages/<name>/test/`, and only `payments-*` adapters (plus tests and tooling) may import them.
+- `packages/inference`: shared SDK-free inference orchestration over protocol ports and core policy. It imports no concrete adapters, node or apps; core and adapters do not import it. Node supplies the engine, economic policy and observation ports.
 - `packages/node`: local-node library for both roles; composes adapters, including seller control, free channels and conditional paid-v2 execution when a payment server is supplied.
 - `apps/node` (seller daemon and the `gyblos` CLI), `apps/buyer`, `apps/desktop` (Electron, the provisional desktop host per vault GYB-DOC-001), `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval) and `apps/docs` (the public docs site, docs.gyblos.com: a Fumadocs static export; publishing needs founder approval) are independent executables; apps never import each other. Every docs page has an English and a Spanish file, updated together; a change to output the seller guide quotes updates the guide in the same PR (`tests/docs-content.test.ts`).
 - `packages/config`: operator values; `config/src/home.ts` is the only owner of local paths. `packages/runtime`: platform helpers.
