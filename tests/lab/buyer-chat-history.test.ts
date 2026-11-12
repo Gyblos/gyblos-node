@@ -38,7 +38,7 @@ for (const pricing of [OFFER_PRICING_KINDS.FREE, OFFER_PRICING_KINDS.PAID])
         'first question',
         'follow-up question',
         CHAT_COMMANDS.NEW,
-        ...(pricing === OFFER_PRICING_KINDS.PAID ? ['fresh question'] : []),
+        'fresh question',
         CHAT_COMMANDS.EXIT,
       ];
       let reads = 0;
@@ -53,7 +53,7 @@ for (const pricing of [OFFER_PRICING_KINDS.FREE, OFFER_PRICING_KINDS.PAID])
           output += text;
         },
       });
-      assert.equal(reads, lines.length);
+      assert.equal(reads, lines.length, output);
       assert.doesNotMatch(output, /Error:|No retry was made/);
       assert.deepEqual(
         received.map((input) => input.messages),
@@ -64,15 +64,10 @@ for (const pricing of [OFFER_PRICING_KINDS.FREE, OFFER_PRICING_KINDS.PAID])
             { role: FREE_CHAT_ROLES.ASSISTANT, content: PAID_ACCEPTANCE.text },
             { role: FREE_CHAT_ROLES.USER, content: 'follow-up question' },
           ],
-          ...(pricing === OFFER_PRICING_KINDS.PAID
-            ? [[{ role: FREE_CHAT_ROLES.USER, content: 'fresh question' }]]
-            : []),
+          [{ role: FREE_CHAT_ROLES.USER, content: 'fresh question' }],
         ],
       );
-      assert.equal(
-        host.engine.attempts(),
-        pricing === OFFER_PRICING_KINDS.PAID ? 3 : 2,
-      );
+      assert.equal(host.engine.attempts(), 3);
       assert.deepEqual(
         host.finance.calls,
         pricing === OFFER_PRICING_KINDS.PAID ? ['deposit'] : [],

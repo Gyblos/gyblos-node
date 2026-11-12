@@ -52,6 +52,13 @@ only after the local stream has a valid completion, its terminal marker and EOF.
 Partial text is provisional. A cut or uncertain result ends the chat; the prompt
 is never resent, including when more input was already queued.
 
+Control queries and receipt exchanges have their own bounded admission and do
+not hold generation slots. A receipt still finishing in the background therefore
+does not occupy the next question's inference capacity. Neither the completed
+answer nor a new question waits for optional local receipt persistence. Existing
+connection, query, inference and deadline limits still apply; a receipt failure
+never retries the prompt.
+
 Use `/new` to clear only the current conversation. It sends no request, closes
 no channel, resets no spending authority and clears no pending financial
 operation. `/settle` and `/exit` retain their existing meanings. Starting the
