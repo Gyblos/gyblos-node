@@ -29,6 +29,7 @@ import { executeBuyerFree, type FreeBuyerDependencies } from './free-execution';
 import { startFreeBuyerHttp, type ChatErrorClassifier } from './free-http';
 import { freeBuyerDependencies } from './free-selection';
 import type { ChatResult } from './free-sse';
+import { afterBuyerReceipts } from './receipt-drain';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
@@ -253,15 +254,15 @@ function buyerHost(
   };
 }
 
-async function startOwnedFreeBuyer(
-  options: {
-    bind?: typeof bindEndpoint;
-    port?: number;
-    telemetry?: TelemetrySink;
-    onSellerFailure?: SellerFailureReporter;
-    execution?: BuyerExecutionFactory;
-  } = {},
-) {
+interface FreeBuyerOptions {
+  bind?: typeof bindEndpoint;
+  port?: number;
+  telemetry?: TelemetrySink;
+  onSellerFailure?: SellerFailureReporter;
+  execution?: BuyerExecutionFactory;
+}
+
+async function startOwnedFreeBuyer(options: FreeBuyerOptions = {}) {
   const telemetryEnabled = await loadLocalTelemetry(process.env);
   const role = await buyerRole();
   if (role.role !== P2P_ROLES.BUYER)
@@ -318,7 +319,18 @@ async function startOwnedFreeBuyer(
       execution?.execute ??
       ((input, signal, onDelta) =>
         executeBuyerFree(input, dependencies, signal, onDelta));
-    const host = await buyerHttp(run, request, options.port, execution);
+    const drainReceipts = receipts.settled;
+    const host = await buyerHttp(
+      (input, signal, onDelta) =>
+        afterBuyerReceipts(
+          drainReceipts,
+          () => run(input, signal, onDelta),
+          signal,
+        ),
+      request,
+      options.port,
+      execution,
+    );
     return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
     await closeBuyerResources(

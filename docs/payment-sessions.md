@@ -52,6 +52,15 @@ only after the local stream has a valid completion, its terminal marker and EOF.
 Partial text is provisional. A cut or uncertain result ends the chat; the prompt
 is never resent, including when more input was already queued.
 
+Before dispatching a new local request, the shared buyer waits for earlier
+background receipt work to settle within that request's existing deadline.
+Receipt transport shares the seller's per-buyer concurrency with queries and
+inference. This ordering prevents the buyer's own prior metadata exchange from
+colliding with its next question; it does not increase capacity or add a retry.
+The completed answer still returns without waiting for its optional receipt
+persistence. Cancelling the later wait dispatches no seller request, including
+after the older cleanup eventually finishes.
+
 Use `/new` to clear only the current conversation. It sends no request, closes
 no channel, resets no spending authority and clears no pending financial
 operation. `/settle` and `/exit` retain their existing meanings. Starting the

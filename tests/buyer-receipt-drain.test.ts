@@ -70,6 +70,42 @@ void test('already cancelled requests do not execute even when receipts are idle
   assert.equal(calls, 0);
 });
 
+void test('cancellation after drain resolution still wins before foreground dispatch', async () => {
+  const receipt = deferred();
+  const controller = new AbortController();
+  let calls = 0;
+  const pending = afterBuyerReceipts(
+    () => receipt.promise,
+    async () => ++calls,
+    controller.signal,
+  );
+  const rejected = assert.rejects(
+    pending,
+    (error) => error === controller.signal.reason,
+  );
+  receipt.resolve();
+  await receipt.promise;
+  controller.abort();
+  await rejected;
+  assert.equal(calls, 0);
+});
+
+void test('a failed receipt drain cannot dispatch financial or inference work', async () => {
+  const failure = new Error('synthetic cleanup failure');
+  let calls = 0;
+  await assert.rejects(
+    afterBuyerReceipts(
+      async () => {
+        throw failure;
+      },
+      async () => ++calls,
+      new AbortController().signal,
+    ),
+    (error) => error === failure,
+  );
+  assert.equal(calls, 0);
+});
+
 void test('new receipt persistence stays in the background of the completed answer', async () => {
   const receipt = deferred();
   let current = Promise.resolve();
