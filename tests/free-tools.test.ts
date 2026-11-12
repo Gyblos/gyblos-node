@@ -62,6 +62,11 @@ void test('a tool conversation answers every call with one result before the mod
     ]),
     true,
   );
+  // Results and the user's text together, as Anthropic clients send them.
+  assert.equal(
+    isToolConversation([...LOOP, { role: 'user', content: 'Also Lima?' }]),
+    true,
+  );
   for (const messages of [
     // A call left unanswered, a result for no call, a result twice, the model speaking after a call
     // before its result, and a leading assistant turn.

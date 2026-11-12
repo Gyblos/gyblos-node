@@ -203,8 +203,9 @@ export const hasToolTurns = (messages: readonly ToolChatMessage[]) =>
 
 // A conversation with tool turns: an optional system message, then a user turn; an assistant turn after
 // each user turn or after the results of every call it made; each assistant call answered by exactly one
-// result, in a run right after it; ending with the user's turn or with results. Text turns other than an
-// assistant's call turn and tool results must have content.
+// result, in a run right after it; a user turn may follow the results (clients send results and text
+// together); ending with the user's turn or with results. Text turns other than an assistant's call turn
+// and tool results must have content.
 export function isToolConversation(
   messages: readonly ToolChatMessage[],
 ): boolean {
@@ -220,11 +221,7 @@ export function isToolConversation(
       if (pending?.size) return false;
       pending = undefined;
       if (turn.role === FREE_CHAT_ROLES.USER) {
-        if (
-          previous?.role === FREE_CHAT_ROLES.USER ||
-          previous?.role === TOOL_ROLE
-        )
-          return false;
+        if (previous?.role === FREE_CHAT_ROLES.USER) return false;
         if (!turn.content) return false;
       } else if (turn.role === FREE_CHAT_ROLES.ASSISTANT) {
         if (previous?.role === FREE_CHAT_ROLES.ASSISTANT) return false;

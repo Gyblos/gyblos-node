@@ -449,7 +449,8 @@ Request fields (required unless marked optional; unknown fields at every level a
   - With tools or tool turns, the conversation is an optional `system` message,
     then a `user` turn; an `assistant` turn follows a `user` turn or the
     results of every call of the previous assistant turn; each call is
-    answered exactly once by the results right after it; it ends with a `user`
+    answered exactly once by the results right after it; a `user` turn may
+    follow the results; it ends with a `user`
     turn or with results. Tools and tool JSON count against `inputBytes`.
   - A buyer that will offer tools sets `tools: true` in its quote request
     (`params.tools`); a seller whose offer cannot serve tools refuses it with

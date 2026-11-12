@@ -41,7 +41,17 @@ export function anthropicTurns(messages: readonly ToolChatMessage[]) {
           })),
         ],
       });
-    else turns.push({ role: message.role, content: message.content });
+    else {
+      const last = turns.at(-1);
+      // Text after results joins their user turn, as clients send them.
+      if (
+        message.role === 'user' &&
+        last?.role === 'user' &&
+        Array.isArray(last.content)
+      )
+        last.content.push({ type: 'text', text: message.content });
+      else turns.push({ role: message.role, content: message.content });
+    }
   }
   return turns;
 }
