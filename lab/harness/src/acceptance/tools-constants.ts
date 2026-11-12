@@ -28,7 +28,7 @@ export interface ToolCaseReport {
   case: ToolAcceptanceCase;
   generations: number;
   executionDials: number;
-  queries: number;
+  controlConnections: number;
   discoveryReads: number;
   registryReads: number;
   cancellations: number;

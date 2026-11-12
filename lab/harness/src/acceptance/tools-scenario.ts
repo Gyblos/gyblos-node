@@ -179,7 +179,7 @@ export async function toolScenario(
       case: scenario,
       generations: provider.calls(),
       executionDials: run.binding.dials(),
-      queries: run.binding.controlDials(),
+      controlConnections: run.binding.controlDials(),
       discoveryReads: run.discoveryReads(),
       registryReads: run.registry.counts().reads,
       cancellations: provider.cancellations(),

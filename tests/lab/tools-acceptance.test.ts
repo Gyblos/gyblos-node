@@ -63,12 +63,12 @@ void test(
           assert.equal(item.verifiedTurns, sent);
           assert.equal(item.forbiddenCalls, 0);
           if (positive) {
-            assert.ok(item.queries >= 2);
+            assert.ok(item.controlConnections >= 2);
             assert.ok(item.discoveryReads >= 2);
             assert.ok(item.registryReads > 0);
           }
           if (item.case === 'unsupported-seller') {
-            assert.ok(item.queries > 0);
+            assert.ok(item.controlConnections > 0);
             assert.ok(item.registryReads > 0);
           }
           if (item.case === 'cancel-before-terminal')

@@ -7,6 +7,7 @@ import { isJsonFields, type JsonFields } from '@gyblos/core/engine-provider';
 import { acceptanceAssert } from './errors';
 import { receiptBody } from './receipt-http';
 import { TOOL_ACCEPTANCE } from './tools-constants';
+import { anthropicToolBlocks } from './tools-events';
 import { TOOL_FIXTURE } from './tools-fixtures';
 
 export function toolHttp(
@@ -80,23 +81,16 @@ export async function verifyToolAnswer(
     );
     if (streaming) acceptanceAssert(events.at(-1)?.type === 'message_stop');
     const blocks = streaming
-      ? events
-          .filter((event) => event.type === 'content_block_start')
-          .map((event) => fields(event.content_block))
+      ? anthropicToolBlocks(events)
       : events.flatMap((event) => {
           acceptanceAssert(Array.isArray(event.content));
           return event.content.map(fields);
         });
     if (followup) {
-      const text = streaming
-        ? events
-            .filter((event) => event.type === 'content_block_delta')
-            .map((event) => fields(event.delta).text ?? '')
-            .join('')
-        : blocks
-            .filter((block) => block.type === 'text')
-            .map((block) => block.text)
-            .join('');
+      const text = blocks
+        .filter((block) => block.type === 'text')
+        .map((block) => block.text)
+        .join('');
       acceptanceAssert(
         text === TOOL_FIXTURE.final &&
           !blocks.some((block) => block.type === 'tool_use'),
@@ -109,15 +103,10 @@ export async function verifyToolAnswer(
       acceptanceAssert(
         call?.id === TOOL_FIXTURE.id && call.name === TOOL_FIXTURE.name,
       );
-      if (streaming)
-        acceptanceAssert(
-          events.some(
-            (event) =>
-              isJsonFields(event.delta) &&
-              event.delta.partial_json === TOOL_FIXTURE.arguments,
-          ),
-        );
-      else acceptanceAssert(fields(call.input).zone === 'UTC');
+      acceptanceAssert(
+        fields(call.input).zone === 'UTC' &&
+          Object.keys(fields(call.input)).length === 1,
+      );
     }
   } else {
     const usage = fields(events.at(-1)!.usage);
