@@ -12,6 +12,7 @@ import {
   anthropicStream,
   parseAnthropicChat,
 } from './anthropic-chat';
+import { openAiCallsOut } from './chat-tools';
 import { CHAT_ROUTES, FREE_BUYER } from './constants';
 import { parseFreeChat, type FreeChatInput } from './free-chat';
 import {
@@ -39,6 +40,8 @@ export interface ChatApi {
     selection: ModelSelection,
     maximum: number,
     allowStreaming: boolean,
+    // False where the endpoint may route to paid execution, which serves text only.
+    allowTools?: boolean,
   ): FreeChatInput;
   completion(model: string, result: ChatResult): unknown;
   stream(model: string, includeDigest: boolean): ChatStreamFormat;
@@ -55,7 +58,14 @@ const openAi: ChatApi = {
     choices: [
       {
         index: 0,
-        message: { role: FREE_CHAT_ROLES.ASSISTANT, content: result.text },
+        message: {
+          role: FREE_CHAT_ROLES.ASSISTANT,
+          // A turn that only calls tools has no content, as OpenAI writes it.
+          content: result.text || (result.toolCalls ? null : ''),
+          ...(result.toolCalls
+            ? { tool_calls: openAiCallsOut(result.toolCalls) }
+            : {}),
+        },
         finish_reason: result.finishReason,
       },
     ],
@@ -107,6 +117,20 @@ export function chatApi(url: string | undefined): ChatApi | undefined {
 
 export const isModelsRoute = (url: string | undefined) =>
   url?.split('?')[0] === CHAT_ROUTES.models;
+export const isCountTokensRoute = (url: string | undefined) =>
+  url?.split('?')[0] === CHAT_ROUTES.countTokens;
+
+// Anthropic's token count, estimated: about four bytes per token over the request's system, messages and
+// tools. The buyer holds no tokenizer for a free offer; agents use the count only to size their context.
+export function estimatedTokens(body: unknown) {
+  const row =
+    body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  const text = JSON.stringify([row.system, row.messages, row.tools]);
+  return {
+    input_tokens: Math.ceil(Buffer.byteLength(text) / BYTES_PER_TOKEN),
+  };
+}
+const BYTES_PER_TOKEN = 4;
 
 // The one model this buyer asks for, in the OpenAI list shape that SDKs and agents read.
 export function modelList(selection: ModelSelection) {

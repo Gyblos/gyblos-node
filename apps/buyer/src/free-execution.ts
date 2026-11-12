@@ -54,9 +54,11 @@ export interface FreeBuyerDependencies {
     now?: () => number;
   };
   enter?(): () => void;
+  // `needs.tools`: only a seller that serves tools may win.
   select(
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
+    needs?: { tools?: boolean },
   ): Promise<FreeWinner>;
   execute(
     winner: FreeWinner,
@@ -81,7 +83,7 @@ export async function executeBuyerFree(
     const excluded = new Set<string>();
     while (!signal.aborted) {
       const winner = await dependencies
-        .select(excluded, signal)
+        .select(excluded, signal, { tools: Boolean(input.tools) })
         .catch((error) => {
           if (!signal.aborted) buyerUnserved(dependencies, Boolean(onDelta));
           throw error;

@@ -1,17 +1,26 @@
 // Turns the messages an OpenAI- or Anthropic-style client sends into the conversation sellers serve: system
-// text first, then user and assistant turns alternating from the user's and ending with it. Consecutive turns
-// of one role are joined, as both APIs allow; tool turns, images and other non-text parts are refused, never
-// dropped. Refusals name the field and a fixed reason, never the text.
-import type { ChatMessage } from '@gyblos/protocol/chat';
+// text first, then user and assistant turns alternating from the user's, with an assistant's tool calls
+// answered by tool results, ending with the user or with results. Consecutive text turns of one role are
+// joined, as both APIs allow; images and other non-text parts are refused, never dropped. Refusals name the
+// field and a fixed reason, never the text.
+import { isConversation, type ChatMessage } from '@gyblos/protocol/chat';
 import { FREE_CHAT_ROLES, FREE_EXECUTION } from '@gyblos/protocol/constants';
+import {
+  hasToolTurns,
+  isToolConversation,
+  TOOL_ROLE,
+  toolMessageBytes,
+  type ToolCall,
+  type ToolChatMessage,
+} from '@gyblos/protocol/tools';
 
 import { CHAT_MESSAGE_DETAILS, FREE_CHAT_FIELDS } from './constants';
 import { invalidChat } from './free-chat-error';
 
-export interface ChatTurn {
-  role: ChatMessage['role'];
-  text: string;
-}
+// A text turn, an assistant turn that calls tools, or a tool's result.
+export type ChatTurn =
+  | { role: ChatMessage['role']; text: string; toolCalls?: ToolCall[] }
+  | { role: typeof TOOL_ROLE; text: string; toolCallId: string };
 
 const JOIN = '\n\n';
 
@@ -47,35 +56,59 @@ export function textOf(value: unknown, allowed: readonly string[]) {
   return text;
 }
 
-// Leading system text becomes one system message; turns of one role in a row become one turn.
+// Joins a text turn into the one before it when both are text of one role (an assistant's text may also
+// lead its calls); returns false when the turn starts a new message.
+function joined(last: ToolChatMessage | undefined, turn: ChatTurn) {
+  if (!last || last.role !== turn.role || last.role === TOOL_ROLE) return false;
+  if ('toolCalls' in last) throw refuse(CHAT_MESSAGE_DETAILS.order);
+  if ('toolCalls' in turn && turn.toolCalls) {
+    Object.assign(last, {
+      content: [last.content, turn.text].filter(Boolean).join(JOIN),
+      toolCalls: turn.toolCalls,
+    });
+    return true;
+  }
+  last.content += JOIN + turn.text;
+  return true;
+}
+function message(turn: ChatTurn): ToolChatMessage {
+  if ('toolCallId' in turn)
+    return { role: TOOL_ROLE, content: turn.text, toolCallId: turn.toolCallId };
+  if (turn.toolCalls)
+    return {
+      role: FREE_CHAT_ROLES.ASSISTANT,
+      content: turn.text,
+      toolCalls: turn.toolCalls,
+    };
+  return { role: turn.role, content: turn.text };
+}
+
+// Leading system text becomes one system message; text turns of one role in a row become one turn.
 export function chatConversation(
   system: readonly string[],
   turns: readonly ChatTurn[],
-): ChatMessage[] {
-  const messages: ChatMessage[] = [];
+): ToolChatMessage[] {
+  const messages: ToolChatMessage[] = [];
   const instructions = system.filter((text) => text.length > 0).join(JOIN);
   if (instructions)
     messages.push({ role: FREE_CHAT_ROLES.SYSTEM, content: instructions });
   for (const turn of turns) {
     if (turn.role === FREE_CHAT_ROLES.SYSTEM)
       throw refuse(CHAT_MESSAGE_DETAILS.order);
-    if (turn.text.length === 0) continue;
-    const last = messages.at(-1);
-    if (last && last.role === turn.role) last.content += JOIN + turn.text;
-    else messages.push({ role: turn.role, content: turn.text });
+    const calls = 'toolCalls' in turn && turn.toolCalls;
+    if (turn.text.length === 0 && turn.role !== TOOL_ROLE && !calls) continue;
+    if (!joined(messages.at(-1), turn)) messages.push(message(turn));
   }
-  const first = messages.find(
-    (message) => message.role !== FREE_CHAT_ROLES.SYSTEM,
-  );
   if (
-    first?.role !== FREE_CHAT_ROLES.USER ||
-    messages.at(-1)?.role !== FREE_CHAT_ROLES.USER
+    !(hasToolTurns(messages)
+      ? isToolConversation(messages)
+      : isConversation(messages as ChatMessage[]))
   )
     throw refuse(CHAT_MESSAGE_DETAILS.order);
   if (messages.length > FREE_EXECUTION.maxMessages)
     throw refuse(CHAT_MESSAGE_DETAILS.count);
   const bytes = messages.reduce(
-    (total, message) => total + Buffer.byteLength(message.content),
+    (total, message) => total + toolMessageBytes(message),
     0,
   );
   if (

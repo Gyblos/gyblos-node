@@ -207,7 +207,12 @@ function buyerHttp(
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
       (input, signal) => run(input, signal),
-      { selection: request.selection, maxTokens: request.maxTokens },
+      {
+        selection: request.selection,
+        maxTokens: request.maxTokens,
+        // Only the free channel serves tools; an execution factory may route to paid sessions.
+        tools: execution === undefined,
+      },
       {
         port,
         stream: run,

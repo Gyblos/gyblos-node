@@ -274,6 +274,7 @@ async function requestCandidate(
         priceCeilings: request.priceCeilings,
         network: request.network,
         asset: request.asset,
+        ...(request.tools ? { tools: true as const } : {}),
       },
       querySignal,
     );
@@ -289,13 +290,15 @@ async function requestCandidate(
     return quote;
   } catch (error) {
     if (!querySignal.aborted) {
-      recordQuote(
-        dependencies.stats,
-        candidate.nodeId,
-        false,
-        now() - start,
-        now(),
-      );
+      // A seller without tools answered as designed: it is not cooled down for the requests it serves.
+      if (sellerFailureCode(error) !== CONTROL_CODES.TOOLS)
+        recordQuote(
+          dependencies.stats,
+          candidate.nodeId,
+          false,
+          now() - start,
+          now(),
+        );
       reportSellerFailure(dependencies.onSellerFailure, {
         nodeId: candidate.nodeId,
         phase: SELLER_FAILURE_PHASES.QUOTE,

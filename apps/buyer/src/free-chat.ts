@@ -1,11 +1,13 @@
-// Validates the supported OpenAI-compatible subset: a whole conversation of text turns. Options clients send
-// by default and that do not change what is asked are accepted and ignored; options that would (tools,
-// structured output, several answers, stop sequences) are refused, never silently dropped.
+// Validates the supported OpenAI-compatible subset: a whole conversation of text turns, tools and tool turns.
+// Options clients send by default and that do not change what is asked are accepted and ignored; options
+// that would (structured output, several answers, stop sequences) are refused, never silently dropped.
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
+import { hasToolTurns } from '@gyblos/protocol/tools';
 
 import { chatConversation, textOf, type ChatTurn } from './chat-messages';
+import { openAiCalls, openAiToolChoice, openAiTools } from './chat-tools';
 import {
   CHAT_MESSAGE_DETAILS,
   FREE_CHAT_DETAILS,
@@ -61,6 +63,28 @@ export function checkModel(row: Row, selection: ModelSelection) {
     );
 }
 
+// Tools and a tool choice for the request; a choice of none without tools asks for nothing.
+export function toolInput(
+  tools: FreeChatInput['tools'],
+  toolChoice: FreeChatInput['toolChoice'],
+  messages: FreeChatInput['messages'],
+  allowed: boolean,
+): Pick<FreeChatInput, 'tools' | 'toolChoice'> {
+  // An endpoint that may route to paid execution serves text only, never dropping tools silently.
+  if (!allowed && (tools || hasToolTurns(messages)))
+    throw invalidChat('tools', FREE_CHAT_DETAILS.paidTools);
+  if (!tools) {
+    if (toolChoice === undefined || toolChoice === 'none') return {};
+    throw invalidChat('tool_choice', FREE_CHAT_DETAILS.toolChoice);
+  }
+  if (
+    typeof toolChoice === 'object' &&
+    !tools.some((tool) => tool.name === toolChoice.name)
+  )
+    throw invalidChat('tool_choice', FREE_CHAT_DETAILS.toolChoice);
+  return { tools, ...(toolChoice ? { toolChoice } : {}) };
+}
+
 export function checkStream(row: Row, allowStreaming: boolean) {
   if (
     Object.hasOwn(row, FREE_CHAT_FIELDS.STREAM) &&
@@ -106,10 +130,7 @@ function chatMessage(entry: unknown): Row {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry))
     throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.shape);
   const message = entry as Row;
-  if (message.role === 'tool' || message.role === 'function')
-    throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.tools);
-  // An assistant turn may leave content null only to call tools, which are not served yet.
-  if (message.tool_calls != null || message.function_call != null)
+  if (message.role === 'function' || message.function_call != null)
     throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.tools);
   if (
     Object.keys(message).some((key) => !OPENAI_CHAT.messageFields.includes(key))
@@ -125,6 +146,33 @@ function openAiConversation(value: unknown) {
   const turns: ChatTurn[] = [];
   for (const entry of value) {
     const message = chatMessage(entry);
+    if (message.role === 'tool') {
+      if (typeof message.tool_call_id !== 'string')
+        throw invalidChat(
+          FREE_CHAT_FIELDS.MESSAGES,
+          CHAT_MESSAGE_DETAILS.toolCalls,
+        );
+      turns.push({
+        role: 'tool',
+        text:
+          message.content == null
+            ? ''
+            : textOf(message.content, OPENAI_CHAT.partFields),
+        toolCallId: message.tool_call_id,
+      });
+      continue;
+    }
+    if (message.role === 'assistant' && message.tool_calls != null) {
+      turns.push({
+        role: 'assistant',
+        text:
+          message.content == null
+            ? ''
+            : textOf(message.content, OPENAI_CHAT.partFields),
+        toolCalls: openAiCalls(message.tool_calls),
+      });
+      continue;
+    }
     const role = OPENAI_CHAT.roles[String(message.role)];
     if (!role)
       throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.shape);
@@ -142,14 +190,22 @@ export function parseFreeChat(
   selection: ModelSelection,
   maximum: number,
   allowStreaming = false,
+  allowTools = true,
 ): FreeChatInput {
   const row = chatObject(value);
   checkFields(row, OPENAI_CHAT.fields);
   checkModel(row, selection);
   const stream = checkStream(row, allowStreaming);
+  const messages = openAiConversation(row.messages);
   return {
-    messages: openAiConversation(row.messages),
+    messages,
     maxTokens: requestedTokens(row, maximum),
+    ...toolInput(
+      openAiTools(row.tools),
+      openAiToolChoice(row.tool_choice),
+      messages,
+      allowTools,
+    ),
     ...stream,
   };
 }
