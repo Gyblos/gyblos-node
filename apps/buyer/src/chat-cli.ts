@@ -3,7 +3,10 @@ import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
 
+import { prepareBuyerConversation } from '@gyblos/core/buyer-conversation';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import type { ChatMessage } from '@gyblos/protocol/chat';
+import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
 import { startBuyer } from './buyer-main';
@@ -13,7 +16,13 @@ import {
   type ChatTurnResult,
 } from './chat-cli-turn';
 import type { ownedChat } from './chat-owned';
-import { isFreeAtomic, PAID_VERDICTS } from './constants';
+import {
+  CHAT_COMMANDS,
+  CHAT_INPUT_BYTES,
+  CHAT_TURN_STATUSES,
+  isFreeAtomic,
+  PAID_VERDICTS,
+} from './constants';
 import { startupMessage } from './free-main';
 
 export interface ChatSessionOptions {
@@ -129,6 +138,7 @@ export async function runOwnedChat(
   }
 }
 export async function chatSession(options: ChatSessionOptions) {
+  let history: ChatMessage[] = [];
   const paid = !isFreeAtomic(options.maxAtomic);
   const mode = options.automatic
     ? paid
@@ -138,30 +148,42 @@ export async function chatSession(options: ChatSessionOptions) {
       ? 'paid (devnet)'
       : 'free';
   options.write(
-    `Model: ${options.model}\nMode: ${mode}\n${options.session ? `Session deposit limit: ${options.session.depositAtomic} atomic units\n${options.session.totalDepositAtomic ? `Total deposit authority: ${options.session.totalDepositAtomic} atomic units\n` : ''}Maximum per question: ${options.maxAtomic} atomic units\nType /settle to close ${options.session.totalDepositAtomic ? 'all seller channels' : 'the channel'}, or /exit to leave settlement to the seller.\n` : `Maximum deposit: ${options.maxAtomic} atomic units per request\n`}Type /exit to quit. Each question is independent.\n`,
+    `Model: ${options.model}\nMode: ${mode}\n${options.session ? `Session deposit limit: ${options.session.depositAtomic} atomic units\n${options.session.totalDepositAtomic ? `Total deposit authority: ${options.session.totalDepositAtomic} atomic units\n` : ''}Maximum per question: ${options.maxAtomic} atomic units\nType ${CHAT_COMMANDS.SETTLE} to close ${options.session.totalDepositAtomic ? 'all seller channels' : 'the channel'}, or ${CHAT_COMMANDS.EXIT} to leave settlement to the seller.\n` : `Maximum deposit: ${options.maxAtomic} atomic units per request\n`}Type ${CHAT_COMMANDS.NEW} for a new conversation; ${CHAT_COMMANDS.EXIT} to quit. History stays in memory only.\n`,
   );
+  if (paid && !options.session)
+    options.write(
+      'Paid offers without reusable sessions accept one user turn; use /new for a separate paid question.\n',
+    );
   while (!options.signal?.aborted) {
     const prompt = await options.read();
-    if (prompt === undefined || prompt.trim() === '/exit') return;
-    if (prompt.trim() === '/settle' && options.session) {
-      try {
-        const settled = await options.session.settle?.();
-        options.write(
-          settled
-            ? `Configured RPC reports finalized charge ${settled.chargedAtomic}; refunded ${settled.refundedAtomic} atomic units.\n`
-            : 'Settlement is pending; the original channel is retained.\n',
-        );
-      } catch {
-        options.write(
-          'Settlement could not be verified; the original channel is retained.\n',
-        );
-      }
+    if (prompt === undefined || prompt.trim() === CHAT_COMMANDS.EXIT) return;
+    if (prompt.trim() === CHAT_COMMANDS.NEW) {
+      history = [];
+      options.write(
+        'New conversation. Payment channels and pending financial state are unchanged.\n',
+      );
+      continue;
+    }
+    if (prompt.trim() === CHAT_COMMANDS.SETTLE && options.session) {
+      await settleChat(options.session, options.write);
       return;
+    }
+    const messages = prepareBuyerConversation(
+      history,
+      prompt,
+      CHAT_INPUT_BYTES,
+    );
+    if (!messages) {
+      options.write(
+        '\nQuestion rejected before sending. Conversation is unchanged; use /new if it no longer fits the supported limits.\n',
+      );
+      continue;
     }
     const input = {
       model: options.model,
       maxTokens: options.maxTokens,
       prompt,
+      history,
       paid,
       automatic: options.automatic,
       write: options.write,
@@ -170,27 +192,17 @@ export async function chatSession(options: ChatSessionOptions) {
     const result = await (options.turn
       ? options.turn(input)
       : chatTurn(input, options.request));
-    if (result.status === 'rejected') {
+    if (result.status === CHAT_TURN_STATUSES.REJECTED) {
       options.write('\nQuestion rejected before sending.\n');
       continue;
     }
-    options.write('\n');
-    if (result.code) options.write(`Error: ${result.code}\n`);
-    if (result.usage)
-      options.write(
-        `Tokens: ${result.usage.input} input, ${result.usage.output} output\n`,
-      );
-    if (result.payment) {
-      const { verdict, charged, refunded } = result.payment;
-      options.write(
-        verdict === SESSION_VERDICTS.APPROVED && result.payment.session
-          ? `Approved this question: ${result.payment.session.approvedAtomic}; cumulative: ${result.payment.session.cumulativeAtomic} of ${result.payment.session.depositAtomic} atomic units; settlement pending.\n`
-          : verdict === PAID_VERDICTS.SETTLED
-            ? `Payment: ${verdict}; charged: ${charged ?? 'unknown'}; refunded: ${refunded ?? 'unknown'} atomic units\n`
-            : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
-      );
-    }
-    if (result.status === 'uncertain') {
+    if (result.status === CHAT_TURN_STATUSES.COMPLETE)
+      history = [
+        ...messages,
+        { role: FREE_CHAT_ROLES.ASSISTANT, content: result.text },
+      ];
+    reportTurn(result, options.write);
+    if (result.status === CHAT_TURN_STATUSES.UNCERTAIN) {
       options.write(
         'The request may have been sent. No retry was made. Check the buyer and reconcile any uncertain payment before continuing.\n',
       );
@@ -198,6 +210,41 @@ export async function chatSession(options: ChatSessionOptions) {
         ? result.requestDigest
         : undefined;
     }
+  }
+}
+async function settleChat(
+  session: NonNullable<ChatSessionOptions['session']>,
+  write: (text: string) => void,
+) {
+  try {
+    const settled = await session.settle?.();
+    write(
+      settled
+        ? `Configured RPC reports finalized charge ${settled.chargedAtomic}; refunded ${settled.refundedAtomic} atomic units.\n`
+        : 'Settlement is pending; the original channel is retained.\n',
+    );
+  } catch {
+    write(
+      'Settlement could not be verified; the original channel is retained.\n',
+    );
+  }
+}
+function reportTurn(result: ChatTurnResult, write: (text: string) => void) {
+  write('\n');
+  if (result.code) write(`Error: ${result.code}\n`);
+  if (result.usage)
+    write(
+      `Tokens: ${result.usage.input} input, ${result.usage.output} output\n`,
+    );
+  if (result.payment) {
+    const { verdict, charged, refunded } = result.payment;
+    write(
+      verdict === SESSION_VERDICTS.APPROVED && result.payment.session
+        ? `Approved this question: ${result.payment.session.approvedAtomic}; cumulative: ${result.payment.session.cumulativeAtomic} of ${result.payment.session.depositAtomic} atomic units; settlement pending.\n`
+        : verdict === PAID_VERDICTS.SETTLED
+          ? `Payment: ${verdict}; charged: ${charged ?? 'unknown'}; refunded: ${refunded ?? 'unknown'} atomic units\n`
+          : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
+    );
   }
 }
 export async function main(options?: {
