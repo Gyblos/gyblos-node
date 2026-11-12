@@ -24,6 +24,8 @@ export interface ControlOffer {
   meteringMode: ControlMeteringMode;
   // This offer's own readiness; each quote is bound to it.
   readiness: () => QuoteReadiness;
+  // Whether the offer's engine serves tools (free offers only).
+  tools?: boolean;
 }
 
 export interface ControlOffers {
@@ -56,7 +58,10 @@ export function quoteModel(offer: ControlOffer): QuoteModel {
     meteringMode: offer.meteringMode,
     // A free offer refuses a longer answer at quote time, not after the buyer sent its conversation.
     ...(offer.offer.kind === OFFER_PRICING_KINDS.FREE
-      ? { maxOutputTokens: offer.offer.caps.maxOutputTokens }
+      ? {
+          maxOutputTokens: offer.offer.caps.maxOutputTokens,
+          tools: offer.tools === true,
+        }
       : {}),
   };
 }

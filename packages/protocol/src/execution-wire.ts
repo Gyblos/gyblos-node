@@ -20,6 +20,8 @@ import {
   controlReasoning,
 } from './control-validation';
 import type {
+  ExecutionInput,
+  ExecutionResult,
   FreeExecutionRequest,
   FreeExecutionResult,
   FreeExecutionStop,
@@ -28,6 +30,18 @@ import {
   freeExecutionFail,
   freeExecutionText,
 } from './free-execution-validation';
+import {
+  checkToolInput,
+  parseToolCalls,
+  parseToolChoice,
+  parseToolMessage,
+  parseTools,
+  TOOL_CALLS_DONE,
+  toolMessageBytes,
+  toolsBytes,
+  type ToolChatMessage,
+  type ToolDefinition,
+} from './tools';
 
 function role(value: unknown): FreeChatRole {
   for (const accepted of Object.values(FREE_CHAT_ROLES))
@@ -49,25 +63,37 @@ function messages(value: unknown, inputBytes: number, maxMessages: number) {
     return { role: role(input.role), content };
   });
 }
+// The free channel's messages, which may also carry tool calls and results; tools and tool JSON count
+// against the same input bound as text.
+function toolMessages(
+  value: unknown,
+  inputBytes: number,
+  maxMessages: number,
+  tools: readonly ToolDefinition[] = [],
+): ToolChatMessage[] {
+  const entries = controlArray(value, maxMessages);
+  if (!entries.length) return freeExecutionFail();
+  let bytes = toolsBytes(tools);
+  if (bytes > inputBytes) return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
+  return entries.map((entry) => {
+    const message = parseToolMessage(entry, role, inputBytes);
+    bytes += toolMessageBytes(message);
+    if (bytes > inputBytes)
+      return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
+    return message;
+  });
+}
 export function boundedWire(value: unknown, maximum: number) {
   if (new TextEncoder().encode(canonicalJson(value)).length > maximum)
     return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
 }
-// Input bound to the quote: the same requestId, selection and reasoning, and a token maximum
-// within the signed offer and model context.
-export function parseExecutionInput(
-  value: unknown,
+// The bound to the quote: the same requestId, selection and reasoning, and a token maximum within the
+// signed offer and model context.
+function boundInput(
+  params: Record<string, unknown>,
   requestId: string,
   offered: InferenceOfferV2,
-  inputBytes: number = PAID_INPUT_BYTES,
-  maxMessages: number = FREE_EXECUTION.maxMessages,
-): FreeExecutionRequest['input'] {
-  const params = controlObject(value, [
-    'messages',
-    'selection',
-    'reasoning',
-    'maxTokens',
-  ]);
+) {
   const selection = parseModelSelection(params.selection);
   const reasoning = controlReasoning(params.reasoning);
   if (
@@ -83,25 +109,82 @@ export function parseExecutionInput(
   );
   if (maxTokens > offered.maxTokens || maxTokens > offered.model.contextTokens)
     return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
+  return { selection, reasoning, maxTokens };
+}
+const INPUT_KEYS = ['messages', 'selection', 'reasoning', 'maxTokens'];
+// The paid and session channels' input: text messages bound to the quote.
+export function parseExecutionInput(
+  value: unknown,
+  requestId: string,
+  offered: InferenceOfferV2,
+  inputBytes: number = PAID_INPUT_BYTES,
+  maxMessages: number = FREE_EXECUTION.maxMessages,
+): ExecutionInput {
+  const params = controlObject(value, INPUT_KEYS);
   return {
     messages: messages(params.messages, inputBytes, maxMessages),
-    selection,
-    reasoning,
-    maxTokens,
+    ...boundInput(params, requestId, offered),
+  };
+}
+// The free channel's input: the same, plus optional tools, a tool choice and tool turns.
+export function parseFreeExecutionInput(
+  value: unknown,
+  requestId: string,
+  offered: InferenceOfferV2,
+): FreeExecutionRequest['input'] {
+  const hasTools = hasField(value, 'tools');
+  const hasChoice = hasField(value, 'toolChoice');
+  const params = controlObject(value, [
+    ...INPUT_KEYS,
+    ...(hasTools ? ['tools'] : []),
+    ...(hasChoice ? ['toolChoice'] : []),
+  ]);
+  const bound = boundInput(params, requestId, offered);
+  const tools = hasTools ? parseTools(params.tools) : undefined;
+  const toolChoice = hasChoice ? parseToolChoice(params.toolChoice) : undefined;
+  checkToolInput({ tools, toolChoice });
+  return {
+    messages: toolMessages(
+      params.messages,
+      FREE_EXECUTION.inputBytes,
+      FREE_EXECUTION.maxMessages,
+      tools,
+    ),
+    ...bound,
+    ...(tools ? { tools } : {}),
+    ...(toolChoice ? { toolChoice } : {}),
   };
 }
 
-// A completed generation's text, usage and finish reason, shared by both channels' terminals.
-export function parseExecutionResult(value: unknown): FreeExecutionResult {
-  const input = controlObject(value, ['text', 'usage', 'finishReason']);
+// A completed generation's text, usage and finish reason, shared by every channel's terminal. Only the free
+// channel allows tool calls: such a result carries them with finish reason tool_calls, and its text may be
+// empty.
+export function parseExecutionResult(value: unknown): ExecutionResult {
+  return parseResult(value, false) as ExecutionResult;
+}
+export function parseFreeExecutionResult(value: unknown): FreeExecutionResult {
+  return parseResult(value, true);
+}
+function parseResult(value: unknown, allowTools: boolean): FreeExecutionResult {
+  const calls = allowTools && hasField(value, 'toolCalls');
+  const input = controlObject(value, [
+    'text',
+    'usage',
+    'finishReason',
+    ...(calls ? ['toolCalls'] : []),
+  ]);
   const usage = controlObject(input.usage, ['inputTokens', 'outputTokens']);
+  if (calls !== (input.finishReason === TOOL_CALLS_DONE))
+    return freeExecutionFail();
   if (
+    !calls &&
     input.finishReason !== ENGINE_DONE_REASONS.STOP &&
     input.finishReason !== ENGINE_DONE_REASONS.LENGTH
   )
     return freeExecutionFail();
   return {
     text: freeExecutionText(input.text, FREE_EXECUTION.outputBytes),
+    ...(calls ? { toolCalls: parseToolCalls(input.toolCalls) } : {}),
     usage: {
       inputTokens: controlInteger(
         usage.inputTokens,
@@ -114,7 +197,7 @@ export function parseExecutionResult(value: unknown): FreeExecutionResult {
         PUBLIC_RECORD_LIMITS.maxContextTokens,
       ),
     },
-    finishReason: input.finishReason,
+    finishReason: input.finishReason as FreeExecutionResult['finishReason'],
   };
 }
 

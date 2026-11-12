@@ -10,15 +10,17 @@ respuesta en streaming por una conexión directa entre pares.
 
 ## Qué funciona hoy [#que-funciona-hoy]
 
-| Función                                                                           | Estado en la beta                              |
-| --------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Conversaciones completas: mensaje de sistema, historial y mensaje nuevo           | Sí, hasta 1024 mensajes                        |
-| `POST /v1/chat/completions` de OpenAI y `POST /v1/messages` de Anthropic          | Sí, respuestas completas y en streaming        |
-| `GET /v1/models`                                                                  | Sí, el modelo que pide tu comprador            |
-| Ofertas gratuitas                                                                 | Sí                                             |
-| Herramientas (function calling), imágenes, salida estructurada, varias respuestas | Todavía no: se rechazan con un error 400 claro |
-| Agentes que necesitan herramientas (Claude Code, modo agente de Cursor)           | Todavía no                                     |
-| Ofertas de pago                                                                   | Fuera de esta guía                             |
+| Función                                                                   | Estado en la beta                              |
+| ------------------------------------------------------------------------- | ---------------------------------------------- |
+| Conversaciones completas: mensaje de sistema, historial y mensaje nuevo   | Sí, hasta 1024 mensajes                        |
+| `POST /v1/chat/completions` de OpenAI y `POST /v1/messages` de Anthropic  | Sí, respuestas completas y en streaming        |
+| `GET /v1/models`                                                          | Sí, el modelo que pide tu comprador            |
+| Ofertas gratuitas                                                         | Sí                                             |
+| Herramientas (function calling), ambos formatos, completas y en streaming | Sí, ver [Herramientas](#herramientas)          |
+| Claude Code                                                               | Solo con un vendedor de un modelo más grande   |
+| Modo agente de Cursor                                                     | No: llama desde la nube de Cursor              |
+| Imágenes, salida estructurada, varias respuestas                          | Todavía no: se rechazan con un error 400 claro |
+| Ofertas de pago                                                           | Fuera de esta guía                             |
 
 Por defecto, un vendedor atiende a cada comprador hasta **30 respuestas por minuto**. Una respuesta tiene
 como máximo **4096 tokens**, salvo que subas el límite del comprador (hasta 32768); un pedido más largo se
@@ -136,13 +138,71 @@ const message = await client.messages.create({
 console.log(message.content[0].text);
 ```
 
+## Herramientas [#herramientas]
+
+Envía `tools` tal como lo define cada API. Cuando el modelo quiere usar una herramienta, la respuesta
+termina con `finish_reason: "tool_calls"` (en Anthropic, `stop_reason: "tool_use"`) y trae la llamada. Tu
+programa ejecuta la herramienta y devuelve el resultado en el siguiente pedido, con la conversación completa:
+
+```js
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://127.0.0.1:4031/v1',
+  apiKey: 'local',
+});
+const tools = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_time',
+      description: 'Current local time in a city',
+      parameters: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city'],
+      },
+    },
+  },
+];
+const messages = [
+  { role: 'user', content: 'What time is it in Santiago? Use the tool.' },
+];
+const first = await client.chat.completions.create({
+  model: 'qwen3-0.6b',
+  messages,
+  tools,
+});
+const call = first.choices[0].message.tool_calls[0];
+// Run the tool yourself, then send its result back.
+messages.push(first.choices[0].message, {
+  role: 'tool',
+  tool_call_id: call.id,
+  content: '15:42',
+});
+const second = await client.chat.completions.create({
+  model: 'qwen3-0.6b',
+  messages,
+  tools,
+});
+console.log(second.choices[0].message.content);
+```
+
+Con el SDK de Anthropic, envía `tools` con `input_schema`, lee los bloques `tool_use` y responde con bloques
+`tool_result`, igual que con Anthropic. El comprador solo le pregunta a vendedores que sirven herramientas;
+si ninguno lo hace, responde 503 y lo dice.
+
+El modelo por defecto, qwen3:0.6b, resuelve llamadas simples como esta. Los agentes que envían muchas
+herramientas e instrucciones largas, como Claude Code, necesitan un vendedor con un modelo más grande, a
+través del motor OpenAI o Anthropic.
+
 ## Opciones y errores [#opciones-y-errores]
 
 Las opciones que los clientes envían por defecto y que no cambian la respuesta se aceptan y se ignoran, como
-`temperature`, `top_p`, `user`, `metadata` y `stream_options`. Las que sí la cambiarían se rechazan salvo
-que tengan su valor neutro: `tools` (vacío), `tool_choice` (`none`), `response_format` (`text`), `n` (1),
-`stop` y `stop_sequences`, `logprobs` y `thinking` (`disabled`). Las imágenes y los turnos de herramientas
-siempre se rechazan.
+`temperature`, `top_p`, `user`, `metadata`, `stream_options` y, en el formato de Anthropic, `thinking`
+(el razonamiento siempre está apagado). Las que sí la cambiarían se rechazan salvo que tengan su valor
+neutro: `response_format` (`text`), `n` (1), `stop` y `stop_sequences`, y `logprobs`. Las imágenes siempre
+se rechazan.
 
 | Respuesta | Significado                                                                                                                                                                   |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

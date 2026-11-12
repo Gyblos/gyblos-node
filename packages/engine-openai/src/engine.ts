@@ -23,6 +23,7 @@ import {
   visibleFragment,
   type JsonFields,
 } from '@gyblos/core/engine-provider';
+import { finishedToolCalls } from '@gyblos/core/engine-tools';
 import {
   ENGINE_DONE_REASONS,
   ENGINE_ERROR_CODES,
@@ -35,6 +36,7 @@ import {
   type EngineInput,
   type EngineResult,
 } from '@gyblos/protocol/engine';
+import { TOOL_CALLS_DONE } from '@gyblos/protocol/tools';
 
 import {
   OPENAI_FINISH_REASONS,
@@ -45,6 +47,7 @@ import {
   OPENAI_STREAM_END,
   OPENAI_TIMEOUTS,
 } from './constants';
+import { applyToolDeltas, openAiMessages, openAiTools } from './tools';
 
 export interface OpenAiEngineSettings {
   // The API base, ending in its version (https://api.example.com/v1).
@@ -78,6 +81,8 @@ function authorization(settings: OpenAiEngineSettings): Record<string, string> {
 // Compatible servers name the same two endings differently.
 const FINISH_REASONS: Readonly<Record<string, EngineDoneReason>> =
   OPENAI_FINISH_REASONS;
+// The endings that mean the model called tools (function_call is the legacy name).
+const TOOL_FINISHES = ['tool_calls', 'function_call'];
 
 // A refused request: an account without credit is quota exhaustion, any other status maps as usual.
 // OpenAI-compatible servers report it only with 429, so only that body is read, for its error code,
@@ -125,8 +130,9 @@ async function describeModel(
 // What the stream has said so far; a completion needs a finish reason and the provider's usage.
 interface Completion {
   text: string;
-  finish?: EngineDoneReason;
+  finish?: EngineDoneReason | typeof TOOL_CALLS_DONE;
   usage?: { inputTokens: number; outputTokens: number };
+  calls: { id: string; name: string; arguments: string }[];
 }
 
 // Applies one streamed event; returns the visible text it carried. Hidden reasoning is never delivered.
@@ -144,13 +150,17 @@ function applyEvent(event: JsonFields, completion: Completion) {
   const choice: unknown = choices[0];
   if (choice === undefined) return '';
   if (!isJsonFields(choice)) throw new FrameFailure();
-  const content = isJsonFields(choice.delta) ? choice.delta.content : undefined;
+  const delta = isJsonFields(choice.delta) ? choice.delta : {};
+  const content = delta.content;
   const text =
     content === undefined || content === null
       ? ''
       : visibleFragment(content, !!completion.finish);
+  applyToolDeltas(delta.tool_calls, completion.calls);
   if (choice.finish_reason !== undefined && choice.finish_reason !== null)
-    completion.finish = doneReasonFrom(FINISH_REASONS, choice.finish_reason);
+    completion.finish = TOOL_FINISHES.includes(String(choice.finish_reason))
+      ? TOOL_CALLS_DONE
+      : doneReasonFrom(FINISH_REASONS, choice.finish_reason);
   return text;
 }
 
@@ -160,7 +170,7 @@ async function readCompletion(
   signal: AbortSignal,
   attempt: EngineAttempt,
 ): Promise<Required<Completion>> {
-  const completion: Completion = { text: '' };
+  const completion: Completion = { text: '', calls: [] };
   for await (const data of serverSentData(body, OPENAI_LIMITS.stream)) {
     signal.throwIfAborted();
     if (data === OPENAI_STREAM_END) break;
@@ -179,13 +189,14 @@ async function readCompletion(
     // answer, and an earlier running count is never taken for the final one.
     if (completion.finish && isJsonFields(event.usage)) break;
   }
-  const { text, finish, usage } = completion;
-  if (!finish) throw new FrameFailure();
+  const { text, finish, usage, calls } = completion;
+  if (!finish || (finish === TOOL_CALLS_DONE) !== calls.length > 0)
+    throw new FrameFailure();
   // Declared usage is the provider's or nothing: a completion without it is not served.
-  // So is a completion with no visible text: its budget went to hidden reasoning, which is not served.
-  if (!usage || !text)
+  // So is a completion with neither visible text nor calls: its budget went to hidden reasoning.
+  if (!usage || (!text && !calls.length))
     throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
-  return { text, finish, usage };
+  return { text, finish, usage, calls };
 }
 
 async function generate(
@@ -211,7 +222,8 @@ async function generate(
         },
         body: JSON.stringify({
           model: settings.model,
-          messages,
+          messages: openAiMessages(messages),
+          ...openAiTools(input.tools, input.toolChoice),
           // OpenAI's own API takes the newer name, which its reasoning models require; compatible
           // servers take max_tokens.
           [isOpenAi(settings.base) ? 'max_completion_tokens' : 'max_tokens']:
@@ -223,7 +235,7 @@ async function generate(
       },
     );
     if (!response.ok || !response.body) throw await refusal(response);
-    const { text, finish, usage } = await readCompletion(
+    const { text, finish, usage, calls } = await readCompletion(
       response.body,
       input,
       signal,
@@ -232,6 +244,9 @@ async function generate(
     return {
       text,
       finishReason: finish,
+      ...(calls.length
+        ? { toolCalls: finishedToolCalls(calls, input.tools) }
+        : {}),
       usage: {
         ...usage,
         totalDurationNs: elapsedNanoseconds(started),
@@ -263,6 +278,8 @@ export function createOpenAiEngine(
       modelIdentity: MODEL_IDENTITIES.NAME_ONLY,
     }),
     describe: () => describeModel(settings, fetchImpl, describeTimeoutMs),
+    // Chat completions carry tools natively; whether the model uses them well is the seller's choice.
+    supportsTools: () => true,
     generate: (input) =>
       generate(settings, fetchImpl, generationTimeoutMs, input),
   };

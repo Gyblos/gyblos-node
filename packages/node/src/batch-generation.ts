@@ -15,8 +15,8 @@ import {
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
-import type { EngineResult } from '@gyblos/protocol/engine';
-import type { FreeExecutionResult } from '@gyblos/protocol/free-execution';
+import { textResult, type EngineResult } from '@gyblos/protocol/engine';
+import type { ExecutionResult } from '@gyblos/protocol/free-execution';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import type {
@@ -64,7 +64,7 @@ function recountedResult(
   inputTokens: number,
   maxTokens: number,
   generated: EngineResult,
-): FreeExecutionResult {
+): ExecutionResult {
   const usage = live.meter.usage(generated.text, generated.usage, inputTokens);
   if (
     !usage ||
@@ -72,7 +72,11 @@ function recountedResult(
     usage.inputTokens + usage.outputTokens > live.model.contextTokens
   )
     return batchFail(PAID_EXECUTION_CODES.LIMIT);
-  return { text: generated.text, usage, finishReason: generated.finishReason };
+  return {
+    text: generated.text,
+    usage,
+    finishReason: textResult(generated).finishReason,
+  };
 }
 export async function generateBatch(
   request: BatchExecutionRequest,
@@ -89,7 +93,7 @@ export async function generateBatch(
     request.input,
     live.meter,
   );
-  const run = await runBatchSellerExecution<FreeExecutionResult>({
+  const run = await runBatchSellerExecution<ExecutionResult>({
     seller: session,
     request: pending,
     peer,
@@ -163,9 +167,7 @@ function batchGeneration(
       output.complete(generated.text);
       return recountedResult(live, inputTokens, input.maxTokens, generated);
     },
-    measure: (
-      generated: import('./execution').Generated<FreeExecutionResult>,
-    ) =>
+    measure: (generated: import('./execution').Generated<ExecutionResult>) =>
       'value' in generated
         ? { ...generated.value.usage, completed: true }
         : { inputTokens, outputTokens: 0, completed: false },

@@ -8,7 +8,8 @@
     "./artifacts": "./src/artifacts.ts",
     "./constants": "./src/constants.ts",
     "./engine": "./src/engine.ts",
-    "./model": "./src/model.ts"
+    "./model": "./src/model.ts",
+    "./tool-template": "./src/tool-template.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

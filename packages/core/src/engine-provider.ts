@@ -7,8 +7,8 @@ import {
   type EngineDoneReason,
 } from '@gyblos/protocol/constants';
 import {
-  engineConversation,
   EngineError,
+  engineToolConversation,
   type EngineInput,
 } from '@gyblos/protocol/engine';
 
@@ -100,7 +100,8 @@ export function generationAttempt(
     input.maxTokens > limits.maxOutputTokens
   )
     throw new Error('Invalid output token limit.');
-  const messages = engineConversation(input);
+  // Text, or with tools and tool turns for the engines that map them to their provider.
+  const messages = engineToolConversation(input);
   input.signal?.throwIfAborted();
   const deadline = AbortSignal.timeout(
     generationDeadlineMs(limits.timeoutMs, input.maxTokens),

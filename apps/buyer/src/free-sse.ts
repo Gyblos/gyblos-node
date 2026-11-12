@@ -21,6 +21,7 @@ import type {
 import type { PaidExecutionCode } from '@gyblos/protocol/paid/constants';
 import type { SessionCode } from '@gyblos/protocol/payment-session';
 
+import { openAiCallsOut } from './chat-tools';
 import {
   BUYER_EXECUTION_FIELD,
   FREE_BUYER,
@@ -194,7 +195,25 @@ export function openAiStream(
           },
         ],
       }),
+    // Calls arrive whole at the end: one delta with every call, then the finish reason.
     close: (result) =>
+      (result.toolCalls
+        ? sse({
+            ...header,
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  role: FREE_CHAT_ROLES.ASSISTANT,
+                  tool_calls: openAiCallsOut(result.toolCalls).map(
+                    (call, index) => ({ index, ...call }),
+                  ),
+                },
+                finish_reason: null,
+              },
+            ],
+          })
+        : '') +
       sse({
         ...header,
         choices: [{ index: 0, delta: {}, finish_reason: result.finishReason }],
@@ -205,7 +224,8 @@ export function openAiStream(
         },
         ...paymentFields(result.payment),
         ...executionFields(result),
-      }) + `data: ${FREE_BUYER.streamDone}\n\n`,
+      }) +
+      `data: ${FREE_BUYER.streamDone}\n\n`,
     // A seller that could not continue adds its reason and, when known, the completion tokens delivered.
     error: (code, stop, payment) =>
       sse({

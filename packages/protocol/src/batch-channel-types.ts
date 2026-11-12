@@ -1,10 +1,7 @@
 // Typed reusable-session messages; opaque SDK payloads stay private to the financial endpoints.
 import type { BATCH_CHANNEL, BATCH_METHODS } from './batch/constants';
 import type { SignedOfferV2 } from './control-types';
-import type {
-  FreeExecutionRequest,
-  FreeExecutionResult,
-} from './free-execution-types';
+import type { ExecutionInput, ExecutionResult } from './free-execution-types';
 import type { PaidExecutionCode } from './paid/constants';
 import type {
   PaymentSessionTerms,
@@ -20,7 +17,7 @@ export interface BatchExecutionRequest {
   channelId: string;
   requestId: string;
   quote: SignedOfferV2;
-  input: FreeExecutionRequest['input'];
+  input: ExecutionInput;
 }
 interface Header {
   version: typeof BATCH_CHANNEL.version;
@@ -53,7 +50,7 @@ export type BatchChannelRequest = Header &
 export type BatchChannelResult =
   | { terms: PaymentSessionTerms }
   | { snapshot: SessionSnapshot }
-  | { value: FreeExecutionResult; bill: SessionBill }
+  | { value: ExecutionResult; bill: SessionBill }
   | { settlement: SessionSettlement };
 export type BatchChannelResponse = Header & { requestDigest: string } & (
     | { result: BatchChannelResult; error?: never }

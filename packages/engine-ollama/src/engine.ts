@@ -26,11 +26,14 @@ export function createOllamaEngine(
         contextTokens: adapter.contextTokens,
       };
     },
+    // The pinned Qwen3 template has a tool branch, rendered and read back here.
+    supportsTools: () => true,
     async generate(input) {
       const result = await adapter.generate(input);
       return {
         text: result.text,
         finishReason: result.doneReason,
+        ...(result.toolCalls ? { toolCalls: result.toolCalls } : {}),
         usage: {
           inputTokens: result.usage.prompt_eval_count,
           outputTokens: result.usage.eval_count,

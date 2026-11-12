@@ -114,6 +114,7 @@ export async function liveSellerOffer(
     offer: settings.offer,
     model: warmed.model,
     capabilities: prepared.engine.capabilities(),
+    tools: prepared.engine.supportsTools?.() ?? false,
     meteringMode: prepared.metering.mode,
     readiness: observation.readiness,
     engine: observation.engine,

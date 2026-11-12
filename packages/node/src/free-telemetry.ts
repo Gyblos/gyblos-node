@@ -13,6 +13,7 @@ import {
   TELEMETRY_REFUSALS,
   type TelemetryRefusal,
 } from '@gyblos/protocol/telemetry';
+import { conversationText, recordedFinishReason } from '@gyblos/protocol/tools';
 
 import type { SellerFreeExecutionOptions } from './free-execution';
 
@@ -74,9 +75,9 @@ export function finishSellerTelemetry(
   if (response.result) {
     observer.completed(
       { ...response.result.usage, reasoningTokens: null },
-      response.result.finishReason,
+      recordedFinishReason(response.result.finishReason),
       telemetrySizes(
-        request.input.messages[0]?.content ?? '',
+        conversationText(request.input.messages),
         response.result.text,
       ),
     );

@@ -1104,31 +1104,59 @@ buyer's `maxTokens` is served up to it, and the answer then ends with `length`
 (`max_tokens` in the Anthropic format). `model` selects the exact configured
 model/variant/quantization tuple; it is not an engine name.
 
+Tools (function calling) work in both formats on the free endpoint:
+
+- OpenAI: `tools` (functions with a JSON Schema in `parameters`), `tool_choice`
+  (`auto`, `none`, `required` or one function), assistant `tool_calls` and
+  `role: "tool"` results.
+- Anthropic: `tools` with `input_schema` (client tools; server tools such as web
+  search are refused), `tool_choice` (`auto`, `any`, `none`, `tool`), and
+  `tool_use` and `tool_result` blocks; a result marked `is_error` reaches the
+  model as `Error: ...`, and text after the results joins them.
+- An answer that calls tools ends with `finish_reason: "tool_calls"`
+  (`stop_reason: "tool_use"`); its calls carry ids the seller assigns. The buyer
+  asks only sellers that serve tools (`params.tools` in the quote); when none
+  does, it answers 503 saying so. An endpoint that may route to paid execution
+  (`buyer:start`, sessions) refuses tools with 400, since only free offers serve
+  them for now.
+- The pinned qwen3:0.6b handles simple calls; agents that send many tools and
+  long instructions (Claude Code) need a seller on a larger model through the
+  OpenAI or Anthropic engine. Cursor's agent mode calls from its own cloud and
+  cannot reach a local endpoint.
+
 Options clients send by default and that do not change what is asked
 (`temperature`, `top_p`, `top_k`, penalties, `seed`, `user`, `metadata`,
-`stream_options`, `store`, `parallel_tool_calls`) are accepted and ignored:
-generation is deterministic. Options that would change the answer are refused
-rather than dropped, unless they hold their neutral value: tools and tool
-results, `tool_choice`, `response_format` other than text, `n` above 1, stop
-sequences, logprobs, enabled `thinking`, images and other non-text parts.
-Unknown options are refused. Everything is checked before selection or prompt
-transmission. This is a compatible subset, not the complete OpenAI or Anthropic
-API. Requests must send `Content-Type: application/json`. Invalid UTF-8, foreign
-Host headers, requests with an Origin header and other content types get 400 (a
-foreign Host gets 421), so a web page cannot reach the endpoint; there is no
-CORS browser interface. A body declared larger than 384 KiB gets 413 before it
-is read; a larger streamed body gets the same 413 once it passes the limit. Both
-close the connection. Use a local client, and apply normal trust to local
-processes. When the endpoint requires its token (paid mode), send it as
-`Authorization: Bearer <token>` or, as Anthropic SDKs do with their key,
-`x-api-key: <token>`.
+`stream_options`, `store`, `parallel_tool_calls`, and in the Anthropic format
+`thinking`, `output_config` and `context_management`, which Claude Code sends)
+are accepted and ignored: generation is deterministic and thinking is always
+off. Options that would change the answer are refused rather than dropped,
+unless they hold their neutral value: the legacy `functions` and
+`function_call`, `response_format` other than text, `n` above 1, stop sequences,
+logprobs, `mcp_servers`, images and other non-text parts. Thinking blocks a
+client sends back in an assistant turn are left out, and a `system` message
+inside `messages` joins the system instructions. Unknown options are refused.
+Everything is checked before selection or prompt transmission. This is a
+compatible subset, not the complete OpenAI or Anthropic API. Requests must send
+`Content-Type: application/json`. Invalid UTF-8, foreign Host headers, requests
+with an Origin header and other content types get 400 (a foreign Host gets 421),
+so a web page cannot reach the endpoint; there is no CORS browser interface. A
+body declared larger than 384 KiB gets 413 before it is read; a larger streamed
+body gets the same 413 once it passes the limit. Both close the connection. Use
+a local client, and apply normal trust to local processes. When the endpoint
+requires its token (paid mode), send it as `Authorization: Bearer <token>` or,
+as Anthropic SDKs do with their key, `x-api-key: <token>`.
 
 Set `stream` to `true` for incremental `text/event-stream` responses. In the
 OpenAI format each `data:` event is a `chat.completion.chunk` with a content
 delta, and successful completion sends a finish reason and usage, then `[DONE]`.
 In the Anthropic format the stream carries `message_start`, one text block's
 `content_block_start`, `content_block_delta` and `content_block_stop`, then
-`message_delta` with the stop reason and usage, and `message_stop`. The default
+`message_delta` with the stop reason and usage, and `message_stop`. Tool calls
+arrive whole at the end: in the OpenAI format one chunk with every `tool_calls`
+entry before the finish chunk; in the Anthropic format one `tool_use` block per
+call (its start, one `input_json_delta` with the whole input, its stop).
+`POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
+over system, messages and tools) without contacting a seller. The default
 (absent or `false`) remains one complete JSON response.
 
 Fragments are provisional until a verified terminal and clean end of the Iroh
@@ -1153,8 +1181,8 @@ prompt, possibly to another seller.
 
 A refused request (`FREE_BUYER_INVALID_REQUEST`, 400) names the offending field
 in `error.param` (`model`, `messages`, `max_tokens`, `stream`, or an unsupported
-field such as `tools`) and says why in `error.message`, for example
-`tools is not supported yet; remove it or send its default`. The reason is fixed
+field such as `n`) and says why in `error.message`, for example
+`n is not supported yet; remove it or send its default`. The reason is fixed
 text or the operator's own limits, never the prompt. In the Anthropic format
 errors take that API's shape
 (`{"type":"error","error":{"type": "invalid_request_error","message":...}}`) and

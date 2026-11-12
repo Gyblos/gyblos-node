@@ -10,13 +10,13 @@ import {
   type EngineKind,
 } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
-import type {
-  Engine,
-  EngineCapabilities,
-  EngineDescription,
-  EngineResult,
+import {
+  textResult,
+  type Engine,
+  type EngineCapabilities,
+  type EngineDescription,
 } from '@gyblos/protocol/engine';
-import type { FreeExecutionResult } from '@gyblos/protocol/free-execution';
+import type { ExecutionResult } from '@gyblos/protocol/free-execution';
 import {
   paidExecutionFail as fail,
   paidExecutionDigest,
@@ -193,15 +193,17 @@ async function generate(
   signal: AbortSignal,
   options: SellerPaidExecutionOptions,
   observer: ReturnType<typeof sellerExecutionTelemetry>,
-): Promise<FreeExecutionResult> {
-  let produced: EngineResult;
+): Promise<ExecutionResult> {
+  let produced: ReturnType<typeof textResult>;
   try {
-    produced = await options.engine.generate({
-      prompt: admitted.prompt,
-      maxTokens: admitted.permit.outputTokens,
-      signal,
-      onText: output.onText,
-    });
+    produced = textResult(
+      await options.engine.generate({
+        prompt: admitted.prompt,
+        maxTokens: admitted.permit.outputTokens,
+        signal,
+        onText: output.onText,
+      }),
+    );
     observer?.generated(produced.usage.outputDurationNs);
     output.complete(produced.text);
   } finally {
@@ -236,7 +238,7 @@ async function serve(
   const run = await runAdmittedExecution<
     Admitted['permit']['state'],
     X402Settlement,
-    FreeExecutionResult
+    ExecutionResult
   >({
     policy,
     permit: admitted.permit,

@@ -4,12 +4,12 @@ import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
-import { REASONING_LEVELS } from '@gyblos/protocol/constants';
+import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER_CODES } from './constants';
+import { FREE_BUYER_CODES, FREE_CHAT_DETAILS } from './constants';
 import { connectBuyerControl } from './control';
 import { discoverBuyerSellers } from './discovery';
 import { FreeBuyerError } from './free-chat';
@@ -72,8 +72,8 @@ export function freeBuyerDependencies(
         active = false;
       };
     },
-    select: (excluded, signal) =>
-      selectFreeWinner(prepared, options, excluded, signal),
+    select: (excluded, signal, needs) =>
+      selectFreeWinner(prepared, options, excluded, signal, needs?.tools),
     async execute(winner, request, signal, onDelta, beforeExecute) {
       const seller = sellers.get(winner.nodeId);
       if (
@@ -149,17 +149,38 @@ export async function permitsWinner(
     )
   );
 }
-function selectFreeWinner(
+// With tools, quotes ask for them; when every seller refused them, the buyer says so plainly.
+async function selectFreeWinner(
   prepared: PreparedSelection,
   options: FreeSelectionOptions,
   excluded: ReadonlySet<string>,
   signal: AbortSignal,
+  tools = false,
 ) {
-  return selectWinner(prepared, options, excluded, signal, {
-    ...prepared.config.request,
-    maxAtomic: '0',
-    priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
-  });
+  let refusedTools = false;
+  const watched: FreeSelectionOptions = {
+    ...options,
+    onSellerFailure: (failure) => {
+      if (failure.code === CONTROL_CODES.TOOLS) refusedTools = true;
+      options.onSellerFailure?.(failure);
+    },
+  };
+  try {
+    return await selectWinner(prepared, watched, excluded, signal, {
+      ...prepared.config.request,
+      maxAtomic: '0',
+      priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+      ...(tools ? { tools: true as const } : {}),
+    });
+  } catch (error) {
+    if (refusedTools && error instanceof FreeSelectionFailure && !error.retryAt)
+      throw new FreeBuyerError(
+        FREE_BUYER_CODES.UNAVAILABLE,
+        null,
+        FREE_CHAT_DETAILS.noToolSeller,
+      );
+    throw error;
+  }
 }
 // One verified winner among the configured or discovered sellers not excluded, quoted for `request`.
 export async function selectWinner(

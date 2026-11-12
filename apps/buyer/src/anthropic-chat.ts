@@ -9,8 +9,15 @@ import {
   FREE_CHAT_ROLES,
 } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
+import { TOOL_CALLS_DONE } from '@gyblos/protocol/tools';
 
 import { chatConversation, textOf, type ChatTurn } from './chat-messages';
+import {
+  anthropicBlockTurns,
+  anthropicToolChoice,
+  anthropicTools,
+  anthropicToolUse,
+} from './chat-tools';
 import {
   ANTHROPIC_CHAT,
   CHAT_MESSAGE_DETAILS,
@@ -25,6 +32,7 @@ import {
   checkStream,
   invalidChat,
   outputTokens,
+  toolInput,
   type FreeChatInput,
 } from './free-chat';
 import {
@@ -39,25 +47,37 @@ function system(value: unknown): string[] {
   return [textOf(value, ANTHROPIC_CHAT.partFields)];
 }
 
-function turns(value: unknown): ChatTurn[] {
+// The turns, and any system text a client sent as a message (Claude Code does for models it does not know).
+function turns(value: unknown, system: string[]): ChatTurn[] {
   if (!Array.isArray(value) || value.length === 0)
     throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.shape);
-  return value.map((entry: unknown) => {
+  return value.flatMap((entry: unknown): ChatTurn[] => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry))
       throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.shape);
     const message = entry as Record<string, unknown>;
     if (
       Object.keys(message).some(
         (key) => !ANTHROPIC_CHAT.messageFields.includes(key),
-      ) ||
-      (message.role !== FREE_CHAT_ROLES.USER &&
-        message.role !== FREE_CHAT_ROLES.ASSISTANT)
+      )
     )
       throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.shape);
-    return {
-      role: message.role,
-      text: textOf(message.content, ANTHROPIC_CHAT.partFields),
-    };
+    if (message.role === FREE_CHAT_ROLES.SYSTEM) {
+      system.push(textOf(message.content, ANTHROPIC_CHAT.partFields));
+      return [];
+    }
+    if (
+      message.role !== FREE_CHAT_ROLES.USER &&
+      message.role !== FREE_CHAT_ROLES.ASSISTANT
+    )
+      throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.shape);
+    if (Array.isArray(message.content))
+      return anthropicBlockTurns(message.role, message.content);
+    return [
+      {
+        role: message.role,
+        text: textOf(message.content, ANTHROPIC_CHAT.partFields),
+      },
+    ];
   });
 }
 
@@ -66,6 +86,7 @@ export function parseAnthropicChat(
   selection: ModelSelection,
   maximum: number,
   allowStreaming = false,
+  allowTools = true,
 ): FreeChatInput {
   const row = chatObject(value);
   checkFields(row, ANTHROPIC_CHAT.fields);
@@ -76,19 +97,39 @@ export function parseAnthropicChat(
       FREE_CHAT_FIELDS.MAX_TOKENS,
       FREE_CHAT_DETAILS.anthropicMaxTokens,
     );
+  const instructions = system(row.system);
+  const conversation = turns(row.messages, instructions);
+  const messages = chatConversation(instructions, conversation);
   return {
-    messages: chatConversation(system(row.system), turns(row.messages)),
+    messages,
     maxTokens: outputTokens(
       row.max_tokens,
       FREE_CHAT_FIELDS.MAX_TOKENS,
       maximum,
+    ),
+    ...toolInput(
+      anthropicTools(row.tools),
+      anthropicToolChoice(row.tool_choice),
+      messages,
+      allowTools,
     ),
     ...stream,
   };
 }
 
 export const anthropicStop = (reason: ChatResult['finishReason']) =>
-  reason === ENGINE_DONE_REASONS.LENGTH ? 'max_tokens' : 'end_turn';
+  reason === ENGINE_DONE_REASONS.LENGTH
+    ? 'max_tokens'
+    : reason === TOOL_CALLS_DONE
+      ? 'tool_use'
+      : 'end_turn';
+// The answer's content blocks: its text, then a tool_use block per call.
+const anthropicContent = (result: ChatResult) => [
+  ...(result.text || !result.toolCalls?.length
+    ? [{ type: 'text', text: result.text }]
+    : []),
+  ...anthropicToolUse(result.toolCalls ?? []),
+];
 
 export const anthropicMessageId = () =>
   `msg_${randomUUID().replaceAll('-', '')}`;
@@ -99,7 +140,7 @@ export function anthropicMessage(model: string, result: ChatResult) {
     type: 'message',
     role: FREE_CHAT_ROLES.ASSISTANT,
     model,
-    content: [{ type: 'text', text: result.text }],
+    content: anthropicContent(result),
     stop_reason: anthropicStop(result.finishReason),
     stop_sequence: null,
     usage: {
@@ -148,6 +189,7 @@ export function anthropicStream(model: string): ChatStreamFormat {
       }),
     close: (result) =>
       event('content_block_stop', { type: 'content_block_stop', index: 0 }) +
+      toolUseEvents(result) +
       event('message_delta', {
         type: 'message_delta',
         delta: {
@@ -179,5 +221,29 @@ export function anthropicStream(model: string): ChatStreamFormat {
   };
 }
 
+// Each call as its own tool_use block after the text block: its start, its whole input as one JSON delta,
+// and its stop.
+const toolUseEvents = (result: ChatResult) =>
+  anthropicToolUse(result.toolCalls ?? [])
+    .map((block, offset) => {
+      const index = offset + 1;
+      return (
+        event('content_block_start', {
+          type: 'content_block_start',
+          index,
+          content_block: { ...block, input: {} },
+        }) +
+        event('content_block_delta', {
+          type: 'content_block_delta',
+          index,
+          delta: {
+            type: 'input_json_delta',
+            partial_json: JSON.stringify(block.input),
+          },
+        }) +
+        event('content_block_stop', { type: 'content_block_stop', index })
+      );
+    })
+    .join('');
 const event = (name: string, data: unknown) =>
   `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
