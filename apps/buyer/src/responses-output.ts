@@ -9,7 +9,7 @@ import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 
 import type { ChatErrorBody } from './chat-api';
-import { FREE_BUYER } from './constants';
+import { CHAT_MESSAGE_DETAILS, FREE_BUYER, RESPONSES_CODES } from './constants';
 import {
   executionFields,
   paymentFields,
@@ -97,12 +97,19 @@ export function responsesCompletion(model: string, result: ChatResult) {
   );
 }
 
+// A conversation over this endpoint's size or message count is reported with the code Codex reads as a full
+// context, so it compacts the history and goes on instead of stopping.
+const FULL = new Set<string>([
+  CHAT_MESSAGE_DETAILS.content,
+  CHAT_MESSAGE_DETAILS.count,
+]);
 export const responsesError = (body: ChatErrorBody) => ({
   error: {
     message: body.message,
     type: FREE_BUYER.errorType,
     param: body.param,
-    code: body.code,
+    code: FULL.has(body.message) ? RESPONSES_CODES.contextFull : body.code,
+    ...(FULL.has(body.message) ? { [RESPONSES_CODES.field]: body.code } : {}),
     ...body.extra,
     ...paymentFields(body.payment),
   },
@@ -124,6 +131,9 @@ const callEvents = (event: Emit, item: CallItem, index: number) =>
   }) +
   event('response.output_item.done', { output_index: index, item });
 
+// A failure after the stream began: the prompt may have reached the seller, so it is never retried. Codex
+// retries any code it does not know, so the stop is reported with one it shows and does not retry, with a
+// readable message; the Gyblos code rides along.
 const failed = (
   base: ReturnType<typeof shell>,
   code: string,
@@ -134,8 +144,9 @@ const failed = (
   status: 'failed',
   output: [],
   error: {
-    code,
-    message: code,
+    code: RESPONSES_CODES.stopped,
+    message: RESPONSES_CODES.stoppedMessage(code),
+    [RESPONSES_CODES.field]: code,
     ...(stop.reason ? { reason: stop.reason } : {}),
   },
   ...(stop.delivered

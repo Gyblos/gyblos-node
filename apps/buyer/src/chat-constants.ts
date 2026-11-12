@@ -200,6 +200,11 @@ export const RESPONSES_CHAT = {
     'output',
   ] as readonly string[],
   textParts: ['input_text', 'output_text'] as readonly string[],
+  imagePlaceholder: '[image omitted: this model reads text only]',
+  // History items that record work no seller does: the model's reasoning and a provider's own search.
+  skippedItems: ['reasoning', 'web_search_call'] as readonly string[],
+  // Provider-run search Codex offers on every request; no seller runs it.
+  skippedTools: ['web_search', 'web_search_preview'] as readonly string[],
   partFields: ['type', 'text', 'annotations', 'logprobs'] as readonly string[],
   toolFields: [
     'type',
@@ -208,6 +213,15 @@ export const RESPONSES_CHAT = {
     'parameters',
     'strict',
   ] as readonly string[],
+} as const;
+
+// Codes Codex CLI acts on: a full context makes it compact, and invalid_prompt stops without retrying.
+export const RESPONSES_CODES = {
+  contextFull: 'context_length_exceeded',
+  stopped: 'invalid_prompt',
+  stoppedMessage: (code: string) =>
+    `The seller stopped before finishing (${code}). Send your message again to try another seller.`,
+  field: 'gyblos_code',
 } as const;
 
 export const FREE_CHAT_DETAILS = {

@@ -1174,16 +1174,43 @@ OpenAI's Responses API, `POST /v1/responses` (the format Codex CLI speaks),
 takes the same model, conversation and function tools: `instructions` and
 leading `developer` or `system` messages become the system text, later ones
 (Codex sends one when the model changes) are sent as user text, consecutive
-`function_call` items form one assistant turn, and `function_call_output` items
-answer them. It is stateless: `store` must be false, and `previous_response_id`,
-structured `text.format`, reasoning items, custom or provider tools and non-text
-parts are refused with a 400 that names them. `reasoning`, `include`,
+`function_call` items form one assistant turn (checked together), and
+`function_call_output` items answer them. It is stateless: `store` must be
+false, and `previous_response_id`, structured `text.format`, custom, namespaced
+(MCP) or other provider tools, and audio or file parts are refused with a 400
+that names them. For Codex sessions, three things are left out rather than
+refused: the `web_search` tool Codex offers on every request (no seller runs
+it), `reasoning` and `web_search_call` records from a session that began on
+another provider, and images, which become a short `[image omitted …]` text so a
+session that once saw a picture goes on. `reasoning`, `include`,
 `prompt_cache_key` and similar hints are accepted and ignored. A stream sends
 `response.created`, the message item (`output_item.added`, `content_part.added`,
 `output_text.delta`, then their `done` events) once text starts, each call as a
 `function_call` item (`output_item.added`, `function_call_arguments.done`,
-`output_item.done`), and `response.completed` with usage; a failure after it
-starts is `response.failed`. A cut answer has status `incomplete`.
+`output_item.done`), and `response.completed` with usage; a cut answer has
+status `incomplete`. A failure after the stream starts is `response.failed` with
+code `invalid_prompt` (which Codex shows and does not retry, since the prompt
+may have reached a seller), a readable message and the Gyblos code in
+`gyblos_code`. A conversation over the size the network carries gets code
+`context_length_exceeded`, so Codex compacts it. Paid endpoints serve text only,
+so they refuse Codex's tools.
+
+Codex CLI points at the endpoint as a custom provider in `~/.codex/config.toml`
+(the built-in `openai` provider sends fields only OpenAI accepts):
+
+```toml
+model = "qwen3-0.6b"
+model_provider = "gyblos"
+
+[model_providers.gyblos]
+name = "Gyblos"
+base_url = "http://127.0.0.1:4031/v1"
+wire_api = "responses"
+```
+
+Leave MCP servers off for these sessions; switch models with `/model` and any
+name the endpoint serves.
+
 `POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
 over system, messages and tools) without contacting a seller. The default
 (absent or `false`) remains one complete JSON response.
