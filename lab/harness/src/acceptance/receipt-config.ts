@@ -65,6 +65,7 @@ export async function writeReceiptBuyerConfig(
   directAddresses: string[],
   rpcUrl: string,
   manualTrust = false,
+  maxTokens: number = RECEIPT_ACCEPTANCE.maxTokens,
 ) {
   const config = {
     request: {
@@ -77,7 +78,7 @@ export async function writeReceiptBuyerConfig(
       lowestReasoning: null,
       network: DEVNET,
       asset: DEVNET_USDC,
-      maxTokens: RECEIPT_ACCEPTANCE.maxTokens,
+      maxTokens,
       maxAtomic: '0',
       priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
       minimumBadge: SELLER_BADGES.DECLARED_USAGE,

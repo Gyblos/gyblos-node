@@ -27,6 +27,7 @@ type AcceptanceAlpn =
   | typeof RECEIPT_CHANNEL.alpn;
 export function receiptNativeBinding(provider: Pick<ReceiptProvider, 'calls'>) {
   let dials = 0;
+  let controlDials = 0;
   let seller: Endpoint | undefined;
   let beforeFirst: number | undefined;
   const bound: Endpoint[] = [];
@@ -56,6 +57,7 @@ export function receiptNativeBinding(provider: Pick<ReceiptProvider, 'calls'>) {
       endpoint.online = async () => {};
       const connect = endpoint.connect.bind(endpoint);
       endpoint.connect = async (...args) => {
+        if (Buffer.from(args[1]).toString() === CONTROL_ALPN) controlDials++;
         if (
           [FREE_EXECUTION.alpn, FREE_STREAM.alpn, PAID_STREAM.alpn].some(
             (value) => value === Buffer.from(args[1]).toString(),
@@ -96,6 +98,7 @@ export function receiptNativeBinding(provider: Pick<ReceiptProvider, 'calls'>) {
       );
     },
     dials: () => dials,
+    controlDials: () => controlDials,
     beforeFirst: () => beforeFirst,
     protocols: () => protocols,
     async close() {
