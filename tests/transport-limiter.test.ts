@@ -257,14 +257,14 @@ void test('control queries and receipts do not count as requests, so each free r
   for (let index = 0; index < TRANSPORT_LIMITS.requestsPerWindow * 2; index++) {
     // Catalog, presence and quote before the execution, and two receipt calls after it.
     for (let query = 0; query < 3; query++) {
-      const release = limiter.enterQuery('buyer');
+      const release = limiter.enterControl();
       assert.ok(release, `query ${query} of request ${index}`);
       release();
     }
     if (!request(limiter, 'buyer')) break;
     served++;
     for (let receipt = 0; receipt < 2; receipt++) {
-      const release = limiter.enterQuery('buyer');
+      const release = limiter.enterControl();
       assert.ok(release);
       release();
     }
@@ -274,20 +274,17 @@ void test('control queries and receipts do not count as requests, so each free r
   data();
 });
 
-void test('a query shares the per-buyer and total concurrency with requests', () => {
+void test('control queries never wait on a running request, and never hold its slot', () => {
   const limiter = createPeerLimiter(() => 0);
   assert.ok(limiter.register('one', CONNECTION_FAMILIES.DATA));
-  assert.ok(limiter.register('two', CONNECTION_FAMILIES.DATA));
-  assert.ok(limiter.register('three', CONNECTION_FAMILIES.CONTROL));
   const running = limiter.enter('one');
   assert.ok(running);
-  // One at a time per buyer, whichever kind.
-  assert.equal(limiter.enterQuery('one'), undefined);
-  const query = limiter.enterQuery('two');
+  // A receipt or the next quote while the answer is still finishing.
+  const query = limiter.enterControl();
   assert.ok(query);
-  // The seller's total in flight is full.
-  assert.equal(limiter.enterQuery('three'), undefined);
   query();
+  // The buyer still has its one request in flight, no more.
+  assert.equal(limiter.enter('one'), undefined);
   running();
-  assert.ok(limiter.enterQuery('three'));
+  assert.ok(limiter.enter('one'));
 });

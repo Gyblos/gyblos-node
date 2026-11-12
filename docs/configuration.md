@@ -406,9 +406,10 @@ among `global_requests_per_minute`, `requests_per_minute` and `max_connections`.
 The editor schema cannot check this rule; `config validate` does.
 
 Only executions count as requests: the control queries before one (catalog,
-presence, quote) and the receipt calls after it share the concurrency limits but
-not this budget, and are bounded by their own per-buyer admission. So 30 per
-minute is 30 answers per buyer.
+presence, quote) and the receipt calls after it neither count against this
+budget nor hold a generation slot (so a receipt still finishing never refuses
+the next quote); their own per-buyer admission bounds them (5 per second, 4 at a
+time). So 30 per minute is 30 answers per buyer.
 
 A free request costs up to four connections (control, execution, one or two
 receipt calls), and each is attempted twice before its handshake (QUIC address

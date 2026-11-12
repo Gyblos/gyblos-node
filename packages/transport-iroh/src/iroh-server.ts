@@ -158,7 +158,7 @@ export function serveIroh(
     await receiptServer?.handle(
       connection,
       signal,
-      () => (routeAllowed(connection) ? limiter.enterQuery(peer) : undefined),
+      () => (routeAllowed(connection) ? limiter.enterControl() : undefined),
       () => closed,
       () => routeAllowed(connection),
     );
@@ -248,7 +248,7 @@ export function serveIroh(
           controller.signal,
           () => {
             if (!routeAllowed(connection)) return undefined;
-            return limiter.enterQuery(peer);
+            return limiter.enterControl();
           },
           () => closed,
           () => routeAllowed(connection),
