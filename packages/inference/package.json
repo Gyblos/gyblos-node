@@ -1,0 +1,14 @@
+{
+  "name": "@gyblos/inference",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/execution.ts",
+    "./generation-window": "./src/generation-window.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/protocol": "workspace:*"
+  }
+}

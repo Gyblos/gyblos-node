@@ -97,7 +97,8 @@
     "@gyblos/engine-anthropic": "workspace:*",
     "x402-upto-metered": "workspace:*",
     "@gyblos/payments-upto": "workspace:*",
-    "@gyblos/receipt-collector": "workspace:*"
+    "@gyblos/receipt-collector": "workspace:*",
+    "@gyblos/inference": "workspace:*"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",

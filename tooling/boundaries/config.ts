@@ -25,6 +25,7 @@ const SDK_PATH =
 export const BOUNDARY_LAYERS = {
   PROTOCOL: 'protocol',
   CORE: 'core',
+  INFERENCE: 'inference',
   ADAPTER: 'adapter',
   NODE: 'node',
   CONFIG: 'config',
@@ -49,6 +50,7 @@ export function layerOf(source: string): BoundaryLayer | null {
   if (source.startsWith('apps/')) return BOUNDARY_LAYERS.APPS;
   const name = source.match(/^packages\/([^/]+)\//)?.[1];
   if (name === BOUNDARY_LAYERS.CORE) return BOUNDARY_LAYERS.CORE;
+  if (name === BOUNDARY_LAYERS.INFERENCE) return BOUNDARY_LAYERS.INFERENCE;
   if (STANDALONE_NAMES.includes(name ?? '')) return BOUNDARY_LAYERS.STANDALONE;
   if (ADAPTER_NAME.test(name ?? '')) return BOUNDARY_LAYERS.ADAPTER;
   if (
@@ -95,7 +97,7 @@ export function boundaryConfig(
 ): BoundaryConfig {
   const adapters = packageNames.filter((name) => ADAPTER_NAME.test(name));
   const adapterPath = `^packages/(?:${adapters.join('|')})/`;
-  const higherThanCore = `(?:${adapterPath}|^packages/node/|^apps/)`;
+  const higherThanCore = `(?:${adapterPath}|^packages/(?:inference|node)/|^apps/)`;
   return {
     forbidden: [
       rule(
@@ -124,10 +126,21 @@ export function boundaryConfig(
         { path: CORE_PATH },
         { path: higherThanCore },
       ),
-      rule('domain-has-no-sdk', { path: CORE_PATH }, { path: SDK_PATH }),
+      rule(
+        'domain-has-no-sdk',
+        { path: '^packages/(?:core|inference)/' },
+        { path: SDK_PATH },
+      ),
+      rule(
+        'inference-only-uses-domain',
+        { path: '^packages/inference/' },
+        {
+          path: '^(?:packages/(?!(?:inference|protocol|core|config|runtime)/)|apps/|lab/|tooling/|tests/)',
+        },
+      ),
       rule(
         'domain-has-no-filesystem',
-        { path: '^packages/(?:protocol|core)/' },
+        { path: '^packages/(?:protocol|core|inference)/' },
         {
           path: '^(?:node:)?fs(?:/|$)',
         },
@@ -149,7 +162,7 @@ export function boundaryConfig(
       rule(
         'adapters-do-not-import-composition',
         { path: adapterPath },
-        { path: '^(?:packages/node/|apps/)' },
+        { path: '^(?:packages/(?:inference|node)/|apps/)' },
       ),
       rule(
         'node-does-not-import-apps',

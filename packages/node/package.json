@@ -99,6 +99,7 @@
     "@x402/express": "2.29.0",
     "@x402/svm": "2.28.0",
     "express": "4.22.3",
-    "smol-toml": "1.9.1"
+    "smol-toml": "1.9.1",
+    "@gyblos/inference": "workspace:*"
   }
 }
