@@ -15,6 +15,7 @@ export function holdFirstReceipt(context: TestContext) {
     resume = resolve;
   });
   let held = false;
+  let pending = false;
   const acceptNext = Endpoint.prototype.acceptNext;
   context.mock.method(
     Endpoint.prototype,
@@ -40,8 +41,13 @@ export function holdFirstReceipt(context: TestContext) {
             send.writeAll = async (bytes) => {
               if (!held) {
                 held = true;
+                pending = true;
                 entered();
-                await released;
+                try {
+                  await released;
+                } finally {
+                  pending = false;
+                }
               }
               return write(bytes);
             };
@@ -54,5 +60,5 @@ export function holdFirstReceipt(context: TestContext) {
       return incoming;
     },
   );
-  return { started, release: resume };
+  return { started, pending: () => pending, release: resume };
 }

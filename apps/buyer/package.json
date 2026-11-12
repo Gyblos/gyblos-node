@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./receipt-drain": "./src/receipt-drain.ts",
     "./anthropic-chat": "./src/anthropic-chat.ts",
     "./chat-cli-turn": "./src/chat-cli-turn.ts",
     "./chat-cli": "./src/chat-cli.ts",

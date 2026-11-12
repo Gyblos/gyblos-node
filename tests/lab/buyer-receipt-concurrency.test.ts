@@ -12,7 +12,7 @@ import { PAID_ACCEPTANCE } from '../support/paid-acceptance-constants';
 import { sessionProductHost } from '../support/session-product-host';
 
 void test(
-  'the next free HTTP turn waits for pending native receipts without retrying either prompt',
+  'the next free HTTP turn completes while the prior native receipt is held without retrying either prompt',
   { skip: NATIVE_CAPABILITY.transportSkip, timeout: PAID_ACCEPTANCE.runMs },
   async (t) => {
     const receipt = holdFirstReceipt(t);
@@ -40,7 +40,7 @@ void test(
       assert.doesNotMatch(output, /Error:|No retry was made/);
       assert.equal(host.engine.attempts(), 2);
       assert.deepEqual(host.finance.calls, []);
-      assert.ok(host.buyer().receipts().failed >= 1);
+      assert.equal(receipt.pending(), true);
     } finally {
       receipt.release();
       await host.close();
