@@ -27,6 +27,7 @@ import {
   PAID_EXECUTION_CODES,
   PAID_STREAM,
 } from './paid/constants';
+import { checkToolCalls } from './tools';
 
 interface PaidStreamHeader {
   version: typeof PAID_EXECUTION.version;
@@ -137,7 +138,7 @@ function checkPayment(
     return;
   }
   if (
-    charge.outputTokens > outputBytes ||
+    (!response.result?.toolCalls && charge.outputTokens > outputBytes) ||
     charge.inputTokens + charge.outputTokens >
       request.quote.offer.model.contextTokens
   )
@@ -145,7 +146,7 @@ function checkPayment(
   const ceiling = BigInt(request.payment.maxAtomic);
   const charged = BigInt(charge.chargedAtomic);
   if (charged > ceiling) return paidExecutionFail(PAID_EXECUTION_CODES.LIMIT);
-  if (!text && charged !== 0n)
+  if (!text && !response.result?.toolCalls && charged !== 0n)
     return paidExecutionFail(PAID_EXECUTION_CODES.PAYMENT_MISMATCH);
   const { settlement, pending, lapsed } = payment;
   const channelId =
@@ -175,6 +176,7 @@ function checkOutcome(
     return paidExecutionFail();
   const result = response.result;
   if (!result) return;
+  paidExecutionBoundary(() => checkToolCalls(request.input, result.toolCalls));
   if (result.text !== text)
     return paidExecutionFail(PAID_EXECUTION_CODES.BINDING);
   if (

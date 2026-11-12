@@ -255,3 +255,10 @@ with independent verification/recounting and the common execution lifecycle.
 `serveSellerTransport` accepts the session service without changing existing
 channels; endpoint advertisement is explicit. The existing CLI/startup path is
 not switched automatically. See [session composition](payment-sessions.md).
+
+The inference package also owns the shared conversation pipeline and completion
+observation. Engine, metering and observation ports are injected; no engine,
+transport or payment adapter is imported there. Node adapters authenticate their
+wire profile and apply either free caps or a reusable paid-session policy around
+that execution. Public semantic input/result types live in protocol. The buyer
+independently recounts tool-aware results before approving accumulated usage.

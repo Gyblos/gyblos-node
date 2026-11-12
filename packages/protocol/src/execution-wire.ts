@@ -50,19 +50,6 @@ function role(value: unknown): FreeChatRole {
 }
 // The paid and batch channels keep the input bound they shipped with; free v4 passes its own.
 export const PAID_INPUT_BYTES = 65536;
-function messages(value: unknown, inputBytes: number, maxMessages: number) {
-  const entries = controlArray(value, maxMessages);
-  if (!entries.length) return freeExecutionFail();
-  let bytes = 0;
-  return entries.map((entry) => {
-    const input = controlObject(entry, ['role', 'content']);
-    const content = freeExecutionText(input.content, inputBytes);
-    bytes += new TextEncoder().encode(content).length;
-    if (bytes > inputBytes)
-      return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
-    return { role: role(input.role), content };
-  });
-}
 // The free channel's messages, which may also carry tool calls and results; tools and tool JSON count
 // against the same input bound as text.
 function toolMessages(
@@ -112,7 +99,7 @@ function boundInput(
   return { selection, reasoning, maxTokens };
 }
 const INPUT_KEYS = ['messages', 'selection', 'reasoning', 'maxTokens'];
-// The paid and session channels' input: text messages bound to the quote.
+// All active channels share tools and turns; their byte and message bounds remain explicit.
 export function parseExecutionInput(
   value: unknown,
   requestId: string,
@@ -120,18 +107,6 @@ export function parseExecutionInput(
   inputBytes: number = PAID_INPUT_BYTES,
   maxMessages: number = FREE_EXECUTION.maxMessages,
 ): ExecutionInput {
-  const params = controlObject(value, INPUT_KEYS);
-  return {
-    messages: messages(params.messages, inputBytes, maxMessages),
-    ...boundInput(params, requestId, offered),
-  };
-}
-// The free channel's input: the same, plus optional tools, a tool choice and tool turns.
-export function parseFreeExecutionInput(
-  value: unknown,
-  requestId: string,
-  offered: InferenceOfferV2,
-): FreeExecutionRequest['input'] {
   const hasTools = hasField(value, 'tools');
   const hasChoice = hasField(value, 'toolChoice');
   const params = controlObject(value, [
@@ -144,29 +119,35 @@ export function parseFreeExecutionInput(
   const toolChoice = hasChoice ? parseToolChoice(params.toolChoice) : undefined;
   checkToolInput({ tools, toolChoice });
   return {
-    messages: toolMessages(
-      params.messages,
-      FREE_EXECUTION.inputBytes,
-      FREE_EXECUTION.maxMessages,
-      tools,
-    ),
+    messages: toolMessages(params.messages, inputBytes, maxMessages, tools),
     ...bound,
     ...(tools ? { tools } : {}),
     ...(toolChoice ? { toolChoice } : {}),
   };
 }
 
-// A completed generation's text, usage and finish reason, shared by every channel's terminal. Only the free
-// channel allows tool calls: such a result carries them with finish reason tool_calls, and its text may be
-// empty.
+export function parseFreeExecutionInput(
+  value: unknown,
+  requestId: string,
+  offered: InferenceOfferV2,
+): FreeExecutionRequest['input'] {
+  return parseExecutionInput(
+    value,
+    requestId,
+    offered,
+    FREE_EXECUTION.inputBytes,
+    FREE_EXECUTION.maxMessages,
+  );
+}
+// Every active terminal shares the same result grammar.
 export function parseExecutionResult(value: unknown): ExecutionResult {
-  return parseResult(value, false) as ExecutionResult;
+  return parseResult(value);
 }
 export function parseFreeExecutionResult(value: unknown): FreeExecutionResult {
-  return parseResult(value, true);
+  return parseExecutionResult(value);
 }
-function parseResult(value: unknown, allowTools: boolean): FreeExecutionResult {
-  const calls = allowTools && hasField(value, 'toolCalls');
+function parseResult(value: unknown): FreeExecutionResult {
+  const calls = hasField(value, 'toolCalls');
   const input = controlObject(value, [
     'text',
     'usage',

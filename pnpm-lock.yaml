@@ -160,6 +160,9 @@ importers:
 
   apps/buyer:
     dependencies:
+      '@gyblos/inference':
+        specifier: workspace:*
+        version: link:../../packages/inference
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -522,6 +525,9 @@ importers:
 
   packages/inference:
     dependencies:
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config

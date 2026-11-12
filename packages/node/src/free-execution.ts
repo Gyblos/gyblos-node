@@ -6,10 +6,9 @@ import {
   FreeExecutionAdmission,
   type FreeSellerLedger,
 } from '@gyblos/core/free-admission';
+import { generateInference } from '@gyblos/inference/conversation';
 import { canonicalJson } from '@gyblos/protocol';
-import { isConversation, type ChatMessage } from '@gyblos/protocol/chat';
 import {
-  CONTROL_METERING_MODES,
   ENGINE_ERROR_CODES,
   ENGINE_ERROR_STOP_REASON,
   FREE_EXECUTION,
@@ -28,7 +27,6 @@ import {
   type Engine,
   type EngineCapabilities,
   type EngineDescription,
-  type EngineResult,
 } from '@gyblos/protocol/engine';
 import {
   freeExecutionFail as fail,
@@ -41,6 +39,7 @@ import {
   type FreeExecutionRequest,
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
+import { INFERENCE_CODES, InferenceError } from '@gyblos/protocol/inference';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import type { ToolChatMessage } from '@gyblos/protocol/tools';
 import type { RouteProbe } from '@gyblos/transport-iroh';
@@ -131,6 +130,13 @@ function executionFailure(error: unknown, signal: AbortSignal) {
   if (signal.aborted) return { code: FREE_EXECUTION_CODES.CANCELLED };
   if (error instanceof FreeExecutionError)
     return { code: error.code, ...freeExecutionStop(error) };
+  if (error instanceof InferenceError)
+    return {
+      code:
+        error.code === INFERENCE_CODES.LIMIT
+          ? FREE_EXECUTION_CODES.LIMIT
+          : FREE_EXECUTION_CODES.INTERNAL,
+    };
   return { code: FREE_EXECUTION_CODES.ENGINE };
 }
 async function respond(
@@ -269,11 +275,6 @@ export function prepareSellerFreeExecution(
   return createSellerFreeRouter(() => [{ selection, service }]);
 }
 
-// The tools and tool choice the buyer offered the model, when it offered any.
-const requestedTools = ({ input }: FreeExecutionRequest) => ({
-  ...(input.tools ? { tools: input.tools } : {}),
-  ...(input.toolChoice ? { toolChoice: input.toolChoice } : {}),
-});
 type ResponseHeader = Pick<
   FreeExecutionResponse,
   'version' | 'requestId' | 'requestDigest'
@@ -298,18 +299,20 @@ async function generateResponse(
         onDelta,
       )
     : undefined;
-  let output: EngineResult;
   try {
-    output = await options.engine.generate({
-      messages,
-      maxTokens: request.input.maxTokens,
-      ...requestedTools(request),
+    const result = await generateInference({
+      engine: options.engine,
+      input: { ...request.input, messages },
+      inputTokens,
+      meter: options.meter,
+      contextTokens: options.model.contextTokens,
       signal,
       ...(streaming ? { onText: streaming.onText } : {}),
+      generated: (duration) => observer?.generated(duration),
     });
     checkSignal(signal);
-    observer?.generated(output.usage.outputDurationNs);
-    streaming?.complete(output.text);
+    streaming?.complete(result.text);
+    return parseFreeExecutionResponse({ ...header, result });
   } catch (error) {
     if (error instanceof EngineError && !signal.aborted)
       return cannotContinue(
@@ -322,42 +325,4 @@ async function generateResponse(
   } finally {
     streaming?.stop();
   }
-  const preliminary = parseFreeExecutionResponse({
-    ...header,
-    result: {
-      text: output.text,
-      usage: { inputTokens, outputTokens: 0 },
-      finishReason: output.finishReason,
-      ...(output.toolCalls ? { toolCalls: output.toolCalls } : {}),
-    },
-  });
-  if (!preliminary.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
-  const usage = options.meter.usage(
-    preliminary.result.text,
-    output.usage,
-    inputTokens,
-    preliminary.result.toolCalls,
-  );
-  // The buyer's own bounds. A recounted count beyond them is a limit (admission already prevents it);
-  // an implausible or out-of-bounds declared count is the provider's invalid response.
-  if (
-    !usage ||
-    !Number.isSafeInteger(usage.outputTokens) ||
-    usage.outputTokens < 0 ||
-    usage.outputTokens > request.input.maxTokens ||
-    usage.inputTokens + usage.outputTokens > options.model.contextTokens
-  ) {
-    if (options.meter.mode === CONTROL_METERING_MODES.RECOUNTED)
-      return fail(FREE_EXECUTION_CODES.LIMIT);
-    return cannotContinue(
-      new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE),
-      options.meter,
-      request.input.maxTokens,
-      streaming?.delivered(),
-    );
-  }
-  return parseFreeExecutionResponse({
-    ...header,
-    result: { ...preliminary.result, usage },
-  });
 }

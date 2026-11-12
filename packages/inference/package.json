@@ -6,9 +6,11 @@
   "exports": {
     ".": "./src/execution.ts",
     "./generation-window": "./src/generation-window.ts",
+    "./observation": "./src/observation.ts",
     "./conversation": "./src/conversation.ts"
   },
   "dependencies": {
+    "@gyblos/core": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/protocol": "workspace:*"
   }

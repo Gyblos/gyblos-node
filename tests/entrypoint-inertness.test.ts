@@ -107,6 +107,9 @@ void test('all executable modules are inert when imported', async (context) => {
         await import('@gyblos/buyer/chat-cli');
         await import('@gyblos/buyer/chat-cli-turn');
         await import('@gyblos/buyer/free-startup');
+        await import('@gyblos/inference');
+        await import('@gyblos/inference/conversation');
+        await import('@gyblos/inference/observation');
         await import('@gyblos/transport-iroh/free-client');
         await import('@gyblos/buyer/trust');
       },

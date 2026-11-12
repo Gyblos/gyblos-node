@@ -39,6 +39,18 @@ const LEGACY_VECTORS = [
     'batch-startup-v2.json',
     'feba40c35b234403dcee41703ab4ef78466f36ae825721ec9f9a8bc3cc1b3523',
   ],
+  [
+    'batch-channel-v3.json',
+    '170144cac61a46ef826b239906f149af05c3de418844e13f83c7fbc802c75fa6',
+  ],
+  [
+    'batch-prepare-v3.json',
+    'd1057f07742800fc7fb8dba96d2012d29f70fa72f591cc6b7de9a9b488e09504',
+  ],
+  [
+    'batch-startup-v3.json',
+    'da2c51faa98de31d5fde6adf7d624b82828ab4e566148de4073c3a053977000a',
+  ],
 ] as const;
 for (const [name, expected] of LEGACY_VECTORS) {
   void test(`retired ${name} keeps its bytes and is refused by the active session`, async () => {
@@ -49,7 +61,7 @@ for (const [name, expected] of LEGACY_VECTORS) {
     const value: LegacyVector | LegacyVector[] = JSON.parse(body.toString());
     for (const vector of Array.isArray(value) ? value : [value]) {
       const bytes = Buffer.from(
-        `gyblos/session-rpc/v${name.includes('-v1') ? 1 : 2}\n` +
+        `gyblos/session-rpc/v${name.includes('-v1') ? 1 : name.includes('-v2') ? 2 : 3}\n` +
           vector.canonicalRequest,
       );
       assert.equal(bytes.toString('hex'), vector.requestSigningHex);

@@ -1,6 +1,7 @@
 // Preflight and verified-use approval for one chosen seller; no selection, UI, retries or chain construction.
 import { chargeV2 } from '@gyblos/core/pricing-v2';
 import { recountSessionInput } from '@gyblos/core/session-input';
+import { verifyInferenceUsage } from '@gyblos/inference/conversation';
 import {
   BATCH_METHODS,
   batchFail,
@@ -42,16 +43,13 @@ function verifiedCharge<Remote extends BatchDestination>(
   input: FreeExecutionBuildInput,
   result: FreeExecutionResult,
 ) {
-  const inputTokens = context.options.meter.chat(input.messages);
-  const outputTokens = result.text
-    ? context.options.meter.count(result.text)
-    : 0;
-  if (
-    inputTokens !== result.usage.inputTokens ||
-    outputTokens !== result.usage.outputTokens ||
-    outputTokens > input.maxTokens
-  )
+  let usage;
+  try {
+    usage = verifyInferenceUsage(input, result, context.options.meter);
+  } catch {
     return batchFail(SESSION_CODES.UNVERIFIED);
+  }
+  const { inputTokens, outputTokens } = usage;
   return outputTokens
     ? String(
         chargeV2(

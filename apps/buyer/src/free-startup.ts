@@ -210,8 +210,8 @@ function buyerHttp(
       {
         selection: request.selection,
         maxTokens: request.maxTokens,
-        // Only the free channel serves tools; an execution factory may route to paid sessions.
-        tools: execution === undefined,
+        // The selected execution policy, not its price, determines admission after capability validation.
+        tools: true,
       },
       {
         port,

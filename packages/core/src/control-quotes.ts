@@ -47,7 +47,7 @@ export interface QuoteModel {
   meteringMode: ControlMeteringMode;
   // The longest answer the offer serves per request; unset, the context alone bounds it.
   maxOutputTokens?: number;
-  // Whether a free request may offer the model tools.
+  // Whether this offer can execute tool-aware requests.
   tools?: boolean;
 }
 export interface QuoteReadiness {

@@ -7,6 +7,7 @@ import {
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
+import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 
 import { chargeV2 } from './pricing-v2';
@@ -14,7 +15,9 @@ import { chargeV2 } from './pricing-v2';
 export function recountSessionInput(
   quote: SignedOfferV2,
   data: FreeExecutionBuildInput,
-  meter: Pick<ChatTokenizer, 'chat'>,
+  meter: Pick<ChatTokenizer, 'chat' | 'output'> & {
+    supportsToolCalls?: boolean;
+  },
 ) {
   const input = batchExecutionInput(quote, data);
   if (
@@ -24,7 +27,9 @@ export function recountSessionInput(
     return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   let inputTokens: number;
   try {
-    inputTokens = meter.chat(input.messages);
+    if (inferenceNeedsTools(input) && !meter.output && !meter.supportsToolCalls)
+      return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+    inputTokens = meter.chat(input.messages, input.tools, input.toolChoice);
   } catch {
     return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   }

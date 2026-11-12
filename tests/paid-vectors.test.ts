@@ -34,7 +34,7 @@ async function vectors(): Promise<Vectors> {
   return JSON.parse(
     await readFile(
       fileURLToPath(
-        import.meta.resolve('@gyblos/protocol/vectors/paid-execution-v1.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/paid-execution-v2.json'),
       ),
       'utf8',
     ),

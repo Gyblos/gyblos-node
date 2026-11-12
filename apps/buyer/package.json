@@ -53,6 +53,7 @@
     "./session-routing": "./src/session-routing.ts"
   },
   "dependencies": {
+    "@gyblos/inference": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/runtime": "workspace:*",

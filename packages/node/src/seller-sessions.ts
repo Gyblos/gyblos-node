@@ -25,6 +25,13 @@ import type { LiveSellerOffer } from './seller-offer-set';
 import type { SellerSessionBackend } from './session-backend';
 
 export interface SellerSessionOptions {
+  telemetry?: {
+    sink: import('@gyblos/protocol/telemetry').TelemetrySink;
+    engineKind: (
+      index: number,
+    ) => import('@gyblos/protocol/constants').EngineKind;
+    now?: () => number;
+  };
   buyerNodeId: string;
   backend: SellerSessionBackend;
   description: PaymentDescription;
@@ -85,6 +92,7 @@ function binding(
     service: createSellerBatchSession({
       session,
       terms,
+      telemetry: options.telemetry,
       now: options.now,
       offers: options.offers,
     }),

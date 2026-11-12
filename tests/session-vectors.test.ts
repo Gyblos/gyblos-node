@@ -25,7 +25,7 @@ for (const index of [0, 1]) {
     const vectors: Vector[] = JSON.parse(
       await readFile(
         new URL(
-          import.meta.resolve('@gyblos/protocol/vectors/batch-startup-v3.json'),
+          import.meta.resolve('@gyblos/protocol/vectors/batch-startup-v4.json'),
         ),
         'utf8',
       ),

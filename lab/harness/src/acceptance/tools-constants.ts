@@ -11,7 +11,7 @@ export const TOOL_ACCEPTANCE_CASES = {
   PROVIDER: 'invalid-provider',
   CUT: 'cut-before-terminal',
   CANCEL: 'cancel-before-terminal',
-  AUTOMATIC: 'automatic-refuses-tools',
+  AUTOMATIC: 'automatic-free-tools',
 } as const;
 export type ToolAcceptanceCase =
   (typeof TOOL_ACCEPTANCE_CASES)[keyof typeof TOOL_ACCEPTANCE_CASES];

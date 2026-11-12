@@ -4,20 +4,26 @@ import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import type { PaidSellerLedger } from '@gyblos/core/paid-admission';
 import { runAdmittedExecution } from '@gyblos/inference';
+import {
+  generateInference,
+  prepareInference,
+} from '@gyblos/inference/conversation';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   CONTROL_METERING_MODES,
-  FREE_CHAT_ROLES,
   type EngineKind,
 } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import {
-  textResult,
   type Engine,
   type EngineCapabilities,
   type EngineDescription,
 } from '@gyblos/protocol/engine';
 import type { ExecutionResult } from '@gyblos/protocol/free-execution';
+import {
+  InferenceError,
+  inferenceNeedsTools,
+} from '@gyblos/protocol/inference';
 import {
   paidExecutionFail as fail,
   paidExecutionDigest,
@@ -28,6 +34,7 @@ import {
   type PaidExecutionRequest,
   type PaidExecutionResponse,
 } from '@gyblos/protocol/paid-execution';
+import { paidExecutionBoundary } from '@gyblos/protocol/paid-execution-validation';
 import {
   PAID_EXECUTION,
   PAID_EXECUTION_CODES,
@@ -80,20 +87,26 @@ function supportedPrompt(
   request: PaidExecutionRequest,
   options: SellerPaidExecutionOptions,
 ) {
+  if (inferenceNeedsTools(request.input))
+    return fail(PAID_EXECUTION_CODES.UNSUPPORTED);
   const offer = request.quote.offer;
   if (
     options.meter.mode !== CONTROL_METERING_MODES.RECOUNTED ||
     canonicalJson(offer.selection) !== canonicalJson(options.selection) ||
     canonicalJson(offer.model) !== canonicalJson(options.model) ||
     canonicalJson(offer.capabilities) !== canonicalJson(options.capabilities) ||
-    !options.reasoning.includes(offer.reasoning) ||
-    request.input.messages.length !== 1 ||
-    request.input.messages[0]!.role !== FREE_CHAT_ROLES.USER
+    !options.reasoning.includes(offer.reasoning)
   )
     return fail(PAID_EXECUTION_CODES.UNSUPPORTED);
   if (request.input.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
     return fail(PAID_EXECUTION_CODES.LIMIT);
-  return request.input.messages[0]!.content;
+  return paidExecutionBoundary(() =>
+    prepareInference(request.input, {
+      engine: options.engine,
+      meter: options.meter,
+      contextTokens: options.model.contextTokens,
+    }),
+  );
 }
 function ready(options: SellerPaidExecutionOptions) {
   const state = options.readiness();
@@ -113,7 +126,6 @@ function refusal(error: unknown, signal: AbortSignal) {
 }
 
 interface Admitted {
-  prompt: string;
   inputTokens: number;
   permit: Parameters<X402Policy['release']>[0];
 }
@@ -155,8 +167,7 @@ async function respond(
     });
     checkSignal(signal);
     observer = sellerExecutionTelemetry(request, options, true, probe);
-    const prompt = supportedPrompt(request, options);
-    const inputTokens = options.meter.input(prompt);
+    const inputTokens = supportedPrompt(request, options);
     if (!Number.isSafeInteger(inputTokens) || inputTokens < 0)
       return fail(PAID_EXECUTION_CODES.LIMIT);
     const permit = await policy.admit(request, {
@@ -165,7 +176,7 @@ async function respond(
       now: options.now,
       ready: () => ready(options),
     });
-    admitted = { prompt, inputTokens, permit };
+    admitted = { inputTokens, permit };
   } catch (error) {
     const response: PaidExecutionResponse = {
       ...header,
@@ -175,6 +186,7 @@ async function respond(
     return response;
   }
   const response = await serve(
+    request,
     admitted,
     header,
     signal,
@@ -188,44 +200,48 @@ async function respond(
 }
 
 async function generate(
+  request: PaidExecutionRequest,
   admitted: Admitted,
   output: ReturnType<typeof createPaidStreamOutput>,
   signal: AbortSignal,
   options: SellerPaidExecutionOptions,
   observer: ReturnType<typeof sellerExecutionTelemetry>,
 ): Promise<ExecutionResult> {
-  let produced: ReturnType<typeof textResult>;
   try {
-    produced = textResult(
-      await options.engine.generate({
-        prompt: admitted.prompt,
-        maxTokens: admitted.permit.outputTokens,
+    const produced = await paidExecutionBoundaryAsync(() =>
+      generateInference({
+        engine: options.engine,
+        input: { ...request.input, maxTokens: admitted.permit.outputTokens },
+        inputTokens: admitted.inputTokens,
+        meter: options.meter,
+        contextTokens: options.model.contextTokens,
         signal,
         onText: output.onText,
+        generated: (duration) => observer?.generated(duration),
       }),
     );
-    observer?.generated(produced.usage.outputDurationNs);
     output.complete(produced.text);
+    return produced;
   } finally {
     output.stop();
   }
-  const usage = options.meter.usage(
-    produced.text,
-    produced.usage,
-    admitted.inputTokens,
-  );
-  if (
-    !usage ||
-    !Number.isSafeInteger(usage.outputTokens) ||
-    usage.outputTokens < 0 ||
-    usage.outputTokens > admitted.permit.outputTokens ||
-    usage.inputTokens + usage.outputTokens > options.model.contextTokens
-  )
-    return fail(PAID_EXECUTION_CODES.INTERNAL);
-  return { text: produced.text, usage, finishReason: produced.finishReason };
+}
+async function paidExecutionBoundaryAsync<T>(
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof InferenceError)
+      return paidExecutionBoundary(() => {
+        throw error;
+      });
+    throw error;
+  }
 }
 
 async function serve(
+  request: PaidExecutionRequest,
   admitted: Admitted,
   header: PaidHeader,
   signal: AbortSignal,
@@ -264,7 +280,7 @@ async function serve(
       );
       return {
         generate: () =>
-          generate(admitted, output, window.signal, options, observer),
+          generate(request, admitted, output, window.signal, options, observer),
         stop: output.stop,
         measure(generated) {
           if ('value' in generated)

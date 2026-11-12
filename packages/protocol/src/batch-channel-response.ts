@@ -26,6 +26,7 @@ import {
 import { parseExecutionResult } from './execution-wire';
 import { PAID_EXECUTION, PAID_EXECUTION_CODES } from './paid/constants';
 import { PAYMENT_SESSION, SESSION_CODES } from './payment-session';
+import { checkToolCalls } from './tools';
 
 function parsedResult(value: unknown, request: BatchChannelRequest) {
   if (request.method === BATCH_METHODS.PREPARE) {
@@ -35,6 +36,7 @@ function parsedResult(value: unknown, request: BatchChannelRequest) {
   if (request.method === BATCH_METHODS.EXECUTE) {
     const row = controlObject(value, ['value', 'bill']);
     const result = parseExecutionResult(row.value);
+    checkToolCalls(request.params.input, result.toolCalls);
     const bill = batchBill(row.bill);
     if (
       bill.requestId !== request.params.requestId ||

@@ -13,7 +13,6 @@ import {
 } from './batch-channel-validation';
 import { BATCH_CHANNEL, BATCH_METHODS } from './batch/constants';
 import { canonicalJson } from './canonical';
-import { isConversation } from './chat';
 import type { SignedOfferV2 } from './control-types';
 import {
   controlAddress,
@@ -31,6 +30,7 @@ import {
 } from './payment-session';
 import { bytesHex } from './public-validation';
 import { signingBytes } from './signing';
+import { isToolConversation } from './tools';
 
 function quoteFor(value: unknown): SignedOfferV2 {
   const row = controlObject(value, ['offer', 'signature']);
@@ -66,7 +66,7 @@ function conversationInput(
         BATCH_CHANNEL.maxMessages,
       ),
     );
-    if (!isConversation(input.messages))
+    if (!isToolConversation(input.messages))
       return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
     if (input.maxTokens > BATCH_CHANNEL.maxOutputTokens)
       return batchFail(PAID_EXECUTION_CODES.LIMIT);
@@ -208,6 +208,8 @@ export function batchExecutionInput(
     conversationInput(
       {
         messages: input.messages,
+        ...(input.tools ? { tools: input.tools } : {}),
+        ...(input.toolChoice ? { toolChoice: input.toolChoice } : {}),
         maxTokens: input.maxTokens,
         selection: quote.offer.selection,
         reasoning: quote.offer.reasoning,
