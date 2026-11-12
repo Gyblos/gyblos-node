@@ -43,6 +43,8 @@ export interface SellerRequest {
   minimumBadge: SellerBadge;
   // Seller retention declarations the buyer accepts; a declaration is not a privacy guarantee.
   retention: readonly DataRetention[];
+  // Set for a free request that offers tools: quotes ask for them and only sellers serving tools quote.
+  tools?: true;
 }
 export interface KnownSeller {
   catalog: PublicCatalogV2;

@@ -36,6 +36,8 @@ export const OPENAI_CHAT = {
       FREE_CHAT_FIELDS.MAX_TOKENS,
       FREE_CHAT_FIELDS.MAX_COMPLETION_TOKENS,
       FREE_CHAT_FIELDS.STREAM,
+      'tools',
+      'tool_choice',
     ] as readonly string[],
     // Sampling hints and bookkeeping the official SDKs and agents send by default.
     ignored: [
@@ -54,9 +56,8 @@ export const OPENAI_CHAT = {
     ],
     neutral: {
       n: (value: unknown) => absent(value) || value === 1,
-      tools: emptyList,
+      // The legacy functions API; tools replace it.
       functions: emptyList,
-      tool_choice: (value: unknown) => absent(value) || value === 'none',
       function_call: (value: unknown) => absent(value) || value === 'none',
       response_format: (value: unknown) =>
         absent(value) ||
@@ -72,7 +73,14 @@ export const OPENAI_CHAT = {
     },
   },
   roles: OPENAI_ROLES,
-  messageFields: ['role', 'content', 'name', 'refusal'] as readonly string[],
+  messageFields: [
+    'role',
+    'content',
+    'name',
+    'refusal',
+    'tool_calls',
+    'tool_call_id',
+  ] as readonly string[],
   partFields: ['type', 'text'] as readonly string[],
 } as const;
 
@@ -84,19 +92,25 @@ export const ANTHROPIC_CHAT = {
       FREE_CHAT_FIELDS.MAX_TOKENS,
       FREE_CHAT_FIELDS.STREAM,
       FREE_CHAT_FIELDS.SYSTEM,
+      'tools',
+      'tool_choice',
     ] as readonly string[],
-    ignored: ['temperature', 'top_p', 'top_k', 'metadata', 'service_tier'],
+    // Sampling hints, bookkeeping and the settings agents such as Claude Code always send: thinking is
+    // always off on Gyblos offers, and effort and context management do not change what is asked.
+    ignored: [
+      'temperature',
+      'top_p',
+      'top_k',
+      'metadata',
+      'service_tier',
+      'thinking',
+      'output_config',
+      'context_management',
+    ],
     neutral: {
-      tools: emptyList,
-      tool_choice: (value: unknown) =>
-        absent(value) ||
-        (typeof value === 'object' &&
-          (value as { type?: unknown }).type === 'none'),
       stop_sequences: emptyList,
-      thinking: (value: unknown) =>
-        absent(value) ||
-        (typeof value === 'object' &&
-          (value as { type?: unknown }).type === 'disabled'),
+      // Servers Anthropic would call on the model's behalf.
+      mcp_servers: emptyList,
     },
   },
   messageFields: ['role', 'content'] as readonly string[],
@@ -124,15 +138,25 @@ export const FREE_CHAT_DETAILS = {
   stream: 'stream must be true or false',
   noStream: 'stream must be false or absent',
   json: 'the body must be valid UTF-8 JSON',
+  tools:
+    'tools must be functions, each with a unique name and a JSON Schema object for its input',
+  toolChoice:
+    'tool_choice must be auto, none, required (any) or one named tool',
+  serverTools:
+    'server tools (web search, code execution and others run by a provider) are not supported',
+  noToolSeller: 'no seller offers tools for this model right now',
+  paidTools: 'tools are served on free offers only for now',
 } as const;
 
 export const CHAT_MESSAGE_DETAILS = {
   shape:
     'messages must be a non-empty list of system, user and assistant messages with text content',
   order:
-    'the conversation must start and end with a user message; system instructions go first',
+    'the conversation must start with a user message, answer every tool call with one result, and end with a user message or results; system instructions go first',
   parts: 'only text content is supported; images and other parts are not',
-  tools: 'tool calls and tool results are not supported yet',
+  tools: 'the legacy function role is not supported; use tools',
+  toolCalls:
+    'tool calls need an id, the name of a tool and a JSON object for arguments, and each result the id of its call',
   count: `the conversation may hold at most ${FREE_EXECUTION.maxMessages} messages`,
   content: `the conversation text must be at most ${FREE_EXECUTION.inputBytes} bytes`,
 } as const;
@@ -150,6 +174,7 @@ export const HTTP_ERROR_KINDS: Readonly<Record<string, string>> = {
 
 // Paths the local endpoint serves besides ROUTES.inference (OpenAI chat completions).
 export const CHAT_ROUTES = {
+  countTokens: '/v1/messages/count_tokens',
   models: '/v1/models',
   messages: '/v1/messages',
 } as const;

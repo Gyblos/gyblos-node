@@ -117,9 +117,9 @@ void test('an Anthropic request carries system text apart and needs max_tokens',
   });
   for (const change of [
     { max_tokens: undefined },
-    { tools: [{ name: 'x' }] },
+    // A server tool runs at the provider, not on a Gyblos seller.
+    { tools: [{ type: 'web_search_20250305', name: 'web' }] },
     { stop_sequences: ['x'] },
-    { thinking: { type: 'enabled', budget_tokens: 1024 } },
     { messages: [{ role: 'system', content: 'x' }] },
     {
       messages: [

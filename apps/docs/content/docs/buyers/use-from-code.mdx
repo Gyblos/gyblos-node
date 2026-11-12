@@ -16,8 +16,10 @@ peer-to-peer connection.
 | OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming        |
 | `GET /v1/models`                                                     | Yes, the model your buyer asks for      |
 | Free offers                                                          | Yes                                     |
-| Tools (function calling), images, structured output, several answers | Not yet: refused with a clear 400 error |
-| Agents that need tools (Claude Code, Cursor agent mode)              | Not yet                                 |
+| Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                |
+| Claude Code                                                          | Only with a seller on a larger model    |
+| Cursor agent mode                                                    | No: it calls from Cursor's cloud        |
+| Images, structured output, several answers                           | Not yet: refused with a clear 400 error |
 | Paid offers                                                          | Outside this guide                      |
 
 A seller serves each buyer up to **30 answers per minute** by default. An answer is at most **4096
@@ -135,13 +137,70 @@ const message = await client.messages.create({
 console.log(message.content[0].text);
 ```
 
+## Tools [#tools]
+
+Send `tools` as each API defines them. When the model wants a tool, the answer ends with
+`finish_reason: "tool_calls"` (Anthropic: `stop_reason: "tool_use"`) and carries the call. Your program
+runs the tool and sends the result back in the next request, with the whole conversation:
+
+```js
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://127.0.0.1:4031/v1',
+  apiKey: 'local',
+});
+const tools = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_time',
+      description: 'Current local time in a city',
+      parameters: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city'],
+      },
+    },
+  },
+];
+const messages = [
+  { role: 'user', content: 'What time is it in Santiago? Use the tool.' },
+];
+const first = await client.chat.completions.create({
+  model: 'qwen3-0.6b',
+  messages,
+  tools,
+});
+const call = first.choices[0].message.tool_calls[0];
+// Run the tool yourself, then send its result back.
+messages.push(first.choices[0].message, {
+  role: 'tool',
+  tool_call_id: call.id,
+  content: '15:42',
+});
+const second = await client.chat.completions.create({
+  model: 'qwen3-0.6b',
+  messages,
+  tools,
+});
+console.log(second.choices[0].message.content);
+```
+
+With the Anthropic SDK, send `tools` with `input_schema`, read the `tool_use` blocks and answer with
+`tool_result` blocks, as with Anthropic. The buyer asks only sellers that serve tools; if none does, it
+answers 503 and says so.
+
+The default model, qwen3:0.6b, handles simple calls like this one. Agents that send many tools and long
+instructions, such as Claude Code, need a seller on a larger model through the OpenAI or Anthropic engine.
+
 ## Options and errors [#options-and-errors]
 
 Options that clients send by default and that do not change the answer are accepted and ignored, such as
-`temperature`, `top_p`, `user`, `metadata` and `stream_options`. Options that would change it are refused
-unless they hold their neutral value: `tools` (empty), `tool_choice` (`none`), `response_format`
-(`text`), `n` (1), `stop` and `stop_sequences`, `logprobs`, and `thinking` (`disabled`). Images and tool
-turns are always refused.
+`temperature`, `top_p`, `user`, `metadata`, `stream_options` and, in the Anthropic format, `thinking`
+(thinking is always off). Options that would change it are refused unless they hold their neutral value:
+`response_format` (`text`), `n` (1), `stop` and `stop_sequences`, and `logprobs`. Images are always
+refused.
 
 | Answer | Meaning                                                                                                                                                                  |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
