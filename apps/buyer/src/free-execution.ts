@@ -1,6 +1,6 @@
 // Orchestrates free quote execution with failover only before possible prompt transmission.
 // Selection and I/O are injected; this module never authorizes payments or records content.
-import { createHash } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import type {
@@ -129,14 +129,17 @@ export async function executeBuyerFree(
 }
 
 // A conversation is known by its model, system text and first user message, which every later turn
-// repeats; only a digest is kept, never the text.
+// repeats; only a digest keyed by this process's own secret is kept, never the text, so a memory dump
+// cannot confirm a guessed prompt.
+const SECRET_BYTES = 32;
+const CONVERSATION_SECRET = randomBytes(SECRET_BYTES);
 export function conversationKey(
   input: FreeExecutionBuildInput,
   model?: RoutedModel,
 ) {
   const system = input.messages.find((message) => message.role === 'system');
   const first = input.messages.find((message) => message.role === 'user');
-  return createHash('sha256')
+  return createHmac('sha256', CONVERSATION_SECRET)
     .update(
       JSON.stringify([
         model?.selection ?? null,

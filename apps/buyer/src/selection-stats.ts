@@ -128,7 +128,8 @@ export function recordExecutionFailure(
   stats.set(nodeId, {
     successes: prior?.successes ?? 0,
     failures: (prior?.failures ?? 0) + 1,
-    latencyMs: prior?.latencyMs ?? 0,
+    // A seller first seen failing has no latency yet, not the best one.
+    latencyMs: prior?.latencyMs ?? null,
     waitAccuracy: prior?.waitAccuracy ?? null,
     cooldownUntil: prior?.cooldownUntil ?? null,
     quotedWaitMs: prior?.quotedWaitMs ?? null,

@@ -5,13 +5,9 @@ import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
 import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
-import { FreeExecutionError } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
-import {
-  createFreeExecutionClient,
-  FreeClientError,
-} from '@gyblos/transport-iroh/free-client';
+import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
 import {
   BUYER_SELECTION,
@@ -26,7 +22,12 @@ import {
   type FreeBuyerDependencies,
   type FreeWinner,
 } from './free-execution';
-import { onceEachSeller, stickySellers } from './free-memory';
+import {
+  onceEachSeller,
+  recordFault,
+  sellerFault,
+  stickySellers,
+} from './free-memory';
 import { freeAdmission } from './free-parallel';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
@@ -36,7 +37,6 @@ import type {
   StaticControlSeller,
 } from './selection-config';
 import type { prepareBuyerSelection } from './selection-runtime';
-import { recordExecutionFailure } from './selection-stats';
 import type { SellerFailureReporter } from './seller-failures';
 
 export function freeBuyerDependencies(
@@ -106,11 +106,13 @@ export function freeBuyerDependencies(
         },
       );
       try {
-        return await client.execute(request, signal);
+        const result = await client.execute(request, signal);
+        sticky.served(winner.nodeId);
+        return result;
       } catch (error) {
         // The seller broke the execution (not this buyer's deadline or the client leaving): it counts.
         if (sellerFault(error) && !signal.aborted)
-          await recordFault(prepared, winner.nodeId);
+          await recordFault(prepared.stats, sticky, winner.nodeId);
         throw error;
       } finally {
         await client.settled();
@@ -119,7 +121,7 @@ export function freeBuyerDependencies(
   };
 }
 
-export { onceEachSeller, stickySellers } from './free-memory';
+export { onceEachSeller, sellerFault, stickySellers } from './free-memory';
 export type PreparedSelection = NonNullable<
   Awaited<ReturnType<typeof prepareBuyerSelection>>
 >;
@@ -322,17 +324,8 @@ async function selectSticky(
     ...needs,
     previousSeller: key ? sticky.get(key) : undefined,
   });
-  if (key) sticky.remember(key, winner.nodeId);
+  if (key) sticky.chose(key, winner.nodeId);
   return winner;
-}
-
-const sellerFault = (error: unknown) =>
-  error instanceof FreeClientError || error instanceof FreeExecutionError;
-// A failed execution lowers its seller's weight; saving the record is best effort, never the request's
-// failure.
-async function recordFault(prepared: PreparedSelection, nodeId: string) {
-  recordExecutionFailure(prepared.stats.rows, nodeId);
-  await prepared.stats.save().catch(() => undefined);
 }
 
 // The earliest moment a seller in cooldown can be tried again; undefined when none is cooling down.

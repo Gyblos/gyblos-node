@@ -34,12 +34,14 @@ export function raceControlOffers(
     let lower: WinningQuote | undefined;
     let other: WinningQuote | undefined;
     let grace: ReturnType<typeof setTimeout> | undefined;
+    // Only an exact-level preferred seller is waited for: a lower level one could not win anyway.
+    const preferred = candidates.find(
+      (item) => item.nodeId === options.preferred && !item.downgrade,
+    );
     const waitsFor = (candidate: SellerCandidate) =>
-      options.preferred !== undefined &&
-      candidate.nodeId !== options.preferred &&
-      unanswered.has(
-        candidates.find((item) => item.nodeId === options.preferred)!,
-      );
+      preferred !== undefined &&
+      candidate !== preferred &&
+      unanswered.has(preferred);
     const unanswered = new Set(candidates);
     const finish = (winner?: WinningQuote) => {
       if (finished) return;
@@ -53,7 +55,9 @@ export function raceControlOffers(
     const abort = () => finish();
     // A timed-out exact candidate is still unresolved: never choose a buffered downgrade then.
     const timer = setTimeout(() => {
-      if (!finished) options.onExpired?.([...unanswered]);
+      // A quote waiting for the preferred seller ends the race as the first quote did before: the sellers
+      // still silent are let go, not cooled down.
+      if (!finished && !other) options.onExpired?.([...unanswered]);
       finish(other);
     }, options.windowMs ?? BUYER_SELECTION.windowMs);
     options.signal?.addEventListener('abort', abort, { once: true });
@@ -86,7 +90,7 @@ export function raceControlOffers(
           pending--;
           if (!candidate.downgrade) exactPending--;
           // The preferred seller refused or failed: the quote that waited for it wins.
-          if (other && candidate.nodeId === options.preferred) finish(other);
+          if (other && candidate === preferred) finish(other);
           else if (!exactPending && (other ?? lower)) finish(other ?? lower);
           else if (!pending) finish();
         });

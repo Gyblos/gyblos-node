@@ -6,14 +6,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { conversationKey } from '@gyblos/buyer/free-execution';
-import { stickySellers } from '@gyblos/buyer/free-selection';
+import { sellerFault, stickySellers } from '@gyblos/buyer/free-selection';
 import { raceControlOffers } from '@gyblos/buyer/offer-race';
 import {
   recordExecutionFailure,
   type LocalSellerStats,
 } from '@gyblos/buyer/selection-stats';
 import type { SellerCandidate } from '@gyblos/core/seller-selection';
+import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
+import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 const candidate = (nodeId: string) =>
   ({ nodeId, owner: `owner-${nodeId}`, downgrade: false }) as SellerCandidate;
@@ -90,15 +92,75 @@ void test('a conversation keeps its key across turns; another model or system te
   );
 });
 
-void test('the remembered conversations are bounded, the least recent forgotten first', () => {
+void test('a conversation is remembered once its seller answered, forgotten when it failed, and bounded', () => {
   const sticky = stickySellers(2);
-  sticky.remember('one', 'a');
-  sticky.remember('two', 'b');
-  sticky.remember('one', 'c'); // refreshed, now the most recent
-  sticky.remember('three', 'd');
-  assert.equal(sticky.get('two'), undefined);
-  assert.equal(sticky.get('one'), 'c');
-  assert.equal(sticky.get('three'), 'd');
+  sticky.chose('one', 'a');
+  assert.equal(sticky.get('one'), undefined); // not yet answered
+  sticky.served('a');
+  assert.equal(sticky.get('one'), 'a');
+  sticky.chose('one', 'a');
+  sticky.forget('a'); // failed on the next turn
+  assert.equal(sticky.get('one'), undefined);
+  for (const [key, node] of [
+    ['one', 'a'],
+    ['two', 'b'],
+    ['one', 'c'],
+    ['three', 'd'],
+  ] as const) {
+    sticky.chose(key, node);
+    sticky.served(node);
+  }
+  assert.equal(sticky.get('two'), undefined); // least recent, forgotten
+  assert.deepEqual([sticky.get('one'), sticky.get('three')], ['c', 'd']);
+});
+
+void test("only the seller's failures count against it, not the buyer's own refusals", () => {
+  const fault = (code: string, sent: boolean, remote = false) =>
+    sellerFault(new FreeClientError(code as never, sent, remote));
+  assert.equal(
+    fault(FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE, true, true),
+    true,
+  );
+  assert.equal(fault(FREE_EXECUTION_CODES.ENGINE, false, true), true);
+  assert.equal(fault(FREE_EXECUTION_CODES.TIMEOUT, true), true);
+  assert.equal(fault(FREE_EXECUTION_CODES.INVALID, true), true);
+  // Before sending: the buyer's request, its relay rules or a quote that expired on its side.
+  assert.equal(fault(FREE_EXECUTION_CODES.INVALID, false), false);
+  assert.equal(fault(FREE_EXECUTION_CODES.PEER, false), false);
+  assert.equal(fault(FREE_EXECUTION_CODES.EXPIRED, false), false);
+  // The buyer's own fault, and a seller that was only busy.
+  assert.equal(fault(FREE_EXECUTION_CODES.INTERNAL, true), false);
+  assert.equal(fault(FREE_EXECUTION_CODES.BUSY, false, true), false);
+  assert.equal(sellerFault(new Error('other')), false);
+});
+
+void test('when the window closes on a quote waiting for the preferred seller, nobody is cooled down', async () => {
+  const expired: string[][] = [];
+  const winner = await raceControlOffers(
+    ['a', 'b', 'c'].map(candidate),
+    (item) =>
+      item.nodeId === 'a'
+        ? after(80, 'a')
+        : new Promise<SignedOfferV2>(() => {}),
+    {
+      windowMs: 100,
+      preferMs: 500,
+      preferred: 'b',
+      onExpired: (pending) => expired.push(pending.map((item) => item.nodeId)),
+    },
+  );
+  assert.equal(winner?.candidate.nodeId, 'a');
+  assert.deepEqual(expired, []);
+  // A preferred seller only at a lower level is not waited for.
+  const lower = { ...candidate('b'), downgrade: true };
+  const started = performance.now();
+  const fast = await raceControlOffers(
+    [candidate('a'), lower],
+    (item) => after(item.nodeId === 'a' ? 5 : 300, item.nodeId),
+    { windowMs: 1000, preferMs: 500, preferred: 'b' },
+  );
+  assert.equal(fast?.candidate.nodeId, 'a');
+  assert.ok(performance.now() - started < 200);
 });
 
 void test('a failed execution counts a failure without a cooldown, keeping the rest of its history', () => {
