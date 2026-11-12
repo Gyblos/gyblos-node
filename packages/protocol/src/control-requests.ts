@@ -57,7 +57,12 @@ export function parseControlQuery(value: unknown): ControlQuery {
     };
   }
   if (input.method !== CONTROL_METHODS.OFFER) return controlFail();
+  const tools =
+    !!input.params &&
+    typeof input.params === 'object' &&
+    Object.hasOwn(input.params, 'tools');
   const params = controlObject(input.params, [
+    ...(tools ? ['tools'] : []),
     'buyer',
     'buyerNodeId',
     'selection',
@@ -88,6 +93,7 @@ export function parseControlQuery(value: unknown): ControlQuery {
       network: controlNetwork(params.network),
       asset: controlAddress(params.asset),
       catalogDigest: controlHex(params.catalogDigest),
+      ...(tools ? { tools: params.tools === true ? true : controlFail() } : {}),
     },
   };
 }

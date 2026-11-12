@@ -14,6 +14,7 @@ import {
   TELEMETRY_REFUSALS,
   type TelemetryRefusal,
 } from '@gyblos/protocol/telemetry';
+import { conversationText, recordedFinishReason } from '@gyblos/protocol/tools';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import type { FreeBuyerDependencies } from './free-execution';
@@ -85,8 +86,8 @@ export function completeBuyerTelemetry(
 ) {
   observer?.completed(
     { ...result.usage, reasoningTokens: null },
-    result.finishReason,
-    telemetrySizes(request.input.messages[0]?.content ?? '', result.text),
+    recordedFinishReason(result.finishReason),
+    telemetrySizes(conversationText(request.input.messages), result.text),
   );
 }
 export function buyerUnserved(

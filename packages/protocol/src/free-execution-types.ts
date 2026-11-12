@@ -1,37 +1,53 @@
 // Free inference wire shapes only; execution, admission and replay storage belong to their callers.
+import type { ChatMessage } from './chat';
 import type {
   EngineDoneReason,
   FREE_EXECUTION,
-  FreeChatRole,
   FreeExecutionCode,
   FreeExecutionStopReason,
   ReasoningLevel,
 } from './constants';
 import type { ModelSelection, SignedOfferV2 } from './control-types';
+import type {
+  TOOL_CALLS_DONE,
+  ToolCall,
+  ToolChatMessage,
+  ToolInput,
+} from './tools';
 
-export interface FreeChatMessage {
-  role: FreeChatRole;
-  content: string;
-}
-export interface FreeExecutionBuildInput {
+// A text message, an assistant turn that calls tools, or a tool's result.
+export type FreeChatMessage = ToolChatMessage;
+export interface FreeExecutionBuildInput extends ToolInput {
   messages: readonly FreeChatMessage[];
   maxTokens: number;
+}
+// The text-only input and result the paid and session channels carry.
+export interface ExecutionInput {
+  messages: ChatMessage[];
+  selection: ModelSelection;
+  reasoning: ReasoningLevel;
+  maxTokens: number;
+}
+export interface ExecutionResult {
+  text: string;
+  usage: { inputTokens: number; outputTokens: number };
+  finishReason: EngineDoneReason;
 }
 export interface FreeExecutionRequest {
   version: typeof FREE_EXECUTION.version;
   requestId: string;
   quote: SignedOfferV2;
-  input: {
-    messages: FreeChatMessage[];
-    selection: ModelSelection;
-    reasoning: ReasoningLevel;
-    maxTokens: number;
-  };
+  input: ToolInput &
+    Omit<ExecutionInput, 'messages'> & { messages: FreeChatMessage[] };
 }
-export interface FreeExecutionResult {
-  text: string;
-  usage: { inputTokens: number; outputTokens: number };
-  finishReason: EngineDoneReason;
+// The free channel's result, which may call tools instead of finishing with text.
+export interface FreeExecutionResult extends Omit<
+  ExecutionResult,
+  'finishReason'
+> {
+  finishReason: EngineDoneReason | typeof TOOL_CALLS_DONE;
+  // Present exactly when finishReason is tool_calls.
+  toolCalls?: ToolCall[];
 }
 // Present only with SELLER_CANNOT_CONTINUE; delivered only on a stream that already sent text.
 export interface FreeExecutionDelivered {

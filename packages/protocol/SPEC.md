@@ -411,7 +411,7 @@ One bidirectional stream carries one request and one complete response, each
 with a four-byte big-endian unsigned body length, canonical UTF-8 JSON, then
 send EOF. A receiver processes nothing until the full body and EOF arrive.
 
-Request fields (all required; unknown fields at every level are rejected):
+Request fields (required unless marked optional; unknown fields at every level are rejected):
 
 - `version: 4`, and `requestId` equal to the quote's validated 128-bit lowercase
   hexadecimal requestId. A fresh execution identifier cannot make a quote reusable.
@@ -425,19 +425,47 @@ Request fields (all required; unknown fields at every level are rejected):
   on the wire. The seller serves a conversation: an optional `system` message
   first, then turns alternating `user`, `assistant`, from and ending with
   `user`, each non-empty.
-  Tools, attachments, remote URLs, function calls and streaming options are not
-  supported. A wire role does not imply a particular engine implements it:
+  Tool turns are described below; attachments, remote URLs and streaming
+  options are not supported. A wire role does not imply a particular engine implements it:
   the seller must refuse unsupported input before generation, without silently
   flattening messages or downgrading reasoning.
 - `maxTokens` is a positive safe integer no greater than the signed output
   maximum or model context. The engine-specific input token count plus the
   requested output maximum must fit the quoted context before generation.
+- Optional tool calling (free channel only; the paid and session channels keep
+  their text-only input and refuse these fields):
+  - `input.tools`: 1–128 `{name, description?, parameters}`. `name` matches
+    `[A-Za-z0-9_-]{1,64}` and is unique; `description` is non-empty text up to
+    8 KiB; `parameters` is JSON text (up to 64 KiB) holding one JSON object, the
+    tool's JSON Schema. JSON values travel as text so signing and digests never
+    reorder keys or round numbers.
+  - `input.toolChoice`: `auto`, `none`, `required` or `{name}` naming one of
+    the tools; it requires `tools`.
+  - An assistant message may carry `toolCalls`: 1–32 `{id, name, arguments}`,
+    `id` printable ASCII up to 64 characters and unique in the turn,
+    `arguments` JSON text holding one object. Its `content` may then be empty.
+  - A message `{role: "tool", content, toolCallId}` answers one call; its
+    content may be empty.
+  - With tools or tool turns, the conversation is an optional `system` message,
+    then a `user` turn; an `assistant` turn follows a `user` turn or the
+    results of every call of the previous assistant turn; each call is
+    answered exactly once by the results right after it; it ends with a `user`
+    turn or with results. Tools and tool JSON count against `inputBytes`.
+  - A buyer that will offer tools sets `tools: true` in its quote request
+    (`params.tools`); a seller whose offer cannot serve tools refuses it with
+    `CONTROL_TOOLS_UNSUPPORTED`. The signed offer is unchanged. A seller that
+    receives tools for an engine without tool support refuses the execution
+    with `FREE_EXECUTION_UNSUPPORTED` before generation.
 
 Success response:
-`{version: 3, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason}}`.
+`{version: 4, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason, toolCalls?}}`.
 Usage contains non-negative safe integer counts under the public context bound;
 output must not exceed the requested maximum, and combined usage must fit the
-quoted context. `finishReason` is `stop` or `length`. Empty text/zero counts are
+quoted context. `finishReason` is `stop`, `length` or `tool_calls`; a result
+has `toolCalls` (same shape as above, the seller naming each call) exactly when
+`finishReason` is `tool_calls`, and its text may then be empty. A stream
+delivers only the visible text as deltas; the calls arrive whole in the
+terminal result. Receipts and telemetry record `tool_calls` as `stop`. Empty text/zero counts are
 representable; usage is reported evidence, not a cryptographic proof of work.
 There are no fragments or buyer-visible streaming in this version.
 
@@ -590,9 +618,18 @@ records never recreates the ledger or token counters.
 
 The engines serve a conversation with reasoning `off`. The pinned Ollama
 adapter renders it with the pinned Qwen3 template's no-tools, thinking-off
-branch (a lone user message exactly as before); the OpenAI adapter sends the
-messages as they are and the Anthropic adapter sends the system message as its
-`system` field. Other shapes are refused with `FREE_EXECUTION_UNSUPPORTED`
+branch (a lone user message exactly as before), or its tools branch when tools
+or tool turns are present: the tools block in the system turn, calls as
+`<tool_call>` JSON and results as `<tool_response>` in one user turn, byte for
+byte as the public template renders them (`toolChoice: none` leaves the tools
+block out; `required` and a named choice cannot be forced and act as `auto`).
+The adapter reads well-formed `<tool_call>` blocks naming offered tools back
+out of the output and keeps anything else as text. The recounted meter counts
+tools in the input and a result's calls as the template writes them. The
+OpenAI adapter sends the messages as they are (calls as `tool_calls`, results
+as role `tool`) and the Anthropic adapter sends the system message as its
+`system` field, calls as `tool_use` blocks and a run of results as one user
+turn of `tool_result` blocks. Other shapes are refused with `FREE_EXECUTION_UNSUPPORTED`
 before generation; no message flattening occurs. `maxTokens` may not exceed the
 offer's answer limit (`free.max_output_tokens` in gyblos.toml, 4096 by default
 and at most 32768; quotes beyond it are refused) and, with the templated input,
