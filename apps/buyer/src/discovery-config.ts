@@ -13,13 +13,18 @@ import { BUYER_DISCOVERY, BUYER_SELECTION } from './constants';
 export interface BuyerDiscoveryConfig {
   baseUrl: string;
   maxPages: number;
+  // Also use sellers found only in the index, never configured here: each must hold a registered
+  // identity (selection.json `identity` is required) and is reached through the configured relay.
+  open?: true;
 }
 export function parseBuyerDiscoveryConfig(
   value: unknown,
 ): BuyerDiscoveryConfig {
   const present =
     value !== null && typeof value === 'object'
-      ? ['baseUrl', 'maxPages'].filter((key) => Object.hasOwn(value, key))
+      ? ['baseUrl', 'maxPages', 'open'].filter((key) =>
+          Object.hasOwn(value, key),
+        )
       : [];
   const input = controlObject(value, present);
   const baseUrl =
@@ -39,8 +44,10 @@ export function parseBuyerDiscoveryConfig(
       ))
   )
     return controlFail();
+  if (input.open !== undefined && input.open !== true) return controlFail();
   return {
     baseUrl,
+    ...(input.open ? { open: true as const } : {}),
     maxPages:
       input.maxPages === undefined
         ? BUYER_DISCOVERY.defaultPages

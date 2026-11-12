@@ -207,8 +207,15 @@ export function parseBuyerSelectionConfig(
     const sellers = controlArray(row.sellers, BUYER_SELECTION.maxSellers).map(
       parseStaticSeller,
     );
+    const discovery =
+      row.discovery === undefined
+        ? undefined
+        : parseBuyerDiscoveryConfig(row.discovery);
+    // Open discovery trusts no index claim: every seller it adds must prove a registered identity, so it
+    // needs `identity`, and it may then start with no configured seller at all.
     if (
-      !sellers.length ||
+      (discovery?.open && row.identity === undefined) ||
+      (!sellers.length && !discovery?.open) ||
       new Set(sellers.map((item) => item.nodeId)).size !== sellers.length
     )
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
@@ -225,9 +232,7 @@ export function parseBuyerSelectionConfig(
       ...(row.identity === undefined
         ? {}
         : { identity: parseBuyerIdentityConfig(row.identity) }),
-      ...(row.discovery === undefined
-        ? {}
-        : { discovery: parseBuyerDiscoveryConfig(row.discovery) }),
+      ...(discovery ? { discovery } : {}),
       ...(row.pinnedNodeId === undefined
         ? {}
         : { pinnedNodeId: controlHex(row.pinnedNodeId) }),

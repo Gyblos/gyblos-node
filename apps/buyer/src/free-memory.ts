@@ -3,6 +3,8 @@
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
+import type { FreeWinner } from './free-execution';
+import type { PreparedSelection } from './free-selection';
 import {
   recordExecutionFailure,
   type LocalSellerStats,
@@ -89,4 +91,21 @@ export async function recordFault(
   sticky.forget(nodeId);
   recordExecutionFailure(stats.rows, nodeId);
   await stats.save().catch(() => undefined);
+}
+
+// Stats of sellers found only in the index stay in memory: selection-stats.json holds the configured
+// sellers alone (at most BUYER_SELECTION.maxSellers rows), and a restart starts them fresh.
+const UNSAVED = new WeakMap<object, Map<string, LocalSellerStats>>();
+export const statsFor = (
+  prepared: PreparedSelection,
+  configured: ReadonlyMap<string, unknown>,
+  winner: FreeWinner,
+) =>
+  configured.has(winner.nodeId)
+    ? prepared.stats
+    : { rows: unsavedStats(prepared), save: async () => {} };
+export function unsavedStats(prepared: PreparedSelection) {
+  let rows = UNSAVED.get(prepared.stats);
+  if (!rows) UNSAVED.set(prepared.stats, (rows = new Map()));
+  return rows;
 }

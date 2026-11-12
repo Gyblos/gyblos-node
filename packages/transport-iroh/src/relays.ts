@@ -104,6 +104,11 @@ export function assertConfiguredRelay(
   return normalized;
 }
 
+// The first configured relay: where a seller found only by NodeId (open discovery) is reached.
+export function primaryRelayUrl(environment: RelayEnvironment = process.env) {
+  return configuredRelayUrls(environment)[0]!;
+}
+
 export function requireConfiguredRelay(
   relayUrl: string | null | undefined,
   environment: RelayEnvironment = process.env,
