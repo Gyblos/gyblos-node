@@ -1,18 +1,19 @@
-// Bounds best-effort receipt work without releasing uncancellable work early or retrying inference.
-export function createReceiptWork(milliseconds: number) {
-  let active: Promise<void> | undefined;
-  let cancelActive: (() => void) | undefined;
+// Bounds best-effort receipt work without releasing uncancellable work early or retrying inference: at most
+// `slots` jobs at once (one per request a buyer may run side by side); another is dropped and counted.
+export function createReceiptWork(milliseconds: number, slots = 1) {
+  const active = new Set<Promise<void>>();
+  const cancels = new Set<() => void>();
   let closed = false;
   let saved = 0;
   let failed = 0;
   let dropped = 0;
   return {
-    health: () => ({ active: Boolean(active), saved, failed, dropped }),
+    health: () => ({ active: active.size > 0, saved, failed, dropped }),
     async run(
       job: (signal: AbortSignal) => Promise<void>,
       external?: AbortSignal,
     ) {
-      if (closed || active || external?.aborted) {
+      if (closed || active.size >= slots || external?.aborted) {
         dropped++;
         return false;
       }
@@ -30,7 +31,7 @@ export function createReceiptWork(milliseconds: number) {
           }
           resolve(false);
         };
-        cancelActive = abort;
+        cancels.add(abort);
         external?.addEventListener('abort', abort, { once: true });
         timer = setTimeout(abort, milliseconds);
       });
@@ -52,10 +53,10 @@ export function createReceiptWork(milliseconds: number) {
           },
         )
         .finally(() => {
-          active = undefined;
-          cancelActive = undefined;
+          active.delete(settled);
+          cancels.delete(abort);
         });
-      active = settled;
+      active.add(settled);
       try {
         return await Promise.race([
           source.then(
@@ -71,10 +72,10 @@ export function createReceiptWork(milliseconds: number) {
     },
     async close() {
       closed = true;
-      cancelActive?.();
+      for (const cancel of cancels) cancel();
     },
     async settled() {
-      await active;
+      await Promise.all(active);
     },
   };
 }

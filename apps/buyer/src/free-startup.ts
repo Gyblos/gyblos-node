@@ -149,6 +149,7 @@ function buyerReceipts(
 ) {
   return createBuyerReceiptRuntime({
     endpoint,
+    slots: TRANSPORT_LIMITS.maxConcurrent,
     store: openReceiptStore({
       environment: process.env,
       role: P2P_ROLES.BUYER,

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { FREE_BUYER_CODES } from '@gyblos/buyer/constants';
+import { FreeBuyerError } from '@gyblos/buyer/free-chat';
 import {
   executeBuyerFree,
   FreeSelectionFailure,
@@ -13,6 +14,7 @@ import {
 } from '@gyblos/buyer/free-execution';
 import { freeAdmission } from '@gyblos/buyer/free-parallel';
 import { onceEachSeller } from '@gyblos/buyer/free-selection';
+import { createReceiptWork } from '@gyblos/node/receipt-work';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
@@ -177,4 +179,67 @@ void test('one request checks each seller identity once, keeping refusals and re
   await assert.rejects(flaky(seller as never));
   failing = false;
   assert.equal(await flaky(seller as never), true);
+});
+
+void test('selections never overlap, and one that gives up waiting neither waits on nor breaks the line', async () => {
+  const admission = freeAdmission(3);
+  let running = 0;
+  let most = 0;
+  const first = gate();
+  const pick = (hold?: Promise<void>) => async () => {
+    running++;
+    most = Math.max(most, running);
+    await hold;
+    running--;
+    return { nodeId: 'a' };
+  };
+  const a = admission.select(
+    new Set(),
+    new AbortController().signal,
+    pick(first.opened),
+  );
+  const leaving = new AbortController();
+  const b = admission.select(new Set(), leaving.signal, pick());
+  const c = admission.select(new Set(), new AbortController().signal, pick());
+  leaving.abort();
+  // B is released at once, while A still holds the turn.
+  await assert.rejects(b, { name: 'AbortError' });
+  assert.equal(running, 1);
+  first.open();
+  await Promise.all([a, c]);
+  assert.equal(most, 1);
+});
+
+void test('with the only tool seller busy, a request that needs tools is told busy, not that none serves tools', async () => {
+  const admission = freeAdmission(2);
+  const signal = new AbortController().signal;
+  await admission.select(new Set(), signal, async () => ({ nodeId: 'tools' }));
+  await assert.rejects(
+    admission.select(new Set(), signal, async () => {
+      throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+    }),
+    { code: FREE_BUYER_CODES.BUSY },
+  );
+  admission.done('tools');
+  await assert.rejects(
+    admission.select(new Set(), signal, async () => {
+      throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+    }),
+    { code: FREE_BUYER_CODES.UNAVAILABLE },
+  );
+});
+
+void test('two receipts at once are both exchanged when the work has two slots', async () => {
+  for (const [slots, dropped] of [
+    [1, 1],
+    [2, 0],
+  ] as const) {
+    const work = createReceiptWork(1000, slots);
+    const hold = gate();
+    const jobs = [work.run(() => hold.opened), work.run(() => hold.opened)];
+    hold.open();
+    await Promise.all(jobs);
+    assert.equal(work.health().dropped, dropped);
+    assert.equal(work.health().saved, 2 - dropped);
+  }
 });
