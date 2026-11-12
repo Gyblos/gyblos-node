@@ -39,6 +39,7 @@ import {
   type DiscoveryLimiters,
   type ResolvedLimiters,
 } from './limits';
+import { modelsPage, parseModelsQuery } from './models';
 import { acceptRecord, type PublishContext } from './publish';
 import { publishModeOf, type DiscoveryPublishers } from './publishers';
 import type { RegistrationStore } from './registration-store';
@@ -271,6 +272,29 @@ function requestCountry(context: IndexContext): unknown {
   return cf && typeof cf === 'object' ? Reflect.get(cf, 'country') : undefined;
 }
 
+function modelsHandler(settings: IndexSettings) {
+  return async (context: IndexContext) => {
+    try {
+      parseModelsQuery(context.req.url);
+    } catch (error) {
+      if (error instanceof IndexError) return rejection(context, error.code);
+      throw error;
+    }
+    const key = `${new URL(context.req.url).origin}${INDEX_ROUTES.MODELS}`;
+    const cached = await cachedPage(settings.cache, key);
+    if (cached) return cached;
+    if (!(await readAllowed(context)))
+      return rejection(context, INDEX_ERRORS.RATE_LIMITED);
+    const body = await modelsPage(context.get('storage'), settings.now());
+    const response = context.body(body, INDEX_STATUS.OK, {
+      [INDEX_HEADERS.CONTENT_TYPE]: INDEX_HEADER_VALUES.JSON,
+      [INDEX_HEADERS.CACHE_CONTROL]: INDEX_HEADER_VALUES.SELLERS_CACHE,
+    });
+    await inBackground(context, storePage(settings.cache, key, response));
+    return response;
+  };
+}
+
 function sellersHandler(settings: IndexSettings) {
   return async (context: IndexContext) => {
     let query: SellersQuery;
@@ -354,6 +378,7 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
       registrationHandler(settings, registrations, registry),
     );
   app.get(INDEX_ROUTES.SELLERS, sellersHandler(settings));
+  app.get(INDEX_ROUTES.MODELS, modelsHandler(settings));
   // Reports the publish mode only, never the allowlisted or registered NodeIds.
   app.get(INDEX_ROUTES.HEALTH, async (context) => {
     const records = await settings.records.read(
