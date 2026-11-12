@@ -23,10 +23,7 @@ import {
   visibleFragment,
   type JsonFields,
 } from '@gyblos/core/engine-provider';
-import {
-  finishedToolCalls,
-  type PartialToolCall,
-} from '@gyblos/core/engine-tools';
+import { finishedToolCalls } from '@gyblos/core/engine-tools';
 import {
   ENGINE_ERROR_CODES,
   MODEL_IDENTITIES,
@@ -57,8 +54,10 @@ import {
   ANTHROPIC_TOOL_USE,
   anthropicTools,
   anthropicTurns,
+  orderedCalls,
   startToolBlock,
   toolInputDelta,
+  type ToolBlocks,
 } from './tools';
 
 export interface AnthropicEngineSettings {
@@ -141,7 +140,7 @@ interface Completion {
   input: Partial<Record<(typeof ANTHROPIC_INPUT_FIELDS)[number], number>>;
   output?: number;
   finish?: EngineDoneReason | typeof TOOL_CALLS_DONE;
-  calls: (PartialToolCall | undefined)[];
+  calls: ToolBlocks;
 }
 
 function readUsage(usage: unknown, completion: Completion, output: boolean) {
@@ -206,7 +205,7 @@ async function readCompletion(
   signal: AbortSignal,
   attempt: EngineAttempt,
 ) {
-  const completion: Completion = { text: '', input: {}, calls: [] };
+  const completion: Completion = { text: '', input: {}, calls: new Map() };
   for await (const data of serverSentData(body, ANTHROPIC_LIMITS.stream)) {
     signal.throwIfAborted();
     const event = jsonFields(data);
@@ -230,7 +229,7 @@ async function readCompletion(
       break;
   }
   const { text, finish, output } = completion;
-  const calls = completion.calls.filter((call) => call !== undefined);
+  const calls = orderedCalls(completion.calls);
   if (!finish || (finish === TOOL_CALLS_DONE) !== calls.length > 0)
     throw new FrameFailure();
   const { input_tokens: fresh } = completion.input;

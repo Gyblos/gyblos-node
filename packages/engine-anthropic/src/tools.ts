@@ -5,6 +5,7 @@ import { isJsonFields } from '@gyblos/core/engine-provider';
 import type { PartialToolCall } from '@gyblos/core/engine-tools';
 import {
   TOOL_CHOICES,
+  TOOL_LIMITS,
   TOOL_ROLE,
   type ToolChatMessage,
   type ToolChoice,
@@ -87,29 +88,55 @@ export function anthropicTools(
   };
 }
 
+// The calls being written, by content block index. Text and thinking blocks take indexes too, so an answer
+// with the most calls a turn allows still fits well below this bound; any index beyond it, or more calls
+// than a turn allows, is a malformed stream, refused before anything is stored.
+// Room for a text or thinking block around every call, twice over.
+const BLOCKS_PER_CALL = 4;
+export const MAX_CONTENT_BLOCKS = BLOCKS_PER_CALL * TOOL_LIMITS.maxCallsPerTurn;
+export type ToolBlocks = Map<number, PartialToolCall>;
+
+function blockIndex(index: unknown): number {
+  if (
+    !Number.isSafeInteger(index) ||
+    (index as number) < 0 ||
+    (index as number) >= MAX_CONTENT_BLOCKS
+  )
+    throw new FrameFailure();
+  return index as number;
+}
+
 // A content block that opens a tool call, recorded at its index.
 export function startToolBlock(
   index: unknown,
   block: unknown,
-  calls: (PartialToolCall | undefined)[],
+  calls: ToolBlocks,
 ) {
   if (!isJsonFields(block) || block.type !== ANTHROPIC_TOOL_USE) return;
+  const at = blockIndex(index);
   if (
-    !Number.isSafeInteger(index) ||
+    calls.has(at) ||
+    calls.size >= TOOL_LIMITS.maxCallsPerTurn ||
     typeof block.id !== 'string' ||
     typeof block.name !== 'string'
   )
     throw new FrameFailure();
-  calls[index as number] = { id: block.id, name: block.name, arguments: '' };
+  calls.set(at, { id: block.id, name: block.name, arguments: '' });
 }
 
 // A fragment of a tool call's input JSON, appended to the call its block opened.
 export function toolInputDelta(
   index: unknown,
   partial: unknown,
-  calls: (PartialToolCall | undefined)[],
+  calls: ToolBlocks,
 ) {
-  const call = Number.isSafeInteger(index) ? calls[index as number] : undefined;
+  const call = calls.get(blockIndex(index));
   if (!call || typeof partial !== 'string') throw new FrameFailure();
   call.arguments += partial;
 }
+
+// The calls in block order.
+export const orderedCalls = (calls: ToolBlocks) =>
+  [...calls.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, call]) => call);

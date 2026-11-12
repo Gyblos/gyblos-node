@@ -262,3 +262,24 @@ export const recordedFinishReason = <Reason extends string>(
   reason === TOOL_CALLS_DONE
     ? 'stop'
     : (reason as Exclude<Reason, typeof TOOL_CALLS_DONE>);
+
+// The calls a result may make for this input: only when it offered tools and did not choose none, each to
+// an offered tool, and only the named tool for a named choice. A buyer checks this whatever the seller's
+// adapter did.
+export function checkToolCalls(
+  input: ToolInput,
+  calls: readonly ToolCall[] | undefined,
+): void {
+  if (!calls?.length) return;
+  const choice = input.toolChoice;
+  if (
+    !input.tools ||
+    choice === TOOL_CHOICES.NONE ||
+    calls.some(
+      (call) =>
+        !input.tools!.some((tool) => tool.name === call.name) ||
+        (typeof choice === 'object' && call.name !== choice.name),
+    )
+  )
+    return freeExecutionFail();
+}

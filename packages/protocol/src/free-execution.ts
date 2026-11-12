@@ -31,6 +31,7 @@ import {
 import { parseOfferSignatureV2, parseOfferV2, verifyOfferV2 } from './offer-v2';
 import { bytesHex } from './public-validation';
 import { signingBytes } from './signing';
+import { checkToolCalls } from './tools';
 
 export type {
   ExecutionInput,
@@ -174,6 +175,7 @@ export async function matchFreeExecutionResponse(
       request.quote.offer.model.contextTokens
   )
     return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
+  checkToolCalls(request.input, response.result.toolCalls);
   return response.result;
 }
 
