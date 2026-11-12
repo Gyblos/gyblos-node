@@ -11,9 +11,9 @@ export function createReceiptServices(
   nodeId: string,
   signal: AbortSignal,
   registryUrl: string,
+  provider = createReceiptProvider(),
 ) {
   const localFetch = globalThis.fetch;
-  const provider = createReceiptProvider();
   const binding = receiptNativeBinding(provider);
   const index = createAcceptanceIndex(Date.now, nodeId);
   let externalCalls = 0;

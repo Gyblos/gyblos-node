@@ -19,6 +19,7 @@ import {
   writeReceiptSellerConfig,
 } from './receipt-config';
 import { RECEIPT_ACCEPTANCE } from './receipt-constants';
+import type { ReceiptProvider } from './receipt-provider';
 import {
   createReceiptServices,
   type ReceiptServices,
@@ -63,18 +64,30 @@ async function closeReceiptHosts(
     }
   }
 }
-export async function startReceiptScenario(signal: AbortSignal) {
+export async function startReceiptScenario(
+  signal: AbortSignal,
+  options: {
+    provider?: ReceiptProvider;
+    maxTokens?: number;
+    seller?: NonNullable<Parameters<typeof createNode>[0]>;
+    buyerStart?: typeof startFreeBuyer;
+  } = {},
+) {
   const { root, sellerRole } = await receiptRoles();
   const registry = await createAcceptanceRegistry(signal);
   const services = createReceiptServices(
     sellerRole.nodeId,
     signal,
     registry.url,
+    options.provider,
   );
   const hosts: ReceiptHosts = {};
   const start = async (cap: number = RECEIPT_ACCEPTANCE.buyerCap) => {
     await writeReceiptSellerConfig(cap);
-    hosts.seller = createNode({ bind: services.binding.bind });
+    hosts.seller = createNode({
+      ...options.seller,
+      bind: services.binding.bind,
+    });
     await hosts.seller.start();
     await receiptWait(
       async () => (await services.listed()).sellers.length === 1,
@@ -95,8 +108,9 @@ export async function startReceiptScenario(signal: AbortSignal) {
       services.binding.directAddresses(),
       registry.url,
       manualTrust,
+      options.maxTokens,
     );
-    hosts.buyer = await startFreeBuyer({
+    hosts.buyer = await (options.buyerStart ?? startFreeBuyer)({
       bind: services.binding.bind,
       port: 0,
     });

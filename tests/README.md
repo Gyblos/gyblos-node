@@ -315,3 +315,37 @@ modes, including disconnect before another fragment. No native support means not
 executed, not successful acceptance. Cancellation before a verified terminal
 must not create an approval or retry a prompt; an already-started financial
 approval remains recoverable using its original bytes.
+
+## Free agent tool-loop acceptance
+
+`node --import tsx --test tests/lab/tools-acceptance.test.ts` calls the lab-only
+`runToolAcceptance({ signal? })`. Each scenario starts an isolated child with
+fresh private homes and an allowlisted environment. The actual memory discovery
+index, synthetic read-only 8004 registry, product seller and `buyer:free`,
+native loopback Iroh, and product OpenAI adapter participate. A scripted
+in-memory provider supplies tool calls and usage; no model, external tool or
+public service is contacted.
+
+OpenAI and Anthropic client formats each complete JSON and streaming loops:
+system/history and `get_time` reach the provider unchanged, a validated call is
+returned, the client supplies the fixed synthetic result, and a second request
+returns the final answer. Each loop has exactly two generations and two
+execution dials. Streaming tests the existing complete terminal tool-call
+format; it does not promise incremental argument delivery. The provider adapter
+remains OpenAI in all four cases: Anthropic here names the buyer's HTTP format.
+
+Negative cases cover invalid schema/choice/result sequences before generation,
+unsupported seller capability before an execution dial, malformed provider
+output, interrupted terminals and disconnect cancellation without retry. For the
+unsupported-capability case only, the existing engine composition port overrides
+`supportsTools` to false while preserving the real adapter and executor. The
+automatic `buyer` entry still refuses tools before selection or financial
+preparation. Existing pending-receipt concurrency coverage remains independent;
+there is no global receipt wait.
+
+Only fixed case names and counters leave the children. Financial factories fail
+if called, and the fetch allowlist rejects foreign I/O. Native unavailability is
+reported as not executed and cannot establish acceptance. These are local
+composition tests with declared synthetic usage, not evidence for live agents,
+provider behavior, independent tokenizer billing or deployed-network
+reliability.
