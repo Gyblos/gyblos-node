@@ -116,3 +116,22 @@ export async function selectionStats(environment: HomeEnvironment) {
     },
   };
 }
+
+// A seller that failed while executing counts a failure, so it weighs less next time; it is not cooled
+// down, since a seller that is really gone already is at its next quote, and the only seller of a buyer
+// stays reachable after one failed answer.
+export function recordExecutionFailure(
+  stats: Map<string, LocalSellerStats>,
+  nodeId: string,
+) {
+  const prior = stats.get(nodeId);
+  stats.set(nodeId, {
+    successes: prior?.successes ?? 0,
+    failures: (prior?.failures ?? 0) + 1,
+    latencyMs: prior?.latencyMs ?? 0,
+    waitAccuracy: prior?.waitAccuracy ?? null,
+    cooldownUntil: prior?.cooldownUntil ?? null,
+    quotedWaitMs: prior?.quotedWaitMs ?? null,
+    observedWaitMs: prior?.observedWaitMs ?? null,
+  });
+}

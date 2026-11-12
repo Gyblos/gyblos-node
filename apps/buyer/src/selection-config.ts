@@ -82,6 +82,8 @@ export interface BuyerSelectionConfig {
   quoteWindowMs?: number;
   // The models the endpoint serves by name; when absent, request.selection is the one model.
   models?: ModelRoute[];
+  // Set per request, never read from selection.json: the seller that served this conversation before.
+  previousSeller?: string;
 }
 function parseRequest(value: unknown): SellerRequest {
   const row = controlObject(value, [

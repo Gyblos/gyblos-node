@@ -1,5 +1,7 @@
 // Orchestrates free quote execution with failover only before possible prompt transmission.
 // Selection and I/O are injected; this module never authorizes payments or records content.
+import { createHash } from 'node:crypto';
+
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import type {
   ModelSelection,
@@ -58,11 +60,12 @@ export interface FreeBuyerDependencies {
   enter?(): () => void;
   // Hands a selected seller back once this request is done with it (free requests side by side).
   done?(winner: FreeWinner): void;
-  // `needs.tools`: only a seller that serves tools may win; `needs.model`: the routed model to quote.
+  // `needs.tools`: only a seller that serves tools may win; `needs.model`: the routed model to quote;
+  // `needs.conversation`: a digest of the conversation's opening, to go back to the seller that served it.
   select(
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
-    needs?: { tools?: boolean; model?: RoutedModel },
+    needs?: { tools?: boolean; model?: RoutedModel; conversation?: string },
   ): Promise<FreeWinner>;
   execute(
     winner: FreeWinner,
@@ -91,6 +94,7 @@ export async function executeBuyerFree(
         .select(excluded, signal, {
           tools: inferenceNeedsTools(input),
           ...(model ? { model } : {}),
+          conversation: conversationKey(input, model),
         })
         .catch((error) => {
           // Busy with this buyer's other request is not a request the network failed to serve.
@@ -122,6 +126,25 @@ export async function executeBuyerFree(
   } finally {
     release?.();
   }
+}
+
+// A conversation is known by its model, system text and first user message, which every later turn
+// repeats; only a digest is kept, never the text.
+export function conversationKey(
+  input: FreeExecutionBuildInput,
+  model?: RoutedModel,
+) {
+  const system = input.messages.find((message) => message.role === 'system');
+  const first = input.messages.find((message) => message.role === 'user');
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        model?.selection ?? null,
+        system?.content ?? null,
+        first?.content ?? null,
+      ]),
+    )
+    .digest('hex');
 }
 
 // Caller owns the request admission, deadline and exclusion set; this never selects another seller.

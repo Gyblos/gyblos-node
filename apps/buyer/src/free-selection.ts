@@ -5,11 +5,19 @@ import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
 import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
+import { FreeExecutionError } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
-import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
+import {
+  createFreeExecutionClient,
+  FreeClientError,
+} from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER_CODES, FREE_CHAT_DETAILS } from './constants';
+import {
+  BUYER_SELECTION,
+  FREE_BUYER_CODES,
+  FREE_CHAT_DETAILS,
+} from './constants';
 import { connectBuyerControl } from './control';
 import { discoverBuyerSellers } from './discovery';
 import { FreeBuyerError } from './free-chat';
@@ -18,6 +26,7 @@ import {
   type FreeBuyerDependencies,
   type FreeWinner,
 } from './free-execution';
+import { onceEachSeller, stickySellers } from './free-memory';
 import { freeAdmission } from './free-parallel';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
@@ -27,6 +36,7 @@ import type {
   StaticControlSeller,
 } from './selection-config';
 import type { prepareBuyerSelection } from './selection-runtime';
+import { recordExecutionFailure } from './selection-stats';
 import type { SellerFailureReporter } from './seller-failures';
 
 export function freeBuyerDependencies(
@@ -35,6 +45,7 @@ export function freeBuyerDependencies(
 ): FreeBuyerDependencies {
   requireBuyerIdentity(prepared.config, prepared.identity);
   const admission = freeAdmission(options.parallel ?? 1);
+  const sticky = stickySellers(BUYER_SELECTION.stickyConversations);
   const now = options.now ?? Date.now;
   const policy = prepared.config;
   if (
@@ -71,7 +82,7 @@ export function freeBuyerDependencies(
     done: (winner) => admission.done(winner.nodeId),
     select: (excluded, signal, needs) =>
       admission.select(excluded, signal, (skip) =>
-        selectFreeWinner(prepared, options, skip, signal, needs),
+        selectSticky(prepared, options, sticky, skip, signal, needs),
       ),
     async execute(winner, request, signal, onDelta, beforeExecute) {
       const seller = sellers.get(winner.nodeId);
@@ -96,6 +107,11 @@ export function freeBuyerDependencies(
       );
       try {
         return await client.execute(request, signal);
+      } catch (error) {
+        // The seller broke the execution (not this buyer's deadline or the client leaving): it counts.
+        if (sellerFault(error) && !signal.aborted)
+          await recordFault(prepared, winner.nodeId);
+        throw error;
       } finally {
         await client.settled();
       }
@@ -103,6 +119,7 @@ export function freeBuyerDependencies(
   };
 }
 
+export { onceEachSeller, stickySellers } from './free-memory';
 export type PreparedSelection = NonNullable<
   Awaited<ReturnType<typeof prepareBuyerSelection>>
 >;
@@ -156,7 +173,11 @@ async function selectFreeWinner(
   options: FreeSelectionOptions,
   excluded: ReadonlySet<string>,
   signal: AbortSignal,
-  { tools = false, model }: { tools?: boolean; model?: RoutedModel } = {},
+  {
+    tools = false,
+    model,
+    previousSeller,
+  }: { tools?: boolean; model?: RoutedModel; previousSeller?: string } = {},
 ) {
   let refusedTools = false;
   const watched: FreeSelectionOptions = {
@@ -167,12 +188,19 @@ async function selectFreeWinner(
     },
   };
   try {
-    return await selectWinner(prepared, watched, excluded, signal, {
-      ...routedRequest(prepared.config.request, model),
-      maxAtomic: '0',
-      priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
-      ...(tools ? { tools: true as const } : {}),
-    });
+    return await selectWinner(
+      prepared,
+      watched,
+      excluded,
+      signal,
+      {
+        ...routedRequest(prepared.config.request, model),
+        maxAtomic: '0',
+        priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+        ...(tools ? { tools: true as const } : {}),
+      },
+      previousSeller ? { previousSeller } : undefined,
+    );
   } catch (error) {
     if (refusedTools && error instanceof FreeSelectionFailure && !error.retryAt)
       throw new FreeBuyerError(
@@ -184,13 +212,36 @@ async function selectFreeWinner(
   }
 }
 // One verified winner among the configured or discovered sellers not excluded, quoted for `request`.
+// The policy one selection runs on: this request, the sellers not excluded, and the route's pin and
+// previous seller.
+function routedPolicy(
+  policy: BuyerSelectionConfig,
+  excluded: ReadonlySet<string>,
+  request: BuyerSelectionConfig['request'],
+  route?: SelectionRoute,
+) {
+  return {
+    ...policy,
+    ...(route && 'pinnedNodeId' in route
+      ? { pinnedNodeId: route.pinnedNodeId }
+      : {}),
+    ...(route?.previousSeller ? { previousSeller: route.previousSeller } : {}),
+    request,
+    sellers: policy.sellers.filter((seller) => !excluded.has(seller.nodeId)),
+  };
+}
+interface SelectionRoute {
+  pinnedNodeId?: string;
+  waitingFor?: string;
+  previousSeller?: string;
+}
 export async function selectWinner(
   prepared: PreparedSelection,
   options: FreeSelectionOptions,
   excluded: ReadonlySet<string>,
   signal: AbortSignal,
   request: BuyerSelectionConfig['request'],
-  route?: { pinnedNodeId?: string; waitingFor?: string },
+  route?: SelectionRoute,
 ): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
@@ -198,12 +249,7 @@ export async function selectWinner(
     (seller: StaticControlSeller, querySignal?: AbortSignal) =>
       verifyBuyerIdentity(prepared.identity, seller, querySignal),
   );
-  const base = {
-    ...policy,
-    ...(route ? { pinnedNodeId: route.pinnedNodeId } : {}),
-    request,
-    sellers: policy.sellers.filter((seller) => !excluded.has(seller.nodeId)),
-  };
+  const base = routedPolicy(policy, excluded, request, route);
   const config =
     base.discovery && prepared.discovery
       ? await discoverBuyerSellers(
@@ -217,7 +263,8 @@ export async function selectWinner(
           },
         )
       : base;
-  const stats = new Map(prepared.stats.rows);
+  const before = new Map(prepared.stats.rows);
+  const stats = new Map(before);
   if (route?.waitingFor && route.waitingFor === route.pinnedNodeId) {
     const prior = stats.get(route.waitingFor);
     if (prior) stats.set(route.waitingFor, { ...prior, cooldownUntil: null });
@@ -242,8 +289,10 @@ export async function selectWinner(
     signal,
   );
   signal.throwIfAborted();
-  prepared.stats.rows.clear();
-  for (const [nodeId, row] of stats) prepared.stats.rows.set(nodeId, row);
+  // Only the rows this selection changed: an execution or another selection may have recorded others
+  // meanwhile, and a whole rewrite would erase them.
+  for (const [nodeId, row] of stats)
+    if (before.get(nodeId) !== row) prepared.stats.rows.set(nodeId, row);
   await prepared.stats.save();
   if (!result.ok)
     throw new FreeSelectionFailure(
@@ -259,21 +308,31 @@ export async function selectWinner(
   return winner;
 }
 
-// One selection checks each seller's registered identity once, however many steps ask (discovery, catalog,
-// quote): a decision is kept for this selection only, and a check that threw (an abort, an outage that
-// stops the request) is not kept.
-export function onceEachSeller<
-  Seller extends { nodeId: string; owner: string },
->(verify: (seller: Seller, signal?: AbortSignal) => Promise<boolean>) {
-  const decided = new Map<string, boolean>();
-  return async (seller: Seller, signal?: AbortSignal) => {
-    const key = `${seller.nodeId} ${seller.owner}`;
-    const known = decided.get(key);
-    if (known !== undefined) return known;
-    const ok = await verify(seller, signal);
-    decided.set(key, ok);
-    return ok;
-  };
+// A winner for the request, preferring the seller that served its conversation before.
+async function selectSticky(
+  prepared: PreparedSelection,
+  options: FreeSelectionOptions,
+  sticky: ReturnType<typeof stickySellers>,
+  skip: ReadonlySet<string>,
+  signal: AbortSignal,
+  needs: Parameters<FreeBuyerDependencies['select']>[2],
+) {
+  const key = needs?.conversation;
+  const winner = await selectFreeWinner(prepared, options, skip, signal, {
+    ...needs,
+    previousSeller: key ? sticky.get(key) : undefined,
+  });
+  if (key) sticky.remember(key, winner.nodeId);
+  return winner;
+}
+
+const sellerFault = (error: unknown) =>
+  error instanceof FreeClientError || error instanceof FreeExecutionError;
+// A failed execution lowers its seller's weight; saving the record is best effort, never the request's
+// failure.
+async function recordFault(prepared: PreparedSelection, nodeId: string) {
+  recordExecutionFailure(prepared.stats.rows, nodeId);
+  await prepared.stats.save().catch(() => undefined);
 }
 
 // The earliest moment a seller in cooldown can be tried again; undefined when none is cooling down.
