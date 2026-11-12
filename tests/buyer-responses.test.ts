@@ -243,7 +243,13 @@ void test('a turn that only calls tools streams no empty message, and a failure 
     const failed = stream.at(-1);
     assert.equal(failed.type, 'response.failed');
     assert.equal(failed.response.status, 'failed');
-    assert.equal(failed.response.error.code, FREE_BUYER_CODES.UNAVAILABLE);
+    // Codex retries codes it does not know; this one it shows and stops, with the Gyblos code alongside.
+    assert.equal(failed.response.error.code, 'invalid_prompt');
+    assert.equal(
+      failed.response.error.gyblos_code,
+      FREE_BUYER_CODES.UNAVAILABLE,
+    );
+    assert.match(failed.response.error.message, /Send your message again/);
   } finally {
     await failing.close();
   }
@@ -263,34 +269,28 @@ const REFUSED: [string, Record<string, unknown>, RegExp][] = [
   ],
   ['an unknown option', { frobnicate: 1 }, /field/],
   [
-    'a reasoning item',
-    {
-      input: [
-        user('hi'),
-        { type: 'reasoning', summary: [], encrypted_content: 'x' },
-        user('again'),
-      ],
-    },
-    /reasoning/,
-  ],
-  [
     'a custom tool',
     { tools: [{ type: 'custom', name: 'apply_patch', format: {} }] },
     /custom/,
   ],
-  ['a provider tool', { tools: [{ type: 'web_search' }] }, /web_search/],
   [
-    'an image',
+    'an MCP namespace',
+    { tools: [{ type: 'namespace', name: 'mcp' }] },
+    /namespace/,
+  ],
+  [
+    'audio',
     {
       input: [
-        {
-          type: 'message',
-          role: 'user',
-          content: [{ type: 'input_image', image_url: 'data:' }],
-        },
+        { role: 'user', content: [{ type: 'input_audio', file_id: 'f' }] },
       ],
     },
     /only text/,
+  ],
+  [
+    'empty content',
+    { input: [{ role: 'user', content: [] }] },
+    /input must be/,
   ],
   ['another model', { model: 'gpt-5' }, /model must be/],
 ];

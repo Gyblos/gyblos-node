@@ -46,13 +46,16 @@ function only(row: Row, keys: readonly string[]) {
   if (Object.keys(row).some((key) => !keys.includes(key))) throw refuse();
 }
 
-// Text content: a string, or input_text / output_text parts; images, audio and files are refused.
+// Text content: a string, or input_text / output_text parts. An image (a pasted picture, or what Codex's
+// view_image returns) becomes a short placeholder: Codex resends its whole history every turn, so refusing
+// it would end the session. Audio, files and other parts are refused.
 function itemText(value: unknown): string {
   if (typeof value === 'string') return value;
-  if (!Array.isArray(value)) throw refuse();
+  if (!Array.isArray(value) || !value.length) throw refuse();
   return value
     .map((part: unknown) => {
       if (!isRow(part)) throw refuse();
+      if (part.type === 'input_image') return RESPONSES_CHAT.imagePlaceholder;
       if (!RESPONSES_CHAT.textParts.includes(String(part.type)))
         throw invalidChat(INPUT, CHAT_MESSAGE_DETAILS.parts);
       only(part, RESPONSES_CHAT.partFields);
@@ -62,14 +65,18 @@ function itemText(value: unknown): string {
     .join('\n\n');
 }
 
-function functionCall(item: Row): ToolCall {
+// A function_call item's call, unchecked; the calls of one turn are checked together (unique ids, count).
+function functionCall(item: Row) {
   only(item, RESPONSES_CHAT.callFields);
+  return {
+    id: item.call_id,
+    name: item.name,
+    arguments: item.arguments || '{}',
+  };
+}
+function toolCalls(calls: unknown[]): ToolCall[] {
   try {
-    const [call] = parseToolCalls([
-      { id: item.call_id, name: item.name, arguments: item.arguments || '{}' },
-    ]);
-    if (!call) throw new Error();
-    return call;
+    return parseToolCalls(calls);
   } catch {
     throw invalidChat(INPUT, CHAT_MESSAGE_DETAILS.toolCalls);
   }
@@ -93,14 +100,18 @@ function conversation(input: unknown, instructions: string[]): ChatTurn[] {
     typeof input === 'string' ? [{ role: 'user', content: input }] : input;
   if (!Array.isArray(items) || !items.length) throw refuse();
   const turns: ChatTurn[] = [];
-  let calls: ToolCall[] | undefined;
+  let calls: unknown[] | undefined;
   const flush = () => {
-    if (calls) turns.push({ role: 'assistant', text: '', toolCalls: calls });
+    if (calls)
+      turns.push({ role: 'assistant', text: '', toolCalls: toolCalls(calls) });
     calls = undefined;
   };
   for (const entry of items) {
     if (!isRow(entry)) throw refuse();
     const type = entry.type ?? 'message';
+    // The record of a model's reasoning or of a provider's own search, kept by a session that began on
+    // another provider: nothing to answer, so it is left out and the switch keeps working.
+    if (RESPONSES_CHAT.skippedItems.includes(String(type))) continue;
     if (type === 'function_call') {
       (calls ??= []).push(functionCall(entry));
       continue;
@@ -126,13 +137,19 @@ function conversation(input: unknown, instructions: string[]): ChatTurn[] {
 }
 
 // Function tools in the Responses shape (flat: {type, name, description?, parameters?, strict?}), read
-// through the Chat Completions checks; custom, namespaced and provider-run tools are refused by type.
+// through the Chat Completions checks. Web search, which Codex offers on every request and the provider would
+// run itself, is left out: no seller runs it, so the model is simply not offered it. Custom, namespaced
+// (MCP) and other provider tools are refused by type.
 function responsesTools(value: unknown): ToolDefinition[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value))
     throw invalidChat('tools', FREE_CHAT_DETAILS.tools);
+  const offered = value.filter(
+    (tool: unknown) =>
+      !(isRow(tool) && RESPONSES_CHAT.skippedTools.includes(String(tool.type))),
+  );
   return openAiTools(
-    value.map((tool: unknown) => {
+    offered.map((tool: unknown) => {
       if (!isRow(tool)) throw invalidChat('tools', FREE_CHAT_DETAILS.tools);
       if (tool.type !== 'function')
         throw invalidChat(

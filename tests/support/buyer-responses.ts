@@ -35,12 +35,13 @@ export const SHELL = {
     required: ['command'],
   },
 };
+// Shaped like what Codex CLI sends a custom provider: web search always offered, reasoning summaries asked.
 export const CODEX = {
   model: MODEL,
-  tools: [SHELL],
+  tools: [SHELL, { type: 'web_search', external_web_access: false }],
   tool_choice: 'auto',
   parallel_tool_calls: false,
-  reasoning: null,
+  reasoning: { summary: 'auto' },
   store: false,
   stream: false,
   include: [],
@@ -66,13 +67,14 @@ export async function host(
         onDelta: (text: string) => Promise<void>,
       ) => Promise<FreeExecutionResult>),
   seen: FreeExecutionBuildInput[],
+  tools = true,
 ) {
   return startFreeBuyerHttp(
     async (input) => {
       seen.push(input);
       return typeof result === 'function' ? result(async () => {}) : result;
     },
-    { selection: SELECTION, maxTokens: 100, tools: true },
+    { selection: SELECTION, maxTokens: 100, tools },
     {
       port: 0,
       stream: async (input, _signal, onDelta) => {
