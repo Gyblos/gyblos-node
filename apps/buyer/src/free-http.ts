@@ -140,8 +140,19 @@ function routedInput(
   settings: ChatSettings,
   streaming: boolean,
 ) {
-  const { route, name: model } = requestedRoute(endpointRoutes(settings), body);
-  // The route was found by this name, so the format checks the name the client sent.
+  const route = requestedRoute(
+    endpointRoutes(settings),
+    body,
+    !!settings.models?.length,
+  );
+  const sent =
+    body && typeof body === 'object' ? Reflect.get(body, 'model') : undefined;
+  // The format checks, and the answer echoes, the name the client sent when it names this route.
+  const model =
+    typeof sent === 'string' &&
+    (sent === route.id || route.aliases.includes(sent))
+      ? sent
+      : route.id;
   const input = api.parse(
     body,
     { ...route.selection, modelId: model },

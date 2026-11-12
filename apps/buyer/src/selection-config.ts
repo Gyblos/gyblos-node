@@ -48,6 +48,7 @@ import {
   type BuyerIdentityConfig,
 } from './identity-config';
 import {
+  findModelRoute,
   parseModelRoutes,
   routedRequest,
   type ModelRoute,
@@ -195,6 +196,9 @@ export function parseBuyerSelectionConfig(
       row.models === undefined
         ? undefined
         : parseModelRoutes(row.models, request);
+    // buyer:chat asks for the request's own model, so a list must serve it by name.
+    if (models && !findModelRoute(models, request.selection.modelId))
+      throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
     // Every model's request must be one selection accepts, as the single request always had to be.
     for (const model of models ?? [undefined])
       validRequest(routedRequest(request, model));

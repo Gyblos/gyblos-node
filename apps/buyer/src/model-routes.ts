@@ -70,15 +70,6 @@ export function parseModelRoutes(
   return routes;
 }
 
-export const singleModelRoute = (request: SellerRequest): ModelRoute[] => [
-  {
-    id: request.selection.modelId,
-    aliases: [],
-    selection: request.selection,
-    maxTokens: request.maxTokens,
-  },
-];
-
 export function findModelRoute(
   routes: readonly ModelRoute[],
   name: unknown,
@@ -117,21 +108,29 @@ export function endpointRoutes(settings: {
       ];
 }
 
-// The route a request body names in `model`, or a 404 refusal that lists the names served.
+// The route a request body names in `model`. An unknown name is a 404 listing the names served, but only
+// when a model list is configured; anything else (no object, no text name, or the one model's endpoint)
+// falls to the first route, so the format's own parser refuses it with the 400 it always gave.
 export function requestedRoute(
   routes: readonly ModelRoute[],
   body: unknown,
-): { route: ModelRoute; name: string } {
+  listed = true,
+): ModelRoute {
   const name =
-    body && typeof body === 'object' ? Reflect.get(body, 'model') : undefined;
+    body && typeof body === 'object' && !Array.isArray(body)
+      ? Reflect.get(body, 'model')
+      : undefined;
   const route = findModelRoute(routes, name);
-  if (!route || typeof name !== 'string')
-    throw new FreeBuyerError(
-      FREE_BUYER_CODES.MODEL,
-      'model',
-      FREE_CHAT_DETAILS.unknownModel(
-        routes.slice(0, BUYER_MODELS.listedInErrors).map((item) => item.id),
-      ),
-    );
-  return { route, name };
+  if (route) return route;
+  if (!listed || typeof name !== 'string') return routes[0] as ModelRoute;
+  const shown = routes
+    .slice(0, BUYER_MODELS.listedInErrors)
+    .map((item) => item.id);
+  throw new FreeBuyerError(
+    FREE_BUYER_CODES.MODEL,
+    'model',
+    FREE_CHAT_DETAILS.unknownModel(
+      routes.length > shown.length ? [...shown, '…'] : shown,
+    ),
+  );
 }
