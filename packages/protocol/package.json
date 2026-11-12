@@ -59,6 +59,7 @@
     "./vectors/batch-prepare-v3.json": "./vectors/batch-prepare-v3.json",
     "./vectors/batch-startup-v2.json": "./vectors/batch-startup-v2.json",
     "./vectors/batch-startup-v3.json": "./vectors/batch-startup-v3.json",
-    "./vectors/batch-stream-v3.json": "./vectors/batch-stream-v3.json"
+    "./vectors/batch-stream-v3.json": "./vectors/batch-stream-v3.json",
+    "./inference": "./src/inference.ts"
   }
 }

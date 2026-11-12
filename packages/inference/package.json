@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/execution.ts",
-    "./generation-window": "./src/generation-window.ts"
+    "./generation-window": "./src/generation-window.ts",
+    "./conversation": "./src/conversation.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
