@@ -223,16 +223,7 @@ export function createFreeExecutionClient(
       const cancelled = new Promise<never>((_resolve, reject) => {
         abort = () => {
           close();
-          reject(
-            new FreeClientError(
-              reason,
-              state.sent,
-              false,
-              {},
-              false,
-              state.consuming,
-            ),
-          );
+          reject(clientCancellation(reason, state));
         };
         external?.addEventListener('abort', abort, { once: true });
         timer = setTimeout(() => {
@@ -276,6 +267,17 @@ export function createFreeExecutionClient(
       await Promise.allSettled(state.pending);
     },
   };
+}
+
+function clientCancellation(reason: FreeExecutionCode, state: FreeClientState) {
+  return new FreeClientError(
+    reason,
+    state.sent,
+    false,
+    {},
+    false,
+    state.consuming,
+  );
 }
 
 function clientError(error: unknown, sent: boolean) {
