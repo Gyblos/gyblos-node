@@ -94,7 +94,9 @@ export async function executeBuyerFree(
         })
         .catch((error) => {
           // Local occupancy is not a network failure; retain request-local model telemetry.
-          const busy = error instanceof FreeBuyerError && error.code === FREE_BUYER_CODES.BUSY;
+          const busy =
+            error instanceof FreeBuyerError &&
+            error.code === FREE_BUYER_CODES.BUSY;
           if (!signal.aborted && !busy)
             buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
           throw error;

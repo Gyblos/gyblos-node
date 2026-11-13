@@ -194,10 +194,10 @@ export async function selectWinner(
 ): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
-  const verifyIdentity = onceEachSeller(
-    (seller: StaticControlSeller, querySignal?: AbortSignal) =>
-      verifyBuyerIdentity(prepared.identity, seller, querySignal),
-  );
+  const verifyIdentity = (
+    seller: StaticControlSeller,
+    querySignal?: AbortSignal,
+  ) => verifyBuyerIdentity(prepared.identity, seller, querySignal);
   const base = {
     ...policy,
     ...(route ? { pinnedNodeId: route.pinnedNodeId } : {}),
@@ -257,23 +257,6 @@ export async function selectWinner(
   if (!(await permitsWinner(prepared, winner, now())))
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   return winner;
-}
-
-// One selection checks each seller's registered identity once, however many steps ask (discovery, catalog,
-// quote): a decision is kept for this selection only, and a check that threw (an abort, an outage that
-// stops the request) is not kept.
-export function onceEachSeller<
-  Seller extends { nodeId: string; owner: string },
->(verify: (seller: Seller, signal?: AbortSignal) => Promise<boolean>) {
-  const decided = new Map<string, boolean>();
-  return async (seller: Seller, signal?: AbortSignal) => {
-    const key = `${seller.nodeId} ${seller.owner}`;
-    const known = decided.get(key);
-    if (known !== undefined) return known;
-    const ok = await verify(seller, signal);
-    decided.set(key, ok);
-    return ok;
-  };
 }
 
 // The earliest moment a seller in cooldown can be tried again; undefined when none is cooling down.
