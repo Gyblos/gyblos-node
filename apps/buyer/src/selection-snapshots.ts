@@ -126,6 +126,7 @@ export async function refreshSnapshots(
           const client = await connectBefore(
             dependencies.connect(seller),
             deadline,
+            signal,
           );
           clients.set(seller.nodeId, client);
           const verified = await verifiedSeller(client, seller, now, deadline);
@@ -147,9 +148,10 @@ export async function refreshSnapshots(
           )
             throw error;
           // A connection to a seller that stopped answering can take the whole transport idle timeout to
-          // close; it closes in the background instead of holding this request.
+          // close; it closes in the background instead of holding this request. A cancelled request
+          // still waits for it, like any native work it started.
           const client = clients.get(seller.nodeId);
-          if (client) {
+          if (client && !signal?.aborted) {
             clients.delete(seller.nodeId);
             void client.close().catch(() => undefined);
           }
@@ -163,14 +165,18 @@ export async function refreshSnapshots(
 }
 
 // A connection attempt ends with the snapshot deadline: a seller that stopped answering would otherwise
-// hold every request for the whole transport timeout. A connection that arrives later is closed.
+// hold every request for the whole transport timeout. A connection that arrives later is closed. A request
+// the caller cancelled still waits for the attempt, so its admission stays held until native work settles.
 async function connectBefore(
   connecting: Promise<BuyerControlClient>,
   deadline: AbortSignal,
+  signal?: AbortSignal,
 ) {
   let stop = () => {};
   const expired = new Promise<never>((_resolve, reject) => {
-    stop = () => reject(deadline.reason);
+    stop = () => {
+      if (!signal?.aborted) reject(deadline.reason);
+    };
     if (deadline.aborted) stop();
     else deadline.addEventListener('abort', stop, { once: true });
   });
