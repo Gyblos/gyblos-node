@@ -246,7 +246,7 @@ void test('oversized RPC cannot become missing identity or erase a persisted buy
   }
 });
 
-void test('open discovery durable admission is supplied by buyer startup and survives restart', async () => {
+void test('buyer startup admits fresh identities after 64 historical floors and preserves them across restart', async () => {
   const source = await fixture();
   try {
     const configured = {
@@ -284,8 +284,10 @@ void test('open discovery durable admission is supplied by buyer startup and sur
       const verifier = await prepareBuyerIdentity(source.environment, config);
       assert.ok(verifier);
       const result = await verifier.verify(source.config.sellers[0]!);
-      assert.equal(!result.ok && result.code, IDENTITY_POLICY_CODES.LIMIT);
+      assert.equal(result.ok, true);
       assert.equal((await verifier.verify(configured)).ok, true);
+      const saved = JSON.parse(await readFile(path, 'utf8'));
+      assert.equal(saved.rows.length, rows.length + 1);
     }
   } finally {
     await source.close();

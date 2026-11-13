@@ -49,8 +49,8 @@ async function rememberEntry(
     { allowOwnerChange },
   );
 }
-// Recent identity refusals avoid repeating an unavailable lookup. Durable identity admission owns
-// the across-restart capacity budget, including denied binding floors and reserved configured IDs.
+// Identity refusals avoid repeating unavailable lookups. Live capacity is bounded separately by
+// discovery observations, so a temporary capacity refusal never enters this registry-denial cache.
 interface OpenMemory {
   refused: Map<string, number>;
 }
