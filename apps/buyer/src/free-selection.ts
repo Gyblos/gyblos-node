@@ -17,12 +17,12 @@ import {
 import { connectBuyerControl } from './control';
 import { FreeBuyerError } from './free-chat';
 import {
+  createConversationKey,
   FreeSelectionFailure,
   type FreeBuyerDependencies,
   type FreeWinner,
 } from './free-execution';
 import {
-  onceEachSeller,
   recordFault,
   sellerFault,
   statsFor,
@@ -43,6 +43,7 @@ import type {
   StaticControlSeller,
 } from './selection-config';
 import type { prepareBuyerSelection } from './selection-runtime';
+import { mergeSelectionStats } from './selection-stats';
 import type { SellerFailureReporter } from './seller-failures';
 
 export function freeBuyerDependencies(
@@ -64,6 +65,7 @@ export function freeBuyerDependencies(
     permitsWinner(prepared, winner, now());
 
   return {
+    conversationKey: createConversationKey(),
     telemetry: freeTelemetry(options, policy, now),
     receiptNow: now,
     receipt: options.receipts
@@ -245,10 +247,10 @@ export async function selectWinner(
 ): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
-  const verifyIdentity = onceEachSeller(
-    (seller: StaticControlSeller, querySignal?: AbortSignal) =>
-      verifyBuyerIdentity(prepared.identity, seller, querySignal),
-  );
+  const verifyIdentity = (
+    seller: StaticControlSeller,
+    querySignal?: AbortSignal,
+  ) => verifyBuyerIdentity(prepared.identity, seller, querySignal);
   const base = routedPolicy(policy, excluded, request, route);
   const config = await withDiscovered(
     prepared,
@@ -286,9 +288,10 @@ export async function selectWinner(
   // Only the rows this selection changed: an execution or another selection may have recorded others
   // meanwhile, and a whole rewrite would erase them.
   const configured = new Set(policy.sellers.map((seller) => seller.nodeId));
-  for (const [nodeId, row] of stats)
-    if (before.get(nodeId) !== row)
-      (configured.has(nodeId) ? prepared.stats.rows : unsaved).set(nodeId, row);
+  const live = new Map([...prepared.stats.rows, ...unsaved]);
+  mergeSelectionStats(live, before, stats);
+  for (const [nodeId, row] of live)
+    (configured.has(nodeId) ? prepared.stats.rows : unsaved).set(nodeId, row);
   await prepared.stats.save();
   if (!result.ok)
     throw new FreeSelectionFailure(

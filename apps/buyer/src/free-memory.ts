@@ -1,5 +1,4 @@
-// What one free buyer remembers: in memory only, the seller each recent conversation went to and, within one
-// selection, each seller's identity decision; and, in its stats, the executions a seller failed.
+// One buyer remembers recent conversation sellers in memory and execution failures in local statistics.
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
@@ -41,23 +40,6 @@ export function stickySellers(limit: number) {
   };
 }
 
-// One selection checks each seller's registered identity once, however many steps ask (discovery, catalog,
-// quote): a decision is kept for this selection only, and a check that threw (an abort, an outage that
-// stops the request) is not kept.
-export function onceEachSeller<
-  Seller extends { nodeId: string; owner: string },
->(verify: (seller: Seller, signal?: AbortSignal) => Promise<boolean>) {
-  const decided = new Map<string, boolean>();
-  return async (seller: Seller, signal?: AbortSignal) => {
-    const key = `${seller.nodeId} ${seller.owner}`;
-    const known = decided.get(key);
-    if (known !== undefined) return known;
-    const ok = await verify(seller, signal);
-    decided.set(key, ok);
-    return ok;
-  };
-}
-
 // Failures that are the seller's: one it reported (its engine or generation failed), or, once the prompt
 // was sent, a stalled or out-of-protocol answer. The buyer's own refusals before sending (an expired quote,
 // relay rules, its request) and its own faults are not held against a seller.
@@ -75,9 +57,10 @@ const AFTER_SENDING: ReadonlySet<string> = new Set([
 ]);
 export const sellerFault = (error: unknown) =>
   error instanceof FreeClientError &&
+  !error.consumerFailure &&
   (error.remote
     ? REPORTED.has(error.code)
-    : error.sent && AFTER_SENDING.has(error.code));
+    : error.sent && (error.ioFailure || AFTER_SENDING.has(error.code)));
 // A failed execution lowers its seller's weight; saving the record is best effort, never the request's
 // failure.
 export async function recordFault(

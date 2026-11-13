@@ -165,6 +165,22 @@ void test('paid startup names each refusal and answers in paid mode once started
       selection: { ...SELECTION.request.selection, modelId: 'other' },
     });
     assert.equal(await reason(base), 'BUYER_PAID_MODEL_UNSUPPORTED');
+    // The explicit paid entry refuses a model list before any tokenizer, wallet or chain work.
+    await write({
+      ...SELECTION,
+      models: [
+        {
+          id: 'qwen3-0.6b',
+          aliases: ['qwen'],
+          selection: SELECTION.request.selection,
+          maxTokens: 32,
+        },
+      ],
+    });
+    assert.equal(
+      await reason({ ...base, meter: undefined }),
+      'BUYER_PAID_MODELS_UNSUPPORTED',
+    );
     await changed({ asset: SELECTION.sellers[0]!.owner });
     assert.equal(await reason(base), 'BUYER_PAYMENT_NETWORK_MISMATCH');
     await write(SELECTION);

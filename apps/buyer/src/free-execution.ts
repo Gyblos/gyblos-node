@@ -60,6 +60,7 @@ export interface FreeBuyerDependencies {
     selection: ModelSelection;
     now?: () => number;
   };
+  conversationKey?: ReturnType<typeof createConversationKey>;
   enter?(): () => void;
   // Hands a selected seller back once this request is done with it (free requests side by side).
   done?(winner: FreeWinner): void;
@@ -97,15 +98,15 @@ export async function executeBuyerFree(
         .select(excluded, signal, {
           tools: inferenceNeedsTools(input),
           ...(model ? { model } : {}),
-          conversation: conversationKey(input, model),
+          conversation: dependencies.conversationKey?.(input, model),
         })
         .catch((error) => {
-          // Busy with this buyer's other request is not a request the network failed to serve.
+          // Local occupancy is not a network failure; retain request-local model telemetry.
           const busy =
             error instanceof FreeBuyerError &&
             error.code === FREE_BUYER_CODES.BUSY;
           if (!signal.aborted && !busy)
-            buyerUnserved(dependencies, Boolean(onDelta));
+            buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
           throw error;
         });
       try {
@@ -132,25 +133,24 @@ export async function executeBuyerFree(
 }
 
 // A conversation is known by its model, system text and first user message, which every later turn
-// repeats; only a digest keyed by this process's own secret is kept, never the text, so a memory dump
-// cannot confirm a guessed prompt.
+// repeats. Only a digest is retained in routing metadata; its secret belongs to this buyer lifecycle.
+// This does not protect conversation contents or the secret from a live process-memory compromise.
 const SECRET_BYTES = 32;
-const CONVERSATION_SECRET = randomBytes(SECRET_BYTES);
-export function conversationKey(
-  input: FreeExecutionBuildInput,
-  model?: RoutedModel,
-) {
-  const system = input.messages.find((message) => message.role === 'system');
-  const first = input.messages.find((message) => message.role === 'user');
-  return createHmac('sha256', CONVERSATION_SECRET)
-    .update(
-      JSON.stringify([
-        model?.selection ?? null,
-        system?.content ?? null,
-        first?.content ?? null,
-      ]),
-    )
-    .digest('hex');
+export function createConversationKey() {
+  const secret = randomBytes(SECRET_BYTES);
+  return (input: FreeExecutionBuildInput, model?: RoutedModel) => {
+    const system = input.messages.find((message) => message.role === 'system');
+    const first = input.messages.find((message) => message.role === 'user');
+    return createHmac('sha256', secret)
+      .update(
+        JSON.stringify([
+          model?.selection ?? null,
+          system?.content ?? null,
+          first?.content ?? null,
+        ]),
+      )
+      .digest('hex');
+  };
 }
 
 // Caller owns the request admission, deadline and exclusion set; this never selects another seller.

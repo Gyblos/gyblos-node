@@ -8,12 +8,15 @@ Anthropic APIs, so programs written for those services can use a Gyblos seller b
 For each request it gets a signed free quote from the seller and streams the answer back over a direct
 peer-to-peer connection.
 
+The Responses route currently refuses `parallel_tool_calls: false`, non-default sampling, and non-neutral reasoning before contacting a seller. The signed protocol cannot carry those constraints yet; Codex versions that require them are not compatible until that support lands. Disable HTTP and stream retries in any configured client.
+
 ## What works today [#what-works-today]
 
 | Feature                                                              | Beta status                             |
 | -------------------------------------------------------------------- | --------------------------------------- |
 | Whole conversations: system message, history, new message            | Yes, up to 1024 messages                |
 | OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming        |
+| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming        |
 | `GET /v1/models`                                                     | Yes, the model your buyer asks for      |
 | Free offers                                                          | Yes                                     |
 | Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                |
@@ -193,6 +196,23 @@ answers 503 and says so.
 
 The default model, qwen3:0.6b, handles simple calls like this one. Agents that send many tools and long
 instructions, such as Claude Code, need a seller on a larger model through the OpenAI or Anthropic engine.
+
+## Connect a coding agent [#connect-a-coding-agent]
+
+One command writes the configuration for OpenCode, pi or Codex CLI with every model your buyer serves,
+changing only the `gyblos` provider and keeping a copy of the previous file. For Claude Code it prints the
+variables to set in your shell. Without `--write`, it only prints.
+
+```bash
+pnpm buyer:agent opencode --write
+pnpm buyer:agent pi --write
+pnpm buyer:agent codex --write
+pnpm buyer:agent claude
+```
+
+Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or
+`codex --profile gyblos`. Each request carries the whole conversation, so switching models keeps the
+context.
 
 ## Options and errors [#options-and-errors]
 
