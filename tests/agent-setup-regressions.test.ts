@@ -126,3 +126,15 @@ void test('managed marker text inside a TOML string cannot overwrite developer i
     { code: 'FILE' },
   );
 });
+
+void test('outside assignments cannot migrate from the old managed profile to a new model', () => {
+  const existing = codexBlock(ENDPOINT) + '\napproval_policy = "never"\n';
+  assert.throws(
+    () =>
+      mergedCodexConfig(
+        { ...ENDPOINT, models: [{ id: 'another', maxOutputTokens: 2 }] },
+        existing,
+      ),
+    { code: 'FILE' },
+  );
+});
