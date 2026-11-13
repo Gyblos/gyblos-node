@@ -4,6 +4,7 @@ import filesystem, { chmod, realpath, rename } from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { test } from 'node:test';
 
+import { FILE_MODES } from '@gyblos/config';
 import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
@@ -48,15 +49,22 @@ void test('session inspection waits for an owned atomic publication and reads th
   const observedWrite = writing.catch(() => undefined);
   try {
     await within(entered.promise);
-    const reading = inspectBatchSession(paths);
+    const reading = inspectBatchSession({
+      ...paths,
+      directory: await realpath(paths.directory),
+      state: target,
+    });
     const observedRead = reading.catch(() => undefined);
     try {
-      // Give an uncoordinated reader its first turn while publication is held.
-      await Promise.resolve();
+      // An unrelated journal completes while this one is held: coordination must be per file.
+      await within(inspectBatchSession(rig.sellerOptions.paths));
       release.resolve();
       await within(writing);
       const snapshot = await within(reading);
-      assert.equal(snapshot?.pending, true);
+      assert.ok(snapshot);
+      assert.equal(snapshot.pending, true);
+      assert.equal(snapshot.snapshot.reservedAtomic, '200');
+      assert.equal(snapshot.snapshot.channelId, rig.buyer.snapshot().channelId);
       assert.equal(snapshot.snapshot.cumulativeAtomic, '0');
       assert.deepEqual(rig.calls, ['deposit']);
     } finally {
@@ -75,7 +83,7 @@ void test('session inspection still refuses a journal whose private mode is chan
   await rig.open();
   const path = rig.buyerOptions.paths.state;
   await chmod(path, 0o644);
-  t.after(() => chmod(path, 0o600));
+  t.after(() => chmod(path, FILE_MODES.privateFile));
   await assert.rejects(inspectBatchSession(rig.buyerOptions.paths), {
     code: SESSION_CODES.UNAVAILABLE,
   });
