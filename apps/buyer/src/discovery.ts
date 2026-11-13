@@ -49,22 +49,15 @@ async function rememberEntry(
     { allowOwnerChange },
   );
 }
-// What open discovery remembers per buyer process, beside the shared discovery state: the sellers it ever
-// admitted (bounded, so the identity and discovery state files never fill with index sellers) and the
-// recent identity refusals (so an index full of unregistered NodeIds costs one lookup each, not one per
-// request).
+// Recent identity refusals avoid repeating an unavailable lookup. Durable identity admission owns
+// the across-restart capacity budget, including denied binding floors and reserved configured IDs.
 interface OpenMemory {
-  admitted: Set<string>;
   refused: Map<string, number>;
 }
 const OPEN_MEMORY = new WeakMap<object, OpenMemory>();
 function openMemory(state: object) {
   let memory = OPEN_MEMORY.get(state);
-  if (!memory)
-    OPEN_MEMORY.set(
-      state,
-      (memory = { admitted: new Set(), refused: new Map() }),
-    );
+  if (!memory) OPEN_MEMORY.set(state, (memory = { refused: new Map() }));
   return memory;
 }
 
@@ -107,8 +100,6 @@ async function openSeller(
     options.excluded?.has(nodeId) ||
     config.sellers.length + run.discovered.size >= BUYER_SELECTION.maxSellers ||
     (run.memory.refused.get(key) ?? 0) > run.now ||
-    (!run.memory.admitted.has(nodeId) &&
-      run.memory.admitted.size >= BUYER_DISCOVERY.openSellers) ||
     run.lookups >= BUYER_DISCOVERY.openLookups
   )
     return undefined;
@@ -125,7 +116,6 @@ async function openSeller(
     run.memory.refused.set(key, run.now + BUYER_DISCOVERY.openRefusalMs);
     return undefined;
   }
-  run.memory.admitted.add(nodeId);
   run.discovered.set(nodeId, seller);
   return seller;
 }

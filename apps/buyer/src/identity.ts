@@ -9,7 +9,7 @@ import {
   type BuyerIdentityVerifier,
 } from '@gyblos/node/identity-verifier';
 
-import { BUYER_SELECTION_CODES } from './constants';
+import { BUYER_DISCOVERY, BUYER_SELECTION_CODES } from './constants';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -23,7 +23,16 @@ export async function prepareBuyerIdentity(
   if (!config.identity) return undefined;
   if (config.request.network !== DEVNET)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
-  return openBuyerIdentityVerifier(environment, config.identity.rpcUrl);
+  return openBuyerIdentityVerifier(
+    environment,
+    config.identity.rpcUrl,
+    config.discovery?.open
+      ? {
+          configuredNodeIds: config.sellers.map((seller) => seller.nodeId),
+          maxUnconfiguredNodes: BUYER_DISCOVERY.openSellers,
+        }
+      : undefined,
+  );
 }
 export async function verifyBuyerIdentity(
   verifier: BuyerIdentityVerifier | undefined,

@@ -144,7 +144,7 @@ const freeTelemetry = (
       }
     : undefined;
 
-export { onceEachSeller, sellerFault, stickySellers } from './free-memory';
+export { sellerFault, stickySellers } from './free-memory';
 export type PreparedSelection = NonNullable<
   Awaited<ReturnType<typeof prepareBuyerSelection>>
 >;
