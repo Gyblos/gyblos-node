@@ -1,5 +1,10 @@
 // Pure conversation transitions for the desktop preview, independent of React/timers.
 // Never makes inference, tool, payment or persistence calls.
+import type { ReasoningLevel } from '@gyblos/protocol/constants';
+
+import { PAYMENT_METHOD, type PaymentMethod } from '../paypal-model';
+import type { ResponseMetrics } from '../response-metrics';
+import { chatReasoningChoice } from './chat-reasoning';
 import {
   CHAT_PHASE,
   CHAT_PREVIEW,
@@ -23,6 +28,16 @@ export type ChatMessage = {
   model: ChatModel;
   state: MessageState;
   tools: ToolId[];
+  paymentMethod: PaymentMethod;
+  sentAt: number | null;
+  paymentSessionId?: string;
+  reasoning?: ReasoningLevel;
+  metrics?: ResponseMetrics;
+};
+export type PaypalChatRun = {
+  id: string;
+  prompt: string;
+  draftRevision: number;
 };
 export type ChatRun = {
   id: string;
@@ -36,20 +51,25 @@ export type ChatSession = {
   id: string;
   title: string;
   draft: string;
+  draftRevision: number;
   notice: string;
   blocked: DemoAuthorizationStatus | null;
   messages: ChatMessage[];
   run: ChatRun | null;
+  paypalRun: PaypalChatRun | null;
 };
+export type ChatSnapshot = { sessions: ChatSession[]; activeId: string };
 export function createSession(id: string): ChatSession {
   return {
     id,
     title: 'New conversation',
     draft: '',
+    draftRevision: 0,
     notice: '',
     blocked: null,
     messages: [],
     run: null,
+    paypalRun: null,
   };
 }
 export function sampleReply(prompt: string, tools: readonly ToolId[]) {
@@ -65,9 +85,17 @@ export function startRun(
   model: ChatModel,
   tools: ToolId[],
   id: string,
+  sentAt: number | null = null,
+  reasoning?: ReasoningLevel,
 ): ChatSession {
-  if (session.run || !prompt.trim()) return session;
+  if (session.run || session.paypalRun || !prompt.trim()) return session;
   const text = prompt.trim();
+  const choice = chatReasoningChoice(
+    model,
+    PAYMENT_METHOD.USDC,
+    reasoning ? { modelId: model.id, level: reasoning } : null,
+  );
+  const settings = choice ? { reasoning: choice.value } : {};
   return {
     ...session,
     draft: '',
@@ -83,6 +111,9 @@ export function startRun(
         model: { ...model },
         state: MESSAGE_STATE.COMPLETE,
         tools: [],
+        paymentMethod: PAYMENT_METHOD.USDC,
+        sentAt,
+        ...settings,
       },
       {
         id: `${id}-assistant`,
@@ -91,6 +122,9 @@ export function startRun(
         model: { ...model },
         state: MESSAGE_STATE.PENDING,
         tools: [...tools],
+        paymentMethod: PAYMENT_METHOD.USDC,
+        sentAt: null,
+        ...settings,
       },
     ],
     run: {

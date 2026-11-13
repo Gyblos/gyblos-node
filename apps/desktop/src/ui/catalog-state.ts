@@ -18,4 +18,4 @@ export function matchesCatalog(
       model.category === filter)
   );
 }
-export { MODEL_FILTER, MODELS, MODE_NAV, UI_VIEW } from './constants';
+export { MAIN_NAV, MODEL_FILTER, MODELS, UI_VIEW } from './constants';

@@ -80,6 +80,8 @@ void test('role file and key names inside a role directory are unchanged', () =>
   assert.deepEqual(ROLE_FILES, {
     roleConfig: 'role.json',
     buyerSelection: 'selection.json',
+    buyerApiKeys: 'api-keys.json',
+    buyerApiKeysLock: 'api-keys.lock',
     buyerInitLock: 'init.lock',
     nodeKey: 'node.key',
     trust: 'trust.json',

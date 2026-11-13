@@ -293,6 +293,20 @@ void test('announced model presentation reuses zero-price controls with explicit
     0,
   );
 });
+
+void test('model artwork does not attribute an unrelated name to a known lab', async () => {
+  const { announcedModels } = await import('@gyblos/desktop/announced-models');
+  const free = await entry(true, 'unrelated-qwen-copy');
+  const snapshot = await readFreeAnnouncements(
+    async () => jsonResponse(200, sellersBody([free.signed])),
+    'unrelated-qwen-copy',
+    () => DISCOVERY_NOW,
+    new AbortController().signal,
+  );
+  const models = announcedModels(snapshot, DISCOVERY_NOW);
+  assert.equal(models[0]?.image.src, './assets/brand/gyblos-icon.png');
+});
+
 void test('desktop catalog bounds distinct variants and excludes paid output even when input is zero', async () => {
   const first = await entry();
   const second = await entry();

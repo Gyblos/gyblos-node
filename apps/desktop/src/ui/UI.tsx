@@ -91,6 +91,44 @@ export function IconButton({
     />
   );
 }
+
+export function ChoiceCard({
+  title,
+  name,
+  description,
+  leading,
+  selected,
+  onSelect,
+  stacked = false,
+}: {
+  title: string;
+  name: string;
+  description?: ReactNode;
+  leading: ReactNode;
+  selected: boolean;
+  onSelect: () => void;
+  stacked?: boolean;
+}) {
+  return (
+    <label className={stacked ? 'ui-choice ui-choice--stacked' : 'ui-choice'}>
+      <input
+        className="ui-choice-input"
+        type="radio"
+        name={name}
+        checked={selected}
+        onChange={onSelect}
+      />
+      <span className="ui-icon-tile" aria-hidden="true">
+        {leading}
+      </span>
+      <span className="ui-choice-copy">
+        <strong>{title}</strong>
+        {description && <small>{description}</small>}
+      </span>
+      {selected && <span className="ui-selection">Selected</span>}
+    </label>
+  );
+}
 // Choice semantics and compact row anatomy are shared by model and tool menus.
 export function MenuItem({
   label,
@@ -163,6 +201,8 @@ export function SearchField({
   onValueChange,
   className = '',
   compact = false,
+  leading,
+  clearIcon,
   ...props
 }: Omit<ComponentPropsWithoutRef<'input'>, 'value' | 'onChange' | 'size'> & {
   label: string;
@@ -170,13 +210,15 @@ export function SearchField({
   onValueChange: (value: string) => void;
   className?: string;
   compact?: boolean;
+  leading?: ReactNode;
+  clearIcon?: ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <div
       className={`ui-search${compact ? ' ui-search--compact' : ''} ${className}`}
     >
-      <MagnifyingGlass size={16} aria-hidden="true" />
+      {leading ?? <MagnifyingGlass size={16} aria-hidden="true" />}
       <input
         {...props}
         ref={input}
@@ -187,12 +229,13 @@ export function SearchField({
       {value && (
         <IconButton
           label={`Clear ${label.toLowerCase()}`}
+          className={clearIcon ? 'ui-sidebar-motion-control' : undefined}
           onClick={() => {
             onValueChange('');
             input.current?.focus();
           }}
         >
-          <X size={16} />
+          {clearIcon ?? <X size={16} />}
         </IconButton>
       )}
     </div>

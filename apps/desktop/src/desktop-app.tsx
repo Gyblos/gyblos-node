@@ -1,116 +1,91 @@
-// Explores a buyer desktop app with Chat and local gateway connections.
-// Inference/Connect remain simulated; Wallet receives public local metadata only.
-import {
-  ArrowUp,
-  CaretDown,
-  CaretRight,
-  ChartBar,
-  ChatCircle,
-  Check,
-  CheckCircle,
-  Clock,
-  Code,
-  GearSix,
-  Globe,
-  MagnifyingGlass,
-  Palette,
-  PlugsConnected,
-  Plus,
-  ShieldCheck,
-  SidebarSimple,
-  Sparkle,
-  TerminalWindow,
-  Wallet,
-  X,
-} from '@phosphor-icons/react';
+// Hosts the buyer desktop, including the local PayPal Sandbox inference session.
+// Native chat uses the buyer bridge for x402 or the separate PayPal coordinator.
+import { Check, CheckCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import manifest from '../package.json';
 import { CATALOG_STATE } from './catalog/model';
+import { WINDOW_CHROME } from './constants';
+import {
+  canSelectPreviewModel,
+  canSwitchPaymentMethod,
+  PAYMENT_METHOD,
+  paypalSessionCanConnectAgent,
+  shouldMonitorPaypal,
+  type PaymentMethod,
+} from './paypal-model';
 import { themeStyle } from './theme';
+import { Activity } from './ui/Activity';
 import { AddFunds } from './ui/AddFunds';
 import { announcedModels } from './ui/announced-models';
-import { Appearance } from './ui/Appearance';
-import { matchesCatalog, type ModelFilter } from './ui/catalog-state';
+import { Applications } from './ui/Applications';
+import { BuyerSidebar } from './ui/BuyerSidebar';
 import { Chat, type ChatHandle } from './ui/Chat';
-import { ToolConnections } from './ui/ChatTools';
-import {
-  saveConnection,
-  type ConnectionTool,
-  type PreviewConnection,
-} from './ui/connection-state';
-import { ConnectionDialog, ConnectionList } from './ui/Connections';
+import { ChatController } from './ui/chat-controller';
+import { ChatPaymentSelector } from './ui/ChatPaymentSelector';
 import {
   BUTTON_VARIANT,
-  MODE_NAV,
-  MODEL_FILTER,
+  MAIN_NAV,
   MODEL_SOURCE,
   MODELS,
-  MODES,
   NAVIGATION_WIDTH,
   ROUTE_ORDER,
   SIDEBAR_MOTION_MS,
   UI_DIALOG,
   UI_VIEW,
+  WORKSPACE_BREAKPOINT,
 } from './ui/constants';
 import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account';
+import { DesignSystem } from './ui/DesignSystem';
+import { FormField, FormInput } from './ui/Form';
 import { Modal } from './ui/Modal';
-import type { Mode, CatalogModel as Model, View } from './ui/model-types';
-import { ModelImage, type ModelArtwork } from './ui/ModelImage';
+import type { CatalogModel as Model, View } from './ui/model-types';
+import { ModelImage } from './ui/ModelImage';
+import { Models } from './ui/Models';
 import {
   animateChange,
   MotionPresence,
   SLIDE_DIRECTION,
   SLIDE_SURFACE,
 } from './ui/Motion';
-import { NetworkCatalogPanel, useNetworkCatalog } from './ui/NetworkCatalog';
-import { NetworkStatus, useLocalNode } from './ui/NetworkStatus';
-import { ResizeHandle } from './ui/ResizeHandle';
-import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon';
-import type { ToolId } from './ui/tools';
 import {
-  Avatar,
-  Badge,
-  Button,
-  EmptyState,
-  IconButton,
-  InfoBar,
-  List,
-  ListRow,
-  Note,
-  PagePanel,
-  RowCopy,
-  SearchField,
-  SectionTitle,
-  SettingsGroup,
-  StatCard,
-} from './ui/UI';
+  back,
+  createNavigation,
+  forward,
+  HISTORY_KEY,
+  historyShortcut,
+  navigate as navigateState,
+} from './ui/navigation-state';
+import { useNetworkCatalog } from './ui/NetworkCatalog';
+import { useLocalNode } from './ui/NetworkStatus';
+import { PageBody } from './ui/PageBody';
+import { Payments } from './ui/Payments';
+import { PaypalAgentConnection } from './ui/PaypalAgentConnection';
+import { Settings } from './ui/Settings';
+import { SystemStatus } from './ui/SystemStatus';
+import type { ToolId } from './ui/tools';
+import { Button, IconButton } from './ui/UI';
+import { UsdcApiKeys } from './ui/UsdcApiKeys';
+import { useActivity } from './ui/useActivity';
+import { useChatArchive } from './ui/useChatArchive';
+import { usePaypalSession } from './ui/usePaypalSession';
+import { useX402 } from './ui/useX402';
 import { WalletBackup } from './ui/WalletBackup';
-import { WalletDetails } from './ui/WalletDetails';
 import { useDesktopWallet } from './ui/WalletState';
-import { WALLET_STATUS } from './wallet/model';
+import { WindowTitlebar } from './ui/WindowTitlebar';
 
 const money = (value: number) => '$' + value.toFixed(2);
-function ModelIcon({ model }: { model: Pick<Model, 'name' | 'image'> }) {
-  return (
-    <Avatar>
-      <ModelImage artwork={model.image} name={model.name} />
-    </Avatar>
-  );
-}
-
 export function DesktopApp() {
-  const [view, setView] = useState<View>(UI_VIEW.CHAT);
-  const [mode, setMode] = useState<Mode>(UI_VIEW.CHAT);
-  const navigation = MODE_NAV[mode];
+  const [route, setRoute] = useState(createNavigation);
+  const view = route.current;
+  const navigation = MAIN_NAV;
   function navigate(next: View) {
     if (next === view) return;
     const currentIndex = ROUTE_ORDER.findIndex((item) => item === view);
     const nextIndex = ROUTE_ORDER.findIndex((item) => item === next);
     animateChange(
       () => {
-        if (next === UI_VIEW.CHAT || next === UI_VIEW.CONNECT) setMode(next);
-        setView(next);
+        setRoute((current) => navigateState(current, next));
       },
       nextIndex > currentIndex
         ? SLIDE_DIRECTION.FORWARD
@@ -118,10 +93,25 @@ export function DesktopApp() {
       SLIDE_SURFACE.WORKSPACE,
     );
   }
-  const [navigationWidth, setNavigationWidth] = useState<number>(
-    NAVIGATION_WIDTH.MIN,
+  function goBack() {
+    animateChange(
+      () => setRoute(back),
+      SLIDE_DIRECTION.BACKWARD,
+      SLIDE_SURFACE.WORKSPACE,
+    );
+  }
+  function goForward() {
+    animateChange(
+      () => setRoute(forward),
+      SLIDE_DIRECTION.FORWARD,
+      SLIDE_SURFACE.WORKSPACE,
+    );
+  }
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR,
   );
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
+  const [managePaypal, setManagePaypal] = useState(false);
   const [sidebarMoving, setSidebarMoving] = useState(false);
   function toggleSidebar() {
     setSidebarMoving(true);
@@ -135,10 +125,56 @@ export function DesktopApp() {
     );
     return () => window.clearTimeout(timer);
   }, [sidebarCollapsed, sidebarMoving]);
-  const modifier = /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl+';
+  useEffect(() => {
+    function resize() {
+      if (window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR)
+        setSidebarCollapsed(true);
+      if (window.innerWidth < WORKSPACE_BREAKPOINT.CONTEXT)
+        setContextOpen(false);
+    }
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
   const [light, setLight] = useState(false);
-  const frameStyle: CSSProperties & { '--navigation-width': string } = {
-    '--navigation-width': navigationWidth + 'px',
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    PAYMENT_METHOD.USDC,
+  );
+  const monitorPaypal =
+    paymentMethod === PAYMENT_METHOD.PAYPAL &&
+    (view === UI_VIEW.CHAT ||
+      shouldMonitorPaypal(
+        paymentMethod,
+        view === UI_VIEW.PAYMENTS ||
+          view === UI_VIEW.ACTIVITY ||
+          view === UI_VIEW.CONNECT,
+      ));
+  const paypal = usePaypalSession(monitorPaypal);
+  const x402 = useX402();
+  const paypalStatus = paypal.state.status;
+  const paypalBusy =
+    paypal.state.busy ||
+    !!paypal.state.pendingPrompt ||
+    !!paypal.state.pendingMessageId;
+  const paypalStatusFresh =
+    paypal.state.statusFresh && !paypal.state.busy && monitorPaypal;
+  useEffect(() => {
+    const showPaypalChat = () => {
+      setPaymentMethod(PAYMENT_METHOD.PAYPAL);
+      setRoute((current) => navigateState(current, UI_VIEW.CHAT));
+    };
+    const removeReturn = window.desktopPaypal?.onReturn?.(showPaypalChat);
+    const removeCancel = window.desktopPaypal?.onCancel?.(showPaypalChat);
+    return () => {
+      removeReturn?.();
+      removeCancel?.();
+    };
+  }, []);
+  const frameStyle: CSSProperties & {
+    '--navigation-width': string;
+    '--shell-header-height': string;
+  } = {
+    '--navigation-width': NAVIGATION_WIDTH.DEFAULT + 'px',
+    '--shell-header-height': WINDOW_CHROME.HEIGHT + 'px',
     ...themeStyle(light),
   };
   const network = useLocalNode();
@@ -146,7 +182,7 @@ export function DesktopApp() {
   const announcements = useNetworkCatalog();
   const networkModels = announcedModels(announcements.snapshot, Date.now());
   const chatModels = [MODELS[0], ...networkModels, ...MODELS.slice(1)];
-  // Chat and Connect remain simulated independently of local endpoint readiness.
+  // Transport readiness and spending permission are independently enforced by each real coordinator.
   const online = true;
   const [model, setModel] = useState(MODELS[0]);
   useEffect(() => {
@@ -167,21 +203,36 @@ export function DesktopApp() {
     (typeof UI_DIALOG)[keyof typeof UI_DIALOG] | null
   >(null);
   const [paidModel, setPaidModel] = useState<Model | null>(null);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<ModelFilter>(MODEL_FILTER.ALL);
-  const [selectedApp, setSelectedApp] = useState<ConnectionTool | null>(null);
-  const [connectionOpen, setConnectionOpen] = useState(false);
-  const [apps, setApps] = useState<PreviewConnection[]>([]);
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
-  const [chatRequestCount, setChatRequestCount] = useState(0);
-  const [connectedTools, setConnectedTools] = useState<ToolId[]>([]);
+  const [chatController] = useState(() => new ChatController('first-chat'));
+  const conversationStorage = useChatArchive(chatController);
+  const activity = useActivity();
+  const [activitySession, setActivitySession] = useState<string | null>(null);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [connectedTools] = useState<ToolId[]>([]);
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
     content.current?.scrollTo({ top: 0 });
-  }, [view, mode]);
+  }, [view]);
   useEffect(() => {
     function command(event: KeyboardEvent) {
+      const editing =
+        event.target instanceof HTMLElement &&
+        (event.target.isContentEditable ||
+          Boolean(
+            event.target.closest('input, textarea, select, [role="textbox"]'),
+          ));
+      const direction = historyShortcut(
+        event,
+        editing || Boolean(document.querySelector('dialog[open]')),
+      );
+      if (direction) {
+        event.preventDefault();
+        if (direction === HISTORY_KEY.BACK) goBack();
+        else goForward();
+        return;
+      }
       if (
         !(event.metaKey || event.ctrlKey) ||
         event.altKey ||
@@ -192,10 +243,10 @@ export function DesktopApp() {
       if (key === 'b') {
         event.preventDefault();
         toggleSidebar();
-      } else if (key === 'k') {
+      } else if (key === 'k' && paymentMethod !== PAYMENT_METHOD.PAYPAL) {
         event.preventDefault();
         navigate(UI_VIEW.MODELS);
-      } else if (key === 'n' && view === UI_VIEW.CHAT) {
+      } else if (key === 'n' && view === UI_VIEW.CHAT && !chatBusy) {
         event.preventDefault();
         chatRef.current?.newChat();
       } else if (/^[1-9]$/.test(key) && Number(key) <= navigation.length) {
@@ -207,13 +258,14 @@ export function DesktopApp() {
     }
     window.addEventListener('keydown', command);
     return () => window.removeEventListener('keydown', command);
-  }, [view, mode]);
+  }, [view, paymentMethod, chatBusy]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(''), DEMO_ACCOUNT.TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
   function choose(next: Model) {
+    if (paymentMethod === PAYMENT_METHOD.PAYPAL) return;
     if (next.id === model.id) return;
     if (!next.free) {
       setPaidModel(next);
@@ -231,15 +283,37 @@ export function DesktopApp() {
     if (result.status !== DEMO_AUTH.APPROVED) return result.status;
     setSpent(result.spent);
     setCredits(result.credits);
-    setChatRequestCount((value) => value + 1);
     return result.status;
   }
-  function toggleTool(id: ToolId) {
-    setConnectedTools((previous) =>
-      previous.includes(id)
-        ? previous.filter((item) => item !== id)
-        : [...previous, id],
+  function paymentSelector() {
+    return (
+      <ChatPaymentSelector
+        value={paymentMethod}
+        locked={
+          chatBusy ||
+          !canSwitchPaymentMethod(
+            paymentMethod,
+            PAYMENT_METHOD.USDC,
+            paypalBusy,
+          )
+        }
+        onChange={changePaymentMethod}
+        onManage={() => navigate(UI_VIEW.PAYMENTS)}
+      />
     );
+  }
+  function changePaymentMethod(next: PaymentMethod) {
+    if (!canSwitchPaymentMethod(paymentMethod, next, paypalBusy, chatBusy)) {
+      setToast('Finish the current response before switching payment methods.');
+      return false;
+    }
+    setPaymentMethod(next);
+    return true;
+  }
+  function reviewPaypalPayments() {
+    if (!changePaymentMethod(PAYMENT_METHOD.PAYPAL)) return;
+    setManagePaypal(true);
+    navigate(UI_VIEW.PAYMENTS);
   }
   return (
     <div
@@ -251,413 +325,187 @@ export function DesktopApp() {
         (sidebarMoving ? 'sidebar-moving' : '')
       }
     >
-      <header className="topbar">
-        <div className="breadcrumb">
-          <IconButton
-            className="sidebar-toggle"
-            label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-controls="app-sidebar"
-            aria-expanded={!sidebarCollapsed}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onClick={toggleSidebar}
-          >
-            <SidebarSimple size={16} aria-hidden="true" />
-          </IconButton>
-          <h1 id="route-title">{view}</h1>
-        </div>
-        <div className="top-actions">
-          <Button
-            variant={BUTTON_VARIANT.SECONDARY}
-            className="command-trigger"
-            title={'Choose model (' + modifier + 'K)'}
-            onClick={() => {
-              navigate(UI_VIEW.MODELS);
-            }}
-          >
-            <MagnifyingGlass size={14} />
-            <span>Choose model</span>
-            <kbd>{modifier}K</kbd>
-          </Button>
-          <Button
-            variant={BUTTON_VARIANT.SECONDARY}
-            className="balance-button"
-            title="Wallet · 0.0 USDC"
-            onClick={() => navigate(UI_VIEW.SETTINGS)}
-          >
-            <Wallet size={17} />
-            <span aria-hidden="true">0.0</span>
-          </Button>
-        </div>
-      </header>
-      <aside
-        id="app-sidebar"
-        className="sidebar"
-        inert={sidebarCollapsed}
-        aria-hidden={sidebarCollapsed || undefined}
+      <WindowTitlebar
+        route={route}
+        chat={chatController}
+        collapsed={sidebarCollapsed}
+        contextOpen={contextOpen}
+        onSidebar={toggleSidebar}
+        onBack={goBack}
+        onForward={goForward}
+        onContext={() => setContextOpen((open) => !open)}
       >
-        <div className="sidebar-controls">
-          <div
-            className="ui-segmented"
-            role="group"
-            aria-label="Chat and Connect modes"
-          >
-            {MODES.map((nextMode) => (
-              <IconButton
-                key={nextMode}
-                label={nextMode}
-                title={nextMode}
-                aria-pressed={mode === nextMode}
-                onClick={() => navigate(nextMode)}
-              >
-                {nextMode === UI_VIEW.CHAT ? (
-                  <ChatCircle size={16} aria-hidden="true" />
-                ) : (
-                  <PlugsConnected size={16} aria-hidden="true" />
-                )}
-              </IconButton>
-            ))}
-          </div>
-        </div>
-        <nav aria-label="Main navigation">
-          {navigation.map((item, index) => (
+        {paypalBusy &&
+          paymentMethod === PAYMENT_METHOD.PAYPAL &&
+          view !== UI_VIEW.CHAT && (
+            <span className="payment-operation-notice" role="status">
+              PayPal is checking, processing or needs attention.
+            </span>
+          )}
+        {paymentMethod === PAYMENT_METHOD.USDC &&
+          paypal.chat.hasKnownUnfinishedSession() && (
             <Button
-              className={'nav-item ' + (view === item.name ? 'active' : '')}
-              key={item.name}
-              title={item.label + ' (' + modifier + (index + 1) + ')'}
-              aria-label={item.label}
-              aria-current={view === item.name ? 'page' : undefined}
-              onClick={() => {
-                navigate(item.name);
-              }}
+              variant={BUTTON_VARIANT.TONAL}
+              title="Check PayPal session"
+              onClick={reviewPaypalPayments}
             >
-              <SidebarIcon name={item.name} />
-              <span>{item.label}</span>
+              <span className="ui-window-action-label">
+                Review PayPal session
+              </span>
             </Button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <IconButton
-            label="Settings"
-            aria-current={view === UI_VIEW.SETTINGS ? 'page' : undefined}
-            onClick={() => navigate(UI_VIEW.SETTINGS)}
-          >
-            <GearSix size={17} />
-          </IconButton>
-          <Appearance light={light} onLightChange={setLight} compact />
-        </div>
-      </aside>
-      <div
-        className="navigation-resizer"
-        inert={sidebarCollapsed}
-        aria-hidden={sidebarCollapsed || undefined}
-      >
-        <ResizeHandle
-          label="Resize navigation"
-          orientation="vertical"
-          value={navigationWidth}
-          min={NAVIGATION_WIDTH.MIN}
-          max={NAVIGATION_WIDTH.MAX}
-          initial={NAVIGATION_WIDTH.MIN}
-          controls="app-sidebar app-workspace"
-          onChange={setNavigationWidth}
-        />
-      </div>
+          )}
+      </WindowTitlebar>
+      <BuyerSidebar
+        systemStatus={
+          <SystemStatus
+            state={network.state}
+            onRetry={network.retry}
+            onPayments={() => navigate(UI_VIEW.PAYMENTS)}
+          />
+        }
+        view={view}
+        collapsed={sidebarCollapsed}
+        chat={chatController}
+        storageState={conversationStorage}
+        navigate={(next) => {
+          navigate(next);
+        }}
+        onNewChat={() => {
+          chatRef.current?.newChat();
+          navigate(UI_VIEW.CHAT);
+        }}
+        onOpenChat={(id) => {
+          chatRef.current?.openChat(id);
+          navigate(UI_VIEW.CHAT);
+        }}
+      />
       <div id="app-workspace" className="app-body">
-        <div
+        <PageBody
           ref={content}
-          className={'content ' + (view === UI_VIEW.CHAT ? 'chat-content' : '')}
+          chat={view === UI_VIEW.CHAT}
+          split={view === UI_VIEW.CONNECT}
         >
           <div className="chat-root" hidden={view !== UI_VIEW.CHAT}>
             <Chat
               ref={chatRef}
+              chat={chatController}
+              storageState={conversationStorage}
+              activity={activity}
+              onActivity={(id) => {
+                setActivitySession(id);
+                navigate(UI_VIEW.ACTIVITY);
+              }}
               active={view === UI_VIEW.CHAT}
+              showToolbar={false}
+              paymentMethod={paymentMethod}
+              paymentControl={paymentSelector()}
+              paypal={paypal}
+              x402={x402}
+              onReviewX402={() => navigate(UI_VIEW.PAYMENTS)}
+              onBusyChange={setChatBusy}
               model={model}
               online={online}
               onAuthorize={authorizeChatRequest}
               connectedTools={connectedTools}
-              onToggleTool={toggleTool}
+              onBrowseApplications={() => navigate(UI_VIEW.TOOLS)}
               models={chatModels}
               onSelectModel={(id) => {
                 const next = chatModels.find((item) => item.id === id);
                 if (next) choose(next);
               }}
               onBrowseModels={() => navigate(UI_VIEW.MODELS)}
+              onReviewPaypal={() => {
+                reviewPaypalPayments();
+              }}
             />
           </div>
           {view === UI_VIEW.MODELS && (
-            <PagePanel>
-              <NetworkCatalogPanel
-                snapshot={announcements.snapshot}
-                onLookup={announcements.lookup}
-                onSelect={choose}
-                selected={model.id}
-              />
-              <details>
-                <summary>Preview models</summary>
-                <div className="ui-toolbar">
-                  <SearchField
-                    label="Search catalog"
-                    placeholder="Search models or families"
-                    value={search}
-                    onValueChange={setSearch}
-                  />
-                  <div
-                    className="ui-segmented"
-                    role="group"
-                    aria-label="Filter models"
-                  >
-                    {Object.values(MODEL_FILTER).map((value) => (
-                      <Button
-                        key={value}
-                        aria-pressed={filter === value}
-                        onClick={() => setFilter(value)}
-                      >
-                        {value}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                <SectionTitle>Preview catalog</SectionTitle>
-                <List label="Model catalog">
-                  {MODELS.filter((item) =>
-                    matchesCatalog(item, search, filter),
-                  ).map((item) => (
-                    <ListRow
-                      key={item.id}
-                      leading={<ModelIcon model={item} />}
-                      onActivate={() => choose(item)}
-                      selected={model.id === item.id}
-                      trailing={
-                        <>
-                          <div className="ui-price">
-                            <strong>
-                              {item.free
-                                ? 'Free'
-                                : `$${item.input.toFixed(2)} / $${item.output.toFixed(2)}`}
-                            </strong>
-                            <small>
-                              {item.free
-                                ? 'Community supported'
-                                : 'In / out per 1M tokens'}
-                            </small>
-                          </div>
-                          {model.id === item.id && <Check size={16} />}
-                        </>
-                      }
-                    >
-                      <RowCopy
-                        title={item.name}
-                        detail={`${item.family} · ${item.context} context · ${item.providers} providers`}
-                      />
-                    </ListRow>
-                  ))}
-                  {!MODELS.some((item) =>
-                    matchesCatalog(item, search, filter),
-                  ) && (
-                    <p className="ui-list-empty">
-                      No models found. Try another name or filter.
-                    </p>
-                  )}
-                </List>
-              </details>
-              <InfoBar
-                leading={<Globe size={16} />}
-                trailing={
-                  <Button
-                    variant={BUTTON_VARIANT.SECONDARY}
-                    onClick={() => navigate(mode)}
-                  >
-                    {mode === UI_VIEW.CHAT
-                      ? 'Back to chat'
-                      : 'Back to applications'}
-                  </Button>
-                }
-              >
-                <span>Chat and Connect use simulated responses.</span>
-              </InfoBar>
-            </PagePanel>
+            <Models
+              selected={model.id}
+              canSelect={canSelectPreviewModel(paymentMethod)}
+              onSelect={choose}
+              catalog={announcements}
+            />
           )}
-          {view === UI_VIEW.CONNECT && (
-            <PagePanel>
-              <SectionTitle trailing={<Badge>{apps.length} configured</Badge>}>
-                On this computer
-              </SectionTitle>
-              <p className="connections-description">
-                Choose a tool, model and daily budget. Gyblos handles the
-                connection.
-              </p>
-
-              <ConnectionList
-                connections={apps}
-                models={MODELS}
-                onEdit={(tool) => {
-                  setSelectedApp(tool);
-                  setConnectionOpen(true);
-                }}
+          {view === UI_VIEW.CONNECT &&
+            paymentMethod === PAYMENT_METHOD.USDC && (
+              <UsdcApiKeys
+                contextOpen={contextOpen}
+                onCloseContext={() => setContextOpen(false)}
+                onPayments={() => navigate(UI_VIEW.PAYMENTS)}
               />
-              <Note>Each application has its own model and daily budget.</Note>
-              <InfoBar leading={<PlugsConnected size={16} />}>
-                <div>
-                  <strong>Local gateway</strong>
-                  <p className="modal-note">
-                    Your tools use Gyblos while this app is open. Server and
-                    remote access are under Advanced in each connection.
-                  </p>
-                </div>
-              </InfoBar>
-            </PagePanel>
-          )}
-          {view === UI_VIEW.TOOLS && (
-            <PagePanel>
-              <ToolConnections
-                connected={connectedTools}
-                onToggle={toggleTool}
+            )}
+          {view === UI_VIEW.CONNECT &&
+            paymentMethod === PAYMENT_METHOD.PAYPAL && (
+              <PaypalAgentConnection
+                onlyConnected={paymentMethod !== PAYMENT_METHOD.PAYPAL}
+                sessionReady={paypalSessionCanConnectAgent(
+                  paypalStatus,
+                  paypalStatusFresh,
+                  paypalBusy,
+                )}
+                sessionStatus={paypalStatus}
+                sessionFresh={paypalStatusFresh}
+                contextOpen={contextOpen}
+                onCloseContext={() => setContextOpen(false)}
+                onPayments={reviewPaypalPayments}
               />
-            </PagePanel>
+            )}
+          {view === UI_VIEW.TOOLS && <Applications />}
+          {view === UI_VIEW.PAYMENTS && (
+            <Payments
+              x402={x402}
+              session={paypal}
+              activity={activity}
+              managePaypal={managePaypal}
+              onManagePaypal={setManagePaypal}
+              onPaymentMethod={changePaymentMethod}
+              onChat={() => navigate(UI_VIEW.CHAT)}
+              onConnections={() => navigate(UI_VIEW.CONNECT)}
+              onActivity={(id) => {
+                setActivitySession(id ?? null);
+                navigate(UI_VIEW.ACTIVITY);
+              }}
+              onBackup={() => setModal(UI_DIALOG.BACKUP)}
+              onAddFunds={() => setModal(UI_DIALOG.ADD_FUNDS)}
+            />
           )}
           {view === UI_VIEW.SETTINGS && (
-            <PagePanel>
-              <div className="settings-content">
-                <SettingsGroup
-                  leading={<Wallet size={18} aria-hidden="true" />}
-                  title="Wallet & backup"
-                  description="Your address, key protection and recovery backup."
-                >
-                  <WalletDetails
-                    onBackup={() => setModal(UI_DIALOG.BACKUP)}
-                    onAddFunds={() => setModal(UI_DIALOG.ADD_FUNDS)}
-                  />
-                </SettingsGroup>
-                <SettingsGroup
-                  leading={<ChartBar size={18} aria-hidden="true" />}
-                  title="Chat spending"
-                  description="Choose how much you can spend on chat each day."
-                >
-                  <List label="Chat spending limit">
-                    <ListRow
-                      leading={null}
-                      trailing={
-                        <Button
-                          variant={BUTTON_VARIANT.TONAL}
-                          onClick={() => {
-                            setModal(UI_DIALOG.BUDGET);
-                          }}
-                        >
-                          Edit limit
-                        </Button>
-                      }
-                    >
-                      <RowCopy
-                        title="Daily spending limit"
-                        detail={money(budget) + ' per day'}
-                      />
-                    </ListRow>
-                  </List>
-                </SettingsGroup>
-                <SettingsGroup
-                  leading={<Palette size={18} aria-hidden="true" />}
-                  title="Appearance"
-                  description="Choose a light or dark interface."
-                >
-                  <Appearance
-                    light={light}
-                    onLightChange={setLight}
-                    label="Theme"
-                  />
-                </SettingsGroup>
-              </div>
-            </PagePanel>
+            <Settings
+              light={light}
+              onLightChange={setLight}
+              version={manifest.version}
+            />
           )}
           {view === UI_VIEW.ACTIVITY && (
-            <PagePanel>
-              <div className="ui-stats">
-                <StatCard
-                  label="Spent today"
-                  value={money(spent)}
-                  detail={`Daily limit: ${money(budget)} per day`}
-                />
-                <StatCard
-                  label="Requests"
-                  value={
-                    mode === UI_VIEW.CHAT
-                      ? String(chatRequestCount + DEMO_ACCOUNT.SAMPLE_REQUESTS)
-                      : '0'
-                  }
-                  detail={
-                    mode === UI_VIEW.CHAT
-                      ? 'Requests today'
-                      : 'No application requests yet'
-                  }
-                />
-                <StatCard
-                  label="Available balance"
-                  value={money(credits)}
-                  detail="USDC"
-                />
-              </div>
-              <SectionTitle
-                trailing={
-                  <Badge>{mode === UI_VIEW.CHAT ? 'Chat' : 'Connect'}</Badge>
-                }
-              >
-                Recent requests
-              </SectionTitle>
-              <List label="Recent requests">
-                {(mode === UI_VIEW.CHAT
-                  ? [MODELS[0], MODELS[1], MODELS[0], MODELS[1]]
-                  : []
-                ).map((item, index) => (
-                  <ListRow
-                    key={index}
-                    leading={<ModelIcon model={item} />}
-                    trailing={
-                      <>
-                        <span className="ui-row-time">
-                          {index * 6 + 2} min ago
-                        </span>
-                        <span className="ui-status">
-                          <CheckCircle size={14} />
-                          Completed
-                        </span>
-                        <strong className="ui-amount">$0.00</strong>
-                      </>
-                    }
-                  >
-                    <RowCopy title={item.name} detail="Chat · This Mac" />
-                  </ListRow>
-                ))}
-              </List>
-              {mode === UI_VIEW.CONNECT && (
-                <Note>
-                  No application requests yet. Connection setup does not
-                  generate inference traffic.
-                </Note>
-              )}
-              <Note>
-                Pending payments stay visible until their outcome is confirmed.
-              </Note>
-            </PagePanel>
+            <Activity
+              x402={x402}
+              activity={activity}
+              chat={chatController}
+              selectedSession={activitySession}
+              onSelectSession={setActivitySession}
+              onPayments={() => {
+                reviewPaypalPayments();
+              }}
+              onOpenChat={(id) => {
+                chatController.openChat(id);
+                navigate(UI_VIEW.CHAT);
+              }}
+            />
           )}
-        </div>
+        </PageBody>
       </div>
-      <footer className="app-footer" aria-label="Application status">
-        <NetworkStatus state={network.state} onRetry={network.retry} />
-        <Button
-          title="Wallet settings"
-          onClick={() => navigate(UI_VIEW.SETTINGS)}
-        >
-          <Wallet size={14} />
-          {wallet.status === WALLET_STATUS.READY && !wallet.backupVerified
-            ? 'Wallet · Backup needed'
-            : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED ||
-                wallet.status === WALLET_STATUS.UNAVAILABLE
-              ? 'Wallet · Needs attention'
-              : 'Wallet'}
-        </Button>
-        <span className="footer-version" title="Gyblos version">
-          v{manifest.version}
-        </span>
-      </footer>
+      <MotionPresence>
+        {modal === UI_DIALOG.DESIGN_SYSTEM && (
+          <Modal
+            title="Design system"
+            description="Shared visual components for the buyer app."
+            close={() => setModal(null)}
+          >
+            <DesignSystem />
+          </Modal>
+        )}
+      </MotionPresence>
       <MotionPresence>
         {modal === UI_DIALOG.ADD_FUNDS && (
           <Modal
@@ -668,7 +516,7 @@ export function DesktopApp() {
             <AddFunds
               onBackup={() => {
                 setModal(null);
-                navigate(UI_VIEW.SETTINGS);
+                navigate(UI_VIEW.PAYMENTS);
               }}
             />
           </Modal>
@@ -685,20 +533,18 @@ export function DesktopApp() {
         {modal === UI_DIALOG.BUDGET && (
           <Modal
             title="Daily spending limit"
-            description="Applies to paid messages in Chat."
+            description="Applies to the USDC chat preview only."
             close={() => setModal(null)}
           >
-            <label className="field-label" htmlFor={UI_DIALOG.BUDGET}>
-              Daily limit ($)
-            </label>
-            <input
-              className="full-input"
-              id={UI_DIALOG.BUDGET}
-              type="number"
-              min="0"
-              value={budgetDraft}
-              onChange={(event) => setBudgetDraft(event.target.value)}
-            />
+            <FormField htmlFor={UI_DIALOG.BUDGET} label="Daily limit ($)">
+              <FormInput
+                id={UI_DIALOG.BUDGET}
+                type="number"
+                min="0"
+                value={budgetDraft}
+                onChange={(event) => setBudgetDraft(event.target.value)}
+              />
+            </FormField>
             <p className="modal-note">Free models do not use this limit.</p>
             <Button
               variant={BUTTON_VARIANT.PRIMARY}
@@ -723,7 +569,7 @@ export function DesktopApp() {
         {paidModel && (
           <Modal title="Use a paid model?" close={() => setPaidModel(null)}>
             <div className="paid-model-summary">
-              <ModelIcon model={paidModel} />
+              <ModelImage name={paidModel.name} artwork={paidModel.image} />
               <strong>{paidModel.name}</strong>
             </div>
             <div className="paid-terms">
@@ -757,34 +603,6 @@ export function DesktopApp() {
               <Check size={16} />
             </Button>
           </Modal>
-        )}
-      </MotionPresence>
-      <MotionPresence>
-        {connectionOpen && (
-          <ConnectionDialog
-            key={selectedApp ?? 'new'}
-            tool={selectedApp}
-            existing={apps.find((item) => item.tool === selectedApp)}
-            models={MODELS}
-            defaultModelId={model.id}
-            close={() => setConnectionOpen(false)}
-            onSave={(policy) => {
-              setApps((previous) => saveConnection(previous, policy));
-              setConnectionOpen(false);
-              setToast(
-                selectedApp && apps.some((item) => item.tool === selectedApp)
-                  ? 'Connection updated'
-                  : 'Connection saved',
-              );
-            }}
-            onRemove={(tool) => {
-              setApps((previous) =>
-                previous.filter((item) => item.tool !== tool),
-              );
-              setConnectionOpen(false);
-              setToast('Connection removed');
-            }}
-          />
         )}
       </MotionPresence>
       <MotionPresence>

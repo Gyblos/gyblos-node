@@ -1,4 +1,7 @@
 // Owns simulated UI catalogs and precomputed brand morph paths; never live network state.
+import { MODEL_IDS } from '@gyblos/protocol/constants';
+
+import { AGENT_CLIENT } from '../constants';
 import { LOCAL_NODE_STATE } from '../node-status';
 import type { CatalogModel } from './model-types';
 
@@ -24,6 +27,7 @@ export const MESSAGE_STATE = {
   PENDING: 'pending',
   COMPLETE: 'complete',
   STOPPED: 'stopped',
+  FAILED: 'failed',
 } as const;
 
 export const SIGNAL_STATE = {
@@ -46,11 +50,20 @@ export const SLIDE_SURFACE = {
 } as const;
 
 export const CONNECTION_TOOLS = [
-  'Claude Code',
-  'Codex',
-  'Pi',
-  'Other tool',
+  AGENT_CLIENT.CLAUDE_CODE,
+  AGENT_CLIENT.CODEX,
+  AGENT_CLIENT.PI,
+  AGENT_CLIENT.OTHER,
 ] as const;
+export const CONNECTION_PRESET = { GENERIC: 'Other app / API' } as const;
+export const PAYPAL_AGENT_CARDS = [
+  { client: CONNECTION_PRESET.GENERIC },
+  { client: AGENT_CLIENT.OPENCODE },
+  { client: AGENT_CLIENT.CODEX },
+  { client: AGENT_CLIENT.PI },
+  { client: AGENT_CLIENT.CLAUDE_CODE },
+] as const;
+export type ConnectionPreset = (typeof PAYPAL_AGENT_CARDS)[number]['client'];
 
 export const CHAT_ROLE = { USER: 'user', ASSISTANT: 'assistant' } as const;
 export const BUTTON_VARIANT = {
@@ -145,10 +158,12 @@ export const UI_VIEW = {
   TOOLS: 'Tools',
   MODELS: 'Models',
   ACTIVITY: 'Activity',
+  PAYMENTS: 'Payments',
   SETTINGS: 'Settings',
 } as const;
 export const UI_DIALOG = {
   BACKUP: 'backup',
+  DESIGN_SYSTEM: 'design-system',
   BUDGET: 'budget',
   ADD_FUNDS: 'add-funds',
 } as const;
@@ -172,6 +187,7 @@ export const MODEL_FILTER = {
 export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   {
     id: 'qwen',
+    catalogId: MODEL_IDS.QWEN3_30B_A3B,
     name: 'Qwen3 30B-A3B',
     family: 'Qwen',
     image: { src: './assets/models/qwen-color.svg' },
@@ -184,6 +200,7 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
   {
     id: 'oss',
+    catalogId: MODEL_IDS.GPT_OSS_20B,
     name: 'gpt-oss 20B',
     family: 'OpenAI',
     image: { src: './assets/models/openai.svg', monochrome: true },
@@ -196,6 +213,7 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
   {
     id: 'llama',
+    catalogId: MODEL_IDS.LLAMA_3_3_70B,
     name: 'Llama 3.3 70B',
     family: 'Meta',
     image: { src: './assets/models/meta-color.svg' },
@@ -208,6 +226,7 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
   {
     id: 'gemma',
+    catalogId: MODEL_IDS.GEMMA_4_26B,
     name: 'Gemma 4 26B',
     family: 'Google',
     image: { src: './assets/models/gemma-color.svg' },
@@ -220,6 +239,7 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
   {
     id: 'deepseek',
+    catalogId: MODEL_IDS.DEEPSEEK_V4_1_FLASH,
     name: 'DeepSeek V4.1 Flash',
     family: 'DeepSeek',
     image: { src: './assets/models/deepseek-color.svg' },
@@ -232,29 +252,30 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
 ];
 
-export const MODES = [UI_VIEW.CHAT, UI_VIEW.CONNECT] as const;
-export const MODE_NAV = {
-  [UI_VIEW.CHAT]: [
-    { name: UI_VIEW.CHAT, label: 'Chat' },
-    { name: UI_VIEW.MODELS, label: 'Models' },
-    { name: UI_VIEW.ACTIVITY, label: 'Activity' },
-    { name: UI_VIEW.TOOLS, label: 'Tools' },
-  ],
-  [UI_VIEW.CONNECT]: [
-    { name: UI_VIEW.CONNECT, label: 'Applications' },
-    { name: UI_VIEW.MODELS, label: 'Models' },
-    { name: UI_VIEW.ACTIVITY, label: 'Activity' },
-  ],
-} as const;
+export const ADDITIONAL_MODEL_ARTWORK = [
+  { prefix: 'claude', image: { src: './assets/models/claude-color.svg' } },
+  { prefix: 'gemini', image: { src: './assets/models/gemini-color.svg' } },
+  { prefix: 'mistral', image: { src: './assets/models/mistral-color.svg' } },
+] as const;
+
+export const MAIN_NAV = [
+  { name: UI_VIEW.CHAT, label: 'Chat' },
+  { name: UI_VIEW.CONNECT, label: 'Connections' },
+  { name: UI_VIEW.MODELS, label: 'Models' },
+  { name: UI_VIEW.TOOLS, label: 'Applications' },
+  { name: UI_VIEW.ACTIVITY, label: 'Activity' },
+  { name: UI_VIEW.PAYMENTS, label: 'Payments' },
+] as const;
 export const ROUTE_ORDER = [
   UI_VIEW.CHAT,
-  UI_VIEW.CONNECT,
   UI_VIEW.MODELS,
-  UI_VIEW.ACTIVITY,
   UI_VIEW.TOOLS,
+  UI_VIEW.CONNECT,
+  UI_VIEW.ACTIVITY,
+  UI_VIEW.PAYMENTS,
   UI_VIEW.SETTINGS,
 ] as const;
-export const SIDEBAR_MOTION_MS = 620;
+export const SIDEBAR_MOTION_MS = 300;
 
 export const NETWORK_STATE = {
   CONNECTING: 'connecting',
@@ -284,4 +305,24 @@ export const DEMO_ACCOUNT = {
   TOAST_MS: 3000,
   SAMPLE_REQUESTS: 4,
 } as const;
-export const NAVIGATION_WIDTH = { MIN: 84, MAX: 112 } as const;
+export const NAVIGATION_WIDTH = { MIN: 224, DEFAULT: 224, MAX: 360 } as const;
+export const HISTORY_KEY = {
+  BACK: 'ArrowLeft',
+  FORWARD: 'ArrowRight',
+} as const;
+export const WORKSPACE_BREAKPOINT = { SIDEBAR: 900, CONTEXT: 1200 } as const;
+
+export const SIDEBAR_ACTION = {
+  CREATE: 'create',
+  CLEAR: 'clear',
+  PANEL: 'panel',
+  STATUS: 'status',
+  SETTINGS: 'settings',
+  WALLET: 'wallet',
+  TOOLS: 'tools',
+  LINK: 'link',
+  CHAT: 'chat',
+  SEARCH: 'search',
+} as const;
+
+export const SIDEBAR_TYPING_POSITIONS = [88, 128, 168] as const;

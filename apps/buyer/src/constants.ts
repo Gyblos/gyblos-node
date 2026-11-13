@@ -4,6 +4,7 @@ import { ROLE_FILES, TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { BUYER_SELECTION_FILE } from '@gyblos/node/buyer-init-constants';
 import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
@@ -245,7 +246,7 @@ export const PAID_BUYER = {
   // A paid buyer quotes paid sellers only; a free winner is skipped this many times at most.
   freeSkips: 8,
   // The JSON field that carries the payment summary in completions and errors.
-  paymentField: 'gyblos_payment',
+  paymentField: BUYER_API.PAYMENT_FIELD,
   observationHeader: 'x-gyblos-payment-observation',
   observationValue: '1',
   requestDigestField: 'gyblos_request_digest',
@@ -305,7 +306,7 @@ export type FreeBuyerStartupReason =
   (typeof FREE_BUYER_STARTUP)[keyof typeof FREE_BUYER_STARTUP];
 
 // Local HTTP terminal metadata; never changes a signed protocol record.
-export const BUYER_EXECUTION_FIELD = 'gyblos_execution';
+export const BUYER_EXECUTION_FIELD = BUYER_API.EXECUTION_FIELD;
 
 // The guided form uses this explicit marker to clear a nullable field without changing blank defaults.
 export const BUYER_INIT_INPUT = { CLEAR: '-', EMPTY_LABEL: 'none' } as const;

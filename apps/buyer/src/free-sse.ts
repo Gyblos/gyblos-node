@@ -5,7 +5,9 @@ import type { ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, UNITS } from '@gyblos/config';
 import type { BuyerRoutingCode } from '@gyblos/core/constants';
+import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import type { SessionApproval } from '@gyblos/node/session-accounting';
+import type { BuyerKeyCode } from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
@@ -47,6 +49,7 @@ export interface ChatPayment {
   refundedAtomic: string | null;
   // Whether the buyer kept a record for reconciliation; false for a settled request.
   recorded: boolean;
+  transaction?: string;
 }
 export type ChatResult = FreeExecutionResult & {
   payment?: ChatPayment;
@@ -57,6 +60,7 @@ export const executionFields = (result: ChatResult) =>
 
 export type ChatErrorCode =
   | BuyerRoutingCode
+  | BuyerKeyCode
   | SessionCode
   | FreeBuyerCode
   | PaidBuyerCode
@@ -74,6 +78,7 @@ export type FreeChatStreamExecutor = (
   signal: AbortSignal,
   onDelta: (text: string, requestDigest?: string) => Promise<void>,
   model?: RoutedModel,
+  permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
 function active(response: ServerResponse, signal: AbortSignal) {
   if (signal.aborted || response.destroyed || response.writableEnded)

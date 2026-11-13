@@ -1,0 +1,115 @@
+/* One native-window row. OS controls remain native; only the remaining header is draggable. */
+.app.desktop-frame {
+  grid-template-rows: var(--shell-header-height) minmax(0, 1fr) 0;
+}
+.desktop-frame > .ui-window-chrome {
+  --window-title-inset: 244px;
+  --window-controls-right: 0px;
+  --window-title-min-width: 128px;
+  grid-area: 1 / 1 / 2 / -1;
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: none;
+  height: var(--shell-header-height);
+  min-height: var(--shell-header-height);
+  margin: 0;
+  padding: 0 var(--space-3);
+  padding-inline-end: calc(var(--space-3) + var(--window-controls-right));
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--side);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.desktop-frame > .buyer-sidebar {
+  grid-row: 2 / 3;
+  padding-top: var(--space-3);
+}
+.ui-window-chrome:is([data-platform='win32'], [data-platform='linux']) {
+  --window-controls-right: max(
+    0px,
+    calc(
+      100vw - env(titlebar-area-x, 0px) -
+        env(titlebar-area-width, calc(100vw - 144px))
+    )
+  );
+}
+.ui-window-leading,
+.ui-window-navigation {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  flex: 0 0 auto;
+}
+.ui-window-leading {
+  gap: var(--space-2);
+  z-index: 1;
+}
+.ui-window-navigation {
+  gap: 0;
+  height: var(--control-size);
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+.ui-native-controls-space {
+  display: none;
+  width: 68px;
+  flex-shrink: 0;
+}
+.ui-window-chrome[data-platform='darwin'] .ui-native-controls-space {
+  display: block;
+}
+.desktop-frame .ui-window-title {
+  position: absolute;
+  inset-inline: var(--window-title-inset);
+  margin: 0;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink);
+  font-size: var(--ui-font);
+  font-weight: 500;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.ui-window-chrome > .top-actions {
+  margin-left: auto;
+  z-index: 1;
+  min-width: 0;
+  max-width: max(
+    0px,
+    calc(
+      (100vw - var(--window-title-min-width)) / 2 -
+        var(--window-controls-right) - var(--space-3) - var(--space-2)
+    )
+  );
+}
+.ui-window-chrome .payment-operation-notice,
+.ui-window-chrome .ui-window-action-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-window-chrome > .top-actions > .ui-button {
+  min-width: 0;
+}
+.ui-window-chrome > .top-actions > .ui-button:has(.ui-window-action-label) {
+  flex-shrink: 1;
+  max-width: 100%;
+}
+.ui-window-chrome button {
+  -webkit-app-region: no-drag;
+}
+@media (max-width: 700px) {
+  .desktop-frame > .ui-window-chrome {
+    --window-title-inset: 228px calc(52px + var(--window-controls-right));
+  }
+}

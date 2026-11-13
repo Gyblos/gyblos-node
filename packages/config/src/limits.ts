@@ -36,10 +36,12 @@ export const RETRIES = {
 
 export const HTTP_STATUS = {
   ok: 200,
+  created: 201,
   unauthorized: 401,
   paymentRequired: 402,
   forbidden: 403,
   notFound: 404,
+  conflict: 409,
   misdirectedRequest: 421,
   tooManyRequests: 429,
   badGateway: 502,
@@ -106,6 +108,11 @@ export const INFERENCE_REQUEST_LIMITS = {
   minOutputTokens: 32,
   maxOutputTokens: 128,
   maxPromptCharacters: 4000,
+} as const;
+
+export const SANDBOX_AGENT_LIMITS = {
+  contextTokens: 16384,
+  maxOutputTokens: 512,
 } as const;
 
 // A free answer's longest length in tokens: a seller's offer default, and the most any offer or buyer

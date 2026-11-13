@@ -305,6 +305,7 @@ void test('free HTTP reports why a seller could not continue, without retry', as
     assert.deepEqual(await response.json(), {
       error: {
         message: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        gyblos_never_sent: false,
         type: 'gyblos_error',
         param: null,
         code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
