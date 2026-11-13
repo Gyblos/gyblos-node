@@ -23,22 +23,34 @@ void test('session inspection waits for an owned atomic publication and reads th
   const nativeRename = filesystem.rename;
   const nativeLstat = filesystem.lstat;
   let publishing = false;
-  t.mock.method(filesystem, 'rename', async (...args: Parameters<typeof rename>) => {
-    if (args[1] !== paths.state) return nativeRename(...args);
-    publishing = true;
-    entered.resolve();
-    await release.promise;
-    try {
-      return await nativeRename(...args);
-    } finally {
-      publishing = false;
-    }
-  });
-  t.mock.method(filesystem, 'lstat', (...args: Parameters<typeof filesystem.lstat>) => {
-    if (args[0] === paths.state || args[0] === target)
-      assert.equal(publishing, false, 'an inspector must not enter an owned journal publication');
-    return nativeLstat(...args);
-  });
+  t.mock.method(
+    filesystem,
+    'rename',
+    async (...args: Parameters<typeof rename>) => {
+      if (args[1] !== paths.state) return nativeRename(...args);
+      publishing = true;
+      entered.resolve();
+      await release.promise;
+      try {
+        return await nativeRename(...args);
+      } finally {
+        publishing = false;
+      }
+    },
+  );
+  t.mock.method(
+    filesystem,
+    'lstat',
+    (...args: Parameters<typeof filesystem.lstat>) => {
+      if (args[0] === paths.state || args[0] === target)
+        assert.equal(
+          publishing,
+          false,
+          'an inspector must not enter an owned journal publication',
+        );
+      return nativeLstat(...args);
+    },
+  );
   syncBuiltinESMExports();
   t.after(() => {
     t.mock.restoreAll();

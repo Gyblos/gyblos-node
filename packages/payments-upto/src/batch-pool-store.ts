@@ -29,6 +29,7 @@ import { WINDOWS } from '@gyblos/runtime/private-mode';
 import type { PoolRecord, PoolRow } from './batch-pool-types';
 import { termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
+import { withBatchState } from './batch-session-io';
 import { readBatchRecord } from './batch-session-state';
 import { BATCH_POOL_VERSION } from './constants';
 
@@ -172,11 +173,13 @@ async function seed(paths: BatchPoolPaths, row: PoolRow, now: number) {
     return;
   }
   await ensurePrivateDirectory(pathsFor.directory);
-  await writePrivateFile(
-    pathsFor.state,
-    JSON.stringify(initialRecord(row.terms, now)),
-    BATCH_SESSION_DEFAULTS.stateBytes,
-    { exclusive: true },
+  await withBatchState(pathsFor, () =>
+    writePrivateFile(
+      pathsFor.state,
+      JSON.stringify(initialRecord(row.terms, now)),
+      BATCH_SESSION_DEFAULTS.stateBytes,
+      { exclusive: true },
+    ),
   );
 }
 export async function openPoolStore(paths: BatchPoolPaths, now: () => number) {

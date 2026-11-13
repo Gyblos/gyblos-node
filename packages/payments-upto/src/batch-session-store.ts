@@ -14,6 +14,7 @@ import {
 } from '@gyblos/runtime/private-file';
 
 import { parseRecord } from './batch-session-checks';
+import { withBatchState } from './batch-session-io';
 import type { BatchCommonOptions, BatchRecord } from './batch-session-types';
 
 export async function openBatchStore(
@@ -26,9 +27,8 @@ export async function openBatchStore(
   let disposed = false;
   let current: BatchRecord;
   try {
-    const text = await readPrivateFile(
-      options.paths.state,
-      BATCH_SESSION_DEFAULTS.stateBytes,
+    const text = await withBatchState(options.paths, () =>
+      readPrivateFile(options.paths.state, BATCH_SESSION_DEFAULTS.stateBytes),
     );
     current =
       text === undefined
@@ -47,10 +47,12 @@ export async function openBatchStore(
       change(draft);
       const next = parseRecord(structuredClone(draft), options.terms);
       try {
-        await writePrivateFile(
-          options.paths.state,
-          JSON.stringify(next),
-          BATCH_SESSION_DEFAULTS.stateBytes,
+        await withBatchState(options.paths, () =>
+          writePrivateFile(
+            options.paths.state,
+            JSON.stringify(next),
+            BATCH_SESSION_DEFAULTS.stateBytes,
+          ),
         );
         current = next;
       } catch {

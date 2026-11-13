@@ -22,7 +22,7 @@ import type {
   PoolRow,
 } from './batch-pool-types';
 import { termsFor } from './batch-session-checks';
-import { inspectBatchSession } from './batch-session-state';
+import { inspectBatchSession, storedBatchSession } from './batch-session-state';
 import { serial } from './batch-session-store';
 
 function budget(entries: PoolRow[], total: string) {
@@ -47,9 +47,7 @@ export async function inspectBatchPool(
   return Promise.all(
     entries.map(async (row) => {
       if (!row.ready) return { ...row, stored: undefined };
-      await poolChild(paths, row);
-      const stored = await inspectBatchSession(poolPaths(paths, row));
-      if (!stored) return sessionFail(SESSION_CODES.UNVERIFIED);
+      const stored = storedBatchSession(await poolChild(paths, row));
       return { ...row, stored };
     }),
   );
@@ -173,11 +171,9 @@ export async function openBatchBuyerPool(
         const rows = store.read().entries;
         return Promise.all(
           rows.map(async (row) => {
-            await poolChild(options.paths, row);
-            const stored = await inspectBatchSession(
-              poolPaths(options.paths, row),
+            const stored = storedBatchSession(
+              await poolChild(options.paths, row),
             );
-            if (!stored) return sessionFail(SESSION_CODES.UNVERIFIED);
             return { ...row, stored };
           }),
         );
