@@ -23,6 +23,8 @@ Routes sit at the root of the index host; the client base URL is
 | ------------------------ | ------------------------------------------------------------------------------------------ |
 | `POST /v1/records`       | Publish one signed public v2 catalog, presence or withdrawal.                              |
 | `GET /v1/sellers`        | List live sellers of one model, paged by an opaque cursor.                                 |
+| `GET /v1/models`         | Every model live sellers list, with how many list it.                                      |
+| `GET /v1/uptime?node=`   | Public uptime of one NodeId over the last day, week and month (below).                     |
 | `GET /v1/health`         | `{ ok: true, records, publish }` (see below).                                              |
 | `POST /v1/registrations` | Trade a beta invite for publishing, once the NodeId is bound in the 8004 registry (below). |
 
@@ -207,6 +209,44 @@ signed a record; clients re-verify everything.
 - **Health:** each isolate reuses its `records` count for 30 seconds and counts
   again after it accepts a publish. `publish` always reflects the current mode.
 
+## Uptime
+
+Public seller uptime comes only from records the index already verified. Each
+UTC hour has one row per NodeId (`migrations/0004_uptime.sql`) with one bit per
+five-minute slot in which the index accepted a signed presence from that NodeId,
+at the index's own clock. Catalogs and withdrawals do not count. Rows older than
+30 days are pruned with the other expired rows.
+
+`GET /v1/uptime?node=<64 lowercase hex>` answers
+
+```json
+{
+  "nodeId": "…",
+  "firstSeenAt": 1762992000000,
+  "lastSeenAt": 1763078400000,
+  "slotMs": 300000,
+  "windows": [
+    { "days": 1, "seen": 286, "slots": 289, "ratio": 0.9896 },
+    { "days": 7, "seen": 2001, "slots": 2017, "ratio": 0.9921 },
+    { "days": 30, "seen": 2001, "slots": 2017, "ratio": 0.9921 }
+  ],
+  "generatedAt": 1763078400000
+}
+```
+
+`seen` counts slots with a presence and `slots` counts every slot from the
+window's start to now, inclusive. A window starts no earlier than `firstSeenAt`
+(within the 30 days kept), so a new seller is not counted down for time before
+it existed. A NodeId not seen in 30 days is `404 NOT_FOUND`; a malformed or
+repeated `node`, or any other parameter, is `400 INVALID_QUERY`. Answers are
+cached and CORS-readable like `/v1/models`.
+
+Each app instance writes a NodeId's slot once, however often the seller
+refreshes its presence, and the write is an idempotent bitwise OR. The write is
+best effort: if it fails, the presence is still accepted and that slot simply
+counts as offline. Uptime says a seller was reachable through the index; it does
+not say its answers were correct or fast.
+
 ## Storage
 
 `src/storage.ts` defines the storage contract and an in-memory adapter (tests
@@ -310,6 +350,16 @@ curl -s -X POST https://discovery.gyblos.com/v1/registrations \
 ```
 
 Rolling that code back leaves the `0003` tables unused; nothing needs reverting.
+
+Public uptime (migration `0004`) follows the same order: apply the migration,
+then deploy. It only adds a table, so the running version keeps working, and
+rolling the code back leaves the table unused.
+
+```sh
+npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote   # 0004
+npx wrangler@4.151.1 deploy
+curl -s "https://discovery.gyblos.com/v1/uptime?node=<a live seller NodeId>"  # 200 after its next presence
+```
 
 The global read limiter (`DISCOVERY_READ_LIMITER`, namespace `42621007`) ships
 in the same deploy as the code that requires it; deploying the code without the

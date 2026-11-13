@@ -6,6 +6,8 @@ import {
   type PublicRecordKind,
 } from '@gyblos/protocol/constants';
 
+import { memoryUptime, type UptimeStorage } from './uptime';
+
 // The NodeId's current catalog; `json` is its signed envelope exactly as published.
 export interface StoredCatalog {
   sequence: number;
@@ -61,11 +63,12 @@ export interface ModelRow {
   sellers: number;
 }
 
-export interface DiscoveryStorage {
+export interface DiscoveryStorage extends UptimeStorage {
   state(nodeId: string): Promise<NodeState | null>;
   // Number of tracked NodeIds (high-water marks), expired records included until pruned.
   nodeCount(): Promise<number>;
-  // Drops expired records; keeps high-water marks until their retainUntil.
+  // Drops expired records and uptime older than its window; keeps high-water marks until their
+  // retainUntil.
   prune(now: number): Promise<void>;
   // Atomic: true when applied, false when the sequence is not above the high-water mark.
   put(entry: StoredEntry): Promise<boolean>;
@@ -189,6 +192,7 @@ export function createMemoryStorage(): DiscoveryStorage {
   const withdrawals = new Map<string, MemoryRecord>();
   const withdrawn = (nodeId: string, digest: string) =>
     withdrawals.get(nodeId)?.digest === digest;
+  const uptime = memoryUptime();
   function apply(entry: StoredEntry) {
     const row: MemoryRecord = {
       sequence: entry.sequence,
@@ -231,7 +235,10 @@ export function createMemoryStorage(): DiscoveryStorage {
       dropExpired(withdrawals, now);
       for (const [id, node] of nodes)
         if (node.retainUntil <= now) nodes.delete(id);
+      uptime.prune(now);
     },
+    markSeen: uptime.markSeen,
+    seen: uptime.seen,
     async put(entry) {
       const node = nodes.get(entry.nodeId);
       if (node && node.lastSequence >= entry.sequence) return false;

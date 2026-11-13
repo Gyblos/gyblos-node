@@ -1,0 +1,119 @@
+// Public seller uptime on the discovery index: each five-minute slot in which the index accepted a
+// signed presence from a NodeId counts as online, GET /v1/uptime?node= reports the share of slots seen
+// over a day, a week and a month (never before the NodeId was first seen), and rows older than a month
+// are pruned. Both storage adapters; fake clock.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { createMemoryStorage } from '@gyblos/discovery-index/storage';
+import { UPTIME, uptimePage } from '@gyblos/discovery-index/uptime';
+
+import {
+  eachStorage,
+  expectError,
+  indexNode,
+} from './support/discovery-index-fixture';
+
+const { slotMs, dayMs } = UPTIME;
+
+eachStorage(
+  'uptime counts the slots in which the index accepted a presence',
+  async ({ publish, call, clock }) => {
+    const seller = indexNode();
+    let sequence = 1;
+    // A seller online now: a fresh catalog and a presence at the index's current time.
+    const online = async () => {
+      const catalog = seller.catalog(sequence++, { issuedAt: clock.now });
+      assert.equal((await publish(catalog)).status, 201);
+      const presence = await seller.presence(sequence++, catalog, {
+        issuedAt: clock.now,
+      });
+      assert.equal((await publish(presence)).status, 201);
+    };
+    await expectError(
+      await call(`/v1/uptime?node=${seller.nodeId}`),
+      404,
+      'NOT_FOUND',
+    );
+    const first = clock.now;
+    // Online for four slots, a second presence inside the same slot, offline for four, then back.
+    for (let slot = 0; slot < 4; slot++) {
+      await online();
+      clock.now += 1000;
+      await online();
+      clock.now += slotMs - 1000;
+    }
+    clock.now += 4 * slotMs;
+    await online();
+    const response = await call(`/v1/uptime?node=${seller.nodeId}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), '*');
+    const body = await response.json();
+    assert.equal(body.nodeId, seller.nodeId);
+    assert.equal(body.firstSeenAt, first);
+    assert.equal(body.lastSeenAt, clock.now);
+    assert.equal(body.slotMs, slotMs);
+    // Every window starts when the seller was first seen: 5 of 9 slots, whichever the window.
+    const slots =
+      Math.floor(clock.now / slotMs) - Math.floor(first / slotMs) + 1;
+    assert.equal(slots, 9);
+    assert.deepEqual(
+      body.windows.map((window: { days: number }) => window.days),
+      [1, 7, 30],
+    );
+    for (const window of body.windows) {
+      assert.equal(window.seen, 5);
+      assert.equal(window.slots, 9);
+      assert.equal(window.ratio, 0.5556);
+    }
+    for (const query of [
+      '',
+      '?node=XYZ',
+      `?node=${seller.nodeId.toUpperCase()}`,
+      `?node=${seller.nodeId}&node=${seller.nodeId}`,
+      `?node=${seller.nodeId}&x=1`,
+    ])
+      await expectError(await call(`/v1/uptime${query}`), 400, 'INVALID_QUERY');
+  },
+);
+
+eachStorage(
+  'a catalog or withdrawal alone is not uptime',
+  async ({ publish, call }) => {
+    const seller = indexNode();
+    const catalog = seller.catalog(1);
+    assert.equal((await publish(catalog)).status, 201);
+    assert.equal(
+      (await publish(await seller.withdrawal(2, catalog))).status,
+      201,
+    );
+    await expectError(
+      await call(`/v1/uptime?node=${seller.nodeId}`),
+      404,
+      'NOT_FOUND',
+    );
+  },
+);
+
+void test('windows are bounded by days, and a month-old row is pruned', async () => {
+  const storage = createMemoryStorage();
+  const node = 'a'.repeat(64);
+  const now = 40 * dayMs;
+  // Seen 20 days ago, then every slot of the last day.
+  await storage.markSeen(node, now - 20 * dayMs);
+  for (let at = now - dayMs + slotMs; at <= now; at += slotMs)
+    await storage.markSeen(node, at);
+  const body = JSON.parse((await uptimePage(storage, node, now))!);
+  const [day, week, month] = body.windows;
+  // 288 slots marked; the window also holds the slot it starts in.
+  assert.deepEqual([day.seen, day.slots, day.ratio], [288, 289, 0.9965]);
+  assert.deepEqual([week.seen, week.slots], [288, 7 * 288 + 1]);
+  // The month window starts at the first sighting, 20 days ago.
+  assert.deepEqual([month.seen, month.slots], [289, 20 * 288 + 1]);
+  await storage.prune(now + 11 * dayMs);
+  const later = JSON.parse(
+    (await uptimePage(storage, node, now + 11 * dayMs))!,
+  );
+  assert.equal(later.firstSeenAt, now - dayMs + slotMs);
+  assert.equal(await uptimePage(storage, node, now + 32 * dayMs), null);
+});

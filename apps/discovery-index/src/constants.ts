@@ -48,12 +48,14 @@ export const INDEX_ROUTES = {
   MODELS: '/v1/models',
   HEALTH: '/v1/health',
   REGISTRATIONS: '/v1/registrations',
+  UPTIME: '/v1/uptime',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.SELLERS,
   INDEX_ROUTES.MODELS,
   INDEX_ROUTES.HEALTH,
+  INDEX_ROUTES.UPTIME,
 ]);
 
 export const INDEX_HEADERS = {
@@ -209,4 +211,19 @@ export const IPV6 = {
   groups: 8,
   prefixGroups: 4,
   hexRadix: 16,
+} as const;
+
+// Public seller uptime (uptime.ts): five-minute slots, kept for the longest reported window.
+export const UPTIME = {
+  // Five minutes.
+  slotMs: 300_000,
+  hourMs: 3_600_000,
+  slotsPerHour: 12,
+  // Windows reported, in days; the longest is also how long rows are kept.
+  windowDays: [1, 7, 30],
+  dayMs: 86_400_000,
+  // NodeIds whose current slot this app instance already wrote; cleared when full.
+  maxRemembered: 4096,
+  // Ratios are rounded to four decimals.
+  ratioScale: 10_000,
 } as const;
