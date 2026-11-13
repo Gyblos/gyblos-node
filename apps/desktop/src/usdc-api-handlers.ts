@@ -1,7 +1,13 @@
 // Main-frame owner actions; delegated secrets remain in host memory and copy without being revealed.
+import {
+  AGENT_SETUP_CODES,
+  AGENT_TOOLS,
+  AgentSetupError,
+} from '@gyblos/node/agent-setup';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { parseBuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
 
+import { prepareAgentSetup, type AgentSetupFiles } from './agent-setup-host';
 import { paypalAgentExample } from './paypal-agent-example';
 import {
   emptyUsdcApi,
@@ -11,7 +17,8 @@ import {
 import type { X402Client } from './x402-client';
 
 type Owner = { contents: unknown; mainFrame(): unknown; destroyed(): boolean };
-type Client = Pick<X402Client, 'manageApiKeys' | 'policy'>;
+type Client = Pick<X402Client, 'manageApiKeys' | 'policy'> &
+  Partial<Pick<X402Client, 'agentEndpoint'>>;
 type Sender = { sender: unknown; senderFrame: unknown };
 class UsdcApiHost {
   private readonly secrets = new Map<string, string>();
@@ -23,6 +30,7 @@ class UsdcApiHost {
     private readonly client: Client,
     private readonly owner: Owner,
     private readonly copy: (value: string) => void,
+    private readonly files?: AgentSetupFiles,
   ) {}
   close() {
     this.closed = true;
@@ -67,6 +75,9 @@ class UsdcApiHost {
         .filter((key) => !key.revoked && this.secrets.has(key.id))
         .map((key) => key.id),
       error: null,
+      ...(this.state.policyId === this.binding.policyId && this.state.setup
+        ? { setup: this.state.setup }
+        : {}),
     };
     return structuredClone(this.state);
   }
@@ -127,6 +138,12 @@ class UsdcApiHost {
         return await this.refresh();
       if (input.policyId !== policy.policyId)
         throw new Error('Buyer changed. Refresh first.');
+      if (
+        input.action === USDC_API_ACTION.PREVIEW_AGENT ||
+        input.action === USDC_API_ACTION.COPY_AGENT ||
+        input.action === USDC_API_ACTION.WRITE_AGENT
+      )
+        return await this.agentSetup(input);
       const { policyId: _policyId, ...command } = input;
       if (
         input.action === USDC_API_ACTION.CREATE ||
@@ -134,21 +151,63 @@ class UsdcApiHost {
       )
         return await this.refresh(parseBuyerApiKeyCommand(command));
       return await this.copyConnection(input);
-    } catch {
+    } catch (error) {
+      if (error instanceof AgentSetupError) {
+        const { setup: _setup, ...state } = this.state;
+        this.state = state;
+      }
       return {
         ...structuredClone(this.state),
         error:
-          'Could not confirm API key status. Check Payments and refresh before using the connection.',
+          error instanceof AgentSetupError &&
+          error.code === AGENT_SETUP_CODES.ENDPOINT
+            ? 'Could not read the models served by the local buyer. Start the buyer and refresh; no model was substituted.'
+            : 'Could not confirm API key status. Check Payments and refresh before using the connection.',
       };
     } finally {
       this.busy = false;
     }
+  }
+  private async agentSetup(input: Record<string, unknown>) {
+    const tool = Object.values(AGENT_TOOLS).find((tool) => tool === input.tool);
+    const action = Object.values(USDC_API_ACTION).find(
+      (action) => action === input.action,
+    );
+    if (
+      Object.keys(input).sort().join(',') !== 'action,id,policyId,tool' ||
+      !tool ||
+      !action ||
+      !this.client.agentEndpoint
+    )
+      throw new Error('Invalid agent setup');
+    await this.refresh();
+    const endpoint = await this.client.agentEndpoint();
+    await this.refresh();
+    if (
+      this.closed ||
+      this.client.policy()?.policyId !== input.policyId ||
+      this.state.snapshot?.blocked ||
+      !this.state.snapshot?.keys.some(
+        (key) => key.id === input.id && !key.revoked,
+      )
+    )
+      throw new Error('Agent key is unavailable');
+    const setup = await prepareAgentSetup(
+      tool,
+      endpoint,
+      action,
+      this.copy,
+      this.files,
+    );
+    this.state = { ...this.state, setup };
+    return structuredClone(this.state);
   }
 }
 export function createUsdcApiHandlers(
   client: Client,
   owner: Owner,
   copy: (value: string) => void,
+  files?: AgentSetupFiles,
 ) {
-  return new UsdcApiHost(client, owner, copy);
+  return new UsdcApiHost(client, owner, copy, files);
 }

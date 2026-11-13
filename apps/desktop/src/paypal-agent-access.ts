@@ -56,11 +56,12 @@ function snapshot(
     disconnectFailed,
     sessionBusy,
   );
+  const budget = endpoint.budget();
   return {
     url: endpoint.url,
-    key: endpoint.key,
     model: endpoint.model,
-    ...endpoint.budget(),
+    keyLimitCents: budget.keyLimitCents,
+    keySpentCents: budget.keySpentCents,
     spentCents: state.spentCents,
     limitCents: state.limitCents,
     disconnecting: usage === USAGE.DISCONNECTING,
@@ -140,6 +141,23 @@ function currentSnapshot(
     : null;
 }
 
+function copyEndpointKey(
+  access: EndpointState,
+  closing: boolean,
+  write: (secret: string) => void,
+) {
+  if (
+    !access.current ||
+    !access.current.isCurrent() ||
+    closing ||
+    access.disconnecting ||
+    access.disconnectFailed
+  )
+    return false;
+  write(access.current.key);
+  return true;
+}
+
 export function createDesktopPaypalAgentAccess(
   status: () => SessionStatus,
   start: (limitCents: number) => Promise<Endpoint>,
@@ -214,5 +232,7 @@ export function createDesktopPaypalAgentAccess(
     disconnect,
     close,
     status: () => currentSnapshot(access, status, isSessionBusy),
+    copyKey: (write: (secret: string) => void) =>
+      copyEndpointKey(access, !!closing, write),
   };
 }

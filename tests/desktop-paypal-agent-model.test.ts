@@ -18,7 +18,7 @@ import {
 void test('OpenCode configuration uses an environment variable instead of embedding the key', () => {
   const config = opencodeConfig({
     url: 'http://127.0.0.1:12345/v1',
-    key: 'synthetic-secret-key',
+
     model: 'synthetic-model',
   });
   assert.match(config, /\{env:GYBLOS_API_KEY\}/);
@@ -68,7 +68,7 @@ void test('Pi settings disable automatic extra calls for the sandbox session', (
 void test('Pi configuration connects to Gyblos without embedding its temporary key', () => {
   const config = piConfig({
     url: 'http://127.0.0.1:12345/v1',
-    key: 'synthetic-secret-key',
+
     model: 'synthetic-model',
   });
   assert.doesNotMatch(config, /synthetic-secret-key/);
@@ -97,7 +97,7 @@ void test('Pi configuration connects to Gyblos without embedding its temporary k
 void test('Codex configuration uses Responses without embedding credentials or automatic retries', () => {
   const config = codexConfig({
     url: 'http://127.0.0.1:12345/v1',
-    key: 'synthetic-secret-key',
+
     model: 'synthetic-model',
   });
   assert.doesNotMatch(config, /synthetic-secret-key/);
@@ -115,7 +115,7 @@ void test('Codex configuration uses Responses without embedding credentials or a
 void test('Claude Code configuration uses a local root URL without embedding credentials', () => {
   const config = claudeCodeConfig({
     url: 'http://127.0.0.1:12345/v1',
-    key: 'synthetic-secret-key',
+
     model: 'synthetic-model',
   });
   assert.doesNotMatch(config, /synthetic-secret-key/);
@@ -130,7 +130,7 @@ void test('Claude Code configuration uses a local root URL without embedding cre
 void test('Claude Code PowerShell configuration safely sets the local gateway without embedding the key', () => {
   const config = claudeCodePowerShellConfig({
     url: 'http://127.0.0.1:12345/v1',
-    key: 'synthetic-secret-key',
+
     model: "synthetic'model",
   });
   assert.doesNotMatch(config, /synthetic-secret-key/);
@@ -176,7 +176,7 @@ void test('a confirmed disconnect clears an older stalled status warning', () =>
 void test('a failed status check preserves an existing connection until status is known', () => {
   const connection = {
     url: 'http://127.0.0.1:12345/v1',
-    key: 'a'.repeat(43),
+
     model: 'synthetic-model',
     spentCents: 20,
     limitCents: 100,
@@ -202,7 +202,7 @@ void test('a failed status check preserves an existing connection until status i
 void test('IPC result rejects external connection URLs and malformed keys', () => {
   const connection = {
     url: 'http://127.0.0.1:12345/v1',
-    key: 'a'.repeat(43),
+
     model: 'synthetic-model',
     spentCents: 0,
     limitCents: 100,
@@ -257,7 +257,7 @@ void test('API key limits parse exact decimal cents and reject unsupported or in
     assert.equal(paypalAgentLimitCents(draft), null);
   const connection = {
     url: 'http://127.0.0.1:12345/v1',
-    key: 'a'.repeat(43),
+
     model: 'synthetic',
     spentCents: 30,
     limitCents: 100,

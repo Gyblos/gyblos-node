@@ -41,6 +41,11 @@ export const USDC_API = {
   POLL_MS: 3000,
   DEFAULT_LIMIT: '0.01',
 } as const;
+export const USDC_AGENT_SETUP = {
+  tokenEnv: 'GYBLOS_API_KEY',
+  maxTextCharacters: 65536,
+  maxPathCharacters: 4096,
+} as const;
 export const USDC_API_ACTION = {
   STATUS: 'status',
   CREATE: 'create',

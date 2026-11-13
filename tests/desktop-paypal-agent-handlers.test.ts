@@ -10,7 +10,6 @@ void test('only the desktop main frame can request agent connection details', as
   let loads = 0;
   const connection = {
     url: 'http://127.0.0.1:12345/v1',
-    key: 'synthetic-key',
     model: 'synthetic-model',
     spentCents: 0,
     limitCents: 100,
@@ -25,6 +24,7 @@ void test('only the desktop main frame can request agent connection details', as
     async connect() {
       return connection;
     },
+    copyKey: () => false,
     async disconnect() {},
     async close() {},
   };
@@ -82,6 +82,7 @@ void test('only a valid explicit key limit can create API access through IPC', a
       granted = limit;
       throw new Error('synthetic stop before creating a key');
     },
+    copyKey: () => false,
     async disconnect() {},
     async close() {},
   };

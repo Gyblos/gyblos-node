@@ -50,6 +50,10 @@ function fixture(failClipboard = false) {
     async connect() {
       return connection;
     },
+    copyKey(write: (text: string) => void) {
+      write(connection.key);
+      return true;
+    },
     async disconnect() {},
     async close() {},
   };

@@ -58,7 +58,7 @@ function ConnectionFields({
         id="agent-key"
         label="API key"
         secret
-        value={connection.key}
+        value="Stored in the app"
         actionLabel="Copy API key"
         disabled={disabled}
         onCopy={() => {

@@ -1,4 +1,5 @@
 // Main-frame bridge and private budget storage; the buyer runs as an isolated executable.
+import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 
 import {
@@ -119,6 +120,7 @@ export function registerDesktopX402(
       destroyed: () => window.isDestroyed(),
     },
     (text) => clipboard.writeText(text),
+    { home: homedir(), environment: process.env },
   );
   ipcMain.handle(USDC_API.CHANNEL, (event, ...args: unknown[]) =>
     apiKeys.run(event, args),

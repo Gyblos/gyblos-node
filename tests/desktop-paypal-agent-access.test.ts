@@ -36,13 +36,11 @@ void test('agent access starts once only after a sandbox session is active', asy
   await assert.rejects(access.connect());
   assert.equal(opened, 0);
   phase = 'active';
-  const [first, second] = await Promise.all([
-    access.connect(),
-    access.connect(),
-  ]);
+  const pending = [access.connect(), access.connect()];
+  const [first, second] = await Promise.all(pending);
   assert.equal(opened, 1);
   assert.equal(first.url, endpoint.url);
-  assert.equal(second.key, endpoint.key);
+  assert.equal(Object.hasOwn(second, 'key'), false);
   await access.close();
   assert.equal(closed, 1);
   await assert.rejects(access.connect());
@@ -153,10 +151,12 @@ void test('a new session gets a new connection and the previous endpoint is clos
       };
     },
   );
-  assert.equal((await access.connect()).key, 'key-1');
+  await access.connect();
+  assert.ok(access.copyKey((key) => assert.equal(key, 'key-1')));
   generation = 2;
   assert.equal(access.status(), null);
-  assert.equal((await access.connect()).key, 'key-2');
+  await access.connect();
+  assert.ok(access.copyKey((key) => assert.equal(key, 'key-2')));
   assert.equal(closed, 1);
   await access.close();
 });

@@ -33,9 +33,7 @@ export const DESKTOP_PAYPAL_AGENT = {
   CHANNEL: 'desktop:paypal-agent',
   COPY_CHANNEL: 'desktop:paypal-agent-copy',
   TOKEN_BYTES: 32,
-  TOKEN_CHARACTERS: 43,
   MODEL_CHARACTERS: 128,
-  MODEL: 'gpt-oss:20b',
   POLL_MS: 2000,
   RESPONSE_DRAIN_MS: 10_000,
 } as const;
@@ -61,7 +59,7 @@ export class PaypalAgentConnectionError extends Error {
 }
 export function paypalAgentErrorMessage(error: PaypalAgentResult['error']) {
   if (error === PAYPAL_AGENT_ERROR.MODEL_UNAVAILABLE)
-    return `Check that ${DESKTOP_PAYPAL_AGENT.MODEL} is installed in Ollama. Settle this session in Payments, restart Gyblos, and start a new session.`;
+    return 'Check that the configured sandbox model is installed in Ollama. Settle this session in Payments, restart Gyblos, and start a new session.';
   if (error === PAYPAL_AGENT_ERROR.NEW_SESSION_REQUIRED)
     return 'Settle the current session in Payments and start a new one to connect the agent.';
   return 'Check that a PayPal Sandbox session is active in Payments, then try again.';
@@ -71,7 +69,6 @@ export type PaypalAgentAction =
 export type PaypalAgentResult = {
   connection: {
     url: string;
-    key: string;
     model: string;
     spentCents: number;
     limitCents: number;
@@ -131,7 +128,7 @@ export function paypalAgentIsReady(
   );
 }
 export function opencodeConfig(
-  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
+  connection: Pick<AgentConnection, 'url' | 'model'>,
 ) {
   return JSON.stringify(
     {
@@ -160,9 +157,7 @@ export function opencodeConfig(
     2,
   );
 }
-export function piConfig(
-  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
-) {
+export function piConfig(connection: Pick<AgentConnection, 'url' | 'model'>) {
   return JSON.stringify(
     {
       providers: {
@@ -205,7 +200,7 @@ export function piSettings() {
   );
 }
 export function codexConfig(
-  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
+  connection: Pick<AgentConnection, 'url' | 'model'>,
 ) {
   return [
     'model_provider = "gyblos"',
@@ -232,7 +227,7 @@ function shellLiteral(value: string) {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 export function claudeCodeConfig(
-  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
+  connection: Pick<AgentConnection, 'url' | 'model'>,
 ) {
   return [
     `export ANTHROPIC_BASE_URL=${shellLiteral(new URL(connection.url).origin)}`,
@@ -248,7 +243,7 @@ export function claudeCodeConfig(
   ].join('\n');
 }
 export function claudeCodePowerShellConfig(
-  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
+  connection: Pick<AgentConnection, 'url' | 'model'>,
 ) {
   const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
   return [
@@ -266,11 +261,9 @@ export function claudeCodePowerShellConfig(
 }
 export function paypalAgentCopyText(
   connection: AgentConnection,
-  target: PaypalAgentCopyTarget,
+  target: Exclude<PaypalAgentCopyTarget, typeof PAYPAL_AGENT_COPY.KEY>,
 ) {
   switch (target) {
-    case PAYPAL_AGENT_COPY.KEY:
-      return connection.key;
     case PAYPAL_AGENT_COPY.URL:
       return connection.url;
     case PAYPAL_AGENT_COPY.MODEL:
@@ -325,7 +318,7 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
   if (
     !row ||
     Object.keys(row).sort().join(',') !==
-      'disconnecting,key,keyLimitCents,keySpentCents,limitCents,model,spentCents,url,usageState,usageUncertain'
+      'disconnecting,keyLimitCents,keySpentCents,limitCents,model,spentCents,url,usageState,usageUncertain'
   )
     return null;
   const budget = parsePaypalAgentBudget(row);
@@ -344,9 +337,6 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
   if (
     typeof row.url !== 'string' ||
     !URL.canParse(row.url) ||
-    typeof row.key !== 'string' ||
-    row.key.length !== DESKTOP_PAYPAL_AGENT.TOKEN_CHARACTERS ||
-    !/^[A-Za-z0-9_-]+$/.test(row.key) ||
     typeof row.model !== 'string' ||
     !row.model ||
     row.model.length > DESKTOP_PAYPAL_AGENT.MODEL_CHARACTERS ||
@@ -374,7 +364,6 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     return null;
   return {
     url: row.url,
-    key: row.key,
     model: row.model,
     spentCents: row.spentCents,
     limitCents: row.limitCents,

@@ -2,6 +2,7 @@
 // It never retries a transmitted request or treats a seller's unverified claim as a payment.
 import { LOCALHOST, ROUTES } from '@gyblos/config';
 import { DEVNET_USDC } from '@gyblos/config/network';
+import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
 import { PAID_BUYER_CODES, PAID_VERDICTS } from '@gyblos/node/constants';
 import {
   BUYER_API,
@@ -15,6 +16,7 @@ import {
   OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 
+import { requestAgentEndpoint } from './agent-endpoint';
 import { RESPONSE_COST_KIND, RESPONSE_COST_UNIT } from './constants';
 import { observedResponse, reportedUsage } from './response-metrics';
 import { requestBuyerApiKeys } from './usdc-api-client';
@@ -207,6 +209,25 @@ export class X402Client {
     } finally {
       this.busy = false;
     }
+  }
+  agentEndpoint() {
+    if (!this.connection || this.closed)
+      return Promise.reject(new AgentSetupError(AGENT_SETUP_CODES.ENDPOINT));
+    const connection = this.connection;
+    const controller = new AbortController();
+    const work = requestAgentEndpoint(
+      connection,
+      this.request,
+      controller.signal,
+    ).then((endpoint) => {
+      if (this.closed || this.connection !== connection)
+        throw new AgentSetupError(AGENT_SETUP_CODES.ENDPOINT);
+      return endpoint;
+    });
+    this.keyRequests.set(work, controller);
+    return work.finally(() => {
+      this.keyRequests.delete(work);
+    });
   }
   send(id: string, prompt: string) {
     if (this.busy || this.closed || !this.connection)

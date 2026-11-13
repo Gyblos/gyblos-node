@@ -16,7 +16,7 @@ import { openPaypalSandbox } from '@gyblos/node/paypal-startup';
 
 import { createActivityHandlers } from './activity-handlers';
 import { createDesktopActivityStorage } from './activity-storage';
-import { DESKTOP_ACTIVITY } from './constants';
+import { DESKTOP_ACTIVITY, PAYPAL_SANDBOX_AGENT_MODEL } from './constants';
 import { createDesktopPaypalAgentAccess } from './paypal-agent-access';
 import { createDesktopPaypalAgentHandlers } from './paypal-agent-handlers';
 import { DESKTOP_PAYPAL_AGENT } from './paypal-agent-model';
@@ -77,7 +77,7 @@ async function startSandbox(window: BrowserWindow) {
       stateDirectory,
       returnOrigin: callback.origin,
       ollamaOrigin: settings.ollamaOrigin,
-      agentModel: DESKTOP_PAYPAL_AGENT.MODEL,
+      agentModel: PAYPAL_SANDBOX_AGENT_MODEL,
       deferEngineCheck: true,
     });
     const model = sandbox.model;

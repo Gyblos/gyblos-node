@@ -1,6 +1,5 @@
 // Presents freshly checked shared amounts; never infers client identity or payment success.
 import {
-  DESKTOP_PAYPAL_AGENT,
   PAYPAL_AGENT_USAGE_STATE,
   paypalAgentConnectionLabel,
   paypalAgentIsReady,
@@ -116,9 +115,7 @@ export function ConnectionContext(props: Props) {
           </>
         ) : (
           <>
-            <strong className="ui-monospace">
-              {DESKTOP_PAYPAL_AGENT.MODEL}
-            </strong>
+            <strong>Configured sandbox model</strong>
             <p className="ui-help-text">Local · Ollama</p>
           </>
         )}

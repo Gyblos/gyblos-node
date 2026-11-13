@@ -77,6 +77,8 @@ export function createDesktopPaypalAgentHandlers(
           connection.usageState === PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED
         )
           return false;
+        if (target === PAYPAL_AGENT_COPY.KEY)
+          return current?.()?.agentAccess.copyKey(writeClipboard) ?? false;
         writeClipboard(paypalAgentCopyText(connection, target));
         return true;
       } catch {

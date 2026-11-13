@@ -6,11 +6,38 @@ then give each key a name and a lifetime spending limit. The key and Base URL
 can be copied into a compatible client. Keep Gyblos and its buyer running while
 the client uses them.
 
-The supported inference interfaces are OpenAI Chat Completions and Anthropic
-Messages, including text history and streaming. Model discovery is authenticated
-and does not consume the key budget. This buyer does not implement tool calls or
-the Responses API. These capabilities differ from the separate PayPal prototype;
-a connection does not imply that every coding agent is supported.
+The supported inference interfaces are OpenAI Chat Completions, Responses and
+Anthropic Messages, including text history and streaming. Tool requests still
+need a compatible seller and execution policy; unsupported options are rejected
+before sending the prompt. Model discovery is authenticated and does not consume
+the key budget.
+
+## Connect a coding agent
+
+With an active key selected in **Connections**, choose **Connect agent**. The
+app reads `GET /v1/models` from that same local buyer and prepares OpenCode, pi,
+Codex CLI or Claude Code configuration with every model it serves and its output
+limit. This list is the buyer's configured routes, not every model advertised by
+the network. An empty, invalid or unavailable list stops setup; no model is
+invented.
+
+Preview and copy use the same generators as `pnpm buyer:agent`. Codex uses the
+Responses interface, with HTTP and stream retries disabled. **Write
+configuration** uses the CLI's shared atomic writer, preserves other settings
+and keeps the first `.before-gyblos` backup. New files are private from
+creation. Existing symlinked configurations retain their link. Claude Code uses
+shell environment settings instead of a file, so its configuration is copy-only.
+
+The generated configuration references `GYBLOS_API_KEY`; it never contains the
+credential's value. Use **Copy API key** and set that variable in the shell that
+starts the agent. The operator token and delegated secrets stay in the app's
+main process; the renderer receives only generated references and public status.
+No additional inference server is started. Model switching uses the same buyer
+and key, with their original spending and routing limits.
+
+The separate PayPal Sandbox demo retains its local Ollama engine and payment
+lifecycle. It does not purchase inference from network sellers. Its key also
+copies through the native clipboard without being returned in renderer status.
 
 ## Authority and accounting
 

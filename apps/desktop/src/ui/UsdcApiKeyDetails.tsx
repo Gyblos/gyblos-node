@@ -7,6 +7,7 @@ import type {
 } from '@gyblos/protocol/buyer-api-keys';
 
 import { usdcApiAmount as amount, USDC_API_ACTION } from '../usdc-api-model';
+import { BuyerAgentSetup } from './BuyerAgentSetup';
 import { BUTTON_VARIANT } from './constants';
 import { CopyField, FormActions } from './Form';
 import { Facts, Pair } from './Management';
@@ -94,6 +95,38 @@ function RevokeConfirmation({
     </Modal>
   );
 }
+function KeyActions({
+  api,
+  id,
+  known,
+  revoked,
+  revoke,
+}: {
+  api: Controller;
+  id: string;
+  known: boolean;
+  revoked: boolean;
+  revoke: () => void;
+}) {
+  const { busy, run } = api;
+  return (
+    <FormActions align="start">
+      <BuyerAgentSetup api={api} id={id} disabled={busy || !known || revoked} />
+      <Button
+        disabled={busy || !known || revoked}
+        onClick={() => {
+          void run({ action: USDC_API_ACTION.COPY_EXAMPLE, id });
+        }}
+      >
+        Copy API example
+      </Button>
+      <Button disabled={busy || revoked} onClick={revoke}>
+        Revoke key
+      </Button>
+    </FormActions>
+  );
+}
+
 export function UsdcApiKeyDetails({
   api,
   id,
@@ -150,22 +183,17 @@ export function UsdcApiKeyDetails({
         }}
       />
       <KeyUsage keyStatus={key} scope={scope} known={known} />
-      <FormActions align="start">
-        <Button
-          disabled={busy || !known || key.revoked}
-          onClick={() => {
-            void run({ action: USDC_API_ACTION.COPY_EXAMPLE, id });
-          }}
-        >
-          Copy API example
-        </Button>
-        <Button disabled={busy || key.revoked} onClick={() => setConfirm(true)}>
-          Revoke key
-        </Button>
-      </FormActions>
+      <KeyActions
+        api={api}
+        id={id}
+        known={known}
+        revoked={key.revoked}
+        revoke={() => setConfirm(true)}
+      />
       <p className="ui-help-text">
-        OpenAI Chat Completions and Anthropic Messages · text history. Tool
-        calls and the Responses API are not supported by this buyer yet.
+        OpenAI Chat Completions, Responses and Anthropic Messages use the same
+        buyer and its configured models. Unsupported options are refused before
+        sending the prompt.
       </p>
       {confirm && (
         <RevokeConfirmation id={id} close={() => setConfirm(false)} run={run} />

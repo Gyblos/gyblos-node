@@ -11,6 +11,10 @@ import {
   type BuyerKeyScope,
 } from '@gyblos/protocol/buyer-api-keys';
 
+import {
+  parseAgentSetupPreview,
+  type AgentSetupPreview,
+} from './agent-setup-model';
 import { x402Amount } from './x402-model';
 
 export {
@@ -25,6 +29,7 @@ export interface UsdcApiState {
   model: string | null;
   copyable: string[];
   error: string | null;
+  setup?: AgentSetupPreview;
 }
 export function emptyUsdcApi(): UsdcApiState {
   return {
@@ -44,6 +49,9 @@ export function parseUsdcApiState(input: unknown): UsdcApiState {
     'model',
     'copyable',
     'error',
+    ...(input && typeof input === 'object' && Object.hasOwn(input, 'setup')
+      ? ['setup']
+      : []),
   ]);
   if (row.error !== null && typeof row.error !== 'string')
     throw new Error('Invalid API status');
@@ -58,7 +66,8 @@ export function parseUsdcApiState(input: unknown): UsdcApiState {
       row.policyId !== null ||
       row.url !== null ||
       row.model !== null ||
-      row.copyable.length
+      row.copyable.length ||
+      row.setup !== undefined
     )
       throw new Error('Invalid API status');
     return { ...emptyUsdcApi(), error: row.error };
@@ -95,6 +104,9 @@ export function parseUsdcApiState(input: unknown): UsdcApiState {
     model: row.model,
     copyable: row.copyable,
     error: row.error,
+    ...(row.setup !== undefined
+      ? { setup: parseAgentSetupPreview(row.setup) }
+      : {}),
   };
 }
 

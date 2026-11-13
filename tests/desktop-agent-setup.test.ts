@@ -16,11 +16,25 @@ void test('desktop previews all buyer models for each agent without exposing cre
   for (const tool of Object.values(AGENT_TOOLS)) {
     const result = await f.run(USDC_API_ACTION.PREVIEW_AGENT, tool);
     assert.equal(result.error, null);
-    assert.equal(result.setup?.text, agentText(tool, { origin: f.origin, models: f.models.map((model) => ({ id: model.id, maxOutputTokens: model.maxTokens })), tokenEnv: 'GYBLOS_API_KEY' }));
-    assert.deepEqual(result.setup?.models, f.models.map((model) => model.id));
+    assert.equal(
+      result.setup?.text,
+      agentText(tool, {
+        origin: f.origin,
+        models: f.models.map((model) => ({
+          id: model.id,
+          maxOutputTokens: model.maxTokens,
+        })),
+        tokenEnv: 'GYBLOS_API_KEY',
+      }),
+    );
+    assert.deepEqual(
+      result.setup?.models,
+      f.models.map((model) => model.id),
+    );
     assert.ok(!JSON.stringify(result).includes(f.token));
     assert.doesNotMatch(JSON.stringify(result), /gyb_[A-Za-z0-9_-]+/);
-    if (tool === AGENT_TOOLS.CODEX) assert.match(result.setup?.text ?? '', /wire_api = "responses"/);
+    if (tool === AGENT_TOOLS.CODEX)
+      assert.match(result.setup?.text ?? '', /wire_api = "responses"/);
   }
   assert.equal(f.generations(), 0);
 });
@@ -35,7 +49,10 @@ void test('desktop copies generated references and writes only its host-selected
   const copied = await f.run(USDC_API_ACTION.COPY_AGENT, AGENT_TOOLS.PI);
   assert.equal(copied.error, null);
   assert.equal(f.copied.at(-1), copied.setup?.text);
-  assert.doesNotMatch(f.copied.at(-1) ?? '', /synthetic-private-owner-token|gyb_[A-Za-z0-9_-]+/);
+  assert.doesNotMatch(
+    f.copied.at(-1) ?? '',
+    /synthetic-private-owner-token|gyb_[A-Za-z0-9_-]+/,
+  );
   for (const _ of [1, 2]) {
     const written = await f.run(USDC_API_ACTION.WRITE_AGENT, AGENT_TOOLS.PI);
     assert.equal(written.error, null);
@@ -47,4 +64,42 @@ void test('desktop copies generated references and writes only its host-selected
   assert.match(await readFile(path, 'utf8'), /synthetic-other/);
   assert.match(await readFile(path, 'utf8'), /\$GYBLOS_API_KEY/);
   assert.equal(f.generations(), 0);
+});
+
+void test('one app-created key switches between the buyer models through the shared Responses endpoint', async (t) => {
+  const f = await desktopAgentFixture({ inference: true });
+  t.after(() => f.close());
+  const setup = await f.run(USDC_API_ACTION.PREVIEW_AGENT, AGENT_TOOLS.CODEX);
+  assert.equal(setup.error, null);
+  assert.equal(f.generations(), 0);
+  const copied = await f.run(USDC_API_ACTION.COPY_KEY);
+  assert.equal(copied.error, null);
+  const token = f.copied.at(-1);
+  assert.ok(token);
+  assert.ok(!JSON.stringify(copied).includes(token));
+  for (const model of f.models) {
+    const response: Response = await fetch(new URL('/v1/responses', f.origin), {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model.id,
+        input: 'synthetic',
+        max_output_tokens: 8,
+      }),
+    });
+    assert.equal(response.status, 200);
+    const result: unknown = await response.json();
+    assert.ok(
+      result &&
+        typeof result === 'object' &&
+        'model' in result &&
+        'status' in result,
+    );
+    assert.equal(result.model, model.id);
+    assert.equal(result.status, 'completed');
+  }
+  assert.equal(f.generations(), 2);
 });

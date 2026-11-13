@@ -13,7 +13,7 @@ import { paypalSessionCanConnectAgent } from '@gyblos/desktop/paypal-model';
 void test('agent connection labels do not present uncertain usage as ready', () => {
   const connection: NonNullable<PaypalAgentResult['connection']> = {
     url: 'http://127.0.0.1:1234/v1',
-    key: 'synthetic-key',
+
     model: 'synthetic-model',
     spentCents: 30,
     limitCents: 100,
@@ -100,7 +100,7 @@ void test('agent setup guides missing or unusable payment sessions to Payments',
   assert.equal(paypalAgentNeedsPayments(null, false, true), false);
   const connection: NonNullable<PaypalAgentResult['connection']> = {
     url: 'http://127.0.0.1:1234/v1',
-    key: 'synthetic-key',
+
     model: 'synthetic-model',
     spentCents: 30,
     limitCents: 100,
@@ -119,7 +119,7 @@ void test('retained API details are ready only with confirmed usable connection 
   assert.equal(typeof model.paypalAgentIsReady, 'function');
   const connection: NonNullable<PaypalAgentResult['connection']> = {
     url: 'http://127.0.0.1:1234/v1',
-    key: 'synthetic-key',
+
     model: 'synthetic-model',
     spentCents: 20,
     limitCents: 100,
