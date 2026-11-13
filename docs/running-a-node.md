@@ -1177,22 +1177,23 @@ leading `developer` or `system` messages become the system text, later ones
 (Codex sends one when the model changes) are sent as user text, consecutive
 `function_call` items form one assistant turn (checked together), and
 `function_call_output` items answer them. It is stateless: `store` must be
-false, and `previous_response_id`, structured `text.format`, custom, namespaced
-(MCP) or other provider tools, and audio or file parts are refused with a 400
-that names them. For Codex sessions, three things are left out rather than
-refused: the `web_search` tool Codex offers on every request (no seller runs
-it), `reasoning` and `web_search_call` records from a session that began on
-another provider, and images, which become a short `[image omitted …]` text so a
-session that once saw a picture goes on. `include`, `prompt_cache_key` and
-bookkeeping hints are accepted and ignored. Non-neutral reasoning, sampling
-settings and `parallel_tool_calls: false` are refused before execution: the
-signed protocol cannot express those constraints yet. Codex versions that
-require them are not supported until that follow-up. A stream sends
-`response.created`, the message item (`output_item.added`, `content_part.added`,
-`output_text.delta`, then their `done` events) once text starts, each call as a
-`function_call` item (`output_item.added`, `function_call_arguments.done`,
-`output_item.done`), and `response.completed` with usage; a token-limited answer
-ends with `response.incomplete`, status `incomplete`, and its delivered usage. A
+false, and `previous_response_id`, structured `text.format`, custom or other
+provider tools, and audio or file parts are refused with a 400 that names them.
+For Codex sessions, three things are left out rather than refused: the
+`web_search` tool and the tool groups (`namespace`, such as Codex's sub-agent
+and MCP tools) Codex sends on every request (no seller runs them), `reasoning`
+and `web_search_call` records from a session that began on another provider, and
+images, which become a short `[image omitted …]` text so a session that once saw
+a picture goes on. `include`, `prompt_cache_key` and bookkeeping hints are
+accepted and ignored. Non-neutral reasoning, sampling settings and
+`parallel_tool_calls: false` are refused before execution: the signed protocol
+cannot express those constraints yet. Codex versions that require them are not
+supported until that follow-up. A stream sends `response.created`, the message
+item (`output_item.added`, `content_part.added`, `output_text.delta`, then their
+`done` events) once text starts, each call as a `function_call` item
+(`output_item.added`, `function_call_arguments.done`, `output_item.done`), and
+`response.completed` with usage; a token-limited answer ends with
+`response.incomplete`, status `incomplete`, and its delivered usage. A
 possible-send failure before the first stream event uses HTTP 400 and
 `invalid_prompt` to stop clients that ignore retry headers. A failure after the
 stream starts is `response.failed` with code `invalid_prompt` (which Codex shows
