@@ -361,3 +361,36 @@ void test('free client checks the shared uncertainty barrier immediately before 
   assert.equal(checks, 1);
   assert.equal(item.writes(), 0);
 });
+
+void test('partial writes carry transport provenance without blaming local validation', async () => {
+  const item = await fixture();
+  item.setWrite(async () => {
+    throw new Error('synthetic reset');
+  });
+  await assert.rejects(item.client.execute(item.request), {
+    code: FREE_EXECUTION_CODES.INTERNAL,
+    sent: true,
+    ioFailure: true,
+  });
+});
+void test('a raw response reset carries transport provenance', async () => {
+  const item = await fixture();
+  const disconnected = {
+    ...item.connection,
+    openBi: async () => ({
+      send: { writeAll: async () => {}, finish: async () => {} },
+      recv: {
+        readExact: async () => {
+          throw new Error('synthetic reset');
+        },
+        read: async () => [],
+      },
+    }),
+  };
+  item.setConnect(async () => disconnected as unknown as Connection);
+  await assert.rejects(item.client.execute(item.request), {
+    code: FREE_EXECUTION_CODES.INTERNAL,
+    sent: true,
+    ioFailure: true,
+  });
+});

@@ -146,6 +146,26 @@ Execution still requires the independently trusted compatible v1 offer; no v2
 payment or free-v2 execution is enabled. See
 [running-a-node.md](running-a-node.md).
 
+### Open discovery
+
+With `"discovery": { "open": true }` (which requires `identity`), the dedicated
+`buyer:free` entry also uses sellers it never configured: for each catalog the
+index lists for the model, the catalog's owner must hold that NodeId in the 8004
+registry, checked before anything is remembered, exactly as for a configured
+seller. Such a seller is dialed by NodeId through the first configured relay
+(`GYBLOS_RELAYS`); the index supplies no address. Configured sellers come first
+and the candidate list stays within 16. Their stats live in memory only, so
+`selection-stats.json` keeps the configured sellers alone. With open discovery
+`sellers` may be empty. The usual replay and withdrawal checks still apply. Only
+`buyer:free` uses these sellers (`buyer`, `buyer:chat`, paid and session
+execution keep their configured list), and never one the request already tried.
+Each selection makes at most 16 new identity lookups; an identity the registry
+refused is not looked up again for five minutes; and durable identity history
+admits at most 64 unconfigured NodeIds across restarts, including owner-mismatch
+and revocation floors. Space is reserved for the original configured IDs. A
+capacity refusal preserves existing trust history without poisoning checks of
+known identities; storage corruption and rollback still fail closed.
+
 ## Seller duties
 
 The seller publisher is opt-in. Set `GYBLOS_DISCOVERY_PUBLISH=1` when starting
