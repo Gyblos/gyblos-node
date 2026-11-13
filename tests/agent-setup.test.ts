@@ -8,6 +8,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rm,
   stat,
   writeFile,
 } from 'node:fs/promises';
@@ -22,8 +23,10 @@ import {
   claudeCodeEnvironment,
   CODEX_MARKS,
   codexBlock,
+  codexProfiles,
   mergedAgentFile,
   mergedCodexConfig,
+  mergedCodexProfile,
   opencodeProvider,
   piProvider,
   type AgentEndpoint,
@@ -63,11 +66,22 @@ void test('every tool gets every model with its limits, on the local endpoint', 
   const codex = codexBlock(ENDPOINT);
   assert.match(codex, /wire_api = "responses"/);
   assert.match(codex, /stream_max_retries = 0/);
-  assert.match(
-    codex,
-    /\[profiles\."gyblos"\]\nmodel_provider = "gyblos"\nmodel = "qwen3-0.6b"/,
+  // Codex CLI 0.162+ refuses profile tables in config.toml: each profile is its own file.
+  assert.doesNotMatch(codex, /profiles/);
+  const profiles = codexProfiles(ENDPOINT);
+  assert.deepEqual(
+    profiles.map((profile) => profile.file),
+    [
+      'gyblos.config.toml',
+      'gyblos-qwen3-0-6b.config.toml',
+      'gyblos-gpt-oss-20b.config.toml',
+    ],
   );
-  assert.match(codex, /\[profiles\."gyblos-gpt-oss-20b"\]/);
+  assert.match(
+    profiles[0]!.text,
+    /^# .*\nmodel_provider = "gyblos"\nmodel = "qwen3-0.6b"\nweb_search = "disabled"\n$/,
+  );
+  assert.match(profiles[2]!.text, /model = "gpt-oss-20b"/);
   // Tables only, so the block is valid at the end of any config.toml.
   const lines = codex
     .split('\n')
@@ -146,8 +160,7 @@ void test('the Codex block is added once and replaced in place, never doubled', 
     once,
   );
   assert.equal(twice.split(CODEX_MARKS.start).length, 2);
-  assert.match(twice, /model = "gpt-oss-20b"/);
-  assert.doesNotMatch(twice, /qwen3/);
+  assert.equal(twice, once);
   assert.ok(twice.startsWith(user));
   for (const edited of [
     `${user}${CODEX_MARKS.start}\n`,
@@ -182,6 +195,18 @@ void test('writing keeps the first copy of the previous file, atomically, and ho
   });
   assert.equal(codex.path, join(codexHome, 'config.toml'));
   assert.match(await readFile(codex.path, 'utf8'), /wire_api = "responses"/);
+  assert.deepEqual(
+    codex.profiles,
+    codexProfiles(ENDPOINT).map((profile) => join(codexHome, profile.file)),
+  );
+  assert.equal(
+    await readFile(join(codexHome, 'gyblos.config.toml'), 'utf8'),
+    codexProfiles(ENDPOINT)[0]!.text,
+  );
+  assert.equal(
+    (await stat(join(codexHome, 'gyblos.config.toml'))).mode & 0o777,
+    0o600,
+  );
   assert.equal(
     agentFilePath(AGENT_TOOLS.OPENCODE, home, { XDG_CONFIG_HOME: '/x' }),
     '/x/opencode/opencode.json',
@@ -200,17 +225,16 @@ void test('writing keeps the first copy of the previous file, atomically, and ho
 });
 
 void test('Codex profiles never collide, and gyblos tables outside the block are refused', () => {
-  const block = codexBlock({
+  const files = codexProfiles({
     ...ENDPOINT,
     models: [
       { id: 'qwen/qwen3:8b', maxOutputTokens: 10 },
       { id: 'qwen/qwen3-8b', maxOutputTokens: 10 },
       { id: 'gyblos', maxOutputTokens: 10 },
     ],
-  });
-  const tables = block.match(/^\[profiles\.[^\]]+\]$/gm) ?? [];
-  assert.equal(new Set(tables).size, tables.length);
-  assert.equal(tables.length, 4);
+  }).map((profile) => profile.file);
+  assert.equal(new Set(files).size, files.length);
+  assert.equal(files.length, 4);
   for (const user of [
     '[profiles.gyblos]\nmodel = "x"\n',
     '[profiles."gyblos-a"]\nmodel = "x"\n',
@@ -236,4 +260,52 @@ void test('Claude Code aliases point at served models, and a context must exceed
       }),
     { code: 'ENDPOINT' },
   );
+});
+
+void test('a block from before Codex CLI 0.162 loses its profile tables, which become files', async (t) => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-agent-legacy-'));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const codexHome = join(home, '.codex');
+  await mkdir(codexHome);
+  const legacy = [
+    'model = "o3"',
+    '',
+    CODEX_MARKS.start,
+    codexBlock(ENDPOINT)
+      .split('\n')
+      .filter((line) => !line.startsWith('#'))
+      .join('\n'),
+    '',
+    '[profiles."gyblos"]',
+    'model_provider = "gyblos"',
+    'model = "qwen3-0.6b"',
+    'web_search = "disabled"',
+    CODEX_MARKS.end,
+    '',
+  ].join('\n');
+  await writeFile(join(codexHome, 'config.toml'), legacy, { mode: 0o600 });
+  await writeAgentFile(AGENT_TOOLS.CODEX, ENDPOINT, home);
+  const config = await readFile(join(codexHome, 'config.toml'), 'utf8');
+  assert.doesNotMatch(config, /profiles/);
+  assert.ok(config.startsWith('model = "o3"\n'));
+  assert.ok((await readdir(codexHome)).includes('gyblos.config.toml'));
+});
+
+void test('a profile file gyblos did not write is refused, and nothing is written', async (t) => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-agent-profile-'));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const codexHome = join(home, '.codex');
+  await mkdir(codexHome);
+  const mine = 'model = "my-own"\n';
+  await writeFile(join(codexHome, 'gyblos-gpt-oss-20b.config.toml'), mine);
+  await assert.rejects(writeAgentFile(AGENT_TOOLS.CODEX, ENDPOINT, home), {
+    code: 'FILE',
+  });
+  assert.deepEqual(await readdir(codexHome), [
+    'gyblos-gpt-oss-20b.config.toml',
+  ]);
+  const ours = codexProfiles(ENDPOINT)[0]!.text;
+  assert.equal(mergedCodexProfile('new', ours), 'new');
+  for (const edited of [mine, `${ours}approval_policy = "never"\n`])
+    assert.throws(() => mergedCodexProfile('new', edited), { code: 'FILE' });
 });

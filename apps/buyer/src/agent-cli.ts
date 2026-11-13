@@ -86,7 +86,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (values.write && tool === AGENT_TOOLS.CLAUDE_CODE)
       console.log('Claude Code reads these from your shell; nothing to write.');
     if (values.write && tool !== AGENT_TOOLS.CLAUDE_CODE) {
-      const { path, backup } = await writeAgentFile(
+      const { path, backup, profiles } = await writeAgentFile(
         tool!,
         endpoint,
         homedir(),
@@ -97,6 +97,7 @@ export async function main(argv = process.argv.slice(2)) {
           ? `Updated ${path} (previous copy: ${backup}).`
           : `Updated ${path}.`,
       );
+      for (const profile of profiles ?? []) console.log(`Wrote ${profile}.`);
     } else console.log(agentText(tool!, endpoint));
     console.log(NEXT[tool!]);
   } catch (error) {
@@ -108,7 +109,7 @@ export async function main(argv = process.argv.slice(2)) {
 function failure(error: unknown) {
   if (error instanceof AgentSetupError)
     return error.code === AGENT_SETUP_CODES.FILE
-      ? 'That file has comments (or is opencode.jsonc), is not plain JSON, or already defines gyblos outside the managed block; print the configuration without --write and paste it yourself.'
+      ? 'That file has comments (or is opencode.jsonc), is not plain JSON, already defines gyblos outside the managed block, or a gyblos*.config.toml profile was not written by this command; print the configuration without --write and paste it yourself.'
       : 'Could not read the models from selection.json; run pnpm buyer:init first.';
   const { code, path } = error as NodeJS.ErrnoException;
   return code
