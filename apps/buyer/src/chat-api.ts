@@ -2,7 +2,7 @@
 // messages and OpenAI responses. Each knows how to read a request, spell a complete answer, a stream and an error.
 import { randomUUID } from 'node:crypto';
 
-import { ROUTES, UNITS } from '@gyblos/config';
+import { HTTP_STATUS, ROUTES, UNITS } from '@gyblos/config';
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 
@@ -123,7 +123,8 @@ const responses: ChatApi = {
   stream: (model) => responsesStream(model),
   error: responsesError,
   // Codex retries HTTP 5xx without consulting x-should-retry. A possible send must stop it.
-  errorStatus: (status, neverSent) => (neverSent ? status : 400),
+  errorStatus: (status, neverSent) =>
+    neverSent ? status : HTTP_STATUS.badRequest,
 };
 
 // The format a path speaks; a query string (some clients add one) does not change the route.

@@ -1183,18 +1183,23 @@ that names them. For Codex sessions, three things are left out rather than
 refused: the `web_search` tool Codex offers on every request (no seller runs
 it), `reasoning` and `web_search_call` records from a session that began on
 another provider, and images, which become a short `[image omitted …]` text so a
-session that once saw a picture goes on. `reasoning`, `include`,
-`prompt_cache_key` and similar hints are accepted and ignored. A stream sends
+session that once saw a picture goes on. `include`, `prompt_cache_key` and
+bookkeeping hints are accepted and ignored. Non-neutral reasoning, sampling
+settings and `parallel_tool_calls: false` are refused before execution: the
+signed protocol cannot express those constraints yet. Codex versions that
+require them are not supported until that follow-up. A stream sends
 `response.created`, the message item (`output_item.added`, `content_part.added`,
 `output_text.delta`, then their `done` events) once text starts, each call as a
 `function_call` item (`output_item.added`, `function_call_arguments.done`,
-`output_item.done`), and `response.completed` with usage; a cut answer has
-status `incomplete`. A failure after the stream starts is `response.failed` with
-code `invalid_prompt` (which Codex shows and does not retry, since the prompt
-may have reached a seller), a readable message and the Gyblos code in
-`gyblos_code`. A conversation over the size the network carries gets code
-`context_length_exceeded`, so Codex compacts it. Paid endpoints serve text only,
-so they refuse Codex's tools.
+`output_item.done`), and `response.completed` with usage; a token-limited answer
+ends with `response.incomplete`, status `incomplete`, and its delivered usage. A
+possible-send failure before the first stream event uses HTTP 400 and
+`invalid_prompt` to stop clients that ignore retry headers. A failure after the
+stream starts is `response.failed` with code `invalid_prompt` (which Codex shows
+and does not retry, since the prompt may have reached a seller), a readable
+message and the Gyblos code in `gyblos_code`. A conversation over the size the
+network carries gets code `context_length_exceeded`, so Codex compacts it. Paid
+endpoints serve text only, so they refuse Codex's tools.
 
 Codex CLI points at the endpoint as a custom provider in `~/.codex/config.toml`
 (the built-in `openai` provider sends fields only OpenAI accepts):
@@ -1207,6 +1212,8 @@ model_provider = "gyblos"
 name = "Gyblos"
 base_url = "http://127.0.0.1:4031/v1"
 wire_api = "responses"
+request_max_retries = 0
+stream_max_retries = 0
 ```
 
 Leave MCP servers off for these sessions; switch models with `/model` and any
