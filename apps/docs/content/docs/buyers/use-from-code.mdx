@@ -8,6 +8,8 @@ Anthropic APIs, so programs written for those services can use a Gyblos seller b
 For each request it gets a signed free quote from the seller and streams the answer back over a direct
 peer-to-peer connection.
 
+The Responses route currently refuses `parallel_tool_calls: false`, non-default sampling, and non-neutral reasoning before contacting a seller. The signed protocol cannot carry those constraints yet; Codex versions that require them are not compatible until that support lands. Disable HTTP and stream retries in any configured client.
+
 ## What works today [#what-works-today]
 
 | Feature                                                              | Beta status                             |

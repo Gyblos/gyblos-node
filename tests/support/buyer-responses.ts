@@ -35,12 +35,13 @@ export const SHELL = {
     required: ['command'],
   },
 };
-// Shaped like what Codex CLI sends a custom provider: web search always offered, reasoning summaries asked.
+// Supported Responses subset of a Codex-shaped request. Actual parallel_tool_calls:false is refused
+// until the signed protocol can convey that constraint.
 export const CODEX = {
   model: MODEL,
   tools: [SHELL, { type: 'web_search', external_web_access: false }],
   tool_choice: 'auto',
-  parallel_tool_calls: false,
+  parallel_tool_calls: true,
   reasoning: { summary: 'auto' },
   store: false,
   stream: false,
