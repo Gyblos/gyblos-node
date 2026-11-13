@@ -1,10 +1,12 @@
-import { join } from 'node:path';
-
 // One source for connecting coding agents to a local Gyblos buyer: OpenCode, pi, Codex CLI and Claude Code.
 // From the endpoint and the models it serves, each tool gets its own configuration text, and the JSON
 // files a tool reads can be merged without touching anything but the `gyblos` provider. Both the buyer
 // command and the desktop app use these, so the two never drift. Pure: no files, network or secrets; a
 // paid endpoint's token is referenced by environment variable name, never written.
+
+import { join } from 'node:path';
+
+import { parse } from 'smol-toml';
 
 export const AGENT_TOOLS = {
   OPENCODE: 'opencode',
@@ -277,20 +279,86 @@ export function mergedAgentFile(
   )}\n`;
 }
 
-// config.toml with the managed gyblos block replaced, or added at the end.
+// Validate complete TOML, not table prefixes: quoted/escaped names must obey the same collision rules.
+function configToml(text: string): Json {
+  try {
+    return parse(text);
+  } catch {
+    throw new AgentSetupError('FILE');
+  }
+}
+function managedBlock(text: string) {
+  const managed = configToml(text);
+  const provider = object(managed.model_providers);
+  const profiles = object(managed.profiles);
+  const allowed = configToml(
+    codexBlock({
+      origin: 'http://127.0.0.1:4031',
+      models: [{ id: 'model', maxOutputTokens: 1 }],
+      tokenEnv: 'TOKEN',
+    }),
+  );
+  const providerKeys = Object.keys(
+    object(object(allowed.model_providers)[AGENT_SETUP.provider]),
+  );
+  const profileKeys = Object.keys(
+    object(object(allowed.profiles)[AGENT_SETUP.provider]),
+  );
+  if (
+    Object.keys(managed).some(
+      (key) => key !== 'model_providers' && key !== 'profiles',
+    ) ||
+    Object.keys(provider).some((key) => key !== AGENT_SETUP.provider) ||
+    Object.keys(object(provider[AGENT_SETUP.provider])).some(
+      (key) => !providerKeys.includes(key),
+    ) ||
+    Object.entries(profiles).some(
+      ([key, value]) =>
+        !key.startsWith(AGENT_SETUP.provider) ||
+        Object.keys(object(value)).some(
+          (field) => !profileKeys.includes(field),
+        ),
+    )
+  )
+    throw new AgentSetupError('FILE');
+}
+// config.toml with exactly one managed block replaced, retaining all unrelated text and tables.
 export function mergedCodexConfig(
   endpoint: AgentEndpoint,
   existing: string | undefined,
 ) {
   const block = codexBlock(endpoint);
   const text = existing ?? '';
+  configToml(text);
   const start = text.indexOf(CODEX_MARKS.start);
   const end = text.indexOf(CODEX_MARKS.end);
-  if (start >= 0 && end > start)
-    return `${text.slice(0, start)}${block}${text.slice(end + CODEX_MARKS.end.length)}`;
-  if (start >= 0 || end >= 0) throw new AgentSetupError('FILE');
-  // Tables of the same names outside the block would be defined twice, which breaks the whole file.
-  if (/^\s*\[\s*(model_providers|profiles)\s*\.\s*"?gyblos/m.test(text))
+  let outside = text;
+  let merged: string;
+  if (start >= 0 || end >= 0) {
+    const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
+    if (
+      start < 0 ||
+      end < start ||
+      text.indexOf(CODEX_MARKS.start, start + 1) >= 0 ||
+      text.indexOf(CODEX_MARKS.end, end + 1) >= 0 ||
+      !lines.includes(CODEX_MARKS.start) ||
+      !lines.includes(CODEX_MARKS.end)
+    )
+      throw new AgentSetupError('FILE');
+    managedBlock(text.slice(start, end));
+    outside = text.slice(0, start) + text.slice(end + CODEX_MARKS.end.length);
+    merged =
+      text.slice(0, start) + block + text.slice(end + CODEX_MARKS.end.length);
+  } else
+    merged = `${text}${text && !text.endsWith('\n') ? '\n' : ''}${text ? '\n' : ''}${block}\n`;
+  const user = configToml(outside);
+  if (
+    Object.hasOwn(object(user.model_providers), AGENT_SETUP.provider) ||
+    Object.keys(object(user.profiles)).some((key) =>
+      key.startsWith(AGENT_SETUP.provider),
+    )
+  )
     throw new AgentSetupError('FILE');
-  return `${text}${text && !text.endsWith('\n') ? '\n' : ''}${text ? '\n' : ''}${block}\n`;
+  configToml(merged);
+  return merged;
 }
