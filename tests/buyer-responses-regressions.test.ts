@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ENGINE_DONE_REASONS, FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
+import {
+  ENGINE_DONE_REASONS,
+  FREE_EXECUTION_CODES,
+} from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
@@ -20,7 +23,11 @@ for (const stream of [false, true]) {
     // Model the HTTP retry decision used by clients that ignore x-should-retry.
     let response: Response | undefined;
     for (let attempt = 0; attempt < 3; attempt++) {
-      response = await post(server.url, { ...CODEX, input: 'synthetic', stream });
+      response = await post(server.url, {
+        ...CODEX,
+        input: 'synthetic',
+        stream,
+      });
       if (response.status < 500) break;
       await response.arrayBuffer();
     }
@@ -40,17 +47,30 @@ void test('Responses proven-unsent unavailability retains retryable status', asy
   t.after(server.close);
   const response = await post(server.url, { ...CODEX, input: 'synthetic' });
   assert.equal(response.status, 503);
-  assert.equal((await response.json()).error.code, FREE_EXECUTION_CODES.INTERNAL);
+  assert.equal(
+    (await response.json()).error.code,
+    FREE_EXECUTION_CODES.INTERNAL,
+  );
 });
 
 void test('Responses token exhaustion emits incomplete with preserved text and usage', async (t) => {
-  const server = await host({ ...TEXT, finishReason: ENGINE_DONE_REASONS.LENGTH }, []);
+  const server = await host(
+    { ...TEXT, finishReason: ENGINE_DONE_REASONS.LENGTH },
+    [],
+  );
   t.after(server.close);
-  const response = await post(server.url, { ...CODEX, input: 'synthetic', stream: true });
+  const response = await post(server.url, {
+    ...CODEX,
+    input: 'synthetic',
+    stream: true,
+  });
   const terminal = events(await response.text()).at(-1);
   assert.equal(terminal.type, 'response.incomplete');
   assert.equal(terminal.response.status, 'incomplete');
-  assert.equal(terminal.response.incomplete_details.reason, 'max_output_tokens');
+  assert.equal(
+    terminal.response.incomplete_details.reason,
+    'max_output_tokens',
+  );
   assert.equal(terminal.response.output[0].content[0].text, TEXT.text);
   assert.equal(terminal.response.usage.total_tokens, 9);
 });
@@ -66,7 +86,11 @@ for (const [field, value] of [
     const seen: FreeExecutionBuildInput[] = [];
     const server = await host(TEXT, seen);
     t.after(server.close);
-    const response = await post(server.url, { ...CODEX, input: 'synthetic', [field]: value });
+    const response = await post(server.url, {
+      ...CODEX,
+      input: 'synthetic',
+      [field]: value,
+    });
     assert.equal(response.status, 400);
     assert.equal((await response.json()).error.param, field);
     assert.equal(seen.length, 0);
