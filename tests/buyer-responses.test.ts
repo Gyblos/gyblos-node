@@ -249,7 +249,10 @@ void test('a turn that only calls tools streams no empty message, and a failure 
       failed.response.error.gyblos_code,
       FREE_BUYER_CODES.UNAVAILABLE,
     );
-    assert.match(failed.response.error.message, /Send your message again/);
+    assert.match(
+      failed.response.error.message,
+      /will not be retried automatically/,
+    );
   } finally {
     await failing.close();
   }

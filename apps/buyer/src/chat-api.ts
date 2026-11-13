@@ -35,6 +35,7 @@ import {
 export interface ChatErrorBody {
   code: ChatErrorCode;
   status: number;
+  neverSent: boolean;
   message: string;
   param: string | null;
   extra: Record<string, unknown>;
@@ -53,6 +54,7 @@ export interface ChatApi {
   completion(model: string, result: ChatResult): unknown;
   stream(model: string, includeDigest: boolean): ChatStreamFormat;
   error(body: ChatErrorBody): unknown;
+  errorStatus?(status: number, neverSent: boolean): number;
 }
 
 const openAi: ChatApi = {
@@ -120,6 +122,8 @@ const responses: ChatApi = {
   completion: responsesCompletion,
   stream: (model) => responsesStream(model),
   error: responsesError,
+  // Codex retries HTTP 5xx without consulting x-should-retry. A possible send must stop it.
+  errorStatus: (status, neverSent) => (neverSent ? status : 400),
 };
 
 // The format a path speaks; a query string (some clients add one) does not change the route.

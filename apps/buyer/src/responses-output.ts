@@ -108,8 +108,14 @@ export const responsesError = (body: ChatErrorBody) => ({
     message: body.message,
     type: FREE_BUYER.errorType,
     param: body.param,
-    code: FULL.has(body.message) ? RESPONSES_CODES.contextFull : body.code,
-    ...(FULL.has(body.message) ? { [RESPONSES_CODES.field]: body.code } : {}),
+    code: !body.neverSent
+      ? RESPONSES_CODES.stopped
+      : FULL.has(body.message)
+        ? RESPONSES_CODES.contextFull
+        : body.code,
+    ...(!body.neverSent || FULL.has(body.message)
+      ? { [RESPONSES_CODES.field]: body.code }
+      : {}),
     ...body.extra,
     ...paymentFields(body.payment),
   },
@@ -217,9 +223,14 @@ export function responsesStream(model: string): ChatStreamFormat {
       return (
         message +
         items +
-        event('response.completed', {
-          response: finished(id, model, created, result, output),
-        })
+        event(
+          result.finishReason === ENGINE_DONE_REASONS.LENGTH
+            ? 'response.incomplete'
+            : 'response.completed',
+          {
+            response: finished(id, model, created, result, output),
+          },
+        )
       );
     },
     error: (code, stop, payment) =>

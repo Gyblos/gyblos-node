@@ -139,8 +139,6 @@ export const RESPONSES_CHAT = {
     ] as readonly string[],
     // Reasoning is always off on Gyblos offers; caching keys, metadata and tiers do not change the answer.
     ignored: [
-      'parallel_tool_calls',
-      'reasoning',
       'include',
       'prompt_cache_key',
       'prompt_cache_options',
@@ -148,12 +146,26 @@ export const RESPONSES_CHAT = {
       'metadata',
       'service_tier',
       'stream_options',
-      'temperature',
-      'top_p',
       'user',
       'safety_identifier',
     ],
     neutral: {
+      // The signed protocol cannot express these constraints yet; refuse non-neutral values.
+      parallel_tool_calls: (value: unknown) => absent(value) || value === true,
+      temperature: (value: unknown) => absent(value) || value === 1,
+      top_p: (value: unknown) => absent(value) || value === 1,
+      reasoning: (value: unknown) => {
+        if (absent(value)) return true;
+        if (typeof value !== 'object' || Array.isArray(value)) return false;
+        const row = value as Record<string, unknown>;
+        return (
+          Object.keys(row).every(
+            (key) => key === 'summary' || key === 'effort',
+          ) &&
+          (absent(row.effort) || row.effort === 'none') &&
+          (absent(row.summary) || row.summary === 'auto')
+        );
+      },
       // Nothing is stored, so there is nothing to continue from.
       store: isFalse,
       background: isFalse,
@@ -220,7 +232,7 @@ export const RESPONSES_CODES = {
   contextFull: 'context_length_exceeded',
   stopped: 'invalid_prompt',
   stoppedMessage: (code: string) =>
-    `The seller stopped before finishing (${code}). Send your message again to try another seller.`,
+    `The request may have been sent (${code}). It will not be retried automatically.`,
   field: 'gyblos_code',
 } as const;
 
