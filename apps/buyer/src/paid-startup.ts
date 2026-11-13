@@ -201,6 +201,9 @@ async function startOwnedPaidBuyer(
   if (role.role !== P2P_ROLES.BUYER)
     return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
   const prepared = await buyerSelection();
+  // This older entry quotes and serves only the root request, so it refuses a model list outright
+  // rather than advertise routes, aliases and limits it would not honor.
+  if (prepared.config.models?.length) refuse(FREE_BUYER_STARTUP.PAID_MODELS);
   checkPaidRequest(prepared, role);
   const meter = await (options.meter ?? tokenizer)();
   const token = await endpointToken();
