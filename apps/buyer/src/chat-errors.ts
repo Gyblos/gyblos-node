@@ -4,6 +4,7 @@
 import type { ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, UNITS } from '@gyblos/config';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import {
   FreeExecutionError,
@@ -145,6 +146,7 @@ export function replyError(
         param: view.param ?? null,
         // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
         extra: {
+          [BUYER_API.NEVER_SENT_FIELD]: view.neverSent,
           ...(stop.reason ? { reason: stop.reason } : {}),
           ...(view.cooldownUntil !== undefined
             ? { cooldownUntil: view.cooldownUntil }
