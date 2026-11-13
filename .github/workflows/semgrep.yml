@@ -2,8 +2,8 @@
 name: Static analysis
 
 on:
-  # Only pull requests into main: a stacked PR (based on another branch) runs no CI until its
-  # chain reaches main, where the bottom PR runs once with everything on top of it.
+  # Only pull requests into main; child PRs intentionally have no hosted run.
+  # The main-facing combined head is checked on updates, and pushes to main run again.
   pull_request:
     branches: [main]
   push:
