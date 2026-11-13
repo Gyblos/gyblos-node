@@ -214,7 +214,9 @@ void test('the free path asks selection for the routed model', async () => {
       ROUTES[1],
     ),
   );
-  assert.deepEqual(asked, [{ tools: false, model: ROUTES[1] }]);
+  assert.equal(asked.length, 1);
+  const [needs] = asked as { tools: boolean; model: unknown }[];
+  assert.deepEqual([needs?.tools, needs?.model], [false, ROUTES[1]]);
 });
 
 void test('one model, as before: another name is a 400 naming the one it serves', async () => {
