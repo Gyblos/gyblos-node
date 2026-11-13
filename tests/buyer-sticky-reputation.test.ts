@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { conversationKey } from '@gyblos/buyer/free-execution';
+import { createConversationKey } from '@gyblos/buyer/free-execution';
 import { sellerFault, stickySellers } from '@gyblos/buyer/free-selection';
 import { raceControlOffers } from '@gyblos/buyer/offer-race';
 import {
@@ -60,10 +60,15 @@ void test('the quote race prefers the seller that served the conversation, brief
 });
 
 void test('a conversation keeps its key across turns; another model or system text is another conversation', () => {
+  const conversationKey = createConversationKey();
   const opening = [
     { role: 'system' as const, content: 'be brief' },
     { role: 'user' as const, content: 'hi' },
   ];
+  assert.notEqual(
+    createConversationKey()({ messages: opening, maxTokens: 5 }),
+    createConversationKey()({ messages: opening, maxTokens: 5 }),
+  );
   const first = conversationKey({ messages: opening, maxTokens: 5 });
   const later = conversationKey({
     messages: [
