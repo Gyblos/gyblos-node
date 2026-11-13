@@ -222,11 +222,18 @@ aceptan en esta lista el modelo pagado fijado y su límite de tokens.
 
 ## Si un vendedor se cae [#si-un-vendedor-se-cae]
 
-En `buyer:free`, un intento que con seguridad no envió el prompt puede seleccionar otro vendedor
-elegible dentro del mismo pedido, respetando el vendedor fijado y la política de enrutamiento. Desde
-que pudo comenzar el envío, el comprador se detiene sin repetir el prompt ni cambiar de vendedor.
-Desactiva los reintentos automáticos del cliente, incluidos los de streaming: ante una conexión cortada
-puede no llegar ningún encabezado de respuesta.
+En `buyer:free`, si el vendedor falla antes de que llegue texto visible a tu cliente, el pedido pasa a
+otro vendedor del mismo modelo dentro del mismo pedido, y tú solo ves la respuesta. Eso cubre a un
+vendedor que se desconectó, se demoró demasiado o dejó de generar después de recibir el prompt; un turno
+que llama herramientas no muestra texto hasta terminar, así que siempre queda cubierto. El prompt llega
+como máximo a tres vendedores, dentro del límite de 180 segundos. Un pedido que el modelo no puede tomar
+(demasiado largo, no admitido) no se mueve, porque todos lo rechazarían. Como el prompt puede llegar a un
+segundo vendedor, `"failover": "never"` en `selection.json` lo deja en un solo vendedor; entonces solo se
+mueve un prompt que con seguridad no se envió.
+
+Si ya llegó texto a tu cliente, una falla termina el pedido con un error: la respuesta no se reinicia en
+otro vendedor. Desactiva los reintentos automáticos del cliente, incluidos los de streaming: ante una
+conexión cortada puede no llegar ningún encabezado de respuesta.
 
 Si decides volver a enviar el mensaje, comienza una selección nueva: puede ganar el mismo vendedor u
 otro. Los fallos atribuibles al vendedor afectan su peso. La preferencia por el que respondió antes es

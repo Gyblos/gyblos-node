@@ -1,8 +1,10 @@
-// Orchestrates free quote execution with failover only before possible prompt transmission.
+// Orchestrates free quote execution with failover to another seller: before the prompt may have been
+// sent, and, when resending is allowed, after it was sent as long as no visible text reached the client.
 // Selection and I/O are injected; this module never authorizes payments or records content.
 import { createHmac, randomBytes } from 'node:crypto';
 
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
+import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import type {
   ModelSelection,
   SignedOfferV2,
@@ -61,6 +63,9 @@ export interface FreeBuyerDependencies {
     now?: () => number;
   };
   conversationKey?: ReturnType<typeof createConversationKey>;
+  // selection.json `failover`: "safe" (the default) lets a request whose seller failed after the prompt
+  // was sent, but before any visible text, go to another seller; "never" keeps the prompt on one seller.
+  resendAfterSend?: boolean;
   enter?(): () => void;
   // Hands a selected seller back once this request is done with it (free requests side by side).
   done?(winner: FreeWinner): void;
@@ -93,6 +98,7 @@ export async function executeBuyerFree(
       ...(external ? [external] : []),
     ]);
     const excluded = new Set<string>();
+    let resends = 0;
     while (!signal.aborted) {
       const winner = await dependencies
         .select(excluded, signal, {
@@ -114,14 +120,18 @@ export async function executeBuyerFree(
         if (excluded.has(winner.nodeId))
           throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
         excluded.add(winner.nodeId);
-        const result = await executeSelectedBuyerFree(
+        const result = await attemptSelectedFree(
           input,
           dependencies,
           winner,
           signal,
           onDelta,
+          undefined,
+          dependencies.resendAfterSend === true &&
+            resends < FREE_BUYER.maxResends,
         );
-        if (result) return result;
+        if (result === RESENT) resends++;
+        else if (result) return result;
       } finally {
         dependencies.done?.(winner);
       }
@@ -153,7 +163,29 @@ export function createConversationKey() {
   };
 }
 
+// Returned when the prompt was sent to a seller that failed before any visible text: another seller may
+// take the whole request again.
+const RESENT = Symbol('resent');
+// Failures after sending that another seller can fix. A refusal of the request itself (too long, invalid,
+// unsupported) would fail the same way anywhere, and a client that left is not a seller failure.
+const RESENDABLE: ReadonlySet<string> = new Set([
+  FREE_EXECUTION_CODES.TIMEOUT,
+  FREE_EXECUTION_CODES.ENGINE,
+  FREE_EXECUTION_CODES.INTERNAL,
+  FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+  FREE_EXECUTION_CODES.BUSY,
+  FREE_EXECUTION_CODES.DAILY_CAP,
+  FREE_EXECUTION_CODES.BUYER_CAP,
+  FREE_EXECUTION_CODES.EXPIRED,
+]);
+function resendable(error: FreeClientError) {
+  return (
+    !error.consumerFailure && (error.ioFailure || RESENDABLE.has(error.code))
+  );
+}
+
 // Caller owns the request admission, deadline and exclusion set; this never selects another seller.
+// Undefined: the prompt was never sent, so another seller may take it.
 export async function executeSelectedBuyerFree(
   input: FreeExecutionBuildInput,
   dependencies: FreeBuyerDependencies,
@@ -162,6 +194,29 @@ export async function executeSelectedBuyerFree(
   onDelta?: (text: string) => Promise<void>,
   beforeExecute?: () => void,
 ): Promise<FreeExecutionResult | undefined> {
+  const result = await attemptSelectedFree(
+    input,
+    dependencies,
+    winner,
+    signal,
+    onDelta,
+    beforeExecute,
+    false,
+  );
+  return result === RESENT ? undefined : result;
+}
+
+// As executeSelectedBuyerFree; with `resend`, RESENT also means the prompt was sent but the seller
+// failed before any visible text, so another seller may take the whole request again.
+async function attemptSelectedFree(
+  input: FreeExecutionBuildInput,
+  dependencies: FreeBuyerDependencies,
+  winner: FreeWinner,
+  signal: AbortSignal,
+  onDelta: ((text: string) => Promise<void>) | undefined,
+  beforeExecute: (() => void) | undefined,
+  resend: boolean,
+): Promise<FreeExecutionResult | typeof RESENT | undefined> {
   const request = buildFreeExecutionRequest(winner.quote, input);
   const observer = buyerExecutionTelemetry(
     request,
@@ -171,10 +226,12 @@ export async function executeSelectedBuyerFree(
   observer?.received();
   const receipt = buyerReceiptObservation(dependencies, Boolean(onDelta));
   let delivered = false;
+  let visible = false;
   const emit = onDelta
     ? async (text: string) => {
         signal.throwIfAborted();
         delivered = true;
+        if (text) visible = true;
         receipt?.text(text);
         await onDelta(text);
         signal.throwIfAborted();
@@ -195,12 +252,9 @@ export async function executeSelectedBuyerFree(
     return result;
   } catch (error) {
     failBuyerTelemetry(observer, error, signal, delivered);
-    if (
-      !(error instanceof FreeClientError) ||
-      error.sent ||
-      delivered ||
-      signal.aborted
-    )
-      throw error;
+    if (!(error instanceof FreeClientError) || signal.aborted) throw error;
+    if (!error.sent && !delivered) return undefined;
+    if (resend && !visible && resendable(error)) return RESENT;
+    throw error;
   }
 }
