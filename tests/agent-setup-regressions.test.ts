@@ -6,13 +6,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { writeAgentFile } from '@gyblos/buyer/agent-cli';
 import {
   AGENT_TOOLS,
   CODEX_MARKS,
   codexBlock,
   mergedCodexConfig,
 } from '@gyblos/node/agent-setup';
+import { writeAgentFile } from '@gyblos/node/agent-setup-host';
 
 const ENDPOINT = {
   origin: 'http://127.0.0.1:4031',
@@ -88,7 +88,7 @@ void test('temporary merged files are private immediately after writing, before 
     const original=promises.writeFile;let observed;
     promises.writeFile=async(...args)=>{await original(...args);if(typeof args[0]==='string'&&args[0].endsWith('.tmp'))observed=(await promises.stat(args[0])).mode&0o777;};
     syncBuiltinESMExports();
-    const {writeAgentFile}=await import('@gyblos/buyer/agent-cli');
+    const {writeAgentFile}=await import('@gyblos/node/agent-setup-host');
     await writeAgentFile('pi',JSON.parse(process.env.GYBLOS_TEST_ENDPOINT),process.env.GYBLOS_TEST_HOME);
     assert.equal(observed,0o600);
   `,
