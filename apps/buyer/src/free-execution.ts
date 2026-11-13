@@ -91,7 +91,8 @@ export async function executeBuyerFree(
           ...(model ? { model } : {}),
         })
         .catch((error) => {
-          if (!signal.aborted) buyerUnserved(dependencies, Boolean(onDelta));
+          if (!signal.aborted)
+            buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
           throw error;
         });
       signal.throwIfAborted();

@@ -194,7 +194,11 @@ function quoteExecutor(
             },
           ).catch((error) => {
             if (!selectionSignal.aborted)
-              buyerUnserved(context.dependencies, Boolean(onDelta));
+              buyerUnserved(
+                context.dependencies,
+                Boolean(onDelta),
+                model?.selection,
+              );
             throw error;
           }),
         free: (winner, executionSignal) =>
