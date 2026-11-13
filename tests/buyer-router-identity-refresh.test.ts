@@ -32,6 +32,7 @@ void test('a paid winner is refused when identity changes during its quote', asy
   };
   const endpoint = transport as unknown as Endpoint;
   const prepared = {
+    discovery: undefined,
     config: { ...run.config, identity: { rpcUrl: 'https://rpc.invalid' } },
     stats: { rows: new Map(), save: async () => {} },
     identity: {

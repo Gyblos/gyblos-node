@@ -1238,8 +1238,9 @@ since a seller serves one request per buyer at a time: selections take turns,
 each skipping the sellers already serving this buyer. When every candidate is
 busy with this buyer's other request the answer is 429 (the seller is not cooled
 down), and a third request at once gets 429 too. Paid and session modes keep
-their own admission. One selection checks each seller's registered identity
-once, however many steps ask; nothing is kept across requests.
+their own admission. The buyer checks registered identity again after quoting,
+before admitting the winner, even if discovery or catalog checks succeeded. No
+identity decision is reused for final admission.
 
 A free buyer goes back to the seller that served a conversation (known by a
 digest of its model, system text and first user message, kept in memory only for
