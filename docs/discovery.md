@@ -245,10 +245,11 @@ and clients must re-verify everything. It does not need, and should not store or
 log, IP addresses, prompts, offers or payments.
 
 The reference index base URL is `https://discovery.gyblos.com/v1`: the Worker
-serves `POST /v1/records`, `GET /v1/sellers` and `GET /v1/health` at the root of
-its own host. This client refuses redirects, so configure the exact base URL.
-All paths below are relative to the base URL. Error bodies are
-`{"error":"<CODE>"}` with a static code; an index never echoes request input.
+serves `POST /v1/records`, `GET /v1/sellers`, `GET /v1/models` and
+`GET /v1/health` at the root of its own host. This client refuses redirects, so
+configure the exact base URL. All paths below are relative to the base URL.
+Error bodies are `{"error":"<CODE>"}` with a static code; an index never echoes
+request input.
 
 An index is HTTPS only. Any request that does not arrive over `https`, whatever
 its method or path, gets `400 {"error":"HTTPS_REQUIRED"}` before any other
@@ -328,6 +329,17 @@ before verifying the signature. Reads stay public.
   `generatedAt` can be that old; errors are never cached.
 - Errors: `400 INVALID_QUERY`, `400 HTTPS_REQUIRED`, `429 RATE_LIMITED`,
   `503 DISCOVERY_UNAVAILABLE`.
+
+### `GET /models`
+
+Takes no parameters (any query is a 400 `INVALID_QUERY`). Returns
+`{"models":[{"id":"<modelId>","sellers":<n>}],"generatedAt":<ms>}`: every model
+listed by catalogs that are live, not withdrawn and referenced by a live
+presence (the same liveness as `/sellers`), with how many such sellers list it,
+most sellers first and then by model ID, at most 500. It is a hint for offering
+the network's models by name; each seller is still found with `/sellers` and
+verified as usual. Cached and rate-limited like a sellers page
+(`public, max-age=10`) and CORS-readable.
 
 ### `GET /health`
 

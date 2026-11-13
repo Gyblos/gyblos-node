@@ -61,6 +61,7 @@ function countingStorage(storage: DiscoveryStorage) {
     state: (nodeId) => (calls.push('state'), storage.state(nodeId)),
     put: (entry) => (calls.push('put'), storage.put(entry)),
     list: (query) => (calls.push('list'), storage.list(query)),
+    models: (now, limit) => (calls.push('models'), storage.models(now, limit)),
     count: (now) => (calls.push('count'), storage.count(now)),
     nodeCount: () => (calls.push('nodeCount'), storage.nodeCount()),
     prune: (now) => (calls.push('prune'), storage.prune(now)),
