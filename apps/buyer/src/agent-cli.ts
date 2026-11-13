@@ -19,6 +19,8 @@ import { isMain } from '@gyblos/runtime';
 import { endpointRoutes } from './model-routes';
 import { loadBuyerSelectionConfig } from './selection-config';
 
+export { agentText, writeAgentFile } from '@gyblos/node/agent-setup-host';
+
 const USAGE =
   'Usage: pnpm buyer:agent <opencode|pi|codex|claude> [--write] [--context <tokens>] [--token-env <NAME>]';
 

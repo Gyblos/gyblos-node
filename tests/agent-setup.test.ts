@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import * as legacy from '@gyblos/buyer/agent-cli';
 import {
   AGENT_TOOLS,
   agentFilePath,
@@ -27,7 +28,6 @@ import {
   piProvider,
   type AgentEndpoint,
 } from '@gyblos/node/agent-setup';
-import * as legacy from '@gyblos/buyer/agent-cli';
 import { agentText, writeAgentFile } from '@gyblos/node/agent-setup-host';
 
 const ENDPOINT: AgentEndpoint = {
