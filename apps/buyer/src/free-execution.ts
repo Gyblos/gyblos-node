@@ -28,6 +28,7 @@ import {
 } from './free-telemetry';
 import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
+import type { StaticControlSeller } from './selection-config';
 
 export class FreeSelectionFailure extends Error {
   // retryAt: when no seller is left because every one failed recently, the earliest cooldown end.
@@ -42,6 +43,8 @@ export class FreeSelectionFailure extends Error {
 export interface FreeWinner {
   nodeId: string;
   quote: SignedOfferV2;
+  // How to reach a seller found only in the index (open discovery); configured sellers are looked up.
+  seller?: StaticControlSeller;
 }
 
 export interface FreeBuyerDependencies {
