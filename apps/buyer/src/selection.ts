@@ -145,6 +145,7 @@ export async function selectVerifiedBuyerQuote(
       sellers: snapshots.filter((item) => item !== undefined),
       stats: dependencies.stats,
       pinnedNodeId: config.pinnedNodeId,
+      previousSeller: config.previousSeller,
       now: now(),
       random:
         dependencies.random ??
@@ -238,6 +239,7 @@ function raceCandidates(
       signal,
       // The operator's selection.json wins over the caller's default.
       windowMs: config.quoteWindowMs ?? dependencies.windowMs,
+      ...(config.previousSeller ? { preferred: config.previousSeller } : {}),
       // A seller silent for the whole window is cooled down like one that refused.
       onExpired: (pending) => {
         for (const candidate of pending) {

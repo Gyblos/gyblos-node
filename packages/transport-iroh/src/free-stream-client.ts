@@ -41,7 +41,7 @@ export async function readFreeStreamResponse(
     const accepted = await verifier.accept(decodeFreeStreamEvent(frame));
     check();
     if (accepted.delta !== undefined) {
-      await stage(onDelta(accepted.delta), IROH_DEADLINES.egressMs);
+      await onDelta(accepted.delta);
       check();
     }
     if (accepted.result) {

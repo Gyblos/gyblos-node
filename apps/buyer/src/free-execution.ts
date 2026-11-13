@@ -1,5 +1,7 @@
 // Orchestrates free quote execution with failover only before possible prompt transmission.
 // Selection and I/O are injected; this module never authorizes payments or records content.
+import { createHmac, randomBytes } from 'node:crypto';
+
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import type {
   ModelSelection,
@@ -26,6 +28,7 @@ import {
 } from './free-telemetry';
 import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
+import type { StaticControlSeller } from './selection-config';
 
 export class FreeSelectionFailure extends Error {
   // retryAt: when no seller is left because every one failed recently, the earliest cooldown end.
@@ -40,6 +43,8 @@ export class FreeSelectionFailure extends Error {
 export interface FreeWinner {
   nodeId: string;
   quote: SignedOfferV2;
+  // How to reach a seller found only in the index (open discovery); configured sellers are looked up.
+  seller?: StaticControlSeller;
 }
 
 export interface FreeBuyerDependencies {
@@ -55,12 +60,16 @@ export interface FreeBuyerDependencies {
     selection: ModelSelection;
     now?: () => number;
   };
+  conversationKey?: ReturnType<typeof createConversationKey>;
   enter?(): () => void;
-  // `needs.tools`: only a seller that serves tools may win; `needs.model`: the routed model to quote.
+  // Hands a selected seller back once this request is done with it (free requests side by side).
+  done?(winner: FreeWinner): void;
+  // `needs.tools`: only a seller that serves tools may win; `needs.model`: the routed model to quote;
+  // `needs.conversation`: a digest of the conversation's opening, to go back to the seller that served it.
   select(
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
-    needs?: { tools?: boolean; model?: RoutedModel },
+    needs?: { tools?: boolean; model?: RoutedModel; conversation?: string },
   ): Promise<FreeWinner>;
   execute(
     winner: FreeWinner,
@@ -89,29 +98,59 @@ export async function executeBuyerFree(
         .select(excluded, signal, {
           tools: inferenceNeedsTools(input),
           ...(model ? { model } : {}),
+          conversation: dependencies.conversationKey?.(input, model),
         })
         .catch((error) => {
-          if (!signal.aborted)
+          // Local occupancy is not a network failure; retain request-local model telemetry.
+          const busy =
+            error instanceof FreeBuyerError &&
+            error.code === FREE_BUYER_CODES.BUSY;
+          if (!signal.aborted && !busy)
             buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
           throw error;
         });
-      signal.throwIfAborted();
-      if (excluded.has(winner.nodeId))
-        throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
-      excluded.add(winner.nodeId);
-      const result = await executeSelectedBuyerFree(
-        input,
-        dependencies,
-        winner,
-        signal,
-        onDelta,
-      );
-      if (result) return result;
+      try {
+        signal.throwIfAborted();
+        if (excluded.has(winner.nodeId))
+          throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+        excluded.add(winner.nodeId);
+        const result = await executeSelectedBuyerFree(
+          input,
+          dependencies,
+          winner,
+          signal,
+          onDelta,
+        );
+        if (result) return result;
+      } finally {
+        dependencies.done?.(winner);
+      }
     }
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   } finally {
     release?.();
   }
+}
+
+// A conversation is known by its model, system text and first user message, which every later turn
+// repeats. Only a digest is retained in routing metadata; its secret belongs to this buyer lifecycle.
+// This does not protect conversation contents or the secret from a live process-memory compromise.
+const SECRET_BYTES = 32;
+export function createConversationKey() {
+  const secret = randomBytes(SECRET_BYTES);
+  return (input: FreeExecutionBuildInput, model?: RoutedModel) => {
+    const system = input.messages.find((message) => message.role === 'system');
+    const first = input.messages.find((message) => message.role === 'user');
+    return createHmac('sha256', secret)
+      .update(
+        JSON.stringify([
+          model?.selection ?? null,
+          system?.content ?? null,
+          first?.content ?? null,
+        ]),
+      )
+      .digest('hex');
+  };
 }
 
 // Caller owns the request admission, deadline and exclusion set; this never selects another seller.

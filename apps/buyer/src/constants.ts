@@ -106,6 +106,10 @@ export const BUYER_SELECTION = {
   // How long quotes may race. A relay round trip to a distant seller took about 250 ms in the
   // first real test, so the default leaves room; selection.json `quoteWindowMs` overrides it.
   windowMs: 3000,
+  // How long another seller's quote waits for the one that served this conversation before.
+  preferMs: 500,
+  // Conversations remembered for that preference, in memory only.
+  stickyConversations: 256,
   minWindowMs: 100,
   // Well inside CONTROL_LIMITS.quoteLifetimeMs, so a quote that wins late is still fresh.
   maxWindowMs: 10_000,
@@ -130,6 +134,11 @@ export const BUYER_DISCOVERY = {
   timeoutMs: 10000,
   maxStateBytes: 1048576,
   maxStateRows: 1024,
+  // Open discovery: lookup work per selection, live unconfigured candidates, and cached identity refusals.
+  openLookups: 16,
+  openSellers: 64,
+  openRefusals: 1024,
+  openRefusalMs: 300_000,
 } as const;
 
 export type BuyerProxyErrorCode =

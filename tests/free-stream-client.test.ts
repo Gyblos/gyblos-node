@@ -21,6 +21,8 @@ async function fixture(
     writeFailure?: boolean;
     truncate?: boolean;
     cancel?: AbortController;
+    consume?: () => Promise<void>;
+    requestMs?: number;
   } = {},
 ) {
   const source = await freeSellerFixture();
@@ -109,9 +111,10 @@ async function fixture(
   } as unknown as EndpointAddr;
   const client = createFreeExecutionClient(endpoint, remote, source.options, {
     now: source.options.now,
-    requestMs: 1000,
+    requestMs: options.requestMs ?? 1000,
     async onDelta(text) {
       await Promise.resolve();
+      await options.consume?.();
       deltas.push(text);
       options.cancel?.abort();
     },
@@ -141,7 +144,10 @@ void test('stream partial write remains possibly sent and is never retried inter
 });
 void test('stream truncation after deltas is an error rather than a successful completion', async () => {
   const value = await fixture({ truncate: true });
-  await assert.rejects(value.client.execute(value.request), { sent: true });
+  await assert.rejects(value.client.execute(value.request), {
+    sent: true,
+    ioFailure: true,
+  });
   await value.client.settled();
   assert.deepEqual(value.deltas, ['an', 'swer']);
 });
@@ -155,4 +161,32 @@ void test('stream cancellation after first delta closes transport and suppresses
   await value.client.settled();
   assert.deepEqual(value.deltas, ['an']);
   assert.ok(value.counts().closes > 0);
+});
+
+void test('consumer rejection is local and cannot damage seller reputation', async () => {
+  const value = await fixture({
+    consume: async () => {
+      throw new Error('synthetic consumer');
+    },
+  });
+  await assert.rejects(value.client.execute(value.request), {
+    sent: true,
+    consumerFailure: true,
+    ioFailure: false,
+  });
+  await value.client.settled();
+});
+void test('deadline during a consumer callback stays local', async () => {
+  let finish = () => {};
+  const hold = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const value = await fixture({ consume: () => hold, requestMs: 30 });
+  await assert.rejects(value.client.execute(value.request), {
+    code: FREE_EXECUTION_CODES.TIMEOUT,
+    sent: true,
+    consumerFailure: true,
+  });
+  finish();
+  await value.client.settled();
 });
