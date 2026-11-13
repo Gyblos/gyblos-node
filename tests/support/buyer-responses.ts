@@ -39,7 +39,17 @@ export const SHELL = {
 // until the signed protocol can convey that constraint.
 export const CODEX = {
   model: MODEL,
-  tools: [SHELL, { type: 'web_search', external_web_access: false }],
+  tools: [
+    SHELL,
+    { type: 'web_search', external_web_access: false },
+    // Codex CLI 0.162 groups its sub-agent tools; no seller runs another Codex, so the group is left out.
+    {
+      type: 'namespace',
+      name: 'multi_agent_v1',
+      description: 'Sub-agents',
+      tools: [{ ...SHELL, name: 'spawn_agent' }],
+    },
+  ],
   tool_choice: 'auto',
   parallel_tool_calls: true,
   reasoning: { summary: 'auto' },
