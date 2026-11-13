@@ -251,13 +251,15 @@ context.
 Options that clients send by default and that do not change the answer are accepted and ignored, such as
 `temperature`, `top_p`, `user`, `metadata`, `stream_options` and, in the Anthropic format, `thinking`
 (thinking is always off). Options that would change it are refused unless they hold their neutral value:
-`response_format` (`text`), `n` (1), `stop` and `stop_sequences`, and `logprobs`. Images are always
-refused.
+`response_format` (`text`), `n` (1), `stop` and `stop_sequences`, and `logprobs`. These sampling hints
+refer to Chat Completions and Anthropic; Responses refuses non-neutral sampling and reasoning.
+Chat Completions and Anthropic refuse images. Responses substitutes a text placeholder for an
+`input_image`; it does not send image content to the seller.
 
-| Answer | Meaning                                                                                                                                                                  |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 400    | The request uses something not supported yet; the message and `param` name it.                                                                                           |
-| 503    | No seller is available right now. With `Retry-After`, the seller failed recently or hit its per-minute limit: the OpenAI and Anthropic SDKs wait and retry on their own. |
-| 504    | The seller did not answer in time.                                                                                                                                       |
+| Answer | Meaning                                                                                                                                                                     |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400    | The request uses something not supported yet; the message and `param` name it.                                                                                              |
+| 503    | No seller is available right now. `Retry-After` suggests when a new attempt may succeed. The clients shown here have automatic retries disabled; retrying is your decision. |
+| 504    | The seller did not answer in time.                                                                                                                                          |
 
 Errors use each API's own shape, so SDKs raise their usual exceptions.

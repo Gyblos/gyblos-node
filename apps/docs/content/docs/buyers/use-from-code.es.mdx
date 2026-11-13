@@ -255,13 +255,15 @@ el contexto.
 Las opciones que los clientes envían por defecto y que no cambian la respuesta se aceptan y se ignoran, como
 `temperature`, `top_p`, `user`, `metadata`, `stream_options` y, en el formato de Anthropic, `thinking`
 (el razonamiento siempre está apagado). Las que sí la cambiarían se rechazan salvo que tengan su valor
-neutro: `response_format` (`text`), `n` (1), `stop` y `stop_sequences`, y `logprobs`. Las imágenes siempre
-se rechazan.
+neutro: `response_format` (`text`), `n` (1), `stop` y `stop_sequences`, y `logprobs`. Las pistas de sampling
+se refieren a Chat Completions y Anthropic; Responses rechaza sampling y razonamiento no neutros.
+Chat Completions y Anthropic rechazan imágenes. Responses sustituye `input_image` por una nota de texto;
+no envía el contenido de la imagen al vendedor.
 
-| Respuesta | Significado                                                                                                                                                                   |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 400       | El pedido usa algo que todavía no se admite; el mensaje y `param` lo nombran.                                                                                                 |
-| 503       | No hay un vendedor disponible ahora. Con `Retry-After`, el vendedor falló hace poco o llegó a su límite por minuto: los SDK de OpenAI y Anthropic esperan y reintentan solos. |
-| 504       | El vendedor no respondió a tiempo.                                                                                                                                            |
+| Respuesta | Significado                                                                                                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400       | El pedido usa algo que todavía no se admite; el mensaje y `param` lo nombran.                                                                                                                           |
+| 503       | No hay un vendedor disponible ahora. `Retry-After` sugiere cuándo intentar de nuevo. Los clientes de estos ejemplos tienen los reintentos automáticos desactivados; volver a intentarlo es tu decisión. |
+| 504       | El vendedor no respondió a tiempo.                                                                                                                                                                      |
 
 Los errores usan la forma de cada API, así que los SDK lanzan sus excepciones habituales.
