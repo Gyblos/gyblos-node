@@ -22,6 +22,7 @@ import { parseArgs } from 'node:util';
 import { FILE_MODES, LOCALHOST, PORTS } from '@gyblos/config';
 import {
   AGENT_SETUP,
+  AGENT_SETUP_CODES,
   AGENT_TOOLS,
   agentFilePath,
   AgentSetupError,
@@ -34,7 +35,6 @@ import {
   type AgentEndpoint,
   type AgentTool,
 } from '@gyblos/node/agent-setup';
-import { AGENT_SETUP_CODES } from '@gyblos/node/constants';
 import { isMain } from '@gyblos/runtime';
 
 import { endpointRoutes } from './model-routes';
