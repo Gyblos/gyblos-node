@@ -6,6 +6,8 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { parse } from 'smol-toml';
 
+import { AGENT_SETUP_CODES } from './constants';
+
 export const AGENT_TOOLS = {
   OPENCODE: 'opencode',
   PI: 'pi',
@@ -73,7 +75,9 @@ export function agentFilePath(
 }
 
 export class AgentSetupError extends Error {
-  constructor(readonly code: 'ENDPOINT' | 'FILE') {
+  constructor(
+    readonly code: (typeof AGENT_SETUP_CODES)[keyof typeof AGENT_SETUP_CODES],
+  ) {
     super(code);
     this.name = 'AgentSetupError';
   }
@@ -101,7 +105,7 @@ function checked(endpoint: AgentEndpoint): AgentEndpoint {
     (endpoint.tokenEnv !== undefined &&
       !AGENT_SETUP.envPattern.test(endpoint.tokenEnv))
   )
-    throw new AgentSetupError('ENDPOINT');
+    throw new AgentSetupError(AGENT_SETUP_CODES.ENDPOINT);
   return endpoint;
 }
 const context = (model: AgentModel) =>
@@ -237,7 +241,7 @@ function jsonObject(text: string | undefined): Json {
   } catch {
     // Comments or other JSONC: refused below rather than rewritten without them.
   }
-  throw new AgentSetupError('FILE');
+  throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
 }
 const object = (value: unknown): Json =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -282,7 +286,7 @@ function configToml(text: string): Json {
   try {
     return parse(text);
   } catch {
-    throw new AgentSetupError('FILE');
+    throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
   }
 }
 function managedBlock(text: string) {
@@ -318,7 +322,7 @@ function managedBlock(text: string) {
         ),
     )
   )
-    throw new AgentSetupError('FILE');
+    throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
 }
 // config.toml with exactly one managed block replaced, retaining all unrelated text and tables.
 export function mergedCodexConfig(
@@ -343,7 +347,7 @@ export function mergedCodexConfig(
       !lines.includes(CODEX_MARKS.start) ||
       !lines.includes(CODEX_MARKS.end)
     )
-      throw new AgentSetupError('FILE');
+      throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
     managedBlock(text.slice(start, end));
     prior = configToml(text.slice(start, end));
     outside = text.slice(0, start) + text.slice(end + CODEX_MARKS.end.length);
@@ -358,7 +362,7 @@ export function mergedCodexConfig(
       key.startsWith(AGENT_SETUP.provider),
     )
   )
-    throw new AgentSetupError('FILE');
+    throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
   const joined = (managed: Json) => ({
     ...user,
     model_providers: {
@@ -374,6 +378,6 @@ export function mergedCodexConfig(
       skipPrototype: true,
     })
   )
-    throw new AgentSetupError('FILE');
+    throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
   return merged;
 }
