@@ -282,6 +282,8 @@ export const FREE_BUYER_STARTUP = {
   PAID_NETWORK: 'BUYER_PAYMENT_NETWORK_MISMATCH',
   // Paid mode recounts with the pinned public tokenizer, so only its model can be bought.
   PAID_MODEL: 'BUYER_PAID_MODEL_UNSUPPORTED',
+  // The explicit paid entry serves only `request.selection`; a `models` list needs the automatic buyer.
+  PAID_MODELS: 'BUYER_PAID_MODELS_UNSUPPORTED',
   PAID_KEY: 'BUYER_WALLET_KEY_INVALID',
   TOKENIZER: 'BUYER_TOKENIZER_UNAVAILABLE',
   // Unreadable, or held by another buyer process.

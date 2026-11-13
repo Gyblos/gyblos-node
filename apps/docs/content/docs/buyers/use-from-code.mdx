@@ -8,12 +8,15 @@ Anthropic APIs, so programs written for those services can use a Gyblos seller b
 For each request it gets a signed free quote from the seller and streams the answer back over a direct
 peer-to-peer connection.
 
+The Responses route currently refuses `parallel_tool_calls: false`, non-default sampling, and non-neutral reasoning before contacting a seller. The signed protocol cannot carry those constraints yet; Codex versions that require them are not compatible until that support lands. Disable HTTP and stream retries in any configured client.
+
 ## What works today [#what-works-today]
 
 | Feature                                                              | Beta status                             |
 | -------------------------------------------------------------------- | --------------------------------------- |
 | Whole conversations: system message, history, new message            | Yes, up to 1024 messages                |
 | OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming        |
+| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming        |
 | `GET /v1/models`                                                     | Yes, the model your buyer asks for      |
 | Free offers                                                          | Yes                                     |
 | Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                |
