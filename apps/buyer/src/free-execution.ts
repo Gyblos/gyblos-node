@@ -93,12 +93,10 @@ export async function executeBuyerFree(
           ...(model ? { model } : {}),
         })
         .catch((error) => {
-          // Busy with this buyer's other request is not a request the network failed to serve.
-          const busy =
-            error instanceof FreeBuyerError &&
-            error.code === FREE_BUYER_CODES.BUSY;
+          // Local occupancy is not a network failure; retain request-local model telemetry.
+          const busy = error instanceof FreeBuyerError && error.code === FREE_BUYER_CODES.BUSY;
           if (!signal.aborted && !busy)
-            buyerUnserved(dependencies, Boolean(onDelta));
+            buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
           throw error;
         });
       try {

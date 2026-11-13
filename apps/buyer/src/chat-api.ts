@@ -1,5 +1,5 @@
-// The two chat formats the local endpoint speaks over one execution: OpenAI chat completions and Anthropic
-// messages. Each knows how to read a request, spell a complete answer, a stream and an error.
+// The three chat formats the local endpoint speaks over one execution: OpenAI chat completions, Anthropic
+// messages and OpenAI responses. Each knows how to read a request, spell a complete answer, a stream and an error.
 import { randomUUID } from 'node:crypto';
 
 import { ROUTES, UNITS } from '@gyblos/config';
@@ -25,10 +25,17 @@ import {
   type ChatStreamFormat,
 } from './free-sse';
 import type { ModelRoute } from './model-routes';
+import { parseResponsesChat } from './responses-chat';
+import {
+  responsesCompletion,
+  responsesError,
+  responsesStream,
+} from './responses-output';
 
 export interface ChatErrorBody {
   code: ChatErrorCode;
   status: number;
+  neverSent: boolean;
   message: string;
   param: string | null;
   extra: Record<string, unknown>;
@@ -47,6 +54,7 @@ export interface ChatApi {
   completion(model: string, result: ChatResult): unknown;
   stream(model: string, includeDigest: boolean): ChatStreamFormat;
   error(body: ChatErrorBody): unknown;
+  errorStatus?(status: number, neverSent: boolean): number;
 }
 
 const openAi: ChatApi = {
@@ -108,11 +116,22 @@ const anthropic: ChatApi = {
   }),
 };
 
+// OpenAI's Responses API, which Codex CLI speaks.
+const responses: ChatApi = {
+  parse: parseResponsesChat,
+  completion: responsesCompletion,
+  stream: (model) => responsesStream(model),
+  error: responsesError,
+  // Codex retries HTTP 5xx without consulting x-should-retry. A possible send must stop it.
+  errorStatus: (status, neverSent) => (neverSent ? status : 400),
+};
+
 // The format a path speaks; a query string (some clients add one) does not change the route.
 export function chatApi(url: string | undefined): ChatApi | undefined {
   const path = url?.split('?')[0];
   if (path === ROUTES.inference) return openAi;
   if (path === CHAT_ROUTES.messages) return anthropic;
+  if (path === CHAT_ROUTES.responses) return responses;
   return undefined;
 }
 

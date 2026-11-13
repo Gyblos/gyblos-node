@@ -5,6 +5,7 @@ import {
   createInferenceTelemetry,
 } from '@gyblos/inference/observation';
 import { FREE_EXECUTION_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
+import type { ModelSelection } from '@gyblos/protocol/control-types';
 import type {
   FreeExecutionRequest,
   FreeExecutionResult,
@@ -88,9 +89,12 @@ export function completeBuyerTelemetry(
 export function buyerUnserved(
   dependencies: FreeBuyerDependencies,
   streaming: boolean,
+  // The model this request asked for; the endpoint's first model when none was routed.
+  selection?: ModelSelection,
 ) {
   const telemetry = dependencies.telemetry;
   if (!telemetry) return;
+  const asked = selection ?? telemetry.selection;
   try {
     emitTelemetry(telemetry.sink, {
       type: TELEMETRY_EVENTS.UNSERVED,
@@ -98,9 +102,9 @@ export function buyerUnserved(
       at: (telemetry.now ?? Date.now)(),
       buyerNodeId: telemetry.buyerNodeId,
       selection: {
-        modelId: telemetry.selection.modelId,
-        variant: telemetry.selection.variant,
-        quantization: telemetry.selection.quantization,
+        modelId: asked.modelId,
+        variant: asked.variant,
+        quantization: asked.quantization,
       },
       streaming,
       requestId: null,
