@@ -251,8 +251,18 @@ async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
     channelId: authorization.channelId,
   };
   let received = '';
-  const recount = (stop: PaidExecutionCode | undefined) =>
-    paidRecount(request, dependencies.meter, run.prompt, received, stop);
+  const recount = (
+    stop: PaidExecutionCode | undefined,
+    result?: PaidExecutionResponse['result'],
+  ) =>
+    paidRecount(
+      request,
+      dependencies.meter,
+      run.prompt,
+      received,
+      stop,
+      result,
+    );
   let terminal: PaidExecutionResponse;
   try {
     terminal = await dependencies.execute(winner, request, signal, (text) => {
@@ -275,7 +285,7 @@ async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
     });
     throw error;
   }
-  const expected = recount(terminal.error?.code);
+  const expected = recount(terminal.error?.code, terminal.result);
   const verdict = await verdictFor(
     dependencies,
     authorization,

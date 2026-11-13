@@ -22,23 +22,35 @@ import {
   type EngineDoneReason,
 } from '@gyblos/protocol/constants';
 import {
-  engineConversation,
   EngineError,
+  engineToolConversation,
   type EngineInput,
 } from '@gyblos/protocol/engine';
+import {
+  TOOL_CALLS_DONE,
+  type ToolCall,
+  type ToolDefinition,
+} from '@gyblos/protocol/tools';
 import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
 import { GENERATION, MODEL_LIMITS } from './constants';
-import { MODEL, renderConversation } from './model';
+import { MODEL } from './model';
+import {
+  createToolStreamSplitter,
+  parseToolOutput,
+  renderInferenceConversation,
+} from './tool-template';
 
 export interface InferenceResult {
   text: string;
   usage: EngineWireUsage;
   done: true;
-  doneReason: EngineDoneReason;
+  doneReason: EngineDoneReason | typeof TOOL_CALLS_DONE;
+  toolCalls?: ToolCall[];
 }
 
 export { renderChat, renderConversation } from './model';
+export { renderAssistantOutput, renderToolConversation } from './tool-template';
 
 export { createModelTokenizer, type ModelTokenizer } from './tokenizer';
 
@@ -115,7 +127,17 @@ async function readGeneration(
   input: GenerateInput,
   signal: AbortSignal,
   attempt: EngineAttempt,
+  tools?: readonly ToolDefinition[],
 ): Promise<InferenceResult> {
+  // With tools offered, text streams up to a possible call; the calls are read once generation ends.
+  const splitter = tools ? createToolStreamSplitter() : undefined;
+  const deliver = async (fragment: string) => {
+    const onText = input.onText;
+    if (!fragment || !onText) return;
+    signal.throwIfAborted();
+    await callerCallback(attempt, () => onText(fragment));
+    signal.throwIfAborted();
+  };
   let buffer = '';
   let text = '';
   let terminal: Record<string, unknown> | undefined;
@@ -162,9 +184,7 @@ async function readGeneration(
           signal.throwIfAborted();
           await callerCallback(attempt, input.onFragment);
           signal.throwIfAborted();
-          const onText = input.onText;
-          await callerCallback(attempt, onText && (() => onText(fragment)));
-          signal.throwIfAborted();
+          await deliver(splitter ? splitter.push(fragment) : fragment);
         }
         if (event.done === true) terminal = event;
       }
@@ -172,18 +192,67 @@ async function readGeneration(
     }
     if (buffer.trim() || !terminal || !attempt.fragments)
       throw new FrameFailure();
-    return {
-      text,
-      usage: terminalUsage(terminal),
-      done: true,
-      doneReason: doneReason(terminal),
-    };
+    return await finishGeneration(text, terminal, tools, async () => {
+      if (splitter) await deliver(splitter.held());
+    });
   } finally {
     signal.removeEventListener('abort', cancel);
     await reader.cancel().catch(() => {});
   }
 }
 
+// The calls the model wrote to offered tools, or its whole text when it wrote none well-formed (then the
+// text held back from the stream is released first).
+async function finishGeneration(
+  text: string,
+  terminal: Record<string, unknown>,
+  tools: readonly ToolDefinition[] | undefined,
+  release: () => Promise<void>,
+): Promise<InferenceResult> {
+  const usage = terminalUsage(terminal);
+  const reason = doneReason(terminal);
+  const called = tools && parseToolOutput(text, tools);
+  if (called)
+    return {
+      text: called.text,
+      toolCalls: called.toolCalls,
+      usage,
+      done: true,
+      doneReason: TOOL_CALLS_DONE,
+    };
+  await release();
+  return { text, usage, done: true, doneReason: reason };
+}
+// The raw prompt and the tools it offers. A tool choice of none renders the conversation without the tools
+// block, so the model is not offered them. An unsupported conversation is a programming error, raised
+// before any engine call.
+function generationPrompt(input: GenerateInput) {
+  return renderInferenceConversation(
+    engineToolConversation(input),
+    input.tools,
+    input.toolChoice,
+  );
+}
+
+// One deterministic raw generation of the rendered prompt.
+const generateBody = (
+  prompt: string,
+  maxTokens: number,
+  contextTokens: number,
+) =>
+  JSON.stringify({
+    model: MODEL.name,
+    prompt,
+    raw: true,
+    stream: true,
+    keep_alive: GENERATION.keepAlive,
+    options: {
+      temperature: GENERATION.temperature,
+      seed: GENERATION.seed,
+      num_predict: maxTokens,
+      num_ctx: contextTokens,
+    },
+  });
 // Ollama's own inventory is local: any refusal or a changed pin means the model is unavailable.
 async function checkModel(
   origin: URL,
@@ -254,8 +323,7 @@ export function createOllama(
         input.maxTokens > contextTokens
       )
         throw new Error('Invalid output token limit.');
-      // An unsupported conversation is a programming error, raised before any engine call.
-      const prompt = renderConversation(engineConversation(input));
+      const { prompt, tools } = generationPrompt(input);
       input.signal?.throwIfAborted();
       await assertModel(input.signal);
       input.signal?.throwIfAborted();
@@ -278,19 +346,7 @@ export function createOllama(
             method: 'POST',
             redirect: 'error',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              model: MODEL.name,
-              prompt,
-              raw: true,
-              stream: true,
-              keep_alive: GENERATION.keepAlive,
-              options: {
-                temperature: GENERATION.temperature,
-                seed: GENERATION.seed,
-                num_predict: input.maxTokens,
-                num_ctx: contextTokens,
-              },
-            }),
+            body: generateBody(prompt, input.maxTokens, contextTokens),
             signal,
           },
         );
@@ -298,7 +354,13 @@ export function createOllama(
           await response.body?.cancel().catch(() => {});
           throw statusFailure(response.status);
         }
-        return await readGeneration(response.body, input, signal, attempt);
+        return await readGeneration(
+          response.body,
+          input,
+          signal,
+          attempt,
+          tools,
+        );
       } catch (error) {
         throw engineFailure(error, attempt);
       }

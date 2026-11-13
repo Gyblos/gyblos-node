@@ -19,6 +19,7 @@ import { httpMultiSellerPayments } from './http-multiseller-finance';
 import { httpMultiText } from './http-multiseller-http';
 import { httpMultiIpc } from './http-multiseller-ipc';
 import { paidSellerConfiguration } from './paid-acceptance-config';
+import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import { paidAcceptanceEngine } from './paid-acceptance-engine';
 
 async function main() {
@@ -81,10 +82,22 @@ async function main() {
               ...prepared,
               engine: {
                 ...prepared.engine,
-                generate: async (input) => ({
-                  ...(await generate(input)),
-                  text: httpMultiText(label),
-                }),
+                generate: async (input) => {
+                  // The synthetic seller label belongs in both live text and the final answer.
+                  const deliver = input.onText;
+                  const output = await generate({
+                    ...input,
+                    onText: deliver
+                      ? (text) =>
+                          deliver(
+                            text === PAID_ACCEPTANCE.text
+                              ? httpMultiText(label)
+                              : text,
+                          )
+                      : undefined,
+                  });
+                  return { ...output, text: httpMultiText(label) };
+                },
               },
             };
           },

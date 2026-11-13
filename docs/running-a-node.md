@@ -863,8 +863,21 @@ contains:
 - optional `pinnedNodeId` for “choose myself”. A pinned seller still passes all
   filters; `PINNED_SELLER_IN_COOLDOWN` includes `cooldownUntil` for the UI;
 - optional `quoteWindowMs`, how long quotes may race (integer milliseconds, 100
-  to 10000; default 3000). A seller that has not answered when the window closes
-  is cooled down like one that refused.
+  to 10000; default 3000).
+- optional `models`: the models the local endpoint serves by name, 1 to 32
+  `{ id, aliases?, selection, maxTokens? }`. A client sends `id` (or an alias)
+  as `model`, and the buyer quotes that `selection` with that answer limit
+  (`maxTokens`, default `request.maxTokens`, at most 32768); every other request
+  setting is shared. Names are unique across ids and aliases, and the list must
+  serve `request.selection.modelId` by name (`buyer:chat` asks for it). Paid
+  modes refuse to start unless every listed model meets the paid limits (the
+  pinned model, at most 128 tokens), since the buyer recounts with that model's
+  tokenizer. `GET /v1/models` lists them (with `max_output_tokens`), and a name
+  the endpoint does not serve gets 404 `FREE_BUYER_MODEL_NOT_FOUND` listing the
+  ones it does. Without `models`, `request.selection` is the one model. Each
+  request carries its whole conversation, so switching models between turns
+  keeps the context. A seller that has not answered when the window closes is
+  cooled down like one that refused.
 
 Without a `discovery` option this is a static candidate list. With optional
 `"discovery": {}` (or
@@ -1064,7 +1077,8 @@ beside it), `SELECTION_MAX_TOKENS_TOO_HIGH`, `SELECTION_REASONING_UNSUPPORTED`,
 The endpoint speaks two chat formats over the same execution, so OpenAI- and
 Anthropic-compatible clients and agents can point at it: set the client's base
 URL to `http://127.0.0.1:4031/v1` (OpenAI) or `http://127.0.0.1:4031`
-(Anthropic). `GET /v1/models` lists the one configured model.
+(Anthropic). `GET /v1/models` lists the models in `models`, or the one
+`request.selection` model when there is no list.
 
 OpenAI format, `POST /v1/chat/completions`:
 
@@ -1104,31 +1118,109 @@ buyer's `maxTokens` is served up to it, and the answer then ends with `length`
 (`max_tokens` in the Anthropic format). `model` selects the exact configured
 model/variant/quantization tuple; it is not an engine name.
 
+Tools (function calling) work in both formats through the normal buyer endpoint:
+
+- OpenAI: `tools` (functions with a JSON Schema in `parameters`), `tool_choice`
+  (`auto`, `none`, `required` or one function), assistant `tool_calls` and
+  `role: "tool"` results.
+- Anthropic: `tools` with `input_schema` (client tools; server tools such as web
+  search are refused), `tool_choice` (`auto`, `any`, `none`, `tool`), and
+  `tool_use` and `tool_result` blocks; a result marked `is_error` reaches the
+  model as `Error: ...`, and text after the results joins them.
+- An answer that calls tools ends with `finish_reason: "tool_calls"`
+  (`stop_reason: "tool_use"`); its calls carry ids the seller assigns. The buyer
+  asks only sellers that serve tools (`params.tools` in the quote); when none
+  does, it answers 503 saying so. A zero-price quote needs no financial
+  services. A positive-price quote requires an explicitly configured reusable
+  session and a tokenizer that can independently recount tool output. The old
+  individual settlement mode refuses tools before opening a payment; it cannot
+  acknowledge arguments held until the response terminal.
+- The pinned qwen3:0.6b handles simple calls; agents that send many tools and
+  long instructions (Claude Code) need a seller on a larger model through the
+  OpenAI or Anthropic engine. Cursor's agent mode calls from its own cloud and
+  cannot reach a local endpoint.
+
 Options clients send by default and that do not change what is asked
 (`temperature`, `top_p`, `top_k`, penalties, `seed`, `user`, `metadata`,
-`stream_options`, `store`, `parallel_tool_calls`) are accepted and ignored:
-generation is deterministic. Options that would change the answer are refused
-rather than dropped, unless they hold their neutral value: tools and tool
-results, `tool_choice`, `response_format` other than text, `n` above 1, stop
-sequences, logprobs, enabled `thinking`, images and other non-text parts.
-Unknown options are refused. Everything is checked before selection or prompt
-transmission. This is a compatible subset, not the complete OpenAI or Anthropic
-API. Requests must send `Content-Type: application/json`. Invalid UTF-8, foreign
-Host headers, requests with an Origin header and other content types get 400 (a
-foreign Host gets 421), so a web page cannot reach the endpoint; there is no
-CORS browser interface. A body declared larger than 384 KiB gets 413 before it
-is read; a larger streamed body gets the same 413 once it passes the limit. Both
-close the connection. Use a local client, and apply normal trust to local
-processes. When the endpoint requires its token (paid mode), send it as
-`Authorization: Bearer <token>` or, as Anthropic SDKs do with their key,
-`x-api-key: <token>`.
+`stream_options`, `store`, `parallel_tool_calls`, and in the Anthropic format
+`thinking`, `output_config` and `context_management`, which Claude Code sends)
+are accepted and ignored: generation is deterministic and thinking is always
+off. Options that would change the answer are refused rather than dropped,
+unless they hold their neutral value: the legacy `functions` and
+`function_call`, `response_format` other than text, `n` above 1, stop sequences,
+logprobs, `mcp_servers`, images and other non-text parts. Thinking blocks a
+client sends back in an assistant turn are left out, and a `system` message
+inside `messages` joins the system instructions. Unknown options are refused.
+Everything is checked before selection or prompt transmission. This is a
+compatible subset, not the complete OpenAI or Anthropic API. Requests must send
+`Content-Type: application/json`. Invalid UTF-8, foreign Host headers, requests
+with an Origin header and other content types get 400 (a foreign Host gets 421),
+so a web page cannot reach the endpoint; there is no CORS browser interface. A
+body declared larger than 384 KiB gets 413 before it is read; a larger streamed
+body gets the same 413 once it passes the limit. Both close the connection. Use
+a local client, and apply normal trust to local processes. When the endpoint
+requires its token (paid mode), send it as `Authorization: Bearer <token>` or,
+as Anthropic SDKs do with their key, `x-api-key: <token>`.
 
 Set `stream` to `true` for incremental `text/event-stream` responses. In the
 OpenAI format each `data:` event is a `chat.completion.chunk` with a content
 delta, and successful completion sends a finish reason and usage, then `[DONE]`.
 In the Anthropic format the stream carries `message_start`, one text block's
 `content_block_start`, `content_block_delta` and `content_block_stop`, then
-`message_delta` with the stop reason and usage, and `message_stop`. The default
+`message_delta` with the stop reason and usage, and `message_stop`. Tool calls
+arrive whole at the end: in the OpenAI format one chunk with every `tool_calls`
+entry before the finish chunk; in the Anthropic format one `tool_use` block per
+call (its start, one `input_json_delta` with the whole input, its stop).
+OpenAI's Responses API, `POST /v1/responses` (the format Codex CLI speaks),
+takes the same model, conversation and function tools: `instructions` and
+leading `developer` or `system` messages become the system text, later ones
+(Codex sends one when the model changes) are sent as user text, consecutive
+`function_call` items form one assistant turn (checked together), and
+`function_call_output` items answer them. It is stateless: `store` must be
+false, and `previous_response_id`, structured `text.format`, custom, namespaced
+(MCP) or other provider tools, and audio or file parts are refused with a 400
+that names them. For Codex sessions, three things are left out rather than
+refused: the `web_search` tool Codex offers on every request (no seller runs
+it), `reasoning` and `web_search_call` records from a session that began on
+another provider, and images, which become a short `[image omitted …]` text so a
+session that once saw a picture goes on. `include`, `prompt_cache_key` and
+bookkeeping hints are accepted and ignored. Non-neutral reasoning, sampling
+settings and `parallel_tool_calls: false` are refused before execution: the
+signed protocol cannot express those constraints yet. Codex versions that
+require them are not supported until that follow-up. A stream sends
+`response.created`, the message item (`output_item.added`, `content_part.added`,
+`output_text.delta`, then their `done` events) once text starts, each call as a
+`function_call` item (`output_item.added`, `function_call_arguments.done`,
+`output_item.done`), and `response.completed` with usage; a token-limited answer
+ends with `response.incomplete`, status `incomplete`, and its delivered usage. A
+possible-send failure before the first stream event uses HTTP 400 and
+`invalid_prompt` to stop clients that ignore retry headers. A failure after the
+stream starts is `response.failed` with code `invalid_prompt` (which Codex shows
+and does not retry, since the prompt may have reached a seller), a readable
+message and the Gyblos code in `gyblos_code`. A conversation over the size the
+network carries gets code `context_length_exceeded`, so Codex compacts it. Paid
+endpoints serve text only, so they refuse Codex's tools.
+
+Codex CLI points at the endpoint as a custom provider in `~/.codex/config.toml`
+(the built-in `openai` provider sends fields only OpenAI accepts):
+
+```toml
+model = "qwen3-0.6b"
+model_provider = "gyblos"
+
+[model_providers.gyblos]
+name = "Gyblos"
+base_url = "http://127.0.0.1:4031/v1"
+wire_api = "responses"
+request_max_retries = 0
+stream_max_retries = 0
+```
+
+Leave MCP servers off for these sessions; switch models with `/model` and any
+name the endpoint serves.
+
+`POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
+over system, messages and tools) without contacting a seller. The default
 (absent or `false`) remains one complete JSON response.
 
 Fragments are provisional until a verified terminal and clean end of the Iroh
@@ -1141,20 +1233,40 @@ before the first fragment. Writes await backpressure. Complete and streaming
 execution share replay/caps; cancellation keeps a conservative full token
 reservation. This free buyer does not invoke the separate paid-v2 path.
 
+A free-only buyer runs up to two requests at once, each on a different seller,
+since a seller serves one request per buyer at a time: selections take turns,
+each skipping the sellers already serving this buyer. When every candidate is
+busy with this buyer's other request the answer is 429 (the seller is not cooled
+down), and a third request at once gets 429 too. Paid and session modes keep
+their own admission. The buyer checks registered identity again after quoting,
+before admitting the winner, even if discovery or catalog checks succeeded. No
+identity decision is reused for final admission.
+
+A free buyer goes back to the seller that served a conversation (known by a
+digest of its model, system text and first user message, kept in memory only for
+the last 256 conversations), so a warm prompt cache can answer sooner: that
+seller is kept among the candidates when it is still competitive, and another
+seller's quote waits up to 500 ms for its quote. A seller that fails while
+executing (its connection breaks or it answers out of protocol, not the buyer's
+own deadline or a client that left) counts a failure, so it weighs less in later
+selections; it is not cooled down (a seller that is gone already is at its next
+quote, and a buyer's only seller stays reachable). When that happens before the
+prompt was sent, the request moves to another seller as before.
+
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
-413 for an oversized body, 429 when the endpoint is already running a request
-(safe to retry), 503 when no seller could take the request, 504 when the
-endpoint's 180-second deadline expires, and 500 for an unexpected failure.
-Whenever the prompt may already have reached a seller, or the request is the
-caller's fault, the error carries `x-should-retry: false`, the header the
+413 for an oversized body, 429 when the endpoint is already running as many
+requests as it can (safe to retry), 503 when no seller could take the request,
+504 when the endpoint's 180-second deadline expires, and 500 for an unexpected
+failure. Whenever the prompt may already have reached a seller, or the request
+is the caller's fault, the error carries `x-should-retry: false`, the header the
 official OpenAI and Anthropic SDKs honor to skip their automatic retries.
 Clients that retry 5xx on their own must check it: retrying would resend the
 prompt, possibly to another seller.
 
 A refused request (`FREE_BUYER_INVALID_REQUEST`, 400) names the offending field
 in `error.param` (`model`, `messages`, `max_tokens`, `stream`, or an unsupported
-field such as `tools`) and says why in `error.message`, for example
-`tools is not supported yet; remove it or send its default`. The reason is fixed
+field such as `n`) and says why in `error.message`, for example
+`n is not supported yet; remove it or send its default`. The reason is fixed
 text or the operator's own limits, never the prompt. In the Anthropic format
 errors take that API's shape
 (`{"type":"error","error":{"type": "invalid_request_error","message":...}}`) and
@@ -1388,10 +1500,13 @@ start it again. The free buyer needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
 network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,
-`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
-`BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
-is not a private 0600 regular file with one name, owned by you and holding a
-token; it is never repaired, since its token may already have been read).
+`BUYER_PAID_MODELS_UNSUPPORTED` (the older explicit paid entry,
+`startPaidBuyer`, serves only `request.selection` and refuses a `models` list;
+the automatic buyer serves the list), `BUYER_WALLET_KEY_INVALID`,
+`BUYER_TOKENIZER_UNAVAILABLE`, `BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and
+`BUYER_API_TOKEN_INVALID` (`api-token` is not a private 0600 regular file with
+one name, owned by you and holding a token; it is never repaired, since its
+token may already have been read).
 
 ## Private free-inference receipts
 

@@ -1,9 +1,13 @@
-// The buyer's own count of a paid request, made exactly as the seller counts: the single user message as
-// input, the streamed text as output, and a stop that reports delivery at least one token and at most
-// its bytes (other stops charge no output). Pure; the tokenizer is the model's public one.
+// Independent recount for legacy individual settlement: full text conversations where supported.
+// Tool requests require reusable sessions, whose buyer signs only after verifying the complete terminal.
+
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
-import type { RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
+import {
+  inferenceNeedsTools,
+  type InferenceResult,
+} from '@gyblos/protocol/inference';
 import type {
   PaidCharge,
   PaidExecutionRequest,
@@ -12,24 +16,30 @@ import {
   PAID_DELIVERED_CODES,
   type PaidExecutionCode,
 } from '@gyblos/protocol/paid/constants';
+import { checkToolCalls, isToolConversation } from '@gyblos/protocol/tools';
 
 import { paidCharge } from './paid-charge';
 
-// The prompt a paid seller would count, or undefined for input no paid seller serves: more than one
-// message, another role, or a prompt the model's chat template refuses (checked before any payment).
+// Legacy input preflight before payment construction/authorization; tools require an acknowledged session.
 export function paidPrompt(
   input: FreeExecutionBuildInput,
-  meter: RecountTokenizer,
+  meter: RecountTokenizer & Partial<Pick<ChatTokenizer, 'chat'>>,
 ): string | undefined {
+  if (inferenceNeedsTools(input)) return undefined;
   const [message, ...rest] = input.messages;
-  if (!message || rest.length > 0 || message.role !== FREE_CHAT_ROLES.USER)
-    return undefined;
+  if (!isToolConversation(input.messages)) return undefined;
   try {
+    if (meter.chat) {
+      meter.chat(input.messages, input.tools, input.toolChoice);
+      return message!.content;
+    }
+    if (!message || rest.length || message.role !== FREE_CHAT_ROLES.USER)
+      return undefined;
     meter.input(message.content);
+    return message.content;
   } catch {
     return undefined;
   }
-  return message.content;
 }
 
 const bytes = (text: string) => new TextEncoder().encode(text).length;
@@ -37,11 +47,13 @@ const bytes = (text: string) => new TextEncoder().encode(text).length;
 // `stop` is the seller's stop code, or undefined for a completed result.
 export function paidRecount(
   request: PaidExecutionRequest,
-  meter: RecountTokenizer,
+  meter: RecountTokenizer & Partial<Pick<ChatTokenizer, 'chat'>>,
   prompt: string,
   received: string,
   stop: PaidExecutionCode | undefined,
+  result?: InferenceResult,
 ): PaidCharge {
+  if (result) checkToolCalls(request.input, result.toolCalls);
   const outputTokens = !received
     ? 0
     : stop === undefined
@@ -51,7 +63,16 @@ export function paidRecount(
         : 0;
   return paidCharge(
     request,
-    { inputTokens: meter.input(prompt), outputTokens },
+    {
+      inputTokens: meter.chat
+        ? meter.chat(
+            request.input.messages,
+            request.input.tools,
+            request.input.toolChoice,
+          )
+        : meter.input(prompt),
+      outputTokens,
+    },
     outputTokens > 0,
   );
 }

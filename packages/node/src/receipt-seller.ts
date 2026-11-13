@@ -15,6 +15,7 @@ import type {
   FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 import type { Signer } from '@gyblos/protocol/signing';
+import { conversationText, recordedFinishReason } from '@gyblos/protocol/tools';
 import { createReceiptService } from '@gyblos/transport-iroh/receipt-service';
 
 import { RECEIPT_WORK } from './constants';
@@ -96,7 +97,7 @@ function sellerRecord(
       }),
       reasoningTokens: null,
     },
-    sizes: receiptTextSizes(request.input.messages[0]!.content, output),
+    sizes: receiptTextSizes(conversationText(request.input.messages), output),
     timing: {
       receivedAt,
       firstTokenMs: output ? (first ?? total) : null,
@@ -109,7 +110,9 @@ function sellerRecord(
         : RECEIPT_OUTCOMES.FAILED,
     code: response.error?.code ?? null,
     reason: response.error?.reason ?? null,
-    finishReason: response.result?.finishReason ?? null,
+    finishReason: response.result
+      ? recordedFinishReason(response.result.finishReason)
+      : null,
   };
 }
 export function sellerReceiptObservation(

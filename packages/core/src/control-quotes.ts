@@ -47,6 +47,8 @@ export interface QuoteModel {
   meteringMode: ControlMeteringMode;
   // The longest answer the offer serves per request; unset, the context alone bounds it.
   maxOutputTokens?: number;
+  // Whether this offer can execute tool-aware requests.
+  tools?: boolean;
 }
 export interface QuoteReadiness {
   generation: number;
@@ -253,6 +255,8 @@ export async function createControlQuote(
   if (!mapped) return controlFail(CONTROL_CODES.MODEL);
   if (!mapped.reasoning.includes(query.params.reasoning))
     return controlFail(CONTROL_CODES.LEVEL);
+  if (query.params.tools && !mapped.tools)
+    return controlFail(CONTROL_CODES.TOOLS);
   const state = readReadiness(context);
   checkReadiness(context, state, now);
   const offer = await buildQuote(query, context, state, catalog, now);

@@ -4,9 +4,18 @@ import { createHash } from 'node:crypto';
 
 import { Tokenizer } from '@huggingface/tokenizers';
 
-import type { ChatMessage } from '@gyblos/protocol/chat';
+import {
+  type ToolCall,
+  type ToolChatMessage,
+  type ToolChoice,
+  type ToolDefinition,
+} from '@gyblos/protocol/tools';
 
-import { MODEL, renderChat, renderConversation } from './model';
+import { MODEL, renderChat } from './model';
+import {
+  renderAssistantOutput,
+  renderInferenceConversation,
+} from './tool-template';
 
 export type ModelTokenizer = ReturnType<typeof createModelTokenizer>;
 
@@ -31,7 +40,13 @@ export function createModelTokenizer(artifacts: {
   return {
     count,
     input: (prompt: string) => count(renderChat(prompt)),
-    chat: (messages: readonly ChatMessage[]) =>
-      count(renderConversation(messages)),
+    // Tools count as the template renders them; without tools or tool turns, as the text template.
+    chat: (
+      messages: readonly ToolChatMessage[],
+      tools?: readonly ToolDefinition[],
+      choice?: ToolChoice,
+    ) => count(renderInferenceConversation(messages, tools, choice).prompt),
+    output: (text: string, toolCalls?: readonly ToolCall[]) =>
+      count(renderAssistantOutput(text, toolCalls)),
   };
 }

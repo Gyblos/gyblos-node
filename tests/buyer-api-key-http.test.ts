@@ -31,7 +31,7 @@ async function fixture() {
   let calls = 0;
   let uncertain = false;
   const host = await startFreeBuyerHttp(
-    async (_input, _signal, _delta, permission) => {
+    async (_input, _signal, _delta, _model, permission) => {
       await permission?.reserve({
         maxAtomic: '60',
         requestId: 'synthetic',

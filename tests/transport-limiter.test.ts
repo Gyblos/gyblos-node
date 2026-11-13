@@ -247,3 +247,44 @@ void test('origin concurrency and duplicate releases remain bounded independentl
   two();
   three();
 });
+
+void test('control queries and receipts do not count as requests, so each free request costs one', () => {
+  const limiter = createPeerLimiter(() => 0);
+  const control = limiter.register('buyer', CONNECTION_FAMILIES.CONTROL);
+  const data = limiter.register('buyer', CONNECTION_FAMILIES.DATA);
+  assert.ok(control && data);
+  let served = 0;
+  for (let index = 0; index < TRANSPORT_LIMITS.requestsPerWindow * 2; index++) {
+    // Catalog, presence and quote before the execution, and two receipt calls after it.
+    for (let query = 0; query < 3; query++) {
+      const release = limiter.enterControl();
+      assert.ok(release, `query ${query} of request ${index}`);
+      release();
+    }
+    if (!request(limiter, 'buyer')) break;
+    served++;
+    for (let receipt = 0; receipt < 2; receipt++) {
+      const release = limiter.enterControl();
+      assert.ok(release);
+      release();
+    }
+  }
+  assert.equal(served, TRANSPORT_LIMITS.requestsPerWindow);
+  control();
+  data();
+});
+
+void test('control queries never wait on a running request, and never hold its slot', () => {
+  const limiter = createPeerLimiter(() => 0);
+  assert.ok(limiter.register('one', CONNECTION_FAMILIES.DATA));
+  const running = limiter.enter('one');
+  assert.ok(running);
+  // A receipt or the next quote while the answer is still finishing.
+  const query = limiter.enterControl();
+  assert.ok(query);
+  query();
+  // The buyer still has its one request in flight, no more.
+  assert.equal(limiter.enter('one'), undefined);
+  running();
+  assert.ok(limiter.enter('one'));
+});

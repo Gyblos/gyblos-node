@@ -22,7 +22,22 @@ export async function batchLoopback(
   const sockets = new Set<Socket>();
   const running = new Set<Promise<void>>();
   let connections = 0;
+  const peers = new Map<
+    number,
+    ReturnType<typeof batchDeferred<AbortController>>
+  >();
+  const peer = (port: number) => {
+    let value = peers.get(port);
+    if (!value) {
+      value = batchDeferred<AbortController>();
+      peers.set(port, value);
+    }
+    return value;
+  };
   const server = createServer({ allowHalfOpen: true }, (socket) => {
+    const connection = new AbortController();
+    peer(socket.remotePort!).resolve(connection);
+    socket.once('close', () => connection.abort());
     sockets.add(socket);
     socket.once('close', () => sockets.delete(socket));
     const task = serveBatchChannelStream(
@@ -30,7 +45,7 @@ export async function batchLoopback(
       service,
       ids.buyerNodeId,
       () => socket.destroy(),
-      new AbortController().signal,
+      connection.signal,
       () => () => {},
     );
     running.add(task);
@@ -60,11 +75,13 @@ export async function batchLoopback(
       connections++;
       const closed = batchDeferred<void>();
       const owned = new Set<Socket>();
+      const controllers = new Set<AbortController>();
       const connection: BatchConnection = {
         remoteId: destination.id,
         paths: () => [],
         closed: () => closed.promise,
         close() {
+          for (const controller of controllers) controller.abort();
           for (const socket of owned) socket.destroy();
           closed.resolve();
         },
@@ -82,6 +99,7 @@ export async function batchLoopback(
           });
           const stream = socketStream(socket);
           await once(socket, 'connect');
+          controllers.add(await peer(socket.localPort!).promise);
           return stream;
         },
       };

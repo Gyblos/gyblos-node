@@ -140,7 +140,7 @@ void test('the golden vector charges are the quote prices applied to the recount
   } = JSON.parse(
     await readFile(
       fileURLToPath(
-        import.meta.resolve('@gyblos/protocol/vectors/paid-execution-v1.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/paid-execution-v2.json'),
       ),
       'utf8',
     ),

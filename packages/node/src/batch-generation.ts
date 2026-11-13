@@ -2,6 +2,10 @@
 import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { chargeV2 } from '@gyblos/core/pricing-v2';
 import { recountSessionInput } from '@gyblos/core/session-input';
+import {
+  generateInference,
+  validateInferenceInput,
+} from '@gyblos/inference/conversation';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   BatchChannelError,
@@ -15,8 +19,8 @@ import {
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
-import type { EngineResult } from '@gyblos/protocol/engine';
-import type { FreeExecutionResult } from '@gyblos/protocol/free-execution';
+import type { ExecutionResult } from '@gyblos/protocol/free-execution';
+import { InferenceError } from '@gyblos/protocol/inference';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import type {
@@ -25,6 +29,7 @@ import type {
 } from '@gyblos/protocol/payment-session';
 
 import { runBatchSellerExecution } from './batch-session';
+import { createPaidStreamOutput } from './paid-stream-output';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export function batchLiveOffer(
@@ -58,21 +63,6 @@ export function batchLiveOffer(
     return batchFail(PAID_EXECUTION_CODES.ENGINE);
   return live;
 }
-function recountedResult(
-  live: LiveSellerOffer,
-  inputTokens: number,
-  maxTokens: number,
-  generated: EngineResult,
-): FreeExecutionResult {
-  const usage = live.meter.usage(generated.text, generated.usage, inputTokens);
-  if (
-    !usage ||
-    usage.outputTokens > maxTokens ||
-    usage.inputTokens + usage.outputTokens > live.model.contextTokens
-  )
-    return batchFail(PAID_EXECUTION_CODES.LIMIT);
-  return { text: generated.text, usage, finishReason: generated.finishReason };
-}
 export async function generateBatch(
   request: BatchExecutionRequest,
   pending: SessionRequest,
@@ -81,13 +71,20 @@ export async function generateBatch(
   live: LiveSellerOffer,
   now: () => number,
   signal: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
+  generated?: (duration: number) => void,
 ) {
   const { input, inputTokens } = recountSessionInput(
     request.quote,
     request.input,
     live.meter,
   );
-  const run = await runBatchSellerExecution<FreeExecutionResult>({
+  try {
+    validateInferenceInput(input, live.engine, live.meter);
+  } catch (error) {
+    throw batchError(error);
+  }
+  const run = await runBatchSellerExecution<ExecutionResult>({
     seller: session,
     request: pending,
     peer,
@@ -112,29 +109,12 @@ export async function generateBatch(
             ),
           )
         : '0',
-    open: (window) => ({
-      generate: async () => {
-        window.check();
-        const generated = await live.engine.generate({
-          messages: input.messages,
-          maxTokens: request.input.maxTokens,
-          signal: window.signal,
-        });
-        window.check();
-        return recountedResult(
-          live,
-          inputTokens,
-          request.input.maxTokens,
-          generated,
-        );
-      },
-      measure: (generated) =>
-        'value' in generated
-          ? { ...generated.value.usage, completed: true }
-          : { inputTokens, outputTokens: 0, completed: false },
-    }),
+    open: (window) =>
+      batchGeneration(live, input, inputTokens, window, onDelta, generated),
   });
   if ('error' in run.generated) {
+    if (run.generated.error instanceof InferenceError)
+      throw batchError(run.generated.error);
     if (run.generated.error instanceof BatchChannelError)
       throw run.generated.error;
     return batchFail(
@@ -144,4 +124,53 @@ export async function generateBatch(
     );
   }
   return { value: run.generated.value, bill: run.settlement };
+}
+
+// Reuses the paid delivered-prefix tracker; session billing stays in runBatchSellerExecution.
+function batchGeneration(
+  live: LiveSellerOffer,
+  input: BatchExecutionRequest['input'],
+  inputTokens: number,
+  window: { signal: AbortSignal; check: () => void },
+  onDelta: ((text: string) => Promise<void>) | undefined,
+  onGenerated: ((duration: number) => void) | undefined,
+) {
+  const output = createPaidStreamOutput(
+    live.meter,
+    { inputTokens, allowance: input.maxTokens },
+    window.signal,
+    onDelta ?? (async () => {}),
+    window.check,
+  );
+  let emitted = false;
+  return {
+    stop: output.stop,
+    generate: async () => {
+      window.check();
+      const generated = await generateInference({
+        engine: live.engine,
+        input,
+        inputTokens,
+        meter: live.meter,
+        contextTokens: live.model.contextTokens,
+        signal: window.signal,
+        check: window.check,
+        generated: onGenerated,
+        onText: async (text) => {
+          if (text) emitted = true;
+          await output.onText(text);
+        },
+      });
+      window.check();
+      if (!emitted && generated.text) await output.onText(generated.text);
+      output.complete(generated.text);
+      return generated;
+    },
+    measure: (
+      generated: import('@gyblos/inference').Generated<ExecutionResult>,
+    ) =>
+      'value' in generated
+        ? { ...generated.value.usage, completed: true }
+        : { inputTokens, outputTokens: 0, completed: false },
+  };
 }

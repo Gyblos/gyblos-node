@@ -49,7 +49,11 @@ void test('buyer emits request and verified completion with unknown engine and n
   await executeBuyerFree(request.input, dependencies);
   assert.deepEqual(
     telemetry.events.map((event) => event.type),
-    [TELEMETRY_EVENTS.REQUEST_RECEIVED, TELEMETRY_EVENTS.COMPLETED],
+    [
+      TELEMETRY_EVENTS.REQUEST_RECEIVED,
+      TELEMETRY_EVENTS.FIRST_TOKEN,
+      TELEMETRY_EVENTS.COMPLETED,
+    ],
   );
   assert.equal(telemetry.events[0]?.engineKind, null);
   for (const event of telemetry.events)
@@ -81,6 +85,7 @@ void test('buyer records refused unsent attempt then successful failover exactly
       TELEMETRY_EVENTS.REQUEST_RECEIVED,
       TELEMETRY_EVENTS.REFUSED,
       TELEMETRY_EVENTS.REQUEST_RECEIVED,
+      TELEMETRY_EVENTS.FIRST_TOKEN,
       TELEMETRY_EVENTS.COMPLETED,
     ],
   );

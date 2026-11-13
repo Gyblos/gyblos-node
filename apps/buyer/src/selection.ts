@@ -145,6 +145,7 @@ export async function selectVerifiedBuyerQuote(
       sellers: snapshots.filter((item) => item !== undefined),
       stats: dependencies.stats,
       pinnedNodeId: config.pinnedNodeId,
+      previousSeller: config.previousSeller,
       now: now(),
       random:
         dependencies.random ??
@@ -238,6 +239,7 @@ function raceCandidates(
       signal,
       // The operator's selection.json wins over the caller's default.
       windowMs: config.quoteWindowMs ?? dependencies.windowMs,
+      ...(config.previousSeller ? { preferred: config.previousSeller } : {}),
       // A seller silent for the whole window is cooled down like one that refused.
       onExpired: (pending) => {
         for (const candidate of pending) {
@@ -274,6 +276,7 @@ async function requestCandidate(
         priceCeilings: request.priceCeilings,
         network: request.network,
         asset: request.asset,
+        ...(request.tools ? { tools: true as const } : {}),
       },
       querySignal,
     );
@@ -289,13 +292,15 @@ async function requestCandidate(
     return quote;
   } catch (error) {
     if (!querySignal.aborted) {
-      recordQuote(
-        dependencies.stats,
-        candidate.nodeId,
-        false,
-        now() - start,
-        now(),
-      );
+      // A seller without tools answered as designed: it is not cooled down for the requests it serves.
+      if (sellerFailureCode(error) !== CONTROL_CODES.TOOLS)
+        recordQuote(
+          dependencies.stats,
+          candidate.nodeId,
+          false,
+          now() - start,
+          now(),
+        );
       reportSellerFailure(dependencies.onSellerFailure, {
         nodeId: candidate.nodeId,
         phase: SELLER_FAILURE_PHASES.QUOTE,

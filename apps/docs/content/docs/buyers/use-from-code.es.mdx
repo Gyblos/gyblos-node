@@ -1,0 +1,269 @@
+---
+title: Usar Gyblos desde tu código
+description: Inicia el comprador local y apunta clientes de OpenAI o Anthropic a él para conversar con un vendedor de Gyblos.
+---
+
+El comprador es un pequeño servidor en tu propio computador, en `http://127.0.0.1:4031`. Habla las API de
+OpenAI y Anthropic, así que los programas hechos para esos servicios pueden usar un vendedor de Gyblos
+cambiando su URL base. En cada pedido obtiene una cotización gratuita firmada del vendedor y devuelve la
+respuesta en streaming por una conexión directa entre pares.
+
+La ruta Responses rechaza `parallel_tool_calls: false`, sampling no predeterminado y razonamiento no neutro antes de contactar al vendedor. El protocolo firmado todavía no expresa esas restricciones; las versiones de Codex que las exigen no son compatibles hasta incorporar ese soporte. Desactiva los reintentos HTTP y de streaming en el cliente.
+
+## Qué funciona hoy [#que-funciona-hoy]
+
+| Función                                                                   | Estado en la beta                              |
+| ------------------------------------------------------------------------- | ---------------------------------------------- |
+| Conversaciones completas: mensaje de sistema, historial y mensaje nuevo   | Sí, hasta 1024 mensajes                        |
+| `POST /v1/chat/completions` de OpenAI y `POST /v1/messages` de Anthropic  | Sí, respuestas completas y en streaming        |
+| `POST /v1/responses` de OpenAI (Codex CLI)                                | Sí, respuestas completas y en streaming        |
+| `GET /v1/models`                                                          | Sí, todos los modelos que sirve tu comprador   |
+| Ofertas gratuitas                                                         | Sí                                             |
+| Herramientas (function calling), ambos formatos, completas y en streaming | Sí, ver [Herramientas](#herramientas)          |
+| Claude Code                                                               | Solo con un vendedor de un modelo más grande   |
+| Modo agente de Cursor                                                     | No: llama desde la nube de Cursor              |
+| Imágenes, salida estructurada, varias respuestas                          | Todavía no: se rechazan con un error 400 claro |
+| Ofertas de pago                                                           | Fuera de esta guía                             |
+
+Por defecto, un vendedor atiende a cada comprador hasta **30 respuestas por minuto**. Una respuesta tiene
+como máximo **4096 tokens**, salvo que subas el límite del comprador (hasta 32768); un pedido más largo se
+atiende hasta ese límite y termina con el motivo `length`.
+
+Tu mensaje llega al vendedor que configuraste, cuyo equipo ejecuta el modelo y puede leerlo. No envíes
+contraseñas, claves ni otros secretos.
+
+## Antes de empezar [#antes-de-empezar]
+
+- Una invitación con un **token de relay** privado.
+- El **NodeId** y la **wallet dueña** del vendedor que usarás, de una fuente en la que confíes (el vendedor
+  muestra ambos con `gyblos doctor`). El vendedor debe estar registrado; el comprador verifica su identidad
+  en Solana devnet.
+- Git, [Node.js](https://nodejs.org) 24.22.1 o posterior y pnpm 10 (`corepack enable` lo instala).
+
+En la beta, el comprador se ejecuta desde el repositorio de código; el instalador y el paquete de npm
+contienen solo el vendedor.
+
+## Instalar y configurar [#instalar-y-configurar]
+
+```sh
+git clone https://github.com/Gyblos/gyblos-node.git
+cd gyblos-node
+pnpm install --frozen-lockfile
+pnpm buyer:init
+```
+
+`buyer:init` pide el NodeId y la wallet dueña del vendedor, muestra la configuración (modelo `qwen3-0.6b`,
+respuestas de hasta 4096 tokens, solo cotizaciones gratuitas) y la guarda cuando confirmas. No envía nada al
+vendedor ni a la cadena. `pnpm buyer:init --advanced` permite además elegir el modelo, el límite de
+respuesta y los endpoints.
+
+## Iniciar el comprador [#iniciar-el-comprador]
+
+Escribe el token de relay sin que se muestre y luego inicia el comprador en la misma terminal:
+
+```sh
+read -rs GYBLOS_RELAY_TOKEN && export GYBLOS_RELAY_TOKEN
+pnpm buyer:free
+```
+
+Déjalo corriendo. En otra terminal, comprueba que responde:
+
+```sh
+curl http://127.0.0.1:4031/v1/models
+```
+
+La lista nombra el único modelo que pide tu comprador; usa ese nombre como `model` en tus pedidos. Si
+prefieres una conversación rápida en la terminal, ejecuta `pnpm buyer:chat`, que inicia su propio comprador.
+
+## Enviar una conversación [#enviar-una-conversacion]
+
+```sh
+curl http://127.0.0.1:4031/v1/chat/completions \
+  -H 'content-type: application/json' \
+  -d '{
+    "model": "qwen3-0.6b",
+    "messages": [
+      {"role": "system", "content": "Answer in one short sentence."},
+      {"role": "user", "content": "My name is Ana."},
+      {"role": "assistant", "content": "Nice to meet you, Ana!"},
+      {"role": "user", "content": "What is my name?"}
+    ]
+  }'
+```
+
+### SDK de OpenAI [#sdk-de-openai]
+
+Usa la URL base `http://127.0.0.1:4031/v1`. El comprador gratuito no revisa la clave de API, pero el SDK
+necesita una que no esté vacía.
+
+```js
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://127.0.0.1:4031/v1',
+  apiKey: 'local',
+  maxRetries: 0,
+});
+const stream = await client.chat.completions.create({
+  model: 'qwen3-0.6b',
+  stream: true,
+  messages: [
+    { role: 'system', content: 'Be brief.' },
+    { role: 'user', content: 'My dog is called Rocky.' },
+    { role: 'assistant', content: 'Got it: your dog is Rocky.' },
+    { role: 'user', content: "What is my dog's name?" },
+  ],
+});
+for await (const chunk of stream)
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? '');
+```
+
+### SDK de Anthropic [#sdk-de-anthropic]
+
+Usa la URL base `http://127.0.0.1:4031` (sin `/v1`). `max_tokens` es obligatorio, igual que con Anthropic.
+
+```js
+import Anthropic from '@anthropic-ai/sdk';
+
+const client = new Anthropic({
+  baseURL: 'http://127.0.0.1:4031',
+  apiKey: 'local',
+  maxRetries: 0,
+});
+const message = await client.messages.create({
+  model: 'qwen3-0.6b',
+  max_tokens: 200,
+  system: 'Be brief.',
+  messages: [
+    { role: 'user', content: 'My dog is called Rocky.' },
+    { role: 'assistant', content: 'Got it: your dog is Rocky.' },
+    { role: 'user', content: "What is my dog's name?" },
+  ],
+});
+console.log(message.content[0].text);
+```
+
+## Herramientas [#herramientas]
+
+Envía `tools` tal como lo define cada API. Cuando el modelo quiere usar una herramienta, la respuesta
+termina con `finish_reason: "tool_calls"` (en Anthropic, `stop_reason: "tool_use"`) y trae la llamada. Tu
+programa ejecuta la herramienta y devuelve el resultado en el siguiente pedido, con la conversación completa:
+
+```js
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://127.0.0.1:4031/v1',
+  apiKey: 'local',
+  maxRetries: 0,
+});
+const tools = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_time',
+      description: 'Current local time in a city',
+      parameters: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city'],
+      },
+    },
+  },
+];
+const messages = [
+  { role: 'user', content: 'What time is it in Santiago? Use the tool.' },
+];
+const first = await client.chat.completions.create({
+  model: 'qwen3-0.6b',
+  messages,
+  tools,
+});
+const call = first.choices[0].message.tool_calls[0];
+// Run the tool yourself, then send its result back.
+messages.push(first.choices[0].message, {
+  role: 'tool',
+  tool_call_id: call.id,
+  content: '15:42',
+});
+const second = await client.chat.completions.create({
+  model: 'qwen3-0.6b',
+  messages,
+  tools,
+});
+console.log(second.choices[0].message.content);
+```
+
+Con el SDK de Anthropic, envía `tools` con `input_schema`, lee los bloques `tool_use` y responde con bloques
+`tool_result`, igual que con Anthropic. El comprador solo le pregunta a vendedores que sirven herramientas;
+si ninguno lo hace, responde 503 y lo dice.
+
+El modelo por defecto, qwen3:0.6b, resuelve llamadas simples como esta. Los agentes que envían muchas
+herramientas e instrucciones largas, como Claude Code, necesitan un vendedor con un modelo más grande, a
+través del motor OpenAI o Anthropic.
+
+## Cambiar de modelo [#cambiar-de-modelo]
+
+Un comprador puede servir varios modelos por nombre. Agrégalos en `selection.json` bajo `models`; la lista
+debe incluir el modelo de `request.selection`. Un cliente cambia de modelo enviando otro nombre en `model`
+(`/model` en la mayoría de los agentes). Cada pedido lleva la conversación completa, así que el siguiente
+modelo lee todo lo anterior; solo se pierde el caché del vendedor anterior, por lo que la primera respuesta
+puede tardar un poco más.
+
+```json
+"models": [
+  { "id": "qwen3-0.6b", "selection": { "modelId": "qwen3-0.6b", "variant": null, "quantization": "Q4_K_M" }, "maxTokens": 2000 },
+  { "id": "gpt-oss-20b", "aliases": ["gpt-oss"], "selection": { "modelId": "gpt-oss-20b", "variant": null, "quantization": null } }
+]
+```
+
+Un nombre que el comprador no sirve recibe un 404 con la lista de los que sí sirve. Los modos pagados solo
+aceptan en esta lista el modelo pagado fijado y su límite de tokens.
+
+## Si un vendedor se cae [#si-un-vendedor-se-cae]
+
+En `buyer:free`, un intento que con seguridad no envió el prompt puede seleccionar otro vendedor
+elegible dentro del mismo pedido, respetando el vendedor fijado y la política de enrutamiento. Desde
+que pudo comenzar el envío, el comprador se detiene sin repetir el prompt ni cambiar de vendedor.
+Desactiva los reintentos automáticos del cliente, incluidos los de streaming: ante una conexión cortada
+puede no llegar ningún encabezado de respuesta.
+
+Si decides volver a enviar el mensaje, comienza una selección nueva: puede ganar el mismo vendedor u
+otro. Los fallos atribuibles al vendedor afectan su peso. La preferencia por el que respondió antes es
+acotada y no garantiza afinidad ni caché. Estas preferencias se aplican aquí al recorrido gratuito;
+los modos pagados mantienen sus restricciones de canal y vendedor.
+
+## Conectar un agente de código [#conectar-un-agente-de-codigo]
+
+Un comando escribe la configuración de OpenCode, pi o Codex CLI con todos los modelos que sirve tu
+comprador. Solo cambia el proveedor `gyblos` y guarda una copia del archivo anterior. Para Claude Code
+muestra las variables que debes definir en tu terminal. Sin `--write`, solo las muestra.
+
+```bash
+pnpm buyer:agent opencode --write
+pnpm buyer:agent pi --write
+pnpm buyer:agent codex --write
+pnpm buyer:agent claude
+```
+
+Después elige un modelo de Gyblos con `/models` (OpenCode), `/model` (pi y Claude Code) o
+`codex --profile gyblos`. Cada pedido lleva la conversación completa, así que cambiar de modelo no pierde
+el contexto.
+
+## Opciones y errores [#opciones-y-errores]
+
+Las opciones que los clientes envían por defecto y que no cambian la respuesta se aceptan y se ignoran, como
+`temperature`, `top_p`, `user`, `metadata`, `stream_options` y, en el formato de Anthropic, `thinking`
+(el razonamiento siempre está apagado). Las que sí la cambiarían se rechazan salvo que tengan su valor
+neutro: `response_format` (`text`), `n` (1), `stop` y `stop_sequences`, y `logprobs`. Las pistas de sampling
+se refieren a Chat Completions y Anthropic; Responses rechaza sampling y razonamiento no neutros.
+Chat Completions y Anthropic rechazan imágenes. Responses sustituye `input_image` por una nota de texto;
+no envía el contenido de la imagen al vendedor.
+
+| Respuesta | Significado                                                                                                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400       | El pedido usa algo que todavía no se admite; el mensaje y `param` lo nombran.                                                                                                                           |
+| 503       | No hay un vendedor disponible ahora. `Retry-After` sugiere cuándo intentar de nuevo. Los clientes de estos ejemplos tienen los reintentos automáticos desactivados; volver a intentarlo es tu decisión. |
+| 504       | El vendedor no respondió a tiempo.                                                                                                                                                                      |
+
+Los errores usan la forma de cada API, así que los SDK lanzan sus excepciones habituales.

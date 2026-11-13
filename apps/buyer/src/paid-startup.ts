@@ -7,6 +7,7 @@ import {
   INFERENCE_REQUEST_LIMITS,
   PROTOCOL_FEE,
 } from '@gyblos/config';
+import type { SellerRequest } from '@gyblos/core/seller-selection';
 import { modelTokenizer } from '@gyblos/node/artifacts';
 import { buyerChainPayments } from '@gyblos/node/buyer-chain';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
@@ -40,6 +41,7 @@ import {
   listenOrRefuse,
   refuse,
 } from './free-startup';
+import { routedRequest } from './model-routes';
 import { classifyPaidError, paidChat } from './paid-http';
 import { paidRecords } from './paid-records';
 import { paidBuyerDependencies } from './paid-selection';
@@ -48,9 +50,18 @@ import type { SellerFailureReporter } from './seller-failures';
 
 type Prepared = Awaited<ReturnType<typeof buyerSelection>>;
 
-// The request the paid buyer can honor: the pinned model, reasoning off, devnet and the role's mint.
+// The requests the paid buyer can honor: the pinned model, reasoning off, devnet and the role's mint, for
+// the request and every model it serves by name, since the meter recounts with the pinned tokenizer.
 export function checkPaidRequest(prepared: Prepared, role: RoleConfig) {
-  const { request } = prepared.config;
+  const { request, models = [] } = prepared.config;
+  for (const routed of [
+    request,
+    ...models.map((model) => routedRequest(request, model)),
+  ])
+    checkPaidSellerRequest(routed, role);
+}
+
+function checkPaidSellerRequest(request: SellerRequest, role: RoleConfig) {
   if (request.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
     refuse(FREE_BUYER_STARTUP.MAX_TOKENS);
   if (
@@ -170,6 +181,7 @@ function paidClosers(
 }
 
 interface BuyerStartupOptions {
+  telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;
   pool?: (
     role: RoleConfig,
     totalDepositAtomic: string,
@@ -190,6 +202,9 @@ async function startOwnedPaidBuyer(
   if (role.role !== P2P_ROLES.BUYER)
     return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
   const prepared = await buyerSelection();
+  // This older entry quotes and serves only the root request, so it refuses a model list outright
+  // rather than advertise routes, aliases and limits it would not honor.
+  if (prepared.config.models?.length) refuse(FREE_BUYER_STARTUP.PAID_MODELS);
   checkPaidRequest(prepared, role);
   const meter = await (options.meter ?? tokenizer)();
   const token = await endpointToken();

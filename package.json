@@ -45,6 +45,7 @@
     "paypal:sandbox": "node --import tsx apps/node/src/paypal-main.ts",
     "gyblos": "node --import tsx apps/node/src/bin.ts",
     "buyer:start": "node --import tsx apps/buyer/src/main.ts",
+    "buyer:agent": "node --import tsx apps/buyer/src/agent-cli.ts",
     "buyer:call": "node --import tsx apps/buyer/src/call.ts",
     "buyer:reconcile": "node --import tsx apps/buyer/src/reconcile.ts",
     "buyer:reconcile:paid": "node --import tsx apps/buyer/src/reconcile-paid.ts",
@@ -99,7 +100,8 @@
     "@gyblos/engine-anthropic": "workspace:*",
     "x402-upto-metered": "workspace:*",
     "@gyblos/payments-upto": "workspace:*",
-    "@gyblos/receipt-collector": "workspace:*"
+    "@gyblos/receipt-collector": "workspace:*",
+    "@gyblos/inference": "workspace:*"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",

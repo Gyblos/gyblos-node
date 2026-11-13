@@ -411,7 +411,7 @@ One bidirectional stream carries one request and one complete response, each
 with a four-byte big-endian unsigned body length, canonical UTF-8 JSON, then
 send EOF. A receiver processes nothing until the full body and EOF arrive.
 
-Request fields (all required; unknown fields at every level are rejected):
+Request fields (required unless marked optional; unknown fields at every level are rejected):
 
 - `version: 4`, and `requestId` equal to the quote's validated 128-bit lowercase
   hexadecimal requestId. A fresh execution identifier cannot make a quote reusable.
@@ -425,19 +425,49 @@ Request fields (all required; unknown fields at every level are rejected):
   on the wire. The seller serves a conversation: an optional `system` message
   first, then turns alternating `user`, `assistant`, from and ending with
   `user`, each non-empty.
-  Tools, attachments, remote URLs, function calls and streaming options are not
-  supported. A wire role does not imply a particular engine implements it:
+  Tool turns are described below; attachments, remote URLs and streaming
+  options are not supported. A wire role does not imply a particular engine implements it:
   the seller must refuse unsupported input before generation, without silently
   flattening messages or downgrading reasoning.
 - `maxTokens` is a positive safe integer no greater than the signed output
   maximum or model context. The engine-specific input token count plus the
   requested output maximum must fit the quoted context before generation.
+- Optional tool calling uses the common grammar below. Active session v4 also
+  accepts it with its own unchanged bounds; legacy individual settlement refuses
+  it before payment (see [common execution](#active-common-tool-aware-execution)):
+  - `input.tools`: 1–128 `{name, description?, parameters}`. `name` matches
+    `[A-Za-z0-9_-]{1,64}` and is unique; `description` is non-empty text up to
+    8 KiB; `parameters` is JSON text (up to 64 KiB) holding one JSON object, the
+    tool's JSON Schema. JSON values travel as text so signing and digests never
+    reorder keys or round numbers.
+  - `input.toolChoice`: `auto`, `none`, `required` or `{name}` naming one of
+    the tools; it requires `tools`.
+  - An assistant message may carry `toolCalls`: 1–32 `{id, name, arguments}`,
+    `id` printable ASCII up to 64 characters and unique in the turn,
+    `arguments` JSON text holding one object. Its `content` may then be empty.
+  - A message `{role: "tool", content, toolCallId}` answers one call; its
+    content may be empty.
+  - With tools or tool turns, the conversation is an optional `system` message,
+    then a `user` turn; an `assistant` turn follows a `user` turn or the
+    results of every call of the previous assistant turn; each call is
+    answered exactly once by the results right after it; a `user` turn may
+    follow the results; it ends with a `user`
+    turn or with results. Tools and tool JSON count against `inputBytes`.
+  - A buyer that will offer tools sets `tools: true` in its quote request
+    (`params.tools`); a seller whose offer cannot serve tools refuses it with
+    `CONTROL_TOOLS_UNSUPPORTED`. The signed offer is unchanged. A seller that
+    receives tools for an engine without tool support refuses the execution
+    with `FREE_EXECUTION_UNSUPPORTED` before generation.
 
 Success response:
-`{version: 3, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason}}`.
+`{version: 4, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason, toolCalls?}}`.
 Usage contains non-negative safe integer counts under the public context bound;
 output must not exceed the requested maximum, and combined usage must fit the
-quoted context. `finishReason` is `stop` or `length`. Empty text/zero counts are
+quoted context. `finishReason` is `stop`, `length` or `tool_calls`; a result
+has `toolCalls` (same shape as above, the seller naming each call) exactly when
+`finishReason` is `tool_calls`, and its text may then be empty. A stream
+delivers only the visible text as deltas; the calls arrive whole in the
+terminal result. Receipts and telemetry record `tool_calls` as `stop`. Empty text/zero counts are
 representable; usage is reported evidence, not a cryptographic proof of work.
 There are no fragments or buyer-visible streaming in this version.
 
@@ -590,9 +620,18 @@ records never recreates the ledger or token counters.
 
 The engines serve a conversation with reasoning `off`. The pinned Ollama
 adapter renders it with the pinned Qwen3 template's no-tools, thinking-off
-branch (a lone user message exactly as before); the OpenAI adapter sends the
-messages as they are and the Anthropic adapter sends the system message as its
-`system` field. Other shapes are refused with `FREE_EXECUTION_UNSUPPORTED`
+branch (a lone user message exactly as before), or its tools branch when tools
+or tool turns are present: the tools block in the system turn, calls as
+`<tool_call>` JSON and results as `<tool_response>` in one user turn, byte for
+byte as the public template renders them (`toolChoice: none` leaves the tools
+block out; `required` and a named choice cannot be forced and act as `auto`).
+The adapter reads well-formed `<tool_call>` blocks naming offered tools back
+out of the output and keeps anything else as text. The recounted meter counts
+tools in the input and a result's calls as the template writes them. The
+OpenAI adapter sends the messages as they are (calls as `tool_calls`, results
+as role `tool`) and the Anthropic adapter sends the system message as its
+`system` field, calls as `tool_use` blocks and a run of results as one user
+turn of `tool_result` blocks. Other shapes are refused with `FREE_EXECUTION_UNSUPPORTED`
 before generation; no message flattening occurs. `maxTokens` may not exceed the
 offer's answer limit (`free.max_output_tokens` in gyblos.toml, 4096 by default
 and at most 32768; quotes beyond it are refused) and, with the templated input,
@@ -1032,6 +1071,90 @@ or disconnected HTTP stream does not itself execute settlement or a refund.
 No existing offer, free/paid execution or golden vector is modified by this port.
 [Session composition and limitations](../../docs/payment-sessions.md).
 
+## Reusable session v3 streaming
+
+The active reusable-session channel is `gyblos/session/3`, envelope version 3,
+with `gyblos/session-request/v3\n` for the canonical inner execution and
+`gyblos/session-rpc/v3\n` for the outer RPC. Both peers upgrade together;
+preparation fails before a new deposit opening on a v1/v2-only peer. Only one
+active session implementation is kept. All previous v1/v2 vectors are frozen;
+SDK cumulative voucher, terms and journal schemas are unchanged. Saved original
+approvals recover over v3 with their exact original digest/bill/voucher, never a
+reconstructed execution request. The historical v2 specification below remains
+an explanation of those frozen bytes, not another active runtime.
+
+PREPARE, OPEN, APPROVE, SNAPSHOT and CLOSE remain one bounded canonical JSON
+frame and EOF. EXECUTE returns zero or more delta frames followed by exactly
+one terminal frame and EOF. Every event contains version 3, the outer requestId,
+the SHA-256 outer requestDigest, a zero-based contiguous sequence and type.
+A delta has type `delta` and nonempty text; a terminal has type `terminal` and
+response containing the existing complete BatchChannelResponse, including the
+inner execution-bound bill or a static typed error. The outer request identifier
+is independent of the quote's inner execution identifier. Unknown/duplicate
+fields, noncanonical JSON, invalid UTF-8, reordered/crossed/replayed events,
+missing terminal and any byte after terminal are refused.
+
+Each delta is at most 8192 UTF-8 bytes, the stream has at most 4096 events
+including the terminal, and total encoded frames including prefixes stay within
+1048576 bytes, the former response budget. Prefixes exceeding the remaining
+aggregate budget are rejected before body allocation. Output content remains
+bounded by 262144 bytes, input 65536 bytes, 1024 messages and 128 output tokens;
+context, signed price/budget, admission and absolute request deadlines are
+unchanged. Deltas reserve 2048 bytes for a static error terminal. JSON escaping
+and the repeated complete terminal text can exhaust the encoded budget earlier
+than content size; return static LIMIT instead of a success that cannot fit.
+Generation waits between events use the existing absolute request deadline.
+After the first byte, incomplete prefixes and bodies retain the ingress deadline.
+Consumers and writes are awaited with existing per-stage deadlines; cancellation
+seals publication even if the engine ignores abort. Quote freshness is checked
+before admission, not required to remain live during generation.
+
+The engine receives intact conversation history. Seller output is bounded and
+recounted over the accumulated text prefix, never by summing separate fragment
+token counts. The final engine text must exactly match emitted text. The buyer
+independently recounts full rendered input and concatenated output, checks the
+terminal/bill, and requires EOF before cumulative signing. Visible fragments are
+provisional until that verification; an error is not a successful answer.
+Cancellation or loss before a verified terminal creates no new approval and
+leaves recovery/closure pending; the seller can collect its previous highest
+accepted signature only, with one unsigned last response as bounded exposure.
+Once verified usage has entered durable approval, an abort cannot revoke an
+already-started signature: recover its exact original financial approval without
+replaying the prompt. No detached post-cancellation approval is introduced.
+
+Independent Node/OpenSSL fixtures are batch-channel-v3.json,
+batch-prepare-v3.json, batch-startup-v3.json and batch-stream-v3.json. Existing
+per-request paid-stream/1 and free-stream contracts remain unchanged.
+
+### Session admission and inference quota
+
+Endpoint connection-open rates, pending/source/global/per-peer connection caps,
+route policy and shared concurrency apply first, with their existing values.
+A session connection stays in the data connection family, but does not reserve
+an inference grant merely by connecting. It remains admissible after the peer
+or global inference quota is exhausted, subject to all those transport caps.
+
+Every session stream, including malformed/incomplete input and EXECUTE, also
+consumes an independent session query-rate budget using the existing
+CONTROL_CAPACITY policy: 5/s with burst 10 per NodeId, 100/s with burst 100
+globally, and a bounded 1024-entry peer table with 60-second idle expiry. This
+budget is shared by all session connections; it is separate from the control
+and receipt budgets. It guards ingress attempts, not an additional execution
+slot or a shorter generation deadline. A refused ingress attempt closes the
+connection before service dispatch. Streams retain the endpoint concurrency
+slot through parsing, service completion, egress and draining cancellation.
+
+Only a complete, canonical, validated EXECUTE consumes the existing per-peer
+and global inference window quota, immediately before dispatch and exactly
+once, even if the service refuses it. An exhausted quota returns a correlated
+static LIMIT terminal without dispatching the prompt. PREPARE, OPEN, APPROVE,
+SNAPSHOT and CLOSE consume no inference quota. Consequently the last accepted
+execution can still approve its verified usage, recover its original approval
+after a lost ACK/reconnection, and request closure. Query-rate exhaustion or
+full transport capacity can still refuse those operations; this is no bypass
+of abuse controls and grants no priority over active work. Reconnection never
+erases spent inference quota, changes a financial intent or retries a prompt.
+
 ## Reusable conversation session channel v2
 
 `gyblos/session/2` replaces the active session v1 transport. Both peers must
@@ -1208,3 +1331,68 @@ The SDK adapter invokes it immediately before each new transaction/message
 signature, rechecking cancellation and quote/host expiry after delayed hints or
 private writes. A signature already in progress may finish internally, but its
 result is not transmitted after cancellation. This changes no signing bytes.
+
+## Active common tool-aware execution
+
+The active execution profiles are free `gyblos/free/4` and
+`gyblos/free-stream/4`, individual paid `gyblos/paid-stream/2` (request version
+2, domain `gyblos/paid-execution-request/v2\n`), and reusable paid
+`gyblos/session/4` (version 4, domains `gyblos/session-request/v4\n` and
+`gyblos/session-rpc/v4\n`). Earlier paid/session descriptions and golden
+vectors document retired wire profiles; they are not additional registered
+ALPNs. Free vectors, existing offers, cumulative SDK voucher signatures and
+financial journals are unchanged. Upgrade both peers together; no downgrade,
+reconstructed old request or automatic prompt replay is supported.
+
+`InferenceInput` and `InferenceResult` own the common conversation, tools,
+choice, output and usage shapes. `@gyblos/inference` owns capability validation,
+generation, output validation and independent usage verification over injected
+engine/meter ports. Economic policies remain outside that package: zero-price
+quotes use caps and construct no financial service; positive-price tool
+execution uses an explicitly authorized reusable session. Selection asks for
+tools for definitions or prior tool turns, regardless of price. Only a seller
+with an implemented engine and the required execution/meter ports may quote
+that capability. Free and paid executions observe the same metadata lifecycle;
+local persistence remains opt-in and no external export is enabled implicitly.
+
+Session v4 accepts tool definitions, choice and tool-result history, and tool
+calls on its complete result or stream terminal. The entire input retains its
+65536-byte bound, 1024 messages and 128 output-token limit; definitions and tool
+JSON consume the existing bound. Framing, deadlines, admission, budgets and
+prices are unchanged. Deltas remain text. Calls are held until the terminal,
+validated against the offered tools and choice, and included in independent
+usage verification before any new cumulative voucher is signed. Incomplete or
+invalid terminals authorize no new charge; prior accepted obligations remain
+recoverable without sending another prompt.
+
+Recounted input includes the model's whole conversation template, tool
+specifications and tool results. Tool choice `none` uses exactly the template
+sent to the engine, excluding the definitions block. Recounted output includes
+canonical assistant text, tool names, arguments and template markup, excluding
+local call identifiers. A tool-only response can therefore have positive usage
+with empty text. This is the agreed public rendering, not a claim that every
+remote provider tokenizes internally in that form. A paid tool request requires
+a tokenizer able to render tool output before financial construction. Declared
+provider usage remains suitable for conservative free caps only.
+
+Individual paid settlement has no buyer acknowledgement for held tool calls:
+it must reject tools and tool-result history with `UNSUPPORTED` before payment
+construction/admission, even after a text runtime was cached. It retains full
+text conversations and the common generator. Hosts must configure a reusable
+session for positive-price tools; they must not silently create a new deposit
+policy. Its v2 wire grammar is common, but this legacy economic policy does not
+admit those inputs. This prevents charging generated arguments before delivery.
+
+Telemetry is observational: failed sinks, clocks and generation callbacks do
+not change inference, caps or billing. Both peers record received, first usable
+output and one completed/failed/refused terminal. Tool-only first output is
+observed with its validated result. A session bill or approved voucher is not a
+confirmed payment; it emits no per-inference `CHARGED`. Existing confirmed
+individual settlement evidence retains that event. Channel totals are not
+attributed to the last request. Existing free signed usage receipts remain
+free-specific; this change does not fabricate paid usage receipts.
+
+New independent Node/OpenSSL vectors are `paid-execution-v2.json`,
+`batch-channel-v4.json`, `batch-prepare-v4.json`, `batch-startup-v4.json`,
+`batch-stream-v4.json` and `batch-tools-v4.json`. All historical vectors stay
+byte-identical and their retired versions are rejected by active parsers.

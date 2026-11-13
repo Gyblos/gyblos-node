@@ -5,6 +5,7 @@ import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import {
@@ -15,15 +16,17 @@ import {
 } from './api-key-execution';
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
+import { observeBuyerExecution } from './execution-observation';
 import { executeSelectedBuyerFree } from './free-execution';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
 import { requireBuyerIdentity } from './identity';
+import { routedRequest } from './model-routes';
 import { classifyPaidError } from './paid-http';
 import { endpointToken, type startPaidBuyer } from './paid-startup';
 import { makeManager, type SessionState } from './session-manager';
-import { pinnedBusy, sessionRouter } from './session-routing';
+import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
@@ -39,7 +42,7 @@ async function executePaidSession(
   permission?: BuyerApiKeyOperation,
 ): Promise<ChatResult> {
   current.throwIfAborted();
-  await bounded(manager.prepareMeter(), current);
+  await bounded(manager.prepareMeter(inferenceNeedsTools(input)), current);
   current.throwIfAborted();
   await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
@@ -49,7 +52,14 @@ async function executePaidSession(
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {
     result = await executeApiKeySession(permission, winner.nodeId, () =>
-      manager.execute(winner.quote, input, current),
+      manager.execute(
+        winner.quote,
+        input,
+        current,
+        onDelta
+          ? (text) => onDelta(text, winner.quote.offer.requestDigest)
+          : undefined,
+      ),
     );
   } finally {
     state.selections.delete(id);
@@ -67,9 +77,52 @@ async function executePaidSession(
     session: result.approval,
   };
   await recordApiKeyPayment(permission, payment);
-  if (onDelta && result.value.text)
-    await onDelta(result.value.text, winner.quote.offer.requestDigest);
   return { ...result.value, payment };
+}
+function freeExecutionGuard(
+  manager: ReturnType<typeof makeManager>,
+  sending?: () => void,
+) {
+  return () => {
+    if ('checkBeforeExternalExecution' in manager)
+      manager.checkBeforeExternalExecution();
+    sending?.();
+  };
+}
+function sessionSelection(
+  context: Context,
+  options: Options,
+  buyer: string,
+  request: Context['prepared']['config']['request'],
+  input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
+  permission: Parameters<typeof reserveApiKey>[0],
+  router: ReturnType<typeof sessionRouter> | undefined,
+): BuyerRoutePorts<ChatResult>['select'] {
+  const { prepared, endpoint, relayOnly } = context;
+  return (
+    excluded: Set<string>,
+    current: AbortSignal,
+    route: Parameters<BuyerRoutePorts<ChatResult>['select']>[2],
+  ) =>
+    selectWinner(
+      prepared,
+      {
+        endpoint,
+        buyer,
+        relayOnly,
+        onSellerFailure: options.onSellerFailure,
+        ...(router ? { onPinnedBusy: pinnedBusy } : {}),
+      },
+      excluded,
+      current,
+      {
+        ...request,
+        maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
+        priceCeilings: route.priceCeilings,
+        ...(inferenceNeedsTools(input) ? { tools: true } : {}),
+      },
+      route,
+    );
 }
 function sessionExecutor(
   context: Context,
@@ -79,30 +132,19 @@ function sessionExecutor(
   buyer: string,
   router?: ReturnType<typeof sessionRouter>,
 ): Awaited<ReturnType<BuyerExecutionFactory>>['execute'] {
-  const { prepared, endpoint, relayOnly } = context;
-  return async (input, signal, onDelta, permission) => {
+  const { prepared } = context;
+  return async (input, signal, onDelta, model, permission) => {
+    const request = routedRequest(prepared.config.request, model);
     const ports: BuyerRoutePorts<ChatResult> = {
-      select: (excluded, current, route) =>
-        selectWinner(
-          prepared,
-          {
-            endpoint,
-            buyer,
-            relayOnly,
-            onSellerFailure: options.onSellerFailure,
-            ...(router ? { onPinnedBusy: pinnedBusy } : {}),
-          },
-          excluded,
-          current,
-          {
-            ...prepared.config.request,
-            priceCeilings: route.priceCeilings,
-            maxAtomic:
-              permission?.ceiling(prepared.config.request.maxAtomic) ??
-              prepared.config.request.maxAtomic,
-          },
-          route,
-        ),
+      select: sessionSelection(
+        context,
+        options,
+        buyer,
+        request,
+        input,
+        permission,
+        router,
+      ),
       free: (winner, current, sending) =>
         executeApiKeyFree(permission, winner.quote, current, () =>
           executeSelectedBuyerFree(
@@ -111,28 +153,32 @@ function sessionExecutor(
             winner,
             current,
             onDelta,
-            () => {
-              if ('checkBeforeExternalExecution' in manager)
-                manager.checkBeforeExternalExecution();
-              sending?.();
-            },
+            freeExecutionGuard(manager, sending),
           ),
         ),
-      paid: async (winner, current, sending) => {
-        return executePaidSession(
-          manager,
-          state,
+
+      paid: (winner, current, sending) =>
+        observeBuyerExecution(
+          context.dependencies,
           winner,
           input,
           current,
           onDelta,
-          sending,
-          permission,
-        );
-      },
+          (emit) =>
+            executePaidSession(
+              manager,
+              state,
+              winner,
+              input,
+              current,
+              emit,
+              sending,
+              permission,
+            ),
+        ),
     };
     const routed = router
-      ? await router.execute(ports, signal)
+      ? await router.execute(ports, signal, routeScope(request))
       : await executeBuyerQuote(
           {
             ...ports,

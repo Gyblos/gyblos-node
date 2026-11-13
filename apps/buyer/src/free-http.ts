@@ -12,12 +12,13 @@ import {
   PORTS,
   ROUTES,
   TRANSPORT_LIMITS,
+  UNITS,
 } from '@gyblos/config';
 import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
-import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
@@ -28,23 +29,29 @@ import {
   type FreeExecutionBuildInput,
   type FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
+import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import { buyerApiCaller } from './api-key-caller';
 import { buyerApiKeyExecutors } from './api-key-execution';
-import { buyerApiKeyErrorView } from './api-key-http';
 import {
   chatApi,
   defaultChatApi,
+  estimatedTokens,
+  isCountTokensRoute,
   isModelsRoute,
   modelList,
   type ChatApi,
 } from './chat-api';
+import { readBody } from './chat-body';
+import { replyError, replyJson, type ChatErrorClassifier } from './chat-errors';
 import {
+  CHAT_ROUTES,
   FREE_BUYER,
   FREE_BUYER_CODES,
   FREE_CHAT_DETAILS,
   PAID_BUYER,
+  PAID_BUYER_CODES,
 } from './constants';
 import {
   createDesktopApi,
@@ -62,160 +69,32 @@ import {
   type ChatStreamFormat,
   type FreeChatStreamExecutor,
 } from './free-sse';
+import {
+  endpointRoutes,
+  requestedRoute,
+  type ModelRoute,
+  type RoutedModel,
+} from './model-routes';
 import { bearerAuthorizer } from './paid-token';
 
+export type { ChatErrorClassifier, ChatErrorView } from './chat-errors';
+
+// A complete answer: no delta callback, then the routed model in the stream executor's position, so one
+// function may serve both.
 type FreeChatExecutor = (
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
-  onDelta?: (text: string, requestDigest?: string) => Promise<void>,
+  onDelta?: undefined,
+  model?: RoutedModel,
   permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
-// How an error is answered: its code and status, whether the prompt certainly never left this
-// process (only then may a client retry), and the stop and payment it carries.
-export interface ChatErrorView {
-  code: ChatErrorCode;
-  status: number;
-  neverSent: boolean;
-  stop: FreeExecutionStop;
-  detail?: string;
-  param?: string | null;
-  cooldownUntil?: number;
-  payment?: ChatPayment;
-}
-// Answers the errors of another executor (the paid one); undefined leaves the free answer.
-export type ChatErrorClassifier = (error: unknown) => ChatErrorView | undefined;
 interface ChatSettings {
   selection: ModelSelection;
   maxTokens: number;
+  tools?: boolean; // true only where every request runs on the free channel
+  // The models served by name; absent, `selection` is the one model.
+  models?: readonly ModelRoute[];
 }
-async function readBody(
-  request: IncomingMessage,
-  signal: AbortSignal,
-): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    signal.throwIfAborted();
-    size += chunk.length;
-    if (size > FREE_EXECUTION.requestBytes)
-      throw new FreeBuyerError(FREE_BUYER_CODES.TOO_LARGE);
-    chunks.push(Buffer.from(chunk));
-  }
-  signal.throwIfAborted();
-  try {
-    return JSON.parse(
-      new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)),
-    );
-  } catch {
-    throw invalidChat(null, FREE_CHAT_DETAILS.json);
-  }
-}
-// True only when the prompt certainly never left this process; anything else may have been sent.
-function neverSent(error: unknown) {
-  if (error instanceof FreeClientError) return !error.sent && !error.remote;
-  if (error instanceof FreeExecutionError) return !error.remote;
-  if (error instanceof FreeBuyerError)
-    return error.code !== FREE_BUYER_CODES.TIMEOUT;
-  return error instanceof FreeSelectionFailure;
-}
-function errorStatus(error: unknown, code: string) {
-  if (code === FREE_BUYER_CODES.INVALID) return HTTP_STATUS.badRequest;
-  if (code === FREE_BUYER_CODES.TOO_LARGE) return HTTP_STATUS.payloadTooLarge;
-  if (code === FREE_EXECUTION_CODES.LIMIT) return HTTP_STATUS.badRequest;
-  if (code === FREE_BUYER_CODES.BUSY) return HTTP_STATUS.tooManyRequests;
-  if (code === FREE_BUYER_CODES.TIMEOUT) return HTTP_STATUS.gatewayTimeout;
-  if (
-    error instanceof FreeClientError ||
-    error instanceof FreeExecutionError ||
-    error instanceof FreeBuyerError ||
-    error instanceof FreeSelectionFailure
-  )
-    return HTTP_STATUS.serviceUnavailable;
-  return HTTP_STATUS.internalServerError;
-}
-function freeErrorView(error: unknown): ChatErrorView {
-  const keyError = buyerApiKeyErrorView(error);
-  if (keyError) return keyError;
-  const known =
-    error instanceof FreeClientError ||
-    error instanceof FreeExecutionError ||
-    error instanceof FreeBuyerError;
-  const selected =
-    error instanceof FreeSelectionFailure ? error.decision : undefined;
-  const code = known
-    ? error.code
-    : (selected?.code ?? FREE_BUYER_CODES.INTERNAL);
-  return {
-    code,
-    status: errorStatus(error, code),
-    neverSent: neverSent(error),
-    stop:
-      error instanceof FreeClientError || error instanceof FreeExecutionError
-        ? error
-        : {},
-    detail: error instanceof FreeBuyerError ? error.detail : undefined,
-    param: error instanceof FreeBuyerError ? error.param : null,
-    cooldownUntil:
-      selected && 'cooldownUntil' in selected
-        ? selected.cooldownUntil
-        : undefined,
-  };
-}
-function replyError(
-  response: ServerResponse,
-  error: unknown,
-  classify?: ChatErrorClassifier,
-  api: ChatApi = defaultChatApi,
-  stream?: ChatStreamFormat,
-) {
-  if (response.destroyed || response.writableEnded) return;
-  // A body cut off mid-stream leaves unread bytes, so the connection cannot be reused.
-  if (
-    error instanceof FreeBuyerError &&
-    error.code === FREE_BUYER_CODES.TOO_LARGE
-  )
-    response.shouldKeepAlive = false;
-  const view = classify?.(error) ?? freeErrorView(error);
-  const { code, stop } = view;
-  if (response.headersSent) {
-    if (stream) replyFreeSseError(response, stream, code, stop, view.payment);
-    else response.destroy();
-    return;
-  }
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-  };
-  // OpenAI and Anthropic SDKs retry 408/409/429/5xx by default; a resend after a possible send would
-  // repeat the prompt, possibly to another seller. Only local BUSY and unsent unavailability stay retryable.
-  const callerFault = view.status < HTTP_STATUS.internalServerError;
-  if (
-    view.status !== HTTP_STATUS.tooManyRequests &&
-    (callerFault || !view.neverSent)
-  )
-    headers[FREE_BUYER.noRetryHeader] = 'false';
-  response.writeHead(view.status, headers).end(
-    JSON.stringify(
-      api.error({
-        code,
-        status: view.status,
-        // A refused request explains itself; every other error keeps its code as the message.
-        message: view.detail || code,
-        param: view.param ?? null,
-        // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
-        extra: {
-          [BUYER_API.NEVER_SENT_FIELD]: view.neverSent,
-          ...(stop.reason ? { reason: stop.reason } : {}),
-          ...(view.cooldownUntil !== undefined
-            ? { cooldownUntil: view.cooldownUntil }
-            : {}),
-        },
-        payment: view.payment,
-      }),
-    ),
-  );
-}
-// Browsers can send "simple" cross-site POSTs only as form or text bodies; requiring JSON forces a
-// preflight, which is refused, on top of the Origin rejection.
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();
   return type?.toLowerCase() === FREE_BUYER.contentType;
@@ -223,12 +102,6 @@ function isJson(request: IncomingMessage) {
 function declaredTooLarge(request: IncomingMessage) {
   const length = Number(request.headers['content-length']);
   return Number.isFinite(length) && length > FREE_EXECUTION.requestBytes;
-}
-function replyJson(response: ServerResponse, body: unknown) {
-  if (response.destroyed || response.writableEnded) return;
-  response
-    .writeHead(HTTP_STATUS.ok, { 'content-type': 'application/json' })
-    .end(JSON.stringify(body));
 }
 // The route's format for a request this endpoint can take now; anything else is answered here: the model
 // list, or a refusal before the body is read, so a stalled oversize body holds no slot.
@@ -241,7 +114,7 @@ function admit(
 ): ChatApi | undefined {
   const local = request.headers.origin === undefined;
   if (request.method === 'GET' && isModelsRoute(request.url) && local) {
-    replyJson(response, modelList(settings.selection));
+    replyJson(response, modelList(endpointRoutes(settings)));
     return undefined;
   }
   const api = desktopApi ?? chatApi(request.url);
@@ -257,16 +130,74 @@ function admit(
   replyError(response, new FreeBuyerError(code), undefined, api);
   return undefined;
 }
-function finishTimedOutRequest(
+const asksTokenCount = (request: IncomingMessage) =>
+  request.method === 'POST' &&
+  isCountTokensRoute(request.url) &&
+  request.headers.origin === undefined;
+// Anthropic's count_tokens, which Claude Code may call to size its context; an estimate, never a seller call.
+async function countTokens(
   request: IncomingMessage,
   response: ServerResponse,
+  requestMs: number,
 ) {
-  // Destroying the request ends a stalled body read and releases its admission slot.
+  try {
+    const body = await readBody(request, AbortSignal.timeout(requestMs));
+    replyJson(response, estimatedTokens(body));
+  } catch (error) {
+    replyError(response, error, undefined, chatApi(CHAT_ROUTES.messages));
+  }
+}
+// The model a request names, and its input parsed against that model's route.
+function routedInput(
+  api: ChatApi,
+  body: unknown,
+  settings: ChatSettings,
+  streaming: boolean,
+) {
+  const route = requestedRoute(
+    endpointRoutes(settings),
+    body,
+    !!settings.models?.length,
+  );
+  const sent =
+    body && typeof body === 'object' ? Reflect.get(body, 'model') : undefined;
+  // The format checks, and the answer echoes, the name the client sent when it names this route.
+  const model =
+    typeof sent === 'string' &&
+    (sent === route.id || route.aliases.includes(sent))
+      ? sent
+      : route.id;
+  const input = api.parse(
+    body,
+    { ...route.selection, modelId: model },
+    route.maxTokens,
+    streaming,
+    settings.tools ?? false,
+  );
+  const { stream: _stream, ...payload } = input; // all but the stream flag
+  return { input, payload, route, model };
+}
+function expireRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  cancel: () => void,
+  reply: () => void,
+) {
+  cancel();
+  response.shouldKeepAlive = false;
+  reply();
   if (response.writableEnded) response.once('close', () => request.destroy());
   else {
     request.destroy();
     response.destroy();
   }
+}
+function streamFormat(api: ChatApi, model: string, request: IncomingMessage) {
+  return api.stream(
+    model,
+    request.headers[PAID_BUYER.observationHeader] ===
+      PAID_BUYER.observationValue,
+  );
 }
 export function freeBuyerHandler(
   execute: FreeChatExecutor,
@@ -286,6 +217,8 @@ export function freeBuyerHandler(
     if (!caller) return;
     const scoped = buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream);
     if (desktop.handled(request, response)) return;
+    if (asksTokenCount(request))
+      return countTokens(request, response, requestMs);
     const localApi = desktop.accepts(request, isJson(request))
       ? defaultChatApi
       : undefined;
@@ -297,44 +230,45 @@ export function freeBuyerHandler(
     const cancel = () => controller.abort();
     // The prompt may already be on its way, so the deadline answers with no-retry rather than a
     // bare socket reset, which OpenAI SDKs would retry. The socket closes once the reply is out.
-    const timer = setTimeout(() => {
-      cancel();
-      response.shouldKeepAlive = false;
-      replyError(
-        response,
-        new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
-        classify,
-        api,
-        format,
-      );
-      finishTimedOutRequest(request, response);
-    }, requestMs);
+    const timer = setTimeout(
+      () =>
+        expireRequest(request, response, cancel, () =>
+          replyError(
+            response,
+            new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
+            classify,
+            api,
+            format,
+          ),
+        ),
+      requestMs,
+    );
     response.once('close', cancel);
     try {
-      const input = api.parse(
+      const { input, payload, route, model } = routedInput(
+        api,
         await readBody(request, controller.signal),
-        settings.selection,
-        settings.maxTokens,
+        settings,
         stream !== undefined,
       );
-      const payload = { messages: input.messages, maxTokens: input.maxTokens };
-      const model = settings.selection.modelId;
       if (input.stream && scoped.stream) {
-        format = api.stream(
-          model,
-          request.headers[PAID_BUYER.observationHeader] ===
-            PAID_BUYER.observationValue,
-        );
+        format = streamFormat(api, model, request);
         await executeFreeSse(
           scoped.stream,
           payload,
           controller.signal,
           response,
           format,
+          route,
         );
         return;
       }
-      const result = await scoped.execute(payload, controller.signal);
+      const result = await scoped.execute(
+        payload,
+        controller.signal,
+        undefined,
+        route,
+      );
       if (!controller.signal.aborted)
         replyJson(response, api.completion(model, result));
     } catch (error) {

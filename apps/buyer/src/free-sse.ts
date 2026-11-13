@@ -23,6 +23,7 @@ import type {
 import type { PaidExecutionCode } from '@gyblos/protocol/paid/constants';
 import type { SessionCode } from '@gyblos/protocol/payment-session';
 
+import { openAiCallsOut } from './chat-tools';
 import {
   BUYER_EXECUTION_FIELD,
   FREE_BUYER,
@@ -32,6 +33,7 @@ import {
   type PaidBuyerCode,
 } from './constants';
 import { FreeBuyerError } from './free-chat';
+import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
 
 // What a paid request cost, as the buyer counted it and as the seller claimed; amounts are atomic
@@ -47,7 +49,6 @@ export interface ChatPayment {
   refundedAtomic: string | null;
   // Whether the buyer kept a record for reconciliation; false for a settled request.
   recorded: boolean;
-  // Present only after the buyer verified the settlement, never a raw seller claim.
   transaction?: string;
 }
 export type ChatResult = FreeExecutionResult & {
@@ -58,8 +59,8 @@ export const executionFields = (result: ChatResult) =>
   result.execution ? { [BUYER_EXECUTION_FIELD]: result.execution } : {};
 
 export type ChatErrorCode =
-  | BuyerKeyCode
   | BuyerRoutingCode
+  | BuyerKeyCode
   | SessionCode
   | FreeBuyerCode
   | PaidBuyerCode
@@ -71,10 +72,12 @@ export type ChatErrorCode =
 export const paymentFields = (payment: ChatPayment | undefined) =>
   payment ? { [PAID_BUYER.paymentField]: payment } : {};
 
+// `model`: the routed model a request named, when the endpoint serves several.
 export type FreeChatStreamExecutor = (
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
   onDelta: (text: string, requestDigest?: string) => Promise<void>,
+  model?: RoutedModel,
   permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
 function active(response: ServerResponse, signal: AbortSignal) {
@@ -129,6 +132,7 @@ export async function executeFreeSse(
   signal: AbortSignal,
   response: ServerResponse,
   format: ChatStreamFormat,
+  model?: RoutedModel,
 ) {
   let text = '';
   let initial = true;
@@ -159,6 +163,7 @@ export async function executeFreeSse(
       );
       initial = false;
     },
+    model,
   );
   active(response, signal);
   if (text !== result.text) throw new FreeBuyerError(FREE_BUYER_CODES.INTERNAL);
@@ -200,7 +205,25 @@ export function openAiStream(
           },
         ],
       }),
+    // Calls arrive whole at the end: one delta with every call, then the finish reason.
     close: (result) =>
+      (result.toolCalls
+        ? sse({
+            ...header,
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  role: FREE_CHAT_ROLES.ASSISTANT,
+                  tool_calls: openAiCallsOut(result.toolCalls).map(
+                    (call, index) => ({ index, ...call }),
+                  ),
+                },
+                finish_reason: null,
+              },
+            ],
+          })
+        : '') +
       sse({
         ...header,
         choices: [{ index: 0, delta: {}, finish_reason: result.finishReason }],
@@ -211,7 +234,8 @@ export function openAiStream(
         },
         ...paymentFields(result.payment),
         ...executionFields(result),
-      }) + `data: ${FREE_BUYER.streamDone}\n\n`,
+      }) +
+      `data: ${FREE_BUYER.streamDone}\n\n`,
     // A seller that could not continue adds its reason and, when known, the completion tokens delivered.
     error: (code, stop, payment) =>
       sse({

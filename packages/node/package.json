@@ -63,6 +63,8 @@
     "./seller-transport": "./src/seller-transport.ts",
     "./identity-verifier": "./src/identity-verifier.ts",
     "./identity-state": "./src/identity-state.ts",
+    "./agent-setup": "./src/agent-setup.ts",
+    "./receipt-work": "./src/receipt-work.ts",
     "./receipts": "./src/receipts.ts",
     "./telemetry-startup": "./src/telemetry-startup.ts",
     "./buyer-chain": "./src/buyer-chain.ts",
@@ -85,7 +87,9 @@
     "./batch-seller": "./src/batch-seller.ts",
     "./buyer-session-pool": "./src/buyer-session-pool.ts",
     "./buyer-runtime": "./src/buyer-runtime.ts",
-    "./buyer-routing": "./src/buyer-routing.ts"
+    "./buyer-routing": "./src/buyer-routing.ts",
+    "./agent-setup-host": "./src/agent-setup-host.ts",
+    "./agent-setup-constants": "./src/agent-setup-constants.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
@@ -108,6 +112,7 @@
     "@x402/express": "2.29.0",
     "@x402/svm": "2.28.0",
     "express": "4.22.3",
-    "smol-toml": "1.9.1"
+    "smol-toml": "1.9.1",
+    "@gyblos/inference": "workspace:*"
   }
 }

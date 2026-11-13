@@ -1,10 +1,11 @@
 // Observes verified buyer attempts and unavailable selection; never retries, stores content or guesses an engine kind.
+import { emitTelemetry, telemetrySizes } from '@gyblos/core/telemetry';
 import {
-  createExecutionTelemetry,
-  emitTelemetry,
-  telemetrySizes,
-} from '@gyblos/core/telemetry';
+  completeInferenceTelemetry,
+  createInferenceTelemetry,
+} from '@gyblos/inference/observation';
 import { FREE_EXECUTION_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
+import type { ModelSelection } from '@gyblos/protocol/control-types';
 import type {
   FreeExecutionRequest,
   FreeExecutionResult,
@@ -19,13 +20,13 @@ import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 import type { FreeBuyerDependencies } from './free-execution';
 
 export function buyerExecutionTelemetry(
-  request: FreeExecutionRequest,
+  request: Pick<FreeExecutionRequest, 'requestId' | 'quote' | 'input'>,
   dependencies: FreeBuyerDependencies,
   streaming: boolean,
 ) {
   const telemetry = dependencies.telemetry;
   if (!telemetry) return undefined;
-  const observer = createExecutionTelemetry({
+  const observer = createInferenceTelemetry({
     sink: telemetry.sink,
     now: telemetry.now ?? Date.now,
     context: {
@@ -80,21 +81,20 @@ export function failBuyerTelemetry(
 }
 export function completeBuyerTelemetry(
   observer: ReturnType<typeof buyerExecutionTelemetry>,
-  request: FreeExecutionRequest,
+  request: Pick<FreeExecutionRequest, 'requestId' | 'quote' | 'input'>,
   result: FreeExecutionResult,
 ) {
-  observer?.completed(
-    { ...result.usage, reasoningTokens: null },
-    result.finishReason,
-    telemetrySizes(request.input.messages[0]?.content ?? '', result.text),
-  );
+  completeInferenceTelemetry(observer, request.input, result);
 }
 export function buyerUnserved(
   dependencies: FreeBuyerDependencies,
   streaming: boolean,
+  // The model this request asked for; the endpoint's first model when none was routed.
+  selection?: ModelSelection,
 ) {
   const telemetry = dependencies.telemetry;
   if (!telemetry) return;
+  const asked = selection ?? telemetry.selection;
   try {
     emitTelemetry(telemetry.sink, {
       type: TELEMETRY_EVENTS.UNSERVED,
@@ -102,9 +102,9 @@ export function buyerUnserved(
       at: (telemetry.now ?? Date.now)(),
       buyerNodeId: telemetry.buyerNodeId,
       selection: {
-        modelId: telemetry.selection.modelId,
-        variant: telemetry.selection.variant,
-        quantization: telemetry.selection.quantization,
+        modelId: asked.modelId,
+        variant: asked.variant,
+        quantization: asked.quantization,
       },
       streaming,
       requestId: null,

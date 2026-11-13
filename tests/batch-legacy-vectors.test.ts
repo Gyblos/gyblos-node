@@ -27,9 +27,33 @@ const LEGACY_VECTORS = [
     'batch-startup-v1.json',
     '7b72e839a2758a0039976002dc3dc828a781a3732df4944de48e1edaebb2b64f',
   ],
+  [
+    'batch-channel-v2.json',
+    '386d0a07dbc539b1fab04649cafbc02714e0e27a1ddffd1f22b7af3f46763fda',
+  ],
+  [
+    'batch-prepare-v2.json',
+    '29d7f2518d44bfdc416a5ed43dfb98fc6d34d132305779074c3a5ffe9e44b659',
+  ],
+  [
+    'batch-startup-v2.json',
+    'feba40c35b234403dcee41703ab4ef78466f36ae825721ec9f9a8bc3cc1b3523',
+  ],
+  [
+    'batch-channel-v3.json',
+    '170144cac61a46ef826b239906f149af05c3de418844e13f83c7fbc802c75fa6',
+  ],
+  [
+    'batch-prepare-v3.json',
+    'd1057f07742800fc7fb8dba96d2012d29f70fa72f591cc6b7de9a9b488e09504',
+  ],
+  [
+    'batch-startup-v3.json',
+    'da2c51faa98de31d5fde6adf7d624b82828ab4e566148de4073c3a053977000a',
+  ],
 ] as const;
 for (const [name, expected] of LEGACY_VECTORS) {
-  void test(`retired ${name} keeps its bytes and is refused by session v2`, async () => {
+  void test(`retired ${name} keeps its bytes and is refused by the active session`, async () => {
     const body = await readFile(
       new URL(import.meta.resolve(`@gyblos/protocol/vectors/${name}`)),
     );
@@ -37,7 +61,8 @@ for (const [name, expected] of LEGACY_VECTORS) {
     const value: LegacyVector | LegacyVector[] = JSON.parse(body.toString());
     for (const vector of Array.isArray(value) ? value : [value]) {
       const bytes = Buffer.from(
-        'gyblos/session-rpc/v1\n' + vector.canonicalRequest,
+        `gyblos/session-rpc/v${name.includes('-v1') ? 1 : name.includes('-v2') ? 2 : 3}\n` +
+          vector.canonicalRequest,
       );
       assert.equal(bytes.toString('hex'), vector.requestSigningHex);
       assert.equal(

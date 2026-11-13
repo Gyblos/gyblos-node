@@ -122,6 +122,7 @@ async function run<Remote extends BatchDestination>(
   quote: SignedOfferV2,
   input: FreeExecutionBuildInput,
   external: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
 ) {
   const signal = AbortSignal.any([external, state.lifetime.signal]);
   recountSessionInput(quote, input, state.options.meter);
@@ -141,7 +142,7 @@ async function run<Remote extends BatchDestination>(
   )
     return sessionFail(SESSION_CODES.LIMIT);
   const before = opened.financial.snapshot();
-  const value = await opened.host.execute(quote, input, signal);
+  const value = await opened.host.execute(quote, input, signal, onDelta);
   const after = opened.financial.snapshot();
   return {
     value,
@@ -198,11 +199,12 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
       quote: SignedOfferV2,
       data: FreeExecutionBuildInput,
       signal: AbortSignal,
+      onDelta?: (text: string) => Promise<void>,
     ) {
       if (state.active) return sessionFail(SESSION_CODES.BUSY);
       state.active = true;
       try {
-        return await run(state, quote, data, signal);
+        return await run(state, quote, data, signal, onDelta);
       } finally {
         state.active = false;
       }

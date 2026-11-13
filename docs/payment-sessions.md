@@ -2,7 +2,7 @@
 
 The shared buyer and seller session services use the pinned Solana x402
 `batch-settlement` client-signature mode. Trusted hosts can compose them over
-the opt-in `gyblos/session/2` Iroh channel. The buyer CLI and seller daemon can
+the opt-in `gyblos/session/4` Iroh channel. The buyer CLI and seller daemon can
 activate this path explicitly. Without that policy, the existing per-request
 path remains available. No public gateway is enabled by this composition.
 
@@ -17,12 +17,69 @@ No server-side conversation history is stored. The existing 64 KiB content,
 1024-message and 128-output-token bounds, signed quote, context and budget all
 apply; unsupported input is rejected rather than trimmed.
 
-The active session transport is v2. An old session-v1 seller must be upgraded;
-failed v2 preparation signs no opening and does not trigger a fallback. The SDK
+The active session transport is v3. Old session-v1/v2 peers must be upgraded;
+failed v3 preparation signs no opening and does not trigger a fallback. The SDK
 channel and private financial journal do not migrate: saved approvals retain
 their original digest and recover without another inference. The per-request
-paid stream remains a separate, single-user path. Free execution is unchanged.
-Session replies are complete responses; incremental token streaming is separate.
+paid stream remains a separate, single-user path. Free wire contracts are
+unchanged. Reusable sessions opt into prompt cancellation of deadline-bounded
+generation, stopping publication even if an engine ignores abort. Legacy free
+and per-request paid paths retain their delivery-measurement timing. Execution
+replies carry ordered text fragments and one correlated complete terminal.
+Streaming API callers receive fragments as the engine produces them;
+complete-response callers drain and verify the same wire without publishing
+fragments. No final text is replayed after streaming. Every frame, the aggregate
+encoded response and the number of events are bounded. Waiting for the next
+engine event uses the original absolute request deadline; after its first byte,
+an incomplete prefix or body keeps the ingress deadline. The terminal's text
+must equal all observed fragments, and EOF is required before usage approval.
+Earlier v1/v2 vectors remain unchanged.
+
+Cancellation before a fully verified terminal creates no new usage approval. It
+stops publication, aborts generation on connection close and preserves the
+pending financial intent; the prompt is never replayed. The seller can collect
+only its highest already accepted cumulative signature, so the last unsigned
+response remains bounded seller exposure. Once independently verified usage
+enters durable approval, cancellation cannot revoke that intent: recover only
+the original bill/voucher, including a lost ACK. Passing time alone does not
+clear uncertainty. Tools remain separate from this shared streaming transport.
+
+## Terminal conversation history
+
+`pnpm buyer:chat` keeps confirmed user/assistant turns in memory and sends the
+whole conversation with the next question. It retains the assistant's exact text
+only after the local stream has a valid completion, its terminal marker and EOF.
+Partial text is provisional. A cut or uncertain result ends the chat; the prompt
+is never resent, including when more input was already queued.
+
+Control queries and receipt exchanges have their own bounded admission and do
+not hold generation slots. A receipt still finishing in the background therefore
+does not occupy the next question's inference capacity. Neither the completed
+answer nor a new question waits for optional local receipt persistence. Existing
+connection, query, inference and deadline limits still apply; a receipt failure
+never retries the prompt.
+
+Use `/new` to clear only the current conversation. It sends no request, closes
+no channel, resets no spending authority and clears no pending financial
+operation. `/settle` and `/exit` retain their existing meanings. Starting the
+process again begins with empty conversation history while financial recovery
+still uses its original private state. This feature adds no prompt/answer file
+or content logging.
+
+The existing terminal input limit of 64000 UTF-8 bytes now applies to the entire
+history plus the new question, within the common 1024-message limit. History is
+never silently shortened. If it no longer fits, the terminal rejects the next
+question before making a request and suggests `/new`. A completed answer may fit
+the existing output bound but make the next conversation too large; it is still
+displayed. Full-history tokenization, context and signed budget checks remain
+the shared buyer/seller policy, so previous turns cost input tokens again.
+
+Free offers and reusable paid sessions support this history. The legacy
+per-request paid path still accepts only a single user message: it refuses a
+multi-turn paid request rather than flattening it or falling back. Use `/new`
+for separate questions on that path, or configure the existing reusable-session
+policy for paid conversations. Selection and financial authorization are
+unchanged.
 
 ## Explicit startup policy
 
@@ -376,3 +433,26 @@ checks.
 Settings controls belong to the separate host/UI integration. The canonical
 parser and behavior below apps are reusable; this implementation changes no
 desktop panel, seller CLI, fee calculation, wire bytes or journal format.
+
+### Tools on the common execution pipeline
+
+The normal buyer endpoint supports tools for both a zero-price quote and a
+positive-price quote backed by an explicitly configured reusable session. The
+same inference package validates capabilities, preserves system/history/tool
+turns, runs the engine and measures the result. A free choice constructs no
+financial services. A paid choice verifies the whole received result before
+signing its cumulative usage. Tools are run by the API client, never implicitly
+by the node, chat CLI or desktop host.
+
+Configure the session authorization above before using positive-price tools. The
+older individual settlement mode rejects tool requests before opening a payment:
+it cannot safely bill arguments held until a terminal without a buyer
+acknowledgement. It does not silently convert an individual authorization into a
+reusable deposit. Both peers need the active session v4 implementation; original
+saved financial approvals retain their exact bill and voucher through recovery,
+without replaying content.
+
+Tool definitions/results count toward the existing input bound; canonical tool
+output counts toward tokens even if the text is empty. Local telemetry covers
+both prices with the same content-free events and remains configurable. A
+voucher approval is shown as approved usage, not as a confirmed settlement.

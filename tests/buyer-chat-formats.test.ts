@@ -5,7 +5,9 @@ import test from 'node:test';
 
 import { parseAnthropicChat } from '@gyblos/buyer/anthropic-chat';
 import { parseFreeChat } from '@gyblos/buyer/free-chat';
+import { FreeSelectionFailure } from '@gyblos/buyer/free-execution';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
+import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import {
   ENGINE_DONE_REASONS,
   FREE_EXECUTION,
@@ -115,9 +117,9 @@ void test('an Anthropic request carries system text apart and needs max_tokens',
   });
   for (const change of [
     { max_tokens: undefined },
-    { tools: [{ name: 'x' }] },
+    // A server tool runs at the provider, not on a Gyblos seller.
+    { tools: [{ type: 'web_search_20250305', name: 'web' }] },
     { stop_sequences: ['x'] },
-    { thinking: { type: 'enabled', budget_tokens: 1024 } },
     { messages: [{ role: 'system', content: 'x' }] },
     {
       messages: [
@@ -271,6 +273,38 @@ void test('a token-protected endpoint takes the key as a bearer token or as x-ap
     );
     assert.equal((await post({ 'x-api-key': 'wrong' })).status, 401);
     assert.equal((await post({})).status, 401);
+  } finally {
+    await server.close();
+  }
+});
+
+void test('when every seller is cooling down the answer says when to retry, so SDKs wait and retry', async () => {
+  const server = await startFreeBuyerHttp(
+    async () => {
+      throw new FreeSelectionFailure(
+        { ok: false, code: SELLER_SELECTION_CODES.NO_CANDIDATES },
+        Date.now() + 20_000,
+      );
+    },
+    { selection: SELECTION, maxTokens: 10 },
+    { port: 0 },
+  );
+  try {
+    const response = await fetch(server.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'synthetic',
+        messages: [{ role: 'user', content: 'hi' }],
+      }),
+    });
+    assert.equal(response.status, 503);
+    const seconds = Number(response.headers.get('retry-after'));
+    assert.ok(seconds >= 19 && seconds <= 20, String(seconds));
+    assert.equal(response.headers.get('x-should-retry'), null);
+    const body = await response.json();
+    assert.equal(body.error.code, SELLER_SELECTION_CODES.NO_CANDIDATES);
+    assert.match(body.error.message, /failed recently; retry in \d+ s/);
   } finally {
     await server.close();
   }

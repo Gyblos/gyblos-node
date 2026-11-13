@@ -9,7 +9,7 @@ import { generationDeadlineMs } from '@gyblos/config';
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { renderChat, renderConversation } from '@gyblos/engine-ollama/model';
 import { recountedMeter } from '@gyblos/node/free-meter';
-import { isConversation } from '@gyblos/protocol/chat';
+import { isConversation, type ChatMessage } from '@gyblos/protocol/chat';
 import {
   CONTROL_CODES,
   FREE_CHAT_ROLES,
@@ -132,7 +132,8 @@ void test('the seller refuses text the model’s template cannot carry as unsupp
     {
       meter: recountedMeter({
         input: (prompt) => renderChat(prompt).length,
-        chat: (messages) => renderConversation(messages).length,
+        chat: (messages) =>
+          renderConversation(messages as readonly ChatMessage[]).length,
         count: (text) => text.length,
       }),
     },

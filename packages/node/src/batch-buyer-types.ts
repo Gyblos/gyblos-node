@@ -40,6 +40,7 @@ export interface BuyerBatchContext<Remote extends BatchDestination> {
     method: import('@gyblos/protocol/batch-channel').BatchMethod,
     params: unknown,
     signal?: AbortSignal,
+    onDelta?: (text: string) => Promise<void>,
   ) => Promise<import('@gyblos/protocol/batch-channel').BatchChannelResult>;
   approve: (
     bill: import('@gyblos/protocol/payment-session').SessionBill,

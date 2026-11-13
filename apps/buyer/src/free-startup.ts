@@ -1,5 +1,9 @@
 // Starts the isolated free buyer using local role identity and selection policy, without paid bootstrap.
-import { BUYER_RELAY_ONLY_ENV, FREE_OUTPUT_TOKENS } from '@gyblos/config';
+import {
+  BUYER_RELAY_ONLY_ENV,
+  FREE_OUTPUT_TOKENS,
+  TRANSPORT_LIMITS,
+} from '@gyblos/config';
 import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
@@ -34,6 +38,7 @@ import { executeBuyerFree, type FreeBuyerDependencies } from './free-execution';
 import { startFreeBuyerHttp, type ChatErrorClassifier } from './free-http';
 import { freeBuyerDependencies } from './free-selection';
 import type { ChatResult } from './free-sse';
+import type { RoutedModel } from './model-routes';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
@@ -50,6 +55,8 @@ export type BuyerExecutionFactory = (context: {
     input: FreeExecutionBuildInput,
     signal: AbortSignal,
     onDelta?: (text: string, requestDigest?: string) => Promise<void>,
+    // The model the request named, when the endpoint serves several.
+    model?: RoutedModel,
     permission?: BuyerApiKeyOperation,
   ): Promise<ChatResult>;
   token?: string;
@@ -149,6 +156,7 @@ function buyerReceipts(
 ) {
   return createBuyerReceiptRuntime({
     endpoint,
+    slots: TRANSPORT_LIMITS.maxConcurrent,
     store: openReceiptStore({
       environment: process.env,
       role: P2P_ROLES.BUYER,
@@ -207,16 +215,22 @@ async function closeBuyerResources(
 
 function buyerHttp(
   run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'],
-  request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
+  { request, models }: Awaited<ReturnType<typeof buyerSelection>>['config'],
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
-      (input, signal, _onDelta, permission) =>
-        run(input, signal, undefined, permission),
-      { selection: request.selection, maxTokens: request.maxTokens },
+      (input, signal, _onDelta, model, permission) =>
+        run(input, signal, undefined, model, permission),
+      {
+        selection: request.selection,
+        maxTokens: request.maxTokens,
+        ...(models ? { models } : {}),
+        // The selected execution policy, not its price, determines admission after capability validation.
+        tools: true,
+      },
       {
         port,
         stream: run,
@@ -263,6 +277,17 @@ function buyerHost(
   };
 }
 
+function checkFreeRequest(
+  request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
+) {
+  if (request.maxTokens > FREE_OUTPUT_TOKENS.max)
+    refuse(FREE_BUYER_STARTUP.MAX_TOKENS);
+  if (
+    request.reasoning !== REASONING_LEVELS.OFF ||
+    request.lowestReasoning !== null
+  )
+    refuse(FREE_BUYER_STARTUP.REASONING);
+}
 async function startOwnedFreeBuyer(
   options: {
     bind?: typeof bindEndpoint;
@@ -278,15 +303,7 @@ async function startOwnedFreeBuyer(
     return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
   const prepared = await buyerSelection();
   const { request } = prepared.config;
-  // Paid mode checks its own, smaller bound before it gets here.
-  if (request.maxTokens > FREE_OUTPUT_TOKENS.max)
-    refuse(FREE_BUYER_STARTUP.MAX_TOKENS);
-  // The free engine serves reasoning off only; checked before any socket is bound.
-  if (
-    request.reasoning !== REASONING_LEVELS.OFF ||
-    request.lowestReasoning !== null
-  )
-    refuse(FREE_BUYER_STARTUP.REASONING);
+  checkFreeRequest(request);
   const relayOnly = process.env[BUYER_RELAY_ONLY_ENV] === '1';
   const endpoint = await (options.bind ?? bindEndpoint)(
     await buyerNodeSecret(),
@@ -316,6 +333,8 @@ async function startOwnedFreeBuyer(
       endpoint,
       buyer: role.buyer,
       relayOnly,
+      // Free-only requests may run side by side, each on its own seller; paid modes admit their own.
+      parallel: options.execution ? 1 : TRANSPORT_LIMITS.maxConcurrent,
     });
     execution = await options.execution?.({
       prepared,
@@ -326,9 +345,15 @@ async function startOwnedFreeBuyer(
     });
     const run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'] =
       execution?.execute ??
-      ((input, signal, onDelta) =>
-        executeBuyerFree(input, dependencies, signal, onDelta));
-    const host = await buyerHttp(run, request, options.port, execution, role);
+      ((input, signal, onDelta, model) =>
+        executeBuyerFree(input, dependencies, signal, onDelta, model));
+    const host = await buyerHttp(
+      run,
+      prepared.config,
+      options.port,
+      execution,
+      role,
+    );
     return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
     await closeBuyerResources(

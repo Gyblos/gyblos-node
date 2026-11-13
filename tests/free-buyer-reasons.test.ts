@@ -28,7 +28,7 @@ void test('a refused free chat names the field and why, never the prompt', async
     [{ ...CHAT, max_tokens: 0 }, 'max_tokens', /positive integer/],
     [{ ...CHAT, max_tokens: 1.5 }, 'max_tokens', /positive integer/],
     [{ ...CHAT, model: 'other' }, 'model', /model must be synthetic/],
-    [{ ...CHAT, tools: [{}] }, 'tools', /tools is not supported yet/],
+    [{ ...CHAT, tools: [{}] }, 'tools', /tools must be functions/],
     [{ ...CHAT, n: 2 }, 'n', /n is not supported yet/],
     [{ ...CHAT, 'bad key!': 1 }, null, /does not support/],
     [{ ...CHAT, stream: true }, 'stream', /stream must be false or absent/],
@@ -39,12 +39,12 @@ void test('a refused free chat names the field and why, never the prompt', async
         messages: [...CHAT.messages, { role: 'assistant', content: 'x' }],
       },
       'messages',
-      /start and end with a user message/,
+      /must start with a user message/,
     ],
     [
       { ...CHAT, messages: [{ role: 'system', content: SECRET_PROMPT }] },
       'messages',
-      /start and end with a user message/,
+      /must start with a user message/,
     ],
     [
       {
@@ -52,7 +52,8 @@ void test('a refused free chat names the field and why, never the prompt', async
         messages: [{ role: 'tool', content: SECRET_PROMPT, tool_call_id: 'a' }],
       },
       'messages',
-      /tool calls/,
+      // A result that answers no call.
+      /answer every tool call/,
     ],
     [
       {

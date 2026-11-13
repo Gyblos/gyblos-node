@@ -19,6 +19,8 @@ function paths(name: string) {
           <path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6" />
         </>
       );
+    case SIDEBAR_ICON_IDS.PLUG:
+      return <path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8ZM12 18v4" />;
     case SIDEBAR_ICON_IDS.BOOK_OPEN:
       return (
         <path d="M12 5v16M12 5C9 2 5 2 2 4v15c3-2 7-2 10 2 3-4 7-4 10-2V4c-3-2-7-2-10 1Z" />

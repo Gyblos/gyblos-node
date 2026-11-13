@@ -1,9 +1,9 @@
 // Emits seller execution observations only after quote and peer verification; never logs content or changes policy.
+import { type RouteProbe } from '@gyblos/core/telemetry';
 import {
-  createExecutionTelemetry,
-  telemetrySizes,
-  type RouteProbe,
-} from '@gyblos/core/telemetry';
+  completeInferenceTelemetry,
+  createInferenceTelemetry,
+} from '@gyblos/inference/observation';
 import { FREE_EXECUTION_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
 import type {
   FreeExecutionRequest,
@@ -46,7 +46,7 @@ export function sellerExecutionTelemetry(
 ) {
   const telemetry = options.telemetry;
   if (!telemetry) return undefined;
-  const observer = createExecutionTelemetry({
+  const observer = createInferenceTelemetry({
     sink: telemetry.sink,
     now: telemetry.now ?? Date.now,
     ...(route ? { route } : {}),
@@ -72,14 +72,7 @@ export function finishSellerTelemetry(
 ) {
   if (!observer) return;
   if (response.result) {
-    observer.completed(
-      { ...response.result.usage, reasoningTokens: null },
-      response.result.finishReason,
-      telemetrySizes(
-        request.input.messages[0]?.content ?? '',
-        response.result.text,
-      ),
-    );
+    completeInferenceTelemetry(observer, request.input, response.result);
   } else if (started || response.error.code === FREE_EXECUTION_CODES.CANCELLED)
     observer.failed(response.error.code, response.error);
   else observer.refused(refusal(response.error));

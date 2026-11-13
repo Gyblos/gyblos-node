@@ -139,6 +139,7 @@ async function execute<Remote extends BatchDestination>(
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
   lease: PoolLease,
+  onDelta?: (text: string) => Promise<void>,
 ) {
   recountSessionInput(quote, input, state.options.meter);
   await state.options.verify(quote, signal);
@@ -178,7 +179,12 @@ async function execute<Remote extends BatchDestination>(
     lease.registered = true;
     return entry;
   });
-  const result = await manager(state, entry).execute(quote, input, signal);
+  const result = await manager(state, entry).execute(
+    quote,
+    input,
+    signal,
+    onDelta,
+  );
   if (!(await (await catalog(state)).resolve(entry.terms.sellerNodeId)))
     return sessionFail(SESSION_CODES.UNVERIFIED);
   return result;
@@ -232,6 +238,7 @@ async function run<Remote extends BatchDestination>(
   quote: SignedOfferV2,
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
 ) {
   const id = quote.offer.nodeId;
   const lease = state.admission.enter(id, quote.offer.requestId);
@@ -243,7 +250,7 @@ async function run<Remote extends BatchDestination>(
   return state.admission.track(
     Promise.resolve().then(async () => {
       try {
-        return await execute(state, quote, input, current, lease);
+        return await execute(state, quote, input, current, lease, onDelta);
       } catch (error) {
         lease.running = false;
         if (lease.registered) {
@@ -302,7 +309,8 @@ export function createBuyerSessionPool<Remote extends BatchDestination>(
       quote: SignedOfferV2,
       input: FreeExecutionBuildInput,
       signal: AbortSignal,
-    ) => run(state, quote, input, signal),
+      onDelta?: (text: string) => Promise<void>,
+    ) => run(state, quote, input, signal, onDelta),
     reconcile: (signal: AbortSignal) =>
       state.admission.maintain(() => summarize(state, signal, false)),
     settle: (signal: AbortSignal) =>

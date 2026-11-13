@@ -8,6 +8,18 @@ import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
+export const CHAT_COMMANDS = {
+  NEW: '/new',
+  EXIT: '/exit',
+  SETTLE: '/settle',
+} as const;
+export const CHAT_TURN_STATUSES = {
+  COMPLETE: 'complete',
+  UNCERTAIN: 'uncertain',
+  REJECTED: 'rejected',
+} as const;
+export const CHAT_INPUT_BYTES = 64_000;
+
 export const CALL_OUTCOMES = {
   CONFIRMED: JOURNAL_STATES.CONFIRMED,
   UNCERTAIN: JOURNAL_STATES.UNCERTAIN,
@@ -76,6 +88,15 @@ export const SELLER_FAILURES = {
   UNKNOWN: 'SELLER_ERROR_UNKNOWN',
   nodeIdChars: 8,
 } as const;
+// The models one endpoint may serve (selection.json `models`): public names clients send as `model`.
+export const BUYER_MODELS = {
+  maxModels: 32,
+  maxAliases: 8,
+  nameCharacters: 128,
+  namePattern: /^[A-Za-z0-9][A-Za-z0-9._:/@-]*$/,
+  // How many names a refusal for an unknown model lists.
+  listedInErrors: 16,
+} as const;
 export const BUYER_SELECTION = {
   configFile: ROLE_FILES.buyerSelection,
   statsFile: 'selection-stats.json',
@@ -86,6 +107,10 @@ export const BUYER_SELECTION = {
   // How long quotes may race. A relay round trip to a distant seller took about 250 ms in the
   // first real test, so the default leaves room; selection.json `quoteWindowMs` overrides it.
   windowMs: 3000,
+  // How long another seller's quote waits for the one that served this conversation before.
+  preferMs: 500,
+  // Conversations remembered for that preference, in memory only.
+  stickyConversations: 256,
   minWindowMs: 100,
   // Well inside CONTROL_LIMITS.quoteLifetimeMs, so a quote that wins late is still fresh.
   maxWindowMs: 10_000,
@@ -110,6 +135,11 @@ export const BUYER_DISCOVERY = {
   timeoutMs: 10000,
   maxStateBytes: 1048576,
   maxStateRows: 1024,
+  // Open discovery: lookup work per selection, live unconfigured candidates, and cached identity refusals.
+  openLookups: 16,
+  openSellers: 64,
+  openRefusals: 1024,
+  openRefusalMs: 300_000,
 } as const;
 
 export type BuyerProxyErrorCode =
@@ -154,6 +184,7 @@ export const FREE_BUYER = {
   contentType: 'application/json',
   // Header the official OpenAI SDKs honor to skip their automatic retries.
   noRetryHeader: 'x-should-retry',
+  retryAfterHeader: 'retry-after',
   requestMs: 180000,
   headerMs: 10000,
   headers: 16384,
@@ -166,6 +197,8 @@ export const FREE_BUYER_CODES = {
   INTERNAL: 'FREE_BUYER_INTERNAL',
   TOO_LARGE: 'FREE_BUYER_REQUEST_TOO_LARGE',
   TIMEOUT: 'FREE_BUYER_TIMEOUT',
+  // The request names a model this endpoint does not serve.
+  MODEL: 'FREE_BUYER_MODEL_NOT_FOUND',
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
@@ -259,6 +292,8 @@ export const FREE_BUYER_STARTUP = {
   PAID_NETWORK: 'BUYER_PAYMENT_NETWORK_MISMATCH',
   // Paid mode recounts with the pinned public tokenizer, so only its model can be bought.
   PAID_MODEL: 'BUYER_PAID_MODEL_UNSUPPORTED',
+  // The explicit paid entry serves only `request.selection`; a `models` list needs the automatic buyer.
+  PAID_MODELS: 'BUYER_PAID_MODELS_UNSUPPORTED',
   PAID_KEY: 'BUYER_WALLET_KEY_INVALID',
   TOKENIZER: 'BUYER_TOKENIZER_UNAVAILABLE',
   // Unreadable, or held by another buyer process.

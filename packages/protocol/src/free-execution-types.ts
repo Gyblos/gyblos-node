@@ -1,38 +1,28 @@
 // Free inference wire shapes only; execution, admission and replay storage belong to their callers.
 import type {
-  EngineDoneReason,
   FREE_EXECUTION,
-  FreeChatRole,
   FreeExecutionCode,
   FreeExecutionStopReason,
-  ReasoningLevel,
 } from './constants';
-import type { ModelSelection, SignedOfferV2 } from './control-types';
+import type { SignedOfferV2 } from './control-types';
+import type {
+  InferenceBuildInput,
+  InferenceInput,
+  InferenceResult,
+} from './inference';
+import type { ToolChatMessage } from './tools';
 
-export interface FreeChatMessage {
-  role: FreeChatRole;
-  content: string;
-}
-export interface FreeExecutionBuildInput {
-  messages: readonly FreeChatMessage[];
-  maxTokens: number;
-}
+export type FreeChatMessage = ToolChatMessage;
+export type FreeExecutionBuildInput = InferenceBuildInput;
+export type ExecutionInput = InferenceInput;
+export type ExecutionResult = InferenceResult;
 export interface FreeExecutionRequest {
   version: typeof FREE_EXECUTION.version;
   requestId: string;
   quote: SignedOfferV2;
-  input: {
-    messages: FreeChatMessage[];
-    selection: ModelSelection;
-    reasoning: ReasoningLevel;
-    maxTokens: number;
-  };
+  input: InferenceInput;
 }
-export interface FreeExecutionResult {
-  text: string;
-  usage: { inputTokens: number; outputTokens: number };
-  finishReason: EngineDoneReason;
-}
+export type FreeExecutionResult = InferenceResult;
 // Present only with SELLER_CANNOT_CONTINUE; delivered only on a stream that already sent text.
 export interface FreeExecutionDelivered {
   outputTokens: number;

@@ -8,6 +8,15 @@
 // 4. programming errors (invalid maxTokens, unsupported messages) stay plain Error.
 import { isConversation, type ChatMessage } from './chat';
 import type { EngineDoneReason, EngineErrorCode } from './constants';
+import {
+  hasToolTurns,
+  isToolConversation,
+  type TOOL_CALLS_DONE,
+  type ToolCall,
+  type ToolChatMessage,
+  type ToolChoice,
+  type ToolDefinition,
+} from './tools';
 import type { EngineWireUsage } from './wire-usage';
 
 // The message is the static code; provider text, bodies and headers never reach it.
@@ -44,16 +53,22 @@ export interface EngineUsage {
 export interface EngineResult {
   text: string;
   usage: EngineUsage;
-  finishReason: EngineDoneReason;
+  // tool_calls only when the input offered tools and the model called at least one.
+  finishReason: EngineDoneReason | typeof TOOL_CALLS_DONE;
+  toolCalls?: ToolCall[];
 }
 
 export type EngineInput = (
   | { prompt: string; messages?: never }
-  | { prompt?: never; messages: readonly ChatMessage[] }
+  | { prompt?: never; messages: readonly ToolChatMessage[] }
 ) & {
   maxTokens: number;
+  // Offered only to an engine whose supportsTools() is true.
+  tools?: readonly ToolDefinition[];
+  toolChoice?: ToolChoice;
   signal?: AbortSignal;
   onFragment?: () => Promise<void>;
+  // Text only: calls arrive whole in the result.
   onText?: (text: string) => Promise<void>;
 };
 
@@ -61,6 +76,8 @@ export interface Engine {
   generate(input: EngineInput): Promise<EngineResult>;
   capabilities(): EngineCapabilities;
   describe(): Promise<EngineDescription>;
+  // Whether generate() accepts tools and tool turns for this engine's model.
+  supportsTools?(): boolean;
 }
 
 // The one user message the paid and HTTP paths serve; tools and other roles are programming errors there.
@@ -80,7 +97,20 @@ export function singleUserPrompt(input: EngineInput): string {
 export function engineConversation(input: EngineInput): readonly ChatMessage[] {
   if (input.prompt !== undefined)
     return [{ role: 'user', content: input.prompt }];
-  if (!isConversation(input.messages))
+  if (input.tools || !isConversation(input.messages as readonly ChatMessage[]))
+    throw new Error('Unsupported conversation shape.');
+  return input.messages as readonly ChatMessage[];
+}
+
+// The conversation a tool-capable engine renders: text only, or with tools and tool turns.
+export function engineToolConversation(
+  input: EngineInput,
+): readonly ToolChatMessage[] {
+  if (input.prompt !== undefined)
+    return [{ role: 'user', content: input.prompt }];
+  if (!input.tools && !hasToolTurns(input.messages))
+    return engineConversation(input);
+  if (!isToolConversation(input.messages))
     throw new Error('Unsupported conversation shape.');
   return input.messages;
 }
@@ -92,7 +122,13 @@ export interface RecountTokenizer {
 
 // A recount tokenizer that also counts a whole conversation as the model's template renders it.
 export interface ChatTokenizer extends RecountTokenizer {
-  chat(messages: readonly ChatMessage[]): number;
+  chat(
+    messages: readonly ToolChatMessage[],
+    tools?: readonly ToolDefinition[],
+    toolChoice?: ToolChoice,
+  ): number;
+  // What a result that called tools costs: its text and calls as the template writes an assistant turn.
+  output?(text: string, toolCalls?: readonly ToolCall[]): number;
 }
 
 export function inferenceWireUsage(usage: EngineUsage): EngineWireUsage {

@@ -67,6 +67,17 @@ FROM page
 JOIN discovery_catalogs c ON c.node_id = page.nodeId
 JOIN discovery_presence p ON p.node_id = page.nodeId
 ORDER BY page.issuedAt DESC, page.nodeId ASC`;
+// The same liveness as LIST_SQL, grouped by model; distinct NodeIds, since a catalog lists a model once.
+const MODELS_SQL = `SELECT m.model_id AS modelId, count(DISTINCT m.node_id) AS sellers
+  FROM discovery_catalog_models m
+  JOIN discovery_catalogs c ON c.node_id = m.node_id
+  JOIN discovery_presence p ON p.node_id = m.node_id AND p.catalog_digest = c.digest
+  WHERE c.issued_at <= ?2 AND c.expires_at > ?1 AND p.issued_at <= ?2 AND p.expires_at > ?1
+    AND NOT EXISTS (SELECT 1 FROM discovery_withdrawals w
+      WHERE w.node_id = c.node_id AND w.catalog_digest = c.digest)
+  GROUP BY m.model_id
+  ORDER BY sellers DESC, modelId ASC
+  LIMIT ?3`;
 const COUNT_SQL = `SELECT (SELECT count(*) FROM discovery_catalogs WHERE expires_at > ?1)
   + (SELECT count(*) FROM discovery_presence WHERE expires_at > ?1)
   + (SELECT count(*) FROM discovery_withdrawals WHERE expires_at > ?1) AS n`;
@@ -208,6 +219,16 @@ export function createD1Storage(db: D1Database): DiscoveryStorage {
         )
         .all();
       return results.map(sellerRow);
+    },
+    async models(now, limit) {
+      const { results } = await db
+        .prepare(MODELS_SQL)
+        .bind(now, now + CONTROL_LIMITS.clockSkewMs, limit)
+        .all();
+      return results.map((row) => ({
+        modelId: String(row.modelId),
+        sellers: integer(row.sellers),
+      }));
     },
     async count(now) {
       const row = await db.prepare(COUNT_SQL).bind(now).first();

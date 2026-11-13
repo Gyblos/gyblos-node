@@ -5,16 +5,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type {
-  ExecutionOutcome,
-  ExecutionPermit,
-} from '@gyblos/protocol/execution-policy';
-
 import {
   runAdmittedExecution,
   type AdmittedExecution,
   type ExecutionSession,
-} from '../packages/node/src/execution';
+} from '@gyblos/inference';
+import type {
+  ExecutionOutcome,
+  ExecutionPermit,
+} from '@gyblos/protocol/execution-policy';
 
 class Timeout extends Error {}
 class Cancelled extends Error {}

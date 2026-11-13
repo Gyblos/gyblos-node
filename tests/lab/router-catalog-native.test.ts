@@ -4,7 +4,11 @@ import { test } from 'node:test';
 
 import { selectWinner } from '@gyblos/buyer/free-selection';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
-import { pinnedBusy, sessionRouter } from '@gyblos/buyer/session-routing';
+import {
+  pinnedBusy,
+  routeScope,
+  sessionRouter,
+} from '@gyblos/buyer/session-routing';
 import { parseBuyerRoutingPolicy } from '@gyblos/core/buyer-routing';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
@@ -81,10 +85,18 @@ void test(
           return winner.nodeId;
         },
       };
-      const first = router.execute(ports, AbortSignal.timeout(5000));
+      const first = router.execute(
+        ports,
+        AbortSignal.timeout(5000),
+        routeScope(prepared.config.request),
+      );
       await entered.promise;
       try {
-        const second = await router.execute(ports, AbortSignal.timeout(5000));
+        const second = await router.execute(
+          ports,
+          AbortSignal.timeout(5000),
+          routeScope(prepared.config.request),
+        );
         assert.equal(second.result, b.catalog.nodeId);
         assert.equal(second.kind, 'paid');
       } finally {

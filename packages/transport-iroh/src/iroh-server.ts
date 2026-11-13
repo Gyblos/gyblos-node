@@ -8,6 +8,7 @@ import {
   TRANSPORT_TIMEOUTS,
   type TransportLimits,
 } from '@gyblos/config';
+import { ControlAdmission } from '@gyblos/core/control-admission';
 import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_ALPN,
@@ -64,6 +65,7 @@ export function serveIroh(
   const receiptServer = receipts ? createReceiptServer(receipts) : undefined;
   const limiter = createPeerLimiter(Date.now, limits);
   const admission = createConnectionAdmission(undefined, limits);
+  const sessionQueries = new ControlAdmission(() => performance.now());
   const connections = new Set<Connection>();
   const streamPeers = new Set<string>();
   let streamsActive = 0;
@@ -151,10 +153,12 @@ export function serveIroh(
     signal: AbortSignal,
     peer: string,
   ) {
+    // Receipts and control queries follow a request the buyer already paid quota for; they keep their own
+    // admission and are not counted as requests again.
     await receiptServer?.handle(
       connection,
       signal,
-      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+      () => (routeAllowed(connection) ? limiter.enterControl() : undefined),
       () => closed,
       () => routeAllowed(connection),
     );
@@ -170,9 +174,28 @@ export function serveIroh(
       connection,
       batchSessions,
       signal,
-      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+      () => {
+        if (!routeAllowed(connection)) return undefined;
+        const release = limiter.enterQuery(peer);
+        if (!release) return undefined;
+        // Reuse the existing bounded query rate, including malformed/incomplete streams. Its lease
+        // covers this synchronous rate check; the endpoint slot covers parsing, generation and egress.
+        let queryConnection:
+          ReturnType<ControlAdmission['openConnection']> | undefined;
+        try {
+          queryConnection = sessionQueries.openConnection(peer);
+          queryConnection.beginQuery().finish();
+          return release;
+        } catch {
+          release();
+          return undefined;
+        } finally {
+          queryConnection?.close();
+        }
+      },
       () => closed,
       () => routeAllowed(connection),
+      () => limiter.consume(peer),
     );
   }
 
@@ -198,7 +221,9 @@ export function serveIroh(
     const family = connectionFamily(alpn);
     const releasePeer = admission.established(peer, family);
     const releaseQuota = releasePeer
-      ? limiter.register(peer, family)
+      ? alpn === BATCH_CHANNEL.alpn && batchSessions
+        ? limiter.registerQuery(peer, family)
+        : limiter.register(peer, family)
       : undefined;
     if (!releasePeer || !releaseQuota) {
       releasePeer?.();
@@ -223,7 +248,7 @@ export function serveIroh(
           controller.signal,
           () => {
             if (!routeAllowed(connection)) return undefined;
-            return limiter.enter(peer);
+            return limiter.enterControl();
           },
           () => closed,
           () => routeAllowed(connection),

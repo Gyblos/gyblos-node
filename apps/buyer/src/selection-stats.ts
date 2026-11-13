@@ -116,3 +116,53 @@ export async function selectionStats(environment: HomeEnvironment) {
     },
   };
 }
+
+// A seller that failed while executing counts a failure, so it weighs less next time; it is not cooled
+// down, since a seller that is really gone already is at its next quote, and the only seller of a buyer
+// stays reachable after one failed answer.
+export function recordExecutionFailure(
+  stats: Map<string, LocalSellerStats>,
+  nodeId: string,
+) {
+  const prior = stats.get(nodeId);
+  stats.set(nodeId, {
+    successes: prior?.successes ?? 0,
+    failures: (prior?.failures ?? 0) + 1,
+    // A seller first seen failing has no latency yet, not the best one.
+    latencyMs: prior?.latencyMs ?? null,
+    waitAccuracy: prior?.waitAccuracy ?? null,
+    cooldownUntil: prior?.cooldownUntil ?? null,
+    quotedWaitMs: prior?.quotedWaitMs ?? null,
+    observedWaitMs: prior?.observedWaitMs ?? null,
+  });
+}
+
+// Apply this selection's deltas to current statistics, preserving concurrent execution updates.
+export function mergeSelectionStats(
+  live: Map<string, LocalSellerStats>,
+  before: ReadonlyMap<string, LocalSellerStats>,
+  selected: ReadonlyMap<string, LocalSellerStats>,
+) {
+  for (const [nodeId, row] of selected) {
+    const prior = before.get(nodeId);
+    if (prior === row) continue;
+    const current = live.get(nodeId);
+    const metadata = <
+      Key extends keyof Omit<LocalSellerStats, 'successes' | 'failures'>,
+    >(
+      key: Key,
+    ) =>
+      current?.[key] !== prior?.[key] ? (current?.[key] ?? null) : row[key];
+    live.set(nodeId, {
+      successes:
+        (current?.successes ?? 0) + row.successes - (prior?.successes ?? 0),
+      failures:
+        (current?.failures ?? 0) + row.failures - (prior?.failures ?? 0),
+      latencyMs: metadata('latencyMs'),
+      waitAccuracy: metadata('waitAccuracy'),
+      cooldownUntil: metadata('cooldownUntil'),
+      quotedWaitMs: metadata('quotedWaitMs'),
+      observedWaitMs: metadata('observedWaitMs'),
+    });
+  }
+}

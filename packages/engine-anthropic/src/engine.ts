@@ -23,6 +23,7 @@ import {
   visibleFragment,
   type JsonFields,
 } from '@gyblos/core/engine-provider';
+import { finishedToolCalls } from '@gyblos/core/engine-tools';
 import {
   ENGINE_ERROR_CODES,
   MODEL_IDENTITIES,
@@ -34,6 +35,7 @@ import {
   type EngineInput,
   type EngineResult,
 } from '@gyblos/protocol/engine';
+import { TOOL_CALLS_DONE } from '@gyblos/protocol/tools';
 
 import {
   ANTHROPIC_CREDIT,
@@ -47,6 +49,16 @@ import {
   ANTHROPIC_TIMEOUTS,
   ANTHROPIC_VERSION,
 } from './constants';
+import {
+  ANTHROPIC_INPUT_DELTA,
+  ANTHROPIC_TOOL_USE,
+  anthropicTools,
+  anthropicTurns,
+  orderedCalls,
+  startToolBlock,
+  toolInputDelta,
+  type ToolBlocks,
+} from './tools';
 
 export interface AnthropicEngineSettings {
   // The API root, without a version path (https://api.anthropic.com).
@@ -127,7 +139,8 @@ interface Completion {
   text: string;
   input: Partial<Record<(typeof ANTHROPIC_INPUT_FIELDS)[number], number>>;
   output?: number;
-  finish?: EngineDoneReason;
+  finish?: EngineDoneReason | typeof TOOL_CALLS_DONE;
+  calls: ToolBlocks;
 }
 
 function readUsage(usage: unknown, completion: Completion, output: boolean) {
@@ -139,11 +152,16 @@ function readUsage(usage: unknown, completion: Completion, output: boolean) {
     completion.output = providerCount(usage.output_tokens);
 }
 
-// A content delta's visible text; thinking and other hidden deltas carry none, a tool's input fails.
-function deltaText(delta: unknown, completion: Completion) {
+// A content delta's visible text; thinking and other hidden deltas carry none, and a tool's input JSON is
+// added to its call.
+function deltaText(delta: unknown, completion: Completion, index: unknown) {
   if (!isJsonFields(delta) || typeof delta.type !== 'string')
     throw new FrameFailure();
   if (HIDDEN_DELTAS.includes(delta.type)) return '';
+  if (delta.type === ANTHROPIC_INPUT_DELTA) {
+    toolInputDelta(index, delta.partial_json, completion.calls);
+    return '';
+  }
   if (delta.type !== ANTHROPIC_TEXT_DELTA) throw new FrameFailure();
   return visibleFragment(delta.text, !!completion.finish);
 }
@@ -158,14 +176,20 @@ function applyEvent(event: JsonFields, completion: Completion) {
       if (!isJsonFields(event.message)) throw new FrameFailure();
       readUsage(event.message.usage, completion, false);
       return '';
+    case ANTHROPIC_EVENTS.BLOCK_START:
+      startToolBlock(event.index, event.content_block, completion.calls);
+      return '';
     case ANTHROPIC_EVENTS.BLOCK_DELTA:
-      return deltaText(event.delta, completion);
+      return deltaText(event.delta, completion, event.index);
     case ANTHROPIC_EVENTS.MESSAGE_DELTA: {
       const reason = isJsonFields(event.delta)
         ? event.delta.stop_reason
         : undefined;
       if (reason !== undefined && reason !== null)
-        completion.finish = doneReasonFrom(STOP_REASONS, reason);
+        completion.finish =
+          reason === ANTHROPIC_TOOL_USE
+            ? TOOL_CALLS_DONE
+            : doneReasonFrom(STOP_REASONS, reason);
       readUsage(event.usage, completion, true);
       return '';
     }
@@ -181,7 +205,7 @@ async function readCompletion(
   signal: AbortSignal,
   attempt: EngineAttempt,
 ) {
-  const completion: Completion = { text: '', input: {} };
+  const completion: Completion = { text: '', input: {}, calls: new Map() };
   for await (const data of serverSentData(body, ANTHROPIC_LIMITS.stream)) {
     signal.throwIfAborted();
     const event = jsonFields(data);
@@ -205,16 +229,23 @@ async function readCompletion(
       break;
   }
   const { text, finish, output } = completion;
-  if (!finish) throw new FrameFailure();
+  const calls = orderedCalls(completion.calls);
+  if (!finish || (finish === TOOL_CALLS_DONE) !== calls.length > 0)
+    throw new FrameFailure();
   const { input_tokens: fresh } = completion.input;
   // Declared usage is the provider's or nothing, and an answer that is only thinking is not served.
-  if (fresh === undefined || output === undefined || !text)
+  if (fresh === undefined || output === undefined || (!text && !calls.length))
     throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
   const inputTokens = Object.values(completion.input).reduce(
     (sum, value) => sum + value,
     0,
   );
-  return { text, finish, usage: { inputTokens, outputTokens: output } };
+  return {
+    text,
+    finish,
+    calls,
+    usage: { inputTokens, outputTokens: output },
+  };
 }
 
 async function generate(
@@ -247,14 +278,15 @@ async function generate(
           model: settings.model,
           max_tokens: input.maxTokens,
           ...(system === undefined ? {} : { system }),
-          messages: turns,
+          messages: anthropicTurns(turns),
+          ...anthropicTools(input.tools, input.toolChoice),
           stream: true,
         }),
         signal,
       },
     );
     if (!response.ok || !response.body) throw await refusal(response);
-    const { text, finish, usage } = await readCompletion(
+    const { text, finish, usage, calls } = await readCompletion(
       response.body,
       input,
       signal,
@@ -263,6 +295,9 @@ async function generate(
     return {
       text,
       finishReason: finish,
+      ...(calls.length
+        ? { toolCalls: finishedToolCalls(calls, input.tools) }
+        : {}),
       usage: {
         ...usage,
         totalDurationNs: elapsedNanoseconds(started),
@@ -294,6 +329,8 @@ export function createAnthropicEngine(
       modelIdentity: MODEL_IDENTITIES.NAME_ONLY,
     }),
     describe: () => describeModel(settings, fetchImpl, describeTimeoutMs),
+    // The Messages API carries tools natively.
+    supportsTools: () => true,
     generate: (input) =>
       generate(settings, fetchImpl, generationTimeoutMs, input),
   };

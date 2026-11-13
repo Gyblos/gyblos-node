@@ -6,10 +6,9 @@ import {
   FreeExecutionAdmission,
   type FreeSellerLedger,
 } from '@gyblos/core/free-admission';
+import { generateInference } from '@gyblos/inference/conversation';
 import { canonicalJson } from '@gyblos/protocol';
-import { isConversation, type ChatMessage } from '@gyblos/protocol/chat';
 import {
-  CONTROL_METERING_MODES,
   ENGINE_ERROR_CODES,
   ENGINE_ERROR_STOP_REASON,
   FREE_EXECUTION,
@@ -28,7 +27,6 @@ import {
   type Engine,
   type EngineCapabilities,
   type EngineDescription,
-  type EngineResult,
 } from '@gyblos/protocol/engine';
 import {
   freeExecutionFail as fail,
@@ -41,10 +39,13 @@ import {
   type FreeExecutionRequest,
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
+import { INFERENCE_CODES, InferenceError } from '@gyblos/protocol/inference';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import type { ToolChatMessage } from '@gyblos/protocol/tools';
 import type { RouteProbe } from '@gyblos/transport-iroh';
 
 import { runFreeAdmitted } from './free-admitted';
+import { freeInputTokens, supportedInput } from './free-execution-input';
 import { createFreeStreamOutput } from './free-execution-stream';
 import type { FreeMeter } from './free-meter';
 import { createSellerFreeRouter } from './free-router';
@@ -83,24 +84,6 @@ export interface SellerFreeExecutionOptions {
 function checkSignal(signal: AbortSignal) {
   if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);
 }
-function supportedInput(
-  request: FreeExecutionRequest,
-  options: SellerFreeExecutionOptions,
-) {
-  const offer = request.quote.offer;
-  if (
-    canonicalJson(offer.selection) !== canonicalJson(options.selection) ||
-    canonicalJson(offer.model) !== canonicalJson(options.model) ||
-    canonicalJson(offer.capabilities) !== canonicalJson(options.capabilities) ||
-    !options.offer.reasoning.includes(offer.reasoning)
-  )
-    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  if (!isConversation(request.input.messages))
-    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  if (request.input.maxTokens > options.offer.caps.maxOutputTokens)
-    return fail(FREE_EXECUTION_CODES.LIMIT);
-  return request.input.messages;
-}
 function ready(options: SellerFreeExecutionOptions) {
   const state = options.readiness();
   const now = options.now();
@@ -129,26 +112,6 @@ export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
     ) => respond(value, peer, signal, options, policy, onDelta, probe),
   };
 }
-function freeInputTokens(
-  request: FreeExecutionRequest,
-  messages: readonly ChatMessage[],
-  options: SellerFreeExecutionOptions,
-) {
-  let inputTokens: number;
-  try {
-    inputTokens = options.meter.chat(messages);
-  } catch {
-    // Text the model's template cannot carry (its control tokens, say) is input the offer cannot serve.
-    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
-  }
-  if (
-    !Number.isSafeInteger(inputTokens) ||
-    inputTokens < 0 ||
-    inputTokens + request.input.maxTokens > options.model.contextTokens
-  )
-    return fail(FREE_EXECUTION_CODES.LIMIT);
-  return inputTokens;
-}
 function observedOutput(
   deliver: ((text: string) => Promise<void>) | undefined,
   receipt: ReturnType<typeof sellerReceiptObservation>,
@@ -167,6 +130,13 @@ function executionFailure(error: unknown, signal: AbortSignal) {
   if (signal.aborted) return { code: FREE_EXECUTION_CODES.CANCELLED };
   if (error instanceof FreeExecutionError)
     return { code: error.code, ...freeExecutionStop(error) };
+  if (error instanceof InferenceError)
+    return {
+      code:
+        error.code === INFERENCE_CODES.LIMIT
+          ? FREE_EXECUTION_CODES.LIMIT
+          : FREE_EXECUTION_CODES.INTERNAL,
+    };
   return { code: FREE_EXECUTION_CODES.ENGINE };
 }
 async function respond(
@@ -311,7 +281,7 @@ type ResponseHeader = Pick<
 >;
 async function generateResponse(
   request: FreeExecutionRequest,
-  messages: readonly ChatMessage[],
+  messages: readonly ToolChatMessage[],
   inputTokens: number,
   header: ResponseHeader,
   options: SellerFreeExecutionOptions,
@@ -329,17 +299,20 @@ async function generateResponse(
         onDelta,
       )
     : undefined;
-  let output: EngineResult;
   try {
-    output = await options.engine.generate({
-      messages,
-      maxTokens: request.input.maxTokens,
+    const result = await generateInference({
+      engine: options.engine,
+      input: { ...request.input, messages },
+      inputTokens,
+      meter: options.meter,
+      contextTokens: options.model.contextTokens,
       signal,
       ...(streaming ? { onText: streaming.onText } : {}),
+      generated: (duration) => observer?.generated(duration),
     });
     checkSignal(signal);
-    observer?.generated(output.usage.outputDurationNs);
-    streaming?.complete(output.text);
+    streaming?.complete(result.text);
+    return parseFreeExecutionResponse({ ...header, result });
   } catch (error) {
     if (error instanceof EngineError && !signal.aborted)
       return cannotContinue(
@@ -352,40 +325,4 @@ async function generateResponse(
   } finally {
     streaming?.stop();
   }
-  const preliminary = parseFreeExecutionResponse({
-    ...header,
-    result: {
-      text: output.text,
-      usage: { inputTokens, outputTokens: 0 },
-      finishReason: output.finishReason,
-    },
-  });
-  if (!preliminary.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
-  const usage = options.meter.usage(
-    preliminary.result.text,
-    output.usage,
-    inputTokens,
-  );
-  // The buyer's own bounds. A recounted count beyond them is a limit (admission already prevents it);
-  // an implausible or out-of-bounds declared count is the provider's invalid response.
-  if (
-    !usage ||
-    !Number.isSafeInteger(usage.outputTokens) ||
-    usage.outputTokens < 0 ||
-    usage.outputTokens > request.input.maxTokens ||
-    usage.inputTokens + usage.outputTokens > options.model.contextTokens
-  ) {
-    if (options.meter.mode === CONTROL_METERING_MODES.RECOUNTED)
-      return fail(FREE_EXECUTION_CODES.LIMIT);
-    return cannotContinue(
-      new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE),
-      options.meter,
-      request.input.maxTokens,
-      streaming?.delivered(),
-    );
-  }
-  return parseFreeExecutionResponse({
-    ...header,
-    result: { ...preliminary.result, usage },
-  });
 }

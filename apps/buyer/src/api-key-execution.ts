@@ -20,6 +20,7 @@ import type {
   ChatResult,
   FreeChatStreamExecutor,
 } from './free-sse';
+import type { RoutedModel } from './model-routes';
 import { PaidOutcomeError, paidSummary } from './paid-http';
 
 export async function reserveApiKey(
@@ -146,24 +147,31 @@ export function buyerApiKeyExecutors(
   execute: (
     input: FreeExecutionBuildInput,
     signal: AbortSignal,
-    onDelta?: (text: string, requestDigest?: string) => Promise<void>,
+    onDelta?: undefined,
+    model?: RoutedModel,
     permission?: BuyerApiKeyOperation,
   ) => Promise<ChatResult>,
   stream?: FreeChatStreamExecutor,
 ) {
   return {
-    execute: (input: FreeExecutionBuildInput, signal: AbortSignal) =>
+    execute: (
+      input: FreeExecutionBuildInput,
+      signal: AbortSignal,
+      _delta?: undefined,
+      model?: RoutedModel,
+    ) =>
       executeApiKey(keys, keyId, signal, (current, permission) =>
-        execute(input, current, undefined, permission),
+        execute(input, current, undefined, model, permission),
       ),
     stream: stream
       ? (
           input: FreeExecutionBuildInput,
           signal: AbortSignal,
           onDelta: (text: string, requestDigest?: string) => Promise<void>,
+          model?: RoutedModel,
         ) =>
           executeApiKey(keys, keyId, signal, (current, permission) =>
-            stream(input, current, onDelta, permission),
+            stream(input, current, onDelta, model, permission),
           )
       : undefined,
   };

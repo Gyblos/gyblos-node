@@ -164,6 +164,8 @@ export const CONTROL_CODES = {
   SIGNATURE: 'INVALID_CONTROL_SIGNATURE',
   EXPIRED: 'EXPIRED_CONTROL_RECORD',
   CANCELLED: 'CONTROL_CANCELLED',
+  // The buyer asked for tools and this offer's engine does not serve them.
+  TOOLS: 'CONTROL_TOOLS_UNSUPPORTED',
 } as const;
 export type ControlCode = (typeof CONTROL_CODES)[keyof typeof CONTROL_CODES];
 export const CONTROL_DOMAINS = {
@@ -388,3 +390,11 @@ export type ReceiptChannelCode =
 // Payment port catalogs live in their own module; re-exported so every caller keeps one import.
 export * from './payments/constants';
 export * from './paypal/constants';
+
+// Neutral semantic failures, mapped by each execution wire boundary.
+export const INFERENCE_CODES = {
+  INVALID: 'INFERENCE_INVALID',
+  UNSUPPORTED: 'INFERENCE_UNSUPPORTED',
+  LIMIT: 'INFERENCE_LIMIT',
+  INTERNAL: 'INFERENCE_INTERNAL',
+} as const;

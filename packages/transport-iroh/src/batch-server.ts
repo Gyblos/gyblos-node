@@ -4,6 +4,7 @@ import type { Connection } from '@number0/iroh';
 import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import {
   BATCH_CHANNEL,
+  BATCH_METHODS,
   batchChannelDigest,
   BatchChannelError,
   batchChannelResponse,
@@ -19,6 +20,7 @@ import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { batchDeadline, readBatchFrame } from './batch-io';
+import { streamBatchResponse } from './batch-stream-server';
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import type { ControlStream } from './control-io';
 import { handleIrohConnection } from './iroh-connection';
@@ -28,6 +30,7 @@ export interface BatchChannelService {
     request: BatchChannelRequest,
     peer: string,
     signal: AbortSignal,
+    onDelta?: (text: string) => Promise<void>,
   ): Promise<BatchChannelResult>;
 }
 export interface BatchStreamLimits {
@@ -54,6 +57,7 @@ async function respond(
   check: () => void,
   cancel: () => void,
   limits: BatchStreamLimits,
+  admitExecution: () => boolean,
 ) {
   const raw = await batchDeadline(
     readBatchFrame(stream, BATCH_CHANNEL.requestBytes, check),
@@ -62,6 +66,37 @@ async function respond(
   );
   check();
   const request = parseBatchChannelRequest(raw);
+  if (request.method === BATCH_METHODS.EXECUTE) {
+    await streamBatchResponse(
+      request,
+      {
+        async exchange(...args) {
+          check();
+          if (!admitExecution())
+            throw new BatchChannelError(SESSION_CODES.LIMIT);
+          return service.exchange(...args);
+        },
+      },
+      peer,
+      signal,
+      check,
+      (bytes) =>
+        batchDeadline(
+          stream.send.writeAll([...bytes]),
+          limits.egressMs ?? IROH_DEADLINES.egressMs,
+          cancel,
+        ),
+      cancel,
+    );
+    check();
+    await batchDeadline(
+      stream.send.finish(),
+      limits.egressMs ?? IROH_DEADLINES.egressMs,
+      cancel,
+    );
+    check();
+    return;
+  }
   let response: BatchChannelResponse;
   try {
     response = await batchChannelResponse(
@@ -102,6 +137,7 @@ export async function serveBatchChannelStream(
   enter: () => (() => void) | undefined,
   allowed: () => boolean = () => true,
   limits: BatchStreamLimits = {},
+  admitExecution: () => boolean = () => true,
 ): Promise<void> {
   const release = enter();
   if (!release) {
@@ -133,6 +169,7 @@ export async function serveBatchChannelStream(
       check,
       cancel,
       limits,
+      admitExecution,
     );
   });
   try {
@@ -156,7 +193,14 @@ export function handleBatchChannelConnection(
   enter: () => (() => void) | undefined,
   isClosed: () => boolean,
   allowed: () => boolean,
+  admitExecution: () => boolean,
 ) {
+  const controller = new AbortController();
+  const current = AbortSignal.any([signal, controller.signal]);
+  void connection.closed().then(
+    () => controller.abort(),
+    () => controller.abort(),
+  );
   return handleIrohConnection(
     connection,
     (stream) =>
@@ -165,9 +209,11 @@ export function handleBatchChannelConnection(
         service,
         connection.remoteId().toString(),
         () => connection.close(HTTP_OVER_IROH.streamCloseCode, []),
-        signal,
+        current,
         enter,
         allowed,
+        {},
+        admitExecution,
       ),
     isClosed,
     { receiveBytes: BATCH_CHANNEL.requestBytes + CONTROL_LIMITS.prefixBytes },

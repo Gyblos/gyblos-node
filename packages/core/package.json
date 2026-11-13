@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./buyer-key-budget": "./src/buyer-key-budget.ts",
+    "./buyer-conversation": "./src/buyer-conversation.ts",
     "./constants": "./src/constants.ts",
     "./inference-observation": "./src/inference-observation.ts",
     "./metering": "./src/metering.ts",
@@ -14,6 +15,7 @@
     "./engine-failures": "./src/engine-failures.ts",
     "./engine-http": "./src/engine-http.ts",
     "./engine-provider": "./src/engine-provider.ts",
+    "./engine-tools": "./src/engine-tools.ts",
     "./control-admission": "./src/control-admission.ts",
     "./seller-selection": "./src/seller-selection.ts",
     "./pricing-v2": "./src/pricing-v2.ts",

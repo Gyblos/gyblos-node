@@ -10,6 +10,7 @@ import {
 import { createIdentityResolutionRpc } from '@gyblos/identity/resolution-rpc';
 
 import { openBuyerIdentityState } from './identity-state';
+import type { BuyerIdentityAdmission } from './identity-state-admission';
 
 export interface BuyerIdentitySubject {
   nodeId: string;
@@ -25,12 +26,14 @@ export interface BuyerIdentityVerifier {
 export async function openBuyerIdentityVerifier(
   environment: HomeEnvironment,
   rpc: IdentityResolutionRpc | string,
+  admission?: BuyerIdentityAdmission,
 ): Promise<BuyerIdentityVerifier> {
   const source =
     typeof rpc === 'string' ? createIdentityResolutionRpc(rpc) : rpc;
   const state = await openBuyerIdentityState(
     environment,
     IDENTITY_RESOLUTION_SCOPE,
+    admission,
   );
   return {
     async verify(subject, signal) {

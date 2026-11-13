@@ -9,6 +9,7 @@ import {
   controlInteger,
   controlObject,
 } from './control-validation';
+import { INFERENCE_CODES, InferenceError } from './inference';
 import { PAID_EXECUTION_CODES } from './paid/constants';
 import {
   PAYMENT_SESSION,
@@ -34,6 +35,14 @@ export function batchFail(
   throw new BatchChannelError(code);
 }
 export function batchError(error: unknown): BatchChannelError {
+  if (error instanceof InferenceError)
+    return new BatchChannelError(
+      error.code === INFERENCE_CODES.LIMIT
+        ? PAID_EXECUTION_CODES.LIMIT
+        : error.code === INFERENCE_CODES.UNSUPPORTED
+          ? PAID_EXECUTION_CODES.UNSUPPORTED
+          : PAID_EXECUTION_CODES.INTERNAL,
+    );
   if (error instanceof BatchChannelError) return error;
   if (error instanceof ControlError) {
     if (error.code === CONTROL_CODES.LIMIT)

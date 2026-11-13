@@ -31,7 +31,10 @@ export const CONVERSATION_INPUT: FreeExecutionBuildInput = {
   maxTokens: 10,
 };
 
-export async function batchConversation(override?: ChatTokenizer) {
+export async function batchConversation(
+  override?: ChatTokenizer,
+  telemetry?: import('@gyblos/node/batch-seller').SellerBatchSessionOptions['telemetry'],
+) {
   const rig = await sessionRig({
     buyerNodeId: '12'.repeat(32),
     sellerNodeId: '34'.repeat(32),
@@ -45,7 +48,7 @@ export async function batchConversation(override?: ChatTokenizer) {
       return 2 + text.length;
     },
     chat: (messages) => {
-      renderConversation(messages);
+      renderConversation(messages as readonly ChatMessage[]);
       return messages.reduce(
         (sum, message) => sum + 2 + message.content.length,
         0,
@@ -61,6 +64,7 @@ export async function batchConversation(override?: ChatTokenizer) {
     return generate(input);
   };
   const service = createSellerBatchSession({
+    telemetry,
     session: rig.seller(),
     terms: rig.terms,
     offers: () => [offers.live],

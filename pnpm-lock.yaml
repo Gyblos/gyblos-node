@@ -45,6 +45,9 @@ importers:
       '@gyblos/engine-openai':
         specifier: workspace:*
         version: link:packages/engine-openai
+      '@gyblos/inference':
+        specifier: workspace:*
+        version: link:packages/inference
       '@gyblos/identity':
         specifier: workspace:*
         version: link:packages/identity
@@ -160,6 +163,9 @@ importers:
 
   apps/buyer:
     dependencies:
+      '@gyblos/inference':
+        specifier: workspace:*
+        version: link:../../packages/inference
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -526,6 +532,18 @@ importers:
         specifier: 8.6.0
         version: 8.6.0(typescript@5.9.3)
 
+  packages/inference:
+    dependencies:
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/node:
     dependencies:
       '@gyblos/config':
@@ -546,6 +564,9 @@ importers:
       '@gyblos/engine-openai':
         specifier: workspace:*
         version: link:../engine-openai
+      '@gyblos/inference':
+        specifier: workspace:*
+        version: link:../inference
       '@gyblos/identity':
         specifier: workspace:*
         version: link:../identity
