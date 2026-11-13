@@ -95,8 +95,10 @@ export function createBuyerReceiptRuntime(options: {
   store: LocalReceiptStore;
   signer: Signer;
   transport?: ReceiptClientOptions;
+  // Receipts that may be exchanged at once: one per request the buyer runs side by side.
+  slots?: number;
 }) {
-  const work = createReceiptWork(RECEIPT_WORK.buyerMs);
+  const work = createReceiptWork(RECEIPT_WORK.buyerMs, options.slots);
   return {
     exchange(
       remote: EndpointAddr,

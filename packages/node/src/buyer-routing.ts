@@ -27,8 +27,14 @@ import {
   type BuyerQuoteWinner,
 } from './buyer-quote-execution';
 import { createBuyerQueue, type BuyerWaitScope } from './buyer-routing-queue';
-import { createRoutingReferences } from './buyer-routing-reference';
+import {
+  createRoutingReferences,
+  type BuyerRouteScope,
+  type BuyerRouteSelection,
+} from './buyer-routing-reference';
 import { PAID_BUYER_CODES } from './constants';
+
+export type { BuyerRouteScope, BuyerRouteSelection };
 
 export class UnsentSellerBusyError extends Error {
   readonly code = BUYER_ROUTING_CODES.BUSY;
@@ -38,22 +44,19 @@ export class UnsentSellerBusyError extends Error {
     this.name = 'UnsentSellerBusyError';
   }
 }
-export interface BuyerRouteSelection {
-  // Host may ignore only a known busy cooldown while refreshing this exact queued seller.
-  waitingFor?: string;
-  pinnedNodeId?: string;
-  priceCeilings: TokenPricesV2;
-}
-export interface BuyerRouteOptions {
+export interface BuyerRouteOptions<
+  S extends BuyerRouteScope = BuyerRouteScope,
+> {
   policy: BuyerRoutingPolicy;
   now?: () => number;
   pinnedNodeId?: string;
   priceCeilings: TokenPricesV2;
   unresolved(): Promise<boolean>;
-  // Trusted host supplies only a fresh signed reference with independently verified identity/replay state.
+  // Trusted host: a fresh signed reference for only `scope`'s listing (none without one), identity/replay verified.
   reference(
     nodeId: string,
     signal: AbortSignal,
+    scope: S | undefined,
   ): Promise<TokenPricesV2 | undefined>;
 }
 export type BuyerRoutePorts<T> = Omit<
@@ -91,6 +94,7 @@ interface Request<T> extends BuyerRouteSelection {
   ports: BuyerRoutePorts<T>;
   excluded: Set<string>;
   owner: symbol;
+  scope?: BuyerRouteScope;
   wait?: BuyerWaitScope;
   kind?: OfferPricingKind;
 }
@@ -177,7 +181,11 @@ async function select<T>(
           state,
           request,
           pinned,
-          state.references.get(pinned, state.owners.get(pinned)),
+          state.references.get(
+            pinned,
+            state.owners.get(pinned),
+            request.scope?.key,
+          ),
         );
     }
     const checking = request.wait?.signal ?? signal;
@@ -209,7 +217,7 @@ async function select<T>(
           state,
           request,
           error.nodeId,
-          await state.options.reference(error.nodeId, signal),
+          await state.options.reference(error.nodeId, signal, request.scope),
         );
     }
   }
@@ -272,7 +280,7 @@ async function attempt<T>(
   request.wait?.signal.throwIfAborted();
   request.kind = buyerQuoteKind(winner.quote);
   state.owners.set(winner.nodeId, request.owner);
-  state.references.remember(winner, request.owner);
+  state.references.remember(winner, request.owner, request.scope?.key);
   try {
     const current = request.wait?.signal ?? signal;
     const result = await run(winner, current, () => {
@@ -317,11 +325,13 @@ function run<T>(
   state: State,
   ports: BuyerRoutePorts<T>,
   external: AbortSignal,
+  scope?: BuyerRouteScope,
 ) {
   const request: Request<T> = {
     ports,
     excluded: new Set(),
     owner: Symbol(),
+    scope,
     pinnedNodeId: state.options.pinnedNodeId,
     priceCeilings: { ...state.options.priceCeilings },
   };
@@ -361,10 +371,12 @@ function run<T>(
   );
   return pending;
 }
-export function createBuyerRouter(options: BuyerRouteOptions) {
+export function createBuyerRouter<S extends BuyerRouteScope = BuyerRouteScope>(
+  options: BuyerRouteOptions<S>,
+) {
   const owners = new Map<string, symbol>();
   const state: State = {
-    options,
+    options: options as BuyerRouteOptions,
     references: createRoutingReferences(options.now),
     owners,
     queue: createBuyerQueue(owners),
@@ -375,8 +387,8 @@ export function createBuyerRouter(options: BuyerRouteOptions) {
   };
   return {
     activeRequests: () => state.requests.size,
-    execute: <T>(ports: BuyerRoutePorts<T>, signal: AbortSignal) =>
-      run(state, ports, signal),
+    execute: <T>(ports: BuyerRoutePorts<T>, signal: AbortSignal, scope?: S) =>
+      run(state, ports, signal, scope),
     async close() {
       state.lifetime.abort();
       state.queue.cancel(state.lifetime.signal.reason);
