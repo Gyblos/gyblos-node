@@ -19,7 +19,7 @@ import { homedir } from 'node:os';
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { LOCALHOST, PORTS } from '@gyblos/config';
+import { FILE_MODES, LOCALHOST, PORTS } from '@gyblos/config';
 import {
   AGENT_SETUP,
   AGENT_TOOLS,
@@ -129,7 +129,10 @@ export async function writeAgentFile(
     );
   const temporary = `${target}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporary, text, { flag: 'wx' });
+    await writeFile(temporary, text, {
+      flag: 'wx',
+      mode: FILE_MODES.privateFile,
+    });
     if (before !== undefined) await chmod(temporary, (await stat(target)).mode);
     await rename(temporary, target);
   } finally {
