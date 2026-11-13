@@ -56,6 +56,7 @@
     "./seller-transport": "./src/seller-transport.ts",
     "./identity-verifier": "./src/identity-verifier.ts",
     "./identity-state": "./src/identity-state.ts",
+    "./agent-setup": "./src/agent-setup.ts",
     "./receipt-work": "./src/receipt-work.ts",
     "./receipts": "./src/receipts.ts",
     "./telemetry-startup": "./src/telemetry-startup.ts",
