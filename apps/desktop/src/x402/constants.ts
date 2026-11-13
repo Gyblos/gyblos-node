@@ -48,6 +48,9 @@ export const USDC_API_ACTION = {
   COPY_KEY: 'copy-key',
   COPY_URL: 'copy-url',
   COPY_EXAMPLE: 'copy-example',
+  PREVIEW_AGENT: 'preview-agent',
+  COPY_AGENT: 'copy-agent',
+  WRITE_AGENT: 'write-agent',
 } as const;
 export type UsdcApiAction =
   (typeof USDC_API_ACTION)[keyof typeof USDC_API_ACTION];
