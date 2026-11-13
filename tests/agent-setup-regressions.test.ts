@@ -113,3 +113,28 @@ void test('new agent configuration files are private by default', async (t) => {
   const result = await writeAgentFile(AGENT_TOOLS.PI, ENDPOINT, home);
   assert.equal((await promises.stat(result.path)).mode & 0o777, 0o600);
 });
+
+void test('managed marker text inside a TOML string cannot overwrite developer instructions', () => {
+  const existing =
+    "developer_instructions = '''\n" + codexBlock(ENDPOINT) + "\n'''\n";
+  assert.throws(
+    () =>
+      mergedCodexConfig(
+        { ...ENDPOINT, models: [{ id: 'another', maxOutputTokens: 2 }] },
+        existing,
+      ),
+    { code: 'FILE' },
+  );
+});
+
+void test('outside assignments cannot migrate from the old managed profile to a new model', () => {
+  const existing = codexBlock(ENDPOINT) + '\napproval_policy = "never"\n';
+  assert.throws(
+    () =>
+      mergedCodexConfig(
+        { ...ENDPOINT, models: [{ id: 'another', maxOutputTokens: 2 }] },
+        existing,
+      ),
+    { code: 'FILE' },
+  );
+});
