@@ -115,6 +115,14 @@ void test('new agent configuration files are private by default', async (t) => {
 });
 
 void test('managed marker text inside a TOML string cannot overwrite developer instructions', () => {
-  const existing = "developer_instructions = '''\n" + codexBlock(ENDPOINT) + "\n'''\n";
-  assert.throws(() => mergedCodexConfig({ ...ENDPOINT, models: [{ id: 'another', maxOutputTokens: 2 }] }, existing), { code: 'FILE' });
+  const existing =
+    "developer_instructions = '''\n" + codexBlock(ENDPOINT) + "\n'''\n";
+  assert.throws(
+    () =>
+      mergedCodexConfig(
+        { ...ENDPOINT, models: [{ id: 'another', maxOutputTokens: 2 }] },
+        existing,
+      ),
+    { code: 'FILE' },
+  );
 });

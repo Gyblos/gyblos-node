@@ -5,6 +5,7 @@
 // paid endpoint's token is referenced by environment variable name, never written.
 
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 import { parse } from 'smol-toml';
 
@@ -329,11 +330,12 @@ export function mergedCodexConfig(
 ) {
   const block = codexBlock(endpoint);
   const text = existing ?? '';
-  configToml(text);
+  const original = configToml(text);
   const start = text.indexOf(CODEX_MARKS.start);
   const end = text.indexOf(CODEX_MARKS.end);
   let outside = text;
   let merged: string;
+  let prior: Json | undefined;
   if (start >= 0 || end >= 0) {
     const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
     if (
@@ -346,6 +348,7 @@ export function mergedCodexConfig(
     )
       throw new AgentSetupError('FILE');
     managedBlock(text.slice(start, end));
+    prior = configToml(text.slice(start, end));
     outside = text.slice(0, start) + text.slice(end + CODEX_MARKS.end.length);
     merged =
       text.slice(0, start) + block + text.slice(end + CODEX_MARKS.end.length);
@@ -359,6 +362,18 @@ export function mergedCodexConfig(
     )
   )
     throw new AgentSetupError('FILE');
-  configToml(merged);
+  const joined = (managed: Json) => ({
+    ...user,
+    model_providers: {
+      ...object(user.model_providers),
+      ...object(managed.model_providers),
+    },
+    profiles: { ...object(user.profiles), ...object(managed.profiles) },
+  });
+  if (
+    (prior && !isDeepStrictEqual(original, joined(prior))) ||
+    !isDeepStrictEqual(configToml(merged), joined(configToml(block)))
+  )
+    throw new AgentSetupError('FILE');
   return merged;
 }
