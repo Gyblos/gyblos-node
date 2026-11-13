@@ -146,6 +146,13 @@ export async function refreshSnapshots(
             ].some((code) => error.code === code)
           )
             throw error;
+          // A connection to a seller that stopped answering can take the whole transport idle timeout to
+          // close; it closes in the background instead of holding this request.
+          const client = clients.get(seller.nodeId);
+          if (client) {
+            clients.delete(seller.nodeId);
+            void client.close().catch(() => undefined);
+          }
           recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
           failed(SELLER_FAILURE_PHASES.CONNECT, sellerFailureCode(error));
           return undefined;

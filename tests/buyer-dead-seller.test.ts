@@ -86,3 +86,38 @@ void test('a seller cooling down is not contacted again, unless it is pinned', a
   assert.equal(host.attempts.includes(DEAD), true);
   host.arriveLate();
 });
+
+void test('a connection to a seller that stopped answering closes in the background', async (t) => {
+  const run = await selectionFixture();
+  t.after(() => run.wire.close());
+  const healthy = run.config.sellers[0]!;
+  let closing = 0;
+  const stuck: BuyerControlClient = {
+    // The connection is open but the seller never answers, so only the deadline ends the snapshot.
+    getCatalog: (signal?: AbortSignal) =>
+      new Promise((_resolve, reject) =>
+        signal?.addEventListener('abort', () => reject(signal.reason), {
+          once: true,
+        }),
+      ),
+    getPresence: async () => assert.fail('unused'),
+    requestOffer: async () => assert.fail('unused'),
+    // Like a QUIC connection to a dead peer: closing waits for an idle timeout far beyond the test.
+    close: () => {
+      closing++;
+      return new Promise<void>(() => undefined);
+    },
+  };
+  const started = performance.now();
+  const result = await selectBuyerQuote(
+    { ...run.config, sellers: [healthy, { ...healthy, nodeId: DEAD }] },
+    {
+      ...run.dependencies,
+      snapshotMs: 300,
+      connect: async (seller) => (seller.nodeId === DEAD ? stuck : run.client),
+    },
+  );
+  assert.equal(result.ok, true);
+  assert.ok(performance.now() - started < 2000);
+  assert.equal(closing, 1);
+});
