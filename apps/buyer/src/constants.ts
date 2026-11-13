@@ -134,6 +134,12 @@ export const BUYER_DISCOVERY = {
   timeoutMs: 10000,
   maxStateBytes: 1048576,
   maxStateRows: 1024,
+  // Open discovery: new identity lookups per selection, sellers ever admitted per process (so the
+  // identity and discovery state files keep room for configured sellers), and recent refusals kept.
+  openLookups: 16,
+  openSellers: 64,
+  openRefusals: 1024,
+  openRefusalMs: 300_000,
 } as const;
 
 export type BuyerProxyErrorCode =

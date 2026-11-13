@@ -49,59 +49,100 @@ async function rememberEntry(
     { allowOwnerChange },
   );
 }
-// A seller the index lists but this buyer never configured, admitted only under open discovery, only when
-// its NodeId is registered to the catalog's owner, and only while the candidate list has room (the
-// configured sellers come first). It is dialed through the configured relay, never an index address.
+// What open discovery remembers per buyer process, beside the shared discovery state: the sellers it ever
+// admitted (bounded, so the identity and discovery state files never fill with index sellers) and the
+// recent identity refusals (so an index full of unregistered NodeIds costs one lookup each, not one per
+// request).
+interface OpenMemory {
+  admitted: Set<string>;
+  refused: Map<string, number>;
+}
+const OPEN_MEMORY = new WeakMap<object, OpenMemory>();
+function openMemory(state: object) {
+  let memory = OPEN_MEMORY.get(state);
+  if (!memory)
+    OPEN_MEMORY.set(
+      state,
+      (memory = { admitted: new Set(), refused: new Map() }),
+    );
+  return memory;
+}
+
+interface OpenOptions {
+  verifyIdentity?: (
+    seller: StaticControlSeller,
+    signal?: AbortSignal,
+  ) => Promise<boolean>;
+  openRelay?: string;
+  excluded?: ReadonlySet<string>;
+}
+interface OpenRun {
+  discovered: Map<string, StaticControlSeller>;
+  memory: OpenMemory;
+  lookups: number;
+  now: number;
+}
+
+// A seller the index lists but this buyer never configured, admitted only under open discovery (on the
+// free path, which passes the relay), only when its NodeId is registered to the catalog's owner, only
+// while the candidate list has room (the configured sellers come first), never one this request
+// excluded, and within the lookup and process bounds. It is dialed through the configured relay, never an
+// index address.
 async function openSeller(
   entry: DiscoveredSeller,
   config: BuyerSelectionConfig & { discovery: BuyerDiscoveryConfig },
-  options: {
-    verifyIdentity?: (
-      seller: StaticControlSeller,
-      signal?: AbortSignal,
-    ) => Promise<boolean>;
-    openRelay?: string;
-  },
-  discovered: Map<string, StaticControlSeller>,
+  options: OpenOptions,
+  run: OpenRun,
   signal: AbortSignal,
 ): Promise<StaticControlSeller | undefined> {
-  const known = discovered.get(entry.catalog.nodeId);
+  const { nodeId, owner } = entry.catalog;
+  const known = run.discovered.get(nodeId);
   if (known) return known;
+  const key = `${nodeId} ${owner}`;
   if (
     !config.discovery.open ||
     !config.identity ||
     !options.verifyIdentity ||
     !options.openRelay ||
-    config.sellers.length + discovered.size >= BUYER_SELECTION.maxSellers
+    options.excluded?.has(nodeId) ||
+    config.sellers.length + run.discovered.size >= BUYER_SELECTION.maxSellers ||
+    (run.memory.refused.get(key) ?? 0) > run.now ||
+    (!run.memory.admitted.has(nodeId) &&
+      run.memory.admitted.size >= BUYER_DISCOVERY.openSellers) ||
+    run.lookups >= BUYER_DISCOVERY.openLookups
   )
     return undefined;
   const seller: StaticControlSeller = {
-    owner: entry.catalog.owner,
-    nodeId: entry.catalog.nodeId,
+    owner,
+    nodeId,
     relayUrl: options.openRelay,
     directAddresses: [],
   };
-  if (!(await options.verifyIdentity(seller, signal))) return undefined;
-  discovered.set(seller.nodeId, seller);
+  run.lookups++;
+  if (!(await options.verifyIdentity(seller, signal))) {
+    if (run.memory.refused.size >= BUYER_DISCOVERY.openRefusals)
+      run.memory.refused.delete(run.memory.refused.keys().next().value!);
+    run.memory.refused.set(key, run.now + BUYER_DISCOVERY.openRefusalMs);
+    return undefined;
+  }
+  run.memory.admitted.add(nodeId);
+  run.discovered.set(nodeId, seller);
   return seller;
 }
 
+// `openRelay`: the relay a seller found only in the index is dialed through (open discovery), passed by
+// the caller so this module never loads the transport; absent, open discovery adds nobody. `excluded`:
+// NodeIds this request already tried, never brought back from the index.
+export interface DiscoverOptions extends OpenOptions {
+  fetch: DiscoveryFetch;
+  now?: () => number;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
 export async function discoverBuyerSellers(
   config: BuyerSelectionConfig & { discovery: BuyerDiscoveryConfig },
   state: BuyerDiscoveryState,
-  options: {
-    fetch: DiscoveryFetch;
-    now?: () => number;
-    signal?: AbortSignal;
-    timeoutMs?: number;
-    verifyIdentity?: (
-      seller: StaticControlSeller,
-      signal?: AbortSignal,
-    ) => Promise<boolean>;
-    // The relay a seller found only in the index is dialed through (open discovery); the caller's,
-    // so this module never loads the transport.
-    openRelay?: string;
-  },
+  options: DiscoverOptions,
 ): Promise<BuyerSelectionConfig> {
   const now = options.now ?? Date.now;
   const signal = AbortSignal.any([
@@ -122,7 +163,12 @@ export async function discoverBuyerSellers(
   }
   const identities = new Map(accepted.map((seller) => [seller.nodeId, seller]));
   // Sellers known only from the index (open discovery), each with a verified registered identity.
-  const discovered = new Map<string, StaticControlSeller>();
+  const run: OpenRun = {
+    discovered: new Map(),
+    memory: openMemory(state),
+    lookups: 0,
+    now: now(),
+  };
   const cursors = new Set<string>();
   let cursor: string | undefined;
   for (let page = 0; page < config.discovery.maxPages; page++) {
@@ -143,7 +189,7 @@ export async function discoverBuyerSellers(
     for (const entry of result.sellers) {
       const trusted =
         identities.get(entry.catalog.nodeId) ??
-        (await openSeller(entry, config, options, discovered, signal));
+        (await openSeller(entry, config, options, run, signal));
       if (trusted?.owner !== entry.catalog.owner) continue;
       await rememberEntry(
         entry,
@@ -164,7 +210,7 @@ export async function discoverBuyerSellers(
   return eligibleConfig(
     config,
     state,
-    [...accepted, ...discovered.values()],
+    [...accepted, ...run.discovered.values()],
     now(),
   );
 }

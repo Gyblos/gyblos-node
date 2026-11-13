@@ -142,3 +142,39 @@ void test('open discovery adds nobody once the configured sellers fill the candi
     await home.close();
   }
 });
+
+void test('a seller this request excluded is not brought back, and a refused identity is not looked up again soon', async () => {
+  const home = await discoveryHome();
+  const run = await discoveryRun();
+  try {
+    const open = {
+      ...run.config,
+      sellers: [],
+      identity: IDENTITY,
+      discovery: { ...run.config.discovery, open: true as const },
+    };
+    const nodeId = run.entry.catalog.record.nodeId;
+    let lookups = 0;
+    const discover = (excluded: ReadonlySet<string>, ok: boolean) =>
+      discoverBuyerSellers(open, home.state, {
+        fetch: async () => discoveryResponse([run.entry]),
+        now: run.context.now,
+        openRelay: primaryRelayUrl(),
+        excluded,
+        verifyIdentity: async () => {
+          lookups++;
+          return ok;
+        },
+      });
+    // Failover: the request already tried this seller, so the index does not offer it again.
+    assert.deepEqual((await discover(new Set([nodeId]), true)).sellers, []);
+    assert.equal(lookups, 0);
+    // An unregistered NodeId costs one lookup, then is skipped for a while.
+    assert.deepEqual((await discover(new Set(), false)).sellers, []);
+    assert.deepEqual((await discover(new Set(), false)).sellers, []);
+    assert.equal(lookups, 1);
+  } finally {
+    await run.wire.close();
+    await home.close();
+  }
+});

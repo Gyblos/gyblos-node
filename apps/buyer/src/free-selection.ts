@@ -6,10 +6,7 @@ import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
 import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
-import {
-  assertConfiguredRelay,
-  primaryRelayUrl,
-} from '@gyblos/transport-iroh/endpoint';
+import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
 import {
@@ -18,7 +15,6 @@ import {
   FREE_CHAT_DETAILS,
 } from './constants';
 import { connectBuyerControl } from './control';
-import { discoverBuyerSellers } from './discovery';
 import { FreeBuyerError } from './free-chat';
 import {
   FreeSelectionFailure,
@@ -34,6 +30,11 @@ import {
   unsavedStats,
 } from './free-memory';
 import { freeAdmission } from './free-parallel';
+import {
+  routedPolicy,
+  withDiscovered,
+  type SelectionRoute,
+} from './free-route';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
 import { selectBusyAwareBuyerQuote } from './selection-busy';
@@ -221,7 +222,7 @@ async function selectFreeWinner(
         priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
         ...(tools ? { tools: true as const } : {}),
       },
-      previousSeller ? { previousSeller } : undefined,
+      { open: true, ...(previousSeller ? { previousSeller } : {}) },
     );
   } catch (error) {
     if (refusedTools && error instanceof FreeSelectionFailure && !error.retryAt)
@@ -234,29 +235,6 @@ async function selectFreeWinner(
   }
 }
 // One verified winner among the configured or discovered sellers not excluded, quoted for `request`.
-// The policy one selection runs on: this request, the sellers not excluded, and the route's pin and
-// previous seller.
-function routedPolicy(
-  policy: BuyerSelectionConfig,
-  excluded: ReadonlySet<string>,
-  request: BuyerSelectionConfig['request'],
-  route?: SelectionRoute,
-) {
-  return {
-    ...policy,
-    ...(route && 'pinnedNodeId' in route
-      ? { pinnedNodeId: route.pinnedNodeId }
-      : {}),
-    ...(route?.previousSeller ? { previousSeller: route.previousSeller } : {}),
-    request,
-    sellers: policy.sellers.filter((seller) => !excluded.has(seller.nodeId)),
-  };
-}
-interface SelectionRoute {
-  pinnedNodeId?: string;
-  waitingFor?: string;
-  previousSeller?: string;
-}
 export async function selectWinner(
   prepared: PreparedSelection,
   options: FreeSelectionOptions,
@@ -272,20 +250,12 @@ export async function selectWinner(
       verifyBuyerIdentity(prepared.identity, seller, querySignal),
   );
   const base = routedPolicy(policy, excluded, request, route);
-  const config =
-    base.discovery && prepared.discovery
-      ? await discoverBuyerSellers(
-          { ...base, discovery: base.discovery },
-          prepared.discovery,
-          {
-            fetch: options.fetch ?? globalThis.fetch,
-            now,
-            signal,
-            verifyIdentity,
-            ...(base.discovery.open ? { openRelay: primaryRelayUrl() } : {}),
-          },
-        )
-      : base;
+  const config = await withDiscovered(
+    prepared,
+    base,
+    { fetch: options.fetch ?? globalThis.fetch, now, signal, verifyIdentity },
+    route?.open ? excluded : undefined,
+  );
   const unsaved = unsavedStats(prepared);
   const before = new Map([...prepared.stats.rows, ...unsaved]);
   const stats = new Map(before);
