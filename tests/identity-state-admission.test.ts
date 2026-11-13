@@ -55,39 +55,53 @@ async function fixture(t: TestContext, count = 0) {
     );
   return { environment, file };
 }
-void test('denied index identities cannot fill or poison a nearly full store', async (t) => {
+void test('denied index identities cannot consume configured history reservations or poison the store', async (t) => {
   const f = await fixture(t, IDENTITY_STATE.maxRows - 1);
-  const policy = { configuredNodeIds: [id(0)], maxUnconfiguredNodes: 64 };
+  const policy = { configuredNodeIds: [id(2000)] };
   const store = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const before = await readFile(f.file, 'utf8');
-  for (const n of [2000, 2001]) {
+  for (const n of [2001, 2002]) {
     const decision = await store.evaluate(input(n));
     assert.equal(!decision.ok && decision.code, IDENTITY_POLICY_CODES.LIMIT);
   }
   assert.equal(await readFile(f.file, 'utf8'), before);
-  assert.equal((await store.evaluate({ ...input(0), owner: OWNER })).ok, true);
+  assert.equal(
+    (await store.evaluate({ ...input(2000), owner: OWNER })).ok,
+    true,
+  );
+  assert.equal(
+    (await store.evaluate({ ...input(0, 2n), owner: OWNER })).ok,
+    true,
+  );
 });
-void test('denial floors count toward the durable budget across restart; known owner updates still work', async (t) => {
+void test('64 owner-mismatch floors do not consume active discovery capacity, including after restart', async (t) => {
   const f = await fixture(t, 64);
-  const policy = { configuredNodeIds: [id(2000)], maxUnconfiguredNodes: 64 };
+  const policy = { configuredNodeIds: [id(2000)] };
   const store = await openBuyerIdentityState(f.environment, SCOPE, policy);
-  assert.equal((await store.evaluate(input(0, 2n))).ok, false);
+  for (let n = 0; n < 64; n++) {
+    const denied = await store.evaluate(input(n, 2n));
+    assert.equal(
+      !denied.ok && denied.code,
+      IDENTITY_POLICY_CODES.OWNER_MISMATCH,
+    );
+  }
   const restarted = await openBuyerIdentityState(f.environment, SCOPE, policy);
-  const refused = await restarted.evaluate(input(64));
-  assert.equal(!refused.ok && refused.code, IDENTITY_POLICY_CODES.LIMIT);
+  assert.equal(
+    (await restarted.evaluate({ ...input(64), owner: OWNER })).ok,
+    true,
+  );
   assert.equal(
     (await restarted.evaluate({ ...input(2000), owner: OWNER })).ok,
     true,
   );
+  const stale = await restarted.evaluate({ ...input(0), owner: OWNER });
+  assert.equal(!stale.ok && stale.code, IDENTITY_POLICY_CODES.STALE);
   const updated = await restarted.evaluate({ ...input(0, 3n), owner: OWNER });
   assert.equal(updated.ok, true);
 });
 void test('missing configured identities retain space at the global row bound', async (t) => {
   const f = await fixture(t, IDENTITY_STATE.maxRows - 1);
-  const policy = {
-    configuredNodeIds: [id(2000)],
-    maxUnconfiguredNodes: IDENTITY_STATE.maxRows,
-  };
+  const policy = { configuredNodeIds: [id(2000)] };
   const store = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const refused = await store.evaluate(input(3000));
   assert.equal(!refused.ok && refused.code, IDENTITY_POLICY_CODES.LIMIT);
@@ -96,18 +110,19 @@ void test('missing configured identities retain space at the global row bound', 
     true,
   );
 });
-void test('two store handles cannot claim the same last unconfigured slot', async (t) => {
-  const f = await fixture(t);
-  const policy = { configuredNodeIds: [], maxUnconfiguredNodes: 1 };
+void test('two store handles cannot claim the same last global history slot', async (t) => {
+  const f = await fixture(t, IDENTITY_STATE.maxRows - 1);
+  const policy = {
+    configuredNodeIds: [],
+  };
   const a = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const b = await openBuyerIdentityState(f.environment, SCOPE, policy);
-  // The existing exclusive store lock rejects contention rather than waiting or deleting a foreign lock.
   const results = await Promise.allSettled([
-    a.evaluate(input(1)),
-    b.evaluate(input(2)),
+    a.evaluate(input(2000)),
+    b.evaluate(input(2001)),
   ]);
   const saved = JSON.parse(await readFile(f.file, 'utf8'));
-  assert.equal(saved.rows.length, 1);
+  assert.equal(saved.rows.length, IDENTITY_STATE.maxRows);
   assert.equal(
     results.filter(
       (r) =>
@@ -118,27 +133,22 @@ void test('two store handles cannot claim the same last unconfigured slot', asyn
     1,
   );
   const reopened = await openBuyerIdentityState(f.environment, SCOPE, policy);
-  const refused = await reopened.evaluate(input(3));
+  const refused = await reopened.evaluate(input(2002));
   assert.equal(!refused.ok && refused.code, IDENTITY_POLICY_CODES.LIMIT);
 });
 void test('a capacity refusal remembers observed floors and genuine rollback remains fatal', async (t) => {
-  const f = await fixture(t);
-  const policy = { configuredNodeIds: [], maxUnconfiguredNodes: 1 };
+  const f = await fixture(t, IDENTITY_STATE.maxRows);
+  const policy = {
+    configuredNodeIds: [],
+  };
+  const before = await readFile(f.file, 'utf8');
   const a = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const b = await openBuyerIdentityState(f.environment, SCOPE, policy);
-  await a.evaluate(input(1));
-  const refused = await b.evaluate(input(2));
+  await a.evaluate(input(0, 2n));
+  const refused = await b.evaluate(input(2000));
   assert.equal(!refused.ok && refused.code, IDENTITY_POLICY_CODES.LIMIT);
-  await writeFile(
-    f.file,
-    canonicalJson({
-      schemaVersion: IDENTITY_STATE.schemaVersion,
-      scope: SCOPE,
-      rows: [],
-    }),
-    { mode: 0o600 },
-  );
-  await assert.rejects(b.evaluate(input(3)), {
+  await writeFile(f.file, before, { mode: 0o600 });
+  await assert.rejects(b.evaluate(input(0)), {
     code: NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE,
   });
   await assert.rejects(b.evaluate(input(1)), {

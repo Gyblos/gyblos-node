@@ -9,7 +9,7 @@ import {
   type BuyerIdentityVerifier,
 } from '@gyblos/node/identity-verifier';
 
-import { BUYER_DISCOVERY, BUYER_SELECTION_CODES } from './constants';
+import { BUYER_SELECTION_CODES } from './constants';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -29,7 +29,6 @@ export async function prepareBuyerIdentity(
     config.discovery?.open
       ? {
           configuredNodeIds: config.sellers.map((seller) => seller.nodeId),
-          maxUnconfiguredNodes: BUYER_DISCOVERY.openSellers,
         }
       : undefined,
   );

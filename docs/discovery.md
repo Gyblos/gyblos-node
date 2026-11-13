@@ -160,11 +160,24 @@ and the candidate list stays within 16. Their stats live in memory only, so
 `buyer:free` uses these sellers (`buyer`, `buyer:chat`, paid and session
 execution keep their configured list), and never one the request already tried.
 Each selection makes at most 16 new identity lookups; an identity the registry
-refused is not looked up again for five minutes; and durable identity history
-admits at most 64 unconfigured NodeIds across restarts, including owner-mismatch
-and revocation floors. Space is reserved for the original configured IDs. A
-capacity refusal preserves existing trust history without poisoning checks of
-known identities; storage corruption and rollback still fail closed.
+refused is not looked up again for five minutes. The separate capacity limit is
+64 **live unconfigured candidates**, counted under the discovery store lock from
+signed catalog/presence expiry and withdrawal/conflict state. Expiry, withdrawal
+or conflict frees a slot without deleting any replay floor. Registry denials
+occupy no live slot, and a temporary capacity refusal is not cached as a
+registry denial. The same candidate can be reconsidered as soon as capacity is
+available, including after restart.
+
+Configured IDs are captured from the original startup configuration and do not
+consume this live-candidate budget. If an older file or changed configuration
+already has more than 64 live unconfigured rows, eligibility is
+deterministically limited by NodeId until rows expire; the history is retained.
+New activations wait while the live budget is full; already eligible renewals
+remain possible. Identity and discovery histories retain their existing
+independent limits of 1024 rows, with room reserved for missing configured IDs.
+Reaching a history limit refuses new identities without poisoning known ones;
+there is no automatic history deletion. Storage corruption and rollback still
+fail closed.
 
 ## Seller duties
 
