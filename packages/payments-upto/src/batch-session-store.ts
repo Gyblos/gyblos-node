@@ -55,7 +55,13 @@ export async function openBatchStore(
           ),
         );
         current = next;
-      } catch {
+      } catch (error) {
+        // A full file queue refuses before I/O; it is not an uncertain publication.
+        if (
+          error instanceof PaymentSessionError &&
+          error.code === SESSION_CODES.BUSY
+        )
+          throw error;
         poisoned = true;
         sessionFail(SESSION_CODES.UNAVAILABLE);
       }
