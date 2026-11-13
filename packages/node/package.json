@@ -79,7 +79,9 @@
     "./batch-seller": "./src/batch-seller.ts",
     "./buyer-session-pool": "./src/buyer-session-pool.ts",
     "./buyer-runtime": "./src/buyer-runtime.ts",
-    "./buyer-routing": "./src/buyer-routing.ts"
+    "./buyer-routing": "./src/buyer-routing.ts",
+    "./agent-setup-host": "./src/agent-setup-host.ts",
+    "./agent-setup-constants": "./src/agent-setup-constants.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

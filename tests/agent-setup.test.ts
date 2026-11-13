@@ -15,7 +15,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { agentText, writeAgentFile } from '@gyblos/buyer/agent-cli';
 import {
   AGENT_TOOLS,
   agentFilePath,
@@ -28,6 +27,7 @@ import {
   piProvider,
   type AgentEndpoint,
 } from '@gyblos/node/agent-setup';
+import { agentText, writeAgentFile } from '@gyblos/node/agent-setup-host';
 
 const ENDPOINT: AgentEndpoint = {
   origin: 'http://127.0.0.1:4031',
