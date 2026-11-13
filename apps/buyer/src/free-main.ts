@@ -50,6 +50,8 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
     'paid mode is devnet only: role.json rpcUrl must serve devnet, and request.network and asset must match the role',
   [FREE_BUYER_STARTUP.PAID_MODEL]:
     'paid mode recounts with the pinned public tokenizer; request.selection.modelId must be qwen3-0.6b',
+  [FREE_BUYER_STARTUP.PAID_MODELS]:
+    'this explicit paid entry serves only request.selection; remove models or use the automatic buyer',
   [FREE_BUYER_STARTUP.PAID_KEY]:
     'the buyer wallet key is missing, unreadable or does not match role.json',
   [FREE_BUYER_STARTUP.TOKENIZER]:

@@ -51,7 +51,8 @@
     "./identity": "./src/identity.ts",
     "./init": "./src/init.ts",
     "./selection-busy": "./src/selection-busy.ts",
-    "./session-routing": "./src/session-routing.ts"
+    "./session-routing": "./src/session-routing.ts",
+    "./quote-startup": "./src/quote-startup.ts"
   },
   "dependencies": {
     "@gyblos/inference": "workspace:*",

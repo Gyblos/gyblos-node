@@ -1077,7 +1077,8 @@ beside it), `SELECTION_MAX_TOKENS_TOO_HIGH`, `SELECTION_REASONING_UNSUPPORTED`,
 The endpoint speaks two chat formats over the same execution, so OpenAI- and
 Anthropic-compatible clients and agents can point at it: set the client's base
 URL to `http://127.0.0.1:4031/v1` (OpenAI) or `http://127.0.0.1:4031`
-(Anthropic). `GET /v1/models` lists the one configured model.
+(Anthropic). `GET /v1/models` lists the models in `models`, or the one
+`request.selection` model when there is no list.
 
 OpenAI format, `POST /v1/chat/completions`:
 
@@ -1472,10 +1473,13 @@ start it again. The free buyer needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
 network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,
-`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
-`BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
-is not a private 0600 regular file with one name, owned by you and holding a
-token; it is never repaired, since its token may already have been read).
+`BUYER_PAID_MODELS_UNSUPPORTED` (the older explicit paid entry,
+`startPaidBuyer`, serves only `request.selection` and refuses a `models` list;
+the automatic buyer serves the list), `BUYER_WALLET_KEY_INVALID`,
+`BUYER_TOKENIZER_UNAVAILABLE`, `BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and
+`BUYER_API_TOKEN_INVALID` (`api-token` is not a private 0600 regular file with
+one name, owned by you and holding a token; it is never repaired, since its
+token may already have been read).
 
 ## Private free-inference receipts
 
