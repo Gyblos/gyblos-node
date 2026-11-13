@@ -38,6 +38,7 @@ void test('agent access starts once only after a sandbox session is active', asy
   phase = 'active';
   const pending = [access.connect(), access.connect()];
   const [first, second] = await Promise.all(pending);
+  assert.ok(first && second);
   assert.equal(opened, 1);
   assert.equal(first.url, endpoint.url);
   assert.equal(Object.hasOwn(second, 'key'), false);
