@@ -25,8 +25,13 @@ import {
   IDENTITY_TRUST_SOURCES,
 } from '@gyblos/core/identity-policy';
 import { IDENTITY_RPC_LIMITS } from '@gyblos/identity/constants';
-import { readRegistryIdentity } from '@gyblos/identity/resolution';
+import {
+  IDENTITY_RESOLUTION_SCOPE,
+  readRegistryIdentity,
+} from '@gyblos/identity/resolution';
+import { IDENTITY_STATE } from '@gyblos/node/constants';
 import { openBuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
+import { canonicalJson } from '@gyblos/protocol';
 
 import {
   discoveryHome,
@@ -236,6 +241,52 @@ void test('oversized RPC cannot become missing identity or erase a persisted buy
     assert.equal(result.state?.revoked, false);
     assert.equal(result.state?.binding.sequence, 9007199254740993n);
     assert.equal(await readFile(path, 'utf8'), before);
+  } finally {
+    await source.close();
+  }
+});
+
+void test('open discovery durable admission is supplied by buyer startup and survives restart', async () => {
+  const source = await fixture();
+  try {
+    const configured = {
+      ...source.config.sellers[0]!,
+      nodeId: '0'.repeat(64),
+      manualTrust: true,
+    };
+    const config = {
+      ...source.config,
+      sellers: [configured],
+      discovery: { ...source.config.discovery, open: true as const },
+    };
+    await prepareBuyerIdentity(source.environment, config);
+    const path = join(
+      homeLayout(source.environment).roles.buyer,
+      ROLE_FILES.identityState,
+    );
+    const rows = Array.from({ length: 65 }, (_, n) => ({
+      binding: {
+        nodeId: n.toString(16).padStart(64, '0'),
+        owner: source.run.catalog.owner,
+        asset: source.asset,
+        sequence: '1',
+      },
+      revoked: false,
+    }));
+    const bytes = JSON.stringify({
+      schemaVersion: IDENTITY_STATE.schemaVersion,
+      scope: IDENTITY_RESOLUTION_SCOPE,
+      rows,
+    });
+    // Canonical metadata is synthetic, and no payment or external RPC is possible in this fixture.
+    await writeFile(path, canonicalJson(JSON.parse(bytes)), { mode: 0o600 });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const verifier = await prepareBuyerIdentity(source.environment, config);
+      assert.ok(verifier);
+      const result = await verifier.verify(source.config.sellers[0]!);
+      assert.equal(!result.ok && result.code, IDENTITY_POLICY_CODES.LIMIT);
+      assert.equal((await verifier.verify(configured)).ok, true);
+    }
   } finally {
     await source.close();
   }

@@ -134,8 +134,7 @@ export const BUYER_DISCOVERY = {
   timeoutMs: 10000,
   maxStateBytes: 1048576,
   maxStateRows: 1024,
-  // Open discovery: new identity lookups per selection, sellers ever admitted per process (so the
-  // identity and discovery state files keep room for configured sellers), and recent refusals kept.
+  // Open discovery: lookup work per selection, durable unconfigured identity history, and cached refusals.
   openLookups: 16,
   openSellers: 64,
   openRefusals: 1024,
