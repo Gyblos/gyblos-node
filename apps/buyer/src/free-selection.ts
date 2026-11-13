@@ -15,7 +15,6 @@ import {
   FREE_CHAT_DETAILS,
 } from './constants';
 import { connectBuyerControl } from './control';
-import { discoverBuyerSellers } from './discovery';
 import { FreeBuyerError } from './free-chat';
 import {
   createConversationKey,
@@ -23,8 +22,19 @@ import {
   type FreeBuyerDependencies,
   type FreeWinner,
 } from './free-execution';
-import { recordFault, sellerFault, stickySellers } from './free-memory';
+import {
+  recordFault,
+  sellerFault,
+  statsFor,
+  stickySellers,
+  unsavedStats,
+} from './free-memory';
 import { freeAdmission } from './free-parallel';
+import {
+  routedPolicy,
+  withDiscovered,
+  type SelectionRoute,
+} from './free-route';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
 import { selectBusyAwareBuyerQuote } from './selection-busy';
@@ -45,11 +55,7 @@ export function freeBuyerDependencies(
   const sticky = stickySellers(BUYER_SELECTION.stickyConversations);
   const now = options.now ?? Date.now;
   const policy = prepared.config;
-  if (
-    policy.request.reasoning !== REASONING_LEVELS.OFF ||
-    policy.request.lowestReasoning !== null
-  )
-    throw new FreeBuyerError(FREE_BUYER_CODES.CONFIG);
+  requireReasoningOff(policy);
   const sellers = new Map(
     policy.sellers.map((seller) => [seller.nodeId, seller]),
   );
@@ -60,18 +66,11 @@ export function freeBuyerDependencies(
 
   return {
     conversationKey: createConversationKey(),
-    telemetry: options.telemetry
-      ? {
-          sink: options.telemetry,
-          buyerNodeId: options.endpoint.id().toString(),
-          selection: policy.request.selection,
-          now,
-        }
-      : undefined,
+    telemetry: freeTelemetry(options, policy, now),
     receiptNow: now,
     receipt: options.receipts
       ? async (winner, evidence, signal) => {
-          const seller = sellers.get(winner.nodeId);
+          const seller = winner.seller ?? sellers.get(winner.nodeId);
           if (seller)
             options.receipts!.exchange(address(seller), evidence, signal);
         }
@@ -83,7 +82,7 @@ export function freeBuyerDependencies(
         selectSticky(prepared, options, sticky, skip, signal, needs),
       ),
     async execute(winner, request, signal, onDelta, beforeExecute) {
-      const seller = sellers.get(winner.nodeId);
+      const seller = winner.seller ?? sellers.get(winner.nodeId);
       if (
         !seller ||
         !(await permits(winner)) ||
@@ -110,7 +109,11 @@ export function freeBuyerDependencies(
       } catch (error) {
         // The seller broke the execution (not this buyer's deadline or the client leaving): it counts.
         if (sellerFault(error) && !signal.aborted)
-          await recordFault(prepared.stats, sticky, winner.nodeId);
+          await recordFault(
+            statsFor(prepared, sellers, winner),
+            sticky,
+            winner.nodeId,
+          );
         throw error;
       } finally {
         await client.settled();
@@ -118,6 +121,28 @@ export function freeBuyerDependencies(
     },
   };
 }
+
+// The free engine serves reasoning off only.
+function requireReasoningOff(policy: BuyerSelectionConfig) {
+  if (
+    policy.request.reasoning !== REASONING_LEVELS.OFF ||
+    policy.request.lowestReasoning !== null
+  )
+    throw new FreeBuyerError(FREE_BUYER_CODES.CONFIG);
+}
+const freeTelemetry = (
+  options: FreeSelectionOptions,
+  policy: BuyerSelectionConfig,
+  now: () => number,
+) =>
+  options.telemetry
+    ? {
+        sink: options.telemetry,
+        buyerNodeId: options.endpoint.id().toString(),
+        selection: policy.request.selection,
+        now,
+      }
+    : undefined;
 
 export { sellerFault, stickySellers } from './free-memory';
 export type PreparedSelection = NonNullable<
@@ -199,7 +224,7 @@ async function selectFreeWinner(
         priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
         ...(tools ? { tools: true as const } : {}),
       },
-      previousSeller ? { previousSeller } : undefined,
+      { open: true, ...(previousSeller ? { previousSeller } : {}) },
     );
   } catch (error) {
     if (refusedTools && error instanceof FreeSelectionFailure && !error.retryAt)
@@ -212,29 +237,6 @@ async function selectFreeWinner(
   }
 }
 // One verified winner among the configured or discovered sellers not excluded, quoted for `request`.
-// The policy one selection runs on: this request, the sellers not excluded, and the route's pin and
-// previous seller.
-function routedPolicy(
-  policy: BuyerSelectionConfig,
-  excluded: ReadonlySet<string>,
-  request: BuyerSelectionConfig['request'],
-  route?: SelectionRoute,
-) {
-  return {
-    ...policy,
-    ...(route && 'pinnedNodeId' in route
-      ? { pinnedNodeId: route.pinnedNodeId }
-      : {}),
-    ...(route?.previousSeller ? { previousSeller: route.previousSeller } : {}),
-    request,
-    sellers: policy.sellers.filter((seller) => !excluded.has(seller.nodeId)),
-  };
-}
-interface SelectionRoute {
-  pinnedNodeId?: string;
-  waitingFor?: string;
-  previousSeller?: string;
-}
 export async function selectWinner(
   prepared: PreparedSelection,
   options: FreeSelectionOptions,
@@ -250,20 +252,14 @@ export async function selectWinner(
     querySignal?: AbortSignal,
   ) => verifyBuyerIdentity(prepared.identity, seller, querySignal);
   const base = routedPolicy(policy, excluded, request, route);
-  const config =
-    base.discovery && prepared.discovery
-      ? await discoverBuyerSellers(
-          { ...base, discovery: base.discovery },
-          prepared.discovery,
-          {
-            fetch: options.fetch ?? globalThis.fetch,
-            now,
-            signal,
-            verifyIdentity,
-          },
-        )
-      : base;
-  const before = new Map(prepared.stats.rows);
+  const config = await withDiscovered(
+    prepared,
+    base,
+    { fetch: options.fetch ?? globalThis.fetch, now, signal, verifyIdentity },
+    route?.open ? excluded : undefined,
+  );
+  const unsaved = unsavedStats(prepared);
+  const before = new Map([...prepared.stats.rows, ...unsaved]);
   const stats = new Map(before);
   if (route?.waitingFor && route.waitingFor === route.pinnedNodeId) {
     const prior = stats.get(route.waitingFor);
@@ -291,16 +287,26 @@ export async function selectWinner(
   signal.throwIfAborted();
   // Only the rows this selection changed: an execution or another selection may have recorded others
   // meanwhile, and a whole rewrite would erase them.
-  mergeSelectionStats(prepared.stats.rows, before, stats);
+  const configured = new Set(policy.sellers.map((seller) => seller.nodeId));
+  const live = new Map([...prepared.stats.rows, ...unsaved]);
+  mergeSelectionStats(live, before, stats);
+  for (const [nodeId, row] of live)
+    (configured.has(nodeId) ? prepared.stats.rows : unsaved).set(nodeId, row);
   await prepared.stats.save();
   if (!result.ok)
     throw new FreeSelectionFailure(
       result,
       coolingUntil(config.sellers, stats, now()),
     );
+  const found = configured.has(result.winner.candidate.nodeId)
+    ? undefined
+    : config.sellers.find(
+        (seller) => seller.nodeId === result.winner.candidate.nodeId,
+      );
   const winner = {
     nodeId: result.winner.candidate.nodeId,
     quote: result.winner.quote,
+    ...(found ? { seller: found } : {}),
   };
   if (!(await permitsWinner(prepared, winner, now())))
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
