@@ -5,8 +5,12 @@ import { syncBuiltinESMExports } from 'node:module';
 import { test } from 'node:test';
 
 import { FILE_MODES } from '@gyblos/config';
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import {
+  PaymentSessionError,
+  SESSION_CODES,
+} from '@gyblos/protocol/payment-session';
 
 import { batchDeferred } from './support/batch-deferred';
 import { sessionRig } from './support/batch-session';
@@ -99,4 +103,106 @@ void test('session inspection still refuses a journal whose private mode is chan
   await assert.rejects(inspectBatchSession(rig.buyerOptions.paths), {
     code: SESSION_CODES.UNAVAILABLE,
   });
+});
+
+void test('read admission pressure does not poison a journal when no publication was attempted', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  const entered = batchDeferred<void>();
+  const release = batchDeferred<void>();
+  const nativeOpen = filesystem.open;
+  const nativeRename = filesystem.rename;
+  let held = false;
+  let publications = 0;
+  t.mock.method(
+    filesystem,
+    'open',
+    async (...args: Parameters<typeof filesystem.open>) => {
+      const file = await nativeOpen(...args);
+      if (!held && args[0] === rig.buyerOptions.paths.state) {
+        held = true;
+        entered.resolve();
+        await release.promise;
+      }
+      return file;
+    },
+  );
+  t.mock.method(filesystem, 'rename', (...args: Parameters<typeof rename>) => {
+    if (args[1] === rig.buyerOptions.paths.state) publications++;
+    return nativeRename(...args);
+  });
+  syncBuiltinESMExports();
+  t.after(() => {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
+  });
+  t.after(() => release.resolve());
+  const first = inspectBatchSession(rig.buyerOptions.paths);
+  await within(entered.promise);
+  const queued = Array.from(
+    { length: BATCH_SESSION_DEFAULTS.maxPendingOperations - 1 },
+    () => inspectBatchSession(rig.buyerOptions.paths),
+  );
+  const readings = Promise.all([first, ...queued]);
+  let refused: unknown;
+  try {
+    try {
+      await rig.buyer.begin(rig.request(1));
+    } catch (error) {
+      refused = error;
+    }
+    assert.ok(refused instanceof PaymentSessionError);
+    assert.equal(publications, 0);
+  } finally {
+    release.resolve();
+    await within(readings);
+  }
+  assert.equal(
+    (await inspectBatchSession(rig.buyerOptions.paths))?.snapshot
+      .reservedAtomic,
+    '0',
+  );
+  await assert.doesNotReject(rig.buyer.begin(rig.request(2)));
+  assert.equal(refused.code, SESSION_CODES.BUSY);
+  assert.equal(
+    (await inspectBatchSession(rig.buyerOptions.paths))?.snapshot
+      .reservedAtomic,
+    '200',
+  );
+  assert.deepEqual(rig.calls, ['deposit']);
+});
+
+void test('an actual publication failure still poisons the writer and preserves the old journal', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  const nativeRename = filesystem.rename;
+  let attempts = 0;
+  t.mock.method(filesystem, 'rename', (...args: Parameters<typeof rename>) => {
+    if (args[1] === rig.buyerOptions.paths.state) {
+      attempts++;
+      if (attempts === 1)
+        return Promise.reject(new Error('Synthetic publication failure'));
+    }
+    return nativeRename(...args);
+  });
+  syncBuiltinESMExports();
+  t.after(() => {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
+  });
+  await assert.rejects(rig.buyer.begin(rig.request(1)), {
+    code: SESSION_CODES.UNAVAILABLE,
+  });
+  await assert.rejects(rig.buyer.begin(rig.request(2)), {
+    code: SESSION_CODES.UNAVAILABLE,
+  });
+  assert.equal(attempts, 1);
+  assert.equal(
+    (await inspectBatchSession(rig.buyerOptions.paths))?.snapshot
+      .reservedAtomic,
+    '0',
+  );
+  assert.deepEqual(rig.calls, ['deposit']);
 });
