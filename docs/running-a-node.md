@@ -1239,8 +1239,8 @@ each skipping the sellers already serving this buyer. When every candidate is
 busy with this buyer's other request the answer is 429 (the seller is not cooled
 down), and a third request at once gets 429 too. Paid and session modes keep
 their own admission. The buyer checks registered identity again after quoting,
-before admitting the winner, even if discovery or catalog checks succeeded.
-No identity decision is reused for final admission.
+before admitting the winner, even if discovery or catalog checks succeeded. No
+identity decision is reused for final admission.
 
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
 413 for an oversized body, 429 when the endpoint is already running as many
