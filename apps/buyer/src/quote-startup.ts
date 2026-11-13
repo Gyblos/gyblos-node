@@ -20,6 +20,7 @@ import { selectWinner } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
 import { buyerUnserved } from './free-telemetry';
+import { routedRequest } from './model-routes';
 import { classifyPaidError, PaidOutcomeError, paidSummary } from './paid-http';
 import { paidRecords } from './paid-records';
 import { paidBuyerDependencies } from './paid-selection';
@@ -171,7 +172,7 @@ function quoteExecutor(
   paid: ReturnType<typeof lazyPaid>,
   buyer: string,
 ): Runtime['execute'] {
-  return async (input, signal, onDelta) => {
+  return async (input, signal, onDelta, model) => {
     const routed = await executeBuyerQuote<ChatResult>(
       {
         enter: state.enter,
@@ -188,12 +189,16 @@ function quoteExecutor(
             excluded,
             selectionSignal,
             {
-              ...context.prepared.config.request,
+              ...routedRequest(context.prepared.config.request, model),
               ...(inferenceNeedsTools(input) ? { tools: true } : {}),
             },
           ).catch((error) => {
             if (!selectionSignal.aborted)
-              buyerUnserved(context.dependencies, Boolean(onDelta));
+              buyerUnserved(
+                context.dependencies,
+                Boolean(onDelta),
+                model?.selection,
+              );
             throw error;
           }),
         free: (winner, executionSignal) =>

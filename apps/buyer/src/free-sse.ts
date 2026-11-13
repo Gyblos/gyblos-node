@@ -31,6 +31,7 @@ import {
   type PaidBuyerCode,
 } from './constants';
 import { FreeBuyerError } from './free-chat';
+import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
 
 // What a paid request cost, as the buyer counted it and as the seller claimed; amounts are atomic
@@ -67,10 +68,12 @@ export type ChatErrorCode =
 export const paymentFields = (payment: ChatPayment | undefined) =>
   payment ? { [PAID_BUYER.paymentField]: payment } : {};
 
+// `model`: the routed model a request named, when the endpoint serves several.
 export type FreeChatStreamExecutor = (
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
   onDelta: (text: string, requestDigest?: string) => Promise<void>,
+  model?: RoutedModel,
 ) => Promise<ChatResult>;
 function active(response: ServerResponse, signal: AbortSignal) {
   if (signal.aborted || response.destroyed || response.writableEnded)
@@ -124,6 +127,7 @@ export async function executeFreeSse(
   signal: AbortSignal,
   response: ServerResponse,
   format: ChatStreamFormat,
+  model?: RoutedModel,
 ) {
   let text = '';
   let initial = true;
@@ -154,6 +158,7 @@ export async function executeFreeSse(
       );
       initial = false;
     },
+    model,
   );
   active(response, signal);
   if (text !== result.text) throw new FreeBuyerError(FREE_BUYER_CODES.INTERNAL);

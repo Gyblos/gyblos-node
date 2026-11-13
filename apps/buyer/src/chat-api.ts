@@ -1,8 +1,8 @@
-// The two chat formats the local endpoint speaks over one execution: OpenAI chat completions and Anthropic
-// messages. Each knows how to read a request, spell a complete answer, a stream and an error.
+// The three chat formats the local endpoint speaks over one execution: OpenAI chat completions, Anthropic
+// messages and OpenAI responses. Each knows how to read a request, spell a complete answer, a stream and an error.
 import { randomUUID } from 'node:crypto';
 
-import { ROUTES, UNITS } from '@gyblos/config';
+import { HTTP_STATUS, ROUTES, UNITS } from '@gyblos/config';
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 
@@ -24,10 +24,18 @@ import {
   type ChatResult,
   type ChatStreamFormat,
 } from './free-sse';
+import type { ModelRoute } from './model-routes';
+import { parseResponsesChat } from './responses-chat';
+import {
+  responsesCompletion,
+  responsesError,
+  responsesStream,
+} from './responses-output';
 
 export interface ChatErrorBody {
   code: ChatErrorCode;
   status: number;
+  neverSent: boolean;
   message: string;
   param: string | null;
   extra: Record<string, unknown>;
@@ -46,6 +54,7 @@ export interface ChatApi {
   completion(model: string, result: ChatResult): unknown;
   stream(model: string, includeDigest: boolean): ChatStreamFormat;
   error(body: ChatErrorBody): unknown;
+  errorStatus?(status: number, neverSent: boolean): number;
 }
 
 const openAi: ChatApi = {
@@ -107,11 +116,23 @@ const anthropic: ChatApi = {
   }),
 };
 
+// OpenAI's Responses API, which Codex CLI speaks.
+const responses: ChatApi = {
+  parse: parseResponsesChat,
+  completion: responsesCompletion,
+  stream: (model) => responsesStream(model),
+  error: responsesError,
+  // Codex retries HTTP 5xx without consulting x-should-retry. A possible send must stop it.
+  errorStatus: (status, neverSent) =>
+    neverSent ? status : HTTP_STATUS.badRequest,
+};
+
 // The format a path speaks; a query string (some clients add one) does not change the route.
 export function chatApi(url: string | undefined): ChatApi | undefined {
   const path = url?.split('?')[0];
   if (path === ROUTES.inference) return openAi;
   if (path === CHAT_ROUTES.messages) return anthropic;
+  if (path === CHAT_ROUTES.responses) return responses;
   return undefined;
 }
 
@@ -133,23 +154,23 @@ export function estimatedTokens(body: unknown) {
 const BYTES_PER_TOKEN = 4;
 
 // The one model this buyer asks for, in the OpenAI list shape that SDKs and agents read.
-export function modelList(selection: ModelSelection) {
+export function modelList(routes: readonly ModelRoute[]) {
   return {
     object: 'list',
-    data: [
-      {
-        id: selection.modelId,
-        object: 'model',
-        created: 0,
-        owned_by: 'gyblos',
-        // Anthropic's model list fields, for clients that read that shape.
-        type: 'model',
-        display_name: selection.modelId,
-      },
-    ],
+    data: routes.map((route) => ({
+      id: route.id,
+      object: 'model',
+      created: 0,
+      owned_by: 'gyblos',
+      // Anthropic's model list fields, for clients that read that shape.
+      type: 'model',
+      display_name: route.id,
+      // The longest answer this endpoint asks a seller for on this model.
+      max_output_tokens: route.maxTokens,
+    })),
     has_more: false,
-    first_id: selection.modelId,
-    last_id: selection.modelId,
+    first_id: routes[0]?.id ?? null,
+    last_id: routes.at(-1)?.id ?? null,
   };
 }
 

@@ -8,13 +8,16 @@ OpenAI y Anthropic, así que los programas hechos para esos servicios pueden usa
 cambiando su URL base. En cada pedido obtiene una cotización gratuita firmada del vendedor y devuelve la
 respuesta en streaming por una conexión directa entre pares.
 
+La ruta Responses rechaza `parallel_tool_calls: false`, sampling no predeterminado y razonamiento no neutro antes de contactar al vendedor. El protocolo firmado todavía no expresa esas restricciones; las versiones de Codex que las exigen no son compatibles hasta incorporar ese soporte. Desactiva los reintentos HTTP y de streaming en el cliente.
+
 ## Qué funciona hoy [#que-funciona-hoy]
 
 | Función                                                                   | Estado en la beta                              |
 | ------------------------------------------------------------------------- | ---------------------------------------------- |
 | Conversaciones completas: mensaje de sistema, historial y mensaje nuevo   | Sí, hasta 1024 mensajes                        |
 | `POST /v1/chat/completions` de OpenAI y `POST /v1/messages` de Anthropic  | Sí, respuestas completas y en streaming        |
-| `GET /v1/models`                                                          | Sí, el modelo que pide tu comprador            |
+| `POST /v1/responses` de OpenAI (Codex CLI)                                | Sí, respuestas completas y en streaming        |
+| `GET /v1/models`                                                          | Sí, todos los modelos que sirve tu comprador   |
 | Ofertas gratuitas                                                         | Sí                                             |
 | Herramientas (function calling), ambos formatos, completas y en streaming | Sí, ver [Herramientas](#herramientas)          |
 | Claude Code                                                               | Solo con un vendedor de un modelo más grande   |
@@ -99,6 +102,7 @@ import OpenAI from 'openai';
 const client = new OpenAI({
   baseURL: 'http://127.0.0.1:4031/v1',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const stream = await client.chat.completions.create({
   model: 'qwen3-0.6b',
@@ -124,6 +128,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic({
   baseURL: 'http://127.0.0.1:4031',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const message = await client.messages.create({
   model: 'qwen3-0.6b',
@@ -150,6 +155,7 @@ import OpenAI from 'openai';
 const client = new OpenAI({
   baseURL: 'http://127.0.0.1:4031/v1',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const tools = [
   {
@@ -196,18 +202,68 @@ El modelo por defecto, qwen3:0.6b, resuelve llamadas simples como esta. Los agen
 herramientas e instrucciones largas, como Claude Code, necesitan un vendedor con un modelo más grande, a
 través del motor OpenAI o Anthropic.
 
+## Cambiar de modelo [#cambiar-de-modelo]
+
+Un comprador puede servir varios modelos por nombre. Agrégalos en `selection.json` bajo `models`; la lista
+debe incluir el modelo de `request.selection`. Un cliente cambia de modelo enviando otro nombre en `model`
+(`/model` en la mayoría de los agentes). Cada pedido lleva la conversación completa, así que el siguiente
+modelo lee todo lo anterior; solo se pierde el caché del vendedor anterior, por lo que la primera respuesta
+puede tardar un poco más.
+
+```json
+"models": [
+  { "id": "qwen3-0.6b", "selection": { "modelId": "qwen3-0.6b", "variant": null, "quantization": "Q4_K_M" }, "maxTokens": 2000 },
+  { "id": "gpt-oss-20b", "aliases": ["gpt-oss"], "selection": { "modelId": "gpt-oss-20b", "variant": null, "quantization": null } }
+]
+```
+
+Un nombre que el comprador no sirve recibe un 404 con la lista de los que sí sirve. Los modos pagados solo
+aceptan en esta lista el modelo pagado fijado y su límite de tokens.
+
+## Si un vendedor se cae [#si-un-vendedor-se-cae]
+
+En `buyer:free`, un intento que con seguridad no envió el prompt puede seleccionar otro vendedor
+elegible dentro del mismo pedido, respetando el vendedor fijado y la política de enrutamiento. Desde
+que pudo comenzar el envío, el comprador se detiene sin repetir el prompt ni cambiar de vendedor.
+Desactiva los reintentos automáticos del cliente, incluidos los de streaming: ante una conexión cortada
+puede no llegar ningún encabezado de respuesta.
+
+Si decides volver a enviar el mensaje, comienza una selección nueva: puede ganar el mismo vendedor u
+otro. Los fallos atribuibles al vendedor afectan su peso. La preferencia por el que respondió antes es
+acotada y no garantiza afinidad ni caché. Estas preferencias se aplican aquí al recorrido gratuito;
+los modos pagados mantienen sus restricciones de canal y vendedor.
+
+## Conectar un agente de código [#conectar-un-agente-de-codigo]
+
+Un comando escribe la configuración de OpenCode, pi o Codex CLI con todos los modelos que sirve tu
+comprador. Solo cambia el proveedor `gyblos` y guarda una copia del archivo anterior. Para Claude Code
+muestra las variables que debes definir en tu terminal. Sin `--write`, solo las muestra.
+
+```bash
+pnpm buyer:agent opencode --write
+pnpm buyer:agent pi --write
+pnpm buyer:agent codex --write
+pnpm buyer:agent claude
+```
+
+Después elige un modelo de Gyblos con `/models` (OpenCode), `/model` (pi y Claude Code) o
+`codex --profile gyblos`. Cada pedido lleva la conversación completa, así que cambiar de modelo no pierde
+el contexto.
+
 ## Opciones y errores [#opciones-y-errores]
 
 Las opciones que los clientes envían por defecto y que no cambian la respuesta se aceptan y se ignoran, como
 `temperature`, `top_p`, `user`, `metadata`, `stream_options` y, en el formato de Anthropic, `thinking`
 (el razonamiento siempre está apagado). Las que sí la cambiarían se rechazan salvo que tengan su valor
-neutro: `response_format` (`text`), `n` (1), `stop` y `stop_sequences`, y `logprobs`. Las imágenes siempre
-se rechazan.
+neutro: `response_format` (`text`), `n` (1), `stop` y `stop_sequences`, y `logprobs`. Las pistas de sampling
+se refieren a Chat Completions y Anthropic; Responses rechaza sampling y razonamiento no neutros.
+Chat Completions y Anthropic rechazan imágenes. Responses sustituye `input_image` por una nota de texto;
+no envía el contenido de la imagen al vendedor.
 
-| Respuesta | Significado                                                                                                                                                                   |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 400       | El pedido usa algo que todavía no se admite; el mensaje y `param` lo nombran.                                                                                                 |
-| 503       | No hay un vendedor disponible ahora. Con `Retry-After`, el vendedor falló hace poco o llegó a su límite por minuto: los SDK de OpenAI y Anthropic esperan y reintentan solos. |
-| 504       | El vendedor no respondió a tiempo.                                                                                                                                            |
+| Respuesta | Significado                                                                                                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400       | El pedido usa algo que todavía no se admite; el mensaje y `param` lo nombran.                                                                                                                           |
+| 503       | No hay un vendedor disponible ahora. `Retry-After` sugiere cuándo intentar de nuevo. Los clientes de estos ejemplos tienen los reintentos automáticos desactivados; volver a intentarlo es tu decisión. |
+| 504       | El vendedor no respondió a tiempo.                                                                                                                                                                      |
 
 Los errores usan la forma de cada API, así que los SDK lanzan sus excepciones habituales.
