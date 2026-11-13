@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import * as legacy from '@gyblos/buyer/agent-cli';
 import {
   AGENT_TOOLS,
   agentFilePath,
@@ -38,6 +39,8 @@ const ENDPOINT: AgentEndpoint = {
 };
 
 void test('every tool gets every model with its limits, on the local endpoint', () => {
+  assert.ok(Object.keys(legacy).includes('agentText'));
+  assert.ok(Object.keys(legacy).includes('writeAgentFile'));
   const opencode = opencodeProvider(ENDPOINT);
   assert.equal(opencode.options.baseURL, 'http://127.0.0.1:4031/v1');
   assert.deepEqual(opencode.models['gpt-oss-20b']?.limit, {
