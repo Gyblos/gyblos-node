@@ -55,6 +55,12 @@ export interface SellerQuery {
   after: SellerCursor | null;
 }
 
+// A model listed by live, non-withdrawn catalogs with a live presence, and how many sellers list it.
+export interface ModelRow {
+  modelId: string;
+  sellers: number;
+}
+
 export interface DiscoveryStorage {
   state(nodeId: string): Promise<NodeState | null>;
   // Number of tracked NodeIds (high-water marks), expired records included until pruned.
@@ -66,6 +72,8 @@ export interface DiscoveryStorage {
   // Live, non-withdrawn catalogs listing `model` with a live presence that references them,
   // ordered by presence issuedAt descending, then NodeId ascending.
   list(query: SellerQuery): Promise<SellerRow[]>;
+  // Every model those catalogs list, most sellers first, then model ID ascending; at most `limit`.
+  models(now: number, limit: number): Promise<ModelRow[]>;
   // Unexpired stored records of all three kinds.
   count(now: number): Promise<number>;
 }
@@ -115,6 +123,37 @@ interface MemoryTables {
   catalogs: Map<string, MemoryRecord>;
   presence: Map<string, MemoryRecord>;
   withdrawn: (nodeId: string, digest: string) => boolean;
+}
+
+function modelsMemory(
+  tables: MemoryTables,
+  now: number,
+  limit: number,
+): ModelRow[] {
+  const counts = new Map<string, number>();
+  for (const [nodeId, catalog] of tables.catalogs) {
+    const alive = tables.presence.get(nodeId);
+    if (
+      !alive ||
+      alive.digest !== catalog.digest ||
+      tables.withdrawn(nodeId, catalog.digest) ||
+      !live(catalog, now) ||
+      !live(alive, now)
+    )
+      continue;
+    for (const model of new Set(catalog.models))
+      counts.set(model, (counts.get(model) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([modelId, sellers]) => ({ modelId, sellers }))
+    .sort((left, right) =>
+      left.sellers !== right.sellers
+        ? right.sellers - left.sellers
+        : left.modelId < right.modelId
+          ? -1
+          : 1,
+    )
+    .slice(0, limit);
 }
 
 function listMemory(tables: MemoryTables, query: SellerQuery): SellerRow[] {
@@ -205,6 +244,9 @@ export function createMemoryStorage(): DiscoveryStorage {
     },
     async list(query) {
       return listMemory({ catalogs, presence, withdrawn }, query);
+    },
+    async models(now, limit) {
+      return modelsMemory({ catalogs, presence, withdrawn }, now, limit);
     },
     async count(now) {
       return (

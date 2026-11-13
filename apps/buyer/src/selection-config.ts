@@ -47,6 +47,12 @@ import {
   parseBuyerIdentityConfig,
   type BuyerIdentityConfig,
 } from './identity-config';
+import {
+  findModelRoute,
+  parseModelRoutes,
+  routedRequest,
+  type ModelRoute,
+} from './model-routes';
 
 export class BuyerSelectionError extends Error {
   constructor(
@@ -74,6 +80,10 @@ export interface BuyerSelectionConfig {
   identity?: BuyerIdentityConfig;
   // Milliseconds quotes may race; when absent, the caller's windowMs, else BUYER_SELECTION.windowMs.
   quoteWindowMs?: number;
+  // The models the endpoint serves by name; when absent, request.selection is the one model.
+  models?: ModelRoute[];
+  // Set per request, never read from selection.json: the seller that served this conversation before.
+  previousSeller?: string;
 }
 function parseRequest(value: unknown): SellerRequest {
   const row = controlObject(value, [
@@ -180,28 +190,38 @@ export function parseBuyerSelectionConfig(
         'quoteWindowMs',
         'session',
         'routing',
+        'models',
       ],
     );
     const request = parseRequest(row.request);
-    const validation = selectSellers({
-      request,
-      sellers: [],
-      stats: new Map(),
-      now: 0,
-      random: () => 0,
-    });
-    if (!validation.ok && validation.code === SELLER_SELECTION_CODES.INVALID)
+    const models =
+      row.models === undefined
+        ? undefined
+        : parseModelRoutes(row.models, request);
+    // buyer:chat asks for the request's own model, so a list must serve it by name.
+    if (models && !findModelRoute(models, request.selection.modelId))
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+    // Every model's request must be one selection accepts, as the single request always had to be.
+    for (const model of models ?? [undefined])
+      validRequest(routedRequest(request, model));
     const sellers = controlArray(row.sellers, BUYER_SELECTION.maxSellers).map(
       parseStaticSeller,
     );
+    const discovery =
+      row.discovery === undefined
+        ? undefined
+        : parseBuyerDiscoveryConfig(row.discovery);
+    // Open discovery trusts no index claim: every seller it adds must prove a registered identity, so it
+    // needs `identity`, and it may then start with no configured seller at all.
     if (
-      !sellers.length ||
+      (discovery?.open && row.identity === undefined) ||
+      (!sellers.length && !discovery?.open) ||
       new Set(sellers.map((item) => item.nodeId)).size !== sellers.length
     )
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
     return {
       request,
+      ...(models ? { models } : {}),
       ...(row.routing === undefined
         ? {}
         : { routing: parseBuyerRoutingPolicy(row.routing) }),
@@ -212,9 +232,7 @@ export function parseBuyerSelectionConfig(
       ...(row.identity === undefined
         ? {}
         : { identity: parseBuyerIdentityConfig(row.identity) }),
-      ...(row.discovery === undefined
-        ? {}
-        : { discovery: parseBuyerDiscoveryConfig(row.discovery) }),
+      ...(discovery ? { discovery } : {}),
       ...(row.pinnedNodeId === undefined
         ? {}
         : { pinnedNodeId: controlHex(row.pinnedNodeId) }),
@@ -233,6 +251,17 @@ export function parseBuyerSelectionConfig(
   }
 }
 
+function validRequest(request: SellerRequest) {
+  const validation = selectSellers({
+    request,
+    sellers: [],
+    stats: new Map(),
+    now: 0,
+    random: () => 0,
+  });
+  if (!validation.ok && validation.code === SELLER_SELECTION_CODES.INVALID)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+}
 function parseWithdrawal(value: unknown) {
   const record = parsePublicV2(value);
   if (record.kind !== PUBLIC_RECORD_KINDS.WITHDRAWAL)

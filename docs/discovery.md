@@ -146,6 +146,39 @@ Execution still requires the independently trusted compatible v1 offer; no v2
 payment or free-v2 execution is enabled. See
 [running-a-node.md](running-a-node.md).
 
+### Open discovery
+
+With `"discovery": { "open": true }` (which requires `identity`), the dedicated
+`buyer:free` entry also uses sellers it never configured: for each catalog the
+index lists for the model, the catalog's owner must hold that NodeId in the 8004
+registry, checked before anything is remembered, exactly as for a configured
+seller. Such a seller is dialed by NodeId through the first configured relay
+(`GYBLOS_RELAYS`); the index supplies no address. Configured sellers come first
+and the candidate list stays within 16. Their stats live in memory only, so
+`selection-stats.json` keeps the configured sellers alone. With open discovery
+`sellers` may be empty. The usual replay and withdrawal checks still apply. Only
+`buyer:free` uses these sellers (`buyer`, `buyer:chat`, paid and session
+execution keep their configured list), and never one the request already tried.
+Each selection makes at most 16 new identity lookups; an identity the registry
+refused is not looked up again for five minutes. The separate capacity limit is
+64 **live unconfigured candidates**, counted under the discovery store lock from
+signed catalog/presence expiry and withdrawal/conflict state. Expiry, withdrawal
+or conflict frees a slot without deleting any replay floor. Registry denials
+occupy no live slot, and a temporary capacity refusal is not cached as a
+registry denial. The same candidate can be reconsidered as soon as capacity is
+available, including after restart.
+
+Configured IDs are captured from the original startup configuration and do not
+consume this live-candidate budget. If an older file or changed configuration
+already has more than 64 live unconfigured rows, eligibility is
+deterministically limited by NodeId until rows expire; the history is retained.
+New activations wait while the live budget is full; already eligible renewals
+remain possible. Identity and discovery histories retain their existing
+independent limits of 1024 rows, with room reserved for missing configured IDs.
+Reaching a history limit refuses new identities without poisoning known ones;
+there is no automatic history deletion. Storage corruption and rollback still
+fail closed.
+
 ## Seller duties
 
 The seller publisher is opt-in. Set `GYBLOS_DISCOVERY_PUBLISH=1` when starting
@@ -245,10 +278,11 @@ and clients must re-verify everything. It does not need, and should not store or
 log, IP addresses, prompts, offers or payments.
 
 The reference index base URL is `https://discovery.gyblos.com/v1`: the Worker
-serves `POST /v1/records`, `GET /v1/sellers` and `GET /v1/health` at the root of
-its own host. This client refuses redirects, so configure the exact base URL.
-All paths below are relative to the base URL. Error bodies are
-`{"error":"<CODE>"}` with a static code; an index never echoes request input.
+serves `POST /v1/records`, `GET /v1/sellers`, `GET /v1/models` and
+`GET /v1/health` at the root of its own host. This client refuses redirects, so
+configure the exact base URL. All paths below are relative to the base URL.
+Error bodies are `{"error":"<CODE>"}` with a static code; an index never echoes
+request input.
 
 An index is HTTPS only. Any request that does not arrive over `https`, whatever
 its method or path, gets `400 {"error":"HTTPS_REQUIRED"}` before any other
@@ -328,6 +362,17 @@ before verifying the signature. Reads stay public.
   `generatedAt` can be that old; errors are never cached.
 - Errors: `400 INVALID_QUERY`, `400 HTTPS_REQUIRED`, `429 RATE_LIMITED`,
   `503 DISCOVERY_UNAVAILABLE`.
+
+### `GET /models`
+
+Takes no parameters (any query is a 400 `INVALID_QUERY`). Returns
+`{"models":[{"id":"<modelId>","sellers":<n>}],"generatedAt":<ms>}`: every model
+listed by catalogs that are live, not withdrawn and referenced by a live
+presence (the same liveness as `/sellers`), with how many such sellers list it,
+most sellers first and then by model ID, at most 500. It is a hint for offering
+the network's models by name; each seller is still found with `/sellers` and
+verified as usual. Cached and rate-limited like a sellers page
+(`public, max-age=10`) and CORS-readable.
 
 ### `GET /health`
 

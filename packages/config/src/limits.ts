@@ -39,6 +39,7 @@ export const HTTP_STATUS = {
   unauthorized: 401,
   paymentRequired: 402,
   forbidden: 403,
+  notFound: 404,
   misdirectedRequest: 421,
   tooManyRequests: 429,
   badGateway: 502,

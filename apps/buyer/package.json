@@ -33,6 +33,7 @@
     "./control": "./src/control.ts",
     "./selection": "./src/selection.ts",
     "./selection-config": "./src/selection-config.ts",
+    "./model-routes": "./src/model-routes.ts",
     "./selection-stats": "./src/selection-stats.ts",
     "./selection-proxy": "./src/selection-proxy.ts",
     "./offer-race": "./src/offer-race.ts",
@@ -44,13 +45,16 @@
     "./free-chat": "./src/free-chat.ts",
     "./free-execution": "./src/free-execution.ts",
     "./free-http": "./src/free-http.ts",
+    "./agent-cli": "./src/agent-cli.ts",
+    "./free-parallel": "./src/free-parallel.ts",
     "./free-selection": "./src/free-selection.ts",
     "./free-startup": "./src/free-startup.ts",
     "./free-main": "./src/free-main.ts",
     "./identity": "./src/identity.ts",
     "./init": "./src/init.ts",
     "./selection-busy": "./src/selection-busy.ts",
-    "./session-routing": "./src/session-routing.ts"
+    "./session-routing": "./src/session-routing.ts",
+    "./quote-startup": "./src/quote-startup.ts"
   },
   "dependencies": {
     "@gyblos/inference": "workspace:*",

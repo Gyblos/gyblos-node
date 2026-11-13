@@ -8,13 +8,16 @@ Anthropic APIs, so programs written for those services can use a Gyblos seller b
 For each request it gets a signed free quote from the seller and streams the answer back over a direct
 peer-to-peer connection.
 
+The Responses route currently refuses `parallel_tool_calls: false`, non-default sampling, and non-neutral reasoning before contacting a seller. The signed protocol cannot carry those constraints yet; Codex versions that require them are not compatible until that support lands. Disable HTTP and stream retries in any configured client.
+
 ## What works today [#what-works-today]
 
 | Feature                                                              | Beta status                             |
 | -------------------------------------------------------------------- | --------------------------------------- |
 | Whole conversations: system message, history, new message            | Yes, up to 1024 messages                |
 | OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming        |
-| `GET /v1/models`                                                     | Yes, the model your buyer asks for      |
+| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming        |
+| `GET /v1/models`                                                     | Yes, every model your buyer serves      |
 | Free offers                                                          | Yes                                     |
 | Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                |
 | Claude Code                                                          | Only with a seller on a larger model    |
@@ -98,6 +101,7 @@ import OpenAI from 'openai';
 const client = new OpenAI({
   baseURL: 'http://127.0.0.1:4031/v1',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const stream = await client.chat.completions.create({
   model: 'qwen3-0.6b',
@@ -123,6 +127,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic({
   baseURL: 'http://127.0.0.1:4031',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const message = await client.messages.create({
   model: 'qwen3-0.6b',
@@ -149,6 +154,7 @@ import OpenAI from 'openai';
 const client = new OpenAI({
   baseURL: 'http://127.0.0.1:4031/v1',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const tools = [
   {
@@ -194,18 +200,66 @@ answers 503 and says so.
 The default model, qwen3:0.6b, handles simple calls like this one. Agents that send many tools and long
 instructions, such as Claude Code, need a seller on a larger model through the OpenAI or Anthropic engine.
 
+## Switch models [#switch-models]
+
+One buyer can serve several models by name. List them in `selection.json` under `models`; the list must
+include the model in `request.selection`. A client switches by sending another name as `model` (`/model`
+in most agents). Each request carries the whole conversation, so the next model reads everything said
+before; only the previous seller's cache is lost, so the first answer may take a little longer.
+
+```json
+"models": [
+  { "id": "qwen3-0.6b", "selection": { "modelId": "qwen3-0.6b", "variant": null, "quantization": "Q4_K_M" }, "maxTokens": 2000 },
+  { "id": "gpt-oss-20b", "aliases": ["gpt-oss"], "selection": { "modelId": "gpt-oss-20b", "variant": null, "quantization": null } }
+]
+```
+
+A name the buyer does not serve gets a 404 that lists the ones it does. Paid modes accept only the pinned
+paid model and its token limit in this list.
+
+## If a seller drops [#if-a-seller-drops]
+
+On `buyer:free`, an attempt that certainly sent no prompt may select another eligible seller within
+the same request, subject to seller pins and routing policy. Once transmission may have begun, the
+buyer stops without resending the prompt or changing seller. Disable client HTTP and stream retries:
+a broken connection may deliver no response headers at all.
+
+A manual resend starts a new selection: the same seller or another one may win. Seller-attributable
+failures affect its weight. Preference for the seller that answered earlier is bounded and guarantees
+neither affinity nor a warm cache. These preferences apply here to free execution; paid modes retain
+their channel and seller constraints.
+
+## Connect a coding agent [#connect-a-coding-agent]
+
+One command writes the configuration for OpenCode, pi or Codex CLI with every model your buyer serves,
+changing only the `gyblos` provider and keeping a copy of the previous file. For Claude Code it prints the
+variables to set in your shell. Without `--write`, it only prints.
+
+```bash
+pnpm buyer:agent opencode --write
+pnpm buyer:agent pi --write
+pnpm buyer:agent codex --write
+pnpm buyer:agent claude
+```
+
+Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or
+`codex --profile gyblos`. Each request carries the whole conversation, so switching models keeps the
+context.
+
 ## Options and errors [#options-and-errors]
 
 Options that clients send by default and that do not change the answer are accepted and ignored, such as
 `temperature`, `top_p`, `user`, `metadata`, `stream_options` and, in the Anthropic format, `thinking`
 (thinking is always off). Options that would change it are refused unless they hold their neutral value:
-`response_format` (`text`), `n` (1), `stop` and `stop_sequences`, and `logprobs`. Images are always
-refused.
+`response_format` (`text`), `n` (1), `stop` and `stop_sequences`, and `logprobs`. These sampling hints
+refer to Chat Completions and Anthropic; Responses refuses non-neutral sampling and reasoning.
+Chat Completions and Anthropic refuse images. Responses substitutes a text placeholder for an
+`input_image`; it does not send image content to the seller.
 
-| Answer | Meaning                                                                                                                                                                  |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 400    | The request uses something not supported yet; the message and `param` name it.                                                                                           |
-| 503    | No seller is available right now. With `Retry-After`, the seller failed recently or hit its per-minute limit: the OpenAI and Anthropic SDKs wait and retry on their own. |
-| 504    | The seller did not answer in time.                                                                                                                                       |
+| Answer | Meaning                                                                                                                                                                     |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400    | The request uses something not supported yet; the message and `param` name it.                                                                                              |
+| 503    | No seller is available right now. `Retry-After` suggests when a new attempt may succeed. The clients shown here have automatic retries disabled; retrying is your decision. |
+| 504    | The seller did not answer in time.                                                                                                                                          |
 
 Errors use each API's own shape, so SDKs raise their usual exceptions.

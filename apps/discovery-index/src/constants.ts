@@ -45,12 +45,14 @@ export type IndexStatus = (typeof INDEX_STATUS)[keyof typeof INDEX_STATUS];
 export const INDEX_ROUTES = {
   RECORDS: '/v1/records',
   SELLERS: '/v1/sellers',
+  MODELS: '/v1/models',
   HEALTH: '/v1/health',
   REGISTRATIONS: '/v1/registrations',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.SELLERS,
+  INDEX_ROUTES.MODELS,
   INDEX_ROUTES.HEALTH,
 ]);
 
@@ -80,6 +82,8 @@ export const DISCOVERY_INDEX_LIMITS = {
   maxBodyBytes: 34_816,
   defaultSellers: 50,
   maxSellers: 200,
+  // Models listed by GET /v1/models, most sellers first.
+  maxModels: 500,
   maxResponseBytes: 1024 * 1024,
   // Bytes reserved for the page framing around the seller entries.
   responseFramingBytes: 128,
