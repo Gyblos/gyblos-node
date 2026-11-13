@@ -16,7 +16,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { FILE_MODES, LOCALHOST, PORTS } from '@gyblos/config';
@@ -28,8 +28,10 @@ import {
   AgentSetupError,
   claudeCodeEnvironment,
   codexBlock,
+  codexProfiles,
   mergedAgentFile,
   mergedCodexConfig,
+  mergedCodexProfile,
   opencodeProvider,
   piProvider,
   type AgentEndpoint,
@@ -80,7 +82,13 @@ export function agentText(tool: AgentTool, endpoint: AgentEndpoint) {
       null,
       2,
     );
-  if (tool === AGENT_TOOLS.CODEX) return codexBlock(endpoint);
+  if (tool === AGENT_TOOLS.CODEX)
+    return [
+      `# config.toml\n${codexBlock(endpoint)}`,
+      ...codexProfiles(endpoint).map(
+        (profile) => `# ${profile.file}, beside it\n${profile.text}`,
+      ),
+    ].join('\n\n');
   return claudeCodeEnvironment(endpoint);
 }
 
@@ -94,8 +102,9 @@ async function existing(path: string) {
 }
 
 // Writes the tool's file, keeping the first copy of what was there as <file>.before-gyblos (later runs
-// never replace it). The new text goes to a temporary file beside the real target and is renamed over it,
-// so a crash never leaves half a file and a symlinked config stays a symlink.
+// never replace it). For Codex it also writes one profile file per model beside config.toml (files only
+// gyblos writes, so no copy is kept). Every new text is prepared first, so a refused file leaves all of
+// them as they were.
 export async function writeAgentFile(
   tool: Exclude<AgentTool, typeof AGENT_TOOLS.CLAUDE_CODE>,
   endpoint: AgentEndpoint,
@@ -113,8 +122,21 @@ export async function writeAgentFile(
     tool === AGENT_TOOLS.CODEX
       ? mergedCodexConfig(endpoint, before)
       : mergedAgentFile(tool, endpoint, before);
+  const profiles =
+    tool === AGENT_TOOLS.CODEX
+      ? await Promise.all(
+          codexProfiles(endpoint).map(async (profile) => {
+            const file = join(dirname(path), profile.file);
+            const previous = await existing(file);
+            return {
+              file,
+              previous,
+              text: mergedCodexProfile(profile.text, previous),
+            };
+          }),
+        )
+      : [];
   await mkdir(dirname(path), { recursive: true });
-  const target = before === undefined ? path : await realpath(path);
   let saved = false;
   if (before !== undefined)
     saved = await copyFile(
@@ -128,6 +150,26 @@ export async function writeAgentFile(
         throw error;
       },
     );
+  await replaced(path, text, before);
+  for (const profile of profiles)
+    await replaced(profile.file, profile.text, profile.previous);
+  return {
+    path,
+    backup: saved ? `${path}.before-gyblos` : undefined,
+    ...(profiles.length
+      ? { profiles: profiles.map((profile) => profile.file) }
+      : {}),
+  };
+}
+
+// The new text goes to a temporary file beside the real target and is renamed over it, so a crash never
+// leaves half a file and a symlinked config stays a symlink.
+async function replaced(
+  path: string,
+  text: string,
+  before: string | undefined,
+) {
+  const target = before === undefined ? path : await realpath(path);
   const temporary = `${target}.${randomUUID()}.tmp`;
   try {
     await writeFile(temporary, text, {
@@ -139,7 +181,6 @@ export async function writeAgentFile(
   } finally {
     await rm(temporary, { force: true });
   }
-  return { path, backup: saved ? `${path}.before-gyblos` : undefined };
 }
 
 const NEXT: Record<AgentTool, string> = {
@@ -181,7 +222,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (values.write && tool === AGENT_TOOLS.CLAUDE_CODE)
       console.log('Claude Code reads these from your shell; nothing to write.');
     if (values.write && tool !== AGENT_TOOLS.CLAUDE_CODE) {
-      const { path, backup } = await writeAgentFile(
+      const { path, backup, profiles } = await writeAgentFile(
         tool!,
         endpoint,
         homedir(),
@@ -192,6 +233,7 @@ export async function main(argv = process.argv.slice(2)) {
           ? `Updated ${path} (previous copy: ${backup}).`
           : `Updated ${path}.`,
       );
+      for (const profile of profiles ?? []) console.log(`Wrote ${profile}.`);
     } else console.log(agentText(tool!, endpoint));
     console.log(NEXT[tool!]);
   } catch (error) {
@@ -203,7 +245,7 @@ export async function main(argv = process.argv.slice(2)) {
 function failure(error: unknown) {
   if (error instanceof AgentSetupError)
     return error.code === AGENT_SETUP_CODES.FILE
-      ? 'That file has comments (or is opencode.jsonc), is not plain JSON, or already defines gyblos outside the managed block; print the configuration without --write and paste it yourself.'
+      ? 'That file has comments (or is opencode.jsonc), is not plain JSON, already defines gyblos outside the managed block, or a gyblos*.config.toml profile was not written by this command; print the configuration without --write and paste it yourself.'
       : 'Could not read the models from selection.json; run pnpm buyer:init first.';
   const { code, path } = error as NodeJS.ErrnoException;
   return code

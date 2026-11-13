@@ -6,49 +6,24 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { parse } from 'smol-toml';
 
-import { AGENT_SETUP_CODES } from './agent-setup-constants';
+import {
+  AGENT_SETUP,
+  AGENT_SETUP_CODES,
+  AGENT_TOOLS,
+  CODEX_MARKS,
+  type AgentEndpoint,
+  type AgentModel,
+} from './agent-setup-constants';
 
-export { AGENT_SETUP_CODES } from './agent-setup-constants';
-
-export const AGENT_TOOLS = {
-  OPENCODE: 'opencode',
-  PI: 'pi',
-  CODEX: 'codex',
-  CLAUDE_CODE: 'claude',
-} as const;
-export type AgentTool = (typeof AGENT_TOOLS)[keyof typeof AGENT_TOOLS];
-
-export const AGENT_SETUP = {
-  provider: 'gyblos',
-  name: 'Gyblos',
-  // What a free endpoint accepts as a key: anything, but some clients refuse an empty one.
-  freeKey: 'gyblos-local',
-  // A context size for tools that need one when the buyer does not know the sellers' own.
-  contextTokens: 32768,
-  maxContextTokens: 10_000_000,
-  maxModels: 32,
-  namePattern: /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/,
-  envPattern: /^[A-Z_][A-Z0-9_]{0,63}$/,
-  // Where each tool reads its configuration, relative to its own directory (see agentFilePath).
-  files: {
-    opencode: 'opencode.json',
-    pi: 'models.json',
-    codex: 'config.toml',
-  },
-} as const;
-
-export interface AgentModel {
-  id: string;
-  maxOutputTokens: number;
-  contextTokens?: number;
-}
-export interface AgentEndpoint {
-  // The buyer's origin, e.g. http://127.0.0.1:4031.
-  origin: string;
-  models: readonly AgentModel[];
-  // A paid endpoint's bearer token, by environment variable name; absent for a free endpoint.
-  tokenEnv?: string;
-}
+export {
+  AGENT_SETUP,
+  AGENT_SETUP_CODES,
+  AGENT_TOOLS,
+  CODEX_MARKS,
+  type AgentEndpoint,
+  type AgentModel,
+  type AgentTool,
+} from './agent-setup-constants';
 
 // The file a tool reads, honoring the variables each tool uses to move its configuration.
 export function agentFilePath(
@@ -161,22 +136,14 @@ export function piProvider(endpoint: AgentEndpoint) {
   };
 }
 
-// Codex CLI: tables only, so the block can sit at the end of any config.toml. A provider speaking the
-// Responses API with retries off (a retry would resend the prompt), and one profile per model; run
+// Codex CLI: the provider, tables only, so the block can sit at the end of any config.toml. It speaks the
+// Responses API with retries off (a retry would resend the prompt). Codex CLI 0.162+ refuses `[profiles.*]`
+// tables in config.toml, so each model gets its own profile file beside it (see codexProfiles); run
 // `codex --profile gyblos` (the first model) or `codex --profile gyblos-<model>`. Profiles take no context
 // size: when a conversation outgrows what the network carries, the buyer answers with the code Codex
 // compacts on.
 export function codexBlock(endpoint: AgentEndpoint) {
-  const { models, tokenEnv } = checked(endpoint);
-  const toml = (value: string) => JSON.stringify(value);
-  const profile = (name: string, model: AgentModel) => [
-    '',
-    `[profiles.${toml(name)}]`,
-    `model_provider = ${toml(AGENT_SETUP.provider)}`,
-    `model = ${toml(model.id)}`,
-    // No seller runs web search; leaving it out also keeps it out of every request.
-    'web_search = "disabled"',
-  ];
+  const { tokenEnv } = checked(endpoint);
   return [
     CODEX_MARKS.start,
     `[model_providers.${AGENT_SETUP.provider}]`,
@@ -188,13 +155,49 @@ export function codexBlock(endpoint: AgentEndpoint) {
     'supports_websockets = false',
     'request_max_retries = 0',
     'stream_max_retries = 0',
-    ...profile(AGENT_SETUP.provider, models[0]!),
-    ...profileNames(models).flatMap((name, index) =>
-      profile(name, models[index]!),
-    ),
     CODEX_MARKS.end,
   ].join('\n');
 }
+const toml = (value: string) => JSON.stringify(value);
+// One profile file per model, named `<profile>.config.toml` in the Codex home: `gyblos` for the first model
+// and `gyblos-<model>` for each. Every file starts with CODEX_MARKS.profile, so a later run replaces only
+// files it wrote.
+export function codexProfiles(endpoint: AgentEndpoint) {
+  const { models } = checked(endpoint);
+  const profile = (name: string, model: AgentModel) => ({
+    name,
+    file: `${name}${AGENT_SETUP.codexProfileSuffix}`,
+    text: [
+      CODEX_MARKS.profile,
+      `model_provider = ${toml(AGENT_SETUP.provider)}`,
+      `model = ${toml(model.id)}`,
+      // No seller runs web search; leaving it out also keeps it out of every request.
+      'web_search = "disabled"',
+      '',
+    ].join('\n'),
+  });
+  return [
+    profile(AGENT_SETUP.provider, models[0]!),
+    ...profileNames(models).map((name, index) => profile(name, models[index]!)),
+  ];
+}
+// A profile file's new text: written when absent or when an earlier run wrote it, refused otherwise.
+export function mergedCodexProfile(text: string, existing: string | undefined) {
+  if (existing === undefined) return text;
+  const lines = existing.split('\n').map((line) => line.replace(/\r$/, ''));
+  const fields = Object.keys(configToml(existing));
+  if (
+    lines[0] !== CODEX_MARKS.profile ||
+    fields.some((field) => !CODEX_PROFILE_FIELDS.includes(field))
+  )
+    throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
+  return text;
+}
+const CODEX_PROFILE_FIELDS: readonly string[] = [
+  'model_provider',
+  'model',
+  'web_search',
+];
 // One profile name per model: its id with other characters as dashes, numbered when two ids collide.
 export function profileNames(models: readonly AgentModel[]) {
   const used = new Set<string>([AGENT_SETUP.provider]);
@@ -206,10 +209,6 @@ export function profileNames(models: readonly AgentModel[]) {
     return name;
   });
 }
-export const CODEX_MARKS = {
-  start: '# >>> gyblos (managed by pnpm buyer:agent codex)',
-  end: '# <<< gyblos',
-} as const;
 
 // Claude Code: environment for one shell. `/model <name>` then switches among the endpoint's models.
 export function claudeCodeEnvironment(endpoint: AgentEndpoint) {
@@ -291,6 +290,8 @@ function configToml(text: string): Json {
     throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
   }
 }
+// The managed block of an earlier run. Before Codex CLI 0.162 it also held `[profiles.gyblos*]` tables;
+// replacing the block drops them, which Codex now requires.
 function managedBlock(text: string) {
   const managed = configToml(text);
   const provider = object(managed.model_providers);
@@ -305,9 +306,6 @@ function managedBlock(text: string) {
   const providerKeys = Object.keys(
     object(object(allowed.model_providers)[AGENT_SETUP.provider]),
   );
-  const profileKeys = Object.keys(
-    object(object(allowed.profiles)[AGENT_SETUP.provider]),
-  );
   if (
     Object.keys(managed).some(
       (key) => key !== 'model_providers' && key !== 'profiles',
@@ -320,7 +318,7 @@ function managedBlock(text: string) {
       ([key, value]) =>
         !key.startsWith(AGENT_SETUP.provider) ||
         Object.keys(object(value)).some(
-          (field) => !profileKeys.includes(field),
+          (field) => !CODEX_PROFILE_FIELDS.includes(field),
         ),
     )
   )
@@ -371,7 +369,11 @@ export function mergedCodexConfig(
       ...object(user.model_providers),
       ...object(managed.model_providers),
     },
-    profiles: { ...object(user.profiles), ...object(managed.profiles) },
+    ...(Object.hasOwn(user, 'profiles') || Object.hasOwn(managed, 'profiles')
+      ? {
+          profiles: { ...object(user.profiles), ...object(managed.profiles) },
+        }
+      : {}),
   });
   if (
     (prior &&
