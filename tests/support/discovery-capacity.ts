@@ -1,5 +1,5 @@
 // Disposable discovery metadata for capacity tests; registry/signature wiring uses the real signed run.
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
 
@@ -22,6 +22,7 @@ export async function discoveryCapacityFixture(
   count = BUYER_DISCOVERY.openSellers,
 ) {
   const home = await discoveryHome();
+  home.environment.GYBLOS_HOME = await realpath(home.directory);
   const run = await discoveryRun();
   t.after(async () => {
     await run.wire.close();
