@@ -57,7 +57,7 @@ async function fixture(t: TestContext, count = 0) {
 }
 void test('denied index identities cannot consume configured history reservations or poison the store', async (t) => {
   const f = await fixture(t, IDENTITY_STATE.maxRows - 1);
-  const policy = { configuredNodeIds: [id(2000)] };
+  const policy = { configuredNodeIds: [id(2000)], maxUnconfiguredNodes: 64 };
   const store = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const before = await readFile(f.file, 'utf8');
   for (const n of [2001, 2002]) {
@@ -76,7 +76,7 @@ void test('denied index identities cannot consume configured history reservation
 });
 void test('64 owner-mismatch floors do not consume active discovery capacity, including after restart', async (t) => {
   const f = await fixture(t, 64);
-  const policy = { configuredNodeIds: [id(2000)] };
+  const policy = { configuredNodeIds: [id(2000)], maxUnconfiguredNodes: 64 };
   const store = await openBuyerIdentityState(f.environment, SCOPE, policy);
   for (let n = 0; n < 64; n++) {
     const denied = await store.evaluate(input(n, 2n));
@@ -101,7 +101,7 @@ void test('64 owner-mismatch floors do not consume active discovery capacity, in
 });
 void test('missing configured identities retain space at the global row bound', async (t) => {
   const f = await fixture(t, IDENTITY_STATE.maxRows - 1);
-  const policy = { configuredNodeIds: [id(2000)] };
+  const policy = { configuredNodeIds: [id(2000)], maxUnconfiguredNodes: 64 };
   const store = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const refused = await store.evaluate(input(3000));
   assert.equal(!refused.ok && refused.code, IDENTITY_POLICY_CODES.LIMIT);
@@ -112,7 +112,10 @@ void test('missing configured identities retain space at the global row bound', 
 });
 void test('two store handles cannot claim the same last global history slot', async (t) => {
   const f = await fixture(t, IDENTITY_STATE.maxRows - 1);
-  const policy = { configuredNodeIds: [] };
+  const policy = {
+    configuredNodeIds: [],
+    maxUnconfiguredNodes: IDENTITY_STATE.maxRows,
+  };
   const a = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const b = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const results = await Promise.allSettled([
@@ -136,7 +139,10 @@ void test('two store handles cannot claim the same last global history slot', as
 });
 void test('a capacity refusal remembers observed floors and genuine rollback remains fatal', async (t) => {
   const f = await fixture(t, IDENTITY_STATE.maxRows);
-  const policy = { configuredNodeIds: [] };
+  const policy = {
+    configuredNodeIds: [],
+    maxUnconfiguredNodes: IDENTITY_STATE.maxRows,
+  };
   const before = await readFile(f.file, 'utf8');
   const a = await openBuyerIdentityState(f.environment, SCOPE, policy);
   const b = await openBuyerIdentityState(f.environment, SCOPE, policy);
