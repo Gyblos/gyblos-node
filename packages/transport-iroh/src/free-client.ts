@@ -9,16 +9,12 @@ import {
   FREE_EXECUTION_CODES,
   FREE_STREAM,
   type FreeExecutionCode,
-  type FreeExecutionStopReason,
 } from '@gyblos/protocol/constants';
 import {
   FreeExecutionError,
-  freeExecutionStop,
   matchFreeExecutionResponse,
   verifyFreeExecutionRequest,
-  type FreeExecutionDelivered,
   type FreeExecutionRequest,
-  type FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
 import {
   encodeFreeExecutionRequest,
@@ -28,23 +24,12 @@ import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import type { ControlStream } from './control-io';
+import { FreeClientError, freeClientIo } from './free-client-errors';
 import { readFreeStreamResponse } from './free-stream-client';
 import { relayOnlyAllows } from './paths';
 
-export class FreeClientError extends Error {
-  declare readonly reason?: FreeExecutionStopReason;
-  declare readonly delivered?: FreeExecutionDelivered;
-  constructor(
-    readonly code: FreeExecutionCode,
-    readonly sent: boolean,
-    readonly remote = false,
-    stop: FreeExecutionStop = {},
-  ) {
-    super(code);
-    this.name = 'FreeClientError';
-    Object.assign(this, freeExecutionStop(stop));
-  }
-}
+export { FreeClientError } from './free-client-errors';
+
 async function readResponse(
   stream: ControlStream,
   check: () => void,
@@ -84,6 +69,7 @@ interface FreeClientState {
   pending: Promise<unknown>[];
   used: boolean;
   sent: boolean;
+  consuming?: boolean;
   connection?: Connection;
   lifetime: AbortController;
 }
@@ -134,10 +120,9 @@ async function runFreeRequest(
   route();
   await authenticate(request);
   route();
-  const stream = await stage(
-    connected.openBi(),
-    IROH_DEADLINES.egressMs,
-    state,
+  const stream = freeClientIo(
+    await stage(connected.openBi(), IROH_DEADLINES.egressMs, state),
+    () => state.sent,
   );
   route();
   // Opening a stream can take time; validate zero-skew expiry immediately before transmission.
@@ -176,7 +161,29 @@ async function readFreeResult(
       request,
       route,
       (operation, milliseconds) => stage(operation, milliseconds, state),
-      options.onDelta,
+      async (text) => {
+        state.consuming = true;
+        try {
+          await stage(
+            Promise.resolve().then(() => options.onDelta!(text)),
+            IROH_DEADLINES.egressMs,
+            state,
+          );
+        } catch (error) {
+          throw new FreeClientError(
+            error instanceof FreeExecutionError
+              ? error.code
+              : FREE_EXECUTION_CODES.INTERNAL,
+            state.sent,
+            false,
+            {},
+            false,
+            true,
+          );
+        } finally {
+          state.consuming = false;
+        }
+      },
     );
   const response = await readResponse(stream, route, state);
   const result = await matchFreeExecutionResponse(response, request);
@@ -216,7 +223,16 @@ export function createFreeExecutionClient(
       const cancelled = new Promise<never>((_resolve, reject) => {
         abort = () => {
           close();
-          reject(new FreeClientError(reason, state.sent));
+          reject(
+            new FreeClientError(
+              reason,
+              state.sent,
+              false,
+              {},
+              false,
+              state.consuming,
+            ),
+          );
         };
         external?.addEventListener('abort', abort, { once: true });
         timer = setTimeout(() => {

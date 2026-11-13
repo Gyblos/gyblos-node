@@ -57,6 +57,7 @@ export interface FreeBuyerDependencies {
     selection: ModelSelection;
     now?: () => number;
   };
+  conversationKey?: ReturnType<typeof createConversationKey>;
   enter?(): () => void;
   // Hands a selected seller back once this request is done with it (free requests side by side).
   done?(winner: FreeWinner): void;
@@ -94,7 +95,7 @@ export async function executeBuyerFree(
         .select(excluded, signal, {
           tools: inferenceNeedsTools(input),
           ...(model ? { model } : {}),
-          conversation: conversationKey(input, model),
+          conversation: dependencies.conversationKey?.(input, model),
         })
         .catch((error) => {
           // Local occupancy is not a network failure; retain request-local model telemetry.
@@ -132,22 +133,21 @@ export async function executeBuyerFree(
 // repeats; only a digest keyed by this process's own secret is kept, never the text, so a memory dump
 // cannot confirm a guessed prompt.
 const SECRET_BYTES = 32;
-const CONVERSATION_SECRET = randomBytes(SECRET_BYTES);
-export function conversationKey(
-  input: FreeExecutionBuildInput,
-  model?: RoutedModel,
-) {
-  const system = input.messages.find((message) => message.role === 'system');
-  const first = input.messages.find((message) => message.role === 'user');
-  return createHmac('sha256', CONVERSATION_SECRET)
-    .update(
-      JSON.stringify([
-        model?.selection ?? null,
-        system?.content ?? null,
-        first?.content ?? null,
-      ]),
-    )
-    .digest('hex');
+export function createConversationKey() {
+  const secret = randomBytes(SECRET_BYTES);
+  return (input: FreeExecutionBuildInput, model?: RoutedModel) => {
+    const system = input.messages.find((message) => message.role === 'system');
+    const first = input.messages.find((message) => message.role === 'user');
+    return createHmac('sha256', secret)
+      .update(
+        JSON.stringify([
+          model?.selection ?? null,
+          system?.content ?? null,
+          first?.content ?? null,
+        ]),
+      )
+      .digest('hex');
+  };
 }
 
 // Caller owns the request admission, deadline and exclusion set; this never selects another seller.
