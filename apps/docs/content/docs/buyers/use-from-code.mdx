@@ -8,12 +8,15 @@ Anthropic APIs, so programs written for those services can use a Gyblos seller b
 For each request it gets a signed free quote from the seller and streams the answer back over a direct
 peer-to-peer connection.
 
+The Responses route currently refuses `parallel_tool_calls: false`, non-default sampling, and non-neutral reasoning before contacting a seller. The signed protocol cannot carry those constraints yet; Codex versions that require them are not compatible until that support lands. Disable HTTP and stream retries in any configured client.
+
 ## What works today [#what-works-today]
 
 | Feature                                                              | Beta status                             |
 | -------------------------------------------------------------------- | --------------------------------------- |
 | Whole conversations: system message, history, new message            | Yes, up to 1024 messages                |
 | OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming        |
+| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming        |
 | `GET /v1/models`                                                     | Yes, every model your buyer serves      |
 | Free offers                                                          | Yes                                     |
 | Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                |
@@ -98,6 +101,7 @@ import OpenAI from 'openai';
 const client = new OpenAI({
   baseURL: 'http://127.0.0.1:4031/v1',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const stream = await client.chat.completions.create({
   model: 'qwen3-0.6b',
@@ -123,6 +127,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic({
   baseURL: 'http://127.0.0.1:4031',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const message = await client.messages.create({
   model: 'qwen3-0.6b',
@@ -149,6 +154,7 @@ import OpenAI from 'openai';
 const client = new OpenAI({
   baseURL: 'http://127.0.0.1:4031/v1',
   apiKey: 'local',
+  maxRetries: 0,
 });
 const tools = [
   {
@@ -213,11 +219,32 @@ paid model and its token limit in this list.
 
 ## If a seller drops [#if-a-seller-drops]
 
-If a seller fails before your question reaches it, the buyer moves the request to another seller without
-you noticing. Once the question may have reached a seller, the buyer never sends it to a second one, to
-keep your prompt with as few sellers as possible: you get an error that SDKs do not retry, and sending the
-message again picks another seller. A seller that fails counts against it in later choices, and the next
-turn of a conversation goes back to the seller that answered the last one when it is still competitive.
+On `buyer:free`, an attempt that certainly sent no prompt may select another eligible seller within
+the same request, subject to seller pins and routing policy. Once transmission may have begun, the
+buyer stops without resending the prompt or changing seller. Disable client HTTP and stream retries:
+a broken connection may deliver no response headers at all.
+
+A manual resend starts a new selection: the same seller or another one may win. Seller-attributable
+failures affect its weight. Preference for the seller that answered earlier is bounded and guarantees
+neither affinity nor a warm cache. These preferences apply here to free execution; paid modes retain
+their channel and seller constraints.
+
+## Connect a coding agent [#connect-a-coding-agent]
+
+One command writes the configuration for OpenCode, pi or Codex CLI with every model your buyer serves,
+changing only the `gyblos` provider and keeping a copy of the previous file. For Claude Code it prints the
+variables to set in your shell. Without `--write`, it only prints.
+
+```bash
+pnpm buyer:agent opencode --write
+pnpm buyer:agent pi --write
+pnpm buyer:agent codex --write
+pnpm buyer:agent claude
+```
+
+Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or
+`codex --profile gyblos`. Each request carries the whole conversation, so switching models keeps the
+context.
 
 ## Options and errors [#options-and-errors]
 

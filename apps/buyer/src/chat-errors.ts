@@ -115,11 +115,12 @@ export function replyError(
   const headers: Record<string, string> = {
     'content-type': 'application/json',
   };
+  const status = api.errorStatus?.(view.status, view.neverSent) ?? view.status;
   // OpenAI and Anthropic SDKs retry 408/409/429/5xx by default; a resend after a possible send would
   // repeat the prompt, possibly to another seller. Only local BUSY and unsent unavailability stay retryable.
-  const callerFault = view.status < HTTP_STATUS.internalServerError;
+  const callerFault = status < HTTP_STATUS.internalServerError;
   if (
-    view.status !== HTTP_STATUS.tooManyRequests &&
+    status !== HTTP_STATUS.tooManyRequests &&
     (callerFault || !view.neverSent)
   )
     headers[FREE_BUYER.noRetryHeader] = 'false';
@@ -128,11 +129,12 @@ export function replyError(
       ? secondsUntil(view.cooldownUntil)
       : undefined;
   if (retry !== undefined) headers[FREE_BUYER.retryAfterHeader] = String(retry);
-  response.writeHead(view.status, headers).end(
+  response.writeHead(status, headers).end(
     JSON.stringify(
       api.error({
         code,
-        status: view.status,
+        status,
+        neverSent: view.neverSent,
         // A refused request explains itself; every other error keeps its code as the message.
         message:
           view.detail ||
