@@ -5,7 +5,10 @@ import test from 'node:test';
 import type { Endpoint } from '@number0/iroh';
 
 import { selectWinner } from '@gyblos/buyer/free-selection';
-import { recordExecutionFailure } from '@gyblos/buyer/selection-stats';
+import {
+  recordExecutionFailure,
+  type LocalSellerStats,
+} from '@gyblos/buyer/selection-stats';
 
 import { selectionFixture } from './support/buyer-selection';
 import { socketStream } from './support/control-loopback';
@@ -15,7 +18,7 @@ void test('selection writeback preserves an execution failure recorded concurren
   t.after(run.wire.close);
   run.context.endpoint = { relayUrl: null, directAddresses: [] };
   run.context.relayOnly = false;
-  const rows = new Map([
+  const rows = new Map<string, LocalSellerStats>([
     [
       run.catalog.nodeId,
       {

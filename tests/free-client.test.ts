@@ -375,7 +375,7 @@ void test('partial writes carry transport provenance without blaming local valid
 });
 void test('a raw response reset carries transport provenance', async () => {
   const item = await fixture();
-  item.setConnect(async () => ({
+  const disconnected = {
     ...item.connection,
     openBi: async () => ({
       send: { writeAll: async () => {}, finish: async () => {} },
@@ -386,7 +386,8 @@ void test('a raw response reset carries transport provenance', async () => {
         read: async () => [],
       },
     }),
-  }));
+  };
+  item.setConnect(async () => disconnected as unknown as Connection);
   await assert.rejects(item.client.execute(item.request), {
     code: FREE_EXECUTION_CODES.INTERNAL,
     sent: true,
