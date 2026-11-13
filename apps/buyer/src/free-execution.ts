@@ -130,8 +130,8 @@ export async function executeBuyerFree(
 }
 
 // A conversation is known by its model, system text and first user message, which every later turn
-// repeats; only a digest keyed by this process's own secret is kept, never the text, so a memory dump
-// cannot confirm a guessed prompt.
+// repeats. Only a digest is retained in routing metadata; its secret belongs to this buyer lifecycle.
+// This does not protect conversation contents or the secret from a live process-memory compromise.
 const SECRET_BYTES = 32;
 export function createConversationKey() {
   const secret = randomBytes(SECRET_BYTES);
