@@ -371,8 +371,11 @@ export function mergedCodexConfig(
     profiles: { ...object(user.profiles), ...object(managed.profiles) },
   });
   if (
-    (prior && !isDeepStrictEqual(original, joined(prior))) ||
-    !isDeepStrictEqual(configToml(merged), joined(configToml(block)))
+    (prior &&
+      !isDeepStrictEqual(original, joined(prior), { skipPrototype: true })) ||
+    !isDeepStrictEqual(configToml(merged), joined(configToml(block)), {
+      skipPrototype: true,
+    })
   )
     throw new AgentSetupError('FILE');
   return merged;
