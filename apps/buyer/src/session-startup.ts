@@ -19,7 +19,7 @@ import { routedRequest } from './model-routes';
 import { classifyPaidError } from './paid-http';
 import { endpointToken, type startPaidBuyer } from './paid-startup';
 import { makeManager, type SessionState } from './session-manager';
-import { pinnedBusy, sessionRouter } from './session-routing';
+import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
@@ -89,6 +89,7 @@ function sessionExecutor(
 ): Awaited<ReturnType<BuyerExecutionFactory>>['execute'] {
   const { prepared, endpoint, relayOnly } = context;
   return async (input, signal, onDelta, model) => {
+    const request = routedRequest(prepared.config.request, model);
     const ports: BuyerRoutePorts<ChatResult> = {
       select: (excluded, current, route) =>
         selectWinner(
@@ -103,7 +104,7 @@ function sessionExecutor(
           excluded,
           current,
           {
-            ...routedRequest(prepared.config.request, model),
+            ...request,
             priceCeilings: route.priceCeilings,
             ...(inferenceNeedsTools(input) ? { tools: true } : {}),
           },
@@ -138,7 +139,7 @@ function sessionExecutor(
         ),
     };
     const routed = router
-      ? await router.execute(ports, signal)
+      ? await router.execute(ports, signal, routeScope(request))
       : await executeBuyerQuote(
           {
             ...ports,

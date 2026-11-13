@@ -23,7 +23,6 @@ import {
   type FreeWinner,
 } from './free-execution';
 import {
-  onceEachSeller,
   recordFault,
   sellerFault,
   stickySellers,
@@ -121,7 +120,7 @@ export function freeBuyerDependencies(
   };
 }
 
-export { onceEachSeller, sellerFault, stickySellers } from './free-memory';
+export { sellerFault, stickySellers } from './free-memory';
 export type PreparedSelection = NonNullable<
   Awaited<ReturnType<typeof prepareBuyerSelection>>
 >;
@@ -247,10 +246,8 @@ export async function selectWinner(
 ): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
-  const verifyIdentity = onceEachSeller(
-    (seller: StaticControlSeller, querySignal?: AbortSignal) =>
-      verifyBuyerIdentity(prepared.identity, seller, querySignal),
-  );
+  const verifyIdentity = (seller: StaticControlSeller, querySignal?: AbortSignal) =>
+    verifyBuyerIdentity(prepared.identity, seller, querySignal);
   const base = routedPolicy(policy, excluded, request, route);
   const config =
     base.discovery && prepared.discovery

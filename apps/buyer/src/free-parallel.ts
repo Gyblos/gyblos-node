@@ -46,6 +46,7 @@ export function freeAdmission(limit: number) {
       signal: AbortSignal,
       pick: (skip: ReadonlySet<string>) => Promise<Winner>,
     ): Promise<Winner> {
+      signal.throwIfAborted();
       // The next selection waits for the ones ahead and for this one, whether it runs or gives up waiting.
       const ahead = turn;
       let finished = () => {};

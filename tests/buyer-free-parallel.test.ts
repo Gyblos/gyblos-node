@@ -1,6 +1,6 @@
 // Free requests side by side: two at once go to different sellers, a second one with no free seller left is
 // busy (not a failure), a third is refused at the door, every reservation is returned however the request
-// ends, and one request checks each seller's identity once. Injected selection and execution only.
+// ends, and cancellation cannot strand selection admission. Injected selection and execution only.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -13,7 +13,6 @@ import {
   type FreeWinner,
 } from '@gyblos/buyer/free-execution';
 import { freeAdmission } from '@gyblos/buyer/free-parallel';
-import { onceEachSeller } from '@gyblos/buyer/free-selection';
 import { createReceiptWork } from '@gyblos/node/receipt-work';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
@@ -154,31 +153,6 @@ void test('a seller is handed back after a failure before sending, an abort, or 
   host.release();
   await Promise.all([one, two]);
   assert.deepEqual(host.ran.slice(-2), ['a', 'b']);
-});
-
-void test('one request checks each seller identity once, keeping refusals and retrying aborted checks', async () => {
-  let calls = 0;
-  const verify = onceEachSeller(async (seller: { nodeId: string }) => {
-    calls++;
-    return seller.nodeId !== 'bad';
-  });
-  const seller = { nodeId: 'a', owner: 'o' };
-  assert.equal(await verify(seller as never), true);
-  assert.equal(await verify(seller as never), true);
-  assert.equal(await verify({ nodeId: 'bad', owner: 'o' } as never), false);
-  assert.equal(await verify({ nodeId: 'bad', owner: 'o' } as never), false);
-  assert.equal(calls, 2);
-  // Another owner for the same node is a different claim, checked on its own.
-  assert.equal(await verify({ nodeId: 'a', owner: 'p' } as never), true);
-  assert.equal(calls, 3);
-  let failing = true;
-  const flaky = onceEachSeller(async () => {
-    if (failing) throw new Error('aborted');
-    return true;
-  });
-  await assert.rejects(flaky(seller as never));
-  failing = false;
-  assert.equal(await flaky(seller as never), true);
 });
 
 void test('selections never overlap, and one that gives up waiting neither waits on nor breaks the line', async () => {

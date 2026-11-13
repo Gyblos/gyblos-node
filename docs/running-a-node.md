@@ -1077,7 +1077,8 @@ beside it), `SELECTION_MAX_TOKENS_TOO_HIGH`, `SELECTION_REASONING_UNSUPPORTED`,
 The endpoint speaks two chat formats over the same execution, so OpenAI- and
 Anthropic-compatible clients and agents can point at it: set the client's base
 URL to `http://127.0.0.1:4031/v1` (OpenAI) or `http://127.0.0.1:4031`
-(Anthropic). `GET /v1/models` lists the one configured model.
+(Anthropic). `GET /v1/models` lists the models in `models`, or the one
+`request.selection` model when there is no list.
 
 OpenAI format, `POST /v1/chat/completions`:
 
@@ -1170,6 +1171,54 @@ In the Anthropic format the stream carries `message_start`, one text block's
 arrive whole at the end: in the OpenAI format one chunk with every `tool_calls`
 entry before the finish chunk; in the Anthropic format one `tool_use` block per
 call (its start, one `input_json_delta` with the whole input, its stop).
+OpenAI's Responses API, `POST /v1/responses` (the format Codex CLI speaks),
+takes the same model, conversation and function tools: `instructions` and
+leading `developer` or `system` messages become the system text, later ones
+(Codex sends one when the model changes) are sent as user text, consecutive
+`function_call` items form one assistant turn (checked together), and
+`function_call_output` items answer them. It is stateless: `store` must be
+false, and `previous_response_id`, structured `text.format`, custom, namespaced
+(MCP) or other provider tools, and audio or file parts are refused with a 400
+that names them. For Codex sessions, three things are left out rather than
+refused: the `web_search` tool Codex offers on every request (no seller runs
+it), `reasoning` and `web_search_call` records from a session that began on
+another provider, and images, which become a short `[image omitted …]` text so a
+session that once saw a picture goes on. `include`, `prompt_cache_key` and
+bookkeeping hints are accepted and ignored. Non-neutral reasoning, sampling
+settings and `parallel_tool_calls: false` are refused before execution: the
+signed protocol cannot express those constraints yet. Codex versions that
+require them are not supported until that follow-up. A stream sends
+`response.created`, the message item (`output_item.added`, `content_part.added`,
+`output_text.delta`, then their `done` events) once text starts, each call as a
+`function_call` item (`output_item.added`, `function_call_arguments.done`,
+`output_item.done`), and `response.completed` with usage; a token-limited answer
+ends with `response.incomplete`, status `incomplete`, and its delivered usage. A
+possible-send failure before the first stream event uses HTTP 400 and
+`invalid_prompt` to stop clients that ignore retry headers. A failure after the
+stream starts is `response.failed` with code `invalid_prompt` (which Codex shows
+and does not retry, since the prompt may have reached a seller), a readable
+message and the Gyblos code in `gyblos_code`. A conversation over the size the
+network carries gets code `context_length_exceeded`, so Codex compacts it. Paid
+endpoints serve text only, so they refuse Codex's tools.
+
+Codex CLI points at the endpoint as a custom provider in `~/.codex/config.toml`
+(the built-in `openai` provider sends fields only OpenAI accepts):
+
+```toml
+model = "qwen3-0.6b"
+model_provider = "gyblos"
+
+[model_providers.gyblos]
+name = "Gyblos"
+base_url = "http://127.0.0.1:4031/v1"
+wire_api = "responses"
+request_max_retries = 0
+stream_max_retries = 0
+```
+
+Leave MCP servers off for these sessions; switch models with `/model` and any
+name the endpoint serves.
+
 `POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
 over system, messages and tools) without contacting a seller. The default
 (absent or `false`) remains one complete JSON response.
@@ -1450,10 +1499,13 @@ start it again. The free buyer needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
 network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,
-`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
-`BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
-is not a private 0600 regular file with one name, owned by you and holding a
-token; it is never repaired, since its token may already have been read).
+`BUYER_PAID_MODELS_UNSUPPORTED` (the older explicit paid entry,
+`startPaidBuyer`, serves only `request.selection` and refuses a `models` list;
+the automatic buyer serves the list), `BUYER_WALLET_KEY_INVALID`,
+`BUYER_TOKENIZER_UNAVAILABLE`, `BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and
+`BUYER_API_TOKEN_INVALID` (`api-token` is not a private 0600 regular file with
+one name, owned by you and holding a token; it is never repaired, since its
+token may already have been read).
 
 ## Private free-inference receipts
 

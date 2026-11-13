@@ -39,23 +39,6 @@ export function stickySellers(limit: number) {
   };
 }
 
-// One selection checks each seller's registered identity once, however many steps ask (discovery, catalog,
-// quote): a decision is kept for this selection only, and a check that threw (an abort, an outage that
-// stops the request) is not kept.
-export function onceEachSeller<
-  Seller extends { nodeId: string; owner: string },
->(verify: (seller: Seller, signal?: AbortSignal) => Promise<boolean>) {
-  const decided = new Map<string, boolean>();
-  return async (seller: Seller, signal?: AbortSignal) => {
-    const key = `${seller.nodeId} ${seller.owner}`;
-    const known = decided.get(key);
-    if (known !== undefined) return known;
-    const ok = await verify(seller, signal);
-    decided.set(key, ok);
-    return ok;
-  };
-}
-
 // Failures that are the seller's: one it reported (its engine or generation failed), or, once the prompt
 // was sent, a stalled or out-of-protocol answer. The buyer's own refusals before sending (an expired quote,
 // relay rules, its request) and its own faults are not held against a seller.
