@@ -156,7 +156,12 @@ is dialed by NodeId through the first configured relay (`GYBLOS_RELAYS`); the
 index supplies no address. Configured sellers come first and the candidate list
 stays within 16. Their stats live in memory only, so `selection-stats.json`
 keeps the configured sellers alone. With open discovery `sellers` may be empty.
-The usual replay and withdrawal checks still apply.
+The usual replay and withdrawal checks still apply. Only free execution uses
+these sellers (paid and session execution keep their configured list), and never
+one the request already tried. Each selection makes at most 16 new identity
+lookups; an identity the registry refused is not looked up again for five
+minutes; and one buyer process admits at most 64 such sellers, so the identity
+and discovery state files keep room for the configured ones.
 
 ## Seller duties
 
