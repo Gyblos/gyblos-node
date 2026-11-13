@@ -398,3 +398,9 @@ export const SELLER_REGISTRATION_STATE = {
   maxBytes: 8192,
   secretBytes: 64,
 } as const;
+
+// Configuration-generator errors are shared by node policy and its host commands.
+export const AGENT_SETUP_CODES = {
+  ENDPOINT: 'ENDPOINT',
+  FILE: 'FILE',
+} as const;
