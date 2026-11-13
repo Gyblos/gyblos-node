@@ -1,9 +1,6 @@
-// One source for connecting coding agents to a local Gyblos buyer: OpenCode, pi, Codex CLI and Claude Code.
-// From the endpoint and the models it serves, each tool gets its own configuration text, and the JSON
-// files a tool reads can be merged without touching anything but the `gyblos` provider. Both the buyer
-// command and the desktop app use these, so the two never drift. Pure: no files, network or secrets; a
-// paid endpoint's token is referenced by environment variable name, never written.
-
+// Shared configuration text and safe merges for coding agents using one local buyer endpoint.
+// Pure configuration only: no files, network or secret values; tokens use environment references.
+// Node owns the generators, and each host owns its file writes.
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
