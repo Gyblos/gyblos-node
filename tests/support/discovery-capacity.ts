@@ -19,7 +19,7 @@ import { discoveryHome, discoveryRun } from './buyer-discovery';
 export const capacityNode = (n: number) => n.toString(16).padStart(64, '0');
 export async function discoveryCapacityFixture(
   t: TestContext,
-  count = BUYER_DISCOVERY.openSellers,
+  count: number = BUYER_DISCOVERY.openSellers,
 ) {
   const home = await discoveryHome();
   home.environment.GYBLOS_HOME = await realpath(home.directory);

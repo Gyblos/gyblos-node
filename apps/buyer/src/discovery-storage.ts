@@ -17,8 +17,12 @@ import {
 
 import { BUYER_DISCOVERY, BUYER_SELECTION_CODES } from './constants';
 import {
+  discoveryAdmission,
+  matchesDiscovery,
+  type DiscoveryAdmission,
+} from './discovery-admission';
+import {
   discoveryObservation,
-  discoveryRowLive,
   mergeDiscoveryRow,
   parseDiscoveryRow,
   type DiscoveryRow,
@@ -135,7 +139,33 @@ async function writeRows(
     await rm(temporary, { force: true });
   }
 }
-export async function buyerDiscoveryState(environment: HomeEnvironment) {
+// Capacity refusals preserve the observed snapshot without becoming permanent storage failures.
+function admittedObservation(
+  current: ReadonlyMap<string, DiscoveryRow>,
+  incoming: DiscoveryRow,
+  allowOwnerChange: boolean | undefined,
+  admission: ReturnType<typeof discoveryAdmission>,
+) {
+  const result = mergeDiscoveryRow(
+    current.get(incoming.nodeId),
+    incoming,
+    allowOwnerChange,
+  );
+  if (admission && !admission.accepts(current, result.row, admission.now()))
+    return undefined;
+  if (
+    !current.has(incoming.nodeId) &&
+    current.size >= BUYER_DISCOVERY.maxStateRows
+  )
+    unavailable();
+  return result;
+}
+
+export async function buyerDiscoveryState(
+  environment: HomeEnvironment,
+  policy?: DiscoveryAdmission,
+) {
+  const admission = discoveryAdmission(policy);
   await assertRoleHome(P2P_ROLES.BUYER, environment);
   const { directory, path, lock } = await discoveryPaths(environment);
   let rows = await readRows(path);
@@ -147,20 +177,17 @@ export async function buyerDiscoveryState(environment: HomeEnvironment) {
       now: number,
     ) {
       if (failed) unavailable();
-      return identities.filter((identity) => {
-        const row = rows.get(identity.nodeId);
-        return row?.owner === identity.owner && discoveryRowLive(row, now);
-      });
+      return identities.filter((identity) =>
+        matchesDiscovery(rows, identity, now, admission),
+      );
     },
     async permits(owner: string, nodeId: string, digest: string, now: number) {
       if (failed) unavailable();
       await privateDirectory(directory);
       rows = await readMonotonicRows(path, rows);
-      const row = rows.get(nodeId);
       return (
-        row?.owner === owner &&
-        row.catalogDigest === digest &&
-        discoveryRowLive(row, now)
+        rows.get(nodeId)?.catalogDigest === digest &&
+        matchesDiscovery(rows, { owner, nodeId }, now, admission)
       );
     },
     async observe(
@@ -180,16 +207,16 @@ export async function buyerDiscoveryState(environment: HomeEnvironment) {
         await privateDirectory(directory);
         handle = await open(lock, 'wx', FILE_MODES.privateFile);
         const current = await readMonotonicRows(path, rows);
-        if (
-          !current.has(incoming.nodeId) &&
-          current.size >= BUYER_DISCOVERY.maxStateRows
-        )
-          unavailable();
-        const result = mergeDiscoveryRow(
-          current.get(incoming.nodeId),
+        const result = admittedObservation(
+          current,
           incoming,
           options.allowOwnerChange,
+          admission,
         );
+        if (!result) {
+          rows = current;
+          return false;
+        }
         current.set(incoming.nodeId, result.row);
         await writeRows(path, directory, current);
         rows = current;
