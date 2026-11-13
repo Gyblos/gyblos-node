@@ -59,6 +59,12 @@ fixed deadline.
 
 ## Required hosted controls
 
+CI, Security and Static analysis run on pull requests into `main` and on pushes
+to `main`. A stacked pull request (based on another branch) runs none of them;
+its changes are checked once when the chain's bottom pull request, the one into
+`main`, carries them. Merge a stack top-down into each base, then merge the
+bottom pull request only after its checks pass on the combined head.
+
 Protect `main` with mandatory pull requests and successful current checks:
 `CI / check`, `Security / Secrets`, `Security / Dependencies` and
 `Static analysis / Semgrep CE`. Confirm the actual check contexts from
