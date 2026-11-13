@@ -136,3 +136,33 @@ export function recordExecutionFailure(
     observedWaitMs: prior?.observedWaitMs ?? null,
   });
 }
+
+// Apply this selection's deltas to current statistics, preserving concurrent execution updates.
+export function mergeSelectionStats(
+  live: Map<string, LocalSellerStats>,
+  before: ReadonlyMap<string, LocalSellerStats>,
+  selected: ReadonlyMap<string, LocalSellerStats>,
+) {
+  for (const [nodeId, row] of selected) {
+    const prior = before.get(nodeId);
+    if (prior === row) continue;
+    const current = live.get(nodeId);
+    const metadata = <
+      Key extends keyof Omit<LocalSellerStats, 'successes' | 'failures'>,
+    >(
+      key: Key,
+    ) =>
+      current?.[key] !== prior?.[key] ? (current?.[key] ?? null) : row[key];
+    live.set(nodeId, {
+      successes:
+        (current?.successes ?? 0) + row.successes - (prior?.successes ?? 0),
+      failures:
+        (current?.failures ?? 0) + row.failures - (prior?.failures ?? 0),
+      latencyMs: metadata('latencyMs'),
+      waitAccuracy: metadata('waitAccuracy'),
+      cooldownUntil: metadata('cooldownUntil'),
+      quotedWaitMs: metadata('quotedWaitMs'),
+      observedWaitMs: metadata('observedWaitMs'),
+    });
+  }
+}

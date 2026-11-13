@@ -18,15 +18,12 @@ import { connectBuyerControl } from './control';
 import { discoverBuyerSellers } from './discovery';
 import { FreeBuyerError } from './free-chat';
 import {
+  createConversationKey,
   FreeSelectionFailure,
   type FreeBuyerDependencies,
   type FreeWinner,
 } from './free-execution';
-import {
-  recordFault,
-  sellerFault,
-  stickySellers,
-} from './free-memory';
+import { recordFault, sellerFault, stickySellers } from './free-memory';
 import { freeAdmission } from './free-parallel';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
@@ -36,6 +33,7 @@ import type {
   StaticControlSeller,
 } from './selection-config';
 import type { prepareBuyerSelection } from './selection-runtime';
+import { mergeSelectionStats } from './selection-stats';
 import type { SellerFailureReporter } from './seller-failures';
 
 export function freeBuyerDependencies(
@@ -61,6 +59,7 @@ export function freeBuyerDependencies(
     permitsWinner(prepared, winner, now());
 
   return {
+    conversationKey: createConversationKey(),
     telemetry: options.telemetry
       ? {
           sink: options.telemetry,
@@ -246,8 +245,10 @@ export async function selectWinner(
 ): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
-  const verifyIdentity = (seller: StaticControlSeller, querySignal?: AbortSignal) =>
-    verifyBuyerIdentity(prepared.identity, seller, querySignal);
+  const verifyIdentity = (
+    seller: StaticControlSeller,
+    querySignal?: AbortSignal,
+  ) => verifyBuyerIdentity(prepared.identity, seller, querySignal);
   const base = routedPolicy(policy, excluded, request, route);
   const config =
     base.discovery && prepared.discovery
@@ -290,8 +291,7 @@ export async function selectWinner(
   signal.throwIfAborted();
   // Only the rows this selection changed: an execution or another selection may have recorded others
   // meanwhile, and a whole rewrite would erase them.
-  for (const [nodeId, row] of stats)
-    if (before.get(nodeId) !== row) prepared.stats.rows.set(nodeId, row);
+  mergeSelectionStats(prepared.stats.rows, before, stats);
   await prepared.stats.save();
   if (!result.ok)
     throw new FreeSelectionFailure(

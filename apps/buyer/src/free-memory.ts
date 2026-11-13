@@ -1,5 +1,4 @@
-// What one free buyer remembers: in memory only, the seller each recent conversation went to and, within one
-// selection, each seller's identity decision; and, in its stats, the executions a seller failed.
+// One buyer remembers recent conversation sellers in memory and execution failures in local statistics.
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
@@ -56,9 +55,10 @@ const AFTER_SENDING: ReadonlySet<string> = new Set([
 ]);
 export const sellerFault = (error: unknown) =>
   error instanceof FreeClientError &&
+  !error.consumerFailure &&
   (error.remote
     ? REPORTED.has(error.code)
-    : error.sent && AFTER_SENDING.has(error.code));
+    : error.sent && (error.ioFailure || AFTER_SENDING.has(error.code)));
 // A failed execution lowers its seller's weight; saving the record is best effort, never the request's
 // failure.
 export async function recordFault(
