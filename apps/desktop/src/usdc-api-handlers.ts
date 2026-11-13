@@ -162,7 +162,10 @@ class UsdcApiHost {
           error instanceof AgentSetupError &&
           error.code === AGENT_SETUP_CODES.ENDPOINT
             ? 'Could not read the models served by the local buyer. Start the buyer and refresh; no model was substituted.'
-            : 'Could not confirm API key status. Check Payments and refresh before using the connection.',
+            : error instanceof AgentSetupError &&
+                error.code === AGENT_SETUP_CODES.FILE
+              ? 'The agent configuration has conflicting or unmanaged settings. Review it before writing; no conflicting file was overwritten.'
+              : 'Could not confirm API key status. Check Payments and refresh before using the connection.',
       };
     } finally {
       this.busy = false;

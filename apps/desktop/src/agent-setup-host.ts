@@ -39,7 +39,12 @@ export async function prepareAgentSetup(
       files.home,
       files.environment,
     );
-    return { ...preview, ...written };
+    return {
+      ...preview,
+      path: written.path,
+      ...(written.backup !== undefined ? { backup: written.backup } : {}),
+      ...(written.profiles !== undefined ? { profiles: written.profiles } : {}),
+    };
   }
   return preview;
 }

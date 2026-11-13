@@ -86,6 +86,9 @@ function AgentPreview({ preview }: { preview: AgentSetupPreview | undefined }) {
       {preview.backup && (
         <p role="status">Original configuration saved at {preview.backup}.</p>
       )}
+      {preview.profiles && (
+        <p role="status">Profile files: {preview.profiles.join(', ')}</p>
+      )}
     </>
   );
 }
@@ -138,6 +141,12 @@ function AgentSetupDialog({
         </p>
       )}
       <AgentPreview preview={preview} />
+      {tool === AGENT_TOOLS.CODEX && (
+        <p className="ui-help-text">
+          Codex uses config.toml plus a separate profile file per model. Write
+          configuration creates those files; the copied preview labels each one.
+        </p>
+      )}
       <p className="ui-help-text">
         Set {USDC_AGENT_SETUP.tokenEnv} in the shell where you start the agent,
         using Copy API key. These files contain the variable name only. Keep

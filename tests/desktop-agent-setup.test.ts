@@ -63,6 +63,7 @@ void test('desktop copies generated references and writes only its host-selected
   for (const _ of [1, 2]) {
     const written = await f.run(USDC_API_ACTION.WRITE_AGENT, AGENT_TOOLS.PI);
     assert.equal(written.error, null);
+    assert.doesNotThrow(() => parseUsdcApiState(written));
     assert.equal(written.setup?.path, path);
   }
   assert.equal(await readFile(`${path}.before-gyblos`, 'utf8'), original);

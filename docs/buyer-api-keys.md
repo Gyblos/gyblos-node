@@ -25,7 +25,9 @@ Preview and copy use the same generators as `pnpm buyer:agent`. Codex uses the
 Responses interface, with HTTP and stream retries disabled. **Write
 configuration** uses the CLI's shared atomic writer, preserves other settings
 and keeps the first `.before-gyblos` backup. New files are private from
-creation. Existing symlinked configurations retain their link. Claude Code uses
+creation. Existing symlinked configurations retain their link. Codex writes the
+provider in config.toml and separate managed profile files beside it, one per
+model; the preview and write confirmation name those files. Claude Code uses
 shell environment settings instead of a file, so its configuration is copy-only.
 
 The generated configuration references `GYBLOS_API_KEY`; it never contains the

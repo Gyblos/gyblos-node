@@ -14,6 +14,7 @@ export interface AgentSetupPreview {
   models: string[];
   path?: string;
   backup?: string;
+  profiles?: string[];
 }
 export function parseAgentSetupPreview(input: unknown): AgentSetupPreview {
   const present = (field: string) =>
@@ -24,6 +25,7 @@ export function parseAgentSetupPreview(input: unknown): AgentSetupPreview {
     'models',
     ...(present('path') ? ['path'] : []),
     ...(present('backup') ? ['backup'] : []),
+    ...(present('profiles') ? ['profiles'] : []),
   ]);
   const tool = Object.values(AGENT_TOOLS).find((tool) => tool === row.tool);
   if (
@@ -46,11 +48,24 @@ export function parseAgentSetupPreview(input: unknown): AgentSetupPreview {
         row[field].length > USDC_AGENT_SETUP.maxPathCharacters)
     )
       throw new Error('Invalid agent configuration');
+  const profiles = row.profiles;
+  if (
+    profiles !== undefined &&
+    (!Array.isArray(profiles) ||
+      profiles.length > AGENT_SETUP.maxModels + 1 ||
+      !profiles.every(
+        (path): path is string =>
+          typeof path === 'string' &&
+          path.length <= USDC_AGENT_SETUP.maxPathCharacters,
+      ))
+  )
+    throw new Error('Invalid agent configuration');
   return {
     tool,
     text: row.text,
     models: row.models,
     ...(typeof row.path === 'string' ? { path: row.path } : {}),
     ...(typeof row.backup === 'string' ? { backup: row.backup } : {}),
+    ...(Array.isArray(profiles) ? { profiles } : {}),
   };
 }
