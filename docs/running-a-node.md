@@ -1242,6 +1242,17 @@ their own admission. The buyer checks registered identity again after quoting,
 before admitting the winner, even if discovery or catalog checks succeeded. No
 identity decision is reused for final admission.
 
+A free buyer goes back to the seller that served a conversation (known by a
+digest of its model, system text and first user message, kept in memory only for
+the last 256 conversations), so a warm prompt cache can answer sooner: that
+seller is kept among the candidates when it is still competitive, and another
+seller's quote waits up to 500 ms for its quote. A seller that fails while
+executing (its connection breaks or it answers out of protocol, not the buyer's
+own deadline or a client that left) counts a failure, so it weighs less in later
+selections; it is not cooled down (a seller that is gone already is at its next
+quote, and a buyer's only seller stays reachable). When that happens before the
+prompt was sent, the request moves to another seller as before.
+
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
 413 for an oversized body, 429 when the endpoint is already running as many
 requests as it can (safe to retry), 503 when no seller could take the request,

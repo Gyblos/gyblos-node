@@ -9,6 +9,7 @@ import {
 } from '@gyblos/config/home';
 import {
   evaluateIdentityPolicy,
+  IDENTITY_POLICY_CODES,
   type IdentityLookup,
   type IdentityPolicyDecision,
   type IdentityRegistryScope,
@@ -16,8 +17,11 @@ import {
 } from '@gyblos/core/identity-policy';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
-import { IDENTITY_STATE } from './constants';
 import { assertRoleHome } from './home';
+import {
+  identityAdmission,
+  type BuyerIdentityAdmission,
+} from './identity-state-admission';
 import {
   acquireIdentityLock,
   identityDirectory,
@@ -30,6 +34,7 @@ import {
   encodeIdentityStates,
   identityStateUnavailable,
   parseIdentityStates,
+  recordIdentityDecision,
 } from './identity-state-schema';
 
 export interface BuyerIdentityInput {
@@ -41,9 +46,11 @@ export interface BuyerIdentityInput {
 export async function openBuyerIdentityState(
   environment: HomeEnvironment,
   value: IdentityRegistryScope,
+  admission?: BuyerIdentityAdmission,
 ) {
   try {
     const scope = checkedIdentityScope(value);
+    const admit = identityAdmission(admission);
     await assertRoleHome(P2P_ROLES.BUYER, environment);
     const directory = await identityDirectory(
       homeLayout(environment).roles.buyer,
@@ -80,19 +87,18 @@ export async function openBuyerIdentityState(
               ? new Map<string, IdentityState>()
               : parseIdentityStates(bytes, scope);
           assertIdentityMonotonic(held, current);
+          if (!admit(current, input.nodeId)) {
+            // Preserve every observed floor even when this new identity is refused without writing.
+            held = current;
+            exists = bytes !== undefined;
+            return { ok: false, code: IDENTITY_POLICY_CODES.LIMIT };
+          }
           const decision = evaluateIdentityPolicy({
             ...input,
             scope,
             previous: current.get(input.nodeId),
           });
-          if (decision.state) {
-            if (
-              !current.has(decision.state.binding.nodeId) &&
-              current.size >= IDENTITY_STATE.maxRows
-            )
-              identityStateUnavailable();
-            current.set(decision.state.binding.nodeId, decision.state);
-          }
+          recordIdentityDecision(current, decision);
           await writeIdentityFile(path, encodeIdentityStates(current, scope));
           held = current;
           exists = true;

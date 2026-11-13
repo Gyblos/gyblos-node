@@ -51,7 +51,12 @@ export async function prepareConfiguredBuyerSelection(
   for (const nodeId of stats.rows.keys())
     if (!configured.has(nodeId)) stats.rows.delete(nodeId);
   const discovery = config.discovery
-    ? await buyerDiscoveryState(environment)
+    ? await buyerDiscoveryState(
+        environment,
+        config.discovery.open
+          ? { configuredNodeIds: [...configured] }
+          : undefined,
+      )
     : undefined;
   const identity = await prepareBuyerIdentity(environment, config);
   return { config, stats, discovery, identity };

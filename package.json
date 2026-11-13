@@ -44,6 +44,7 @@
     "node:start": "node --import tsx apps/node/src/bin.ts start",
     "gyblos": "node --import tsx apps/node/src/bin.ts",
     "buyer:start": "node --import tsx apps/buyer/src/main.ts",
+    "buyer:agent": "node --import tsx apps/buyer/src/agent-cli.ts",
     "buyer:call": "node --import tsx apps/buyer/src/call.ts",
     "buyer:reconcile": "node --import tsx apps/buyer/src/reconcile.ts",
     "buyer:reconcile:paid": "node --import tsx apps/buyer/src/reconcile-paid.ts",
