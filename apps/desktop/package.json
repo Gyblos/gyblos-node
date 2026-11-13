@@ -89,20 +89,20 @@
     "@gyblos/node": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/protocol": "workspace:*",
-    "@number0/iroh": "1.1.0",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "@number0/iroh": "1.2.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "@phosphor-icons/react": "2.1.10",
     "@solana/kit": "5.1.0",
     "@gyblos/discovery-http": "workspace:*",
     "@gyblos/runtime": "workspace:*"
   },
   "devDependencies": {
-    "electron": "45.0.0",
+    "electron": "45.3.0",
     "@electron/packager": "20.3.0",
     "esbuild": "0.28.2",
-    "vite": "8.3.6",
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2"
+    "vite": "8.3.7",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0"
   }
 }
