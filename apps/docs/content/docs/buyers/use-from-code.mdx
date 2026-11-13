@@ -14,7 +14,7 @@ peer-to-peer connection.
 | -------------------------------------------------------------------- | --------------------------------------- |
 | Whole conversations: system message, history, new message            | Yes, up to 1024 messages                |
 | OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming        |
-| `GET /v1/models`                                                     | Yes, the model your buyer asks for      |
+| `GET /v1/models`                                                     | Yes, every model your buyer serves      |
 | Free offers                                                          | Yes                                     |
 | Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                |
 | Claude Code                                                          | Only with a seller on a larger model    |
@@ -193,6 +193,31 @@ answers 503 and says so.
 
 The default model, qwen3:0.6b, handles simple calls like this one. Agents that send many tools and long
 instructions, such as Claude Code, need a seller on a larger model through the OpenAI or Anthropic engine.
+
+## Switch models [#switch-models]
+
+One buyer can serve several models by name. List them in `selection.json` under `models`; the list must
+include the model in `request.selection`. A client switches by sending another name as `model` (`/model`
+in most agents). Each request carries the whole conversation, so the next model reads everything said
+before; only the previous seller's cache is lost, so the first answer may take a little longer.
+
+```json
+"models": [
+  { "id": "qwen3-0.6b", "selection": { "modelId": "qwen3-0.6b", "variant": null, "quantization": "Q4_K_M" }, "maxTokens": 2000 },
+  { "id": "gpt-oss-20b", "aliases": ["gpt-oss"], "selection": { "modelId": "gpt-oss-20b", "variant": null, "quantization": null } }
+]
+```
+
+A name the buyer does not serve gets a 404 that lists the ones it does. Paid modes accept only the pinned
+paid model and its token limit in this list.
+
+## If a seller drops [#if-a-seller-drops]
+
+If a seller fails before your question reaches it, the buyer moves the request to another seller without
+you noticing. Once the question may have reached a seller, the buyer never sends it to a second one, to
+keep your prompt with as few sellers as possible: you get an error that SDKs do not retry, and sending the
+message again picks another seller. A seller that fails counts against it in later choices, and the next
+turn of a conversation goes back to the seller that answered the last one when it is still competitive.
 
 ## Options and errors [#options-and-errors]
 

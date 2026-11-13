@@ -14,7 +14,7 @@ respuesta en streaming por una conexión directa entre pares.
 | ------------------------------------------------------------------------- | ---------------------------------------------- |
 | Conversaciones completas: mensaje de sistema, historial y mensaje nuevo   | Sí, hasta 1024 mensajes                        |
 | `POST /v1/chat/completions` de OpenAI y `POST /v1/messages` de Anthropic  | Sí, respuestas completas y en streaming        |
-| `GET /v1/models`                                                          | Sí, el modelo que pide tu comprador            |
+| `GET /v1/models`                                                          | Sí, todos los modelos que sirve tu comprador   |
 | Ofertas gratuitas                                                         | Sí                                             |
 | Herramientas (function calling), ambos formatos, completas y en streaming | Sí, ver [Herramientas](#herramientas)          |
 | Claude Code                                                               | Solo con un vendedor de un modelo más grande   |
@@ -195,6 +195,33 @@ si ninguno lo hace, responde 503 y lo dice.
 El modelo por defecto, qwen3:0.6b, resuelve llamadas simples como esta. Los agentes que envían muchas
 herramientas e instrucciones largas, como Claude Code, necesitan un vendedor con un modelo más grande, a
 través del motor OpenAI o Anthropic.
+
+## Cambiar de modelo [#cambiar-de-modelo]
+
+Un comprador puede servir varios modelos por nombre. Agrégalos en `selection.json` bajo `models`; la lista
+debe incluir el modelo de `request.selection`. Un cliente cambia de modelo enviando otro nombre en `model`
+(`/model` en la mayoría de los agentes). Cada pedido lleva la conversación completa, así que el siguiente
+modelo lee todo lo anterior; solo se pierde el caché del vendedor anterior, por lo que la primera respuesta
+puede tardar un poco más.
+
+```json
+"models": [
+  { "id": "qwen3-0.6b", "selection": { "modelId": "qwen3-0.6b", "variant": null, "quantization": "Q4_K_M" }, "maxTokens": 2000 },
+  { "id": "gpt-oss-20b", "aliases": ["gpt-oss"], "selection": { "modelId": "gpt-oss-20b", "variant": null, "quantization": null } }
+]
+```
+
+Un nombre que el comprador no sirve recibe un 404 con la lista de los que sí sirve. Los modos pagados solo
+aceptan en esta lista el modelo pagado fijado y su límite de tokens.
+
+## Si un vendedor se cae [#si-un-vendedor-se-cae]
+
+Si un vendedor falla antes de que tu pregunta le llegue, el comprador pasa el pedido a otro sin que lo
+notes. Cuando la pregunta ya pudo llegar a un vendedor, el comprador nunca la envía a un segundo, para que
+tu prompt pase por la menor cantidad de vendedores posible: recibes un error que los SDK no reintentan, y
+al enviar el mensaje de nuevo se elige otro vendedor. Un vendedor que falla pierde prioridad en las
+siguientes elecciones, y el siguiente turno de una conversación vuelve al vendedor que respondió el
+anterior mientras siga siendo competitivo.
 
 ## Opciones y errores [#opciones-y-errores]
 
