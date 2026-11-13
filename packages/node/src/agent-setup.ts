@@ -6,7 +6,9 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { parse } from 'smol-toml';
 
-import { AGENT_SETUP_CODES } from './constants';
+import { AGENT_SETUP_CODES } from './agent-setup-constants';
+
+export { AGENT_SETUP_CODES } from './agent-setup-constants';
 
 export const AGENT_TOOLS = {
   OPENCODE: 'opencode',
