@@ -1,11 +1,18 @@
 // Desktop agents use exactly the shared generator and writer for the connected buyer's real model list.
 import assert from 'node:assert/strict';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 
-import { USDC_API_ACTION } from '@gyblos/desktop/usdc-api-model';
-import { AGENT_TOOLS, agentFilePath } from '@gyblos/node/agent-setup';
+import {
+  parseUsdcApiState,
+  USDC_API_ACTION,
+} from '@gyblos/desktop/usdc-api-model';
+import {
+  AGENT_TOOLS,
+  agentFilePath,
+  codexProfiles,
+} from '@gyblos/node/agent-setup';
 import { agentText } from '@gyblos/node/agent-setup-host';
 
 import { desktopAgentFixture } from './support/desktop-agent';
@@ -102,4 +109,37 @@ void test('one app-created key switches between the buyer models through the sha
     assert.equal(result.status, 'completed');
   }
   assert.equal(f.generations(), 2);
+});
+
+void test('desktop Codex writes the current separate profile files and validates their IPC metadata', async (t) => {
+  const f = await desktopAgentFixture();
+  t.after(() => f.close());
+  const written = await f.run(USDC_API_ACTION.WRITE_AGENT, AGENT_TOOLS.CODEX);
+  assert.equal(written.error, null);
+  assert.doesNotThrow(() => parseUsdcApiState(written));
+  const state = parseUsdcApiState(written);
+  const profiles = codexProfiles({
+    origin: f.origin,
+    models: f.models.map((model) => ({
+      id: model.id,
+      maxOutputTokens: model.maxTokens,
+    })),
+    tokenEnv: 'GYBLOS_API_KEY',
+  });
+  const expected = profiles.map((profile) =>
+    join(f.environment.CODEX_HOME, profile.file),
+  );
+  assert.deepEqual(state.setup?.profiles, expected);
+  const config = await readFile(
+    join(f.environment.CODEX_HOME, 'config.toml'),
+    'utf8',
+  );
+  assert.doesNotMatch(config, /\[profiles\./);
+  assert.match(config, /wire_api = "responses"/);
+  for (const profile of profiles) {
+    const path = join(f.environment.CODEX_HOME, profile.file);
+    assert.equal(await readFile(path, 'utf8'), profile.text);
+    assert.equal((await stat(path)).mode & 0o777, 0o600);
+  }
+  assert.equal(f.generations(), 0);
 });
