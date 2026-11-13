@@ -34,6 +34,7 @@ import {
   type AgentEndpoint,
   type AgentTool,
 } from '@gyblos/node/agent-setup';
+import { AGENT_SETUP_CODES } from '@gyblos/node/constants';
 import { isMain } from '@gyblos/runtime';
 
 import { endpointRoutes } from './model-routes';
@@ -49,7 +50,7 @@ export async function agentEndpoint(
   const config = await loadBuyerSelectionConfig(environment).catch(
     () => undefined,
   );
-  if (!config) throw new AgentSetupError('ENDPOINT');
+  if (!config) throw new AgentSetupError(AGENT_SETUP_CODES.ENDPOINT);
   return {
     origin: `http://${LOCALHOST}:${PORTS.buyerProxy}`,
     models: endpointRoutes({
@@ -106,7 +107,7 @@ export async function writeAgentFile(
     tool === AGENT_TOOLS.OPENCODE &&
     (await existing(`${path}c`)) !== undefined
   )
-    throw new AgentSetupError('FILE'); // opencode.jsonc: comments this command would drop
+    throw new AgentSetupError(AGENT_SETUP_CODES.FILE); // opencode.jsonc: comments this command would drop
   const before = await existing(path);
   const text =
     tool === AGENT_TOOLS.CODEX
@@ -201,7 +202,7 @@ export async function main(argv = process.argv.slice(2)) {
 
 function failure(error: unknown) {
   if (error instanceof AgentSetupError)
-    return error.code === 'FILE'
+    return error.code === AGENT_SETUP_CODES.FILE
       ? 'That file has comments (or is opencode.jsonc), is not plain JSON, or already defines gyblos outside the managed block; print the configuration without --write and paste it yourself.'
       : 'Could not read the models from selection.json; run pnpm buyer:init first.';
   const { code, path } = error as NodeJS.ErrnoException;
