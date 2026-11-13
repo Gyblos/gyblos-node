@@ -23,7 +23,15 @@ export async function prepareBuyerIdentity(
   if (!config.identity) return undefined;
   if (config.request.network !== DEVNET)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
-  return openBuyerIdentityVerifier(environment, config.identity.rpcUrl);
+  return openBuyerIdentityVerifier(
+    environment,
+    config.identity.rpcUrl,
+    config.discovery?.open
+      ? {
+          configuredNodeIds: config.sellers.map((seller) => seller.nodeId),
+        }
+      : undefined,
+  );
 }
 export async function verifyBuyerIdentity(
   verifier: BuyerIdentityVerifier | undefined,

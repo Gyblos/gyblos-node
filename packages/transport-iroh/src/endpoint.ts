@@ -20,7 +20,11 @@ import {
   type RelayEnvironment,
 } from './relays';
 
-export { assertConfiguredRelay, requireConfiguredRelay } from './relays';
+export {
+  assertConfiguredRelay,
+  primaryRelayUrl,
+  requireConfiguredRelay,
+} from './relays';
 export type { RelayEnvironment } from './relays';
 
 export interface BindEndpointOptions {

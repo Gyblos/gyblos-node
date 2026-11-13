@@ -2,6 +2,7 @@
 // Sequence strings stay exact u64 values; malformed or duplicate rows never reset trust history.
 import {
   evaluateIdentityPolicy,
+  type IdentityPolicyDecision,
   type IdentityRegistryScope,
   type IdentityState,
 } from '@gyblos/core/identity-policy';
@@ -122,4 +123,16 @@ export function assertIdentityMonotonic(
     )
       identityStateUnavailable();
   }
+}
+
+// Append only verified policy state; unknown identities never evict existing replay history.
+export function recordIdentityDecision(
+  current: Map<string, IdentityState>,
+  decision: IdentityPolicyDecision,
+) {
+  if (!decision.state) return;
+  const nodeId = decision.state.binding.nodeId;
+  if (!current.has(nodeId) && current.size >= IDENTITY_STATE.maxRows)
+    identityStateUnavailable();
+  current.set(nodeId, decision.state);
 }
