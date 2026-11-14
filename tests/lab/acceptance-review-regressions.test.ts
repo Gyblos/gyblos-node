@@ -1,14 +1,22 @@
-// Reproduces review failures with in-memory module doubles and disposable state only.
-// Child output is static evidence; no real engine, remote index, RPC, keys or payments are used.
+// Reproduces acceptance regressions with disposable state and bounded synthetic child processes.
+// Replay uses the actual native phase directly; no real engine, remote RPC, keys or payments.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
+import { ACCEPTANCE_CODES } from '@gyblos/lab-harness/acceptance/constants';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 
+import { acceptanceReplay } from '../support/acceptance-replay';
 import { NATIVE_TEST_OPTIONS } from '../support/native-runtime';
+
+const REGRESSION_TIMEOUT_MS = 15000;
+const REPLAY_TEST_OPTIONS = {
+  ...NATIVE_TEST_OPTIONS,
+  timeout: REGRESSION_TIMEOUT_MS,
+};
 
 function child(
   source: string,
@@ -39,7 +47,7 @@ function child(
   args.push('--import', 'tsx', '--input-type=module', '--eval', source);
   return spawnSync(process.execPath, args, {
     encoding: 'utf8',
-    timeout: 15000,
+    timeout: REGRESSION_TIMEOUT_MS,
     maxBuffer: 65536,
     env: { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR },
   });
@@ -66,36 +74,64 @@ void test(
 
 void test(
   'acceptance refuses lost buyer replay persistence before any fresh observation can repair it',
-  NATIVE_TEST_OPTIONS,
-  () => {
-    const wrapper = `
-      import {buyerDiscoveryState as actual} from '@gyblos/buyer/discovery-storage';
-      import {mkdtemp,mkdir,rm} from 'node:fs/promises';
-      import {tmpdir} from 'node:os';
-      import {join} from 'node:path';
-      const roots=[];
-      export let opens=0;
-      export async function buyerDiscoveryState(){
-        opens++;const root=await mkdtemp(join(tmpdir(),'acceptance-lost-store-'));roots.push(root);
-        await mkdir(join(root,'buyer'),{mode:0o700});
-        return actual({GYBLOS_HOME:root});
-      }
-      export async function cleanup(){for(const root of roots)await rm(root,{recursive:true,force:true});}
-    `;
-    const result = child(
-      `
-      const state=await import('@gyblos/buyer/discovery-storage');
-      const {runNodeDiscoveryAcceptance}=await import('@gyblos/lab-harness/acceptance');
-      let rejected=false;
-      try{await runNodeDiscoveryAcceptance();}catch(error){rejected=error.code==='ACCEPTANCE_FAILED';}
-      finally{await state.cleanup();}
-      console.log(JSON.stringify({rejected,opens:state.opens}));
-    `,
-      [{ name: '@gyblos/buyer/discovery-storage', module: wrapper }],
+  REPLAY_TEST_OPTIONS,
+  async (t) => {
+    const replay = await acceptanceReplay(t, true);
+    await assert.rejects(replay.check(), { code: ACCEPTANCE_CODES.FAILED });
+    assert.deepEqual(replay.snapshot(), {
+      restarts: 1,
+      observations: 1,
+      replayAccepted: true,
+      prematureFresh: false,
+      publications: 0,
+      connections: 0,
+      checks: 2,
+    });
+  },
+);
+
+void test(
+  'acceptance awaits the reopened replay decision before publishing or requesting a fresh quote',
+  REPLAY_TEST_OPTIONS,
+  async (t) => {
+    const replay = await acceptanceReplay(t, true);
+    const paused = replay.pauseReplay();
+    const pending = replay.check();
+    let finished = false;
+    void pending.then(
+      () => {
+        finished = true;
+      },
+      () => {
+        finished = true;
+      },
     );
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stderr, '');
-    assert.deepEqual(JSON.parse(result.stdout), { rejected: true, opens: 2 });
+    await paused.observed;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(finished, false);
+    assert.equal(replay.snapshot().publications, 0);
+    assert.equal(replay.snapshot().connections, 0);
+    paused.release();
+    await assert.rejects(pending, { code: ACCEPTANCE_CODES.FAILED });
+    assert.equal(replay.snapshot().prematureFresh, false);
+    assert.equal(replay.snapshot().checks, 2);
+  },
+);
+
+void test(
+  'acceptance keeps persisted replay protection and then permits a fresh quote after restart',
+  REPLAY_TEST_OPTIONS,
+  async (t) => {
+    const replay = await acceptanceReplay(t, false);
+    await replay.check();
+    const observed = replay.snapshot();
+    assert.equal(observed.restarts, 1);
+    assert.equal(observed.replayAccepted, false);
+    assert.equal(observed.prematureFresh, false);
+    assert.ok(observed.observations > 1);
+    assert.equal(observed.publications, 1);
+    assert.equal(observed.connections, 1);
+    assert.equal(observed.checks, 2);
   },
 );
 

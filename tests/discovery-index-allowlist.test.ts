@@ -64,6 +64,13 @@ function countingStorage(storage: DiscoveryStorage) {
     models: (now, limit) => (calls.push('models'), storage.models(now, limit)),
     count: (now) => (calls.push('count'), storage.count(now)),
     prune: (now) => (calls.push('prune'), storage.prune(now)),
+    markSeen: (nodeId, now) => (
+      calls.push('markSeen'),
+      storage.markSeen(nodeId, now)
+    ),
+    seen: (nodeId, since) => (calls.push('seen'), storage.seen(nodeId, since)),
+    pruneUptime: (now) => (calls.push('pruneUptime'), storage.pruneUptime(now)),
+    firstSeen: (nodeId) => (calls.push('firstSeen'), storage.firstSeen(nodeId)),
   };
   return { storage: counted, calls };
 }
