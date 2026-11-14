@@ -202,6 +202,19 @@ function memoryState(
   };
 }
 
+function dropWithdrawals(
+  withdrawals: Map<string, MemoryRecord>,
+  catalogs: Map<string, MemoryRecord>,
+  now: number,
+) {
+  for (const [nodeId, withdrawal] of withdrawals)
+    if (
+      withdrawal.expiresAt <= now &&
+      catalogs.get(nodeId)?.digest !== withdrawal.digest
+    )
+      withdrawals.delete(nodeId);
+}
+
 // Same semantics as the D1 adapter, in process memory.
 export function createMemoryStorage(): DiscoveryStorage {
   const nodes = new Map<string, MemoryNode>();
@@ -240,14 +253,7 @@ export function createMemoryStorage(): DiscoveryStorage {
     async prune(now) {
       dropExpired(presence, now);
       dropExpired(catalogs, now);
-      for (const [nodeId, withdrawal] of withdrawals) {
-        const catalog = catalogs.get(nodeId);
-        if (
-          withdrawal.expiresAt <= now &&
-          catalog?.digest !== withdrawal.digest
-        )
-          withdrawals.delete(nodeId);
-      }
+      dropWithdrawals(withdrawals, catalogs, now);
       for (const [id, node] of nodes)
         if (node.retainUntil <= now) nodes.delete(id);
     },
