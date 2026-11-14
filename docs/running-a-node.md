@@ -1220,10 +1220,14 @@ stream_max_retries = 0
 Leave MCP servers off for these sessions; switch models with `/model` and any
 name the endpoint serves. `pnpm buyer:agent codex --write` adds the provider
 block to `config.toml` and one profile file per model beside it
-(`gyblos.config.toml` for the first model, `gyblos-<model>.config.toml` for
-each), since Codex CLI 0.162 and later refuse `[profiles.*]` tables in
-`config.toml`; start with `codex --profile gyblos`. It replaces only profile
-files it wrote and drops the profile tables an earlier run put in its block.
+(`gyblos.config.toml` for the first model and `gyblos-<model>.config.toml` for
+each, with characters other than letters, digits, `_` and `-` as dashes, e.g.
+`gyblos-qwen3-0-6b`), since Codex CLI 0.162 and later refuse `[profiles.*]`
+tables in `config.toml`; start with `codex --profile gyblos`. It needs Codex CLI
+0.162 or later, which reads those files. It replaces only profile files it
+wrote, leaves those of models no longer served, and drops the profile tables an
+earlier run put in its block. A history item from a tool group Codex used on
+another provider (`function_call` with `namespace`) is kept as history.
 
 `POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
 over system, messages and tools) without contacting a seller. The default

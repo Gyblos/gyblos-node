@@ -1,8 +1,10 @@
 // Reads OpenAI's Responses API request, the one Codex CLI sends, into the conversation sellers serve:
 // instructions and leading developer or system messages first, then user and assistant turns, an
 // assistant's function calls grouped into one turn and answered by their outputs. Requests are stateless:
-// every one carries the whole conversation, so a client may switch models between turns. Item and tool
-// types this endpoint cannot serve (reasoning, custom or provider-run tools, images) are refused by name.
+// every one carries the whole conversation, so a client may switch models between turns. Records no seller
+// needs (reasoning, a provider's own search, tool groups) are left out and images become a placeholder;
+// other item and tool types this endpoint cannot serve (custom or provider-run tools, audio) are refused
+// by name.
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import {
   parseToolCalls,

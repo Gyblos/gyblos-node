@@ -199,13 +199,16 @@ const CODEX_PROFILE_FIELDS: readonly string[] = [
   'web_search',
 ];
 // One profile name per model: its id with other characters as dashes, numbered when two ids collide.
+// Names collide ignoring case: each is a file name, and macOS and Windows file systems would make
+// `gyblos-Qwen3` and `gyblos-qwen3` one file.
 export function profileNames(models: readonly AgentModel[]) {
   const used = new Set<string>([AGENT_SETUP.provider]);
   return models.map((model) => {
     const plain = `${AGENT_SETUP.provider}-${model.id.replaceAll(/[^A-Za-z0-9_-]/g, '-')}`;
     let name = plain;
-    for (let count = 2; used.has(name); count++) name = `${plain}-${count}`;
-    used.add(name);
+    for (let count = 2; used.has(name.toLowerCase()); count++)
+      name = `${plain}-${count}`;
+    used.add(name.toLowerCase());
     return name;
   });
 }

@@ -135,3 +135,27 @@ void test('an endpoint that may route to paid execution refuses Codex tools plai
     await server.close();
   }
 });
+
+void test('a call from a tool group earlier in the session stays as history', async () => {
+  const seen: FreeExecutionBuildInput[] = [];
+  const server = await host(TEXT, seen);
+  try {
+    // Codex CLI 0.162 records which group a call came from, e.g. an MCP server used on another provider.
+    const response = await post(server.url, {
+      ...CODEX,
+      input: [
+        user('use the tool'),
+        { ...call('call_1'), namespace: 'mcp__demo' },
+        output('call_1'),
+        user('thanks'),
+      ],
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(
+      seen[0]?.messages.map((message) => message.role),
+      ['user', 'assistant', 'tool', 'user'],
+    );
+  } finally {
+    await server.close();
+  }
+});

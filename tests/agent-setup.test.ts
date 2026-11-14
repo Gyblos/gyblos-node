@@ -231,10 +231,16 @@ void test('Codex profiles never collide, and gyblos tables outside the block are
       { id: 'qwen/qwen3:8b', maxOutputTokens: 10 },
       { id: 'qwen/qwen3-8b', maxOutputTokens: 10 },
       { id: 'gyblos', maxOutputTokens: 10 },
+      // One file on macOS and Windows unless numbered apart.
+      { id: 'Qwen3', maxOutputTokens: 10 },
+      { id: 'qwen3', maxOutputTokens: 10 },
     ],
   }).map((profile) => profile.file);
-  assert.equal(new Set(files).size, files.length);
-  assert.equal(files.length, 4);
+  assert.equal(
+    new Set(files.map((file) => file.toLowerCase())).size,
+    files.length,
+  );
+  assert.equal(files.length, 6);
   for (const user of [
     '[profiles.gyblos]\nmodel = "x"\n',
     '[profiles."gyblos-a"]\nmodel = "x"\n',

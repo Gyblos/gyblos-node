@@ -196,6 +196,8 @@ export const RESPONSES_CHAT = {
     'status',
     'phase',
   ] as readonly string[],
+  // `namespace`: Codex CLI 0.162 names the tool group a call came from (its sub-agent or MCP tools, offered
+  // on another provider); the call is kept as history and the group is ignored, as tool groups are.
   callFields: [
     'type',
     'id',
@@ -203,6 +205,7 @@ export const RESPONSES_CHAT = {
     'name',
     'arguments',
     'call_id',
+    'namespace',
   ] as readonly string[],
   outputFields: [
     'type',

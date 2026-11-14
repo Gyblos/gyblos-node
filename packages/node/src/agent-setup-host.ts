@@ -71,7 +71,8 @@ async function existing(path: string) {
 // Writes the tool's file, keeping the first copy of what was there as <file>.before-gyblos (later runs
 // never replace it). For Codex it also writes one profile file per model beside config.toml (files only
 // gyblos writes, so no copy is kept). Every new text is prepared first, so a refused file leaves all of
-// them as they were.
+// them as they were. Each file is replaced atomically, but not all of them together: a write failing
+// midway (a full disk, a read-only directory) can leave some updated, and running it again finishes.
 export async function writeAgentFile(
   tool: Exclude<AgentTool, typeof AGENT_TOOLS.CLAUDE_CODE>,
   endpoint: AgentEndpoint,
