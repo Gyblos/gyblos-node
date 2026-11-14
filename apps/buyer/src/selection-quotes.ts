@@ -107,11 +107,19 @@ function raceAll(
       onExpired: (pending) => {
         for (const candidate of pending) {
           dependencies.snapshots?.drop(candidate.nodeId);
-          recordQuote(dependencies.stats, candidate.nodeId, false, 0, now());
+          const retryAt = recordQuote(
+            dependencies.stats,
+            candidate.nodeId,
+            false,
+            0,
+            now(),
+            dependencies.backoff,
+          );
           reportSellerFailure(dependencies.onSellerFailure, {
             nodeId: candidate.nodeId,
             phase: SELLER_FAILURE_PHASES.TIMEOUT,
             code: ERROR_DIAGNOSTICS.TIMEOUT,
+            ...(retryAt ? { retryAt } : {}),
           });
         }
       },
@@ -181,6 +189,7 @@ async function requestCandidate(
       true,
       now() - start,
       now(),
+      dependencies.backoff,
     );
     return quote;
   } catch (error) {
@@ -202,18 +211,22 @@ async function requestCandidate(
       // that only lost the race keeps its snapshot.
       dependencies.snapshots?.drop(candidate.nodeId);
       // A seller without tools answered as designed: it is not cooled down for the requests it serves.
-      if (sellerFailureCode(error) !== CONTROL_CODES.TOOLS)
-        recordQuote(
-          dependencies.stats,
-          candidate.nodeId,
-          false,
-          now() - start,
-          now(),
-        );
+      const retryAt =
+        sellerFailureCode(error) === CONTROL_CODES.TOOLS
+          ? null
+          : recordQuote(
+              dependencies.stats,
+              candidate.nodeId,
+              false,
+              now() - start,
+              now(),
+              dependencies.backoff,
+            );
       reportSellerFailure(dependencies.onSellerFailure, {
         nodeId: candidate.nodeId,
         phase: SELLER_FAILURE_PHASES.QUOTE,
         code: sellerFailureCode(error),
+        ...(retryAt ? { retryAt } : {}),
       });
     }
     throw error;

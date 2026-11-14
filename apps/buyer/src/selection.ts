@@ -24,6 +24,7 @@ import {
 } from './constants';
 import type { createBuyerControlClient } from './control';
 import { raceControlOffers, type WinningQuote } from './offer-race';
+import type { SellerBackoff } from './selection-backoff';
 import type { SnapshotCache } from './selection-cache';
 import {
   BuyerSelectionError,
@@ -75,6 +76,8 @@ export interface VerifiedSelectionDependencies {
   observeVerified?: (seller: KnownSeller) => Promise<boolean>;
   // Snapshots kept from earlier requests (selection-cache.ts); absent, every request asks every seller.
   snapshots?: SnapshotCache;
+  // Longer cooldowns for sellers failing again and again (selection-backoff.ts); absent, always 30 s.
+  backoff?: SellerBackoff;
   // Told why each seller dropped out; it never affects which seller wins.
   onSellerFailure?: SellerFailureReporter;
 }
