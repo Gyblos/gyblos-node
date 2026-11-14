@@ -236,6 +236,7 @@ export function createMemoryStorage(): DiscoveryStorage {
         if (node.retainUntil <= now) nodes.delete(id);
     },
     pruneUptime: uptime.pruneUptime,
+    firstSeen: uptime.firstSeen,
     markSeen: uptime.markSeen,
     seen: uptime.seen,
     async put(entry) {

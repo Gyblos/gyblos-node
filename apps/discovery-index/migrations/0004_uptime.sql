@@ -11,3 +11,11 @@ CREATE TABLE IF NOT EXISTS discovery_uptime (
   PRIMARY KEY (node_id, hour)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS discovery_uptime_by_hour ON discovery_uptime (hour);
+
+-- When the index first accepted a presence from each NodeId. Kept after its hourly rows are pruned, so a
+-- seller that was away longer than the retention window is not reported as new (and its absence counts).
+-- One row per NodeId; NodeIds are bounded by publish admission (allowlist or registration).
+CREATE TABLE IF NOT EXISTS discovery_uptime_nodes (
+  node_id TEXT PRIMARY KEY NOT NULL CHECK (length(node_id) = 64),
+  first_at INTEGER NOT NULL
+) WITHOUT ROWID;

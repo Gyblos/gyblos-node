@@ -117,12 +117,40 @@ void test('windows are bounded by days, and a month-old row is pruned', async ()
   assert.deepEqual([week.seen, week.slots], [288, 7 * 288]);
   // The month window starts at the first sighting, 20 days ago.
   assert.deepEqual([month.seen, month.slots], [289, 20 * 288 + 1]);
+  // Pruning keeps the first sighting: the old row is gone, the seller is not new.
   await storage.pruneUptime(now + 11 * dayMs);
   const later = JSON.parse(
     (await uptimePage(storage, node, now + 11 * dayMs))!,
   );
-  assert.equal(later.firstSeenAt, now - dayMs + slotMs);
-  assert.equal(await uptimePage(storage, node, now + 32 * dayMs), null);
+  assert.equal(later.firstSeenAt, now - 20 * dayMs);
+  // Away for 40 days: nothing seen, no last sighting, but not forgotten.
+  const back = now + 40 * dayMs;
+  await storage.pruneUptime(back);
+  const away = JSON.parse((await uptimePage(storage, node, back - slotMs))!);
+  assert.equal(away.lastSeenAt, null);
+  assert.deepEqual(
+    away.windows.map((window: { seen: number }) => window.seen),
+    [0, 0, 0],
+  );
+  // Back for two hours: the absence counts in every window.
+  const hour = 3_600_000;
+  for (let at = back; at < back + 2 * hour; at += slotMs)
+    await storage.markSeen(node, at);
+  const returned = JSON.parse(
+    (await uptimePage(storage, node, back + 2 * hour - slotMs))!,
+  );
+  assert.deepEqual(
+    returned.windows.map((window: { seen: number; slots: number }) => [
+      window.seen,
+      window.slots,
+    ]),
+    [
+      [24, 288],
+      [24, 7 * 288],
+      [24, 30 * 288],
+    ],
+  );
+  assert.equal(await uptimePage(storage, 'b'.repeat(64), back), null);
 });
 
 void test('equivalent spellings of one query share one cache entry', async () => {

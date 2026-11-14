@@ -22,6 +22,8 @@ export interface UptimeStorage {
   markSeen(nodeId: string, now: number): Promise<void>;
   // The NodeId's rows from `sinceHour` on, oldest first.
   seen(nodeId: string, sinceHour: number): Promise<UptimeRow[]>;
+  // When the NodeId was first seen, kept after its rows are pruned; null when never seen.
+  firstSeen(nodeId: string): Promise<number | null>;
   // Drops rows older than the longest window.
   pruneUptime(now: number): Promise<void>;
 }
@@ -98,9 +100,16 @@ export async function uptimePage(
   const rows = (await storage.seen(nodeId, retainedHour(now))).filter(
     (row) => row.firstAt <= now,
   );
-  if (!rows.length) return null;
-  const firstSeenAt = Math.min(...rows.map((row) => row.firstAt));
-  const lastSeenAt = Math.max(...rows.map((row) => row.lastAt));
+  // The first sighting ever, not the oldest row kept: a seller back after a long absence is not new.
+  const first = await storage.firstSeen(nodeId);
+  const firstSeenAt = Math.min(
+    ...(first !== null && first <= now ? [first] : []),
+    ...rows.map((row) => row.firstAt),
+  );
+  if (!Number.isFinite(firstSeenAt)) return null;
+  const lastSeenAt = rows.length
+    ? Math.max(...rows.map((row) => row.lastAt))
+    : null;
   return JSON.stringify({
     nodeId,
     firstSeenAt,
@@ -122,7 +131,11 @@ export async function uptimePage(
 // The in-memory adapter's uptime rows (storage.ts), with their pruning.
 export function memoryUptime() {
   const nodes = new Map<string, Map<number, UptimeRow>>();
+  const first = new Map<string, number>();
   return {
+    async firstSeen(nodeId: string) {
+      return first.get(nodeId) ?? null;
+    },
     async pruneUptime(now: number) {
       for (const [id, hours] of nodes) {
         for (const hour of hours.keys())
@@ -131,6 +144,7 @@ export function memoryUptime() {
       }
     },
     async markSeen(nodeId: string, now: number) {
+      if (!first.has(nodeId)) first.set(nodeId, now);
       const hours = nodes.get(nodeId) ?? new Map<number, UptimeRow>();
       nodes.set(nodeId, hours);
       const prior = hours.get(hourOf(now));

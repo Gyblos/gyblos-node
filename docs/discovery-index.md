@@ -238,12 +238,17 @@ admission of a new NodeId.
 }
 ```
 
-`seen` counts slots with a presence and `slots` counts the window's slots up to
-and including the current one: a full day is 288 slots, so a seller online all
-day reports `1`. A window starts no earlier than `firstSeenAt` (within the 30
-days kept), so a new seller is not counted down for time before it existed. A
-NodeId not seen in 30 days is `404 NOT_FOUND`; a malformed or repeated `node`,
-or any other parameter, is `400 INVALID_QUERY`. Answers are cached and
+`firstSeenAt` is the first presence the index ever accepted from the NodeId: one
+row per NodeId (`discovery_uptime_nodes`) outlives the 30-day hourly rows, so a
+seller back after a long absence is not reported as new and the absence counts
+in every window. `lastSeenAt` is the last recorded presence, at five-minute
+resolution (each app instance writes a NodeId once per slot), or `null` when
+none falls within the last 30 days. `seen` counts slots with a presence and
+`slots` counts the window's slots up to and including the current one: a full
+day is 288 slots, so a seller online all day reports `1`. A window starts no
+earlier than `firstSeenAt`, so a new seller is not counted down for time before
+it existed. A NodeId never seen is `404 NOT_FOUND`; a malformed or repeated
+`node`, or any other parameter, is `400 INVALID_QUERY`. Answers are cached and
 CORS-readable like `/v1/models`, with one cache entry per NodeId however the
 query is spelled.
 
