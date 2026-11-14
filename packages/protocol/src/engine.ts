@@ -115,9 +115,15 @@ export function engineToolConversation(
   return input.messages;
 }
 
+export interface StableTokenPrefix {
+  characters: number;
+  tokens: number;
+}
 export interface RecountTokenizer {
   count(text: string): number;
   input(prompt: string): number;
+  // A certified prefix whose token IDs cannot change under any appended continuation.
+  stablePrefix?(text: string, targetTokens?: number): StableTokenPrefix;
 }
 
 // A recount tokenizer that also counts a whole conversation as the model's template renders it.

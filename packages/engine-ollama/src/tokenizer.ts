@@ -39,6 +39,7 @@ export function createModelTokenizer(artifacts: {
     tokenizer.encode(text, { add_special_tokens: false }).ids.length;
   return {
     count,
+    stablePrefix: (_text: string, _targetTokens?: number) => ({ characters: 0, tokens: 0 }),
     input: (prompt: string) => count(renderChat(prompt)),
     // Tools count as the template renders them; without tools or tool turns, as the text template.
     chat: (
