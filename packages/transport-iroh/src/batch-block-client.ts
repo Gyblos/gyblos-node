@@ -9,6 +9,7 @@ import {
   batchFail,
   type BatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
+import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import {
   createSessionBlockVerifier,
@@ -52,20 +53,28 @@ interface BlockReader {
   binding: SessionBlockBinding;
   verifier: ReturnType<typeof createSessionBlockVerifier>;
   outgoing: ReturnType<typeof blockBudget>;
+  incoming: ReturnType<typeof blockBudget>;
   check: () => void;
   stage: BlockStage;
   onDelta: (text: string) => Promise<void>;
   index: number;
 }
-async function nextCheckpoint(state: BlockReader) {
-  state.check();
+async function nextFrame(state: BlockReader, waitMs: number) {
+  const maximum = state.incoming.remaining() - CONTROL_LIMITS.prefixBytes;
+  if (maximum <= 0) return batchFail(SESSION_CODES.LIMIT);
   const frame = await readSessionBlock(
     state.stream,
-    SESSION_BLOCKS.frameBytes,
+    maximum,
     state.check,
     state.stage,
-    TRANSPORT_TIMEOUTS.requestMs,
+    waitMs,
   );
+  state.incoming(encodeSessionBlock(frame).length);
+  return frame;
+}
+async function nextCheckpoint(state: BlockReader) {
+  state.check();
+  const frame = await nextFrame(state, TRANSPORT_TIMEOUTS.requestMs);
   reportedFailure(frame, state.binding, state.index);
   if (frame.kind !== SESSION_BLOCK_KINDS.CHECKPOINT) return batchFail();
   if (
@@ -120,13 +129,7 @@ async function approveCheckpoint(
     IROH_DEADLINES.egressMs,
   );
   state.check();
-  const ack = await readSessionBlock(
-    state.stream,
-    SESSION_BLOCKS.frameBytes,
-    state.check,
-    state.stage,
-    BATCH_SESSION_DEFAULTS.operationMs,
-  );
+  const ack = await nextFrame(state, BATCH_SESSION_DEFAULTS.operationMs);
   reportedFailure(ack, state.binding, state.index);
   state.verifier.acknowledge(ack);
   await state.stage(
@@ -134,7 +137,8 @@ async function approveCheckpoint(
     BATCH_SESSION_DEFAULTS.operationMs,
   );
   state.check();
-  await state.stage(state.onDelta(block.text), IROH_DEADLINES.egressMs);
+  // A consumer is not owned financial work: cancellation cannot wait for arbitrary application code.
+  await state.stage(state.onDelta(block.text), IROH_DEADLINES.egressMs, false);
   state.check();
 }
 async function completeTranscript(
@@ -187,6 +191,7 @@ export async function readBatchBlocks(
     stage,
     onDelta,
     outgoing: blockBudget(BATCH_CHANNEL.requestBytes, initialBytes),
+    incoming: blockBudget(BATCH_CHANNEL.responseBytes),
     index: 0,
   };
   const poison = () => {

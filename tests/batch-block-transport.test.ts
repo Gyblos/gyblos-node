@@ -30,6 +30,7 @@ import { batchDeferred } from './support/batch-deferred';
 import { batchOfferFixture } from './support/batch-iroh-offer';
 import { batchLoopback } from './support/batch-loopback';
 import { sessionRig } from './support/batch-session';
+import { within } from './support/test-deadline';
 
 async function fixture(t: TestContext) {
   const f = await sessionRig();
@@ -165,8 +166,10 @@ async function fixture(t: TestContext) {
     approve: (next: typeof approve) => {
       approve = next;
     },
-    execute: (signal?: AbortSignal) =>
-      client.exchange(request, signal, undefined, blockClient),
+    execute: (
+      signal?: AbortSignal,
+      onDelta?: (text: string) => Promise<void>,
+    ) => client.exchange(request, signal, onDelta, blockClient),
   };
 }
 void test('two response blocks share one duplex execution and approve only the verified total', async (t) => {
@@ -179,6 +182,60 @@ void test('two response blocks share one duplex execution and approve only the v
   assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '40');
   assert.equal(f.f.buyer.snapshot().reservedAtomic, '0');
   assert.deepEqual(f.f.calls, ['deposit']);
+});
+void test('block cancellation drains owned work without waiting for a stalled text consumer', async (t) => {
+  const f = await fixture(t);
+  const entered = batchDeferred<void>();
+  const release = batchDeferred<void>();
+  const controller = new AbortController();
+  const running = f.execute(controller.signal, async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  const rejected = assert.rejects(running, {
+    code: PAID_EXECUTION_CODES.CANCELLED,
+  });
+  try {
+    await entered.promise;
+    controller.abort();
+    await rejected;
+    await within(f.client.settled(), 1000);
+    assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '24');
+    assert.equal(f.calls(), 1);
+  } finally {
+    release.resolve();
+  }
+});
+void test('block cancellation still drains a financial approval already in flight before releasing ownership', async (t) => {
+  const f = await fixture(t);
+  const entered = batchDeferred<void>();
+  const release = batchDeferred<void>();
+  f.approve(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  const controller = new AbortController();
+  const running = f.execute(controller.signal);
+  const rejected = assert.rejects(running, {
+    code: PAID_EXECUTION_CODES.CANCELLED,
+  });
+  let drained = false;
+  try {
+    await entered.promise;
+    controller.abort();
+    await rejected;
+    const finishing = f.client.settled().then(() => {
+      drained = true;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(drained, false);
+    release.resolve();
+    await finishing;
+    assert.equal(drained, true);
+    assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
+  } finally {
+    release.resolve();
+  }
 });
 void test('a crossed request, inflated usage or wrong cumulative amount never reaches buyer signing', async (t) => {
   const changes = [
