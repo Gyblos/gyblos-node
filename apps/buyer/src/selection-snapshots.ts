@@ -180,6 +180,79 @@ export async function refreshSnapshots(
   return snapshots;
 }
 
+// Identity remains per request. Cached work is reusable only while no native retirement is pending
+// and durable discovery still permits the snapshot; a superseded record is fetched before filtering.
+async function beforeSnapshot(
+  seller: StaticControlSeller,
+  dependencies: VerifiedSelectionDependencies,
+  now: () => number,
+  deadline: AbortSignal,
+  recalled: Map<string, SignedPublicV2>,
+  refusedIdentity: () => void,
+): Promise<{ complete: boolean; known?: KnownSeller }> {
+  if (
+    dependencies.verifyIdentity &&
+    !(await dependencies.verifyIdentity(seller, deadline))
+  ) {
+    refusedIdentity();
+    return { complete: true };
+  }
+  if (dependencies.snapshots?.retiring(seller.nodeId))
+    return { complete: true };
+  const cached = recall(dependencies, seller, now(), recalled);
+  if (!cached) return { complete: false };
+  if (
+    !dependencies.observeVerified ||
+    (await dependencies.observeVerified(cached))
+  )
+    return { complete: true, known: cached };
+  dependencies.snapshots?.drop(seller.nodeId);
+  recalled.delete(seller.nodeId);
+  return { complete: false };
+}
+
+// The fresh signed records still pass durable discovery before entering reusable memory.
+async function freshSnapshot(
+  client: BuyerControlClient,
+  seller: StaticControlSeller,
+  dependencies: VerifiedSelectionDependencies,
+  now: () => number,
+  deadline: AbortSignal,
+  refusedDiscovery: () => void,
+) {
+  const { known, signed } = await verifiedSnapshot(
+    client,
+    seller,
+    now,
+    deadline,
+  );
+  if (
+    dependencies.observeVerified &&
+    !(await dependencies.observeVerified(known))
+  ) {
+    refusedDiscovery();
+    return undefined;
+  }
+  dependencies.snapshots?.set(seller, known, signed);
+  return known;
+}
+
+// Reports are observational only; a caller cancellation never becomes a seller failure.
+function failureReporter(
+  dependencies: VerifiedSelectionDependencies,
+  seller: StaticControlSeller,
+  signal?: AbortSignal,
+) {
+  return (phase: SellerFailurePhase, code: SellerFailureCode) => {
+    if (!signal?.aborted)
+      reportSellerFailure(dependencies.onSellerFailure, {
+        nodeId: seller.nodeId,
+        phase,
+        code,
+      });
+  };
+}
+
 async function snapshotBatch(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
@@ -200,39 +273,18 @@ async function snapshotBatch(
           skipped.add(seller);
           return undefined;
         }
-        // A request the caller cancelled is not a seller failure.
-        const failed = (phase: SellerFailurePhase, code: SellerFailureCode) => {
-          if (!signal?.aborted)
-            reportSellerFailure(dependencies.onSellerFailure, {
-              nodeId: seller.nodeId,
-              phase,
-              code,
-            });
-        };
+        const failed = failureReporter(dependencies, seller, signal);
         try {
-          if (
-            dependencies.verifyIdentity &&
-            !(await dependencies.verifyIdentity(seller, deadline))
-          ) {
-            failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
-            return undefined;
-          }
-          // A previous losing connection may still be retiring in the native SDK. Do not start a
-          // second operation for the same peer merely because its snapshot remains current.
-          if (dependencies.snapshots?.retiring(seller.nodeId)) return undefined;
-          // A snapshot verified on an earlier request and still current: no connection, no records asked.
-          const cached = recall(dependencies, seller, now(), recalled);
-          if (cached) {
-            if (
-              !dependencies.observeVerified ||
-              (await dependencies.observeVerified(cached))
-            )
-              return cached;
-            // Discovery may already hold a newer catalog. Refetch before candidate filtering, even
-            // when the remembered catalog contains no model eligible to produce a stale quote.
-            dependencies.snapshots?.drop(seller.nodeId);
-            recalled.delete(seller.nodeId);
-          }
+          const remembered = await beforeSnapshot(
+            seller,
+            dependencies,
+            now,
+            deadline,
+            recalled,
+            () =>
+              failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY),
+          );
+          if (remembered.complete) return remembered.known;
           deadline.throwIfAborted();
           const client = await connectBefore(
             dependencies.connect(seller),
@@ -242,21 +294,18 @@ async function snapshotBatch(
             (work) => dependencies.snapshots?.retire(seller.nodeId, work),
           );
           clients.set(seller.nodeId, client);
-          const { known: verified, signed } = await verifiedSnapshot(
+          return await freshSnapshot(
             client,
             seller,
+            dependencies,
             now,
             deadline,
+            () =>
+              failed(
+                SELLER_FAILURE_PHASES.DISCOVERY,
+                SELLER_FAILURES.DISCOVERY,
+              ),
           );
-          if (
-            dependencies.observeVerified &&
-            !(await dependencies.observeVerified(verified))
-          ) {
-            failed(SELLER_FAILURE_PHASES.DISCOVERY, SELLER_FAILURES.DISCOVERY);
-            return undefined;
-          }
-          dependencies.snapshots?.set(seller, verified, signed);
-          return verified;
         } catch (error) {
           if (
             error instanceof BuyerSelectionError &&
