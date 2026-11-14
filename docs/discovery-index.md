@@ -152,10 +152,13 @@ signed a record; clients re-verify everything.
   `--local-protocol https`.
 - **Rate limits:** `DISCOVERY_IP_LIMITER` on every request and
   `DISCOVERY_PUBLISH_LIMITER` on publishes, keyed by client address (IPv4 by
-  full address, IPv6 by its /64 prefix); `DISCOVERY_NODE_LIMITER` keyed by the
-  verified NodeId, consumed only by records that would advance its high-water
-  mark. A limiter that refuses or fails is `429 RATE_LIMITED` with
-  `Retry-After: 60`.
+  full address, IPv6 by its /64 prefix). A limiter that refuses or fails is
+  `429 RATE_LIMITED` with `Retry-After: 60`. NodeId publishing uses a separate
+  storage-backed budget: ten accepted records per fixed UTC minute, shared
+  across Worker isolates and locations. Its counter advances atomically with the
+  high-water mark; rejected, stale and concurrent duplicate records consume no
+  NodeId allowance. Delayed requests cannot move its window backwards. The old
+  `DISCOVERY_NODE_LIMITER` binding is no longer used.
 - **Global read cap:** `DISCOVERY_READ_LIMITER` (300 per 60 seconds, constant
   key `global`) is consumed only by storage reads: a `GET /v1/sellers` cache
   miss and a `/v1/health` whose cached count is stale. Cache hits and fresh
@@ -171,12 +174,11 @@ signed a record; clients re-verify everything.
 - **Publish order:** per-IP limit, the 34816-byte body cap (`413`), publish
   limit, content type, strict JSON, the allowlist check on the claimed NodeId
   (`403`), then shape, lifetime and the self-signature. Only then is the stored
-  high-water mark checked: stale replays are `409` before the per-NodeId limit,
-  so a replay observed after a committed publication consumes no NodeId
-  allowance. Concurrent copies can all pass that earlier read and consume
-  allowance before only one D1 write wins. The external limiter and D1 are
-  separate operations; this is a remaining availability limitation, not an
-  exactly-once quota guarantee. Unsigned junk never reaches the NodeId limit.
+  high-water mark checked: stale replays are `409`. Catalog reference validation
+  follows, then the atomic write checks freshness, the current catalog, capacity
+  and the NodeId allowance together. Invalid references are `400` without
+  spending allowance; full NodeId budgets are `429` without advancing the
+  sequence. Unsigned junk never reaches storage admission.
 - **Strict JSON:** invalid UTF-8, a BOM, duplicate members, nesting deeper than
   16, non-canonical or unsafe numbers, `-0` and bad escapes are
   `400 INVALID_RECORD`. The signed envelope must be posted compact (no padding,
@@ -230,7 +232,8 @@ schema and mutation builders. Wrangler commands render bound values through
 Drizzle's SQLite dialect because the CLI accepts SQL rather than bind
 parameters. Existing Wrangler SQL migrations remain the physical schema
 authority and are unchanged by the ORM migration. A publish is one D1 batch (one
-transaction) whose statements apply only if its high-water upsert won.
+transaction) that admits the high-water mark and NodeId quota together before
+writing the corresponding public record. A failed batch rolls both back.
 
 `migrations/0001_discovery_index.sql` creates the five tables and their indexes.
 The website's draft `0001` and `0002` (prune indexes) were never applied to any
@@ -240,7 +243,9 @@ database, so they are combined into this one clean migration.
 on catalogs `(node_id, digest, issued_at, expires_at)`, presence
 `(node_id, catalog_digest, issued_at, expires_at)` and withdrawals
 `(node_id, catalog_digest)`, and it drops the unused
-`discovery_presence_by_issue`.
+`discovery_presence_by_issue`. Migration `0004_node_publish_quota.sql` adds the
+accepted-publication window and counter to `discovery_nodes`; rollout and
+rollback requirements are described below.
 
 - **Listing is two-phase.** A `page` CTE filters, sorts and limits only keys,
   digests and times read from those covering indexes; the signed JSON of the
@@ -336,6 +341,14 @@ bindings.
 
 Rolling the code back does not require reverting `0002`: earlier code names no
 index and no query used `discovery_presence_by_issue`.
+`migrations/0004_node_publish_quota.sql` adds the accepted-publication window
+and counter to `discovery_nodes`. Apply it before deploying this version;
+without it publishing fails closed with `503`. The columns have defaults, so
+older code remains compatible during rollout. When rolling back, retain the
+three remaining rate-limit bindings and restore `DISCOVERY_NODE_LIMITER` for any
+older Worker that still requires it. Do not revert the added columns. A rollback
+to the older Worker also restores its earlier per-location quota and concurrent
+duplicate-consumption behavior.
 
 Rollback: `npx wrangler@4.151.1 rollback` returns to the previous version (it
 asks for confirmation when secrets changed since that version; decline unless

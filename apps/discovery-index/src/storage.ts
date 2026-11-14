@@ -6,7 +6,7 @@ import {
   type PublicRecordKind,
 } from '@gyblos/protocol/constants';
 
-import { INDEX_ERRORS } from './constants';
+import { INDEX_ERRORS, NODE_PUBLISH_QUOTA } from './constants';
 import { indexFail } from './errors';
 
 // The NodeId's current catalog; `json` is its signed envelope exactly as published.
@@ -84,6 +84,8 @@ export interface DiscoveryStorage {
 interface MemoryNode {
   lastSequence: number;
   retainUntil: number;
+  publishWindow: number;
+  publishCount: number;
 }
 
 interface MemoryRecord {
@@ -202,6 +204,21 @@ function memoryState(
   };
 }
 
+function nextMemoryNode(
+  node: MemoryNode | undefined,
+  entry: StoredEntry,
+): MemoryNode {
+  const window = Math.floor(entry.admission.now / NODE_PUBLISH_QUOTA.windowMs);
+  const count = node && node.publishWindow >= window ? node.publishCount : 0;
+  if (count >= NODE_PUBLISH_QUOTA.limit) indexFail(INDEX_ERRORS.RATE_LIMITED);
+  return {
+    lastSequence: entry.sequence,
+    retainUntil: Math.max(node?.retainUntil ?? 0, entry.retainUntil),
+    publishWindow: Math.max(node?.publishWindow ?? window, window),
+    publishCount: count + 1,
+  };
+}
+
 function dropWithdrawals(
   withdrawals: Map<string, MemoryRecord>,
   catalogs: Map<string, MemoryRecord>,
@@ -271,10 +288,7 @@ export function createMemoryStorage(): DiscoveryStorage {
         indexFail(INDEX_ERRORS.UNKNOWN_CATALOG);
       if (!node && nodes.size >= entry.admission.maxNodes)
         indexFail(INDEX_ERRORS.RATE_LIMITED);
-      nodes.set(entry.nodeId, {
-        lastSequence: entry.sequence,
-        retainUntil: Math.max(node?.retainUntil ?? 0, entry.retainUntil),
-      });
+      nodes.set(entry.nodeId, nextMemoryNode(node, entry));
       apply(entry);
       return true;
     },

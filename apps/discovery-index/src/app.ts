@@ -213,7 +213,6 @@ function publishHandler(settings: IndexSettings) {
       return rejection(context, INDEX_ERRORS.PAYLOAD_TOO_LARGE);
     const publish: PublishContext = {
       storage: context.get('storage'),
-      limiters: context.get('limiters'),
       publishers: settings.publishers,
       registrations: settings.registrations,
       now: settings.now(),

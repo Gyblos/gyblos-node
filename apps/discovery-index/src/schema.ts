@@ -14,6 +14,8 @@ export const nodes = sqliteTable('discovery_nodes', {
   lastSequence: integer('last_sequence').notNull(),
   lastSignature: text('last_signature').notNull(),
   retainUntil: integer('retain_until').notNull(),
+  publishWindow: integer('publish_window').notNull().default(0),
+  publishCount: integer('publish_count').notNull().default(0),
 });
 export const catalogs = sqliteTable('discovery_catalogs', {
   nodeId: text('node_id').primaryKey(),

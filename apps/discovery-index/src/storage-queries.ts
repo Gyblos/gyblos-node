@@ -46,7 +46,11 @@ export function nodeStateQuery(database: DiscoveryDatabase, nodeId: string) {
   return database
     .select({
       lastSequence: nodes.lastSequence,
+      publishWindow: nodes.publishWindow,
+      publishCount: nodes.publishCount,
       sequence: catalogs.sequence,
+      digest: catalogs.digest,
+      issuedAt: catalogs.issuedAt,
       expiresAt: catalogs.expiresAt,
       json: catalogs.json,
       withdrawn: exists(withdrawnCatalog(database)).as('withdrawn'),

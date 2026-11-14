@@ -18,6 +18,7 @@ import {
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 
+import { NODE_PUBLISH_QUOTA } from './constants';
 import type { D1Value, DiscoveryDatabase } from './d1-client';
 import { catalogs, models, nodes, presence, withdrawals } from './schema';
 import type { StoredEntry } from './storage';
@@ -25,15 +26,9 @@ import { withdrawnCatalog } from './storage-queries';
 
 const bound = <T extends D1Value>(value: T, name: string) =>
   sql<T>`${value}`.as(name);
-export function admitNodeQuery(
-  database: DiscoveryDatabase,
-  entry: StoredEntry,
-) {
-  const existing = database
-    .select({ nodeId: nodes.nodeId })
-    .from(nodes)
-    .where(eq(nodes.nodeId, entry.nodeId));
-  const reference = database
+
+function currentReference(database: DiscoveryDatabase, entry: StoredEntry) {
+  return database
     .select({ nodeId: catalogs.nodeId })
     .from(catalogs)
     .where(
@@ -48,6 +43,17 @@ export function admitNodeQuery(
         notExists(withdrawnCatalog(database)),
       ),
     );
+}
+
+export function admitNodeQuery(
+  database: DiscoveryDatabase,
+  entry: StoredEntry,
+) {
+  const window = Math.floor(entry.admission.now / NODE_PUBLISH_QUOTA.windowMs);
+  const existing = database
+    .select({ nodeId: nodes.nodeId })
+    .from(nodes)
+    .where(eq(nodes.nodeId, entry.nodeId));
   return database
     .insert(nodes)
     .select(
@@ -57,6 +63,8 @@ export function admitNodeQuery(
           lastSequence: bound(entry.sequence, 'sequence'),
           lastSignature: bound(entry.signature, 'signature'),
           retainUntil: bound(entry.retainUntil, 'retainUntil'),
+          publishWindow: bound(window, 'publishWindow'),
+          publishCount: bound(1, 'publishCount'),
         })
         .from(sql`(values (1))`)
         .where(
@@ -67,7 +75,7 @@ export function admitNodeQuery(
             ),
             entry.kind === PUBLIC_RECORD_KINDS.CATALOG
               ? undefined
-              : exists(reference),
+              : exists(currentReference(database, entry)),
           ),
         ),
     )
@@ -77,8 +85,16 @@ export function admitNodeQuery(
         lastSequence: entry.sequence,
         lastSignature: entry.signature,
         retainUntil: sql<number>`max(${nodes.retainUntil}, ${entry.retainUntil})`,
+        publishWindow: sql<number>`max(${nodes.publishWindow}, ${window})`,
+        publishCount: sql<number>`case when ${nodes.publishWindow} >= ${window} then ${nodes.publishCount} + 1 else 1 end`,
       },
-      setWhere: lt(nodes.lastSequence, entry.sequence),
+      setWhere: and(
+        lt(nodes.lastSequence, entry.sequence),
+        or(
+          lt(nodes.publishWindow, window),
+          lt(nodes.publishCount, NODE_PUBLISH_QUOTA.limit),
+        ),
+      ),
     })
     .returning({ nodeId: nodes.nodeId });
 }
