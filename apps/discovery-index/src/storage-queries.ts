@@ -24,6 +24,10 @@ import { catalogs, models, nodes, presence, withdrawals } from './schema';
 import { columnField, coveringIndex } from './sqlite-expressions';
 import type { SellerQuery } from './storage';
 
+// Built-in aggregates default to Number coercion. Keep external values unchanged so the storage
+// boundary still rejects malformed numeric text, nulls and non-integers instead of accepting them.
+const driverValue = (value: unknown) => value;
+
 export function withdrawnCatalog(database: DiscoveryDatabase) {
   return database
     .select({ nodeId: withdrawals.nodeId })
@@ -126,18 +130,18 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
 }
 export function recordCountsQuery(database: DiscoveryDatabase, now: number) {
   return database
-    .select({ n: count().as('n') })
+    .select({ n: count().mapWith(driverValue).as('n') })
     .from(catalogs)
     .where(gt(catalogs.expiresAt, now))
     .unionAll(
       database
-        .select({ n: count().as('n') })
+        .select({ n: count().mapWith(driverValue).as('n') })
         .from(presence)
         .where(gt(presence.expiresAt, now)),
     )
     .unionAll(
       database
-        .select({ n: count().as('n') })
+        .select({ n: count().mapWith(driverValue).as('n') })
         .from(withdrawals)
         .where(gt(withdrawals.expiresAt, now)),
     );
@@ -148,7 +152,9 @@ export function modelsQuery(
   now: number,
   limit: number,
 ) {
-  const sellers = countDistinct(models.nodeId).as('sellers');
+  const sellers = countDistinct(models.nodeId)
+    .mapWith(driverValue)
+    .as('sellers');
   return database
     .select({ modelId: models.modelId, sellers })
     .from(models)

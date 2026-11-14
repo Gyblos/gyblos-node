@@ -18,7 +18,10 @@ import {
   type StoredEntry,
 } from '@gyblos/discovery-index/storage';
 import { createD1Storage } from '@gyblos/discovery-index/storage-d1';
-import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import {
+  PUBLIC_RECORD_KINDS,
+  PUBLIC_RECORD_LIMITS,
+} from '@gyblos/protocol/constants';
 
 import {
   createSqliteD1,
@@ -65,6 +68,13 @@ async function recordingD1() {
       return record(statement);
     },
     batch: async (statements) => {
+      for (const statement of statements) {
+        assert.ok('params' in statement && Array.isArray(statement.params));
+        assert.ok(
+          statement.params.length <= 100,
+          'D1 accepts at most 100 parameters per statement',
+        );
+      }
       const results = await db.batch(statements);
       statements.forEach((statement, index) =>
         written.push({
@@ -148,7 +158,16 @@ void test('D1 catalog republish writes only the model rows that changed', async 
   await storage.put(
     entry(PUBLIC_RECORD_KINDS.CATALOG, hex(2), 1, { models: ['b'] }),
   );
-  await storage.put(catalog(4, []));
+  const full = Array.from(
+    { length: PUBLIC_RECORD_LIMITS.maxModels },
+    (_, index) => `model-${String(index).padStart(2, '0')}`,
+  );
+  await storage.put(catalog(4, full));
+  assert.deepEqual(models(), full);
+  written.length = 0;
+  await storage.put(catalog(5, [...full].reverse()));
+  assert.equal(modelChanges(written), 0);
+  await storage.put(catalog(6, []));
   assert.deepEqual(models(), []);
   assert.equal(
     db.raw.prepare('SELECT count(*) AS n FROM discovery_catalog_models').get()

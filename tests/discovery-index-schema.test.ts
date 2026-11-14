@@ -20,7 +20,7 @@ void test('discovery ORM schema matches migrated columns and primary keys', asyn
         key.columns.map((column) => column.name),
       ),
     );
-    const actual = database.raw
+    const actual: readonly unknown[] = database.raw
       .prepare(
         'SELECT name, type, "notnull", dflt_value, pk FROM pragma_table_info(?)',
       )
@@ -51,7 +51,7 @@ void test('discovery ORM schema owns every migrated secondary index and its colu
   if (!database) return context.skip('node:sqlite unavailable');
   for (const table of Object.values(schema)) {
     const config = getTableConfig(table);
-    const actual = database.raw
+    const actual: readonly unknown[] = database.raw
       .prepare(
         "SELECT name FROM pragma_index_list(?) WHERE origin = 'c' ORDER BY name",
       )
@@ -82,7 +82,7 @@ void test('discovery ORM schema preserves migrated check constraints', async (co
   const dialect = new SQLiteSyncDialect();
   for (const table of Object.values(schema)) {
     const config = getTableConfig(table);
-    const row = database.raw
+    const row: Record<string, unknown> | undefined = database.raw
       .prepare(
         "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?",
       )
@@ -96,7 +96,11 @@ void test('discovery ORM schema preserves migrated check constraints', async (co
     const actual = [
       ...String(row.sql).matchAll(/CHECK\s*\(((?:[^()]|\([^()]*\))*)\)/gi),
     ]
-      .map((match) => normalize(match[1]))
+      .map((match) => {
+        const expression = match[1];
+        assert.ok(expression);
+        return normalize(expression);
+      })
       .sort();
     const declared = config.checks
       .map((check) =>

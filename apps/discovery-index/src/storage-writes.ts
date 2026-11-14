@@ -5,13 +5,14 @@ import {
   eq,
   exists,
   gt,
+  isNotNull,
   lt,
   lte,
   notExists,
   notInArray,
   or,
-  sql,
 } from 'drizzle-orm';
+import { unionAll } from 'drizzle-orm/sqlite-core';
 
 import {
   CONTROL_LIMITS,
@@ -19,13 +20,16 @@ import {
 } from '@gyblos/protocol/constants';
 
 import { NODE_PUBLISH_QUOTA } from './constants';
-import type { D1Value, DiscoveryDatabase } from './d1-client';
+import type { DiscoveryDatabase } from './d1-client';
 import { catalogs, models, nodes, presence, withdrawals } from './schema';
+import {
+  maximum,
+  publicationCount,
+  singleRow,
+  valueField,
+} from './sqlite-expressions';
 import type { StoredEntry } from './storage';
 import { withdrawnCatalog } from './storage-queries';
-
-const bound = <T extends D1Value>(value: T, name: string) =>
-  sql<T>`${value}`.as(name);
 
 function currentReference(database: DiscoveryDatabase, entry: StoredEntry) {
   return database
@@ -59,14 +63,14 @@ export function admitNodeQuery(
     .select(
       database
         .select({
-          nodeId: bound(entry.nodeId, 'nodeId'),
-          lastSequence: bound(entry.sequence, 'sequence'),
-          lastSignature: bound(entry.signature, 'signature'),
-          retainUntil: bound(entry.retainUntil, 'retainUntil'),
-          publishWindow: bound(window, 'publishWindow'),
-          publishCount: bound(1, 'publishCount'),
+          nodeId: valueField(entry.nodeId, 'nodeId'),
+          lastSequence: valueField(entry.sequence, 'sequence'),
+          lastSignature: valueField(entry.signature, 'signature'),
+          retainUntil: valueField(entry.retainUntil, 'retainUntil'),
+          publishWindow: valueField(window, 'publishWindow'),
+          publishCount: valueField(1, 'publishCount'),
         })
-        .from(sql`(values (1))`)
+        .from(singleRow())
         .where(
           and(
             or(
@@ -84,9 +88,13 @@ export function admitNodeQuery(
       set: {
         lastSequence: entry.sequence,
         lastSignature: entry.signature,
-        retainUntil: sql<number>`max(${nodes.retainUntil}, ${entry.retainUntil})`,
-        publishWindow: sql<number>`max(${nodes.publishWindow}, ${window})`,
-        publishCount: sql<number>`case when ${nodes.publishWindow} >= ${window} then ${nodes.publishCount} + 1 else 1 end`,
+        retainUntil: maximum(nodes.retainUntil, entry.retainUntil),
+        publishWindow: maximum(nodes.publishWindow, window),
+        publishCount: publicationCount(
+          nodes.publishWindow,
+          nodes.publishCount,
+          window,
+        ),
       },
       setWhere: and(
         lt(nodes.lastSequence, entry.sequence),
@@ -113,12 +121,43 @@ function writeGuard(database: DiscoveryDatabase, entry: StoredEntry) {
   );
 }
 const selectedRecord = (entry: StoredEntry) => ({
-  sequence: bound(entry.sequence, 'sequence'),
-  issuedAt: bound(entry.issuedAt, 'issuedAt'),
-  expiresAt: bound(entry.expiresAt, 'expiresAt'),
-  digest: bound(entry.digest, 'digest'),
-  json: bound(entry.json, 'json'),
+  sequence: valueField(entry.sequence, 'sequence'),
+  issuedAt: valueField(entry.issuedAt, 'issuedAt'),
+  expiresAt: valueField(entry.expiresAt, 'expiresAt'),
+  digest: valueField(entry.digest, 'digest'),
+  json: valueField(entry.json, 'json'),
 });
+
+function catalogModelQueries(database: DiscoveryDatabase, entry: StoredEntry) {
+  const admitted = database.$with('admitted_models').as(
+    database
+      .select({ nodeId: nodes.nodeId })
+      .from(nodes)
+      .where(
+        and(
+          eq(nodes.nodeId, entry.nodeId),
+          eq(nodes.lastSequence, entry.sequence),
+          eq(nodes.lastSignature, entry.signature),
+        ),
+      ),
+  );
+  const [first, second, ...rest] = entry.models.map((modelId) =>
+    database
+      .select({
+        nodeId: admitted.nodeId,
+        modelId: valueField(modelId, 'modelId'),
+      })
+      .from(admitted)
+      // An explicit WHERE disambiguates SQLite's INSERT SELECT ON CONFLICT grammar.
+      .where(isNotNull(admitted.nodeId)),
+  );
+  if (!first) return [];
+  const source = second ? unionAll(first, second, ...rest) : first;
+  // One guarded CTE and at most 64 model parameters remain below D1's 100-bind limit.
+  return [
+    database.with(admitted).insert(models).select(source).onConflictDoNothing(),
+  ];
+}
 export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
   const won = writeGuard(database, entry);
   const fields = {
@@ -129,7 +168,10 @@ export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
     json: entry.json,
   };
   const source = database
-    .select({ nodeId: bound(entry.nodeId, 'nodeId'), ...selectedRecord(entry) })
+    .select({
+      nodeId: valueField(entry.nodeId, 'nodeId'),
+      ...selectedRecord(entry),
+    })
     .from(nodes)
     .where(and(eq(nodes.nodeId, entry.nodeId), won));
   const clearPresence = database
@@ -156,8 +198,8 @@ export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
       .select(
         database
           .select({
-            nodeId: bound(entry.nodeId, 'nodeId'),
-            owner: bound(entry.owner, 'owner'),
+            nodeId: valueField(entry.nodeId, 'nodeId'),
+            owner: valueField(entry.owner, 'owner'),
             ...selectedRecord(entry),
           })
           .from(nodes)
@@ -176,18 +218,7 @@ export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
           won,
         ),
       ),
-    database
-      .insert(models)
-      .select(
-        database
-          .select({
-            nodeId: bound(entry.nodeId, 'nodeId'),
-            modelId: sql<string>`value`.as('modelId'),
-          })
-          .from(sql`json_each(${JSON.stringify(entry.models)})`)
-          .where(won),
-      )
-      .onConflictDoNothing(),
+    ...catalogModelQueries(database, entry),
     clearPresence,
   ];
 }

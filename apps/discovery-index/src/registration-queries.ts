@@ -1,11 +1,12 @@
 // Builds enrollment reads and writes with the shared ORM schema. Invite spending and admission
 // remain one native D1 batch, and operator commands compile these same mutations.
-import { and, eq, gt, isNull, notExists, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, notExists } from 'drizzle-orm';
 
 import { REGISTRATION_STATUS, type RegistrationStatus } from './constants';
 import type { DiscoveryDatabase } from './d1-client';
 import type { InviteInput, Redemption } from './registration-store';
 import { invites, registrations } from './schema';
+import { valueField } from './sqlite-expressions';
 
 export function createInviteQuery(
   database: DiscoveryDatabase,
@@ -60,20 +61,18 @@ export function redemptionQueries(
       ),
     )
     .returning({ inviteHash: invites.inviteHash });
-  const bound = <T extends string | number | null>(value: T, name: string) =>
-    sql<T>`${value}`.as(name);
   const admit = database
     .insert(registrations)
     .select(
       database
         .select({
-          nodeId: bound(redemption.nodeId, 'nodeId'),
-          owner: bound(redemption.owner, 'owner'),
-          asset: bound(redemption.asset, 'asset'),
-          status: bound(REGISTRATION_STATUS.ACTIVE, 'status'),
-          inviteHash: bound(redemption.inviteHash, 'inviteHash'),
-          country: bound(redemption.country, 'country'),
-          registeredAt: bound(redemption.now, 'registeredAt'),
+          nodeId: valueField(redemption.nodeId, 'nodeId'),
+          owner: valueField(redemption.owner, 'owner'),
+          asset: valueField(redemption.asset, 'asset'),
+          status: valueField(REGISTRATION_STATUS.ACTIVE, 'status'),
+          inviteHash: valueField(redemption.inviteHash, 'inviteHash'),
+          country: valueField(redemption.country, 'country'),
+          registeredAt: valueField(redemption.now, 'registeredAt'),
         })
         .from(invites)
         .where(
