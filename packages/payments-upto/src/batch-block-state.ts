@@ -17,7 +17,7 @@ import {
 
 import type { BatchRecord, BatchRequestBlocks } from './batch-session-types';
 
-export function effectiveBlock(
+function effectiveBlock(
   progress: BatchRequestBlocks,
 ): SessionBlockIntent | null {
   return progress.pending?.voucher

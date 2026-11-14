@@ -469,10 +469,10 @@ permission and the seller's fee payer funds its submission.
 | Buyer requests close/settle                                    | Authenticated buyer requests it; seller authorizes and submits finalization. Active executions keep maintenance exclusive.                                                                                          |
 | Terms expire                                                   | Online seller worker finalizes the latest accepted total. If both parties are offline, nothing submits until one recovers.                                                                                          |
 | Deposit is fully authorized                                    | Seller worker finalizes; unused deposit is zero. There is no automatic top-up.                                                                                                                                      |
-| Ten minutes without use and at least10,000atomic accrued       | Seller worker finalizes. The threshold is a soft economic default, not an additional charge.                                                                                                                        |
+| Ten minutes without use and at least 10,000 atomic accrued     | Seller worker finalizes. The threshold is a soft economic default, not an additional charge.                                                                                                                        |
 | Interrupted/unsigned work becomes idle                         | Seller finalizes the preceding accepted total, even below the soft threshold. A block-aware runtime lease prevents treating a live generation as abandoned.                                                         |
 | Retained request limit reached with no active or unsigned work | Seller finalizes the existing total before the record can grow beyond its bound.                                                                                                                                    |
-| Buyer requests native forced close                             | Buyer signs and funds that control transaction. An online seller can claim during the configured grace, normally900seconds.                                                                                         |
+| Buyer requests native forced close                             | Buyer signs and funds that control transaction. An online seller can claim during the configured grace, normally 900 seconds.                                                                                       |
 | Recovery after a crash                                         | Seller resumes its saved finalization; buyer can resend original financial messages, or complete native seal/distribution after grace when the seller is absent. Buyer-only recovery pays its own transaction fees. |
 | Opening expired and was independently proved never created     | No settlement or pretend refund: the unfunded commitment is released using the finalized absence proof.                                                                                                             |
 
@@ -491,8 +491,8 @@ bounds the delivery/approval window, not arbitrary settlement outages.
 
 The block checkpoint ports are an additive integration foundation. Until the
 bidirectional transport/runtime activation is installed, existing inference
-still uses whole-result approval. Its new private block record is version2;
-legacy pending version1 records must resolve before upgrading. Do not downgrade
-software while a version2 session is active. Only hashes, usage and financial
+still uses whole-result approval. Its new private block record is version 2;
+legacy pending version 1 records must resolve before upgrading. Do not downgrade
+software while a version 2 session is active. Only hashes, usage and financial
 metadata are stored; no conversation or response content is written to this
 record.

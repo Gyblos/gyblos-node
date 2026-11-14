@@ -1492,8 +1492,8 @@ intent before signing, then the exact voucher before sending. The seller
 verifies the authenticated buyer and SDK signature and persists acceptance
 before ACK. A terminal ACK alone marks the original inference complete.
 
-The existing private session file has an explicit block-aware version2; native
-memo/voucher version1 remains unchanged. Version1 files stay readable under
+The existing private session file has an explicit block-aware version 2; native
+memo/voucher version 1 remains unchanged. Version 1 files stay readable under
 existing semantics. Enabling a fresh block request upgrades the private record
 atomically only after legacy pending requests resolve. Unknown versions or
 contradictory state fail closed. Older software cannot read the new private
