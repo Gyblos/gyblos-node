@@ -25,6 +25,7 @@ import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
+import { runBuyerBlocks } from './batch-block-buyer';
 import type { BuyerBatchContext } from './batch-buyer-types';
 import { executeBatchBuyer } from './batch-session';
 import { bounded } from './buyer-operation';
@@ -58,6 +59,24 @@ function verifiedCharge<Remote extends BatchDestination>(
         ),
       )
     : '0';
+}
+async function openBuyerChannel<Remote extends BatchDestination>(
+  context: BuyerBatchContext<Remote>,
+  request: import('@gyblos/protocol/batch-channel').BatchExecutionRequest,
+  signal: AbortSignal,
+  payload: string,
+) {
+  const snapshot = batchBuyerSnapshot(
+    await context.rpc(
+      BATCH_METHODS.OPEN,
+      { payload, quote: request.quote, terms: context.terms },
+      signal,
+    ),
+    request.channelId,
+  );
+  if (snapshot.expiresAt !== context.terms.expiresAt)
+    return batchFail(SESSION_CODES.BINDING);
+  return snapshot;
 }
 export async function runBuyerBatch<Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
@@ -106,19 +125,19 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   signal.throwIfAborted();
   const channelId = options.buyer.snapshot().channelId;
   const request = buildBatchExecutionRequest(channelId, quote, input);
+  const open = (payload: string) =>
+    openBuyerChannel(context, request, signal, payload);
+  if (context.blockMode) {
+    await verify(signal);
+    await open(await options.buyer.open());
+    signal.throwIfAborted();
+    return runBuyerBlocks(context, request, signal, onDelta);
+  }
   return executeBatchBuyer(
     {
       buyer: options.buyer,
       verify,
-      open: async (payload) => {
-        const snapshot = batchBuyerSnapshot(
-          await rpc(BATCH_METHODS.OPEN, { payload, quote, terms }, signal),
-          channelId,
-        );
-        if (snapshot.expiresAt !== terms.expiresAt)
-          return batchFail(SESSION_CODES.BINDING);
-        return snapshot;
-      },
+      open,
       execute: async () => {
         const result = await rpc(
           BATCH_METHODS.EXECUTE,

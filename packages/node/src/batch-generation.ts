@@ -71,7 +71,7 @@ export async function generateBatch(
   live: LiveSellerOffer,
   now: () => number,
   signal: AbortSignal,
-  onDelta?: (text: string) => Promise<void>,
+  onDelta?: (text: string, check: () => void) => Promise<void>,
   generated?: (duration: number) => void,
 ) {
   const { input, inputTokens } = recountSessionInput(
@@ -132,14 +132,14 @@ function batchGeneration(
   input: BatchExecutionRequest['input'],
   inputTokens: number,
   window: { signal: AbortSignal; check: () => void },
-  onDelta: ((text: string) => Promise<void>) | undefined,
+  onDelta: ((text: string, check: () => void) => Promise<void>) | undefined,
   onGenerated: ((duration: number) => void) | undefined,
 ) {
   const output = createPaidStreamOutput(
     live.meter,
     { inputTokens, allowance: input.maxTokens },
     window.signal,
-    onDelta ?? (async () => {}),
+    onDelta ? (text) => onDelta(text, window.check) : async () => {},
     window.check,
   );
   let emitted = false;

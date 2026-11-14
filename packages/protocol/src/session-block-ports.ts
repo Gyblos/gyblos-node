@@ -29,6 +29,7 @@ export interface SessionBlockIntent {
   terminal: boolean;
 }
 export interface SessionBlockBuyer extends SessionBuyer {
+  usesBlocks(): boolean;
   pendingBlockRequest(): SessionRequest | undefined;
   beginBlocks(request: SessionRequest): Promise<void>;
   approveBlock(
