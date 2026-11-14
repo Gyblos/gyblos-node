@@ -91,3 +91,60 @@ void test('stale cleanup keeps a managed profile after manual field or comment e
   assert.equal(await readFile(stale, 'utf8'), edited);
   assert.deepEqual(result.removed ?? [], []);
 });
+
+void test('concurrent successful writers leave a named profile for the final default model', async (context) => {
+  const home = await isolatedHome(context);
+  const directory = join(home, '.codex');
+  const original = fs.promises.readdir;
+  let arrivals = 0;
+  let release = () => {};
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  context.mock.method(
+    fs.promises,
+    'readdir',
+    async (...args: Parameters<typeof original>) => {
+      if (args[0] === directory) {
+        arrivals++;
+        if (arrivals === 2) release();
+        // A serialized writer is valid too: do not require the second scan before releasing the first.
+        await Promise.race([
+          barrier,
+          new Promise<void>((resolve) => {
+            timers.push(setTimeout(resolve, 1000));
+          }),
+        ]);
+      }
+      return original(...args);
+    },
+  );
+  syncBuiltinESMExports();
+  try {
+    const results = await Promise.allSettled([
+      writeAgentFile(AGENT_TOOLS.CODEX, endpoint('alpha'), home, {}),
+      writeAgentFile(AGENT_TOOLS.CODEX, endpoint('beta'), home, {}),
+    ]);
+    assert.equal(arrivals, 2);
+    assert.deepEqual(
+      results.map((result) => result.status),
+      ['fulfilled', 'fulfilled'],
+    );
+    const current = await readFile(
+      join(directory, 'gyblos.config.toml'),
+      'utf8',
+    );
+    const id = current.match(/^model = "(alpha|beta)"$/m)?.[1];
+    assert.ok(id);
+    assert.ok(
+      (await readdir(directory)).includes(`gyblos-${id}.config.toml`),
+      `the final default ${id} must retain its active named profile`,
+    );
+  } finally {
+    release();
+    for (const timer of timers) clearTimeout(timer);
+    context.mock.restoreAll();
+    syncBuiltinESMExports();
+  }
+});

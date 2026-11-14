@@ -38,6 +38,7 @@ import {
   type AgentTool,
 } from './agent-setup';
 import { CODEX_MARKS } from './agent-setup-constants';
+import { withAgentSetupLock } from './agent-setup-lock';
 
 // What to print for a tool: its file's gyblos part, or the environment for one shell.
 export function agentText(tool: AgentTool, endpoint: AgentEndpoint) {
@@ -78,6 +79,23 @@ async function existing(path: string) {
 // them as they were. Each file is replaced atomically, but not all of them together: a write failing
 // midway (a full disk, a read-only directory) can leave some updated, and running it again finishes.
 export async function writeAgentFile(
+  tool: Exclude<AgentTool, typeof AGENT_TOOLS.CLAUDE_CODE>,
+  endpoint: AgentEndpoint,
+  home: string,
+  environment: NodeJS.ProcessEnv = {},
+) {
+  if (tool !== AGENT_TOOLS.CODEX)
+    return writeAgentFileUnlocked(tool, endpoint, home, environment);
+  // Validate the endpoint before creating a tool directory or taking publication ownership.
+  codexProfiles(endpoint);
+  const path = agentFilePath(tool, home, environment);
+  await mkdir(dirname(path), { recursive: true });
+  return withAgentSetupLock(dirname(path), () =>
+    writeAgentFileUnlocked(tool, endpoint, home, environment),
+  );
+}
+
+async function writeAgentFileUnlocked(
   tool: Exclude<AgentTool, typeof AGENT_TOOLS.CLAUDE_CODE>,
   endpoint: AgentEndpoint,
   home: string,

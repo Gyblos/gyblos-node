@@ -1229,10 +1229,13 @@ the first model and `gyblos-<model>.config.toml` for each, with characters other
 than letters, digits, `_` and `-` as dashes, e.g. `gyblos-qwen3-0-6b`), since
 Codex CLI 0.162 and later refuse `[profiles.*]` tables in `config.toml`; start
 with `codex --profile gyblos`. It needs Codex CLI 0.162 or later, which reads
-those files. It replaces only profile files it wrote, removes those it wrote for
-models no longer served (never an edited file or a link), and drops the profile
-tables an earlier run put in its block. A history item from a tool group Codex
-used on another provider (`function_call` with `namespace`) is kept as history.
+those files. It replaces only managed profile files and drops the profile tables
+an earlier run put in its block. Profiles written by this version carry a
+content checksum: a stale profile is removed only while it still matches. Edited
+files, links and older profiles without that checksum are left in place. Updates
+to one Codex directory are serialized and guarded against another live process
+writing at the same time. A history item from a tool group Codex used on another
+provider (`function_call` with `namespace`) is kept as history.
 
 `POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
 over system, messages and tools) without contacting a seller. The default

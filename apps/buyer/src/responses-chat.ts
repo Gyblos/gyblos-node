@@ -149,7 +149,7 @@ const mcpGroup = (tool: unknown) =>
   tool.type === 'namespace' &&
   typeof tool.name === 'string' &&
   tool.name.startsWith(RESPONSES_CHAT.mcpGroupPrefix);
-let mcpWarned = false;
+let mcpWarned: boolean | undefined;
 function warnMcpOnce() {
   if (mcpWarned) return;
   mcpWarned = true;
