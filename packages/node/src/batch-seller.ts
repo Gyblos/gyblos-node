@@ -18,13 +18,23 @@ import {
   type PaymentSessionTerms,
   type SessionSeller,
 } from '@gyblos/protocol/payment-session';
-import type { BatchChannelService } from '@gyblos/transport-iroh/batch-server';
+import {
+  SESSION_BLOCK_KINDS,
+  type SessionBlockAck,
+} from '@gyblos/protocol/session-blocks';
+import type {
+  BatchBlockExchange,
+  BatchChannelService,
+} from '@gyblos/transport-iroh/batch-server';
 
+import { isBlockSeller } from './batch-block-ports';
+import { createSellerBlockPlan } from './batch-block-seller';
 import { batchLiveOffer, generateBatch } from './batch-generation';
 import { sellerExecutionTelemetry } from './free-telemetry';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export interface SellerBatchSessionOptions {
+  blockTargetTokens?: number;
   telemetry?: import('./seller-sessions').SellerSessionOptions['telemetry'];
   session: SessionSeller;
   terms: Readonly<PaymentSessionTerms>;
@@ -38,6 +48,7 @@ async function executeObserved(
   options: SellerBatchSessionOptions,
   live: LiveSellerOffer,
   onDelta?: (text: string) => Promise<void>,
+  blocks?: BatchBlockExchange,
 ) {
   let observer: ReturnType<typeof sellerExecutionTelemetry>;
   try {
@@ -53,31 +64,44 @@ async function executeObserved(
         nodeId: options.terms.sellerNodeId,
         meter: live.meter,
       },
-      Boolean(onDelta),
+      Boolean(onDelta || blocks),
     );
   } catch {
     /* Optional metadata cannot block generation. */
   }
 
+  let plan: Awaited<ReturnType<typeof createSellerBlockPlan>> | undefined;
   try {
+    plan = blocks
+      ? await createSellerBlockPlan(
+          request,
+          options,
+          live,
+          peer,
+          signal,
+          blocks,
+        )
+      : undefined;
     const result = await generateBatch(
       request,
-      await batchSessionRequest(request),
-      options.session,
+      plan?.pending ?? (await batchSessionRequest(request)),
+      plan?.session ?? options.session,
       peer,
       live,
       options.now,
       signal,
-      onDelta
-        ? async (text) => {
-            await onDelta(text);
+      plan || onDelta
+        ? async (text, check) => {
+            if (plan) await plan.delta(text, check);
+            else await onDelta?.(text);
             if (text && !signal.aborted) observer?.firstToken();
           }
         : undefined,
       (duration) => observer?.generated(duration),
     );
+    const completed = plan ? await plan.complete(result.value) : result;
     completeInferenceTelemetry(observer, request.input, result.value);
-    return result;
+    return completed;
   } catch (error) {
     observer?.failed(
       signal.aborted
@@ -85,6 +109,8 @@ async function executeObserved(
         : FREE_EXECUTION_CODES.ENGINE,
     );
     throw error;
+  } finally {
+    await plan?.release();
   }
 }
 async function exchange(
@@ -93,6 +119,8 @@ async function exchange(
   signal: AbortSignal,
   options: SellerBatchSessionOptions,
   onDelta?: (text: string) => Promise<void>,
+  blocks?: BatchBlockExchange,
+  blockMode?: boolean,
 ) {
   signal.throwIfAborted();
   const session = options.session;
@@ -122,6 +150,11 @@ async function exchange(
       }
     }
     const live = batchLiveOffer(offer, options.offers(), options.now());
+    if (
+      (blockMode || blocks) &&
+      (!live.meter.stablePrefix || !isBlockSeller(session))
+    )
+      return batchFail(SESSION_CODES.UNAVAILABLE);
     if (request.method === BATCH_METHODS.PREPARE)
       return { terms: structuredClone(options.terms) };
     if (request.method === BATCH_METHODS.OPEN)
@@ -135,6 +168,7 @@ async function exchange(
       options,
       live,
       onDelta,
+      blocks,
     );
   }
   const channel =
@@ -159,17 +193,44 @@ export function createSellerBatchSession(
     terms: matchBatchTerms(input.terms, input.terms),
   };
   let active = false;
+  const run = async <T>(
+    peer: string,
+    signal: AbortSignal,
+    operation: () => Promise<T>,
+  ) => {
+    if (peer !== options.terms.buyerNodeId)
+      throw new BatchChannelError(PAID_EXECUTION_CODES.PEER);
+    signal.throwIfAborted();
+    if (active) return batchFail(SESSION_CODES.BUSY);
+    active = true;
+    try {
+      return await operation();
+    } finally {
+      active = false;
+    }
+  };
   return {
-    async exchange(request, peer, signal, onDelta) {
-      if (peer !== options.terms.buyerNodeId)
-        throw new BatchChannelError(PAID_EXECUTION_CODES.PEER);
-      if (active) return batchFail(SESSION_CODES.BUSY);
-      active = true;
-      try {
-        return await exchange(request, peer, signal, options, onDelta);
-      } finally {
-        active = false;
-      }
-    },
+    exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
+      run(peer, signal, () =>
+        exchange(request, peer, signal, options, onDelta, blocks, blockMode),
+      ),
+    resumeBlock: (approval, peer, signal) =>
+      run(peer, signal, async (): Promise<SessionBlockAck> => {
+        const session = options.session;
+        if (!isBlockSeller(session))
+          return batchFail(SESSION_CODES.UNAVAILABLE);
+        const intent = await session.resumeBlock(approval, peer);
+        signal.throwIfAborted();
+        return {
+          version: approval.version,
+          kind: SESSION_BLOCK_KINDS.ACK,
+          channelId: approval.channelId,
+          requestId: approval.requestId,
+          requestDigest: approval.requestDigest,
+          index: approval.index,
+          blockDigest: intent.digest,
+          cumulativeAtomic: intent.bill.cumulativeAtomic,
+        };
+      }),
   };
 }
