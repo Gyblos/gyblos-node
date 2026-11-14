@@ -1,12 +1,13 @@
 # Static analysis
 
-The `Static analysis / Semgrep CE` workflow runs on every pull request and push
-to `main`. It uses Semgrep Community Edition 1.183.0, pinned by the official
-multi-platform image digest in [the workflow](../.github/workflows/semgrep.yml).
-No Semgrep account, paid GitHub security product or subscription is required.
-Private-repository Actions usage still counts against the plan's included usage.
-This job reports its result as an ordinary Actions check, without hosted SARIF
-alerts or cloud analysis.
+The `Static analysis / Semgrep CE` workflow runs on pull requests into `main`
+and pushes to `main`. It uses Semgrep Community Edition 1.183.0, pinned by the
+official multi-platform image digest in
+[the workflow](../.github/workflows/semgrep.yml). No Semgrep account, paid
+GitHub security product or subscription is required. Private-repository Actions
+usage still counts against the plan's included usage. This job reports its
+result as an ordinary Actions check, without hosted SARIF alerts or cloud
+analysis.
 
 ## Rules and scope
 

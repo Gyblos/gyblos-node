@@ -12,6 +12,7 @@ import {
 } from '@gyblos/protocol/tools';
 
 import { MODEL, renderChat } from './model';
+import { qwenStablePrefix } from './stable-prefix';
 import {
   renderAssistantOutput,
   renderInferenceConversation,
@@ -39,6 +40,8 @@ export function createModelTokenizer(artifacts: {
     tokenizer.encode(text, { add_special_tokens: false }).ids.length;
   return {
     count,
+    stablePrefix: (text: string, targetTokens?: number) =>
+      qwenStablePrefix(count, text, targetTokens),
     input: (prompt: string) => count(renderChat(prompt)),
     // Tools count as the template renders them; without tools or tool turns, as the text template.
     chat: (
