@@ -22,6 +22,9 @@ export interface SnapshotCache {
   ): void;
   // A seller that failed or answered with a quote that no longer matches: verify it again next time.
   drop(nodeId: string): void;
+  // A retiring native operation keeps its seller unavailable until actual settlement.
+  retiring(nodeId: string): boolean;
+  retire(nodeId: string, work: Promise<unknown>): void;
 }
 
 const key = (seller: { nodeId: string; owner: string }) =>
@@ -37,11 +40,21 @@ const current = (known: KnownSeller, now: number) => {
 };
 
 export function createSnapshotCache(): SnapshotCache {
+  const retiring = new Map<string, Promise<unknown>>();
   const entries = new Map<
     string,
     { known: KnownSeller; catalog: SignedPublicV2 }
   >();
   return {
+    retiring: (nodeId) => retiring.has(nodeId),
+    retire(nodeId, work) {
+      const prior = retiring.get(nodeId);
+      const settled = Promise.allSettled(prior ? [prior, work] : [work]);
+      retiring.set(nodeId, settled);
+      void settled.then(() => {
+        if (retiring.get(nodeId) === settled) retiring.delete(nodeId);
+      });
+    },
     get(seller, now) {
       // A withdrawal attached by discovery changes what selection must see: no cached answer for it.
       if (seller.withdrawal) return undefined;

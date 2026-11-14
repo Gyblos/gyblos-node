@@ -19,7 +19,7 @@ import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
 } from './selection-config';
-import { recordQuote } from './selection-snapshots';
+import { connectBefore, recordQuote } from './selection-snapshots';
 import { reportSellerFailure, sellerFailureCode } from './seller-failures';
 
 // After the race, every losing query is cancelled; the caller's cleanup waits for those to settle (a
@@ -27,6 +27,7 @@ import { reportSellerFailure, sellerFailureCode } from './seller-failures';
 // before the remaining ones are closed and awaited.
 export interface RaceState {
   clients: Map<string, BuyerControlClient>;
+  settling: Promise<unknown>[];
   // Sellers whose remembered catalog turned out stale in this selection.
   stale: Set<string>;
   // The remembered signed catalog of each seller whose snapshot came from memory.
@@ -66,15 +67,19 @@ function coolAfterQuote(
 // that waits out the transport: it closes in the background. A pinned seller's is still awaited (it is
 // asked again next), and so is every one of a request the caller cancelled.
 function releaseInBackground(
-  clients: Map<string, BuyerControlClient>,
+  race: RaceState,
   nodeId: string,
   config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
   signal?: AbortSignal,
 ) {
+  const { clients, settling } = race;
   const client = clients.get(nodeId);
   if (!client || signal?.aborted || nodeId === config.pinnedNodeId) return;
   clients.delete(nodeId);
-  void client.close().catch(() => undefined);
+  const closing = client.close().catch(() => undefined);
+  settling.push(closing);
+  dependencies.snapshots?.retire(nodeId, closing);
 }
 
 export async function raceCandidates(
@@ -157,9 +162,11 @@ function raceAll(
 // earlier request, a new one that starts from that verified catalog.
 async function candidateClient(
   candidate: SellerCandidate,
-  { clients, recalled }: RaceState,
+  { clients, recalled, settling }: RaceState,
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
+  querySignal: AbortSignal,
+  signal?: AbortSignal,
 ) {
   const open = clients.get(candidate.nodeId);
   if (open) return { client: open, remembered: false };
@@ -170,7 +177,14 @@ async function candidateClient(
   const catalog = recalled.get(candidate.nodeId);
   if (!seller || !catalog)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
-  const client = await dependencies.connect(seller);
+  querySignal.throwIfAborted();
+  const client = await connectBefore(
+    dependencies.connect(seller),
+    querySignal,
+    settling,
+    signal,
+    (work) => dependencies.snapshots?.retire(candidate.nodeId, work),
+  );
   clients.set(candidate.nodeId, client);
   await client.useCatalog?.(catalog);
   return { client, remembered: true };
@@ -190,7 +204,14 @@ async function requestCandidate(
   const request = config.request;
   let remembered = false;
   try {
-    const opened = await candidateClient(candidate, race, config, dependencies);
+    const opened = await candidateClient(
+      candidate,
+      race,
+      config,
+      dependencies,
+      querySignal,
+      signal,
+    );
     remembered = opened.remembered;
     const client = opened.client;
     const quote = await client.requestOffer(
@@ -219,7 +240,7 @@ async function requestCandidate(
     );
     return quote;
   } catch (error) {
-    releaseInBackground(clients, candidate.nodeId, config, signal);
+    releaseInBackground(race, candidate.nodeId, config, dependencies, signal);
     if (
       !querySignal.aborted &&
       remembered &&

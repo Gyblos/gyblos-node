@@ -1326,14 +1326,14 @@ another request's cooldown. Cancelled selection attempts do not commit quote
 statistics. A seller that stops answering costs at most the 10-second snapshot
 deadline: its failed connection closes in the background (a pinned seller's is
 still awaited, since it is asked again next), and while its cooldown outlasts
-the snapshot it is not contacted again unless it is pinned, so at most one such
-attempt per seller is left settling. A cancelled request still waits for the
-native work it started. Control and execution admission otherwise remain
-occupied until pending native work settles. The client marks sending before the
-first frame write; after visible text, partial writes, remote errors, timeouts
-and lost responses never cause automatic failover. Native work that ignores
-cancellation retains its execution resource until it actually settles. The v1
-paid proxy remains a separate command.
+the snapshot it is not contacted again unless it is pinned. Retries are
+throttled by the cooldown; a close that outlasts it can overlap a later attempt.
+A cancelled request still waits for the native work it started. Control and
+execution admission otherwise remain occupied until pending native work settles.
+The client marks sending before the first frame write; after visible text,
+partial writes, remote errors, timeouts and lost responses never cause automatic
+failover. Native work that ignores cancellation retains its execution resource
+until it actually settles. The v1 paid proxy remains a separate command.
 
 Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab

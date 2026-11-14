@@ -165,11 +165,13 @@ function connectFailed(
   seller: StaticControlSeller,
   {
     clients,
+    settling,
     config,
     dependencies,
     now,
   }: {
     clients: Map<string, BuyerControlClient>;
+    settling: Promise<unknown>[];
     config: BuyerSelectionConfig;
     dependencies: VerifiedSelectionDependencies;
     now: number;
@@ -180,7 +182,9 @@ function connectFailed(
   const client = clients.get(seller.nodeId);
   if (client && !signal?.aborted && !pinned) {
     clients.delete(seller.nodeId);
-    void client.close().catch(() => undefined);
+    const closing = client.close().catch(() => undefined);
+    settling.push(closing);
+    dependencies.snapshots?.retire(seller.nodeId, closing);
   }
   dependencies.snapshots?.drop(seller.nodeId);
   return recordQuote(
@@ -201,6 +205,62 @@ export async function refreshSnapshots(
   recalled: Map<string, SignedPublicV2>,
   now: () => number,
   deadline: AbortSignal,
+  settling: Promise<unknown>[],
+  signal?: AbortSignal,
+) {
+  const skipped = new Set<StaticControlSeller>();
+  const snapshots = await snapshotBatch(
+    config,
+    dependencies,
+    clients,
+    recalled,
+    now,
+    deadline,
+    settling,
+    skipped,
+    signal,
+  );
+  // Identity and durable discovery work may settle after the nominal snapshot deadline. A seller
+  // skipped earlier must still be considered if its cooldown ended before selection actually runs.
+  while (!signal?.aborted) {
+    const recovered = [...skipped].filter((seller) => {
+      const until = dependencies.stats.get(seller.nodeId)?.cooldownUntil;
+      return until == null || until <= now();
+    });
+    if (!recovered.length) break;
+    for (const seller of recovered) skipped.delete(seller);
+    const nextDeadline = AbortSignal.any([
+      AbortSignal.timeout(
+        dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs,
+      ),
+      ...(signal ? [signal] : []),
+    ]);
+    snapshots.push(
+      ...(await snapshotBatch(
+        { ...config, sellers: recovered },
+        dependencies,
+        clients,
+        recalled,
+        now,
+        nextDeadline,
+        settling,
+        new Set<StaticControlSeller>(),
+        signal,
+      )),
+    );
+  }
+  return snapshots;
+}
+
+async function snapshotBatch(
+  config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
+  clients: Map<string, BuyerControlClient>,
+  recalled: Map<string, SignedPublicV2>,
+  now: () => number,
+  deadline: AbortSignal,
+  settling: Promise<unknown>[],
+  skipped: Set<StaticControlSeller>,
   // The caller's own signal: its abort is a cancellation, while the snapshot deadline is a failure.
   signal?: AbortSignal,
 ) {
@@ -208,8 +268,10 @@ export async function refreshSnapshots(
     await Promise.allSettled(
       config.sellers.map(async (seller) => {
         const pinned = seller.nodeId === config.pinnedNodeId;
-        if (!pinned && coolingPastSnapshot(seller, dependencies, now()))
+        if (!pinned && coolingPastSnapshot(seller, dependencies, now())) {
+          skipped.add(seller);
           return undefined;
+        }
         const failed = failureReporter(dependencies, seller, signal);
         try {
           if (
@@ -219,14 +281,29 @@ export async function refreshSnapshots(
             failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
             return undefined;
           }
+          // A previous losing connection may still be retiring in the native SDK. Do not start a
+          // second operation for the same peer merely because its snapshot remains current.
+          if (dependencies.snapshots?.retiring(seller.nodeId)) return undefined;
           // A snapshot verified on an earlier request and still current: no connection, no records asked.
           const cached = recall(dependencies, seller, now(), recalled);
-          if (cached) return cached;
+          if (cached) {
+            if (
+              !dependencies.observeVerified ||
+              (await dependencies.observeVerified(cached))
+            )
+              return cached;
+            // Discovery may already hold a newer catalog. Refetch before candidate filtering, even
+            // when the remembered catalog contains no model eligible to produce a stale quote.
+            dependencies.snapshots?.drop(seller.nodeId);
+            recalled.delete(seller.nodeId);
+          }
           deadline.throwIfAborted();
           const client = await connectBefore(
             dependencies.connect(seller),
             deadline,
+            settling,
             signal,
+            (work) => dependencies.snapshots?.retire(seller.nodeId, work),
           );
           clients.set(seller.nodeId, client);
           const { known: verified, signed } = await verifiedSnapshot(
@@ -255,7 +332,7 @@ export async function refreshSnapshots(
             throw error;
           const retryAt = connectFailed(
             seller,
-            { clients, config, dependencies, now: now() },
+            { clients, settling, config, dependencies, now: now() },
             pinned,
             signal,
           );
@@ -274,10 +351,12 @@ export async function refreshSnapshots(
 // A connection attempt ends with the snapshot deadline: a seller that stopped answering would otherwise
 // hold every request for the whole transport timeout. A connection that arrives later is closed. A request
 // the caller cancelled still waits for the attempt, so its admission stays held until native work settles.
-async function connectBefore(
+export async function connectBefore(
   connecting: Promise<BuyerControlClient>,
   deadline: AbortSignal,
+  settling: Promise<unknown>[],
   signal?: AbortSignal,
+  retire?: (work: Promise<unknown>) => void,
 ) {
   let stop = () => {};
   const expired = new Promise<never>((_resolve, reject) => {
@@ -290,10 +369,12 @@ async function connectBefore(
   try {
     return await Promise.race([connecting, expired]);
   } catch (error) {
-    void connecting.then(
+    const closing = connecting.then(
       (client) => client.close().catch(() => undefined),
       () => undefined,
     );
+    settling.push(closing);
+    retire?.(closing);
     throw error;
   } finally {
     deadline.removeEventListener('abort', stop);
