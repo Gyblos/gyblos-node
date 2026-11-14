@@ -235,7 +235,9 @@ void test('block-plan admission failure emits failed telemetry without generatio
           records.push(record);
         },
         async flush() {},
-        async close() {},
+        async close() {
+          return { emitted: records.length, dropped: 0, failed: false };
+        },
       },
       engineKind: () => ENGINE_KINDS.OLLAMA,
     },
