@@ -277,10 +277,7 @@ export function createMemoryStorage(): DiscoveryStorage {
       for (const [id, node] of nodes)
         if (node.retainUntil <= now) nodes.delete(id);
     },
-    pruneUptime: uptime.pruneUptime,
-    firstSeen: uptime.firstSeen,
-    markSeen: uptime.markSeen,
-    seen: uptime.seen,
+    ...uptime,
     async put(entry) {
       const node = nodes.get(entry.nodeId);
       if (node && node.lastSequence >= entry.sequence) return false;
