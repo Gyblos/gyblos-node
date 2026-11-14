@@ -19,6 +19,12 @@ export function sessionNativeRpc(vm: Awaited<ReturnType<typeof nativeVm>>) {
   let loseSendReply = false;
   let outgoing: (wire: string) => Promise<void> = async () => {};
   const rpc = {
+    isBlockhashValid: (value: string) => ({
+      send: async () => ({
+        context: { slot: vm.slot() },
+        value: vm.blockhashValid(value),
+      }),
+    }),
     getGenesisHash: () => ({
       send: async () =>
         wrongGenesis

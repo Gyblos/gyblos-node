@@ -1396,3 +1396,229 @@ New independent Node/OpenSSL vectors are `paid-execution-v2.json`,
 `batch-channel-v4.json`, `batch-prepare-v4.json`, `batch-startup-v4.json`,
 `batch-stream-v4.json` and `batch-tools-v4.json`. All historical vectors stay
 byte-identical and their retired versions are rejected by active parsers.
+
+## Reusable session block checkpoints (v5)
+
+`@gyblos/protocol/session-blocks` defines the checkpoint grammar for
+`gyblos/session/5`. This contract alone does not register or advertise the ALPN.
+The existing session-v4 contracts and vectors remain unchanged. The native
+payment program, cumulative voucher bytes and final settlement are unchanged.
+There is no payment transaction per response block. A final settlement phase
+can require more than one native transaction.
+
+A checkpoint carries the channel, original inference `requestId` and
+`requestDigest`, zero-based block index, newly delivered text, cumulative request
+usage, cumulative request charge, cumulative channel charge, and either a full
+terminal result or `null`. The terminal text must equal all delivered text, and
+its usage must equal checkpoint usage. The final result uses the existing
+inference/tool grammar; tools remain complete values, not partially accepted
+arguments. The request digest is SHA-256 of the validated existing inference
+parameters under `gyblos/session-request/v5\n`. A checkpoint digest is SHA-256 of
+its strict canonical JSON under `gyblos/session-block/v5\n`. Domain suffixes are
+literal LF bytes. Neither digest is a new native payment-signature format.
+
+The exchange is strictly alternating on **one bidirectional execution stream**:
+checkpoint → approval containing its digest and native cumulative voucher →
+durable seller ACK containing that digest and cumulative amount → next
+checkpoint. The buyer independently verifies usage and cumulative pricing
+before approval. The native signature authorizes the cumulative channel amount;
+it does not prove model quality or commit the native program to response bytes.
+The application binds the checkpoint and persists that binding privately.
+A separate concurrent APPROVE RPC must not be used while execution holds the
+same peer's admission lease. Management/recovery does not execute a prompt.
+
+A single original inference reservation remains active through all checkpoints.
+If its maximum is M and its approved request charge is C, its remaining reserve
+is M−C, until the terminal ACK releases the unused portion. Channel total is the
+fixed pre-request total plus C. Input is charged once, and existing per-million
+pricing rounds cumulative request usage once rather than each block separately.
+The buyer checks all binding fields, exact index, immutable input usage and
+request ceiling, monotone output usage and charges, deposit ceiling and the
+independent usage/price result. No second checkpoint is accepted while one is
+unacknowledged. Failure/early EOF poisons the transcript; late ACKs cannot repair
+an unfinished stream.
+
+All messages use existing four-byte big-endian canonical JSON framing and strict
+UTF-8/depth/unknown-field checks. A frame and aggregate seller transcript retain
+the existing 1 MiB response budget; delivered text retains the existing output
+byte limit. There are at most `maxOutputTokens + 1` checkpoints, retaining the
+128-token execution bound; the extra checkpoint allows a terminal result after
+an already approved text prefix. The original absolute deadline, ingress/egress
+limits, endpoint admission and per-peer execution capacity must apply without
+renewal. Cancellation stops further publication and new signing, and a failed
+write may already have transmitted bytes. Never repeat the prompt.
+
+Both sides must persist the exact financial intent before a signature or ACK
+escapes. The seller preserves the highest durably accepted voucher before ACK;
+the buyer records approval and acknowledgment without freeing the remaining
+inference reservation early. Recovery resends only the same stored financial
+attempt; it does not regenerate or persist conversation content. At most the
+latest accepted and one pending checkpoint need be retained, within existing
+private-file bounds. Older unresolved session formats recover under their
+original digest and voucher semantics before new block execution is admitted.
+
+Bill only stable tokenizer prefixes: the count of a growing arbitrary prefix
+may decrease. A max-of-counts clamp is forbidden because it can overcharge the
+final result. For the hash-pinned Qwen tokenizer, a conservative certified cut is
+immediately **before** the ASCII space in `[A-Za-z0-9] `. A nonterminal
+checkpoint delivers that guard space too, but does not bill it yet; the buyer
+must observe the boundary before signing. Its certified billed prefix ends one
+character before the delivered text. Keep only the unfinished suffix for a later
+checkpoint. NFC cannot compose across this fixed
+space, no pinned added token contains it, and the preceding alphanumeric regex
+piece cannot grow across it. Other tokenizers need their own certified frontier
+or one final exact block within current limits. An indivisible piece can reach
+the existing 128-token response bound. A proposed target block size is therefore
+soft, and first-block exposure includes input cost. This contract does not select
+a production target without engine and round-trip measurements.
+
+The accepted residual risk is one unapproved delivery block per interrupted
+exchange, **while native settlement remains live**. Reputation and dual-signed
+receipts mitigate risk; they are not insurance or proof of blame for an unsigned
+block. Host expiry triggers settlement work, not an automatic blockchain
+transaction. A seller offline beyond forced-close grace can also lose older
+unclaimed signed totals. No adaptor signatures, conditional cryptographic
+payments, new service, protocol fee change or perfect fair-exchange claim is
+introduced by this extension.
+
+### Durable block ports and certified metering
+
+`SessionBlockBuyer` and `SessionBlockSeller` extend the existing financial ports
+without changing native voucher bytes. A `SessionBlockIntent` contains index,
+checkpoint digest, cumulative usage/bill and a terminal boolean. It contains no
+response text or tool arguments. The seller prepares it durably before
+publishing a checkpoint; the buyer durably records the independently verified
+intent before signing, then the exact voucher before sending. The seller
+verifies the authenticated buyer and SDK signature and persists acceptance
+before ACK. A terminal ACK alone marks the original inference complete.
+
+The existing private session file has an explicit block-aware version 2; native
+memo/voucher version 1 remains unchanged. Version 1 files stay readable under
+existing semantics. Enabling a fresh block request upgrades the private record
+atomically only after legacy pending requests resolve. Unknown versions or
+contradictory state fail closed. Older software cannot read the new private
+record and must not be used to downgrade an active block session.
+
+Each original request has a fixed channel base, its latest accepted intent and
+at most one pending intent/voucher. With request ceiling M and effective signed
+request charge C, the remaining reserve stays M−C until the terminal ACK. The
+effective charge is the pending charge only if its voucher is durable;
+otherwise it is the accepted charge. Whole-request accounting and block
+accounting are disjoint, so completed totals cannot be counted twice. The
+existing private-file bound, exclusive lock, SDK-operation queue and poisoning
+on uncertain persistence remain in force.
+
+Recovery can reconstruct only the exact durably verified intent, or resend its
+exact saved voucher. It cannot execute a prompt, invent a new block, change the
+bill or clear the original request reservation. A cancellation before the first
+intent creates no recoverable approval. If signing has already begun, its
+result must be saved even when cancellation prevents its publication; later
+financial recovery uses that same attempt. Runtime generation ownership is not
+restored from disk. After release or restart, an interrupted block request is
+eligible for the existing idle close using the highest seller-accepted total,
+including the existing below-threshold exception for unfinished work.
+
+`RecountTokenizer.stablePrefix` is optional and certified only by the tokenizer
+implementation that owns it. The pinned Qwen adapter verifies its public
+artifacts before exposing the conservative ASCII-space frontier. The optional
+target selects the earliest certified frontier reaching that cumulative count;
+a large engine fragment therefore need not become an arbitrarily larger block
+when an earlier safe boundary exists. Text without such a frontier requires one
+terminal exact block within existing limits. Free/declared metering and legacy
+whole-result verification remain unchanged by the optional port.
+
+### Opt-in duplex transport for session blocks
+
+`gyblos/session/5` uses the validated session-v4 management envelopes for
+prepare, opening, snapshot and close. Its execution parameters are also parsed
+by the existing request parser, but their financial digest uses the distinct
+session-v5 request domain. Existing ALPNs and signed vectors retain their bytes.
+The transport option is off by default; registering session-v4 does not advertise
+block execution. A host must explicitly enable it when composing a block-capable
+service. The ALPN is chosen before preparing or funding a channel.
+
+An execution keeps its send direction open. Each checkpoint is followed by one
+approval on that same stream, then an ACK after durable seller acceptance. The
+service cannot publish a second checkpoint while acceptance is outstanding.
+The buyer independently verifies the checkpoint and terminal tool allowlist
+before calling its durable signer, and persists the ACK before delivering the
+chunk to its consumer. The final checkpoint/ACK is followed by FIN in both
+directions. A partial first prompt write is already possibly sent; transport
+failure never authorizes another prompt or protocol fallback.
+
+For financial recovery, the first frame of a fresh v5 stream can be the exact
+stored approval, followed by FIN. It is matched to the seller's pending or last
+accepted checkpoint and verified by the existing native voucher verifier before
+ACK. Repeating a last accepted approval does not discard the next unsigned
+checkpoint or increase the amount. This exchange contains no inference input
+and consumes no inference-rate token. It cannot resume generation.
+
+Both session ALPNs share DATA connection and active-query admission. Execution
+consumes the existing inference quota once, not once per block. Existing
+absolute request, ingress, egress and financial-operation deadlines are retained.
+The first response byte may wait for generation; after it arrives, the entire
+remaining frame has one ingress budget. Each approval is capped at the existing
+8-KiB control-request limit; the original request plus all approvals and the
+entire response transcript stay within their existing 1-MiB aggregate budgets.
+Continuation lengths are also checked against the remaining aggregate budget
+before their bodies are allocated or read. The first frame on a recovery stream
+shares the 1-MiB initial management-frame cap; its approval-specific 8-KiB limit
+is checked after parsing, since that frame can also be an opening or execution. Cancellation
+poisons pending verification; no late approval or ACK may escape afterward.
+
+### Product composition for certified response blocks
+
+A block-capable paid session uses the same inference lifecycle, engine, input
+validation and terminal tool checks as complete-response sessions. The economic
+adapter replaces the final-only approval with cumulative checkpoints; it never
+starts another generation. Free execution and single-request paid execution
+retain their existing transports. Reusable-session startup explicitly enables
+the block ALPN. Buyer composition selects it before PREPARE only when both its
+financial port and recount tokenizer support checkpoints. A v5 seller refuses
+unsupported prefix certification before funding; neither side falls back after
+a possible prompt write.
+
+Already-created legacy channels stay on session-v4 until closed, including
+financial recovery against an older seller. The financial `usesBlocks()` port
+identifies an existing checkpoint journal without exposing private data. A new
+unfunded channel or an existing checkpoint channel can use v5; upgrading the
+buyer never strands an old v4 voucher by requiring a newer remote ALPN.
+
+The default soft target is 64 newly billable output tokens. It is not a hard
+64-token exposure cap: the first certified boundary may be later, or a response
+without a safe separator may be one terminal block up to the existing 128-output-
+token request limit. Input usage belongs to the first nonzero charge too. The
+original per-request ceiling and capped deposit continue to bound the amount.
+No new price, fee or per-block minimum is introduced.
+
+For the hash-pinned tokenizer, the stable frontier is immediately before an
+observed ASCII space following an ASCII letter or digit. The space is delivered
+as proof of that boundary but is not billed until a later checkpoint or the
+terminal. A buyer repeats the same independent certification. It never signs
+the maximum of changing prefix counts. Each bill recomputes one ceiling over
+input plus the total certified output using the signed quote, and adds the
+request's fixed channel base; it does not add rounded block charges or input
+charges repeatedly. The terminal uses the exact independent text/tool recount.
+A nonterminal signed prefix cannot exceed a valid final continuation's usage.
+
+There is one original inference reservation until the terminal ACK or verified
+channel closure. Intermediate approvals reduce its remaining allowance but do
+not release it or admit another request on that seller. Before emitting an
+approval, the buyer stores the exact verified intent, signs, then stores the
+voucher. The seller stores the exact accepted voucher before ACK. Both stores
+retain only bounded rolling metadata, never prompts, response text or tools.
+
+Cancellation, disconnect, engine failure or a missing ACK retain the original
+attempt. Recovery first checks independent settlement evidence, then can resend
+only the stored approval. A nonterminal interruption closes that channel at the
+highest accepted amount; it cannot continue generation, replay the prompt or
+move it to another seller. If the host deadline has passed, recovery verifies
+closure rather than trying to authorize fresh usage. Previously completed
+requests retain their cumulative charge and the unused deposit is returned.
+
+The one-block bound concerns the delivery/signature window, not response quality
+or whether a human saw the content. It also does not insure disk loss, restored
+stale backups or a seller absent for the entire on-chain withdrawal grace. An
+online seller/recovery worker must still claim signed totals in time. Public
+uptime and dual-signed receipts are reputation evidence, not a source of refunds;
+this session composition does not yet collect dual-signed paid usage receipts.

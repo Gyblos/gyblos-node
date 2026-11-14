@@ -1,0 +1,25 @@
+// Public block contract: wire values and independent usage verification, without import cycles.
+export {
+  SESSION_BLOCK_KINDS,
+  SESSION_BLOCKS,
+  parseSessionBlock,
+  encodeSessionBlock,
+  decodeSessionBlock,
+  sessionBlockDigest,
+  sessionBlockRequestDigest,
+  type SessionBlockBinding,
+  type SessionBlockFrame,
+  type SessionCheckpoint,
+  type SessionBlockApproval,
+  type SessionBlockAck,
+} from './session-block-wire';
+export {
+  createSessionBlockVerifier,
+  type SessionBlockVerification,
+} from './session-block-verifier';
+export {
+  parseSessionBlockIntent,
+  type SessionBlockIntent,
+  type SessionBlockBuyer,
+  type SessionBlockSeller,
+} from './session-block-ports';

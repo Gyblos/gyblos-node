@@ -31,10 +31,11 @@ import {
   type SessionVoucher,
 } from '@gyblos/protocol/payment-session';
 
+import { parseBlocks } from './batch-block-state';
 import { coherentRecord } from './batch-session-consistency';
 import { strictBatchOpening } from './batch-session-opening';
 import type { BatchRecord } from './batch-session-types';
-import { UPTO_BUYER_DISTINCT_PARTIES } from './constants';
+import { BATCH_BLOCK_STATE, UPTO_BUYER_DISTINCT_PARTIES } from './constants';
 
 export function atomic(value: unknown): string {
   return controlAtomic(value);
@@ -186,10 +187,12 @@ export function openingFor(input: unknown, terms: PaymentSessionTerms) {
   voucherFor(value.voucher);
   return value;
 }
-export function parseRecord(
-  value: unknown,
-  terms: PaymentSessionTerms,
-): BatchRecord {
+function recordFields(value: unknown) {
+  const blockVersion =
+    !!value &&
+    typeof value === 'object' &&
+    'version' in value &&
+    value.version === BATCH_BLOCK_STATE.version;
   const row = controlObject(value, [
     'version',
     'terms',
@@ -205,9 +208,17 @@ export function parseRecord(
     'closing',
     'settlement',
     'pending',
+    ...(blockVersion ? ['blocks'] : []),
   ]);
+  return { row, blockVersion };
+}
+export function parseRecord(
+  value: unknown,
+  terms: PaymentSessionTerms,
+): BatchRecord {
+  const { row, blockVersion } = recordFields(value);
   if (
-    row.version !== PAYMENT_SESSION.version ||
+    (row.version !== PAYMENT_SESSION.version && !blockVersion) ||
     canonicalJson(termsFor(row.terms)) !== canonicalJson(terms) ||
     !Object.values(SESSION_STATES).some((state) => state === row.state)
   )
@@ -243,7 +254,7 @@ export function parseRecord(
   const closing = parseClosing(row.closing);
   const settlement = parseSettlement(row.settlement);
   const record: BatchRecord = {
-    version: PAYMENT_SESSION.version,
+    version: blockVersion ? BATCH_BLOCK_STATE.version : PAYMENT_SESSION.version,
     terms,
     channelId,
     state,
@@ -257,6 +268,9 @@ export function parseRecord(
     closing,
     settlement,
     pending,
+    ...(blockVersion
+      ? { blocks: parseBlocks(row.blocks, parsed, voucherFor) }
+      : {}),
   };
   coherentRecord(record);
   return record;
