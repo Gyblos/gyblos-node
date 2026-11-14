@@ -217,6 +217,9 @@ async function snapshotBatch(
             failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
             return undefined;
           }
+          // A previous losing connection may still be retiring in the native SDK. Do not start a
+          // second operation for the same peer merely because its snapshot remains current.
+          if (dependencies.snapshots?.retiring(seller.nodeId)) return undefined;
           // A snapshot verified on an earlier request and still current: no connection, no records asked.
           const cached = recall(dependencies, seller, now(), recalled);
           if (cached) {
@@ -236,6 +239,7 @@ async function snapshotBatch(
             deadline,
             settling,
             signal,
+            (work) => dependencies.snapshots?.retire(seller.nodeId, work),
           );
           clients.set(seller.nodeId, client);
           const { known: verified, signed } = await verifiedSnapshot(
@@ -270,7 +274,9 @@ async function snapshotBatch(
           const client = clients.get(seller.nodeId);
           if (client && !signal?.aborted && !pinned) {
             clients.delete(seller.nodeId);
-            settling.push(client.close().catch(() => undefined));
+            const closing = client.close().catch(() => undefined);
+            settling.push(closing);
+            dependencies.snapshots?.retire(seller.nodeId, closing);
           }
           dependencies.snapshots?.drop(seller.nodeId);
           recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
@@ -290,6 +296,7 @@ export async function connectBefore(
   deadline: AbortSignal,
   settling: Promise<unknown>[],
   signal?: AbortSignal,
+  retire?: (work: Promise<unknown>) => void,
 ) {
   let stop = () => {};
   const expired = new Promise<never>((_resolve, reject) => {
@@ -302,12 +309,12 @@ export async function connectBefore(
   try {
     return await Promise.race([connecting, expired]);
   } catch (error) {
-    settling.push(
-      connecting.then(
-        (client) => client.close().catch(() => undefined),
-        () => undefined,
-      ),
+    const closing = connecting.then(
+      (client) => client.close().catch(() => undefined),
+      () => undefined,
     );
+    settling.push(closing);
+    retire?.(closing);
     throw error;
   } finally {
     deadline.removeEventListener('abort', stop);

@@ -41,15 +41,19 @@ const CATALOG_CHANGED: ReadonlySet<string> = new Set([
 // that waits out the transport: it closes in the background. A pinned seller's is still awaited (it is
 // asked again next), and so is every one of a request the caller cancelled.
 function releaseInBackground(
-  clients: Map<string, BuyerControlClient>,
+  race: RaceState,
   nodeId: string,
   config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
   signal?: AbortSignal,
 ) {
+  const { clients, settling } = race;
   const client = clients.get(nodeId);
   if (!client || signal?.aborted || nodeId === config.pinnedNodeId) return;
   clients.delete(nodeId);
-  void client.close().catch(() => undefined);
+  const closing = client.close().catch(() => undefined);
+  settling.push(closing);
+  dependencies.snapshots?.retire(nodeId, closing);
 }
 
 export async function raceCandidates(
@@ -145,6 +149,7 @@ async function candidateClient(
     querySignal,
     settling,
     signal,
+    (work) => dependencies.snapshots?.retire(candidate.nodeId, work),
   );
   clients.set(candidate.nodeId, client);
   await client.useCatalog?.(catalog);
@@ -200,7 +205,7 @@ async function requestCandidate(
     );
     return quote;
   } catch (error) {
-    releaseInBackground(clients, candidate.nodeId, config, signal);
+    releaseInBackground(race, candidate.nodeId, config, dependencies, signal);
     if (
       !querySignal.aborted &&
       remembered &&

@@ -268,3 +268,102 @@ void test('a newer catalog accepted from discovery supersedes an older remembere
     `latest catalog was ignored; queries=${cachedQueries}`,
   );
 });
+
+void test('sequential remembered selections never open another native dial while the previous loser settles', async (context) => {
+  await isolatedHome(context);
+  const host = await signedSellers(2);
+  const dead = host.config.sellers[1]!;
+  const source = host.sources[1]!;
+  let retiring = false;
+  let dials = 0;
+  let closes = 0;
+  let began = () => {};
+  const dialStarted = new Promise<void>((resolve) => {
+    began = resolve;
+  });
+  const releases: (() => void)[] = [];
+  const endpoint = {
+    id: () => ({ toString: () => source.request.params.buyerNodeId }),
+    connect: () => {
+      dials++;
+      began();
+      return new Promise<Connection>((resolve) => {
+        releases.push(() =>
+          resolve({
+            close() {
+              closes++;
+            },
+          } as unknown as Connection),
+        );
+      });
+    },
+  } as unknown as Endpoint;
+  const dependencies = {
+    ...host.dependencies,
+    connect: async (seller: { nodeId: string }) => {
+      const index = host.config.sellers.findIndex(
+        (entry) => entry.nodeId === seller.nodeId,
+      );
+      if (!retiring || index !== 1) {
+        const client = host.client(index);
+        const requestOffer = client.requestOffer.bind(client);
+        return Object.assign(client, {
+          requestOffer: async (...args: Parameters<typeof requestOffer>) => {
+            if (retiring) await dialStarted;
+            return requestOffer(...args);
+          },
+        });
+      }
+      const client = createBuyerControlClient(
+        createControlTransport(endpoint, {} as EndpointAddr, dead.nodeId, {
+          queryMs: 10_000,
+        }),
+        { ...source.trust(), now: source.context.now },
+      );
+      return {
+        getCatalog: (...args: Parameters<typeof client.getCatalog>) =>
+          client.getCatalog(...args),
+        getPresence: (...args: Parameters<typeof client.getPresence>) =>
+          client.getPresence(...args),
+        useCatalog: (...args: Parameters<typeof client.useCatalog>) =>
+          client.useCatalog(...args),
+        requestOffer: (...args: Parameters<typeof client.requestOffer>) =>
+          client.requestOffer(...args),
+        async close() {
+          await client.close();
+          await client.settled();
+        },
+      };
+    },
+  };
+  assert.equal(
+    (await selectVerifiedBuyerQuote(host.config, dependencies)).ok,
+    true,
+  );
+  retiring = true;
+  try {
+    for (let index = 0; index < 4; index++) {
+      const result = await selectVerifiedBuyerQuote(host.config, dependencies);
+      assert.equal(
+        result.ok,
+        true,
+        'a native loser cannot hold the healthy winner',
+      );
+      if (result.ok)
+        assert.equal(
+          result.winner.candidate.nodeId,
+          host.config.sellers[0]!.nodeId,
+        );
+    }
+    assert.equal(closes, 0, 'the native dial is still held by the SDK');
+    assert.equal(
+      dials,
+      1,
+      'pending native work must exclude another dial to the same seller',
+    );
+  } finally {
+    for (const release of releases) release();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(closes, dials);
+  }
+});
