@@ -98,6 +98,9 @@ export async function executeBuyerFree(
       ...(external ? [external] : []),
     ]);
     const excluded = new Set<string>();
+    // The failure of a seller that already had the prompt: when no other seller can take it, or time
+    // runs out, the client sees that failure, not a later selection's.
+    let resent: FreeClientError | undefined;
     let resends = 0;
     while (!signal.aborted) {
       const winner = await dependencies
@@ -107,6 +110,7 @@ export async function executeBuyerFree(
           conversation: dependencies.conversationKey?.(input, model),
         })
         .catch((error) => {
+          if (resent) throw resent;
           // Local occupancy is not a network failure; retain request-local model telemetry.
           const busy =
             error instanceof FreeBuyerError &&
@@ -130,13 +134,15 @@ export async function executeBuyerFree(
           dependencies.resendAfterSend === true &&
             resends < FREE_BUYER.maxResends,
         );
-        if (result === RESENT) resends++;
-        else if (result) return result;
+        if (result instanceof Resent) {
+          resent = result.error;
+          resends++;
+        } else if (result) return result;
       } finally {
         dependencies.done?.(winner);
       }
     }
-    throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+    throw resent ?? new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   } finally {
     release?.();
   }
@@ -163,9 +169,11 @@ export function createConversationKey() {
   };
 }
 
-// Returned when the prompt was sent to a seller that failed before any visible text: another seller may
-// take the whole request again.
-const RESENT = Symbol('resent');
+// Returned, with the seller's failure, when the prompt was sent to a seller that failed before any visible
+// text: another seller may take the whole request again.
+class Resent {
+  constructor(readonly error: FreeClientError) {}
+}
 // Failures after sending that another seller can fix. A refusal of the request itself (too long, invalid,
 // unsupported) would fail the same way anywhere, and a client that left is not a seller failure.
 const RESENDABLE: ReadonlySet<string> = new Set([
@@ -203,10 +211,10 @@ export async function executeSelectedBuyerFree(
     beforeExecute,
     false,
   );
-  return result === RESENT ? undefined : result;
+  return result instanceof Resent ? undefined : result;
 }
 
-// As executeSelectedBuyerFree; with `resend`, RESENT also means the prompt was sent but the seller
+// As executeSelectedBuyerFree; with `resend`, a Resent also means the prompt was sent but the seller
 // failed before any visible text, so another seller may take the whole request again.
 async function attemptSelectedFree(
   input: FreeExecutionBuildInput,
@@ -216,7 +224,7 @@ async function attemptSelectedFree(
   onDelta: ((text: string) => Promise<void>) | undefined,
   beforeExecute: (() => void) | undefined,
   resend: boolean,
-): Promise<FreeExecutionResult | typeof RESENT | undefined> {
+): Promise<FreeExecutionResult | Resent | undefined> {
   const request = buildFreeExecutionRequest(winner.quote, input);
   const observer = buyerExecutionTelemetry(
     request,
@@ -254,7 +262,7 @@ async function attemptSelectedFree(
     failBuyerTelemetry(observer, error, signal, delivered);
     if (!(error instanceof FreeClientError) || signal.aborted) throw error;
     if (!error.sent && !delivered) return undefined;
-    if (resend && !visible && resendable(error)) return RESENT;
+    if (resend && !visible && resendable(error)) return new Resent(error);
     throw error;
   }
 }

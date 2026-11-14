@@ -9,7 +9,10 @@ import type { Connection, Endpoint } from '@number0/iroh';
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { executeBuyerFree } from '@gyblos/buyer/free-execution';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
-import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
+import type {
+  BuyerFailover,
+  BuyerSelectionConfig,
+} from '@gyblos/buyer/selection-config';
 import type { PreparedBuyerSelection } from '@gyblos/buyer/selection-runtime';
 import { selectionStats } from '@gyblos/buyer/selection-stats';
 import { FILE_MODES, homeLayout } from '@gyblos/config';
@@ -74,6 +77,7 @@ export async function createFreeBuyer(
   sellers: AcceptanceSession[] = [run],
   fault?: FreeAcceptanceFault,
   identity?: FreeBuyerIdentityOptions,
+  failover?: BuyerFailover,
 ) {
   const { freeBuyerDependencies } =
     await import('@gyblos/buyer/free-selection');
@@ -84,6 +88,7 @@ export async function createFreeBuyer(
     const config: BuyerSelectionConfig = acceptanceSelection(run);
     config.request.maxTokens = FREE_ACCEPTANCE.maxTokens;
     config.request.maxAtomic = '0';
+    if (failover) config.failover = failover;
     config.request.priceCeilings = {
       inputAtomicPerMtok: '0',
       outputAtomicPerMtok: '0',

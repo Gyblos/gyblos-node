@@ -167,3 +167,26 @@ void test('selection.json takes failover "safe" or "never" only', async () => {
     await run.wire.close();
   }
 });
+
+void test('with no other seller to take it, the client sees the seller failure', async () => {
+  const error = sent(FREE_EXECUTION_CODES.TIMEOUT);
+  const { dependencies, asked } = rig({
+    a: { error },
+    b: { error },
+    c: { error },
+    d: { error },
+  });
+  // Only seller a exists: selection then finds no one.
+  const only: FreeBuyerDependencies = {
+    ...dependencies,
+    select: async (excluded, signal, needs) => {
+      if (excluded.has('a'))
+        throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+      return dependencies.select(excluded, signal, needs);
+    },
+  };
+  await assert.rejects(executeBuyerFree(INPUT, only), {
+    code: FREE_EXECUTION_CODES.TIMEOUT,
+  });
+  assert.deepEqual(asked, ['a']);
+});
