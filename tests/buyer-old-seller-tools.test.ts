@@ -6,13 +6,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
+import {
+  selectVerifiedBuyerQuote,
+  type VerifiedSelectionDependencies,
+} from '@gyblos/buyer/selection';
+import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 
 import { selectionFixture } from './support/buyer-selection';
 
-type SellerFailure = { code: string };
+type SellerFailure = Parameters<
+  NonNullable<VerifiedSelectionDependencies['onSellerFailure']>
+>[0];
 
 for (const tools of [true, false])
   void test(`an invalid-request quote refusal ${tools ? 'with tools is "no tools"' : 'without tools still cools down'}`, async (t) => {
@@ -22,7 +28,7 @@ for (const tools of [true, false])
       throw new ControlError(CONTROL_CODES.INVALID);
     };
     const failures: SellerFailure[] = [];
-    const stats = new Map();
+    const stats = new Map<string, LocalSellerStats>();
     const result = await selectVerifiedBuyerQuote(
       {
         ...run.config,
