@@ -14,7 +14,6 @@ import type {
   BuyerControlClient,
   VerifiedSelectionDependencies,
 } from './selection';
-import { backoffFor } from './selection-backoff';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -44,14 +43,13 @@ function coolAfterQuote(
   error: unknown,
   nodeId: string,
   context: {
-    config: BuyerSelectionConfig;
     dependencies: VerifiedSelectionDependencies;
     elapsedMs: number;
     now: number;
     signal?: AbortSignal;
   },
 ) {
-  const { config, dependencies, signal } = context;
+  const { dependencies } = context;
   if (sellerFailureCode(error) === CONTROL_CODES.TOOLS) return null;
   return recordQuote(
     dependencies.stats,
@@ -59,7 +57,7 @@ function coolAfterQuote(
     false,
     context.elapsedMs,
     context.now,
-    backoffFor(dependencies.backoff, config, nodeId, signal),
+    dependencies.backoff,
   );
 }
 
@@ -144,7 +142,7 @@ function raceAll(
             false,
             0,
             now(),
-            backoffFor(dependencies.backoff, config, candidate.nodeId, signal),
+            dependencies.backoff,
           );
           reportSellerFailure(dependencies.onSellerFailure, {
             nodeId: candidate.nodeId,
@@ -258,7 +256,6 @@ async function requestCandidate(
       // that only lost the race keeps its snapshot.
       dependencies.snapshots?.drop(candidate.nodeId);
       const retryAt = coolAfterQuote(error, candidate.nodeId, {
-        config,
         dependencies,
         elapsedMs: now() - start,
         now: now(),

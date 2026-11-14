@@ -6,12 +6,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import type { Endpoint } from '@number0/iroh';
-
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { createBuyerControlClient } from '@gyblos/buyer/control';
-import { selectWinner } from '@gyblos/buyer/free-selection';
-import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
+import {
+  selectVerifiedBuyerQuote,
+  type VerifiedSelectionDependencies,
+} from '@gyblos/buyer/selection';
 import { createSellerBackoff } from '@gyblos/buyer/selection-backoff';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
@@ -21,6 +21,10 @@ import { CONTROL_METHODS } from '@gyblos/protocol/constants';
 import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
 import { controlFixture } from './support/control-fixture';
+
+type SellerFailure = Parameters<
+  NonNullable<VerifiedSelectionDependencies['onSellerFailure']>
+>[0];
 
 async function isolatedHome(context: test.TestContext) {
   const directory = await mkdtemp(join(tmpdir(), 'buyer-backoff-regression-'));
@@ -176,4 +180,37 @@ void test('a configured seller for another model is not an alternative that exte
       alternativeQuotes: 0,
     },
   );
+});
+
+void test('a failed snapshot keeps progressive cooldowns when another seller supplies a valid quote', async (context) => {
+  await isolatedHome(context);
+  const source = await controlFixture(true);
+  const other = await controlFixture(true);
+  const config = configuration(source, other);
+  const alternative = memorySeller(other);
+  const failures: SellerFailure[] = [];
+  let now = source.context.now();
+  const dependencies = {
+    buyer: source.request.params.buyer,
+    stats: new Map<string, LocalSellerStats>(),
+    backoff: createSellerBackoff(),
+    now: () => now,
+    random: () => 0,
+    onSellerFailure: (failure: SellerFailure) => failures.push(failure),
+    connect: async (seller: { nodeId: string }) => {
+      if (seller.nodeId === source.catalog.nodeId)
+        throw new Error('Synthetic unreachable seller');
+      return alternative.client();
+    },
+  };
+  for (const duration of [30_000, 60_000, 120_000]) {
+    other.setNow(now);
+    other.setReadiness({ observedAt: now, validUntil: now + 20_000 });
+    const result = await selectVerifiedBuyerQuote(config, dependencies);
+    assert.equal(result.ok, true);
+    const until = dependencies.stats.get(source.catalog.nodeId)!.cooldownUntil!;
+    assert.equal(until - now, duration);
+    assert.equal(failures.at(-1)?.retryAt, until);
+    now = until + 1;
+  }
 });

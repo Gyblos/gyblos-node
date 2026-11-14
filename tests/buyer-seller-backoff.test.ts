@@ -8,7 +8,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { BUYER_SELECTION } from '@gyblos/buyer/constants';
+import {
+  BUYER_SELECTION,
+  ERROR_DIAGNOSTICS,
+  SELLER_FAILURE_PHASES,
+} from '@gyblos/buyer/constants';
 import { sellerFailureLine } from '@gyblos/buyer/free-main';
 import {
   backoffFor,
@@ -59,43 +63,40 @@ void test('without a backoff every failure cools for 30 s, as before', () => {
 });
 
 void test('the failure line says when the seller is tried again', () => {
-  const failure = {
+  const failure: Parameters<typeof sellerFailureLine>[0] = {
     nodeId: NODE,
-    phase: 'connect',
-    code: 'REQUEST_TIMEOUT',
-  } as const;
-  assert.doesNotMatch(sellerFailureLine(failure as never, 0), /retry_in/);
+    phase: SELLER_FAILURE_PHASES.CONNECT,
+    code: ERROR_DIAGNOSTICS.TIMEOUT,
+  };
+  assert.doesNotMatch(sellerFailureLine(failure, 0), /retry_in/);
   assert.match(
-    sellerFailureLine({ ...failure, retryAt: 120_400 } as never, 400),
+    sellerFailureLine({ ...failure, retryAt: 120_400 }, 400),
     / retry_in=120s$/,
   );
 });
 
 void test('no growing cooldown for a cancelled request, the pinned seller or the only seller', () => {
   const backoff = createSellerBackoff();
-  const two = { sellers: [1, 2] };
-  assert.equal(backoffFor(backoff, two, NODE), backoff);
-  assert.equal(backoffFor(undefined, two, NODE), undefined);
-  assert.equal(backoffFor(backoff, { sellers: [1] }, NODE), undefined);
+  const alternative = 'b'.repeat(64);
+  assert.equal(backoffFor(backoff, {}, NODE, alternative), backoff);
+  assert.equal(backoffFor(undefined, {}, NODE, alternative), undefined);
+  assert.equal(backoffFor(backoff, {}, NODE), undefined);
+  assert.equal(backoffFor(backoff, {}, NODE, NODE), undefined);
   assert.equal(
-    backoffFor(backoff, { ...two, pinnedNodeId: NODE }, NODE),
+    backoffFor(backoff, { pinnedNodeId: NODE }, NODE, alternative),
     undefined,
   );
   const cancelled = new AbortController();
   cancelled.abort();
-  assert.equal(backoffFor(backoff, two, NODE, cancelled.signal), undefined);
-  // Without a backoff the cooldown stays 30 s however often it fails, and the count does not grow.
+  assert.equal(
+    backoffFor(backoff, {}, NODE, alternative, cancelled.signal),
+    undefined,
+  );
+  // Without an alternative the cooldown stays 30 s and the count does not grow.
   const stats = new Map<string, LocalSellerStats>();
   for (let index = 0; index < 3; index++)
     assert.equal(
-      recordQuote(
-        stats,
-        NODE,
-        false,
-        0,
-        0,
-        backoffFor(backoff, { sellers: [1] }, NODE),
-      ),
+      recordQuote(stats, NODE, false, 0, 0, backoffFor(backoff, {}, NODE)),
       30_000,
     );
   assert.equal(recordQuote(stats, NODE, false, 0, 0, backoff), 30_000);

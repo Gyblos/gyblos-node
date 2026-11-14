@@ -24,7 +24,7 @@ import {
 } from './constants';
 import type { createBuyerControlClient } from './control';
 import { raceControlOffers, type WinningQuote } from './offer-race';
-import type { SellerBackoff } from './selection-backoff';
+import { selectionBackoff, type SellerBackoff } from './selection-backoff';
 import type { SnapshotCache } from './selection-cache';
 import {
   BuyerSelectionError,
@@ -88,10 +88,31 @@ export async function selectVerifiedBuyerQuote(
   dependencies: VerifiedSelectionDependencies,
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
-  const stale = new Set<string>();
-  const first = await selectOnce(config, dependencies, stale, signal);
-  if (first.ok || !stale.size || signal?.aborted) return first;
-  return selectOnce(config, dependencies, new Set(), signal);
+  const pending = selectionBackoff(
+    dependencies.backoff,
+    config,
+    dependencies.stats,
+    dependencies.onSellerFailure,
+    signal,
+  );
+  const active = {
+    ...dependencies,
+    backoff: pending.backoff,
+    onSellerFailure: pending.onSellerFailure,
+  };
+  let alternativeNodeId: string | undefined;
+  try {
+    const stale = new Set<string>();
+    const first = await selectOnce(config, active, stale, signal);
+    const result =
+      first.ok || !stale.size || signal?.aborted
+        ? first
+        : await selectOnce(config, active, new Set(), signal);
+    if (result.ok) alternativeNodeId = result.winner.candidate.nodeId;
+    return result;
+  } finally {
+    pending.finish(alternativeNodeId);
+  }
 }
 async function selectOnce(
   config: BuyerSelectionConfig,
