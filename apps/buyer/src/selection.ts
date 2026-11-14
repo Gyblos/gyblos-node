@@ -86,14 +86,17 @@ export async function selectVerifiedBuyerQuote(
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
   const stale = new Set<string>();
-  const first = await selectOnce(config, dependencies, stale, signal);
+  // One caller owns both catalog attempts, including native work retired by the first.
+  const settling: Promise<unknown>[] = [];
+  const first = await selectOnce(config, dependencies, stale, settling, signal);
   if (first.ok || !stale.size || signal?.aborted) return first;
-  return selectOnce(config, dependencies, new Set(), signal);
+  return selectOnce(config, dependencies, new Set(), settling, signal);
 }
 async function selectOnce(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
   stale: Set<string>,
+  settling: Promise<unknown>[],
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
   if (config.identity && !dependencies.verifyIdentity)
@@ -104,7 +107,6 @@ async function selectOnce(
     ...(signal ? [signal] : []),
   ]);
   const clients = new Map<string, BuyerControlClient>();
-  const settling: Promise<unknown>[] = [];
   try {
     const recalled = new Map<string, SignedPublicV2>();
     const snapshots = await refreshSnapshots(
