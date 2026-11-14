@@ -15,6 +15,7 @@ import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 import { buyerApiKeyErrorView } from './api-key-http';
 import { defaultChatApi, type ChatApi } from './chat-api';
 import { FREE_BUYER, FREE_BUYER_CODES, FREE_CHAT_DETAILS } from './constants';
+import { sellerContextFull } from './context-full';
 import { FreeBuyerError } from './free-chat';
 import { FreeSelectionFailure } from './free-execution';
 import {
@@ -153,6 +154,7 @@ export function replyError(
             : {}),
         },
         payment: view.payment,
+        ...(sellerContextFull(view) ? { contextFull: true } : {}),
       }),
     ),
   );
