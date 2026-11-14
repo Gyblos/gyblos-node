@@ -100,9 +100,9 @@ const PRUNE_SQL = [
 const PRUNE_UPTIME_SQL = 'DELETE FROM discovery_uptime WHERE hour < ?1';
 // One row per NodeId and hour: the slot bit is ORed in, so repeating a write changes nothing.
 const MARK_SEEN_SQL = `INSERT INTO discovery_uptime (node_id, hour, slots, first_at, last_at) VALUES (?1, ?2, ?3, ?4, ?4)
-ON CONFLICT (node_id, hour) DO UPDATE SET slots = slots | excluded.slots, last_at = max(last_at, excluded.last_at)`;
+ON CONFLICT (node_id, hour) DO UPDATE SET slots = slots | excluded.slots, first_at = min(first_at, excluded.first_at), last_at = max(last_at, excluded.last_at)`;
 const FIRST_SEEN_SQL = `INSERT INTO discovery_uptime_nodes (node_id, first_at) VALUES (?1, ?2)
-ON CONFLICT (node_id) DO NOTHING`;
+ON CONFLICT (node_id) DO UPDATE SET first_at = min(first_at, excluded.first_at)`;
 const SEEN_SQL =
   'SELECT hour, slots, first_at AS firstAt, last_at AS lastAt FROM discovery_uptime WHERE node_id = ?1 AND hour >= ?2 ORDER BY hour';
 

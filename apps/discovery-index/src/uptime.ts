@@ -144,14 +144,14 @@ export function memoryUptime() {
       }
     },
     async markSeen(nodeId: string, now: number) {
-      if (!first.has(nodeId)) first.set(nodeId, now);
+      first.set(nodeId, Math.min(first.get(nodeId) ?? now, now));
       const hours = nodes.get(nodeId) ?? new Map<number, UptimeRow>();
       nodes.set(nodeId, hours);
       const prior = hours.get(hourOf(now));
       hours.set(hourOf(now), {
         hour: hourOf(now),
         slots: (prior?.slots ?? 0) | slotBit(now),
-        firstAt: prior?.firstAt ?? now,
+        firstAt: Math.min(prior?.firstAt ?? now, now),
         lastAt: Math.max(prior?.lastAt ?? now, now),
       });
     },
