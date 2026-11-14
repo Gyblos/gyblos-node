@@ -2,6 +2,7 @@
 // snapshot came from, or on a new one starting from a remembered catalog; stats and failures recorded.
 import type { SellerCandidate } from '@gyblos/core/seller-selection';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
+import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 
 import {
   BUYER_SELECTION_CODES,
@@ -27,7 +28,14 @@ export interface RaceState {
   clients: Map<string, BuyerControlClient>;
   // Sellers whose remembered catalog turned out stale in this selection.
   stale: Set<string>;
+  // The remembered signed catalog of each seller whose snapshot came from memory.
+  recalled: Map<string, SignedPublicV2>;
 }
+const CATALOG_CHANGED: ReadonlySet<string> = new Set([
+  CONTROL_CODES.STALE,
+  CONTROL_CODES.MODEL,
+]);
+
 // A quote that did not arrive leaves a connection that may be dialing a seller that is gone, and closing
 // that waits out the transport: it closes in the background. A pinned seller's is still awaited (it is
 // asked again next), and so is every one of a request the caller cancelled.
@@ -115,7 +123,7 @@ function raceAll(
 // earlier request, a new one that starts from that verified catalog.
 async function candidateClient(
   candidate: SellerCandidate,
-  clients: Map<string, BuyerControlClient>,
+  { clients, recalled }: RaceState,
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
 ) {
@@ -125,17 +133,17 @@ async function candidateClient(
     (item) =>
       item.nodeId === candidate.nodeId && item.owner === candidate.owner,
   );
-  const cached = seller && dependencies.snapshots?.signedCatalog(seller);
-  if (!seller || !cached)
+  const catalog = recalled.get(candidate.nodeId);
+  if (!seller || !catalog)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
   const client = await dependencies.connect(seller);
   clients.set(candidate.nodeId, client);
-  await client.useCatalog?.(cached);
+  await client.useCatalog?.(catalog);
   return { client, remembered: true };
 }
 async function requestCandidate(
   candidate: SellerCandidate,
-  { clients, stale }: RaceState,
+  race: RaceState,
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
   now: () => number,
@@ -143,16 +151,12 @@ async function requestCandidate(
   // The caller's own signal: a cancelled request still waits for every connection it opened.
   signal?: AbortSignal,
 ) {
+  const { clients, stale } = race;
   const start = now();
   const request = config.request;
   let remembered = false;
   try {
-    const opened = await candidateClient(
-      candidate,
-      clients,
-      config,
-      dependencies,
-    );
+    const opened = await candidateClient(candidate, race, config, dependencies);
     remembered = opened.remembered;
     const client = opened.client;
     const quote = await client.requestOffer(
@@ -181,10 +185,14 @@ async function requestCandidate(
     return quote;
   } catch (error) {
     releaseInBackground(clients, candidate.nodeId, config, signal);
-    if (!querySignal.aborted && remembered) {
-      // A quote for a remembered catalog that the seller refused (it replaced the catalog, or no longer
-      // lists the model) says the memory is out of date, not that the seller failed: it is asked again
-      // with a fresh snapshot, and a real failure then counts as usual.
+    if (
+      !querySignal.aborted &&
+      remembered &&
+      CATALOG_CHANGED.has(sellerFailureCode(error))
+    ) {
+      // A quote for a remembered catalog that the seller refused because it replaced the catalog or no
+      // longer lists the model says the memory is out of date, not that the seller failed: it is asked
+      // again with a fresh snapshot. Any other refusal counts as usual.
       dependencies.snapshots?.drop(candidate.nodeId);
       stale.add(candidate.nodeId);
       throw error;

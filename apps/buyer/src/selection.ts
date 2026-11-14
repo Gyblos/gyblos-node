@@ -10,6 +10,7 @@ import {
   type SellerSelectionResult,
 } from '@gyblos/core/seller-selection';
 import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
@@ -104,10 +105,12 @@ async function selectOnce(
   ]);
   const clients = new Map<string, BuyerControlClient>();
   try {
+    const recalled = new Map<string, SignedPublicV2>();
     const snapshots = await refreshSnapshots(
       config,
       dependencies,
       clients,
+      recalled,
       now,
       deadline,
       signal,
@@ -129,7 +132,7 @@ async function selectOnce(
     if (!selected.ok) return selected;
     const winner = await raceCandidates(
       selected.candidates,
-      { clients, stale },
+      { clients, stale, recalled },
       config,
       dependencies,
       now,

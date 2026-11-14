@@ -117,6 +117,8 @@ export async function refreshSnapshots(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
   clients: Map<string, BuyerControlClient>,
+  // Remembered signed catalogs used by this selection, by NodeId, for its quotes.
+  recalled: Map<string, SignedPublicV2>,
   now: () => number,
   deadline: AbortSignal,
   // The caller's own signal: its abort is a cancellation, while the snapshot deadline is a failure.
@@ -147,7 +149,10 @@ export async function refreshSnapshots(
           }
           // A snapshot verified on an earlier request and still current: no connection, no records asked.
           const cached = dependencies.snapshots?.get(seller, now());
-          if (cached) return cached;
+          if (cached) {
+            recalled.set(seller.nodeId, cached.catalog);
+            return cached.known;
+          }
           deadline.throwIfAborted();
           const client = await connectBefore(
             dependencies.connect(seller),

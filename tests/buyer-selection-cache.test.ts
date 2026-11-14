@@ -77,14 +77,26 @@ void test('a seller verified on one request is only asked for a quote on the nex
   assert.equal(host.connects(), 2);
 });
 
-void test('any refusal of a quote for a remembered catalog is asked again fresh in the same request', async (t) => {
+void test('any other failure of a remembered quote counts and drops the memory', async (t) => {
   const host = await rig(t);
   assert.equal((await host.select()).ok, true);
   host.failOnce();
+  assert.equal((await host.select()).ok, false);
   const before = host.run.wire.queries;
   assert.equal((await host.select()).ok, true);
-  // The synthetic refusal is local: then catalog, presence and quote on a fresh snapshot.
   assert.equal(host.run.wire.queries - before, 3);
+});
+
+void test('a remembered seller whose identity is refused is not used', async (t) => {
+  const host = await rig(t);
+  assert.equal((await host.select()).ok, true);
+  const before = host.run.wire.queries;
+  const result = await selectBuyerQuote(
+    { ...host.run.config, identity: { rpcUrl: 'http://127.0.0.1:1/' } },
+    { ...host.dependencies, verifyIdentity: async () => false },
+  );
+  assert.equal(result.ok, false);
+  assert.equal(host.run.wire.queries, before);
 });
 
 void test('a snapshot about to expire, or under a withdrawal, is not used', () => {
@@ -128,4 +140,27 @@ void test('a seller that replaced its catalog is asked again in the same request
     host.dependencies.stats.get(seller)?.cooldownUntil ?? null,
     null,
   );
+});
+
+void test('a full memory forgets expired sellers before the current ones', () => {
+  const cache = createSnapshotCache();
+  const later = Date.now() + 10 * 60_000;
+  const known = (expiresAt: number) =>
+    ({
+      catalog: { expiresAt: later },
+      presence: { expiresAt },
+      withdrawal: null,
+    }) as never;
+  const seller = (nodeId: string) => ({
+    owner: 'o',
+    nodeId,
+    relayUrl: null,
+    directAddresses: [],
+  });
+  cache.set(seller('current'), known(later), {} as never);
+  for (let index = 1; index < BUYER_SELECTION.maxCachedSellers; index++)
+    cache.set(seller(`gone-${index}`), known(0), {} as never);
+  cache.set(seller('new'), known(later), {} as never);
+  assert.ok(cache.get(seller('current'), Date.now()));
+  assert.ok(cache.get(seller('new'), Date.now()));
 });

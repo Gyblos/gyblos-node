@@ -8,21 +8,32 @@ import { BUYER_SELECTION } from './constants';
 import type { StaticControlSeller } from './selection-config';
 
 export interface SnapshotCache {
-  // The seller's verified snapshot, while both records stay current for at least the margin.
-  get(seller: StaticControlSeller, now: number): KnownSeller | undefined;
+  // The seller's verified snapshot and its signed catalog, while both records stay current for at least
+  // the margin.
+  get(
+    seller: StaticControlSeller,
+    now: number,
+  ): { known: KnownSeller; catalog: SignedPublicV2 } | undefined;
   set(
     seller: StaticControlSeller,
     known: KnownSeller,
     catalog: SignedPublicV2,
   ): void;
-  // The signed catalog behind a cached snapshot, for a new connection to quote against.
-  signedCatalog(seller: StaticControlSeller): SignedPublicV2 | undefined;
   // A seller that failed or answered with a quote that no longer matches: verify it again next time.
   drop(nodeId: string): void;
 }
 
 const key = (seller: { nodeId: string; owner: string }) =>
   `${seller.nodeId}/${seller.owner}`;
+
+const current = (known: KnownSeller, now: number) => {
+  const until = now + BUYER_SELECTION.snapshotMarginMs;
+  return (
+    !!known.presence &&
+    known.presence.expiresAt > until &&
+    known.catalog.expiresAt > until
+  );
+};
 
 export function createSnapshotCache(): SnapshotCache {
   const entries = new Map<
@@ -33,26 +44,22 @@ export function createSnapshotCache(): SnapshotCache {
     get(seller, now) {
       // A withdrawal attached by discovery changes what selection must see: no cached answer for it.
       if (seller.withdrawal) return undefined;
-      const known = entries.get(key(seller))?.known;
-      if (!known) return undefined;
-      const until = now + BUYER_SELECTION.snapshotMarginMs;
-      if (
-        !known.presence ||
-        known.presence.expiresAt <= until ||
-        known.catalog.expiresAt <= until
-      ) {
+      const entry = entries.get(key(seller));
+      if (!entry) return undefined;
+      if (!current(entry.known, now)) {
         entries.delete(key(seller));
         return undefined;
       }
-      return known;
+      return entry;
     },
     set(seller, known, catalog) {
       if (seller.withdrawal || known.withdrawal) return;
+      // Full: forget what expired (sellers that left discovery) first, and only then everything.
+      if (entries.size >= BUYER_SELECTION.maxCachedSellers)
+        for (const [name, entry] of entries)
+          if (!current(entry.known, Date.now())) entries.delete(name);
       if (entries.size >= BUYER_SELECTION.maxCachedSellers) entries.clear();
       entries.set(key(seller), { known, catalog });
-    },
-    signedCatalog(seller) {
-      return entries.get(key(seller))?.catalog;
     },
     drop(nodeId) {
       for (const name of entries.keys())
