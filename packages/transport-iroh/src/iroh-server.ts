@@ -24,6 +24,7 @@ import {
   connectionSource,
   createConnectionAdmission,
 } from './admission';
+import { admitBatchQuery } from './batch-admission';
 import {
   handleBatchChannelConnection,
   type BatchChannelService,
@@ -182,19 +183,13 @@ export function serveIroh(
           release();
           return undefined;
         }
-        // Reuse the existing bounded query rate, including malformed/incomplete streams. Its lease
-        // covers this synchronous rate check; the endpoint slot covers parsing, generation and egress.
-        let queryConnection:
-          ReturnType<ControlAdmission['openConnection']> | undefined;
         try {
-          queryConnection = sessionQueries.openConnection(peer);
-          queryConnection.beginQuery().finish();
+          // Keep the endpoint lease and original ingress deadline while the query bucket refills.
+          await admitBatchQuery(sessionQueries, peer, querySignal);
           return release;
         } catch {
           release();
           return undefined;
-        } finally {
-          queryConnection?.close();
         }
       },
       () => closed,
