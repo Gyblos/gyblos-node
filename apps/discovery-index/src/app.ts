@@ -6,7 +6,6 @@ import { bodyLimit } from 'hono/body-limit';
 import { isJsonContentType } from './body';
 import {
   cachedPage,
-  recordCounter,
   sellersCacheKey,
   storePage,
   type RecordCounter,
@@ -35,42 +34,25 @@ import { IndexError, statusOf } from './errors';
 import { ipKey } from './ip-key';
 import {
   allowed,
-  limiterResolver,
   type DiscoveryLimiters,
   type ResolvedLimiters,
 } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
 import { acceptRecord, type PublishContext } from './publish';
-import { publishModeOf, type DiscoveryPublishers } from './publishers';
+import { publishModeOf } from './publishers';
 import type { RegistrationStore } from './registration-store';
 import { registerSeller, type RegistryReader } from './registrations';
-import { parseSellersQuery, sellersPage, type SellersQuery } from './sellers';
+import { parseSellersQuery, sellersPage } from './sellers';
+import {
+  settingsOf,
+  type DiscoveryIndexOptions,
+  type IndexSettings,
+} from './settings';
 import type { DiscoveryStorage } from './storage';
+import { parseUptimeQuery, uptimePage } from './uptime';
 
 export type { ResponseCache } from './cache';
-
-export interface DiscoveryIndexOptions {
-  // Missing storage or any missing limiter fails closed with 503 DISCOVERY_UNAVAILABLE.
-  storage?: DiscoveryStorage;
-  limiters?: DiscoveryLimiters;
-  // Who may publish. Missing means closed: every publish is 503 DISCOVERY_UNAVAILABLE,
-  // reads are unaffected. Development never relaxes it.
-  publishers?: DiscoveryPublishers;
-  // NodeIds admitted through /v1/registrations; they may publish too. With no allowlist either,
-  // publishing is closed.
-  registrations?: RegistrationStore;
-  // The 8004 registry reader /v1/registrations verifies against. Missing, that route answers 503.
-  registry?: RegistryReader;
-  // Response cache for GET /v1/sellers (the Worker passes caches.default). Missing means none.
-  cache?: ResponseCache;
-  now?: () => number;
-  // Loopback hosts only: missing limiters become in-memory counters and plain http is accepted.
-  // Storage is never relaxed. The Worker entry always passes false.
-  development?: boolean;
-  maxNodes?: number;
-  maxResponseBytes?: number;
-  pruneIntervalMs?: number;
-}
+export type { DiscoveryIndexOptions } from './settings';
 
 interface IndexVariables {
   storage: DiscoveryStorage;
@@ -117,57 +99,6 @@ function finishHeaders(context: Context) {
     headers.set(INDEX_HEADERS.CORS_ORIGIN, INDEX_HEADER_VALUES.ANY_ORIGIN);
   headers.set(INDEX_HEADERS.ROBOTS, INDEX_HEADER_VALUES.NOINDEX);
   headers.set(INDEX_HEADERS.CONTENT_TYPE_OPTIONS, INDEX_HEADER_VALUES.NOSNIFF);
-}
-
-// Per-app prune throttle (the Worker keeps one app per isolate).
-function pruneThrottle(
-  storage: DiscoveryStorage | undefined,
-  intervalMs: number,
-) {
-  let prunedAt = -Infinity;
-  return async (now: number) => {
-    if (!storage || now - prunedAt < intervalMs) return;
-    prunedAt = now;
-    await storage.prune(now);
-  };
-}
-
-interface IndexSettings {
-  now: () => number;
-  development: boolean;
-  storage: DiscoveryStorage | undefined;
-  publishers: DiscoveryPublishers | undefined;
-  registrations: RegistrationStore | undefined;
-  registry: RegistryReader | undefined;
-  cache: ResponseCache | undefined;
-  records: RecordCounter;
-  resolve: (url: string) => ResolvedLimiters | null;
-  prune: (now: number) => Promise<void>;
-  maxNodes: number;
-  maxResponseBytes: number;
-}
-
-function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
-  const now = options.now ?? Date.now;
-  const development = options.development === true;
-  return {
-    now,
-    development,
-    storage: options.storage,
-    publishers: options.publishers,
-    registrations: options.registrations,
-    registry: options.registry,
-    cache: options.cache,
-    records: recordCounter(),
-    resolve: limiterResolver(options.limiters ?? {}, development, now),
-    prune: pruneThrottle(
-      options.storage,
-      options.pruneIntervalMs ?? DISCOVERY_INDEX_LIMITS.pruneIntervalMs,
-    ),
-    maxNodes: options.maxNodes ?? DISCOVERY_INDEX_LIMITS.maxNodes,
-    maxResponseBytes:
-      options.maxResponseBytes ?? DISCOVERY_INDEX_LIMITS.maxResponseBytes,
-  };
 }
 
 // https only; development apps also accept plain http on a loopback host.
@@ -219,6 +150,7 @@ function publishHandler(settings: IndexSettings) {
       now: settings.now(),
       maxNodes: settings.maxNodes,
       prune: settings.prune,
+      markSeen: settings.markSeen,
     };
     try {
       await acceptRecord(bytes, publish);
@@ -272,50 +204,33 @@ function requestCountry(context: IndexContext): unknown {
   return cf && typeof cf === 'object' ? Reflect.get(cf, 'country') : undefined;
 }
 
-function modelsHandler(settings: IndexSettings) {
-  return async (context: IndexContext) => {
-    try {
-      parseModelsQuery(context.req.url);
-    } catch (error) {
-      if (error instanceof IndexError) return rejection(context, error.code);
-      throw error;
-    }
-    const key = `${new URL(context.req.url).origin}${INDEX_ROUTES.MODELS}`;
-    const cached = await cachedPage(settings.cache, key);
-    if (cached) return cached;
-    if (!(await readAllowed(context)))
-      return rejection(context, INDEX_ERRORS.RATE_LIMITED);
-    const body = await modelsPage(context.get('storage'), settings.now());
-    const response = context.body(body, INDEX_STATUS.OK, {
-      [INDEX_HEADERS.CONTENT_TYPE]: INDEX_HEADER_VALUES.JSON,
-      [INDEX_HEADERS.CACHE_CONTROL]: INDEX_HEADER_VALUES.SELLERS_CACHE,
-    });
-    await inBackground(context, storePage(settings.cache, key, response));
-    return response;
-  };
+// A public read with no paging: parsed first, then served from the cache or, within the read budget,
+// from storage. A null body is 404.
+interface Read {
+  body: () => Promise<string | null>;
+  // The cache key; by default the request URL.
+  key?: string;
 }
-
-function sellersHandler(settings: IndexSettings) {
+function cachedRead(
+  settings: IndexSettings,
+  read: (context: IndexContext) => Promise<Read>,
+) {
   return async (context: IndexContext) => {
-    let query: SellersQuery;
+    let parsed: Read;
     try {
-      query = await parseSellersQuery(context.req.url);
+      parsed = await read(context);
     } catch (error) {
       if (error instanceof IndexError) return rejection(context, error.code);
       throw error;
     }
-    const key = sellersCacheKey(context.req.url, query);
+    const { body, key = context.req.url } = parsed;
     const cached = await cachedPage(settings.cache, key);
     if (cached) return cached;
     if (!(await readAllowed(context)))
       return rejection(context, INDEX_ERRORS.RATE_LIMITED);
-    const body = await sellersPage(
-      context.get('storage'),
-      query,
-      settings.now(),
-      settings.maxResponseBytes,
-    );
-    const response = context.body(body, INDEX_STATUS.OK, {
+    const text = await body();
+    if (text === null) return rejection(context, INDEX_ERRORS.NOT_FOUND);
+    const response = context.body(text, INDEX_STATUS.OK, {
       [INDEX_HEADERS.CONTENT_TYPE]: INDEX_HEADER_VALUES.JSON,
       [INDEX_HEADERS.CACHE_CONTROL]: INDEX_HEADER_VALUES.SELLERS_CACHE,
     });
@@ -332,6 +247,49 @@ function inBackground(context: IndexContext, task: Promise<void>) {
   } catch {
     return task;
   }
+}
+
+// The public reads with a body: sellers pages, the model list and seller uptime.
+function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
+  app.get(
+    INDEX_ROUTES.SELLERS,
+    cachedRead(settings, async (context) => {
+      const query = await parseSellersQuery(context.req.url);
+      return {
+        key: sellersCacheKey(context.req.url, query),
+        body: () =>
+          sellersPage(
+            context.get('storage'),
+            query,
+            settings.now(),
+            settings.maxResponseBytes,
+          ),
+      };
+    }),
+  );
+  app.get(
+    INDEX_ROUTES.MODELS,
+    cachedRead(settings, async (context) => {
+      parseModelsQuery(context.req.url);
+      const url = new URL(context.req.url);
+      return {
+        key: `${url.origin}${INDEX_ROUTES.MODELS}`,
+        body: () => modelsPage(context.get('storage'), settings.now()),
+      };
+    }),
+  );
+  app.get(
+    INDEX_ROUTES.UPTIME,
+    cachedRead(settings, async (context) => {
+      const node = parseUptimeQuery(context.req.url);
+      // One cache entry per NodeId, whatever equivalent spelling the query used.
+      const { origin } = new URL(context.req.url);
+      return {
+        key: `${origin}${INDEX_ROUTES.UPTIME}?node=${node}`,
+        body: () => uptimePage(context.get('storage'), node, settings.now()),
+      };
+    }),
+  );
 }
 
 export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
@@ -377,8 +335,7 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
       }),
       registrationHandler(settings, registrations, registry),
     );
-  app.get(INDEX_ROUTES.SELLERS, sellersHandler(settings));
-  app.get(INDEX_ROUTES.MODELS, modelsHandler(settings));
+  readRoutes(app, settings);
   // Reports the publish mode only, never the allowlisted or registered NodeIds.
   app.get(INDEX_ROUTES.HEALTH, async (context) => {
     const records = await settings.records.read(

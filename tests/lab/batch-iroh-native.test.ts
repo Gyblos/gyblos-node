@@ -15,6 +15,7 @@ import { SESSION_STATES } from '@gyblos/protocol/payment-session';
 import { batchDeferred } from '../support/batch-deferred';
 import { batchOfferFixture } from '../support/batch-iroh-offer';
 import { batchNativeFinancial } from '../support/batch-native';
+import { batchQueryClock } from '../support/batch-query-clock';
 import { nativeBatchFinish } from '../support/native-batch-finish';
 import { endpoint, within } from '../support/native-fixture';
 import { NATIVE_CAPABILITY, waitFor } from '../support/native-runtime';
@@ -128,6 +129,32 @@ void test(
         await execution.catch(() => undefined);
       }
     }
+  },
+);
+void test(
+  'native batch query rate backpressures approval without dropping or repeating any prompt',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const now = 1800000000000;
+    t.mock.method(Date, 'now', () => now);
+    const clock = batchQueryClock(t);
+    const f = await fixture(() => now);
+    t.after(f.close);
+    const sends = f.financial.vm.sends();
+    for (let index = 1; index <= 3; index++) {
+      const result = await within(
+        f.buyer().execute(await f.offers.quote(index), f.offers.input),
+      );
+      assert.equal(result.text, 'ok!');
+    }
+    assert.ok(clock.refused() > 0, 'The real query bucket must be exhausted.');
+    assert.equal(f.offers.generations(), 3);
+    assert.equal(f.financial.vm.sends(), sends + 1);
+    assert.equal(f.financial.seller().snapshot().cumulativeAtomic, '120');
+    assert.equal(await f.financial.buyer.recoverApproval(), undefined);
+    const settlement = await within(f.buyer().close());
+    assert.equal(settlement.chargedAtomic, '120');
+    assert.equal(settlement.refundedAtomic, '880');
   },
 );
 void test(
