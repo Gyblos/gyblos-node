@@ -172,13 +172,19 @@ function isUneditedProfile(text: string) {
   return marker > 0 && codexProfileText(text.slice(0, marker)) === text;
 }
 
-const PROFILE_FILE = /^gyblos(-[A-Za-z0-9_-]+)?\.config\.toml$/;
+function isProfileFile(name: string) {
+  const prefix = AGENT_SETUP.provider;
+  const suffix = AGENT_SETUP.codexProfileSuffix;
+  if (!name.startsWith(prefix) || !name.endsWith(suffix)) return false;
+  const model = name.slice(prefix.length, -suffix.length);
+  return model.length === 0 || /^-[A-Za-z0-9_-]+$/.test(model);
+}
 async function removeStaleProfiles(directory: string, kept: Set<string>) {
   const removed: string[] = [];
   const backups: string[] = [];
   for (const name of await readdir(directory)) {
     const file = join(directory, name);
-    if (!PROFILE_FILE.test(name)) continue;
+    if (!isProfileFile(name)) continue;
     if (!(await lstat(file)).isFile()) continue;
     // Replacement follows an existing target: filesystem identity preserves its actual casing.
     if (kept.has(await realpath(file))) continue;
