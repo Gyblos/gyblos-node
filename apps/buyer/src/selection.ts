@@ -2,28 +2,24 @@
 // Static operator identity trust stays independent of seller declarations; never executes payments.
 import { randomInt } from 'node:crypto';
 
-import { SELLER_BADGES } from '@gyblos/core/constants';
 import {
   selectSellers,
   type KnownSeller,
-  type SellerCandidate,
   type SellerSelectionResult,
 } from '@gyblos/core/seller-selection';
-import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
-import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
 import {
   BUYER_SELECTION,
   BUYER_SELECTION_CODES,
-  ERROR_DIAGNOSTICS,
   SELLER_FAILURE_PHASES,
   SELLER_FAILURES,
   type SellerFailurePhase,
 } from './constants';
 import type { createBuyerControlClient } from './control';
-import { raceControlOffers, type WinningQuote } from './offer-race';
+import type { WinningQuote } from './offer-race';
 import { selectionBackoff, type SellerBackoff } from './selection-backoff';
 import type { SnapshotCache } from './selection-cache';
 import {
@@ -32,15 +28,10 @@ import {
   type StaticControlSeller,
 } from './selection-config';
 import { raceCandidates } from './selection-quotes';
-import {
-  recordQuote,
-  refreshSnapshots,
-  verifiedSeller,
-} from './selection-snapshots';
+import { refreshSnapshots, verifiedSeller } from './selection-snapshots';
 import type { LocalSellerStats } from './selection-stats';
 import {
   reportSellerFailure,
-  sellerFailureCode,
   type SellerFailureCode,
   type SellerFailureReporter,
 } from './seller-failures';

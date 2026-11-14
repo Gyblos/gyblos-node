@@ -1,8 +1,5 @@
-// How long a seller stays cooled down after failing to connect or quote: 30 s the first time, twice as
-// long after each further failure in a row, at most ten minutes, and back to normal on its first good
-// quote. A seller that is gone is then asked less and less often, so it stops costing a request a wait
-// every half minute. Counts live in memory for the buyer's lifetime (a restart starts over) and are not
-// written to selection-stats.json, which older buyers read strictly.
+// Owns buyer-local failure streaks and cooldowns; streak counters live only in memory.
+// Never changes the strict persisted selection-stats.json format.
 import { BUYER_SELECTION } from './constants';
 import type { LocalSellerStats } from './selection-stats';
 import {
