@@ -40,6 +40,9 @@ export interface ChatErrorBody {
   param: string | null;
   extra: Record<string, unknown>;
   payment?: ChatPayment;
+  // A seller refused the conversation as longer than it serves, before generating anything: a client
+  // that can shorten it (Codex compacts) may try again.
+  contextFull?: boolean;
 }
 
 export interface ChatApi {
