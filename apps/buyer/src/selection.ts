@@ -101,23 +101,28 @@ export async function selectVerifiedBuyerQuote(
     onSellerFailure: pending.onSellerFailure,
   };
   let alternativeNodeId: string | undefined;
+  // One caller owns both catalog attempts and work retired before deferred failure reports.
+  const settling: Promise<unknown>[] = [];
   try {
     const stale = new Set<string>();
-    const first = await selectOnce(config, active, stale, signal);
+    const first = await selectOnce(config, active, stale, settling, signal);
     const result =
       first.ok || !stale.size || signal?.aborted
         ? first
-        : await selectOnce(config, active, new Set(), signal);
+        : await selectOnce(config, active, new Set(), settling, signal);
     if (result.ok) alternativeNodeId = result.winner.candidate.nodeId;
     return result;
   } finally {
     pending.finish(alternativeNodeId);
+    // A failure reporter can synchronously cancel after the last attempt already closed its clients.
+    if (signal?.aborted) await Promise.allSettled(settling);
   }
 }
 async function selectOnce(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
   stale: Set<string>,
+  settling: Promise<unknown>[],
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
   if (config.identity && !dependencies.verifyIdentity)
@@ -128,7 +133,6 @@ async function selectOnce(
     ...(signal ? [signal] : []),
   ]);
   const clients = new Map<string, BuyerControlClient>();
-  const settling: Promise<unknown>[] = [];
   try {
     const recalled = new Map<string, SignedPublicV2>();
     const snapshots = await refreshSnapshots(
