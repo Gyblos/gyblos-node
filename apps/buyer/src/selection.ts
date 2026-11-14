@@ -104,6 +104,7 @@ async function selectOnce(
     ...(signal ? [signal] : []),
   ]);
   const clients = new Map<string, BuyerControlClient>();
+  const settling: Promise<unknown>[] = [];
   try {
     const recalled = new Map<string, SignedPublicV2>();
     const snapshots = await refreshSnapshots(
@@ -113,6 +114,7 @@ async function selectOnce(
       recalled,
       now,
       deadline,
+      settling,
       signal,
     );
     if (signal?.aborted)
@@ -163,6 +165,9 @@ async function selectOnce(
     await Promise.allSettled(
       [...clients.values()].map((client) => client.close()),
     );
+    // Cancellation retains ownership of every native operation this selection started, including
+    // connections retired before the caller cancelled. Admission stays held until they settle.
+    if (signal?.aborted) await Promise.allSettled(settling);
   }
 }
 
