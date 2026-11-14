@@ -17,27 +17,8 @@ import {
   SESSION_BLOCKS,
 } from '@gyblos/protocol/session-blocks';
 
-const binding = {
-  version: SESSION_BLOCKS.version,
-  channelId: '11111111111111111111111111111111',
-  requestId: '11'.repeat(16),
-  requestDigest: '22'.repeat(32),
-  index: 0,
-};
-const block = {
-  ...binding,
-  kind: SESSION_BLOCK_KINDS.CHECKPOINT,
-  text: 'a',
-  usage: { inputTokens: 2, outputTokens: 1 },
-  bill: {
-    requestId: binding.requestId,
-    requestDigest: binding.requestDigest,
-    maxAtomic: '20',
-    chargedAtomic: '3',
-    cumulativeAtomic: '8',
-  },
-  terminal: null,
-};
+import { binding, block } from './support/session-blocks';
+
 const invalid = (code: string) => (error: unknown) =>
   error instanceof BatchChannelError && error.code === code;
 
@@ -99,7 +80,7 @@ void test('session block rejects excessive prefix before body allocation', () =>
   assert.throws(() => decodeSessionBlock(prefix), invalid(SESSION_CODES.LIMIT));
 });
 void test('session approval cannot substitute another channel', () => {
-  assert.throws(() => parseSessionBlock({ ...binding, kind: SESSION_BLOCK_KINDS.APPROVAL, blockDigest: '33'.repeat(32), voucher: { channelId: '22222222222222222222222222222222', maxClaimableAmount: '8', expiresAt: 0, signature: '1'.repeat(64) } }), invalid(SESSION_CODES.BINDING));
+  assert.throws(() => parseSessionBlock({ ...binding, kind: SESSION_BLOCK_KINDS.APPROVAL, blockDigest: '33'.repeat(32), voucher: { channelId: '11111111111111111111111111111112', maxClaimableAmount: '8', expiresAt: 0, signature: '1'.repeat(64) } }), invalid(SESSION_CODES.BINDING));
 });
 void test('session failure never reflects arbitrary remote messages', () => {
   assert.throws(() => parseSessionBlock({ ...binding, kind: SESSION_BLOCK_KINDS.FAILURE, code: 'private-content' }), invalid(SESSION_CODES.INVALID));
