@@ -49,7 +49,8 @@ export function buyerChainWithdraw(
   report: (result: BuyerWithdrawalResult) => Promise<void>,
 ) => Promise<BuyerWithdrawalResult[]> {
   return async (inputRole, report) => {
-    if (inputRole.role !== P2P_ROLES.BUYER)
+    const role = { ...inputRole };
+    if (role.role !== P2P_ROLES.BUYER)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
     const paths = batchPoolPathsIn(process.env);
     const lock = await ensurePrivateDirectory(paths.directory)
@@ -58,7 +59,7 @@ export function buyerChainWithdraw(
         throw new NodeError(NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE);
       });
     try {
-      const { rpcUrl, mint } = inputRole;
+      const { rpcUrl, mint } = role;
       // Devnet only: this signs and spends fees from the buyer's wallet.
       const served = await genesis(rpcUrl).catch(() => undefined);
       if (served !== DEVNET_GENESIS)
@@ -68,7 +69,7 @@ export function buyerChainWithdraw(
           throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
         },
       );
-      const legacy = await withdrawLegacy(inputRole, payer, report, rpc);
+      const legacy = await withdrawLegacy(role, payer, report, rpc);
       const batch = await recoverBatchPool({
         paths,
         payer,
