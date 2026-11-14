@@ -1,5 +1,5 @@
-// Hosts simulated inference and a local protected wallet; never starts paid services.
-// The renderer receives public metadata only; smoke never creates a wallet.
+// Hosts the local protected wallet and an opt-in PayPal Sandbox inference service.
+// The renderer receives public metadata only; smoke never creates a wallet or PayPal service.
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,8 +7,11 @@ import { join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 
 import { registerNetworkCatalog } from './catalog/host';
+import { registerChatArchive } from './chat-archive-host';
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
 import { registerDesktopNode } from './node-host';
+import { createDesktopQuitCoordinator } from './paypal-close-guard';
+import { registerDesktopPaypal } from './paypal-host';
 import { probeInUtility } from './probe-host';
 import { failedProbe, type ProbeResult } from './probe-model';
 import { cleanupDesktopSession } from './session-cleanup';
@@ -18,9 +21,12 @@ import { BRAND_COLORS } from './theme';
 import { WALLET } from './wallet/constants';
 import { registerDesktopWallet } from './wallet/host';
 import { focusExistingWindow, prepareWalletProfile } from './wallet/lifecycle';
+import { windowChrome } from './window-chrome';
+import { registerDesktopX402 } from './x402-host';
 
 function createProbeWindow(startup = false) {
   const window = new BrowserWindow({
+    ...windowChrome(process.platform, startup),
     title: DESKTOP.TITLE,
     width: startup ? STARTUP_WINDOW.WIDTH : DESKTOP.WIDTH,
     height: startup ? STARTUP_WINDOW.HEIGHT : DESKTOP.HEIGHT,
@@ -83,6 +89,69 @@ async function loadDesktopWindows(
   }
 }
 
+type DesktopServices = {
+  wallet: ReturnType<typeof registerDesktopWallet> | undefined;
+  node: ReturnType<typeof registerDesktopNode> | null;
+  paypal: ReturnType<typeof registerDesktopPaypal> | null;
+  chats: ReturnType<typeof registerChatArchive> | null;
+  x402: ReturnType<typeof registerDesktopX402> | null;
+};
+function createDesktopServices(): DesktopServices {
+  return {
+    wallet: undefined,
+    node: null,
+    paypal: null,
+    chats: null,
+    x402: null,
+  };
+}
+function installDesktopServices(
+  services: DesktopServices,
+  window: BrowserWindow,
+  walletRoot: string,
+  smoke: boolean,
+  signal: AbortSignal,
+) {
+  const wallet = registerDesktopWallet(window, walletRoot, smoke, signal);
+  services.wallet = wallet;
+  if (!smoke) {
+    registerNetworkCatalog(window, signal);
+    services.paypal = registerDesktopPaypal(window);
+    services.chats = registerChatArchive(window, app.getPath('userData'));
+    services.x402 = registerDesktopX402(
+      window,
+      app.getPath('userData'),
+      __dirname,
+    );
+    services.node = registerDesktopNode(window, __dirname, signal);
+  }
+  return wallet.ready;
+}
+
+function registerDesktopQuit(
+  controller: AbortController,
+  services: () => DesktopServices,
+) {
+  app.on(
+    'before-quit',
+    createDesktopQuitCoordinator(
+      (event) => services().paypal?.guard(event) ?? false,
+      async () => {
+        controller.abort();
+        const { wallet, node, paypal, chats, x402 } = services();
+        await Promise.allSettled([
+          wallet?.settled() ?? Promise.resolve(),
+          node?.close() ?? Promise.resolve(),
+          paypal?.close() ?? Promise.resolve(),
+          chats?.close() ?? Promise.resolve(),
+          x402?.close() ?? Promise.resolve(),
+        ]);
+      },
+      () => app.quit(),
+    ),
+  );
+}
+
 async function main() {
   const smoke = process.argv.includes(DESKTOP.SMOKE_FLAG);
   app.setName(WALLET.APP_NAME);
@@ -97,13 +166,13 @@ async function main() {
     }
   }
   const controller = new AbortController();
+  const services = createDesktopServices();
   const fail = () => {
     process.stdout.write(`${JSON.stringify(failedProbe())}\n`);
     app.exit(1);
   };
   const cancelWatchdog = smoke ? armSmokeWatchdog(fail) : () => {};
-  // Stop window reveals immediately; wallet/backup settlement still owns quit.
-  app.once('before-quit', () => controller.abort());
+  registerDesktopQuit(controller, () => services);
   app.on('quit', () => {
     cancelWatchdog();
     controller.abort();
@@ -120,16 +189,13 @@ async function main() {
   app.dock?.setIcon(join(__dirname, 'renderer', DESKTOP.ICON_FILE));
   const window = createProbeWindow();
   const loading = smoke ? null : createProbeWindow(true);
-  const prepared = registerDesktopWallet(
+  const preparation = installDesktopServices(
+    services,
     window,
     walletRoot,
     smoke,
     controller.signal,
   );
-  if (!smoke) registerNetworkCatalog(window, controller.signal);
-  const node = smoke
-    ? null
-    : registerDesktopNode(window, __dirname, controller.signal);
   app.on('second-instance', () => {
     focusExistingWindow(loading && !loading.isDestroyed() ? loading : window);
   });
@@ -159,8 +225,8 @@ async function main() {
     app.quit();
   });
   await settleDesktopStartup(
-    loadDesktopWindows(window, loading, prepared, controller.signal),
-    () => node?.close() ?? Promise.resolve(),
+    loadDesktopWindows(window, loading, preparation, controller.signal),
+    () => services.node?.close() ?? Promise.resolve(),
   );
 }
 void main().catch(() => {

@@ -32,6 +32,7 @@ import {
   PAID_BUYER,
   PAID_BUYER_HTTP_MS,
 } from './constants';
+import { configuredBuyerAccess } from './desktop-api';
 import { startFreeBuyerHttp } from './free-http';
 import {
   buyerNodeSecret,
@@ -251,7 +252,7 @@ async function startOwnedPaidBuyer(
           stream: chat.stream,
           classify: classifyPaidError,
           requestMs: PAID_BUYER_HTTP_MS,
-          token,
+          ...configuredBuyerAccess(prepared.config.request, role, token),
         },
       ),
     );

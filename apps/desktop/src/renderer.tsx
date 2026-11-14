@@ -1,5 +1,5 @@
-// Mounts either the simulated buyer UI or the existing isolated compatibility smoke.
-// Chat/Connect remain simulated; the host owns a separate local-only Iroh endpoint.
+// Mounts the buyer UI or the existing isolated compatibility smoke.
+// Live Chat paths use the guarded PayPal coordinator or explicitly connected x402 buyer.
 import { createRoot } from 'react-dom/client';
 
 import { CompatibilityView } from './compatibility-view';
@@ -8,17 +8,7 @@ import { DesktopApp } from './desktop-app';
 import { StartupSplash } from './ui/StartupSplash';
 import { DesktopWalletProvider } from './ui/WalletState';
 
-import './mockup-base.css';
-import './ui/motion.css';
-import './ui/ui.css';
-import './ui/geometry.css';
-import './ui/chat.css';
-import './ui/signal.css';
-import './ui/dropdown.css';
-import './ui/appearance.css';
-import './ui/network-status.css';
-import './ui/icon-motion.css';
-import './ui/startup-splash.css';
+import './ui/buyer-styles.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing desktop root.');

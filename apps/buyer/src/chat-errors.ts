@@ -4,6 +4,7 @@
 import type { ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, UNITS } from '@gyblos/config';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import {
   FreeExecutionError,
@@ -11,6 +12,7 @@ import {
 } from '@gyblos/protocol/free-execution';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
+import { buyerApiKeyErrorView } from './api-key-http';
 import { defaultChatApi, type ChatApi } from './chat-api';
 import { FREE_BUYER, FREE_BUYER_CODES, FREE_CHAT_DETAILS } from './constants';
 import { FreeBuyerError } from './free-chat';
@@ -61,6 +63,8 @@ function errorStatus(error: unknown, code: string) {
   return HTTP_STATUS.internalServerError;
 }
 function freeErrorView(error: unknown): ChatErrorView {
+  const keyError = buyerApiKeyErrorView(error);
+  if (keyError) return keyError;
   const known =
     error instanceof FreeClientError ||
     error instanceof FreeExecutionError ||
@@ -142,6 +146,7 @@ export function replyError(
         param: view.param ?? null,
         // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
         extra: {
+          [BUYER_API.NEVER_SENT_FIELD]: view.neverSent,
           ...(stop.reason ? { reason: stop.reason } : {}),
           ...(view.cooldownUntil !== undefined
             ? { cooldownUntil: view.cooldownUntil }

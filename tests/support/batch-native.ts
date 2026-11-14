@@ -29,9 +29,19 @@ import { nativeVm } from './paid-native-vm';
 export async function batchNativeFinancial(
   now: () => number,
   nodes: { buyerNodeId: string; sellerNodeId: string },
+  supplied: {
+    network?: Parameters<typeof nativeVm>[1];
+    signers?: Parameters<typeof nativeVm>[2];
+    home?: string;
+  } = {},
 ) {
-  const vm = await nativeVm(now, SOLANA_TESTNET_CAIP2);
-  const root = await mkdtemp(join(tmpdir(), 'gyb-batch-iroh-native-'));
+  const vm = await nativeVm(
+    now,
+    supplied.network ?? SOLANA_TESTNET_CAIP2,
+    supplied.signers,
+  );
+  const root =
+    supplied.home ?? (await mkdtemp(join(tmpdir(), 'gyb-batch-iroh-native-')));
   const terms: PaymentSessionTerms = {
     ...nodes,
     buyer: vm.payer.address,

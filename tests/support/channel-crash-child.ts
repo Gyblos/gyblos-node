@@ -38,35 +38,12 @@ import {
   type CrashReply,
 } from './channel-crash-protocol';
 import {
+  childCrashPort,
   crashObject,
   crashRpc,
   crashSigner,
   type CrashCallPort,
 } from './channel-crash-rpc';
-
-function childPort(): CrashCallPort {
-  let sequence = 0;
-  const pending = new Map<
-    number,
-    { resolve(value: unknown): void; reject(error: Error): void }
-  >();
-  process.on('message', (raw: unknown) => {
-    const value = crashObject(raw);
-    if (value.kind !== CRASH_MESSAGES.REPLY) return;
-    assert.ok(typeof value.id === 'number' && typeof value.ok === 'boolean');
-    const held = pending.get(value.id);
-    assert.ok(held);
-    pending.delete(value.id);
-    if (value.ok) held.resolve(value.value);
-    else held.reject(new Error(CRASH_FAILURE));
-  });
-  return (method, args) =>
-    new Promise((resolve, reject) => {
-      const id = ++sequence;
-      pending.set(id, { resolve, reject });
-      process.send!({ kind: CRASH_MESSAGES.CALL, id, method, args });
-    });
-}
 
 function instrument(
   journal: UptoBuyerJournal,
@@ -206,7 +183,7 @@ async function execute(
 
 async function main() {
   assert.ok(process.send);
-  const call = childPort();
+  const call = childCrashPort();
   process.once('message', (raw: unknown) => {
     const message = crashObject(raw);
     assert.equal(message.kind, CRASH_MESSAGES.INIT);

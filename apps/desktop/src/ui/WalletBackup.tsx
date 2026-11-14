@@ -10,6 +10,7 @@ import {
 } from '../wallet/backup-flow-model';
 import { backupPasswordFeedback } from './backup-feedback';
 import { BUTTON_VARIANT } from './constants';
+import { FormField, FormInput } from './Form';
 import { Button, Note } from './UI';
 import { useDesktopWallet, useDesktopWalletActions } from './WalletState';
 
@@ -100,10 +101,8 @@ export function PasswordField({
 }) {
   const hintId = useId();
   return (
-    <label className="field-label">
-      {label}
-      <input
-        className="full-input"
+    <FormField label={label}>
+      <FormInput
         type="password"
         autoFocus={autoFocus}
         autoComplete={creating ? 'new-password' : 'off'}
@@ -123,7 +122,7 @@ export function PasswordField({
           {hint}
         </small>
       )}
-    </label>
+    </FormField>
   );
 }
 export function WalletBackup() {

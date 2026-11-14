@@ -1,0 +1,144 @@
+/* A compact catalog for the local agent connection, using the desktop theme. */
+.desktop-frame .paypal-agent-page {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+}
+.paypal-agent-header,
+.paypal-agent-section-heading,
+.paypal-agent-session,
+.paypal-agent-session-copy,
+.paypal-agent-setup-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.paypal-agent-header,
+.paypal-agent-section-heading,
+.paypal-agent-session {
+  justify-content: space-between;
+}
+.paypal-agent-header {
+  align-items: flex-start;
+  margin-bottom: var(--space-6);
+}
+.paypal-agent-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+.paypal-agent-header p,
+.paypal-agent-session p,
+.paypal-agent-setup-heading p {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.paypal-agent-session {
+  min-height: 66px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.paypal-agent-session-copy {
+  min-width: 0;
+  align-items: flex-start;
+}
+.paypal-agent-session strong,
+.paypal-agent-rate {
+  font-size: 12px;
+  font-weight: 550;
+}
+.paypal-agent-status-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: var(--space-1);
+  flex: 0 0 8px;
+  background: var(--muted);
+}
+.paypal-agent-status-dot[data-connected='true'] {
+  background: var(--connected);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--connected) 14%, transparent);
+}
+.paypal-agent-rate {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.paypal-agent-section-heading {
+  margin: var(--space-6) 0 var(--space-3);
+}
+.paypal-agent-section-heading h3,
+.paypal-agent-setup-heading h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.paypal-agent-section-heading > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.paypal-agent-setup {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.paypal-agent-setup-heading {
+  align-items: center;
+}
+.paypal-agent-setup-body {
+  width: 100%;
+  display: grid;
+  gap: var(--space-3);
+}
+.paypal-agent-setup-body > p {
+  margin: 0;
+  max-width: 75ch;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.paypal-agent-setup .ui-form {
+  max-width: 560px;
+  margin-top: var(--space-3);
+}
+.paypal-agent-key-row {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.paypal-agent-key-row > .ui-field {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.paypal-agent-setup .ui-section > .modal-note {
+  max-width: 75ch;
+  margin: var(--space-2) 0 0;
+}
+.paypal-agent-setup .ui-form > .ui-button {
+  justify-self: start;
+}
+.paypal-agent-page > .ui-help-text {
+  margin-top: var(--space-4);
+}
+.paypal-agent-page > .ui-help-text p {
+  max-width: 75ch;
+}
+@media (max-width: 700px) {
+  .paypal-agent-session {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .paypal-agent-section-heading > span {
+    display: none;
+  }
+}

@@ -56,6 +56,12 @@ export function createUptoWithdrawal(
               parseUptoWithdrawalAttempt(recovery.previous),
             save: recovery.save.bind(recovery),
             readOnly: recovery.readOnly,
+            ...(recovery.prepare
+              ? { prepare: recovery.prepare.bind(recovery) }
+              : {}),
+            ...(recovery.signed
+              ? { signed: recovery.signed.bind(recovery) }
+              : {}),
           }
         : undefined;
       await verifyPaymentNetwork(fixedRpc, network);

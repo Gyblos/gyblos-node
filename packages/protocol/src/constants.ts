@@ -225,6 +225,16 @@ export const FREE_CHAT_ROLES = {
 } as const;
 export type FreeChatRole =
   (typeof FREE_CHAT_ROLES)[keyof typeof FREE_CHAT_ROLES];
+export const AGENT_CHAT = {
+  ROLES: { ...FREE_CHAT_ROLES, DEVELOPER: 'developer', TOOL: 'tool' },
+  FUNCTION: 'function',
+  FINISH: { ...ENGINE_DONE_REASONS, TOOL_CALLS: 'tool_calls' },
+  COMPLETION: 'chat.completion',
+  CHUNK: 'chat.completion.chunk',
+  STREAM_DONE: '[DONE]',
+  LIST: 'list',
+  MODEL: 'model',
+} as const;
 export const FREE_EXECUTION_CODES = {
   INVALID: 'INVALID_FREE_EXECUTION',
   VERSION: 'UNSUPPORTED_FREE_EXECUTION_VERSION',
@@ -379,6 +389,7 @@ export type ReceiptChannelCode =
 
 // Payment port catalogs live in their own module; re-exported so every caller keeps one import.
 export * from './payments/constants';
+export * from './paypal/constants';
 
 // Neutral semantic failures, mapped by each execution wire boundary.
 export const INFERENCE_CODES = {

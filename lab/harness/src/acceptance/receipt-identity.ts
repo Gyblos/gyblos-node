@@ -12,6 +12,7 @@ import {
 } from '@gyblos/config';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { IDENTITY_STATE } from '@gyblos/node/constants';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   controlArray,
@@ -80,7 +81,14 @@ async function refusedIdentity(run: ReceiptScenario, signal: AbortSignal) {
   const body = controlObject(JSON.parse(await receiptBody(response)), [
     'error',
   ]);
-  const error = controlObject(body.error, ['message', 'type', 'param', 'code']);
+  const error = controlObject(body.error, [
+    'message',
+    'type',
+    'param',
+    'code',
+    BUYER_API.NEVER_SENT_FIELD,
+  ]);
+  acceptanceAssert(error[BUYER_API.NEVER_SENT_FIELD] === true);
   acceptanceAssert(
     response.statusCode === HTTP_STATUS.serviceUnavailable &&
       error.code === SELLER_SELECTION_CODES.NO_CANDIDATES,

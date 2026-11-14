@@ -1,7 +1,33 @@
 // Maps sanitized announcements into shared preview controls; never authorizes inference.
 import { CATALOG_STATE, type NetworkCatalog } from '../catalog/model';
-import { MODEL_CATEGORY, MODEL_SOURCE, MODELS } from './constants';
-import type { CatalogModel } from './model-types';
+import {
+  ADDITIONAL_MODEL_ARTWORK,
+  MODEL_CATEGORY,
+  MODEL_SOURCE,
+  MODELS,
+} from './constants';
+import type { CatalogModel, ModelArtwork } from './model-types';
+
+export function modelArtwork(modelId: string): ModelArtwork {
+  const family = modelId.toLowerCase().split('/').at(-1) ?? '';
+  const matchesPrefix = (prefix: string) => {
+    if (!family.startsWith(prefix)) return false;
+    const suffix = family.slice(prefix.length);
+    return suffix.length === 0 || /^[0-9:._-]/.test(suffix);
+  };
+  const additional = ADDITIONAL_MODEL_ARTWORK.find((item) =>
+    matchesPrefix(item.prefix),
+  );
+  if (additional) return additional.image;
+  const known = MODELS.find((model) => {
+    if (model.id === 'oss')
+      return (
+        matchesPrefix('gpt-oss') || /^gpt-[0-9]+o?(?=$|[-.:])/.test(family)
+      );
+    return matchesPrefix(model.id);
+  });
+  return known?.image ?? { src: './assets/brand/gyblos-icon.png' };
+}
 
 export function announcedModels(
   catalog: NetworkCatalog,
@@ -16,10 +42,6 @@ export function announcedModels(
   return catalog.models
     .filter((item) => item.expiresAt > now)
     .map((item) => {
-      const family = item.modelId.toLowerCase();
-      const known = MODELS.find((model) =>
-        family.includes(model.id === 'oss' ? 'gpt-oss' : model.id),
-      );
       return {
         id: JSON.stringify([
           item.modelId,
@@ -31,7 +53,7 @@ export function announcedModels(
         family:
           [item.variant, item.quantization].filter(Boolean).join(' · ') ||
           'Signed announcement',
-        image: known?.image ?? { src: './assets/brand/gyblos-icon.png' },
+        image: modelArtwork(item.modelId),
         category: MODEL_CATEGORY.EVERYDAY,
         context: item.contextTokens.toLocaleString(),
         providers: item.announcements,

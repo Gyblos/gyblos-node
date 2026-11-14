@@ -24,6 +24,7 @@ import {
   PrivateFileError,
   readPrivateFile,
   writePrivateFile,
+  writePrivateFileOnce,
 } from '@gyblos/runtime/private-file';
 
 const MAX = 1024;
@@ -57,6 +58,30 @@ void test('directories and files are created owner-only and written atomically',
       writePrivateFile(file, 'x'.repeat(MAX + 1), MAX),
       refused,
     );
+  }));
+
+void test('a private audit file is created once even with concurrent writers', () =>
+  withRoot(async (root) => {
+    await ensurePrivateDirectory(root);
+    const file = join(root, 'audit.json');
+    const results = await Promise.allSettled([
+      writePrivateFileOnce(file, '{"decision":1}', MAX),
+      writePrivateFileOnce(file, '{"decision":2}', MAX),
+    ]);
+    assert.equal(
+      results.filter((result) => result.status === 'fulfilled').length,
+      1,
+    );
+    assert.equal(
+      results.filter((result) => result.status === 'rejected').length,
+      1,
+    );
+    assert.ok(
+      ['{"decision":1}', '{"decision":2}'].includes(
+        (await readPrivateFile(file, MAX)) ?? '',
+      ),
+    );
+    assert.equal((await stat(file)).mode & 0o777, 0o600);
   }));
 
 void test('symlinked components, wrong modes, oversized and special files are refused', () =>
@@ -95,6 +120,18 @@ void test('a held process lock refuses a second holder and is released only by i
     await lock.release();
     const again = await acquireProcessLock(path);
     await again.release();
+  }));
+
+void test('a no-takeover lock refuses even an apparently stale owner', () =>
+  withRoot(async (root) => {
+    const path = join(root, 'ledger.lock');
+    const owner = JSON.stringify({ pid: process.pid, host: hostname() });
+    await writeFile(path, owner, { mode: 0o600 });
+    await assert.rejects(
+      acquireProcessLock(path, { allowTakeover: false }),
+      refused,
+    );
+    assert.equal(await readPrivateFile(path, MAX), owner);
   }));
 
 void test('only a lock whose owner process is gone is taken over', () =>

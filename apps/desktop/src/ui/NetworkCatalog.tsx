@@ -102,7 +102,7 @@ function AnnouncementList({
 }: {
   models: CatalogModel[];
   selected: string;
-  onSelect: (model: CatalogModel) => void;
+  onSelect?: (model: CatalogModel) => void;
 }) {
   return (
     <>
@@ -112,10 +112,10 @@ function AnnouncementList({
           {models.map((model) => (
             <ListRow
               key={model.id}
-              selected={selected === model.id}
+              selected={!!onSelect && selected === model.id}
               leading={<ModelImage name={model.name} artwork={model.image} />}
               trailing={<Badge>Free</Badge>}
-              onActivate={() => onSelect(model)}
+              onActivate={onSelect ? () => onSelect(model) : undefined}
             >
               <RowCopy
                 title={model.name}
@@ -136,7 +136,7 @@ export function NetworkCatalogPanel({
 }: {
   snapshot: NetworkCatalog;
   onLookup: (query: string) => void;
-  onSelect: (model: CatalogModel) => void;
+  onSelect?: (model: CatalogModel) => void;
   selected: string;
 }) {
   const [query, setQuery] = useState(snapshot.query);

@@ -862,6 +862,10 @@ contains:
   Relay origins must be configured;
 - optional `pinnedNodeId` for “choose myself”. A pinned seller still passes all
   filters; `PINNED_SELLER_IN_COOLDOWN` includes `cooldownUntil` for the UI;
+- optional `failover`, `"safe"` (the default) or `"never"`: with `"safe"` a free
+  request whose seller dropped or stalled after the prompt was sent, before any
+  visible text, goes to another seller (below); `"never"` keeps a sent prompt on
+  one seller;
 - optional `quoteWindowMs`, how long quotes may race (integer milliseconds, 100
   to 10000; default 3000).
 - optional `models`: the models the local endpoint serves by name, 1 to 32
@@ -1177,22 +1181,23 @@ leading `developer` or `system` messages become the system text, later ones
 (Codex sends one when the model changes) are sent as user text, consecutive
 `function_call` items form one assistant turn (checked together), and
 `function_call_output` items answer them. It is stateless: `store` must be
-false, and `previous_response_id`, structured `text.format`, custom, namespaced
-(MCP) or other provider tools, and audio or file parts are refused with a 400
-that names them. For Codex sessions, three things are left out rather than
-refused: the `web_search` tool Codex offers on every request (no seller runs
-it), `reasoning` and `web_search_call` records from a session that began on
-another provider, and images, which become a short `[image omitted …]` text so a
-session that once saw a picture goes on. `include`, `prompt_cache_key` and
-bookkeeping hints are accepted and ignored. Non-neutral reasoning, sampling
-settings and `parallel_tool_calls: false` are refused before execution: the
-signed protocol cannot express those constraints yet. Codex versions that
-require them are not supported until that follow-up. A stream sends
-`response.created`, the message item (`output_item.added`, `content_part.added`,
-`output_text.delta`, then their `done` events) once text starts, each call as a
-`function_call` item (`output_item.added`, `function_call_arguments.done`,
-`output_item.done`), and `response.completed` with usage; a token-limited answer
-ends with `response.incomplete`, status `incomplete`, and its delivered usage. A
+false, and `previous_response_id`, structured `text.format`, custom or other
+provider tools, and audio or file parts are refused with a 400 that names them.
+For Codex sessions, three things are left out rather than refused: the
+`web_search` tool and the tool groups (`namespace`, such as Codex's sub-agent
+and MCP tools) Codex sends on every request (no seller runs them), `reasoning`
+and `web_search_call` records from a session that began on another provider, and
+images, which become a short `[image omitted …]` text so a session that once saw
+a picture goes on. `include`, `prompt_cache_key` and bookkeeping hints are
+accepted and ignored. Non-neutral reasoning, sampling settings and
+`parallel_tool_calls: false` are refused before execution: the signed protocol
+cannot express those constraints yet. Codex versions that require them are not
+supported until that follow-up. A stream sends `response.created`, the message
+item (`output_item.added`, `content_part.added`, `output_text.delta`, then their
+`done` events) once text starts, each call as a `function_call` item
+(`output_item.added`, `function_call_arguments.done`, `output_item.done`), and
+`response.completed` with usage; a token-limited answer ends with
+`response.incomplete`, status `incomplete`, and its delivered usage. A
 possible-send failure before the first stream event uses HTTP 400 and
 `invalid_prompt` to stop clients that ignore retry headers. A failure after the
 stream starts is `response.failed` with code `invalid_prompt` (which Codex shows
@@ -1307,17 +1312,23 @@ buyer NodeId, exact terms and lifetime again before sending (an issue time up to
 5 s ahead is accepted; expiry has no grace). Request/response bounds and
 correlation use the free protocol codec. A query has an absolute 180-second
 budget including discovery, quotes and execution; each transport also retains
-its stage bounds. A failed seller may be excluded and selection repeated only
-before sending begins, and no seller is executed twice in one local request. The
-free runtime admits one orchestration at a time with no queue; overlapping
-requests return `FREE_BUYER_BUSY` rather than racing the per-peer connection
-limit or poisoning another request's cooldown. Cancelled selection attempts do
-not commit quote statistics. Control and execution admission remain occupied
-until pending native work settles. The client marks sending before the first
-frame write: partial writes, remote errors, timeouts and lost responses never
-cause automatic failover afterward. Native work that ignores cancellation
-retains its execution resource until it actually settles. The v1 paid proxy
-remains a separate command.
+its stage bounds. A failed seller is excluded and selection repeated before
+sending begins and, with `failover` `"safe"` (the default in `selection.json`),
+also after the prompt was sent when the seller dropped (the connection broke) or
+stalled until this buyer's timeout, before any visible text reached the client:
+at most two such resends per request, each counted against the failed seller. An
+error the seller answered itself (busy, caps, engine failure) is not resent, nor
+a refusal of the request or a client that left. `"never"` keeps a sent prompt on
+one seller. No seller is executed twice in one local request. The free runtime
+admits one orchestration at a time with no queue; overlapping requests return
+`FREE_BUYER_BUSY` rather than racing the per-peer connection limit or poisoning
+another request's cooldown. Cancelled selection attempts do not commit quote
+statistics. Control and execution admission remain occupied until pending native
+work settles. The client marks sending before the first frame write; after
+visible text, partial writes, remote errors, timeouts and lost responses never
+cause automatic failover. Native work that ignores cancellation retains its
+execution resource until it actually settles. The v1 paid proxy remains a
+separate command.
 
 Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab

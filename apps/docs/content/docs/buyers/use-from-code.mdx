@@ -219,10 +219,19 @@ paid model and its token limit in this list.
 
 ## If a seller drops [#if-a-seller-drops]
 
-On `buyer:free`, an attempt that certainly sent no prompt may select another eligible seller within
-the same request, subject to seller pins and routing policy. Once transmission may have begun, the
-buyer stops without resending the prompt or changing seller. Disable client HTTP and stream retries:
-a broken connection may deliver no response headers at all.
+On `buyer:free`, if the seller drops (its connection breaks) or stalls after it got the prompt, before
+any visible text reached your client, the request goes to another seller of the same model within the
+same request, and you see only the answer. That covers a complete (non-streaming) answer and a streamed
+tool call with no text before it; a streamed answer that already showed text is not restarted. The
+prompt goes to at most three sellers, within the 180-second limit. An error the seller sends back itself
+(busy, its daily limit, an engine failure) ends the request as before, so a seller cannot read prompts
+it then refuses without that showing. Because the prompt may reach a second seller,
+`"failover": "never"` in `selection.json` keeps each prompt on one seller; then only a prompt that was
+certainly never sent moves.
+
+Once text reached your client, a failure ends the request with an error: the answer is not restarted
+elsewhere. Disable client HTTP and stream retries: a broken connection may deliver no response headers
+at all.
 
 A manual resend starts a new selection: the same seller or another one may win. Seller-attributable
 failures affect its weight. Preference for the seller that answered earlier is bounded and guarantees

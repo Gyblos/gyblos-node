@@ -34,6 +34,12 @@
       "license": "MIT",
       "licenseSource": "https://raw.githubusercontent.com/earendil-works/pi-website/2f5e410b97474d0a34ec2500aa1aa58d6c3f992c/LICENSE",
       "attribution": "Copyright 2026 Earendil Inc. and contributors; see pi-LICENSE.txt and the official press kit at https://pi.dev/press-kit."
+    },
+    {
+      "file": "opencode.svg",
+      "source": "https://github.com/anomalyco/opencode/blob/dev/packages/ui/src/components/logo.tsx",
+      "sha256": "622de0ee5c1ab68c00a19bb7886dc8828e68704211dcd7f3aca33f5a278c0374",
+      "license": "MIT; see opencode-LICENSE.txt"
     }
   ],
   "license": "Lobe Icons SVGs use MIT; see ../models/lobe-icons-LICENSE.txt. Pi uses MIT; see pi-LICENSE.txt. TinyFish rights are reserved; no MIT or Apache grant is asserted. Brand rights remain with their owners."
