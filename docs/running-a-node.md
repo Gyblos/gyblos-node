@@ -1203,8 +1203,10 @@ possible-send failure before the first stream event uses HTTP 400 and
 stream starts is `response.failed` with code `invalid_prompt` (which Codex shows
 and does not retry, since the prompt may have reached a seller), a readable
 message and the Gyblos code in `gyblos_code`. A conversation over the size the
-network carries gets code `context_length_exceeded`, so Codex compacts it. Paid
-endpoints serve text only, so they refuse Codex's tools.
+network carries, or one a seller refuses as longer than it serves
+(`FREE_EXECUTION_LIMIT_EXCEEDED` before any output), gets code
+`context_length_exceeded`, so Codex compacts it. Paid endpoints serve text only,
+so they refuse Codex's tools.
 
 Codex CLI points at the endpoint as a custom provider in `~/.codex/config.toml`
 (the built-in `openai` provider sends fields only OpenAI accepts):
@@ -1228,6 +1230,10 @@ block to `config.toml` and one profile file per model beside it
 each), since Codex CLI 0.162 and later refuse `[profiles.*]` tables in
 `config.toml`; start with `codex --profile gyblos`. It replaces only profile
 files it wrote and drops the profile tables an earlier run put in its block.
+Codex has no metadata for these models and otherwise assumes a large context;
+pass the sellers' context size with `--context <tokens>` (each profile then
+carries `model_context_window`) so Codex sizes and compacts its requests to fit.
+With a small model such as `qwen3-0.6b`, Codex works only with it.
 
 `POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
 over system, messages and tools) without contacting a seller. The default
