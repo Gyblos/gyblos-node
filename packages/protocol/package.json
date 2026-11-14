@@ -71,6 +71,7 @@
     "./vectors/batch-startup-v4.json": "./vectors/batch-startup-v4.json",
     "./vectors/batch-stream-v4.json": "./vectors/batch-stream-v4.json",
     "./vectors/batch-tools-v4.json": "./vectors/batch-tools-v4.json",
-    "./session-blocks": "./src/session-blocks.ts"
+    "./session-blocks": "./src/session-blocks.ts",
+    "./vectors/session-blocks-v5.json": "./vectors/session-blocks-v5.json"
   }
 }

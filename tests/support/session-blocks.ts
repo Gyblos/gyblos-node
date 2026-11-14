@@ -1,5 +1,8 @@
 // Public synthetic checkpoint values; no real identities, content or vouchers.
-import { SESSION_BLOCK_KINDS, SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
+import {
+  SESSION_BLOCK_KINDS,
+  SESSION_BLOCKS,
+} from '@gyblos/protocol/session-blocks';
 
 export const binding = {
   version: SESSION_BLOCKS.version,
