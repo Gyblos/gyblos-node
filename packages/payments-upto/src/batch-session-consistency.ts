@@ -2,6 +2,7 @@
 import { canonicalJson } from '@gyblos/protocol';
 import { SESSION_STATES, sessionFail } from '@gyblos/protocol/payment-session';
 
+import { coherentBlocks } from './batch-block-state';
 import { batchOpeningAbsent } from './batch-opening-proof';
 import type { BatchRecord } from './batch-session-types';
 
@@ -9,10 +10,13 @@ export function coherentRecord(record: BatchRecord) {
   batchOpeningAbsent(record);
   const cumulative = BigInt(record.cumulativeAtomic);
   const accepted = Object.values(record.requests).filter(
-    (request) => request.accepted,
+    (request) => request.accepted && !record.blocks?.[request.requestId],
   );
   const pending = Object.values(record.requests).filter(
-    (request) => !request.accepted && request.bill !== null,
+    (request) =>
+      !request.accepted &&
+      request.bill !== null &&
+      !record.blocks?.[request.requestId],
   );
   for (const request of Object.values(record.requests)) {
     if (request.accepted && request.bill === null) sessionFail();
@@ -26,7 +30,7 @@ export function coherentRecord(record: BatchRecord) {
   }
   const committed = accepted.reduce(
     (sum, request) => sum + BigInt(request.bill!.chargedAtomic),
-    0n,
+    coherentBlocks(record),
   );
   const signed =
     committed +

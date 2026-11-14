@@ -127,3 +127,5 @@ export const BATCH_OPENING_LIMITS = {
 
 // Private catalog format, independent of wire/session record versions.
 export const BATCH_POOL_VERSION = 1;
+// Private block checkpoints do not change the native memo, voucher or existing v1 session record.
+export const BATCH_BLOCK_STATE = { version: 2 } as const;

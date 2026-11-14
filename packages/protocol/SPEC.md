@@ -1480,3 +1480,49 @@ transaction. A seller offline beyond forced-close grace can also lose older
 unclaimed signed totals. No adaptor signatures, conditional cryptographic
 payments, new service, protocol fee change or perfect fair-exchange claim is
 introduced by this extension.
+
+### Durable block ports and certified metering
+
+`SessionBlockBuyer` and `SessionBlockSeller` extend the existing financial ports
+without changing native voucher bytes. A `SessionBlockIntent` contains index,
+checkpoint digest, cumulative usage/bill and a terminal boolean. It contains no
+response text or tool arguments. The seller prepares it durably before
+publishing a checkpoint; the buyer durably records the independently verified
+intent before signing, then the exact voucher before sending. The seller
+verifies the authenticated buyer and SDK signature and persists acceptance
+before ACK. A terminal ACK alone marks the original inference complete.
+
+The existing private session file has an explicit block-aware version 2; native
+memo/voucher version 1 remains unchanged. Version 1 files stay readable under
+existing semantics. Enabling a fresh block request upgrades the private record
+atomically only after legacy pending requests resolve. Unknown versions or
+contradictory state fail closed. Older software cannot read the new private
+record and must not be used to downgrade an active block session.
+
+Each original request has a fixed channel base, its latest accepted intent and
+at most one pending intent/voucher. With request ceiling M and effective signed
+request charge C, the remaining reserve stays M−C until the terminal ACK. The
+effective charge is the pending charge only if its voucher is durable;
+otherwise it is the accepted charge. Whole-request accounting and block
+accounting are disjoint, so completed totals cannot be counted twice. The
+existing private-file bound, exclusive lock, SDK-operation queue and poisoning
+on uncertain persistence remain in force.
+
+Recovery can reconstruct only the exact durably verified intent, or resend its
+exact saved voucher. It cannot execute a prompt, invent a new block, change the
+bill or clear the original request reservation. A cancellation before the first
+intent creates no recoverable approval. If signing has already begun, its
+result must be saved even when cancellation prevents its publication; later
+financial recovery uses that same attempt. Runtime generation ownership is not
+restored from disk. After release or restart, an interrupted block request is
+eligible for the existing idle close using the highest seller-accepted total,
+including the existing below-threshold exception for unfinished work.
+
+`RecountTokenizer.stablePrefix` is optional and certified only by the tokenizer
+implementation that owns it. The pinned Qwen adapter verifies its public
+artifacts before exposing the conservative ASCII-space frontier. The optional
+target selects the earliest certified frontier reaching that cumulative count;
+a large engine fragment therefore need not become an arbitrarily larger block
+when an earlier safe boundary exists. Text without such a frontier requires one
+terminal exact block within existing limits. Free/declared metering and legacy
+whole-result verification remain unchanged by the optional port.

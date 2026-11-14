@@ -10,7 +10,9 @@ import {
   type SessionBill,
   type SessionSeller,
 } from '@gyblos/protocol/payment-session';
+import type { SessionBlockSeller } from '@gyblos/protocol/session-blocks';
 
+import { acceptSellerBlock, checkpointSeller } from './batch-block-seller';
 import {
   atomic,
   billFor,
@@ -35,7 +37,7 @@ import { waitBatch } from './batch-session-wait';
 
 export async function createBatchSeller(
   input: BatchSellerOptions,
-): Promise<SessionSeller> {
+): Promise<SessionBlockSeller> {
   const options = { ...input, terms: termsFor(input.terms) };
   if (options.authorizer.address !== options.terms.authorizer)
     sessionFail(SESSION_CODES.BINDING);
@@ -71,6 +73,7 @@ export async function createBatchSeller(
     throw error;
   }
   const context: BatchSellerContext = {
+    blockExecutions: new Set(),
     options,
     store,
     requirements,
@@ -83,6 +86,18 @@ export async function createBatchSeller(
   }, options.pollMs ?? BATCH_SESSION_DEFAULTS.pollMs);
   timer.unref();
   return {
+    reserveBlocks: (request, peer) =>
+      exclusive(async () => {
+        await reserveSeller(context, request, peer, true);
+        context.blockExecutions.add(request.requestId);
+      }),
+    checkpoint: (intent) => exclusive(() => checkpointSeller(context, intent)),
+    acceptBlock: (intent, voucher, peer) =>
+      exclusive(() => acceptSellerBlock(context, intent, voucher, peer)),
+    releaseBlocks: (requestId) =>
+      exclusive(async () => {
+        context.blockExecutions.delete(requestId);
+      }),
     open: (payload) => exclusive(() => openSeller(context, payload)),
     reserve: (request, peer) =>
       exclusive(() => reserveSeller(context, request, peer)),
@@ -198,6 +213,7 @@ async function finishSeller(
   await context.store.update((state) => {
     active(state, context.options.now());
     const request = state.requests[requestId];
+    if (state.blocks?.[requestId]) return sessionFail(SESSION_CODES.BINDING);
     if (!request || request.bill || request.accepted)
       sessionFail(SESSION_CODES.BINDING);
     if (BigInt(amount) > BigInt(request.maxAtomic))
@@ -228,6 +244,7 @@ async function acceptSeller(
   const state = store.read();
   active(state, options.now());
   const request = state.requests[bill.requestId];
+  if (state.blocks?.[bill.requestId]) return sessionFail(SESSION_CODES.BINDING);
   if (
     !request?.bill ||
     canonicalJson(request.bill) !== canonicalJson(bill) ||
@@ -270,6 +287,7 @@ async function reserveSeller(
   context: BatchSellerContext,
   request: Parameters<SessionSeller['reserve']>[0],
   peer: string,
+  blocks = false,
 ) {
   const { options, store, facilitator, requirements } = context;
 
@@ -294,5 +312,5 @@ async function reserveSeller(
   );
   if (!verdict.isValid || verdict.payer !== options.terms.buyer)
     sessionFail(SESSION_CODES.UNVERIFIED);
-  await reserve(store, request, options.now());
+  await reserve(store, request, options.now(), blocks);
 }
