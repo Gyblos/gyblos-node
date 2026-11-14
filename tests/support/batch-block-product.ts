@@ -24,7 +24,7 @@ export const blockTestMeter: ChatTokenizer = {
   },
 };
 export async function blockProduct() {
-  const f = await sessionRig();
+  const f = await sessionRig({ buyerNodeId: '12'.repeat(32), sellerNodeId: '34'.repeat(32), transaction: 'SyntheticClose' });
   const offers = await batchOfferFixture(f.terms, f.owner, f.now);
   offers.live.meter = recountedMeter(blockTestMeter);
   offers.generate(async (input) => {
@@ -34,5 +34,5 @@ export async function blockProduct() {
   const service = createSellerBatchSession({ session: f.seller(), terms: f.terms, offers: () => [offers.live], now: f.now, blockTargetTokens: 2 });
   const wire = await batchLoopback(service, f.terms, true);
   const buyer = createBuyerBatchSession({ ...wire, terms: f.terms, buyer: f.buyer, meter: blockTestMeter, now: f.now, unresolved: async () => false, verify: async () => {}, observe: f.sellerOptions.observe });
-  return { f, buyer, offers, async close() { await buyer.disconnect();await buyer.settled();await wire.close();await f.dispose(); } };
+  return { f, buyer, offers, wire, async close() { await buyer.disconnect();await buyer.settled();await wire.close();await f.dispose(); } };
 }

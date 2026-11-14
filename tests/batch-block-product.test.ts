@@ -25,3 +25,14 @@ void test('a second product inference reuses the same deposit and adds its exact
   assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '160');
   const closed = await f.buyer.close();assert.equal(closed.chargedAtomic, '160');assert.equal(closed.refundedAtomic, '840');
 });
+void test('cancelling after a block ACK recovers that attempt and closes only its signed prefix without replay', async (t) => {
+  const f = await blockProduct();t.after(f.close);
+  const controller = new AbortController();let delivered = 0;
+  await assert.rejects(f.buyer.execute(await f.offers.quote(1), f.offers.input, controller.signal, async () => { delivered++;controller.abort(); }));
+  await f.buyer.settled();await f.wire.settled();
+  assert.equal(delivered, 1);assert.equal(f.offers.generations(), 1);
+  assert.equal(await f.buyer.recoverApproval(), true);
+  assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '32');assert.equal(f.f.buyer.snapshot().reservedAtomic, '0');
+  const closed = await f.buyer.reconcile();assert.equal(closed?.chargedAtomic, '32');assert.equal(closed?.refundedAtomic, '968');
+  assert.equal(f.offers.generations(), 1);assert.deepEqual(f.f.calls, ['deposit', 'refund']);
+});

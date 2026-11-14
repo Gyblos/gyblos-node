@@ -113,6 +113,7 @@ export async function batchLoopback(
     endpoint,
     destination,
     connections: () => connections,
+    settled: () => Promise.allSettled([...running]),
     async close() {
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
