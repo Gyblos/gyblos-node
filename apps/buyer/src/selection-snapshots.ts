@@ -113,6 +113,18 @@ function coolingPastSnapshot(
   );
 }
 
+// A snapshot remembered from an earlier request, with its signed catalog kept for this selection.
+function recall(
+  dependencies: VerifiedSelectionDependencies,
+  seller: StaticControlSeller,
+  now: number,
+  recalled: Map<string, SignedPublicV2>,
+) {
+  const cached = dependencies.snapshots?.get(seller, now);
+  if (cached) recalled.set(seller.nodeId, cached.catalog);
+  return cached?.known;
+}
+
 export async function refreshSnapshots(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
@@ -148,11 +160,8 @@ export async function refreshSnapshots(
             return undefined;
           }
           // A snapshot verified on an earlier request and still current: no connection, no records asked.
-          const cached = dependencies.snapshots?.get(seller, now());
-          if (cached) {
-            recalled.set(seller.nodeId, cached.catalog);
-            return cached.known;
-          }
+          const cached = recall(dependencies, seller, now(), recalled);
+          if (cached) return cached;
           deadline.throwIfAborted();
           const client = await connectBefore(
             dependencies.connect(seller),
