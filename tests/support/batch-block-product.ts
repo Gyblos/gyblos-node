@@ -23,16 +23,65 @@ export const blockTestMeter: ChatTokenizer = {
     return { characters, tokens: characters };
   },
 };
-export async function blockProduct() {
-  const f = await sessionRig({ buyerNodeId: '12'.repeat(32), sellerNodeId: '34'.repeat(32), transaction: 'SyntheticClose' });
-  const offers = await batchOfferFixture(f.terms, f.owner, f.now);
+export function configureBlockEngine(
+  offers: Awaited<ReturnType<typeof batchOfferFixture>>,
+) {
   offers.live.meter = recountedMeter(blockTestMeter);
   offers.generate(async (input) => {
-    for (const text of BLOCK_TEXT) { input.signal?.throwIfAborted();await input.onText?.(text); }
-    return { text: BLOCK_TEXT, finishReason: ENGINE_DONE_REASONS.STOP, usage: { inputTokens: 2, outputTokens: BLOCK_TEXT.length, totalDurationNs: 0, loadDurationNs: 0, inputDurationNs: 0, outputDurationNs: 0 } };
+    for (const text of BLOCK_TEXT) {
+      input.signal?.throwIfAborted();
+      await input.onText?.(text);
+    }
+    return {
+      text: BLOCK_TEXT,
+      finishReason: ENGINE_DONE_REASONS.STOP,
+      usage: {
+        inputTokens: 2,
+        outputTokens: BLOCK_TEXT.length,
+        totalDurationNs: 0,
+        loadDurationNs: 0,
+        inputDurationNs: 0,
+        outputDurationNs: 0,
+      },
+    };
   });
-  const service = createSellerBatchSession({ session: f.seller(), terms: f.terms, offers: () => [offers.live], now: f.now, blockTargetTokens: 2 });
+}
+export async function blockProduct() {
+  const f = await sessionRig({
+    buyerNodeId: '12'.repeat(32),
+    sellerNodeId: '34'.repeat(32),
+    transaction: 'SyntheticClose',
+  });
+  const offers = await batchOfferFixture(f.terms, f.owner, f.now);
+  configureBlockEngine(offers);
+  const service = createSellerBatchSession({
+    session: f.seller(),
+    terms: f.terms,
+    offers: () => [offers.live],
+    now: f.now,
+    blockTargetTokens: 2,
+  });
   const wire = await batchLoopback(service, f.terms, true);
-  const buyer = createBuyerBatchSession({ ...wire, terms: f.terms, buyer: f.buyer, meter: blockTestMeter, now: f.now, unresolved: async () => false, verify: async () => {}, observe: f.sellerOptions.observe });
-  return { f, buyer, offers, wire, async close() { await buyer.disconnect();await buyer.settled();await wire.close();await f.dispose(); } };
+  const buyer = createBuyerBatchSession({
+    ...wire,
+    terms: f.terms,
+    buyer: f.buyer,
+    meter: blockTestMeter,
+    now: f.now,
+    unresolved: async () => false,
+    verify: async () => {},
+    observe: f.sellerOptions.observe,
+  });
+  return {
+    f,
+    buyer,
+    offers,
+    wire,
+    async close() {
+      await buyer.disconnect();
+      await buyer.settled();
+      await wire.close();
+      await f.dispose();
+    },
+  };
 }

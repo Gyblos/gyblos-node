@@ -18,7 +18,18 @@ import { ControlError } from '@gyblos/protocol/control-validation';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import {
+  parseSessionBlock,
+  SESSION_BLOCK_KINDS,
+  SESSION_BLOCKS,
+  type SessionBlockAck,
+  type SessionBlockApproval,
+} from '@gyblos/protocol/session-blocks';
 
+import { readBatchBlocks } from './batch-block-client';
+import type { BlockStage } from './batch-block-io';
+import { recoverBlockStream } from './batch-block-resume-client';
+import type { BatchBlockClient } from './batch-block-types';
 import type {
   BatchConnection,
   BatchDestination,
@@ -26,12 +37,12 @@ import type {
 } from './batch-client-types';
 import { readBatchFrame } from './batch-io';
 import { readBatchStreamResponse } from './batch-stream-client';
-import type { BatchBlockClient } from './batch-block-types';
-export type { BatchBlockClient } from './batch-block-types';
 import { HTTP_OVER_IROH } from './constants';
 import { controlDeadline } from './control-io';
 import { withDeadline } from './deadline';
 import { relayOnlyAllows } from './paths';
+
+export type { BatchBlockClient } from './batch-block-types';
 
 export type {
   BatchConnection,
@@ -112,7 +123,11 @@ async function connect<Remote extends BatchDestination>(
     const connecting = track(
       state,
       state.endpoint
-        .connect(state.destination, [...Buffer.from(BATCH_CHANNEL.alpn)])
+        .connect(state.destination, [
+          ...Buffer.from(
+            state.options.blocks ? SESSION_BLOCKS.alpn : BATCH_CHANNEL.alpn,
+          ),
+        ])
         .then((value) => {
           try {
             if (expired)
@@ -146,6 +161,23 @@ async function connect<Remote extends BatchDestination>(
   route(state, state.connection, signal);
   return state.connection;
 }
+function stageIn<Remote extends BatchDestination>(
+  state: Context<Remote>,
+  signal: AbortSignal,
+): BlockStage {
+  return (operation, milliseconds) => {
+    const running = track(state, operation);
+    return track(
+      state,
+      controlDeadline(
+        () => running,
+        milliseconds,
+        () => drop(state),
+        signal,
+      ),
+    );
+  };
+}
 async function requestReply<Remote extends BatchDestination>(
   state: Context<Remote>,
   request: BatchChannelRequest,
@@ -153,6 +185,7 @@ async function requestReply<Remote extends BatchDestination>(
   signal: AbortSignal,
   beforeWrite: () => void,
   onDelta: (text: string) => Promise<void>,
+  blocks?: BatchBlockClient,
 ) {
   const current = await connect(state, signal);
   const stream = await track(state, current.openBi());
@@ -168,9 +201,31 @@ async function requestReply<Remote extends BatchDestination>(
     );
   if (request.method === BATCH_METHODS.EXECUTE)
     state.options.beforeExecute?.(request.params);
+  if (
+    request.method === BATCH_METHODS.EXECUTE &&
+    state.options.blocks &&
+    !blocks
+  )
+    throw new BatchChannelError(SESSION_CODES.UNAVAILABLE);
   beforeWrite(); // Even a rejected write may have transmitted bytes.
   await track(state, stream.send.writeAll([...bytes]));
   route(state, current, signal);
+  if (
+    request.method === BATCH_METHODS.EXECUTE &&
+    state.options.blocks &&
+    blocks
+  ) {
+    return readBatchBlocks(
+      stream,
+      request,
+      blocks,
+      signal,
+      () => route(state, current, signal),
+      stageIn(state, signal),
+      onDelta,
+      bytes.length,
+    );
+  }
   await track(state, stream.send.finish());
   route(state, current, signal);
   if (request.method === BATCH_METHODS.EXECUTE)
@@ -178,16 +233,7 @@ async function requestReply<Remote extends BatchDestination>(
       stream,
       request,
       () => route(state, current, signal),
-      (operation, milliseconds) =>
-        track(
-          state,
-          controlDeadline(
-            () => operation,
-            milliseconds,
-            () => drop(state),
-            signal,
-          ),
-        ),
+      stageIn(state, signal),
       onDelta,
     );
   const raw = await track(
@@ -201,11 +247,10 @@ async function requestReply<Remote extends BatchDestination>(
   route(state, current, signal);
   return result;
 }
-async function exchange<Remote extends BatchDestination>(
+async function runOperation<T, Remote extends BatchDestination>(
   state: Context<Remote>,
-  value: unknown,
+  operation: (source: AbortSignal, markSent: () => void) => Promise<T>,
   external?: AbortSignal,
-  onDelta: (text: string) => Promise<void> = async () => {},
 ) {
   if (state.active) throw new BatchClientError(SESSION_CODES.BUSY, false);
   const source = AbortSignal.any([
@@ -216,29 +261,9 @@ async function exchange<Remote extends BatchDestination>(
   state.active = true;
   try {
     source.throwIfAborted();
-    const request = parseBatchChannelRequest(value);
-    const bytes = encodeControlFrame(request, BATCH_CHANNEL.requestBytes);
-    return await controlDeadline(
-      (signal) =>
-        track(
-          state,
-          requestReply(
-            state,
-            request,
-            bytes,
-            signal,
-            () => {
-              sent = true;
-            },
-            onDelta,
-          ),
-        ),
-      request.method === BATCH_METHODS.EXECUTE
-        ? (state.options.requestMs ?? TRANSPORT_TIMEOUTS.requestMs)
-        : (state.options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs),
-      () => drop(state),
-      source,
-    );
+    return await operation(source, () => {
+      sent = true;
+    });
   } catch (error) {
     drop(state);
     const failure = batchError(error);
@@ -251,6 +276,75 @@ async function exchange<Remote extends BatchDestination>(
   } finally {
     state.active = false;
   }
+}
+function exchange<Remote extends BatchDestination>(
+  state: Context<Remote>,
+  value: unknown,
+  external?: AbortSignal,
+  onDelta: (text: string) => Promise<void> = async () => {},
+  blocks?: BatchBlockClient,
+) {
+  return runOperation(
+    state,
+    (source, markSent) => {
+      const request = parseBatchChannelRequest(value);
+      const bytes = encodeControlFrame(request, BATCH_CHANNEL.requestBytes);
+      return controlDeadline(
+        (signal) =>
+          track(
+            state,
+            requestReply(
+              state,
+              request,
+              bytes,
+              signal,
+              markSent,
+              onDelta,
+              blocks,
+            ),
+          ),
+        request.method === BATCH_METHODS.EXECUTE
+          ? (state.options.requestMs ?? TRANSPORT_TIMEOUTS.requestMs)
+          : (state.options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs),
+        () => drop(state),
+        source,
+      );
+    },
+    external,
+  );
+}
+function resumeBlock<Remote extends BatchDestination>(
+  state: Context<Remote>,
+  value: SessionBlockApproval,
+  external?: AbortSignal,
+) {
+  return runOperation(
+    state,
+    (source, markSent) =>
+      controlDeadline(
+        async (signal): Promise<SessionBlockAck> => {
+          if (!state.options.blocks)
+            throw new BatchChannelError(SESSION_CODES.UNAVAILABLE);
+          const approval = parseSessionBlock(value);
+          if (approval.kind !== SESSION_BLOCK_KINDS.APPROVAL)
+            throw new BatchChannelError(SESSION_CODES.INVALID);
+          const current = await connect(state, signal);
+          const stream = await track(state, current.openBi());
+          const check = () => route(state, current, signal);
+          return recoverBlockStream(
+            stream,
+            approval,
+            check,
+            stageIn(state, signal),
+            markSent,
+          );
+        },
+        state.options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs,
+        () => drop(state),
+        source,
+      ),
+    external,
+  );
 }
 export function createBatchChannelClient<Remote extends BatchDestination>(
   endpoint: BatchEndpoint<Remote>,
@@ -268,12 +362,14 @@ export function createBatchChannelClient<Remote extends BatchDestination>(
     active: false,
   };
   return {
+    resumeBlock: (approval: SessionBlockApproval, signal?: AbortSignal) =>
+      resumeBlock(state, approval, signal),
     exchange: (
       value: unknown,
       signal?: AbortSignal,
       onDelta?: (text: string) => Promise<void>,
-      _blocks?: BatchBlockClient,
-    ) => exchange(state, value, signal, onDelta),
+      blocks?: BatchBlockClient,
+    ) => exchange(state, value, signal, onDelta, blocks),
     async close() {
       state.lifetime.abort();
       drop(state);

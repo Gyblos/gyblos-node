@@ -12,7 +12,11 @@ import {
 } from '@gyblos/protocol/payment-session';
 import type { SessionBlockSeller } from '@gyblos/protocol/session-blocks';
 
-import { acceptSellerBlock, checkpointSeller } from './batch-block-seller';
+import {
+  acceptSellerBlock,
+  checkpointSeller,
+  resumeSellerBlock,
+} from './batch-block-seller';
 import {
   atomic,
   billFor,
@@ -86,7 +90,8 @@ export async function createBatchSeller(
   }, options.pollMs ?? BATCH_SESSION_DEFAULTS.pollMs);
   timer.unref();
   return {
-    resumeBlock: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
+    resumeBlock: (approval, peer) =>
+      exclusive(() => resumeSellerBlock(context, approval, peer)),
     reserveBlocks: (request, peer) =>
       exclusive(async () => {
         await reserveSeller(context, request, peer, true);

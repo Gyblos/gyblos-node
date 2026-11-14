@@ -20,10 +20,15 @@ import {
   SESSION_CODES,
 } from '@gyblos/protocol/payment-session';
 import {
+  SESSION_BLOCK_KINDS,
+  SESSION_BLOCKS,
+} from '@gyblos/protocol/session-blocks';
+import {
   createBatchChannelClient,
   type BatchDestination,
 } from '@gyblos/transport-iroh/batch-client';
 
+import { isBlockBuyer } from './batch-block-ports';
 import { batchBuyerSnapshot, runBuyerBatch } from './batch-buyer-execution';
 import type {
   BuyerBatchContext,
@@ -42,17 +47,21 @@ function createContext<Remote extends BatchDestination>(
   const terms = options.terms;
   if (options.endpoint.id().toString() !== terms.buyerNodeId)
     return batchFail(PAID_EXECUTION_CODES.PEER);
+  const blockMode =
+    isBlockBuyer(options.buyer) &&
+    typeof options.meter.stablePrefix === 'function';
   const client = createBatchChannelClient(
     options.endpoint,
     options.destination,
     terms.sellerNodeId,
-    { ...options.transport, now: options.now },
+    { ...options.transport, now: options.now, blocks: blockMode },
   );
   const rpc: BuyerBatchContext<Remote>['rpc'] = async (
     method,
     params,
     signal,
     onDelta,
+    blocks,
   ) => {
     const request = parseBatchChannelRequest({
       version: BATCH_CHANNEL.version,
@@ -60,11 +69,12 @@ function createContext<Remote extends BatchDestination>(
       method,
       params,
     });
-    const reply = await client.exchange(request, signal, onDelta);
+    const reply = await client.exchange(request, signal, onDelta, blocks);
     if (!reply.result) return batchFail();
     return reply.result;
   };
   return {
+    blockMode,
     options,
     terms,
     client,
@@ -121,6 +131,35 @@ async function recover<Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
   signal: AbortSignal,
 ) {
+  const buyer = context.options.buyer;
+  if (context.blockMode && isBlockBuyer(buyer)) {
+    const pending = buyer.pendingBlockRequest();
+    if (pending) {
+      const recovered = await bounded(buyer.recoverBlockApproval(), signal);
+      signal.throwIfAborted();
+      if (recovered) {
+        const { intent, voucher } = recovered;
+        await context.client.resumeBlock(
+          {
+            version: SESSION_BLOCKS.version,
+            kind: SESSION_BLOCK_KINDS.APPROVAL,
+            channelId: voucher.channelId,
+            requestId: intent.bill.requestId,
+            requestDigest: intent.bill.requestDigest,
+            index: intent.index,
+            blockDigest: intent.digest,
+            voucher,
+          },
+          signal,
+        );
+        signal.throwIfAborted();
+        await buyer.acknowledgeBlock(intent);
+      }
+      // Interrupted generation cannot resume safely. Close this exact channel, never the prompt.
+      if (!recovered?.intent.terminal) await close(context, signal);
+      return true;
+    }
+  }
   const approval = await bounded(
     context.options.buyer.recoverApproval(),
     signal,

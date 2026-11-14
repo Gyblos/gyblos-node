@@ -19,21 +19,31 @@ import { encodeControlFrame } from '@gyblos/protocol/control-framing';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
-import { batchDeadline, readBatchFrame } from './batch-io';
-import { streamBatchResponse } from './batch-stream-server';
+import { respondBlockApproval } from './batch-block-resume';
+import { streamBatchBlocks } from './batch-block-server';
 import type { BatchBlockExchange } from './batch-block-types';
-export type { BatchBlockExchange } from './batch-block-types';
+import { batchDeadline, readBatchMessage } from './batch-io';
+import { streamBatchResponse } from './batch-stream-server';
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import type { ControlStream } from './control-io';
 import { handleIrohConnection } from './iroh-connection';
 
+export type { BatchBlockExchange } from './batch-block-types';
+export type { BatchBlockClient } from './batch-block-types';
+
 export interface BatchChannelService {
+  resumeBlock?(
+    approval: import('@gyblos/protocol/session-blocks').SessionBlockApproval,
+    peer: string,
+    signal: AbortSignal,
+  ): Promise<import('@gyblos/protocol/session-blocks').SessionBlockAck>;
   exchange(
     request: BatchChannelRequest,
     peer: string,
     signal: AbortSignal,
     onDelta?: (text: string) => Promise<void>,
     blocks?: BatchBlockExchange,
+    blockMode?: boolean,
   ): Promise<BatchChannelResult>;
 }
 export interface BatchStreamLimits {
@@ -53,6 +63,58 @@ async function errorReply(
     error: { code: batchError(error).code },
   };
 }
+async function respondExecution(
+  request: Extract<
+    BatchChannelRequest,
+    { method: typeof BATCH_METHODS.EXECUTE }
+  >,
+  stream: ControlStream,
+  service: BatchChannelService,
+  peer: string,
+  signal: AbortSignal,
+  check: () => void,
+  cancel: () => void,
+  limits: BatchStreamLimits,
+  admitExecution: () => boolean,
+) {
+  const admitted: BatchChannelService = {
+    async exchange(...args) {
+      check();
+      if (!admitExecution()) throw new BatchChannelError(SESSION_CODES.LIMIT);
+      return service.exchange(...args);
+    },
+  };
+  const stage: import('./batch-block-io').BlockStage = (
+    operation,
+    milliseconds,
+  ) => batchDeadline(operation, milliseconds, cancel);
+  if (limits.blocks)
+    return streamBatchBlocks(
+      request,
+      stream,
+      admitted,
+      peer,
+      signal,
+      check,
+      stage,
+    );
+  await streamBatchResponse(
+    request,
+    admitted,
+    peer,
+    signal,
+    check,
+    (bytes) =>
+      stage(
+        stream.send.writeAll([...bytes]),
+        limits.egressMs ?? IROH_DEADLINES.egressMs,
+      ),
+    cancel,
+  );
+  check();
+  await stage(stream.send.finish(), limits.egressMs ?? IROH_DEADLINES.egressMs);
+  check();
+}
 async function respond(
   stream: ControlStream,
   service: BatchChannelService,
@@ -63,49 +125,50 @@ async function respond(
   limits: BatchStreamLimits,
   admitExecution: () => boolean,
 ) {
-  const raw = await batchDeadline(
-    readBatchFrame(stream, BATCH_CHANNEL.requestBytes, check),
-    limits.ingressMs ?? IROH_DEADLINES.ingressMs,
-    cancel,
-  );
+  const raw = await readRequest(stream, check, cancel, limits);
   check();
-  const request = parseBatchChannelRequest(raw);
-  if (request.method === BATCH_METHODS.EXECUTE) {
-    await streamBatchResponse(
-      request,
-      {
-        async exchange(...args) {
-          check();
-          if (!admitExecution())
-            throw new BatchChannelError(SESSION_CODES.LIMIT);
-          return service.exchange(...args);
-        },
-      },
+  if (
+    limits.blocks &&
+    raw !== null &&
+    typeof raw === 'object' &&
+    'kind' in raw
+  ) {
+    return respondBlockApproval(
+      raw,
+      stream,
+      service,
       peer,
       signal,
       check,
-      (bytes) =>
-        batchDeadline(
-          stream.send.writeAll([...bytes]),
-          limits.egressMs ?? IROH_DEADLINES.egressMs,
-          cancel,
-        ),
-      cancel,
+      (operation, milliseconds) =>
+        batchDeadline(operation, milliseconds, cancel),
     );
-    check();
-    await batchDeadline(
-      stream.send.finish(),
-      limits.egressMs ?? IROH_DEADLINES.egressMs,
-      cancel,
-    );
-    check();
-    return;
   }
+  const request = parseBatchChannelRequest(raw);
+  if (request.method === BATCH_METHODS.EXECUTE)
+    return respondExecution(
+      request,
+      stream,
+      service,
+      peer,
+      signal,
+      check,
+      cancel,
+      limits,
+      admitExecution,
+    );
   let response: BatchChannelResponse;
   try {
     response = await batchChannelResponse(
       request,
-      await service.exchange(request, peer, signal),
+      await service.exchange(
+        request,
+        peer,
+        signal,
+        undefined,
+        undefined,
+        limits.blocks,
+      ),
     );
   } catch (error) {
     response = await errorReply(request, error);
@@ -131,6 +194,37 @@ async function respond(
     limits.egressMs ?? IROH_DEADLINES.egressMs,
     cancel,
   );
+}
+async function readRequest(
+  stream: ControlStream,
+  check: () => void,
+  cancel: () => void,
+  limits: BatchStreamLimits,
+) {
+  const started = performance.now();
+  const maximumMs = limits.ingressMs ?? IROH_DEADLINES.ingressMs;
+  const raw = await batchDeadline(
+    readBatchMessage(stream, BATCH_CHANNEL.requestBytes, check),
+    maximumMs,
+    cancel,
+  );
+  check();
+  const duplex =
+    limits.blocks &&
+    raw !== null &&
+    typeof raw === 'object' &&
+    'method' in raw &&
+    raw.method === BATCH_METHODS.EXECUTE;
+  if (!duplex) {
+    const remaining = maximumMs - (performance.now() - started);
+    if (
+      remaining <= 0 ||
+      (await batchDeadline(stream.recv.read(1), remaining, cancel)).length
+    )
+      throw new BatchChannelError(SESSION_CODES.INVALID);
+    check();
+  }
+  return raw;
 }
 export async function serveBatchChannelStream(
   stream: ControlStream,
@@ -217,6 +311,7 @@ export function handleBatchChannelConnection(
   isClosed: () => boolean,
   allowed: () => boolean,
   admitExecution: () => boolean,
+  blocks = false,
 ) {
   const controller = new AbortController();
   const current = AbortSignal.any([signal, controller.signal]);
@@ -235,7 +330,7 @@ export function handleBatchChannelConnection(
         current,
         enter,
         allowed,
-        {},
+        { blocks },
         admitExecution,
       ),
     isClosed,

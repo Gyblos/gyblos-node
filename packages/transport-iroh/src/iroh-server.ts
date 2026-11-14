@@ -18,6 +18,7 @@ import {
   RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
 import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
+import { SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
 
 import {
   connectionFamily,
@@ -168,6 +169,7 @@ export function serveIroh(
     connection: Connection,
     signal: AbortSignal,
     peer: string,
+    blocks: boolean,
   ) {
     if (!batchSessions) return;
     await handleBatchChannelConnection(
@@ -200,6 +202,7 @@ export function serveIroh(
       () => closed,
       () => routeAllowed(connection),
       () => limiter.consume(peer),
+      blocks,
     );
   }
 
@@ -225,7 +228,8 @@ export function serveIroh(
     const family = connectionFamily(alpn);
     const releasePeer = admission.established(peer, family);
     const releaseQuota = releasePeer
-      ? alpn === BATCH_CHANNEL.alpn && batchSessions
+      ? (alpn === BATCH_CHANNEL.alpn || alpn === SESSION_BLOCKS.alpn) &&
+        batchSessions
         ? limiter.registerQuery(peer, family)
         : limiter.register(peer, family)
       : undefined;
@@ -274,8 +278,16 @@ export function serveIroh(
         );
         return;
       }
-      if (alpn === BATCH_CHANNEL.alpn && batchSessions) {
-        await batchConnection(connection, controller.signal, peer);
+      if (
+        (alpn === BATCH_CHANNEL.alpn || alpn === SESSION_BLOCKS.alpn) &&
+        batchSessions
+      ) {
+        await batchConnection(
+          connection,
+          controller.signal,
+          peer,
+          alpn === SESSION_BLOCKS.alpn,
+        );
         return;
       }
       if (alpn === PAID_STREAM.alpn && paidExecution) {

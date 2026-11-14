@@ -8,7 +8,10 @@ import type {
 
 export interface BatchBlockClient {
   verification: SessionBlockVerification;
-  approve(intent: SessionBlockIntent, check: () => void): Promise<SessionVoucher>;
+  approve(
+    intent: SessionBlockIntent,
+    check: () => void,
+  ): Promise<SessionVoucher>;
   acknowledge(intent: SessionBlockIntent): Promise<void>;
 }
 export type BatchBlockExchange = (

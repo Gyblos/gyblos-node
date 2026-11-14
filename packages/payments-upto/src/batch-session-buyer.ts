@@ -46,7 +46,19 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
-    pendingBlockRequest: () => undefined,
+    pendingBlockRequest: () => {
+      const state = store.read();
+      const request = Object.values(state.requests).find(
+        (row) => !row.accepted && state.blocks?.[row.requestId],
+      );
+      return request
+        ? {
+            requestId: request.requestId,
+            requestDigest: request.requestDigest,
+            maxAtomic: request.maxAtomic,
+          }
+        : undefined;
+    },
     beginBlocks: (request) =>
       exclusive(() => reserve(store, request, options.now(), true)),
     approveBlock: (intent, verified, check) =>
