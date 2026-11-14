@@ -60,3 +60,17 @@ export function reportSellerFailure(
     // Reporting is best effort.
   }
 }
+
+// Why a seller refused a quote. A seller older than tool calling (before the quote's `tools` field, e.g.
+// v0.1.0-beta.9) refuses a quote that asks for tools as an invalid request: that is the same answer as
+// "no tools", not a fault, so it is reported as one and does not cool the seller down for the requests
+// without tools it still serves.
+export function quoteFailureCode(
+  error: unknown,
+  asksTools: boolean,
+): SellerFailureCode {
+  const code = sellerFailureCode(error);
+  return asksTools && code === CONTROL_CODES.INVALID
+    ? CONTROL_CODES.TOOLS
+    : code;
+}
