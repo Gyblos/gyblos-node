@@ -328,9 +328,11 @@ Rolling that code back leaves the `0003` tables unused; nothing needs reverting.
 The global read limiter (`DISCOVERY_READ_LIMITER`, namespace `42621007`) ships
 in the same deploy as the code that requires it; deploying the code without the
 binding answers `503` everywhere. After deploying it, check that sellers pages
-still answer `200` and a repeat within 10 seconds is a cache hit. To roll it
-back, `npx wrangler@4.151.1 rollback 916eb7c0` (the version before it, which has
-neither the binding nor the code).
+still answer `200` and a repeat within 10 seconds is a cache hit. For a
+rollback, inspect `npx wrangler@4.151.1 deployments list` and select an approved
+compatible version with `npx wrangler@4.151.1 rollback <version-id>`; do not
+assume an old version from a previous feature rollout is compatible with today's
+bindings.
 
 Rolling the code back does not require reverting `0002`: earlier code names no
 index and no query used `discovery_presence_by_issue`.
