@@ -5,7 +5,9 @@ import { constants } from 'node:fs';
 import {
   chmod,
   copyFile,
+  lstat,
   mkdir,
+  readdir,
   readFile,
   realpath,
   rename,
@@ -121,13 +123,42 @@ export async function writeAgentFile(
   await replaced(path, text, before);
   for (const profile of profiles)
     await replaced(profile.file, profile.text, profile.previous);
+  const removed =
+    tool === AGENT_TOOLS.CODEX
+      ? await removeStaleProfiles(
+          dirname(path),
+          new Set(profiles.map((profile) => profile.file)),
+        )
+      : [];
   return {
     path,
     backup: saved ? `${path}.before-gyblos` : undefined,
     ...(profiles.length
       ? { profiles: profiles.map((profile) => profile.file) }
       : {}),
+    ...(removed.length ? { removed } : {}),
   };
+}
+
+// Profile files an earlier run wrote for models this endpoint no longer serves: a `codex --profile` on
+// one would fail. Only regular files that still carry the managed marker and nothing else are removed;
+// a link or a file someone edited is left alone.
+const PROFILE_FILE = /^gyblos(-[A-Za-z0-9_-]+)?\.config\.toml$/;
+async function removeStaleProfiles(directory: string, kept: Set<string>) {
+  const removed: string[] = [];
+  for (const name of await readdir(directory)) {
+    const file = join(directory, name);
+    if (!PROFILE_FILE.test(name) || kept.has(file)) continue;
+    if (!(await lstat(file)).isFile()) continue;
+    try {
+      mergedCodexProfile('', await readFile(file, 'utf8'));
+    } catch {
+      continue;
+    }
+    await rm(file);
+    removed.push(file);
+  }
+  return removed;
 }
 
 // The new text goes to a temporary file beside the real target and is renamed over it, so a crash never

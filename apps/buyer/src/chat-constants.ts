@@ -225,6 +225,9 @@ export const RESPONSES_CHAT = {
     'web_search_preview',
     'namespace',
   ] as readonly string[],
+  mcpGroupPrefix: 'mcp__',
+  mcpNotice:
+    'Codex sent MCP server tools; sellers cannot run them, so they are not offered to the model. Turn MCP servers off for Gyblos sessions.',
   partFields: ['type', 'text', 'annotations', 'logprobs'] as readonly string[],
   toolFields: [
     'type',

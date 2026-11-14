@@ -159,3 +159,34 @@ void test('a call from a tool group earlier in the session stays as history', as
     await server.close();
   }
 });
+
+void test('MCP tools Codex sends are not offered, and the operator is told once', async (t) => {
+  const seen: FreeExecutionBuildInput[] = [];
+  const server = await host(TEXT, seen);
+  const notices: string[] = [];
+  t.mock.method(console, 'error', (line: string) => notices.push(line));
+  try {
+    const mcp = {
+      type: 'namespace',
+      name: 'mcp__demo',
+      description: 'A local MCP server',
+      tools: [{ type: 'function', name: 'echo', parameters: {} }],
+    };
+    for (let turn = 0; turn < 2; turn++) {
+      const response = await post(server.url, {
+        ...CODEX,
+        tools: [...CODEX.tools, mcp],
+        input: [user('hi')],
+      });
+      assert.equal(response.status, 200);
+    }
+    assert.deepEqual(
+      seen[0]?.tools?.map((tool) => tool.name),
+      ['shell'],
+    );
+    assert.equal(notices.filter((line) => /MCP/.test(line)).length, 1);
+    assert.equal(notices.join('\n').includes('demo'), false);
+  } finally {
+    await server.close();
+  }
+});
