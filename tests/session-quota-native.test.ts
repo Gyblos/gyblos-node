@@ -14,13 +14,14 @@ import {
   type BatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
 import { encodeControlFrame } from '@gyblos/protocol/control-framing';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import { createBatchChannelClient } from '@gyblos/transport-iroh/batch-client';
 import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
+import { batchDeferred } from './support/batch-deferred';
 import { batchOfferFixture } from './support/batch-iroh-offer';
+import { observeBatchQueryRefusals } from './support/batch-query-clock';
 import { sessionRig } from './support/batch-session';
 import { endpoint, within } from './support/native-fixture';
 import { NATIVE_TEST_OPTIONS } from './support/native-runtime';
@@ -187,14 +188,24 @@ void test(
     for (let index = initial; index < CONTROL_CAPACITY.peerBurst; index++)
       await within(f.buyer().status());
     assert.equal(f.calls.length, CONTROL_CAPACITY.peerBurst);
-    await assert.rejects(within(f.buyer().status()), {
-      code: PAID_EXECUTION_CODES.INTERNAL,
-      remote: false,
-      sent: true,
-    });
+    const refused = batchDeferred<void>();
+    observeBatchQueryRefusals(t, refused.resolve);
+    let completed = false;
+    const pending = f.buyer().status();
+    void pending.then(
+      () => {
+        completed = true;
+      },
+      () => {
+        completed = true;
+      },
+    );
+    await within(refused.promise);
+    assert.equal(completed, false);
     assert.equal(f.calls.length, CONTROL_CAPACITY.peerBurst);
     time += CONTROL_CAPACITY.millisecondsPerSecond / CONTROL_CAPACITY.peerRate;
-    assert.equal((await within(f.buyer().status())).cumulativeAtomic, '40');
+    assert.equal((await within(pending)).cumulativeAtomic, '40');
+    assert.equal(f.calls.length, CONTROL_CAPACITY.peerBurst + 1);
     assert.equal(f.offers.generations(), 1);
   },
 );
@@ -239,17 +250,17 @@ void test(
       method: BATCH_METHODS.SNAPSHOT,
       params: { channelId: '1'.repeat(32) },
     };
-    await assert.rejects(within(client.exchange(request)), {
-      code: PAID_EXECUTION_CODES.INTERNAL,
-      remote: false,
-      sent: true,
-    });
-    assert.equal(f.calls.length, 0);
-    time += CONTROL_CAPACITY.millisecondsPerSecond / CONTROL_CAPACITY.peerRate;
-    await assert.rejects(within(client.exchange(request)), {
+    const refused = batchDeferred<void>();
+    observeBatchQueryRefusals(t, refused.resolve);
+    const pending = client.exchange(request);
+    const rejected = assert.rejects(within(pending), {
       code: SESSION_CODES.BINDING,
       remote: true,
     });
+    await within(refused.promise);
+    assert.equal(f.calls.length, 0);
+    time += CONTROL_CAPACITY.millisecondsPerSecond / CONTROL_CAPACITY.peerRate;
+    await rejected;
     assert.equal(f.calls.length, 1);
     assert.equal(f.offers.generations(), 0);
     assert.deepEqual(f.rig.calls, []);

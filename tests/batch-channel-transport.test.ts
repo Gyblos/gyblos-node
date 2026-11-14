@@ -124,7 +124,43 @@ void test('batch stream rejects oversized prefix without reading a body or enter
   assert.equal(released, 1);
 });
 
-void test('batch ingress timeout drains the original native read before releasing admission', async () => {
+void test('batch ingress deadline includes admission before the first native read', async (t) => {
+  const wire = memory(encodeControlFrame(request, BATCH_CHANNEL.requestBytes));
+  let now = 0;
+  let closed = 0;
+  let released = 0;
+  t.mock.method(performance, 'now', () => now);
+  await serveBatchChannelStream(
+    wire.stream,
+    {
+      async exchange() {
+        assert.fail('must not call policy after admission spends the deadline');
+      },
+    },
+    '34'.repeat(32),
+    () => {
+      closed++;
+    },
+    new AbortController().signal,
+    () => {
+      now = 2;
+      return () => {
+        released++;
+      };
+    },
+    () => true,
+    { ingressMs: 1, requestMs: 1000 },
+  );
+  assert.deepEqual(wire.reads, []);
+  assert.equal(wire.written.length, 0);
+  assert.equal(closed, 1);
+  assert.equal(released, 1);
+});
+
+void test('batch ingress timeout drains the original native read before releasing admission', async (t) => {
+  t.mock.method(performance, 'now', () => 0);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const entered = batchDeferred<void>();
   const prefix = batchDeferred<number[]>();
   const closed = batchDeferred<void>();
   const reads: number[] = [];
@@ -133,6 +169,7 @@ void test('batch ingress timeout drains the original native read before releasin
     recv: {
       async readExact(length) {
         reads.push(length);
+        entered.resolve();
         return prefix.promise;
       },
       async read() {
@@ -163,6 +200,9 @@ void test('batch ingress timeout drains the original native read before releasin
     { ingressMs: 1, requestMs: 1000 },
   );
   try {
+    await entered.promise;
+    assert.deepEqual(reads, [4]);
+    t.mock.timers.tick(1);
     await closed.promise;
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(released, 0);
