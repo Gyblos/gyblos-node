@@ -19,6 +19,7 @@ import type { BatchCommonOptions, BatchRecord } from './batch-session-types';
 export async function openBatchStore(
   options: BatchCommonOptions,
   initial: BatchRecord,
+  requireExisting = false,
 ) {
   await ensurePrivateDirectory(options.paths.directory);
   const lock = await acquireProcessLock(options.paths.lock);
@@ -30,6 +31,8 @@ export async function openBatchStore(
       options.paths.state,
       BATCH_SESSION_DEFAULTS.stateBytes,
     );
+    if (requireExisting && text === undefined)
+      sessionFail(SESSION_CODES.UNAVAILABLE);
     current =
       text === undefined
         ? initial
