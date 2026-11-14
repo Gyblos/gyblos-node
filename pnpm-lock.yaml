@@ -63,6 +63,9 @@ importers:
       '@gyblos/node-app':
         specifier: workspace:*
         version: link:apps/node
+      '@gyblos/payments-paypal':
+        specifier: workspace:*
+        version: link:packages/payments-paypal
       '@gyblos/payments-upto':
         specifier: workspace:*
         version: link:packages/payments-upto
@@ -211,6 +214,9 @@ importers:
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0
@@ -312,6 +318,9 @@ importers:
 
   apps/node:
     dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
@@ -561,6 +570,9 @@ importers:
       '@gyblos/identity':
         specifier: workspace:*
         version: link:../identity
+      '@gyblos/payments-paypal':
+        specifier: workspace:*
+        version: link:../payments-paypal
       '@gyblos/payments-upto':
         specifier: workspace:*
         version: link:../payments-upto
@@ -600,6 +612,15 @@ importers:
       smol-toml:
         specifier: 1.9.1
         version: 1.9.1
+
+  packages/payments-paypal:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/payments-upto:
     dependencies:

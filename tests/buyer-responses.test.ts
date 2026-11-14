@@ -277,11 +277,6 @@ const REFUSED: [string, Record<string, unknown>, RegExp][] = [
     /custom/,
   ],
   [
-    'an MCP namespace',
-    { tools: [{ type: 'namespace', name: 'mcp' }] },
-    /namespace/,
-  ],
-  [
     'audio',
     {
       input: [

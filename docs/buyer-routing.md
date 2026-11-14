@@ -37,10 +37,12 @@ separate from inference payment transactions.
 
 The loopback endpoint requires a private bearer token for every request because
 this entry can spend. Its owned CLI connection attaches the token without
-exposing it. Completed automatic JSON/SSE replies include `gyblos_execution`
-(`free` or `paid`); only paid replies carry `gyblos_payment`. The terminal uses
-this explicit result rather than guessing from the configured spending ceiling.
-A paid completion missing payment information is never reported as free success.
+exposing it. Tools use separate [bounded API keys](buyer-api-keys.md) created by
+the desktop owner; they do not receive that operator token. Completed automatic
+JSON/SSE replies include `gyblos_execution` (`free` or `paid`); only paid
+replies carry `gyblos_payment`. The terminal uses this explicit result rather
+than guessing from the configured spending ceiling. A paid completion missing
+payment information is never reported as free success.
 
 One deadline and seller exclusion set cover the whole request. A proven-unsent
 attempt may try another seller, including across price modes. A potentially sent

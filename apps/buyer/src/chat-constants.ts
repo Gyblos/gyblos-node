@@ -215,8 +215,13 @@ export const RESPONSES_CHAT = {
   imagePlaceholder: '[image omitted: this model reads text only]',
   // History items that record work no seller does: the model's reasoning and a provider's own search.
   skippedItems: ['reasoning', 'web_search_call'] as readonly string[],
-  // Provider-run search Codex offers on every request; no seller runs it.
-  skippedTools: ['web_search', 'web_search_preview'] as readonly string[],
+  // Provider-run search Codex offers on every request, and the tool groups (namespaces) Codex CLI 0.162+
+  // sends for its own sub-agents and MCP servers: no seller runs them, so the model is not offered them.
+  skippedTools: [
+    'web_search',
+    'web_search_preview',
+    'namespace',
+  ] as readonly string[],
   partFields: ['type', 'text', 'annotations', 'logprobs'] as readonly string[],
   toolFields: [
     'type',

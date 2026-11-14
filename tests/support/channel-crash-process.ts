@@ -28,15 +28,16 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-export function crashChild(
-  input: CrashInput,
+export function crashChild<Input extends Pick<CrashInput, 'root'>>(
+  input: Input,
   handler: (
     method: CrashCall,
     args: readonly unknown[],
     pause: () => Promise<void>,
   ) => Promise<unknown>,
+  entry = new URL('./channel-crash-child.ts', import.meta.url),
 ) {
-  const child = fork(new URL('./channel-crash-child.ts', import.meta.url), [], {
+  const child = fork(entry, [], {
     execArgv: ['--import', import.meta.resolve('tsx')],
     serialization: 'advanced',
     env: {

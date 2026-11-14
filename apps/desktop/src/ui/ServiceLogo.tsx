@@ -2,10 +2,13 @@
 // Unknown/custom tools retain a generic SVG icon rather than invented branding.
 import { PlugsConnected } from '@phosphor-icons/react';
 
+import { AGENT_CLIENT } from '../constants';
+
 const SERVICE_MARKS: Record<string, { file: string; monochrome?: boolean }> = {
-  'Claude Code': { file: 'claudecode-color' },
-  Codex: { file: 'codex', monochrome: true },
-  Pi: { file: 'pi' },
+  [AGENT_CLIENT.CLAUDE_CODE]: { file: 'claudecode-color' },
+  [AGENT_CLIENT.CODEX]: { file: 'codex', monochrome: true },
+  [AGENT_CLIENT.OPENCODE]: { file: 'opencode', monochrome: true },
+  [AGENT_CLIENT.PI]: { file: 'pi' },
   exa: { file: 'exa', monochrome: true },
   firecrawl: { file: 'firecrawl-color' },
   tinyfish: { file: 'tinyfish' },

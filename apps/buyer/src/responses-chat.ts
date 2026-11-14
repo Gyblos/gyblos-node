@@ -137,9 +137,9 @@ function conversation(input: unknown, instructions: string[]): ChatTurn[] {
 }
 
 // Function tools in the Responses shape (flat: {type, name, description?, parameters?, strict?}), read
-// through the Chat Completions checks. Web search, which Codex offers on every request and the provider would
-// run itself, is left out: no seller runs it, so the model is simply not offered it. Custom, namespaced
-// (MCP) and other provider tools are refused by type.
+// through the Chat Completions checks. Web search and tool groups (namespaces), which Codex sends on every
+// request, are left out: no seller runs them, so the model is simply not offered them. Custom and other
+// provider tools are refused by type.
 function responsesTools(value: unknown): ToolDefinition[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value))

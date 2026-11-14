@@ -72,16 +72,23 @@ const digest = (value: string) => createHash('sha256').update(value).digest();
 export function bearerAuthorizer(token: string) {
   const expected = digest(token);
   return (request: IncomingMessage) => {
-    const key = request.headers[PAID_BUYER.apiKeyHeader];
-    if (typeof key === 'string' && request.headers.authorization === undefined)
-      return timingSafeEqual(digest(key), expected);
-    const header = request.headers.authorization ?? '';
-    const space = header.indexOf(' ');
-    const scheme = space < 0 ? '' : header.slice(0, space);
-    const presented = space < 0 ? '' : header.slice(space + 1);
-    const matches = timingSafeEqual(digest(presented), expected);
+    const presented = buyerBearer(request);
     return (
-      scheme.toLowerCase() === PAID_BUYER.authScheme.toLowerCase() && matches
+      presented !== undefined && timingSafeEqual(digest(presented), expected)
     );
   };
+}
+export function buyerBearer(request: IncomingMessage) {
+  const key = request.headers[PAID_BUYER.apiKeyHeader];
+  const header = request.headers.authorization;
+  if (key !== undefined && header !== undefined) return undefined;
+  if (typeof key === 'string') return key || undefined;
+  if (typeof header !== 'string') return undefined;
+  const space = header.indexOf(' ');
+  if (
+    space < 0 ||
+    header.slice(0, space).toLowerCase() !== PAID_BUYER.authScheme.toLowerCase()
+  )
+    return undefined;
+  return header.slice(space + 1) || undefined;
 }

@@ -1,10 +1,22 @@
 // Exposes fixed probe, public wallet status/copy and bounded setup/backup interactions; no signing or raw IPC.
 import { contextBridge, ipcRenderer } from 'electron';
 
+import { parseActivityResult } from './activity-model';
 import { NETWORK_CATALOG, parseNetworkCatalog } from './catalog/model';
-import { DESKTOP } from './constants';
+import {
+  parseChatArchiveLoad,
+  parseChatArchiveStatus,
+} from './chat-archive-model';
+import { CHAT_STORAGE, DESKTOP, DESKTOP_ACTIVITY } from './constants';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
+import { parsePaymentReferences } from './payment-reference-model';
+import {
+  DESKTOP_PAYPAL_AGENT,
+  parsePaypalAgentResult,
+} from './paypal-agent-model';
+import { DESKTOP_PAYPAL, parsePaypalResult } from './paypal-model';
 import { parseProbeResult } from './probe-model';
+import { parseUsdcApiState, USDC_API } from './usdc-api-model';
 import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model';
 import { parseWalletSummary, WALLET } from './wallet/model';
 import {
@@ -12,6 +24,47 @@ import {
   parseWalletSettingsResult,
   WALLET_SETTINGS,
 } from './wallet/settings-model';
+import { windowPlatform } from './window-chrome';
+import { DESKTOP_X402, parseX402Result } from './x402-model';
+
+contextBridge.exposeInMainWorld('desktopWindow', {
+  platform: windowPlatform(process.platform),
+});
+
+contextBridge.exposeInMainWorld('desktopConversations', {
+  load: async () =>
+    parseChatArchiveLoad(await ipcRenderer.invoke(CHAT_STORAGE.LOAD_CHANNEL)),
+  save: async (request: unknown) =>
+    parseChatArchiveStatus(
+      await ipcRenderer.invoke(CHAT_STORAGE.SAVE_CHANNEL, request),
+    ),
+  status: async () =>
+    parseChatArchiveStatus(
+      await ipcRenderer.invoke(CHAT_STORAGE.STATUS_CHANNEL),
+    ),
+});
+contextBridge.exposeInMainWorld('desktopUsdcApiKeys', {
+  run: async (request: unknown) =>
+    parseUsdcApiState(await ipcRenderer.invoke(USDC_API.CHANNEL, request)),
+});
+contextBridge.exposeInMainWorld('desktopX402', {
+  run: async (request: unknown) =>
+    parseX402Result(await ipcRenderer.invoke(DESKTOP_X402.CHANNEL, request)),
+});
+
+contextBridge.exposeInMainWorld('desktopActivity', {
+  copyReference: async (sessionId: string) =>
+    (await ipcRenderer.invoke(
+      DESKTOP_ACTIVITY.COPY_REFERENCE_CHANNEL,
+      sessionId,
+    )) === true,
+  references: async () =>
+    parsePaymentReferences(
+      await ipcRenderer.invoke(DESKTOP_ACTIVITY.REFERENCES_CHANNEL),
+    ),
+  summary: async () =>
+    parseActivityResult(await ipcRenderer.invoke(DESKTOP_ACTIVITY.CHANNEL)),
+});
 
 contextBridge.exposeInMainWorld('desktopCatalog', {
   summary: async () =>
@@ -29,6 +82,37 @@ contextBridge.exposeInMainWorld('desktopNode', {
     parseLocalNodeState(await ipcRenderer.invoke(LOCAL_NODE.STATUS_CHANNEL)),
   retry: async () =>
     parseLocalNodeState(await ipcRenderer.invoke(LOCAL_NODE.RETRY_CHANNEL)),
+});
+
+contextBridge.exposeInMainWorld('desktopPaypal', {
+  run: async (request: unknown) =>
+    parsePaypalResult(
+      await ipcRenderer.invoke(DESKTOP_PAYPAL.CHANNEL, request),
+    ),
+  onReturn: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on(DESKTOP_PAYPAL.RETURN_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(DESKTOP_PAYPAL.RETURN_CHANNEL, handler);
+    };
+  },
+  onCancel: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on(DESKTOP_PAYPAL.CANCEL_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(DESKTOP_PAYPAL.CANCEL_CHANNEL, handler);
+    };
+  },
+});
+
+contextBridge.exposeInMainWorld('desktopPaypalAgent', {
+  run: async (request: unknown) =>
+    parsePaypalAgentResult(
+      await ipcRenderer.invoke(DESKTOP_PAYPAL_AGENT.CHANNEL, request),
+    ),
+  copy: async (request: unknown) =>
+    (await ipcRenderer.invoke(DESKTOP_PAYPAL_AGENT.COPY_CHANNEL, request)) ===
+    true,
 });
 
 contextBridge.exposeInMainWorld('desktopProbe', {

@@ -6,20 +6,15 @@ import { dirname, join, resolve } from 'node:path';
 
 import { packager } from '@electron/packager';
 
+import { stageDesktopAssets } from './package-assets';
+
 if (process.platform !== 'darwin' || process.arch !== 'arm64')
   throw new Error('This probe packages macOS arm64 only.');
 const require = createRequire(import.meta.url);
 const stage = resolve('dist/stage');
 await rm(stage, { recursive: true, force: true });
 await mkdir(stage, { recursive: true });
-for (const file of [
-  'main.cjs',
-  'preload.cjs',
-  'worker.cjs',
-  'node-worker.cjs',
-  'renderer',
-])
-  await cp(join('dist', file), join(stage, file), { recursive: true });
+await stageDesktopAssets('dist', stage);
 const manifest: { version: string; devDependencies: { electron: string } } =
   JSON.parse(await readFile('package.json', 'utf8'));
 await writeFile(

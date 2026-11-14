@@ -11,6 +11,7 @@ import {
   type PaidBuyerOutcome,
 } from '@gyblos/node/buyer-paid-execution';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import { PAID_VERDICTS } from '@gyblos/node/constants';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
@@ -21,6 +22,7 @@ import { PaymentError } from '@gyblos/protocol/payment';
 import { PaymentSessionError } from '@gyblos/protocol/payment-session';
 import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
+import { buyerApiKeyErrorView } from './api-key-http';
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import type { ChatErrorView } from './free-http';
 import type { ChatPayment, ChatResult } from './free-sse';
@@ -51,6 +53,9 @@ export function paidSummary(outcome: PaidBuyerOutcome): ChatPayment {
     feeAtomic: settled?.feeAtomic ?? null,
     refundedAtomic: settled?.refundedAtomic ?? null,
     recorded: outcome.recorded,
+    ...(outcome.verdict === PAID_VERDICTS.SETTLED && settled
+      ? { transaction: settled.transaction }
+      : {}),
   };
 }
 
@@ -92,6 +97,8 @@ const unavailable = (
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  const keyError = buyerApiKeyErrorView(error);
+  if (keyError) return keyError;
   if (
     error instanceof BuyerRoutingError ||
     error instanceof UnsentSellerBusyError

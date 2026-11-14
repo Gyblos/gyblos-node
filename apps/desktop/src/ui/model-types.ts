@@ -1,7 +1,10 @@
 // Shared illustrative model presentation types; no live discovery contract is implied.
+import type { CatalogModelId } from '@gyblos/protocol/constants';
+
 export type ModelArtwork = { src: string; monochrome?: boolean };
 export type ChatModel = {
   id: string;
+  catalogId?: CatalogModelId;
   name: string;
   image: ModelArtwork;
   free: boolean;
@@ -21,4 +24,3 @@ export type CatalogModel = ModelOption & {
 };
 export type View =
   (typeof import('./constants').UI_VIEW)[keyof typeof import('./constants').UI_VIEW];
-export type Mode = (typeof import('./constants').MODES)[number];
