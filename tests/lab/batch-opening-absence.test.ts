@@ -11,6 +11,7 @@ import {
   openBatchBuyerPool,
   recoverBatchPool,
 } from '@gyblos/payments-upto/batch-session';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { batchNativeFinancial } from '../support/batch-native';
 import { sessionNativeRpc } from '../support/session-native-rpc';
@@ -104,7 +105,15 @@ void test('an expired never-submitted batch opening releases only its unfunded r
     hints: async () => assert.fail('Never replace original hints'),
   });
   try {
-    await assert.rejects(reopened.open());
+    await assert.rejects(reopened.open(), { code: SESSION_CODES.CLOSED });
+    await assert.rejects(
+      reopened.begin({
+        requestId: '11'.repeat(16),
+        requestDigest: '22'.repeat(32),
+        maxAtomic: '100',
+      }),
+      { code: SESSION_CODES.CLOSED },
+    );
   } finally {
     await reopened.dispose();
   }

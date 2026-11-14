@@ -141,6 +141,13 @@ function openingHistory(
   const base = observationSdk(rpc, signal);
   return createUptoChannelHistory({
     ...base,
+    minimumLedgerSlot: () => ({
+      send: () => retainedSlot(() => base.minimumLedgerSlot().send(), signal),
+    }),
+    getFirstAvailableBlock: () => ({
+      send: () =>
+        retainedSlot(() => base.getFirstAvailableBlock().send(), signal),
+    }),
     getSignaturesForAddress: (account, config) => ({
       send: async () => {
         const rows = await beforeAbort(signal, () =>
@@ -165,4 +172,11 @@ function openingHistory(
       },
     }),
   });
+}
+
+async function retainedSlot(read: () => Promise<bigint>, signal: AbortSignal) {
+  const value = await beforeAbort(signal, read);
+  if (typeof value !== 'bigint' || value < 0n)
+    return sessionFail(SESSION_CODES.UNVERIFIED);
+  return value;
 }

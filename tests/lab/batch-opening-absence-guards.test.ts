@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  address,
+  assertIsSignatureBytes,
+  getBase64EncodedWireTransaction,
+  getTransactionDecoder,
+} from '@solana/kit';
+
+import {
   ABSENCE_PREPARATIONS,
   batchAbsenceRig,
 } from '../support/batch-absence';
@@ -259,4 +266,94 @@ void test('a history row without an explicit error verdict is not failed-history
     committedAtomic: '1000',
     availableAtomic: '0',
   });
+});
+void test('a forged cached payer signature cannot authenticate an otherwise identical opening', async (t) => {
+  const rig = await batchAbsenceRig(t);
+  const record = await rig.read();
+  const transaction = getTransactionDecoder().decode(
+    Buffer.from(record.opening.deposit.transaction, 'base64'),
+  );
+  const empty = new Uint8Array(
+    transaction.signatures[address(rig.financial.terms.buyer)]!.length,
+  );
+  assertIsSignatureBytes(empty);
+  record.opening.deposit.transaction = getBase64EncodedWireTransaction({
+    ...transaction,
+    signatures: {
+      ...transaction.signatures,
+      [rig.financial.terms.buyer]: empty,
+    },
+  });
+  await rig.write(record);
+  rig.financial.vm.expire();
+  const results = await rig.recover();
+  assert.notEqual(results[0]?.notCreated, true);
+  assert.equal(results[0]?.confirmed, false);
+  assert.equal(rig.signs(), 0);
+});
+void test('a modified terminal proof cannot clear startup uncertainty or credit the pool', async (t) => {
+  const { inspectBatchSession } =
+    await import('@gyblos/payments-upto/batch-session');
+  const rig = await batchAbsenceRig(t);
+  rig.financial.vm.expire();
+  await rig.recover();
+  const record = await rig.read();
+  const key = Object.keys(record.pending).find((key) =>
+    key.endsWith(':absent'),
+  )!;
+  const proof = JSON.parse(record.pending[key]);
+  proof.messageDigest = '00'.repeat(32);
+  record.pending[key] = JSON.stringify(proof);
+  await rig.write(record);
+  await assert.rejects(inspectBatchSession(rig.options.paths.legacy));
+  await assert.rejects(rig.budget());
+  assert.equal(rig.financial.vm.sends(), 0);
+});
+void test('a missing ledger-retention answer cannot be masked by a valid block-retention answer', async (t) => {
+  const rig = await batchAbsenceRig(t);
+  rig.financial.vm.expire();
+  rig.patch({ minimumLedgerSlot: () => ({ send: async () => undefined }) });
+  const results = await rig.recover();
+  assert.notEqual(results[0]?.notCreated, true);
+  assert.deepEqual(await rig.budget(), {
+    committedAtomic: '1000',
+    availableAtomic: '0',
+  });
+});
+void test('an original SDK deposit rejected after native blockhash expiry is not a refund', async (t) => {
+  const rig = await batchAbsenceRig(t);
+  const record = await rig.read();
+  rig.financial.vm.expire();
+  const wire = await rig.financial.vm.signer.signTransaction(
+    record.opening.deposit.transaction,
+    rig.financial.vm.feePayer.address,
+    rig.financial.vm.network,
+  );
+  await assert.rejects(
+    rig.financial.vm.signer.sendTransaction(wire, rig.financial.vm.network),
+    /BlockhashNotFound/,
+  );
+  const sends = rig.financial.vm.sends();
+  const result = await rig.recover();
+  assert.equal(result[0]?.notCreated, true);
+  assert.equal(result[0]?.settlement, null);
+  assert.equal(rig.signs(), 0);
+  assert.equal(rig.financial.vm.sends(), sends);
+  assert.equal(
+    await rig.financial.vm.balance(rig.financial.terms.buyer),
+    rig.financial.before.buyer,
+  );
+});
+void test('host expiry alone never resolves an opening whose chain blockhash remains live', async (t) => {
+  const rig = await batchAbsenceRig(t);
+  rig.options.now = () => rig.financial.terms.expiresAt + 1;
+  const result = await rig.recover();
+  assert.notEqual(result[0]?.notCreated, true);
+  assert.equal(result[0]?.confirmed, false);
+  assert.deepEqual(await rig.budget(), {
+    committedAtomic: '1000',
+    availableAtomic: '0',
+  });
+  assert.equal(rig.signs(), 0);
+  assert.equal(rig.financial.vm.sends(), 0);
 });
