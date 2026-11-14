@@ -10,6 +10,7 @@ import {
   type SellerSelectionResult,
 } from '@gyblos/core/seller-selection';
 import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
@@ -23,11 +24,13 @@ import {
 } from './constants';
 import type { createBuyerControlClient } from './control';
 import { raceControlOffers, type WinningQuote } from './offer-race';
+import type { SnapshotCache } from './selection-cache';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
   type StaticControlSeller,
 } from './selection-config';
+import { raceCandidates } from './selection-quotes';
 import {
   recordQuote,
   refreshSnapshots,
@@ -45,7 +48,8 @@ export { verifiedSeller };
 export type BuyerControlClient = Pick<
   ReturnType<typeof createBuyerControlClient>,
   'getCatalog' | 'getPresence' | 'requestOffer' | 'close'
->;
+> &
+  Partial<Pick<ReturnType<typeof createBuyerControlClient>, 'useCatalog'>>;
 export type SelectionDecision =
   | { ok: true; winner: WinningQuote }
   | {
@@ -69,12 +73,27 @@ export interface VerifiedSelectionDependencies {
     signal?: AbortSignal,
   ) => Promise<boolean>;
   observeVerified?: (seller: KnownSeller) => Promise<boolean>;
+  // Snapshots kept from earlier requests (selection-cache.ts); absent, every request asks every seller.
+  snapshots?: SnapshotCache;
   // Told why each seller dropped out; it never affects which seller wins.
   onSellerFailure?: SellerFailureReporter;
 }
+// A seller that refused a quote for a remembered catalog is not counted as failing: its snapshot is
+// dropped and, when no other seller won, the selection runs once more with fresh snapshots.
 export async function selectVerifiedBuyerQuote(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
+  signal?: AbortSignal,
+): Promise<SelectionDecision> {
+  const stale = new Set<string>();
+  const first = await selectOnce(config, dependencies, stale, signal);
+  if (first.ok || !stale.size || signal?.aborted) return first;
+  return selectOnce(config, dependencies, new Set(), signal);
+}
+async function selectOnce(
+  config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
+  stale: Set<string>,
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
   if (config.identity && !dependencies.verifyIdentity)
@@ -86,10 +105,12 @@ export async function selectVerifiedBuyerQuote(
   ]);
   const clients = new Map<string, BuyerControlClient>();
   try {
+    const recalled = new Map<string, SignedPublicV2>();
     const snapshots = await refreshSnapshots(
       config,
       dependencies,
       clients,
+      recalled,
       now,
       deadline,
       signal,
@@ -111,7 +132,7 @@ export async function selectVerifiedBuyerQuote(
     if (!selected.ok) return selected;
     const winner = await raceCandidates(
       selected.candidates,
-      clients,
+      { clients, stale, recalled },
       config,
       dependencies,
       now,
@@ -169,101 +190,6 @@ function offerCurrent(winner: WinningQuote, now: () => number) {
     return true;
   } catch {
     return false;
-  }
-}
-
-function raceCandidates(
-  candidates: readonly SellerCandidate[],
-  clients: ReadonlyMap<string, BuyerControlClient>,
-  config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
-  now: () => number,
-  signal?: AbortSignal,
-) {
-  return raceControlOffers(
-    candidates,
-    (candidate, querySignal) =>
-      requestCandidate(
-        candidate,
-        clients,
-        config,
-        dependencies,
-        now,
-        querySignal,
-      ),
-    {
-      signal,
-      // The operator's selection.json wins over the caller's default.
-      windowMs: config.quoteWindowMs ?? dependencies.windowMs,
-      ...(config.previousSeller ? { preferred: config.previousSeller } : {}),
-      // A seller silent for the whole window is cooled down like one that refused.
-      onExpired: (pending) => {
-        for (const candidate of pending) {
-          recordQuote(dependencies.stats, candidate.nodeId, false, 0, now());
-          reportSellerFailure(dependencies.onSellerFailure, {
-            nodeId: candidate.nodeId,
-            phase: SELLER_FAILURE_PHASES.TIMEOUT,
-            code: ERROR_DIAGNOSTICS.TIMEOUT,
-          });
-        }
-      },
-    },
-  );
-}
-
-async function requestCandidate(
-  candidate: SellerCandidate,
-  clients: ReadonlyMap<string, BuyerControlClient>,
-  config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
-  now: () => number,
-  querySignal: AbortSignal,
-) {
-  const start = now();
-  const request = config.request;
-  try {
-    const quote = await clients.get(candidate.nodeId)!.requestOffer(
-      {
-        buyer: dependencies.buyer,
-        selection: request.selection,
-        reasoning: candidate.reasoning,
-        maxTokens: request.maxTokens,
-        maxAtomic: candidate.free ? '0' : request.maxAtomic,
-        priceCeilings: request.priceCeilings,
-        network: request.network,
-        asset: request.asset,
-        ...(request.tools ? { tools: true as const } : {}),
-      },
-      querySignal,
-    );
-    if (querySignal.aborted)
-      throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
-    recordQuote(
-      dependencies.stats,
-      candidate.nodeId,
-      true,
-      now() - start,
-      now(),
-    );
-    return quote;
-  } catch (error) {
-    if (!querySignal.aborted) {
-      // A seller without tools answered as designed: it is not cooled down for the requests it serves.
-      if (sellerFailureCode(error) !== CONTROL_CODES.TOOLS)
-        recordQuote(
-          dependencies.stats,
-          candidate.nodeId,
-          false,
-          now() - start,
-          now(),
-        );
-      reportSellerFailure(dependencies.onSellerFailure, {
-        nodeId: candidate.nodeId,
-        phase: SELLER_FAILURE_PHASES.QUOTE,
-        code: sellerFailureCode(error),
-      });
-    }
-    throw error;
   }
 }
 

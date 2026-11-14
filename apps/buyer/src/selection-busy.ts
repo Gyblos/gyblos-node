@@ -29,6 +29,9 @@ export async function selectBusyAwareBuyerQuote(
           getCatalog: (...args) => client.getCatalog(...args),
           getPresence: (...args) => client.getPresence(...args),
           close: () => client.close(),
+          ...(client.useCatalog
+            ? { useCatalog: client.useCatalog.bind(client) }
+            : {}),
           requestOffer: async (...args) => {
             try {
               return await client.requestOffer(...args);
