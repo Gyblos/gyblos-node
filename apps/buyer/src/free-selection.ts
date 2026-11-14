@@ -38,9 +38,10 @@ import {
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
 import { selectBusyAwareBuyerQuote } from './selection-busy';
-import type {
-  BuyerSelectionConfig,
-  StaticControlSeller,
+import {
+  BUYER_FAILOVER,
+  type BuyerSelectionConfig,
+  type StaticControlSeller,
 } from './selection-config';
 import type { prepareBuyerSelection } from './selection-runtime';
 import { mergeSelectionStats } from './selection-stats';
@@ -66,6 +67,7 @@ export function freeBuyerDependencies(
 
   return {
     conversationKey: createConversationKey(),
+    resendAfterSend: policy.failover !== BUYER_FAILOVER.NEVER,
     telemetry: freeTelemetry(options, policy, now),
     receiptNow: now,
     receipt: options.receipts

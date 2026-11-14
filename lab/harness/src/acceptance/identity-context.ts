@@ -1,4 +1,5 @@
 // Owns synthetic identity acceptance bookkeeping; reports counters, never identities or private content.
+import type { BuyerFailover } from '@gyblos/buyer/selection-config';
 import { HTTP_STATUS } from '@gyblos/config';
 import { openBuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 
@@ -48,6 +49,7 @@ export async function withIdentityBuyer(
     beforeExecute?: () => Promise<void>;
     fault?: FreeAcceptanceFault;
     sellers?: AcceptanceSession[];
+    failover?: BuyerFailover;
   } = {},
 ) {
   assertAcceptanceActive(context.signal);
@@ -61,6 +63,7 @@ export async function withIdentityBuyer(
     options.sellers,
     options.fault,
     identity,
+    options.failover,
   );
   try {
     await action(buyer);
