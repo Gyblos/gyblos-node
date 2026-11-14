@@ -115,6 +115,64 @@ async function signedSellers(count: number) {
   };
 }
 
+void test('a remembered seller connecting late cannot hold a healthy quote and is closed on arrival', async (context) => {
+  await isolatedHome(context);
+  const host = await signedSellers(2);
+  let delaySecond = false;
+  let lateCloses = 0;
+  let release = (_client: BuyerControlClient) => {};
+  let began = () => {};
+  const connecting = new Promise<void>((resolve) => {
+    began = resolve;
+  });
+  const dependencies = {
+    ...host.dependencies,
+    connect: async (seller: { nodeId: string }) => {
+      const index = host.config.sellers.findIndex(
+        (entry) => entry.nodeId === seller.nodeId,
+      );
+      if (!delaySecond || index !== 1) return host.client(index);
+      began();
+      return new Promise<BuyerControlClient>((resolve) => {
+        release = resolve;
+      });
+    },
+  };
+  assert.equal(
+    (await selectVerifiedBuyerQuote(host.config, dependencies)).ok,
+    true,
+  );
+  delaySecond = true;
+  let finished = false;
+  const pending = selectVerifiedBuyerQuote(host.config, dependencies).then(
+    (result) => {
+      finished = true;
+      return result;
+    },
+  );
+  await connecting;
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    assert.equal(
+      finished,
+      true,
+      'the healthy quote must finish before late connect',
+    );
+    const result = await pending;
+    assert.equal(result.ok, true);
+    if (result.ok)
+      assert.equal(
+        result.winner.candidate.nodeId,
+        host.config.sellers[0]!.nodeId,
+      );
+  } finally {
+    release(host.client(1, () => lateCloses++));
+    await pending;
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(lateCloses, 1);
+  }
+});
+
 void test('a newer catalog accepted from discovery supersedes an older remembered snapshot before filtering', async (context) => {
   const environment = await isolatedHome(context);
   await mkdir(homeLayout(environment).roles.buyer, {

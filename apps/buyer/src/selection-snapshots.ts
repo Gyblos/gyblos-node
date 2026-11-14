@@ -285,7 +285,7 @@ async function snapshotBatch(
 // A connection attempt ends with the snapshot deadline: a seller that stopped answering would otherwise
 // hold every request for the whole transport timeout. A connection that arrives later is closed. A request
 // the caller cancelled still waits for the attempt, so its admission stays held until native work settles.
-async function connectBefore(
+export async function connectBefore(
   connecting: Promise<BuyerControlClient>,
   deadline: AbortSignal,
   settling: Promise<unknown>[],

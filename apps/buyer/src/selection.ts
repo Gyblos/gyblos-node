@@ -134,7 +134,7 @@ async function selectOnce(
     if (!selected.ok) return selected;
     const winner = await raceCandidates(
       selected.candidates,
-      { clients, stale, recalled },
+      { clients, stale, recalled, settling },
       config,
       dependencies,
       now,
