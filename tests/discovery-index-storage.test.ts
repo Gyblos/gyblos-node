@@ -43,6 +43,7 @@ const hex = (seed: number) => seed.toString(16).padStart(64, '0');
 
 interface Written {
   sql: string;
+  params: SqliteStatement['params'];
   changes: number;
 }
 
@@ -79,6 +80,7 @@ async function recordingD1() {
       statements.forEach((statement, index) =>
         written.push({
           sql: (statement as SqliteStatement).sql,
+          params: (statement as SqliteStatement).params,
           changes: results[index]?.meta.changes ?? 0,
         }),
       );
@@ -162,8 +164,22 @@ void test('D1 catalog republish writes only the model rows that changed', async 
     { length: PUBLIC_RECORD_LIMITS.maxModels },
     (_, index) => `model-${String(index).padStart(2, '0')}`,
   );
+  written.length = 0;
   await storage.put(catalog(4, full));
   assert.deepEqual(models(), full);
+  const modelInsert = written.find(({ sql }) =>
+    /\binsert\s+into\s+"?discovery_catalog_models\b/i.test(sql),
+  );
+  assert.ok(modelInsert);
+  const plan = db.raw
+    .prepare('EXPLAIN QUERY PLAN ' + namedSql(modelInsert.sql))
+    .all(namedParams(modelInsert.params))
+    .map((row) => String(row.detail));
+  assert.equal(
+    plan.filter((step) => /\b(?:SEARCH|SCAN) discovery_nodes\b/.test(step)).length,
+    1,
+    plan.join('\n'),
+  );
   written.length = 0;
   await storage.put(catalog(5, [...full].reverse()));
   assert.equal(modelChanges(written), 0);
