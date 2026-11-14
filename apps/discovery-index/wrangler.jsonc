@@ -30,7 +30,7 @@
   //   all requests per IP(/64), publishes per IP(/64), and
   //   storage reads (sellers cache misses, stale health counts) under one constant key.
   //   Cloudflare counts per location, so the read cap is per Cloudflare location, not worldwide.
-  // Accepted NodeId publications are counted atomically in D1 (migration 0004), globally.
+  // Accepted NodeId publications are counted atomically in D1 (migration 0005), globally.
   "ratelimits": [
     {
       "name": "DISCOVERY_IP_LIMITER",

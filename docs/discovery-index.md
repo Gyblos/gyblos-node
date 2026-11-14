@@ -302,7 +302,7 @@ database, so they are combined into this one clean migration.
 on catalogs `(node_id, digest, issued_at, expires_at)`, presence
 `(node_id, catalog_digest, issued_at, expires_at)` and withdrawals
 `(node_id, catalog_digest)`, and it drops the unused
-`discovery_presence_by_issue`. Migration `0004_node_publish_quota.sql` adds the
+`discovery_presence_by_issue`. Migration `0005_node_publish_quota.sql` adds the
 accepted-publication window and counter to `discovery_nodes`; rollout and
 rollback requirements are described below.
 
@@ -410,7 +410,7 @@ bindings.
 
 Rolling the code back does not require reverting `0002`: earlier code names no
 index and no query used `discovery_presence_by_issue`.
-`migrations/0004_node_publish_quota.sql` adds the accepted-publication window
+`migrations/0005_node_publish_quota.sql` adds the accepted-publication window
 and counter to `discovery_nodes`. Apply it before deploying this version;
 without it publishing fails closed with `503`. The columns have defaults, so
 older code remains compatible during rollout. When rolling back, retain the
