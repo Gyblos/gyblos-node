@@ -89,12 +89,19 @@ export function startupMessage(error: unknown) {
 }
 
 // One stderr line per seller that dropped out of a selection: a short NodeId, the phase and a code.
-export function sellerFailureLine(failure: SellerFailure) {
+// One line per seller that dropped out; when the failure cooled it down, when it will be tried again
+// (e.g. `retry_in=60s`), which grows while the seller keeps failing.
+export function sellerFailureLine(failure: SellerFailure, now = Date.now()) {
   return [
     SELLER_FAILURES.LINE,
     failure.nodeId.slice(0, SELLER_FAILURES.nodeIdChars),
     failure.phase,
     failure.code,
+    ...(failure.retryAt
+      ? [
+          `retry_in=${Math.max(0, Math.round((failure.retryAt - now) / SELLER_FAILURES.msPerSecond))}s`,
+        ]
+      : []),
   ].join(' ');
 }
 

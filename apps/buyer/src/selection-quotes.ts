@@ -14,6 +14,7 @@ import type {
   BuyerControlClient,
   VerifiedSelectionDependencies,
 } from './selection';
+import { backoffFor } from './selection-backoff';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -35,6 +36,31 @@ const CATALOG_CHANGED: ReadonlySet<string> = new Set([
   CONTROL_CODES.STALE,
   CONTROL_CODES.MODEL,
 ]);
+
+// A seller without tools answered as designed: it is not cooled down for the requests it serves. Any
+// other refused quote cools it down; returns when it is tried again.
+function coolAfterQuote(
+  error: unknown,
+  nodeId: string,
+  context: {
+    config: BuyerSelectionConfig;
+    dependencies: VerifiedSelectionDependencies;
+    elapsedMs: number;
+    now: number;
+    signal?: AbortSignal;
+  },
+) {
+  const { config, dependencies, signal } = context;
+  if (sellerFailureCode(error) === CONTROL_CODES.TOOLS) return null;
+  return recordQuote(
+    dependencies.stats,
+    nodeId,
+    false,
+    context.elapsedMs,
+    context.now,
+    backoffFor(dependencies.backoff, config, nodeId, signal),
+  );
+}
 
 // A quote that did not arrive leaves a connection that may be dialing a seller that is gone, and closing
 // that waits out the transport: it closes in the background. A pinned seller's is still awaited (it is
@@ -107,11 +133,19 @@ function raceAll(
       onExpired: (pending) => {
         for (const candidate of pending) {
           dependencies.snapshots?.drop(candidate.nodeId);
-          recordQuote(dependencies.stats, candidate.nodeId, false, 0, now());
+          const retryAt = recordQuote(
+            dependencies.stats,
+            candidate.nodeId,
+            false,
+            0,
+            now(),
+            backoffFor(dependencies.backoff, config, candidate.nodeId, signal),
+          );
           reportSellerFailure(dependencies.onSellerFailure, {
             nodeId: candidate.nodeId,
             phase: SELLER_FAILURE_PHASES.TIMEOUT,
             code: ERROR_DIAGNOSTICS.TIMEOUT,
+            ...(retryAt ? { retryAt } : {}),
           });
         }
       },
@@ -181,6 +215,7 @@ async function requestCandidate(
       true,
       now() - start,
       now(),
+      dependencies.backoff,
     );
     return quote;
   } catch (error) {
@@ -201,19 +236,18 @@ async function requestCandidate(
       // Its catalog may have changed or it may be gone: the next request verifies it again. A seller
       // that only lost the race keeps its snapshot.
       dependencies.snapshots?.drop(candidate.nodeId);
-      // A seller without tools answered as designed: it is not cooled down for the requests it serves.
-      if (sellerFailureCode(error) !== CONTROL_CODES.TOOLS)
-        recordQuote(
-          dependencies.stats,
-          candidate.nodeId,
-          false,
-          now() - start,
-          now(),
-        );
+      const retryAt = coolAfterQuote(error, candidate.nodeId, {
+        config,
+        dependencies,
+        elapsedMs: now() - start,
+        now: now(),
+        signal,
+      });
       reportSellerFailure(dependencies.onSellerFailure, {
         nodeId: candidate.nodeId,
         phase: SELLER_FAILURE_PHASES.QUOTE,
         code: sellerFailureCode(error),
+        ...(retryAt ? { retryAt } : {}),
       });
     }
     throw error;

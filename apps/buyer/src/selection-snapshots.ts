@@ -17,6 +17,7 @@ import type {
   BuyerControlClient,
   VerifiedSelectionDependencies,
 } from './selection';
+import { backoffFor, type SellerBackoff } from './selection-backoff';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -72,24 +73,32 @@ export async function verifiedSeller(
 ): Promise<KnownSeller> {
   return (await verifiedSnapshot(client, seller, now, signal)).known;
 }
+// Returns the cooldown end a failure set (null after a success). With `backoff`, repeated failures cool
+// a seller down longer each time (selection-backoff.ts); without it, always cooldownMs.
 export function recordQuote(
   stats: Map<string, LocalSellerStats>,
   nodeId: string,
   success: boolean,
   latencyMs: number,
   now: number,
+  backoff?: SellerBackoff,
 ) {
   const prior = stats.get(nodeId);
+  if (success) backoff?.succeeded(nodeId);
+  const cooldownUntil = success
+    ? null
+    : now + (backoff?.failed(nodeId) ?? BUYER_SELECTION.cooldownMs);
   stats.set(nodeId, {
     successes: (prior?.successes ?? 0) + Number(success),
     failures: (prior?.failures ?? 0) + Number(!success),
     latencyMs: Math.max(0, Math.round(latencyMs)),
     waitAccuracy: prior?.waitAccuracy ?? null,
-    cooldownUntil: success ? null : now + BUYER_SELECTION.cooldownMs,
+    cooldownUntil,
     // v2 has no predicted wait and control latency is not inference waiting time.
     quotedWaitMs: prior?.quotedWaitMs ?? null,
     observedWaitMs: prior?.observedWaitMs ?? null,
   });
+  return cooldownUntil;
 }
 function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
   return outcomes.map((outcome) => {
@@ -125,6 +134,65 @@ function recall(
   return cached?.known;
 }
 
+// Reports why this seller dropped out of the selection; a request the caller cancelled is not a seller
+// failure.
+function failureReporter(
+  dependencies: VerifiedSelectionDependencies,
+  seller: StaticControlSeller,
+  signal?: AbortSignal,
+) {
+  return (
+    phase: SellerFailurePhase,
+    code: SellerFailureCode,
+    retryAt?: number | null,
+  ) => {
+    if (!signal?.aborted)
+      reportSellerFailure(dependencies.onSellerFailure, {
+        nodeId: seller.nodeId,
+        phase,
+        code,
+        ...(retryAt ? { retryAt } : {}),
+      });
+  };
+}
+
+// A seller that could not be reached or verified: its connection, which can take the whole transport idle
+// timeout to close on a seller that stopped answering, closes in the background instead of holding the
+// request (a cancelled request still waits for it, like any native work it started, and a pinned seller's
+// close is awaited so its next connection never races this one for the per-peer limit). Its memory is
+// dropped and it is cooled down; returns when it is tried again.
+function connectFailed(
+  seller: StaticControlSeller,
+  {
+    clients,
+    config,
+    dependencies,
+    now,
+  }: {
+    clients: Map<string, BuyerControlClient>;
+    config: BuyerSelectionConfig;
+    dependencies: VerifiedSelectionDependencies;
+    now: number;
+  },
+  pinned: boolean,
+  signal?: AbortSignal,
+) {
+  const client = clients.get(seller.nodeId);
+  if (client && !signal?.aborted && !pinned) {
+    clients.delete(seller.nodeId);
+    void client.close().catch(() => undefined);
+  }
+  dependencies.snapshots?.drop(seller.nodeId);
+  return recordQuote(
+    dependencies.stats,
+    seller.nodeId,
+    false,
+    0,
+    now,
+    backoffFor(dependencies.backoff, config, seller.nodeId, signal),
+  );
+}
+
 export async function refreshSnapshots(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
@@ -142,15 +210,7 @@ export async function refreshSnapshots(
         const pinned = seller.nodeId === config.pinnedNodeId;
         if (!pinned && coolingPastSnapshot(seller, dependencies, now()))
           return undefined;
-        // A request the caller cancelled is not a seller failure.
-        const failed = (phase: SellerFailurePhase, code: SellerFailureCode) => {
-          if (!signal?.aborted)
-            reportSellerFailure(dependencies.onSellerFailure, {
-              nodeId: seller.nodeId,
-              phase,
-              code,
-            });
-        };
+        const failed = failureReporter(dependencies, seller, signal);
         try {
           if (
             dependencies.verifyIdentity &&
@@ -193,19 +253,17 @@ export async function refreshSnapshots(
             ].some((code) => error.code === code)
           )
             throw error;
-          // A connection to a seller that stopped answering can take the whole transport idle timeout to
-          // close; it closes in the background instead of holding this request. A cancelled request
-          // still waits for it, like any native work it started.
-          // A pinned seller is asked again on the next request, so its close is still awaited: a new
-          // connection never races one still closing for the seller's per-peer limit.
-          const client = clients.get(seller.nodeId);
-          if (client && !signal?.aborted && !pinned) {
-            clients.delete(seller.nodeId);
-            void client.close().catch(() => undefined);
-          }
-          dependencies.snapshots?.drop(seller.nodeId);
-          recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
-          failed(SELLER_FAILURE_PHASES.CONNECT, sellerFailureCode(error));
+          const retryAt = connectFailed(
+            seller,
+            { clients, config, dependencies, now: now() },
+            pinned,
+            signal,
+          );
+          failed(
+            SELLER_FAILURE_PHASES.CONNECT,
+            sellerFailureCode(error),
+            retryAt,
+          );
           return undefined;
         }
       }),

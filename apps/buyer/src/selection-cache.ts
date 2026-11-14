@@ -5,6 +5,7 @@ import type { KnownSeller } from '@gyblos/core/seller-selection';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 
 import { BUYER_SELECTION } from './constants';
+import { createSellerBackoff, type SellerBackoff } from './selection-backoff';
 import type { StaticControlSeller } from './selection-config';
 
 export interface SnapshotCache {
@@ -68,13 +69,15 @@ export function createSnapshotCache(): SnapshotCache {
   };
 }
 
-// Work a free buyer remembers for its lifetime: the verified snapshots of its sellers. Identity checks are
+// Work a free buyer remembers for its lifetime: the verified snapshots of its sellers, and how many times
+// in a row each one failed (for longer cooldowns). Identity checks are
 // not remembered: a revoked seller is refused on the very next request.
-export function rememberedWork<Options extends { snapshots?: SnapshotCache }>(
-  options: Options,
-) {
+export function rememberedWork<
+  Options extends { snapshots?: SnapshotCache; backoff?: SellerBackoff },
+>(options: Options) {
   return {
     ...options,
     snapshots: options.snapshots ?? createSnapshotCache(),
+    backoff: options.backoff ?? createSellerBackoff(),
   };
 }
