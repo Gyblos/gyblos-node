@@ -6,6 +6,9 @@ import {
   type PublicRecordKind,
 } from '@gyblos/protocol/constants';
 
+import { INDEX_ERRORS } from './constants';
+import { indexFail } from './errors';
+
 // The NodeId's current catalog; `json` is its signed envelope exactly as published.
 export interface StoredCatalog {
   sequence: number;
@@ -21,6 +24,8 @@ export interface NodeState {
 }
 
 export interface StoredEntry {
+  // Admission is checked with the write, never against an earlier storage snapshot.
+  admission: { now: number; maxNodes: number };
   kind: PublicRecordKind;
   nodeId: string;
   owner: string;
@@ -63,8 +68,6 @@ export interface ModelRow {
 
 export interface DiscoveryStorage {
   state(nodeId: string): Promise<NodeState | null>;
-  // Number of tracked NodeIds (high-water marks), expired records included until pruned.
-  nodeCount(): Promise<number>;
   // Drops expired records; keeps high-water marks until their retainUntil.
   prune(now: number): Promise<void>;
   // Atomic: true when applied, false when the sequence is not above the high-water mark.
@@ -181,6 +184,24 @@ function listMemory(tables: MemoryTables, query: SellerQuery): SellerRow[] {
   return rows.sort(compareRows).slice(0, limit);
 }
 
+function memoryState(
+  node: MemoryNode,
+  catalog: MemoryRecord | undefined,
+  withdrawn: boolean,
+): NodeState {
+  return {
+    lastSequence: node.lastSequence,
+    catalog: catalog
+      ? {
+          sequence: catalog.sequence,
+          expiresAt: catalog.expiresAt,
+          withdrawn,
+          json: catalog.json,
+        }
+      : null,
+  };
+}
+
 // Same semantics as the D1 adapter, in process memory.
 export function createMemoryStorage(): DiscoveryStorage {
   const nodes = new Map<string, MemoryNode>();
@@ -210,31 +231,40 @@ export function createMemoryStorage(): DiscoveryStorage {
       const node = nodes.get(nodeId);
       if (!node) return null;
       const catalog = catalogs.get(nodeId);
-      return {
-        lastSequence: node.lastSequence,
-        catalog: catalog
-          ? {
-              sequence: catalog.sequence,
-              expiresAt: catalog.expiresAt,
-              withdrawn: withdrawn(nodeId, catalog.digest),
-              json: catalog.json,
-            }
-          : null,
-      };
-    },
-    async nodeCount() {
-      return nodes.size;
+      return memoryState(
+        node,
+        catalog,
+        !!catalog && withdrawn(nodeId, catalog.digest),
+      );
     },
     async prune(now) {
       dropExpired(presence, now);
       dropExpired(catalogs, now);
-      dropExpired(withdrawals, now);
+      for (const [nodeId, withdrawal] of withdrawals) {
+        const catalog = catalogs.get(nodeId);
+        if (
+          withdrawal.expiresAt <= now &&
+          catalog?.digest !== withdrawal.digest
+        )
+          withdrawals.delete(nodeId);
+      }
       for (const [id, node] of nodes)
         if (node.retainUntil <= now) nodes.delete(id);
     },
     async put(entry) {
       const node = nodes.get(entry.nodeId);
       if (node && node.lastSequence >= entry.sequence) return false;
+      const catalog = catalogs.get(entry.nodeId);
+      if (
+        entry.kind !== PUBLIC_RECORD_KINDS.CATALOG &&
+        (!catalog ||
+          catalog.digest !== entry.digest ||
+          !live(catalog, entry.admission.now) ||
+          withdrawn(entry.nodeId, entry.digest))
+      )
+        indexFail(INDEX_ERRORS.UNKNOWN_CATALOG);
+      if (!node && nodes.size >= entry.admission.maxNodes)
+        indexFail(INDEX_ERRORS.RATE_LIMITED);
       nodes.set(entry.nodeId, {
         lastSequence: entry.sequence,
         retainUntil: Math.max(node?.retainUntil ?? 0, entry.retainUntil),

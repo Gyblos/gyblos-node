@@ -5,6 +5,8 @@ import {
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 
+import { INDEX_ERRORS } from './constants';
+import { indexFail } from './errors';
 import type {
   DiscoveryStorage,
   NodeState,
@@ -81,19 +83,24 @@ const MODELS_SQL = `SELECT m.model_id AS modelId, count(DISTINCT m.node_id) AS s
 const COUNT_SQL = `SELECT (SELECT count(*) FROM discovery_catalogs WHERE expires_at > ?1)
   + (SELECT count(*) FROM discovery_presence WHERE expires_at > ?1)
   + (SELECT count(*) FROM discovery_withdrawals WHERE expires_at > ?1) AS n`;
-const UPSERT_NODE_SQL = `INSERT INTO discovery_nodes (node_id, last_sequence, last_signature, retain_until) VALUES (?1, ?2, ?3, ?4)
+const UPSERT_NODE_SQL = `INSERT INTO discovery_nodes (node_id, last_sequence, last_signature, retain_until)
+SELECT ?1, ?2, ?3, ?4 WHERE
+  (EXISTS (SELECT 1 FROM discovery_nodes WHERE node_id = ?1) OR (SELECT count(*) FROM discovery_nodes) < ?5)
+  AND (?6 IS NULL OR EXISTS (SELECT 1 FROM discovery_catalogs c WHERE c.node_id = ?1 AND c.digest = ?6
+    AND c.issued_at <= ?7 AND c.expires_at > ?8
+    AND NOT EXISTS (SELECT 1 FROM discovery_withdrawals w WHERE w.node_id = c.node_id AND w.catalog_digest = c.digest)))
 ON CONFLICT (node_id) DO UPDATE SET last_sequence = excluded.last_sequence, last_signature = excluded.last_signature,
 retain_until = max(discovery_nodes.retain_until, excluded.retain_until) WHERE excluded.last_sequence > discovery_nodes.last_sequence`;
 // Every later statement of a put applies only if this batch's upsert won the high-water mark.
 const GUARD =
   'EXISTS (SELECT 1 FROM discovery_nodes WHERE node_id = ?1 AND last_sequence = ?2 AND last_signature = ?3)';
-// Models go by key before their catalogs. A withdrawal never outlives its catalog and
-// retain_until exceeds every expiry, so expiry alone drops it. Each DELETE is index-driven.
+// Models go by key before their catalogs. An expired withdrawal remains a tombstone while
+// its referenced catalog is live. High-water retention is independent. Deletes use indexes.
 const PRUNE_SQL = [
   'DELETE FROM discovery_presence WHERE expires_at <= ?1',
   'DELETE FROM discovery_catalog_models WHERE node_id IN (SELECT node_id FROM discovery_catalogs WHERE expires_at <= ?1)',
   'DELETE FROM discovery_catalogs WHERE expires_at <= ?1',
-  'DELETE FROM discovery_withdrawals WHERE expires_at <= ?1',
+  'DELETE FROM discovery_withdrawals WHERE expires_at <= ?1 AND NOT EXISTS (SELECT 1 FROM discovery_catalogs c WHERE c.node_id = discovery_withdrawals.node_id AND c.digest = discovery_withdrawals.catalog_digest AND c.expires_at > ?1)',
   'DELETE FROM discovery_nodes WHERE retain_until <= ?1',
 ];
 
@@ -189,22 +196,33 @@ export function createD1Storage(db: D1Database): DiscoveryStorage {
       const row = await db.prepare(STATE_SQL).bind(nodeId).first();
       return row ? nodeState(row) : null;
     },
-    async nodeCount() {
-      const row = await db
-        .prepare('SELECT count(*) AS n FROM discovery_nodes')
-        .first();
-      return row ? integer(row.n) : 0;
-    },
     async prune(now) {
       await db.batch(PRUNE_SQL.map((sql) => db.prepare(sql).bind(now)));
     },
     async put(entry) {
       const upsert = db
         .prepare(UPSERT_NODE_SQL)
-        .bind(entry.nodeId, entry.sequence, entry.signature, entry.retainUntil);
+        .bind(
+          entry.nodeId,
+          entry.sequence,
+          entry.signature,
+          entry.retainUntil,
+          entry.admission.maxNodes,
+          entry.kind === PUBLIC_RECORD_KINDS.CATALOG ? null : entry.digest,
+          entry.admission.now + CONTROL_LIMITS.clockSkewMs,
+          entry.admission.now,
+        );
       // The guard sees the upsert result because the batch is one transaction.
       const [result] = await db.batch([upsert, ...kindStatements(db, entry)]);
-      return result?.meta.changes === 1;
+      if (result?.meta.changes === 1) return true;
+      const current = await db.prepare(STATE_SQL).bind(entry.nodeId).first();
+      if (current && integer(current.lastSequence) >= entry.sequence)
+        return false;
+      return indexFail(
+        entry.kind === PUBLIC_RECORD_KINDS.CATALOG
+          ? INDEX_ERRORS.RATE_LIMITED
+          : INDEX_ERRORS.UNKNOWN_CATALOG,
+      );
     },
     async list({ model, now, limit, after }) {
       const { results } = await db
