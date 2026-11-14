@@ -86,9 +86,11 @@ void test('free path without a routed model keeps the initial selection', async 
 void test('quote path: UNSERVED names the requested model', async (t) => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-unserved-'));
   const previous = process.env.GYBLOS_HOME;
+  let close = async () => {};
   process.env.GYBLOS_HOME = home;
   await mkdir(join(home, 'buyer'), { recursive: true, mode: 0o700 });
   t.after(async () => {
+    await close();
     if (previous === undefined) delete process.env.GYBLOS_HOME;
     else process.env.GYBLOS_HOME = previous;
     await rm(home, { recursive: true, force: true });
@@ -109,7 +111,7 @@ void test('quote path: UNSERVED names the requested model', async (t) => {
     dependencies: { telemetry },
   } as unknown as Parameters<BuyerExecutionFactory>[0];
   const runtime = await quoteBuyerExecution({})(context);
-  t.after(() => runtime.close());
+  close = () => runtime.close();
   await assert.rejects(
     runtime.execute(input, AbortSignal.timeout(5000), undefined, ASKED),
   );

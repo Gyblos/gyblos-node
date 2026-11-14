@@ -46,10 +46,16 @@ function payment(value: unknown, verdict: PaidVerdict) {
     'feeAtomic',
     'refundedAtomic',
     'recorded',
+    ...(verdict === PAID_VERDICTS.SETTLED ? ['transaction'] : []),
   ]);
   assert.equal(row.verdict, verdict);
   assert.equal(row.maxAtomic, PAID_ACCEPTANCE.maxAtomic);
   assert.equal(row.recorded, verdict !== PAID_VERDICTS.SETTLED);
+  if (verdict === PAID_VERDICTS.SETTLED)
+    assert.ok(
+      typeof row.transaction === 'string' && row.transaction.length > 0,
+    );
+  else assert.equal(row.transaction, undefined);
 }
 export function assertPaidJsonAnswer(body: string, verdict: PaidVerdict) {
   const row = controlObject(JSON.parse(body), [

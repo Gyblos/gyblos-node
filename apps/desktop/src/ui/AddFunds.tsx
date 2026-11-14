@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { prepareTopUp, TOP_UP_STATUS, type TopUpStatus } from './add-funds';
 import { BUTTON_VARIANT, TOP_UP_AMOUNTS } from './constants';
+import { FormField, FormInput } from './Form';
 import { Button } from './UI';
 import { useDesktopWallet } from './WalletState';
 
@@ -34,16 +35,14 @@ export function AddFunds({ onBackup }: { onBackup: () => void }) {
         setStatus(prepareTopUp(amount, wallet));
       }}
     >
-      <label className="field-label" htmlFor="top-up-amount">
-        Amount (USDC)
-        <input
+      <FormField htmlFor="top-up-amount" label="Amount (USDC)">
+        <FormInput
           id="top-up-amount"
-          className="full-input"
           inputMode="decimal"
           value={amount}
           onChange={(event) => updateAmount(event.target.value)}
         />
-      </label>
+      </FormField>
       <div
         className="ui-segmented top-up-amounts"
         role="group"

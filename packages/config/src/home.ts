@@ -1,5 +1,6 @@
 // Owns the local data layout: the product home (one directory per role plus shared public artifacts),
 // the separate lab home and the legacy paths they replace. Pure path computation; never touches files.
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -45,6 +46,8 @@ export const HOME_FILES = {
 export const ROLE_FILES = {
   roleConfig: 'role.json',
   buyerSelection: 'selection.json',
+  buyerApiKeys: 'api-keys.json',
+  buyerApiKeysLock: 'api-keys.lock',
   buyerInitLock: 'init.lock',
   nodeKey: 'node.key',
   trust: 'trust.json',
@@ -238,6 +241,69 @@ export function paymentPathsIn(environment: HomeEnvironment, role: HomeRole) {
   };
 }
 
+// Explicit, isolated sandbox directory; never shares a journal with the chain payment adapter.
+export function paypalSandboxPaths(root: string) {
+  return {
+    directory: root,
+    state: join(root, 'paypal-sandbox-v1.json'),
+    lock: join(root, 'paypal-sandbox-v1.lock'),
+    reviewDirectory: join(root, 'paypal-sandbox-reviews-v1'),
+  };
+}
+export function paypalSandboxReviewPaths(root: string, requestId: string) {
+  const digest = createHash('sha256').update(requestId).digest('hex');
+  const directory = paypalSandboxPaths(root).reviewDirectory;
+  return {
+    decision: join(directory, `${digest}-decision.json`),
+    outcome: join(directory, `${digest}-outcome.json`),
+  };
+}
+
+export function paypalSandboxVoidExceptionPath(
+  root: string,
+  requestId: string,
+) {
+  const digest = createHash('sha256').update(requestId).digest('hex');
+  return join(
+    paypalSandboxPaths(root).reviewDirectory,
+    `${digest}-void-sandbox-exception.json`,
+  );
+}
+
+// Separate from payment journals: private, descriptive desktop history only.
+export const DESKTOP_ACTIVITY_FILES = {
+  state: 'desktop-activity-v1.json',
+  lock: 'desktop-activity-v1.lock',
+} as const;
+export function desktopActivityPaths(sandboxDirectory: string) {
+  return {
+    state: join(sandboxDirectory, DESKTOP_ACTIVITY_FILES.state),
+    lock: join(sandboxDirectory, DESKTOP_ACTIVITY_FILES.lock),
+  };
+}
+
+// Conversation files live in the persistent desktop profile, outside disposable Chromium sessions.
+export const DESKTOP_CHAT_FILES = {
+  directory: 'conversations',
+  state: 'conversations-v1.json',
+  lock: 'conversations-v1.lock',
+} as const;
+export function desktopChatPaths(profile: string) {
+  const directory = join(profile, DESKTOP_CHAT_FILES.directory);
+  return {
+    directory,
+    state: join(directory, DESKTOP_CHAT_FILES.state),
+    lock: join(directory, DESKTOP_CHAT_FILES.lock),
+  };
+}
+// Separate desktop chat permission and confirmed payment references, never wallet keys.
+export function desktopX402Paths(profile: string) {
+  return {
+    state: join(profile, 'desktop-x402-v1.json'),
+    lock: join(profile, 'desktop-x402-v1.lock'),
+  };
+}
+
 // One bounded reusable channel journal per role; no prompts, answers or signing keys.
 export const BATCH_SESSION_FILES = {
   state: 'batch-session-v1.json',
@@ -280,5 +346,12 @@ export function batchPoolChannelPaths(paths: BatchPoolPaths, nodeId: string) {
     directory,
     state: join(directory, BATCH_SESSION_FILES.state),
     lock: join(directory, BATCH_SESSION_FILES.lock),
+  };
+}
+
+export function buyerApiKeyPathsIn(environment: HomeEnvironment) {
+  return {
+    state: rolePathIn(environment, 'buyer', ROLE_FILES.buyerApiKeys),
+    lock: rolePathIn(environment, 'buyer', ROLE_FILES.buyerApiKeysLock),
   };
 }

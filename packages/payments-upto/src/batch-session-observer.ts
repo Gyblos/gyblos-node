@@ -190,6 +190,17 @@ export function batchSessionObserver(options: BatchObserverOptions) {
     terms: structuredClone(options.terms),
   };
   return {
+    async bound(channelId: string) {
+      const current = await context(state);
+      if (
+        channelId !== current.record.channelId ||
+        !(await originalLanded(state, current))
+      )
+        return sessionFail(SESSION_CODES.UNVERIFIED);
+      const found = await channel(state, current);
+      if (!found) return sessionFail(SESSION_CODES.UNVERIFIED);
+      return found.status;
+    },
     async opening(opening: BatchDepositPayload) {
       const current = await context(state);
       if (canonicalJson(current.record.opening) !== canonicalJson(opening))

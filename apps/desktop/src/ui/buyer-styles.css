@@ -1,0 +1,17 @@
+/* Shared buyer layers: foundations first, approved compact design last. */
+@import '../mockup-base.css';
+@import 'motion.css';
+@import 'ui.css';
+@import 'geometry.css';
+@import 'chat.css';
+@import 'activity.css';
+@import 'paypal-agent.css';
+@import 'signal.css';
+@import 'dropdown.css';
+@import 'appearance.css';
+@import 'network-status.css';
+@import 'icon-motion.css';
+@import 'startup-splash.css';
+@import 'buyer-design.css';
+@import 'window-chrome.css';
+@import 'response-metrics.css';

@@ -1,0 +1,1437 @@
+/* Approved buyer interface: shared scale, navigation and financial surfaces. */
+/* Compact interface scale. */
+.desktop-frame {
+  --control-size: 32px;
+  --control-icon: 16px;
+  --ui-font: 14px;
+  --ui-detail: 12px;
+  --row-size: 48px;
+  --shell-header-height: 48px;
+  --shell-control-size: 32px;
+  --page-gutter: clamp(16px, 2vw, 32px);
+  --context-width: 280px;
+  --compact-navigation-width: min(var(--navigation-width), 256px);
+  --navigation-row-height: 36px;
+  --page-title-size: 24px;
+  --section-title-size: 18px;
+  --metric-size: 22px;
+  --reading-size: 14px;
+  --field-padding: 8px;
+}
+.app.desktop-frame {
+  grid-template-columns: var(--compact-navigation-width) 0 minmax(0, 1fr);
+}
+.desktop-frame > .sidebar {
+  width: var(--compact-navigation-width);
+  min-width: var(--compact-navigation-width);
+}
+.desktop-frame > .buyer-sidebar {
+  padding-inline: var(--space-3);
+  gap: var(--space-3);
+}
+.desktop-frame .ui-sidebar-brand strong {
+  font-size: 20px;
+}
+.desktop-frame .ui-sidebar-brand > img {
+  width: 24px;
+  height: 24px;
+}
+.desktop-frame .ui-nav-row {
+  height: var(--navigation-row-height);
+  min-height: var(--navigation-row-height);
+  padding-inline: var(--space-2);
+  gap: var(--space-2);
+  font-size: var(--ui-font);
+}
+.desktop-frame .ui-nav-row > svg {
+  width: var(--control-icon);
+  height: var(--control-icon);
+}
+/* Navigation uses its selected surface, without an extra leading marker. */
+.desktop-frame .ui-nav-row[aria-current='page']::before {
+  content: none;
+}
+/* New chat and history live in the shared sidebar at every window width. */
+.desktop-frame .chat-toolbar {
+  display: none;
+}
+.desktop-frame .ui-sidebar-history {
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+}
+.desktop-frame .ui-page-heading {
+  gap: var(--space-2);
+}
+.desktop-frame .ui-page-heading h2 {
+  font-size: var(--page-title-size);
+}
+.desktop-frame .ui-page-heading p,
+.desktop-frame .ui-context-section {
+  font-size: var(--ui-font);
+}
+.desktop-frame .ui-connection-page {
+  gap: var(--section-gap);
+}
+.desktop-frame .ui-connection-entry {
+  gap: var(--space-4);
+  padding-block: var(--space-4);
+}
+.desktop-frame .ui-connection-entry h3,
+.desktop-frame .ui-separated-section h3,
+.desktop-frame .ui-context-heading h2 {
+  font-size: var(--section-title-size);
+}
+.desktop-frame .ui-entry-art {
+  flex-basis: 80px;
+}
+.desktop-frame .ui-separated-section {
+  padding-top: var(--space-4);
+}
+.desktop-frame .ui-choice-grid--compact .ui-choice {
+  min-height: 96px;
+  padding: var(--space-2);
+}
+.desktop-frame .ui-choice-grid--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@container (max-width: 600px) {
+  .desktop-frame .ui-choice-grid--four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 300px) {
+  .desktop-frame .ui-choice-grid--four {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.desktop-frame .ui-choice-grid--compact .ui-icon-tile {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+.desktop-frame .ui-choice-grid--compact .ui-icon-tile :is(.model-artwork, svg) {
+  width: 24px;
+  height: 24px;
+}
+.desktop-frame .ui-copy-field {
+  padding: var(--space-1);
+}
+.desktop-frame .ui-copy-field .ui-input {
+  font-size: 13px;
+}
+.desktop-frame .ui-context-panel {
+  padding: var(--space-4);
+}
+.desktop-frame .ui-context-section {
+  padding-block: var(--space-4);
+}
+/* Shared primitives cover Models, Applications, Activity, Payments and Settings. */
+.desktop-frame .ui-section-title h2 {
+  font-size: var(--section-title-size);
+  line-height: 1.35;
+}
+.desktop-frame .ui-stat > strong,
+.desktop-frame .payment-session-stats .ui-stat strong,
+.desktop-frame .wallet-balance strong,
+.desktop-frame .balance-display > strong {
+  font-size: var(--metric-size);
+  line-height: 1.3;
+}
+.desktop-frame .ui-stat {
+  min-height: 80px;
+}
+.desktop-frame .composer textarea,
+.desktop-frame .chat-user p,
+.desktop-frame .reply-text {
+  font-size: var(--reading-size);
+}
+.desktop-frame .reply-text h3 {
+  font-size: var(--section-title-size);
+}
+.desktop-frame .composer-note {
+  font-size: var(--ui-detail);
+}
+.desktop-frame .ui-data-table th,
+.desktop-frame .ui-data-table td {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--ui-font);
+}
+@container (max-width: 700px) {
+  .desktop-frame .ui-data-table th,
+  .desktop-frame .ui-data-table td {
+    padding: 0;
+  }
+}
+@media (max-width: 899px) {
+  .app.desktop-frame {
+    grid-template-columns: 0 0 minmax(0, 1fr);
+  }
+}
+
+/* Shared compact buyer workspace. */
+.desktop-frame {
+  --compact-navigation-width: min(var(--navigation-width), 224px);
+  --shell-header-height: 40px;
+  --navigation-row-height: 32px;
+  --page-gutter: 24px;
+  --page-max-width: 1120px;
+  --context-width: 260px;
+  --reading-column-width: 760px;
+  --navigation-rail-width: 56px;
+}
+.desktop-frame .ui-sidebar-brand strong {
+  font-size: 18px;
+}
+.desktop-frame .ui-sidebar-brand > img {
+  width: 20px;
+  height: 20px;
+}
+/* One centered reading column aligns messages, the composer and API setup. */
+.desktop-frame :is(.chat-transcript, .composer-wrap) {
+  width: 100%;
+  max-width: var(--reading-column-width);
+  margin-inline: auto;
+}
+.desktop-frame .ui-connection-page {
+  width: 100%;
+  max-width: var(--reading-column-width);
+  margin-inline: auto;
+}
+/* Neutral selections and information; existing focus, primary and status colors stay intact. */
+.desktop-frame .ui-choice:hover {
+  border-color: var(--muted);
+}
+.desktop-frame .ui-choice:has(.ui-choice-input:checked) {
+  border-color: color-mix(in srgb, var(--muted) 65%, var(--line));
+  background: var(--raised);
+}
+.desktop-frame :is(.ui-badge, .ui-selection) {
+  color: var(--muted);
+}
+.desktop-frame .ui-badge {
+  background: var(--raised);
+}
+/* Shared copy fields: the input owns its border; the action sits beside it. */
+.desktop-frame .ui-copy-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.desktop-frame .ui-copy-field .ui-input {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-size);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--raised);
+}
+.desktop-frame .ui-copy-field .ui-input:focus-visible {
+  border-color: var(--focus);
+}
+@media (max-width: 899px) {
+  .desktop-frame {
+    --page-gutter: 16px;
+  }
+}
+/* Navigation and context are layout columns, including narrow windows. */
+.app.desktop-frame {
+  grid-template-columns: var(--compact-navigation-width) 0 minmax(0, 1fr);
+}
+.desktop-frame > .buyer-sidebar {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  min-width: 0;
+  box-shadow: none;
+}
+.desktop-frame .ui-workspace[data-context-open='true'] {
+  grid-template-columns: minmax(0, 1fr) min(var(--context-width), 40%);
+}
+.desktop-frame .ui-context-panel {
+  position: static;
+  inset: auto;
+  width: auto;
+  z-index: auto;
+  box-shadow: none;
+}
+.desktop-frame .ui-context-heading h2 {
+  min-width: 0;
+  font-size: var(--ui-font);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+/* A constant second track makes the inspector reversible without an overlay. */
+.desktop-frame .ui-motion-workspace {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  container-type: inline-size;
+  --motion-context-width: min(var(--context-width), 40cqi);
+}
+.desktop-frame .ui-motion-workspace > .ui-workspace {
+  grid-template-columns: minmax(0, 1fr) 0px;
+  overflow: hidden;
+}
+.desktop-frame .ui-motion-workspace[data-context-open='true'] > .ui-workspace {
+  grid-template-columns: minmax(0, 1fr) var(--motion-context-width);
+}
+.desktop-frame .ui-motion-workspace > .ui-workspace > .ui-context-panel {
+  box-sizing: border-box;
+  width: var(--motion-context-width);
+  max-width: none;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.desktop-frame
+  .ui-motion-workspace[data-context-open='true']
+  > .ui-workspace
+  > .ui-context-panel {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .desktop-frame .ui-motion-workspace > .ui-workspace {
+    transition: grid-template-columns var(--motion-push) var(--motion-push-ease);
+  }
+  .desktop-frame .ui-motion-workspace .ui-context-panel {
+    transition:
+      opacity var(--motion-push) var(--motion-push-ease),
+      visibility 0s var(--motion-push);
+  }
+  .desktop-frame
+    .ui-motion-workspace[data-context-open='true']
+    .ui-context-panel {
+    transition:
+      opacity var(--motion-push) var(--motion-push-ease),
+      visibility 0s;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-frame .ui-motion-workspace > .ui-workspace,
+  .desktop-frame .ui-motion-workspace .ui-context-panel {
+    transition: none;
+  }
+}
+/* The same navigation becomes an icon rail when folded, including narrow windows. */
+.app.desktop-frame.sidebar-collapsed {
+  grid-template-columns: var(--navigation-rail-width) 0 minmax(0, 1fr);
+}
+.desktop-frame.sidebar-collapsed > .buyer-sidebar {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  min-width: 0;
+  opacity: 1;
+  visibility: visible;
+  translate: none;
+  pointer-events: auto;
+  box-shadow: none;
+}
+/* Keep the rail anatomy stable while the shared grid track retracts. */
+.desktop-frame .ui-sidebar-brand {
+  position: relative;
+  min-width: 0;
+}
+.desktop-frame .ui-sidebar-brand > :is(img, strong) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.desktop-frame .ui-sidebar-brand .ui-icon-button {
+  position: absolute;
+  inset-inline-end: 0;
+  margin-inline-start: 0;
+}
+.desktop-frame .ui-nav-row {
+  justify-content: flex-start;
+  padding-inline: var(--space-2);
+  gap: var(--space-2);
+}
+.desktop-frame .ui-sidebar-history {
+  min-inline-size: calc(var(--compact-navigation-width) - var(--space-3) * 2);
+}
+.desktop-frame
+  :is(
+    .ui-sidebar-brand > img,
+    .ui-sidebar-brand > strong,
+    .ui-nav-row > span,
+    .ui-sidebar-history
+  ) {
+  opacity: 1;
+  visibility: visible;
+  translate: none;
+}
+.desktop-frame.sidebar-collapsed
+  :is(
+    .ui-sidebar-brand > img,
+    .ui-sidebar-brand > strong,
+    .ui-nav-row > span,
+    .ui-sidebar-history
+  ) {
+  opacity: 0;
+  visibility: hidden;
+  translate: -6px 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .app.desktop-frame {
+    transition: grid-template-columns var(--motion-push) var(--motion-push-ease);
+  }
+  .desktop-frame
+    :is(
+      .ui-sidebar-brand > img,
+      .ui-sidebar-brand > strong,
+      .ui-nav-row > span,
+      .ui-sidebar-history
+    ) {
+    transition:
+      opacity var(--motion-push) var(--motion-push-ease),
+      translate var(--motion-push) var(--motion-push-ease),
+      visibility 0s;
+  }
+  .desktop-frame.sidebar-collapsed
+    :is(
+      .ui-sidebar-brand > img,
+      .ui-sidebar-brand > strong,
+      .ui-nav-row > span,
+      .ui-sidebar-history
+    ) {
+    transition:
+      opacity var(--motion-push) var(--motion-push-ease),
+      translate var(--motion-push) var(--motion-push-ease),
+      visibility 0s var(--motion-push);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app.desktop-frame,
+  .desktop-frame
+    :is(
+      .ui-sidebar-brand > img,
+      .ui-sidebar-brand > strong,
+      .ui-nav-row > span,
+      .ui-sidebar-history
+    ) {
+    transition: none;
+  }
+}
+.desktop-frame.sidebar-collapsed .ui-sidebar-footer {
+  margin-top: auto;
+}
+.desktop-frame.sidebar-collapsed
+  :is(
+    .navigation-resizer,
+    .topbar .sidebar-toggle,
+    .topbar .sidebar-toggle + .ui-tooltip
+  ) {
+  display: none;
+}
+
+/* Buyer surfaces share the same composition and controls. */
+.desktop-frame {
+  --control-border: color-mix(in srgb, var(--muted) 25%, var(--line));
+  --control-border-hover: color-mix(in srgb, var(--muted) 65%, var(--line));
+  --section-gap: 24px;
+  --control-size: 32px;
+  --control-icon: 16px;
+  --metric-compact-size: 18px;
+}
+/* Outline only otherwise-transparent actions. Shell navigation keeps its original style. */
+.desktop-frame
+  .ui-button--ghost:not(
+    :where(
+      #app-sidebar *,
+      .topbar .ui-icon-button,
+      .ui-context-heading .ui-icon-button,
+      .modal > header .ui-icon-button,
+      .composer .ui-menu-trigger,
+      .chat-user-actions *,
+      .answer-actions *,
+      .app-footer *,
+      [role='switch'],
+      [aria-selected='true'],
+      [aria-pressed='true']
+    )
+  ) {
+  border: 1px solid var(--control-border);
+  background: var(--panel);
+}
+.desktop-frame
+  .ui-button--ghost:not(
+    :where(
+      #app-sidebar *,
+      .topbar .ui-icon-button,
+      .ui-context-heading .ui-icon-button,
+      .modal > header .ui-icon-button,
+      .composer .ui-menu-trigger,
+      .chat-user-actions *,
+      .answer-actions *,
+      .app-footer *,
+      [role='switch'],
+      [aria-selected='true'],
+      [aria-pressed='true']
+    )
+  ):hover:not(:disabled) {
+  border-color: var(--control-border-hover);
+  background: var(--raised);
+}
+.desktop-frame
+  .ui-button--ghost:not(:where(#app-sidebar *, .app-footer *)):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.desktop-frame .ui-button {
+  height: var(--control-size);
+  min-height: var(--control-size);
+  padding-inline: var(--space-3);
+  gap: var(--space-2);
+}
+.desktop-frame .ui-icon-button {
+  width: var(--control-size);
+  min-width: var(--control-size);
+  padding-inline: 0;
+}
+.desktop-frame .theme-switch {
+  width: 64px;
+  padding-inline: var(--space-2);
+}
+.desktop-frame .ui-search .ui-icon-button {
+  height: var(--control-size);
+  min-height: var(--control-size);
+  margin-right: 0;
+}
+.desktop-frame .ui-nav-row {
+  padding-inline: var(--space-2);
+}
+.desktop-frame .ui-section-title h2 {
+  font-size: var(--section-title-size);
+  line-height: 1.35;
+}
+/* The body owns its inset. Internal sections add no second page gutter. */
+.desktop-frame .ui-page,
+.desktop-frame .ui-connection-page,
+.desktop-frame .ui-management-review {
+  width: 100%;
+  max-width: var(--page-max-width);
+  margin-inline: auto;
+  min-width: 0;
+}
+.desktop-frame .ui-connection-page {
+  gap: var(--section-gap);
+}
+.desktop-frame .ui-connection-page:focus {
+  outline: none;
+}
+.desktop-frame .ui-copy-field {
+  max-width: var(--reading-column-width);
+}
+.desktop-frame .ui-form {
+  gap: var(--space-4);
+}
+.desktop-frame .ui-form--limited {
+  max-width: 320px;
+}
+.desktop-frame .ui-section {
+  gap: var(--space-4);
+}
+.desktop-frame :is(.ui-toolbar, .ui-form-actions, .ui-inline-actions) {
+  gap: var(--space-2);
+}
+.desktop-frame .ui-toolbar > .ui-search {
+  max-width: none;
+}
+.desktop-frame .ui-help-text {
+  margin: 0;
+}
+.desktop-frame .ui-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-6);
+  padding-block: var(--space-4);
+  margin: 0;
+  border-block: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .ui-facts > div {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.desktop-frame .ui-facts dt {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .ui-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--metric-size);
+  font-weight: 550;
+  line-height: 1.35;
+}
+.desktop-frame .ui-method-tabs {
+  display: flex;
+  gap: var(--space-2);
+}
+.desktop-frame .ui-method-tabs [aria-selected='true'],
+.desktop-frame .ui-inline-actions [aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--raised);
+}
+.desktop-frame .ui-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font-size: var(--ui-font);
+}
+.desktop-frame .ui-list .ui-row:not(button) {
+  padding: var(--space-3) var(--space-4);
+}
+.desktop-frame .applications-grid {
+  margin: 0;
+  gap: var(--space-4);
+}
+.desktop-frame .application-card {
+  gap: var(--space-4);
+}
+.desktop-frame .ui-settings-title > svg {
+  display: none;
+}
+.desktop-frame .ui-data-table th:first-child {
+  width: 24%;
+}
+.desktop-frame .ui-data-table th:last-child {
+  width: 80px;
+}
+.desktop-frame .ui-data-table :is(th, td) {
+  padding: var(--space-4);
+}
+.desktop-frame .ui-data-table th > strong {
+  font-weight: 500;
+}
+@container (max-width:700px) {
+  .desktop-frame .ui-data-table :is(th, td) {
+    padding: 0;
+    width: auto;
+  }
+  .desktop-frame .ui-data-table tbody tr {
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+}
+
+/* Responsive tables keep their action beside the row identity, not on an extra line. */
+@container (max-width:700px) {
+  .desktop-frame .ui-data-table tr:has(td button) > th[scope='row'] {
+    grid-column: 1;
+    width: auto;
+  }
+  .desktop-frame .ui-data-table td:last-child:has(button) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+  }
+  .desktop-frame .ui-data-table td:last-child:has(button) .ui-table-cell-label {
+    display: none;
+  }
+}
+
+/* The workspace owns the full height; system details now live in the sidebar. */
+.app.desktop-frame {
+  grid-template-rows: var(--shell-header-height) minmax(0, 1fr);
+}
+.desktop-frame > .app-footer {
+  display: none;
+}
+.desktop-frame .ui-system-status-host {
+  min-width: 0;
+}
+.desktop-frame .ui-attention-dot {
+  position: absolute;
+  inset-inline-end: var(--space-2);
+  inset-block-start: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-circle);
+  background: var(--warm);
+}
+.desktop-frame .ui-status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding-block: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.desktop-frame .ui-status-item:last-child {
+  border-bottom: 0;
+}
+.desktop-frame .ui-status-item > div {
+  display: grid;
+  gap: var(--space-2);
+}
+/* Financial overview uses the shared sections, fields, cards and table. */
+.desktop-frame .ui-wallet-overview {
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--panel);
+  gap: var(--space-4);
+}
+.desktop-frame .ui-wallet-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.desktop-frame .ui-wallet-amount {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--metric-size);
+  font-weight: 550;
+  line-height: 1.3;
+}
+.desktop-frame .ui-wallet-amount small {
+  font-size: var(--ui-font);
+  color: var(--muted);
+  font-weight: 450;
+}
+.desktop-frame .ui-paypal-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.desktop-frame .ui-paypal-summary-copy {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.desktop-frame .ui-paypal-summary-copy h2 {
+  margin: 0;
+  font-size: var(--ui-font);
+  font-weight: 550;
+}
+.desktop-frame .ui-paypal-summary-copy .ui-status-line {
+  font-size: var(--ui-detail);
+  font-weight: 450;
+}
+.desktop-frame .ui-spending-filters {
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.desktop-frame .ui-spending-filters > .ui-field {
+  flex: 1 1 140px;
+  max-width: 240px;
+  gap: var(--space-1);
+}
+.desktop-frame .ui-spending-filters > .ui-field > span {
+  font-size: var(--ui-detail);
+  color: var(--muted);
+}
+.desktop-frame .ui-spending-filters .ui-menu-trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+.desktop-frame .ui-money-summaries {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-4);
+}
+.desktop-frame .ui-money-summary {
+  min-width: 0;
+}
+.desktop-frame .ui-money-summary h3 {
+  font-size: var(--ui-font);
+  font-weight: 500;
+  margin: var(--space-3) 0 0;
+}
+.desktop-frame .ui-facts--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.desktop-frame .ui-facts--compact dd {
+  font-size: var(--metric-compact-size);
+  overflow-wrap: anywhere;
+}
+.desktop-frame .ui-payment-history {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+@container (max-width:520px) {
+  .desktop-frame .ui-wallet-overview {
+    padding: var(--space-4);
+  }
+  .desktop-frame .ui-paypal-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .desktop-frame .ui-paypal-summary > .ui-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+/* Shared table region: keep tabular structure at every width, scroll it internally. */
+.desktop-frame .ui-section--tight {
+  gap: var(--space-2);
+}
+.desktop-frame .ui-table-region {
+  --table-identity-width: 172px;
+  width: 100%;
+  min-width: 0;
+  overflow: auto;
+  max-height: min(560px, max(240px, calc(100dvh - 320px)));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--bg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) var(--panel);
+  overscroll-behavior: contain;
+}
+.desktop-frame .ui-table-region:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.desktop-frame .ui-table-region .ui-data-table-wrap {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+}
+.desktop-frame .ui-table-region .ui-data-table {
+  min-width: 760px;
+  table-layout: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.desktop-frame .ui-table-region .ui-data-table thead {
+  position: static;
+  display: table-header-group;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+}
+.desktop-frame .ui-table-region .ui-data-table tbody {
+  display: table-row-group;
+}
+.desktop-frame .ui-table-region .ui-data-table tr {
+  display: table-row;
+  padding: 0;
+  border: 0;
+}
+.desktop-frame .ui-table-region .ui-data-table :is(th, td) {
+  display: table-cell;
+  width: auto;
+  padding: var(--space-3) var(--space-4);
+  white-space: nowrap;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+}
+.desktop-frame .ui-table-region .ui-data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+}
+.desktop-frame
+  .ui-table-region
+  .ui-data-table
+  tr:has(td button)
+  > th[scope='row'],
+.desktop-frame .ui-table-region .ui-data-table th:first-child {
+  position: sticky;
+  left: 0;
+  width: var(--table-identity-width);
+  min-width: var(--table-identity-width);
+  z-index: 1;
+  background: var(--bg);
+}
+.desktop-frame .ui-table-region .ui-data-table th:last-child {
+  width: 84px;
+}
+.desktop-frame .ui-table-region .ui-data-table :is(th, td):last-child {
+  text-align: right;
+}
+.desktop-frame .ui-table-region .ui-data-table thead th:first-child {
+  z-index: 3;
+  background: var(--panel);
+}
+.desktop-frame .ui-table-region .ui-data-table thead th:last-child {
+  background: var(--panel);
+}
+.desktop-frame .ui-table-region .ui-data-table .ui-table-cell-label {
+  display: none;
+}
+.desktop-frame .ui-table-region .ui-data-table tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+.desktop-frame .ui-table-scroll-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+/* Pagination stays outside the table scroll area. */
+.desktop-frame .ui-pagination,
+.desktop-frame .ui-pagination-controls,
+.desktop-frame .ui-pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.desktop-frame .ui-pagination {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  font-size: var(--ui-detail);
+  color: var(--muted);
+}
+.desktop-frame .ui-pagination-summary {
+  margin-right: auto;
+}
+.desktop-frame .ui-pagination-pages {
+  gap: var(--space-1);
+}
+.desktop-frame .ui-pagination-pages .ui-button {
+  min-width: var(--control-size);
+  padding-inline: var(--space-2);
+}
+.desktop-frame .ui-pagination-controls .ui-icon-button {
+  width: var(--control-size);
+  padding-inline: 0;
+}
+.desktop-frame .ui-pagination-compact {
+  display: none;
+  white-space: nowrap;
+}
+@container (max-width:600px) {
+  .desktop-frame .ui-pagination-pages {
+    display: none;
+  }
+  .desktop-frame .ui-pagination-compact {
+    display: inline;
+  }
+}
+
+.desktop-frame .ui-attention-dot[data-attention='false'] {
+  background: var(--connected);
+}
+/* Shared, concise loading/empty/error panels across buyer pages. */
+.desktop-frame .ui-state-panel {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--panel);
+}
+.desktop-frame .ui-state-panel h2 {
+  margin: 0;
+  font-size: var(--section-title-size);
+  line-height: 1.35;
+  font-weight: 550;
+}
+.desktop-frame .ui-journey-host {
+  order: -1;
+  display: flex;
+  align-items: center;
+}
+.desktop-frame .ui-journey-host:empty {
+  display: none;
+}
+
+/* Contextual payment setup reuses the shared Button, outside the composer. */
+.ui-chat-payment-next {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-2);
+}
+.ui-chat-payment-next:empty {
+  display: none;
+}
+
+/* Quiet composer controls share one treatment; send/stop keeps its filled action. */
+.desktop-frame .composer {
+  --control-quiet-hover: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+.desktop-frame .composer .ui-menu-trigger {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.desktop-frame
+  .composer
+  .ui-menu-trigger:is(:hover, [aria-expanded='true']):not(:disabled) {
+  border-color: transparent;
+  background: var(--control-quiet-hover);
+}
+.desktop-frame .composer-leading {
+  gap: var(--space-1);
+}
+.desktop-frame .composer .ui-model-trigger {
+  color: var(--ink);
+}
+.desktop-frame .composer .ui-thinking-trigger {
+  gap: var(--space-1);
+  padding-inline: var(--space-2);
+  font-size: var(--ui-font);
+}
+.desktop-frame .composer .ui-thinking-trigger > svg {
+  display: none;
+}
+.desktop-frame .composer .ui-thinking-trigger::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  rotate: 45deg;
+  margin-inline-start: var(--space-1);
+  margin-block-start: -3px;
+}
+.desktop-frame .ui-thinking-menu .dropdown-search {
+  display: none;
+}
+.desktop-frame .ui-thinking-menu .dropdown-copy > small {
+  display: none;
+}
+
+/* A shared select affordance for filter and pagination dropdowns. */
+.desktop-frame .ui-select-trigger::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  rotate: 45deg;
+  margin-inline-start: var(--space-2);
+  margin-block-start: -3px;
+}
+
+/* Financial columns keep dates compact and amounts aligned for comparison. */
+.desktop-frame .ui-transaction-reference {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--ui-detail);
+  white-space: nowrap;
+}
+.desktop-frame .ui-receipt-reference {
+  display: inline-block;
+  white-space: nowrap;
+}
+.desktop-frame .ui-receipt-link {
+  color: var(--blue);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+  border-radius: var(--radius-control);
+}
+.desktop-frame .ui-receipt-link:hover {
+  text-decoration-color: currentColor;
+}
+.desktop-frame .ui-receipt-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+.desktop-frame .ui-facts--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* Shared financial semantics: incoming funds, pending state, failed state.
+   Payment outflows and completed/released authorizations remain neutral. */
+.desktop-frame {
+  --financial-incoming: var(--connected);
+  --financial-pending: var(--warm);
+  --financial-failed: var(--error);
+}
+.desktop-frame.light {
+  --financial-failed: var(--error);
+}
+.desktop-frame .ui-financial-value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .ui-financial-value[data-tone='incoming'] {
+  color: var(--financial-incoming);
+}
+.desktop-frame .ui-financial-value[data-tone='pending'] {
+  color: var(--financial-pending);
+}
+.desktop-frame .ui-financial-value[data-tone='failed'] {
+  color: var(--financial-failed);
+}
+.desktop-frame .ui-payment-history .ui-table-region {
+  --table-identity-width: 104px;
+}
+.desktop-frame .ui-payment-history .ui-data-table :is(th, td):nth-child(4) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.desktop-frame .ui-menu-caption {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--ui-detail);
+  color: var(--muted);
+}
+.desktop-frame .ui-menu-context {
+  font-size: var(--ui-detail);
+  color: var(--muted);
+}
+
+/* Sidebar choreography. Root icons keep their original size and position.
+   Each symbol moves its meaningful pieces; the compiled legacy SVG reset is overridden
+   only inside the sidebar and only when the system allows motion. */
+#app-sidebar svg[data-sidebar-motion] {
+  overflow: visible;
+}
+
+#app-sidebar :is(.sidebar-chat-dot, .sidebar-wallet-coin) {
+  opacity: 0;
+}
+
+#app-sidebar :is(.sidebar-create-horizontal, .sidebar-create-vertical) {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+#app-sidebar .sidebar-tools-part {
+  transform-origin: 64px 192px;
+}
+#app-sidebar .sidebar-settings-part {
+  transform-origin: 128px 128px;
+}
+#app-sidebar .sidebar-wallet-lid {
+  transform-origin: 40px 80px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-create-rest {
+    animation: sidebar-create-rest 600ms linear !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-create-horizontal {
+    animation: sidebar-create-stroke 320ms ease-out both !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-create-vertical {
+    animation: sidebar-create-stroke 320ms 150ms ease-out both !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-link-upper {
+    animation: sidebar-link-upper 620ms cubic-bezier(0.2, 0.7, 0.3, 1) !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-link-lower {
+    animation: sidebar-link-lower 620ms cubic-bezier(0.2, 0.7, 0.3, 1) !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .globe-rest {
+    animation: globe-build-rest 760ms linear !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .globe-trace--outline {
+    animation: globe-build-line 400ms ease-out both !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .globe-trace--latitude {
+    animation: globe-build-line 400ms 130ms ease-out both !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .globe-trace--meridian {
+    animation: globe-build-line 400ms 260ms ease-out both !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-tools-part {
+    animation: sidebar-tool-turn 640ms ease-in-out !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .chart-trace {
+    animation: chart-draw 600ms ease-out !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-wallet-lid {
+    animation: sidebar-wallet-open 700ms ease-in-out !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-wallet-coin {
+    animation: sidebar-wallet-deposit 700ms ease-in-out !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-settings-part {
+    animation: sidebar-gear-adjust 680ms cubic-bezier(0.25, 0.65, 0.3, 1) !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-panel-divider {
+    animation: sidebar-panel-slide 560ms ease-in-out !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-chat-dot-0 {
+    animation: sidebar-chat-type 480ms ease-in-out both !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-chat-dot-1 {
+    animation: sidebar-chat-type 480ms 65ms ease-in-out both !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-chat-dot-2 {
+    animation: sidebar-chat-type 480ms 130ms ease-in-out both !important;
+  }
+
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion]
+    .sidebar-search-part {
+    animation: sidebar-search-scan 620ms ease-in-out !important;
+  }
+}
+
+@keyframes sidebar-create-rest {
+  0%,
+  99% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes sidebar-create-stroke {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sidebar-link-upper {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  32% {
+    transform: translate(20px, -20px);
+  }
+  74% {
+    transform: translate(-3px, 3px);
+  }
+}
+@keyframes sidebar-link-lower {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  32% {
+    transform: translate(-20px, 20px);
+  }
+  74% {
+    transform: translate(3px, -3px);
+  }
+}
+@keyframes sidebar-tool-turn {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  34% {
+    transform: rotate(-18deg);
+  }
+  70% {
+    transform: rotate(8deg);
+  }
+}
+@keyframes sidebar-wallet-open {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  32%,
+  58% {
+    transform: rotate(-16deg);
+  }
+}
+@keyframes sidebar-wallet-deposit {
+  0%,
+  16%,
+  100% {
+    opacity: 0;
+    transform: translateY(-42px);
+  }
+  28% {
+    opacity: 1;
+    transform: translateY(-42px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(36px);
+  }
+  82% {
+    opacity: 0;
+    transform: translateY(52px);
+  }
+}
+@keyframes sidebar-gear-adjust {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  24% {
+    transform: rotate(-12deg);
+  }
+  68% {
+    transform: rotate(42deg);
+  }
+}
+@keyframes sidebar-panel-slide {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  48% {
+    transform: translateX(48px);
+  }
+}
+@keyframes sidebar-chat-type {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-10px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sidebar-search-scan {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  28% {
+    transform: translateX(-12px);
+  }
+  62% {
+    transform: translateX(10px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #app-sidebar svg[data-sidebar-motion],
+  #app-sidebar svg[data-sidebar-motion] * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #app-sidebar
+    .ui-sidebar-motion-control:is(:hover, :focus-visible, :focus-within)
+    > svg[data-sidebar-motion='status']
+    .sidebar-status-scan {
+    animation: sidebar-status-scan 650ms ease-out !important;
+  }
+}
+@keyframes sidebar-status-scan {
+  from {
+    width: 0;
+  }
+  to {
+    width: 256px;
+  }
+}
+
+.ui-sidebar-brand .ui-brand-mark {
+  font-size: 12px;
+  flex: 0 0 18px;
+  margin: 0;
+  color: var(--ink);
+}
+.sidebar-collapsed .ui-brand-mark {
+  width: 0;
+  flex-basis: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* Own-brand controls and generation artwork use the single approved blue family. */
+.desktop-frame .ui-button--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  color: var(--primary-ink);
+}
+.desktop-frame :is(.signal-foil-stop, .signal-trail-stop) {
+  stop-color: var(--accent);
+}
+.desktop-frame :is(.signal-foil-stop, .signal-trail-stop):nth-child(2n) {
+  stop-color: var(--blue);
+}

@@ -1,5 +1,5 @@
 // Quick model selection for chat; the full catalog remains a separate screen.
-import { CaretDown, Check } from '@phosphor-icons/react';
+import { Check } from '@phosphor-icons/react';
 
 import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
 import { Dropdown } from './Dropdown';
@@ -29,6 +29,7 @@ export function ModelDropdown({
   toolbar = false,
   label,
   showBrowse = true,
+  contextLabel,
 }: {
   model: ModelOption;
   models: readonly ModelOption[];
@@ -37,25 +38,27 @@ export function ModelDropdown({
   toolbar?: boolean;
   label?: string;
   showBrowse?: boolean;
+  contextLabel?: string;
 }) {
   const ordered = [model, ...models.filter((item) => item.id !== model.id)];
   return (
     <Dropdown
       searchLabel="Search models"
       label={label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')}
-      className={toolbar ? 'model-picker' : 'composer-model'}
+      className={toolbar ? 'model-picker' : 'ui-model-trigger'}
       trigger={
         <>
           <ModelImage artwork={model.image} name={model.name} />
           {model.name}
-          {model.free ? (
+          {contextLabel ? (
+            <Badge>Local</Badge>
+          ) : model.free ? (
             <Badge>Free</Badge>
           ) : (
             <span className="model-trigger-price" title={priceLabel(model)}>
               ${model.input.toFixed(2)} / ${model.output.toFixed(2)} /M
             </span>
           )}
-          <CaretDown size={12} />
         </>
       }
     >
@@ -76,7 +79,7 @@ export function ModelDropdown({
                 role="menuitemradio"
                 checked={item.id === model.id}
                 label={item.name}
-                detail={modelDetail(item)}
+                detail={contextLabel ?? modelDetail(item)}
                 badge={item.free ? <Badge>Free</Badge> : undefined}
                 leading={<ModelImage artwork={item.image} name={item.name} />}
                 trailing={item.id === model.id && <Check size={16} />}

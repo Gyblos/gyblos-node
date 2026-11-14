@@ -14,11 +14,13 @@ import {
 } from '@gyblos/runtime/private-file';
 
 import { parseRecord } from './batch-session-checks';
+import { withBatchState } from './batch-session-io';
 import type { BatchCommonOptions, BatchRecord } from './batch-session-types';
 
 export async function openBatchStore(
   options: BatchCommonOptions,
   initial: BatchRecord,
+  requireExisting = false,
 ) {
   await ensurePrivateDirectory(options.paths.directory);
   const lock = await acquireProcessLock(options.paths.lock);
@@ -26,10 +28,11 @@ export async function openBatchStore(
   let disposed = false;
   let current: BatchRecord;
   try {
-    const text = await readPrivateFile(
-      options.paths.state,
-      BATCH_SESSION_DEFAULTS.stateBytes,
+    const text = await withBatchState(options.paths, () =>
+      readPrivateFile(options.paths.state, BATCH_SESSION_DEFAULTS.stateBytes),
     );
+    if (requireExisting && text === undefined)
+      sessionFail(SESSION_CODES.UNAVAILABLE);
     current =
       text === undefined
         ? initial
@@ -47,13 +50,21 @@ export async function openBatchStore(
       change(draft);
       const next = parseRecord(structuredClone(draft), options.terms);
       try {
-        await writePrivateFile(
-          options.paths.state,
-          JSON.stringify(next),
-          BATCH_SESSION_DEFAULTS.stateBytes,
+        await withBatchState(options.paths, () =>
+          writePrivateFile(
+            options.paths.state,
+            JSON.stringify(next),
+            BATCH_SESSION_DEFAULTS.stateBytes,
+          ),
         );
         current = next;
-      } catch {
+      } catch (error) {
+        // A full file queue refuses before I/O; it is not an uncertain publication.
+        if (
+          error instanceof PaymentSessionError &&
+          error.code === SESSION_CODES.BUSY
+        )
+          throw error;
         poisoned = true;
         sessionFail(SESSION_CODES.UNAVAILABLE);
       }

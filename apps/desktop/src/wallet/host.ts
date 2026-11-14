@@ -1,7 +1,6 @@
 // Wires the Electron window to the tested automatic wallet session and fixed IPC handlers.
 // File pickers belong to the host; renderer startup never chooses or exports a wallet.
 import {
-  app,
   clipboard,
   dialog,
   ipcMain,
@@ -12,7 +11,6 @@ import {
 import { BACKUP_FLOW } from './backup-flow-model';
 import { WALLET } from './constants';
 import { createWalletHandlers } from './handlers';
-import { waitForWalletBeforeQuit } from './lifecycle';
 import { walletProtection } from './protection';
 import { createDesktopWalletSession } from './session';
 import { unavailableCollection, WALLET_SETTINGS } from './settings-model';
@@ -88,13 +86,8 @@ export function registerDesktopWallet(
   ipcMain.handle(BACKUP_FLOW.CHANNEL, (event, ...args: unknown[]) =>
     handlers.backup(event, args),
   );
-  if (session)
-    app.on(
-      'before-quit',
-      waitForWalletBeforeQuit(
-        () => session.settled(),
-        () => app.quit(),
-      ),
-    );
-  return session?.ready ?? Promise.resolve(unavailableCollection());
+  return {
+    ready: session?.ready ?? Promise.resolve(unavailableCollection()),
+    settled: () => session?.settled() ?? Promise.resolve(),
+  };
 }

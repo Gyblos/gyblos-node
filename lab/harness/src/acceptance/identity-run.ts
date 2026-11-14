@@ -1,5 +1,6 @@
 // Runs the full free path with independent signed synthetic 8004 accounts and durable buyer state.
 // The only external boundary is ephemeral loopback HTTP/Iroh; operational inputs are not accepted.
+import { BUYER_FAILOVER } from '@gyblos/buyer/selection-config';
 import { HTTP_STATUS, SELLER_DISCOVERY } from '@gyblos/config';
 
 import { ACCEPTANCE_INDEX } from './constants';
@@ -61,6 +62,8 @@ async function noPostSendRetry(context: IdentityAcceptanceContext) {
       {
         fault: FREE_ACCEPTANCE_FAULTS.RESPONSE,
         sellers: [context.run, alternate],
+        // This case proves a sent prompt stays on one seller; failover "safe" is proven in free-failover.
+        failover: BUYER_FAILOVER.NEVER,
       },
     );
   } finally {

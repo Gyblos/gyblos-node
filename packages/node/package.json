@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./buyer-api-key-storage": "./src/buyer-api-key-storage.ts",
+    "./buyer-api-keys": "./src/buyer-api-keys.ts",
     "./session-policy": "./src/session-policy.ts",
     "./session-backend": "./src/session-backend.ts",
     "./seller-sessions": "./src/seller-sessions.ts",
@@ -50,6 +52,11 @@
     "./paid-execution": "./src/paid-execution.ts",
     "./policy-x402": "./src/policy-x402.ts",
     "./paid-router": "./src/paid-router.ts",
+    "./paypal-inference": "./src/paypal-inference.ts",
+    "./paypal-session": "./src/paypal-session.ts",
+    "./paypal-agent-gateway": "./src/paypal-agent-gateway.ts",
+    "./paypal-journal": "./src/paypal-journal.ts",
+    "./paypal-startup": "./src/paypal-startup.ts",
     "./paid-retry": "./src/paid-retry.ts",
     "./paid-offers": "./src/paid-offers.ts",
     "./seller-paid": "./src/seller-paid.ts",
@@ -66,6 +73,7 @@
     "./buyer-reconcile": "./src/buyer-reconcile.ts",
     "./buyer-withdraw": "./src/buyer-withdraw.ts",
     "./seller-chain": "./src/seller-chain.ts",
+    "./paypal-payment-reference": "./src/paypal-payment-reference.ts",
     "./seller-registration-state": "./src/seller-registration-state.ts",
     "./seller-registration": "./src/seller-registration.ts",
     "./seller-funds": "./src/seller-funds.ts",
@@ -79,7 +87,9 @@
     "./batch-seller": "./src/batch-seller.ts",
     "./buyer-session-pool": "./src/buyer-session-pool.ts",
     "./buyer-runtime": "./src/buyer-runtime.ts",
-    "./buyer-routing": "./src/buyer-routing.ts"
+    "./buyer-routing": "./src/buyer-routing.ts",
+    "./agent-setup-host": "./src/agent-setup-host.ts",
+    "./agent-setup-constants": "./src/agent-setup-constants.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
@@ -90,6 +100,7 @@
     "@gyblos/engine-openai": "workspace:*",
     "@gyblos/identity": "workspace:*",
     "@gyblos/payments-upto": "workspace:*",
+    "@gyblos/payments-paypal": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",
     "@gyblos/protocol": "workspace:*",
     "@gyblos/runtime": "workspace:*",

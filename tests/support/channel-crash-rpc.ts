@@ -19,12 +19,40 @@ import {
 
 import type { UptoWithdrawRpc } from '@gyblos/payments-upto';
 
-import { CRASH_CALLS, type CrashCall } from './channel-crash-constants';
+import {
+  CRASH_CALLS,
+  CRASH_FAILURE,
+  CRASH_MESSAGES,
+  type CrashCall,
+} from './channel-crash-constants';
 
 export type CrashCallPort = (
   method: CrashCall,
   args: readonly unknown[],
 ) => Promise<unknown>;
+export function childCrashPort(): CrashCallPort {
+  let sequence = 0;
+  const pending = new Map<
+    number,
+    { resolve(value: unknown): void; reject(error: Error): void }
+  >();
+  process.on('message', (raw: unknown) => {
+    const value = crashObject(raw);
+    if (value.kind !== CRASH_MESSAGES.REPLY) return;
+    assert.ok(typeof value.id === 'number' && typeof value.ok === 'boolean');
+    const held = pending.get(value.id);
+    assert.ok(held);
+    pending.delete(value.id);
+    if (value.ok) held.resolve(value.value);
+    else held.reject(new Error(CRASH_FAILURE));
+  });
+  return (method, args) =>
+    new Promise((resolve, reject) => {
+      const id = ++sequence;
+      pending.set(id, { resolve, reject });
+      process.send!({ kind: CRASH_MESSAGES.CALL, id, method, args });
+    });
+}
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

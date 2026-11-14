@@ -1,5 +1,7 @@
-// Injects failures on actual native connections to prove free pre-send failover and post-send stopping.
+// Injects failures on actual native connections to prove free pre-send failover, post-send failover
+// before any text (failover "safe", the default) and post-send stopping (failover "never").
 // The second seller is independently signed, allowlisted only in this in-process index and never paid.
+import { BUYER_FAILOVER } from '@gyblos/buyer/selection-config';
 import { HTTP_STATUS } from '@gyblos/config';
 
 import { acceptanceAssert } from './errors';
@@ -31,10 +33,35 @@ export async function failoverCases(run: AcceptanceSession) {
     }
     await pump(run, 1);
     await pump(second, 1);
+    // The second seller's answer is lost after it generated: "safe" asks the other seller.
+    const safe = await createFreeBuyer(
+      run,
+      [run, second],
+      FREE_ACCEPTANCE_FAULTS.RESPONSE,
+    );
+    try {
+      const generations = safe.generations();
+      const response = await safe.chat();
+      acceptanceAssert(response.status === HTTP_STATUS.ok);
+      acceptanceAssert(
+        safe.dials.length === 2 &&
+          safe.dials[0] !== safe.dials[1] &&
+          safe.selections() === 2,
+      );
+      acceptanceAssert(
+        safe.generations() === generations + 2 && safe.queryGenerations() === 0,
+      );
+    } finally {
+      await safe.close();
+    }
+    await pump(run, 1);
+    await pump(second, 1);
     const after = await createFreeBuyer(
       run,
       [run, second],
       FREE_ACCEPTANCE_FAULTS.RESPONSE,
+      undefined,
+      BUYER_FAILOVER.NEVER,
     );
     try {
       const generations = after.generations();

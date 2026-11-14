@@ -1,0 +1,133 @@
+/* Shared metric anatomy: primary readings, measured proportions and a quiet cost summary. */
+.desktop-frame .ui-metric-summary {
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+}
+.desktop-frame .ui-metric-summary > img {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.desktop-frame .ui-metric-summary > .ui-help-text {
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-frame .ui-metric-summary > .ui-badge {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+.desktop-frame .ui-facts--plain {
+  padding: 0;
+  border: 0;
+  gap: var(--space-4);
+}
+.desktop-frame .ui-metric-grid {
+  padding-block: var(--space-2);
+}
+.desktop-frame .ui-metric-value {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  white-space: nowrap;
+  letter-spacing: -0.025em;
+}
+.desktop-frame .ui-metric-value strong {
+  font-weight: 550;
+}
+.desktop-frame .ui-metric-value > span {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  letter-spacing: 0;
+}
+.desktop-frame .ui-metric-grid > div:first-child strong {
+  font-size: var(--metric-size);
+  font-weight: 600;
+}
+.desktop-frame .ui-token-usage {
+  gap: var(--space-2);
+}
+.desktop-frame .ui-token-usage h3 {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  font-weight: 400;
+  margin: 0;
+}
+.desktop-frame .ui-meter-total {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--ui-detail);
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .ui-meter-total > span {
+  color: var(--muted);
+}
+.desktop-frame .ui-meter-total strong {
+  font-weight: 500;
+}
+.desktop-frame .ui-meter {
+  display: flex;
+  height: 6px;
+  gap: 2px;
+  overflow: hidden;
+  border-radius: var(--radius-badge);
+}
+.desktop-frame .ui-meter > span:first-child {
+  width: var(--meter-share);
+  flex-shrink: 0;
+  background: var(--accent);
+}
+.desktop-frame .ui-meter > span:last-child {
+  flex: 1;
+  background: color-mix(in srgb, var(--accent) 30%, var(--raised));
+}
+.desktop-frame .ui-meter-legend,
+.desktop-frame .ui-meter-legend > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  font-size: var(--ui-detail);
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .ui-meter-legend {
+  justify-content: space-between;
+}
+.desktop-frame .ui-meter-legend dt {
+  color: var(--muted);
+}
+.desktop-frame .ui-meter-legend dd {
+  margin: 0;
+}
+.desktop-frame .ui-cost-summary {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.desktop-frame .ui-metric-money {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .ui-metric-money > span {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .ui-metric-money strong {
+  color: var(--ink);
+  font-size: var(--metric-size);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.desktop-frame .ui-metric-summary > img {
+  width: 20px;
+  height: 20px;
+}
+.desktop-frame .ui-meter[data-measured='false'] > span {
+  background: var(--raised);
+}

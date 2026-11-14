@@ -2,6 +2,10 @@
 export const ROUTES = {
   health: '/health',
   inference: '/v1/chat/completions',
+  agentResponses: '/v1/responses',
+  agentMessages: '/v1/messages',
+  agentBase: '/v1',
+  models: '/v1/models',
   events: '/facilitator/events',
   verifications: '/facilitator/verifications',
   facilitatorDiagnostics: '/facilitator/diagnostics',
@@ -9,6 +13,8 @@ export const ROUTES = {
   supported: '/supported',
   ollamaVersion: '/api/version',
   ollamaTags: '/api/tags',
+  ollamaShow: '/api/show',
+  ollamaChat: '/api/chat',
   ollamaGenerate: '/api/generate',
   inferenceDefinition: 'POST /v1/chat/completions',
 } as const;

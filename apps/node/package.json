@@ -10,6 +10,8 @@
     "./cli-status": "./src/cli-status.ts",
     "./status-system": "./src/status-system.ts",
     "./constants": "./src/constants.ts",
+    "./paypal-demo": "./src/paypal-demo.ts",
+    "./paypal-main": "./src/paypal-main.ts",
     "./daemon": "./src/daemon.ts",
     "./service": "./src/service.ts",
     "./service-environment": "./src/service-environment.ts",
@@ -19,6 +21,7 @@
     "./tokenizer": "./src/tokenizer.ts"
   },
   "dependencies": {
+    "@gyblos/config": "workspace:*",
     "@gyblos/node": "workspace:*",
     "@gyblos/protocol": "workspace:*",
     "@gyblos/runtime": "workspace:*"
