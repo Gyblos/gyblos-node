@@ -7,6 +7,7 @@ import {
   copyFile,
   lstat,
   mkdir,
+  open,
   readdir,
   readFile,
   realpath,
@@ -74,8 +75,9 @@ async function existing(path: string) {
 }
 
 // Writes the tool's file, keeping the first copy of what was there as <file>.before-gyblos (later runs
-// never replace it). For Codex it also writes one profile file per model beside config.toml (files only
-// gyblos writes, so no copy is kept). Every new text is prepared first, so a refused file leaves all of
+// never replace it). Codex also gets one profile per model; stale profiles keep unique recoverable
+// backups, and an observed concurrent edit is restored without overwriting another save. All new text
+// is prepared first, so a refused file leaves all of
 // them as they were. Each file is replaced atomically, but not all of them together: a write failing
 // midway (a full disk, a read-only directory) can leave some updated, and running it again finishes.
 export async function writeAgentFile(
@@ -127,13 +129,10 @@ async function writeAgentFileUnlocked(
         )
       : [];
   await mkdir(dirname(path), { recursive: true });
+  const backup = `${path}${AGENT_SETUP.backupSuffix}`;
   let saved = false;
   if (before !== undefined)
-    saved = await copyFile(
-      path,
-      `${path}.before-gyblos`,
-      constants.COPYFILE_EXCL,
-    ).then(
+    saved = await copyFile(path, backup, constants.COPYFILE_EXCL).then(
       () => true,
       (error: NodeJS.ErrnoException) => {
         if (error.code === 'EEXIST') return false;
@@ -143,7 +142,7 @@ async function writeAgentFileUnlocked(
   await replaced(path, text, before);
   for (const profile of profiles)
     await replaced(profile.file, profile.text, profile.previous);
-  const removed =
+  const stale =
     tool === AGENT_TOOLS.CODEX
       ? await removeStaleProfiles(
           dirname(path),
@@ -153,20 +152,21 @@ async function writeAgentFileUnlocked(
             ),
           ),
         )
-      : [];
+      : { removed: [], backups: [] };
   return {
     path,
-    backup: saved ? `${path}.before-gyblos` : undefined,
+    backup: saved ? backup : undefined,
     ...(profiles.length
       ? { profiles: profiles.map((profile) => profile.file) }
       : {}),
-    ...(removed.length ? { removed } : {}),
+    ...(stale.removed.length ? { removed: stale.removed } : {}),
+    ...(stale.backups.length ? { profileBackups: stale.backups } : {}),
   };
 }
 
 // Profile files an earlier run wrote for models this endpoint no longer serves: a `codex --profile` on
-// one would fail. Only regular files that still carry the managed marker and nothing else are removed;
-// a link or a file someone edited is left alone.
+// one would fail. Known edits and links are left alone; candidates are archived atomically before
+// removal. An editor racing the earlier read cannot lose its bytes to an unchecked unlink.
 function isUneditedProfile(text: string) {
   const marker = text.lastIndexOf(CODEX_MARKS.profileDigest);
   return marker > 0 && codexProfileText(text.slice(0, marker)) === text;
@@ -175,23 +175,55 @@ function isUneditedProfile(text: string) {
 const PROFILE_FILE = /^gyblos(-[A-Za-z0-9_-]+)?\.config\.toml$/;
 async function removeStaleProfiles(directory: string, kept: Set<string>) {
   const removed: string[] = [];
+  const backups: string[] = [];
   for (const name of await readdir(directory)) {
     const file = join(directory, name);
     if (!PROFILE_FILE.test(name)) continue;
     if (!(await lstat(file)).isFile()) continue;
     // Replacement follows an existing target: filesystem identity preserves its actual casing.
     if (kept.has(await realpath(file))) continue;
+    let text: string;
     try {
-      const text = await readFile(file, 'utf8');
+      text = await readFile(file, 'utf8');
       mergedCodexProfile('', text);
       if (!isUneditedProfile(text)) continue;
     } catch {
       continue;
     }
-    await rm(file);
-    removed.push(file);
+    const archived = await archiveProfile(file, text);
+    backups.push(archived.backup);
+    if (archived.removed) removed.push(file);
   }
-  return removed;
+  return { removed, backups };
+}
+
+// Reserve a unique backup before moving the actual pathname, preserving even a racing editor's inode.
+// Backups are retained; a detected edit is copied back only when no newer file occupies its old name.
+async function archiveProfile(file: string, snapshot: string) {
+  const backup = `${file}.${randomUUID()}${AGENT_SETUP.backupSuffix}`;
+  const reservation = await open(backup, 'wx', FILE_MODES.privateFile);
+  await reservation.close();
+  try {
+    await rename(file, backup);
+  } catch (error) {
+    await rm(backup, { force: true });
+    throw error;
+  }
+  if ((await readFile(backup, 'utf8')) !== snapshot) {
+    await copyFile(backup, file, constants.COPYFILE_EXCL).catch(
+      (error: unknown) => {
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          error.code === 'EEXIST'
+        )
+          return;
+        throw error;
+      },
+    );
+    return { backup, removed: false };
+  }
+  return { backup, removed: true };
 }
 
 // The new text goes to a temporary file beside the real target and is renamed over it, so a crash never

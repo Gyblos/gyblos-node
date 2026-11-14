@@ -26,6 +26,7 @@ export const AGENT_SETUP = {
   },
   codexProfileSuffix: '.config.toml',
   codexWriteLock: '.gyblos-config-write.lock',
+  backupSuffix: '.before-gyblos',
 } as const;
 
 export interface AgentModel {

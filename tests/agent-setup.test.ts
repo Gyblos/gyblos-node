@@ -14,7 +14,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import test from 'node:test';
 
 import * as legacy from '@gyblos/buyer/agent-cli';
@@ -339,14 +339,24 @@ void test('profiles of models no longer served are removed, but never an edited 
   assert.deepEqual(result.removed, [
     join(codexHome, 'gyblos-gpt-oss-20b.config.toml'),
   ]);
-  assert.deepEqual((await readdir(codexHome)).sort(), [
-    'config.toml',
-    'config.toml.before-gyblos',
-    'gyblos-link.config.toml',
-    'gyblos-mine.config.toml',
-    'gyblos-qwen3-0-6b.config.toml',
-    'gyblos.config.toml',
-  ]);
+  assert.equal(result.profileBackups?.length, 1);
+  const staleBackup = result.profileBackups![0]!;
+  assert.equal(
+    await readFile(staleBackup, 'utf8'),
+    codexProfiles(ENDPOINT)[2]!.text,
+  );
+  assert.deepEqual(
+    (await readdir(codexHome)).sort(),
+    [
+      'config.toml',
+      'config.toml.before-gyblos',
+      'gyblos-link.config.toml',
+      'gyblos-mine.config.toml',
+      'gyblos-qwen3-0-6b.config.toml',
+      'gyblos.config.toml',
+      basename(staleBackup),
+    ].sort(),
+  );
 });
 
 void test('a Codex profile carries the context size when it is known', () => {

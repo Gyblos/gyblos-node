@@ -86,18 +86,16 @@ export async function main(argv = process.argv.slice(2)) {
     if (values.write && tool === AGENT_TOOLS.CLAUDE_CODE)
       console.log('Claude Code reads these from your shell; nothing to write.');
     if (values.write && tool !== AGENT_TOOLS.CLAUDE_CODE) {
-      const { path, backup, profiles, removed } = await writeAgentFile(
-        tool!,
-        endpoint,
-        homedir(),
-        process.env,
-      );
+      const { path, backup, profiles, removed, profileBackups } =
+        await writeAgentFile(tool!, endpoint, homedir(), process.env);
       console.log(
         backup
           ? `Updated ${path} (previous copy: ${backup}).`
           : `Updated ${path}.`,
       );
       for (const profile of profiles ?? []) console.log(`Wrote ${profile}.`);
+      for (const profile of profileBackups ?? [])
+        console.log(`Saved stale profile backup at ${profile}.`);
       for (const profile of removed ?? [])
         console.log(`Removed ${profile} (a model no longer served).`);
     } else console.log(agentText(tool!, endpoint));
