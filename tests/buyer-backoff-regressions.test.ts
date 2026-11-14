@@ -330,3 +330,54 @@ void test('a cancelled selection discards earlier backoff mutations along with i
     },
   );
 });
+
+void test('a deferred failure report that cancels the caller retains ownership of retiring connections', async (context) => {
+  await isolatedHome(context);
+  const source = await controlFixture(true);
+  const other = await controlFixture(true);
+  const config = configuration(source, other);
+  const caller = new AbortController();
+  let release = () => {};
+  const closing = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let reported = () => {};
+  const cancelled = new Promise<void>((resolve) => {
+    reported = resolve;
+  });
+  const failed = Object.assign(memorySeller(source).client(), {
+    getCatalog: async () => {
+      throw new Error('Synthetic unreachable seller');
+    },
+    close: () => closing,
+  });
+  const alternative = memorySeller(other);
+  let finished = false;
+  const pending = selectVerifiedBuyerQuote(
+    config,
+    {
+      buyer: source.request.params.buyer,
+      stats: new Map<string, LocalSellerStats>(),
+      backoff: createSellerBackoff(),
+      now: source.context.now,
+      random: () => 0,
+      connect: async (seller) =>
+        seller.nodeId === source.catalog.nodeId ? failed : alternative.client(),
+      onSellerFailure: () => {
+        caller.abort();
+        reported();
+      },
+    },
+    caller.signal,
+  ).then(() => {
+    finished = true;
+  });
+  try {
+    await cancelled;
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(finished, false);
+  } finally {
+    release();
+    await pending;
+  }
+});
