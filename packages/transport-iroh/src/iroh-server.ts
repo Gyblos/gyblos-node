@@ -52,6 +52,10 @@ const { streamCloseCode } = HTTP_OVER_IROH;
 const { connectMs, requestMs } = TRANSPORT_TIMEOUTS;
 const REQUEST_BYTES = HTTP_OVER_IROH.bodyBytes + HTTP_OVER_IROH.headerBytes;
 
+function isBatchAlpn(alpn: string) {
+  return alpn === BATCH_CHANNEL.alpn || alpn === SESSION_BLOCKS.alpn;
+}
+
 export function serveIroh(
   endpoint: Endpoint,
   origin: string,
@@ -169,9 +173,10 @@ export function serveIroh(
     connection: Connection,
     signal: AbortSignal,
     peer: string,
-    blocks: boolean,
   ) {
     if (!batchSessions) return;
+    const blocks =
+      Buffer.from(connection.alpn()).toString() === SESSION_BLOCKS.alpn;
     await handleBatchChannelConnection(
       connection,
       batchSessions,
@@ -228,8 +233,7 @@ export function serveIroh(
     const family = connectionFamily(alpn);
     const releasePeer = admission.established(peer, family);
     const releaseQuota = releasePeer
-      ? (alpn === BATCH_CHANNEL.alpn || alpn === SESSION_BLOCKS.alpn) &&
-        batchSessions
+      ? isBatchAlpn(alpn) && batchSessions
         ? limiter.registerQuery(peer, family)
         : limiter.register(peer, family)
       : undefined;
@@ -278,16 +282,8 @@ export function serveIroh(
         );
         return;
       }
-      if (
-        (alpn === BATCH_CHANNEL.alpn || alpn === SESSION_BLOCKS.alpn) &&
-        batchSessions
-      ) {
-        await batchConnection(
-          connection,
-          controller.signal,
-          peer,
-          alpn === SESSION_BLOCKS.alpn,
-        );
+      if (isBatchAlpn(alpn) && batchSessions) {
+        await batchConnection(connection, controller.signal, peer);
         return;
       }
       if (alpn === PAID_STREAM.alpn && paidExecution) {
