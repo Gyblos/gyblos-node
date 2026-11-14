@@ -98,9 +98,8 @@ void test(
     const gate = nativeBatchFinish(3);
     const f = await fixture(() => now, gate.observeSeller);
     const sends = f.financial.vm.sends();
-    const execution = f
-      .buyer()
-      .execute(await f.offers.quote(1), f.offers.input);
+    const execution = (async () =>
+      f.buyer().execute(await f.offers.quote(1), f.offers.input))();
     void execution.catch(() => undefined);
     try {
       await within(gate.finished);
@@ -122,8 +121,11 @@ void test(
       assert.equal(f.financial.vm.sends(), sends + 1);
     } finally {
       gate.release();
-      await execution.catch(() => undefined);
-      await f.close();
+      try {
+        await f.close();
+      } finally {
+        await execution.catch(() => undefined);
+      }
     }
   },
 );
