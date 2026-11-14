@@ -140,7 +140,7 @@ The beta replaces the allowlist with one-use invites (vault
 The index is an untrusted cache. Acceptance proves only that the NodeId key
 signed a record; clients re-verify everything.
 
-- **Fail closed:** without the `DISCOVERY_DB` binding or any of the four
+- **Fail closed:** without the `DISCOVERY_DB` binding or any of the three
   rate-limit bindings, every route answers `503 DISCOVERY_UNAVAILABLE`, as does
   any storage failure. Without a valid publish allowlist, only publishing is
   `503`. Errors are static codes; input is never echoed, and nothing is logged.
