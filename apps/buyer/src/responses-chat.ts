@@ -1,8 +1,10 @@
 // Reads OpenAI's Responses API request, the one Codex CLI sends, into the conversation sellers serve:
 // instructions and leading developer or system messages first, then user and assistant turns, an
 // assistant's function calls grouped into one turn and answered by their outputs. Requests are stateless:
-// every one carries the whole conversation, so a client may switch models between turns. Item and tool
-// types this endpoint cannot serve (reasoning, custom or provider-run tools, images) are refused by name.
+// every one carries the whole conversation, so a client may switch models between turns. Records no seller
+// needs (reasoning, a provider's own search, tool groups) are left out and images become a placeholder;
+// other item and tool types this endpoint cannot serve (custom or provider-run tools, audio) are refused
+// by name.
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import {
   parseToolCalls,
@@ -140,6 +142,19 @@ function conversation(input: unknown, instructions: string[]): ChatTurn[] {
 // through the Chat Completions checks. Web search and tool groups (namespaces), which Codex sends on every
 // request, are left out: no seller runs them, so the model is simply not offered them. Custom and other
 // provider tools are refused by type.
+// Codex CLI names an MCP server's tool group `mcp__<server>`. Its tools are left out like every group, so
+// the operator is told once per process (on stderr, without the server's name) that they are not offered.
+const mcpGroup = (tool: unknown) =>
+  isRow(tool) &&
+  tool.type === 'namespace' &&
+  typeof tool.name === 'string' &&
+  tool.name.startsWith(RESPONSES_CHAT.mcpGroupPrefix);
+let mcpWarned = false;
+function warnMcpOnce() {
+  if (mcpWarned) return;
+  mcpWarned = true;
+  console.error(RESPONSES_CHAT.mcpNotice);
+}
 function responsesTools(value: unknown): ToolDefinition[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value))
@@ -148,6 +163,7 @@ function responsesTools(value: unknown): ToolDefinition[] | undefined {
     (tool: unknown) =>
       !(isRow(tool) && RESPONSES_CHAT.skippedTools.includes(String(tool.type))),
   );
+  if (value.some(mcpGroup)) warnMcpOnce();
   return openAiTools(
     offered.map((tool: unknown) => {
       if (!isRow(tool)) throw invalidChat('tools', FREE_CHAT_DETAILS.tools);

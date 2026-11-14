@@ -5,7 +5,9 @@ import { constants } from 'node:fs';
 import {
   chmod,
   copyFile,
+  lstat,
   mkdir,
+  readdir,
   readFile,
   realpath,
   rename,
@@ -71,7 +73,8 @@ async function existing(path: string) {
 // Writes the tool's file, keeping the first copy of what was there as <file>.before-gyblos (later runs
 // never replace it). For Codex it also writes one profile file per model beside config.toml (files only
 // gyblos writes, so no copy is kept). Every new text is prepared first, so a refused file leaves all of
-// them as they were.
+// them as they were. Each file is replaced atomically, but not all of them together: a write failing
+// midway (a full disk, a read-only directory) can leave some updated, and running it again finishes.
 export async function writeAgentFile(
   tool: Exclude<AgentTool, typeof AGENT_TOOLS.CLAUDE_CODE>,
   endpoint: AgentEndpoint,
@@ -120,13 +123,42 @@ export async function writeAgentFile(
   await replaced(path, text, before);
   for (const profile of profiles)
     await replaced(profile.file, profile.text, profile.previous);
+  const removed =
+    tool === AGENT_TOOLS.CODEX
+      ? await removeStaleProfiles(
+          dirname(path),
+          new Set(profiles.map((profile) => profile.file)),
+        )
+      : [];
   return {
     path,
     backup: saved ? `${path}.before-gyblos` : undefined,
     ...(profiles.length
       ? { profiles: profiles.map((profile) => profile.file) }
       : {}),
+    ...(removed.length ? { removed } : {}),
   };
+}
+
+// Profile files an earlier run wrote for models this endpoint no longer serves: a `codex --profile` on
+// one would fail. Only regular files that still carry the managed marker and nothing else are removed;
+// a link or a file someone edited is left alone.
+const PROFILE_FILE = /^gyblos(-[A-Za-z0-9_-]+)?\.config\.toml$/;
+async function removeStaleProfiles(directory: string, kept: Set<string>) {
+  const removed: string[] = [];
+  for (const name of await readdir(directory)) {
+    const file = join(directory, name);
+    if (!PROFILE_FILE.test(name) || kept.has(file)) continue;
+    if (!(await lstat(file)).isFile()) continue;
+    try {
+      mergedCodexProfile('', await readFile(file, 'utf8'));
+    } catch {
+      continue;
+    }
+    await rm(file);
+    removed.push(file);
+  }
+  return removed;
 }
 
 // The new text goes to a temporary file beside the real target and is renamed over it, so a crash never
