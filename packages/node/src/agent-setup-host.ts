@@ -127,7 +127,11 @@ export async function writeAgentFile(
     tool === AGENT_TOOLS.CODEX
       ? await removeStaleProfiles(
           dirname(path),
-          new Set(profiles.map((profile) => profile.file)),
+          new Set(
+            await Promise.all(
+              profiles.map((profile) => realpath(profile.file)),
+            ),
+          ),
         )
       : [];
   return {
@@ -148,8 +152,10 @@ async function removeStaleProfiles(directory: string, kept: Set<string>) {
   const removed: string[] = [];
   for (const name of await readdir(directory)) {
     const file = join(directory, name);
-    if (!PROFILE_FILE.test(name) || kept.has(file)) continue;
+    if (!PROFILE_FILE.test(name)) continue;
     if (!(await lstat(file)).isFile()) continue;
+    // Replacement follows an existing target: filesystem identity preserves its actual casing.
+    if (kept.has(await realpath(file))) continue;
     try {
       mergedCodexProfile('', await readFile(file, 'utf8'));
     } catch {
