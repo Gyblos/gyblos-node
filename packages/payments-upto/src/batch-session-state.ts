@@ -86,7 +86,13 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
       record.state !== SESSION_STATES.CLOSED &&
       pending.length > 0,
     recoverable:
-      !notCreated && pending.some((request) => request.bill !== null),
+      !notCreated &&
+      pending.some(
+        (request) =>
+          request.bill !== null ||
+          !!record.blocks?.[request.requestId]?.pending ||
+          !!record.blocks?.[request.requestId]?.accepted,
+      ),
   };
 }
 

@@ -8,6 +8,7 @@ import {
   SESSION_CODES,
   sessionFail,
   type PaymentSessionTerms,
+  type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
 import { WINDOWS } from '@gyblos/runtime/private-mode';
 
@@ -51,7 +52,7 @@ export function openBatchBuyerBackend(
   let observer: ReturnType<typeof batchSessionObserver> | undefined;
   return {
     inspect: () => inspectBatchSession(options.paths),
-    async create(terms: PaymentSessionTerms) {
+    async create(terms: PaymentSessionTerms): Promise<SessionBuyer> {
       if (options.payer.address !== terms.buyer)
         return sessionFail(SESSION_CODES.BINDING);
       await compatible(options, terms);

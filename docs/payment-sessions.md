@@ -456,3 +456,43 @@ Tool definitions/results count toward the existing input bound; canonical tool
 output counts toward tokens even if the text is empty. Local telemetry covers
 both prices with the same content-free events and remains configurable. A
 voucher approval is shown as approved usage, not as a confirmed settlement.
+
+## What closes a channel
+
+Passing time does not itself execute a blockchain transaction. Normal closure
+uses the highest buyer voucher already accepted by the seller; it does not ask
+for a new buyer spending signature. The seller's authorizer signs the close
+permission and the seller's fee payer funds its submission.
+
+| Trigger                                                        | Actor and result                                                                                                                                                                                                    |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Buyer requests close/settle                                    | Authenticated buyer requests it; seller authorizes and submits finalization. Active executions keep maintenance exclusive.                                                                                          |
+| Terms expire                                                   | Online seller worker finalizes the latest accepted total. If both parties are offline, nothing submits until one recovers.                                                                                          |
+| Deposit is fully authorized                                    | Seller worker finalizes; unused deposit is zero. There is no automatic top-up.                                                                                                                                      |
+| Ten minutes without use and at least10,000atomic accrued       | Seller worker finalizes. The threshold is a soft economic default, not an additional charge.                                                                                                                        |
+| Interrupted/unsigned work becomes idle                         | Seller finalizes the preceding accepted total, even below the soft threshold. A block-aware runtime lease prevents treating a live generation as abandoned.                                                         |
+| Retained request limit reached with no active or unsigned work | Seller finalizes the existing total before the record can grow beyond its bound.                                                                                                                                    |
+| Buyer requests native forced close                             | Buyer signs and funds that control transaction. An online seller can claim during the configured grace, normally900seconds.                                                                                         |
+| Recovery after a crash                                         | Seller resumes its saved finalization; buyer can resend original financial messages, or complete native seal/distribution after grace when the seller is absent. Buyer-only recovery pays its own transaction fees. |
+| Opening expired and was independently proved never created     | No settlement or pretend refund: the unfunded commitment is released using the finalized absence proof.                                                                                                             |
+
+For deposit D and independently observed gross charge C, the buyer receives D−C.
+Seller payout and Gyblos treasury receive the existing `settlementShares` for
+the channel's frozen fee terms. Native program rounding residuals remain
+separate from Gyblos revenue. This work does not change the canonical fee or the
+program's rounding. Finalization can require several native transactions; block
+approvals themselves require none.
+
+Buyer/seller shutdown, an HTTP disconnect or switching A→B are not, by
+themselves, guaranteed financial close operations. Recovery and the online
+seller worker still matter. A seller absent throughout native forced-close grace
+can lose previously signed but unclaimed earnings; the accepted one-block risk
+bounds the delivery/approval window, not arbitrary settlement outages.
+
+The block checkpoint ports are an additive integration foundation. Until the
+bidirectional transport/runtime activation is installed, existing inference
+still uses whole-result approval. Its new private block record is version2;
+legacy pending version1 records must resolve before upgrading. Do not downgrade
+software while a version2 session is active. Only hashes, usage and financial
+metadata are stored; no conversation or response content is written to this
+record.

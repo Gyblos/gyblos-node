@@ -6,7 +6,6 @@ import { signBatchVoucher } from '@x402/svm/batch-settlement/client';
 
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
-import type { SessionBlockBuyer } from '@gyblos/protocol/session-blocks';
 import {
   PAYMENT_SESSION,
   SESSION_CODES,
@@ -14,7 +13,13 @@ import {
   sessionFail,
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
+import type { SessionBlockBuyer } from '@gyblos/protocol/session-blocks';
 
+import {
+  acknowledgeBuyerBlock,
+  approveBuyerBlock,
+  recoverBuyerBlock,
+} from './batch-block-buyer';
 import { buildBuyerOpening } from './batch-opening-build';
 import { batchOpeningAbsent } from './batch-opening-proof';
 import { batchOpeningSigner } from './batch-opening-signer';
@@ -41,10 +46,16 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
-    beginBlocks: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
-    approveBlock: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
-    acknowledgeBlock: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
-    recoverBlockApproval: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
+    beginBlocks: (request) =>
+      exclusive(() => reserve(store, request, options.now(), true)),
+    approveBlock: (intent, verified, check) =>
+      exclusive(() =>
+        approveBuyerBlock(options, store, intent, verified, check),
+      ),
+    acknowledgeBlock: (intent) =>
+      exclusive(() => acknowledgeBuyerBlock(options, store, intent)),
+    recoverBlockApproval: () =>
+      exclusive(() => recoverBuyerBlock(options, store)),
     open: (check) => exclusive(() => openBuyer(options, store, check)),
     begin: (request) => exclusive(() => reserve(store, request, options.now())),
     approve: (inputBill, verifiedAtomic) =>
@@ -148,6 +159,8 @@ async function approveBuyer(
 ) {
   const bill = billFor(inputBill);
   const current = store.read();
+  if (current.blocks?.[bill.requestId])
+    return sessionFail(SESSION_CODES.BINDING);
   active(current, options.now());
   const request = current.requests[bill.requestId];
   if (
