@@ -1578,6 +1578,12 @@ financial port and recount tokenizer support checkpoints. A v5 seller refuses
 unsupported prefix certification before funding; neither side falls back after
 a possible prompt write.
 
+Already-created legacy channels stay on session-v4 until closed, including
+financial recovery against an older seller. The financial `usesBlocks()` port
+identifies an existing checkpoint journal without exposing private data. A new
+unfunded channel or an existing checkpoint channel can use v5; upgrading the
+buyer never strands an old v4 voucher by requiring a newer remote ALPN.
+
 The default soft target is 64 newly billable output tokens. It is not a hard
 64-token exposure cap: the first certified boundary may be later, or a response
 without a safe separator may be one terminal block up to the existing 128-output-

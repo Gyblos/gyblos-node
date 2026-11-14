@@ -147,19 +147,17 @@ void test(
     t.after(f.close);
     const sends = f.financial.vm.sends();
     await within(
-      f
-        .buyer()
-        .execute(
-          await f.offers.quote(1, {
-            maxTokens: 8,
-            maxAtomic: '1000',
-            prices: {
-              inputAtomicPerMtok: '100000000',
-              outputAtomicPerMtok: '100000000',
-            },
-          }),
-          { ...f.offers.input, maxTokens: 8 },
-        ),
+      f.buyer().execute(
+        await f.offers.quote(1, {
+          maxTokens: 8,
+          maxAtomic: '1000',
+          prices: {
+            inputAtomicPerMtok: '100000000',
+            outputAtomicPerMtok: '100000000',
+          },
+        }),
+        { ...f.offers.input, maxTokens: 8 },
+      ),
     );
     await waitFor(
       () => f.financial.seller().snapshot().state === SESSION_STATES.CLOSED,

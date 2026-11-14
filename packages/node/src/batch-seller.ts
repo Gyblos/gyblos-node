@@ -70,10 +70,18 @@ async function executeObserved(
     /* Optional metadata cannot block generation. */
   }
 
-  const plan = blocks
-    ? await createSellerBlockPlan(request, options, live, peer, signal, blocks)
-    : undefined;
+  let plan: Awaited<ReturnType<typeof createSellerBlockPlan>> | undefined;
   try {
+    plan = blocks
+      ? await createSellerBlockPlan(
+          request,
+          options,
+          live,
+          peer,
+          signal,
+          blocks,
+        )
+      : undefined;
     const result = await generateBatch(
       request,
       plan?.pending ?? (await batchSessionRequest(request)),

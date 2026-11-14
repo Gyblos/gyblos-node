@@ -1,6 +1,9 @@
 // Product buyer/seller fixture uses a deterministic synthetic engine and actual SDK/private journals over TCP.
 import { createBuyerBatchSession } from '@gyblos/node/batch-buyer';
-import { createSellerBatchSession, type SellerBatchSessionOptions } from '@gyblos/node/batch-seller';
+import {
+  createSellerBatchSession,
+  type SellerBatchSessionOptions,
+} from '@gyblos/node/batch-seller';
 import { recountedMeter } from '@gyblos/node/free-meter';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
@@ -46,7 +49,9 @@ export function configureBlockEngine(
     };
   });
 }
-export async function blockProduct(options: Pick<SellerBatchSessionOptions, 'telemetry'> = {}) {
+export async function blockProduct(
+  options: Pick<SellerBatchSessionOptions, 'telemetry'> = {},
+) {
   const f = await sessionRig({
     buyerNodeId: '12'.repeat(32),
     sellerNodeId: '34'.repeat(32),

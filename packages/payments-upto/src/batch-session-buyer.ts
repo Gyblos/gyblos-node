@@ -32,7 +32,7 @@ import {
 } from './batch-session-common';
 import { openBatchStore, serial, type BatchStore } from './batch-session-store';
 import type { BatchBuyerOptions } from './batch-session-types';
-import { BATCH_BUYER_CHECKPOINTS } from './constants';
+import { BATCH_BLOCK_STATE, BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export async function createBatchBuyer(
   input: BatchBuyerOptions,
@@ -46,7 +46,7 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
-    usesBlocks: () => false,
+    usesBlocks: () => store.read().version === BATCH_BLOCK_STATE.version,
     pendingBlockRequest: () => {
       const state = store.read();
       const request = Object.values(state.requests).find(

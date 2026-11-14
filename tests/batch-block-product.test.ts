@@ -3,19 +3,25 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
-import { ENGINE_DONE_REASONS, ENGINE_KINDS } from '@gyblos/protocol/constants';
-import { TELEMETRY_EVENTS, type TelemetryRecord } from '@gyblos/protocol/telemetry';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { createBuyerBatchSession } from '@gyblos/node/batch-buyer';
 import { createSellerBatchSession } from '@gyblos/node/batch-seller';
 import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
+import { ENGINE_DONE_REASONS, ENGINE_KINDS } from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import {
+  TELEMETRY_EVENTS,
+  type TelemetryEvent,
+} from '@gyblos/protocol/telemetry';
 
-import { BLOCK_TEXT, blockProduct } from './support/batch-block-product';
-import { blockJson } from './support/block-json';
-import { blockTestMeter } from './support/batch-block-product';
-import { sessionRig } from './support/batch-session';
+import {
+  BLOCK_TEXT,
+  blockProduct,
+  blockTestMeter,
+} from './support/batch-block-product';
 import { batchOfferFixture } from './support/batch-iroh-offer';
 import { batchLoopback } from './support/batch-loopback';
+import { sessionRig } from './support/batch-session';
+import { blockJson } from './support/block-json';
 
 void test('product buyer and seller verify each block through the shared generation pipeline', async (t) => {
   const f = await blockProduct();
@@ -184,42 +190,118 @@ void test('an expired interrupted channel reconciles its final settlement instea
   assert.equal(f.offers.generations(), 1);
 });
 void test('an expired intent without a voucher or settlement cannot create a fresh signature during recovery', async (t) => {
-  const f = await blockProduct();t.after(f.close);
+  const f = await blockProduct();
+  t.after(f.close);
   const original = f.f.buyer.approveBlock.bind(f.f.buyer);
-  t.mock.method(f.f.buyer, 'approveBlock', async (...args: Parameters<typeof original>) => {
-    let checks = 0;
-    return original(args[0], args[1], () => { args[2]?.();if (++checks === 2) throw new Error('Synthetic stop after intent, before signature'); });
-  });
-  await assert.rejects(f.buyer.execute(await f.offers.quote(1), f.offers.input));
-  await f.buyer.settled();await f.wire.settled();assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
+  t.mock.method(
+    f.f.buyer,
+    'approveBlock',
+    async (...args: Parameters<typeof original>) => {
+      let checks = 0;
+      return original(args[0], args[1], () => {
+        args[2]?.();
+        if (++checks === 2)
+          throw new Error('Synthetic stop after intent, before signature');
+      });
+    },
+  );
+  await assert.rejects(
+    f.buyer.execute(await f.offers.quote(1), f.offers.input),
+  );
+  await f.buyer.settled();
+  await f.wire.settled();
+  assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
   let signaturesRecovered = 0;
   const recover = f.f.buyer.recoverBlockApproval.bind(f.f.buyer);
-  t.mock.method(f.f.buyer, 'recoverBlockApproval', async () => { signaturesRecovered++;return recover(); });
+  t.mock.method(f.f.buyer, 'recoverBlockApproval', async () => {
+    signaturesRecovered++;
+    return recover();
+  });
   f.f.time(f.f.terms.expiresAt + 1);
   assert.equal(await f.buyer.recoverApproval(), true);
-  assert.equal(signaturesRecovered, 0);assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
-  const settled = await f.buyer.reconcile();assert.equal(settled?.chargedAtomic, '0');assert.equal(settled?.refundedAtomic, '1000');
+  assert.equal(signaturesRecovered, 0);
+  assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
+  const settled = await f.buyer.reconcile();
+  assert.equal(settled?.chargedAtomic, '0');
+  assert.equal(settled?.refundedAtomic, '1000');
   assert.equal(f.offers.generations(), 1);
 });
 void test('block-plan admission failure emits failed telemetry without generation or another deposit', async (t) => {
-  const records: TelemetryRecord[] = [];
-  const f = await blockProduct({ telemetry: { sink: { emit(record) { records.push(record); } }, engineKind: () => ENGINE_KINDS.OLLAMA } });t.after(f.close);
-  await f.f.open();const calls = [...f.f.calls];
+  const records: TelemetryEvent[] = [];
+  const f = await blockProduct({
+    telemetry: {
+      sink: {
+        emit(record) {
+          records.push(record);
+        },
+        async flush() {},
+        async close() {},
+      },
+      engineKind: () => ENGINE_KINDS.OLLAMA,
+    },
+  });
+  t.after(f.close);
+  await f.f.open();
+  const calls = [...f.f.calls];
   f.offers.live.meter.chat = () => f.offers.live.model.contextTokens;
-  await assert.rejects(f.buyer.execute(await f.offers.quote(1), f.offers.input), { code: PAID_EXECUTION_CODES.LIMIT });
-  assert.equal(f.offers.generations(), 0);assert.deepEqual(f.f.calls, calls);
-  assert.deepEqual(records.map((record) => record.type), [TELEMETRY_EVENTS.REQUEST_RECEIVED, TELEMETRY_EVENTS.FAILED]);
+  await assert.rejects(
+    f.buyer.execute(await f.offers.quote(1), f.offers.input),
+    { code: PAID_EXECUTION_CODES.LIMIT },
+  );
+  assert.equal(f.offers.generations(), 0);
+  assert.deepEqual(f.f.calls, calls);
+  assert.deepEqual(
+    records.map((record) => record.type),
+    [TELEMETRY_EVENTS.REQUEST_RECEIVED, TELEMETRY_EVENTS.FAILED],
+  );
 });
 void test('an already funded legacy channel recovers and closes against a v4-only seller after upgrading the buyer', async (t) => {
-  const f = await sessionRig({ buyerNodeId: '12'.repeat(32), sellerNodeId: '34'.repeat(32), transaction: 'SyntheticClose' });t.after(f.dispose);
-  await f.open();const request = f.request(1);await f.buyer.begin(request);await f.seller().reserve(request, f.terms.buyerNodeId);
-  const bill = await f.seller().finish(request.requestId, '10');await f.buyer.approve(bill, '10');
+  const f = await sessionRig({
+    buyerNodeId: '12'.repeat(32),
+    sellerNodeId: '34'.repeat(32),
+    transaction: 'SyntheticClose',
+  });
+  t.after(f.dispose);
+  await f.open();
+  const request = f.request(1);
+  await f.buyer.begin(request);
+  await f.seller().reserve(request, f.terms.buyerNodeId);
+  const bill = await f.seller().finish(request.requestId, '10');
+  await f.buyer.approve(bill, '10');
   const offers = await batchOfferFixture(f.terms, f.owner, f.now);
-  const wire = await batchLoopback(createSellerBatchSession({ session: f.seller(), terms: f.terms, offers: () => [offers.live], now: f.now }), f.terms);t.after(wire.close);
+  const wire = await batchLoopback(
+    createSellerBatchSession({
+      session: f.seller(),
+      terms: f.terms,
+      offers: () => [offers.live],
+      now: f.now,
+    }),
+    f.terms,
+  );
+  t.after(wire.close);
   const connect = wire.endpoint.connect.bind(wire.endpoint);
-  wire.endpoint.connect = async (...args: Parameters<typeof connect>) => { assert.equal(Buffer.from(args[1]).toString(), BATCH_CHANNEL.alpn);return connect(...args); };
-  const buyer = createBuyerBatchSession({ ...wire, terms: f.terms, buyer: f.buyer, meter: blockTestMeter, now: f.now, unresolved: async () => false, verify: async () => {}, observe: f.sellerOptions.observe });
-  t.after(async () => { await buyer.disconnect();await buyer.settled(); });
-  assert.equal(await buyer.recoverApproval(), true);const settled = await buyer.close();
-  assert.equal(settled.chargedAtomic, '10');assert.equal(settled.refundedAtomic, '990');assert.equal(offers.generations(), 0);assert.deepEqual(f.calls, ['deposit', 'refund']);
+  wire.endpoint.connect = async (...args: Parameters<typeof connect>) => {
+    assert.equal(Buffer.from(args[1]).toString(), BATCH_CHANNEL.alpn);
+    return connect(...args);
+  };
+  const buyer = createBuyerBatchSession({
+    ...wire,
+    terms: f.terms,
+    buyer: f.buyer,
+    meter: blockTestMeter,
+    now: f.now,
+    unresolved: async () => false,
+    verify: async () => {},
+    observe: f.sellerOptions.observe,
+  });
+  t.after(async () => {
+    await buyer.disconnect();
+    await buyer.settled();
+  });
+  assert.equal(await buyer.recoverApproval(), true);
+  const settled = await buyer.close();
+  assert.equal(settled.chargedAtomic, '10');
+  assert.equal(settled.refundedAtomic, '990');
+  assert.equal(offers.generations(), 0);
+  assert.deepEqual(f.calls, ['deposit', 'refund']);
 });

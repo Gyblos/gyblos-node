@@ -19,7 +19,9 @@ export function isBlockBuyer(buyer: SessionBuyer): buyer is SessionBlockBuyer {
     'recoverBlockApproval' in buyer &&
     typeof buyer.recoverBlockApproval === 'function' &&
     'pendingBlockRequest' in buyer &&
-    typeof buyer.pendingBlockRequest === 'function'
+    typeof buyer.pendingBlockRequest === 'function' &&
+    'usesBlocks' in buyer &&
+    typeof buyer.usesBlocks === 'function'
   );
 }
 export function isBlockSeller(

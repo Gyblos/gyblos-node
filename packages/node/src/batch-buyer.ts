@@ -49,7 +49,8 @@ function createContext<Remote extends BatchDestination>(
     return batchFail(PAID_EXECUTION_CODES.PEER);
   const blockMode =
     isBlockBuyer(options.buyer) &&
-    typeof options.meter.stablePrefix === 'function';
+    typeof options.meter.stablePrefix === 'function' &&
+    (!options.buyer.snapshot().channelId || options.buyer.usesBlocks());
   const client = createBatchChannelClient(
     options.endpoint,
     options.destination,
@@ -141,6 +142,10 @@ async function recover<Remote extends BatchDestination>(
       );
       signal.throwIfAborted();
       if (settled) return true;
+      if (context.options.now() >= context.terms.expiresAt) {
+        await close(context, signal);
+        return true;
+      }
       const recovered = await bounded(buyer.recoverBlockApproval(), signal);
       signal.throwIfAborted();
       if (recovered) {
