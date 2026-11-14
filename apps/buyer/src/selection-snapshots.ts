@@ -92,6 +92,58 @@ export async function refreshSnapshots(
   now: () => number,
   deadline: AbortSignal,
   settling: Promise<unknown>[],
+  signal?: AbortSignal,
+) {
+  const skipped = new Set<StaticControlSeller>();
+  const snapshots = await snapshotBatch(
+    config,
+    dependencies,
+    clients,
+    now,
+    deadline,
+    settling,
+    skipped,
+    signal,
+  );
+  // Identity and durable discovery work may settle after the nominal snapshot deadline. A seller
+  // skipped earlier must still be considered if its cooldown ended before selection actually runs.
+  while (!signal?.aborted) {
+    const recovered = [...skipped].filter((seller) => {
+      const until = dependencies.stats.get(seller.nodeId)?.cooldownUntil;
+      return until == null || until <= now();
+    });
+    if (!recovered.length) break;
+    for (const seller of recovered) skipped.delete(seller);
+    const nextDeadline = AbortSignal.any([
+      AbortSignal.timeout(
+        dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs,
+      ),
+      ...(signal ? [signal] : []),
+    ]);
+    snapshots.push(
+      ...(await snapshotBatch(
+        { ...config, sellers: recovered },
+        dependencies,
+        clients,
+        now,
+        nextDeadline,
+        settling,
+        new Set<StaticControlSeller>(),
+        signal,
+      )),
+    );
+  }
+  return snapshots;
+}
+
+async function snapshotBatch(
+  config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
+  clients: Map<string, BuyerControlClient>,
+  now: () => number,
+  deadline: AbortSignal,
+  settling: Promise<unknown>[],
+  skipped: Set<StaticControlSeller>,
   // The caller's own signal: its abort is a cancellation, while the snapshot deadline is a failure.
   signal?: AbortSignal,
 ) {
@@ -108,8 +160,10 @@ export async function refreshSnapshots(
           stats?.cooldownUntil != null &&
           stats.cooldownUntil >
             now() + (dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs)
-        )
+        ) {
+          skipped.add(seller);
           return undefined;
+        }
         // A request the caller cancelled is not a seller failure.
         const failed = (phase: SellerFailurePhase, code: SellerFailureCode) => {
           if (!signal?.aborted)
