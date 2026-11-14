@@ -1,7 +1,6 @@
 // Shared configuration text and safe merges for coding agents using one local buyer endpoint.
 // Pure configuration only: no files, network or secret values; tokens use environment references.
 // Node owns the generators, and each host owns its file writes.
-import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -15,6 +14,7 @@ import {
   type AgentEndpoint,
   type AgentModel,
 } from './agent-setup-constants';
+import { codexProfileText, profileNames } from './agent-setup-profiles';
 
 export {
   AGENT_SETUP,
@@ -25,6 +25,7 @@ export {
   type AgentModel,
   type AgentTool,
 } from './agent-setup-constants';
+export { codexProfileText, profileNames } from './agent-setup-profiles';
 
 // The file a tool reads, honoring the variables each tool uses to move its configuration.
 export function agentFilePath(
@@ -191,12 +192,6 @@ export function codexProfiles(endpoint: AgentEndpoint) {
     ...profileNames(models).map((name, index) => profile(name, models[index]!)),
   ];
 }
-// Content integrity for managed profiles; comments remain valid TOML and carry no secret material.
-export function codexProfileText(text: string) {
-  const digest = createHash('sha256').update(text).digest('hex');
-  return text + CODEX_MARKS.profileDigest + digest + '\n';
-}
-
 // A profile file's new text: written when absent or when an earlier run wrote it, refused otherwise.
 export function mergedCodexProfile(text: string, existing: string | undefined) {
   if (existing === undefined) return text;
@@ -216,21 +211,6 @@ const CODEX_PROFILE_FIELDS: readonly string[] = [
   'model_context_window',
   'model_auto_compact_token_limit',
 ];
-// One profile name per model: its id with other characters as dashes, numbered when two ids collide.
-// Names collide ignoring case: each is a file name, and macOS and Windows file systems would make
-// `gyblos-Qwen3` and `gyblos-qwen3` one file.
-export function profileNames(models: readonly AgentModel[]) {
-  const used = new Set<string>([AGENT_SETUP.provider]);
-  return models.map((model) => {
-    const plain = `${AGENT_SETUP.provider}-${model.id.replaceAll(/[^A-Za-z0-9_-]/g, '-')}`;
-    let name = plain;
-    for (let count = 2; used.has(name.toLowerCase()); count++)
-      name = `${plain}-${count}`;
-    used.add(name.toLowerCase());
-    return name;
-  });
-}
-
 // Claude Code: environment for one shell. `/model <name>` then switches among the endpoint's models.
 export function claudeCodeEnvironment(endpoint: AgentEndpoint) {
   const { models, tokenEnv } = checked(endpoint);
