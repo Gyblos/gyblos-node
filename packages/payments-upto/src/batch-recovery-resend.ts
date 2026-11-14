@@ -54,7 +54,10 @@ export async function resumeBatchControl(
   );
   if (
     !statuses.context ||
+    typeof statuses.context.slot !== 'bigint' ||
+    statuses.context.slot < 0n ||
     statuses.context.slot < tip.absoluteSlot ||
+    !Array.isArray(statuses.value) ||
     statuses.value.length !== 1
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);

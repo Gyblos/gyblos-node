@@ -93,64 +93,79 @@ export async function recoverBatchBuyer(
     const known = await observer.settlement(channelId);
     if (known) return acceptRecoverySettlement(store, known);
     const status = await observer.bound(channelId);
-    await retireCompletedControlIntent(store, status);
-    const checkpoint = await batchRecoveryCheckpoint(
+    await retireCompletedControlIntent(
       store,
+      status,
+      input.rpc ?? createBuyerRecoveryRpc(input.rpcUrl),
       input.payer,
       input.signal,
     );
-    const rpc = input.rpc ?? createBuyerRecoveryRpc(input.rpcUrl);
-    const transport = withdrawalRpc(rpc, checkpoint.lifetime);
-    const withdrawal = createUptoWithdrawal(transport, {
-      payer: input.payer,
-      network: record.terms.network,
-      tokenProgram: TOKEN_PROGRAM_ADDRESS,
-      ...(input.sleep ? { sleep: input.sleep } : {}),
-    });
-    input.signal?.throwIfAborted();
-    await store.update((state) => {
-      state.state = SESSION_STATES.CLOSING;
-    });
-    const outcome = await withdrawal.withdraw(
-      {
-        channelId,
-        mint: record.terms.mint,
-        rentPayer: record.terms.feePayer,
-        maxAtomic: record.terms.depositAtomic,
-        splits: paymentSplits(record.terms),
-      },
-      checkpoint.recovery,
-    );
-    await resumeBatchControl(
-      transport,
-      checkpoint.pending,
-      outcome,
-      input.signal,
-    );
-    input.signal?.throwIfAborted();
-    const settled = await observer.settlement(channelId);
-    return settled
-      ? acceptRecoverySettlement(store, settled)
-      : {
-          ...outcome,
-          channelId,
-          settlement: null,
-          confirmed:
-            outcome.step === WITHDRAW_STEPS.DISTRIBUTED
-              ? false
-              : outcome.confirmed,
-          retryAfterSeconds:
-            outcome.step === WITHDRAW_STEPS.DISTRIBUTED
-              ? UPTO_WITHDRAW.recheckSeconds
-              : outcome.retryAfterSeconds,
-          failure:
-            outcome.step === WITHDRAW_STEPS.DISTRIBUTED
-              ? SESSION_CODES.UNVERIFIED
-              : null,
-        };
+    return await withdrawBatch(input, store, observer);
   } finally {
     await store.dispose();
   }
+}
+
+async function withdrawBatch(
+  input: BatchRecoveryOptions,
+  store: BatchStore,
+  observer: ReturnType<typeof batchSessionObserver>,
+): Promise<BatchRecoveryResult> {
+  const channelId = store.read().channelId;
+  const checkpoint = await batchRecoveryCheckpoint(
+    store,
+    input.payer,
+    input.signal,
+  );
+  const rpc = input.rpc ?? createBuyerRecoveryRpc(input.rpcUrl);
+  const transport = withdrawalRpc(rpc, checkpoint.lifetime);
+  const withdrawal = createUptoWithdrawal(transport, {
+    payer: input.payer,
+    network: store.read().terms.network,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    ...(input.sleep ? { sleep: input.sleep } : {}),
+  });
+  input.signal?.throwIfAborted();
+  await store.update((state) => {
+    state.state = SESSION_STATES.CLOSING;
+  });
+  const outcome = await withdrawal.withdraw(
+    {
+      channelId,
+      mint: store.read().terms.mint,
+      rentPayer: store.read().terms.feePayer,
+      maxAtomic: store.read().terms.depositAtomic,
+      splits: paymentSplits(store.read().terms),
+    },
+    checkpoint.recovery,
+  );
+  await resumeBatchControl(
+    transport,
+    checkpoint.pending,
+    outcome,
+    input.signal,
+  );
+  input.signal?.throwIfAborted();
+  const settled = await observer.settlement(channelId);
+  return settled
+    ? acceptRecoverySettlement(store, settled)
+    : {
+        ...outcome,
+        channelId,
+        settlement: null,
+        confirmed:
+          outcome.step === WITHDRAW_STEPS.DISTRIBUTED
+            ? false
+            : outcome.confirmed,
+        retryAfterSeconds:
+          outcome.step === WITHDRAW_STEPS.DISTRIBUTED
+            ? UPTO_WITHDRAW.recheckSeconds
+            : outcome.retryAfterSeconds,
+        failure:
+          outcome.step === WITHDRAW_STEPS.DISTRIBUTED
+            ? SESSION_CODES.UNVERIFIED
+            : null,
+      };
 }
 
 function withdrawalRpc(

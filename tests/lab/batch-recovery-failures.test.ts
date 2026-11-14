@@ -4,10 +4,20 @@ import { readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
+  appendTransactionMessageInstruction,
+  blockhash,
+  compileTransaction,
+  createTransactionMessage,
   generateKeyPairSigner,
+  getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
   getTransactionDecoder,
+  partiallySignTransaction,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
 } from '@solana/kit';
+import { requestCloseInstruction } from 'x402-upto-metered';
 
 import { WITHDRAW_STEPS } from '@gyblos/payments-upto';
 import { recoverBatchBuyer } from '@gyblos/payments-upto/batch-session';
@@ -181,4 +191,49 @@ void test('a signed control interrupted before dispatch resumes the original wir
     1,
     'resubmission uses exactly the retained signed bytes',
   );
+});
+
+void test('a valid buyer signature for a different channel cannot replace the stored control intent', async (t) => {
+  const rig = await batchRecoveryRig(t);
+  rig.local.beforeSend(async () => {
+    throw new Error('Synthetic interrupted dispatch');
+  });
+  await rig.recover();
+  const state = await rig.read();
+  const key = Object.keys(state.pending).find(
+    (key) => JSON.parse(state.pending[key]).attempt,
+  );
+  assert.ok(key);
+  const saved = JSON.parse(state.pending[key]);
+  const foreign = await generateKeyPairSigner();
+  const hints = rig.financial.vm.hints();
+  const message = pipe(
+    createTransactionMessage({ version: 0 }),
+    (value) =>
+      setTransactionMessageFeePayerSigner(rig.financial.vm.payer, value),
+    (value) =>
+      setTransactionMessageLifetimeUsingBlockhash(
+        {
+          blockhash: blockhash(hints.recentBlockhash),
+          lastValidBlockHeight: BigInt(hints.lastValidBlockHeight),
+        },
+        value,
+      ),
+    (value) =>
+      appendTransactionMessageInstruction(
+        requestCloseInstruction(rig.financial.vm.payer, foreign.address),
+        value,
+      ),
+  );
+  const signed = await partiallySignTransaction(
+    [rig.financial.vm.payer.keyPair],
+    compileTransaction(message),
+  );
+  saved.wire = getBase64EncodedWireTransaction(signed);
+  saved.attempt.transaction = String(getSignatureFromTransaction(signed));
+  state.pending[key] = JSON.stringify(saved);
+  await writeFile(rig.options.paths.state, JSON.stringify(state));
+  const sends = rig.financial.vm.sends();
+  await assert.rejects(rig.recover(), { code: SESSION_CODES.BINDING });
+  assert.equal(rig.financial.vm.sends(), sends);
 });
