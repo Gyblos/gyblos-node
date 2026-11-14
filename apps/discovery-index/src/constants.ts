@@ -155,17 +155,25 @@ export const DISCOVERY_SOLANA_RPC_BINDING = 'DISCOVERY_SOLANA_RPC_URL';
 // Beta invites (vault: 20 Decisions/Alta de vendedores.md §2). The code is the prefix and 26 base32
 // characters (128 random bits); only its SHA-256 is stored.
 const INVITE_PREFIX = 'gyb_';
+const REGISTRATION_TEXT_LIMITS = {
+  inviteHashCharacters: 64,
+  maxContactCharacters: 128,
+  countryCharacters: 2,
+} as const;
 export const REGISTRATION = {
+  ...REGISTRATION_TEXT_LIMITS,
   invitePrefix: INVITE_PREFIX,
   invite: new RegExp(`^${INVITE_PREFIX}[a-z2-7]{26}$`),
   inviteBytes: 16,
   nodeId: PUBLISH_ALLOWLIST.nodeId,
-  country: /^[A-Z]{2}$/,
+  country: new RegExp(`^[A-Z]{${REGISTRATION_TEXT_LIMITS.countryCharacters}}$`),
   maxBodyBytes: 512,
   dayMs: 24 * 60 * 60 * 1000,
   inviteLifetimeMs: 14 * 24 * 60 * 60 * 1000,
   maxInviteDays: 90,
-  contact: /^[A-Za-z0-9@._+-]{1,128}$/,
+  contact: new RegExp(
+    `^[A-Za-z0-9@._+-]{1,${REGISTRATION_TEXT_LIMITS.maxContactCharacters}}$`,
+  ),
 } as const;
 // Lowercase hex of a SHA-256 digest: two characters per byte.
 export const HEX = { radix: 16, byteWidth: 2 } as const;

@@ -90,8 +90,8 @@ void test('discovery ORM schema preserves migrated check constraints', async (co
     assert.ok(row);
     const normalize = (expression: string) =>
       expression
-        .replaceAll(`${config.name}.`, '')
         .replaceAll(/["()\s]/g, '')
+        .replaceAll(`${config.name}.`, '')
         .toLowerCase();
     const actual = [
       ...String(row.sql).matchAll(/CHECK\s*\(((?:[^()]|\([^()]*\))*)\)/gi),
