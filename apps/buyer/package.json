@@ -69,7 +69,7 @@
     "@gyblos/protocol": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
     "@number0/iroh": "1.1.0",
-    "@solana/kit": "5.1.0",
+    "@solana/kit": "5.5.1",
     "@gyblos/discovery-http": "workspace:*"
   }
 }

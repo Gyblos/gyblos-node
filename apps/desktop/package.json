@@ -93,7 +93,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "@phosphor-icons/react": "2.1.10",
-    "@solana/kit": "5.1.0",
+    "@solana/kit": "5.5.1",
     "@gyblos/discovery-http": "workspace:*",
     "@gyblos/runtime": "workspace:*"
   },
