@@ -11,6 +11,7 @@ import type {
   SellerRow,
   StoredEntry,
 } from './storage';
+import { hourOf, retainedHour, slotBit } from './uptime';
 
 export type D1Value = string | number | null;
 export type D1Row = Record<string, unknown>;
@@ -96,6 +97,14 @@ const PRUNE_SQL = [
   'DELETE FROM discovery_withdrawals WHERE expires_at <= ?1',
   'DELETE FROM discovery_nodes WHERE retain_until <= ?1',
 ];
+const PRUNE_UPTIME_SQL = 'DELETE FROM discovery_uptime WHERE hour < ?1';
+// One row per NodeId and hour: the slot bit is ORed in, so repeating a write changes nothing.
+const MARK_SEEN_SQL = `INSERT INTO discovery_uptime (node_id, hour, slots, first_at, last_at) VALUES (?1, ?2, ?3, ?4, ?4)
+ON CONFLICT (node_id, hour) DO UPDATE SET slots = slots | excluded.slots, last_at = max(last_at, excluded.last_at)`;
+const FIRST_SEEN_SQL = `INSERT INTO discovery_uptime_nodes (node_id, first_at) VALUES (?1, ?2)
+ON CONFLICT (node_id) DO NOTHING`;
+const SEEN_SQL =
+  'SELECT hour, slots, first_at AS firstAt, last_at AS lastAt FROM discovery_uptime WHERE node_id = ?1 AND hour >= ?2 ORDER BY hour';
 
 function nodeState(row: D1Row): NodeState {
   return {
@@ -197,6 +206,36 @@ export function createD1Storage(db: D1Database): DiscoveryStorage {
     },
     async prune(now) {
       await db.batch(PRUNE_SQL.map((sql) => db.prepare(sql).bind(now)));
+    },
+    async pruneUptime(now) {
+      await db.prepare(PRUNE_UPTIME_SQL).bind(retainedHour(now)).run();
+    },
+    async markSeen(nodeId, now) {
+      await db.batch([
+        db.prepare(MARK_SEEN_SQL).bind(nodeId, hourOf(now), slotBit(now), now),
+        db.prepare(FIRST_SEEN_SQL).bind(nodeId, now),
+      ]);
+    },
+    async firstSeen(nodeId) {
+      const row = await db
+        .prepare(
+          'SELECT first_at AS firstAt FROM discovery_uptime_nodes WHERE node_id = ?1',
+        )
+        .bind(nodeId)
+        .first();
+      return row ? integer(row.firstAt) : null;
+    },
+    async seen(nodeId, sinceHour) {
+      const { results } = await db
+        .prepare(SEEN_SQL)
+        .bind(nodeId, sinceHour)
+        .all();
+      return results.map((row) => ({
+        hour: integer(row.hour),
+        slots: integer(row.slots),
+        firstAt: integer(row.firstAt),
+        lastAt: integer(row.lastAt),
+      }));
     },
     async put(entry) {
       const upsert = db
