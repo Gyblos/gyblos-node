@@ -65,6 +65,14 @@ export type SessionBlockFrame =
       kind: typeof SESSION_BLOCK_KINDS.FAILURE;
       code: BatchChannelCode;
     });
+export type SessionBlockApproval = Extract<
+  SessionBlockFrame,
+  { kind: typeof SESSION_BLOCK_KINDS.APPROVAL }
+>;
+export type SessionBlockAck = Extract<
+  SessionBlockFrame,
+  { kind: typeof SESSION_BLOCK_KINDS.ACK }
+>;
 
 function checkpoint(
   header: Header,

@@ -19,6 +19,7 @@ import type {
   SessionSeller,
   SessionVoucher,
 } from './payment-session';
+import type { SessionBlockApproval } from './session-block-wire';
 
 export interface SessionBlockIntent {
   index: number;
@@ -28,6 +29,7 @@ export interface SessionBlockIntent {
   terminal: boolean;
 }
 export interface SessionBlockBuyer extends SessionBuyer {
+  pendingBlockRequest(): SessionRequest | undefined;
   beginBlocks(request: SessionRequest): Promise<void>;
   approveBlock(
     intent: SessionBlockIntent,
@@ -40,6 +42,10 @@ export interface SessionBlockBuyer extends SessionBuyer {
   >;
 }
 export interface SessionBlockSeller extends SessionSeller {
+  resumeBlock(
+    approval: SessionBlockApproval,
+    peer: string,
+  ): Promise<SessionBlockIntent>;
   reserveBlocks(request: SessionRequest, peer: string): Promise<void>;
   checkpoint(intent: SessionBlockIntent): Promise<void>;
   acceptBlock(
