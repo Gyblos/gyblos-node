@@ -6,14 +6,12 @@ import { ControlAdmission } from '@gyblos/core/control-admission';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 
-export function batchQueryClock(t: TestContext) {
-  let now = 0;
-  let attempts = 0;
-  let refused = 0;
-  const step =
-    CONTROL_CAPACITY.millisecondsPerSecond / CONTROL_CAPACITY.peerRate;
+export function observeBatchQueryRefusals(
+  t: TestContext,
+  refused: () => void,
+  before: () => void = () => {},
+) {
   const open = ControlAdmission.prototype.openConnection;
-  t.mock.method(performance, 'now', () => now);
   t.mock.method(
     ControlAdmission.prototype,
     'openConnection',
@@ -22,9 +20,7 @@ export function batchQueryClock(t: TestContext) {
       return {
         ...lease,
         beginQuery() {
-          attempts++;
-          // Permit the third EXECUTE, then exhaust the bucket at its following APPROVE.
-          if (attempts === CONTROL_CAPACITY.peerBurst + 1) now += step;
+          before();
           try {
             return lease.beginQuery();
           } catch (error) {
@@ -32,13 +28,33 @@ export function batchQueryClock(t: TestContext) {
               error instanceof ControlError &&
               error.code === CONTROL_CODES.LIMIT
             ) {
-              refused++;
-              now += step;
+              refused();
             }
             throw error;
           }
         },
       };
+    },
+  );
+}
+
+export function batchQueryClock(t: TestContext) {
+  let now = 0;
+  let attempts = 0;
+  let refused = 0;
+  const step =
+    CONTROL_CAPACITY.millisecondsPerSecond / CONTROL_CAPACITY.peerRate;
+  t.mock.method(performance, 'now', () => now);
+  observeBatchQueryRefusals(
+    t,
+    () => {
+      refused++;
+      now += step;
+    },
+    () => {
+      attempts++;
+      // Permit the third EXECUTE, then exhaust the bucket at its following APPROVE.
+      if (attempts === CONTROL_CAPACITY.peerBurst + 1) now += step;
     },
   );
   return { refused: () => refused };
