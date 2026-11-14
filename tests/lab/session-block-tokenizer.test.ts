@@ -47,7 +47,7 @@ void test('large engine fragments choose the earliest certified frontier reachin
   assert.ok(frontier.characters > 0 && frontier.characters < text.length - 1);
   assert.ok(frontier.tokens >= 3);
   assert.equal(text[frontier.characters], ' ');
-  for (let i = 0; i < frontier.characters; i++) {
+  for (let i = 0; i + 1 < frontier.characters; i++) {
     if (/[A-Za-z0-9]/.test(text[i]!) && text[i + 1] === ' ') assert.ok(meter.count(text.slice(0, i + 1)) < 3);
   }
 });

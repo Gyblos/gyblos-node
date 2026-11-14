@@ -2,6 +2,7 @@
 // No engine calls, automatic topups or prompt retries. Financial reservations outlive request signals.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
+import type { SessionBlockSeller } from '@gyblos/protocol/session-blocks';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import {
   SESSION_CODES,
@@ -35,7 +36,7 @@ import { waitBatch } from './batch-session-wait';
 
 export async function createBatchSeller(
   input: BatchSellerOptions,
-): Promise<SessionSeller> {
+): Promise<SessionBlockSeller> {
   const options = { ...input, terms: termsFor(input.terms) };
   if (options.authorizer.address !== options.terms.authorizer)
     sessionFail(SESSION_CODES.BINDING);
@@ -83,6 +84,10 @@ export async function createBatchSeller(
   }, options.pollMs ?? BATCH_SESSION_DEFAULTS.pollMs);
   timer.unref();
   return {
+    reserveBlocks: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
+    checkpoint: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
+    acceptBlock: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
+    releaseBlocks: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
     open: (payload) => exclusive(() => openSeller(context, payload)),
     reserve: (request, peer) =>
       exclusive(() => reserveSeller(context, request, peer)),

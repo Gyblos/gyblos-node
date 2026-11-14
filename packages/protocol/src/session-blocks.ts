@@ -15,3 +15,4 @@ export {
   createSessionBlockVerifier,
   type SessionBlockVerification,
 } from './session-block-verifier';
+export { parseSessionBlockIntent, type SessionBlockIntent, type SessionBlockBuyer, type SessionBlockSeller } from './session-block-ports';

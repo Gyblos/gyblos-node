@@ -6,6 +6,7 @@ import { signBatchVoucher } from '@x402/svm/batch-settlement/client';
 
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
+import type { SessionBlockBuyer } from '@gyblos/protocol/session-blocks';
 import {
   PAYMENT_SESSION,
   SESSION_CODES,
@@ -30,7 +31,7 @@ import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export async function createBatchBuyer(
   input: BatchBuyerOptions,
-): Promise<SessionBuyer> {
+): Promise<SessionBlockBuyer> {
   const options = { ...input, terms: termsFor(input.terms) };
   if (options.payer.address !== options.terms.buyer)
     sessionFail(SESSION_CODES.BINDING);
@@ -40,6 +41,10 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
+    beginBlocks: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
+    approveBlock: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
+    acknowledgeBlock: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
+    recoverBlockApproval: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
     open: (check) => exclusive(() => openBuyer(options, store, check)),
     begin: (request) => exclusive(() => reserve(store, request, options.now())),
     approve: (inputBill, verifiedAtomic) =>

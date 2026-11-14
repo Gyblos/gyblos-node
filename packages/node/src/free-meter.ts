@@ -34,6 +34,7 @@ export function recountedMeter(tokenizer: ChatTokenizer): FreeMeter {
     input: (prompt) => tokenizer.input(prompt),
     chat: (messages, tools, choice) => tokenizer.chat(messages, tools, choice),
     streamed: (text) => tokenizer.count(text),
+    ...(tokenizer.stablePrefix ? { stablePrefix: tokenizer.stablePrefix } : {}),
     // A normalising tokenizer could count more tokens than bytes; the stream already bounded maxTokens.
     delivered: (text) =>
       Math.min(Math.max(1, tokenizer.count(text)), bytes(text)),
