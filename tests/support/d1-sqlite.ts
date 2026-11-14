@@ -46,6 +46,26 @@ export function namedSql(sql: string) {
 export const namedParams = (params: D1Value[]) =>
   Object.fromEntries(params.map((value, index) => [`p${index + 1}`, value]));
 
+export interface SqliteQueryPlanRow {
+  id: number;
+  parent: number;
+  detail: string;
+}
+
+export function explainD1Statement(
+  database: SqliteD1,
+  statement: Pick<SqliteStatement, 'sql' | 'params'>,
+): SqliteQueryPlanRow[] {
+  return database.raw
+    .prepare('EXPLAIN QUERY PLAN ' + namedSql(statement.sql))
+    .all(namedParams(statement.params))
+    .map((row) => ({
+      id: Number(row.id),
+      parent: Number(row.parent),
+      detail: String(row.detail),
+    }));
+}
+
 function row(value: unknown): D1Row {
   return value && typeof value === 'object' ? { ...value } : {};
 }

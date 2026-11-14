@@ -25,9 +25,9 @@ import {
 
 import {
   createSqliteD1,
-  namedParams,
-  namedSql,
+  explainD1Statement,
   type SqliteD1,
+  type SqliteQueryPlanRow,
   type SqliteStatement,
 } from './support/d1-sqlite';
 import {
@@ -171,15 +171,13 @@ void test('D1 catalog republish writes only the model rows that changed', async 
     /\binsert\s+into\s+"?discovery_catalog_models\b/i.test(sql),
   );
   assert.ok(modelInsert);
-  const plan = db.raw
-    .prepare('EXPLAIN QUERY PLAN ' + namedSql(modelInsert.sql))
-    .all(namedParams(modelInsert.params))
-    .map((row) => String(row.detail));
+  const plan = explainD1Statement(db, modelInsert);
   assert.equal(
-    plan.filter((step) => /\b(?:SEARCH|SCAN) discovery_nodes\b/.test(step))
-      .length,
+    plan.filter(({ detail }) =>
+      /\b(?:SEARCH|SCAN) discovery_nodes\b/.test(detail),
+    ).length,
     1,
-    plan.join('\n'),
+    plan.map(({ detail }) => detail).join('\n'),
   );
   written.length = 0;
   await storage.put(catalog(5, [...full].reverse()));
@@ -273,12 +271,6 @@ CREATE TEMP TRIGGER withdrawal_deleted AFTER DELETE ON discovery_withdrawals BEG
   assert.equal(withdrawal?.sequence, 7);
 });
 
-interface PlanRow {
-  id: number;
-  parent: number;
-  detail: string;
-}
-
 void test('D1 listing sorts and limits keys only, then reads blobs by key for the page', async (context) => {
   const made = await recordingD1();
   if (!made) return context.skip('node:sqlite unavailable');
@@ -286,16 +278,9 @@ void test('D1 listing sorts and limits keys only, then reads blobs by key for th
   await storage.list({ model: 'm', now: T0, limit: 51, after: null });
   const statement = read.at(-1);
   assert.ok(statement);
-  const plan: PlanRow[] = db.raw
-    .prepare('EXPLAIN QUERY PLAN ' + namedSql(statement.sql))
-    .all(namedParams(statement.params))
-    .map((row) => ({
-      id: Number(row.id),
-      parent: Number(row.parent),
-      detail: String(row.detail),
-    }));
+  const plan = explainD1Statement(db, statement);
   const byId = new Map(plan.map((row) => [row.id, row]));
-  const inPage = (row: PlanRow): boolean => {
+  const inPage = (row: SqliteQueryPlanRow): boolean => {
     const parent = byId.get(row.parent);
     if (!parent) return false;
     return /^(CO-ROUTINE|MATERIALIZE) /.test(parent.detail) || inPage(parent);
