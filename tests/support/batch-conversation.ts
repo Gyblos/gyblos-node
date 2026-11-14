@@ -74,6 +74,7 @@ export async function batchConversation(
   let alterUsage = false;
   const wire = await batchLoopback(
     {
+      resumeBlock: service.resumeBlock,
       async exchange(...args: Parameters<typeof service.exchange>) {
         const result = await service.exchange(...args);
         if ('value' in result && alterUsage)
@@ -86,6 +87,7 @@ export async function batchConversation(
       },
     },
     rig.terms,
+    Boolean(meter.stablePrefix),
   );
   let financial = rig.buyer;
   let constructions = 0;
