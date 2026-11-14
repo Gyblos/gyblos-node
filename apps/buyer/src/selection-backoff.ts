@@ -35,3 +35,23 @@ export function createSellerBackoff(): SellerBackoff {
     },
   };
 }
+
+// The backoff for one failure of `nodeId`, or none (a plain 30 s cooldown). None when the request was
+// cancelled (its cooldown is not kept, so neither is the count), for the pinned seller (asked on every
+// request, so its count would grow per request), and when it is the only seller (nobody else answers
+// while it waits, so it must not stay out long after it recovers).
+export function backoffFor(
+  backoff: SellerBackoff | undefined,
+  config: { pinnedNodeId?: string; sellers: readonly unknown[] },
+  nodeId: string,
+  signal?: AbortSignal,
+) {
+  if (
+    !backoff ||
+    signal?.aborted ||
+    nodeId === config.pinnedNodeId ||
+    config.sellers.length < 2
+  )
+    return undefined;
+  return backoff;
+}

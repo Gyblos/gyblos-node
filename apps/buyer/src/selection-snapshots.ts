@@ -17,7 +17,7 @@ import type {
   BuyerControlClient,
   VerifiedSelectionDependencies,
 } from './selection';
-import type { SellerBackoff } from './selection-backoff';
+import { backoffFor, type SellerBackoff } from './selection-backoff';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -165,10 +165,12 @@ function connectFailed(
   seller: StaticControlSeller,
   {
     clients,
+    config,
     dependencies,
     now,
   }: {
     clients: Map<string, BuyerControlClient>;
+    config: BuyerSelectionConfig;
     dependencies: VerifiedSelectionDependencies;
     now: number;
   },
@@ -187,7 +189,7 @@ function connectFailed(
     false,
     0,
     now,
-    dependencies.backoff,
+    backoffFor(dependencies.backoff, config, seller.nodeId, signal),
   );
 }
 
@@ -253,7 +255,7 @@ export async function refreshSnapshots(
             throw error;
           const retryAt = connectFailed(
             seller,
-            { clients, dependencies, now: now() },
+            { clients, config, dependencies, now: now() },
             pinned,
             signal,
           );

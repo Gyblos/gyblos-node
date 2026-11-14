@@ -14,6 +14,7 @@ import type {
   BuyerControlClient,
   VerifiedSelectionDependencies,
 } from './selection';
+import { backoffFor } from './selection-backoff';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -113,7 +114,7 @@ function raceAll(
             false,
             0,
             now(),
-            dependencies.backoff,
+            backoffFor(dependencies.backoff, config, candidate.nodeId, signal),
           );
           reportSellerFailure(dependencies.onSellerFailure, {
             nodeId: candidate.nodeId,
@@ -220,7 +221,12 @@ async function requestCandidate(
               false,
               now() - start,
               now(),
-              dependencies.backoff,
+              backoffFor(
+                dependencies.backoff,
+                config,
+                candidate.nodeId,
+                signal,
+              ),
             );
       reportSellerFailure(dependencies.onSellerFailure, {
         nodeId: candidate.nodeId,
