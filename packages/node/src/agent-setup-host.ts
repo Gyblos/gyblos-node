@@ -172,20 +172,19 @@ function isUneditedProfile(text: string) {
   return marker > 0 && codexProfileText(text.slice(0, marker)) === text;
 }
 
-function profileFilePattern() {
-  const literal = (value: string) =>
-    value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(
-    `^${literal(AGENT_SETUP.provider)}(-[A-Za-z0-9_-]+)?${literal(AGENT_SETUP.codexProfileSuffix)}$`,
-  );
+function isProfileFile(name: string) {
+  const prefix = AGENT_SETUP.provider;
+  const suffix = AGENT_SETUP.codexProfileSuffix;
+  if (!name.startsWith(prefix) || !name.endsWith(suffix)) return false;
+  const model = name.slice(prefix.length, -suffix.length);
+  return model.length === 0 || /^-[A-Za-z0-9_-]+$/.test(model);
 }
 async function removeStaleProfiles(directory: string, kept: Set<string>) {
   const removed: string[] = [];
   const backups: string[] = [];
-  const pattern = profileFilePattern();
   for (const name of await readdir(directory)) {
     const file = join(directory, name);
-    if (!pattern.test(name)) continue;
+    if (!isProfileFile(name)) continue;
     if (!(await lstat(file)).isFile()) continue;
     // Replacement follows an existing target: filesystem identity preserves its actual casing.
     if (kept.has(await realpath(file))) continue;
