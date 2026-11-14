@@ -99,11 +99,14 @@ export async function refreshSnapshots(
       config.sellers.map(async (seller) => {
         // A seller cooling down after a failure cannot win an automatic selection, so it is not contacted
         // until the cooldown ends; a pinned one still is, so the caller can say when it returns.
+        // Selection reads the clock again after the snapshot, so only a cooldown that outlasts it is skipped.
         const stats = dependencies.stats.get(seller.nodeId);
+        const pinned = seller.nodeId === config.pinnedNodeId;
         if (
-          seller.nodeId !== config.pinnedNodeId &&
+          !pinned &&
           stats?.cooldownUntil != null &&
-          stats.cooldownUntil > now()
+          stats.cooldownUntil >
+            now() + (dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs)
         )
           return undefined;
         // A request the caller cancelled is not a seller failure.
@@ -123,6 +126,7 @@ export async function refreshSnapshots(
             failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
             return undefined;
           }
+          deadline.throwIfAborted();
           const client = await connectBefore(
             dependencies.connect(seller),
             deadline,
@@ -150,8 +154,10 @@ export async function refreshSnapshots(
           // A connection to a seller that stopped answering can take the whole transport idle timeout to
           // close; it closes in the background instead of holding this request. A cancelled request
           // still waits for it, like any native work it started.
+          // A pinned seller is asked again on the next request, so its close is still awaited: a new
+          // connection never races one still closing for the seller's per-peer limit.
           const client = clients.get(seller.nodeId);
-          if (client && !signal?.aborted) {
+          if (client && !signal?.aborted && !pinned) {
             clients.delete(seller.nodeId);
             void client.close().catch(() => undefined);
           }

@@ -121,3 +121,57 @@ void test('a connection to a seller that stopped answering closes in the backgro
   assert.ok(performance.now() - started < 2000);
   assert.equal(closing, 1);
 });
+
+void test('a cooldown that ends during the snapshot does not skip the seller', async (t) => {
+  const host = await rig();
+  t.after(() => host.run.wire.close());
+  const healthy = host.config.sellers[0]!.nodeId;
+  const now = host.dependencies.now();
+  // Cooling until just inside the snapshot window: selection, which reads the clock later, may use it.
+  host.dependencies.stats.set(healthy, {
+    successes: 0,
+    failures: 1,
+    latencyMs: 0,
+    waitAccuracy: null,
+    cooldownUntil: now + 100,
+    quotedWaitMs: null,
+    observedWaitMs: null,
+  });
+  await selectBuyerQuote(host.config, host.dependencies).catch(() => undefined);
+  assert.equal(host.attempts.includes(healthy), true);
+  host.arriveLate();
+});
+
+void test("a pinned seller's failed connection is closed before the request returns", async (t) => {
+  const run = await selectionFixture();
+  t.after(() => run.wire.close());
+  const healthy = run.config.sellers[0]!;
+  let closed = false;
+  const stuck: BuyerControlClient = {
+    getCatalog: (signal?: AbortSignal) =>
+      new Promise((_resolve, reject) =>
+        signal?.addEventListener('abort', () => reject(signal.reason), {
+          once: true,
+        }),
+      ),
+    getPresence: async () => assert.fail('unused'),
+    requestOffer: async () => assert.fail('unused'),
+    close: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      closed = true;
+    },
+  };
+  await selectBuyerQuote(
+    {
+      ...run.config,
+      sellers: [healthy, { ...healthy, nodeId: DEAD }],
+      pinnedNodeId: DEAD,
+    },
+    {
+      ...run.dependencies,
+      snapshotMs: 300,
+      connect: async (seller) => (seller.nodeId === DEAD ? stuck : run.client),
+    },
+  );
+  assert.equal(closed, true);
+});
