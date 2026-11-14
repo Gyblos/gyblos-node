@@ -19,7 +19,11 @@ import {
   type BuyerSelectionConfig,
 } from './selection-config';
 import { connectBefore, recordQuote } from './selection-snapshots';
-import { reportSellerFailure, sellerFailureCode } from './seller-failures';
+import {
+  reportSellerFailure,
+  sellerFailureCode,
+  type SellerFailureCode,
+} from './seller-failures';
 
 // After the race, every losing query is cancelled; the caller's cleanup waits for those to settle (a
 // cancelled query settles at once), so each one has already handed its connection to background closing
@@ -32,7 +36,7 @@ export interface RaceState {
   // The remembered signed catalog of each seller whose snapshot came from memory.
   recalled: Map<string, SignedPublicV2>;
 }
-const CATALOG_CHANGED: ReadonlySet<string> = new Set([
+const CATALOG_CHANGED: ReadonlySet<SellerFailureCode> = new Set([
   CONTROL_CODES.STALE,
   CONTROL_CODES.MODEL,
 ]);
