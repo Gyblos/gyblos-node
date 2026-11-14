@@ -45,11 +45,13 @@ import {
 } from './chat-api';
 import { readBody } from './chat-body';
 import { replyError, replyJson, type ChatErrorClassifier } from './chat-errors';
+import { stoppedResult, stoppingStream, withoutStop } from './chat-stop';
 import {
   CHAT_ROUTES,
   FREE_BUYER,
   FREE_BUYER_CODES,
   FREE_CHAT_DETAILS,
+  OPENROUTER,
   PAID_BUYER,
   PAID_BUYER_CODES,
 } from './constants';
@@ -71,7 +73,7 @@ import {
 } from './free-sse';
 import {
   endpointRoutes,
-  requestedRoute,
+  requestedModel,
   type ModelRoute,
   type RoutedModel,
 } from './model-routes';
@@ -147,35 +149,51 @@ async function countTokens(
     replyError(response, error, undefined, chatApi(CHAT_ROUTES.messages));
   }
 }
-// The model a request names, and its input parsed against that model's route.
+// The model a request names (or the first of its OpenRouter fallbacks that this endpoint serves), and its
+// input parsed against that model's route. The answer echoes the name that matched. The fallback list and
+// the buyer's own stop sequences are not part of what a seller receives.
 function routedInput(
   api: ChatApi,
   body: unknown,
   settings: ChatSettings,
   streaming: boolean,
 ) {
-  const route = requestedRoute(
+  const { route, name } = requestedModel(
     endpointRoutes(settings),
     body,
     !!settings.models?.length,
   );
-  const sent =
-    body && typeof body === 'object' ? Reflect.get(body, 'model') : undefined;
-  // The format checks, and the answer echoes, the name the client sent when it names this route.
-  const model =
-    typeof sent === 'string' &&
-    (sent === route.id || route.aliases.includes(sent))
-      ? sent
-      : route.id;
+  const model = name ?? route.id;
+  let request = body;
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    const { [OPENROUTER.fallbackField]: _fallbacks, ...rest } = body as Record<
+      string,
+      unknown
+    >;
+    request = name === undefined ? rest : { ...rest, model: name };
+  }
   const input = api.parse(
-    body,
+    request,
     { ...route.selection, modelId: model },
     route.maxTokens,
     streaming,
     settings.tools ?? false,
   );
-  const { stream: _stream, ...payload } = input; // all but the stream flag
-  return { input, payload, route, model };
+  const { stream: _stream, ...rest } = input; // all but the stream flag
+  return { input, payload: withoutStop(rest), route, model };
+}
+// The executors with the request's stop sequences honored on what the client sees (see chat-stop.ts).
+function stopping(
+  scoped: { execute: FreeChatExecutor; stream?: FreeChatStreamExecutor },
+  stops: string[] | undefined,
+) {
+  if (!stops) return scoped;
+  const { execute, stream } = scoped;
+  return {
+    execute: async (...args: Parameters<FreeChatExecutor>) =>
+      stoppedResult(await execute(...args), stops),
+    stream: stream && stoppingStream(stream, stops),
+  };
 }
 function expireRequest(
   request: IncomingMessage,
@@ -251,10 +269,11 @@ export function freeBuyerHandler(
         settings,
         stream !== undefined,
       );
-      if (input.stream && scoped.stream) {
+      const run = stopping(scoped, input.stop);
+      if (input.stream && run.stream) {
         format = streamFormat(api, model, request);
         await executeFreeSse(
-          scoped.stream,
+          run.stream,
           payload,
           controller.signal,
           response,
@@ -263,7 +282,7 @@ export function freeBuyerHandler(
         );
         return;
       }
-      const result = await scoped.execute(
+      const result = await run.execute(
         payload,
         controller.signal,
         undefined,

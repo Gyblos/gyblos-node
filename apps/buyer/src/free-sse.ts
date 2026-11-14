@@ -54,6 +54,8 @@ export interface ChatPayment {
 export type ChatResult = FreeExecutionResult & {
   payment?: ChatPayment;
   execution?: OfferPricingKind;
+  // The stop sequence the buyer ended the answer at (see chat-stop.ts), for formats that name it.
+  stopSequence?: string;
 };
 export const executionFields = (result: ChatResult) =>
   result.execution ? { [BUYER_EXECUTION_FIELD]: result.execution } : {};

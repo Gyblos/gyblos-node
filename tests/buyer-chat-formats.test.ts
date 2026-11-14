@@ -119,7 +119,8 @@ void test('an Anthropic request carries system text apart and needs max_tokens',
     { max_tokens: undefined },
     // A server tool runs at the provider, not on a Gyblos seller.
     { tools: [{ type: 'web_search_20250305', name: 'web' }] },
-    { stop_sequences: ['x'] },
+    // Stop sequences are honored (see buyer-chat-openrouter.test.ts); a malformed list is still refused.
+    { stop_sequences: [''] },
     { messages: [{ role: 'system', content: 'x' }] },
     {
       messages: [

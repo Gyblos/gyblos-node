@@ -32,6 +32,7 @@ import {
   checkStream,
   invalidChat,
   outputTokens,
+  stopInput,
   toolInput,
   type FreeChatInput,
 } from './free-chat';
@@ -113,16 +114,22 @@ export function parseAnthropicChat(
       messages,
       allowTools,
     ),
+    ...stopInput(row.stop_sequences, 'stop_sequences'),
     ...stream,
   };
 }
 
-export const anthropicStop = (reason: ChatResult['finishReason']) =>
-  reason === ENGINE_DONE_REASONS.LENGTH
-    ? 'max_tokens'
-    : reason === TOOL_CALLS_DONE
-      ? 'tool_use'
-      : 'end_turn';
+export const anthropicStop = (
+  reason: ChatResult['finishReason'],
+  sequence?: string,
+) =>
+  sequence !== undefined
+    ? 'stop_sequence'
+    : reason === ENGINE_DONE_REASONS.LENGTH
+      ? 'max_tokens'
+      : reason === TOOL_CALLS_DONE
+        ? 'tool_use'
+        : 'end_turn';
 // The answer's content blocks: its text, then a tool_use block per call.
 const anthropicContent = (result: ChatResult) => [
   ...(result.text || !result.toolCalls?.length
@@ -141,8 +148,8 @@ export function anthropicMessage(model: string, result: ChatResult) {
     role: FREE_CHAT_ROLES.ASSISTANT,
     model,
     content: anthropicContent(result),
-    stop_reason: anthropicStop(result.finishReason),
-    stop_sequence: null,
+    stop_reason: anthropicStop(result.finishReason, result.stopSequence),
+    stop_sequence: result.stopSequence ?? null,
     usage: {
       input_tokens: result.usage.inputTokens,
       output_tokens: result.usage.outputTokens,
@@ -193,8 +200,8 @@ export function anthropicStream(model: string): ChatStreamFormat {
       event('message_delta', {
         type: 'message_delta',
         delta: {
-          stop_reason: anthropicStop(result.finishReason),
-          stop_sequence: null,
+          stop_reason: anthropicStop(result.finishReason, result.stopSequence),
+          stop_sequence: result.stopSequence ?? null,
         },
         usage: {
           input_tokens: result.usage.inputTokens,
