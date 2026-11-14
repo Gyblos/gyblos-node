@@ -85,17 +85,33 @@ void test(
     const result = child(
       `
       const state=await import('@gyblos/buyer/discovery-storage');
+      const engine=await import('@gyblos/lab-harness/acceptance/engine');
       const {runNodeDiscoveryAcceptance}=await import('@gyblos/lab-harness/acceptance');
       let rejected=false;
       try{await runNodeDiscoveryAcceptance();}catch(error){rejected=error.code==='ACCEPTANCE_FAILED';}
       finally{await state.cleanup();}
-      console.log(JSON.stringify({rejected,opens:state.opens}));
+      console.log(JSON.stringify({rejected,opens:state.opens,checks:engine.checks()}));
     `,
-      [{ name: '@gyblos/buyer/discovery-storage', module: wrapper }],
+      [
+        { name: '@gyblos/buyer/discovery-storage', module: wrapper },
+        {
+          name: '@gyblos/lab-harness/acceptance/engine',
+          module: `
+            import {createAcceptanceEngine as actual} from '@gyblos/lab-harness/acceptance/engine';
+            let managed;
+            export function createAcceptanceEngine(mode){managed=actual(mode);return managed;}
+            export function checks(){return managed.generations();}
+          `,
+        },
+      ],
     );
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stderr, '');
-    assert.deepEqual(JSON.parse(result.stdout), { rejected: true, opens: 2 });
+    assert.deepEqual(JSON.parse(result.stdout), {
+      rejected: true,
+      opens: 2,
+      checks: 2,
+    });
   },
 );
 
