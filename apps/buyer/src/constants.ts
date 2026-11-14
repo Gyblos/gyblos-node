@@ -122,6 +122,12 @@ export const BUYER_SELECTION = {
   signatureHexCharacters: 128,
   randomRange: 0x100000000,
   cooldownMs: 30000,
+  // A cached seller snapshot is used only while its presence and catalog stay current this long more.
+  snapshotMarginMs: 15_000,
+  // A passed identity check is reused this long (a revocation reaches the buyer this late at most).
+  identityCacheMs: 600_000,
+  // Sellers remembered at once; the memory starts over when full.
+  maxCachedSellers: 1024,
 } as const;
 
 // Discovery replay metadata is separate from payment authorization journals and selection telemetry.

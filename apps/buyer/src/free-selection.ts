@@ -3,6 +3,7 @@
 import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
+import type { BuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
 import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
@@ -38,6 +39,7 @@ import {
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
 import { selectBusyAwareBuyerQuote } from './selection-busy';
+import { rememberedWork, type SnapshotCache } from './selection-cache';
 import {
   BUYER_FAILOVER,
   type BuyerSelectionConfig,
@@ -55,6 +57,7 @@ export function freeBuyerDependencies(
   const admission = freeAdmission(options.parallel ?? 1);
   const sticky = stickySellers(BUYER_SELECTION.stickyConversations);
   const now = options.now ?? Date.now;
+  const { identity, remembered } = rememberedWork(prepared, options, now);
   const policy = prepared.config;
   requireReasoningOff(policy);
   const sellers = new Map(
@@ -81,14 +84,14 @@ export function freeBuyerDependencies(
     done: (winner) => admission.done(winner.nodeId),
     select: (excluded, signal, needs) =>
       admission.select(excluded, signal, (skip) =>
-        selectSticky(prepared, options, sticky, skip, signal, needs),
+        selectSticky(prepared, remembered, sticky, skip, signal, needs),
       ),
     async execute(winner, request, signal, onDelta, beforeExecute) {
       const seller = winner.seller ?? sellers.get(winner.nodeId);
       if (
         !seller ||
         !(await permits(winner)) ||
-        !(await verifyBuyerIdentity(prepared.identity, seller, signal))
+        !(await verifyBuyerIdentity(identity, seller, signal))
       )
         throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
       signal.throwIfAborted();
@@ -162,6 +165,10 @@ export interface FreeSelectionOptions {
   fetch?: DiscoveryFetch;
   // Free requests that may run side by side, each on its own seller; 1 when absent.
   parallel?: number;
+  // Seller snapshots remembered across requests; the free buyer keeps one for its lifetime.
+  snapshots?: SnapshotCache;
+  // The identity check to use instead of prepared.identity: the free buyer's remembers passed checks.
+  identity?: BuyerIdentityVerifier;
 }
 export function sellerAddress(seller: StaticControlSeller, relayOnly: boolean) {
   if (seller.relayUrl) assertConfiguredRelay(seller.relayUrl);
@@ -252,7 +259,12 @@ export async function selectWinner(
   const verifyIdentity = (
     seller: StaticControlSeller,
     querySignal?: AbortSignal,
-  ) => verifyBuyerIdentity(prepared.identity, seller, querySignal);
+  ) =>
+    verifyBuyerIdentity(
+      options.identity ?? prepared.identity,
+      seller,
+      querySignal,
+    );
   const base = routedPolicy(policy, excluded, request, route);
   const config = await withDiscovered(
     prepared,
@@ -281,6 +293,7 @@ export async function selectWinner(
             })
         : undefined,
       connect: (seller) => connectFreeControl(seller, options, now),
+      ...(options.snapshots ? { snapshots: options.snapshots } : {}),
       onSellerFailure: options.onSellerFailure,
       onPinnedBusy: options.onPinnedBusy,
     },
@@ -363,6 +376,8 @@ export async function connectFreeControl(
       client.getPresence(...args),
     requestOffer: (...args: Parameters<typeof client.requestOffer>) =>
       client.requestOffer(...args),
+    useCatalog: (...args: Parameters<typeof client.useCatalog>) =>
+      client.useCatalog(...args),
     async close() {
       try {
         await client.close();

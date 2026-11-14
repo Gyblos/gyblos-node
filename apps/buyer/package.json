@@ -34,6 +34,7 @@
     "./trust": "./src/trust.ts",
     "./control": "./src/control.ts",
     "./selection": "./src/selection.ts",
+    "./selection-cache": "./src/selection-cache.ts",
     "./selection-config": "./src/selection-config.ts",
     "./model-routes": "./src/model-routes.ts",
     "./selection-stats": "./src/selection-stats.ts",

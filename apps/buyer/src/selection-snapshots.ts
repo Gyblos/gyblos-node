@@ -3,6 +3,7 @@
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import type { KnownSeller } from '@gyblos/core/seller-selection';
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
 import {
@@ -28,12 +29,13 @@ import {
   type SellerFailureCode,
 } from './seller-failures';
 
-export async function verifiedSeller(
+// The seller's verified snapshot and the signed catalog it came from.
+async function verifiedSnapshot(
   client: BuyerControlClient,
   seller: StaticControlSeller,
   now: () => number,
   signal: AbortSignal,
-): Promise<KnownSeller> {
+): Promise<{ known: KnownSeller; signed: SignedPublicV2 }> {
   const signed = await client.getCatalog(signal);
   const trust = { owner: seller.owner, nodeId: seller.nodeId, now: now() };
   const catalog = await verifyPublicV2(signed, trust);
@@ -52,12 +54,23 @@ export async function verifiedSeller(
   if (withdrawal && withdrawal.kind !== PUBLIC_RECORD_KINDS.WITHDRAWAL)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
   return {
-    catalog,
-    presence,
-    withdrawal,
-    badge: SELLER_BADGES.DECLARED_USAGE,
-    openChannel: false,
+    signed,
+    known: {
+      catalog,
+      presence,
+      withdrawal,
+      badge: SELLER_BADGES.DECLARED_USAGE,
+      openChannel: false,
+    },
   };
+}
+export async function verifiedSeller(
+  client: BuyerControlClient,
+  seller: StaticControlSeller,
+  now: () => number,
+  signal: AbortSignal,
+): Promise<KnownSeller> {
+  return (await verifiedSnapshot(client, seller, now, signal)).known;
 }
 export function recordQuote(
   stats: Map<string, LocalSellerStats>,
@@ -85,6 +98,21 @@ function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
   });
 }
 
+// A seller cooling down after a failure cannot win an automatic selection, so it is not contacted until
+// the cooldown ends; a pinned one still is, so the caller can say when it returns. Selection reads the
+// clock again after the snapshot, so only a cooldown that outlasts it counts.
+function coolingPastSnapshot(
+  seller: StaticControlSeller,
+  dependencies: VerifiedSelectionDependencies,
+  now: number,
+) {
+  const until = dependencies.stats.get(seller.nodeId)?.cooldownUntil;
+  return (
+    until != null &&
+    until > now + (dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs)
+  );
+}
+
 export async function refreshSnapshots(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
@@ -97,17 +125,8 @@ export async function refreshSnapshots(
   return settledValues(
     await Promise.allSettled(
       config.sellers.map(async (seller) => {
-        // A seller cooling down after a failure cannot win an automatic selection, so it is not contacted
-        // until the cooldown ends; a pinned one still is, so the caller can say when it returns.
-        // Selection reads the clock again after the snapshot, so only a cooldown that outlasts it is skipped.
-        const stats = dependencies.stats.get(seller.nodeId);
         const pinned = seller.nodeId === config.pinnedNodeId;
-        if (
-          !pinned &&
-          stats?.cooldownUntil != null &&
-          stats.cooldownUntil >
-            now() + (dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs)
-        )
+        if (!pinned && coolingPastSnapshot(seller, dependencies, now()))
           return undefined;
         // A request the caller cancelled is not a seller failure.
         const failed = (phase: SellerFailurePhase, code: SellerFailureCode) => {
@@ -126,6 +145,9 @@ export async function refreshSnapshots(
             failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
             return undefined;
           }
+          // A snapshot verified on an earlier request and still current: no connection, no records asked.
+          const cached = dependencies.snapshots?.get(seller, now());
+          if (cached) return cached;
           deadline.throwIfAborted();
           const client = await connectBefore(
             dependencies.connect(seller),
@@ -133,7 +155,12 @@ export async function refreshSnapshots(
             signal,
           );
           clients.set(seller.nodeId, client);
-          const verified = await verifiedSeller(client, seller, now, deadline);
+          const { known: verified, signed } = await verifiedSnapshot(
+            client,
+            seller,
+            now,
+            deadline,
+          );
           if (
             dependencies.observeVerified &&
             !(await dependencies.observeVerified(verified))
@@ -141,6 +168,7 @@ export async function refreshSnapshots(
             failed(SELLER_FAILURE_PHASES.DISCOVERY, SELLER_FAILURES.DISCOVERY);
             return undefined;
           }
+          dependencies.snapshots?.set(seller, verified, signed);
           return verified;
         } catch (error) {
           if (
@@ -161,6 +189,7 @@ export async function refreshSnapshots(
             clients.delete(seller.nodeId);
             void client.close().catch(() => undefined);
           }
+          dependencies.snapshots?.drop(seller.nodeId);
           recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
           failed(SELLER_FAILURE_PHASES.CONNECT, sellerFailureCode(error));
           return undefined;

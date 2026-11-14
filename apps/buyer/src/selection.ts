@@ -23,6 +23,7 @@ import {
 } from './constants';
 import type { createBuyerControlClient } from './control';
 import { raceControlOffers, type WinningQuote } from './offer-race';
+import type { SnapshotCache } from './selection-cache';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -45,7 +46,8 @@ export { verifiedSeller };
 export type BuyerControlClient = Pick<
   ReturnType<typeof createBuyerControlClient>,
   'getCatalog' | 'getPresence' | 'requestOffer' | 'close'
->;
+> &
+  Partial<Pick<ReturnType<typeof createBuyerControlClient>, 'useCatalog'>>;
 export type SelectionDecision =
   | { ok: true; winner: WinningQuote }
   | {
@@ -69,6 +71,8 @@ export interface VerifiedSelectionDependencies {
     signal?: AbortSignal,
   ) => Promise<boolean>;
   observeVerified?: (seller: KnownSeller) => Promise<boolean>;
+  // Snapshots kept from earlier requests (selection-cache.ts); absent, every request asks every seller.
+  snapshots?: SnapshotCache;
   // Told why each seller dropped out; it never affects which seller wins.
   onSellerFailure?: SellerFailureReporter;
 }
@@ -174,7 +178,7 @@ function offerCurrent(winner: WinningQuote, now: () => number) {
 
 function raceCandidates(
   candidates: readonly SellerCandidate[],
-  clients: ReadonlyMap<string, BuyerControlClient>,
+  clients: Map<string, BuyerControlClient>,
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
   now: () => number,
@@ -199,6 +203,7 @@ function raceCandidates(
       // A seller silent for the whole window is cooled down like one that refused.
       onExpired: (pending) => {
         for (const candidate of pending) {
+          dependencies.snapshots?.drop(candidate.nodeId);
           recordQuote(dependencies.stats, candidate.nodeId, false, 0, now());
           reportSellerFailure(dependencies.onSellerFailure, {
             nodeId: candidate.nodeId,
@@ -211,9 +216,31 @@ function raceCandidates(
   );
 }
 
+// The candidate's connection: the one its snapshot was fetched on, or, for a snapshot remembered from an
+// earlier request, a new one that starts from that verified catalog.
+async function candidateClient(
+  candidate: SellerCandidate,
+  clients: Map<string, BuyerControlClient>,
+  config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
+) {
+  const open = clients.get(candidate.nodeId);
+  if (open) return open;
+  const seller = config.sellers.find(
+    (item) =>
+      item.nodeId === candidate.nodeId && item.owner === candidate.owner,
+  );
+  const cached = seller && dependencies.snapshots?.signedCatalog(seller);
+  if (!seller || !cached)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+  const client = await dependencies.connect(seller);
+  clients.set(candidate.nodeId, client);
+  await client.useCatalog?.(cached);
+  return client;
+}
 async function requestCandidate(
   candidate: SellerCandidate,
-  clients: ReadonlyMap<string, BuyerControlClient>,
+  clients: Map<string, BuyerControlClient>,
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
   now: () => number,
@@ -222,7 +249,13 @@ async function requestCandidate(
   const start = now();
   const request = config.request;
   try {
-    const quote = await clients.get(candidate.nodeId)!.requestOffer(
+    const client = await candidateClient(
+      candidate,
+      clients,
+      config,
+      dependencies,
+    );
+    const quote = await client.requestOffer(
       {
         buyer: dependencies.buyer,
         selection: request.selection,
@@ -247,6 +280,8 @@ async function requestCandidate(
     );
     return quote;
   } catch (error) {
+    // Its catalog may have changed or it may be gone: the next request verifies it again.
+    dependencies.snapshots?.drop(candidate.nodeId);
     if (!querySignal.aborted) {
       // A seller without tools answered as designed: it is not cooled down for the requests it serves.
       if (sellerFailureCode(error) !== CONTROL_CODES.TOOLS)
