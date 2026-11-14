@@ -390,8 +390,8 @@ curl -s -X POST https://discovery.gyblos.com/v1/registrations \
 Rolling that code back leaves the `0003` tables unused; nothing needs reverting.
 
 Public uptime (migration `0004`) follows the same order: apply the migration,
-then deploy. It only adds a table, so the running version keeps working, and
-rolling the code back leaves the table unused.
+then deploy. It only adds two uptime tables, so the running version keeps
+working, and rolling the code back leaves those tables unused.
 
 ```sh
 npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote   # 0004
