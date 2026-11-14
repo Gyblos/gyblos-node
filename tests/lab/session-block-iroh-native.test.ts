@@ -11,7 +11,7 @@ import {
 import { nativeBlockProduct } from '../support/batch-block-native';
 import { BLOCK_TEXT } from '../support/batch-block-product';
 import { within } from '../support/native-fixture';
-import { NATIVE_TEST_OPTIONS } from '../support/native-runtime';
+import { NATIVE_TEST_OPTIONS, waitFor } from '../support/native-runtime';
 
 void test(
   'native blocks: two inferences share one deposit, verified signatures and one final settlement',
@@ -112,5 +112,64 @@ void test(
     );
     assert.equal(f.offers.generations(), 0);
     assert.equal(f.financial.vm.sends(), sends);
+  },
+);
+void test(
+  'native blocks: the seller finalizes a completed below-minimum channel at host expiry while the buyer is offline',
+  NATIVE_TEST_OPTIONS,
+  async (t) => {
+    let now = 1800000000000;
+    t.mock.method(Date, 'now', () => now);
+    const f = await nativeBlockProduct(() => now);
+    t.after(f.close);
+    await within(f.buyer().execute(await f.offers.quote(1), f.offers.input));
+    await f.buyer().disconnect();
+    await f.buyer().settled();
+    now = f.financial.terms.expiresAt + 1;
+    await waitFor(
+      () => f.financial.seller().snapshot().state === SESSION_STATES.CLOSED,
+      3500,
+      'host-expiry finalization',
+    );
+    const settled = await f.buyer().reconcile();
+    assert.equal(settled?.chargedAtomic, '80');
+    assert.equal(settled?.refundedAtomic, '920');
+    assert.equal(f.offers.generations(), 1);
+  },
+);
+void test(
+  'native blocks: exhausting the capped deposit triggers seller finalization without a buyer close request',
+  NATIVE_TEST_OPTIONS,
+  async (t) => {
+    const now = 1800000000000;
+    t.mock.method(Date, 'now', () => now);
+    const f = await nativeBlockProduct(() => now);
+    t.after(f.close);
+    const sends = f.financial.vm.sends();
+    await within(
+      f
+        .buyer()
+        .execute(
+          await f.offers.quote(1, {
+            maxTokens: 8,
+            maxAtomic: '1000',
+            prices: {
+              inputAtomicPerMtok: '100000000',
+              outputAtomicPerMtok: '100000000',
+            },
+          }),
+          { ...f.offers.input, maxTokens: 8 },
+        ),
+    );
+    await waitFor(
+      () => f.financial.seller().snapshot().state === SESSION_STATES.CLOSED,
+      3500,
+      'deposit-exhaustion finalization',
+    );
+    const settled = await f.buyer().reconcile();
+    assert.equal(settled?.chargedAtomic, '1000');
+    assert.equal(settled?.refundedAtomic, '0');
+    assert.equal(f.offers.generations(), 1);
+    assert.equal(f.financial.vm.sends(), sends + 2);
   },
 );
