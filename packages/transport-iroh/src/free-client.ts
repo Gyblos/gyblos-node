@@ -48,12 +48,22 @@ async function readResponse(
     ),
   );
   check();
-  if (
-    (await stage(stream.recv.read(1), IROH_DEADLINES.ingressMs, state)).length
-  )
+  if ((await trailing(stream, state)).length)
     throw new FreeExecutionError(FREE_EXECUTION_CODES.INVALID);
   check();
   return reader.finish();
+}
+// The end-of-stream check after a complete response: any byte is invalid, but a connection that breaks
+// once the whole answer arrived has lost nothing, so the answer stands rather than counting as a failure
+// (which a buyer may otherwise resend to another seller). A deadline or cancellation still fails.
+async function trailing(stream: ControlStream, state: FreeClientState) {
+  try {
+    return await stage(stream.recv.read(1), IROH_DEADLINES.ingressMs, state);
+  } catch (error) {
+    if (error instanceof FreeExecutionError || state.lifetime.signal.aborted)
+      throw error;
+    return [];
+  }
 }
 interface FreeClientOptions {
   // Trusted host guard runs synchronously after authentication and immediately before transmission.

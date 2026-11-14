@@ -70,6 +70,9 @@ export interface StaticControlSeller {
   withdrawal?: SignedPublicV2;
   manualTrust?: boolean;
 }
+export const BUYER_FAILOVER = { SAFE: 'safe', NEVER: 'never' } as const;
+export type BuyerFailover =
+  (typeof BUYER_FAILOVER)[keyof typeof BUYER_FAILOVER];
 export interface BuyerSelectionConfig {
   routing?: BuyerRoutingPolicy;
   session?: BuyerSessionPolicy;
@@ -82,6 +85,9 @@ export interface BuyerSelectionConfig {
   quoteWindowMs?: number;
   // The models the endpoint serves by name; when absent, request.selection is the one model.
   models?: ModelRoute[];
+  // "safe" (the default): a free request whose seller failed after the prompt was sent, before any
+  // visible text, goes to another seller, so the prompt may reach two sellers. "never" keeps it on one.
+  failover?: BuyerFailover;
   // Set per request, never read from selection.json: the seller that served this conversation before.
   previousSeller?: string;
 }
@@ -191,6 +197,7 @@ export function parseBuyerSelectionConfig(
         'session',
         'routing',
         'models',
+        'failover',
       ],
     );
     const request = parseRequest(row.request);
@@ -236,6 +243,9 @@ export function parseBuyerSelectionConfig(
       ...(row.pinnedNodeId === undefined
         ? {}
         : { pinnedNodeId: controlHex(row.pinnedNodeId) }),
+      ...(row.failover === undefined
+        ? {}
+        : { failover: parseFailover(row.failover) }),
       ...(row.quoteWindowMs === undefined
         ? {}
         : {
@@ -249,6 +259,12 @@ export function parseBuyerSelectionConfig(
   } catch {
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
   }
+}
+
+function parseFailover(value: unknown): BuyerFailover {
+  for (const option of Object.values(BUYER_FAILOVER))
+    if (value === option) return option;
+  throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
 }
 
 function validRequest(request: SellerRequest) {

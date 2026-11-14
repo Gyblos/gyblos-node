@@ -5,6 +5,12 @@ import { UPTO_WITHDRAW_STEPS } from 'x402-upto-metered';
 
 export const PAYMENT_PHASES = { ADMIT: 'admit', SETTLE: 'settle' } as const;
 export const BUYER_OBSERVATION = { maxResponseBytes: 1024 * 1024 } as const;
+export const BATCH_BUYER_CHECKPOINTS = {
+  OPENING_TRANSACTION: 'gyblos:opening:transaction',
+  OPENING_VOUCHER: 'gyblos:opening:voucher',
+  WITHDRAWAL: 'gyblos:withdrawal',
+  WITHDRAWAL_INTENT: 'gyblos:withdrawal:intent',
+} as const;
 export const UPTO_BUYER_DISTINCT_PARTIES = 4;
 export const BUYER_OBSERVATION_RPC_METHODS = [
   'getLatestBlockhash',
@@ -16,6 +22,12 @@ export const BUYER_OBSERVATION_RPC_METHODS = [
   'getAccountInfo',
   'minimumLedgerSlot',
   'getFirstAvailableBlock',
+] as const;
+export const BUYER_RECOVERY_RPC_METHODS = [
+  ...BUYER_OBSERVATION_RPC_METHODS,
+  'getBlockTime',
+  'sendTransaction',
+  'getSignatureStatuses',
 ] as const;
 export type PaymentPhase = (typeof PAYMENT_PHASES)[keyof typeof PAYMENT_PHASES];
 

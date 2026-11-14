@@ -4,7 +4,13 @@ When a paid call fails halfway, the buyer cannot know whether money moved. The
 rule is simple: **an uncertain payment blocks new payments until it is proven
 on-chain.** Nothing is retried automatically.
 
-## Paid v2 opening recovery
+## Single-request paid v2 recovery
+
+The next two sections concern the separate Upto buyer journal used by the
+single-request paid flow. Reusable batch channels use the recovery described
+under [Reusable batch recovery](#reusable-batch-recovery).
+
+### Opening recovery
 
 The paid v2 buyer journals an intent, then prepares one SDK channel open without
 asking the wallet to sign. Before the real payer signature, it durably records
@@ -34,7 +40,7 @@ channel reusable between requests. Lock acquisition can reclaim a complete lock
 whose owner is dead on the same host and PID namespace. Ambiguous ownership
 requires investigation; never delete a lock to bypass an uncertain payment.
 
-## Paid v2 closure and refund results
+### Closure and refund results
 
 With the buyer stopped and the original home intact, `pnpm buyer:withdraw:paid`
 can request closure, wait for the chain's grace period, then seal and distribute
@@ -73,6 +79,43 @@ detect process-start identity or provide cross-host/PID-namespace coordination.
 Do not clear a lock or journal, retry a prompt or authorize a replacement
 channel to bypass uncertainty.
 
+## Reusable batch recovery
+
+Stop the buyer and keep its original home. `pnpm buyer:withdraw:paid` also
+recovers the existing batch catalog and each of its channels, including a single
+channel created before the catalog existed. The command takes the buyer's
+runtime lock, then the catalog lock, then one channel lock. A running buyer is
+refused. Recovery signs control transactions and spends buyer fees; it is not
+the read-only reconciliation command.
+
+Opening checkpoints retain the exact SDK message before each payer signature,
+then its verified signature. Restarting reuses the original salt, blockhash,
+channel and zero voucher; it does not create a replacement deposit. Control
+checkpoints retain the unsigned message before signing and the complete signed
+transaction before sending. Lost replies are resolved against finalized
+signature status and bound channel state. If the original signed transaction has
+not landed and remains valid, recovery can resend **only those same saved
+bytes**. It cannot sign a different live attempt. An interrupted unsigned intent
+may be replaced only after its original blockhash has expired at a nonregressing
+finalized bank, or its close is independently proven complete.
+
+The buyer can request closure without the seller. Further invocations wait for
+the program's grace period, then seal and distribute to the original payer,
+seller and treasury accounts. No channel, recipient or split comes from a seller
+reply or a modified checkpoint. A confirmed control operation alone does not
+release the deposit reservation. Recovery independently verifies the original
+opening and final token transfers, checks the charge against the buyer's
+cumulative authorization and checks charge plus refund against the deposit. Only
+then does it persist `closed`, clear uncertainty and credit the verified refund
+in the catalog. Missing evidence keeps the channel blocked.
+
+An opening without enough original signing data, or an expired opening whose
+deposit cannot be proven to have landed, stays unresolved. An absent account
+does not become an invented refund. No journal format migration, rollback
+protection against an older home backup, prompt retry or automatic top-up is
+provided by this recovery. Keep the original home; never delete a journal or
+lock to bypass an unresolved result.
+
 ## Offline abrupt-exit acceptance
 
 The native crash suites run the actual payment client, journal, withdrawal and
@@ -97,8 +140,11 @@ public RPC behavior. Simulated inclusion is treated as finalized locally.
 
 Process death is not OS/drive power loss: fsync does not provide F_FULLFSYNC on
 macOS. Restoration of an old home/journal can still erase later checkpoints;
-independent rollback protection remains separate. Reusable multi-request
-channels and background channel management are not enabled by this acceptance.
+independent rollback protection remains separate. The batch crash suite uses the
+current reusable store and buyer-only recovery, with the seller stopped. The CLI
+test exercises a devnet-labelled open and request-close in the VM; the full
+native refund suites use the treasury-matching testnet identifier. Neither test
+contacts devnet or proves the deployed binary's behavior.
 
 The remaining sections describe the separate legacy paid-v1 recovery path.
 

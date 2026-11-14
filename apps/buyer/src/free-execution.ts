@@ -1,8 +1,10 @@
-// Orchestrates free quote execution with failover only before possible prompt transmission.
+// Orchestrates free quote execution with failover to another seller: before the prompt may have been
+// sent, and, when resending is allowed, after it was sent as long as no visible text reached the client.
 // Selection and I/O are injected; this module never authorizes payments or records content.
 import { createHmac, randomBytes } from 'node:crypto';
 
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
+import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import type {
   ModelSelection,
   SignedOfferV2,
@@ -61,6 +63,9 @@ export interface FreeBuyerDependencies {
     now?: () => number;
   };
   conversationKey?: ReturnType<typeof createConversationKey>;
+  // selection.json `failover`: "safe" (the default) lets a request whose seller failed after the prompt
+  // was sent, but before any visible text, go to another seller; "never" keeps the prompt on one seller.
+  resendAfterSend?: boolean;
   enter?(): () => void;
   // Hands a selected seller back once this request is done with it (free requests side by side).
   done?(winner: FreeWinner): void;
@@ -93,6 +98,10 @@ export async function executeBuyerFree(
       ...(external ? [external] : []),
     ]);
     const excluded = new Set<string>();
+    // The failure of a seller that already had the prompt: when no other seller can take it, or time
+    // runs out, the client sees that failure, not a later selection's.
+    let resent: FreeClientError | undefined;
+    let resends = 0;
     while (!signal.aborted) {
       const winner = await dependencies
         .select(excluded, signal, {
@@ -101,11 +110,13 @@ export async function executeBuyerFree(
           conversation: dependencies.conversationKey?.(input, model),
         })
         .catch((error) => {
-          // Local occupancy is not a network failure; retain request-local model telemetry.
           const busy =
             error instanceof FreeBuyerError &&
             error.code === FREE_BUYER_CODES.BUSY;
-          if (!signal.aborted && !busy)
+          // Every other seller taken by requests side by side: busy, so the client may try again.
+          if (resent && !busy) throw resent;
+          // Local occupancy is not a network failure; retain request-local model telemetry.
+          if (!signal.aborted && !busy && !resent)
             buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
           throw error;
         });
@@ -114,19 +125,25 @@ export async function executeBuyerFree(
         if (excluded.has(winner.nodeId))
           throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
         excluded.add(winner.nodeId);
-        const result = await executeSelectedBuyerFree(
+        const result = await attemptSelectedFree(
           input,
           dependencies,
           winner,
           signal,
           onDelta,
+          undefined,
+          dependencies.resendAfterSend === true &&
+            resends < FREE_BUYER.maxResends,
         );
-        if (result) return result;
+        if (result instanceof Resent) {
+          resent = result.error;
+          resends++;
+        } else if (result) return result;
       } finally {
         dependencies.done?.(winner);
       }
     }
-    throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+    throw resent ?? new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   } finally {
     release?.();
   }
@@ -153,7 +170,26 @@ export function createConversationKey() {
   };
 }
 
+// Returned, with the seller's failure, when the prompt was sent to a seller that failed before any visible
+// text: another seller may take the whole request again.
+class Resent {
+  constructor(readonly error: FreeClientError) {}
+}
+// Failures after sending that another seller can fix: the seller dropped (the connection broke) or
+// stalled (this buyer's own timeout). Both count against that seller (free-memory.ts `sellerFault`).
+// An error the seller itself answered is not resent: a refusal (busy, caps) would let a seller read
+// prompts it never serves without paying for it, and an engine failure may be the request's own and
+// would repeat on every seller. A client that left is not a seller failure.
+function resendable(error: FreeClientError) {
+  return (
+    !error.consumerFailure &&
+    !error.remote &&
+    (error.ioFailure || error.code === FREE_EXECUTION_CODES.TIMEOUT)
+  );
+}
+
 // Caller owns the request admission, deadline and exclusion set; this never selects another seller.
+// Undefined: the prompt was never sent, so another seller may take it.
 export async function executeSelectedBuyerFree(
   input: FreeExecutionBuildInput,
   dependencies: FreeBuyerDependencies,
@@ -162,6 +198,29 @@ export async function executeSelectedBuyerFree(
   onDelta?: (text: string) => Promise<void>,
   beforeExecute?: () => void,
 ): Promise<FreeExecutionResult | undefined> {
+  const result = await attemptSelectedFree(
+    input,
+    dependencies,
+    winner,
+    signal,
+    onDelta,
+    beforeExecute,
+    false,
+  );
+  return result instanceof Resent ? undefined : result;
+}
+
+// As executeSelectedBuyerFree; with `resend`, a Resent also means the prompt was sent but the seller
+// failed before any visible text, so another seller may take the whole request again.
+async function attemptSelectedFree(
+  input: FreeExecutionBuildInput,
+  dependencies: FreeBuyerDependencies,
+  winner: FreeWinner,
+  signal: AbortSignal,
+  onDelta: ((text: string) => Promise<void>) | undefined,
+  beforeExecute: (() => void) | undefined,
+  resend: boolean,
+): Promise<FreeExecutionResult | Resent | undefined> {
   const request = buildFreeExecutionRequest(winner.quote, input);
   const observer = buyerExecutionTelemetry(
     request,
@@ -171,10 +230,12 @@ export async function executeSelectedBuyerFree(
   observer?.received();
   const receipt = buyerReceiptObservation(dependencies, Boolean(onDelta));
   let delivered = false;
+  let visible = false;
   const emit = onDelta
     ? async (text: string) => {
         signal.throwIfAborted();
         delivered = true;
+        if (text) visible = true;
         receipt?.text(text);
         await onDelta(text);
         signal.throwIfAborted();
@@ -195,12 +256,9 @@ export async function executeSelectedBuyerFree(
     return result;
   } catch (error) {
     failBuyerTelemetry(observer, error, signal, delivered);
-    if (
-      !(error instanceof FreeClientError) ||
-      error.sent ||
-      delivered ||
-      signal.aborted
-    )
-      throw error;
+    if (!(error instanceof FreeClientError) || signal.aborted) throw error;
+    if (!error.sent && !delivered) return undefined;
+    if (resend && !visible && resendable(error)) return new Resent(error);
+    throw error;
   }
 }

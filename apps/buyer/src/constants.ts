@@ -186,6 +186,8 @@ export const FREE_BUYER = {
   noRetryHeader: 'x-should-retry',
   retryAfterHeader: 'retry-after',
   requestMs: 180000,
+  // Times one request may go to another seller after its prompt was sent (failover "safe").
+  maxResends: 2,
   headerMs: 10000,
   headers: 16384,
 } as const;

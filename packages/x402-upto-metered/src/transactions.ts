@@ -133,6 +133,11 @@ export async function uptoSend(
   beforeSend?: (attempt: {
     transaction: string;
     lastValidBlockHeight: string;
+    wire: string;
+  }) => Promise<void>,
+  beforeSign?: (intent: {
+    wire: string;
+    lastValidBlockHeight: string;
   }) => Promise<void>,
 ): Promise<{ transaction: string; confirmed: boolean }> {
   const { value: lifetime } = await uptoRead(
@@ -145,8 +150,14 @@ export async function uptoSend(
     (draft) => setTransactionMessageLifetimeUsingBlockhash(lifetime, draft),
     (draft) => appendTransactionMessageInstructions(instructions, draft),
   );
+  const unsigned = compileTransaction(message);
+  if (beforeSign)
+    await beforeSign({
+      wire: getBase64EncodedWireTransaction(unsigned),
+      lastValidBlockHeight,
+    });
   const signed = beforeSend
-    ? await signControl(feePayer, compileTransaction(message))
+    ? await signControl(feePayer, unsigned)
     : await signTransactionMessageWithSigners(message);
   const signature = getSignatureFromTransaction(signed);
   const wire = getBase64EncodedWireTransaction(signed);
@@ -155,6 +166,7 @@ export async function uptoSend(
       await beforeSend({
         transaction: String(signature),
         lastValidBlockHeight,
+        wire,
       });
     } catch {
       throw new UptoError(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE);

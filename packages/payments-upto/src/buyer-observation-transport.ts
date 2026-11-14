@@ -13,7 +13,11 @@ import {
 import { PaymentError } from '@gyblos/protocol/payment';
 
 import { beforeAbort } from './buyer-observation-rpc';
-import { BUYER_OBSERVATION, BUYER_OBSERVATION_RPC_METHODS } from './constants';
+import {
+  BUYER_OBSERVATION,
+  BUYER_OBSERVATION_RPC_METHODS,
+  BUYER_RECOVERY_RPC_METHODS,
+} from './constants';
 
 export type BuyerObservationFetch = (
   url: string,
@@ -22,7 +26,11 @@ export type BuyerObservationFetch = (
 function invalid(): never {
   throw new PaymentError(PAYMENT_ERROR_CODES.UNAVAILABLE);
 }
-function requestId(payload: unknown): string {
+type BuyerRpcMethod = (typeof BUYER_RECOVERY_RPC_METHODS)[number];
+function requestId(
+  payload: unknown,
+  methods: readonly BuyerRpcMethod[],
+): string {
   if (
     !payload ||
     typeof payload !== 'object' ||
@@ -32,7 +40,7 @@ function requestId(payload: unknown): string {
     payload.jsonrpc !== '2.0' ||
     !('method' in payload) ||
     typeof payload.method !== 'string' ||
-    !BUYER_OBSERVATION_RPC_METHODS.some((method) => method === payload.method)
+    !methods.some((method) => method === payload.method)
   )
     return invalid();
   return payload.id;
@@ -141,6 +149,22 @@ export function createBuyerObservationRpc(
   fetcher: BuyerObservationFetch = globalThis.fetch,
   now: () => number = () => performance.now(),
 ) {
+  return boundedRpc(url, fetcher, now, BUYER_OBSERVATION_RPC_METHODS);
+}
+export function createBuyerRecoveryRpc(url: string) {
+  return boundedRpc(
+    url,
+    globalThis.fetch,
+    () => performance.now(),
+    BUYER_RECOVERY_RPC_METHODS,
+  );
+}
+function boundedRpc(
+  url: string,
+  fetcher: BuyerObservationFetch,
+  now: () => number,
+  methods: readonly BuyerRpcMethod[],
+) {
   function transport<TResponse>(
     request: Parameters<RpcTransport>[0],
   ): Promise<TResponse>;
@@ -157,7 +181,7 @@ export function createBuyerObservationRpc(
       const deadline = now() + TIMEOUTS.rpc;
       if (!Number.isFinite(deadline)) return invalid();
       active(signal, deadline, now);
-      const id = requestId(payload);
+      const id = requestId(payload, methods);
       if (
         !payload ||
         typeof payload !== 'object' ||
