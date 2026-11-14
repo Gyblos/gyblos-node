@@ -298,6 +298,7 @@ void test('D1 prune uses indexes only and drops expired rows by key', async (con
     models: string[],
   ) =>
     storage.put({
+      admission: { now: T0, maxNodes: 10_000 },
       kind: 'catalog',
       nodeId,
       owner: INDEX_OWNER,
@@ -330,7 +331,8 @@ void test('D1 prune uses indexes only and drops expired rows by key', async (con
     .all()
     .map((row) => `${String(row.n)[0]}:${String(row.m)}`);
   assert.deepEqual(models, ['a:m1']);
-  assert.equal(await storage.nodeCount(), 1);
+  assert.ok(await storage.state('a'.repeat(64)));
+  assert.equal(await storage.state('b'.repeat(64)), null);
 });
 
 void test('ipKey keys IPv4 by full address and IPv6 by /64 prefix', () => {
