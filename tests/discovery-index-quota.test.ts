@@ -49,6 +49,55 @@ function publishers(storage: DiscoveryStorage) {
 }
 
 for (const kind of HARNESS_KINDS) {
+  void test(`${kind}: a raced withdrawal keeps UNKNOWN_CATALOG precedence when it fills the quota`, async () => {
+    const database = kind === 'sqlite-d1' ? await createSqliteD1() : null;
+    if (kind === 'sqlite-d1') assert.ok(database);
+    const storage = database
+      ? createD1Storage(database)
+      : createMemoryStorage();
+    let entered = () => {};
+    let resume = () => {};
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const wrapped: DiscoveryStorage = {
+      ...storage,
+      async put(entry) {
+        if (entry.sequence === 11) {
+          entered();
+          await released;
+        }
+        return storage.put(entry);
+      },
+    };
+    const { publish } = publishers(wrapped);
+    const seller = indexNode();
+    const catalog = seller.catalog(1);
+    assert.equal((await publish(catalog)).status, 201);
+    for (let sequence = 2; sequence <= 9; sequence++)
+      assert.equal(
+        (await publish(await seller.presence(sequence, catalog))).status,
+        201,
+      );
+    const pending = publish(await seller.presence(11, catalog));
+    await started;
+    try {
+      assert.equal(
+        (await publish(await seller.withdrawal(10, catalog))).status,
+        201,
+      );
+    } finally {
+      resume();
+    }
+    const refused = await pending;
+    assert.equal(refused.status, 400);
+    assert.deepEqual(await refused.json(), { error: 'UNKNOWN_CATALOG' });
+    assert.equal((await storage.state(seller.nodeId))?.lastSequence, 10);
+  });
+
   void test(`${kind}: concurrent duplicate publications spend one shared NodeId allowance`, async () => {
     const database = kind === 'sqlite-d1' ? await createSqliteD1() : null;
     if (kind === 'sqlite-d1') assert.ok(database);
