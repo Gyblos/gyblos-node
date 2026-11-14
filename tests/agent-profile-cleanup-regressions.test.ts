@@ -72,3 +72,22 @@ void test('case-only model changes retain the newly written active profile', asy
   assert.match(await readFile(active, 'utf8'), /model = "qwen3"/);
   assert.deepEqual(result.removed ?? [], []);
 });
+
+void test('stale cleanup keeps a managed profile after manual field or comment edits', async (context) => {
+  const home = await isolatedHome(context);
+  await writeAgentFile(AGENT_TOOLS.CODEX, endpoint('keep', 'old'), home, {});
+  const stale = join(home, '.codex', 'gyblos-old.config.toml');
+  const original = await readFile(stale, 'utf8');
+  const edited =
+    original.replace('model = "old"', 'model = "my-custom-model"') +
+    '# My manual note\n';
+  await writeFile(stale, edited);
+  const result = await writeAgentFile(
+    AGENT_TOOLS.CODEX,
+    endpoint('keep'),
+    home,
+    {},
+  );
+  assert.equal(await readFile(stale, 'utf8'), edited);
+  assert.deepEqual(result.removed ?? [], []);
+});

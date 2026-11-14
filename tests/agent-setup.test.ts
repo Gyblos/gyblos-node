@@ -78,10 +78,14 @@ void test('every tool gets every model with its limits, on the local endpoint', 
       'gyblos-gpt-oss-20b.config.toml',
     ],
   );
+  const [profileBody, profileDigest] = profiles[0]!.text.split(
+    CODEX_MARKS.profileDigest,
+  );
   assert.match(
-    profiles[0]!.text,
+    profileBody!,
     /^# .*\nmodel_provider = "gyblos"\nmodel = "qwen3-0.6b"\nweb_search = "disabled"\n$/,
   );
+  assert.match(profileDigest!, /^[0-9a-f]{64}\n$/);
   assert.match(profiles[2]!.text, /model = "gpt-oss-20b"/);
   // Tables only, so the block is valid at the end of any config.toml.
   const lines = codex

@@ -1,6 +1,7 @@
 // Shared configuration text and safe merges for coding agents using one local buyer endpoint.
 // Pure configuration only: no files, network or secret values; tokens use environment references.
 // Node owns the generators, and each host owns its file writes.
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -167,20 +168,28 @@ export function codexProfiles(endpoint: AgentEndpoint) {
   const profile = (name: string, model: AgentModel) => ({
     name,
     file: `${name}${AGENT_SETUP.codexProfileSuffix}`,
-    text: [
-      CODEX_MARKS.profile,
-      `model_provider = ${toml(AGENT_SETUP.provider)}`,
-      `model = ${toml(model.id)}`,
-      // No seller runs web search; leaving it out also keeps it out of every request.
-      'web_search = "disabled"',
-      '',
-    ].join('\n'),
+    text: codexProfileText(
+      [
+        CODEX_MARKS.profile,
+        `model_provider = ${toml(AGENT_SETUP.provider)}`,
+        `model = ${toml(model.id)}`,
+        // No seller runs web search; leaving it out also keeps it out of every request.
+        'web_search = "disabled"',
+        '',
+      ].join('\n'),
+    ),
   });
   return [
     profile(AGENT_SETUP.provider, models[0]!),
     ...profileNames(models).map((name, index) => profile(name, models[index]!)),
   ];
 }
+// Content integrity for managed profiles; comments remain valid TOML and carry no secret material.
+export function codexProfileText(text: string) {
+  const digest = createHash('sha256').update(text).digest('hex');
+  return text + CODEX_MARKS.profileDigest + digest + '\n';
+}
+
 // A profile file's new text: written when absent or when an earlier run wrote it, refused otherwise.
 export function mergedCodexProfile(text: string, existing: string | undefined) {
   if (existing === undefined) return text;

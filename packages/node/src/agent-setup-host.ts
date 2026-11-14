@@ -28,6 +28,7 @@ import {
   claudeCodeEnvironment,
   codexBlock,
   codexProfiles,
+  codexProfileText,
   mergedAgentFile,
   mergedCodexConfig,
   mergedCodexProfile,
@@ -36,6 +37,7 @@ import {
   type AgentEndpoint,
   type AgentTool,
 } from './agent-setup';
+import { CODEX_MARKS } from './agent-setup-constants';
 
 // What to print for a tool: its file's gyblos part, or the environment for one shell.
 export function agentText(tool: AgentTool, endpoint: AgentEndpoint) {
@@ -147,6 +149,11 @@ export async function writeAgentFile(
 // Profile files an earlier run wrote for models this endpoint no longer serves: a `codex --profile` on
 // one would fail. Only regular files that still carry the managed marker and nothing else are removed;
 // a link or a file someone edited is left alone.
+function isUneditedProfile(text: string) {
+  const marker = text.lastIndexOf(CODEX_MARKS.profileDigest);
+  return marker > 0 && codexProfileText(text.slice(0, marker)) === text;
+}
+
 const PROFILE_FILE = /^gyblos(-[A-Za-z0-9_-]+)?\.config\.toml$/;
 async function removeStaleProfiles(directory: string, kept: Set<string>) {
   const removed: string[] = [];
@@ -157,7 +164,9 @@ async function removeStaleProfiles(directory: string, kept: Set<string>) {
     // Replacement follows an existing target: filesystem identity preserves its actual casing.
     if (kept.has(await realpath(file))) continue;
     try {
-      mergedCodexProfile('', await readFile(file, 'utf8'));
+      const text = await readFile(file, 'utf8');
+      mergedCodexProfile('', text);
+      if (!isUneditedProfile(text)) continue;
     } catch {
       continue;
     }
