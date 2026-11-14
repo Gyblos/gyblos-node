@@ -192,6 +192,19 @@ void test('block cancellation drains owned work without waiting for a stalled te
     assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '24');assert.equal(f.calls(), 1);
   } finally { release.resolve(); }
 });
+void test('block cancellation still drains a financial approval already in flight before releasing ownership', async (t) => {
+  const f = await fixture(t);const entered = batchDeferred<void>();const release = batchDeferred<void>();
+  f.approve(async () => { entered.resolve();await release.promise; });
+  const controller = new AbortController();const running = f.execute(controller.signal);
+  const rejected = assert.rejects(running, { code: PAID_EXECUTION_CODES.CANCELLED });
+  let drained = false;
+  try {
+    await entered.promise;controller.abort();await rejected;
+    const finishing = f.client.settled().then(() => { drained = true; });
+    await new Promise<void>((resolve) => setImmediate(resolve));assert.equal(drained, false);
+    release.resolve();await finishing;assert.equal(drained, true);assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
+  } finally { release.resolve(); }
+});
 void test('a crossed request, inflated usage or wrong cumulative amount never reaches buyer signing', async (t) => {
   const changes = [
     (value: SessionCheckpoint) => ({
