@@ -107,8 +107,10 @@ export async function uptimePage(
     ...rows.map((row) => row.firstAt),
   );
   if (!Number.isFinite(firstSeenAt)) return null;
-  const lastSeenAt = rows.length
-    ? Math.max(...rows.map((row) => row.lastAt))
+  const firstSlot = slotOf(now - RETENTION_DAYS * UPTIME.dayMs) + 1;
+  const recent = rows.filter((row) => slotOf(row.lastAt) >= firstSlot);
+  const lastSeenAt = recent.length
+    ? Math.max(...recent.map((row) => row.lastAt))
     : null;
   return JSON.stringify({
     nodeId,

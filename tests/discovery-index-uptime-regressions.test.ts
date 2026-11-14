@@ -120,4 +120,29 @@ for (const kind of HARNESS_KINDS) {
     });
   });
 
+  void test(`${kind}: an observation outside every uptime window has no last sighting even in a retained hour`, async (context) => {
+    const storage = await storageFor(kind, context);
+    if (!storage) return;
+    const first = T0 + UPTIME.slotMs;
+    const now = first + 30 * UPTIME.dayMs + 60_000;
+    const nodeId = 'a'.repeat(64);
+    await storage.markSeen(nodeId, first);
+    await storage.pruneUptime(now);
+    const page = await uptimePage(storage, nodeId, now);
+    assert.ok(page);
+    assert.deepEqual(JSON.parse(page), {
+      nodeId,
+      firstSeenAt: first,
+      lastSeenAt: null,
+      slotMs: UPTIME.slotMs,
+      windows: UPTIME.windowDays.map((days) => ({
+        days,
+        seen: 0,
+        slots: (days * UPTIME.dayMs) / UPTIME.slotMs,
+        ratio: 0,
+      })),
+      generatedAt: now,
+    });
+  });
+
 }
