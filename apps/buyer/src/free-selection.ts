@@ -37,7 +37,7 @@ import {
 } from './free-route';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
-import type { SellerBackoff } from './selection-backoff';
+import type { SellerBackoffMemory } from './selection-backoff';
 import { selectBusyAwareBuyerQuote } from './selection-busy';
 import { rememberedWork, type SnapshotCache } from './selection-cache';
 import {
@@ -168,7 +168,7 @@ export interface FreeSelectionOptions {
   // Seller snapshots remembered across requests; the free buyer keeps one for its lifetime.
   snapshots?: SnapshotCache;
   // Repeated failures of each seller, for longer cooldowns; the free buyer keeps one for its lifetime.
-  backoff?: SellerBackoff;
+  backoff?: SellerBackoffMemory;
 }
 export function sellerAddress(seller: StaticControlSeller, relayOnly: boolean) {
   if (seller.relayUrl) assertConfiguredRelay(seller.relayUrl);
@@ -270,6 +270,7 @@ export async function selectWinner(
   const unsaved = unsavedStats(prepared);
   const before = new Map([...prepared.stats.rows, ...unsaved]);
   const stats = new Map(before);
+  const backoff = options.backoff?.fork();
   if (route?.waitingFor && route.waitingFor === route.pinnedNodeId) {
     const prior = stats.get(route.waitingFor);
     if (prior) stats.set(route.waitingFor, { ...prior, cooldownUntil: null });
@@ -289,13 +290,14 @@ export async function selectWinner(
         : undefined,
       connect: (seller) => connectFreeControl(seller, options, now),
       ...(options.snapshots ? { snapshots: options.snapshots } : {}),
-      ...(options.backoff ? { backoff: options.backoff } : {}),
+      ...(backoff ? { backoff: backoff.backoff } : {}),
       onSellerFailure: options.onSellerFailure,
       onPinnedBusy: options.onPinnedBusy,
     },
     signal,
   );
   signal.throwIfAborted();
+  backoff?.commit();
   // Only the rows this selection changed: an execution or another selection may have recorded others
   // meanwhile, and a whole rewrite would erase them.
   const configured = new Set(policy.sellers.map((seller) => seller.nodeId));

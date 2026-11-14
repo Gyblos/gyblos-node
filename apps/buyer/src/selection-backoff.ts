@@ -17,8 +17,20 @@ export interface SellerBackoff {
   succeeded(nodeId: string): void;
 }
 
-export function createSellerBackoff(): SellerBackoff {
+export interface SellerBackoffMemory extends SellerBackoff {
+  fork(): { backoff: SellerBackoff; commit(): void };
+}
+
+export function createSellerBackoff(): SellerBackoffMemory {
   const streaks = new Map<string, number>();
+  const backoff = backoffFrom(streaks);
+  return {
+    ...backoff,
+    fork: () => forkBackoff(backoff, backoffFrom(new Map(streaks))),
+  };
+}
+
+function backoffFrom(streaks: Map<string, number>): SellerBackoff {
   return {
     failed(nodeId) {
       const streak = Math.min(
@@ -38,6 +50,30 @@ export function createSellerBackoff(): SellerBackoff {
     },
     succeeded(nodeId) {
       streaks.delete(nodeId);
+    },
+  };
+}
+
+// A request previews its own streak changes. Only accepted selections replay them into the live
+// buyer memory; replaying changes rather than replacing the map preserves other accepted selections.
+function forkBackoff(live: SellerBackoff, local: SellerBackoff) {
+  const outcomes: { nodeId: string; success: boolean }[] = [];
+  return {
+    backoff: {
+      failed(nodeId: string) {
+        outcomes.push({ nodeId, success: false });
+        return local.failed(nodeId);
+      },
+      succeeded(nodeId: string) {
+        outcomes.push({ nodeId, success: true });
+        local.succeeded(nodeId);
+      },
+    },
+    commit() {
+      for (const outcome of outcomes.splice(0)) {
+        if (outcome.success) live.succeeded(outcome.nodeId);
+        else live.failed(outcome.nodeId);
+      }
     },
   };
 }
