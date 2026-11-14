@@ -18,6 +18,7 @@ import { WINDOWS } from '@gyblos/runtime/private-mode';
 import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { reserved } from './batch-session-common';
+import { withBatchState } from './batch-session-io';
 import type { BatchPaths, BatchRecord } from './batch-session-types';
 
 export interface BatchStoredSession {
@@ -27,9 +28,7 @@ export interface BatchStoredSession {
   recoverable: boolean;
   notCreated?: true;
 }
-export async function readBatchRecord(
-  paths: BatchPaths,
-): Promise<BatchRecord | undefined> {
+async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
   try {
     await lstat(paths.state);
   } catch (error) {
@@ -53,11 +52,21 @@ export async function readBatchRecord(
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   }
 }
+export async function readBatchRecord(paths: BatchPaths) {
+  try {
+    return await withBatchState(paths, () => readRecord(paths));
+  } catch {
+    return sessionFail(SESSION_CODES.UNAVAILABLE);
+  }
+}
 export async function inspectBatchSession(
   paths: BatchPaths,
 ): Promise<BatchStoredSession | undefined> {
   const record = await readBatchRecord(paths);
   if (!record) return undefined;
+  return storedBatchSession(record);
+}
+export function storedBatchSession(record: BatchRecord): BatchStoredSession {
   const pending = Object.values(record.requests).filter(
     (request) => !request.accepted,
   );
