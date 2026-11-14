@@ -1,0 +1,171 @@
+{
+  "oracle": "Independent Node/OpenSSL canonical framing and SHA-256; voucher signature is a structural synthetic placeholder, not a payment authorization.",
+  "request": {
+    "channelId": "11111111111111111111111111111111",
+    "requestId": "00112233445566778899aabbccddeeff",
+    "quote": {
+      "offer": {
+        "schemaVersion": 2,
+        "protocol": "gyblos/http/2",
+        "owner": "BVYffz3iHiSp76z5YT5cY2NaZ85PdbzUPXjQYWNXpL2H",
+        "nodeId": "9bcc0ad65a5b0eafc7e2e51aa51b69864de7a2ba88d2eae035677d5df7d18884",
+        "endpoint": {
+          "relayUrl": null,
+          "directAddresses": []
+        },
+        "relayOnly": false,
+        "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "mint": "11111111111111111111111111111111",
+        "payTo": "9qu3LDEBERqxRZh6NMu8exiGfXqa2cjYori8T1yvhWQ4",
+        "feePayer": "4EhLnDY3tkdTh96NkdznFrDuBR7tsJa2oC3jM7kkBmd3",
+        "authorizer": "HaSERM8yVkNNfjRnqcd5PfVCY41q96MAJNzbtyu2KiWX",
+        "buyer": "11111111111111111111111111111111",
+        "issuedAt": 1800000000000,
+        "expiresAt": 1800000030000,
+        "prices": {
+          "inputAtomicPerMtok": "100000",
+          "outputAtomicPerMtok": "200000"
+        },
+        "maxAtomic": "1000",
+        "maxTokens": 32,
+        "model": {
+          "name": "synthetic/α-model",
+          "digest": "synthetic-model-digest",
+          "contextTokens": 2048
+        },
+        "capabilities": {
+          "reportsUsage": true,
+          "logprobs": false,
+          "cancellable": true,
+          "recountable": true,
+          "modelIdentity": "digest"
+        },
+        "meteringMode": "recounted",
+        "buyerNodeId": "abababababababababababababababababababababababababababababababab",
+        "requestId": "00112233445566778899aabbccddeeff",
+        "requestDigest": "d43ae532e69d2ff5d0b4e85c418d173dc6392d8a0a1dfde16059993ac28ded5a",
+        "catalogDigest": "9205548d0a5cec43637b7236fcd61c096bdf1154932c60ceeafb6c4c684fb339",
+        "selection": {
+          "modelId": "qwen3-0.6b",
+          "variant": null,
+          "quantization": "Q4_K_M"
+        },
+        "reasoning": "off",
+        "availability": {
+          "state": "ready",
+          "observedAt": 1800000000000
+        }
+      },
+      "signature": "KTDHCnlYZgKwUwcHHHOg+V6YF8BJJG4WykWRbjUlfCURJXQQocJHWdS9e2b1Tz00SQYfWZBpuM7+4I09XBAlAg=="
+    },
+    "input": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Synthetic system"
+        },
+        {
+          "role": "user",
+          "content": "Synthetic question"
+        },
+        {
+          "role": "assistant",
+          "content": "Synthetic prior answer"
+        },
+        {
+          "role": "user",
+          "content": "Synthetic follow-up"
+        }
+      ],
+      "selection": {
+        "modelId": "qwen3-0.6b",
+        "variant": null,
+        "quantization": "Q4_K_M"
+      },
+      "reasoning": "off",
+      "maxTokens": 32
+    }
+  },
+  "requestDigest": "69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b",
+  "blockDigest": "c5dac486cee4fe90d0a581d53de1a6e42906db3e00dcf6b56ad61dc4809869b7",
+  "vectors": [
+    {
+      "value": {
+        "version": 5,
+        "channelId": "11111111111111111111111111111111",
+        "requestId": "00112233445566778899aabbccddeeff",
+        "requestDigest": "69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b",
+        "index": 0,
+        "kind": "checkpoint",
+        "text": "a",
+        "usage": {
+          "inputTokens": 2,
+          "outputTokens": 1
+        },
+        "bill": {
+          "requestId": "00112233445566778899aabbccddeeff",
+          "requestDigest": "69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b",
+          "maxAtomic": "1000",
+          "chargedAtomic": "3",
+          "cumulativeAtomic": "8"
+        },
+        "terminal": {
+          "text": "a",
+          "usage": {
+            "inputTokens": 2,
+            "outputTokens": 1
+          },
+          "finishReason": "stop"
+        }
+      },
+      "canonical": "{\"bill\":{\"chargedAtomic\":\"3\",\"cumulativeAtomic\":\"8\",\"maxAtomic\":\"1000\",\"requestDigest\":\"69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b\",\"requestId\":\"00112233445566778899aabbccddeeff\"},\"channelId\":\"11111111111111111111111111111111\",\"index\":0,\"kind\":\"checkpoint\",\"requestDigest\":\"69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b\",\"requestId\":\"00112233445566778899aabbccddeeff\",\"terminal\":{\"finishReason\":\"stop\",\"text\":\"a\",\"usage\":{\"inputTokens\":2,\"outputTokens\":1}},\"text\":\"a\",\"usage\":{\"inputTokens\":2,\"outputTokens\":1},\"version\":5}",
+      "frameHex": "000002347b2262696c6c223a7b226368617267656441746f6d6963223a2233222c2263756d756c617469766541746f6d6963223a2238222c226d617841746f6d6963223a2231303030222c2272657175657374446967657374223a2236393033316138653561353039353935323330373432386433366331323038636435623761653532383038646363343765616437663661623064383037373462222c22726571756573744964223a223030313132323333343435353636373738383939616162626363646465656666227d2c226368616e6e656c4964223a223131313131313131313131313131313131313131313131313131313131313131222c22696e646578223a302c226b696e64223a22636865636b706f696e74222c2272657175657374446967657374223a2236393033316138653561353039353935323330373432386433366331323038636435623761653532383038646363343765616437663661623064383037373462222c22726571756573744964223a223030313132323333343435353636373738383939616162626363646465656666222c227465726d696e616c223a7b2266696e697368526561736f6e223a2273746f70222c2274657874223a2261222c227573616765223a7b22696e707574546f6b656e73223a322c226f7574707574546f6b656e73223a317d7d2c2274657874223a2261222c227573616765223a7b22696e707574546f6b656e73223a322c226f7574707574546f6b656e73223a317d2c2276657273696f6e223a357d"
+    },
+    {
+      "value": {
+        "version": 5,
+        "channelId": "11111111111111111111111111111111",
+        "requestId": "00112233445566778899aabbccddeeff",
+        "requestDigest": "69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b",
+        "index": 0,
+        "kind": "approval",
+        "blockDigest": "c5dac486cee4fe90d0a581d53de1a6e42906db3e00dcf6b56ad61dc4809869b7",
+        "voucher": {
+          "channelId": "11111111111111111111111111111111",
+          "maxClaimableAmount": "8",
+          "expiresAt": 0,
+          "signature": "1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      },
+      "canonical": "{\"blockDigest\":\"c5dac486cee4fe90d0a581d53de1a6e42906db3e00dcf6b56ad61dc4809869b7\",\"channelId\":\"11111111111111111111111111111111\",\"index\":0,\"kind\":\"approval\",\"requestDigest\":\"69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b\",\"requestId\":\"00112233445566778899aabbccddeeff\",\"version\":5,\"voucher\":{\"channelId\":\"11111111111111111111111111111111\",\"expiresAt\":0,\"maxClaimableAmount\":\"8\",\"signature\":\"1111111111111111111111111111111111111111111111111111111111111111\"}}",
+      "frameHex": "000001dc7b22626c6f636b446967657374223a2263356461633438366365653466653930643061353831643533646531613665343239303664623365303064636636623536616436316463343830393836396237222c226368616e6e656c4964223a223131313131313131313131313131313131313131313131313131313131313131222c22696e646578223a302c226b696e64223a22617070726f76616c222c2272657175657374446967657374223a2236393033316138653561353039353935323330373432386433366331323038636435623761653532383038646363343765616437663661623064383037373462222c22726571756573744964223a223030313132323333343435353636373738383939616162626363646465656666222c2276657273696f6e223a352c22766f7563686572223a7b226368616e6e656c4964223a223131313131313131313131313131313131313131313131313131313131313131222c22657870697265734174223a302c226d6178436c61696d61626c65416d6f756e74223a2238222c227369676e6174757265223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131227d7d"
+    },
+    {
+      "value": {
+        "version": 5,
+        "channelId": "11111111111111111111111111111111",
+        "requestId": "00112233445566778899aabbccddeeff",
+        "requestDigest": "69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b",
+        "index": 0,
+        "kind": "ack",
+        "blockDigest": "c5dac486cee4fe90d0a581d53de1a6e42906db3e00dcf6b56ad61dc4809869b7",
+        "cumulativeAtomic": "8"
+      },
+      "canonical": "{\"blockDigest\":\"c5dac486cee4fe90d0a581d53de1a6e42906db3e00dcf6b56ad61dc4809869b7\",\"channelId\":\"11111111111111111111111111111111\",\"cumulativeAtomic\":\"8\",\"index\":0,\"kind\":\"ack\",\"requestDigest\":\"69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b\",\"requestId\":\"00112233445566778899aabbccddeeff\",\"version\":5}",
+      "frameHex": "0000013d7b22626c6f636b446967657374223a2263356461633438366365653466653930643061353831643533646531613665343239303664623365303064636636623536616436316463343830393836396237222c226368616e6e656c4964223a223131313131313131313131313131313131313131313131313131313131313131222c2263756d756c617469766541746f6d6963223a2238222c22696e646578223a302c226b696e64223a2261636b222c2272657175657374446967657374223a2236393033316138653561353039353935323330373432386433366331323038636435623761653532383038646363343765616437663661623064383037373462222c22726571756573744964223a223030313132323333343435353636373738383939616162626363646465656666222c2276657273696f6e223a357d"
+    },
+    {
+      "value": {
+        "version": 5,
+        "channelId": "11111111111111111111111111111111",
+        "requestId": "00112233445566778899aabbccddeeff",
+        "requestDigest": "69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b",
+        "index": 0,
+        "kind": "failure",
+        "code": "PAYMENT_SESSION_CLOSED"
+      },
+      "canonical": "{\"channelId\":\"11111111111111111111111111111111\",\"code\":\"PAYMENT_SESSION_CLOSED\",\"index\":0,\"kind\":\"failure\",\"requestDigest\":\"69031a8e5a5095952307428d36c1208cd5b7ae52808dcc47ead7f6ab0d80774b\",\"requestId\":\"00112233445566778899aabbccddeeff\",\"version\":5}",
+      "frameHex": "000000f97b226368616e6e656c4964223a223131313131313131313131313131313131313131313131313131313131313131222c22636f6465223a225041594d454e545f53455353494f4e5f434c4f534544222c22696e646578223a302c226b696e64223a226661696c757265222c2272657175657374446967657374223a2236393033316138653561353039353935323330373432386433366331323038636435623761653532383038646363343765616437663661623064383037373462222c22726571756573744964223a223030313132323333343435353636373738383939616162626363646465656666222c2276657273696f6e223a357d"
+    }
+  ]
+}

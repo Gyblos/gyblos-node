@@ -58,6 +58,7 @@ export interface InferenceMeter {
     toolChoice?: ToolChoice,
   ): number;
   streamed(text: string): number;
+  stablePrefix?: import('./engine').RecountTokenizer['stablePrefix'];
   delivered(text: string, maxTokens: number): number;
   usage(
     text: string,
