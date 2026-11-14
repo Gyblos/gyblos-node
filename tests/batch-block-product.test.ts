@@ -175,3 +175,21 @@ void test('an expired interrupted channel reconciles its final settlement instea
   assert.equal(f.f.buyer.snapshot().reservedAtomic, '0');
   assert.equal(f.offers.generations(), 1);
 });
+void test('an expired intent without a voucher or settlement cannot create a fresh signature during recovery', async (t) => {
+  const f = await blockProduct();t.after(f.close);
+  const original = f.f.buyer.approveBlock.bind(f.f.buyer);
+  t.mock.method(f.f.buyer, 'approveBlock', async (...args: Parameters<typeof original>) => {
+    let checks = 0;
+    return original(args[0], args[1], () => { args[2]?.();if (++checks === 2) throw new Error('Synthetic stop after intent, before signature'); });
+  });
+  await assert.rejects(f.buyer.execute(await f.offers.quote(1), f.offers.input));
+  await f.buyer.settled();await f.wire.settled();assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
+  let signaturesRecovered = 0;
+  const recover = f.f.buyer.recoverBlockApproval.bind(f.f.buyer);
+  t.mock.method(f.f.buyer, 'recoverBlockApproval', async () => { signaturesRecovered++;return recover(); });
+  f.f.time(f.f.terms.expiresAt + 1);
+  assert.equal(await f.buyer.recoverApproval(), true);
+  assert.equal(signaturesRecovered, 0);assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
+  const settled = await f.buyer.reconcile();assert.equal(settled?.chargedAtomic, '0');assert.equal(settled?.refundedAtomic, '1000');
+  assert.equal(f.offers.generations(), 1);
+});
