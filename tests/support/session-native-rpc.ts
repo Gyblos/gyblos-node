@@ -1,8 +1,9 @@
-// Read-only RPC projection of actual LiteSVM transactions/account bytes, including original message proofs.
+// RPC projection of actual LiteSVM transactions/account bytes; every send stays inside the synthetic VM.
 import assert from 'node:assert/strict';
 
 import {
   address,
+  signature as asSignature,
   type Address,
   type createSolanaRpc,
   type Signature,
@@ -15,6 +16,8 @@ export function sessionNativeRpc(vm: Awaited<ReturnType<typeof nativeVm>>) {
   let hideOriginal = false;
   let wrongFee = false;
   let incomplete = false;
+  let loseSendReply = false;
+  let outgoing: (wire: string) => Promise<void> = async () => {};
   const rpc = {
     getGenesisHash: () => ({
       send: async () =>
@@ -58,7 +61,29 @@ export function sessionNativeRpc(vm: Awaited<ReturnType<typeof nativeVm>>) {
     getAccountInfo: (id: Address, config: { commitment: string }) => ({
       send: async () => {
         assert.equal(config.commitment, 'finalized');
-        return { value: await vm.accountInfo(address(id), vm.network) };
+        return {
+          value: await vm.accountInfo(address(id), vm.network),
+          context: { slot: vm.slot() },
+        };
+      },
+    }),
+    getBlockTime: () => ({ send: async () => vm.blockTime() }),
+    getSignatureStatuses: (signatures: Signature[]) => ({
+      send: async () => ({
+        context: { slot: vm.slot() },
+        value: signatures.map((id) =>
+          vm.signatureSucceeded(id)
+            ? { err: null, confirmationStatus: 'finalized', slot: vm.slot() }
+            : null,
+        ),
+      }),
+    }),
+    sendTransaction: (wire: string) => ({
+      send: async () => {
+        await outgoing(wire);
+        const sent = await vm.signer.sendTransaction(wire, vm.network);
+        if (loseSendReply) throw new Error('Synthetic send reply lost');
+        return asSignature(sent);
       },
     }),
     getTransaction: (
@@ -92,6 +117,12 @@ export function sessionNativeRpc(vm: Awaited<ReturnType<typeof nativeVm>>) {
   } as unknown as ReturnType<typeof createSolanaRpc>;
   return {
     rpc,
+    beforeSend: (handler: (wire: string) => Promise<void>) => {
+      outgoing = handler;
+    },
+    loseSendReply: (value: boolean) => {
+      loseSendReply = value;
+    },
     wrongGenesis: (value: boolean) => {
       wrongGenesis = value;
     },

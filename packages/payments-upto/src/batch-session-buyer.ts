@@ -20,6 +20,7 @@ import {
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
 
+import { batchOpeningSigner } from './batch-opening-signer';
 import {
   atomic,
   billFor,
@@ -34,6 +35,7 @@ import {
 } from './batch-session-common';
 import { openBatchStore, serial, type BatchStore } from './batch-session-store';
 import type { BatchBuyerOptions } from './batch-session-types';
+import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export async function createBatchBuyer(
   input: BatchBuyerOptions,
@@ -91,19 +93,20 @@ export async function createBatchBuyer(
   };
 }
 
-async function openBuyer(
+export async function openBuyer(
   options: BatchBuyerOptions,
   store: BatchStore,
   check?: () => void,
+  recovering = false,
 ) {
   const beforeSign = () => {
     check?.();
     if (options.now() >= options.terms.expiresAt)
       return sessionFail(SESSION_CODES.CLOSED);
   };
-  beforeSign();
+  if (!recovering) beforeSign();
   const current = store.read();
-  if (options.now() >= options.terms.expiresAt)
+  if (!recovering && options.now() >= options.terms.expiresAt)
     sessionFail(SESSION_CODES.CLOSED);
   if (
     current.state === SESSION_STATES.CLOSED ||
@@ -112,6 +115,7 @@ async function openBuyer(
     sessionFail(SESSION_CODES.CLOSED);
   if (current.opening) return JSON.stringify(current.opening);
   if (!current.hints) {
+    if (recovering) return sessionFail(SESSION_CODES.UNVERIFIED);
     const hints = await options.hints();
     const salt = String(
       randomBytes(BATCH_SESSION_DEFAULTS.saltBytes).readBigUInt64LE(),
@@ -126,17 +130,7 @@ async function openBuyer(
   if (!hints) return sessionFail(SESSION_CODES.UNAVAILABLE);
   const requirements = await requirementsFor(options.terms);
   const built = await buildDepositPayload({
-    payer: {
-      address: options.payer.address,
-      signMessages: (...args) => {
-        beforeSign();
-        return options.payer.signMessages(...args);
-      },
-      signTransactions: (...args) => {
-        beforeSign();
-        return options.payer.signTransactions(...args);
-      },
-    },
+    payer: batchOpeningSigner(options.payer, store, beforeSign, recovering),
     receiver: options.terms.payTo,
     receiverAuthorizer: options.terms.authorizer,
     mint: options.terms.mint,
@@ -160,6 +154,8 @@ async function openBuyer(
     state.opening = built.payload;
     state.voucher = built.payload.voucher ?? null;
     state.state = SESSION_STATES.OPEN;
+    delete state.pending[BATCH_BUYER_CHECKPOINTS.OPENING_TRANSACTION];
+    delete state.pending[BATCH_BUYER_CHECKPOINTS.OPENING_VOUCHER];
   });
   return JSON.stringify(built.payload);
 }

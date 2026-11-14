@@ -16,6 +16,7 @@ export {
   type BatchRecoveryOptions,
   type BatchRecoveryResult,
 } from './batch-recovery';
+export { recoverBatchPool } from './batch-pool-recovery';
 export type {
   BatchBuyerOptions,
   BatchSellerOptions,

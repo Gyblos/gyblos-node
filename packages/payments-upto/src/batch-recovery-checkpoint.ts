@@ -1,0 +1,163 @@
+// Maps guarded SDK withdrawal checkpoints onto the existing batch pending map; no alternate journal.
+import { blockhash, getCompiledTransactionMessageDecoder } from '@solana/kit';
+import {
+  parseUptoWithdrawalAttempt,
+  UPTO_CHANNEL_ACCOUNT,
+  type UptoWithdrawalRecovery,
+} from 'x402-upto-metered';
+
+import {
+  controlAtomic,
+  controlObject,
+  controlText,
+} from '@gyblos/protocol/control-validation';
+import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
+
+import {
+  decodeControlWire,
+  validateControlIntent,
+  validateControlSignature,
+  type BatchControlIntent,
+} from './batch-recovery-wire';
+import type { BatchStore } from './batch-session-store';
+import type { BatchBuyerOptions } from './batch-session-types';
+import {
+  BATCH_BUYER_CHECKPOINTS,
+  BATCH_OPENING_LIMITS,
+  WITHDRAW_STEPS,
+} from './constants';
+
+function parseIntent(raw: string): BatchControlIntent {
+  const input: unknown = JSON.parse(raw);
+  const row = controlObject(input, [
+    'step',
+    'wire',
+    'lastValidBlockHeight',
+    'checkedSlot',
+  ]);
+  if (
+    row.step !== WITHDRAW_STEPS.CLOSE_REQUESTED &&
+    row.step !== WITHDRAW_STEPS.DISTRIBUTED
+  )
+    return sessionFail(SESSION_CODES.BINDING);
+  return {
+    step: row.step,
+    wire: controlText(row.wire, BATCH_OPENING_LIMITS.bytes),
+    lastValidBlockHeight: controlAtomic(row.lastValidBlockHeight),
+    checkedSlot: controlAtomic(row.checkedSlot),
+  };
+}
+export async function retireCompletedControlIntent(
+  store: BatchStore,
+  status: number,
+) {
+  const saved = store.read().pending[BATCH_BUYER_CHECKPOINTS.WITHDRAWAL_INTENT];
+  if (!saved) return;
+  const intent = parseIntent(saved);
+  if (
+    intent.step === WITHDRAW_STEPS.CLOSE_REQUESTED &&
+    (status === UPTO_CHANNEL_ACCOUNT.statuses.CLOSING ||
+      status === UPTO_CHANNEL_ACCOUNT.statuses.SEALED ||
+      status === UPTO_CHANNEL_ACCOUNT.statuses.DISTRIBUTED)
+  )
+    await store.pending.delete(BATCH_BUYER_CHECKPOINTS.WITHDRAWAL_INTENT);
+}
+export async function batchRecoveryCheckpoint(
+  store: BatchStore,
+  payer: BatchBuyerOptions['payer'],
+  signal?: AbortSignal,
+) {
+  const saved = store.read().pending[BATCH_BUYER_CHECKPOINTS.WITHDRAWAL];
+  const record = saved
+    ? controlObject(JSON.parse(saved), ['attempt', 'wire'])
+    : undefined;
+  const previous = record
+    ? parseUptoWithdrawalAttempt(record.attempt)
+    : undefined;
+  if (record && previous) {
+    const wire = controlText(record.wire, BATCH_OPENING_LIMITS.bytes);
+    await validateControlSignature(payer, previous, wire);
+    await validateControlIntent(store.read(), payer, { ...previous, wire });
+  }
+  const pending =
+    store.read().pending[BATCH_BUYER_CHECKPOINTS.WITHDRAWAL_INTENT];
+  const intent = pending ? parseIntent(pending) : undefined;
+  if (intent) await validateControlIntent(store.read(), payer, intent);
+  const recovery: UptoWithdrawalRecovery = {
+    previous,
+    async save(attempt) {
+      if (!record || !previous || attempt.transaction !== previous.transaction)
+        return sessionFail(SESSION_CODES.BINDING);
+      await store.pending.set(
+        BATCH_BUYER_CHECKPOINTS.WITHDRAWAL,
+        JSON.stringify({
+          attempt: parseUptoWithdrawalAttempt(attempt),
+          wire: record.wire,
+        }),
+      );
+    },
+    async prepare(next) {
+      signal?.throwIfAborted();
+      await validateControlIntent(store.read(), payer, next);
+      if (
+        intent &&
+        !Buffer.from(decodeControlWire(intent.wire).messageBytes).equals(
+          Buffer.from(decodeControlWire(next.wire).messageBytes),
+        )
+      )
+        return sessionFail(SESSION_CODES.BINDING);
+      await store.pending.set(
+        BATCH_BUYER_CHECKPOINTS.WITHDRAWAL_INTENT,
+        JSON.stringify(next),
+      );
+    },
+    async signed(attempt, wire) {
+      signal?.throwIfAborted();
+      await validateControlSignature(payer, attempt, wire);
+      const prepared =
+        store.read().pending[BATCH_BUYER_CHECKPOINTS.WITHDRAWAL_INTENT];
+      if (!prepared) return sessionFail(SESSION_CODES.UNVERIFIED);
+      const original = parseIntent(prepared);
+      if (
+        original.step !== attempt.step ||
+        original.lastValidBlockHeight !== attempt.lastValidBlockHeight ||
+        !Buffer.from(decodeControlWire(original.wire).messageBytes).equals(
+          Buffer.from(decodeControlWire(wire).messageBytes),
+        )
+      )
+        return sessionFail(SESSION_CODES.BINDING);
+      await store.update((state) => {
+        state.pending[BATCH_BUYER_CHECKPOINTS.WITHDRAWAL] = JSON.stringify({
+          attempt,
+          wire,
+        });
+        delete state.pending[BATCH_BUYER_CHECKPOINTS.WITHDRAWAL_INTENT];
+      });
+      signal?.throwIfAborted();
+    },
+  };
+  return {
+    recovery,
+    pending:
+      record && previous?.pending
+        ? {
+            attempt: previous,
+            wire: controlText(record.wire, BATCH_OPENING_LIMITS.bytes),
+          }
+        : undefined,
+    // An interrupted unsigned attempt may only rebuild its original lifetime/message.
+    lifetime: intent
+      ? {
+          blockhash: blockhash(getLifetime(intent)),
+          lastValidBlockHeight: BigInt(intent.lastValidBlockHeight),
+        }
+      : undefined,
+  };
+}
+
+function getLifetime(intent: BatchControlIntent) {
+  // The blockhash is carried by the signed message, not trusted caller metadata.
+  const transaction = decodeControlWire(intent.wire);
+  return getCompiledTransactionMessageDecoder().decode(transaction.messageBytes)
+    .lifetimeToken;
+}

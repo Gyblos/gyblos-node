@@ -102,6 +102,14 @@ export interface UptoWithdrawalRecovery {
   previous?: UptoWithdrawalAttempt;
   save(attempt: UptoWithdrawalAttempt): Promise<void>;
   readOnly?: boolean;
+  // Optional guarded-host checkpoints; defaults and legacy attempt shape stay unchanged.
+  prepare?(input: {
+    step: UptoWithdrawalAttempt['step'];
+    wire: string;
+    lastValidBlockHeight: string;
+    checkedSlot: string;
+  }): Promise<void>;
+  signed?(attempt: UptoWithdrawalAttempt, wire: string): Promise<void>;
 }
 
 const sameBytes = (left: readonly number[], right: Uint8Array) =>
@@ -242,6 +250,7 @@ const publishWithdrawal = (
   view: ControlView,
   step: UptoWithdrawalAttempt['step'],
   instructions: readonly UptoProgramInstruction[],
+  recovery?: UptoWithdrawalRecovery,
 ) =>
   uptoSend(
     rpc,
@@ -250,13 +259,20 @@ const publishWithdrawal = (
     options.sleep,
     'save' in view
       ? async (attempt) => {
-          await view.save({
-            ...attempt,
+          const saved: UptoWithdrawalAttempt = {
+            transaction: attempt.transaction,
+            lastValidBlockHeight: attempt.lastValidBlockHeight,
             step,
             checkedSlot: view.slot,
             pending: true,
-          });
+          };
+          if (recovery?.signed) await recovery.signed(saved, attempt.wire);
+          else await view.save(saved);
         }
+      : undefined,
+    recovery?.prepare && 'slot' in view
+      ? (intent) =>
+          recovery.prepare!({ ...intent, step, checkedSlot: view.slot })
       : undefined,
   );
 
@@ -280,7 +296,7 @@ export function createUptoWithdrawal(
       const publish = (
         step: UptoWithdrawalAttempt['step'],
         instructions: readonly UptoProgramInstruction[],
-      ) => publishWithdrawal(rpc, options, view, step, instructions);
+      ) => publishWithdrawal(rpc, options, view, step, instructions, recovery);
       if ('readOnly' in view && view.readOnly)
         return result(UPTO_WITHDRAW_STEPS.NOTHING);
       if (channel === undefined) return result(UPTO_WITHDRAW_STEPS.NOTHING);
