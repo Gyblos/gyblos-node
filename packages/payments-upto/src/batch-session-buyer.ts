@@ -46,6 +46,7 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
+    usesBlocks: () => false,
     pendingBlockRequest: () => {
       const state = store.read();
       const request = Object.values(state.requests).find(
