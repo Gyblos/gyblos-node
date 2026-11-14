@@ -36,7 +36,10 @@ async function signStored(
   if (!progress.pending || !sameBlock(progress.pending.intent, intent))
     return sessionFail(SESSION_CODES.BINDING);
   if (progress.pending.voucher) return progress.pending.voucher;
-  if (state.state !== SESSION_STATES.OPEN)
+  if (
+    state.state !== SESSION_STATES.OPEN ||
+    options.now() >= options.terms.expiresAt
+  )
     return sessionFail(SESSION_CODES.CLOSED);
   check?.();
   const voucher = await signBatchVoucher(options.payer, {

@@ -1565,3 +1565,60 @@ before their bodies are allocated or read. The first frame on a recovery stream
 shares the 1-MiB initial management-frame cap; its approval-specific 8-KiB limit
 is checked after parsing, since that frame can also be an opening or execution. Cancellation
 poisons pending verification; no late approval or ACK may escape afterward.
+
+### Product composition for certified response blocks
+
+A block-capable paid session uses the same inference lifecycle, engine, input
+validation and terminal tool checks as complete-response sessions. The economic
+adapter replaces the final-only approval with cumulative checkpoints; it never
+starts another generation. Free execution and single-request paid execution
+retain their existing transports. Reusable-session startup explicitly enables
+the block ALPN. Buyer composition selects it before PREPARE only when both its
+financial port and recount tokenizer support checkpoints. A v5 seller refuses
+unsupported prefix certification before funding; neither side falls back after
+a possible prompt write.
+
+Already-created legacy channels stay on session-v4 until closed, including
+financial recovery against an older seller. The financial `usesBlocks()` port
+identifies an existing checkpoint journal without exposing private data. A new
+unfunded channel or an existing checkpoint channel can use v5; upgrading the
+buyer never strands an old v4 voucher by requiring a newer remote ALPN.
+
+The default soft target is 64 newly billable output tokens. It is not a hard
+64-token exposure cap: the first certified boundary may be later, or a response
+without a safe separator may be one terminal block up to the existing 128-output-
+token request limit. Input usage belongs to the first nonzero charge too. The
+original per-request ceiling and capped deposit continue to bound the amount.
+No new price, fee or per-block minimum is introduced.
+
+For the hash-pinned tokenizer, the stable frontier is immediately before an
+observed ASCII space following an ASCII letter or digit. The space is delivered
+as proof of that boundary but is not billed until a later checkpoint or the
+terminal. A buyer repeats the same independent certification. It never signs
+the maximum of changing prefix counts. Each bill recomputes one ceiling over
+input plus the total certified output using the signed quote, and adds the
+request's fixed channel base; it does not add rounded block charges or input
+charges repeatedly. The terminal uses the exact independent text/tool recount.
+A nonterminal signed prefix cannot exceed a valid final continuation's usage.
+
+There is one original inference reservation until the terminal ACK or verified
+channel closure. Intermediate approvals reduce its remaining allowance but do
+not release it or admit another request on that seller. Before emitting an
+approval, the buyer stores the exact verified intent, signs, then stores the
+voucher. The seller stores the exact accepted voucher before ACK. Both stores
+retain only bounded rolling metadata, never prompts, response text or tools.
+
+Cancellation, disconnect, engine failure or a missing ACK retain the original
+attempt. Recovery first checks independent settlement evidence, then can resend
+only the stored approval. A nonterminal interruption closes that channel at the
+highest accepted amount; it cannot continue generation, replay the prompt or
+move it to another seller. If the host deadline has passed, recovery verifies
+closure rather than trying to authorize fresh usage. Previously completed
+requests retain their cumulative charge and the unused deposit is returned.
+
+The one-block bound concerns the delivery/signature window, not response quality
+or whether a human saw the content. It also does not insure disk loss, restored
+stale backups or a seller absent for the entire on-chain withdrawal grace. An
+online seller/recovery worker must still claim signed totals in time. Public
+uptime and dual-signed receipts are reputation evidence, not a source of refunds;
+this session composition does not yet collect dual-signed paid usage receipts.
