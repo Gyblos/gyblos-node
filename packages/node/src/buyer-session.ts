@@ -61,6 +61,7 @@ async function openCurrent<Remote extends BatchDestination>(
 ): Promise<Current<Remote>> {
   const options = state.options;
   const stored = await bounded(options.inspect(), signal);
+  if (stored?.notCreated) return sessionFail(SESSION_CODES.CLOSED);
   const terms =
     stored?.terms ??
     (quote ? sessionTerms(quote, options.policy, options.now()) : undefined);
@@ -210,11 +211,13 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
       }
     },
     async reconcile(signal: AbortSignal) {
-      if (!(await options.inspect())) return undefined;
+      const stored = await options.inspect();
+      if (!stored || stored.notCreated) return undefined;
       return (await current(state, undefined, signal)).host.reconcile(signal);
     },
     async settle(signal: AbortSignal) {
-      if (!(await options.inspect())) return undefined;
+      const stored = await options.inspect();
+      if (!stored || stored.notCreated) return undefined;
       const opened = await current(state, undefined, signal);
       return (await opened.host.reconcile(signal)) ?? opened.host.close(signal);
     },

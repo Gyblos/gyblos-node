@@ -302,6 +302,7 @@ export async function nativeVm(
     accountInfo,
     history,
     height: () => blockHeight,
+    blockhashValid: (value: string) => value === String(svm.latestBlockhash()),
     expire() {
       svm.expireBlockhash();
       blockHeight = lastValidBlockHeight + 1n;

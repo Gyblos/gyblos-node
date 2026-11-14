@@ -109,12 +109,36 @@ cumulative authorization and checks charge plus refund against the deposit. Only
 then does it persist `closed`, clear uncertainty and credit the verified refund
 in the catalog. Missing evidence keeps the channel blocked.
 
-An opening without enough original signing data, or an expired opening whose
-deposit cannot be proven to have landed, stays unresolved. An absent account
-does not become an invented refund. No journal format migration, rollback
-protection against an older home backup, prompt retry or automatic top-up is
-provided by this recovery. Keep the original home; never delete a journal or
-lock to bypass an unresolved result.
+### An expired opening that never created a channel
+
+The command can also resolve an original opening that never reached the chain.
+It reconstructs the original SDK message without wallet authority and compares
+it to the retained deposit or exact pre-sign checkpoint. Saved payer signatures
+are verified when present. Hints alone, quote expiry and account absence are
+insufficient.
+
+Resolution requires a finalized height strictly beyond the recorded lifetime, an
+independently invalid original blockhash, complete retained history covering the
+opening slot, no successful channel history and a null channel account. History
+and account reads must be at least as recent as the finalized blockhash-expiry
+observation. Malformed, stale, pruned, unavailable or ambiguous evidence keeps
+the reservation blocked. Any successful unknown transaction is conservatively
+treated as unresolved.
+
+The result is `notCreated: true`, with no transaction or settlement. It does
+**not** report a refund: no deposit moved. A validated terminal marker preserves
+the original signing evidence in the existing private store before the catalog
+clears uncertainty. The pool releases only that unfunded reservation and keeps
+`refundedAtomic` at zero. Repeating recovery is idempotent; other sellers'
+deposits and consumed amounts remain committed. The common buyer startup guard
+recognizes this terminal outcome, and the original slot cannot reopen.
+
+No prompt is replayed or replacement channel opened. As with existing closed
+slots, automatic same-seller channel rotation is separate. No journal format
+migration, independent protection against an older home backup or automatic
+top-up is provided. Older binaries do not recognize the new terminal marker and
+conservatively retain their unresolved-state block. Keep the original home;
+never delete a journal or lock to bypass an unresolved result.
 
 ## Offline abrupt-exit acceptance
 

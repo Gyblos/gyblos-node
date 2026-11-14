@@ -16,11 +16,11 @@ import {
   type UptoBuyerPaymentsOptions,
 } from '@gyblos/payments-upto';
 import {
+  batchSessionTerminal,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import { SESSION_STATES } from '@gyblos/protocol/payment-session';
 
 import { NODE_ERROR_CODES } from './constants';
 import { NodeError } from './errors';
@@ -69,16 +69,12 @@ export async function buyerPaymentsUnresolved(includeSession = true) {
   if (
     pool.some(
       (entry) =>
-        !entry.stored ||
-        entry.uncertain ||
-        entry.stored.snapshot.state !== SESSION_STATES.CLOSED,
+        !entry.stored || entry.uncertain || !batchSessionTerminal(entry.stored),
     )
   )
     return true;
   const session = await inspectBatchSession(
     batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
   );
-  return (
-    session !== undefined && session.snapshot.state !== SESSION_STATES.CLOSED
-  );
+  return session !== undefined && !batchSessionTerminal(session);
 }

@@ -1,20 +1,17 @@
 // Bounded routing across independently persisted seller sessions; the private catalog owns all budget credit.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { recountSessionInput } from '@gyblos/core/session-input';
-import type {
-  BatchBuyerPool,
-  BatchPoolEntry,
+import {
+  batchSessionTerminal,
+  type BatchBuyerPool,
+  type BatchPoolEntry,
 } from '@gyblos/payments-upto/batch-session';
 import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import {
-  SESSION_CODES,
-  SESSION_STATES,
-  sessionFail,
-} from '@gyblos/protocol/payment-session';
+import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 import {
   BatchClientError,
   type BatchDestination,
@@ -111,7 +108,7 @@ async function unresolved<Remote extends BatchDestination>(
       pending = true;
       continue;
     }
-    if (entry.stored?.snapshot.state === SESSION_STATES.CLOSED) {
+    if (batchSessionTerminal(entry.stored)) {
       await pool.resolve(entry.terms.sellerNodeId);
       continue;
     }
@@ -160,7 +157,7 @@ async function execute<Remote extends BatchDestination>(
       state.options.now(),
     );
     if (
-      existing?.stored?.snapshot.state === SESSION_STATES.CLOSED ||
+      batchSessionTerminal(existing?.stored) ||
       state.options.now() >= terms.expiresAt
     )
       return sessionFail(SESSION_CODES.CLOSED);
@@ -210,6 +207,10 @@ async function summarize<Remote extends BatchDestination>(
     Math.floor(state.operationMs / Math.max(1, entries.length)),
   );
   for (const entry of entries) {
+    if (entry.stored?.notCreated) {
+      await pool.resolve(entry.terms.sellerNodeId);
+      continue;
+    }
     try {
       overall.throwIfAborted();
       const host = manager(state, entry);

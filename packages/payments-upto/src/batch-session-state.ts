@@ -15,6 +15,7 @@ import {
 } from '@gyblos/runtime/private-file';
 import { WINDOWS } from '@gyblos/runtime/private-mode';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { reserved } from './batch-session-common';
 import type { BatchPaths, BatchRecord } from './batch-session-types';
@@ -24,6 +25,7 @@ export interface BatchStoredSession {
   snapshot: SessionSnapshot;
   pending: boolean;
   recoverable: boolean;
+  notCreated?: true;
 }
 export async function readBatchRecord(
   paths: BatchPaths,
@@ -59,7 +61,9 @@ export async function inspectBatchSession(
   const pending = Object.values(record.requests).filter(
     (request) => !request.accepted,
   );
+  const notCreated = batchOpeningAbsent(record) !== undefined;
   return {
+    ...(notCreated ? { notCreated: true as const } : {}),
     terms: record.terms,
     snapshot: {
       channelId: record.channelId,
@@ -68,7 +72,19 @@ export async function inspectBatchSession(
       cumulativeAtomic: record.cumulativeAtomic,
       reservedAtomic: String(reserved(record)),
     },
-    pending: record.state !== SESSION_STATES.CLOSED && pending.length > 0,
-    recoverable: pending.some((request) => request.bill !== null),
+    pending:
+      !notCreated &&
+      record.state !== SESSION_STATES.CLOSED &&
+      pending.length > 0,
+    recoverable:
+      !notCreated && pending.some((request) => request.bill !== null),
   };
+}
+
+export function batchSessionTerminal(stored: BatchStoredSession | undefined) {
+  return (
+    stored !== undefined &&
+    (stored.notCreated === true ||
+      stored.snapshot.state === SESSION_STATES.CLOSED)
+  );
 }

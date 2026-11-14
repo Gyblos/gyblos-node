@@ -11,6 +11,7 @@ import {
 } from '@gyblos/node/buyer-session-chain';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import {
+  batchSessionTerminal,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
@@ -19,11 +20,7 @@ import { batchFail } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import {
-  SESSION_CODES,
-  SESSION_STATES,
-  sessionFail,
-} from '@gyblos/protocol/payment-session';
+import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import {
   permitsWinner,
@@ -156,7 +153,7 @@ export function makeManager(
         (entry) =>
           !entry.stored ||
           entry.uncertain ||
-          entry.stored.snapshot.state !== SESSION_STATES.CLOSED,
+          !batchSessionTerminal(entry.stored),
       );
     },
     verify: trustedQuote(context, state),
