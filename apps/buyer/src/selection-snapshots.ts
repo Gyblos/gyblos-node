@@ -219,7 +219,17 @@ async function snapshotBatch(
           }
           // A snapshot verified on an earlier request and still current: no connection, no records asked.
           const cached = recall(dependencies, seller, now(), recalled);
-          if (cached) return cached;
+          if (cached) {
+            if (
+              !dependencies.observeVerified ||
+              (await dependencies.observeVerified(cached))
+            )
+              return cached;
+            // Discovery may already hold a newer catalog. Refetch before candidate filtering, even
+            // when the remembered catalog contains no model eligible to produce a stale quote.
+            dependencies.snapshots?.drop(seller.nodeId);
+            recalled.delete(seller.nodeId);
+          }
           deadline.throwIfAborted();
           const client = await connectBefore(
             dependencies.connect(seller),
