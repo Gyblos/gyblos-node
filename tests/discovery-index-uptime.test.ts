@@ -6,12 +6,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createMemoryStorage } from '@gyblos/discovery-index/storage';
-import { UPTIME, uptimePage } from '@gyblos/discovery-index/uptime';
+import {
+  UPTIME,
+  uptimePage,
+  uptimeRecorder,
+} from '@gyblos/discovery-index/uptime';
 
 import {
   eachStorage,
   expectError,
+  INDEX_ORIGIN,
+  indexHarness,
   indexNode,
+  memoryCache,
 } from './support/discovery-index-fixture';
 
 const { slotMs, dayMs } = UPTIME;
@@ -105,15 +112,73 @@ void test('windows are bounded by days, and a month-old row is pruned', async ()
     await storage.markSeen(node, at);
   const body = JSON.parse((await uptimePage(storage, node, now))!);
   const [day, week, month] = body.windows;
-  // 288 slots marked; the window also holds the slot it starts in.
-  assert.deepEqual([day.seen, day.slots, day.ratio], [288, 289, 0.9965]);
-  assert.deepEqual([week.seen, week.slots], [288, 7 * 288 + 1]);
+  // Online for the whole last day: exactly a day of slots, all seen.
+  assert.deepEqual([day.seen, day.slots, day.ratio], [288, 288, 1]);
+  assert.deepEqual([week.seen, week.slots], [288, 7 * 288]);
   // The month window starts at the first sighting, 20 days ago.
   assert.deepEqual([month.seen, month.slots], [289, 20 * 288 + 1]);
-  await storage.prune(now + 11 * dayMs);
+  await storage.pruneUptime(now + 11 * dayMs);
   const later = JSON.parse(
     (await uptimePage(storage, node, now + 11 * dayMs))!,
   );
   assert.equal(later.firstSeenAt, now - dayMs + slotMs);
   assert.equal(await uptimePage(storage, node, now + 32 * dayMs), null);
+});
+
+void test('equivalent spellings of one query share one cache entry', async () => {
+  const { cache, puts } = memoryCache();
+  const { publish, call, clock } = (await indexHarness('memory', { cache }))!;
+  const seller = indexNode();
+  const catalog = seller.catalog(1, { issuedAt: clock.now });
+  assert.equal((await publish(catalog)).status, 201);
+  const presence = await seller.presence(2, catalog, { issuedAt: clock.now });
+  assert.equal((await publish(presence)).status, 201);
+  for (const query of [
+    `node=${seller.nodeId}`,
+    `node=${seller.nodeId}&`,
+    `%6Eode=${seller.nodeId}`,
+  ])
+    assert.equal((await call(`/v1/uptime?${query}`)).status, 200);
+  assert.deepEqual(puts, [`${INDEX_ORIGIN}/v1/uptime?node=${seller.nodeId}`]);
+});
+
+void test('old uptime is pruned while sellers keep publishing, and a failing uptime table never blocks a publish', async () => {
+  const storage = createMemoryStorage();
+  const pruned: number[] = [];
+  const failing = {
+    ...storage,
+    pruneUptime: async (now: number) => {
+      pruned.push(now);
+      throw new Error('no such table: discovery_uptime');
+    },
+    markSeen: async () => {
+      throw new Error('no such table: discovery_uptime');
+    },
+  };
+  // A new NodeId is still admitted and its presence accepted; only its uptime is lost.
+  const { publish, call, clock } = (await indexHarness('memory', {
+    storage: failing,
+  }))!;
+  const seller = indexNode();
+  const catalog = seller.catalog(1, { issuedAt: clock.now });
+  assert.equal((await publish(catalog)).status, 201);
+  const presence = await seller.presence(2, catalog, { issuedAt: clock.now });
+  assert.equal((await publish(presence)).status, 201);
+  assert.equal(pruned.length, 1);
+  await expectError(
+    await call(`/v1/uptime?node=${seller.nodeId}`),
+    404,
+    'NOT_FOUND',
+  );
+  pruned.length = 0;
+  // A recorder prunes again only after its interval, whoever publishes.
+  const working = {
+    ...storage,
+    pruneUptime: async (now: number) => void pruned.push(now),
+  };
+  const again = uptimeRecorder(working);
+  await again('b'.repeat(64), 0);
+  await again('b'.repeat(64), UPTIME.pruneIntervalMs - 1);
+  await again('b'.repeat(64), UPTIME.pruneIntervalMs);
+  assert.deepEqual(pruned, [0, UPTIME.pruneIntervalMs]);
 });

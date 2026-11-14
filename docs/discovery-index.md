@@ -158,17 +158,18 @@ signed a record; clients re-verify everything.
   mark. A limiter that refuses or fails is `429 RATE_LIMITED` with
   `Retry-After: 60`.
 - **Global read cap:** `DISCOVERY_READ_LIMITER` (300 per 60 seconds, constant
-  key `global`) is consumed only by storage reads: a `GET /v1/sellers` cache
-  miss and a `/v1/health` whose cached count is stale. Cache hits and fresh
-  health counts never consume it, so many cursors or clients cannot multiply D1
-  reads past it. Cloudflare counts rate limits per location, so this is a cap
-  per Cloudflare location, not an exact worldwide one; a Durable Object counter
-  would be the exact alternative if that is ever needed. Any well-formed cursor,
-  `limit` or `model` makes a cache miss, so a few clients at one location can
-  spend its budget; the other clients there then get `429` on uncached pages for
-  up to 60 seconds while cached pages keep serving. This is the accepted cost of
-  one shared key. Its `429` is `no-store` and never enters the response cache.
-  The per-IP limit still applies first to every request.
+  key `global`) is consumed only by storage reads: a `GET /v1/sellers`,
+  `/v1/models` or `/v1/uptime` cache miss and a `/v1/health` whose cached count
+  is stale. Cache hits and fresh health counts never consume it, so many cursors
+  or clients cannot multiply D1 reads past it. Cloudflare counts rate limits per
+  location, so this is a cap per Cloudflare location, not an exact worldwide
+  one; a Durable Object counter would be the exact alternative if that is ever
+  needed. Any well-formed cursor, `limit` or `model` makes a cache miss, so a
+  few clients at one location can spend its budget; the other clients there then
+  get `429` on uncached pages for up to 60 seconds while cached pages keep
+  serving. This is the accepted cost of one shared key. Its `429` is `no-store`
+  and never enters the response cache. The per-IP limit still applies first to
+  every request.
 - **Publish order:** per-IP limit, the 34816-byte body cap (`413`), publish
   limit, content type, strict JSON, the allowlist check on the claimed NodeId
   (`403`), then shape, lifetime and the self-signature. Only then is the stored
@@ -215,7 +216,10 @@ Public seller uptime comes only from records the index already verified. Each
 UTC hour has one row per NodeId (`migrations/0004_uptime.sql`) with one bit per
 five-minute slot in which the index accepted a signed presence from that NodeId,
 at the index's own clock. Catalogs and withdrawals do not count. Rows older than
-30 days are pruned with the other expired rows.
+30 days are pruned at most once an hour per app instance, on the next accepted
+presence, separately from record pruning: retention holds even when no new
+NodeId publishes, and a failing uptime table never blocks a publish or the
+admission of a new NodeId.
 
 `GET /v1/uptime?node=<64 lowercase hex>` answers
 
@@ -226,20 +230,22 @@ at the index's own clock. Catalogs and withdrawals do not count. Rows older than
   "lastSeenAt": 1763078400000,
   "slotMs": 300000,
   "windows": [
-    { "days": 1, "seen": 286, "slots": 289, "ratio": 0.9896 },
-    { "days": 7, "seen": 2001, "slots": 2017, "ratio": 0.9921 },
+    { "days": 1, "seen": 286, "slots": 288, "ratio": 0.9931 },
+    { "days": 7, "seen": 2001, "slots": 2016, "ratio": 0.9926 },
     { "days": 30, "seen": 2001, "slots": 2017, "ratio": 0.9921 }
   ],
   "generatedAt": 1763078400000
 }
 ```
 
-`seen` counts slots with a presence and `slots` counts every slot from the
-window's start to now, inclusive. A window starts no earlier than `firstSeenAt`
-(within the 30 days kept), so a new seller is not counted down for time before
-it existed. A NodeId not seen in 30 days is `404 NOT_FOUND`; a malformed or
-repeated `node`, or any other parameter, is `400 INVALID_QUERY`. Answers are
-cached and CORS-readable like `/v1/models`.
+`seen` counts slots with a presence and `slots` counts the window's slots up to
+and including the current one: a full day is 288 slots, so a seller online all
+day reports `1`. A window starts no earlier than `firstSeenAt` (within the 30
+days kept), so a new seller is not counted down for time before it existed. A
+NodeId not seen in 30 days is `404 NOT_FOUND`; a malformed or repeated `node`,
+or any other parameter, is `400 INVALID_QUERY`. Answers are cached and
+CORS-readable like `/v1/models`, with one cache entry per NodeId however the
+query is spelled.
 
 Each app instance writes a NodeId's slot once, however often the seller
 refreshes its presence, and the write is an idempotent bitwise OR. The write is

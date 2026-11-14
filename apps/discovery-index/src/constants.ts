@@ -224,6 +224,8 @@ export const UPTIME = {
   dayMs: 86_400_000,
   // NodeIds whose current slot this app instance already wrote; cleared when full.
   maxRemembered: 4096,
+  // Old rows are pruned at most once an hour per app instance.
+  pruneIntervalMs: 3_600_000,
   // Ratios are rounded to four decimals.
   ratioScale: 10_000,
 } as const;

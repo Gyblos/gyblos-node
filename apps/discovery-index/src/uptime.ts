@@ -22,6 +22,8 @@ export interface UptimeStorage {
   markSeen(nodeId: string, now: number): Promise<void>;
   // The NodeId's rows from `sinceHour` on, oldest first.
   seen(nodeId: string, sinceHour: number): Promise<UptimeRow[]>;
+  // Drops rows older than the longest window.
+  pruneUptime(now: number): Promise<void>;
 }
 
 export const slotOf = (now: number) => Math.floor(now / UPTIME.slotMs);
@@ -33,11 +35,19 @@ export const retainedHour = (now: number) =>
   hourOf(now - RETENTION_DAYS * UPTIME.dayMs);
 
 // One write per NodeId and slot per app instance: sellers refresh their presence far more often
-// than every five minutes, and the storage write is idempotent anyway.
+// than every five minutes, and the storage write is idempotent anyway. Old rows are pruned here, on
+// its own throttle and separately from record pruning, so retention holds even when no new NodeId
+// publishes and a failing uptime table never blocks admitting one.
 export function uptimeRecorder(storage: UptimeStorage | undefined) {
   const written = new Map<string, number>();
+  let prunedAt = -Infinity;
   return async (nodeId: string, now: number) => {
-    if (!storage || written.get(nodeId) === slotOf(now)) return;
+    if (!storage) return;
+    if (now - prunedAt >= UPTIME.pruneIntervalMs) {
+      prunedAt = now;
+      await storage.pruneUptime(now).catch(() => undefined);
+    }
+    if (written.get(nodeId) === slotOf(now)) return;
     if (written.size >= UPTIME.maxRemembered) written.clear();
     await storage.markSeen(nodeId, now);
     written.set(nodeId, slotOf(now));
@@ -60,9 +70,8 @@ function bits(value: number) {
   return count;
 }
 
-// Slots seen and slots elapsed since `start` (at most now), counting the current slot.
-function window(rows: readonly UptimeRow[], start: number, now: number) {
-  const first = slotOf(start);
+// Slots seen and slots elapsed from `first` to now, counting the current slot.
+function window(rows: readonly UptimeRow[], first: number, now: number) {
   const last = slotOf(now);
   let seen = 0;
   for (const row of rows) {
@@ -99,7 +108,12 @@ export async function uptimePage(
     slotMs: UPTIME.slotMs,
     windows: UPTIME.windowDays.map((days) => ({
       days,
-      ...window(rows, Math.max(now - days * UPTIME.dayMs, firstSeenAt), now),
+      // A full window holds exactly `days` of slots; a younger seller's starts at its first sighting.
+      ...window(
+        rows,
+        Math.max(slotOf(now - days * UPTIME.dayMs) + 1, slotOf(firstSeenAt)),
+        now,
+      ),
     })),
     generatedAt: now,
   });
@@ -109,7 +123,7 @@ export async function uptimePage(
 export function memoryUptime() {
   const nodes = new Map<string, Map<number, UptimeRow>>();
   return {
-    prune(now: number) {
+    async pruneUptime(now: number) {
       for (const [id, hours] of nodes) {
         for (const hour of hours.keys())
           if (hour < retainedHour(now)) hours.delete(hour);

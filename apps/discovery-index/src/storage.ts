@@ -67,8 +67,7 @@ export interface DiscoveryStorage extends UptimeStorage {
   state(nodeId: string): Promise<NodeState | null>;
   // Number of tracked NodeIds (high-water marks), expired records included until pruned.
   nodeCount(): Promise<number>;
-  // Drops expired records and uptime older than its window; keeps high-water marks until their
-  // retainUntil.
+  // Drops expired records; keeps high-water marks until their retainUntil. Uptime prunes itself.
   prune(now: number): Promise<void>;
   // Atomic: true when applied, false when the sequence is not above the high-water mark.
   put(entry: StoredEntry): Promise<boolean>;
@@ -235,8 +234,8 @@ export function createMemoryStorage(): DiscoveryStorage {
       dropExpired(withdrawals, now);
       for (const [id, node] of nodes)
         if (node.retainUntil <= now) nodes.delete(id);
-      uptime.prune(now);
     },
+    pruneUptime: uptime.pruneUptime,
     markSeen: uptime.markSeen,
     seen: uptime.seen,
     async put(entry) {

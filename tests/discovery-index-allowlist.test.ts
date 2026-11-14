@@ -70,6 +70,7 @@ function countingStorage(storage: DiscoveryStorage) {
       storage.markSeen(nodeId, now)
     ),
     seen: (nodeId, since) => (calls.push('seen'), storage.seen(nodeId, since)),
+    pruneUptime: (now) => (calls.push('pruneUptime'), storage.pruneUptime(now)),
   };
   return { storage: counted, calls };
 }

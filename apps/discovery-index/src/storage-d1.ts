@@ -203,10 +203,10 @@ export function createD1Storage(db: D1Database): DiscoveryStorage {
       return row ? integer(row.n) : 0;
     },
     async prune(now) {
-      await db.batch([
-        ...PRUNE_SQL.map((sql) => db.prepare(sql).bind(now)),
-        db.prepare(PRUNE_UPTIME_SQL).bind(retainedHour(now)),
-      ]);
+      await db.batch(PRUNE_SQL.map((sql) => db.prepare(sql).bind(now)));
+    },
+    async pruneUptime(now) {
+      await db.prepare(PRUNE_UPTIME_SQL).bind(retainedHour(now)).run();
     },
     async markSeen(nodeId, now) {
       await db

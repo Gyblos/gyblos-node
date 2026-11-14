@@ -6,7 +6,6 @@ import { bodyLimit } from 'hono/body-limit';
 import { isJsonContentType } from './body';
 import {
   cachedPage,
-  recordCounter,
   sellersCacheKey,
   storePage,
   type RecordCounter,
@@ -35,7 +34,6 @@ import { IndexError, statusOf } from './errors';
 import { ipKey } from './ip-key';
 import {
   allowed,
-  limiterResolver,
   type DiscoveryLimiters,
   type ResolvedLimiters,
 } from './limits';
@@ -51,7 +49,7 @@ import {
   type IndexSettings,
 } from './settings';
 import type { DiscoveryStorage } from './storage';
-import { parseUptimeQuery, uptimePage, uptimeRecorder } from './uptime';
+import { parseUptimeQuery, uptimePage } from './uptime';
 
 export type { ResponseCache } from './cache';
 export type { DiscoveryIndexOptions } from './settings';
@@ -284,7 +282,10 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
     INDEX_ROUTES.UPTIME,
     cachedRead(settings, async (context) => {
       const node = parseUptimeQuery(context.req.url);
+      // One cache entry per NodeId, whatever equivalent spelling the query used.
+      const { origin } = new URL(context.req.url);
       return {
+        key: `${origin}${INDEX_ROUTES.UPTIME}?node=${node}`,
         body: () => uptimePage(context.get('storage'), node, settings.now()),
       };
     }),
