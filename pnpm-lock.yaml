@@ -139,6 +139,9 @@ importers:
       dependency-cruiser:
         specifier: 18.7.0
         version: 18.7.0
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
