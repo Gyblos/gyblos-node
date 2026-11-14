@@ -13,7 +13,13 @@ import {
   sessionFail,
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
+import type { SessionBlockBuyer } from '@gyblos/protocol/session-blocks';
 
+import {
+  acknowledgeBuyerBlock,
+  approveBuyerBlock,
+  recoverBuyerBlock,
+} from './batch-block-buyer';
 import { buildBuyerOpening } from './batch-opening-build';
 import { batchOpeningAbsent } from './batch-opening-proof';
 import { batchOpeningSigner } from './batch-opening-signer';
@@ -26,11 +32,11 @@ import {
 } from './batch-session-common';
 import { openBatchStore, serial, type BatchStore } from './batch-session-store';
 import type { BatchBuyerOptions } from './batch-session-types';
-import { BATCH_BUYER_CHECKPOINTS } from './constants';
+import { BATCH_BLOCK_STATE, BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export async function createBatchBuyer(
   input: BatchBuyerOptions,
-): Promise<SessionBuyer> {
+): Promise<SessionBlockBuyer> {
   const options = { ...input, terms: termsFor(input.terms) };
   if (options.payer.address !== options.terms.buyer)
     sessionFail(SESSION_CODES.BINDING);
@@ -40,6 +46,30 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
+    usesBlocks: () => store.read().version === BATCH_BLOCK_STATE.version,
+    pendingBlockRequest: () => {
+      const state = store.read();
+      const request = Object.values(state.requests).find(
+        (row) => !row.accepted && state.blocks?.[row.requestId],
+      );
+      return request
+        ? {
+            requestId: request.requestId,
+            requestDigest: request.requestDigest,
+            maxAtomic: request.maxAtomic,
+          }
+        : undefined;
+    },
+    beginBlocks: (request) =>
+      exclusive(() => reserve(store, request, options.now(), true)),
+    approveBlock: (intent, verified, check) =>
+      exclusive(() =>
+        approveBuyerBlock(options, store, intent, verified, check),
+      ),
+    acknowledgeBlock: (intent) =>
+      exclusive(() => acknowledgeBuyerBlock(options, store, intent)),
+    recoverBlockApproval: () =>
+      exclusive(() => recoverBuyerBlock(options, store)),
     open: (check) => exclusive(() => openBuyer(options, store, check)),
     begin: (request) => exclusive(() => reserve(store, request, options.now())),
     approve: (inputBill, verifiedAtomic) =>
@@ -143,6 +173,8 @@ async function approveBuyer(
 ) {
   const bill = billFor(inputBill);
   const current = store.read();
+  if (current.blocks?.[bill.requestId])
+    return sessionFail(SESSION_CODES.BINDING);
   active(current, options.now());
   const request = current.requests[bill.requestId];
   if (

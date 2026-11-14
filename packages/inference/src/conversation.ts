@@ -155,3 +155,26 @@ export function verifyInferenceUsage(
     throw new InferenceError(INFERENCE_CODES.INVALID);
   return { inputTokens, outputTokens };
 }
+
+// A nonterminal checkpoint includes the space proving the preceding prefix is stable, but does not
+// bill that guard space yet. Only tokenizer-certified boundaries can authorize intermediate usage.
+export function verifyInferencePrefix(
+  input: InferenceBuildInput,
+  text: string,
+  meter: ChatTokenizer,
+): InferenceResult['usage'] {
+  if (!meter.stablePrefix || !text.endsWith(' '))
+    throw new InferenceError(INFERENCE_CODES.UNSUPPORTED);
+  const prefix = meter.stablePrefix(text);
+  const inputTokens = meter.chat(input.messages, input.tools, input.toolChoice);
+  if (
+    prefix.characters !== text.length - 1 ||
+    !Number.isSafeInteger(inputTokens) ||
+    inputTokens < 0 ||
+    !Number.isSafeInteger(prefix.tokens) ||
+    prefix.tokens <= 0 ||
+    prefix.tokens > input.maxTokens
+  )
+    throw new InferenceError(INFERENCE_CODES.INVALID);
+  return { inputTokens, outputTokens: prefix.tokens };
+}
