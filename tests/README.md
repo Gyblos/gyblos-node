@@ -91,6 +91,14 @@ without payments or RPC. Native cases use the same explicit capability gating as
 other Iroh tests. The command has a separate real-Ollama opt-in that CI never
 runs; see [the acceptance procedure](../docs/node-discovery-acceptance.md).
 
+The replay cases in `tests/lab/acceptance-review-regressions.test.ts` run the
+actual restart phase over native Iroh and private stores. Lost replay state must
+fail before fresh publication or a new quote; retained state permits progress. A
+deferred observation checks ordering without a timed sleep. Only the initial and
+restarted readiness checks run, within the original 15-second regression budget;
+unrelated renewal and engine-failure phases stay in the complete acceptance
+above.
+
 `tests/lab/free-acceptance.test.ts` adds the synthetic-only complete free
 journey through the actual local index, native Iroh and product buyer HTTP
 endpoint. It checks renewal answers, typed execution refusals, persistent public
