@@ -61,6 +61,39 @@ function harness(storage: DiscoveryStorage, maxNodes = 10_000) {
 }
 
 for (const kind of HARNESS_KINDS) {
+  void test(`${kind}: a concurrent withdrawal fences a previously validated presence`, async () => {
+    const storage = await storageFor(kind);
+    const started = deferred();
+    const release = deferred();
+    const wrapped: DiscoveryStorage = {
+      ...storage,
+      async put(entry) {
+        if (entry.kind === PUBLIC_RECORD_KINDS.PRESENCE) {
+          started.resolve();
+          await release.promise;
+        }
+        return storage.put(entry);
+      },
+    };
+    const { publish } = harness(wrapped);
+    const seller = indexNode();
+    const catalog = seller.catalog(1);
+    assert.equal((await publish(catalog)).status, 201);
+    const pending = publish(await seller.presence(4, catalog));
+    await started.promise;
+    try {
+      assert.equal(
+        (await publish(await seller.withdrawal(3, catalog))).status,
+        201,
+      );
+    } finally {
+      release.resolve();
+    }
+    const response = await pending;
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { error: 'UNKNOWN_CATALOG' });
+    assert.equal((await storage.state(seller.nodeId))?.lastSequence, 3);
+  });
   void test(`${kind}: pruning a short withdrawal never revives its live catalog`, async () => {
     const storage = await storageFor(kind);
     const { clock, publish, sellers } = harness(storage);
@@ -171,3 +204,31 @@ for (const kind of HARNESS_KINDS) {
     assert.equal(states.filter(Boolean).length, 1);
   });
 }
+
+void test('D1 rolls back the entire publication when a later batch statement fails', async () => {
+  const database = await createSqliteD1();
+  assert.ok(database);
+  const before = database.dump();
+  let batches = 0;
+  const storage = createD1Storage({
+    ...database,
+    async batch(statements) {
+      batches++;
+      return database.batch(
+        batches === 2
+          ? [
+              ...statements,
+              database.prepare(
+                'INSERT INTO missing_discovery_table VALUES (1)',
+              ),
+            ]
+          : statements,
+      );
+    },
+  });
+  const { publish } = harness(storage);
+  const seller = indexNode();
+  assert.equal((await publish(seller.catalog(1))).status, 503);
+  assert.equal(database.dump(), before);
+  assert.equal(await storage.state(seller.nodeId), null);
+});
