@@ -241,6 +241,7 @@ export async function startSeller(
         freeExecution: true,
         paidExecution: paid !== undefined,
         batchSessions: sessions !== undefined,
+        batchBlocks: sessions !== undefined,
         receipts: true,
         http: false,
         bindAddress: settings.irohBind,

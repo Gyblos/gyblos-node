@@ -18,6 +18,7 @@ import {
   RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
 import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
+import { SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
 
 import {
   connectionFamily,
@@ -50,6 +51,10 @@ import { decodeRequest, encodeResponse } from './wire';
 const { streamCloseCode } = HTTP_OVER_IROH;
 const { connectMs, requestMs } = TRANSPORT_TIMEOUTS;
 const REQUEST_BYTES = HTTP_OVER_IROH.bodyBytes + HTTP_OVER_IROH.headerBytes;
+
+function isBatchAlpn(alpn: string) {
+  return alpn === BATCH_CHANNEL.alpn || alpn === SESSION_BLOCKS.alpn;
+}
 
 export function serveIroh(
   endpoint: Endpoint,
@@ -170,14 +175,20 @@ export function serveIroh(
     peer: string,
   ) {
     if (!batchSessions) return;
+    const blocks =
+      Buffer.from(connection.alpn()).toString() === SESSION_BLOCKS.alpn;
     await handleBatchChannelConnection(
       connection,
       batchSessions,
       signal,
-      () => {
+      async (querySignal) => {
         if (!routeAllowed(connection)) return undefined;
-        const release = limiter.enterQuery(peer);
+        const release = await limiter.waitQuery(peer, querySignal);
         if (!release) return undefined;
+        if (querySignal.aborted || !routeAllowed(connection)) {
+          release();
+          return undefined;
+        }
         // Reuse the existing bounded query rate, including malformed/incomplete streams. Its lease
         // covers this synchronous rate check; the endpoint slot covers parsing, generation and egress.
         let queryConnection:
@@ -196,6 +207,7 @@ export function serveIroh(
       () => closed,
       () => routeAllowed(connection),
       () => limiter.consume(peer),
+      blocks,
     );
   }
 
@@ -221,7 +233,7 @@ export function serveIroh(
     const family = connectionFamily(alpn);
     const releasePeer = admission.established(peer, family);
     const releaseQuota = releasePeer
-      ? alpn === BATCH_CHANNEL.alpn && batchSessions
+      ? isBatchAlpn(alpn) && batchSessions
         ? limiter.registerQuery(peer, family)
         : limiter.register(peer, family)
       : undefined;
@@ -270,7 +282,7 @@ export function serveIroh(
         );
         return;
       }
-      if (alpn === BATCH_CHANNEL.alpn && batchSessions) {
+      if (isBatchAlpn(alpn) && batchSessions) {
         await batchConnection(connection, controller.signal, peer);
         return;
       }
