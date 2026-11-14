@@ -18,6 +18,7 @@ import { batchNativeFinancial } from '../support/batch-native';
 import { nativeBatchFinish } from '../support/native-batch-finish';
 import { endpoint, within } from '../support/native-fixture';
 import { NATIVE_CAPABILITY, waitFor } from '../support/native-runtime';
+import { pauseSessionControl } from '../support/session-control-pause';
 
 async function fixture(
   now: () => number,
@@ -139,6 +140,7 @@ void test(
     t.after(f.close);
     const sends = f.financial.vm.sends();
     for (let index = 1; index <= 3; index++) {
+      if (index > 1) await pauseSessionControl();
       const result = await within(
         f.buyer().execute(await f.offers.quote(index), f.offers.input),
       );
