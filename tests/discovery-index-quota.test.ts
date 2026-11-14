@@ -130,7 +130,103 @@ for (const kind of HARNESS_KINDS) {
         201,
       );
   });
+
+  void test(`${kind}: delayed requests cannot rewind the NodeId quota window`, async () => {
+    const database = kind === 'sqlite-d1' ? await createSqliteD1() : null;
+    if (kind === 'sqlite-d1') assert.ok(database);
+    const storage = database
+      ? createD1Storage(database)
+      : createMemoryStorage();
+    let entered = () => {};
+    let resume = () => {};
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const wrapped: DiscoveryStorage = {
+      ...storage,
+      async put(entry) {
+        if (entry.sequence === 3) {
+          entered();
+          await released;
+        }
+        return storage.put(entry);
+      },
+    };
+    const { publish, clock } = publishers(wrapped);
+    const seller = indexNode();
+    const catalog = seller.catalog(1);
+    assert.equal((await publish(catalog)).status, 201);
+    const delayed = publish(await seller.presence(3, catalog));
+    await started;
+    try {
+      clock.now = Math.floor(clock.now / 60_000) * 60_000 + 60_000;
+      assert.equal(
+        (
+          await publish(
+            await seller.presence(2, catalog, { issuedAt: clock.now }),
+          )
+        ).status,
+        201,
+      );
+    } finally {
+      resume();
+    }
+    assert.equal((await delayed).status, 201);
+    for (let sequence = 4; sequence <= 11; sequence++)
+      assert.equal(
+        (
+          await publish(
+            await seller.presence(sequence, catalog, { issuedAt: clock.now }),
+          )
+        ).status,
+        201,
+      );
+    assert.equal(
+      (
+        await publish(
+          await seller.presence(12, catalog, { issuedAt: clock.now }),
+        )
+      ).status,
+      429,
+    );
+  });
 }
+
+void test('D1 rolls back the quota when a later publication statement fails', async () => {
+  const database = await createSqliteD1();
+  assert.ok(database);
+  let fail = false;
+  const storage = createD1Storage({
+    ...database,
+    batch: (statements) =>
+      database.batch(
+        fail
+          ? [
+              ...statements,
+              database.prepare('INSERT INTO missing_quota_table VALUES (1)'),
+            ]
+          : statements,
+      ),
+  });
+  const { publish } = publishers(storage);
+  const seller = indexNode();
+  const catalog = seller.catalog(1);
+  assert.equal((await publish(catalog)).status, 201);
+  const before = database.dump();
+  fail = true;
+  assert.equal((await publish(await seller.presence(2, catalog))).status, 503);
+  assert.equal(database.dump(), before);
+  fail = false;
+  for (let sequence = 2; sequence <= 10; sequence++)
+    assert.equal(
+      (await publish(await seller.presence(sequence, catalog))).status,
+      201,
+    );
+  assert.equal((await publish(await seller.presence(11, catalog))).status, 429);
+});
 
 void test('the Worker app requires only IP, publish and read limiters when NodeId quota is stored atomically', async () => {
   const all = allLimiters();
