@@ -18,6 +18,7 @@ import { socketStream } from './control-loopback';
 export async function batchLoopback(
   service: BatchChannelService,
   ids: { buyerNodeId: string; sellerNodeId: string },
+  blocks = false,
 ) {
   const sockets = new Set<Socket>();
   const running = new Set<Promise<void>>();
@@ -47,6 +48,8 @@ export async function batchLoopback(
       () => socket.destroy(),
       connection.signal,
       () => () => {},
+      () => true,
+      { blocks },
     );
     running.add(task);
     void task.then(
@@ -110,6 +113,7 @@ export async function batchLoopback(
     endpoint,
     destination,
     connections: () => connections,
+    settled: () => Promise.allSettled([...running]),
     async close() {
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));

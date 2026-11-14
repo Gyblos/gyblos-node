@@ -12,6 +12,7 @@ import {
   RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
 import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
+import { SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
 
 import { RELAY_CONFIGURATION_CODES } from './constants';
 import {
@@ -35,6 +36,7 @@ export interface BindEndpointOptions {
   // Accepts the paid stream; payment and settlement belong to the caller's service.
   paidExecution?: boolean;
   batchSessions?: boolean;
+  batchBlocks?: boolean;
   http?: boolean;
   bindAddress?: string;
   externalAddress?: string;
@@ -63,6 +65,9 @@ export async function bindEndpoint(
       ...(options.freeExecution ? [FREE_EXECUTION.alpn, FREE_STREAM.alpn] : []),
       ...(options.paidExecution ? [PAID_STREAM.alpn] : []),
       ...(options.batchSessions ? [BATCH_CHANNEL.alpn] : []),
+      ...(options.batchSessions && options.batchBlocks
+        ? [SESSION_BLOCKS.alpn]
+        : []),
     ].map((alpn) => [...Buffer.from(alpn)]),
   );
   if (options.relayOnly) {
