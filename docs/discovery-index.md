@@ -226,37 +226,41 @@ admission of a new NodeId.
 ```json
 {
   "nodeId": "…",
-  "firstSeenAt": 1762992000000,
+  "firstSeenAt": 1762473600000,
   "lastSeenAt": 1763078400000,
   "slotMs": 300000,
   "windows": [
     { "days": 1, "seen": 286, "slots": 288, "ratio": 0.9931 },
     { "days": 7, "seen": 2001, "slots": 2016, "ratio": 0.9926 },
-    { "days": 30, "seen": 2001, "slots": 2017, "ratio": 0.9921 }
+    { "days": 30, "seen": 2002, "slots": 2017, "ratio": 0.9926 }
   ],
   "generatedAt": 1763078400000
 }
 ```
 
-`firstSeenAt` is the first presence the index ever accepted from the NodeId: one
-row per NodeId (`discovery_uptime_nodes`) outlives the 30-day hourly rows, so a
-seller back after a long absence is not reported as new and the absence counts
-in every window. `lastSeenAt` is the last recorded presence, at five-minute
-resolution (each app instance writes a NodeId once per slot), or `null` when
-none falls within the last 30 days. `seen` counts slots with a presence and
-`slots` counts the window's slots up to and including the current one: a full
-day is 288 slots, so a seller online all day reports `1`. A window starts no
-earlier than `firstSeenAt`, so a new seller is not counted down for time before
-it existed. A NodeId never seen is `404 NOT_FOUND`; a malformed or repeated
-`node`, or any other parameter, is `400 INVALID_QUERY`. Answers are cached and
-CORS-readable like `/v1/models`, with one cache entry per NodeId however the
-query is spelled.
+`firstSeenAt` is the earliest presence recorded for the NodeId: one row per
+NodeId (`discovery_uptime_nodes`) outlives the 30-day hourly rows, so a seller
+back after a long absence is not reported as new and the absence counts in every
+window. Permanent uptime identities share the configured `maxNodes` capacity. At
+capacity, existing identities keep their history; new identities are omitted
+from uptime (404) while ordinary signed publication still succeeds. The capacity
+check and first-sighting/hourly writes are one D1 transaction. `lastSeenAt` is
+the last recorded presence, at five-minute resolution (each app instance writes
+a NodeId once per slot), or `null` when none falls within the last 30 days.
+`seen` counts slots with a presence and `slots` counts the window's slots up to
+and including the current one: a full day is 288 slots, so a seller online all
+day reports `1`. A window starts no earlier than `firstSeenAt`, so a new seller
+is not counted down for time before it existed. A NodeId never seen is
+`404 NOT_FOUND`; a malformed or repeated `node`, or any other parameter, is
+`400 INVALID_QUERY`. Answers are cached and CORS-readable like `/v1/models`,
+with one cache entry per NodeId however the query is spelled.
 
-Each app instance writes a NodeId's slot once, however often the seller
-refreshes its presence, and the write is an idempotent bitwise OR. The write is
-best effort: if it fails, the presence is still accepted and that slot simply
-counts as offline. Uptime says a seller was reachable through the index; it does
-not say its answers were correct or fast.
+Each app instance reserves a NodeId's slot before starting storage work, so
+concurrent refreshes share the pending write. A successful write is remembered
+for that slot, and the write is an idempotent bitwise OR. Uptime is best effort:
+a failed write still accepts the presence and releases the reservation, so a
+later accepted presence can retry that slot. Uptime says a seller was reachable
+through the index; it does not say its answers were correct or fast.
 
 ## Storage
 

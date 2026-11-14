@@ -67,6 +67,7 @@ export interface IndexSettings {
 export function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
   const now = options.now ?? Date.now;
   const development = options.development === true;
+  const maxNodes = options.maxNodes ?? DISCOVERY_INDEX_LIMITS.maxNodes;
   return {
     now,
     development,
@@ -81,8 +82,8 @@ export function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
       options.storage,
       options.pruneIntervalMs ?? DISCOVERY_INDEX_LIMITS.pruneIntervalMs,
     ),
-    markSeen: uptimeRecorder(options.storage),
-    maxNodes: options.maxNodes ?? DISCOVERY_INDEX_LIMITS.maxNodes,
+    markSeen: uptimeRecorder(options.storage, maxNodes),
+    maxNodes,
     maxResponseBytes:
       options.maxResponseBytes ?? DISCOVERY_INDEX_LIMITS.maxResponseBytes,
   };

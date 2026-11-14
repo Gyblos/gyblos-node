@@ -2,7 +2,7 @@
 // accepted, and GET /v1/uptime?node=<NodeId>, which reports the share of slots seen over the last day,
 // week and month. A window starts no earlier than the NodeId was first seen, so a new seller is not
 // counted down for time before it existed. Built only from records the index already verified.
-import { INDEX_ERRORS, UPTIME } from './constants';
+import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS, UPTIME } from './constants';
 import { indexFail } from './errors';
 
 export { UPTIME } from './constants';
@@ -19,7 +19,7 @@ export interface UptimeRow {
 
 export interface UptimeStorage {
   // Marks the slot holding `now` for the NodeId.
-  markSeen(nodeId: string, now: number): Promise<void>;
+  markSeen(nodeId: string, now: number, maxNodes?: number): Promise<void>;
   // The NodeId's rows from `sinceHour` on, oldest first.
   seen(nodeId: string, sinceHour: number): Promise<UptimeRow[]>;
   // When the NodeId was first seen, kept after its rows are pruned; null when never seen.
@@ -40,7 +40,10 @@ export const retainedHour = (now: number) =>
 // than every five minutes, and the storage write is idempotent anyway. Old rows are pruned here, on
 // its own throttle and separately from record pruning, so retention holds even when no new NodeId
 // publishes and a failing uptime table never blocks admitting one.
-export function uptimeRecorder(storage: UptimeStorage | undefined) {
+export function uptimeRecorder(
+  storage: UptimeStorage | undefined,
+  maxNodes: number = DISCOVERY_INDEX_LIMITS.maxNodes,
+) {
   // High-water admission bounds distinct nodes in one five-minute slot. Rotate only between
   // slots, instead of evicting current entries when a smaller process cache fills.
   const written = new Set<string>();
@@ -61,7 +64,7 @@ export function uptimeRecorder(storage: UptimeStorage | undefined) {
         prunedAt = now;
         await storage.pruneUptime(now).catch(() => undefined);
       }
-      await storage.markSeen(nodeId, now);
+      await storage.markSeen(nodeId, now, maxNodes);
     } catch (error) {
       if (slot === writtenSlot) written.delete(nodeId);
       throw error;
@@ -158,7 +161,14 @@ export function memoryUptime() {
         if (!hours.size) nodes.delete(id);
       }
     },
-    async markSeen(nodeId: string, now: number) {
+    async markSeen(
+      nodeId: string,
+      now: number,
+      maxNodes: number = DISCOVERY_INDEX_LIMITS.maxNodes,
+    ) {
+      // Historical first sightings stay immutable under identity churn: optional uptime simply stops
+      // admitting new identities at capacity, without blocking ordinary discovery publication.
+      if (!first.has(nodeId) && first.size >= maxNodes) return;
       first.set(nodeId, Math.min(first.get(nodeId) ?? now, now));
       const hours = nodes.get(nodeId) ?? new Map<number, UptimeRow>();
       nodes.set(nodeId, hours);

@@ -184,4 +184,42 @@ for (const kind of HARNESS_KINDS) {
     assert.equal(writes, 1);
   });
 
+  void test(`${kind}: expiring discovery admissions cannot accumulate unbounded permanent uptime identities`, async (context) => {
+    const storage = await storageFor(kind, context);
+    if (!storage) return;
+    const harness = await indexHarness('memory', {
+      storage,
+      maxNodes: 1,
+      pruneIntervalMs: 0,
+    });
+    assert.ok(harness);
+    const nodes: string[] = [];
+    for (let index = 0; index < 4; index++) {
+      const seller = indexNode();
+      nodes.push(seller.nodeId);
+      const catalog = seller.catalog(1, { issuedAt: harness.clock.now });
+      assert.equal((await harness.publish(catalog)).status, 201);
+      assert.equal(
+        (
+          await harness.publish(
+            await seller.presence(2, catalog, { issuedAt: harness.clock.now }),
+          )
+        ).status,
+        201,
+      );
+      assert.equal(await storage.nodeCount(), 1);
+      harness.clock.now += UPTIME.dayMs;
+    }
+    harness.clock.now += 31 * UPTIME.dayMs;
+    await storage.prune(harness.clock.now);
+    await storage.pruneUptime(harness.clock.now);
+    assert.equal(await storage.nodeCount(), 0);
+    const remembered = (
+      await Promise.all(nodes.map((nodeId) => storage.firstSeen(nodeId)))
+    ).filter((first) => first !== null);
+    assert.ok(
+      remembered.length <= 1,
+      `permanent uptime identities=${remembered.length}; configured node capacity=1`,
+    );
+  });
 }

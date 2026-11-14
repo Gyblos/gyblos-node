@@ -5,6 +5,7 @@ import {
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 
+import { DISCOVERY_INDEX_LIMITS } from './constants';
 import type {
   DiscoveryStorage,
   NodeState,
@@ -99,9 +100,12 @@ const PRUNE_SQL = [
 ];
 const PRUNE_UPTIME_SQL = 'DELETE FROM discovery_uptime WHERE hour < ?1';
 // One row per NodeId and hour: the slot bit is ORed in, so repeating a write changes nothing.
-const MARK_SEEN_SQL = `INSERT INTO discovery_uptime (node_id, hour, slots, first_at, last_at) VALUES (?1, ?2, ?3, ?4, ?4)
+const MARK_SEEN_SQL = `INSERT INTO discovery_uptime (node_id, hour, slots, first_at, last_at)
+SELECT ?1, ?2, ?3, ?4, ?4 WHERE EXISTS (SELECT 1 FROM discovery_uptime_nodes WHERE node_id = ?1)
 ON CONFLICT (node_id, hour) DO UPDATE SET slots = slots | excluded.slots, first_at = min(first_at, excluded.first_at), last_at = max(last_at, excluded.last_at)`;
-const FIRST_SEEN_SQL = `INSERT INTO discovery_uptime_nodes (node_id, first_at) VALUES (?1, ?2)
+const FIRST_SEEN_SQL = `INSERT INTO discovery_uptime_nodes (node_id, first_at)
+SELECT ?1, ?2 WHERE CASE WHEN EXISTS (SELECT 1 FROM discovery_uptime_nodes WHERE node_id = ?1)
+  THEN 1 ELSE (SELECT count(*) FROM discovery_uptime_nodes) < ?3 END
 ON CONFLICT (node_id) DO UPDATE SET first_at = min(first_at, excluded.first_at)`;
 const SEEN_SQL =
   'SELECT hour, slots, first_at AS firstAt, last_at AS lastAt FROM discovery_uptime WHERE node_id = ?1 AND hour >= ?2 ORDER BY hour';
@@ -192,6 +196,19 @@ function kindStatements(db: D1Database, entry: StoredEntry) {
   ];
 }
 
+// Capacity admission and the hourly mark share one transaction across Worker isolates.
+async function markSeen(
+  db: D1Database,
+  nodeId: string,
+  now: number,
+  maxNodes: number,
+) {
+  await db.batch([
+    db.prepare(FIRST_SEEN_SQL).bind(nodeId, now, maxNodes),
+    db.prepare(MARK_SEEN_SQL).bind(nodeId, hourOf(now), slotBit(now), now),
+  ]);
+}
+
 export function createD1Storage(db: D1Database): DiscoveryStorage {
   return {
     async state(nodeId) {
@@ -210,12 +227,8 @@ export function createD1Storage(db: D1Database): DiscoveryStorage {
     async pruneUptime(now) {
       await db.prepare(PRUNE_UPTIME_SQL).bind(retainedHour(now)).run();
     },
-    async markSeen(nodeId, now) {
-      await db.batch([
-        db.prepare(MARK_SEEN_SQL).bind(nodeId, hourOf(now), slotBit(now), now),
-        db.prepare(FIRST_SEEN_SQL).bind(nodeId, now),
-      ]);
-    },
+    markSeen: (nodeId, now, maxNodes = DISCOVERY_INDEX_LIMITS.maxNodes) =>
+      markSeen(db, nodeId, now, maxNodes),
     async firstSeen(nodeId) {
       const row = await db
         .prepare(
