@@ -21,6 +21,8 @@ import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { batchDeadline, readBatchFrame } from './batch-io';
 import { streamBatchResponse } from './batch-stream-server';
+import type { BatchBlockExchange } from './batch-block-types';
+export type { BatchBlockExchange } from './batch-block-types';
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import type { ControlStream } from './control-io';
 import { handleIrohConnection } from './iroh-connection';
@@ -31,9 +33,11 @@ export interface BatchChannelService {
     peer: string,
     signal: AbortSignal,
     onDelta?: (text: string) => Promise<void>,
+    blocks?: BatchBlockExchange,
   ): Promise<BatchChannelResult>;
 }
 export interface BatchStreamLimits {
+  blocks?: boolean;
   ingressMs?: number;
   requestMs?: number;
   egressMs?: number;

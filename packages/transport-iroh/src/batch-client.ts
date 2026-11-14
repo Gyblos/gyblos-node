@@ -26,6 +26,8 @@ import type {
 } from './batch-client-types';
 import { readBatchFrame } from './batch-io';
 import { readBatchStreamResponse } from './batch-stream-client';
+import type { BatchBlockClient } from './batch-block-types';
+export type { BatchBlockClient } from './batch-block-types';
 import { HTTP_OVER_IROH } from './constants';
 import { controlDeadline } from './control-io';
 import { withDeadline } from './deadline';
@@ -47,6 +49,7 @@ export class BatchClientError extends BatchChannelError {
   }
 }
 export interface BatchClientOptions {
+  blocks?: boolean;
   // Trusted host guard, called synchronously immediately before the first prompt write.
   beforeExecute?(request: BatchExecutionRequest): void;
   now?: () => number;
@@ -269,6 +272,7 @@ export function createBatchChannelClient<Remote extends BatchDestination>(
       value: unknown,
       signal?: AbortSignal,
       onDelta?: (text: string) => Promise<void>,
+      _blocks?: BatchBlockClient,
     ) => exchange(state, value, signal, onDelta),
     async close() {
       state.lifetime.abort();
