@@ -11,6 +11,8 @@ import {
   cachedIdentityCheck,
   createSnapshotCache,
 } from '@gyblos/buyer/selection-cache';
+import { CONTROL_CODES } from '@gyblos/protocol/constants';
+import { controlFail } from '@gyblos/protocol/control-validation';
 
 import { selectionFixture } from './support/buyer-selection';
 
@@ -19,6 +21,7 @@ async function rig(t: test.TestContext) {
   t.after(() => run.wire.close());
   const snapshots = createSnapshotCache();
   let failNext = false;
+  let staleNext = false;
   let connects = 0;
   const dependencies = {
     ...run.dependencies,
@@ -39,6 +42,10 @@ async function rig(t: test.TestContext) {
             failNext = false;
             throw new Error('Synthetic quote failure');
           }
+          if (staleNext) {
+            staleNext = false;
+            controlFail(CONTROL_CODES.STALE);
+          }
           return original(...args);
         },
       });
@@ -55,6 +62,10 @@ async function rig(t: test.TestContext) {
     failOnce: () => {
       failNext = true;
     },
+    staleOnce: () => {
+      staleNext = true;
+    },
+    dependencies,
     connects: () => connects,
   };
 }
@@ -69,13 +80,13 @@ void test('a seller verified on one request is only asked for a quote on the nex
   assert.equal(host.connects(), 2);
 });
 
-void test('a failed quote drops the remembered snapshot, so the next request verifies again', async (t) => {
+void test('any refusal of a quote for a remembered catalog is asked again fresh in the same request', async (t) => {
   const host = await rig(t);
   assert.equal((await host.select()).ok, true);
   host.failOnce();
-  assert.equal((await host.select()).ok, false);
   const before = host.run.wire.queries;
   assert.equal((await host.select()).ok, true);
+  // The synthetic refusal is local: then catalog, presence and quote on a fresh snapshot.
   assert.equal(host.run.wire.queries - before, 3);
 });
 
@@ -128,4 +139,20 @@ void test('a passed identity check is reused for ten minutes; a refusal never is
   clock = BUYER_SELECTION.identityCacheMs;
   assert.equal((await verify(good)).ok, true);
   assert.deepEqual(asked, ['a', 'b', 'b', 'a']);
+});
+
+void test('a seller that replaced its catalog is asked again in the same request, not cooled down', async (t) => {
+  const host = await rig(t);
+  assert.equal((await host.select()).ok, true);
+  host.staleOnce();
+  const before = host.run.wire.queries;
+  const result = await selectBuyerQuote(host.run.config, host.dependencies);
+  assert.equal(result.ok, true);
+  // The refused quote was not sent (the synthetic refusal is local), then catalog, presence and quote.
+  assert.equal(host.run.wire.queries - before, 3);
+  const seller = host.run.config.sellers[0]!.nodeId;
+  assert.equal(
+    host.dependencies.stats.get(seller)?.cooldownUntil ?? null,
+    null,
+  );
 });
