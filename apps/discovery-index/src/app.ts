@@ -4,13 +4,7 @@ import { Hono, type Context, type Next } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 
 import { isJsonContentType } from './body';
-import {
-  cachedPage,
-  sellersCacheKey,
-  storePage,
-  type RecordCounter,
-  type ResponseCache,
-} from './cache';
+import { cachedPage, sellersCacheKey, storePage } from './cache';
 import {
   DISCOVERY_INDEX_LIMITS,
   DISCOVERY_LIMITERS,
@@ -32,11 +26,7 @@ import {
 } from './constants';
 import { IndexError, statusOf } from './errors';
 import { ipKey } from './ip-key';
-import {
-  allowed,
-  type DiscoveryLimiters,
-  type ResolvedLimiters,
-} from './limits';
+import { allowed, type ResolvedLimiters } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
 import { acceptRecord, type PublishContext } from './publish';
 import { publishModeOf } from './publishers';
