@@ -254,13 +254,15 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 
 The same module's projection helpers interpolate only ORM columns, bound values
 and built-in predicates; they contain no SQL syntax. Model insertion uses a
-guarded ORM CTE and `unionAll`, with at most 67 bound parameters for 64 models,
+guarded ORM CTE and `unionAll`, with at most 68 bound parameters for 64 models,
 below
-[D1's limit of 100](https://developers.cloudflare.com/d1/platform/limits/). It
-preserves diff-only writes and rollback without `json_each` or a handwritten
-query. Counts use Drizzle aggregates while retaining strict runtime validation
-of the driver response. Test-only SQL remains for independent migration and
-query-plan inspection, synthetic fixtures and rollback fault injection.
+[D1's limit of 100](https://developers.cloudflare.com/d1/platform/limits/). The
+admission CTE is limited to its single primary-key row, preventing SQLite from
+repeating the node lookup for every model. It preserves diff-only writes and
+rollback without `json_each` or a handwritten query. Counts use Drizzle
+aggregates while retaining strict runtime validation of the driver response.
+Test-only SQL remains for independent migration and query-plan inspection,
+synthetic fixtures and rollback fault injection.
 
 `migrations/0001_discovery_index.sql` creates the five tables and their indexes.
 The website's draft `0001` and `0002` (prune indexes) were never applied to any

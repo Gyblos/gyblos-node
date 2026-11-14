@@ -139,7 +139,10 @@ function catalogModelQueries(database: DiscoveryDatabase, entry: StoredEntry) {
           eq(nodes.lastSequence, entry.sequence),
           eq(nodes.lastSignature, entry.signature),
         ),
-      ),
+      )
+      // nodeId is unique. LIMIT preserves cardinality and prevents SQLite from inlining this
+      // admission lookup into every UNION branch of a large catalog.
+      .limit(1),
   );
   const [first, second, ...rest] = entry.models.map((modelId) =>
     database
@@ -153,7 +156,7 @@ function catalogModelQueries(database: DiscoveryDatabase, entry: StoredEntry) {
   );
   if (!first) return [];
   const source = second ? unionAll(first, second, ...rest) : first;
-  // One guarded CTE and at most 64 model parameters remain below D1's 100-bind limit.
+  // Guard, materialization limit and at most 64 models use 68 of D1's 100 bound parameters.
   return [
     database.with(admitted).insert(models).select(source).onConflictDoNothing(),
   ];

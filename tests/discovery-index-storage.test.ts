@@ -176,7 +176,8 @@ void test('D1 catalog republish writes only the model rows that changed', async 
     .all(namedParams(modelInsert.params))
     .map((row) => String(row.detail));
   assert.equal(
-    plan.filter((step) => /\b(?:SEARCH|SCAN) discovery_nodes\b/.test(step)).length,
+    plan.filter((step) => /\b(?:SEARCH|SCAN) discovery_nodes\b/.test(step))
+      .length,
     1,
     plan.join('\n'),
   );
