@@ -106,16 +106,35 @@ Focus lines, one per reviewer:
 
 ## 6. Merge (only after founder approval)
 
-A PR or green CI is never approval. Merge only when the founder explicitly
-approved this PR and CI is green on the exact head:
+A PR or green CI is never approval. Each merge needs the founder's explicit
+approval for that PR and the reviewed head:
+
+- A PR into `main` needs successful current CI, Security and Static analysis
+  checks on its combined head before merge. Check the actual PR base and head;
+  an ancestor's green result does not validate a later combined tree.
+- A stacked child PR into another branch intentionally runs none of those
+  hosted workflows. Require exact-head local gates and three independent
+  reviews, then separate founder approval for that child. Do not claim that
+  absent or filtered hosted checks passed.
+- Merge a stack top-down into each base. Every head update can trigger another
+  main-facing run; the final push to `main` can run workflows again. This filter
+  reduces duplicate stacked runs, not all repeated runs.
+- If the task prohibits remote CI, use `[skip ci]` in new commits, report hosted
+  checks as not run and leave the PR open. Never trigger a rerun, bypass a hosted
+  protection or infer merge approval from local results.
+
+After the appropriate evidence and explicit approval, use:
 
 ```sh
+# For a PR into main, verify the current combined checks first.
 gh pr checks <n> --repo Gyblos/gyblos-node
+# For every approved PR, match the reviewed head and preserve a merge commit.
 gh pr merge <n> --repo Gyblos/gyblos-node --merge --match-head-commit <SHA>
 ```
 
 Merge commits only, never `--squash` or `--rebase`. Do not pass
-`--delete-branch`. Then confirm the post-merge CI on `main` for the merge SHA.
+`--delete-branch`. When remote validation is authorized, confirm the post-merge
+CI on `main` for the merge SHA; otherwise report it as not run.
 
 ## 7. Post-merge vault update
 

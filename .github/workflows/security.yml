@@ -3,7 +3,10 @@
 name: Security
 
 on:
+  # Only pull requests into main; child PRs intentionally have no hosted run.
+  # The main-facing combined head is checked on updates, and pushes to main run again.
   pull_request:
+    branches: [main]
   push:
     branches: [main]
 

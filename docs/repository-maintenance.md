@@ -59,6 +59,19 @@ fixed deadline.
 
 ## Required hosted controls
 
+CI, Security and Static analysis run on pull requests into `main` and on pushes
+to `main`. A stacked child pull request (based on another branch) intentionally
+runs none of them. Each child still needs exact-head local gates, three
+independent reviews and separate founder approval. Merge a stack top-down into
+each base, then merge the bottom pull request only after its checks pass on the
+current combined head. Missing or filtered checks are not successful checks.
+
+The branch filter reduces stacked runs; it does not promise a single run.
+Opening, updating or reopening the main-facing pull request can run workflows,
+as can the final push to `main`. For a local-only task, new commits use
+`[skip ci]`; report remote checks as not run, leave the PR open and never bypass
+hosted protections or trigger workflows without authorization.
+
 Protect `main` with mandatory pull requests and successful current checks:
 `CI / check`, `Security / Secrets`, `Security / Dependencies` and
 `Static analysis / Semgrep CE`. Confirm the actual check contexts from
