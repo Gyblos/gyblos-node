@@ -14,23 +14,16 @@ import {
   lte,
   notExists,
   or,
-  sql,
 } from 'drizzle-orm';
-import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 
-import {
-  DISCOVERY_LISTING_INDEXES,
-  type DiscoveryListingIndex,
-} from './constants';
+import { DISCOVERY_LISTING_INDEXES } from './constants';
 import type { DiscoveryDatabase } from './d1-client';
 import { catalogs, models, nodes, presence, withdrawals } from './schema';
+import { columnField, coveringIndex } from './sqlite-expressions';
 import type { SellerQuery } from './storage';
 
-// SQLite index hints are expression fragments because Drizzle has no index-hint builder.
-const indexed = (table: SQLiteTable, name: DiscoveryListingIndex) =>
-  sql`${table} indexed by ${sql.identifier(name)}`;
 export function withdrawnCatalog(database: DiscoveryDatabase) {
   return database
     .select({ nodeId: withdrawals.nodeId })
@@ -64,16 +57,16 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
   const page = database.$with('page').as(
     database
       .select({
-        nodeId: sql<string>`${presence.nodeId}`.as('nodeId'),
-        issuedAt: sql<number>`${presence.issuedAt}`.as('issuedAt'),
+        nodeId: columnField(presence.nodeId, 'nodeId'),
+        issuedAt: columnField(presence.issuedAt, 'issuedAt'),
       })
       .from(models)
       .innerJoin(
-        indexed(catalogs, DISCOVERY_LISTING_INDEXES.CATALOG),
+        coveringIndex(catalogs, DISCOVERY_LISTING_INDEXES.CATALOG),
         eq(catalogs.nodeId, models.nodeId),
       )
       .innerJoin(
-        indexed(presence, DISCOVERY_LISTING_INDEXES.PRESENCE),
+        coveringIndex(presence, DISCOVERY_LISTING_INDEXES.PRESENCE),
         and(
           eq(presence.nodeId, models.nodeId),
           eq(presence.digest, catalogs.digest),
@@ -89,9 +82,14 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
           notExists(
             database
               .select({
-                nodeId: sql<string>`${withdrawals.nodeId}`.as('nodeId'),
+                nodeId: columnField(withdrawals.nodeId, 'nodeId'),
               })
-              .from(indexed(withdrawals, DISCOVERY_LISTING_INDEXES.WITHDRAWAL))
+              .from(
+                coveringIndex(
+                  withdrawals,
+                  DISCOVERY_LISTING_INDEXES.WITHDRAWAL,
+                ),
+              )
               .where(
                 and(
                   eq(withdrawals.nodeId, catalogs.nodeId),
@@ -118,8 +116,8 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
     .select({
       nodeId: page.nodeId,
       issuedAt: page.issuedAt,
-      catalogJson: sql<string>`${catalogs.json}`.as('catalogJson'),
-      presenceJson: sql<string>`${presence.json}`.as('presenceJson'),
+      catalogJson: columnField(catalogs.json, 'catalogJson'),
+      presenceJson: columnField(presence.json, 'presenceJson'),
     })
     .from(page)
     .innerJoin(catalogs, eq(catalogs.nodeId, page.nodeId))
@@ -128,18 +126,18 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
 }
 export function recordCountsQuery(database: DiscoveryDatabase, now: number) {
   return database
-    .select({ n: sql<number>`${count()}` })
+    .select({ n: count().as('n') })
     .from(catalogs)
     .where(gt(catalogs.expiresAt, now))
     .unionAll(
       database
-        .select({ n: sql<number>`${count()}` })
+        .select({ n: count().as('n') })
         .from(presence)
         .where(gt(presence.expiresAt, now)),
     )
     .unionAll(
       database
-        .select({ n: sql<number>`${count()}` })
+        .select({ n: count().as('n') })
         .from(withdrawals)
         .where(gt(withdrawals.expiresAt, now)),
     );
@@ -150,7 +148,7 @@ export function modelsQuery(
   now: number,
   limit: number,
 ) {
-  const sellers = sql<number>`${countDistinct(models.nodeId)}`;
+  const sellers = countDistinct(models.nodeId).as('sellers');
   return database
     .select({ modelId: models.modelId, sellers })
     .from(models)
