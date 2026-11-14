@@ -1526,3 +1526,39 @@ a large engine fragment therefore need not become an arbitrarily larger block
 when an earlier safe boundary exists. Text without such a frontier requires one
 terminal exact block within existing limits. Free/declared metering and legacy
 whole-result verification remain unchanged by the optional port.
+
+### Opt-in duplex transport for session blocks
+
+`gyblos/session/5` uses the validated session-v4 management envelopes for
+prepare, opening, snapshot and close. Its execution parameters are also parsed
+by the existing request parser, but their financial digest uses the distinct
+session-v5 request domain. Existing ALPNs and signed vectors retain their bytes.
+The transport option is off by default; registering session-v4 does not advertise
+block execution. A host must explicitly enable it when composing a block-capable
+service. The ALPN is chosen before preparing or funding a channel.
+
+An execution keeps its send direction open. Each checkpoint is followed by one
+approval on that same stream, then an ACK after durable seller acceptance. The
+service cannot publish a second checkpoint while acceptance is outstanding.
+The buyer independently verifies the checkpoint and terminal tool allowlist
+before calling its durable signer, and persists the ACK before delivering the
+chunk to its consumer. The final checkpoint/ACK is followed by FIN in both
+directions. A partial first prompt write is already possibly sent; transport
+failure never authorizes another prompt or protocol fallback.
+
+For financial recovery, the first frame of a fresh v5 stream can be the exact
+stored approval, followed by FIN. It is matched to the seller's pending or last
+accepted checkpoint and verified by the existing native voucher verifier before
+ACK. Repeating a last accepted approval does not discard the next unsigned
+checkpoint or increase the amount. This exchange contains no inference input
+and consumes no inference-rate token. It cannot resume generation.
+
+Both session ALPNs share DATA connection and active-query admission. Execution
+consumes the existing inference quota once, not once per block. Existing
+absolute request, ingress, egress and financial-operation deadlines are retained.
+The first response byte may wait for generation; after it arrives, the entire
+remaining frame has one ingress budget. Each approval is capped at the existing
+8-KiB control-request limit; the original request plus all approvals and the
+entire response transcript stay within their existing 1-MiB aggregate budgets.
+An oversized length is refused before its body is allocated or read. Cancellation
+poisons pending verification; no late approval or ACK may escape afterward.

@@ -4,7 +4,12 @@ import {
   sessionFail,
   type SessionVoucher,
 } from '@gyblos/protocol/payment-session';
-import type { SessionBlockIntent } from '@gyblos/protocol/session-blocks';
+import {
+  parseSessionBlock,
+  SESSION_BLOCK_KINDS,
+  type SessionBlockApproval,
+  type SessionBlockIntent,
+} from '@gyblos/protocol/session-blocks';
 
 import {
   acknowledgeBlock,
@@ -17,6 +22,32 @@ import { voucherFor } from './batch-session-checks';
 import { active } from './batch-session-common';
 import type { BatchSellerContext } from './batch-session-types';
 import { waitBatch } from './batch-session-wait';
+
+export async function resumeSellerBlock(
+  context: BatchSellerContext,
+  input: SessionBlockApproval,
+  peer: string,
+) {
+  const approval = parseSessionBlock(input);
+  const state = context.store.read();
+  if (
+    approval.kind !== SESSION_BLOCK_KINDS.APPROVAL ||
+    approval.channelId !== state.channelId ||
+    peer !== context.options.terms.buyerNodeId
+  )
+    return sessionFail(SESSION_CODES.BINDING);
+  const progress = state.blocks?.[approval.requestId];
+  const intent = [progress?.pending?.intent, progress?.accepted].find(
+    (value) =>
+      value &&
+      value.index === approval.index &&
+      value.digest === approval.blockDigest &&
+      value.bill.requestDigest === approval.requestDigest,
+  );
+  if (!intent) return sessionFail(SESSION_CODES.BINDING);
+  await acceptSellerBlock(context, intent, approval.voucher, peer);
+  return intent;
+}
 
 export async function checkpointSeller(
   context: BatchSellerContext,

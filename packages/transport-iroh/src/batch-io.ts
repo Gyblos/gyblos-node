@@ -1,11 +1,23 @@
 // Drains native session I/O and checks cancellation between prefix, body and EOF; no policy.
 import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import { ControlFrameReader } from '@gyblos/protocol/control-framing';
+import { controlFail } from '@gyblos/protocol/control-validation';
 
 import type { ControlStream } from './control-io';
 import { withDeadline } from './deadline';
 
 export async function readBatchFrame(
+  stream: ControlStream,
+  maximum: number,
+  check: () => void,
+) {
+  const value = await readBatchMessage(stream, maximum, check);
+  const trailing = await stream.recv.read(1);
+  check();
+  if (trailing.length) return controlFail();
+  return value;
+}
+export async function readBatchMessage(
   stream: ControlStream,
   maximum: number,
   check: () => void,
@@ -21,9 +33,6 @@ export async function readBatchFrame(
   const body = await stream.recv.readExact(length);
   check();
   reader.push(Uint8Array.from(body));
-  const trailing = await stream.recv.read(1);
-  check();
-  reader.push(Uint8Array.from(trailing));
   return reader.finish();
 }
 export async function batchDeadline<T>(
