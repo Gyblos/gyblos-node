@@ -6,8 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
+
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { createBuyerControlClient } from '@gyblos/buyer/control';
+import { selectWinner } from '@gyblos/buyer/free-selection';
 import {
   selectVerifiedBuyerQuote,
   type VerifiedSelectionDependencies,
@@ -17,7 +20,11 @@ import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { createSellerControlService } from '@gyblos/node/control';
-import { CONTROL_METHODS } from '@gyblos/protocol/constants';
+import { CONTROL_LIMITS, CONTROL_METHODS } from '@gyblos/protocol/constants';
+import {
+  ControlFrameReader,
+  encodeControlFrame,
+} from '@gyblos/protocol/control-framing';
 import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
 import { controlFixture } from './support/control-fixture';
@@ -213,4 +220,113 @@ void test('a failed snapshot keeps progressive cooldowns when another seller sup
     assert.equal(failures.at(-1)?.retryAt, until);
     now = until + 1;
   }
+});
+
+// A minimal native-port double exercises selectWinner's actual control framing without binding sockets.
+function memoryEndpoint(source: Awaited<ReturnType<typeof controlFixture>>) {
+  source.context.endpoint = { relayUrl: null, directAddresses: [] };
+  const service = createSellerControlService({
+    context: source.context,
+    ownerSigner: source.ownerSigner,
+    nodeSigner: source.nodeSigner,
+  });
+  return {
+    id: () => ({ toString: () => source.request.params.buyerNodeId }),
+    connect: async (remote: EndpointAddr) => {
+      if (remote.id().toString() !== source.catalog.nodeId)
+        throw new Error('Synthetic unreachable seller');
+      return {
+        remoteId: () => remote.id(),
+        closeReason: () => null,
+        close: () => {},
+        openBi: async () => {
+          let response: Uint8Array = new Uint8Array();
+          let offset = 0;
+          return {
+            send: {
+              writeAll: async (bytes: number[]) => {
+                const reader = new ControlFrameReader(
+                  CONTROL_LIMITS.requestBytes,
+                );
+                reader.push(Uint8Array.from(bytes));
+                response = encodeControlFrame(
+                  await service.respond(
+                    reader.finish(),
+                    source.request.params.buyerNodeId,
+                    new AbortController().signal,
+                  ),
+                  CONTROL_LIMITS.responseBytes,
+                );
+              },
+              finish: async () => {},
+            },
+            recv: {
+              readExact: async (size: number) => {
+                const bytes = response.slice(offset, offset + size);
+                offset += size;
+                return [...bytes];
+              },
+              read: async () => [],
+            },
+          };
+        },
+      } as unknown as Connection;
+    },
+  } as unknown as Endpoint;
+}
+
+void test('a cancelled selection discards earlier backoff mutations along with its quote statistics', async (context) => {
+  await isolatedHome(context);
+  const source = await controlFixture(true);
+  const other = await controlFixture(true);
+  const config = configuration(source, other);
+  const prepared = {
+    config,
+    discovery: undefined,
+    stats: {
+      rows: new Map<string, LocalSellerStats>(),
+      save: async () => {},
+    },
+  };
+  const caller = new AbortController();
+  let abortOnFailure = true;
+  const backoff = createSellerBackoff();
+  backoff.failed(source.catalog.nodeId);
+  backoff.failed(source.catalog.nodeId);
+  const options = {
+    endpoint: memoryEndpoint(source),
+    buyer: source.request.params.buyer,
+    relayOnly: false,
+    now: source.context.now,
+    backoff,
+    onSellerFailure: () => {
+      if (abortOnFailure) caller.abort();
+    },
+  };
+  await assert.rejects(
+    selectWinner(prepared, options, new Set(), caller.signal, config.request),
+    { name: 'AbortError' },
+  );
+  assert.equal(prepared.stats.rows.size, 0);
+  const afterDiscardedReset = backoff.failed(source.catalog.nodeId);
+  abortOnFailure = false;
+  await selectWinner(
+    prepared,
+    options,
+    new Set(),
+    new AbortController().signal,
+    config.request,
+  );
+  assert.deepEqual(
+    {
+      afterDiscardedReset,
+      afterDiscardedIncrement:
+        prepared.stats.rows.get(other.catalog.nodeId)!.cooldownUntil! -
+        source.context.now(),
+    },
+    {
+      afterDiscardedReset: BUYER_SELECTION.cooldownMs * 4,
+      afterDiscardedIncrement: BUYER_SELECTION.cooldownMs,
+    },
+  );
 });
