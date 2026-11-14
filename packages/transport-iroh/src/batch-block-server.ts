@@ -92,7 +92,10 @@ async function exchangeCheckpoint(
     );
     const approval = await readSessionBlock(
       state.stream,
-      CONTROL_LIMITS.requestBytes,
+      Math.min(
+        CONTROL_LIMITS.requestBytes - CONTROL_LIMITS.prefixBytes,
+        state.received.remaining() - CONTROL_LIMITS.prefixBytes,
+      ),
       state.check,
       state.stage,
       BATCH_SESSION_DEFAULTS.operationMs,

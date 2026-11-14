@@ -1560,5 +1560,8 @@ The first response byte may wait for generation; after it arrives, the entire
 remaining frame has one ingress budget. Each approval is capped at the existing
 8-KiB control-request limit; the original request plus all approvals and the
 entire response transcript stay within their existing 1-MiB aggregate budgets.
-An oversized length is refused before its body is allocated or read. Cancellation
+Continuation lengths are also checked against the remaining aggregate budget
+before their bodies are allocated or read. The first frame on a recovery stream
+shares the 1-MiB initial management-frame cap; its approval-specific 8-KiB limit
+is checked after parsing, since that frame can also be an opening or execution. Cancellation
 poisons pending verification; no late approval or ACK may escape afterward.

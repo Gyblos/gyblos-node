@@ -14,14 +14,16 @@ import type { ControlStream } from './control-io';
 export type BlockStage = <T>(
   operation: Promise<T>,
   milliseconds: number,
+  trackCompletion?: boolean,
 ) => Promise<T>;
 export function blockBudget(maximum: number, initial = 0) {
   let bytes = initial;
-  return (added: number, reserve = 0) => {
+  const consume = (added: number, reserve = 0) => {
     if (bytes + added + reserve > maximum)
       return batchFail(SESSION_CODES.LIMIT);
     bytes += added;
   };
+  return Object.assign(consume, { remaining: () => maximum - bytes });
 }
 export function matchBlockBinding(
   row: SessionBlockBinding & { index: number },
@@ -43,6 +45,7 @@ export async function readSessionBlock(
   stage: BlockStage,
   firstByteMs: number,
 ) {
+  if (maximum < 1) return batchFail(SESSION_CODES.LIMIT);
   const first = await stage(stream.recv.read(1), firstByteMs);
   check();
   if (first.length !== 1) return batchFail();

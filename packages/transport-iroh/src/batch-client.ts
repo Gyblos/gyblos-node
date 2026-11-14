@@ -164,9 +164,10 @@ async function connect<Remote extends BatchDestination>(
 function stageIn<Remote extends BatchDestination>(
   state: Context<Remote>,
   signal: AbortSignal,
+  owned = true,
 ): BlockStage {
-  return (operation, milliseconds) => {
-    const running = track(state, operation);
+  return (operation, milliseconds, trackCompletion = owned) => {
+    const running = trackCompletion ? track(state, operation) : operation;
     return track(
       state,
       controlDeadline(
@@ -233,7 +234,7 @@ async function requestReply<Remote extends BatchDestination>(
       stream,
       request,
       () => route(state, current, signal),
-      stageIn(state, signal),
+      stageIn(state, signal, false),
       onDelta,
     );
   const raw = await track(
