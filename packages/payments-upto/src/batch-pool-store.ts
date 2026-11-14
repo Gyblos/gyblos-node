@@ -13,6 +13,7 @@ import {
 } from '@gyblos/protocol/control-validation';
 import {
   PAYMENT_SESSION,
+  PaymentSessionError,
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
@@ -108,9 +109,8 @@ export async function readPool(
 ): Promise<PoolRecord> {
   if (!(await checkPrivateDirectory(paths.directory)))
     return { version: BATCH_POOL_VERSION, entries: [] };
-  const raw = await readPrivateFile(
-    paths.state,
-    BATCH_SESSION_DEFAULTS.poolBytes,
+  const raw = await withBatchState(paths, () =>
+    readPrivateFile(paths.state, BATCH_SESSION_DEFAULTS.poolBytes),
   );
   const legacy = await readBatchRecord(paths.legacy);
   if (raw === undefined) {
@@ -204,13 +204,21 @@ export async function openPoolStore(paths: BatchPoolPaths, now: () => number) {
     change(next);
     const checked = parse(next);
     try {
-      await writePrivateFile(
-        paths.state,
-        JSON.stringify(checked),
-        BATCH_SESSION_DEFAULTS.poolBytes,
+      await withBatchState(paths, () =>
+        writePrivateFile(
+          paths.state,
+          JSON.stringify(checked),
+          BATCH_SESSION_DEFAULTS.poolBytes,
+        ),
       );
       current = checked;
-    } catch {
+    } catch (error) {
+      // Queue pressure refuses before publication; only attempted/uncertain writes poison authority.
+      if (
+        error instanceof PaymentSessionError &&
+        error.code === SESSION_CODES.BUSY
+      )
+        throw error;
       poisoned = true;
       return sessionFail(SESSION_CODES.UNAVAILABLE);
     }
