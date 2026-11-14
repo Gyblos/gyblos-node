@@ -1233,7 +1233,8 @@ files it wrote and drops the profile tables an earlier run put in its block.
 Codex has no metadata for these models and otherwise assumes a large context;
 pass the sellers' context size with `--context <tokens>` (each profile then
 carries `model_context_window`) so Codex sizes and compacts its requests to fit.
-With a small model such as `qwen3-0.6b`, Codex works only with it.
+With a small model such as `qwen3-0.6b`, Codex answers only when given its
+context this way.
 
 `POST /v1/messages/count_tokens` answers an estimate (about four bytes per token
 over system, messages and tools) without contacting a seller. The default
