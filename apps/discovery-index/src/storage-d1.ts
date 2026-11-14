@@ -13,7 +13,7 @@ import type {
   SellerRow,
   StoredEntry,
 } from './storage';
-import { hourOf, retainedHour, slotBit } from './uptime';
+import { hourOf, retainedHour, slotBit, type UptimeStorage } from './uptime';
 
 export type D1Value = string | number | null;
 export type D1Row = Record<string, unknown>;
@@ -215,15 +215,8 @@ async function markSeen(
   ]);
 }
 
-export function createD1Storage(db: D1Database): DiscoveryStorage {
+function d1Uptime(db: D1Database): UptimeStorage {
   return {
-    async state(nodeId) {
-      const row = await db.prepare(STATE_SQL).bind(nodeId).first();
-      return row ? nodeState(row) : null;
-    },
-    async prune(now) {
-      await db.batch(PRUNE_SQL.map((sql) => db.prepare(sql).bind(now)));
-    },
     async pruneUptime(now) {
       await db.prepare(PRUNE_UPTIME_SQL).bind(retainedHour(now)).run();
     },
@@ -250,6 +243,19 @@ export function createD1Storage(db: D1Database): DiscoveryStorage {
         lastAt: integer(row.lastAt),
       }));
     },
+  };
+}
+
+export function createD1Storage(db: D1Database): DiscoveryStorage {
+  return {
+    async state(nodeId) {
+      const row = await db.prepare(STATE_SQL).bind(nodeId).first();
+      return row ? nodeState(row) : null;
+    },
+    async prune(now) {
+      await db.batch(PRUNE_SQL.map((sql) => db.prepare(sql).bind(now)));
+    },
+    ...d1Uptime(db),
     async put(entry) {
       const upsert = db
         .prepare(UPSERT_NODE_SQL)
