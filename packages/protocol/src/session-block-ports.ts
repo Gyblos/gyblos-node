@@ -5,6 +5,7 @@ import {
   batchFail,
 } from './batch-channel-validation';
 import { SESSION_BLOCKS } from './batch/blocks';
+import type { SessionBlockApproval } from './session-block-wire';
 import { BATCH_CHANNEL } from './batch/constants';
 import { PUBLIC_RECORD_LIMITS } from './constants';
 import {
@@ -28,6 +29,7 @@ export interface SessionBlockIntent {
   terminal: boolean;
 }
 export interface SessionBlockBuyer extends SessionBuyer {
+  pendingBlockRequest(): SessionRequest | undefined;
   beginBlocks(request: SessionRequest): Promise<void>;
   approveBlock(
     intent: SessionBlockIntent,
@@ -40,6 +42,7 @@ export interface SessionBlockBuyer extends SessionBuyer {
   >;
 }
 export interface SessionBlockSeller extends SessionSeller {
+  resumeBlock(approval: SessionBlockApproval, peer: string): Promise<SessionBlockIntent>;
   reserveBlocks(request: SessionRequest, peer: string): Promise<void>;
   checkpoint(intent: SessionBlockIntent): Promise<void>;
   acceptBlock(

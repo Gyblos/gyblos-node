@@ -86,6 +86,7 @@ export async function createBatchSeller(
   }, options.pollMs ?? BATCH_SESSION_DEFAULTS.pollMs);
   timer.unref();
   return {
+    resumeBlock: async () => sessionFail(SESSION_CODES.UNAVAILABLE),
     reserveBlocks: (request, peer) =>
       exclusive(async () => {
         await reserveSeller(context, request, peer, true);

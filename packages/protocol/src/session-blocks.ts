@@ -10,6 +10,8 @@ export {
   type SessionBlockBinding,
   type SessionBlockFrame,
   type SessionCheckpoint,
+  type SessionBlockApproval,
+  type SessionBlockAck,
 } from './session-block-wire';
 export {
   createSessionBlockVerifier,

@@ -46,6 +46,7 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
+    pendingBlockRequest: () => undefined,
     beginBlocks: (request) =>
       exclusive(() => reserve(store, request, options.now(), true)),
     approveBlock: (intent, verified, check) =>
