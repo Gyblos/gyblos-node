@@ -19,7 +19,10 @@ import { nativeBatchFinish } from '../support/native-batch-finish';
 import { endpoint, within } from '../support/native-fixture';
 import { NATIVE_CAPABILITY, waitFor } from '../support/native-runtime';
 
-async function fixture(now: () => number, observeSeller?: (seller: Endpoint) => void) {
+async function fixture(
+  now: () => number,
+  observeSeller?: (seller: Endpoint) => void,
+) {
   let sellerEndpoint = await endpoint(undefined, [BATCH_CHANNEL.alpn]);
   observeSeller?.(sellerEndpoint);
   const sellerSecret = [...sellerEndpoint.secretKey().toBytes()];
@@ -95,13 +98,19 @@ void test(
     const gate = nativeBatchFinish(3);
     const f = await fixture(() => now, gate.observeSeller);
     const sends = f.financial.vm.sends();
-    const execution = f.buyer().execute(await f.offers.quote(1), f.offers.input);
+    const execution = f
+      .buyer()
+      .execute(await f.offers.quote(1), f.offers.input);
     void execution.catch(() => undefined);
     try {
       await within(gate.finished);
       await within(gate.following);
       await new Promise<void>((resolve) => setImmediate(resolve));
-      assert.equal(gate.closed(), false, 'The next approval must not close the connection.');
+      assert.equal(
+        gate.closed(),
+        false,
+        'The next approval must not close the connection.',
+      );
       assert.equal(f.offers.generations(), 1);
       assert.equal(f.financial.seller().snapshot().cumulativeAtomic, '0');
       assert.equal(f.financial.vm.sends(), sends + 1);

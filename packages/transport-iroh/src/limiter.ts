@@ -13,6 +13,10 @@ interface PeerWindow {
   // All connections, including mixed-session connections, share the same per-family cap.
   families: Map<ConnectionFamily, number>;
 }
+interface QueryWaiter {
+  signal: AbortSignal;
+  finish(release?: () => void): void;
+}
 
 export function createPeerLimiter(
   now: () => number = Date.now,
@@ -21,6 +25,7 @@ export function createPeerLimiter(
   const windows = new Map<string, PeerWindow>();
   // Only admitted work adds an entry, bounded by the global window budget.
   const requestCounts = new Map<string, number>();
+  const waitingQueries = new Map<string, QueryWaiter>();
   let active = 0;
   let globalStarted = now();
   let globalRequests = 0;
@@ -148,6 +153,26 @@ export function createPeerLimiter(
     return true;
   }
 
+  function enterQuery(nodeId: string) {
+    refresh();
+    if (active >= limits.maxConcurrent) return undefined;
+    const window = windowFor(nodeId);
+    if (!window || window.active >= limits.maxPeerConcurrent) return undefined;
+    window.active++;
+    active++;
+    return activeLease(window);
+  }
+
+  function drainQueries() {
+    for (const [nodeId, waiter] of waitingQueries) {
+      if (waiter.signal.aborted) waiter.finish();
+      else {
+        const release = enterQuery(nodeId);
+        if (release) waiter.finish(release);
+      }
+    }
+  }
+
   return {
     register: (nodeId: string, family: ConnectionFamily) =>
       register(nodeId, family, true),
@@ -178,15 +203,28 @@ export function createPeerLimiter(
       return activeLease(window);
     },
     // A control query or receipt: one at a time per buyer within the same concurrency, outside the quota.
-    enterQuery(nodeId: string) {
-      refresh();
-      if (active >= limits.maxConcurrent) return undefined;
-      const window = windowFor(nodeId);
-      if (!window || window.active >= limits.maxPeerConcurrent)
+    enterQuery,
+    // One cancellable handoff per peer, globally bounded by the existing active-work limit.
+    // Waiting holds no active slot and consumes no inference allowance. The caller bounds its lifetime.
+    async waitQuery(nodeId: string, signal: AbortSignal) {
+      if (signal.aborted) return undefined;
+      const release = enterQuery(nodeId);
+      if (release) return release;
+      if (
+        waitingQueries.has(nodeId) ||
+        waitingQueries.size >= limits.maxConcurrent
+      )
         return undefined;
-      window.active++;
-      active++;
-      return activeLease(window);
+      return new Promise<(() => void) | undefined>((resolve) => {
+        const abort = () => finish();
+        const finish = (release?: () => void) => {
+          waitingQueries.delete(nodeId);
+          signal.removeEventListener('abort', abort);
+          resolve(release);
+        };
+        waitingQueries.set(nodeId, { signal, finish });
+        signal.addEventListener('abort', abort, { once: true });
+      });
     },
     // A control query or receipt call: outside the request quota and the generation slots, so a receipt
     // still finishing never refuses the buyer's next quote. Its own admission (ControlAdmission) bounds its
@@ -204,6 +242,7 @@ export function createPeerLimiter(
       released = true;
       active--;
       window.active--;
+      drainQueries();
     };
   }
 }
