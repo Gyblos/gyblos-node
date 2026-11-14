@@ -105,10 +105,16 @@ export async function tickBatch(context: BatchSellerContext) {
     options.now() - state.lastActivity >=
     (options.idleMs ?? BATCH_SESSION_DEFAULTS.idleMs);
   const unsigned = Object.values(state.requests).some(
-    (request) => !request.accepted && request.bill !== null,
+    (request) =>
+      !request.accepted &&
+      (request.bill !== null || !!state.blocks?.[request.requestId]),
   );
   const generating = Object.values(state.requests).some(
-    (request) => !request.accepted && request.bill === null,
+    (request) =>
+      !request.accepted &&
+      (state.blocks?.[request.requestId]
+        ? context.blockExecutions.has(request.requestId)
+        : request.bill === null),
   );
   const threshold = BigInt(
     options.minSettlementAtomic ?? BATCH_SESSION_DEFAULTS.minSettlementAtomic,
