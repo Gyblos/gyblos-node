@@ -1,40 +1,28 @@
-// Owns the Cloudflare D1 adapter of the discovery storage contract (schema in migrations/, applied in order).
-// Minimal local D1 interfaces stand in for @cloudflare/workers-types; rows are validated on read.
-import {
-  CONTROL_LIMITS,
-  PUBLIC_RECORD_KINDS,
-} from '@gyblos/protocol/constants';
+// Owns the D1 storage port: typed ORM reads, atomic admission batches and runtime row validation.
+// The schema and query builders contain no wallet, request metadata or network initialization.
+import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 
 import { INDEX_ERRORS } from './constants';
+import { createD1Orm, type D1Database, type D1Row } from './d1-client';
 import { indexFail } from './errors';
-import type {
-  DiscoveryStorage,
-  NodeState,
-  SellerRow,
-  StoredEntry,
-} from './storage';
+import type { DiscoveryStorage, NodeState, SellerRow } from './storage';
+import {
+  listingQuery,
+  modelsQuery,
+  nodeStateQuery,
+  pruneQueries,
+  recordCountsQuery,
+} from './storage-queries';
+import { admitNodeQuery, recordQueries } from './storage-writes';
 
-export type D1Value = string | number | null;
-export type D1Row = Record<string, unknown>;
+export type {
+  D1Database,
+  D1PreparedStatement,
+  D1Result,
+  D1Row,
+  D1Value,
+} from './d1-client';
 
-export interface D1Result {
-  meta: { changes: number };
-}
-
-export interface D1PreparedStatement {
-  bind(...values: D1Value[]): D1PreparedStatement;
-  first(): Promise<D1Row | null>;
-  all(): Promise<{ results: D1Row[] }>;
-  run(): Promise<D1Result>;
-}
-
-export interface D1Database {
-  prepare(query: string): D1PreparedStatement;
-  // D1 runs a batch as one transaction.
-  batch(statements: D1PreparedStatement[]): Promise<D1Result[]>;
-}
-
-// Storage rows are our own, but a corrupted row must fail closed (503), not be trusted.
 function integer(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value))
     throw new TypeError('Unexpected discovery storage row.');
@@ -45,65 +33,6 @@ function text(value: unknown): string {
     throw new TypeError('Unexpected discovery storage row.');
   return value;
 }
-
-const STATE_SQL = `SELECT n.last_sequence AS lastSequence, c.sequence AS sequence, c.expires_at AS expiresAt,
-  c.signed_json AS json, EXISTS (SELECT 1 FROM discovery_withdrawals w WHERE w.node_id = n.node_id AND w.catalog_digest = c.digest) AS withdrawn
-FROM discovery_nodes n LEFT JOIN discovery_catalogs c ON c.node_id = n.node_id WHERE n.node_id = ?1`;
-// Two phases: the page CTE filters, sorts and limits keys from covering indexes only (migration
-// 0002), then the signed JSON of just those rows is read by primary key. INDEXED BY pins the plan
-// because D1 may have no statistics; the indexes must exist before this code is deployed. ?6 is the
-// latest accepted issue time: records issued slightly ahead of this clock are listed, as at publish.
-const LIST_SQL = `WITH page AS (
-  SELECT p.node_id AS nodeId, p.issued_at AS issuedAt
-  FROM discovery_catalog_models m
-  JOIN discovery_catalogs c INDEXED BY discovery_catalogs_listing ON c.node_id = m.node_id
-  JOIN discovery_presence p INDEXED BY discovery_presence_listing ON p.node_id = m.node_id AND p.catalog_digest = c.digest
-  WHERE m.model_id = ?1 AND c.issued_at <= ?6 AND c.expires_at > ?2 AND p.issued_at <= ?6 AND p.expires_at > ?2
-    AND NOT EXISTS (SELECT 1 FROM discovery_withdrawals w INDEXED BY discovery_withdrawals_listing
-      WHERE w.node_id = c.node_id AND w.catalog_digest = c.digest)
-    AND (?3 IS NULL OR p.issued_at < ?3 OR (p.issued_at = ?3 AND p.node_id > ?4))
-  ORDER BY p.issued_at DESC, p.node_id ASC
-  LIMIT ?5)
-SELECT page.nodeId AS nodeId, page.issuedAt AS issuedAt, c.signed_json AS catalogJson, p.signed_json AS presenceJson
-FROM page
-JOIN discovery_catalogs c ON c.node_id = page.nodeId
-JOIN discovery_presence p ON p.node_id = page.nodeId
-ORDER BY page.issuedAt DESC, page.nodeId ASC`;
-// The same liveness as LIST_SQL, grouped by model; distinct NodeIds, since a catalog lists a model once.
-const MODELS_SQL = `SELECT m.model_id AS modelId, count(DISTINCT m.node_id) AS sellers
-  FROM discovery_catalog_models m
-  JOIN discovery_catalogs c ON c.node_id = m.node_id
-  JOIN discovery_presence p ON p.node_id = m.node_id AND p.catalog_digest = c.digest
-  WHERE c.issued_at <= ?2 AND c.expires_at > ?1 AND p.issued_at <= ?2 AND p.expires_at > ?1
-    AND NOT EXISTS (SELECT 1 FROM discovery_withdrawals w
-      WHERE w.node_id = c.node_id AND w.catalog_digest = c.digest)
-  GROUP BY m.model_id
-  ORDER BY sellers DESC, modelId ASC
-  LIMIT ?3`;
-const COUNT_SQL = `SELECT (SELECT count(*) FROM discovery_catalogs WHERE expires_at > ?1)
-  + (SELECT count(*) FROM discovery_presence WHERE expires_at > ?1)
-  + (SELECT count(*) FROM discovery_withdrawals WHERE expires_at > ?1) AS n`;
-const UPSERT_NODE_SQL = `INSERT INTO discovery_nodes (node_id, last_sequence, last_signature, retain_until)
-SELECT ?1, ?2, ?3, ?4 WHERE
-  (EXISTS (SELECT 1 FROM discovery_nodes WHERE node_id = ?1) OR (SELECT count(*) FROM discovery_nodes) < ?5)
-  AND (?6 IS NULL OR EXISTS (SELECT 1 FROM discovery_catalogs c WHERE c.node_id = ?1 AND c.digest = ?6
-    AND c.issued_at <= ?7 AND c.expires_at > ?8
-    AND NOT EXISTS (SELECT 1 FROM discovery_withdrawals w WHERE w.node_id = c.node_id AND w.catalog_digest = c.digest)))
-ON CONFLICT (node_id) DO UPDATE SET last_sequence = excluded.last_sequence, last_signature = excluded.last_signature,
-retain_until = max(discovery_nodes.retain_until, excluded.retain_until) WHERE excluded.last_sequence > discovery_nodes.last_sequence`;
-// Every later statement of a put applies only if this batch's upsert won the high-water mark.
-const GUARD =
-  'EXISTS (SELECT 1 FROM discovery_nodes WHERE node_id = ?1 AND last_sequence = ?2 AND last_signature = ?3)';
-// Models go by key before their catalogs. An expired withdrawal remains a tombstone while
-// its referenced catalog is live. High-water retention is independent. Deletes use indexes.
-const PRUNE_SQL = [
-  'DELETE FROM discovery_presence WHERE expires_at <= ?1',
-  'DELETE FROM discovery_catalog_models WHERE node_id IN (SELECT node_id FROM discovery_catalogs WHERE expires_at <= ?1)',
-  'DELETE FROM discovery_catalogs WHERE expires_at <= ?1',
-  'DELETE FROM discovery_withdrawals WHERE expires_at <= ?1 AND NOT EXISTS (SELECT 1 FROM discovery_catalogs c WHERE c.node_id = discovery_withdrawals.node_id AND c.digest = discovery_withdrawals.catalog_digest AND c.expires_at > ?1)',
-  'DELETE FROM discovery_nodes WHERE retain_until <= ?1',
-];
-
 function nodeState(row: D1Row): NodeState {
   return {
     lastSequence: integer(row.lastSequence),
@@ -118,7 +47,6 @@ function nodeState(row: D1Row): NodeState {
           },
   };
 }
-
 function sellerRow(row: D1Row): SellerRow {
   return {
     nodeId: text(row.nodeId),
@@ -127,95 +55,23 @@ function sellerRow(row: D1Row): SellerRow {
     presenceJson: text(row.presenceJson),
   };
 }
-
-// One row per NodeId, updated in place under the guard: no delete and reinsert of the row and
-// its index entries. ?1 is the NodeId; `values` are the remaining columns' parameters.
-function upsertSql(table: string, columns: readonly string[], values: string) {
-  const updates = columns
-    .map((column) => `${column} = excluded.${column}`)
-    .join(', ');
-  return `INSERT INTO ${table} (node_id, ${columns.join(', ')}) SELECT ?1, ${values} WHERE ${GUARD}
-ON CONFLICT (node_id) DO UPDATE SET ${updates}`;
-}
-
-const RECORD_COLUMNS = [
-  'sequence',
-  'issued_at',
-  'expires_at',
-  'catalog_digest',
-  'signed_json',
-] as const;
-const PRESENCE_SQL = upsertSql(
-  'discovery_presence',
-  RECORD_COLUMNS,
-  '?2, ?4, ?5, ?6, ?7',
-);
-const WITHDRAWAL_SQL = upsertSql(
-  'discovery_withdrawals',
-  RECORD_COLUMNS,
-  '?2, ?4, ?5, ?6, ?7',
-);
-const CATALOG_SQL = upsertSql(
-  'discovery_catalogs',
-  ['owner', 'sequence', 'issued_at', 'expires_at', 'digest', 'signed_json'],
-  '?8, ?2, ?4, ?5, ?6, ?7',
-);
-// Model rows are (node_id, model_id) only, so a republish touches just the ids that changed;
-// an unchanged model list writes no row.
-const DROP_MODELS_SQL = `DELETE FROM discovery_catalog_models WHERE node_id = ?1
-  AND model_id NOT IN (SELECT value FROM json_each(?4)) AND ${GUARD}`;
-const ADD_MODELS_SQL = `INSERT INTO discovery_catalog_models (node_id, model_id) SELECT ?1, value FROM json_each(?4)
-  WHERE ${GUARD} ON CONFLICT (node_id, model_id) DO NOTHING`;
-const CLEAR_PRESENCE_SQL = `DELETE FROM discovery_presence WHERE node_id = ?1 AND ${GUARD}`;
-
-function kindStatements(db: D1Database, entry: StoredEntry) {
-  const head = [entry.nodeId, entry.sequence, entry.signature] as const;
-  const record = [
-    entry.issuedAt,
-    entry.expiresAt,
-    entry.digest,
-    entry.json,
-  ] as const;
-  const clearPresence = db.prepare(CLEAR_PRESENCE_SQL).bind(...head);
-  if (entry.kind === PUBLIC_RECORD_KINDS.PRESENCE)
-    return [db.prepare(PRESENCE_SQL).bind(...head, ...record)];
-  if (entry.kind === PUBLIC_RECORD_KINDS.WITHDRAWAL)
-    return [db.prepare(WITHDRAWAL_SQL).bind(...head, ...record), clearPresence];
-  const models = JSON.stringify(entry.models);
-  return [
-    db.prepare(CATALOG_SQL).bind(...head, ...record, entry.owner),
-    db.prepare(DROP_MODELS_SQL).bind(...head, models),
-    db.prepare(ADD_MODELS_SQL).bind(...head, models),
-    clearPresence,
-  ];
-}
-
-export function createD1Storage(db: D1Database): DiscoveryStorage {
+export function createD1Storage(client: D1Database): DiscoveryStorage {
+  const database = createD1Orm(client);
   return {
     async state(nodeId) {
-      const row = await db.prepare(STATE_SQL).bind(nodeId).first();
+      const [row] = await nodeStateQuery(database, nodeId);
       return row ? nodeState(row) : null;
     },
     async prune(now) {
-      await db.batch(PRUNE_SQL.map((sql) => db.prepare(sql).bind(now)));
+      await database.batch(pruneQueries(database, now));
     },
     async put(entry) {
-      const upsert = db
-        .prepare(UPSERT_NODE_SQL)
-        .bind(
-          entry.nodeId,
-          entry.sequence,
-          entry.signature,
-          entry.retainUntil,
-          entry.admission.maxNodes,
-          entry.kind === PUBLIC_RECORD_KINDS.CATALOG ? null : entry.digest,
-          entry.admission.now + CONTROL_LIMITS.clockSkewMs,
-          entry.admission.now,
-        );
-      // The guard sees the upsert result because the batch is one transaction.
-      const [result] = await db.batch([upsert, ...kindStatements(db, entry)]);
-      if (result?.meta.changes === 1) return true;
-      const current = await db.prepare(STATE_SQL).bind(entry.nodeId).first();
+      const [inserted] = await database.batch([
+        admitNodeQuery(database, entry),
+        ...recordQueries(database, entry),
+      ]);
+      if (inserted.length === 1) return true;
+      const [current] = await nodeStateQuery(database, entry.nodeId);
       if (current && integer(current.lastSequence) >= entry.sequence)
         return false;
       return indexFail(
@@ -224,33 +80,18 @@ export function createD1Storage(db: D1Database): DiscoveryStorage {
           : INDEX_ERRORS.UNKNOWN_CATALOG,
       );
     },
-    async list({ model, now, limit, after }) {
-      const { results } = await db
-        .prepare(LIST_SQL)
-        .bind(
-          model,
-          now,
-          after?.issuedAt ?? null,
-          after?.nodeId ?? null,
-          limit,
-          now + CONTROL_LIMITS.clockSkewMs,
-        )
-        .all();
-      return results.map(sellerRow);
-    },
-    async models(now, limit) {
-      const { results } = await db
-        .prepare(MODELS_SQL)
-        .bind(now, now + CONTROL_LIMITS.clockSkewMs, limit)
-        .all();
-      return results.map((row) => ({
-        modelId: String(row.modelId),
-        sellers: integer(row.sellers),
-      }));
+    async list(query) {
+      return (await listingQuery(database, query)).map(sellerRow);
     },
     async count(now) {
-      const row = await db.prepare(COUNT_SQL).bind(now).first();
-      return row ? integer(row.n) : 0;
+      const rows = await recordCountsQuery(database, now);
+      return rows.reduce((total, row) => total + integer(row.n), 0);
+    },
+    async models(now, limit) {
+      return (await modelsQuery(database, now, limit)).map((row) => ({
+        modelId: text(row.modelId),
+        sellers: integer(row.sellers),
+      }));
     },
   };
 }

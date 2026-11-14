@@ -23,6 +23,7 @@ Routes sit at the root of the index host; the client base URL is
 | ------------------------ | ------------------------------------------------------------------------------------------ |
 | `POST /v1/records`       | Publish one signed public v2 catalog, presence or withdrawal.                              |
 | `GET /v1/sellers`        | List live sellers of one model, paged by an opaque cursor.                                 |
+| `GET /v1/models`         | List models from live sellers, ordered by seller count; no query parameters.               |
 | `GET /v1/health`         | `{ ok: true, records, publish }` (see below).                                              |
 | `POST /v1/registrations` | Trade a beta invite for publishing, once the NodeId is bound in the 8004 registry (below). |
 
@@ -171,8 +172,11 @@ signed a record; clients re-verify everything.
   limit, content type, strict JSON, the allowlist check on the claimed NodeId
   (`403`), then shape, lifetime and the self-signature. Only then is the stored
   high-water mark checked: stale replays are `409` before the per-NodeId limit,
-  so replaying a seller's records cannot exhaust its allowance, and unsigned
-  junk never reaches that limit.
+  so a replay observed after a committed publication consumes no NodeId
+  allowance. Concurrent copies can all pass that earlier read and consume
+  allowance before only one D1 write wins. The external limiter and D1 are
+  separate operations; this is a remaining availability limitation, not an
+  exactly-once quota guarantee. Unsigned junk never reaches the NodeId limit.
 - **Strict JSON:** invalid UTF-8, a BOM, duplicate members, nesting deeper than
   16, non-canonical or unsafe numbers, `-0` and bad escapes are
   `400 INVALID_RECORD`. The signed envelope must be posted compact (no padding,
@@ -215,9 +219,18 @@ signed a record; clients re-verify everything.
 ## Storage
 
 `src/storage.ts` defines the storage contract and an in-memory adapter (tests
-and local runs); `src/storage-d1.ts` is the D1 adapter, with minimal local D1
-interfaces instead of `@cloudflare/workers-types`. A publish is one D1 batch
-(one transaction) whose statements apply only if its high-water upsert won.
+and local runs); `src/storage-d1.ts` is the D1 adapter using Drizzle ORM, pinned
+in the app manifest. `src/schema.ts` maps typed columns; `storage-queries.ts`
+and `storage-writes.ts` build reads and mutations. `d1-client.ts` connects
+Drizzle's SQLite driver to native D1 statements and batches without an HTTP
+proxy or interactive transaction. SQLite function and index-hint expressions use
+parameterized ORM fragments; there are no handwritten runtime query blocks.
+Registration storage and founder invite/revoke/restore commands use the same ORM
+schema and mutation builders. Wrangler commands render bound values through
+Drizzle's SQLite dialect because the CLI accepts SQL rather than bind
+parameters. Existing Wrangler SQL migrations remain the physical schema
+authority and are unchanged by the ORM migration. A publish is one D1 batch (one
+transaction) whose statements apply only if its high-water upsert won.
 
 `migrations/0001_discovery_index.sql` creates the five tables and their indexes.
 The website's draft `0001` and `0002` (prune indexes) were never applied to any
