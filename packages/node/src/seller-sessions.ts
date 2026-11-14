@@ -17,7 +17,10 @@ import {
   type PaymentSessionTerms,
   type SessionSeller,
 } from '@gyblos/protocol/payment-session';
-import type { BatchChannelService } from '@gyblos/transport-iroh/batch-server';
+import type {
+  BatchBlockExchange,
+  BatchChannelService,
+} from '@gyblos/transport-iroh/batch-server';
 
 import { batchLiveOffer } from './batch-generation';
 import { createSellerBatchSession } from './batch-seller';
@@ -105,6 +108,8 @@ async function operation(
   peer: string,
   signal: AbortSignal,
   onDelta?: (text: string) => Promise<void>,
+  blocks?: BatchBlockExchange,
+  blockMode?: boolean,
 ) {
   signal.throwIfAborted();
   if (
@@ -129,7 +134,9 @@ async function operation(
     const checkedAt = options.now();
     validateOfferV2Time(offer, checkedAt);
     if (checkedAt >= terms.expiresAt) return batchFail(SESSION_CODES.LIMIT);
-    batchLiveOffer(offer, options.offers(), options.now());
+    const live = batchLiveOffer(offer, options.offers(), options.now());
+    if (blockMode && !live.meter.stablePrefix)
+      return batchFail(SESSION_CODES.UNAVAILABLE);
     if (request.method === BATCH_METHODS.PREPARE) return { terms };
     if (!state.current) {
       const session = await options.backend.create(
@@ -144,7 +151,14 @@ async function operation(
     }
   }
   if (!state.current) return batchFail(SESSION_CODES.UNAVAILABLE);
-  return state.current.service.exchange(request, peer, signal, onDelta);
+  return state.current.service.exchange(
+    request,
+    peer,
+    signal,
+    onDelta,
+    blocks,
+    blockMode,
+  );
 }
 export async function startSellerSessions(
   options: SellerSessionOptions,
@@ -161,31 +175,48 @@ export async function startSellerSessions(
   }
   let active: Promise<unknown> | undefined;
   let closed = false;
+  const run = async <T>(
+    peer: string,
+    signal: AbortSignal,
+    operation: () => Promise<T>,
+  ) => {
+    if (closed) return batchFail(SESSION_CODES.UNAVAILABLE);
+    if (peer !== options.buyerNodeId)
+      return batchFail(PAID_EXECUTION_CODES.PEER);
+    if (active) return batchFail(SESSION_CODES.BUSY);
+    signal.throwIfAborted();
+    const running = operation();
+    active = running;
+    try {
+      return await running;
+    } catch (error) {
+      if (signal.aborted) return batchFail(PAID_EXECUTION_CODES.CANCELLED);
+      throw batchError(error);
+    } finally {
+      active = undefined;
+    }
+  };
   return {
     service: {
-      async exchange(request, peer, signal, onDelta) {
-        if (closed) return batchFail(SESSION_CODES.UNAVAILABLE);
-        if (peer !== options.buyerNodeId)
-          return batchFail(PAID_EXECUTION_CODES.PEER);
-        if (active) return batchFail(SESSION_CODES.BUSY);
-        const running = operation(
-          options,
-          state,
-          request,
-          peer,
-          signal,
-          onDelta,
-        );
-        active = running;
-        try {
-          return await running;
-        } catch (error) {
-          if (signal.aborted) return batchFail(PAID_EXECUTION_CODES.CANCELLED);
-          throw batchError(error);
-        } finally {
-          active = undefined;
-        }
-      },
+      exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
+        run(peer, signal, () =>
+          operation(
+            options,
+            state,
+            request,
+            peer,
+            signal,
+            onDelta,
+            blocks,
+            blockMode,
+          ),
+        ),
+      resumeBlock: (approval, peer, signal) =>
+        run(peer, signal, () => {
+          if (!state.current?.service.resumeBlock)
+            return batchFail(SESSION_CODES.UNAVAILABLE);
+          return state.current.service.resumeBlock(approval, peer, signal);
+        }),
     },
     async close() {
       closed = true;

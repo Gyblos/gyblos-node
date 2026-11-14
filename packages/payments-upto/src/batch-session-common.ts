@@ -9,10 +9,12 @@ import {
   type SessionSnapshot,
 } from '@gyblos/protocol/payment-session';
 
+import { blockCharge } from './batch-block-state';
 import { batchOpeningAbsent } from './batch-opening-proof';
 import { requestFor } from './batch-session-checks';
 import type { BatchStore } from './batch-session-store';
 import type { BatchRecord } from './batch-session-types';
+import { BATCH_BLOCK_STATE } from './constants';
 
 export function initialRecord(
   terms: PaymentSessionTerms,
@@ -41,6 +43,9 @@ export function reserved(record: BatchRecord): bigint {
   return Object.values(record.requests)
     .filter((request) => !request.accepted)
     .reduce((total, request) => {
+      const progress = record.blocks?.[request.requestId];
+      if (progress)
+        return total + BigInt(request.maxAtomic) - blockCharge(progress);
       const signed =
         request.bill &&
         BigInt(request.bill.cumulativeAtomic) <=
@@ -67,7 +72,12 @@ export function active(record: BatchRecord, now: number) {
   )
     sessionFail(SESSION_CODES.CLOSED);
 }
-export async function reserve(store: BatchStore, input: unknown, now: number) {
+export async function reserve(
+  store: BatchStore,
+  input: unknown,
+  now: number,
+  blocks = false,
+) {
   const request = requestFor(input);
   await store.update((state) => {
     active(state, now);
@@ -97,6 +107,15 @@ export async function reserve(store: BatchStore, input: unknown, now: number) {
       bill: null,
       accepted: false,
     };
+    if (blocks) {
+      state.version = BATCH_BLOCK_STATE.version;
+      state.blocks ??= {};
+      state.blocks[request.requestId] = {
+        baseAtomic: state.cumulativeAtomic,
+        accepted: null,
+        pending: null,
+      };
+    }
     state.lastActivity = now;
   });
 }
