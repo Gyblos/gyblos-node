@@ -1,6 +1,5 @@
 // Shared tool connection list and editor; the local gateway flow is simulated.
 import {
-  CaretDown,
   Cloud,
   Desktop,
   HardDrives,
@@ -17,10 +16,10 @@ import {
   type ConnectionTool,
   type PreviewConnection,
 } from './connection-state';
-import { BUTTON_VARIANT, MOTION_VARIANT } from './constants';
+import { BUTTON_VARIANT } from './constants';
+import { FormActions, FormField, FormInput } from './Form';
 import { Modal } from './Modal';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
-import { MotionPresence } from './Motion';
 import { ServiceLogo } from './ServiceLogo';
 import { Avatar, Badge, Button, List, ListRow, Note, RowCopy } from './UI';
 
@@ -103,7 +102,6 @@ export function ConnectionDialog({
   const [selectedTool, setSelectedTool] = useState<ConnectionTool>(
     tool ?? CONNECTION_TOOLS[0],
   );
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [modelId, setModelId] = useState(() =>
     connectionModelId(existing?.modelId ?? defaultModelId, models),
   );
@@ -119,7 +117,7 @@ export function ConnectionDialog({
       close={close}
     >
       <form
-        className="connection-form"
+        className="ui-form"
         onSubmit={(event) => {
           event.preventDefault();
           if (policy && model) onSave(policy);
@@ -130,11 +128,10 @@ export function ConnectionDialog({
           <strong>This computer</strong>
           <Badge>Default</Badge>
         </div>
-        <label className="connection-field" htmlFor="connection-tool">
-          Tool
+        <FormField htmlFor="connection-tool" label="Tool">
           <select
             id="connection-tool"
-            className="full-input"
+            className="ui-input"
             value={selectedTool}
             disabled={!!existing}
             onChange={(event) => {
@@ -148,8 +145,8 @@ export function ConnectionDialog({
               <option key={item}>{item}</option>
             ))}
           </select>
-        </label>
-        <div className="connection-field">
+        </FormField>
+        <div className="ui-field">
           <span>Model</span>
           <ModelDropdown
             model={model}
@@ -160,11 +157,9 @@ export function ConnectionDialog({
             showBrowse={false}
           />
         </div>
-        <label className="connection-field" htmlFor="connection-budget">
-          Daily budget (USD)
-          <input
+        <FormField htmlFor="connection-budget" label="Daily budget (USD)">
+          <FormInput
             id="connection-budget"
-            className="full-input"
             type="number"
             min="0.01"
             max="10000"
@@ -173,51 +168,39 @@ export function ConnectionDialog({
             onChange={(event) => setBudget(event.target.value)}
             required
           />
-        </label>
+        </FormField>
         <p className="modal-note">
           Independent per tool. Free model requests do not use the limit. Gyblos
           must stay open on this computer.
         </p>
-        <Button
-          className="instructions-toggle"
-          aria-expanded={advancedOpen}
-          aria-controls="connection-advanced"
-          onClick={() => setAdvancedOpen((value) => !value)}
-        >
-          Advanced
-          <CaretDown size={14} />
-        </Button>
-        <MotionPresence variant={MOTION_VARIANT.EXPAND}>
-          {advancedOpen && (
-            <div id="connection-advanced">
-              <List label="Advanced connection options">
-                <ListRow
-                  leading={<HardDrives size={16} />}
-                  trailing={<Badge>Planned</Badge>}
-                >
-                  <RowCopy
-                    title="Run on my server"
-                    detail="Keep agents running when this computer is off."
-                  />
-                </ListRow>
-                <ListRow
-                  leading={<Cloud size={16} />}
-                  trailing={<Badge>Planned</Badge>}
-                >
-                  <RowCopy
-                    title="Remote access"
-                    detail="Reach this computer through a public HTTPS endpoint."
-                  />
-                </ListRow>
-              </List>
-              <p className="modal-note">
-                Server and remote access will be available in a future update.
-              </p>
-            </div>
-          )}
-        </MotionPresence>
+        <section className="ui-section" aria-label="Planned connection options">
+          <h3 className="ui-subheading">Planned connection options</h3>
+          <List label="Advanced connection options">
+            <ListRow
+              leading={<HardDrives size={16} />}
+              trailing={<Badge>Planned</Badge>}
+            >
+              <RowCopy
+                title="Run on my server"
+                detail="Keep agents running when this computer is off."
+              />
+            </ListRow>
+            <ListRow
+              leading={<Cloud size={16} />}
+              trailing={<Badge>Planned</Badge>}
+            >
+              <RowCopy
+                title="Remote access"
+                detail="Reach this computer through a public HTTPS endpoint."
+              />
+            </ListRow>
+          </List>
+          <p className="modal-note">
+            Server and remote access will be available in a future update.
+          </p>
+        </section>
         <Note>Each application uses its own model and spending limit.</Note>
-        <div className="connection-actions">
+        <FormActions>
           {existing && (
             <Button onClick={() => onRemove(selectedTool)}>
               <Trash size={16} />
@@ -233,7 +216,7 @@ export function ConnectionDialog({
             {existing ? 'Save changes' : 'Open with Gyblos'}
             <Plus size={16} />
           </Button>
-        </div>
+        </FormActions>
       </form>
     </Modal>
   );

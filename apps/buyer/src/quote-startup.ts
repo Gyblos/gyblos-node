@@ -12,6 +12,12 @@ import { rolePath } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 
+import {
+  executeApiKeyFree,
+  recordApiKeyPayment,
+  reserveApiKey,
+} from './api-key-execution';
+import { withBuyerApiKeys } from './api-key-runtime';
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER, PAID_BUYER_CODES, PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
@@ -165,6 +171,50 @@ function lazyPaid(
     },
   };
 }
+function paidQuoteExecutor(
+  context: Context,
+  paid: ReturnType<typeof lazyPaid>,
+  input: Parameters<Runtime['execute']>[0],
+  onDelta: Parameters<Runtime['execute']>[2],
+  permission: Parameters<typeof reserveApiKey>[0],
+) {
+  return async (
+    winner: Parameters<typeof executeSelectedBuyerFree>[2],
+    executionSignal: AbortSignal,
+  ) =>
+    observeBuyerExecution(
+      context.dependencies,
+      winner,
+      input,
+      executionSignal,
+      onDelta,
+      async (emit) => {
+        if (inferenceNeedsTools(input))
+          throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+        await reserveApiKey(permission, winner.quote, executionSignal);
+        const runtime = await paid.get(executionSignal, input);
+        const outcome = await executeSelectedBuyerPaid(
+          input,
+          runtime.paid,
+          winner,
+          executionSignal,
+          emit,
+        );
+        if (!outcome) {
+          if (
+            permission &&
+            !(await bounded(paid.unresolved(), executionSignal))
+          )
+            await permission.releaseUnsent();
+          return undefined;
+        }
+        await recordApiKeyPayment(permission, paidSummary(outcome));
+        const { result, error } = outcome.terminal;
+        if (!result) throw new PaidOutcomeError(error.code, outcome);
+        return { ...result, payment: paidSummary(outcome) };
+      },
+    );
+}
 function quoteExecutor(
   context: Context,
   options: Options,
@@ -172,7 +222,8 @@ function quoteExecutor(
   paid: ReturnType<typeof lazyPaid>,
   buyer: string,
 ): Runtime['execute'] {
-  return async (input, signal, onDelta, model) => {
+  return async (input, signal, onDelta, model, permission) => {
+    const request = routedRequest(context.prepared.config.request, model);
     const routed = await executeBuyerQuote<ChatResult>(
       {
         enter: state.enter,
@@ -189,7 +240,9 @@ function quoteExecutor(
             excluded,
             selectionSignal,
             {
-              ...routedRequest(context.prepared.config.request, model),
+              ...request,
+              maxAtomic:
+                permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
               ...(inferenceNeedsTools(input) ? { tools: true } : {}),
             },
           ).catch((error) => {
@@ -202,37 +255,16 @@ function quoteExecutor(
             throw error;
           }),
         free: (winner, executionSignal) =>
-          executeSelectedBuyerFree(
-            input,
-            context.dependencies,
-            winner,
-            executionSignal,
-            onDelta,
+          executeApiKeyFree(permission, winner.quote, executionSignal, () =>
+            executeSelectedBuyerFree(
+              input,
+              context.dependencies,
+              winner,
+              executionSignal,
+              onDelta,
+            ),
           ),
-        paid: async (winner, executionSignal) =>
-          observeBuyerExecution(
-            context.dependencies,
-            winner,
-            input,
-            executionSignal,
-            onDelta,
-            async (emit) => {
-              if (inferenceNeedsTools(input))
-                throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
-              const runtime = await paid.get(executionSignal, input);
-              const outcome = await executeSelectedBuyerPaid(
-                input,
-                runtime.paid,
-                winner,
-                executionSignal,
-                emit,
-              );
-              if (!outcome) return undefined;
-              const { result, error } = outcome.terminal;
-              if (!result) throw new PaidOutcomeError(error.code, outcome);
-              return { ...result, payment: paidSummary(outcome) };
-            },
-          ),
+        paid: paidQuoteExecutor(context, paid, input, onDelta, permission),
       },
       signal,
     );
@@ -273,5 +305,6 @@ async function startQuoteRuntime(
   };
 }
 export function quoteBuyerExecution(options: Options): BuyerExecutionFactory {
-  return (context) => startQuoteRuntime(context, options);
+  return async (context) =>
+    withBuyerApiKeys(await startQuoteRuntime(context, options), context);
 }

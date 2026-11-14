@@ -1,16 +1,15 @@
 @font-face {
-  font-family: Geist;
-  src: url('/assets/geist-400.ttf');
+  font-family: 'Instrument Sans';
+  src: url('/assets/InstrumentSans-Variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: swap;
 }
 @font-face {
-  font-family: Geist;
-  src: url('/assets/geist-500.ttf');
-  font-weight: 500;
-}
-@font-face {
-  font-family: Geist;
-  src: url('/assets/geist-600.ttf');
-  font-weight: 600;
+  font-family: 'Instrument Sans';
+  src: url('/assets/InstrumentSans-Italic-Variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
 }
 @font-face {
   font-family: GeistMono;
@@ -22,8 +21,9 @@
 body {
   margin: 0;
   font:
-    14px Geist,
-    Arial,
+    14px 'Instrument Sans',
+    system-ui,
+    -apple-system,
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -546,18 +546,11 @@ nav {
   color: var(--dim);
   line-height: 1.7;
 }
-.field-label {
-  display: block;
-  font-size: 11px;
-  color: var(--muted);
-  margin: 22px 0 9px;
-}
 .engine-field {
   display: flex;
   gap: 8px;
 }
 .engine-field input,
-.full-input,
 .terms-row input,
 .terms-row select {
   padding: 11px 12px;
@@ -794,10 +787,6 @@ nav {
 .balance-display > span {
   font-size: 11px;
   color: var(--dim);
-}
-.full-input {
-  width: 100%;
-  font-size: 15px;
 }
 .paid-terms > div {
   display: flex;
@@ -1618,7 +1607,8 @@ nav {
 kbd {
   font:
     10px Geist,
-    Arial,
+    system-ui,
+    -apple-system,
     sans-serif;
   border: 1px solid var(--line);
   border-bottom-width: 2px;
@@ -2266,10 +2256,6 @@ kbd {
 .desktop-frame .endpoint {
   border-color: var(--subtle-line);
   background: var(--editor);
-}
-.desktop-frame .full-input {
-  background: var(--editor);
-  border-color: var(--line);
 }
 .desktop-frame .toast {
   background: var(--raised);

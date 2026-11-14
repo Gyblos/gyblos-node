@@ -10,6 +10,7 @@ import {
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import {
   openPoolStore,
   poolChild,
@@ -25,10 +26,18 @@ import { termsFor } from './batch-session-checks';
 import { inspectBatchSession, storedBatchSession } from './batch-session-state';
 import { serial } from './batch-session-store';
 
-function budget(entries: PoolRow[], total: string) {
+function budget(
+  entries: PoolRow[],
+  total: string,
+  unfunded: ReadonlySet<string>,
+) {
   const committed = entries.reduce(
     (sum, entry) =>
-      sum + BigInt(entry.terms.depositAtomic) - BigInt(entry.refundedAtomic),
+      sum +
+      BigInt(entry.terms.depositAtomic) -
+      (unfunded.has(entry.terms.sellerNodeId)
+        ? BigInt(entry.terms.depositAtomic)
+        : BigInt(entry.refundedAtomic)),
     0n,
   );
   return {
@@ -55,6 +64,7 @@ export async function inspectBatchPool(
 interface PoolContext {
   options: BatchPoolOptions;
   total: string;
+  unfunded: Set<string>;
   store: Awaited<ReturnType<typeof openPoolStore>>;
   rowFor(id: string): PoolRow;
 }
@@ -78,8 +88,9 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
       return sessionFail(SESSION_CODES.BINDING);
     if (
       store.read().entries.length >= BATCH_SESSION_DEFAULTS.maxSessions ||
-      BigInt(budget(store.read().entries, total).availableAtomic) <
-        BigInt(checked.depositAtomic)
+      BigInt(
+        budget(store.read().entries, total, context.unfunded).availableAtomic,
+      ) < BigInt(checked.depositAtomic)
     )
       return sessionFail(SESSION_CODES.LIMIT);
     row = {
@@ -109,6 +120,7 @@ async function resolve(
   const { options, store, rowFor } = context;
   const row = rowFor(id);
   const record = await poolChild(options.paths, row);
+  const notCreated = batchOpeningAbsent(record) !== undefined;
   const closed =
     record.state === SESSION_STATES.CLOSED && record.settlement !== null;
   const accepted =
@@ -127,6 +139,7 @@ async function resolve(
         Object.values(record.requests).every((request) => request.accepted)));
   if (
     !closed &&
+    !notCreated &&
     !unsent &&
     (row.uncertain || row.requestId !== null) &&
     !accepted &&
@@ -137,8 +150,10 @@ async function resolve(
     row.requestId === null &&
     !row.uncertain &&
     (!closed || row.refundedAtomic === record.settlement!.refundedAtomic)
-  )
+  ) {
+    if (notCreated) context.unfunded.add(id);
     return true;
+  }
   await store.update((next) => {
     const current = next.entries.find(
       (entry) => entry.terms.sellerNodeId === id,
@@ -147,7 +162,23 @@ async function resolve(
     current.uncertain = false;
     if (closed) current.refundedAtomic = record.settlement!.refundedAtomic;
   });
+  if (notCreated) context.unfunded.add(id);
   return true;
+}
+async function unfundedRows(
+  paths: BatchPoolOptions['paths'],
+  store: PoolContext['store'],
+) {
+  const unfunded = new Set<string>();
+  try {
+    for (const row of store.read().entries)
+      if (batchOpeningAbsent(await poolChild(paths, row)))
+        unfunded.add(row.terms.sellerNodeId);
+  } catch (error) {
+    await store.dispose();
+    throw error;
+  }
+  return unfunded;
 }
 export async function openBatchBuyerPool(
   options: BatchPoolOptions,
@@ -164,7 +195,8 @@ export async function openBatchBuyerPool(
     if (!row) return sessionFail(SESSION_CODES.BINDING);
     return row;
   };
-  const context: PoolContext = { options, total, store, rowFor };
+  const unfunded = await unfundedRows(options.paths, store);
+  const context: PoolContext = { options, total, store, rowFor, unfunded };
   return {
     list: () =>
       exclusive(async () => {
@@ -183,6 +215,8 @@ export async function openBatchBuyerPool(
       exclusive(async () => {
         const row = rowFor(id);
         const record = await poolChild(options.paths, row);
+        if (batchOpeningAbsent(record))
+          return sessionFail(SESSION_CODES.CLOSED);
         if (row.requestId !== null || Object.hasOwn(record.requests, requestId))
           return sessionFail(SESSION_CODES.UNVERIFIED);
         await store.update((next) => {
@@ -210,7 +244,10 @@ export async function openBatchBuyerPool(
         }
         return pending;
       }),
-    budget: () => exclusive(async () => budget(store.read().entries, total)),
+    budget: () =>
+      exclusive(async () =>
+        budget(store.read().entries, total, context.unfunded),
+      ),
     dispose: () => exclusive(store.dispose),
   };
 }

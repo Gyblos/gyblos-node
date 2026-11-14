@@ -26,6 +26,7 @@ import {
 } from '@gyblos/runtime/private-file';
 import { WINDOWS } from '@gyblos/runtime/private-mode';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import type { PoolRecord, PoolRow } from './batch-pool-types';
 import { termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
@@ -126,11 +127,12 @@ export async function readPool(
           legacy: true,
           ready: true,
           uncertain:
-            legacy.state === SESSION_STATES.OPENING ||
-            (legacy.opening !== null &&
-              Object.keys(legacy.requests).length === 0) ||
-            pending !== undefined,
-          requestId: pending?.[0] ?? null,
+            !batchOpeningAbsent(legacy) &&
+            (legacy.state === SESSION_STATES.OPENING ||
+              (legacy.opening !== null &&
+                Object.keys(legacy.requests).length === 0) ||
+              pending !== undefined),
+          requestId: batchOpeningAbsent(legacy) ? null : (pending?.[0] ?? null),
           refundedAtomic: legacy.settlement?.refundedAtomic ?? '0',
         },
       ],

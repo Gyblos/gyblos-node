@@ -352,6 +352,7 @@ export const LOCAL_TELEMETRY = { closeMs: 5000 } as const;
 
 // How long a role's RPC may take to say which chain it serves before paid startup refuses it.
 export const GENESIS_READ_MS = 10000;
+export * from './paypal/constants';
 
 // Buyer orchestration values shared by every host, with no process or network actions.
 export const BUYER_PAID_TIMEOUTS = {
@@ -390,6 +391,10 @@ export const PAID_VERDICTS = {
   INTERRUPTED: 'interrupted',
 } as const;
 export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];
+export const PAYPAL_PAYMENT_REFERENCE_KIND = {
+  AUTHORIZATION: 'authorization',
+  CAPTURE: 'capture',
+} as const;
 export const SESSION_VERDICTS = { APPROVED: 'approved' } as const;
 
 // Durable seller registration state is private and limited to one active identity.
@@ -398,3 +403,6 @@ export const SELLER_REGISTRATION_STATE = {
   maxBytes: 8192,
   secretBytes: 64,
 } as const;
+
+// Bounded private delegated-key ledger; it never contains inference content or signed payments.
+export const BUYER_API_KEY_STORAGE = { MAX_BYTES: 262144 } as const;

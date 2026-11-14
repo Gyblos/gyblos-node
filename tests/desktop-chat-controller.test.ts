@@ -9,6 +9,7 @@ import {
 } from '@gyblos/desktop/chat-controller';
 import { CHAT_PHASE, MESSAGE_STATE } from '@gyblos/desktop/chat-state';
 import { DEMO_AUTH } from '@gyblos/desktop/demo-account';
+import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 
 const model = {
   id: 'synthetic',
@@ -263,4 +264,95 @@ void test('choosing a free model clears paid blockers but preserves unrelated no
   assert.equal(session(chat, 'a').draft, 'Draft a');
   assert.equal(session(chat, 'b').notice, 'Copy unavailable');
   assert.equal(session(chat, 'b').draft, 'Draft b');
+});
+
+void test('one conversation retains its draft and both payment methods in send order', () => {
+  const { chat, clock } = setup();
+  start(chat, 'preview');
+  clock.advance(10000);
+  chat.setDraft('A PayPal question');
+  const origin = chat.startPaypal('A PayPal question', model, 'paypal');
+  assert.equal(origin, 'a');
+  assert.equal(clock.pending, 0);
+  assert.equal(session(chat, 'a').messages.length, 4);
+  chat.setDraft('Next draft');
+  chat.completePaypal('a', 'paypal', 'Real service answer', model);
+  assert.equal(session(chat, 'a').draft, 'Next draft');
+  assert.equal(
+    session(chat, 'a').messages[1]?.paymentMethod,
+    PAYMENT_METHOD.USDC,
+  );
+  assert.equal(
+    session(chat, 'a').messages[3]?.paymentMethod,
+    PAYMENT_METHOD.PAYPAL,
+  );
+  assert.equal(session(chat, 'a').messages[3]?.text, 'Real service answer');
+  start(chat, 'preview-again');
+  clock.advance(10000);
+  assert.equal(session(chat, 'a').messages.length, 6);
+  assert.equal(session(chat, 'a').messages[3]?.text, 'Real service answer');
+});
+
+void test('paid responses remain with their originating conversation and cannot complete twice', () => {
+  const { chat } = setup();
+  chat.startPaypal('Question', model, 'paid');
+  chat.newChat('b', 'Other draft');
+  chat.completePaypal('a', 'paid', 'Received answer', model);
+  chat.completePaypal('a', 'paid', 'Duplicate answer', model);
+  assert.equal(chat.getSnapshot().activeId, 'b');
+  assert.equal(session(chat, 'a').messages.at(-1)?.text, 'Received answer');
+  assert.equal(session(chat, 'a').messages.length, 2);
+  assert.equal(session(chat, 'b').draft, 'Other draft');
+  assert.deepEqual(session(chat, 'b').messages, []);
+});
+
+void test('a paid run is never advanced, stopped or duplicated by preview controls', () => {
+  const { chat, clock } = setup();
+  chat.startPaypal('Question', model, 'paid');
+  chat.stop();
+  chat.setOnline(false);
+  clock.advance(10000);
+  assert.equal(session(chat, 'a').paypalRun?.id, 'paid');
+  assert.equal(
+    session(chat, 'a').messages.at(-1)?.state,
+    MESSAGE_STATE.PENDING,
+  );
+  assert.equal(chat.startPaypal('Duplicate', model, 'other'), null);
+  assert.equal(start(chat, 'preview'), false);
+  assert.equal(clock.pending, 0);
+});
+
+void test('failed paid sends preserve newer drafts and reject late completion', () => {
+  const { chat } = setup();
+  chat.setDraft('Original');
+  chat.startPaypal('Original', model, 'one');
+  chat.failPaypal('a', 'one', 'Review in Payments');
+  assert.equal(session(chat, 'a').draft, 'Original');
+  assert.equal(session(chat, 'a').messages.at(-1)?.state, MESSAGE_STATE.FAILED);
+  chat.startPaypal('Original', model, 'two');
+  chat.setDraft('Newer draft');
+  chat.failPaypal('a', 'two', 'Unavailable');
+  chat.completePaypal('a', 'two', 'Late answer', model);
+  assert.equal(session(chat, 'a').draft, 'Newer draft');
+  assert.equal(session(chat, 'a').messages.at(-1)?.text, '');
+  assert.equal(session(chat, 'a').notice, 'Unavailable');
+});
+
+void test('user message send times are captured once and survive history and payment changes', () => {
+  const firstTime = Date.parse('2026-01-01T12:30:00.000Z');
+  const secondTime = Date.parse('2026-01-01T12:35:00.000Z');
+  let now = firstTime;
+  const chat = new ChatController('a', () => now);
+  start(chat, 'preview');
+  assert.equal(session(chat, 'a').messages[0]?.sentAt, firstTime);
+  chat.stop();
+  now = secondTime;
+  chat.startPaypal('PayPal question', model, 'paid');
+  assert.equal(session(chat, 'a').messages[2]?.sentAt, secondTime);
+  chat.completePaypal('a', 'paid', 'Received later', model);
+  chat.newChat('b');
+  chat.openChat('a');
+  chat.setDraft('Edited draft');
+  assert.equal(session(chat, 'a').messages[0]?.sentAt, firstTime);
+  assert.equal(session(chat, 'a').messages[2]?.sentAt, secondTime);
 });

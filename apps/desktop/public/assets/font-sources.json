@@ -36,6 +36,24 @@
       "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision",
       "verifiedSource": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/webfonts/JetBrainsMono-Regular.woff2",
       "verifiedSourceCommit": "cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9"
+    },
+    {
+      "file": "InstrumentSans-Variable.ttf",
+      "sha256": "b24f1812584816958afcf22e22d08e44318c5e51651e25d2438efdde389b33b1",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "InstrumentSans-OFL.txt",
+      "upstream": "https://github.com/Instrument/instrument-sans",
+      "verifiedSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/InstrumentSans%5Bwdth%2Cwght%5D.ttf",
+      "exactDownloadRevision": "Google Fonts main; SHA256 identifies downloaded bytes"
+    },
+    {
+      "file": "InstrumentSans-Italic-Variable.ttf",
+      "sha256": "a74203cc5066a3b2f8de1a7b0887ef897773c2319dc86c911f8e85350cde0d07",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "InstrumentSans-OFL.txt",
+      "upstream": "https://github.com/Instrument/instrument-sans",
+      "verifiedSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/InstrumentSans-Italic%5Bwdth%2Cwght%5D.ttf",
+      "exactDownloadRevision": "Google Fonts main; SHA256 identifies downloaded bytes"
     }
   ],
   "sourceVerification": "The verified source URLs served bytes matching the recorded SHA256 values. This establishes a reproducible source match, not the original download date or revision. Google Fonts distribution URLs are versioned endpoints, not cryptographic Git revisions."

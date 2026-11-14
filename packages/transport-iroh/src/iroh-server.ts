@@ -174,10 +174,14 @@ export function serveIroh(
       connection,
       batchSessions,
       signal,
-      () => {
+      async (querySignal) => {
         if (!routeAllowed(connection)) return undefined;
-        const release = limiter.enterQuery(peer);
+        const release = await limiter.waitQuery(peer, querySignal);
         if (!release) return undefined;
+        if (querySignal.aborted || !routeAllowed(connection)) {
+          release();
+          return undefined;
+        }
         // Reuse the existing bounded query rate, including malformed/incomplete streams. Its lease
         // covers this synchronous rate check; the endpoint slot covers parsing, generation and egress.
         let queryConnection:

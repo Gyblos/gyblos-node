@@ -17,6 +17,16 @@ await build({
   format: 'cjs',
   external: ['electron', '@number0/iroh'],
 });
+// Stage the buyer-owned executable; desktop source never imports another app.
+await build({
+  entryPoints: ['../buyer/src/desktop-worker.ts'],
+  outfile: 'dist/buyer-service.cjs',
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  external: ['electron', '@number0/iroh'],
+  footer: { js: 'void module.exports.startBuyerWorker();' },
+});
 await buildRenderer({
   base: './',
   esbuild: { jsx: 'automatic' },

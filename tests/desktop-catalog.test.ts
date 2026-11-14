@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  MAIN_NAV,
   matchesCatalog,
-  MODE_NAV,
   MODEL_FILTER,
   MODELS,
   UI_VIEW,
@@ -47,14 +47,18 @@ void test('desktop catalog category and search combine rather than override each
     0,
   );
 });
-void test('desktop contextual navigation shares Models and Activity without duplicate modes', () => {
-  assert.equal(MODE_NAV.Chat[0].name, UI_VIEW.CHAT);
-  assert.equal(MODE_NAV.Connect[0].name, UI_VIEW.CONNECT);
+void test('desktop buyer navigation has one stable destination per task', () => {
   assert.deepEqual(
-    MODE_NAV.Chat.filter((item) => item.name !== UI_VIEW.TOOLS).slice(1),
-    MODE_NAV.Connect.slice(1),
+    MAIN_NAV.map((item) => [item.name, item.label]),
+    [
+      [UI_VIEW.CHAT, 'Chat'],
+      [UI_VIEW.CONNECT, 'Connections'],
+      [UI_VIEW.MODELS, 'Models'],
+      [UI_VIEW.TOOLS, 'Applications'],
+      [UI_VIEW.ACTIVITY, 'Activity'],
+      [UI_VIEW.PAYMENTS, 'Payments'],
+    ],
   );
-  assert.equal(MODE_NAV.Chat.at(-1)?.name, UI_VIEW.TOOLS);
 });
 void test('desktop demo free request succeeds with no credits and a zero limit', () => {
   assert.equal(

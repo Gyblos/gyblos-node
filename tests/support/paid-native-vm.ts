@@ -35,7 +35,11 @@ import {
   type Instruction,
   type Transaction,
 } from '@solana/kit';
-import { SOLANA_MAINNET_CAIP2, type FacilitatorSvmSigner } from '@x402/svm';
+import {
+  SOLANA_DEVNET_CAIP2,
+  SOLANA_MAINNET_CAIP2,
+  type FacilitatorSvmSigner,
+} from '@x402/svm';
 import { FailedTransactionMetadata, LiteSVM } from 'litesvm';
 import {
   UPTO_PROGRAM,
@@ -81,6 +85,10 @@ function nativeCode(failure: FailedTransactionMetadata): number | undefined {
 export async function nativeVm(
   now: () => number,
   requestedNetwork: UptoTerms['network'] = SOLANA_MAINNET_CAIP2,
+  supplied: {
+    payer?: Awaited<ReturnType<typeof generateKeyPairSigner>>;
+    mint?: Awaited<ReturnType<typeof generateKeyPairSigner>>;
+  } = {},
 ) {
   const bytes = await readFile(
     new URL('../fixtures/payment-channels-native.so', import.meta.url),
@@ -105,12 +113,12 @@ export async function nativeVm(
   const history = nativeHistory(svm);
   let blockHeight = 1000n;
   let lastValidBlockHeight = 500_000_000n;
-  const payer = await generateKeyPairSigner();
+  const payer = supplied.payer ?? (await generateKeyPairSigner());
   const feePayer = await generateKeyPairSigner();
   const authorizer = await generateKeyPairSigner();
   const seller = await generateKeyPairSigner();
   const fee = await generateKeyPairSigner();
-  const mint = await generateKeyPairSigner();
+  const mint = supplied.mint ?? (await generateKeyPairSigner());
   for (const signer of [payer, feePayer])
     assert.ok(
       !(
@@ -244,7 +252,11 @@ export async function nativeVm(
     feePayer.address,
     seller.address,
     fee.address,
-    address(UPTO_PROGRAM.treasuryOwners.mainnet),
+    address(
+      network === SOLANA_DEVNET_CAIP2
+        ? UPTO_PROGRAM.treasuryOwners.devnet
+        : UPTO_PROGRAM.treasuryOwners.mainnet,
+    ),
   ])
     await send([
       await getCreateAssociatedTokenIdempotentInstructionAsync({
@@ -290,6 +302,7 @@ export async function nativeVm(
     accountInfo,
     history,
     height: () => blockHeight,
+    blockhashValid: (value: string) => value === String(svm.latestBlockhash()),
     expire() {
       svm.expireBlockhash();
       blockHeight = lastValidBlockHeight + 1n;

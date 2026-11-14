@@ -52,3 +52,7 @@ export const MODEL_LIMITS = {
   // The free channel's output bytes.
   maxOutputCharacters: 262144,
 } as const;
+
+export const AGENT_MODEL_LIMITS = {
+  minimumOllamaVersion: [0, 20, 0],
+} as const;

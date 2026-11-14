@@ -111,6 +111,7 @@ void test('a completed paid request answers its text and what it cost', async ()
         BigInt(buyer.winners[0]!.quote.offer.maxAtomic) - 1n,
       ),
       recorded: false,
+      transaction: 't'.repeat(64),
     });
     // The same summary closes a stream, before [DONE].
     const streamed = await (await post(url, chat(true))).text();

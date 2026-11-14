@@ -5,6 +5,13 @@ import { UPTO_WITHDRAW_STEPS } from 'x402-upto-metered';
 
 export const PAYMENT_PHASES = { ADMIT: 'admit', SETTLE: 'settle' } as const;
 export const BUYER_OBSERVATION = { maxResponseBytes: 1024 * 1024 } as const;
+export const BATCH_BUYER_CHECKPOINTS = {
+  OPENING_ABSENT: 'gyblos:opening:absent',
+  OPENING_TRANSACTION: 'gyblos:opening:transaction',
+  OPENING_VOUCHER: 'gyblos:opening:voucher',
+  WITHDRAWAL: 'gyblos:withdrawal',
+  WITHDRAWAL_INTENT: 'gyblos:withdrawal:intent',
+} as const;
 export const UPTO_BUYER_DISTINCT_PARTIES = 4;
 export const BUYER_OBSERVATION_RPC_METHODS = [
   'getLatestBlockhash',
@@ -16,6 +23,13 @@ export const BUYER_OBSERVATION_RPC_METHODS = [
   'getAccountInfo',
   'minimumLedgerSlot',
   'getFirstAvailableBlock',
+  'isBlockhashValid',
+] as const;
+export const BUYER_RECOVERY_RPC_METHODS = [
+  ...BUYER_OBSERVATION_RPC_METHODS,
+  'getBlockTime',
+  'sendTransaction',
+  'getSignatureStatuses',
 ] as const;
 export type PaymentPhase = (typeof PAYMENT_PHASES)[keyof typeof PAYMENT_PHASES];
 
@@ -105,6 +119,7 @@ export const BUYER_WITHDRAW = {
 
 // Bound the SDK opening far below the journal capacity; use the SDK's Solana packet limit.
 export const BATCH_OPENING_LIMITS = {
+  signatureBytes: 64,
   bytes: 8 * 1024,
   transactionBytes: TRANSACTION_SIZE_LIMIT,
   transactionBase64Chars: Math.ceil(TRANSACTION_SIZE_LIMIT / 3) * 4,

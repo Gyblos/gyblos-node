@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./buyer-api-keys": "./src/buyer-api-keys.ts",
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
+    "./buyer-api": "./src/buyer-api.ts",
     "./chat": "./src/chat.ts",
     "./tools": "./src/tools.ts",
     "./engine": "./src/engine.ts",
@@ -42,6 +44,7 @@
     "./receipt-channel": "./src/receipt-channel.ts",
     "./vectors/receipt-channel-v1.json": "./vectors/receipt-channel-v1.json",
     "./payment": "./src/payment.ts",
+    "./paypal-payment": "./src/paypal-payment.ts",
     "./payment-binding": "./src/payment-binding.ts",
     "./paid-execution-validation": "./src/paid-execution-validation.ts",
     "./paid-execution": "./src/paid-execution.ts",

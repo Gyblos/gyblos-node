@@ -34,28 +34,28 @@
   d: var(--signal-mouth);
 }
 .signal-foil-stop {
-  stop-color: #69c7e8;
+  stop-color: var(--accent);
 }
 .signal-foil-stop:nth-child(2) {
-  stop-color: #b9b9ed;
+  stop-color: var(--blue);
 }
 .signal-foil-stop:nth-child(3) {
-  stop-color: #f3cfe0;
+  stop-color: var(--accent);
 }
 .signal-foil-stop:nth-child(4) {
-  stop-color: #7bd2e4;
+  stop-color: var(--blue);
 }
 .light .signal-foil-stop {
-  stop-color: #176b91;
+  stop-color: var(--accent);
 }
 .light .signal-foil-stop:nth-child(2) {
-  stop-color: #695294;
+  stop-color: var(--blue);
 }
 .light .signal-foil-stop:nth-child(3) {
-  stop-color: #985a80;
+  stop-color: var(--accent);
 }
 .light .signal-foil-stop:nth-child(4) {
-  stop-color: #287f8c;
+  stop-color: var(--blue);
 }
 .signal-mark[data-working='true'] .signal-foil-stop {
   animation: signal-foil-color 3600ms ease-in-out infinite alternate;
@@ -74,28 +74,28 @@
 }
 /* Each traveler keeps its own hue through a crossing; the overlap blends light. */
 .signal-trail-stop--left {
-  stop-color: #6cc6ec;
+  stop-color: var(--accent);
 }
 .signal-trail-stop--left:nth-child(2) {
-  stop-color: #b6edff;
+  stop-color: var(--blue);
 }
 .signal-trail-stop--right {
-  stop-color: #b9b9ed;
+  stop-color: var(--blue);
 }
 .signal-trail-stop--right:nth-child(2) {
-  stop-color: #f3cfe0;
+  stop-color: var(--accent);
 }
 .light .signal-trail-stop--left {
-  stop-color: #176b91;
+  stop-color: var(--accent);
 }
 .light .signal-trail-stop--left:nth-child(2) {
-  stop-color: #287f8c;
+  stop-color: var(--blue);
 }
 .light .signal-trail-stop--right {
-  stop-color: #695294;
+  stop-color: var(--blue);
 }
 .light .signal-trail-stop--right:nth-child(2) {
-  stop-color: #985a80;
+  stop-color: var(--accent);
 }
 .signal-mark[data-working='true'] .signal-trail-stop {
   animation: signal-foil-sheen 3600ms ease-in-out infinite alternate;
@@ -244,30 +244,30 @@
 }
 @keyframes signal-foil-color {
   0% {
-    stop-color: #69c7e8;
+    stop-color: var(--accent);
   }
   40% {
-    stop-color: #b9b9ed;
+    stop-color: var(--blue);
   }
   70% {
-    stop-color: #f3cfe0;
+    stop-color: var(--accent);
   }
   100% {
-    stop-color: #7bd2e4;
+    stop-color: var(--blue);
   }
 }
 @keyframes signal-foil-color-light {
   0% {
-    stop-color: #176b91;
+    stop-color: var(--accent);
   }
   40% {
-    stop-color: #695294;
+    stop-color: var(--blue);
   }
   70% {
-    stop-color: #985a80;
+    stop-color: var(--accent);
   }
   100% {
-    stop-color: #287f8c;
+    stop-color: var(--blue);
   }
 }
 @media (prefers-reduced-motion: reduce) {
