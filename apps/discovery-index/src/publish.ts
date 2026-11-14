@@ -24,6 +24,7 @@ export interface PublishContext {
   registrations: RegistrationStore | undefined;
   now: number;
   maxNodes: number;
+  maxPublications: number;
   // Throttled pruning, run only before admitting a new NodeId.
   prune: (now: number) => Promise<void>;
 }
@@ -94,6 +95,7 @@ export async function acceptRecord(
       await storedEntry(record, signature, json, {
         now,
         maxNodes: context.maxNodes,
+        maxPublications: context.maxPublications,
       }),
     ))
   )

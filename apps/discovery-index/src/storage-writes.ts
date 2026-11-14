@@ -92,7 +92,7 @@ export function admitNodeQuery(
         lt(nodes.lastSequence, entry.sequence),
         or(
           lt(nodes.publishWindow, window),
-          lt(nodes.publishCount, NODE_PUBLISH_QUOTA.limit),
+          lt(nodes.publishCount, entry.admission.maxPublications),
         ),
       ),
     })

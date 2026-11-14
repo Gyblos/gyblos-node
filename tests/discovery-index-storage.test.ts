@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
-import { PUBLISH_MODES } from '@gyblos/discovery-index/constants';
+import {
+  NODE_PUBLISH_QUOTA,
+  PUBLISH_MODES,
+} from '@gyblos/discovery-index/constants';
 import type { DiscoveryPublishers } from '@gyblos/discovery-index/publishers';
 import {
   createMemoryStorage,
@@ -82,7 +85,11 @@ function entry(
   overrides: Partial<StoredEntry> = {},
 ): StoredEntry {
   return {
-    admission: { now: T0, maxNodes: 10_000 },
+    admission: {
+      now: T0,
+      maxNodes: 10_000,
+      maxPublications: NODE_PUBLISH_QUOTA.limit,
+    },
     kind,
     nodeId,
     owner: INDEX_OWNER,

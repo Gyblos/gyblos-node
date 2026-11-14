@@ -158,7 +158,11 @@ signed a record; clients re-verify everything.
   across Worker isolates and locations. Its counter advances atomically with the
   high-water mark; rejected, stale and concurrent duplicate records consume no
   NodeId allowance. Delayed requests cannot move its window backwards. The old
-  `DISCOVERY_NODE_LIMITER` binding is no longer used.
+  `DISCOVERY_NODE_LIMITER` binding is no longer used. Explicit development apps
+  on loopback retain their previous allowance of 120 accepted records per NodeId
+  per minute, using the same atomic counter. The development flag does not raise
+  the ten-record allowance on other hosts; the deployed Worker always disables
+  development mode.
 - **Global read cap:** `DISCOVERY_READ_LIMITER` (300 per 60 seconds, constant
   key `global`) is consumed only by storage reads: a `GET /v1/sellers` cache
   miss and a `/v1/health` whose cached count is stale. Cache hits and fresh

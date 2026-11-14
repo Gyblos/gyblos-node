@@ -25,7 +25,7 @@ export interface NodeState {
 
 export interface StoredEntry {
   // Admission is checked with the write, never against an earlier storage snapshot.
-  admission: { now: number; maxNodes: number };
+  admission: { now: number; maxNodes: number; maxPublications: number };
   kind: PublicRecordKind;
   nodeId: string;
   owner: string;
@@ -210,7 +210,8 @@ function nextMemoryNode(
 ): MemoryNode {
   const window = Math.floor(entry.admission.now / NODE_PUBLISH_QUOTA.windowMs);
   const count = node && node.publishWindow >= window ? node.publishCount : 0;
-  if (count >= NODE_PUBLISH_QUOTA.limit) indexFail(INDEX_ERRORS.RATE_LIMITED);
+  if (count >= entry.admission.maxPublications)
+    indexFail(INDEX_ERRORS.RATE_LIMITED);
   return {
     lastSequence: entry.sequence,
     retainUntil: Math.max(node?.retainUntil ?? 0, entry.retainUntil),

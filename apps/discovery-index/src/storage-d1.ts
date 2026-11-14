@@ -100,7 +100,7 @@ export function createD1Storage(client: D1Database): DiscoveryStorage {
         current &&
         integer(current.publishWindow) >=
           Math.floor(entry.admission.now / NODE_PUBLISH_QUOTA.windowMs) &&
-        integer(current.publishCount) >= NODE_PUBLISH_QUOTA.limit
+        integer(current.publishCount) >= entry.admission.maxPublications
       )
         return indexFail(INDEX_ERRORS.RATE_LIMITED);
       return indexFail(

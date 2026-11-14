@@ -217,6 +217,7 @@ function publishHandler(settings: IndexSettings) {
       registrations: settings.registrations,
       now: settings.now(),
       maxNodes: settings.maxNodes,
+      maxPublications: context.get('limiters').maxNodePublications,
       prune: settings.prune,
     };
     try {
