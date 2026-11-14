@@ -41,18 +41,31 @@ export const retainedHour = (now: number) =>
 // its own throttle and separately from record pruning, so retention holds even when no new NodeId
 // publishes and a failing uptime table never blocks admitting one.
 export function uptimeRecorder(storage: UptimeStorage | undefined) {
-  const written = new Map<string, number>();
+  // High-water admission bounds distinct nodes in one five-minute slot. Rotate only between
+  // slots, instead of evicting current entries when a smaller process cache fills.
+  const written = new Set<string>();
+  let writtenSlot: number | undefined;
   let prunedAt = -Infinity;
   return async (nodeId: string, now: number) => {
     if (!storage) return;
-    if (now - prunedAt >= UPTIME.pruneIntervalMs) {
-      prunedAt = now;
-      await storage.pruneUptime(now).catch(() => undefined);
+    const slot = slotOf(now);
+    if (writtenSlot === undefined || slot > writtenSlot) {
+      writtenSlot = slot;
+      written.clear();
     }
-    if (written.get(nodeId) === slotOf(now)) return;
-    if (written.size >= UPTIME.maxRemembered) written.clear();
-    await storage.markSeen(nodeId, now);
-    written.set(nodeId, slotOf(now));
+    if (slot === writtenSlot && written.has(nodeId)) return;
+    // Reserve before any await, including pruning. Concurrent accepted presences share this write.
+    if (slot === writtenSlot) written.add(nodeId);
+    try {
+      if (now - prunedAt >= UPTIME.pruneIntervalMs) {
+        prunedAt = now;
+        await storage.pruneUptime(now).catch(() => undefined);
+      }
+      await storage.markSeen(nodeId, now);
+    } catch (error) {
+      if (slot === writtenSlot) written.delete(nodeId);
+      throw error;
+    }
   };
 }
 

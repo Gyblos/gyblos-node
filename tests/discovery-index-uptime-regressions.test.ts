@@ -145,4 +145,43 @@ for (const kind of HARNESS_KINDS) {
     });
   });
 
+  void test(`${kind}: concurrent accepted presences in one slot share one pending uptime write`, async (context) => {
+    const base = await storageFor(kind, context);
+    if (!base) return;
+    const entered = deferred();
+    const held = deferred();
+    let writes = 0;
+    const storage: DiscoveryStorage = {
+      ...base,
+      async markSeen(nodeId, now) {
+        writes++;
+        entered.resolve();
+        await held.promise;
+        await base.markSeen(nodeId, now);
+      },
+    };
+    const harness = await indexHarness('memory', { storage });
+    assert.ok(harness);
+    const seller = indexNode();
+    const catalog = seller.catalog(1, { issuedAt: harness.clock.now });
+    assert.equal((await harness.publish(catalog)).status, 201);
+    const initial = harness.publish(
+      await seller.presence(2, catalog, { issuedAt: harness.clock.now }),
+    );
+    await entered.promise;
+    const next = harness.publish(
+      await seller.presence(3, catalog, { issuedAt: harness.clock.now }),
+    );
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    } finally {
+      held.resolve();
+    }
+    assert.deepEqual(
+      (await Promise.all([initial, next])).map((response) => response.status),
+      [201, 201],
+    );
+    assert.equal(writes, 1);
+  });
+
 }
