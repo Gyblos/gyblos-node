@@ -189,7 +189,8 @@ void test('catalog read pressure refuses publication before I/O without poisonin
   const gate = heldReaders(t, paths);
   const first = inspectBatchPool(paths);
   void first.catch(() => undefined);
-  let readings = Promise.all([first]);
+  let readings: Promise<Awaited<ReturnType<typeof inspectBatchPool>>[]> =
+    Promise.all([first]);
   try {
     await within(gate.entered);
     readings = Promise.all([
