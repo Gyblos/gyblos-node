@@ -82,12 +82,6 @@ export function parseUptimeQuery(url: string) {
   return node;
 }
 
-function bits(value: number) {
-  let count = 0;
-  for (let rest = value; rest; rest &= rest - 1) count++;
-  return count;
-}
-
 // Slots seen and slots elapsed from `first` to now, counting the current slot.
 function window(rows: readonly UptimeRow[], first: number, now: number) {
   const last = slotOf(now);
