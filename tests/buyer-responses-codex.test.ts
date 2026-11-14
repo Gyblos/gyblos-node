@@ -171,9 +171,8 @@ void test('a seller refusing the conversation as too long tells Codex to compact
   // After text reached the client, the same code means a cut answer: Codex is told to stop.
   const cut = await host(async (onDelta) => {
     await onDelta('partial');
-    throw new FreeClientError(FREE_EXECUTION_CODES.LIMIT, true, true, {
-      delivered: { outputTokens: 1 },
-    } as never);
+    // As the protocol sends it: a limit carries no delivered usage.
+    throw new FreeClientError(FREE_EXECUTION_CODES.LIMIT, true, true);
   }, []);
   try {
     const stream = events(

@@ -10,7 +10,6 @@ import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 
 import type { ChatErrorBody } from './chat-api';
 import { CHAT_MESSAGE_DETAILS, FREE_BUYER, RESPONSES_CODES } from './constants';
-import { sellerContextFull } from './context-full';
 import {
   executionFields,
   paymentFields,
@@ -153,9 +152,7 @@ const failed = (
   status: 'failed',
   output: [],
   error: {
-    code: sellerContextFull({ code, stop })
-      ? RESPONSES_CODES.contextFull
-      : RESPONSES_CODES.stopped,
+    code: RESPONSES_CODES.stopped,
     message: RESPONSES_CODES.stoppedMessage(code),
     [RESPONSES_CODES.field]: code,
     ...(stop.reason ? { reason: stop.reason } : {}),

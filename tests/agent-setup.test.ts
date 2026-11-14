@@ -313,6 +313,9 @@ void test('a profile file gyblos did not write is refused, and nothing is writte
 void test('a Codex profile carries the context size when it is known', () => {
   const [first, , second] = codexProfiles(ENDPOINT);
   assert.doesNotMatch(first!.text, /model_context_window/);
-  assert.match(second!.text, /\nmodel_context_window = 131072\n/);
+  assert.match(
+    second!.text,
+    /\nmodel_context_window = 131072\nmodel_auto_compact_token_limit = 129072\n/,
+  );
   assert.equal(mergedCodexProfile('new', second!.text), 'new');
 });
