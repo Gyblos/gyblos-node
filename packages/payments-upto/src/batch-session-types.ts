@@ -16,6 +16,7 @@ import type {
 } from '@x402/svm';
 
 import type {
+  PAYMENT_SESSION,
   PaymentSessionTerms,
   SessionBill,
   SessionRequest,
@@ -23,6 +24,18 @@ import type {
   SessionState,
   SessionVoucher,
 } from '@gyblos/protocol/payment-session';
+import type { SessionBlockIntent } from '@gyblos/protocol/session-blocks';
+
+import type { BATCH_BLOCK_STATE } from './constants';
+
+export interface BatchRequestBlocks {
+  baseAtomic: string;
+  accepted: SessionBlockIntent | null;
+  pending: {
+    intent: SessionBlockIntent;
+    voucher: SessionVoucher | null;
+  } | null;
+}
 
 export interface BatchPaths {
   directory: string;
@@ -35,7 +48,7 @@ export interface BatchHint {
   slot: string;
 }
 export interface BatchRecord {
-  version: number;
+  version: typeof PAYMENT_SESSION.version | typeof BATCH_BLOCK_STATE.version;
   terms: PaymentSessionTerms;
   channelId: string;
   state: SessionState;
@@ -52,6 +65,7 @@ export interface BatchRecord {
   closing: BatchFacilitatorPayload | null;
   settlement: SessionSettlement | null;
   pending: Record<string, string>;
+  blocks?: Record<string, BatchRequestBlocks>;
 }
 export interface BatchCommonOptions {
   terms: PaymentSessionTerms;
@@ -100,6 +114,7 @@ export interface BatchSellerOptions extends BatchCommonOptions {
 }
 
 export interface BatchSellerContext {
+  blockExecutions: Set<string>;
   options: BatchSellerOptions;
   store: import('./batch-session-store').BatchStore;
   requirements: PaymentRequirements;

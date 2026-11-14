@@ -7,6 +7,7 @@ import {
   sessionFail,
 } from '@gyblos/protocol/payment-session';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import { openPoolStore, poolChild, poolPaths } from './batch-pool-store';
 import {
   recoverBatchBuyer,
@@ -32,11 +33,14 @@ export async function recoverBatchPool(
           paths: poolPaths(options.paths, row),
         });
         if (!result) return sessionFail(SESSION_CODES.UNVERIFIED);
-        if (result.settlement) {
+        if (result.settlement || result.notCreated) {
           const verified = await poolChild(options.paths, row);
           if (
-            verified.state !== SESSION_STATES.CLOSED ||
-            verified.settlement?.transaction !== result.settlement.transaction
+            result.notCreated
+              ? !batchOpeningAbsent(verified)
+              : verified.state !== SESSION_STATES.CLOSED ||
+                verified.settlement?.transaction !==
+                  result.settlement!.transaction
           )
             return sessionFail(SESSION_CODES.UNVERIFIED);
           await store.update((state) => {
@@ -44,7 +48,8 @@ export async function recoverBatchPool(
               (entry) => entry.terms.sellerNodeId === row.terms.sellerNodeId,
             );
             if (!next) return sessionFail(SESSION_CODES.BINDING);
-            next.refundedAtomic = result.settlement!.refundedAtomic;
+            if (result.settlement)
+              next.refundedAtomic = result.settlement.refundedAtomic;
             next.requestId = null;
             next.uncertain = false;
           });

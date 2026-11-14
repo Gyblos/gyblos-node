@@ -146,3 +146,29 @@ from a browser. It is not authentication against other local processes.
 
 For what happens when a payment outcome is unclear, see
 [recovery.md](recovery.md).
+
+### Incremental delivery on reusable sessions
+
+Block-capable sessions use one capped deposit for repeated inferences. During a
+response, the buyer verifies each certified prefix and durably signs its
+cumulative total before the next block can be sent. These signatures do not
+submit transactions. Settlement is still a final operation over the highest
+accepted native voucher, with the unused deposit returned to the buyer.
+
+The soft target is 64 output tokens, subject to a safe tokenizer boundary and
+the existing 128-token request cap. A first block also authorizes its input
+usage; it must fit the signed request ceiling and remaining deposit. This bounds
+the delivery/signature exposure to one outstanding block, not to a fixed dollar
+amount. A tokenizer without a certified boundary cannot authorize intermediate
+prefixes.
+
+After cancellation or a lost ACK, recovery resends only the exact stored
+financial approval. It closes an unfinished channel and independently verifies
+the charged/refunded amounts. It never sends the prompt again. An existing
+settlement is verified before attempting to recover an expired approval.
+
+These protections require the seller's worker to remain available for claims
+within the program's withdrawal grace. They do not insure long simultaneous
+outages or a restored stale local backup. Reputation and paid usage-receipt
+integration are separate; do not interpret a cumulative payment voucher as a
+dual-signed quality receipt.

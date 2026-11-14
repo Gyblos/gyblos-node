@@ -1,4 +1,4 @@
-# Offline checks for every pull request and push to main: types, lint
+# Offline checks for every pull request into main and every push to main: types, lint
 # (including boundaries and tooling tests), product tests, lab tests and the desktop
 # build, on Linux only. They run as parallel jobs (tests in shards) so a run takes about
 # the time of its slowest part; a pull request that changes only the docs site
@@ -10,7 +10,10 @@
 name: CI
 
 on:
+  # Only pull requests into main; child PRs intentionally have no hosted run.
+  # The main-facing combined head is checked on updates, and pushes to main run again.
   pull_request:
+    branches: [main]
   push:
     branches: [main]
 
