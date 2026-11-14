@@ -30,6 +30,7 @@ import {
 } from './selection-config';
 import type { LocalSellerStats } from './selection-stats';
 import {
+  quoteFailureCode,
   reportSellerFailure,
   sellerFailureCode,
   type SellerFailureCode,
@@ -292,8 +293,9 @@ async function requestCandidate(
     return quote;
   } catch (error) {
     if (!querySignal.aborted) {
+      const code = quoteFailureCode(error, request.tools === true);
       // A seller without tools answered as designed: it is not cooled down for the requests it serves.
-      if (sellerFailureCode(error) !== CONTROL_CODES.TOOLS)
+      if (code !== CONTROL_CODES.TOOLS)
         recordQuote(
           dependencies.stats,
           candidate.nodeId,
@@ -304,13 +306,12 @@ async function requestCandidate(
       reportSellerFailure(dependencies.onSellerFailure, {
         nodeId: candidate.nodeId,
         phase: SELLER_FAILURE_PHASES.QUOTE,
-        code: sellerFailureCode(error),
+        code,
       });
     }
     throw error;
   }
 }
-
 function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
   return outcomes.map((outcome) => {
     if (outcome.status === 'rejected') throw outcome.reason;
