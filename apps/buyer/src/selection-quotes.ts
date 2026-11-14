@@ -37,7 +37,7 @@ export interface RaceState {
   // The remembered signed catalog of each seller whose snapshot came from memory.
   recalled: Map<string, SignedPublicV2>;
 }
-const CATALOG_CHANGED: ReadonlySet<string> = new Set([
+const CATALOG_CHANGED: ReadonlySet<SellerFailureCode> = new Set([
   CONTROL_CODES.STALE,
   CONTROL_CODES.MODEL,
 ]);
