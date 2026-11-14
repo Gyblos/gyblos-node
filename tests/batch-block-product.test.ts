@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
-import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
+import { ENGINE_DONE_REASONS, ENGINE_KINDS } from '@gyblos/protocol/constants';
+import { TELEMETRY_EVENTS, type TelemetryRecord } from '@gyblos/protocol/telemetry';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 
 import { BLOCK_TEXT, blockProduct } from './support/batch-block-product';
@@ -192,4 +193,13 @@ void test('an expired intent without a voucher or settlement cannot create a fre
   assert.equal(signaturesRecovered, 0);assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0');
   const settled = await f.buyer.reconcile();assert.equal(settled?.chargedAtomic, '0');assert.equal(settled?.refundedAtomic, '1000');
   assert.equal(f.offers.generations(), 1);
+});
+void test('block-plan admission failure emits failed telemetry without generation or another deposit', async (t) => {
+  const records: TelemetryRecord[] = [];
+  const f = await blockProduct({ telemetry: { sink: { emit(record) { records.push(record); } }, engineKind: () => ENGINE_KINDS.OLLAMA } });t.after(f.close);
+  await f.f.open();const calls = [...f.f.calls];
+  f.offers.live.meter.chat = () => f.offers.live.model.contextTokens;
+  await assert.rejects(f.buyer.execute(await f.offers.quote(1), f.offers.input), { code: PAID_EXECUTION_CODES.LIMIT });
+  assert.equal(f.offers.generations(), 0);assert.deepEqual(f.f.calls, calls);
+  assert.deepEqual(records.map((record) => record.type), [TELEMETRY_EVENTS.REQUEST_RECEIVED, TELEMETRY_EVENTS.FAILED]);
 });
