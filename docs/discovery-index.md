@@ -194,8 +194,9 @@ signed a record; clients re-verify everything.
   at most once a minute per isolate, with index-only deletes. In open mode,
   distributed publishers can fill and renew these slots, blocking admission of
   new sellers. The cap bounds storage; it is not Sybil resistance. The index
-  retains only current records, not presence history or transport observations,
-  so it cannot supply historical uptime or direct/relay metrics.
+  keeps current records and accepted-presence slot history for the uptime
+  windows below. Those observations do not prove engine availability or measure
+  direct/relay transport quality.
 - **Privacy:** no IP address, header, session or request metadata is stored or
   logged; rate-limit keys go only to Cloudflare limiters.
 
