@@ -348,3 +348,13 @@ void test('profiles of models no longer served are removed, but never an edited 
     'gyblos.config.toml',
   ]);
 });
+
+void test('a Codex profile carries the context size when it is known', () => {
+  const [first, , second] = codexProfiles(ENDPOINT);
+  assert.doesNotMatch(first!.text, /model_context_window/);
+  assert.match(
+    second!.text,
+    /\nmodel_context_window = 131072\nmodel_auto_compact_token_limit = 129072\n/,
+  );
+  assert.equal(mergedCodexProfile('new', second!.text), 'new');
+});

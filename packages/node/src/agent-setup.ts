@@ -140,9 +140,9 @@ export function piProvider(endpoint: AgentEndpoint) {
 // Codex CLI: the provider, tables only, so the block can sit at the end of any config.toml. It speaks the
 // Responses API with retries off (a retry would resend the prompt). Codex CLI 0.162+ refuses `[profiles.*]`
 // tables in config.toml, so each model gets its own profile file beside it (see codexProfiles); run
-// `codex --profile gyblos` (the first model) or `codex --profile gyblos-<model>`. Profiles take no context
-// size: when a conversation outgrows what the network carries, the buyer answers with the code Codex
-// compacts on.
+// `codex --profile gyblos` (the first model) or `codex --profile gyblos-<model>`. A profile carries the
+// model's context size when it is known (`--context`), so Codex compacts in time; either way, when a
+// conversation outgrows what a seller serves, the buyer answers with the code Codex compacts on.
 export function codexBlock(endpoint: AgentEndpoint) {
   const { tokenEnv } = checked(endpoint);
   return [
@@ -175,6 +175,13 @@ export function codexProfiles(endpoint: AgentEndpoint) {
         `model = ${toml(model.id)}`,
         // No seller runs web search; leaving it out also keeps it out of every request.
         'web_search = "disabled"',
+        // Codex compacts before the input leaves no room for the seller's reserved answer.
+        ...(model.contextTokens === undefined
+          ? []
+          : [
+              `model_context_window = ${model.contextTokens}`,
+              `model_auto_compact_token_limit = ${model.contextTokens - model.maxOutputTokens}`,
+            ]),
         '',
       ].join('\n'),
     ),
@@ -206,6 +213,8 @@ const CODEX_PROFILE_FIELDS: readonly string[] = [
   'model_provider',
   'model',
   'web_search',
+  'model_context_window',
+  'model_auto_compact_token_limit',
 ];
 // One profile name per model: its id with other characters as dashes, numbered when two ids collide.
 // Names collide ignoring case: each is a file name, and macOS and Windows file systems would make

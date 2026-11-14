@@ -13,6 +13,7 @@ import {
 } from '@gyblos/protocol/control-validation';
 import {
   PAYMENT_SESSION,
+  PaymentSessionError,
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
@@ -26,9 +27,11 @@ import {
 } from '@gyblos/runtime/private-file';
 import { WINDOWS } from '@gyblos/runtime/private-mode';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import type { PoolRecord, PoolRow } from './batch-pool-types';
 import { termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
+import { withBatchState } from './batch-session-io';
 import { readBatchRecord } from './batch-session-state';
 import { BATCH_POOL_VERSION } from './constants';
 
@@ -106,9 +109,8 @@ export async function readPool(
 ): Promise<PoolRecord> {
   if (!(await checkPrivateDirectory(paths.directory)))
     return { version: BATCH_POOL_VERSION, entries: [] };
-  const raw = await readPrivateFile(
-    paths.state,
-    BATCH_SESSION_DEFAULTS.poolBytes,
+  const raw = await withBatchState(paths, () =>
+    readPrivateFile(paths.state, BATCH_SESSION_DEFAULTS.poolBytes),
   );
   const legacy = await readBatchRecord(paths.legacy);
   if (raw === undefined) {
@@ -125,11 +127,12 @@ export async function readPool(
           legacy: true,
           ready: true,
           uncertain:
-            legacy.state === SESSION_STATES.OPENING ||
-            (legacy.opening !== null &&
-              Object.keys(legacy.requests).length === 0) ||
-            pending !== undefined,
-          requestId: pending?.[0] ?? null,
+            !batchOpeningAbsent(legacy) &&
+            (legacy.state === SESSION_STATES.OPENING ||
+              (legacy.opening !== null &&
+                Object.keys(legacy.requests).length === 0) ||
+              pending !== undefined),
+          requestId: batchOpeningAbsent(legacy) ? null : (pending?.[0] ?? null),
           refundedAtomic: legacy.settlement?.refundedAtomic ?? '0',
         },
       ],
@@ -172,11 +175,13 @@ async function seed(paths: BatchPoolPaths, row: PoolRow, now: number) {
     return;
   }
   await ensurePrivateDirectory(pathsFor.directory);
-  await writePrivateFile(
-    pathsFor.state,
-    JSON.stringify(initialRecord(row.terms, now)),
-    BATCH_SESSION_DEFAULTS.stateBytes,
-    { exclusive: true },
+  await withBatchState(pathsFor, () =>
+    writePrivateFile(
+      pathsFor.state,
+      JSON.stringify(initialRecord(row.terms, now)),
+      BATCH_SESSION_DEFAULTS.stateBytes,
+      { exclusive: true },
+    ),
   );
 }
 export async function openPoolStore(paths: BatchPoolPaths, now: () => number) {
@@ -199,13 +204,21 @@ export async function openPoolStore(paths: BatchPoolPaths, now: () => number) {
     change(next);
     const checked = parse(next);
     try {
-      await writePrivateFile(
-        paths.state,
-        JSON.stringify(checked),
-        BATCH_SESSION_DEFAULTS.poolBytes,
+      await withBatchState(paths, () =>
+        writePrivateFile(
+          paths.state,
+          JSON.stringify(checked),
+          BATCH_SESSION_DEFAULTS.poolBytes,
+        ),
       );
       current = checked;
-    } catch {
+    } catch (error) {
+      // Queue pressure refuses before publication; only attempted/uncertain writes poison authority.
+      if (
+        error instanceof PaymentSessionError &&
+        error.code === SESSION_CODES.BUSY
+      )
+        throw error;
       poisoned = true;
       return sessionFail(SESSION_CODES.UNAVAILABLE);
     }

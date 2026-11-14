@@ -2,16 +2,10 @@
 // Reopening retains the original channel, hints and salt; it never silently tops up or rotates.
 import { randomBytes } from 'node:crypto';
 
-import { blockhash } from '@solana/kit';
-import { TOKEN_PROGRAM_ADDRESS } from '@x402/svm';
-import {
-  buildDepositPayload,
-  signBatchVoucher,
-} from '@x402/svm/batch-settlement/client';
+import { signBatchVoucher } from '@x402/svm/batch-settlement/client';
 
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
-import { paymentSplits } from '@gyblos/protocol/payment-binding';
 import {
   PAYMENT_SESSION,
   SESSION_CODES,
@@ -19,14 +13,17 @@ import {
   sessionFail,
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
+import type { SessionBlockBuyer } from '@gyblos/protocol/session-blocks';
 
-import { batchOpeningSigner } from './batch-opening-signer';
 import {
-  atomic,
-  billFor,
-  requirementsFor,
-  termsFor,
-} from './batch-session-checks';
+  acknowledgeBuyerBlock,
+  approveBuyerBlock,
+  recoverBuyerBlock,
+} from './batch-block-buyer';
+import { buildBuyerOpening } from './batch-opening-build';
+import { batchOpeningAbsent } from './batch-opening-proof';
+import { batchOpeningSigner } from './batch-opening-signer';
+import { atomic, billFor, termsFor } from './batch-session-checks';
 import {
   active,
   initialRecord,
@@ -39,7 +36,7 @@ import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export async function createBatchBuyer(
   input: BatchBuyerOptions,
-): Promise<SessionBuyer> {
+): Promise<SessionBlockBuyer> {
   const options = { ...input, terms: termsFor(input.terms) };
   if (options.payer.address !== options.terms.buyer)
     sessionFail(SESSION_CODES.BINDING);
@@ -49,6 +46,16 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
+    beginBlocks: (request) =>
+      exclusive(() => reserve(store, request, options.now(), true)),
+    approveBlock: (intent, verified, check) =>
+      exclusive(() =>
+        approveBuyerBlock(options, store, intent, verified, check),
+      ),
+    acknowledgeBlock: (intent) =>
+      exclusive(() => acknowledgeBuyerBlock(options, store, intent)),
+    recoverBlockApproval: () =>
+      exclusive(() => recoverBuyerBlock(options, store)),
     open: (check) => exclusive(() => openBuyer(options, store, check)),
     begin: (request) => exclusive(() => reserve(store, request, options.now())),
     approve: (inputBill, verifiedAtomic) =>
@@ -113,6 +120,7 @@ export async function openBuyer(
     current.state === SESSION_STATES.CLOSING
   )
     sessionFail(SESSION_CODES.CLOSED);
+  if (batchOpeningAbsent(current)) return sessionFail(SESSION_CODES.CLOSED);
   if (current.opening) return JSON.stringify(current.opening);
   if (!current.hints) {
     if (recovering) return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -128,27 +136,10 @@ export async function openBuyer(
   const prepared = store.read();
   const hints = prepared.hints;
   if (!hints) return sessionFail(SESSION_CODES.UNAVAILABLE);
-  const requirements = await requirementsFor(options.terms);
-  const built = await buildDepositPayload({
-    payer: batchOpeningSigner(options.payer, store, beforeSign, recovering),
-    receiver: options.terms.payTo,
-    receiverAuthorizer: options.terms.authorizer,
-    mint: options.terms.mint,
-    feePayer: options.terms.feePayer,
-    tokenProgram: TOKEN_PROGRAM_ADDRESS,
-    blockhash: {
-      blockhash: blockhash(hints.blockhash),
-      lastValidBlockHeight: BigInt(hints.lastValidBlockHeight),
-    },
-    openSlot: BigInt(hints.slot),
-    salt: BigInt(prepared.salt),
-    depositAmount: BigInt(options.terms.depositAtomic),
-    firstCharge: 0n,
-    allowZeroFirstCharge: true,
-    withdrawDelay: options.terms.withdrawDelaySeconds,
-    memo: String(requirements.extra?.memo),
-    splits: paymentSplits(options.terms),
-  });
+  const built = await buildBuyerOpening(
+    prepared,
+    batchOpeningSigner(options.payer, store, beforeSign, recovering),
+  );
   await store.update((state) => {
     state.channelId = built.channelId;
     state.opening = built.payload;
@@ -168,6 +159,8 @@ async function approveBuyer(
 ) {
   const bill = billFor(inputBill);
   const current = store.read();
+  if (current.blocks?.[bill.requestId])
+    return sessionFail(SESSION_CODES.BINDING);
   active(current, options.now());
   const request = current.requests[bill.requestId];
   if (

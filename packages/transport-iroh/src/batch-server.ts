@@ -134,17 +134,15 @@ export async function serveBatchChannelStream(
   peer: string,
   close: () => void,
   external: AbortSignal,
-  enter: () => (() => void) | undefined,
+  enter: (
+    signal: AbortSignal,
+  ) => (() => void) | undefined | Promise<(() => void) | undefined>,
   allowed: () => boolean = () => true,
   limits: BatchStreamLimits = {},
   admitExecution: () => boolean = () => true,
 ): Promise<void> {
-  const release = enter();
-  if (!release) {
-    close();
-    return;
-  }
   const controller = new AbortController();
+  let release: (() => void) | undefined;
   let closed = false;
   const cancel = () => {
     controller.abort();
@@ -159,8 +157,27 @@ export async function serveBatchChannelStream(
     if (controller.signal.aborted || !allowed())
       throw new BatchChannelError(PAID_EXECUTION_CODES.CANCELLED);
   };
-  const operation = Promise.resolve().then(() => {
+  const operation = Promise.resolve().then(async () => {
     check();
+    const ingressStarted = performance.now();
+    const ingressLimit = limits.ingressMs ?? IROH_DEADLINES.ingressMs;
+    // A peer may have received the previous FIN before its server continuation released admission.
+    // Handoff and frame parsing share the original ingress budget; waiting never renews a deadline.
+    release = await batchDeadline(
+      Promise.resolve(enter(controller.signal)),
+      ingressLimit,
+      cancel,
+    );
+    check();
+    if (!release) {
+      cancel();
+      return;
+    }
+    const ingressMs = ingressLimit - (performance.now() - ingressStarted);
+    if (ingressMs <= 0) {
+      cancel();
+      return;
+    }
     return respond(
       stream,
       service,
@@ -168,7 +185,7 @@ export async function serveBatchChannelStream(
       controller.signal,
       check,
       cancel,
-      limits,
+      { ...limits, ingressMs },
       admitExecution,
     );
   });
@@ -183,14 +200,16 @@ export async function serveBatchChannelStream(
   } finally {
     await operation.catch(() => undefined);
     external.removeEventListener('abort', cancel);
-    release();
+    release?.();
   }
 }
 export function handleBatchChannelConnection(
   connection: Connection,
   service: BatchChannelService,
   signal: AbortSignal,
-  enter: () => (() => void) | undefined,
+  enter: (
+    signal: AbortSignal,
+  ) => (() => void) | undefined | Promise<(() => void) | undefined>,
   isClosed: () => boolean,
   allowed: () => boolean,
   admitExecution: () => boolean,
