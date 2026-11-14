@@ -85,6 +85,7 @@ export async function selectVerifiedBuyerQuote(
     ...(signal ? [signal] : []),
   ]);
   const clients = new Map<string, BuyerControlClient>();
+  const settling: Promise<unknown>[] = [];
   try {
     const snapshots = await refreshSnapshots(
       config,
@@ -92,6 +93,7 @@ export async function selectVerifiedBuyerQuote(
       clients,
       now,
       deadline,
+      settling,
       signal,
     );
     if (signal?.aborted)
@@ -142,6 +144,9 @@ export async function selectVerifiedBuyerQuote(
     await Promise.allSettled(
       [...clients.values()].map((client) => client.close()),
     );
+    // Cancellation retains ownership of every native operation this selection started, including
+    // connections retired before the caller cancelled. Admission stays held until they settle.
+    if (signal?.aborted) await Promise.allSettled(settling);
   }
 }
 

@@ -91,6 +91,7 @@ export async function refreshSnapshots(
   clients: Map<string, BuyerControlClient>,
   now: () => number,
   deadline: AbortSignal,
+  settling: Promise<unknown>[],
   // The caller's own signal: its abort is a cancellation, while the snapshot deadline is a failure.
   signal?: AbortSignal,
 ) {
@@ -130,6 +131,7 @@ export async function refreshSnapshots(
           const client = await connectBefore(
             dependencies.connect(seller),
             deadline,
+            settling,
             signal,
           );
           clients.set(seller.nodeId, client);
@@ -159,7 +161,7 @@ export async function refreshSnapshots(
           const client = clients.get(seller.nodeId);
           if (client && !signal?.aborted && !pinned) {
             clients.delete(seller.nodeId);
-            void client.close().catch(() => undefined);
+            settling.push(client.close().catch(() => undefined));
           }
           recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
           failed(SELLER_FAILURE_PHASES.CONNECT, sellerFailureCode(error));
@@ -176,6 +178,7 @@ export async function refreshSnapshots(
 async function connectBefore(
   connecting: Promise<BuyerControlClient>,
   deadline: AbortSignal,
+  settling: Promise<unknown>[],
   signal?: AbortSignal,
 ) {
   let stop = () => {};
@@ -189,9 +192,11 @@ async function connectBefore(
   try {
     return await Promise.race([connecting, expired]);
   } catch (error) {
-    void connecting.then(
-      (client) => client.close().catch(() => undefined),
-      () => undefined,
+    settling.push(
+      connecting.then(
+        (client) => client.close().catch(() => undefined),
+        () => undefined,
+      ),
     );
     throw error;
   } finally {
