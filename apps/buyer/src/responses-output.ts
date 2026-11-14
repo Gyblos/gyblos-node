@@ -10,6 +10,7 @@ import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 
 import type { ChatErrorBody } from './chat-api';
 import { CHAT_MESSAGE_DETAILS, FREE_BUYER, RESPONSES_CODES } from './constants';
+import { sellerContextFull } from './context-full';
 import {
   executionFields,
   paymentFields,
@@ -97,8 +98,9 @@ export function responsesCompletion(model: string, result: ChatResult) {
   );
 }
 
-// A conversation over this endpoint's size or message count is reported with the code Codex reads as a full
-// context, so it compacts the history and goes on instead of stopping.
+// A conversation over this endpoint's size or message count, or one a seller refused as longer than it
+// serves before generating anything, is reported with the code Codex reads as a full context, so it
+// compacts the history and goes on instead of stopping.
 const FULL = new Set<string>([
   CHAT_MESSAGE_DETAILS.content,
   CHAT_MESSAGE_DETAILS.count,
@@ -108,11 +110,12 @@ export const responsesError = (body: ChatErrorBody) => ({
     message: body.message,
     type: FREE_BUYER.errorType,
     param: body.param,
-    code: !body.neverSent
-      ? RESPONSES_CODES.stopped
-      : FULL.has(body.message)
+    code:
+      body.contextFull || (body.neverSent && FULL.has(body.message))
         ? RESPONSES_CODES.contextFull
-        : body.code,
+        : !body.neverSent
+          ? RESPONSES_CODES.stopped
+          : body.code,
     ...(!body.neverSent || FULL.has(body.message)
       ? { [RESPONSES_CODES.field]: body.code }
       : {}),
@@ -150,7 +153,9 @@ const failed = (
   status: 'failed',
   output: [],
   error: {
-    code: RESPONSES_CODES.stopped,
+    code: sellerContextFull({ code, stop })
+      ? RESPONSES_CODES.contextFull
+      : RESPONSES_CODES.stopped,
     message: RESPONSES_CODES.stoppedMessage(code),
     [RESPONSES_CODES.field]: code,
     ...(stop.reason ? { reason: stop.reason } : {}),

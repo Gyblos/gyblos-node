@@ -5,10 +5,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { FREE_EXECUTION } from '@gyblos/protocol/constants';
+import {
+  FREE_EXECUTION,
+  FREE_EXECUTION_CODES,
+} from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
+import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { CODEX, host, post, TEXT, user } from './support/buyer-responses';
+import {
+  CODEX,
+  events,
+  host,
+  post,
+  TEXT,
+  user,
+} from './support/buyer-responses';
 
 const call = (id: string) => ({
   type: 'function_call',
@@ -133,5 +144,45 @@ void test('an endpoint that may route to paid execution refuses Codex tools plai
     assert.equal(seen.length, 0);
   } finally {
     await server.close();
+  }
+});
+
+void test('a seller refusing the conversation as too long tells Codex to compact, before any output', async () => {
+  // The seller's admission refusal: sent, answered by the seller, nothing generated.
+  const tooLong = new FreeClientError(FREE_EXECUTION_CODES.LIMIT, true, true);
+  for (const stream of [false, true]) {
+    const server = await host(async () => {
+      throw tooLong;
+    }, []);
+    try {
+      const response = await post(server.url, {
+        ...CODEX,
+        stream,
+        input: [user('a long conversation')],
+      });
+      const body = await response.json();
+      assert.equal(response.status, 400, String(stream));
+      assert.equal(body.error.code, 'context_length_exceeded', String(stream));
+      assert.equal(body.error.gyblos_code, FREE_EXECUTION_CODES.LIMIT);
+    } finally {
+      await server.close();
+    }
+  }
+  // After text reached the client, the same code means a cut answer: Codex is told to stop.
+  const cut = await host(async (onDelta) => {
+    await onDelta('partial');
+    throw new FreeClientError(FREE_EXECUTION_CODES.LIMIT, true, true, {
+      delivered: { outputTokens: 1 },
+    } as never);
+  }, []);
+  try {
+    const stream = events(
+      await (
+        await post(cut.url, { ...CODEX, stream: true, input: 'go' })
+      ).text(),
+    );
+    assert.equal(stream.at(-1).response.error.code, 'invalid_prompt');
+  } finally {
+    await cut.close();
   }
 });
