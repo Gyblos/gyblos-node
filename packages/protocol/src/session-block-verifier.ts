@@ -13,7 +13,7 @@ import {
   sessionBlockDigest,
   type SessionBlockBinding,
   type SessionCheckpoint,
-} from './session-blocks';
+} from './session-block-wire';
 
 export interface SessionBlockVerification {
   binding: SessionBlockBinding;
@@ -110,8 +110,10 @@ async function accept(state: Transcript, value: unknown) {
     if (block.terminal && block.terminal.text !== next)
       return batchFail(SESSION_CODES.BINDING);
     const verified = await state.verify(next, block.terminal);
+    if (state.failed) return batchFail();
     const amount = checked(state, block, verified);
     const digest = await sessionBlockDigest(block);
+    if (state.failed) return batchFail();
     state.pending = {
       digest,
       total: block.bill.cumulativeAtomic,

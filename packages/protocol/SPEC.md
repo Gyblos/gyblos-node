@@ -1460,8 +1460,11 @@ original digest and voucher semantics before new block execution is admitted.
 Bill only stable tokenizer prefixes: the count of a growing arbitrary prefix
 may decrease. A max-of-counts clamp is forbidden because it can overcharge the
 final result. For the hash-pinned Qwen tokenizer, a conservative certified cut is
-immediately **before** the ASCII space in `[A-Za-z0-9] `; keep that space and the
-unfinished suffix for a later checkpoint. NFC cannot compose across this fixed
+immediately **before** the ASCII space in `[A-Za-z0-9] `. A nonterminal
+checkpoint delivers that guard space too, but does not bill it yet; the buyer
+must observe the boundary before signing. Its certified billed prefix ends one
+character before the delivered text. Keep only the unfinished suffix for a later
+checkpoint. NFC cannot compose across this fixed
 space, no pinned added token contains it, and the preceding alphanumeric regex
 piece cannot grow across it. Other tokenizers need their own certified frontier
 or one final exact block within current limits. An indivisible piece can reach

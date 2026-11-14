@@ -147,3 +147,122 @@ void test('combined block output keeps the existing aggregate text bound', async
     code(SESSION_CODES.LIMIT),
   );
 });
+
+for (const interrupted of ['EOF', 'invalid ACK']) {
+  void test(`a pending recount cannot return an approval after ${interrupted}`, async () => {
+    let release = () => {};
+    const paused = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const v = createSessionBlockVerifier({
+      binding,
+      request: block.bill,
+      baseAtomic: '5',
+      depositAtomic: '25',
+      maxTokens: 10,
+      verify: async () => {
+        await paused;
+        return { inputTokens: 2, outputTokens: 1, chargedAtomic: '3' };
+      },
+    });
+    const accepting = v.accept(block);
+    if (interrupted === 'EOF')
+      assert.throws(() => v.finish(), code(SESSION_CODES.INVALID));
+    else
+      assert.throws(
+        () => v.acknowledge(ack('33'.repeat(32))),
+        code(SESSION_CODES.INVALID),
+      );
+    release();
+    await assert.rejects(accepting, code(SESSION_CODES.INVALID));
+    await assert.rejects(v.accept(block), code(SESSION_CODES.BUSY));
+  });
+}
+
+for (const scenario of [
+  {
+    name: 'deposit',
+    deposit: '8',
+    maxTokens: 10,
+    input: 2,
+    output: 2,
+    amount: '4',
+    expected: SESSION_CODES.LIMIT,
+  },
+  {
+    name: 'decreasing charge',
+    deposit: '25',
+    maxTokens: 10,
+    input: 2,
+    output: 2,
+    amount: '2',
+    expected: SESSION_CODES.LIMIT,
+  },
+  {
+    name: 'decreasing output',
+    deposit: '25',
+    maxTokens: 10,
+    input: 2,
+    output: 0,
+    amount: '4',
+    expected: SESSION_CODES.LIMIT,
+  },
+  {
+    name: 'request output ceiling',
+    deposit: '25',
+    maxTokens: 1,
+    input: 2,
+    output: 2,
+    amount: '4',
+    expected: SESSION_CODES.LIMIT,
+  },
+  {
+    name: 'changed input',
+    deposit: '25',
+    maxTokens: 10,
+    input: 3,
+    output: 2,
+    amount: '4',
+    expected: SESSION_CODES.BINDING,
+  },
+]) {
+  void test(`second checkpoint rejects ${scenario.name} even if its recount agrees`, async () => {
+    let calls = 0;
+    const v = createSessionBlockVerifier({
+      binding,
+      request: block.bill,
+      baseAtomic: '5',
+      depositAtomic: scenario.deposit,
+      maxTokens: scenario.maxTokens,
+      verify: async () =>
+        ++calls === 1
+          ? { inputTokens: 2, outputTokens: 1, chargedAtomic: '3' }
+          : {
+              inputTokens: scenario.input,
+              outputTokens: scenario.output,
+              chargedAtomic: scenario.amount,
+            },
+    });
+    const first = await v.accept(block);
+    v.acknowledge(ack(first.digest));
+    const usage = {
+      inputTokens: scenario.input,
+      outputTokens: scenario.output,
+    };
+    await assert.rejects(
+      v.accept({
+        ...block,
+        index: 1,
+        text: 'b',
+        usage,
+        bill: {
+          ...block.bill,
+          chargedAtomic: scenario.amount,
+          cumulativeAtomic: String(5 + Number(scenario.amount)),
+        },
+        terminal: { text: 'ab', usage, finishReason: ENGINE_DONE_REASONS.STOP },
+      }),
+      code(scenario.expected),
+    );
+  });
+}
