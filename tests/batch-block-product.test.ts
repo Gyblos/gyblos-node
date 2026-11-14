@@ -153,12 +153,25 @@ void test('text without a certified boundary is one terminal block with the exac
   assert.equal(f.offers.generations(), 1);
 });
 void test('an expired interrupted channel reconciles its final settlement instead of retrying an expired approval', async (t) => {
-  const f = await blockProduct();t.after(f.close);
+  const f = await blockProduct();
+  t.after(f.close);
   const controller = new AbortController();
-  await assert.rejects(f.buyer.execute(await f.offers.quote(1), f.offers.input, controller.signal, async () => { controller.abort(); }));
-  await f.buyer.settled();await f.wire.settled();
-  f.f.time(f.f.terms.expiresAt + 1);await f.f.seller().tick();
+  await assert.rejects(
+    f.buyer.execute(
+      await f.offers.quote(1),
+      f.offers.input,
+      controller.signal,
+      async () => {
+        controller.abort();
+      },
+    ),
+  );
+  await f.buyer.settled();
+  await f.wire.settled();
+  f.f.time(f.f.terms.expiresAt + 1);
+  await f.f.seller().tick();
   assert.equal(await f.buyer.recoverApproval(), true);
-  assert.equal((await f.buyer.reconcile())?.chargedAtomic, '32');assert.equal(f.f.buyer.snapshot().reservedAtomic, '0');
+  assert.equal((await f.buyer.reconcile())?.chargedAtomic, '32');
+  assert.equal(f.f.buyer.snapshot().reservedAtomic, '0');
   assert.equal(f.offers.generations(), 1);
 });

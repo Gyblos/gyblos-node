@@ -29,7 +29,6 @@ import type { ControlStream } from './control-io';
 import { handleIrohConnection } from './iroh-connection';
 
 export type { BatchBlockExchange } from './batch-block-types';
-export type { BatchBlockClient } from './batch-block-types';
 
 export interface BatchChannelService {
   resumeBlock?(

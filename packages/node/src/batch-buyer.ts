@@ -135,23 +135,35 @@ async function recover<Remote extends BatchDestination>(
   if (context.blockMode && isBlockBuyer(buyer)) {
     const pending = buyer.pendingBlockRequest();
     if (pending) {
+      const settled = await bounded(
+        buyer.reconcile((id) => bounded(context.options.observe(id), signal)),
+        signal,
+      );
+      signal.throwIfAborted();
+      if (settled) return true;
       const recovered = await bounded(buyer.recoverBlockApproval(), signal);
       signal.throwIfAborted();
       if (recovered) {
         const { intent, voucher } = recovered;
-        await context.client.resumeBlock(
-          {
-            version: SESSION_BLOCKS.version,
-            kind: SESSION_BLOCK_KINDS.APPROVAL,
-            channelId: voucher.channelId,
-            requestId: intent.bill.requestId,
-            requestDigest: intent.bill.requestDigest,
-            index: intent.index,
-            blockDigest: intent.digest,
-            voucher,
-          },
-          signal,
-        );
+        try {
+          await context.client.resumeBlock(
+            {
+              version: SESSION_BLOCKS.version,
+              kind: SESSION_BLOCK_KINDS.APPROVAL,
+              channelId: voucher.channelId,
+              requestId: intent.bill.requestId,
+              requestDigest: intent.bill.requestDigest,
+              index: intent.index,
+              blockDigest: intent.digest,
+              voucher,
+            },
+            signal,
+          );
+        } catch (error) {
+          if (batchError(error).code !== SESSION_CODES.CLOSED) throw error;
+          await close(context, signal);
+          return true;
+        }
         signal.throwIfAborted();
         await buyer.acknowledgeBlock(intent);
       }
