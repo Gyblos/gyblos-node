@@ -13,6 +13,7 @@ import {
   type SessionSettlement,
 } from '@gyblos/protocol/payment-session';
 
+import { resolveAbsentBatchOpening } from './batch-opening-absence';
 import {
   batchRecoveryCheckpoint,
   retireCompletedControlIntent,
@@ -42,6 +43,7 @@ export interface BatchRecoveryOptions {
 export interface BatchRecoveryResult extends Omit<UptoWithdrawResult, 'step'> {
   // One channel spans many requests, so it has no single inference digest.
   requestDigest?: never;
+  notCreated?: true;
   step: UptoBuyerWithdrawStep;
   channelId: string;
   settlement: SessionSettlement | null;
@@ -70,6 +72,23 @@ export async function recoverBatchBuyer(
   };
   const store = await openBatchStore(common, record, true);
   try {
+    if (
+      await resolveAbsentBatchOpening(
+        store,
+        input.rpc ?? createBuyerRecoveryRpc(input.rpcUrl),
+        input.signal,
+      )
+    )
+      return {
+        channelId: store.read().channelId,
+        step: WITHDRAW_STEPS.NOTHING,
+        transaction: null,
+        confirmed: true,
+        retryAfterSeconds: null,
+        settlement: null,
+        failure: null,
+        notCreated: true,
+      };
     if (!record.opening) {
       if (!record.hints)
         return {

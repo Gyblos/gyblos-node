@@ -4,6 +4,7 @@ export { createBatchSeller } from './batch-session-seller';
 export { batchFacilitatorFor } from './batch-session-facilitator';
 export {
   inspectBatchSession,
+  batchSessionTerminal,
   type BatchStoredSession,
 } from './batch-session-state';
 export {

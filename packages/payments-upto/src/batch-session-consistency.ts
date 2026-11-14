@@ -2,9 +2,11 @@
 import { canonicalJson } from '@gyblos/protocol';
 import { SESSION_STATES, sessionFail } from '@gyblos/protocol/payment-session';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import type { BatchRecord } from './batch-session-types';
 
 export function coherentRecord(record: BatchRecord) {
+  batchOpeningAbsent(record);
   const cumulative = BigInt(record.cumulativeAtomic);
   const accepted = Object.values(record.requests).filter(
     (request) => request.accepted,

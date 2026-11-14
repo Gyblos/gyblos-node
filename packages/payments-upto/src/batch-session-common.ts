@@ -9,6 +9,7 @@ import {
   type SessionSnapshot,
 } from '@gyblos/protocol/payment-session';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import { requestFor } from './batch-session-checks';
 import type { BatchStore } from './batch-session-store';
 import type { BatchRecord } from './batch-session-types';
@@ -35,7 +36,8 @@ export function initialRecord(
   };
 }
 export function reserved(record: BatchRecord): bigint {
-  if (record.state === SESSION_STATES.CLOSED) return 0n;
+  if (record.state === SESSION_STATES.CLOSED || batchOpeningAbsent(record))
+    return 0n;
   return Object.values(record.requests)
     .filter((request) => !request.accepted)
     .reduce((total, request) => {
@@ -58,7 +60,11 @@ export function snapshot(store: BatchStore): SessionSnapshot {
   };
 }
 export function active(record: BatchRecord, now: number) {
-  if (record.state !== SESSION_STATES.OPEN || now >= record.terms.expiresAt)
+  if (
+    batchOpeningAbsent(record) ||
+    record.state !== SESSION_STATES.OPEN ||
+    now >= record.terms.expiresAt
+  )
     sessionFail(SESSION_CODES.CLOSED);
 }
 export async function reserve(store: BatchStore, input: unknown, now: number) {
