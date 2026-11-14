@@ -219,14 +219,15 @@ paid model and its token limit in this list.
 
 ## If a seller drops [#if-a-seller-drops]
 
-On `buyer:free`, a request whose seller fails before any visible text reached your client goes to
-another seller of the same model within the same request, and you see only the answer. That covers a
-seller that dropped, timed out or stopped generating after it got the prompt; a tool-calling turn shows
-no text until it ends, so it is always covered. The prompt goes to at most three sellers, within the
-180-second limit. A request the model cannot take (too long, unsupported) is not moved, since every
-seller would refuse it. Because the prompt may reach a second seller, `"failover": "never"` in
-`selection.json` keeps each prompt on one seller; then only a prompt that was certainly never sent
-moves.
+On `buyer:free`, if the seller drops (its connection breaks) or stalls after it got the prompt, before
+any visible text reached your client, the request goes to another seller of the same model within the
+same request, and you see only the answer. That covers a complete (non-streaming) answer and a streamed
+tool call with no text before it; a streamed answer that already showed text is not restarted. The
+prompt goes to at most three sellers, within the 180-second limit. An error the seller sends back itself
+(busy, its daily limit, an engine failure) ends the request as before, so a seller cannot read prompts
+it then refuses without that showing. Because the prompt may reach a second seller,
+`"failover": "never"` in `selection.json` keeps each prompt on one seller; then only a prompt that was
+certainly never sent moves.
 
 Once text reached your client, a failure ends the request with an error: the answer is not restarted
 elsewhere. Disable client HTTP and stream retries: a broken connection may deliver no response headers

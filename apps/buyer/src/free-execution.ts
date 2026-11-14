@@ -110,12 +110,13 @@ export async function executeBuyerFree(
           conversation: dependencies.conversationKey?.(input, model),
         })
         .catch((error) => {
-          if (resent) throw resent;
-          // Local occupancy is not a network failure; retain request-local model telemetry.
           const busy =
             error instanceof FreeBuyerError &&
             error.code === FREE_BUYER_CODES.BUSY;
-          if (!signal.aborted && !busy)
+          // Every other seller taken by requests side by side: busy, so the client may try again.
+          if (resent && !busy) throw resent;
+          // Local occupancy is not a network failure; retain request-local model telemetry.
+          if (!signal.aborted && !busy && !resent)
             buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
           throw error;
         });
@@ -174,21 +175,16 @@ export function createConversationKey() {
 class Resent {
   constructor(readonly error: FreeClientError) {}
 }
-// Failures after sending that another seller can fix. A refusal of the request itself (too long, invalid,
-// unsupported) would fail the same way anywhere, and a client that left is not a seller failure.
-const RESENDABLE: ReadonlySet<string> = new Set([
-  FREE_EXECUTION_CODES.TIMEOUT,
-  FREE_EXECUTION_CODES.ENGINE,
-  FREE_EXECUTION_CODES.INTERNAL,
-  FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
-  FREE_EXECUTION_CODES.BUSY,
-  FREE_EXECUTION_CODES.DAILY_CAP,
-  FREE_EXECUTION_CODES.BUYER_CAP,
-  FREE_EXECUTION_CODES.EXPIRED,
-]);
+// Failures after sending that another seller can fix: the seller dropped (the connection broke) or
+// stalled (this buyer's own timeout). Both count against that seller (free-memory.ts `sellerFault`).
+// An error the seller itself answered is not resent: a refusal (busy, caps) would let a seller read
+// prompts it never serves without paying for it, and an engine failure may be the request's own and
+// would repeat on every seller. A client that left is not a seller failure.
 function resendable(error: FreeClientError) {
   return (
-    !error.consumerFailure && (error.ioFailure || RESENDABLE.has(error.code))
+    !error.consumerFailure &&
+    !error.remote &&
+    (error.ioFailure || error.code === FREE_EXECUTION_CODES.TIMEOUT)
   );
 }
 

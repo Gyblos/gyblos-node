@@ -37,6 +37,8 @@ interface Fault {
   text?: string[];
   error: FreeClientError;
 }
+const answered = (code: FreeExecutionCode) =>
+  new FreeClientError(code, true, true);
 const sent = (
   code: FreeExecutionCode,
   options: { io?: boolean; consumer?: boolean } = {},
@@ -69,8 +71,7 @@ const stream = async () => {};
 
 for (const [name, error] of [
   ['the connection dropped', sent(FREE_EXECUTION_CODES.INTERNAL, { io: true })],
-  ['it timed out', sent(FREE_EXECUTION_CODES.TIMEOUT)],
-  ['its engine stopped', sent(FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE)],
+  ['it stalled until this buyer timed out', sent(FREE_EXECUTION_CODES.TIMEOUT)],
 ] as const)
   void test(`a seller that got the prompt and failed before any text is replaced: ${name}`, async () => {
     for (const onDelta of [undefined, stream]) {
@@ -112,6 +113,18 @@ for (const [name, error] of [
   [
     'the client left',
     sent(FREE_EXECUTION_CODES.INTERNAL, { io: true, consumer: true }),
+  ],
+  // A seller that answers with an error after reading the prompt keeps it: a refusal would otherwise let
+  // it read prompts for free, and an engine failure may be the request's own on every seller.
+  ['the seller answered busy', answered(FREE_EXECUTION_CODES.BUSY)],
+  ['the seller answered its cap', answered(FREE_EXECUTION_CODES.BUYER_CAP)],
+  [
+    'the seller answered an engine failure',
+    answered(FREE_EXECUTION_CODES.ENGINE),
+  ],
+  [
+    'the seller stopped generating',
+    answered(FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE),
   ],
 ] as const)
   void test(`a failure another seller cannot fix is not resent: ${name}`, async () => {
@@ -189,4 +202,19 @@ void test('with no other seller to take it, the client sees the seller failure',
     code: FREE_EXECUTION_CODES.TIMEOUT,
   });
   assert.deepEqual(asked, ['a']);
+});
+
+void test('after a resend, every other seller busy with other requests is busy, not the first failure', async () => {
+  const error = sent(FREE_EXECUTION_CODES.TIMEOUT);
+  const { dependencies } = rig({ a: { error } });
+  const busy: FreeBuyerDependencies = {
+    ...dependencies,
+    select: async (excluded, signal, needs) => {
+      if (excluded.has('a')) throw new FreeBuyerError(FREE_BUYER_CODES.BUSY);
+      return dependencies.select(excluded, signal, needs);
+    },
+  };
+  await assert.rejects(executeBuyerFree(INPUT, busy), {
+    code: FREE_BUYER_CODES.BUSY,
+  });
 });
