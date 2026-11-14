@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import type { Endpoint } from '@number0/iroh';
+
 import { TRANSPORT_LIMITS } from '@gyblos/config';
 import { createBuyerBatchSession } from '@gyblos/node/batch-buyer';
 import { createSellerBatchSession } from '@gyblos/node/batch-seller';
@@ -13,11 +15,13 @@ import { SESSION_STATES } from '@gyblos/protocol/payment-session';
 import { batchDeferred } from '../support/batch-deferred';
 import { batchOfferFixture } from '../support/batch-iroh-offer';
 import { batchNativeFinancial } from '../support/batch-native';
+import { nativeBatchFinish } from '../support/native-batch-finish';
 import { endpoint, within } from '../support/native-fixture';
 import { NATIVE_CAPABILITY, waitFor } from '../support/native-runtime';
 
-async function fixture(now: () => number) {
+async function fixture(now: () => number, observeSeller?: (seller: Endpoint) => void) {
   let sellerEndpoint = await endpoint(undefined, [BATCH_CHANNEL.alpn]);
+  observeSeller?.(sellerEndpoint);
   const sellerSecret = [...sellerEndpoint.secretKey().toBytes()];
   const buyerEndpoint = await endpoint(undefined, [BATCH_CHANNEL.alpn]);
   const financial = await batchNativeFinancial(now, {
@@ -81,6 +85,39 @@ async function fixture(now: () => number) {
     },
   };
 }
+void test(
+  'native batch approval waits for the prior real FIN continuation without closing or repeating execution',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const now = 1800000000000;
+    t.mock.method(Date, 'now', () => now);
+    // PREPARE and OPEN precede EXECUTE. Hold its native FIN continuation, not the FIN itself.
+    const gate = nativeBatchFinish(3);
+    const f = await fixture(() => now, gate.observeSeller);
+    const sends = f.financial.vm.sends();
+    const execution = f.buyer().execute(await f.offers.quote(1), f.offers.input);
+    void execution.catch(() => undefined);
+    try {
+      await within(gate.finished);
+      await within(gate.following);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.equal(gate.closed(), false, 'The next approval must not close the connection.');
+      assert.equal(f.offers.generations(), 1);
+      assert.equal(f.financial.seller().snapshot().cumulativeAtomic, '0');
+      assert.equal(f.financial.vm.sends(), sends + 1);
+      gate.release();
+      assert.equal((await within(execution)).text, 'ok!');
+      assert.equal(f.financial.seller().snapshot().cumulativeAtomic, '40');
+      assert.equal(await f.financial.buyer.recoverApproval(), undefined);
+      assert.equal(f.offers.generations(), 1);
+      assert.equal(f.financial.vm.sends(), sends + 1);
+    } finally {
+      gate.release();
+      await execution.catch(() => undefined);
+      await f.close();
+    }
+  },
+);
 void test(
   'native batch Iroh: three prompts share one deposit and seller finalizes while buyer is offline',
   { skip: NATIVE_CAPABILITY.transportSkip },
