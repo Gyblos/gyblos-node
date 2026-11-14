@@ -4,8 +4,13 @@ import { test } from 'node:test';
 
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import { PAYMENT_SESSION } from '@gyblos/protocol/payment-session';
+import { chargeV2 } from '@gyblos/core/pricing-v2';
 import {
   SESSION_BLOCKS,
+  SESSION_BLOCK_KINDS,
+  encodeSessionBlock,
+  sessionBlockDigest,
   sessionBlockRequestDigest,
 } from '@gyblos/protocol/session-blocks';
 import {
@@ -62,6 +67,8 @@ async function framing(
   };
   return {
     peer,
+    request: f.request,
+    callbacks,
     approvals: () => approvals,
     run: () => client.exchange(f.request, undefined, undefined, callbacks),
     async close() {
@@ -78,6 +85,20 @@ void test('block response length is rejected from its prefix before a body read 
   await assert.rejects(f.run(), { code: SESSION_CODES.LIMIT, sent: true });
   assert.equal(f.peer.reads(), 2);
   assert.equal(f.approvals(), 0);
+});
+void test('the next declared block is checked against the remaining transcript before reading its body', async (t) => {
+  const source = await batchStreamFixture();const request = source.request.params;
+  const requestDigest = await sessionBlockRequestDigest(request);
+  const amount = String(chargeV2({ input: 12, output: 1 }, request.quote.offer.prices));
+  const header = { version: SESSION_BLOCKS.version, channelId: request.channelId, requestId: request.requestId, requestDigest, index: 0 };
+  const checkpoint = { ...header, kind: SESSION_BLOCK_KINDS.CHECKPOINT, text: '\u0001'.repeat(160000), usage: { inputTokens: 12, outputTokens: 1 }, bill: { requestId: request.requestId, requestDigest, maxAtomic: request.quote.offer.maxAtomic, chargedAtomic: amount, cumulativeAtomic: amount }, terminal: null };
+  const digest = await sessionBlockDigest(checkpoint);
+  const ack = { ...header, kind: SESSION_BLOCK_KINDS.ACK, blockDigest: digest, cumulativeAtomic: amount };
+  const prefix = Buffer.alloc(4);prefix.writeUInt32BE(SESSION_BLOCKS.frameBytes - 1000);
+  const f = await framing(Buffer.concat([encodeSessionBlock(checkpoint), encodeSessionBlock(ack), prefix]));t.after(f.close);
+  f.callbacks.verification.verify = async () => ({ ...checkpoint.usage, chargedAtomic: amount });
+  f.callbacks.approve = async () => ({ channelId: request.channelId, maxClaimableAmount: amount, expiresAt: PAYMENT_SESSION.voucherExpiry, signature: '1'.repeat(64) });
+  await assert.rejects(f.run(), { code: SESSION_CODES.LIMIT, sent: true });assert.equal(f.peer.reads(), 8);
 });
 void test('a failed first prompt write stays possibly sent and never reads, approves or retries', async (t) => {
   const f = await framing(new Uint8Array(), true);
