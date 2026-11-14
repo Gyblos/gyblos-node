@@ -1,8 +1,7 @@
 // Per-buyer memory of work that does not change from one request to the next: each seller's verified
-// catalog and presence while they stay current, and positive identity checks for a few minutes. Nothing
-// here is trusted beyond what was verified when it was stored, and nothing is written to disk.
+// catalog and presence while they stay current. Nothing here is trusted beyond what was verified when it
+// was stored, and nothing is written to disk.
 import type { KnownSeller } from '@gyblos/core/seller-selection';
-import type { BuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 
 import { BUYER_SELECTION } from './constants';
@@ -62,58 +61,13 @@ export function createSnapshotCache(): SnapshotCache {
   };
 }
 
-// Remembers a passed identity check for `ttlMs`, so a request does not ask the registry again for every
-// step (refresh, winner, execution). A refusal is never remembered: it is checked again each time. The
-// cost is that a revocation reaches this buyer up to `ttlMs` late.
-export function cachedIdentityCheck<
-  Subject extends { nodeId: string; owner: string; manualTrust?: boolean },
-  Decision extends { ok: boolean },
->(
-  verify: (subject: Subject, signal?: AbortSignal) => Promise<Decision>,
-  now: () => number = Date.now,
-  ttlMs: number = BUYER_SELECTION.identityCacheMs,
-) {
-  const passed = new Map<string, { until: number; decision: Decision }>();
-  return async (subject: Subject, signal?: AbortSignal) => {
-    const name = `${key(subject)}/${subject.manualTrust === true}`;
-    const cached = passed.get(name);
-    if (cached && cached.until > now()) return cached.decision;
-    passed.delete(name);
-    const decision = await verify(subject, signal);
-    if (decision.ok) {
-      if (passed.size >= BUYER_SELECTION.maxCachedSellers) passed.clear();
-      passed.set(name, { until: now() + ttlMs, decision });
-    }
-    return decision;
-  };
-}
-
-// Work a free buyer remembers for its lifetime: verified snapshots, and passed identity checks so one
-// request does not ask the registry again at every step (refresh, winner, execution).
-export function rememberedWork<
-  Options extends {
-    snapshots?: SnapshotCache;
-    identity?: BuyerIdentityVerifier;
-  },
->(
-  prepared: { identity?: BuyerIdentityVerifier },
+// Work a free buyer remembers for its lifetime: the verified snapshots of its sellers. Identity checks are
+// not remembered: a revoked seller is refused on the very next request.
+export function rememberedWork<Options extends { snapshots?: SnapshotCache }>(
   options: Options,
-  now: () => number,
 ) {
-  const identity =
-    options.identity ??
-    (prepared.identity && {
-      verify: cachedIdentityCheck(
-        prepared.identity.verify.bind(prepared.identity),
-        now,
-      ),
-    });
   return {
-    identity,
-    remembered: {
-      ...options,
-      snapshots: options.snapshots ?? createSnapshotCache(),
-      ...(identity ? { identity } : {}),
-    },
+    ...options,
+    snapshots: options.snapshots ?? createSnapshotCache(),
   };
 }

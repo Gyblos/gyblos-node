@@ -1,16 +1,13 @@
 // Work a free buyer remembers between requests: a seller's verified catalog and presence while they stay
-// current (the next request only asks for a quote), dropped after any failure; and a passed identity check
-// for ten minutes, while a refusal is always checked again. Loopback control seller; no network.
+// current (the next request only asks for a quote), dropped after any failure. Identity checks are never
+// remembered. Loopback control seller; no network.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { createBuyerControlClient } from '@gyblos/buyer/control';
 import { selectBuyerQuote } from '@gyblos/buyer/selection';
-import {
-  cachedIdentityCheck,
-  createSnapshotCache,
-} from '@gyblos/buyer/selection-cache';
+import { createSnapshotCache } from '@gyblos/buyer/selection-cache';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { controlFail } from '@gyblos/protocol/control-validation';
 
@@ -115,30 +112,6 @@ void test('a snapshot about to expire, or under a withdrawal, is not used', () =
   );
   assert.ok(cache.get({ ...seller, owner: 'o' }, 1000));
   assert.equal(cache.get({ ...seller, owner: 'other' }, 1000), undefined);
-});
-
-void test('a passed identity check is reused for ten minutes; a refusal never is', async () => {
-  let clock = 0;
-  const answers = [true, false, true, true];
-  const asked: string[] = [];
-  const verify = cachedIdentityCheck(
-    async (subject: { nodeId: string; owner: string }) => {
-      asked.push(subject.nodeId);
-      return { ok: answers.shift()! };
-    },
-    () => clock,
-  );
-  const good = { nodeId: 'a', owner: 'o' };
-  assert.equal((await verify(good)).ok, true);
-  assert.equal((await verify(good)).ok, true);
-  assert.deepEqual(asked, ['a']);
-  const bad = { nodeId: 'b', owner: 'o' };
-  assert.equal((await verify(bad)).ok, false);
-  assert.equal((await verify(bad)).ok, true);
-  assert.deepEqual(asked, ['a', 'b', 'b']);
-  clock = BUYER_SELECTION.identityCacheMs;
-  assert.equal((await verify(good)).ok, true);
-  assert.deepEqual(asked, ['a', 'b', 'b', 'a']);
 });
 
 void test('a seller that replaced its catalog is asked again in the same request, not cooled down', async (t) => {
