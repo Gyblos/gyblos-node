@@ -25,6 +25,7 @@ import { sellerExecutionTelemetry } from './free-telemetry';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export interface SellerBatchSessionOptions {
+  blockTargetTokens?: number;
   telemetry?: import('./seller-sessions').SellerSessionOptions['telemetry'];
   session: SessionSeller;
   terms: Readonly<PaymentSessionTerms>;
