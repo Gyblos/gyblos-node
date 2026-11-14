@@ -277,6 +277,7 @@ void test('a forged cached payer signature cannot authenticate an otherwise iden
     transaction.signatures[address(rig.financial.terms.buyer)]!.length,
   );
   assertIsSignatureBytes(empty);
+  empty[0] = 1; // A nonzero forged signature must reach cryptographic verification, not missing-signature rejection.
   record.opening.deposit.transaction = getBase64EncodedWireTransaction({
     ...transaction,
     signatures: {
