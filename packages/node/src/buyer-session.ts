@@ -47,6 +47,7 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
 }
 interface Current<Remote extends BatchDestination> {
   terms: PaymentSessionTerms;
+  priorSpentAtomic: string;
   financial: SessionBuyer;
   host: ReturnType<typeof createBuyerBatchSession<Remote>>;
 }
@@ -93,6 +94,7 @@ async function openCurrent<Remote extends BatchDestination>(
       return sessionFail(SESSION_CODES.UNAVAILABLE);
     return {
       terms,
+      priorSpentAtomic: stored?.priorSpentAtomic ?? '0',
       financial,
       host: createBuyerBatchSession({
         ...options,
@@ -135,7 +137,7 @@ async function run<Remote extends BatchDestination>(
     return sessionFail(SESSION_CODES.UNVERIFIED);
   const opened = await current(state, quote, signal);
   if (
-    BigInt(opened.terms.depositAtomic) >
+    BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
       BigInt(state.options.policy.depositAtomic) ||
     opened.terms.withdrawDelaySeconds >
       state.options.policy.withdrawDelaySeconds ||

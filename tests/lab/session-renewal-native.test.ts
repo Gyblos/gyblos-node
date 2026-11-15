@@ -99,12 +99,12 @@ for (const blocks of [false, true]) {
       t.after(seller.close);
       const wire = await batchLoopback(seller.service, terms, blocks);
       t.after(wire.close);
-      const start = () =>
+      const start = (depositAtomic = '1000') =>
         createBuyerSessionManager({
           endpoint: wire.endpoint,
           destination: () => wire.destination,
           policy: {
-            depositAtomic: '1000',
+            depositAtomic,
             lifetimeMs: 3_600_000,
             withdrawDelaySeconds: 900,
           },
@@ -161,6 +161,18 @@ for (const blocks of [false, true]) {
         'exactly one new deposit, no transaction for usage',
       );
       assert.equal(offers.generations(), 2);
+      await buyer.close();
+      buyer = start(String(1000 - charge));
+      await assert.rejects(
+        buyer.execute(await offers.quote(21), offers.input, signal()),
+        { code: SESSION_CODES.LIMIT },
+      );
+      assert.equal(
+        offers.generations(),
+        2,
+        'a lower total cap includes prior generations before a new prompt',
+      );
+      assert.equal(vm.sends(), beforeRenew + 1);
       await buyer.close();
       buyer = start();
       now += 1_000;
