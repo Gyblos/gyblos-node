@@ -84,8 +84,16 @@ void test(
       },
     });
     assert.match(output, /Approved this question/);
-    assert.equal(host.engine.attempts(), 2, 'the original prompt is never repeated');
-    assert.equal(host.finance.approvals(), 3);
+    assert.equal(
+      host.engine.attempts(),
+      2,
+      'the original prompt is never repeated',
+    );
+    assert.equal(
+      host.finance.approvals(),
+      2,
+      'terminal ACK recovery reuses the seller acceptance instead of approving it twice',
+    );
     assert.equal(loads, 2);
     assert.deepEqual(host.finance.calls, ['deposit']);
   },
