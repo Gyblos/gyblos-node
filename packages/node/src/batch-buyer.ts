@@ -49,8 +49,9 @@ function createContext<Remote extends BatchDestination>(
     return batchFail(PAID_EXECUTION_CODES.PEER);
   const blockMode =
     isBlockBuyer(options.buyer) &&
-    typeof options.meter.stablePrefix === 'function' &&
-    (!options.buyer.snapshot().channelId || options.buyer.usesBlocks());
+    (options.buyer.usesBlocks() ||
+      (!options.buyer.snapshot().channelId &&
+        typeof options.meter.stablePrefix === 'function'));
   const client = createBatchChannelClient(
     options.endpoint,
     options.destination,

@@ -86,6 +86,8 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   onDelta?: (text: string) => Promise<void>,
 ) {
   const { options, terms, rpc, approve } = context;
+  if (context.blockMode && typeof options.meter.stablePrefix !== 'function')
+    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   const quote = {
     offer: parseOfferV2(value.offer),
     signature: parseOfferSignatureV2(value.signature),

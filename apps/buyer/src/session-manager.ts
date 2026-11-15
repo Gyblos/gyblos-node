@@ -80,6 +80,10 @@ function activeMeter(state: SessionState): ChatTokenizer {
       return meter.output(text, calls);
     },
     count: (text) => current().count(text),
+    get stablePrefix() {
+      const meter = state.meter;
+      return meter?.stablePrefix?.bind(meter);
+    },
   };
 }
 function supportsChat(meter: RecountTokenizer): meter is ChatTokenizer {
