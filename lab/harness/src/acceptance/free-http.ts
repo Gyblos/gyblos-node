@@ -92,6 +92,7 @@ export function assertChatAnswer(
     'model',
     'choices',
     'usage',
+    'system_fingerprint',
   ]);
   acceptanceAssert(
     row.object === FREE_BUYER.completionObject &&
