@@ -1,0 +1,103 @@
+---
+title: Get paid
+description: Charge for an offer on devnet, fund the fee payer, and know when and where your USDC arrives.
+---
+
+During the beta a seller can charge for its model on **devnet**. Devnet USDC has no market value: the
+beta tests the payment path, not real income. Mainnet is not open.
+
+## What you need [#requirements]
+
+- A registered seller ([register and publish](/en/sellers/register-publish)).
+- The pinned **Qwen3 0.6B** offer that the installer sets up. A priced offer needs a model whose tokens the
+  buyer can recount with its public tokenizer; today that is only `qwen3:0.6b`. Any other priced model
+  stops startup with `SELLER_PAID_METERING_UNRECOUNTED`.
+- About **0.05 devnet SOL** on the **fee payer** (see [below](#fund-the-fee-payer)). The owner's SOL pays
+  for registration only.
+
+You do not need USDC to sell. Buyers pay you in devnet USDC.
+
+## The four keys [#keys]
+
+The installer creates four Solana keys. They live in the seller's role folder: the Docker volume at
+`/data/seller/` with Docker, `~/.gyblos/seller/` without Docker, `%USERPROFILE%\.gyblos\seller\` on Windows.
+
+| Key        | File               | What it does                                                                       |
+| ---------- | ------------------ | ---------------------------------------------------------------------------------- |
+| Node key   | `node.key`         | The seller's network identity (NodeId). Buyers connect to it.                      |
+| Owner      | `owner.json`       | Registered in 8004, pays registration, and **receives your USDC** (the payout).    |
+| Authorizer | `authorizer.json`  | Signs the permission to close a payment channel. Holds no funds.                   |
+| Fee payer  | `facilitator.json` | Pays the Solana fees and rent of your payment transactions. Holds only devnet SOL. |
+
+`gyblos doctor` prints the public addresses of the owner and the fee payer under the seller identity. They
+are safe to share. The files are private keys: never share or upload them. How to keep a copy is in
+[identity](/en/sellers/identity#back-up-keys).
+
+## Set a price [#set-a-price]
+
+Replace `free = {...}` on the offer with a price, in USDC per million tokens:
+
+```toml
+[[offers]]
+model = "qwen3:0.6b"
+reasoning = ["off"]
+engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
+price = { input_per_mtok = "0.05", output_per_mtok = "0.20", currency = "USDC" }
+```
+
+Prices have at most 6 decimals and both sides cannot be zero. An offer is either free or priced, not both.
+Then apply the change:
+
+- Docker: `docker compose up -d --force-recreate seller` in `~/gyblos-seller`.
+- Without Docker (macOS, Linux, Windows): run the installer again (`sh install.sh`, or `install.ps1`). It
+  keeps your keys and restarts the seller with the new file.
+
+Buyers see your price **plus the 4% Gyblos fee**. You set the net price; the fee is added on top.
+
+## Fund the fee payer [#fund-the-fee-payer]
+
+Run `gyblos doctor` (Docker: `docker compose run --rm seller gyblos doctor`) and copy the `fee payer`
+address. Send it about 0.05 SOL from [the devnet faucet](https://faucet.solana.com).
+
+The fee payer pays:
+
+- once, about 0.002 SOL for each missing token account (your USDC payout account and the fee accounts),
+  which the seller creates at startup;
+- the fees and temporary rent of each channel it closes. Rent comes back when the channel closes.
+
+If it has too little SOL, the seller does not start (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) or cannot
+close channels. Check its balance from time to time and top it up from the faucet.
+
+## How a buyer pays you [#how-payment-works]
+
+1. The buyer opens a **payment channel** with a deposit. Your seller serves requests against it.
+2. After each answer the buyer signs an approval for the total used so far. No transaction is sent per
+   answer.
+3. Your seller **closes the channel** on chain. Your share goes to the owner as USDC, the 4% fee to
+   Gyblos, and the unused deposit back to the buyer.
+
+Your seller closes a channel by itself when:
+
+- the buyer asks to settle;
+- the deposit is used up;
+- the channel's terms expire;
+- it has been idle for 10 minutes and at least 0.01 USDC is owed.
+
+Time alone moves no money: **your seller must be running** to close channels. If a buyer forces a close
+while your seller stays offline longer than the grace period (normally 15 minutes), you can lose earnings
+that were approved but not yet claimed. Keep the seller online, and after a restart leave it running so it
+can finish pending closes.
+
+## See your earnings [#see-earnings]
+
+`gyblos seller status` shows activity, not money. Your earnings are the devnet USDC balance of the
+**owner** address. Look it up on
+[Solana Explorer](https://explorer.solana.com/?cluster=devnet) (search the owner address, devnet
+cluster). A close can take a few minutes to appear.
+
+## Back to free [#back-to-free]
+
+Replace `price = {...}` with `free = {...}` again and apply the change as above. Channels already open stay
+open until they close; keep the seller running until then.
+
+**Next:** [Operate and update](/en/sellers/operate).
