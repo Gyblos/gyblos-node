@@ -284,18 +284,19 @@ and local runs); `src/storage-d1.ts` is the D1 adapter using Drizzle ORM, pinned
 in the app manifest. `src/schema.ts` declares all nine tables, columns, primary
 keys, nine secondary indexes and eleven check constraints, including uptime.
 Both the D1 client and admin compiler use it. `storage-queries.ts`,
-`storage-writes.ts` and `registration-queries.ts` build every complete query
-through Drizzle. `d1-client.ts` executes only ORM-generated statements and
-native transactional batches, without an HTTP proxy or interactive transaction.
-Registration storage and founder invite/revoke/restore commands use the same ORM
-schema and mutation builders. Wrangler commands render bound values through
-Drizzle's SQLite dialect because the CLI accepts SQL rather than bind
-parameters. Schema changes start in `schema.ts`; its metadata is checked against
-the independently applied migrations. The existing migration chain is retained
-unchanged for D1 deployment history and physical `WITHOUT ROWID` layout, which
-Drizzle's SQLite table API does not represent. A publish is one D1 batch (one
-transaction) that admits the high-water mark and NodeId quota together before
-writing the corresponding public record. A failed batch rolls both back.
+`storage-writes.ts`, `registration-queries.ts` and `uptime-d1.ts` build every
+complete query through Drizzle. `d1-client.ts` executes only ORM-generated
+statements and native transactional batches, without an HTTP proxy or
+interactive transaction. Registration storage and founder invite/revoke/restore
+commands use the same ORM schema and mutation builders. Wrangler commands render
+bound values through Drizzle's SQLite dialect because the CLI accepts SQL rather
+than bind parameters. Schema changes start in `schema.ts`; its metadata is
+checked against the independently applied migrations. The existing migration
+chain is retained unchanged for D1 deployment history and physical
+`WITHOUT ROWID` layout, which Drizzle's SQLite table API does not represent. A
+publish is one D1 batch (one transaction) that admits the high-water mark and
+NodeId quota together before writing the corresponding public record. A failed
+batch rolls both back.
 
 The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 
