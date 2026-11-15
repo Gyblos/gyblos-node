@@ -39,7 +39,7 @@ void test('installs from the repository compose file and example with the publis
     );
     const example = read('examples/seller-docker.toml');
     assert.equal(
-      install.file('gyblos.toml'),
+      install.file('config.toml'),
       example
         .split('\n')
         .filter((line) => !/^(#:schema|# \(The #:schema)/.test(line))
@@ -52,7 +52,7 @@ void test('installs from the repository compose file and example with the publis
     const mode = (name: string) =>
       statSync(join(install.directory, name)).mode & 0o777;
     assert.equal(mode('seller.env'), 0o600);
-    assert.equal(mode('gyblos.toml'), 0o644);
+    assert.equal(mode('config.toml'), 0o644);
     assert.equal(mode('.'), 0o700);
     assert.ok(!result.output.includes(FAKE_SECRET), 'token printed');
     const model = /^model = "(.+)"$/m.exec(example)?.[1];
@@ -78,11 +78,11 @@ void test('a rerun keeps every file, needs no token and recreates the seller', a
   const install = await harness();
   try {
     assert.equal(install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET }).status, 0);
-    for (const name of ['compose.yaml', 'gyblos.toml', 'seller.env'])
+    for (const name of ['compose.yaml', 'config.toml', 'seller.env'])
       writeFileSync(join(install.directory, name), `edited ${name}\n`);
     const rerun = install.run();
     assert.equal(rerun.status, 0, rerun.output);
-    for (const name of ['compose.yaml', 'gyblos.toml', 'seller.env'])
+    for (const name of ['compose.yaml', 'config.toml', 'seller.env'])
       assert.equal(install.file(name), `edited ${name}\n`);
     assert.match(rerun.stdout, /Kept existing .*seller\.env/);
     assert.match(rerun.stdout, /GYBLOS_IMAGE is not applied/);

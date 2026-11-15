@@ -26,7 +26,7 @@ export const TRANSPORT_LIMITS = {
   globalRequestsPerWindow: 256,
   rateWindowMs: 60_000,
 } as const;
-// The same shape with plain numbers, so a seller's gyblos.toml [limits] can replace some values.
+// The same shape with plain numbers, so a seller's config.toml [limits] can replace some values.
 export type TransportLimits = {
   readonly [Key in keyof typeof TRANSPORT_LIMITS]: number;
 };

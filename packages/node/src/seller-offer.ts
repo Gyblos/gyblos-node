@@ -1,5 +1,5 @@
 // The seller's public listing: what the daemon serves and its paid or free terms. No config loading here,
-// so control startup and the lab host stay independent of gyblos.toml reading.
+// so control startup and the lab host stay independent of config.toml reading.
 import { PROTOCOL_FEE } from '@gyblos/config';
 import {
   MODEL_CLASSIFICATIONS,
@@ -13,7 +13,7 @@ import { grossAtomicPerMtok } from '@gyblos/protocol/payment-binding';
 
 import type { OfferModel } from './node-config';
 
-// Token caps from gyblos.toml `free = {...}`; the free execution handler enforces them.
+// Token caps from config.toml `free = {...}`; the free execution handler enforces them.
 export interface FreeOfferCaps {
   // Total tokens this offer gives away per day, across all buyers.
   dailyTokenCap: number;

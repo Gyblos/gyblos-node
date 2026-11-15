@@ -11,7 +11,7 @@ configuración; no crea ni recupera esas llaves.
 
 | Ubicación en la instalación suministrada        | Uso                                                                                             | Regla para compartir                                                              |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `~/gyblos-seller/gyblos.toml`                   | Modelos, cuotas y publicación                                                                   | Revísalo antes de compartir; las URLs personalizadas pueden contener credenciales |
+| `~/gyblos-seller/config.toml`                   | Modelos, cuotas y publicación                                                                   | Revísalo antes de compartir; las URLs personalizadas pueden contener credenciales |
 | `~/gyblos-seller/compose.yaml`                  | Contenedores y referencias a volúmenes                                                          | Consérvalo con la instalación; revisa valores personalizados antes de compartir   |
 | `~/gyblos-seller/seller.env`                    | Credenciales de proveedores y el token de relay opcional                                        | Privado; nunca lo subas ni lo muestres                                            |
 | Volumen con nombre de Docker montado en `/data` | Llaves, estado del rol, intentos privados de registro, secuencia pública, recibos y tokenizador | Privado; nunca subas el volumen ni sus archivos                                   |

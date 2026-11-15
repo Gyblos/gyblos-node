@@ -11,7 +11,7 @@ import type { ChatTokenizer, Engine } from '@gyblos/protocol/engine';
 import type { NODE_ERROR_CODES } from './constants';
 import type { OfferEngine, OfferModel } from './node-config';
 
-// One [[offers]] entry as an engine sees it; index is its position in gyblos.toml.
+// One [[offers]] entry as an engine sees it; index is its position in config.toml.
 export interface SellerEngineOffer {
   index: number;
   model: OfferModel;

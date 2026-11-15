@@ -1,4 +1,4 @@
-// Keeps the published gyblos.toml JSON Schema in step with the validator: both accept every example and
+// Keeps the published config.toml JSON Schema in step with the validator: both accept every example and
 // valid fixture, both reject every invalid fixture except the documented cross-field rules.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

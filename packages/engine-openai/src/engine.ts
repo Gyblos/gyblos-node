@@ -54,7 +54,7 @@ export interface OpenAiEngineSettings {
   base: string;
   // The model name the provider expects.
   model: string;
-  // The model's context size from gyblos.toml; the API does not report it.
+  // The model's context size from config.toml; the API does not report it.
   contextTokens: number;
   apiKey?: string;
   // True when the seller recounts this model's output with its pinned public tokenizer.

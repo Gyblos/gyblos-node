@@ -83,7 +83,7 @@ void test('seller register: a new registration sends only the invite and NodeId 
         'm',
       ),
     );
-    assert.match(result.stdout, /Publishing is off in gyblos\.toml/);
+    assert.match(result.stdout, /Publishing is off in config\.toml/);
     assert.deepEqual(await snapshot(home.root), before);
   }));
 
@@ -203,7 +203,7 @@ void test('seller register: a home without a seller role sends nothing', () =>
     { role: false },
   ));
 
-void test('seller register: an invalid gyblos.toml is refused before asking for the invite', () =>
+void test('seller register: an invalid config.toml is refused before asking for the invite', () =>
   withHome(async (home) => {
     const questions: string[] = [];
     const result = await register(home, [], {

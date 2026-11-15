@@ -29,7 +29,7 @@ To make the check mandatory, run `GYBLOS_REQUIRE_SIGNATURE=1 sh install.sh`: it 
 To verify the image yourself or set up each file by hand, see [Install without the script](/en/sellers/manual-install).
 
 The script asks for no relay token. It works in `~/gyblos-seller` unless you explicitly
-set another installation directory. It creates `compose.yaml`, `gyblos.toml` and private `seller.env`,
+set another installation directory. It creates `compose.yaml`, `config.toml` and private `seller.env`,
 downloads Ollama and `qwen3:0.6b`, creates seller keys in a Docker volume, installs the tokenizer,
 runs `gyblos doctor` and starts the seller.
 

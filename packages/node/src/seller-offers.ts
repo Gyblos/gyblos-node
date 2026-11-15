@@ -26,7 +26,7 @@ import type { SellerOfferSettings, SellerSettings } from './seller-settings';
 
 export interface SellerOfferDependencies extends EngineDependencies {
   snapshot: () => Promise<MemorySnapshot>;
-  // Each warmup's private outcome, by gyblos.toml [[offers]] index.
+  // Each warmup's private outcome, by config.toml [[offers]] index.
   record: (index: number, record: ReadinessRecord) => Promise<void>;
   // The engine registry unless a test supplies its own plugins.
   create?: typeof createSellerEngine;

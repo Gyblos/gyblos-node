@@ -1,4 +1,4 @@
-// Owns the precedence contract (flag > GYBLOS_* env > gyblos.toml > default) and proves that resolving
+// Owns the precedence contract (flag > GYBLOS_* env > config.toml > default) and proves that resolving
 // from the environment alone reproduces today's readers. Offline; env values are synthetic.
 import assert from 'node:assert/strict';
 import test from 'node:test';

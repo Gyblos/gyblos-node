@@ -1,4 +1,4 @@
-// Owns the gyblos.toml validator contract: examples parse, every invalid case maps to one static code and
+// Owns the config.toml validator contract: examples parse, every invalid case maps to one static code and
 // path, inline secrets are refused and no input value is echoed. Offline; synthetic inputs only.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -33,7 +33,7 @@ function issuesOf(result: NodeConfigResult) {
   return result.ok ? [] : result.issues;
 }
 
-void test('every example in examples/ is a valid gyblos.toml', () => {
+void test('every example in examples/ is a valid config.toml', () => {
   const examples = exampleFiles();
   assert.deepEqual(
     examples.map((example) => example.name),
@@ -274,7 +274,7 @@ void test('readNodeConfigFile maps missing, oversized and valid files to static 
     assert.deepEqual(issuesOf(unreadable), [
       { code: NODE_CONFIG_ISSUE_CODES.FILE_UNREADABLE, path: '' },
     ]);
-    const valid = join(directory, 'gyblos.toml');
+    const valid = join(directory, 'config.toml');
     await writeFile(valid, BASE);
     assert.equal((await readNodeConfigFile(valid)).ok, true);
   } finally {

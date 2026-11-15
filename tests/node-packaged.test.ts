@@ -1,4 +1,4 @@
-// Owns the packaged release's differences from a checkout: the run mode, the home and gyblos.toml under the
+// Owns the packaged release's differences from a checkout: the run mode, the home and config.toml under the
 // account's ~/.gyblos, a service that runs the launcher from that home with no Node on PATH, the commands
 // printed to the operator, and the one entry point's `--version`; also the reinstall notice for services
 // written before the one entry point.
@@ -46,7 +46,7 @@ const INPUT: ServiceInput = {
   repository: '/home/ana/.gyblos/app/0.1.0/lib',
   launcher: PACKAGED.GYBLOS_LAUNCHER,
   home: '/home/ana/.gyblos',
-  config: '/home/ana/.gyblos/gyblos.toml',
+  config: '/home/ana/.gyblos/config.toml',
   environmentFile: '/home/ana/.gyblos/seller.env',
   logFile: '/home/ana/.gyblos/service.log',
   accountHome: '/home/ana',
@@ -65,18 +65,18 @@ void test('packaged: the run mode, with the image winning when both are set', ()
   );
 });
 
-void test('packaged: home and gyblos.toml default to ~/.gyblos wherever it runs; explicit values still win', () => {
+void test('packaged: home and config.toml default to ~/.gyblos wherever it runs; explicit values still win', () => {
   assert.equal(homeLayout(PACKAGED).root, '/home/ana/.gyblos');
   assert.equal(
     nodeConfigPath(PACKAGED, '/tmp/anywhere').path,
-    '/home/ana/.gyblos/gyblos.toml',
+    '/home/ana/.gyblos/config.toml',
   );
   assert.equal(nodeConfigPath(PACKAGED, '/tmp/anywhere').explicit, false);
   const home = { ...PACKAGED, GYBLOS_HOME: '/srv/seller' };
   assert.equal(homeLayout(home).root, '/srv/seller');
   assert.equal(
     nodeConfigPath(home, '/tmp').path,
-    join('/srv/seller', 'gyblos.toml'),
+    join('/srv/seller', 'config.toml'),
   );
   assert.equal(
     nodeConfigPath({ ...PACKAGED, GYBLOS_CONFIG: 'my.toml' }, '/tmp').path,
@@ -84,7 +84,7 @@ void test('packaged: home and gyblos.toml default to ~/.gyblos wherever it runs;
   );
   // A checkout keeps its working-directory defaults.
   assert.equal(homeLayout({ HOME: '/home/ana' }).root, '.local/gyblos');
-  assert.equal(nodeConfigPath({}, '/repo').path, '/repo/gyblos.toml');
+  assert.equal(nodeConfigPath({}, '/repo').path, '/repo/config.toml');
 });
 
 void test('packaged: the user unit runs the launcher from the home with no Node on PATH', () => {
@@ -220,7 +220,7 @@ void test('packaged: the legacy .local guard does not apply, and init creates th
     assert.match(stdout, /`gyblos doctor`/);
     const home = await stat(join(root, 'account/.gyblos'));
     assert.equal(home.mode & 0o777, 0o700);
-    await stat(join(root, 'account/.gyblos/gyblos.toml'));
+    await stat(join(root, 'account/.gyblos/config.toml'));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

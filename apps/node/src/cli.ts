@@ -1,6 +1,6 @@
-// The `gyblos` command: `config validate` checks gyblos.toml and the GYBLOS_* environment; `doctor` runs the
+// The `gyblos` command: `config validate` checks config.toml and the GYBLOS_* environment; `doctor` runs the
 // seller's read-only startup preflight, calling remote engines only with --online; `seller init` writes a
-// starting gyblos.toml, `seller service` installs the background service, `seller status` reports on
+// starting config.toml, `seller service` installs the background service, `seller status` reports on
 // the running seller and `seller register` trades a beta invite for permission to publish. Prints codes, key paths and environment variable names; never a value read from the environment, and URLs only as
 // origins, because providers embed API keys in URL paths.
 import { resolve } from 'node:path';
@@ -56,7 +56,7 @@ export interface CliContext {
 }
 
 const USAGE =
-  'Usage: gyblos start   (runs the seller daemon)\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or gyblos.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n';
+  'Usage: gyblos start   (runs the seller daemon)\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or config.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n';
 // `seller init`'s flags, declared once for parsing and for refusing them on other commands.
 const INIT_OPTIONS = {
   engine: { type: 'string' },
@@ -313,7 +313,7 @@ export async function runCli(args: readonly string[], context: CliContext) {
     const code = await runService(rest[0], parsed.values, context);
     if (code !== undefined) return code;
   }
-  // doctor reads exactly what node:start reads (GYBLOS_CONFIG or ./gyblos.toml), so it takes no --config.
+  // doctor reads exactly what node:start reads (GYBLOS_CONFIG or ./config.toml), so it takes no --config.
   if (
     parsed &&
     group === 'doctor' &&
@@ -343,7 +343,7 @@ export async function runCli(args: readonly string[], context: CliContext) {
     context.stderr(USAGE);
     return EXIT.failure;
   }
-  // validate checks the file it is given (--config, else ./gyblos.toml), not GYBLOS_CONFIG: doctor does that.
+  // validate checks the file it is given (--config, else ./config.toml), not GYBLOS_CONFIG: doctor does that.
   return validate(
     resolve(
       context.cwd ?? process.cwd(),

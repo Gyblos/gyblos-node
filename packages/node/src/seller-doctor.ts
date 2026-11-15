@@ -60,7 +60,7 @@ export interface DoctorCheck {
   check: DoctorCheckName;
   status: DoctorStatus;
   code: DoctorResultCode;
-  // Zero-based gyblos.toml [[offers]] entry a config failure is about.
+  // Zero-based config.toml [[offers]] entry a config failure is about.
   offer?: number;
 }
 type Result = Omit<DoctorCheck, 'check'>;
@@ -69,7 +69,7 @@ export interface DoctorReport {
   configIssues: NodeConfigIssue[];
   // feePayer: the key that pays paid offers' transactions, when the role has payment keys.
   seller: { nodeId: string; owner: string; feePayer?: string } | undefined;
-  // gyblos.toml [[offers]] in order, once every entry is servable.
+  // config.toml [[offers]] in order, once every entry is servable.
   offers: SellerCatalogOffer[] | undefined;
   publication: string | undefined;
   limits: SellerLimits | undefined;

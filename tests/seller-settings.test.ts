@@ -1,4 +1,4 @@
-// Seller startup reads gyblos.toml: a servable offer becomes the public listing; a missing offer, a paid
+// Seller startup reads config.toml: a servable offer becomes the public listing; a missing offer, a paid
 // offer while paid selling is not wired, and anything the daemon cannot honor fail closed.
 // Offline; files live in a disposable directory and values are synthetic.
 import assert from 'node:assert/strict';
@@ -320,7 +320,7 @@ void test('the seller-docker example starts the seller as written', () => {
   assert.equal(settings.publication, undefined);
 });
 
-void test('loadSellerSettings: optional ./gyblos.toml, required GYBLOS_CONFIG, invalid files fail closed', async () => {
+void test('loadSellerSettings: optional ./config.toml, required GYBLOS_CONFIG, invalid files fail closed', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-seller-settings-'));
   try {
     await rejectsAsync(NODE_ERROR_CODES.SELLER_OFFERS_MISSING, () =>
@@ -337,7 +337,7 @@ void test('loadSellerSettings: optional ./gyblos.toml, required GYBLOS_CONFIG, i
         pricing: FREE,
         extra: 'reasoning = ["off"]',
       });
-    await writeFile(join(directory, 'gyblos.toml'), freeToml);
+    await writeFile(join(directory, 'config.toml'), freeToml);
     assert.equal(
       (await loadSellerSettings({}, directory)).offers[0]!.offer.kind,
       'free',
@@ -346,7 +346,7 @@ void test('loadSellerSettings: optional ./gyblos.toml, required GYBLOS_CONFIG, i
     await rejectsAsync(NODE_ERROR_CODES.NODE_CONFIG_INVALID, () =>
       loadSellerSettings({ GYBLOS_CONFIG: 'other.toml' }, directory),
     );
-    await writeFile(join(directory, 'gyblos.toml'), 'version = 1\n[node\n');
+    await writeFile(join(directory, 'config.toml'), 'version = 1\n[node\n');
     await rejectsAsync(NODE_ERROR_CODES.NODE_CONFIG_INVALID, () =>
       loadSellerSettings({}, directory),
     );

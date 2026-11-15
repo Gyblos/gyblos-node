@@ -1,4 +1,4 @@
-// Invalid gyblos.toml engine fixtures: the context size remote engine kinds require and
+// Invalid config.toml engine fixtures: the context size remote engine kinds require and
 // Ollama refuses. Test data only;
 // spread into INVALID_FIXTURES.
 import { BASE, offer } from './node-config-fixtures';

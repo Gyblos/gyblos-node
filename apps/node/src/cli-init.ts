@@ -1,6 +1,6 @@
-// `gyblos seller init`: writes gyblos.toml with one free devnet offer, asking for each value on a terminal
+// `gyblos seller init`: writes config.toml with one free devnet offer, asking for each value on a terminal
 // and taking flags or defaults otherwise. It writes the file node:start and doctor read (GYBLOS_CONFIG, else
-// ./gyblos.toml), checks it with startup's own offer rules, never replaces one without --force, never
+// ./config.toml), checks it with startup's own offer rules, never replaces one without --force, never
 // follows a symlink, and handles no secret: API keys and the relay token stay in seller.env, so only their
 // variable names appear.
 import { mkdir } from 'node:fs/promises';

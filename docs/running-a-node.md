@@ -16,7 +16,7 @@ forwards local requests to it. Both are devnet-only and experimental.
 
 All node data lives under one local home, `GYBLOS_HOME` (default `.local/gyblos`
 in the working directory; the seller image uses `/data`, and the packaged
-release `~/.gyblos`, where it also reads `gyblos.toml`). Each role has its own
+release `~/.gyblos`, where it also reads `config.toml`). Each role has its own
 directory, so one machine can hold a buyer and a seller side by side without
 sharing keys or journals:
 
@@ -157,19 +157,19 @@ pnpm node:tokenizer              # pinned tokenizer; doctor reports NOT_NEEDED w
 # A dedicated Ollama, used only for selling, on loopback; leave it running in its own terminal:
 OLLAMA_HOST=127.0.0.1:11435 OLLAMA_MODELS=$HOME/.gyblos-ollama OLLAMA_NO_CLOUD=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 ollama serve
 OLLAMA_HOST=127.0.0.1:11435 ollama pull qwen3:0.6b   # the pinned model
-pnpm gyblos seller init         # asks for the engine, model and free caps; writes gyblos.toml
+pnpm gyblos seller init         # asks for the engine, model and free caps; writes config.toml
 pnpm gyblos doctor               # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
 
-- `pnpm gyblos seller init` writes a `gyblos.toml` with one free devnet offer:
+- `pnpm gyblos seller init` writes a `config.toml` with one free devnet offer:
   it asks for the engine (`ollama`, `openai` or `anthropic`), its URL (default
   the dedicated Ollama above), the model and the daily caps, and whether to list
   the seller in discovery (default no). Without a terminal it takes flags and
   defaults (`--engine`, `--url`, `--model`, `--upstream-model`,
   `--context-tokens`, `--api-key-env <NAME>|none`, `--daily-cap`,
   `--per-buyer-cap`, `--publish` or `--no-publish`). It writes `GYBLOS_CONFIG`
-  or `./gyblos.toml` (mode 0600, since an engine URL may carry a key in its
+  or `./config.toml` (mode 0600, since an engine URL may carry a key in its
   path), replaces an existing file only with `--force`, never writes through a
   symlink, and writes nothing when the file format or startup's offer rules
   would refuse the values (for Ollama, only the pinned `qwen3:0.6b` at a literal
@@ -177,7 +177,7 @@ pnpm node:start
   token) stay in the environment or `seller.env`, and it prints only their
   variable names. `examples/seller-daemon.toml` is an equivalent file to copy
   instead.
-- The seller serves configured free and paid offers in `gyblos.toml`; it needs
+- The seller serves configured free and paid offers in `config.toml`; it needs
   at least one offer to start (`SELLER_OFFERS_MISSING`). A paid offer
   (`price = {...}` instead of `free`) is sold on devnet over the paid stream.
   The fee payer key (`fee payer` in `gyblos doctor`'s identity) needs devnet SOL
@@ -331,7 +331,7 @@ In the seller image, from the compose directory:
 ### Seller status
 
 ```sh
-pnpm gyblos seller status            # read-only; same GYBLOS_HOME and gyblos.toml as node:start
+pnpm gyblos seller status            # read-only; same GYBLOS_HOME and config.toml as node:start
 pnpm gyblos seller status --online   # also looks this NodeId up in the discovery index
 ```
 
@@ -380,7 +380,7 @@ v2.17 or later) is needed on the host; no port is published, because Iroh
 connects outbound.
 
 ```sh
-cp examples/seller-docker.toml gyblos.toml        # one free offer; edit the caps
+cp examples/seller-docker.toml config.toml        # one free offer; edit the caps
 (umask 077; touch seller.env)                     # API keys only if needed; keep it private
 docker compose up -d ollama
 docker compose exec ollama ollama pull qwen3:0.6b # `ollama list` must show 7df6b6e09427
@@ -399,8 +399,8 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 - **`docker compose down -v` deletes the `gyblos` volume, and with it the
   seller's keys and journals.** Back the volume up before removing it.
 - Keys, journals, the public sequence and the tokenizer live in the `gyblos`
-  volume (`/data`, mode 0700). `gyblos.toml` is mounted read-only at
-  `/config/gyblos.toml` and must exist before the first `up` (compose refuses to
+  volume (`/data`, mode 0700). `config.toml` is mounted read-only at
+  `/config/config.toml` and must exist before the first `up` (compose refuses to
   create it). `seller.env` holds any `api_key_env` variables and the optional
   `GYBLOS_RELAY_TOKEN`; it may be empty (it is in `.gitignore`; keep it mode
   0600).
@@ -439,7 +439,7 @@ sh install.sh
 ```
 
 - It writes `compose.yaml` (this repository's, with the published image),
-  `gyblos.toml` (`examples/seller-docker.toml`) and `seller.env` into
+  `config.toml` (`examples/seller-docker.toml`) and `seller.env` into
   `~/gyblos-seller` (created mode 0700; `GYBLOS_DIR` changes it), then pulls the
   images and the model, creates the seller keys, downloads the tokenizer, runs
   `gyblos doctor` and starts the seller only when doctor is READY.
@@ -472,7 +472,7 @@ sh install.sh
   `GYBLOS_UPDATE_CHECK=0` turns it off, and a build without `GYBLOS_VERSION`
   checks nothing.
 - `sh install.sh publish` (or `unpublish`) sets `publish` in the installed
-  `gyblos.toml` (`GYBLOS_DIR` names a non-default install), validates it and
+  `config.toml` (`GYBLOS_DIR` names a non-default install), validates it and
   recreates the seller; an invalid result or an interruption restores the file.
   It rewrites the file in place, so the container's bind mount keeps working.
 - `DEFAULT_IMAGE` pins one release by version and digest
@@ -485,11 +485,11 @@ sh install.sh
   still requires one) is validated and written only to `seller.env`, never
   printed. A `gyb_` invite code in `GYBLOS_RELAY_TOKEN` stops it: unset it and
   enter the invite code later with `gyblos seller register`.
-- Rerunning it resumes a failed install and updates the seller: `gyblos.toml`,
+- Rerunning it resumes a failed install and updates the seller: `config.toml`,
   `seller.env` and `compose.yaml` are kept, except that a seller `image:` from
   `ghcr.io/gyblos/seller` moves to the installer's release. Any other image is
   the operator's own build and stays. It then recreates the seller with the
-  current files; after editing `gyblos.toml`, rerun it or run
+  current files; after editing `config.toml`, rerun it or run
   `docker compose up -d --force-recreate seller` (a plain `up -d` does not apply
   the edit).
 
@@ -550,7 +550,7 @@ existing install keeps its mode.
 - It uses the machine's own Ollama at `127.0.0.1:11434` and never installs it:
   when Ollama does not answer it says how to install and start it (the Ollama
   app on a Mac) and stops; a rerun continues. It pulls the model with `ollama`.
-- It writes `gyblos.toml` and `seller.env` into `~/.gyblos` (`GYBLOS_HOME`
+- It writes `config.toml` and `seller.env` into `~/.gyblos` (`GYBLOS_HOME`
   changes it), creates the keys, downloads the tokenizer, runs `gyblos doctor`
   with `seller.env` and installs the user service
   (`gyblos seller service install`: a launch agent on macOS, a systemd user unit
@@ -579,7 +579,7 @@ powershell -ExecutionPolicy Bypass -File install.ps1   # also: publish, unpublis
   user `PATH` (not with `GYBLOS_MODIFY_PATH=0`).
 - The home is `%USERPROFILE%\.gyblos` (`GYBLOS_HOME`), created readable only by
   your account, SYSTEM and Administrators, which `gyblos setup` and doctor
-  check. `gyblos.toml` and `seller.env` are written there once, as UTF-8 without
+  check. `config.toml` and `seller.env` are written there once, as UTF-8 without
   a byte order mark.
 - Ollama, the keys, the tokenizer, doctor, the service (the scheduled task
   above), registering and `publish` work as in
@@ -690,7 +690,7 @@ the iroh binding against `pnpm-lock.yaml`. `--node "$(command -v node)"` reuses
 this machine's Node and installed binding for a local build of this machine's
 target, with no download.
 
-The packaged seller keeps its home and `gyblos.toml` in `~/.gyblos` and runs as
+The packaged seller keeps its home and `config.toml` in `~/.gyblos` and runs as
 `gyblos start`; `gyblos seller service install` makes the service run the
 launcher.
 
@@ -825,10 +825,10 @@ loopback, so do not run one on a relay-only machine.
 
 ## Other settings
 
-These variables can also be written in a `gyblos.toml` file, checked with
+These variables can also be written in a `config.toml` file, checked with
 `pnpm gyblos config validate`; the variables keep precedence over the file. See
 [configuration.md](configuration.md). The seller reads `GYBLOS_CONFIG` or
-`./gyblos.toml` at startup; see its "Seller startup" section for what it honors.
+`./config.toml` at startup; see its "Seller startup" section for what it honors.
 
 - `GYBLOS_HOME`: local home for both roles and shared artifacts (default
   `.local/gyblos`).
@@ -952,7 +952,7 @@ action, described in [discovery-index.md](discovery-index.md).
 
 ## Free v2 seller execution
 
-A supported `gyblos.toml` free offer starts control plus the separate
+A supported `config.toml` free offer starts control plus the separate
 `gyblos/free/4` complete-response and `gyblos/free-stream/4` streaming data
 channels. The daemon has no paid HTTP service or v1 offer; paid v2 offers use
 the separate paid stream described in the protocol spec. Free execution serves a

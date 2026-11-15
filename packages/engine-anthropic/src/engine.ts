@@ -65,7 +65,7 @@ export interface AnthropicEngineSettings {
   base: string;
   // The model id or alias the provider expects.
   model: string;
-  // The model's context size from gyblos.toml; the API does not report it.
+  // The model's context size from config.toml; the API does not report it.
   contextTokens: number;
   apiKey: string;
 }

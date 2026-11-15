@@ -257,5 +257,5 @@ void test('buyer configuration refusal has a static actionable telemetry diagnos
     new NodeError(NODE_ERROR_CODES.NODE_CONFIG_INVALID),
   );
   assert.ok(message.includes(FREE_BUYER_STARTUP.TELEMETRY_CONFIG));
-  assert.ok(message.includes('gyblos.toml'));
+  assert.ok(message.includes('config.toml'));
 });

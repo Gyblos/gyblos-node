@@ -8,7 +8,7 @@ creada al instalar. [Instala primero](/es/sellers/beta-guide) si el nodo aún no
 
 ## Registra [#registra-la-identidad-en-descubrimiento]
 
-Antes de ejecutar el comando, verifica el `discovery.url` previsto en `gyblos.toml` y cualquier
+Antes de ejecutar el comando, verifica el `discovery.url` previsto en `config.toml` y cualquier
 `GYBLOS_DISCOVERY_URL` que prevalezca en el entorno del contenedor. El valor predeterminado es
 `https://discovery.gyblos.com/v1`. Revisa un `seller.env` personalizado solo en un editor privado; no lo muestres.
 Introduce la invitación solo si confías en el destino configurado.
@@ -24,7 +24,7 @@ y el NodeId público. Esa línea es informativa; no hay una pausa de confirmaci�
 
 `Registered: this seller may now publish.` significa que descubrimiento aceptó el registro.
 `Already registered` también es correcto para la misma invitación e identidad. El registro no modifica
-`gyblos.toml` ni publica la oferta.
+`config.toml` ni publica la oferta.
 
 ### Inscripción en Solana [#completa-la-inscripción-en-solana-si-se-solicita]
 
@@ -74,12 +74,12 @@ Con el instalador, activa la publicación desde la carpeta donde guardaste `inst
 sh install.sh publish
 ```
 
-Pone `publish = true` en `~/gyblos-seller/gyblos.toml`, valida el archivo y recrea el vendedor; si la
+Pone `publish = true` en `~/gyblos-seller/config.toml`, valida el archivo y recrea el vendedor; si la
 validación falla o lo interrumpes, deja el archivo como estaba. Si instalaste en otra carpeta, antepone el mismo
 `GYBLOS_DIR=…` que usaste al instalar. Un `install.sh` anterior no conoce `publish`: descárgalo de nuevo antes. `gyblos seller status` también indica este paso mientras la
 publicación está desactivada.
 
-Para hacerlo a mano, edita la tabla `[discovery]` existente en `~/gyblos-seller/gyblos.toml`; no agregues una
+Para hacerlo a mano, edita la tabla `[discovery]` existente en `~/gyblos-seller/config.toml`; no agregues una
 tabla duplicada:
 
 ```toml
@@ -91,7 +91,7 @@ Valida el archivo montado y recrea el vendedor para aplicarlo:
 
 ```sh
 cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/gyblos.toml && docker compose up -d --force-recreate seller
+docker compose run --rm seller gyblos config validate --config /config/config.toml && docker compose up -d --force-recreate seller
 ```
 
 El primer comando debe mostrar `OK`. La validación revisa sintaxis y resolución del entorno; el inicio

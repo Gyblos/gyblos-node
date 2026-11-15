@@ -1,5 +1,5 @@
 // Owns the seller on real Windows (skipped elsewhere): setup restricts the home and seller folders to this
-// account, doctor then accepts the keys, init writes gyblos.toml, and keys in a folder others can open are
+// account, doctor then accepts the keys, init writes config.toml, and keys in a folder others can open are
 // refused. Offline.
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
@@ -75,7 +75,7 @@ void test(
             env: {
               ...process.env,
               GYBLOS_HOME: home,
-              GYBLOS_CONFIG: join(home, 'gyblos.toml'),
+              GYBLOS_CONFIG: join(home, 'config.toml'),
             },
           },
         );

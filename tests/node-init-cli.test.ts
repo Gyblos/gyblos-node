@@ -1,4 +1,4 @@
-// Owns the `gyblos seller init` contract for a successful run: a gyblos.toml that node:start accepts, one
+// Owns the `gyblos seller init` contract for a successful run: a config.toml that node:start accepts, one
 // question per missing value on a terminal and defaults otherwise, --force, GYBLOS_CONFIG, and no secret or
 // URL path in any output. Offline; temporary directories only. Refusals are in node-init-refusal.test.ts.
 import assert from 'node:assert/strict';
@@ -14,7 +14,7 @@ void test('seller init: without a terminal it writes the default free Ollama off
   inDirectory(async (directory) => {
     const result = await run(directory, []);
     assert.equal(result.code, 0, result.output);
-    const path = join(directory, 'gyblos.toml');
+    const path = join(directory, 'config.toml');
     const { file, settings } = await configOf(path);
     assert.equal(settings.network, 'devnet');
     assert.equal(file.discovery?.publish, false);
@@ -32,7 +32,7 @@ void test('seller init: without a terminal it writes the default free Ollama off
       maxOutputTokens: 4096,
     });
     assert.equal((await lstat(path)).mode & 0o777, 0o600);
-    assert.deepEqual(await readdir(directory), ['gyblos.toml']);
+    assert.deepEqual(await readdir(directory), ['config.toml']);
     assert.match(
       result.stdout,
       /OLLAMA_HOST=127\.0\.0\.1:11435 ollama pull qwen3:0\.6b/,
@@ -68,7 +68,7 @@ void test('seller init: on a terminal it asks each missing value, in order, and 
       'Free tokens per buyer per day [50000]: ',
       'List this seller in the public discovery index? [y/N]: ',
     ]);
-    const { file, settings } = await configOf(join(directory, 'gyblos.toml'));
+    const { file, settings } = await configOf(join(directory, 'config.toml'));
     assert.equal(file.discovery?.publish, true);
     const [entry] = settings.offers;
     assert.equal(entry!.model.kind, 'custom');
@@ -119,7 +119,7 @@ void test('seller init: flags are never asked again, and "none" leaves the API k
     assert.deepEqual(result.questions, [
       'Model name at the provider [acme/local-chat]: ',
     ]);
-    const { settings } = await configOf(join(directory, 'gyblos.toml'));
+    const { settings } = await configOf(join(directory, 'config.toml'));
     assert.deepEqual(settings.offers[0]!.engine, {
       kind: 'openai',
       url: 'http://127.0.0.1:1234/v1',
@@ -135,7 +135,7 @@ void test('seller init: OpenAI defaults to OPENAI_API_KEY, and any answer but ye
       answers: ['openai', '', 'x/y', '', '8192', '', '', '', 'n'],
     });
     assert.equal(result.code, 0, result.output);
-    const { file, settings } = await configOf(join(directory, 'gyblos.toml'));
+    const { file, settings } = await configOf(join(directory, 'config.toml'));
     assert.equal(file.discovery?.publish, false);
     assert.equal(settings.offers[0]!.engine.apiKeyEnv, 'OPENAI_API_KEY');
     assert.equal(settings.offers[0]!.engine.url, 'https://api.openai.com/v1');
@@ -148,7 +148,7 @@ void test('seller init: --no-publish answers the discovery question, and both fl
     });
     assert.equal(result.code, 0, result.output);
     assert.equal(result.questions.length, 5);
-    const { file } = await configOf(join(directory, 'gyblos.toml'));
+    const { file } = await configOf(join(directory, 'config.toml'));
     assert.equal(file.discovery?.publish, false);
     const both = await run(directory, ['--publish', '--no-publish', '--force']);
     assert.equal(both.code, 1);
@@ -164,7 +164,7 @@ void test('seller init: a catalog id is pulled by its Ollama alias', () =>
 
 void test('seller init: an existing file is kept without --force and replaced with it', () =>
   inDirectory(async (directory) => {
-    const path = join(directory, 'gyblos.toml');
+    const path = join(directory, 'config.toml');
     await writeFile(path, 'kept\n');
     const refused = await run(directory, []);
     assert.equal(refused.code, 1);
@@ -176,7 +176,7 @@ void test('seller init: an existing file is kept without --force and replaced wi
     const replaced = await run(directory, ['--force']);
     assert.equal(replaced.code, 0, replaced.output);
     await configOf(path);
-    assert.deepEqual(await readdir(directory), ['gyblos.toml']);
+    assert.deepEqual(await readdir(directory), ['config.toml']);
   }));
 
 void test('seller init: writes to GYBLOS_CONFIG, relative to the working directory', () =>
@@ -227,7 +227,7 @@ void test('seller init: prints URLs as origins and never a secret from the envir
 
 void test('seller init: the script entry takes defaults without a terminal and sets the exit code', () =>
   inDirectory(async (directory) => {
-    const path = join(directory, 'gyblos.toml');
+    const path = join(directory, 'config.toml');
     const script = (args: string[]) =>
       spawnSync(
         process.execPath,

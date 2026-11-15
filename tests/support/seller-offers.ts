@@ -1,5 +1,5 @@
 // Synthetic live seller offers for offer-set, catalog and routing tests: a distinct catalog model per
-// gyblos.toml index, mutable readiness and counted observation lifecycle. No engines or network.
+// config.toml index, mutable readiness and counted observation lifecycle. No engines or network.
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import { recountedMeter } from '@gyblos/node/free-meter';
 import type { LiveSellerOffer } from '@gyblos/node/seller-offer-set';

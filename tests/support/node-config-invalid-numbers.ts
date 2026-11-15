@@ -1,4 +1,4 @@
-// Invalid gyblos.toml number fixtures: price decimal spellings, TOML floats where integers are
+// Invalid config.toml number fixtures: price decimal spellings, TOML floats where integers are
 // required and [limits] ranges. Test data only; spread into INVALID_FIXTURES.
 import { BASE, offer } from './node-config-fixtures';
 import type { InvalidConfigFixture } from './node-config-invalid';

@@ -25,7 +25,7 @@ development rate counters and an explicit allowlist containing only the
 ephemeral seller NodeId. Its injected HTTP fetch rejects every foreign origin
 and never uses global fetch. This is an in-process HTTP handler test, not a TCP
 connection to the deployed index. The command has no index URL, home or
-configuration flags and does not load `gyblos.toml` or inherit discovery/role
+configuration flags and does not load `config.toml` or inherit discovery/role
 settings.
 
 Both role directories are created under a fresh private temporary root before
@@ -238,7 +238,7 @@ pnpm acceptance:receipts
 ```
 
 This synthetic-only scenario calls the public `createNode().start()` lifecycle
-and `startFreeBuyer()`, loading real temporary role files, `gyblos.toml`,
+and `startFreeBuyer()`, loading real temporary role files, `config.toml`,
 selection configuration, discovery/replay state and private receipt stores. The
 actual in-process discovery index uses memory storage and an explicit seller
 allowlist. The OpenAI-compatible engine adapter talks only to a deterministic

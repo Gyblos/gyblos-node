@@ -1,4 +1,4 @@
-// Startup with several offers: each is warmed in gyblos.toml order, the seller starts with the ready ones,
+// Startup with several offers: each is warmed in config.toml order, the seller starts with the ready ones,
 // and the others are warmed again in the background until ready or stopped. Synthetic engine plugins and
 // memory snapshots; no network or processes.
 import assert from 'node:assert/strict';

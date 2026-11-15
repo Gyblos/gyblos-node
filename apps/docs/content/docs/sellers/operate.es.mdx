@@ -40,7 +40,7 @@ una parada o reparación habitual**: elimina los volúmenes persistentes, inclui
 
 ## Aplica cambios [#aplica-cambios-de-configuración-o-entorno]
 
-Edita `gyblos.toml` en el equipo anfitrión. Valídalo como indica la
+Edita `config.toml` en el equipo anfitrión. Valídalo como indica la
 [referencia de configuración](/es/reference/configuration) y recrea el vendedor:
 
 ```sh
@@ -72,7 +72,7 @@ reemplaza tu `install.sh` por él y lo ejecuta. Si tu instalador ya fija la últ
 `GYBLOS_UPDATE_CHECK=0` en `seller.env` desactiva la comprobación de status, que solo pregunta a GitHub por
 la última versión.
 
-Conserva `gyblos.toml`, `seller.env`, las llaves y tus demás cambios de Compose. Solo cambia la línea
+Conserva `config.toml`, `seller.env`, las llaves y tus demás cambios de Compose. Solo cambia la línea
 `image:` del vendedor de Gyblos en `compose.yaml` a la nueva versión, comprueba su firma si cosign está
 instalado y reinicia el vendedor. Una imagen de vendedor de otro repositorio de imágenes se considera tu propia
 compilación y no se cambia. No migra el TOML ni el archivo de entorno.

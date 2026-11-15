@@ -1,6 +1,6 @@
 // install.sh after a successful install prints the steps from a running seller to a listed one (fund the
 // owner it read from doctor, register with the invite, publish), and `sh install.sh publish|unpublish`
-// flips publish in the installed gyblos.toml, validates it and recreates the seller, restoring the file
+// flips publish in the installed config.toml, validates it and recreates the seller, restoring the file
 // when validation fails. Offline, against the fake docker of install-harness.ts.
 import assert from 'node:assert/strict';
 import { statSync, writeFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ import { FAKE_SECRET } from './support/node-config-fixtures';
 const OWNER = '11111111111111111111111111111112';
 const DOCTOR = `Seller doctor (read-only)\n  OK    config\nSeller identity (public; \`gyblos seller register\` enrolls it in discovery):\n  nodeId  ${'a'.repeat(64)}\n  owner   ${OWNER}\nResult: READY`;
 const VALIDATE =
-  'compose run --rm seller gyblos config validate --config /config/gyblos.toml';
+  'compose run --rm seller gyblos config validate --config /config/config.toml';
 const RECREATE = 'compose up -d --force-recreate seller';
 
 void test('after installing it prints the steps to start selling, with the owner to fund', async () => {
@@ -53,9 +53,9 @@ void test('after installing it prints the steps to start selling, with the owner
     );
     // Once publishing is on (here with CRLF line endings and a comment), a rerun only says how to check.
     writeFileSync(
-      join(install.directory, 'gyblos.toml'),
+      join(install.directory, 'config.toml'),
       install
-        .file('gyblos.toml')
+        .file('config.toml')
         .replace(/^publish = false$/m, 'publish=true # listed')
         .replaceAll('\n', '\r\n'),
     );
@@ -71,21 +71,21 @@ void test('after installing it prints the steps to start selling, with the owner
   }
 });
 
-void test('publish and unpublish flip publish in gyblos.toml, validate it and recreate the seller', async () => {
+void test('publish and unpublish flip publish in config.toml, validate it and recreate the seller', async () => {
   const install = await harness();
   try {
     assert.equal(install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET }).status, 0);
-    const written = install.file('gyblos.toml');
-    const inode = statSync(join(install.directory, 'gyblos.toml')).ino;
+    const written = install.file('config.toml');
+    const inode = statSync(join(install.directory, 'config.toml')).ino;
     const before = install.calls().length;
     const on = install.run({}, ['publish']);
     assert.equal(on.status, 0, on.output);
     assert.equal(
-      install.file('gyblos.toml'),
+      install.file('config.toml'),
       written.replace(/^publish = false$/m, 'publish = true'),
     );
     // Rewritten in place: the running container keeps its bind mount.
-    assert.equal(statSync(join(install.directory, 'gyblos.toml')).ino, inode);
+    assert.equal(statSync(join(install.directory, 'config.toml')).ino, inode);
     assert.deepEqual(
       install
         .calls()
@@ -100,12 +100,12 @@ void test('publish and unpublish flip publish in gyblos.toml, validate it and re
     const again = install.run({}, ['publish']);
     assert.equal(again.status, 0, again.output);
     assert.equal(
-      install.file('gyblos.toml'),
+      install.file('config.toml'),
       written.replace(/^publish = false$/m, 'publish = true'),
     );
     const off = install.run({}, ['unpublish']);
     assert.equal(off.status, 0, off.output);
-    assert.equal(install.file('gyblos.toml'), written);
+    assert.equal(install.file('config.toml'), written);
     assert.match(
       off.stdout,
       /^Publishing is off: the index withdraws this seller/m,
@@ -115,7 +115,7 @@ void test('publish and unpublish flip publish in gyblos.toml, validate it and re
   }
 });
 
-void test('publish restores gyblos.toml when the change does not validate, and refuses what it cannot change', async () => {
+void test('publish restores config.toml when the change does not validate, and refuses what it cannot change', async () => {
   const install = await harness();
   try {
     const missing = install.run({}, ['publish']);
@@ -125,23 +125,23 @@ void test('publish restores gyblos.toml when the change does not validate, and r
       /No installed seller in .*: run sh install\.sh first/,
     );
     assert.equal(install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET }).status, 0);
-    const written = install.file('gyblos.toml');
+    const written = install.file('config.toml');
     const before = install.calls().length;
     const interrupted = install.run({ FAKE_VALIDATE_INTERRUPT: '1' }, [
       'publish',
     ]);
     assert.equal(interrupted.status, 130, interrupted.output);
-    assert.equal(install.file('gyblos.toml'), written);
+    assert.equal(install.file('config.toml'), written);
     const invalid = install.run({ FAKE_VALIDATE_EXIT: '1' }, ['publish']);
     assert.equal(invalid.status, 1);
     assert.match(
       invalid.stderr,
       /not valid with that change; it was left as it was/,
     );
-    assert.equal(install.file('gyblos.toml'), written);
+    assert.equal(install.file('config.toml'), written);
     assert.ok(!install.calls().slice(before).includes(RECREATE));
     writeFileSync(
-      join(install.directory, 'gyblos.toml'),
+      join(install.directory, 'config.toml'),
       written.replace(/^publish = false$/m, 'publish=false'),
     );
     const handEdited = install.run({}, ['publish']);

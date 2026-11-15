@@ -1,4 +1,4 @@
-// Parses and validates gyblos.toml (schema version 1, GYB-DOC-026) into a typed NodeConfig. Strict: unknown
+// Parses and validates config.toml (schema version 1, GYB-DOC-026) into a typed NodeConfig. Strict: unknown
 // keys and inline secrets are refused; issues carry static codes and key paths, never input values.
 import { open } from 'node:fs/promises';
 

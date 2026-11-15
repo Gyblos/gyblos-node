@@ -22,7 +22,7 @@ export function streamResult(text = 'answer'): EngineResult {
   };
 }
 export async function freeStreamSellerFixture(
-  // The answer limit defaults to the seller's own default, as gyblos.toml leaves it.
+  // The answer limit defaults to the seller's own default, as config.toml leaves it.
   caps: {
     dailyTokenCap: number;
     perBuyerCap: number;

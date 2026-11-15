@@ -8,7 +8,7 @@ export const NODE_ENVIRONMENT = {
   relayOnly: 'GYBLOS_RELAY_ONLY',
   irohBind: 'GYBLOS_IROH_BIND',
   irohExternalAddress: 'GYBLOS_IROH_EXTERNAL_ADDR',
-  // Path to gyblos.toml for the seller daemon; without it ./gyblos.toml is read when present.
+  // Path to config.toml for the seller daemon; without it ./config.toml is read when present.
   config: 'GYBLOS_CONFIG',
   // Set to ENVIRONMENT_SWITCH.on by the seller image: `gyblos seller status` then looks for the daemon in
   // its own container instead of a systemd unit or launch agent.

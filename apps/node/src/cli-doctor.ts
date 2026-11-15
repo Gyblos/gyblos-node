@@ -84,7 +84,7 @@ export async function doctor(
   }
   if (report.limits) {
     const { transport, maxFreeBuyers } = report.limits;
-    stdout('Limits (effective; gyblos.toml [limits] over the defaults):\n');
+    stdout('Limits (effective; config.toml [limits] over the defaults):\n');
     stdout(`  connections ${transport.maxConnections} total\n`);
     stdout(
       `  requests    ${transport.requestsPerWindow}/min per buyer, ${transport.globalRequestsPerWindow}/min total\n`,

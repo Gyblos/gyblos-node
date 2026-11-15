@@ -332,7 +332,7 @@ export async function registerCommand(
   );
   if (!discovery.publish)
     output.stdout(
-      `  Publishing is off in gyblos.toml. Next: ${PUBLISH_STEP}\n`,
+      `  Publishing is off in config.toml. Next: ${PUBLISH_STEP}\n`,
     );
   return EXIT.ok;
 }

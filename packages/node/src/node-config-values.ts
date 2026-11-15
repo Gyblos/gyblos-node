@@ -1,4 +1,4 @@
-// Readers for values validated the same way in gyblos.toml and in CLI flags: payout address, relay
+// Readers for values validated the same way in config.toml and in CLI flags: payout address, relay
 // origin and discovery index URL, each delegating to the policy's owner. Issues never carry values.
 import { isAddress } from '@solana/kit';
 

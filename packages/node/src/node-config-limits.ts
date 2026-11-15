@@ -1,4 +1,4 @@
-// gyblos.toml [limits]: the seller capacity values an operator may tune, each between 1 and a hard
+// config.toml [limits]: the seller capacity values an operator may tune, each between 1 and a hard
 // ceiling, and together within the global request budget. Request concurrency and per-buyer
 // connections stay fixed: the managed engine runs one generation at a time, so each buyer has one
 // request in flight and the seller at most two (one running, one queued).

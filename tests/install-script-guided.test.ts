@@ -15,7 +15,7 @@ const OWNER = '11111111111111111111111111111112';
 const DOCTOR = `Seller doctor (read-only)\n  OK    config\nSeller identity (public; \`gyblos seller register\` enrolls it in discovery):\n  nodeId  ${'a'.repeat(64)}\n  owner   ${OWNER}\nResult: READY`;
 const REGISTER = 'compose exec seller gyblos seller register';
 const VALIDATE =
-  'compose run --rm seller gyblos config validate --config /config/gyblos.toml';
+  'compose run --rm seller gyblos config validate --config /config/config.toml';
 const RECREATE = 'compose up -d --force-recreate seller';
 
 async function guided(answers: string, env: Record<string, string> = {}) {
@@ -46,7 +46,7 @@ void test('on a terminal it registers, then publishes on an empty answer', async
       VALIDATE,
       RECREATE,
     ]);
-    assert.match(install.file('gyblos.toml'), /^publish = true$/m);
+    assert.match(install.file('config.toml'), /^publish = true$/m);
     assert.match(
       result.stdout,
       /Step 1 of 2: register, with the gyb_ invite code from your invitation/,
@@ -75,7 +75,7 @@ void test('a failed registration publishes nothing and says to run the script ag
   try {
     assert.equal(result.status, 0, result.output);
     assert.deepEqual(afterInstall(install.calls()), [REGISTER]);
-    assert.match(install.file('gyblos.toml'), /^publish = false$/m);
+    assert.match(install.file('config.toml'), /^publish = false$/m);
     assert.match(result.stdout, /Registration did not finish\./);
     assert.ok(
       result.stdout.includes(
@@ -94,7 +94,7 @@ void test('declining to publish keeps it unlisted and prints the publish command
     try {
       assert.equal(result.status, 0, result.output);
       assert.deepEqual(afterInstall(install.calls()), [REGISTER]);
-      assert.match(install.file('gyblos.toml'), /^publish = false$/m);
+      assert.match(install.file('config.toml'), /^publish = false$/m);
       assert.match(result.stdout, /Not published\. When you are ready:/);
       assert.ok(
         result.stdout.includes(
@@ -115,9 +115,9 @@ void test('GYBLOS_GUIDED=0, no terminal or publishing already on asks nothing', 
     assert.match(off.result.stdout, /Next steps, to start selling:/);
     // The install is done; publishing turned on by hand means a rerun only says how to check.
     writeFileSync(
-      join(off.install.directory, 'gyblos.toml'),
+      join(off.install.directory, 'config.toml'),
       off.install
-        .file('gyblos.toml')
+        .file('config.toml')
         .replace(/^publish = false$/m, 'publish = true'),
     );
     const rerun = off.install.run({

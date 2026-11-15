@@ -41,7 +41,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_OFFER_API_KEY_UNSAFE]:
     'api_key_env must name the provider key itself, never a GYBLOS_* or relay token variable',
   [NODE_ERROR_CODES.SELLER_OFFERS_MISSING]:
-    'add a free [[offers]] entry to gyblos.toml (examples/seller-daemon.toml)',
+    'add a free [[offers]] entry to config.toml (examples/seller-daemon.toml)',
   [NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE]:
     'paid offers need the payment chain; list the offer as free',
   [NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED]:

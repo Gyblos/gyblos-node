@@ -46,7 +46,7 @@ async function run(args: string[], env: Record<string, string> = {}) {
 async function withFile<T>(toml: string, use: (path: string) => Promise<T>) {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-cli-'));
   try {
-    const path = join(directory, 'gyblos.toml');
+    const path = join(directory, 'config.toml');
     await writeFile(path, toml);
     return await use(path);
   } finally {
@@ -189,7 +189,7 @@ void test('missing files, usage errors and invalid environment values exit 1', a
     'config',
     'validate',
     '--config',
-    '/nonexistent/gyblos.toml',
+    '/nonexistent/config.toml',
   ]);
   assert.equal(missing.code, 1);
   assert.match(missing.stderr, /FILE_NOT_FOUND/);

@@ -40,7 +40,7 @@ ordinary stop or repair**: it deletes the persistent volumes, including keys and
 
 ## Apply changes [#apply-configuration-or-environment-changes]
 
-Edit `gyblos.toml` on the host. Validate it as shown in the
+Edit `config.toml` on the host. Validate it as shown in the
 [configuration reference](/en/reference/configuration), then recreate the seller:
 
 ```sh
@@ -71,7 +71,7 @@ current one with `curl -fsSL https://gyblos.com/install.sh -o install.sh` and ru
 `GYBLOS_UPDATE_CHECK=0` in `seller.env` turns off the status check, which only asks GitHub for the latest
 release.
 
-It keeps `gyblos.toml`, `seller.env`, the keys and your other Compose edits. It changes only the Gyblos
+It keeps `config.toml`, `seller.env`, the keys and your other Compose edits. It changes only the Gyblos
 seller `image:` line in `compose.yaml` to the new release, checks its signature when cosign is installed
 and restarts the seller. A seller image from another image repository is treated as your own build and is left
 unchanged. It does not migrate the TOML or the environment file.

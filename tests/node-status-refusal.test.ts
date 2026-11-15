@@ -79,15 +79,15 @@ void test('seller status: an unexpected status file or receipt file is reported 
 
 void test('seller status: a configuration node:start would refuse is reported, not replaced by defaults', () =>
   withHome(async (home) => {
-    await writeFile(join(home.root, 'gyblos.toml'), 'version = "x"\n');
+    await writeFile(join(home.root, 'config.toml'), 'version = "x"\n');
     const invalid = await status(home, system(home));
     assert.match(invalid.stdout, /discovery\s+configuration invalid/);
-    await rm(join(home.root, 'gyblos.toml'));
+    await rm(join(home.root, 'config.toml'));
     const missing = await status(home, system(home), [], {
       GYBLOS_CONFIG: 'absent.toml',
     });
     assert.match(missing.stdout, /discovery\s+configuration invalid/);
-    // Only a missing implicit ./gyblos.toml falls back to the defaults.
+    // Only a missing implicit ./config.toml falls back to the defaults.
     const implicit = await status(home, system(home));
     assert.match(implicit.stdout, /discovery\s+off/);
   }));
@@ -98,7 +98,7 @@ void test('seller status --online pages the index for the served model until it 
   await withHome(
     async (home) => {
       await daemonReady(home);
-      await writeFile(join(home.root, 'gyblos.toml'), PUBLISH);
+      await writeFile(join(home.root, 'config.toml'), PUBLISH);
       const index = fakeFetch((call) =>
         jsonResponse(
           200,
@@ -133,7 +133,7 @@ void test('seller status --online pages the index for the served model until it 
 void test('seller status --online says when it found nothing, stopped paging or had nothing to look up', async () => {
   const other = await discoverySeller({ modelId: 'qwen3-0.6b' });
   await withHome(async (home) => {
-    await writeFile(join(home.root, 'gyblos.toml'), PUBLISH);
+    await writeFile(join(home.root, 'config.toml'), PUBLISH);
     const once = fakeFetch(() => jsonResponse(200, sellersBody([other.entry])));
     await daemonReady(home);
     const absent = await status(

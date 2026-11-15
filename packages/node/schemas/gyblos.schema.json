@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:gyblos:node-config:1",
-  "title": "gyblos.toml",
-  "description": "Gyblos node configuration, schema version 1 (GYB-DOC-026). Secrets never go in this file: keys ending in _env name environment variables instead. Precedence: CLI flags > GYBLOS_* environment > gyblos.toml > defaults. Run `gyblos config validate` for the authoritative check.",
+  "title": "config.toml",
+  "description": "Gyblos node configuration, schema version 1 (GYB-DOC-026). Secrets never go in this file: keys ending in _env name environment variables instead. Precedence: CLI flags > GYBLOS_* environment > config.toml > defaults. Run `gyblos config validate` for the authoritative check.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "node"],

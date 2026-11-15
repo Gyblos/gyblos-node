@@ -1,4 +1,4 @@
-// Resolves effective node settings with precedence CLI flag > GYBLOS_* environment > gyblos.toml > default,
+// Resolves effective node settings with precedence CLI flag > GYBLOS_* environment > config.toml > default,
 // recording where each value came from. Environment parsing mirrors today's readers exactly; secrets are
 // reported by variable name and presence only. The seller daemon consumes it through seller-settings.
 import {

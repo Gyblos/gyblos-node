@@ -34,7 +34,7 @@ export const NODE_ERROR_CODES = {
   DISCOVERY_PUBLISH_FAILED: 'DISCOVERY_PUBLISH_FAILED',
   INVALID_PRICE: 'INVALID_PRICE',
   RECEIPT_STORAGE_UNAVAILABLE: 'RECEIPT_STORAGE_UNAVAILABLE',
-  // gyblos.toml at seller startup; `pnpm gyblos config validate` explains file problems.
+  // config.toml at seller startup; `pnpm gyblos config validate` explains file problems.
   NODE_CONFIG_INVALID: 'NODE_CONFIG_INVALID',
   SELLER_SETTING_UNSUPPORTED: 'SELLER_SETTING_UNSUPPORTED',
   SELLER_OFFER_MODEL_UNSUPPORTED: 'SELLER_OFFER_MODEL_UNSUPPORTED',
@@ -173,10 +173,10 @@ export const READINESS_REASONS = {
   WARMUP_TIMEOUT: 'warmup-timeout',
 } as const;
 
-// gyblos.toml (GYB-DOC-026): schema version, closed vocabularies, bounds and static issue codes. The
+// config.toml (GYB-DOC-026): schema version, closed vocabularies, bounds and static issue codes. The
 // file never holds secrets; it names environment variables instead.
 export const NODE_CONFIG_VERSION = 1;
-export const NODE_CONFIG_FILENAME = 'gyblos.toml';
+export const NODE_CONFIG_FILENAME = 'config.toml';
 // The `status` values the seller daemon writes to its status.json; `gyblos seller status` reads them.
 export const SELLER_DAEMON_STATES = {
   STARTING: 'starting',
@@ -211,7 +211,7 @@ export const NODE_CONFIG_LIMITS = {
   maxRelays: 8,
   envNameCharacters: 128,
   upstreamModelCharacters: 256,
-  // A remote engine's context size, which its API does not report (gyblos.toml engine.context_tokens).
+  // A remote engine's context size, which its API does not report (config.toml engine.context_tokens).
   minContextTokens: 1_024,
   maxContextTokens: 2_000_000,
   // Price per million tokens: at most 9999 USDC, with USDC's 6 decimal places once trailing zeros are dropped.
@@ -227,7 +227,7 @@ export const NODE_CONFIG_LIMITS = {
   tokenRunCharacters: 16,
 } as const;
 
-// Hard ceilings for gyblos.toml [limits], so a typo cannot let one seller exhaust its machine. Every
+// Hard ceilings for config.toml [limits], so a typo cannot let one seller exhaust its machine. Every
 // value must be at least 1; omitted keys keep TRANSPORT_LIMITS and FREE_EXECUTION_ADMISSION.
 export const SELLER_LIMIT_CEILINGS = {
   maxConnections: 64,
@@ -236,7 +236,7 @@ export const SELLER_LIMIT_CEILINGS = {
   maxFreeBuyersPerDay: 65_536,
 } as const;
 
-// gyblos.toml prices are USDC per million tokens; protocol v2 will charge atomic units (10^-6 USDC) per
+// config.toml prices are USDC per million tokens; protocol v2 will charge atomic units (10^-6 USDC) per
 // million tokens, so the conversion is exact.
 export const USDC_ATOMIC_UNITS_PER_USDC = 1_000_000n;
 
@@ -284,7 +284,7 @@ export const NODE_CONFIG_WARNING_CODES = {
 export type NodeConfigWarningCode =
   (typeof NODE_CONFIG_WARNING_CODES)[keyof typeof NODE_CONFIG_WARNING_CODES];
 
-// Precedence, highest first: CLI flags, GYBLOS_* environment, gyblos.toml, built-in defaults.
+// Precedence, highest first: CLI flags, GYBLOS_* environment, config.toml, built-in defaults.
 export const NODE_CONFIG_SOURCES = {
   FLAG: 'flag',
   ENV: 'env',

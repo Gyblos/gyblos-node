@@ -58,7 +58,7 @@ check Ollama first. Only use `--online` when you intend additional remote probes
 
 ```sh
 cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
 Use the reported key path, such as `offers[0].free.per_buyer_cap`. After `OK`, run doctor if startup still

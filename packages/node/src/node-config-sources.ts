@@ -63,7 +63,7 @@ export interface NodeSettings {
 export interface SettingOrigin {
   setting: NodeSettingKey;
   source: NodeConfigSource;
-  // Flag spelling, environment variable name, gyblos.toml key path or "default"; never a value.
+  // Flag spelling, environment variable name, config.toml key path or "default"; never a value.
   name: string;
 }
 
