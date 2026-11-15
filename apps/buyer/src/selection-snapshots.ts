@@ -3,6 +3,7 @@
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import type { KnownSeller } from '@gyblos/core/seller-selection';
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
 import {
@@ -28,12 +29,13 @@ import {
   type SellerFailureCode,
 } from './seller-failures';
 
-export async function verifiedSeller(
+// The seller's verified snapshot and the signed catalog it came from.
+async function verifiedSnapshot(
   client: BuyerControlClient,
   seller: StaticControlSeller,
   now: () => number,
   signal: AbortSignal,
-): Promise<KnownSeller> {
+): Promise<{ known: KnownSeller; signed: SignedPublicV2 }> {
   const signed = await client.getCatalog(signal);
   const trust = { owner: seller.owner, nodeId: seller.nodeId, now: now() };
   const catalog = await verifyPublicV2(signed, trust);
@@ -52,12 +54,23 @@ export async function verifiedSeller(
   if (withdrawal && withdrawal.kind !== PUBLIC_RECORD_KINDS.WITHDRAWAL)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
   return {
-    catalog,
-    presence,
-    withdrawal,
-    badge: SELLER_BADGES.DECLARED_USAGE,
-    openChannel: false,
+    signed,
+    known: {
+      catalog,
+      presence,
+      withdrawal,
+      badge: SELLER_BADGES.DECLARED_USAGE,
+      openChannel: false,
+    },
   };
+}
+export async function verifiedSeller(
+  client: BuyerControlClient,
+  seller: StaticControlSeller,
+  now: () => number,
+  signal: AbortSignal,
+): Promise<KnownSeller> {
+  return (await verifiedSnapshot(client, seller, now, signal)).known;
 }
 export function recordQuote(
   stats: Map<string, LocalSellerStats>,
@@ -85,10 +98,39 @@ function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
   });
 }
 
+// A seller cooling down after a failure cannot win an automatic selection, so it is not contacted until
+// the cooldown ends; a pinned one still is, so the caller can say when it returns. Selection reads the
+// clock again after the snapshot, so only a cooldown that outlasts it counts.
+function coolingPastSnapshot(
+  seller: StaticControlSeller,
+  dependencies: VerifiedSelectionDependencies,
+  now: number,
+) {
+  const until = dependencies.stats.get(seller.nodeId)?.cooldownUntil;
+  return (
+    until != null &&
+    until > now + (dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs)
+  );
+}
+
+// A snapshot remembered from an earlier request, with its signed catalog kept for this selection.
+function recall(
+  dependencies: VerifiedSelectionDependencies,
+  seller: StaticControlSeller,
+  now: number,
+  recalled: Map<string, SignedPublicV2>,
+) {
+  const cached = dependencies.snapshots?.get(seller, now);
+  if (cached) recalled.set(seller.nodeId, cached.catalog);
+  return cached?.known;
+}
+
 export async function refreshSnapshots(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
   clients: Map<string, BuyerControlClient>,
+  // Remembered signed catalogs used by this selection, by NodeId, for its quotes.
+  recalled: Map<string, SignedPublicV2>,
   now: () => number,
   deadline: AbortSignal,
   settling: Promise<unknown>[],
@@ -99,6 +141,7 @@ export async function refreshSnapshots(
     config,
     dependencies,
     clients,
+    recalled,
     now,
     deadline,
     settling,
@@ -125,6 +168,7 @@ export async function refreshSnapshots(
         { ...config, sellers: recovered },
         dependencies,
         clients,
+        recalled,
         now,
         nextDeadline,
         settling,
@@ -136,10 +180,84 @@ export async function refreshSnapshots(
   return snapshots;
 }
 
+// Identity remains per request. Cached work is reusable only while no native retirement is pending
+// and durable discovery still permits the snapshot; a superseded record is fetched before filtering.
+async function beforeSnapshot(
+  seller: StaticControlSeller,
+  dependencies: VerifiedSelectionDependencies,
+  now: () => number,
+  deadline: AbortSignal,
+  recalled: Map<string, SignedPublicV2>,
+  refusedIdentity: () => void,
+): Promise<{ complete: boolean; known?: KnownSeller }> {
+  if (
+    dependencies.verifyIdentity &&
+    !(await dependencies.verifyIdentity(seller, deadline))
+  ) {
+    refusedIdentity();
+    return { complete: true };
+  }
+  if (dependencies.snapshots?.retiring(seller.nodeId))
+    return { complete: true };
+  const cached = recall(dependencies, seller, now(), recalled);
+  if (!cached) return { complete: false };
+  if (
+    !dependencies.observeVerified ||
+    (await dependencies.observeVerified(cached))
+  )
+    return { complete: true, known: cached };
+  dependencies.snapshots?.drop(seller.nodeId);
+  recalled.delete(seller.nodeId);
+  return { complete: false };
+}
+
+// The fresh signed records still pass durable discovery before entering reusable memory.
+async function freshSnapshot(
+  client: BuyerControlClient,
+  seller: StaticControlSeller,
+  dependencies: VerifiedSelectionDependencies,
+  now: () => number,
+  deadline: AbortSignal,
+  refusedDiscovery: () => void,
+) {
+  const { known, signed } = await verifiedSnapshot(
+    client,
+    seller,
+    now,
+    deadline,
+  );
+  if (
+    dependencies.observeVerified &&
+    !(await dependencies.observeVerified(known))
+  ) {
+    refusedDiscovery();
+    return undefined;
+  }
+  dependencies.snapshots?.set(seller, known, signed);
+  return known;
+}
+
+// Reports are observational only; a caller cancellation never becomes a seller failure.
+function failureReporter(
+  dependencies: VerifiedSelectionDependencies,
+  seller: StaticControlSeller,
+  signal?: AbortSignal,
+) {
+  return (phase: SellerFailurePhase, code: SellerFailureCode) => {
+    if (!signal?.aborted)
+      reportSellerFailure(dependencies.onSellerFailure, {
+        nodeId: seller.nodeId,
+        phase,
+        code,
+      });
+  };
+}
+
 async function snapshotBatch(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
   clients: Map<string, BuyerControlClient>,
+  recalled: Map<string, SignedPublicV2>,
   now: () => number,
   deadline: AbortSignal,
   settling: Promise<unknown>[],
@@ -150,54 +268,44 @@ async function snapshotBatch(
   return settledValues(
     await Promise.allSettled(
       config.sellers.map(async (seller) => {
-        // A seller cooling down after a failure cannot win an automatic selection, so it is not contacted
-        // until the cooldown ends; a pinned one still is, so the caller can say when it returns.
-        // Selection reads the clock again after the snapshot, so only a cooldown that outlasts it is skipped.
-        const stats = dependencies.stats.get(seller.nodeId);
         const pinned = seller.nodeId === config.pinnedNodeId;
-        if (
-          !pinned &&
-          stats?.cooldownUntil != null &&
-          stats.cooldownUntil >
-            now() + (dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs)
-        ) {
+        if (!pinned && coolingPastSnapshot(seller, dependencies, now())) {
           skipped.add(seller);
           return undefined;
         }
-        // A request the caller cancelled is not a seller failure.
-        const failed = (phase: SellerFailurePhase, code: SellerFailureCode) => {
-          if (!signal?.aborted)
-            reportSellerFailure(dependencies.onSellerFailure, {
-              nodeId: seller.nodeId,
-              phase,
-              code,
-            });
-        };
+        const failed = failureReporter(dependencies, seller, signal);
         try {
-          if (
-            dependencies.verifyIdentity &&
-            !(await dependencies.verifyIdentity(seller, deadline))
-          ) {
-            failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
-            return undefined;
-          }
+          const remembered = await beforeSnapshot(
+            seller,
+            dependencies,
+            now,
+            deadline,
+            recalled,
+            () =>
+              failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY),
+          );
+          if (remembered.complete) return remembered.known;
           deadline.throwIfAborted();
           const client = await connectBefore(
             dependencies.connect(seller),
             deadline,
             settling,
             signal,
+            (work) => dependencies.snapshots?.retire(seller.nodeId, work),
           );
           clients.set(seller.nodeId, client);
-          const verified = await verifiedSeller(client, seller, now, deadline);
-          if (
-            dependencies.observeVerified &&
-            !(await dependencies.observeVerified(verified))
-          ) {
-            failed(SELLER_FAILURE_PHASES.DISCOVERY, SELLER_FAILURES.DISCOVERY);
-            return undefined;
-          }
-          return verified;
+          return await freshSnapshot(
+            client,
+            seller,
+            dependencies,
+            now,
+            deadline,
+            () =>
+              failed(
+                SELLER_FAILURE_PHASES.DISCOVERY,
+                SELLER_FAILURES.DISCOVERY,
+              ),
+          );
         } catch (error) {
           if (
             error instanceof BuyerSelectionError &&
@@ -215,8 +323,11 @@ async function snapshotBatch(
           const client = clients.get(seller.nodeId);
           if (client && !signal?.aborted && !pinned) {
             clients.delete(seller.nodeId);
-            settling.push(client.close().catch(() => undefined));
+            const closing = client.close().catch(() => undefined);
+            settling.push(closing);
+            dependencies.snapshots?.retire(seller.nodeId, closing);
           }
+          dependencies.snapshots?.drop(seller.nodeId);
           recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
           failed(SELLER_FAILURE_PHASES.CONNECT, sellerFailureCode(error));
           return undefined;
@@ -229,11 +340,12 @@ async function snapshotBatch(
 // A connection attempt ends with the snapshot deadline: a seller that stopped answering would otherwise
 // hold every request for the whole transport timeout. A connection that arrives later is closed. A request
 // the caller cancelled still waits for the attempt, so its admission stays held until native work settles.
-async function connectBefore(
+export async function connectBefore(
   connecting: Promise<BuyerControlClient>,
   deadline: AbortSignal,
   settling: Promise<unknown>[],
   signal?: AbortSignal,
+  retire?: (work: Promise<unknown>) => void,
 ) {
   let stop = () => {};
   const expired = new Promise<never>((_resolve, reject) => {
@@ -246,12 +358,12 @@ async function connectBefore(
   try {
     return await Promise.race([connecting, expired]);
   } catch (error) {
-    settling.push(
-      connecting.then(
-        (client) => client.close().catch(() => undefined),
-        () => undefined,
-      ),
+    const closing = connecting.then(
+      (client) => client.close().catch(() => undefined),
+      () => undefined,
     );
+    settling.push(closing);
+    retire?.(closing);
     throw error;
   } finally {
     deadline.removeEventListener('abort', stop);
