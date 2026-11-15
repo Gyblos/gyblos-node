@@ -13,11 +13,7 @@ import {
   BUYER_SELECTION,
 } from '@gyblos/buyer/constants';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
-import {
-  FILE_MODES,
-  INFERENCE_REQUEST_LIMITS,
-  ROLE_FILES,
-} from '@gyblos/config';
+import { FILE_MODES, ROLE_FILES } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
@@ -125,8 +121,8 @@ void test(
     const config: BuyerSelectionConfig = {
       request: {
         ...request,
-        // Above the paid answer bound: paid preparation must still start (devnet rehearsal finding).
-        maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens + 1,
+        // Above the former paid answer bound of 128: paid preparation must still start (devnet rehearsal).
+        maxTokens: 129,
         maxAtomic: '1000',
         priceCeilings: {
           inputAtomicPerMtok: '100',

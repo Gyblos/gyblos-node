@@ -8,10 +8,11 @@ import { FREE_EXECUTION, FREE_STREAM } from '../constants';
 const AUTHORIZATION_BYTES = 8192;
 const PAYMENT_TERMINAL_BYTES = 2048;
 
-// Paid v1 keeps the bounds it shipped with when free execution moved to v4 (128 KiB requests, 4096
-// events); changing them is a paid version change.
+// Paid v1 keeps the request bound it shipped with when free execution moved to v4 (128 KiB). Its events
+// follow the free stream's, a delta per token for the longest answer a context allows, since a paid answer
+// is no longer held to a short bound; a reader only accepts more, so shorter answers are unchanged.
 const PAID_V1_REQUEST_BYTES = 131072;
-const PAID_V1_MAX_EVENTS = 4096;
+const PAID_V1_MAX_EVENTS = FREE_STREAM.maxEvents;
 
 export const PAID_EXECUTION = {
   version: 2,

@@ -1,9 +1,5 @@
 // Owns the free buyer process lifetime. Importing this entry creates no endpoint, timer or files.
-import {
-  FREE_OUTPUT_TOKENS,
-  INFERENCE_REQUEST_LIMITS,
-  PORTS,
-} from '@gyblos/config';
+import { FREE_OUTPUT_TOKENS, PORTS } from '@gyblos/config';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { isMain, shutdownSignal } from '@gyblos/runtime';
@@ -40,7 +36,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
     'discovery-state-v2.json in the buyer home is unavailable; see docs/discovery.md',
   [FREE_BUYER_STARTUP.IDENTITY_STATE]:
     'the buyer identity state or its configuration is unavailable',
-  [FREE_BUYER_STARTUP.MAX_TOKENS]: `request.maxTokens in selection.json must be at most ${FREE_OUTPUT_TOKENS.max} (${INFERENCE_REQUEST_LIMITS.maxOutputTokens} in paid mode)`,
+  [FREE_BUYER_STARTUP.MAX_TOKENS]: `request.maxTokens in selection.json must be at most ${FREE_OUTPUT_TOKENS.max}`,
   [FREE_BUYER_STARTUP.REASONING]:
     'request.reasoning must be "off" and lowestReasoning null',
   [FREE_BUYER_STARTUP.NODE_KEY]:

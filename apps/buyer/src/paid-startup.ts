@@ -52,30 +52,17 @@ type Prepared = Awaited<ReturnType<typeof buyerSelection>>;
 
 // The requests the paid buyer can honor: the pinned model, reasoning off, devnet and the role's mint, for
 // the request and every model it serves by name, since the meter recounts with the pinned tokenizer.
-// The explicit paid entry also refuses an answer bound above the paid one; the automatic buyer instead
-// asks each paid seller for at most what it quoted (see `paidAnswerInput`), so free answers keep theirs.
-export function checkPaidRequest(
-  prepared: Prepared,
-  role: RoleConfig,
-  { answerBound = true }: { answerBound?: boolean } = {},
-) {
+export function checkPaidRequest(prepared: Prepared, role: RoleConfig) {
   const { request, models = [] } = prepared.config;
   for (const routed of [
     request,
     ...models.map((model) => routedRequest(request, model)),
   ])
-    checkPaidSellerRequest(routed, role, answerBound);
+    checkPaidSellerRequest(routed, role);
 }
 
-function checkPaidSellerRequest(
-  request: SellerRequest,
-  role: RoleConfig,
-  answerBound: boolean,
-) {
-  if (
-    answerBound &&
-    request.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens
-  )
+function checkPaidSellerRequest(request: SellerRequest, role: RoleConfig) {
+  if (request.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
     refuse(FREE_BUYER_STARTUP.MAX_TOKENS);
   if (
     request.reasoning !== REASONING_LEVELS.OFF ||
@@ -86,20 +73,6 @@ function checkPaidSellerRequest(
     refuse(FREE_BUYER_STARTUP.PAID_MODEL);
   if (request.network !== DEVNET || request.asset !== role.mint)
     refuse(FREE_BUYER_STARTUP.PAID_NETWORK);
-}
-
-// A paid answer is bounded by the seller's signed quote and the paid limit; a longer request is served up
-// to that bound, as the endpoint serves any request above its maximum, ending with finish reason `length`.
-export function paidAnswerInput<T extends { maxTokens: number }>(
-  input: T,
-  quoted: number,
-): T {
-  const bound = Math.min(
-    input.maxTokens,
-    quoted,
-    INFERENCE_REQUEST_LIMITS.maxOutputTokens,
-  );
-  return bound === input.maxTokens ? input : { ...input, maxTokens: bound };
 }
 
 export async function tokenizer(): Promise<RecountTokenizer> {
