@@ -14,7 +14,6 @@ import {
 import { indexFail } from './errors';
 import { allowed, type ResolvedLimiters } from './limits';
 import {
-  allowlistWithin,
   claimedNodeId,
   publisherAllowed,
   type DiscoveryPublishers,
@@ -41,9 +40,11 @@ async function storedEntry(
   record: PublicRecordV2,
   signature: string,
   json: string,
+  admission: StoredEntry['admission'],
 ): Promise<StoredEntry> {
   const catalog = record.kind === PUBLIC_RECORD_KINDS.CATALOG;
   return {
+    admission,
     kind: record.kind,
     nodeId: record.nodeId,
     owner: record.owner,
@@ -99,15 +100,15 @@ export async function acceptRecord(
   await verifyAgainstStored(envelope, record, state?.catalog ?? null, now);
   if (!state) {
     await context.prune(now);
-    // Registered NodeIds are not bounded by the allowlist, so then the stored count decides.
-    const bounded =
-      !!context.publishers &&
-      !context.registrations &&
-      allowlistWithin(context.publishers, context.maxNodes);
-    if (!bounded && (await storage.nodeCount()) >= context.maxNodes)
-      indexFail(INDEX_ERRORS.RATE_LIMITED);
   }
-  if (!(await storage.put(await storedEntry(record, signature, json))))
+  if (
+    !(await storage.put(
+      await storedEntry(record, signature, json, {
+        now,
+        maxNodes: context.maxNodes,
+      }),
+    ))
+  )
     indexFail(INDEX_ERRORS.STALE_RECORD);
   // Uptime counts only presence the index accepted, at the index's own clock. It is best effort: the
   // record is already stored, so a failed uptime write must not make the seller republish it.

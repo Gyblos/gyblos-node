@@ -185,12 +185,18 @@ signed a record; clients re-verify everything.
   Presence and withdrawal must reference the NodeId's current, live,
   non-withdrawn stored catalog under `verifyPublicV2` reference rules, else
   `UNKNOWN_CATALOG`. A withdrawal hides the seller; only a higher catalog
-  revives it.
+  revives it. An expired withdrawal remains effective until its catalog expires
+  or is replaced; its signed lifetime does not shorten tombstone retention.
 - **Capacity:** at most 10,000 tracked NodeIds (new NodeIds beyond that are
-  `429`). When publishing is an allowlist no larger than that cap, the list
-  itself bounds new NodeIds and the count is skipped (NodeIds kept from an
-  earlier list leave with their retention). Expired rows are pruned when a new
-  NodeId publishes, at most once a minute per isolate, with index-only deletes.
+  `429`). Capacity and the current catalog reference are checked in the same
+  atomic write as the high-water update, including concurrent publishers and
+  changes to the allowlist. Expired rows are pruned when a new NodeId publishes,
+  at most once a minute per isolate, with index-only deletes. In open mode,
+  distributed publishers can fill and renew these slots, blocking admission of
+  new sellers. The cap bounds storage; it is not Sybil resistance. The index
+  keeps current records and accepted-presence slot history for the uptime
+  windows below. Those observations do not prove engine availability or measure
+  direct/relay transport quality.
 - **Privacy:** no IP address, header, session or request metadata is stored or
   logged; rate-limit keys go only to Cloudflare limiters.
 
@@ -298,28 +304,24 @@ rows; CI needs no Cloudflare account.
 
 ## Operations
 
-Every step below needs explicit founder approval. Run from
-`apps/discovery-index` after `pnpm install --frozen-lockfile` at the repository
-root. Wrangler is not a workspace dependency (it would add a large toolchain to
-the lockfile for a manual, rare step); use the version the website already pins:
+The resources in `wrangler.jsonc` already exist. Do not recreate the database or
+replace its ID when updating this deployment. Every step below needs explicit
+founder approval. Run from `apps/discovery-index` after
+`pnpm install --frozen-lockfile` at the repository root. Wrangler is not a
+workspace dependency (it would add a large toolchain to the lockfile for a
+manual, rare step); use the version the website already pins:
 
 ```sh
 npx wrangler@4.151.1 login   # pick the account that holds the gyblos.com zone
-npx wrangler@4.151.1 d1 create gyblos-discovery
-# put the printed database_id into wrangler.jsonc and uncomment d1_databases
+npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote
+# apply only pending migrations before deploying code that needs them
 npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote
-npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote   # 0001 applied
-# rate-limit namespace ids 42621004-42621007 must not collide with the website's
-# web/wrangler.jsonc (it uses 42621001-42621003); then uncomment ratelimits and
-# routes (custom domain discovery.gyblos.com, zone gyblos.com in this account)
-# deploy closed first: the Worker must exist before its secret is set
-# (secret put on a missing Worker uploads an empty draft Worker, which would
-# become the rollback target)
+npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote
 npx wrangler@4.151.1 deploy
 curl -s https://discovery.gyblos.com/v1/health
-# expected: 200 {"ok":true,"records":0,"publish":"closed"} (reads work,
-# publishes answer 503)
-# publish allowlist: paste comma-separated approved NodeIds at the prompt;
+# expected: 200 with ok=true, the current record count and the configured publish mode
+# change the publish allowlist only when explicitly approved;
+# paste the full comma-separated approved NodeIds at the prompt;
 # this deploys a new version with the secret
 npx wrangler@4.151.1 secret put DISCOVERY_PUBLISH_ALLOWLIST
 curl -s https://discovery.gyblos.com/v1/health

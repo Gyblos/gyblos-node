@@ -207,13 +207,21 @@ for (const kind of HARNESS_KINDS) {
         ).status,
         201,
       );
-      assert.equal(await storage.nodeCount(), 1);
+      assert.equal(
+        (
+          await Promise.all(nodes.map((nodeId) => storage.state(nodeId)))
+        ).filter((state) => state !== null).length,
+        1,
+      );
       harness.clock.now += UPTIME.dayMs;
     }
     harness.clock.now += 31 * UPTIME.dayMs;
     await storage.prune(harness.clock.now);
     await storage.pruneUptime(harness.clock.now);
-    assert.equal(await storage.nodeCount(), 0);
+    assert.deepEqual(
+      await Promise.all(nodes.map((nodeId) => storage.state(nodeId))),
+      nodes.map(() => null),
+    );
     const remembered = (
       await Promise.all(nodes.map((nodeId) => storage.firstSeen(nodeId)))
     ).filter((first) => first !== null);

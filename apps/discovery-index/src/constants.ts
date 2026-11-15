@@ -89,7 +89,7 @@ export const DISCOVERY_INDEX_LIMITS = {
   maxResponseBytes: 1024 * 1024,
   // Bytes reserved for the page framing around the seller entries.
   responseFramingBytes: 128,
-  // Soft cap on tracked NodeIds, checked before a new NodeId is admitted. NodeIds are free
+  // Atomic cap on tracked NodeIds, checked while a new NodeId is admitted. NodeIds are free
   // to mint; each slot is held until its high-water retention ends (about 20 minutes),
   // bounded by the per-IP(/64) publish limit.
   maxNodes: 10_000,
