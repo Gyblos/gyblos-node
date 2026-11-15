@@ -30,7 +30,10 @@ interface RegistryBuyer {
   payload: string;
 }
 
-export async function sellerRegistryRig(maxSessions = 2) {
+export async function sellerRegistryRig(
+  maxSessions = 2,
+  nodes?: { buyerNodeIds: readonly string[]; sellerNodeId: string },
+) {
   const now = () => 1_800_000_000_000;
   const vm = await nativeVm(now, SOLANA_TESTNET_CAIP2, {
     treasury: PROTOCOL_FEE.treasury,
@@ -71,9 +74,11 @@ export async function sellerRegistryRig(maxSessions = 2) {
       ]);
     const terms = {
       buyer: payer.address,
-      buyerNodeId: (index + 1).toString(16).padStart(64, '0'),
+      buyerNodeId:
+        nodes?.buyerNodeIds[index] ??
+        (index + 1).toString(16).padStart(64, '0'),
       owner: vm.seller.address,
-      sellerNodeId: '34'.repeat(32),
+      sellerNodeId: nodes?.sellerNodeId ?? '34'.repeat(32),
       network: vm.network,
       mint: vm.mint.address,
       payTo: vm.seller.address,
