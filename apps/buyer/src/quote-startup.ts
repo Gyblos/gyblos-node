@@ -33,6 +33,7 @@ import { paidBuyerDependencies } from './paid-selection';
 import {
   checkPaidRequest,
   endpointToken,
+  paidAnswerInput,
   payments,
   tokenizer,
   type startPaidBuyer,
@@ -85,7 +86,7 @@ async function preparePaid(
   input: import('@gyblos/protocol/free-execution').FreeExecutionBuildInput,
 ) {
   const { prepared, role, endpoint, relayOnly } = context;
-  checkPaidRequest(prepared, role);
+  checkPaidRequest(prepared, role, { answerBound: false });
   const meter = await (options.meter ?? tokenizer)();
   if (inferenceNeedsTools(input)) {
     if (
@@ -192,9 +193,10 @@ function paidQuoteExecutor(
         if (inferenceNeedsTools(input))
           throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
         await reserveApiKey(permission, winner.quote, executionSignal);
-        const runtime = await paid.get(executionSignal, input);
+        const paidInput = paidAnswerInput(input, winner.quote.offer.maxTokens);
+        const runtime = await paid.get(executionSignal, paidInput);
         const outcome = await executeSelectedBuyerPaid(
-          input,
+          paidInput,
           runtime.paid,
           winner,
           executionSignal,

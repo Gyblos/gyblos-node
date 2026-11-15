@@ -8,7 +8,6 @@ import {
   DEVNET_RPC_URL,
   DEVNET_USDC,
   FREE_OUTPUT_TOKENS,
-  INFERENCE_REQUEST_LIMITS,
 } from '@gyblos/config';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { MODEL } from '@gyblos/engine-ollama/model';
@@ -118,7 +117,7 @@ void test('malformed identities, unknown fields and token bounds refuse static t
     );
   }
 });
-void test('free answers may run to the free bound; a spending ceiling keeps the paid one', () => {
+void test('a spending ceiling keeps the free answer bound; paid answers are bounded per request', () => {
   const free = buildBuyerInit({ ...answers(), maxTokens: '8192' });
   assert.equal(free.request.maxTokens, 8192);
   const paid = buildBuyerInit({
@@ -128,10 +127,7 @@ void test('free answers may run to the free bound; a spending ceiling keeps the 
     inputUsdcPerMtok: '1',
     outputUsdcPerMtok: '1',
   });
-  assert.equal(
-    paid.request.maxTokens,
-    INFERENCE_REQUEST_LIMITS.maxOutputTokens,
-  );
+  assert.equal(paid.request.maxTokens, 8192);
 });
 void test('USDC precision, canonical decimal spelling and overflow are bounded before bigint conversion', () => {
   for (const value of [
