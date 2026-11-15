@@ -38,6 +38,13 @@ export async function sessionProductPayments(
   let sellerCreates = 0;
   let lostAcknowledgment = false;
   let approvals = 0;
+  const acknowledged = () => {
+    approvals++;
+    if (lostAcknowledgment) {
+      lostAcknowledgment = false;
+      throw new Error('Synthetic acknowledgment lost');
+    }
+  };
   const now = () => Date.now() + offset;
   const paths = (role: typeof P2P_ROLES.BUYER | typeof P2P_ROLES.SELLER) =>
     batchSessionPathsIn(process.env, role);
@@ -132,11 +139,11 @@ export async function sessionProductPayments(
         ...financial,
         async accept(...args) {
           await financial.accept(...args);
-          approvals++;
-          if (lostAcknowledgment) {
-            lostAcknowledgment = false;
-            throw new Error('Synthetic acknowledgment lost');
-          }
+          acknowledged();
+        },
+        async acceptBlock(...args: Parameters<typeof financial.acceptBlock>) {
+          await financial.acceptBlock(...args);
+          acknowledged();
         },
       };
     },

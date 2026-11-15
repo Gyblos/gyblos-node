@@ -44,3 +44,49 @@ void test(
     );
   },
 );
+
+void test(
+  'ordinary buyer restores an unacknowledged block before loading the tokenizer or accepting another prompt',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    let loads = 0;
+    const host = await sessionProductHost(OFFER_PRICING_KINDS.PAID, undefined, {
+      meter: blockTestMeter,
+      loadMeter: async () => {
+        loads++;
+        return blockTestMeter;
+      },
+      observe() {},
+    });
+    t.after(host.close);
+    host.finance.loseAcknowledgment();
+    let questions = 0;
+    let output = '';
+    await chatSession({
+      ...host.buyer().chat,
+      read: async () => (++questions === 1 ? 'synthetic' : '/exit'),
+      write: (text) => {
+        output += text;
+      },
+    });
+    assert.match(output, /No retry was made/);
+    assert.equal(host.engine.attempts(), 1);
+    assert.equal(host.finance.approvals(), 1);
+    assert.equal(loads, 1);
+    await host.restartBoth();
+    questions = 0;
+    output = '';
+    await chatSession({
+      ...host.buyer().chat,
+      read: async () => (++questions === 1 ? 'new synthetic' : '/exit'),
+      write: (text) => {
+        output += text;
+      },
+    });
+    assert.match(output, /Approved this question/);
+    assert.equal(host.engine.attempts(), 2, 'the original prompt is never repeated');
+    assert.equal(host.finance.approvals(), 3);
+    assert.equal(loads, 2);
+    assert.deepEqual(host.finance.calls, ['deposit']);
+  },
+);
