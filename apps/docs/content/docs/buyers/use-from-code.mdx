@@ -260,8 +260,14 @@ context.
 Options that clients send by default and that do not change the answer are accepted and ignored, such as
 `temperature`, `top_p`, `user`, `metadata`, `stream_options` and, in the Anthropic format, `thinking`
 (thinking is always off). Options that would change it are refused unless they hold their neutral value:
-`response_format` (`text`), `n` (1), `stop` and `stop_sequences`, and `logprobs`. These sampling hints
-refer to Chat Completions and Anthropic; Responses refuses non-neutral sampling and reasoning.
+`response_format` (`text`), `n` (1) and `logprobs`. These sampling hints refer to Chat Completions and
+Anthropic; Responses refuses non-neutral sampling and reasoning.
+
+`stop` (Chat Completions, a string or up to 4 strings) and `stop_sequences` (Anthropic) are honored by your
+buyer: the answer ends just before the first sequence, with finish reason `stop` (Anthropic:
+`stop_reason: "stop_sequence"` and the sequence in `stop_sequence`). A cut answer carries no tool calls.
+The seller does not receive the sequences, so it keeps generating until its own end: a stream shows nothing
+after the sequence but closes only when the seller finishes, and `usage` counts everything it generated.
 Chat Completions and Anthropic refuse images. Responses substitutes a text placeholder for an
 `input_image`; it does not send image content to the seller.
 
@@ -272,3 +278,23 @@ Chat Completions and Anthropic refuse images. Responses substitutes a text place
 | 504    | The seller did not answer in time.                                                                                                                                          |
 
 Errors use each API's own shape, so SDKs raise their usual exceptions.
+
+## Clients made for OpenRouter [#clients-made-for-openrouter]
+
+OpenRouter speaks the same Chat Completions format, plus a few fields of its own. A client or agent set up
+for OpenRouter works by pointing its base URL at your buyer (`http://127.0.0.1:<port>/v1`) and using its
+token as the API key:
+
+- `provider`, `route`, `transforms`, `usage`, `debug`, `reasoning`, `verbosity`, `prediction` and the
+  extra sampling knobs `top_k`, `min_p`, `top_a` and `repetition_penalty` are accepted and ignored: they
+  choose among OpenRouter's providers or tune sampling, and do not change what a seller is asked.
+- `models` (a fallback list) is honored: the answer comes from the first name, `model` first, that your
+  buyer serves, and the reply's `model` says which. With none served, the 404 lists the names it serves.
+- OpenRouter-style names find the same model: `qwen/qwen3-0.6b` and `qwen/qwen3-0.6b:free` answer as
+  `qwen3-0.6b`. The suffixes `:free`, `:nitro` and `:floor` only choose a provider there; a suffix that
+  changes the answer, such as `:online` (web search), is not accepted as the plain model.
+- `plugins` (for example web search) and `web_search_options` are refused with a 400 rather than skipped,
+  so a client never shows an answer as searched when it was not.
+
+Later, `provider` (a price ceiling, cheapest or fastest, sellers to avoid) could steer seller selection per
+request, and `usage` could report what each answer cost; neither does yet.

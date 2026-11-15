@@ -31,6 +31,7 @@ function response(finishReason: string = ENGINE_DONE_REASONS.STOP, index = 0) {
         },
       ],
       usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      system_fingerprint: null,
     },
   };
 }

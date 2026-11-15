@@ -28,6 +28,42 @@ const OPENAI_ROLES: Readonly<Record<string, ChatRole>> = {
   assistant: FREE_CHAT_ROLES.ASSISTANT,
 };
 
+// Extras that clients written for OpenRouter send alongside OpenAI's fields. Routing preferences (provider,
+// route), prompt transforms, usage accounting, debug echo, extra sampling knobs, reasoning settings (reasoning
+// is always off on Gyblos offers), verbosity and predicted output do not change what is asked of a seller, so
+// they are accepted and ignored. `models` (a fallback list) is honored by the endpoint before parsing.
+// Future: `provider` (price ceiling, cheapest or fastest, sellers to avoid) maps onto seller selection, and
+// `usage` could report the real cost of each answer; both are noted in the public buyer guide
+// (apps/docs/content/docs/buyers/use-from-code.mdx, "Clients made for OpenRouter").
+export const OPENROUTER = {
+  ignored: [
+    'provider',
+    'route',
+    'transforms',
+    'usage',
+    'debug',
+    'top_k',
+    'min_p',
+    'top_a',
+    'repetition_penalty',
+    'reasoning',
+    'verbosity',
+    'prediction',
+  ],
+  // The request's own fallback list of model names; the first one this endpoint serves answers.
+  fallbackField: 'models',
+  maxFallbacks: 8,
+  // Name suffixes that only choose among OpenRouter's providers (free tier, fastest, cheapest), so they name
+  // the same model here. Suffixes that change the answer, such as :online (web search), do not.
+  routingSuffixes: [':free', ':nitro', ':floor'],
+} as const;
+
+// Stop sequences the buyer honors on the answer it shows: at most this many, each this long at most.
+export const CHAT_STOP = {
+  maxSequences: 4,
+  maxBytes: 256,
+} as const;
+
 export const OPENAI_CHAT = {
   fields: {
     supported: [
@@ -38,8 +74,11 @@ export const OPENAI_CHAT = {
       FREE_CHAT_FIELDS.STREAM,
       'tools',
       'tool_choice',
+      // Honored by the buyer: the answer ends before the first stop sequence (see chat-stop.ts).
+      'stop',
     ] as readonly string[],
-    // Sampling hints and bookkeeping the official SDKs and agents send by default.
+    // Sampling hints and bookkeeping the official SDKs and agents send by default, and the extras clients
+    // written for OpenRouter add. None changes what is asked; sellers do not receive them.
     ignored: [
       'temperature',
       'top_p',
@@ -53,6 +92,7 @@ export const OPENAI_CHAT = {
       'parallel_tool_calls',
       'reasoning_effort',
       'service_tier',
+      ...OPENROUTER.ignored,
     ],
     neutral: {
       n: (value: unknown) => absent(value) || value === 1,
@@ -63,7 +103,10 @@ export const OPENAI_CHAT = {
         absent(value) ||
         (typeof value === 'object' &&
           (value as { type?: unknown }).type === 'text'),
-      stop: (value: unknown) => absent(value) || emptyList(value),
+      // Provider-run additions (web search and others) no seller runs: refused rather than skipped, so a
+      // client never believes the answer searched the web when it did not.
+      plugins: emptyList,
+      web_search_options: absent,
       logprobs: isFalse,
       top_logprobs: absent,
       logit_bias: (value: unknown) =>
@@ -94,6 +137,8 @@ export const ANTHROPIC_CHAT = {
       FREE_CHAT_FIELDS.SYSTEM,
       'tools',
       'tool_choice',
+      // Honored by the buyer, as OpenAI's stop is.
+      'stop_sequences',
     ] as readonly string[],
     // Sampling hints, bookkeeping and the settings agents such as Claude Code always send: thinking is
     // always off on Gyblos offers, and effort and context management do not change what is asked.
@@ -108,7 +153,6 @@ export const ANTHROPIC_CHAT = {
       'context_management',
     ],
     neutral: {
-      stop_sequences: emptyList,
       // Servers Anthropic would call on the model's behalf.
       mcp_servers: emptyList,
     },
@@ -272,6 +316,8 @@ export const FREE_CHAT_DETAILS = {
     'server tools (web search, code execution and others run by a provider) are not supported',
   noToolSeller: 'no seller offers tools for this model right now',
   paidTools: 'tools are served on free offers only for now',
+  stop: `stop must be a non-empty string or a list of at most ${CHAT_STOP.maxSequences} of them, each at most ${CHAT_STOP.maxBytes} bytes`,
+  models: `models must be a list of at most ${OPENROUTER.maxFallbacks} model names`,
   responsesInput:
     'input must be text or a list of message, function_call and function_call_output items with text content',
   responsesItem: (type: string) =>
