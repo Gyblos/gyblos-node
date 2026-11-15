@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { TRANSPORT_LIMITS } from '@gyblos/config';
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { FREE_EXECUTION_ADMISSION } from '@gyblos/core/constants';
 import { parseNodeConfig } from '@gyblos/node/node-config';
 import { sellerSettings } from '@gyblos/node/seller-settings';
@@ -46,6 +47,7 @@ void test('without [limits] the seller keeps the built-in limits', () => {
   assert.deepEqual(sellerSettings(parsed.config, {}).limits, {
     transport: TRANSPORT_LIMITS,
     maxFreeBuyers: FREE_EXECUTION_ADMISSION.maxBuyers,
+    maxSessions: BATCH_SESSION_DEFAULTS.maxSessions,
   });
 });
 
@@ -70,6 +72,7 @@ void test('[limits] values reach the transport limits the seller serves with', (
       connectionAttemptsPerWindow: 8192,
     },
     maxFreeBuyers: 10,
+    maxSessions: BATCH_SESSION_DEFAULTS.maxSessions,
   });
 
   // One buyer gets 60 requests per window instead of 30.

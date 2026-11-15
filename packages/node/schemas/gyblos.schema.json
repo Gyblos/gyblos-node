@@ -162,6 +162,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 65536
+        },
+        "max_sessions": {
+          "description": "Maximum nonterminal reusable financial sessions, including disconnected or uncertain buyers. Does not enable the paired pilot or change inference concurrency.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 16
         }
       }
     },

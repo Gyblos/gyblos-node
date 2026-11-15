@@ -12,6 +12,11 @@ export {
   openBatchSellerBackend,
 } from './batch-session-backend';
 export { batchSessionObserver } from './batch-session-observer';
+export {
+  openBatchSellerRegistry,
+  type BatchSellerRegistry,
+  type BatchSellerRegistryEntry,
+} from './batch-seller-registry';
 export { renewBatchSession } from './batch-session-renewal';
 export {
   recoverBatchBuyer,

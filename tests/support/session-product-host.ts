@@ -39,7 +39,9 @@ export async function sessionProductHost(
     ) => Promise<import('@gyblos/protocol/engine').EngineResult>;
     telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;
   },
+  capacity?: { maxSessions: number },
 ) {
+  let servedMaxSessions: number | undefined;
   const workspace = await createAcceptanceWorkspace();
   const previous = new Map(
     [
@@ -92,6 +94,12 @@ export async function sessionProductHost(
     const finance = await sessionProductPayments(roles);
     await paidSellerConfiguration(pricing);
     const configuration = process.env.GYBLOS_CONFIG!;
+    if (capacity)
+      await writeFile(
+        configuration,
+        `${await readFile(configuration, 'utf8')}\n[limits]\nmax_sessions = ${capacity.maxSessions}\n`,
+        { mode: FILE_MODES.privateFile },
+      );
     await writeFile(
       configuration,
       (await readFile(configuration, 'utf8')).replace(
@@ -126,7 +134,10 @@ export async function sessionProductHost(
             },
           };
         },
-        payments: finance.seller,
+        payments: async (_role, limits) => {
+          servedMaxSessions = limits?.maxSessions;
+          return finance.seller();
+        },
       });
       await seller.start();
     };
@@ -174,6 +185,7 @@ export async function sessionProductHost(
     await start();
     return {
       finance,
+      servedMaxSessions: () => servedMaxSessions,
       engine,
       binding,
       buyer: () => {
