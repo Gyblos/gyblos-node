@@ -17,6 +17,12 @@ market value: the beta tests the payment path, not real income. Mainnet is not o
 Coding agents such as Codex or Claude Code use tools, so during the beta they buy from **free** offers or
 from the paired pilot. A priced offer serves plain text conversations.
 
+A paid request has at most **128 tokens** of answer and **4000 characters** of prompt.
+
+Agents send long prompts, thousands of tokens. To serve them for free, raise the engine's `context_tokens`
+(up to 32768, see [configuration](/en/reference/configuration)) and use a fast machine, with Apple Silicon or
+a GPU. On a CPU-only server, reading the prompt takes longer than the agent waits.
+
 ## What you need [#requirements]
 
 - A registered seller ([register and publish](/en/sellers/register-publish)).
@@ -79,9 +85,12 @@ The fee payer pays:
 - the temporary rent of each request's channel, recovered later by a cleanup. A restart can lose track of
   older rent, so not all of it is guaranteed to come back automatically.
 
-  0.05 SOL is a starting balance, not a fixed budget. If it runs low, the seller does not start
-  (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) or cannot collect. Check its balance regularly and top it up from
-  the faucet.
+In our devnet rehearsal, each paid request held about **0.002 SOL** as rent until cleanup. With many
+requests in a row, 0.05 SOL goes down fast; if you expect heavy use, fund more.
+
+0.05 SOL is a starting balance, not a fixed budget. If it runs low, the seller does not start
+(`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) or cannot collect. Check its balance regularly and top it up from the
+faucet.
 
 ## How a buyer pays you [#how-payment-works]
 

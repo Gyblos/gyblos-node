@@ -17,6 +17,12 @@ devnet no tienen valor de mercado: la beta prueba el camino del pago, no ingreso
 Los agentes de programación como Codex o Claude Code usan herramientas, así que durante la beta compran a
 ofertas **gratis** o al piloto emparejado. Una oferta con precio atiende conversaciones de solo texto.
 
+Un pedido pagado tiene como máximo **128 tokens** de respuesta y **4000 caracteres** de pregunta.
+
+Los agentes envían preguntas largas, de miles de tokens. Para atenderlos gratis, sube `context_tokens` del
+motor (hasta 32768, ver [configuración](/es/reference/configuration)) y usa una máquina rápida, con Apple
+Silicon o GPU. En un servidor solo con CPU, leer la pregunta tarda más que el plazo del agente.
+
 ## Qué necesitas [#requisitos]
 
 - Un vendedor registrado ([registrar y publicar](/es/sellers/register-publish)).
@@ -79,6 +85,9 @@ El pagador de comisiones paga:
   predeterminados (una estimación, no un máximo garantizado);
 - la renta temporal del canal de cada pedido, que se recupera después con una limpieza. Un reinicio puede
   perder el registro de la renta antigua, así que no se garantiza que vuelva toda automáticamente.
+
+En nuestro ensayo en devnet, cada pedido pagado dejó unos **0,002 SOL** retenidos como renta hasta la
+limpieza. Con muchos pedidos seguidos, 0,05 SOL baja rápido; si esperas mucho uso, carga más.
 
 0,05 SOL es un saldo inicial, no un presupuesto fijo. Si se acaba, el vendedor no inicia
 (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) o no puede cobrar. Revisa su saldo con frecuencia y recárgalo desde
