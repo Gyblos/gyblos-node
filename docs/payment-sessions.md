@@ -1,5 +1,47 @@
 # Reusable buyer-authorized payment sessions
 
+## Seller capacity and separate buyer sessions
+
+The seller reads financial session capacity from its `config.toml`:
+
+```toml
+[limits]
+max_sessions = 16
+```
+
+The default is 16, with an initial supported range of 1–16. This counts durable
+nonterminal financial sessions, including disconnected buyers, opening attempts
+and uncertain or closing channels. It does not change connection quotas or the
+single global foreground execution turn. A completed answer or disconnected
+client does not release financial capacity. Only a proved closure/refund or a
+proved never-created opening does. Lowering the limit preserves existing
+obligations and their recovery while refusing additional reservations.
+
+Capacity does not activate public reusable inference. For selected paired
+pilots, set `GYBLOS_SESSION_BUYER_NODE_IDS` to a comma-separated list of
+lowercase buyer NodeIds, without spaces. The old singular
+`GYBLOS_SESSION_BUYER_NODE_ID` remains a one-peer compatibility alias; setting
+both is refused. With neither set, ordinary free/per-request paid operation
+remains the default. Any old financial obligations still restore for status,
+approval and closure; removing pilot eligibility never grants a new inference or
+discards a debt.
+
+Each buyer has a separate private child journal. The admission index reserves a
+slot before a deposit can be submitted; an interrupted initial publication is
+repaired only from its exact pristine state. Legacy role journals remain at
+their original path and count toward capacity. Missing, corrupt or unindexed
+financial state fails closed. Renewal keeps terms and financial history solely
+in the existing atomic child journal. A stale unsubmitted preparation can
+refresh only after the financial adapter verifies its exact unsigned state;
+attempted openings retain their original recovery intent.
+
+Closed buyer proof remains private and retained. The pilot index is additionally
+bounded to 64 recorded buyers; it refuses a previously unseen buyer at that
+storage ceiling rather than evicting proof. This retention limit is separate
+from active `max_sessions`. General public reusable admission and automatic
+retention management are later work. Do not delete journals or locks to obtain
+capacity or bypass recovery.
+
 ## Pilot renewal and spending authority
 
 The ordinary beta paid path charges per request. Reusable sessions remain an

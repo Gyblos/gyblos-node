@@ -1,12 +1,18 @@
 // Seller financial session capacity comes from config.toml without changing transport or generation limits.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
-import { parseNodeConfig } from '@gyblos/node/node-config';
+import { parseNodeConfig, parseTomlDocument } from '@gyblos/node/node-config';
 import { sellerSettings } from '@gyblos/node/seller-settings';
 
-import { BASE, FREE_SELLER_OFFER } from './support/node-config-fixtures';
+import { createValidator } from './support/json-schema';
+import {
+  BASE,
+  FREE_SELLER_OFFER,
+  SCHEMA_PATH,
+} from './support/node-config-fixtures';
 
 function configured(value = '') {
   const parsed = parseNodeConfig(
@@ -53,5 +59,27 @@ void test('max_sessions rejects zero, excessive, noninteger and wrong-type value
       assert.ok(
         parsed.issues.some((issue) => issue.path === 'limits.max_sessions'),
       );
+  }
+});
+
+void test('the published config.toml schema accepts the same financial capacity values', () => {
+  const schema: unknown = JSON.parse(readFileSync(SCHEMA_PATH, 'utf8'));
+  assert.ok(
+    schema !== null && typeof schema === 'object' && !Array.isArray(schema),
+  );
+  const validate = createValidator({ ...schema });
+  for (const [value, accepted] of [
+    ['1', true],
+    ['16', true],
+    ['0', false],
+    ['17', false],
+    ['1.5', false],
+    ['"2"', false],
+  ] as const) {
+    const parsed = parseTomlDocument(
+      `${BASE}${FREE_SELLER_OFFER}[limits]\nmax_sessions = ${value}\n`,
+    );
+    assert.ok(parsed.ok);
+    assert.equal(validate(parsed.document), accepted);
   }
 });

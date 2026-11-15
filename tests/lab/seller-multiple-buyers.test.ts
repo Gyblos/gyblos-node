@@ -1,5 +1,6 @@
 // Product session hosts authenticate two buyers over loopback while their channels run in native LiteSVM.
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
@@ -118,6 +119,30 @@ void test(
       ),
       { code: SESSION_CODES.BINDING },
     );
+    const other = JSON.parse(await readFile(b.paths.state, 'utf8'));
+    for (const [method, params] of [
+      [BATCH_METHODS.CLOSE, { channelId: second.stored.snapshot.channelId }],
+      [
+        BATCH_METHODS.APPROVE,
+        {
+          bill: other.requests['1'.padStart(32, '0')].bill,
+          voucher: other.voucher,
+        },
+      ],
+    ] as const)
+      await assert.rejects(
+        seller.service.exchange(
+          parseBatchChannelRequest({
+            version: BATCH_CHANNEL.version,
+            requestId: 'fd'.repeat(16),
+            method,
+            params,
+          }),
+          a.terms.buyerNodeId,
+          signal,
+        ),
+        { code: SESSION_CODES.BINDING },
+      );
     await assert.rejects(
       seller.service.exchange(
         request(first.stored.snapshot.channelId),

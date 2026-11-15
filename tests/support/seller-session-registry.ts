@@ -32,16 +32,21 @@ interface RegistryBuyer {
 
 export async function sellerRegistryRig(
   maxSessions = 2,
-  nodes?: { buyerNodeIds: readonly string[]; sellerNodeId: string },
+  options: {
+    buyerNodeIds?: readonly string[];
+    sellerNodeId?: string;
+    now?: () => number;
+    prepareOpenings?: boolean;
+  } = {},
 ) {
-  const now = () => 1_800_000_000_000;
+  const now = options.now ?? (() => 1_800_000_000_000);
   const vm = await nativeVm(now, SOLANA_TESTNET_CAIP2, {
     treasury: PROTOCOL_FEE.treasury,
   });
   const local = sessionNativeRpc(vm);
   const root = await mkdtemp(join(tmpdir(), 'gyb-seller-registry-'));
   const paths = batchSellerPathsIn({ GYBLOS_HOME: root });
-  const options = {
+  const registryOptions = {
     paths,
     maxSessions,
     now,
@@ -75,10 +80,10 @@ export async function sellerRegistryRig(
     const terms = {
       buyer: payer.address,
       buyerNodeId:
-        nodes?.buyerNodeIds[index] ??
+        options.buyerNodeIds?.[index] ??
         (index + 1).toString(16).padStart(64, '0'),
       owner: vm.seller.address,
-      sellerNodeId: nodes?.sellerNodeId ?? '34'.repeat(32),
+      sellerNodeId: options.sellerNodeId ?? '34'.repeat(32),
       network: vm.network,
       mint: vm.mint.address,
       payTo: vm.seller.address,
@@ -111,7 +116,7 @@ export async function sellerRegistryRig(
       buyer,
       paths: buyerPaths,
       payer,
-      payload: await buyer.open(),
+      payload: options.prepareOpenings === false ? '' : await buyer.open(),
     });
   }
   return {
@@ -119,10 +124,10 @@ export async function sellerRegistryRig(
     now,
     root,
     paths,
-    options,
+    options: registryOptions,
     buyers,
     open: (capacity = maxSessions) =>
-      openBatchSellerRegistry({ ...options, maxSessions: capacity }),
+      openBatchSellerRegistry({ ...registryOptions, maxSessions: capacity }),
     async dispose() {
       for (const row of buyers) await row.buyer.dispose();
     },

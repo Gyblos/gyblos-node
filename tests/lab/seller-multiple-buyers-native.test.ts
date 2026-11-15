@@ -1,5 +1,6 @@
 // Two authenticated native Iroh buyers share one seller; all native financial transactions stay in LiteSVM.
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 import { TRANSPORT_LIMITS } from '@gyblos/config';
@@ -8,7 +9,12 @@ import { startSellerSessionHost } from '@gyblos/node/seller-session-directory';
 import { serveSellerTransport } from '@gyblos/node/seller-transport';
 import { openBatchBuyerBackend } from '@gyblos/payments-upto/batch-session';
 import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
-import { SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import {
+  parseSessionBlock,
+  SESSION_BLOCK_KINDS,
+  SESSION_BLOCKS,
+} from '@gyblos/protocol/session-blocks';
 import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import {
@@ -45,6 +51,7 @@ void test(
     const rig = await sellerRegistryRig(2, {
       sellerNodeId: sellerEndpoint.id().toString(),
       buyerNodeIds: endpoints.map((peer) => peer.id().toString()),
+      prepareOpenings: false,
     });
     t.after(rig.dispose);
     const buyers = rig.buyers.slice(0, 2);
@@ -119,6 +126,29 @@ void test(
       );
     const original = await registry.list();
     assert.equal(original.length, 2);
+    const other = JSON.parse(await readFile(buyers[1]!.paths.state, 'utf8'));
+    const intent = other.blocks['1'.padStart(32, '0')].accepted;
+    const approval = parseSessionBlock({
+      version: SESSION_BLOCKS.version,
+      kind: SESSION_BLOCK_KINDS.APPROVAL,
+      channelId: other.channelId,
+      requestId: intent.bill.requestId,
+      requestDigest: intent.bill.requestDigest,
+      index: intent.index,
+      blockDigest: intent.digest,
+      voucher: other.voucher,
+    });
+    assert.equal(approval.kind, SESSION_BLOCK_KINDS.APPROVAL);
+    assert.ok(server.host.service.resumeBlock);
+    if (approval.kind === SESSION_BLOCK_KINDS.APPROVAL)
+      await assert.rejects(
+        server.host.service.resumeBlock(
+          approval,
+          buyers[0]!.terms.buyerNodeId,
+          signal(),
+        ),
+        { code: SESSION_CODES.BINDING },
+      );
     assert.equal(rig.vm.sends(), baseline + 2);
     for (const client of clients) await client.close();
     await server.transport.close();
