@@ -9,6 +9,7 @@ import {
   matchBatchTerms,
   verifyBatchQuote,
   type BatchChannelRequest,
+  type BatchExecutionRequest,
 } from '@gyblos/protocol/batch-channel';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
@@ -30,10 +31,13 @@ import type {
 import { isBlockSeller } from './batch-block-ports';
 import { createSellerBlockPlan } from './batch-block-seller';
 import { batchLiveOffer, generateBatch } from './batch-generation';
+import { publishSessionReceipt, sessionReceiptPayment } from './batch-receipts';
 import { sellerExecutionTelemetry } from './free-telemetry';
+import type { PaidSellerReceiptOptions } from './receipt-seller';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export interface SellerBatchSessionOptions {
+  receipts?: (index: number) => PaidSellerReceiptOptions;
   blockTargetTokens?: number;
   telemetry?: import('./seller-sessions').SellerSessionOptions['telemetry'];
   session: SessionSeller;
@@ -41,18 +45,14 @@ export interface SellerBatchSessionOptions {
   offers: () => readonly LiveSellerOffer[];
   now: () => number;
 }
-async function executeObserved(
-  request: import('@gyblos/protocol/batch-channel').BatchExecutionRequest,
-  peer: string,
-  signal: AbortSignal,
+function batchObserver(
+  request: BatchExecutionRequest,
   options: SellerBatchSessionOptions,
   live: LiveSellerOffer,
-  onDelta?: (text: string) => Promise<void>,
-  blocks?: BatchBlockExchange,
+  streaming: boolean,
 ) {
-  let observer: ReturnType<typeof sellerExecutionTelemetry>;
   try {
-    observer = sellerExecutionTelemetry(
+    return sellerExecutionTelemetry(
       request,
       {
         telemetry: options.telemetry
@@ -64,12 +64,31 @@ async function executeObserved(
         nodeId: options.terms.sellerNodeId,
         meter: live.meter,
       },
-      Boolean(onDelta || blocks),
+      streaming,
     );
   } catch {
     /* Optional metadata cannot block generation. */
   }
-
+}
+async function executeObserved(
+  request: BatchExecutionRequest,
+  peer: string,
+  signal: AbortSignal,
+  options: SellerBatchSessionOptions,
+  live: LiveSellerOffer,
+  onDelta?: (text: string) => Promise<void>,
+  blocks?: BatchBlockExchange,
+) {
+  const receivedAt = options.now();
+  const started = performance.now();
+  let first: number | null = null;
+  const base = options.session.snapshot().cumulativeAtomic;
+  const observer = batchObserver(
+    request,
+    options,
+    live,
+    Boolean(onDelta || blocks),
+  );
   let plan: Awaited<ReturnType<typeof createSellerBlockPlan>> | undefined;
   try {
     plan = blocks
@@ -92,6 +111,7 @@ async function executeObserved(
       signal,
       plan || onDelta
         ? async (text, check) => {
+            if (text) first ??= Math.floor(performance.now() - started);
             if (plan) await plan.delta(text, check);
             else await onDelta?.(text);
             if (text && !signal.aborted) observer?.firstToken();
@@ -100,6 +120,22 @@ async function executeObserved(
       (duration) => observer?.generated(duration),
     );
     const completed = plan ? await plan.complete(result.value) : result;
+    if (plan && options.receipts) {
+      try {
+        publishSessionReceipt(
+          options.receipts(live.index),
+          request,
+          plan.pending.requestDigest,
+          result.value,
+          sessionReceiptPayment(request, options.terms, base, completed.bill),
+          receivedAt,
+          first,
+          Math.floor(performance.now() - started),
+        );
+      } catch {
+        /* Optional attestations never change the signed approval or repeat generation. */
+      }
+    }
     completeInferenceTelemetry(observer, request.input, result.value);
     return completed;
   } catch (error) {

@@ -204,6 +204,10 @@ export async function startSeller(
     const sessions = paid?.sessions
       ? await startSellerSessions({
           ...paid.sessions,
+          receipts: (index) => ({
+            publisher: receipts.paidPublisher,
+            engineKind: settings.offers[index]!.engine.engine.kind,
+          }),
           telemetry: telemetry.sink
             ? {
                 sink: telemetry.sink,

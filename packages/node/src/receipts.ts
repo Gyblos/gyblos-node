@@ -8,6 +8,7 @@ export {
 } from './receipt-store';
 export {
   createSellerReceiptRuntime,
+  type PaidSellerReceiptOptions,
   type SellerReceiptOptions,
   type SellerReceiptPublisher,
 } from './receipt-seller';

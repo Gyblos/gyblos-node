@@ -28,6 +28,7 @@ import type { LiveSellerOffer } from './seller-offer-set';
 import type { SellerSessionBackend } from './session-backend';
 
 export interface SellerSessionOptions {
+  receipts?: import('./batch-seller').SellerBatchSessionOptions['receipts'];
   telemetry?: {
     sink: import('@gyblos/protocol/telemetry').TelemetrySink;
     engineKind: (
@@ -96,6 +97,7 @@ function binding(
       session,
       terms,
       telemetry: options.telemetry,
+      receipts: options.receipts,
       now: options.now,
       offers: options.offers,
     }),

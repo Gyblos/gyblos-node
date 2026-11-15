@@ -839,9 +839,11 @@ handed to the caller as a failure to surface, never retried.
 
 ## Usage receipts v1
 
-Usage receipts are defined but not yet emitted. No execution channel, seller,
-buyer, collector or payment path is wired to them. They apply to v2-and-later
-quotes; paid v1 does not have the required request identifiers and digests.
+Seller and buyer startup exchange private usage receipts after supported free
+execution and completed paid block sessions. Free-only collector ingestion
+remains separate; paid collector ingestion and public aggregation are not
+enabled. Receipts apply to v2-and-later quotes; paid v1 does not have the
+required request identifiers and digests.
 A receipt is evidence of what its signer reports, not proof of model execution,
 correctness or independently measured usage.
 
@@ -910,6 +912,41 @@ public. Public data consists of seller/model aggregates, buyer totals and
 signed daily snapshots, per the founder's receipt-privacy decision. Collection,
 consent, retention and public aggregation are outside this contract.
 
+### Paid block-session usage attestations
+
+For a completed request on `gyblos/session/5`, the existing paid receipt shape
+attests independently recounted usage and the amount authorized by the buyer's
+terminal cumulative voucher. It is not proof of an on-chain payment, settlement
+or refund. The execution digest is `sessionBlockRequestDigest` of the exact
+execution request, including its signed quote and channel binding. Receipts
+remain separate from payment vouchers and never authorize another generation.
+
+`amountAtomic` is the per-request gross charge, not the deposit or the cumulative
+channel total. Given the cumulative total before the request `B`, the accepted
+terminal total `C`, and the frozen channel fee split, let `F(x)` be the program's
+integer-rounded Gyblos share at total `x`. The attributed `feeAtomic` is
+`F(C) - F(B)`. This telescopes across requests; independently rounding each
+request's fee would not. The program treasury residual is not a Gyblos fee.
+This attribution describes the current split's authorized allocation, not an
+exact percentage collected or a transfer already confirmed in the chain.
+The sum equals the channel allocation only when receipts cover every authorized
+interval; missing receipts or partially authorized interrupted requests leave
+gaps and must not be reported as a fully receipted channel settlement.
+
+The buyer requires exact identity, selection, reasoning, execution digest,
+pricing, network, asset, charge and fee bindings and non-null independently
+recounted token counts. Known usage or byte mismatches prevent countersigning.
+Timing remains each node's own observation. `streaming` describes the block
+transport even if the local HTTP caller requested one complete JSON response.
+
+Only a verified terminal result and accepted terminal voucher produce a completed
+paid receipt. A cut, cancellation or lost terminal ACK does not fabricate one
+from partial data. Recovering a saved voucher does not repeat the prompt or
+reconstruct receipt observations absent from the journal. Receipt exchange and
+private storage are bounded best-effort metadata work: a failure cannot change
+the answer, release financial uncertainty or trigger inference again. Existing
+free-only collection policy is unchanged; paid aggregate ingestion is separate.
+
 ### Telemetry port (not connected)
 
 `TelemetrySink.emit` is synchronous and must never throw. `flush` drains
@@ -942,7 +979,8 @@ installed into a live role by this change.
 `gyblos/receipt/1` exchanges historical `receipt/v1` attestations independently
 of control, free inference and the reserved paid HTTP v2 path. It never carries
 inference input, starts generation, reserves capacity or authorizes payment.
-The adapter supports it explicitly; node/buyer startup does not enable it yet.
+Seller and buyer startup explicitly enable this independent metadata channel;
+receipt failure never authorizes inference or changes its payment state.
 
 Each bidirectional stream carries one request and one response, each as a
 four-byte big-endian body length followed by canonical UTF-8 JSON and sending

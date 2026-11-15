@@ -12,7 +12,13 @@ import type {
   BatchEndpoint,
 } from '@gyblos/transport-iroh/batch-client';
 
+import type { BuyerReceiptEvidence } from './receipt-buyer';
+
 export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
+  receipt?: (
+    evidence: BuyerReceiptEvidence,
+    quote: SignedOfferV2,
+  ) => Promise<void> | void;
   buyer: SessionBuyer;
   terms: Readonly<PaymentSessionTerms>;
   endpoint: BatchEndpoint<Remote>;
