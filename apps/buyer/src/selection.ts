@@ -2,44 +2,46 @@
 // Static operator identity trust stays independent of seller declarations; never executes payments.
 import { randomInt } from 'node:crypto';
 
-import { SELLER_BADGES } from '@gyblos/core/constants';
 import {
   selectSellers,
   type KnownSeller,
-  type SellerCandidate,
   type SellerSelectionResult,
 } from '@gyblos/core/seller-selection';
-import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import { CONTROL_CODES } from '@gyblos/protocol/constants';
+import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
-import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
 import {
   BUYER_SELECTION,
   BUYER_SELECTION_CODES,
-  ERROR_DIAGNOSTICS,
   SELLER_FAILURE_PHASES,
   SELLER_FAILURES,
   type SellerFailurePhase,
 } from './constants';
 import type { createBuyerControlClient } from './control';
-import { raceControlOffers, type WinningQuote } from './offer-race';
+import type { WinningQuote } from './offer-race';
+import { selectionBackoff, type SellerBackoff } from './selection-backoff';
+import type { SnapshotCache } from './selection-cache';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
   type StaticControlSeller,
 } from './selection-config';
+import { raceCandidates } from './selection-quotes';
+import { refreshSnapshots, verifiedSeller } from './selection-snapshots';
 import type { LocalSellerStats } from './selection-stats';
 import {
   reportSellerFailure,
-  sellerFailureCode,
   type SellerFailureCode,
   type SellerFailureReporter,
 } from './seller-failures';
 
+export { verifiedSeller };
 export type BuyerControlClient = Pick<
   ReturnType<typeof createBuyerControlClient>,
   'getCatalog' | 'getPresence' | 'requestOffer' | 'close'
->;
+> &
+  Partial<Pick<ReturnType<typeof createBuyerControlClient>, 'useCatalog'>>;
 export type SelectionDecision =
   | { ok: true; winner: WinningQuote }
   | {
@@ -63,62 +65,55 @@ export interface VerifiedSelectionDependencies {
     signal?: AbortSignal,
   ) => Promise<boolean>;
   observeVerified?: (seller: KnownSeller) => Promise<boolean>;
+  // Snapshots kept from earlier requests (selection-cache.ts); absent, every request asks every seller.
+  snapshots?: SnapshotCache;
+  // Longer cooldowns for sellers failing again and again (selection-backoff.ts); absent, always 30 s.
+  backoff?: SellerBackoff;
   // Told why each seller dropped out; it never affects which seller wins.
   onSellerFailure?: SellerFailureReporter;
 }
-export async function verifiedSeller(
-  client: BuyerControlClient,
-  seller: StaticControlSeller,
-  now: () => number,
-  signal: AbortSignal,
-): Promise<KnownSeller> {
-  const signed = await client.getCatalog(signal);
-  const trust = { owner: seller.owner, nodeId: seller.nodeId, now: now() };
-  const catalog = await verifyPublicV2(signed, trust);
-  if (catalog.kind !== PUBLIC_RECORD_KINDS.CATALOG)
-    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
-  const presence = await verifyPublicV2(await client.getPresence(signal), {
-    ...trust,
-    now: now(),
-    catalog,
-  });
-  if (presence.kind !== PUBLIC_RECORD_KINDS.PRESENCE)
-    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
-  const withdrawal = seller.withdrawal
-    ? await verifyPublicV2(seller.withdrawal, { ...trust, now: now(), catalog })
-    : null;
-  if (withdrawal && withdrawal.kind !== PUBLIC_RECORD_KINDS.WITHDRAWAL)
-    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
-  return {
-    catalog,
-    presence,
-    withdrawal,
-    badge: SELLER_BADGES.DECLARED_USAGE,
-    openChannel: false,
-  };
-}
-function recordQuote(
-  stats: Map<string, LocalSellerStats>,
-  nodeId: string,
-  success: boolean,
-  latencyMs: number,
-  now: number,
-) {
-  const prior = stats.get(nodeId);
-  stats.set(nodeId, {
-    successes: (prior?.successes ?? 0) + Number(success),
-    failures: (prior?.failures ?? 0) + Number(!success),
-    latencyMs: Math.max(0, Math.round(latencyMs)),
-    waitAccuracy: prior?.waitAccuracy ?? null,
-    cooldownUntil: success ? null : now + BUYER_SELECTION.cooldownMs,
-    // v2 has no predicted wait and control latency is not inference waiting time.
-    quotedWaitMs: prior?.quotedWaitMs ?? null,
-    observedWaitMs: prior?.observedWaitMs ?? null,
-  });
-}
+// A seller that refused a quote for a remembered catalog is not counted as failing: its snapshot is
+// dropped and, when no other seller won, the selection runs once more with fresh snapshots.
 export async function selectVerifiedBuyerQuote(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
+  signal?: AbortSignal,
+): Promise<SelectionDecision> {
+  const pending = selectionBackoff(
+    dependencies.backoff,
+    config,
+    dependencies.stats,
+    dependencies.onSellerFailure,
+    signal,
+  );
+  const active = {
+    ...dependencies,
+    backoff: pending.backoff,
+    onSellerFailure: pending.onSellerFailure,
+  };
+  let alternativeNodeId: string | undefined;
+  // One caller owns both catalog attempts and work retired before deferred failure reports.
+  const settling: Promise<unknown>[] = [];
+  try {
+    const stale = new Set<string>();
+    const first = await selectOnce(config, active, stale, settling, signal);
+    const result =
+      first.ok || !stale.size || signal?.aborted
+        ? first
+        : await selectOnce(config, active, new Set(), settling, signal);
+    if (result.ok) alternativeNodeId = result.winner.candidate.nodeId;
+    return result;
+  } finally {
+    pending.finish(alternativeNodeId);
+    // A failure reporter can synchronously cancel after the last attempt already closed its clients.
+    if (signal?.aborted) await Promise.allSettled(settling);
+  }
+}
+async function selectOnce(
+  config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
+  stale: Set<string>,
+  settling: Promise<unknown>[],
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
   if (config.identity && !dependencies.verifyIdentity)
@@ -130,12 +125,15 @@ export async function selectVerifiedBuyerQuote(
   ]);
   const clients = new Map<string, BuyerControlClient>();
   try {
+    const recalled = new Map<string, SignedPublicV2>();
     const snapshots = await refreshSnapshots(
       config,
       dependencies,
       clients,
+      recalled,
       now,
       deadline,
+      settling,
       signal,
     );
     if (signal?.aborted)
@@ -155,7 +153,7 @@ export async function selectVerifiedBuyerQuote(
     if (!selected.ok) return selected;
     const winner = await raceCandidates(
       selected.candidates,
-      clients,
+      { clients, stale, recalled, settling },
       config,
       dependencies,
       now,
@@ -186,6 +184,9 @@ export async function selectVerifiedBuyerQuote(
     await Promise.allSettled(
       [...clients.values()].map((client) => client.close()),
     );
+    // Cancellation retains ownership of every native operation this selection started, including
+    // connections retired before the caller cancelled. Admission stays held until they settle.
+    if (signal?.aborted) await Promise.allSettled(settling);
   }
 }
 
@@ -214,167 +215,6 @@ function offerCurrent(winner: WinningQuote, now: () => number) {
   } catch {
     return false;
   }
-}
-
-function raceCandidates(
-  candidates: readonly SellerCandidate[],
-  clients: ReadonlyMap<string, BuyerControlClient>,
-  config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
-  now: () => number,
-  signal?: AbortSignal,
-) {
-  return raceControlOffers(
-    candidates,
-    (candidate, querySignal) =>
-      requestCandidate(
-        candidate,
-        clients,
-        config,
-        dependencies,
-        now,
-        querySignal,
-      ),
-    {
-      signal,
-      // The operator's selection.json wins over the caller's default.
-      windowMs: config.quoteWindowMs ?? dependencies.windowMs,
-      ...(config.previousSeller ? { preferred: config.previousSeller } : {}),
-      // A seller silent for the whole window is cooled down like one that refused.
-      onExpired: (pending) => {
-        for (const candidate of pending) {
-          recordQuote(dependencies.stats, candidate.nodeId, false, 0, now());
-          reportSellerFailure(dependencies.onSellerFailure, {
-            nodeId: candidate.nodeId,
-            phase: SELLER_FAILURE_PHASES.TIMEOUT,
-            code: ERROR_DIAGNOSTICS.TIMEOUT,
-          });
-        }
-      },
-    },
-  );
-}
-
-async function requestCandidate(
-  candidate: SellerCandidate,
-  clients: ReadonlyMap<string, BuyerControlClient>,
-  config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
-  now: () => number,
-  querySignal: AbortSignal,
-) {
-  const start = now();
-  const request = config.request;
-  try {
-    const quote = await clients.get(candidate.nodeId)!.requestOffer(
-      {
-        buyer: dependencies.buyer,
-        selection: request.selection,
-        reasoning: candidate.reasoning,
-        maxTokens: request.maxTokens,
-        maxAtomic: candidate.free ? '0' : request.maxAtomic,
-        priceCeilings: request.priceCeilings,
-        network: request.network,
-        asset: request.asset,
-        ...(request.tools ? { tools: true as const } : {}),
-      },
-      querySignal,
-    );
-    if (querySignal.aborted)
-      throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
-    recordQuote(
-      dependencies.stats,
-      candidate.nodeId,
-      true,
-      now() - start,
-      now(),
-    );
-    return quote;
-  } catch (error) {
-    if (!querySignal.aborted) {
-      // A seller without tools answered as designed: it is not cooled down for the requests it serves.
-      if (sellerFailureCode(error) !== CONTROL_CODES.TOOLS)
-        recordQuote(
-          dependencies.stats,
-          candidate.nodeId,
-          false,
-          now() - start,
-          now(),
-        );
-      reportSellerFailure(dependencies.onSellerFailure, {
-        nodeId: candidate.nodeId,
-        phase: SELLER_FAILURE_PHASES.QUOTE,
-        code: sellerFailureCode(error),
-      });
-    }
-    throw error;
-  }
-}
-
-function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
-  return outcomes.map((outcome) => {
-    if (outcome.status === 'rejected') throw outcome.reason;
-    return outcome.value;
-  });
-}
-
-async function refreshSnapshots(
-  config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
-  clients: Map<string, BuyerControlClient>,
-  now: () => number,
-  deadline: AbortSignal,
-  // The caller's own signal: its abort is a cancellation, while the snapshot deadline is a failure.
-  signal?: AbortSignal,
-) {
-  return settledValues(
-    await Promise.allSettled(
-      config.sellers.map(async (seller) => {
-        // A request the caller cancelled is not a seller failure.
-        const failed = (phase: SellerFailurePhase, code: SellerFailureCode) => {
-          if (!signal?.aborted)
-            reportSellerFailure(dependencies.onSellerFailure, {
-              nodeId: seller.nodeId,
-              phase,
-              code,
-            });
-        };
-        try {
-          if (
-            dependencies.verifyIdentity &&
-            !(await dependencies.verifyIdentity(seller, deadline))
-          ) {
-            failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
-            return undefined;
-          }
-          deadline.throwIfAborted();
-          const client = await dependencies.connect(seller);
-          clients.set(seller.nodeId, client);
-          const verified = await verifiedSeller(client, seller, now, deadline);
-          if (
-            dependencies.observeVerified &&
-            !(await dependencies.observeVerified(verified))
-          ) {
-            failed(SELLER_FAILURE_PHASES.DISCOVERY, SELLER_FAILURES.DISCOVERY);
-            return undefined;
-          }
-          return verified;
-        } catch (error) {
-          if (
-            error instanceof BuyerSelectionError &&
-            [
-              BUYER_SELECTION_CODES.DISCOVERY_STATE,
-              BUYER_SELECTION_CODES.IDENTITY_STATE,
-            ].some((code) => error.code === code)
-          )
-            throw error;
-          recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
-          failed(SELLER_FAILURE_PHASES.CONNECT, sellerFailureCode(error));
-          return undefined;
-        }
-      }),
-    ),
-  );
 }
 
 export interface SelectionDependencies extends VerifiedSelectionDependencies {
