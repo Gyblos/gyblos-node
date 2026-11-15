@@ -1,5 +1,8 @@
 // Defines content-free inputs to free receipt policy; callers own execution evidence and node signers.
 import type {
+  OFFER_PRICING_KINDS,
+} from '@gyblos/protocol/constants';
+import type {
   BuyerReceiptV1,
   ReceiptV1,
   SellerReceiptV1,
@@ -24,4 +27,20 @@ export interface FreeBuyerReceiptInput {
   seller: ReceiptV1['seller'];
   context: ReceiptExecutionContext;
   observed: BuyerReceiptV1['observed'];
+}
+
+export interface PaidReceiptPayment {
+  pricing: Extract<
+    SellerReceiptV1['pricing'],
+    { kind: typeof OFFER_PRICING_KINDS.PAID }
+  >;
+  amountAtomic: string;
+  feeAtomic: string;
+}
+export interface PaidSellerReceiptInput {
+  record: FreeSellerReceiptInput;
+  payment: PaidReceiptPayment;
+}
+export interface PaidBuyerReceiptInput extends FreeBuyerReceiptInput {
+  payment: PaidReceiptPayment;
 }

@@ -29,6 +29,9 @@ import { receiptContext, sameReceiptContext } from './receipts-context';
 export type {
   FreeBuyerReceiptInput,
   FreeSellerReceiptInput,
+  PaidBuyerReceiptInput,
+  PaidReceiptPayment,
+  PaidSellerReceiptInput,
   ReceiptExecutionContext,
 } from './receipts-types';
 
@@ -145,4 +148,28 @@ export function receiptTextSizes(
     inputChars: Array.from(input).length,
     outputChars: Array.from(output).length,
   };
+}
+
+export function buildPaidSellerReceipt(value: unknown): SellerReceiptV1 {
+  const input = controlObject(value, ['record', 'payment']);
+  return buildFreeSellerReceipt(input.record);
+}
+export async function createPaidSellerReceipt(
+  value: unknown,
+  signer: Signer,
+): Promise<ReceiptV1> {
+  return { seller: await signSellerReceipt(buildPaidSellerReceipt(value), signer) };
+}
+export async function buildPaidBuyerReceipt(value: unknown): Promise<BuyerReceiptV1> {
+  return buildFreeBuyerReceipt(value);
+}
+export async function createPaidBuyerReceipt(
+  value: unknown,
+  signer: Signer,
+): Promise<ReceiptV1> {
+  const input = controlObject(value, ['seller', 'context', 'observed', 'payment']);
+  return createFreeBuyerReceipt(
+    { seller: input.seller, context: input.context, observed: input.observed },
+    signer,
+  );
 }
