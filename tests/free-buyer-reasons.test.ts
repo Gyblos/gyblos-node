@@ -4,7 +4,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
+import {
+  BUYER_SELECTION,
+  BUYER_SELECTION_CODES,
+} from '@gyblos/buyer/constants';
 import { FreeBuyerError, parseFreeChat } from '@gyblos/buyer/free-chat';
 import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import {
@@ -135,6 +138,8 @@ void test('selection reports each failing seller with its phase and a fixed code
   try {
     const { windowMs: _default, ...dependencies } = run.dependencies;
     const nodeId = run.config.sellers[0]!.nodeId;
+    // Each failure cools the seller down for the first time: tried again 30 s later.
+    const retryAt = run.context.now() + BUYER_SELECTION.cooldownMs;
     const select = async (
       patch: Partial<typeof dependencies>,
       quoteWindowMs?: number,
@@ -159,7 +164,7 @@ void test('selection reports each failing seller with its phase and a fixed code
     });
     assert.equal(unreachable.result.ok, false);
     assert.deepEqual(unreachable.failures, [
-      { nodeId, phase: 'connect', code: 'SELLER_ERROR_UNKNOWN' },
+      { nodeId, phase: 'connect', code: 'SELLER_ERROR_UNKNOWN', retryAt },
     ]);
     // The seller answers the catalog but refuses the quote with a control code.
     run.client.requestOffer = async () => {
@@ -171,7 +176,7 @@ void test('selection reports each failing seller with its phase and a fixed code
       code: BUYER_SELECTION_CODES.NO_OFFER,
     });
     assert.deepEqual(refused.failures, [
-      { nodeId, phase: 'quote', code: CONTROL_CODES.MODEL },
+      { nodeId, phase: 'quote', code: CONTROL_CODES.MODEL, retryAt },
     ]);
     // The seller never answers before the window closes.
     run.client.requestOffer = (_params, signal) =>
@@ -182,7 +187,7 @@ void test('selection reports each failing seller with its phase and a fixed code
       );
     const silent = await select({ connect: async () => run.client }, 100);
     assert.deepEqual(silent.failures, [
-      { nodeId, phase: 'timeout', code: 'REQUEST_TIMEOUT' },
+      { nodeId, phase: 'timeout', code: 'REQUEST_TIMEOUT', retryAt },
     ]);
   } finally {
     await run.wire.close();
@@ -209,7 +214,12 @@ void test('a seller that hangs past the snapshot deadline is reported; a cancell
       onSellerFailure: (failure) => failures.push(failure),
     });
     assert.deepEqual(failures, [
-      { nodeId, phase: 'connect', code: 'REQUEST_TIMEOUT' },
+      {
+        nodeId,
+        phase: 'connect',
+        code: 'REQUEST_TIMEOUT',
+        retryAt: run.context.now() + BUYER_SELECTION.cooldownMs,
+      },
     ]);
     const cancelled: unknown[] = [];
     const caller = new AbortController();

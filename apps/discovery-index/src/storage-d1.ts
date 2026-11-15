@@ -22,6 +22,7 @@ import {
   recordCountsQuery,
 } from './storage-queries';
 import { admitNodeQuery, recordQueries } from './storage-writes';
+import { createD1Uptime } from './uptime-d1';
 
 export type {
   D1Database,
@@ -78,6 +79,7 @@ function referenceMissing(row: D1Row | undefined, entry: StoredEntry) {
 export function createD1Storage(client: D1Database): DiscoveryStorage {
   const database = createD1Orm(client);
   return {
+    ...createD1Uptime(database),
     async state(nodeId) {
       const [row] = await nodeStateQuery(database, nodeId);
       return row ? nodeState(row) : null;

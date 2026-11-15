@@ -25,6 +25,8 @@ export const AGENT_SETUP = {
     codex: 'config.toml',
   },
   codexProfileSuffix: '.config.toml',
+  codexWriteLock: '.gyblos-config-write.lock',
+  backupSuffix: '.before-gyblos',
 } as const;
 
 export interface AgentModel {
@@ -44,6 +46,7 @@ export const CODEX_MARKS = {
   start: '# >>> gyblos (managed by pnpm buyer:agent codex)',
   end: '# <<< gyblos',
   profile: '# gyblos profile (managed by pnpm buyer:agent codex)',
+  profileDigest: '# gyblos profile sha256: ',
 } as const;
 
 // Canonical configuration-generator error codes, shared with the host commands.

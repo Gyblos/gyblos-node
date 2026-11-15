@@ -163,3 +163,19 @@ export const registrations = sqliteTable(
     ),
   ],
 );
+
+export const uptimeNodes = sqliteTable('discovery_uptime_nodes', {
+  nodeId: text('node_id').primaryKey(),
+  firstAt: integer('first_at').notNull(),
+});
+export const uptimeSlots = sqliteTable(
+  'discovery_uptime',
+  {
+    nodeId: text('node_id').notNull(),
+    hour: integer('hour').notNull(),
+    slots: integer('slots').notNull(),
+    firstAt: integer('first_at').notNull(),
+    lastAt: integer('last_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.nodeId, table.hour] })],
+);
