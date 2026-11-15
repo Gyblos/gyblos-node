@@ -54,6 +54,14 @@ function parseStats(value: unknown): LocalSellerStats {
     observedWaitMs: nullableNumber(row.observedWaitMs),
   };
 }
+// A cooldown saved by an earlier run lasts at most the base cooldown from now: a restart starts the
+// backoff count over (selection-backoff.ts), so it must not keep a long one.
+function loadedStats(stats: LocalSellerStats, now = Date.now()) {
+  const limit = now + BUYER_SELECTION.cooldownMs;
+  return stats.cooldownUntil !== null && stats.cooldownUntil > limit
+    ? { ...stats, cooldownUntil: limit }
+    : stats;
+}
 export async function selectionStats(environment: HomeEnvironment) {
   await assertRoleHome(P2P_ROLES.BUYER, environment);
   const directory = homeLayout(environment).roles.buyer;
@@ -78,7 +86,7 @@ export async function selectionStats(environment: HomeEnvironment) {
         throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
       for (const entry of value.rows) {
         const row = controlObject(entry, ['nodeId', 'stats']);
-        rows.set(controlHex(row.nodeId), parseStats(row.stats));
+        rows.set(controlHex(row.nodeId), loadedStats(parseStats(row.stats)));
       }
     } finally {
       await file.close();
