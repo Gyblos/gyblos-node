@@ -17,11 +17,9 @@ market value: the beta tests the payment path, not real income. Mainnet is not o
 Coding agents such as Codex or Claude Code use tools, so during the beta they buy from **free** offers or
 from the paired pilot. A priced offer serves plain text conversations.
 
-A paid request has at most **128 tokens** of answer and **4000 characters** of prompt.
-
 Agents send long prompts, thousands of tokens. To serve them for free, raise the engine's `context_tokens`
 (up to 32768, see [configuration](/en/reference/configuration)) and use a fast machine, with Apple Silicon or
-a GPU. On a CPU-only server, reading the prompt takes longer than the agent waits.
+a GPU. A CPU-only server can be too slow, as it was in our rehearsal.
 
 ## What you need [#requirements]
 
