@@ -14,7 +14,7 @@ import { batchOpeningAbsent } from './batch-opening-proof';
 import { requestFor } from './batch-session-checks';
 import type { BatchStore } from './batch-session-store';
 import type { BatchRecord } from './batch-session-types';
-import { BATCH_BLOCK_STATE } from './constants';
+import { BATCH_BLOCK_STATE, BATCH_RENEWAL_STATE } from './constants';
 
 export function initialRecord(
   terms: PaymentSessionTerms,
@@ -108,7 +108,8 @@ export async function reserve(
       accepted: false,
     };
     if (blocks) {
-      state.version = BATCH_BLOCK_STATE.version;
+      if (state.version !== BATCH_RENEWAL_STATE.version)
+        state.version = BATCH_BLOCK_STATE.version;
       state.blocks ??= {};
       state.blocks[request.requestId] = {
         baseAtomic: state.cumulativeAtomic,

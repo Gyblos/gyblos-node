@@ -14,6 +14,7 @@ import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import type { PaymentDescription } from '@gyblos/protocol/payment';
 import {
   SESSION_CODES,
+  SESSION_STATES,
   type PaymentSessionTerms,
   type SessionSeller,
 } from '@gyblos/protocol/payment-session';
@@ -114,17 +115,30 @@ async function operation(
   blockMode?: boolean,
 ) {
   signal.throwIfAborted();
+  if (!state.current) {
+    const stored = await options.backend.inspect();
+    if (stored)
+      state.current = binding(
+        options,
+        ownTerms(stored.terms, options, false),
+        await options.backend.create(stored.terms),
+      );
+  }
   if (
     request.method === BATCH_METHODS.PREPARE ||
     request.method === BATCH_METHODS.OPEN
   ) {
     const proposed = request.params.terms ?? state.current?.terms;
     if (!proposed) return batchFail();
-    const terms = ownTerms(proposed, options, !state.current);
-    if (
-      state.current &&
-      canonicalJson(state.current.terms) !== canonicalJson(terms)
-    )
+    const replacing =
+      state.current !== undefined &&
+      canonicalJson(state.current.terms) !== canonicalJson(proposed);
+    const terms = ownTerms(proposed, options, !state.current || replacing);
+    const snapshot = state.current?.session.snapshot();
+    const preparing =
+      snapshot?.state === SESSION_STATES.OPENING && snapshot.channelId === '';
+    // Empty transport identity is only a candidate; backend.renew verifies exact unsigned durable state.
+    if (replacing && snapshot?.state !== SESSION_STATES.CLOSED && !preparing)
       return batchFail(SESSION_CODES.BUSY);
     const offer = await verifyBatchQuote(
       request.params.quote,
@@ -140,6 +154,13 @@ async function operation(
     if (blockMode && !live.meter.stablePrefix)
       return batchFail(SESSION_CODES.UNAVAILABLE);
     if (request.method === BATCH_METHODS.PREPARE) return { terms };
+    if (replacing && state.current) {
+      if (!options.backend.renew) return batchFail(SESSION_CODES.CLOSED);
+      const expected = state.current.session.snapshot().channelId;
+      await state.current.session.dispose();
+      state.current = undefined;
+      await options.backend.renew(expected, terms, request.params.payload);
+    }
     if (!state.current) {
       const session = await options.backend.create(
         terms,

@@ -10,6 +10,7 @@ import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
   SESSION_CODES,
+  SESSION_STATES,
   sessionFail,
   type PaymentSessionTerms,
   type SessionBuyer,
@@ -46,6 +47,7 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
 }
 interface Current<Remote extends BatchDestination> {
   terms: PaymentSessionTerms;
+  priorSpentAtomic: string;
   financial: SessionBuyer;
   host: ReturnType<typeof createBuyerBatchSession<Remote>>;
 }
@@ -68,7 +70,7 @@ async function openCurrent<Remote extends BatchDestination>(
     stored?.terms ??
     (quote ? sessionTerms(quote, options.policy, options.now()) : undefined);
   if (!terms) return sessionFail(SESSION_CODES.UNAVAILABLE);
-  if (quote)
+  if (quote && !stored)
     await verifyBatchQuote(
       quote,
       terms,
@@ -92,6 +94,7 @@ async function openCurrent<Remote extends BatchDestination>(
       return sessionFail(SESSION_CODES.UNAVAILABLE);
     return {
       terms,
+      priorSpentAtomic: stored?.priorSpentAtomic ?? '0',
       financial,
       host: createBuyerBatchSession({
         ...options,
@@ -134,7 +137,7 @@ async function run<Remote extends BatchDestination>(
     return sessionFail(SESSION_CODES.UNVERIFIED);
   const opened = await current(state, quote, signal);
   if (
-    BigInt(opened.terms.depositAtomic) >
+    BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
       BigInt(state.options.policy.depositAtomic) ||
     opened.terms.withdrawDelaySeconds >
       state.options.policy.withdrawDelaySeconds ||
@@ -144,9 +147,10 @@ async function run<Remote extends BatchDestination>(
       state.options.policy.lifetimeMs
   )
     return sessionFail(SESSION_CODES.LIMIT);
-  const before = opened.financial.snapshot();
-  const value = await opened.host.execute(quote, input, signal, onDelta);
-  const after = opened.financial.snapshot();
+  const ready = await renewable(state, opened, quote, signal);
+  const before = ready.financial.snapshot();
+  const value = await ready.host.execute(quote, input, signal, onDelta);
+  const after = ready.financial.snapshot();
   return {
     value,
     approval: sessionApproval({
@@ -154,9 +158,70 @@ async function run<Remote extends BatchDestination>(
         BigInt(after.cumulativeAtomic) - BigInt(before.cumulativeAtomic),
       ),
       cumulativeAtomic: after.cumulativeAtomic,
-      depositAtomic: opened.terms.depositAtomic,
+      depositAtomic: ready.terms.depositAtomic,
     }),
   };
+}
+
+async function renewable<Remote extends BatchDestination>(
+  state: State<Remote>,
+  opened: Current<Remote>,
+  quote: SignedOfferV2,
+  signal: AbortSignal,
+): Promise<Current<Remote>> {
+  const options = state.options;
+  const backend = await state.backend!;
+  if (!backend.renew) return opened;
+  if (opened.financial.snapshot().channelId)
+    await opened.host.reconcile(signal);
+  const snapshot = opened.financial.snapshot();
+  if (
+    (!snapshot.channelId && options.now() < opened.terms.expiresAt) ||
+    (snapshot.state === SESSION_STATES.OPEN &&
+      options.now() < opened.terms.expiresAt &&
+      BigInt(snapshot.cumulativeAtomic) +
+        BigInt(snapshot.reservedAtomic) +
+        BigInt(quote.offer.maxAtomic) <=
+        BigInt(opened.terms.depositAtomic))
+  )
+    return opened;
+  const proposed = sessionTerms(quote, options.policy, options.now());
+  await verifyBatchQuote(
+    quote,
+    proposed,
+    options.endpoint.id().toString(),
+    options.now(),
+  );
+  const stored = await options.inspect();
+  if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
+  const settlement = snapshot.channelId
+    ? ((await opened.host.reconcile(signal)) ??
+      (await opened.host.close(signal)))
+    : undefined;
+  const remaining =
+    BigInt(options.policy.depositAtomic) -
+    BigInt(stored.priorSpentAtomic ?? '0') -
+    BigInt(settlement?.chargedAtomic ?? '0');
+  if (remaining <= 0n) return sessionFail(SESSION_CODES.LIMIT);
+  const terms = sessionTerms(
+    quote,
+    { ...options.policy, depositAtomic: String(remaining) },
+    options.now(),
+  );
+  await verifyBatchQuote(
+    quote,
+    terms,
+    options.endpoint.id().toString(),
+    options.now(),
+  );
+  signal.throwIfAborted();
+  await opened.host.disconnect();
+  await opened.host.settled();
+  await opened.financial.dispose();
+  state.current = undefined;
+  await backend.renew(snapshot.channelId, terms, options.policy.depositAtomic);
+  signal.throwIfAborted();
+  return current(state, quote, signal);
 }
 async function unresolved<Remote extends BatchDestination>(
   state: State<Remote>,

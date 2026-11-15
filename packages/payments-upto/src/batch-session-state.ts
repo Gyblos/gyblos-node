@@ -27,6 +27,7 @@ export interface BatchStoredSession {
   pending: boolean;
   recoverable: boolean;
   notCreated?: true;
+  priorSpentAtomic?: string;
 }
 async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
   try {
@@ -74,6 +75,9 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
   return {
     ...(notCreated ? { notCreated: true as const } : {}),
     terms: record.terms,
+    ...(record.history
+      ? { priorSpentAtomic: String(priorBatchSpent(record)) }
+      : {}),
     snapshot: {
       channelId: record.channelId,
       state: record.state,
@@ -94,6 +98,13 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
           !!record.blocks?.[request.requestId]?.accepted,
       ),
   };
+}
+
+export function priorBatchSpent(record: BatchRecord): bigint {
+  return (record.history ?? []).reduce(
+    (total, entry) => total + BigInt(entry.settlement!.chargedAtomic),
+    0n,
+  );
 }
 
 export function batchSessionTerminal(stored: BatchStoredSession | undefined) {

@@ -88,6 +88,7 @@ export async function nativeVm(
   supplied: {
     payer?: Awaited<ReturnType<typeof generateKeyPairSigner>>;
     mint?: Awaited<ReturnType<typeof generateKeyPairSigner>>;
+    treasury?: string;
   } = {},
 ) {
   const bytes = await readFile(
@@ -117,7 +118,9 @@ export async function nativeVm(
   const feePayer = await generateKeyPairSigner();
   const authorizer = await generateKeyPairSigner();
   const seller = await generateKeyPairSigner();
-  const fee = await generateKeyPairSigner();
+  const fee = supplied.treasury
+    ? { address: address(supplied.treasury) }
+    : await generateKeyPairSigner();
   const mint = supplied.mint ?? (await generateKeyPairSigner());
   for (const signer of [payer, feePayer])
     assert.ok(
