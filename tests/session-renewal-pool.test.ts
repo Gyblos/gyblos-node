@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
+import type { BatchBuyerBackend } from '@gyblos/payments-upto/batch-session';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { multisellerLoopback } from './support/multiseller-session';
@@ -17,13 +18,25 @@ void test('pooled insufficient reserve does not close, renew or execute an unacc
       const pool = await fixture.options.pool();
       return {
         ...pool,
-        backend: async (id) => ({
-          ...(await pool.backend(id)),
-          renew: async () => {
-            renewals++;
-            return sessionFail(SESSION_CODES.UNAVAILABLE);
-          },
-        }),
+        backend: async (id) => {
+          const backend = await pool.backend(id);
+          const original: BatchBuyerBackend = {
+            ...backend,
+            create(terms) {
+              assert.equal(
+                this,
+                original,
+                'the financial port keeps its receiver',
+              );
+              return backend.create(terms);
+            },
+            renew: async () => {
+              renewals++;
+              return sessionFail(SESSION_CODES.UNAVAILABLE);
+            },
+          };
+          return original;
+        },
       };
     },
   });

@@ -77,9 +77,9 @@ function manager<Remote extends BatchDestination>(
         const backend = await (await catalog(state)).backend(id);
         // Individual rollover cannot replace a child behind the catalog's shared budget.
         return {
-          inspect: backend.inspect,
-          create: backend.create,
-          observe: backend.observe,
+          inspect: backend.inspect.bind(backend),
+          create: backend.create.bind(backend),
+          observe: backend.observe.bind(backend),
         };
       },
     });
