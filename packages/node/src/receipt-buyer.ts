@@ -6,7 +6,10 @@ import type { Endpoint, EndpointAddr } from '@number0/iroh';
 
 import {
   buildFreeBuyerReceipt,
+  buildPaidBuyerReceipt,
   createFreeBuyerReceipt,
+  createPaidBuyerReceipt,
+  type PaidReceiptPayment,
   type ReceiptExecutionContext,
 } from '@gyblos/core/receipts';
 import { canonicalJson } from '@gyblos/protocol';
@@ -35,6 +38,7 @@ import { createReceiptWork } from './receipt-work';
 export interface BuyerReceiptEvidence {
   context: ReceiptExecutionContext;
   observed: BuyerReceiptV1['observed'];
+  payment?: PaidReceiptPayment;
 }
 async function receiptQuery(
   client: ReturnType<typeof createReceiptTransport<EndpointAddr>>,
@@ -67,7 +71,9 @@ async function buyerPair(
   signer: Signer,
   signal: AbortSignal,
 ) {
-  await buildFreeBuyerReceipt({ seller: found.seller, ...evidence });
+  const input = { seller: found.seller, ...evidence };
+  if (evidence.payment) await buildPaidBuyerReceipt(input);
+  else await buildFreeBuyerReceipt(input);
   receiptSignal(signal);
   const context = evidence.context;
   const local = await store.load(
@@ -88,7 +94,9 @@ async function buyerPair(
       throw new ReceiptChannelError(RECEIPT_CHANNEL_CODES.CONFLICT);
     return held;
   }
-  return createFreeBuyerReceipt({ seller: found.seller, ...evidence }, signer);
+  return evidence.payment
+    ? createPaidBuyerReceipt(input, signer)
+    : createFreeBuyerReceipt(input, signer);
 }
 export function createBuyerReceiptRuntime(options: {
   endpoint: Endpoint;
@@ -102,9 +110,10 @@ export function createBuyerReceiptRuntime(options: {
   return {
     exchange(
       remote: EndpointAddr,
-      evidence: BuyerReceiptEvidence,
+      input: BuyerReceiptEvidence,
       external?: AbortSignal,
     ) {
+      const evidence = structuredClone(input);
       void work
         .run(async (signal) => {
           const client = createReceiptTransport(

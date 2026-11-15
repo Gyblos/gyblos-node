@@ -1,4 +1,4 @@
-// Constructs and signs free usage attestations from supplied evidence; no transport, clocks, storage or collection.
+// Constructs signed usage attestations from supplied evidence; payment authorization is not chain settlement.
 import {
   CONTROL_CODES,
   OFFER_PRICING_KINDS,
@@ -25,6 +25,7 @@ import {
 import type { Signer } from '@gyblos/protocol/signing';
 
 import { receiptContext, sameReceiptContext } from './receipts-context';
+import { matchPaidReceipt, receiptPayment } from './receipts-payment';
 
 export type {
   FreeBuyerReceiptInput,
@@ -70,8 +71,14 @@ export async function createFreeSellerReceipt(
   const record = buildFreeSellerReceipt(value);
   return { seller: await signSellerReceipt(record, signer) };
 }
-async function prepareBuyerReceipt(value: unknown) {
-  const input = controlObject(value, ['seller', 'context', 'observed']);
+async function prepareBuyerReceipt(value: unknown, paid = false) {
+  const input = controlObject(value, [
+    'seller',
+    'context',
+    'observed',
+    ...(paid ? ['payment'] : []),
+  ]);
+  const payment = paid ? receiptPayment(input.payment) : undefined;
   const context = receiptContext(input.context);
   // Parse observations now, before yielding; replace this valid digest with the seller signing digest below.
   const snapshot = parseBuyerReceipt({
@@ -87,10 +94,11 @@ async function prepareBuyerReceipt(value: unknown) {
   const { seller } = await verifyReceipt({ seller: input.seller });
   const record = seller.record;
   if (
-    record.pricing.kind !== OFFER_PRICING_KINDS.FREE ||
+    (!payment && record.pricing.kind !== OFFER_PRICING_KINDS.FREE) ||
     !sameReceiptContext(context, receiptContextFromRecord(record))
   )
     return controlFail(CONTROL_CODES.POLICY);
+  if (payment) matchPaidReceipt(record, payment);
   const disputed: ReceiptDisputeField[] = [];
   for (const field of Object.values(RECEIPT_DISPUTE_FIELDS)) {
     const observed = snapshot.observed[field];
@@ -100,6 +108,13 @@ async function prepareBuyerReceipt(value: unknown) {
         : record.usage[field];
     if (observed !== null && observed !== reported) disputed.push(field);
   }
+  if (
+    payment &&
+    (snapshot.observed.inputTokens === null ||
+      snapshot.observed.outputTokens === null ||
+      disputed.length)
+  )
+    return controlFail(CONTROL_CODES.POLICY);
   const buyer = parseBuyerReceipt({
     ...snapshot,
     sellerReceiptDigest: await sellerReceiptDigest(record),
@@ -152,24 +167,34 @@ export function receiptTextSizes(
 
 export function buildPaidSellerReceipt(value: unknown): SellerReceiptV1 {
   const input = controlObject(value, ['record', 'payment']);
-  return buildFreeSellerReceipt(input.record);
+  const payment = receiptPayment(input.payment);
+  const record = parseSellerReceipt({
+    ...buildFreeSellerReceipt(input.record),
+    ...payment,
+  });
+  matchPaidReceipt(record, payment);
+  return record;
 }
 export async function createPaidSellerReceipt(
   value: unknown,
   signer: Signer,
 ): Promise<ReceiptV1> {
-  return { seller: await signSellerReceipt(buildPaidSellerReceipt(value), signer) };
+  return {
+    seller: await signSellerReceipt(buildPaidSellerReceipt(value), signer),
+  };
 }
-export async function buildPaidBuyerReceipt(value: unknown): Promise<BuyerReceiptV1> {
-  return buildFreeBuyerReceipt(value);
+export async function buildPaidBuyerReceipt(
+  value: unknown,
+): Promise<BuyerReceiptV1> {
+  return (await prepareBuyerReceipt(value, true)).buyer;
 }
 export async function createPaidBuyerReceipt(
   value: unknown,
   signer: Signer,
 ): Promise<ReceiptV1> {
-  const input = controlObject(value, ['seller', 'context', 'observed', 'payment']);
-  return createFreeBuyerReceipt(
-    { seller: input.seller, context: input.context, observed: input.observed },
-    signer,
-  );
+  const prepared = await prepareBuyerReceipt(value, true);
+  return {
+    seller: prepared.seller,
+    buyer: await signBuyerReceipt(prepared.buyer, signer),
+  };
 }

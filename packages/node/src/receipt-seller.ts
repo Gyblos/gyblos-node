@@ -1,8 +1,10 @@
 // Records supplied seller observations through a bounded signer/store worker; never controls inference.
 import {
   createFreeSellerReceipt,
+  createPaidSellerReceipt,
   receiptTextSizes,
   type FreeSellerReceiptInput,
+  type PaidSellerReceiptInput,
 } from '@gyblos/core/receipts';
 import {
   CONTROL_METERING_MODES,
@@ -32,6 +34,10 @@ export interface SellerReceiptOptions {
   engineKind: EngineKind;
   clock?: () => number;
 }
+export interface PaidSellerReceiptOptions {
+  publisher: { publish(record: PaidSellerReceiptInput): void };
+  engineKind: EngineKind;
+}
 export function createSellerReceiptRuntime(options: {
   nodeId: string;
   store: LocalReceiptStore;
@@ -48,6 +54,21 @@ export function createSellerReceiptRuntime(options: {
         void work
           .run(async (signal) => {
             const receipt = await createFreeSellerReceipt(
+              record,
+              options.signer,
+            );
+            receiptSignal(signal);
+            await options.store.put(receipt, signal);
+          })
+          .catch(() => {});
+      },
+    },
+    paidPublisher: {
+      publish(input: PaidSellerReceiptInput) {
+        const record = structuredClone(input);
+        void work
+          .run(async (signal) => {
+            const receipt = await createPaidSellerReceipt(
               record,
               options.signer,
             );

@@ -24,6 +24,10 @@ import type {
 
 import { isBlockBuyer } from './batch-block-ports';
 import type { BuyerBatchContext } from './batch-buyer-types';
+import {
+  sessionReceiptEvidence,
+  sessionReceiptPayment,
+} from './batch-receipts';
 import { bounded } from './buyer-operation';
 
 function blockCallbacks<Remote extends BatchDestination>(
@@ -89,6 +93,8 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
   onDelta?: (text: string) => Promise<void>,
 ) {
   const { options, terms } = context;
+  const started = performance.now();
+  let first: number | null = null;
   const buyer = options.buyer;
   if (!isBlockBuyer(buyer)) return batchFail(SESSION_CODES.UNAVAILABLE);
   const pending = {
@@ -117,7 +123,10 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
     BATCH_METHODS.EXECUTE,
     request,
     signal,
-    onDelta,
+    async (text) => {
+      if (text) first ??= Math.floor(performance.now() - started);
+      await onDelta?.(text);
+    },
     callbacks,
   );
   check();
@@ -127,5 +136,21 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
     buyer.snapshot().cumulativeAtomic !== result.bill.cumulativeAtomic
   )
     return batchFail(SESSION_CODES.BINDING);
+  if (options.receipt) {
+    try {
+      const evidence = await sessionReceiptEvidence(
+        request,
+        result.value,
+        sessionReceiptPayment(request, terms, baseAtomic, result.bill),
+        first,
+        Math.floor(performance.now() - started),
+      );
+      void Promise.resolve(options.receipt(evidence, request.quote)).catch(
+        () => {},
+      );
+    } catch {
+      /* Receipt work never changes execution or the durable financial result. */
+    }
+  }
   return result.value;
 }

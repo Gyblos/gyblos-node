@@ -1,7 +1,5 @@
-// Defines content-free inputs to free receipt policy; callers own execution evidence and node signers.
-import type {
-  OFFER_PRICING_KINDS,
-} from '@gyblos/protocol/constants';
+// Defines content-free receipt evidence; callers own independent observations and node signers.
+import type { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import type {
   BuyerReceiptV1,
   ReceiptV1,

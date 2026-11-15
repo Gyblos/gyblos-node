@@ -21,6 +21,7 @@ import type {
 } from '@gyblos/transport-iroh/batch-client';
 
 import { createBuyerBatchSession } from './batch-buyer';
+import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import { bounded } from './buyer-operation';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
@@ -31,6 +32,7 @@ import {
 } from './session-policy';
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
+  receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
   policy: BuyerSessionPolicy;
   inspect(): Promise<BatchStoredSession | undefined>;
   backend(): Promise<BuyerSessionBackend>;

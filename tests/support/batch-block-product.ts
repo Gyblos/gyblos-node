@@ -5,6 +5,7 @@ import {
   type SellerBatchSessionOptions,
 } from '@gyblos/node/batch-seller';
 import { recountedMeter } from '@gyblos/node/free-meter';
+import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 
@@ -50,7 +51,9 @@ export function configureBlockEngine(
   });
 }
 export async function blockProduct(
-  options: Pick<SellerBatchSessionOptions, 'telemetry'> = {},
+  options: Pick<SellerBatchSessionOptions, 'telemetry' | 'receipts'> & {
+    receipt?: (evidence: BuyerReceiptEvidence) => void | Promise<void>;
+  } = {},
 ) {
   const f = await sessionRig({
     buyerNodeId: '12'.repeat(32),
@@ -61,6 +64,7 @@ export async function blockProduct(
   configureBlockEngine(offers);
   const service = createSellerBatchSession({
     telemetry: options.telemetry,
+    receipts: options.receipts,
     session: f.seller(),
     terms: f.terms,
     offers: () => [offers.live],
@@ -77,6 +81,7 @@ export async function blockProduct(
     unresolved: async () => false,
     verify: async () => {},
     observe: f.sellerOptions.observe,
+    receipt: options.receipt,
   });
   return {
     f,

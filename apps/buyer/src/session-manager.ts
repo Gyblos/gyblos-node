@@ -102,6 +102,20 @@ async function prepareMeter(state: SessionState, options: Options) {
     });
   state.meter = await state.meterLoading;
 }
+function sessionReceipts(
+  context: Context,
+  state: SessionState,
+): BuyerSessionOptions<ReturnType<typeof sellerAddress>>['receipt'] {
+  return (evidence, quote) => {
+    const selected = state.selections.get(quote.offer.requestId);
+    if (selected)
+      return context.dependencies.receipt?.(
+        selected,
+        evidence,
+        new AbortController().signal,
+      );
+  };
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -161,6 +175,7 @@ export function makeManager(
       );
     },
     verify: trustedQuote(context, state),
+    receipt: sessionReceipts(context, state),
   };
   const manager =
     policy.totalDepositAtomic !== undefined
