@@ -73,7 +73,15 @@ function manager<Remote extends BatchDestination>(
         (await (await catalog(state)).list()).find(
           (entry) => entry.terms.sellerNodeId === id,
         )?.stored,
-      backend: async () => (await catalog(state)).backend(id),
+      backend: async () => {
+        const backend = await (await catalog(state)).backend(id);
+        // Individual rollover cannot replace a child behind the catalog's shared budget.
+        return {
+          inspect: backend.inspect,
+          create: backend.create,
+          observe: backend.observe,
+        };
+      },
     });
     state.managers.set(id, found);
   }

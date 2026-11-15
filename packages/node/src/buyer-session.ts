@@ -168,6 +168,8 @@ async function renewable<Remote extends BatchDestination>(
   signal: AbortSignal,
 ): Promise<Current<Remote>> {
   const options = state.options;
+  const backend = await state.backend!;
+  if (!backend.renew) return opened;
   if (opened.financial.snapshot().channelId)
     await opened.host.reconcile(signal);
   const snapshot = opened.financial.snapshot();
@@ -188,8 +190,6 @@ async function renewable<Remote extends BatchDestination>(
     options.endpoint.id().toString(),
     options.now(),
   );
-  const backend = await state.backend!;
-  if (!backend.renew) return sessionFail(SESSION_CODES.CLOSED);
   const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
   const settlement = snapshot.channelId

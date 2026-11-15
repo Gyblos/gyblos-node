@@ -114,7 +114,8 @@ export async function readPool(
   );
   const legacy = await readBatchRecord(paths.legacy);
   // Pool generation accounting is separate; never silently discard a renewed root's historical spend.
-  if (legacy?.history?.length) return sessionFail(SESSION_CODES.UNVERIFIED);
+  if (legacy?.history?.length && (raw !== undefined || includeLegacy))
+    return sessionFail(SESSION_CODES.UNVERIFIED);
   if (raw === undefined) {
     if (!includeLegacy) return { version: BATCH_POOL_VERSION, entries: [] };
     if (!legacy) return { version: BATCH_POOL_VERSION, entries: [] };

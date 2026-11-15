@@ -178,6 +178,12 @@ void test('new block checkpoints retain closed history and cannot be imported as
       (await inspectBatchSession(options.paths))?.priorSpentAtomic,
       '40',
     );
+    assert.deepEqual(
+      await inspectBatchPool(batchPoolPathsIn({ GYBLOS_HOME: rig.root }), {
+        includeLegacy: false,
+      }),
+      [],
+    );
     await assert.rejects(
       inspectBatchPool(batchPoolPathsIn({ GYBLOS_HOME: rig.root })),
       { code: SESSION_CODES.UNVERIFIED },

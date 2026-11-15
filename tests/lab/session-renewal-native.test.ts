@@ -8,10 +8,12 @@ import { test } from 'node:test';
 import { SOLANA_TESTNET_CAIP2 } from '@x402/svm';
 
 import { PROTOCOL_FEE } from '@gyblos/config';
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
 import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
 import { startSellerSessions } from '@gyblos/node/seller-sessions';
 import {
+  batchSessionTerminal,
+  inspectBatchPool,
   inspectBatchSession,
   openBatchBuyerBackend,
   openBatchSellerBackend,
@@ -110,7 +112,17 @@ for (const blocks of [false, true]) {
           backend: async () => buyerBackend,
           meter: blocks ? blockTestMeter : offers.meter,
           now: () => now,
-          unresolved: async () => false,
+          unresolved: async () =>
+            (
+              await inspectBatchPool(batchPoolPathsIn({ GYBLOS_HOME: root }), {
+                includeLegacy: false,
+              })
+            ).some(
+              (entry) =>
+                !entry.stored ||
+                entry.uncertain ||
+                !batchSessionTerminal(entry.stored),
+            ),
           verify: async () => {},
         });
       let buyer = start();
