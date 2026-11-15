@@ -1,4 +1,4 @@
-// Validates one gyblos.toml [[offers]] engine table: kind, URL, the API key's environment variable name,
+// Validates one config.toml [[offers]] engine table: kind, URL, the API key's environment variable name,
 // the upstream model name and, for remote kinds whose APIs do not report it, the context size. Values
 // are checked, never echoed.
 import { ENGINE_KINDS, type EngineKind } from '@gyblos/protocol/constants';

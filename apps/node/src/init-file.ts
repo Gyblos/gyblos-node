@@ -1,4 +1,4 @@
-// Writes the gyblos.toml `gyblos seller init` produced: refuses a symlink or non-file at the target, replaces
+// Writes the config.toml `gyblos seller init` produced: refuses a symlink or non-file at the target, replaces
 // an existing file only with --force, and writes beside it before moving the file into place. Errors are
 // InitError codes the command prints.
 import { randomUUID } from 'node:crypto';

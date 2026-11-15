@@ -1,7 +1,7 @@
 #:schema ../packages/node/schemas/gyblos.schema.json
 # (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
 # Sell one model from an Ollama you already run on this machine.
-# Copy to gyblos.toml and check it with: pnpm gyblos config validate --config gyblos.toml
+# Copy to config.toml and check it with: pnpm gyblos config validate --config config.toml
 # Secrets never go in this file: API keys (and the optional GYBLOS_RELAY_TOKEN) stay in the environment.
 
 version = 1                       # schema version; required

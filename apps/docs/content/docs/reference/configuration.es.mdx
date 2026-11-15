@@ -3,8 +3,8 @@ title: Configuración
 description: Claves TOML, valores predeterminados, variables de entorno y restricciones de inicio.
 ---
 
-Edita `~/gyblos-seller/gyblos.toml` en el anfitrión. La imagen suministrada lo monta en modo de solo lectura
-en `/config/gyblos.toml` y lo selecciona mediante `GYBLOS_CONFIG`. Se lee al arrancar; los cambios requieren recrear.
+Edita `~/gyblos-seller/config.toml` en el anfitrión. La imagen suministrada lo monta en modo de solo lectura
+en `/config/config.toml` y lo selecciona mediante `GYBLOS_CONFIG`. Se lee al arrancar; los cambios requieren recrear.
 
 ## Ejemplo [#configuración-completa-para-docker-gratuito]
 
@@ -31,7 +31,7 @@ Para cambiar cuotas, consulta [Modelos y ofertas](/es/sellers/models-offers).
 
 ```sh
 cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
 Espera `OK`; corrige cada código y ruta de clave antes de aplicar. Después:

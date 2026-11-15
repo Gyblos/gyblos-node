@@ -29,7 +29,7 @@ case "$*" in
   'compose run --rm seller gyblos doctor')
     [ -z "\${FAKE_DOCTOR_OUTPUT:-}" ] || printf '%s\\n' "$FAKE_DOCTOR_OUTPUT"
     exit "\${FAKE_DOCTOR_EXIT:-0}" ;;
-  'compose run --rm seller gyblos config validate --config /config/gyblos.toml')
+  'compose run --rm seller gyblos config validate --config /config/config.toml')
     # An operator's Ctrl-C while validation runs.
     [ -z "\${FAKE_VALIDATE_INTERRUPT:-}" ] || { kill -INT 0; sleep 1; }
     exit "\${FAKE_VALIDATE_EXIT:-0}" ;;

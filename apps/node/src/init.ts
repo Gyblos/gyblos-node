@@ -1,4 +1,4 @@
-// Renders the gyblos.toml that `gyblos seller init` writes: one free devnet offer. Values are written as
+// Renders the config.toml that `gyblos seller init` writes: one free devnet offer. Values are written as
 // TOML basic strings through JSON escaping (a subset TOML accepts); the caller validates the result with
 // the same parser node:start uses, so anything the parser refuses is never written.
 import {

@@ -10,15 +10,15 @@
 #                    and run it here
 #
 # Environment (all optional):
-#   GYBLOS_HOME         the seller's home, with gyblos.toml and seller.env (default: %USERPROFILE%\.gyblos)
+#   GYBLOS_HOME         the seller's home, with config.toml and seller.env (default: %USERPROFILE%\.gyblos)
 #   GYBLOS_RELAY_TOKEN  optional; only for a relay that still requires a token
 #   GYBLOS_REQUIRE_SIGNATURE=1  stop unless cosign verifies the seller as a Gyblos release
 #   GYBLOS_GUIDED=0     only print the steps to start selling; never ask to register or publish
 #   GYBLOS_MODIFY_PATH=0  do not add the gyblos command's folder to your user PATH
 #   GYBLOS_RELEASE_URL  where releases are downloaded from (default: GitHub); the checksum still applies
 #
-# The program goes to %LOCALAPPDATA%\Gyblos; the home keeps gyblos.toml, seller.env and the keys, readable
-# only by this account, SYSTEM and Administrators. Existing gyblos.toml and seller.env are kept: rerunning
+# The program goes to %LOCALAPPDATA%\Gyblos; the home keeps config.toml, seller.env and the keys, readable
+# only by this account, SYSTEM and Administrators. Existing config.toml and seller.env are kept: rerunning
 # resumes a failed install and updates the seller. The relay token is written only to seller.env and never
 # printed.
 param([string]$Command = '')
@@ -207,7 +207,7 @@ function Add-UserPath {
 }
 
 function Write-Config {
-  $path = Join-Path $SellerHome 'gyblos.toml'
+  $path = Join-Path $SellerHome 'config.toml'
   if (Test-Path -LiteralPath $path) { Say "Kept existing $path"; return }
   $text = @'
 # The packaged seller: the pinned Qwen3 0.6B with reasoning off on this machine's Ollama, given away free
@@ -306,7 +306,7 @@ function Reinstall-Service {
 }
 
 function Publishing {
-  $path = Join-Path $SellerHome 'gyblos.toml'
+  $path = Join-Path $SellerHome 'config.toml'
   [bool](Select-String -LiteralPath $path -Pattern '^\s*publish\s*=\s*true\s*(#.*)?$' -Quiet)
 }
 
@@ -356,16 +356,16 @@ function Guided-Setup {
   Say 'Done: this seller is registered and published. Buyers can find it within about two minutes.'
 }
 
-# Turns publishing on or off in gyblos.toml, checks the result with the seller and restarts it; an invalid
+# Turns publishing on or off in config.toml, checks the result with the seller and restarts it; an invalid
 # result restores the original.
 function Set-Publish([string]$Value) {
-  $path = Join-Path $SellerHome 'gyblos.toml'
+  $path = Join-Path $SellerHome 'config.toml'
   if (-not (Test-Path -LiteralPath $path) -or -not (Test-Path -LiteralPath (Join-Path $App 'current'))) {
     Die "No packaged seller in ${SellerHome}: run install.ps1 first (GYBLOS_HOME names another home)."
   }
   $original = [IO.File]::ReadAllText($path)
   $lines = [regex]::Matches($original, '(?m)^publish = (true|false)\r?$')
-  if ($lines.Count -ne 1) { Die 'gyblos.toml has no single "publish = true" or "publish = false" line under [discovery]; set it by hand.' }
+  if ($lines.Count -ne 1) { Die 'config.toml has no single "publish = true" or "publish = false" line under [discovery]; set it by hand.' }
   Write-Text $path ([regex]::Replace($original, '(?m)^publish = (true|false)(\r?)$', "publish = $Value`$2"))
   $ErrorActionPreference = 'Continue'
   $report = Gyblos config validate --config $path 2>&1
@@ -373,7 +373,7 @@ function Set-Publish([string]$Value) {
   if ($LASTEXITCODE -ne 0) {
     Write-Text $path $original
     $report | ForEach-Object { [Console]::Error.WriteLine($_) }
-    Die 'gyblos.toml is not valid with that change; it was left as it was.'
+    Die 'config.toml is not valid with that change; it was left as it was.'
   }
   Reinstall-Service
   if ($Value -eq 'true') {

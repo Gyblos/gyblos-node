@@ -145,7 +145,7 @@ void test('install.sh without Docker installs the pinned packaged seller as a us
       join(install.home, 'app/current/bin/gyblos'),
     );
     assert.match(
-      readFileSync(join(install.home, 'gyblos.toml'), 'utf8'),
+      readFileSync(join(install.home, 'config.toml'), 'utf8'),
       /url = "http:\/\/127\.0\.0\.1:11434\/"/,
     );
     assert.equal(
@@ -215,14 +215,14 @@ void test('publish changes the packaged seller home and restarts its service', a
     const result = install.run({}, ['publish']);
     assert.equal(result.status, 0, result.output);
     assert.match(
-      readFileSync(join(install.home, 'gyblos.toml'), 'utf8'),
+      readFileSync(join(install.home, 'config.toml'), 'utf8'),
       /^publish = true$/m,
     );
     assert.ok(
       install
         .gyblos()
         .includes(
-          `config validate --config ${join(install.home, 'gyblos.toml')}`,
+          `config validate --config ${join(install.home, 'config.toml')}`,
         ),
     );
     assert.ok(

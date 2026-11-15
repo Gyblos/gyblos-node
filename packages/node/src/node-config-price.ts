@@ -1,4 +1,4 @@
-// Exact USDC conversion and gyblos.toml price bounds; pure, with no input values in errors.
+// Exact USDC conversion and config.toml price bounds; pure, with no input values in errors.
 // Buyer ceilings retain the protocol u64 range; seller TOML prices keep their existing narrower bound.
 import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
 

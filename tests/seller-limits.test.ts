@@ -1,4 +1,4 @@
-// gyblos.toml [limits] tunes the seller's capacity within hard ceilings; omitted keys keep today's values.
+// config.toml [limits] tunes the seller's capacity within hard ceilings; omitted keys keep today's values.
 // Pure: parsed synthetic files, the settings resolver and the in-memory limiters; no network or engine.
 import assert from 'node:assert/strict';
 import test from 'node:test';

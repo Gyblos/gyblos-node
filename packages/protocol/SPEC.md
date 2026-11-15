@@ -633,7 +633,7 @@ as role `tool`) and the Anthropic adapter sends the system message as its
 `system` field, calls as `tool_use` blocks and a run of results as one user
 turn of `tool_result` blocks. Other shapes are refused with `FREE_EXECUTION_UNSUPPORTED`
 before generation; no message flattening occurs. `maxTokens` may not exceed the
-offer's answer limit (`free.max_output_tokens` in gyblos.toml, 4096 by default
+offer's answer limit (`free.max_output_tokens` in config.toml, 4096 by default
 and at most 32768; quotes beyond it are refused) and, with the templated input,
 must fit the model's context (a free Ollama offer's `engine.context_tokens`,
 8192 by default and at most 32768). The engine deadline grows by 25 ms per

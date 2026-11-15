@@ -21,15 +21,15 @@ import {
 void test('doctor: a paid offer is checked like startup, with the payout and payment keys', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    await writeFile(join(run.root, 'config.toml'), paidToml(run));
     const paid = await doctor(run);
     assert.match(line(paid.output, 'config'), /^\s*OK\s+config/);
     assert.match(line(paid.output, 'payments'), /^\s*OK\s+payments/);
     assert.match(paid.output, /offer\[1\] paid qwen3-0\.6b/);
     // Free sellers never see the payments line.
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     assert.doesNotMatch((await doctor(run)).output, /payments/);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    await writeFile(join(run.root, 'config.toml'), paidToml(run));
     await unlink(join(run.seller, 'facilitator.json'));
     const noKey = await doctor(run);
     assert.equal(noKey.code, 1);
@@ -42,7 +42,7 @@ void test('doctor: a paid offer is checked like startup, with the payout and pay
 void test('doctor: a paid offer on a seller set up without a payout fails the payments check', () =>
   scenario({ free: true }, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    await writeFile(join(run.root, 'config.toml'), paidToml(run));
     const result = await doctor(run);
     assert.equal(result.code, 1);
     assert.match(
@@ -55,11 +55,11 @@ void test('doctor: a payout on a signing key or loose payment key files fail pay
   scenario({}, async (run) => {
     await withOllama(run);
     const mixed = paidToml(run) + REMOTE_FREE.split('\n').slice(3).join('\n');
-    await writeFile(join(run.root, 'gyblos.toml'), mixed);
+    await writeFile(join(run.root, 'config.toml'), mixed);
     const both = await doctor(run, [], { UPSTREAM_API_KEY: 'synthetic' });
     assert.match(line(both.output, 'config'), /^\s*OK\s+config/);
     assert.equal(both.output.match(/payments/g)?.length, 1);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    await writeFile(join(run.root, 'config.toml'), paidToml(run));
     await chmod(join(run.seller, 'authorizer.json'), 0o644);
     assert.match(
       line((await doctor(run)).output, 'payments'),
@@ -80,7 +80,7 @@ void test('doctor: a payout on a signing key or loose payment key files fail pay
 void test('doctor --online: missing payment token accounts warn, an unreadable RPC warns, another chain fails, offline never asks', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    await writeFile(join(run.root, 'config.toml'), paidToml(run));
     const asked: { mint: string; owners: readonly string[] }[] = [];
     const missing = await doctor(
       run,
@@ -192,7 +192,7 @@ void test('doctor --online: missing payment token accounts warn, an unreadable R
 void test('doctor accepts a paid seller whose payout is its owner', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    await writeFile(join(run.root, 'config.toml'), paidToml(run));
     const rolePath = join(run.seller, 'role.json');
     const role = JSON.parse(await readFile(rolePath, 'utf8'));
     await writeFile(rolePath, JSON.stringify({ ...role, payTo: role.owner }));

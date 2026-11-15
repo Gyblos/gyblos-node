@@ -42,7 +42,7 @@ function provider() {
 }
 
 async function remote(run: Fixture) {
-  await writeFile(join(run.root, 'gyblos.toml'), remoteToml());
+  await writeFile(join(run.root, 'config.toml'), remoteToml());
 }
 
 void test('doctor: offline, a remote engine is not called and is reported as not checked', () =>

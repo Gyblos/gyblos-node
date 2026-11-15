@@ -1,4 +1,4 @@
-// Owns the gyblos.toml reasoning contract: catalog models accept only their verified levels and default to
+// Owns the config.toml reasoning contract: catalog models accept only their verified levels and default to
 // their catalog level; custom and unverified models accept any levels with a warning. Offline; synthetic inputs.
 import assert from 'node:assert/strict';
 import test from 'node:test';

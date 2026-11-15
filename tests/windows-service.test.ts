@@ -40,7 +40,7 @@ const INPUT: ServiceInput = {
   repository: 'C:\\unused',
   launcher: 'C:\\Users\\ana\\.gyblos\\app\\current\\bin\\gyblos.cmd',
   home: 'C:\\Users\\ana\\.gyblos',
-  config: 'C:\\Users\\ana\\.gyblos\\gyblos.toml',
+  config: 'C:\\Users\\ana\\.gyblos\\config.toml',
   environmentFile: 'C:\\Users\\ana\\.gyblos\\seller.env',
   logFile: 'C:\\Users\\ana\\.gyblos\\service.log',
   accountHome: 'C:\\Users\\ana',
@@ -98,7 +98,7 @@ void test('the scheduled task runs the launcher’s supervisor at the account’
   assert.deepEqual(plan.extra, [
     {
       path: 'C:\\Users\\ana\\AppData\\Local\\Gyblos\\seller-service.cmd',
-      contents: `@echo off\r\nrem Gyblos seller service, started by the scheduled task ${TASK}.\r\n"C:\\Users\\ana\\.gyblos\\app\\current\\bin\\gyblos.cmd" service-run --home "C:\\Users\\ana\\.gyblos" --config "C:\\Users\\ana\\.gyblos\\gyblos.toml"\r\n`,
+      contents: `@echo off\r\nrem Gyblos seller service, started by the scheduled task ${TASK}.\r\n"C:\\Users\\ana\\.gyblos\\app\\current\\bin\\gyblos.cmd" service-run --home "C:\\Users\\ana\\.gyblos" --config "C:\\Users\\ana\\.gyblos\\config.toml"\r\n`,
     },
   ]);
   assert.match(plan.notes[0]!, /log is C:\\Users\\ana\\.gyblos\\service\.log/);
@@ -226,7 +226,7 @@ void test(
         'GYBLOS_RELAY_TOKEN=test-relay-value\n',
         { mode: 0o600 },
       );
-      const config = join(home, 'gyblos.toml');
+      const config = join(home, 'config.toml');
       const program = join(root, 'seller.mjs');
       // A seller that records how it was started and stops on the supervisor's message, which it listens
       // for only after a startup of a few seconds, as the daemon does: the supervisor resends it.

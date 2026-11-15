@@ -55,7 +55,7 @@ function index(ahead: number | null) {
 async function published(run: Fixture) {
   await withOllama(run);
   await writeFile(
-    join(run.root, 'gyblos.toml'),
+    join(run.root, 'config.toml'),
     `${freeToml(run)}[discovery]\npublish = true\nurl = "${INDEX}/v1/${FAKE_SECRET}"\n`,
   );
 }

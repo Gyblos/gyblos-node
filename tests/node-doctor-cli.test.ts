@@ -37,7 +37,7 @@ import { FAKE_SECRET, REPOSITORY_ROOT } from './support/node-config-fixtures';
 void test('doctor: a ready free seller exits 0, prints its public identity and changes nothing', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     const before = await snapshot(run.root);
     const result = await doctor(run);
     assert.deepEqual(await snapshot(run.root), before);
@@ -69,7 +69,7 @@ void test('doctor: prints the [limits] the seller will serve with', () =>
   scenario({}, async (run) => {
     await withOllama(run);
     await writeFile(
-      join(run.root, 'gyblos.toml'),
+      join(run.root, 'config.toml'),
       `${freeToml(run)}\n[limits]\nrequests_per_minute = 60\nglobal_requests_per_minute = 512\n`,
     );
     const result = await doctor(run);
@@ -77,7 +77,7 @@ void test('doctor: prints the [limits] the seller will serve with', () =>
     assert.match(result.output, /connections 8 total/);
     assert.match(result.output, /requests\s+60\/min per buyer, 512\/min total/);
     await writeFile(
-      join(run.root, 'gyblos.toml'),
+      join(run.root, 'config.toml'),
       `${freeToml(run)}\n[limits]\nrequests_per_minute = 60\n`,
     );
     const invalid = await doctor(run);
@@ -104,7 +104,7 @@ void test('doctor: an empty home fails the role check with a setup hint and exit
 void test('doctor: a free seller role without payment fields is ready', () =>
   scenario({ free: true }, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     const result = await doctor(run);
     assert.equal(result.code, 0, result.output);
     assert.match(line(result.output, 'role'), /^\s*OK\s/);
@@ -139,10 +139,10 @@ void test('doctor: key files must be private regular files; free sellers need on
     await unlink(join(run.seller, 'facilitator.json'));
     await unlink(join(run.seller, 'authorizer.json'));
     for (const toml of [freeToml(run), paidToml(run)]) {
-      await writeFile(join(run.root, 'gyblos.toml'), toml);
+      await writeFile(join(run.root, 'config.toml'), toml);
       assert.match(line((await doctor(run)).output, 'keys'), /OK\s+keys/);
     }
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     const free = await doctor(run);
     assert.match(line(free.output, 'keys'), /OK\s+keys/);
     await unlink(join(run.seller, 'node.key'));
@@ -189,7 +189,7 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
   scenario({}, async (run) => {
     await withOllama(run);
     // A remote offer whose API key variable is unset is refused after the file parsed.
-    await writeFile(join(run.root, 'gyblos.toml'), REMOTE_FREE);
+    await writeFile(join(run.root, 'config.toml'), REMOTE_FREE);
     const refused = await doctor(run);
     assert.equal(refused.code, 1);
     assert.match(
@@ -198,7 +198,7 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
     );
     // A refused offer still leaves the relay settings checked.
     assert.match(line(refused.output, 'relays'), /^\s*OK\s+relays/);
-    await unlink(join(run.root, 'gyblos.toml'));
+    await unlink(join(run.root, 'config.toml'));
     const none = await doctor(run);
     assert.equal(none.code, 1);
     assert.match(
@@ -218,7 +218,7 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
       /FAIL\s+config\s+NODE_CONFIG_INVALID/,
     );
     await writeFile(
-      join(run.root, 'gyblos.toml'),
+      join(run.root, 'config.toml'),
       `${freeToml(run)}[discovery]\npublish = true\nurl = "https://discovery.example.com/v1/${FAKE_SECRET}"\n`,
     );
     const published = await doctor(run);
@@ -231,7 +231,7 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
 void test('doctor: no relay token passes; a malformed one fails without echoing it', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     const missing = await doctor(run, [], { GYBLOS_RELAY_TOKEN: '' });
     assert.doesNotMatch(line(missing.output, 'relays'), /FAIL/);
     const short = await doctor(run, [], {
@@ -245,7 +245,7 @@ void test('doctor: no relay token passes; a malformed one fails without echoing 
 
 void test('doctor: a stopped engine at the offer URL fails with the engine code; no tokenizer fails too', () =>
   scenario({}, async (run) => {
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     const stopped = await doctor(run, [], {}, { tokenizer: undefined });
     assert.equal(stopped.code, 1);
     assert.match(
@@ -258,7 +258,7 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
     );
     // The engine is checked by describing it only: the model list, never a generation.
     const ollama = await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     const ready = await doctor(run);
     assert.match(line(ready.output, 'engine[1]'), /^\s*OK\s+engine\[1\]/);
     assert.deepEqual([...new Set(ollama.paths)], ['/api/tags']);
@@ -267,7 +267,7 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
 void test('doctor: an engine that never answers fails with ENGINE_TIMEOUT within its deadline', () =>
   scenario({}, async (run) => {
     await withOllama(run, { hang: true });
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     const hung = await doctor(run);
     assert.equal(hung.code, 1);
     assert.match(
@@ -281,7 +281,7 @@ void test('doctor: an offer the daemon refuses leaves the engine unchecked', () 
     const ollama = await withOllama(run);
     // A reasoning level the engine cannot honor refuses the offer.
     await writeFile(
-      join(run.root, 'gyblos.toml'),
+      join(run.root, 'config.toml'),
       freeToml(run).replace('["off"]', '["low"]'),
     );
     const refused = await doctor(run);
@@ -293,7 +293,7 @@ void test('doctor: an offer the daemon refuses leaves the engine unchecked', () 
 
 void test('doctor and config validate refuse arguments they do not take', () =>
   scenario({}, async (run) => {
-    for (const args of [['--config', 'gyblos.toml'], ['extra'], ['--bogus']]) {
+    for (const args of [['--config', 'config.toml'], ['extra'], ['--bogus']]) {
       const result = await doctor(run, args);
       assert.equal(result.code, 1, args.join(' '));
       assert.match(result.output, /Usage:/);

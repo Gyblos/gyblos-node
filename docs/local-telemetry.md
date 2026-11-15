@@ -2,7 +2,7 @@
 
 Seller and buyer free execution can emit content-free events through the
 existing `TelemetrySink` port. Ordinary seller and free-buyer startup can opt in
-to private local file telemetry through `gyblos.toml`; the default is off.
+to private local file telemetry through `config.toml`; the default is off.
 Programmatic sinks remain supported. Paid-path instrumentation, external
 collection and OpenTelemetry startup configuration are separate work.
 
@@ -13,8 +13,8 @@ collection and OpenTelemetry startup configuration are separate work.
 file = true
 ```
 
-Add this table to a valid `gyblos.toml` and run `pnpm node:start` or
-`pnpm buyer:free`. Both read `GYBLOS_CONFIG`, else optional `./gyblos.toml`. An
+Add this table to a valid `config.toml` and run `pnpm node:start` or
+`pnpm buyer:free`. Both read `GYBLOS_CONFIG`, else optional `./config.toml`. An
 explicit missing file, any invalid TOML configuration, unknown telemetry fields
 and non-boolean `file` values refuse startup with static errors. The buyer
 validates the selected whole TOML before opening sockets, but consumes only

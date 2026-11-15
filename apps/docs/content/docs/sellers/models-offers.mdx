@@ -9,7 +9,7 @@ mean that every model has been tested.
 
 ## Free limits [#lower-the-free-limits]
 
-Edit the existing `[[offers]]` entry in `~/gyblos-seller/gyblos.toml`. The following complete example
+Edit the existing `[[offers]]` entry in `~/gyblos-seller/config.toml`. The following complete example
 halves the total daily limit and lowers the per-buyer limit. It deliberately leaves publication off;
 if already listed, preserve your existing `[discovery]` setting when editing just the caps.
 
@@ -41,7 +41,7 @@ persistent billing or a guarantee against someone creating another buyer identit
 
 ```sh
 cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
 After `OK`, apply the edit:

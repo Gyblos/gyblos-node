@@ -1,4 +1,4 @@
-// Seller startup settings from gyblos.toml (GYBLOS_CONFIG, else ./gyblos.toml when present; relative to the
+// Seller startup settings from config.toml (GYBLOS_CONFIG, else ./config.toml when present; relative to the
 // working directory) under flag > env > file > default. Without a file the values equal today's
 // environment-only startup; invalid environment values now fail here with NODE_CONFIG_INVALID.
 // The daemon serves every listed offer it can warm; each offer's engine plugin refuses what it cannot
@@ -36,7 +36,7 @@ export interface SellerSettings {
   irohExternalAddress: string | undefined;
   relayEnvironment: RelayEnvironment;
   publication: { baseUrl: string } | undefined;
-  // gyblos.toml [[offers]], in order.
+  // config.toml [[offers]], in order.
   offers: SellerOfferSettings[];
   limits: SellerLimits;
 }

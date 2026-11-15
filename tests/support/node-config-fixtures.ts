@@ -1,4 +1,4 @@
-// Synthetic gyblos.toml fixtures shared by the validator, schema and CLI suites; test data only.
+// Synthetic config.toml fixtures shared by the validator, schema and CLI suites; test data only.
 // Secret-looking values are fake markers so tests can assert they never reach output.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

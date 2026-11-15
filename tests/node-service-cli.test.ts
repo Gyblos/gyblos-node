@@ -45,7 +45,7 @@ const INPUT: ServiceInput = {
   nodePath: '/opt/node24/bin/node',
   repository: '/srv/gyblos node',
   home: '/srv/gyblos-home',
-  config: '/srv/gyblos-home/gyblos.toml',
+  config: '/srv/gyblos-home/config.toml',
   environmentFile: '/srv/gyblos-home/seller.env',
   logFile: '/srv/gyblos-home/service.log',
   accountHome: '/home/gyblos',
@@ -65,7 +65,7 @@ void test('a user unit runs the seller with limits, SIGINT, a start limit and th
     'WorkingDirectory=/srv/gyblos node',
     'EnvironmentFile=-/srv/gyblos-home/seller.env',
     'Environment="GYBLOS_HOME=/srv/gyblos-home"',
-    'Environment="GYBLOS_CONFIG=/srv/gyblos-home/gyblos.toml"',
+    'Environment="GYBLOS_CONFIG=/srv/gyblos-home/config.toml"',
     'ExecStart="/opt/node24/bin/node" --import tsx apps/node/src/bin.ts start',
     'KillSignal=SIGINT',
     'TimeoutStopSec=120',
@@ -222,7 +222,7 @@ async function service(
 
 async function readySeller(run: Fixture) {
   await withOllama(run);
-  await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+  await writeFile(join(run.root, 'config.toml'), freeToml(run));
   const environment = join(run.home, 'seller.env');
   await writeFile(environment, `GYBLOS_RELAY_TOKEN=${RELAY_SECRET}\n`);
   await chmod(environment, 0o600);
@@ -232,7 +232,7 @@ async function readySeller(run: Fixture) {
 void test('install refuses when the service environment would fail doctor, writing and running nothing', () =>
   scenario({ free: true }, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
     // seller.env holds a malformed relay token: the service would fail doctor with it, even though the
     // shell's own environment is fine.
     const environment = join(run.home, 'seller.env');

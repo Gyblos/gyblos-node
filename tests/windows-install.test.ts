@@ -1,7 +1,7 @@
 // Owns install.ps1 on real Windows (skipped elsewhere), against a local release server, a fake Ollama on
 // 127.0.0.1:11434 and a fake packaged seller whose gyblos.cmd records its commands: a pinned release is
 // downloaded, checked and unpacked into %LOCALAPPDATA%\Gyblos behind an app\current junction; the home is
-// readable only by this account; gyblos.toml and seller.env are written once, without a byte order mark
+// readable only by this account; config.toml and seller.env are written once, without a byte order mark
 // and without printing the relay token; setup, tokenizer, doctor (with seller.env) and the service run in
 // order; a checksum mismatch changes nothing; and `publish` turns publishing on and restarts the service.
 import assert from 'node:assert/strict';
@@ -194,7 +194,7 @@ void test(
         await pathsArePrivate([home, join(home, 'seller.env')]),
         ACL_VERDICTS.PRIVATE,
       );
-      const config = await readFile(join(home, 'gyblos.toml'));
+      const config = await readFile(join(home, 'config.toml'));
       assert.notEqual(config[0], 0xef);
       assert.match(config.toString(), /^publish = false$/m);
       assert.ok(!config.toString().includes('\r'));
@@ -224,12 +224,12 @@ void test(
       // A rerun keeps the files and the release; publish turns it on and restarts the service.
       const again = await installer(script);
       assert.equal(again.code, 0, again.output);
-      assert.match(again.output, /Kept existing .*gyblos\.toml/);
+      assert.match(again.output, /Kept existing .*config\.toml/);
       await writeFile(log, '');
       const publish = await installer(script, 'publish');
       assert.equal(publish.code, 0, publish.output);
       assert.match(
-        await readFile(join(home, 'gyblos.toml'), 'utf8'),
+        await readFile(join(home, 'config.toml'), 'utf8'),
         /^publish = true$/m,
       );
       assert.deepEqual(

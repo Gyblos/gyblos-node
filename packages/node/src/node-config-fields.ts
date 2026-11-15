@@ -1,4 +1,4 @@
-// Field readers for gyblos.toml: each checks one value and records static issue codes with a path.
+// Field readers for config.toml: each checks one value and records static issue codes with a path.
 // Issues carry codes and key paths only; no reader ever copies an input value into an issue.
 import { isIPv4, isIPv6 } from 'node:net';
 

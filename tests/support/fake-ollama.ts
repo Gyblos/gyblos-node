@@ -8,7 +8,7 @@ import { ROUTES } from '@gyblos/config';
 import { MODEL } from '@gyblos/engine-ollama/constants';
 
 export interface FakeOllama {
-  // The engine URL to put in gyblos.toml, e.g. http://127.0.0.1:54321
+  // The engine URL to put in config.toml, e.g. http://127.0.0.1:54321
   url: string;
   paths: string[];
   close: () => Promise<void>;

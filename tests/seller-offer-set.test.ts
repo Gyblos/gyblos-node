@@ -121,7 +121,7 @@ void test('the catalog is busy only when every listed offer is busy', () => {
   assert.equal(set.readiness().busy, true);
 });
 
-void test('offers list in gyblos.toml order and an index or selection is added once', () => {
+void test('offers list in config.toml order and an index or selection is added once', () => {
   const a = fakeLiveOffer(0, NOW);
   const b = fakeLiveOffer(1, NOW);
   const set = new SellerOfferSet(() => NOW);

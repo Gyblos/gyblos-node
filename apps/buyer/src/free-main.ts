@@ -24,7 +24,7 @@ const BUYER_DOCS = 'docs/running-a-node.md "Free v2 buyer endpoint"';
 // Next steps by reason; static text only, never a path from the environment.
 const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
   [FREE_BUYER_STARTUP.TELEMETRY_CONFIG]:
-    'check GYBLOS_CONFIG or ./gyblos.toml; telemetry.file must be a boolean',
+    'check GYBLOS_CONFIG or ./config.toml; telemetry.file must be a boolean',
 
   [FREE_BUYER_STARTUP.ROLE_MISSING]:
     'run `pnpm node:setup --role buyer --mint MINT` first',

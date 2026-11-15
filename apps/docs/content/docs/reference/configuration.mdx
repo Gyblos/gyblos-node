@@ -3,8 +3,8 @@ title: Configuration
 description: Seller TOML keys, defaults, environment overrides and startup restrictions.
 ---
 
-Edit `~/gyblos-seller/gyblos.toml` on the host. The supplied image mounts it read-only at
-`/config/gyblos.toml` and selects it through `GYBLOS_CONFIG`. It is read at startup; edits require recreation.
+Edit `~/gyblos-seller/config.toml` on the host. The supplied image mounts it read-only at
+`/config/config.toml` and selects it through `GYBLOS_CONFIG`. It is read at startup; edits require recreation.
 
 ## Example [#complete-free-docker-configuration]
 
@@ -31,7 +31,7 @@ another setting. To change caps, use [Models and offers](/en/sellers/models-offe
 
 ```sh
 cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
 Expect `OK`; correct each reported issue code and key path before applying. Then:

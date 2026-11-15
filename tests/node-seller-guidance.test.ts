@@ -60,7 +60,7 @@ void test('seller status names the next onboarding step only while the seller ru
       container.stdout,
       /^Next: publish: .* first run `docker compose exec seller gyblos seller register`/m,
     );
-    await writeFile(join(home.root, 'gyblos.toml'), PUBLISH);
+    await writeFile(join(home.root, 'config.toml'), PUBLISH);
     const unchecked = await status(home, system(home));
     assert.match(
       unchecked.stdout,
@@ -75,7 +75,7 @@ void test('seller status --online says the seller is selling when listed, and ho
     async (home: Home) => {
       await daemonReady(home);
       await installUnit(home);
-      await writeFile(join(home.root, 'gyblos.toml'), PUBLISH);
+      await writeFile(join(home.root, 'config.toml'), PUBLISH);
       const online = (body: unknown) =>
         status(
           home,

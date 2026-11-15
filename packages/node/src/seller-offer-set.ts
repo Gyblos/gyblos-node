@@ -22,7 +22,7 @@ export interface SellerOfferObservation {
 }
 
 export interface LiveSellerOffer extends ControlOffer {
-  // Position in gyblos.toml [[offers]].
+  // Position in config.toml [[offers]].
   index: number;
   offer: SellerCatalogOffer;
   // The readiness-tracking engine: generation marks this offer busy.

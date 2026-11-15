@@ -111,7 +111,7 @@ Seller:
 pnpm node:setup --role seller --mint MINT   # free selling needs no payout or buyer address
 pnpm node:tokenizer             # pinned tokenizer, for offers whose usage the seller recounts
 # run your own engine (a dedicated Ollama, or an OpenAI- or Anthropic-compatible API; see the full steps)
-cp examples/seller-daemon.toml gyblos.toml   # example free offer
+cp examples/seller-daemon.toml config.toml   # example free offer
 pnpm gyblos doctor              # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
@@ -132,7 +132,7 @@ the published image without a checkout
 | Group  | Command                                              | What it does                                                                           |
 | ------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).                                |
-| Node   | `pnpm gyblos config validate --config gyblos.toml`   | Check a node config file and the environment ([configuration](docs/configuration.md)). |
+| Node   | `pnpm gyblos config validate --config config.toml`   | Check a node config file and the environment ([configuration](docs/configuration.md)). |
 | Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                                      |
 | Node   | `pnpm gyblos seller service install\|uninstall`      | Run the seller in the background (systemd or launchd) after an offline doctor check.   |
 | Node   | `pnpm node:tokenizer`                                | Download and verify the pinned tokenizer for either role, without an engine.           |
@@ -221,7 +221,7 @@ wired into node startup. Local record adapters remain separate.
 The free seller and buyer APIs support explicitly supplied local event sinks;
 see [local telemetry composition and event semantics](docs/local-telemetry.md).
 Seller and free-buyer startup can opt in with `[telemetry] file = true` in
-`gyblos.toml`.
+`config.toml`.
 
 Simulated paid product-startup verification: `pnpm acceptance:paid`
 ([scope and limits](docs/paid-acceptance.md)).

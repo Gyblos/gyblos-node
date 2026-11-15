@@ -4,9 +4,9 @@ import { RUN_MODES, type RunMode } from '@gyblos/config';
 
 export const FAUCET = 'https://faucet.solana.com, choose devnet';
 
-// gyblos.toml is read-only inside the installer's container, so publishing is a step on the host.
+// config.toml is read-only inside the installer's container, so publishing is a step on the host.
 export const PUBLISH_STEP =
-  'set publish = true under [discovery] in gyblos.toml and restart the seller (installed with install.sh: run `sh install.sh publish` where you saved it, with GYBLOS_DIR if you installed elsewhere; download install.sh again if it does not know publish)';
+  'set publish = true under [discovery] in config.toml and restart the seller (installed with install.sh: run `sh install.sh publish` where you saved it, with GYBLOS_DIR if you installed elsewhere; download install.sh again if it does not know publish)';
 
 export const LISTING = {
   OFF: 'off',

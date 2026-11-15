@@ -1,4 +1,4 @@
-// A minimal draft-07 JSON Schema evaluator for the keywords the gyblos.toml schema uses; test-only.
+// A minimal draft-07 JSON Schema evaluator for the keywords the config.toml schema uses; test-only.
 // Unknown keywords throw, so the schema cannot rely on a rule this evaluator silently ignores.
 // Values come from smol-toml with integersAsBigInt, as editors see TOML: integers are bigint, floats number.
 type Schema = Record<string, unknown>;

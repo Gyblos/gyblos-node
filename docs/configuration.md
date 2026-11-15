@@ -1,4 +1,4 @@
-# Node configuration file (`gyblos.toml`)
+# Node configuration file (`config.toml`)
 
 For the invited free Docker seller, use the bilingual
 [public seller handbook](https://docs.gyblos.com/en/sellers/beta-guide),
@@ -9,7 +9,7 @@ canonical source is `apps/docs/content/docs/`. This engineering document also
 covers checkout, library and experimental paths; those paths are not
 interchangeable with the invitation's Docker onboarding.
 
-A node can be described by one TOML file, `gyblos.toml`, as decided in vault
+A node can be described by one TOML file, `config.toml`, as decided in vault
 GYB-DOC-026. This page is its reference. The seller daemon (`pnpm node:start`)
 reads it at startup; see [Seller startup](#seller-startup) for what it honors
 today. `gyblos doctor` checks a seller before startup
@@ -19,7 +19,7 @@ writes a starting file with one free offer ([Seller](running-a-node.md#seller)).
 ## Validate a file
 
 ```sh
-pnpm gyblos config validate --config path/to/gyblos.toml   # default: ./gyblos.toml
+pnpm gyblos config validate --config path/to/config.toml   # default: ./config.toml
 ```
 
 On success it prints `OK`, every effective setting with where it came from
@@ -49,7 +49,7 @@ For each setting, the first source that sets it wins:
 
 1. CLI flags (for future `gyblos start`; the resolver already accepts them).
 2. `GYBLOS_*` environment variables.
-3. `gyblos.toml`.
+3. `config.toml`.
 4. Built-in defaults.
 
 | Setting                | Flag                   | Environment                 | File key                  | Default                                 |
@@ -185,7 +185,7 @@ a payment server configured; see [limitations](limitations.md).
 
 ### Price unit
 
-A `gyblos.toml` price is USDC per million tokens. Protocol v2 represents rates
+A `config.toml` price is USDC per million tokens. Protocol v2 represents rates
 in USDC atomic units (10^-6 USDC) per million tokens. Because a price has at
 most 6 decimals, the conversion is exact: atomic per million tokens = USDC per
 million tokens × 10^6. `pricePerMtokToAtomicPerMtok` (from
@@ -238,7 +238,7 @@ the validator.
 ## Seller startup
 
 `pnpm node:start` reads `GYBLOS_CONFIG` (a path; it must exist) or, when that
-variable is unset, `./gyblos.toml`. Relative paths resolve against the daemon's
+variable is unset, `./config.toml`. Relative paths resolve against the daemon's
 working directory, which is the repository root under `pnpm node:start`. The
 file must list the offer to serve: without a file, or without `[[offers]]`,
 startup stops with `SELLER_OFFERS_MISSING`. An environment variable still
@@ -433,13 +433,13 @@ there are no `GYBLOS_*` variables for it, and the buyer ignores it.
 ## Seller preflight (`gyblos doctor`)
 
 ```sh
-pnpm gyblos doctor                         # reads ./gyblos.toml, like node:start
+pnpm gyblos doctor                         # reads ./config.toml, like node:start
 GYBLOS_CONFIG=my.toml pnpm gyblos doctor   # the file node:start will read
 pnpm gyblos doctor --online                # also calls remote engine APIs and checks the clock
 ```
 
 `doctor` has no `--config` flag on purpose: it reads exactly the file
-`pnpm node:start` reads (`GYBLOS_CONFIG`, else `./gyblos.toml`), so a passing
+`pnpm node:start` reads (`GYBLOS_CONFIG`, else `./config.toml`), so a passing
 doctor and a starting node never look at different files. It runs, read-only,
 the checks startup would fail on, and prints one line per check (`OK`, `WARN` or
 `FAIL`) with a static code and a hint:
@@ -517,7 +517,7 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
   a valid result also carries `warnings`.
 - `@gyblos/node/node-config-file`: `nodeConfigPath` and `readStartupConfig`, the
   one rule for which file is read (`GYBLOS_CONFIG`, else an optional
-  `./gyblos.toml`, or `~/.gyblos/gyblos.toml` for the packaged release).
+  `./config.toml`, or `~/.gyblos/config.toml` for the packaged release).
 - `@gyblos/node/node-config-resolve`: `resolveNodeConfig({ file, env, flags })`,
   returning settings, origins, secret references and warnings, or issues.
 - `apps/node/src/bin.ts`: the one seller entry point (`pnpm gyblos` from a

@@ -161,7 +161,7 @@ void test('the manual install page matches what install.sh writes and runs', asy
     );
     assert.ok(
       text.includes(`\`\`\`toml\n${toml}\n\`\`\``),
-      `${page}: gyblos.toml`,
+      `${page}: config.toml`,
     );
     assert.ok(
       text.includes(`ollama pull ${value('MODEL')}\n`),

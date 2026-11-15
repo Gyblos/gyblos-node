@@ -46,7 +46,7 @@ void test('the image runs as the unprivileged node user with data in a private v
   assert.match(dockerfile, /install -d -o node -g node -m 0700 \/data/);
   assert.match(
     dockerfile,
-    /ENV GYBLOS_HOME=\/data GYBLOS_CONFIG=\/config\/gyblos\.toml/,
+    /ENV GYBLOS_HOME=\/data GYBLOS_CONFIG=\/config\/config\.toml/,
   );
   assert.equal(
     statSync(join(REPOSITORY_ROOT, 'docker/entrypoint.sh')).mode & 0o111,
@@ -71,7 +71,7 @@ void test('the build context is an allowlist that never admits local state or se
   ])
     assert.ok(ignored.includes(entry), entry);
   // Nothing at the root is admitted that could hold local state or configuration.
-  for (const entry of ['!.local', '!gyblos.toml', '!seller.env', '!.git'])
+  for (const entry of ['!.local', '!config.toml', '!seller.env', '!.git'])
     assert.equal(ignored.includes(entry), false, entry);
   assert.ok(read('.gitignore').split(/\r?\n/).includes('/seller.env'));
 });

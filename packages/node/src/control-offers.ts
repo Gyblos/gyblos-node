@@ -16,7 +16,7 @@ import type { SellerCatalogOffer } from './seller-offer';
 export interface ControlOffer {
   // From the engine plugin: what the catalog lists and how delivered tokens are counted.
   selection: ModelSelection;
-  // The listing: from gyblos.toml in the daemon, chosen by the caller in lab acceptance.
+  // The listing: from config.toml in the daemon, chosen by the caller in lab acceptance.
   offer: SellerCatalogOffer;
   // The warmed engine's description, which quotes carry.
   model: EngineDescription;

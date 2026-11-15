@@ -95,7 +95,7 @@ function readinessDiagnostics() {
   };
 }
 
-// Private status: which gyblos.toml offers are listed now, without engine URLs.
+// Private status: which config.toml offers are listed now, without engine URLs.
 function offerStatus(settings: SellerSettings, offers: SellerOfferSet) {
   const listed = new Set(offers.listed().map((offer) => offer.index));
   return settings.offers.map(({ offer, engine }) => ({

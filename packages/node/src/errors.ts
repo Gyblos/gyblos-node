@@ -2,7 +2,7 @@
 import type { NodeErrorCode } from './constants';
 
 export interface NodeErrorContext {
-  // Zero-based position of the gyblos.toml [[offers]] entry the error is about.
+  // Zero-based position of the config.toml [[offers]] entry the error is about.
   offer?: number;
   requiredLamports?: bigint;
   missingLamports?: bigint;

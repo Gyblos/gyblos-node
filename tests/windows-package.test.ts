@@ -101,7 +101,7 @@ void test(
       assert.deepEqual(await readdir(work), []);
       assert.deepEqual((await readdir(join(account, '.gyblos'))).sort(), [
         'app',
-        'gyblos.toml',
+        'config.toml',
         'seller',
       ]);
     } finally {

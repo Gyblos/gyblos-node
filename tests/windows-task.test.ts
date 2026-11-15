@@ -66,7 +66,7 @@ void test(
         repository: root,
         launcher: join(app, 'current', nativeLayout(TARGET).launcher),
         home,
-        config: join(home, 'gyblos.toml'),
+        config: join(home, 'config.toml'),
         environmentFile: join(home, 'seller.env'),
         logFile: join(home, 'service.log'),
         accountHome: account,

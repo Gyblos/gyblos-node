@@ -41,7 +41,7 @@ export class FreeSellerLedger {
   private buyers = new Set<string>();
   constructor(
     private readonly startedAt: number,
-    // Distinct buyers served per UTC day; a seller's gyblos.toml [limits] may set it.
+    // Distinct buyers served per UTC day; a seller's config.toml [limits] may set it.
     private readonly maxBuyers: number = FREE_EXECUTION_ADMISSION.maxBuyers,
   ) {
     count(startedAt);

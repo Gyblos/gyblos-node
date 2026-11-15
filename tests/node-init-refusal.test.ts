@@ -23,12 +23,12 @@ void test('seller init: never writes through a symlink or over a directory, even
   inDirectory(async (directory) => {
     const target = join(directory, 'target.txt');
     await writeFile(target, 'untouched\n');
-    await symlink(target, join(directory, 'gyblos.toml'));
+    await symlink(target, join(directory, 'config.toml'));
     const result = await run(directory, ['--force']);
     assert.equal(result.code, 1);
     assert.match(result.stderr, /INIT_UNSAFE_PATH/);
     assert.equal(await readFile(target, 'utf8'), 'untouched\n');
-    assert.ok((await lstat(join(directory, 'gyblos.toml'))).isSymbolicLink());
+    assert.ok((await lstat(join(directory, 'config.toml'))).isSymbolicLink());
 
     await mkdir(join(directory, 'folder.toml'));
     const nested = await run(directory, ['--force'], {
@@ -91,7 +91,7 @@ void test('seller init: values node:start would refuse write nothing and print t
 void test('seller init: a directory that cannot be written reports INIT_WRITE_FAILED and leaves nothing', () =>
   inDirectory(async (directory) => {
     const result = await run(directory, [], {
-      env: { GYBLOS_CONFIG: 'missing/gyblos.toml' },
+      env: { GYBLOS_CONFIG: 'missing/config.toml' },
     });
     assert.equal(result.code, 1);
     assert.match(result.stderr, /^INIT_WRITE_FAILED: /);
@@ -149,14 +149,14 @@ void test('seller init: its flags are refused on other commands, and other flags
 
 void test('seller init: where hard links are unsupported it creates the file in place, still never over one', () =>
   inDirectory(async (directory) => {
-    const path = join(directory, 'gyblos.toml');
+    const path = join(directory, 'config.toml');
     const unsupported = async () => {
       throw Object.assign(new Error('link'), { code: 'ENOTSUP' });
     };
     await writeConfigFile(path, 'version = 1\n', false, unsupported);
     assert.equal(await readFile(path, 'utf8'), 'version = 1\n');
     assert.equal((await lstat(path)).mode & 0o777, 0o600);
-    assert.deepEqual(await readdir(directory), ['gyblos.toml']);
+    assert.deepEqual(await readdir(directory), ['config.toml']);
     await assert.rejects(
       writeConfigFile(path, 'replaced\n', false, unsupported),
       { message: 'INIT_FILE_EXISTS' },

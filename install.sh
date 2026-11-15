@@ -12,16 +12,16 @@
 #
 # Environment (all optional):
 #   GYBLOS_MODE         docker or native (default: an existing install's, else docker when it runs)
-#   GYBLOS_DIR          Docker: where compose.yaml, gyblos.toml and seller.env go (default: ~/gyblos-seller)
-#   GYBLOS_HOME         native: the seller's home, with gyblos.toml and seller.env (default: ~/.gyblos)
+#   GYBLOS_DIR          Docker: where compose.yaml, config.toml and seller.env go (default: ~/gyblos-seller)
+#   GYBLOS_HOME         native: the seller's home, with config.toml and seller.env (default: ~/.gyblos)
 #   GYBLOS_IMAGE        node image (default: the release pinned below, by version and digest)
 #   GYBLOS_RELAY_TOKEN  optional; only for a relay that still requires a token
 #   GYBLOS_REQUIRE_SIGNATURE=1  stop unless cosign verifies the seller image as a Gyblos release
 #   GYBLOS_GUIDED=0     only print the steps to start selling; never ask to register or publish
 #
-# Existing gyblos.toml and seller.env are kept, and so is compose.yaml except for a Gyblos seller image,
+# Existing config.toml and seller.env are kept, and so is compose.yaml except for a Gyblos seller image,
 # which moves to this script's release: rerunning resumes a failed install, updates the seller and
-# restarts it with the current gyblos.toml. With cosign installed, a Gyblos image must carry the release
+# restarts it with the current config.toml. With cosign installed, a Gyblos image must carry the release
 # signature of the release workflow (docs/running-a-node.md#image-signature).
 # An optional relay token is written only to seller.env (mode 0600) and never printed.
 set -eu
@@ -150,7 +150,7 @@ install_file() {
 # echo back on if the token prompt was interrupted.
 cleanup() {
   # An interrupted or failed publish change goes back to the saved original before it is removed.
-  [ -z "${restore:-}" ] || cat "$original" >gyblos.toml
+  [ -z "${restore:-}" ] || cat "$original" >config.toml
   [ -z "${tmp:-}" ] || rm -f "$tmp"
   [ -z "${work:-}" ] || rm -rf "$work"
   [ -z "${unpack:-}" ] || rm -rf "$unpack"
@@ -197,8 +197,8 @@ services:
     volumes:
       - gyblos:/data
       - type: bind
-        source: ./gyblos.toml
-        target: /config/gyblos.toml
+        source: ./config.toml
+        target: /config/config.toml
         read_only: true
         bind:
           create_host_path: false
@@ -284,14 +284,14 @@ verify_image() {
 
 # examples/seller-docker.toml without its repository-relative schema line.
 write_config() {
-  refuse_symlink gyblos.toml
-  if [ -e gyblos.toml ]; then
-    say "Kept existing $dir/gyblos.toml"
+  refuse_symlink config.toml
+  if [ -e config.toml ]; then
+    say "Kept existing $dir/config.toml"
     return
   fi
-  install_file gyblos.toml 644 <<'TOML'
+  install_file config.toml 644 <<'TOML'
 # The seller daemon in Docker (compose.yaml): the pinned Qwen3 0.6B with reasoning off on the compose
-# Ollama, given away free within daily token caps. Copy it next to compose.yaml as gyblos.toml; the seller
+# Ollama, given away free within daily token caps. Copy it next to compose.yaml as config.toml; the seller
 # shares Ollama's network namespace, so 127.0.0.1:11434 is that Ollama (docs/running-a-node.md#docker).
 # Free by default. To charge, give an offer `price = {...}` instead of `free` (docs/configuration.md) and
 # fund the fee payer `gyblos doctor` prints with devnet SOL.
@@ -316,7 +316,7 @@ reasoning = ["off"]
 engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
 free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 TOML
-  say "Wrote $dir/gyblos.toml"
+  say "Wrote $dir/config.toml"
 }
 
 # seller.env holds private variables for the seller (API keys, NAME=value per line). The Gyblos relays need
@@ -401,7 +401,7 @@ publish_command() {
 
 # Tolerates spacing, a comment and CRLF line endings, like the TOML reader.
 publishing() {
-  tr -d '\r' <gyblos.toml | grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$'
+  tr -d '\r' <config.toml | grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$'
 }
 
 next_steps() {
@@ -455,54 +455,54 @@ guided_setup() {
   say 'Done: this seller is registered and published. Buyers can find it within about two minutes.'
 }
 
-# Checks gyblos.toml with the installed seller, then restarts it with the file.
+# Checks config.toml with the installed seller, then restarts it with the file.
 validate_config() {
   if [ "$mode" = native ]; then
-    seller_cli config validate --config "$dir/gyblos.toml" 2>&1
+    seller_cli config validate --config "$dir/config.toml" 2>&1
   else
-    docker compose run --rm seller gyblos config validate --config /config/gyblos.toml 2>&1
+    docker compose run --rm seller gyblos config validate --config /config/config.toml 2>&1
   fi
 }
 restart_seller() {
   if [ "$mode" = native ]; then
     restart_service ||
-      die "gyblos.toml is changed, but the seller service did not restart; restart it (or run $(seller_typed 'seller service install')) for the change to apply."
+      die "config.toml is changed, but the seller service did not restart; restart it (or run $(seller_typed 'seller service install')) for the change to apply."
   else
     docker compose up -d --force-recreate seller
   fi
 }
 
-# Turns publishing on or off in the installed gyblos.toml, then restarts the seller with it. With Docker
+# Turns publishing on or off in the installed config.toml, then restarts the seller with it. With Docker
 # the file is read-only inside the container, so this runs on the host; an invalid result restores the
 # original.
 set_publish() {
   if [ "$mode" = native ]; then
-    [ -f "$dir/gyblos.toml" ] && [ -e "$native_home/app/current" ] ||
+    [ -f "$dir/config.toml" ] && [ -e "$native_home/app/current" ] ||
       die "No packaged seller in $dir: run sh install.sh first (GYBLOS_HOME names another home)."
   else
     check_docker
-    [ -f "$dir/gyblos.toml" ] && [ -f "$dir/compose.yaml" ] ||
+    [ -f "$dir/config.toml" ] && [ -f "$dir/compose.yaml" ] ||
       die "No installed seller in $dir: run sh install.sh first (GYBLOS_DIR names another directory)."
   fi
   cd "$dir"
-  refuse_symlink gyblos.toml
-  [ "$(grep -Ec '^publish = (true|false)$' gyblos.toml)" -eq 1 ] ||
-    die 'gyblos.toml has no single "publish = true" or "publish = false" line under [discovery]; set it by hand.'
-  original=$(mktemp ./.gyblos.toml.XXXXXX)
+  refuse_symlink config.toml
+  [ "$(grep -Ec '^publish = (true|false)$' config.toml)" -eq 1 ] ||
+    die 'config.toml has no single "publish = true" or "publish = false" line under [discovery]; set it by hand.'
+  original=$(mktemp ./.config.toml.XXXXXX)
   tmp=$original
-  cp gyblos.toml "$original"
+  cp config.toml "$original"
   # Rewritten in place, keeping the file the running container has bind-mounted; until the seller is
   # recreated with it, any exit restores the original (cleanup).
   restore=1
-  sed -E "s/^publish = (true|false)\$/publish = $1/" "$original" >gyblos.toml
-  grep -Eq "^publish = $1\$" gyblos.toml || {
-    cat "$original" >gyblos.toml
-    die 'could not change publish in gyblos.toml; set it by hand.'
+  sed -E "s/^publish = (true|false)\$/publish = $1/" "$original" >config.toml
+  grep -Eq "^publish = $1\$" config.toml || {
+    cat "$original" >config.toml
+    die 'could not change publish in config.toml; set it by hand.'
   }
   if ! report=$(validate_config); then
-    cat "$original" >gyblos.toml
+    cat "$original" >config.toml
     printf '%s\n' "$report" >&2
-    die 'gyblos.toml is not valid with that change; it was left as it was.'
+    die 'config.toml is not valid with that change; it was left as it was.'
   fi
   restore=
   restart_seller
@@ -690,14 +690,14 @@ pull_model() {
   fi
 }
 
-# The packaged seller's gyblos.toml: examples/seller-docker.toml's offer on the machine's own Ollama.
+# The packaged seller's config.toml: examples/seller-docker.toml's offer on the machine's own Ollama.
 write_native_config() {
-  refuse_symlink gyblos.toml
-  if [ -e gyblos.toml ]; then
-    say "Kept existing $dir/gyblos.toml"
+  refuse_symlink config.toml
+  if [ -e config.toml ]; then
+    say "Kept existing $dir/config.toml"
     return
   fi
-  install_file gyblos.toml 644 <<'TOML'
+  install_file config.toml 644 <<'TOML'
 # The packaged seller: the pinned Qwen3 0.6B with reasoning off on this machine's Ollama, given away free
 # within daily token caps. To charge, give an offer `price = {...}` instead of `free`
 # (docs/configuration.md) and fund the fee payer `gyblos doctor` prints with devnet SOL.
@@ -722,7 +722,7 @@ reasoning = ["off"]
 engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
 free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 TOML
-  say "Wrote $dir/gyblos.toml"
+  say "Wrote $dir/config.toml"
 }
 
 # Runs the packaged seller with seller.env's variables, as its service does.
@@ -767,7 +767,7 @@ main_native() {
     die "The seller is not ready; fix the failures above, then run this script again."
   owner=$(printf '%s\n' "$doctor" | sed -n 's/^  owner  *\([1-9A-HJ-NP-Za-km-z]\{32,44\}\)[[:space:]]*$/\1/p' | sed -n 1p)
   switch_native
-  # Reinstalled so a rerun or an update runs this release with the current gyblos.toml and seller.env;
+  # Reinstalled so a rerun or an update runs this release with the current config.toml and seller.env;
   # removing the service stops the seller first (it withdraws within 120 s). It runs app/current.
   seller_cli seller service uninstall >/dev/null 2>&1 || true
   seller_cli seller service install ||
@@ -862,14 +862,14 @@ main() {
   [ -n "$ready" ] ||
     die "The seller is not ready; fix the failures above, then run this script again (cd $dir)."
   owner=$(printf '%s\n' "$doctor" | sed -n 's/^  owner  *\([1-9A-HJ-NP-Za-km-z]\{32,44\}\)[[:space:]]*$/\1/p' | sed -n 1p)
-  # Recreated so a rerun applies the current gyblos.toml and seller.env; stopping sends SIGINT.
+  # Recreated so a rerun applies the current config.toml and seller.env; stopping sends SIGINT.
   docker compose up -d --force-recreate seller
   say ''
   say "The seller is running. In $dir:"
   say '  docker compose exec seller gyblos seller status   is it serving?'
   say '  docker compose logs -f seller        follow it'
   say '  docker compose stop seller           stop it (withdraws within 120 s)'
-  say '  docker compose up -d --force-recreate seller   apply an edited gyblos.toml'
+  say '  docker compose up -d --force-recreate seller   apply an edited config.toml'
   say "  $(publish_command update)   update it to the latest release"
   say 'Its keys are in the gyblos volume: `docker compose down -v` deletes them.'
   if publishing; then

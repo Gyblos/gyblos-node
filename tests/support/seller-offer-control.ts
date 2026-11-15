@@ -1,4 +1,4 @@
-// Seller control over two synthetic offers (gyblos.toml indexes 0 and 1) with ephemeral unfunded signers:
+// Seller control over two synthetic offers (config.toml indexes 0 and 1) with ephemeral unfunded signers:
 // the signed catalog, and quotes for either offer through the control service. No engines or network.
 import assert from 'node:assert/strict';
 

@@ -192,7 +192,7 @@ void test(
     try {
       process.env.GYBLOS_HOME = join(directory, 'home');
       // A file with no [[offers]]: startup refuses it after the first status write.
-      process.env.GYBLOS_CONFIG = join(directory, 'gyblos.toml');
+      process.env.GYBLOS_CONFIG = join(directory, 'config.toml');
       await writeFile(
         process.env.GYBLOS_CONFIG,
         'version = 1\n\n[node]\nnetwork = "devnet"\n',

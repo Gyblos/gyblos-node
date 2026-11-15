@@ -9,7 +9,7 @@ no significa que todos los modelos hayan sido probados.
 
 ## Cuotas gratuitas [#reduce-las-cuotas-gratuitas]
 
-Edita la entrada `[[offers]]` existente en `~/gyblos-seller/gyblos.toml`. Este ejemplo completo reduce
+Edita la entrada `[[offers]]` existente en `~/gyblos-seller/config.toml`. Este ejemplo completo reduce
 a la mitad la cuota total y baja la cuota por comprador. Deja la publicación desactivada intencionadamente;
 si ya estás publicado, conserva tu ajuste `[discovery]` al cambiar solo las cuotas.
 
@@ -41,7 +41,7 @@ parcial; no es facturación persistente ni garantiza impedir que alguien cree ot
 
 ```sh
 cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
 Después de `OK`, aplica el cambio:

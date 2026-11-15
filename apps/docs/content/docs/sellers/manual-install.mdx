@@ -77,8 +77,8 @@ services:
     volumes:
       - gyblos:/data
       - type: bind
-        source: ./gyblos.toml
-        target: /config/gyblos.toml
+        source: ./config.toml
+        target: /config/config.toml
         read_only: true
         bind:
           create_host_path: false
@@ -93,11 +93,11 @@ volumes:
   gyblos:
 ```
 
-Save this as `~/gyblos-seller/gyblos.toml`:
+Save this as `~/gyblos-seller/config.toml`:
 
 ```toml
 # The seller daemon in Docker (compose.yaml): the pinned Qwen3 0.6B with reasoning off on the compose
-# Ollama, given away free within daily token caps. Copy it next to compose.yaml as gyblos.toml; the seller
+# Ollama, given away free within daily token caps. Copy it next to compose.yaml as config.toml; the seller
 # shares Ollama's network namespace, so 127.0.0.1:11434 is that Ollama (docs/running-a-node.md#docker).
 # Free by default. To charge, give an offer `price = {...}` instead of `free` (docs/configuration.md) and
 # fund the fee payer `gyblos doctor` prints with devnet SOL.

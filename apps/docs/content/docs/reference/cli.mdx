@@ -30,7 +30,7 @@ There is no general `gyblos start` or `gyblos stop` command, or general `--home`
 
 ```sh
 cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
 Success prints `OK`, effective settings and their source, offers, and secret variable names with
@@ -40,10 +40,10 @@ The command parses the file and resolves the environment; it does not check engi
 all seller startup restrictions.
 
 <Callout title="Configuration selection differs by command">
-  `config validate` uses `--config`, otherwise `./gyblos.toml`; it does not read
+  `config validate` uses `--config`, otherwise `./config.toml`; it does not read
   `GYBLOS_CONFIG` to select the file. In the supplied container use
-  `/config/gyblos.toml` explicitly. Doctor, init and startup use
-  `GYBLOS_CONFIG`, otherwise the working directory's `gyblos.toml`. Doctor,
+  `/config/config.toml` explicitly. Doctor, init and startup use
+  `GYBLOS_CONFIG`, otherwise the working directory's `config.toml`. Doctor,
   init, status, register and service do not accept `--config`.
 </Callout>
 

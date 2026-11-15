@@ -10,7 +10,7 @@ export function isLocalEngineUrl(url: URL) {
 }
 
 export function providerEngineUrl(raw: string) {
-  // gyblos.toml already refuses a query or fragment; plugins keep the check so a caller that skips the
+  // config.toml already refuses a query or fragment; plugins keep the check so a caller that skips the
   // config validator cannot route around it.
   if (!URL.canParse(raw) || /[?#]/.test(raw)) return undefined;
   const url = new URL(raw);
