@@ -20,6 +20,7 @@ import {
 } from './constants';
 import type { createBuyerControlClient } from './control';
 import type { WinningQuote } from './offer-race';
+import { selectionBackoff, type SellerBackoff } from './selection-backoff';
 import type { SnapshotCache } from './selection-cache';
 import {
   BuyerSelectionError,
@@ -66,6 +67,8 @@ export interface VerifiedSelectionDependencies {
   observeVerified?: (seller: KnownSeller) => Promise<boolean>;
   // Snapshots kept from earlier requests (selection-cache.ts); absent, every request asks every seller.
   snapshots?: SnapshotCache;
+  // Longer cooldowns for sellers failing again and again (selection-backoff.ts); absent, always 30 s.
+  backoff?: SellerBackoff;
   // Told why each seller dropped out; it never affects which seller wins.
   onSellerFailure?: SellerFailureReporter;
 }
@@ -76,12 +79,35 @@ export async function selectVerifiedBuyerQuote(
   dependencies: VerifiedSelectionDependencies,
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
-  const stale = new Set<string>();
-  // One caller owns both catalog attempts, including native work retired by the first.
+  const pending = selectionBackoff(
+    dependencies.backoff,
+    config,
+    dependencies.stats,
+    dependencies.onSellerFailure,
+    signal,
+  );
+  const active = {
+    ...dependencies,
+    backoff: pending.backoff,
+    onSellerFailure: pending.onSellerFailure,
+  };
+  let alternativeNodeId: string | undefined;
+  // One caller owns both catalog attempts and work retired before deferred failure reports.
   const settling: Promise<unknown>[] = [];
-  const first = await selectOnce(config, dependencies, stale, settling, signal);
-  if (first.ok || !stale.size || signal?.aborted) return first;
-  return selectOnce(config, dependencies, new Set(), settling, signal);
+  try {
+    const stale = new Set<string>();
+    const first = await selectOnce(config, active, stale, settling, signal);
+    const result =
+      first.ok || !stale.size || signal?.aborted
+        ? first
+        : await selectOnce(config, active, new Set(), settling, signal);
+    if (result.ok) alternativeNodeId = result.winner.candidate.nodeId;
+    return result;
+  } finally {
+    pending.finish(alternativeNodeId);
+    // A failure reporter can synchronously cancel after the last attempt already closed its clients.
+    if (signal?.aborted) await Promise.allSettled(settling);
+  }
 }
 async function selectOnce(
   config: BuyerSelectionConfig,

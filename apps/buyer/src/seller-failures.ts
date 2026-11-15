@@ -24,6 +24,8 @@ export interface SellerFailure {
   nodeId: string;
   phase: SellerFailurePhase;
   code: SellerFailureCode;
+  // When the seller will be tried again, if this failure cooled it down.
+  retryAt?: number;
 }
 export type SellerFailureReporter = (failure: SellerFailure) => unknown;
 

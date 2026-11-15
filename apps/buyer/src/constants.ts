@@ -87,6 +87,7 @@ export const SELLER_FAILURES = {
   DISCOVERY: 'SELLER_DISCOVERY_REJECTED',
   UNKNOWN: 'SELLER_ERROR_UNKNOWN',
   nodeIdChars: 8,
+  msPerSecond: 1000,
 } as const;
 // The models one endpoint may serve (selection.json `models`): public names clients send as `model`.
 export const BUYER_MODELS = {
@@ -122,6 +123,9 @@ export const BUYER_SELECTION = {
   signatureHexCharacters: 128,
   randomRange: 0x100000000,
   cooldownMs: 30000,
+  // A seller failing again and again waits twice as long each time, up to ten minutes (backoff).
+  maxCooldownMs: 600_000,
+  maxBackoffSteps: 6,
   // A cached seller snapshot is used only while its presence and catalog stay current this long more.
   snapshotMarginMs: 15_000,
   // Sellers remembered at once; the memory starts over when full.

@@ -17,6 +17,7 @@ import type {
   BuyerControlClient,
   VerifiedSelectionDependencies,
 } from './selection';
+import type { SellerBackoff } from './selection-backoff';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
@@ -24,8 +25,8 @@ import {
 } from './selection-config';
 import type { LocalSellerStats } from './selection-stats';
 import {
+  sellerFailureCode as failureCode,
   reportSellerFailure,
-  sellerFailureCode,
   type SellerFailureCode,
 } from './seller-failures';
 
@@ -72,24 +73,31 @@ export async function verifiedSeller(
 ): Promise<KnownSeller> {
   return (await verifiedSnapshot(client, seller, now, signal)).known;
 }
+// Record quote stats and return their cooldown end (null after a success).
 export function recordQuote(
   stats: Map<string, LocalSellerStats>,
   nodeId: string,
   success: boolean,
   latencyMs: number,
   now: number,
+  backoff?: SellerBackoff,
 ) {
   const prior = stats.get(nodeId);
+  if (success) backoff?.succeeded(nodeId);
+  const cooldownUntil = success
+    ? null
+    : now + (backoff?.failed(nodeId) ?? BUYER_SELECTION.cooldownMs);
   stats.set(nodeId, {
     successes: (prior?.successes ?? 0) + Number(success),
     failures: (prior?.failures ?? 0) + Number(!success),
     latencyMs: Math.max(0, Math.round(latencyMs)),
     waitAccuracy: prior?.waitAccuracy ?? null,
-    cooldownUntil: success ? null : now + BUYER_SELECTION.cooldownMs,
+    cooldownUntil,
     // v2 has no predicted wait and control latency is not inference waiting time.
     quotedWaitMs: prior?.quotedWaitMs ?? null,
     observedWaitMs: prior?.observedWaitMs ?? null,
   });
+  return cooldownUntil;
 }
 function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
   return outcomes.map((outcome) => {
@@ -98,9 +106,7 @@ function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
   });
 }
 
-// A seller cooling down after a failure cannot win an automatic selection, so it is not contacted until
-// the cooldown ends; a pinned one still is, so the caller can say when it returns. Selection reads the
-// clock again after the snapshot, so only a cooldown that outlasts it counts.
+// Skip only unpinned cooldowns that outlast the snapshot; recheck expiry afterward.
 function coolingPastSnapshot(
   seller: StaticControlSeller,
   dependencies: VerifiedSelectionDependencies,
@@ -123,6 +129,50 @@ function recall(
   const cached = dependencies.snapshots?.get(seller, now);
   if (cached) recalled.set(seller.nodeId, cached.catalog);
   return cached?.known;
+}
+
+// Reports why this seller dropped out of the selection; a request the caller cancelled is not a seller
+// failure.
+function failureReporter(
+  dependencies: VerifiedSelectionDependencies,
+  seller: StaticControlSeller,
+  signal?: AbortSignal,
+) {
+  return (
+    phase: SellerFailurePhase,
+    code: SellerFailureCode,
+    retryAt?: number | null,
+  ) => {
+    if (!signal?.aborted)
+      reportSellerFailure(dependencies.onSellerFailure, {
+        nodeId: seller.nodeId,
+        phase,
+        code,
+        ...(retryAt ? { retryAt } : {}),
+      });
+  };
+}
+
+// A failed connection closes in the background unless pinned or cancelled. Retain its native work,
+// drop the snapshot and record the cooldown returned to failure diagnostics.
+function connectFailed(
+  seller: StaticControlSeller,
+  clients: Map<string, BuyerControlClient>,
+  settling: Promise<unknown>[],
+  { stats, snapshots, backoff }: VerifiedSelectionDependencies,
+  now: number,
+  pinned: boolean,
+  signal?: AbortSignal,
+) {
+  const client = clients.get(seller.nodeId);
+  if (client && !signal?.aborted && !pinned) {
+    clients.delete(seller.nodeId);
+    const closing = client.close().catch(() => undefined);
+    settling.push(closing);
+    snapshots?.retire(seller.nodeId, closing);
+  }
+  snapshots?.drop(seller.nodeId);
+  return recordQuote(stats, seller.nodeId, false, 0, now, backoff);
 }
 
 export async function refreshSnapshots(
@@ -237,22 +287,6 @@ async function freshSnapshot(
   return known;
 }
 
-// Reports are observational only; a caller cancellation never becomes a seller failure.
-function failureReporter(
-  dependencies: VerifiedSelectionDependencies,
-  seller: StaticControlSeller,
-  signal?: AbortSignal,
-) {
-  return (phase: SellerFailurePhase, code: SellerFailureCode) => {
-    if (!signal?.aborted)
-      reportSellerFailure(dependencies.onSellerFailure, {
-        nodeId: seller.nodeId,
-        phase,
-        code,
-      });
-  };
-}
-
 async function snapshotBatch(
   config: BuyerSelectionConfig,
   dependencies: VerifiedSelectionDependencies,
@@ -315,21 +349,16 @@ async function snapshotBatch(
             ].some((code) => error.code === code)
           )
             throw error;
-          // A connection to a seller that stopped answering can take the whole transport idle timeout to
-          // close; it closes in the background instead of holding this request. A cancelled request
-          // still waits for it, like any native work it started.
-          // A pinned seller is asked again on the next request, so its close is still awaited: a new
-          // connection never races one still closing for the seller's per-peer limit.
-          const client = clients.get(seller.nodeId);
-          if (client && !signal?.aborted && !pinned) {
-            clients.delete(seller.nodeId);
-            const closing = client.close().catch(() => undefined);
-            settling.push(closing);
-            dependencies.snapshots?.retire(seller.nodeId, closing);
-          }
-          dependencies.snapshots?.drop(seller.nodeId);
-          recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
-          failed(SELLER_FAILURE_PHASES.CONNECT, sellerFailureCode(error));
+          const retryAt = connectFailed(
+            seller,
+            clients,
+            settling,
+            dependencies,
+            now(),
+            pinned,
+            signal,
+          );
+          failed(SELLER_FAILURE_PHASES.CONNECT, failureCode(error), retryAt);
           return undefined;
         }
       }),
@@ -337,9 +366,8 @@ async function snapshotBatch(
   );
 }
 
-// A connection attempt ends with the snapshot deadline: a seller that stopped answering would otherwise
-// hold every request for the whole transport timeout. A connection that arrives later is closed. A request
-// the caller cancelled still waits for the attempt, so its admission stays held until native work settles.
+// Bound dialing by the snapshot deadline and close late connections. Cancellation
+// still owns the native attempt until it settles, keeping admission held.
 export async function connectBefore(
   connecting: Promise<BuyerControlClient>,
   deadline: AbortSignal,
