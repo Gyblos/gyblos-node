@@ -121,6 +121,14 @@ export const READ_LIMIT_KEY = 'global';
 
 export const DISCOVERY_DB_BINDING = 'DISCOVERY_DB';
 
+export const DISCOVERY_LISTING_INDEXES = {
+  CATALOG: 'discovery_catalogs_listing',
+  PRESENCE: 'discovery_presence_listing',
+  WITHDRAWAL: 'discovery_withdrawals_listing',
+} as const;
+export type DiscoveryListingIndex =
+  (typeof DISCOVERY_LISTING_INDEXES)[keyof typeof DISCOVERY_LISTING_INDEXES];
+
 // Worker secret naming who may publish: `*` (open) or comma-separated NodeIds. Missing,
 // empty or malformed closes publishing (503); reads stay public either way.
 export const DISCOVERY_PUBLISH_ALLOWLIST_BINDING =

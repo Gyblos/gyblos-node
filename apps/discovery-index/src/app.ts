@@ -103,7 +103,7 @@ function secureRequest(url: string, development: boolean) {
 }
 
 // Before routing: https, then fail closed on storage and every limiter, then the per-IP(/64) limit.
-function gate(settings: IndexSettings) {
+function admitRequest(settings: IndexSettings) {
   return async (context: IndexContext, next: Next) => {
     const limiters = settings.resolve(context.req.url);
     if (!secureRequest(context.req.url, settings.development))
@@ -285,7 +285,7 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
 export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
   const settings = settingsOf(options);
   const app = new Hono<IndexEnv>();
-  app.use('*', gate(settings));
+  app.use('*', admitRequest(settings));
   // Storage failures map to one static code; details are neither returned nor logged.
   app.onError((_error, context) =>
     rejection(context, INDEX_ERRORS.UNAVAILABLE),
