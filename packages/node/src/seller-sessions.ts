@@ -134,10 +134,11 @@ async function operation(
       state.current !== undefined &&
       canonicalJson(state.current.terms) !== canonicalJson(proposed);
     const terms = ownTerms(proposed, options, !state.current || replacing);
-    if (
-      replacing &&
-      state.current?.session.snapshot().state !== SESSION_STATES.CLOSED
-    )
+    const snapshot = state.current?.session.snapshot();
+    const preparing =
+      snapshot?.state === SESSION_STATES.OPENING && snapshot.channelId === '';
+    // Empty transport identity is only a candidate; backend.renew verifies exact unsigned durable state.
+    if (replacing && snapshot?.state !== SESSION_STATES.CLOSED && !preparing)
       return batchFail(SESSION_CODES.BUSY);
     const offer = await verifyBatchQuote(
       request.params.quote,

@@ -9,7 +9,7 @@ import {
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { batchOfferFixture } from './support/batch-iroh-offer';
 import { sessionRig } from './support/batch-session';
@@ -130,3 +130,77 @@ for (const expires of ['quote', 'session'] as const) {
     assert.deepEqual(rig.calls, []);
   });
 }
+
+void test('an expired unsubmitted seller preparation permits fresh terms but delegates final renewal safety to finance', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  rig.time(rig.terms.expiresAt + 1);
+  const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
+  let renewals = 0;
+  let creates = 0;
+  const host = await startSellerSessions({
+    buyerNodeId: rig.terms.buyerNodeId,
+    owner: rig.terms.owner,
+    nodeId: rig.terms.sellerNodeId,
+    description: rig.terms,
+    now: rig.now,
+    offers: () => [offers.live],
+    backend: {
+      inspect: async () => ({
+        terms: rig.terms,
+        snapshot: rig.seller().snapshot(),
+        pending: false,
+        recoverable: false,
+      }),
+      create: async () => {
+        creates++;
+        return rig.seller();
+      },
+      renew: async (expected) => {
+        assert.equal(expected, '');
+        renewals++;
+        return sessionFail(SESSION_CODES.UNVERIFIED);
+      },
+    },
+  });
+  t.after(host.close);
+  const terms = { ...rig.terms, expiresAt: rig.now() + 3_600_000 };
+  const quote = await offers.quote(50);
+  const request = (
+    method: typeof BATCH_METHODS.PREPARE | typeof BATCH_METHODS.OPEN,
+  ) =>
+    parseBatchChannelRequest({
+      version: BATCH_CHANNEL.version,
+      requestId: 'ab'.repeat(16),
+      method,
+      params:
+        method === BATCH_METHODS.OPEN
+          ? { terms, quote, payload: '{}' }
+          : { terms, quote },
+    });
+  const signal = new AbortController().signal;
+  await assert.doesNotReject(
+    host.service.exchange(
+      request(BATCH_METHODS.PREPARE),
+      terms.buyerNodeId,
+      signal,
+    ),
+  );
+  assert.equal(
+    renewals,
+    0,
+    'preparation does not replace or sign a financial attempt',
+  );
+  await assert.rejects(
+    host.service.exchange(
+      request(BATCH_METHODS.OPEN),
+      terms.buyerNodeId,
+      signal,
+    ),
+    { code: SESSION_CODES.UNVERIFIED },
+  );
+  assert.equal(renewals, 1);
+  assert.equal(creates, 1);
+  assert.deepEqual(rig.calls, []);
+  assert.equal(offers.generations(), 0);
+});
