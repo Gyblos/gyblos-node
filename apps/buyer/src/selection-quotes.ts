@@ -20,6 +20,7 @@ import {
 } from './selection-config';
 import { connectBefore, recordQuote } from './selection-snapshots';
 import {
+  quoteFailureCode,
   reportSellerFailure,
   sellerFailureCode,
   type SellerFailureCode,
@@ -44,7 +45,7 @@ const CATALOG_CHANGED: ReadonlySet<SellerFailureCode> = new Set([
 // A seller without tools answered as designed: it is not cooled down for the requests it serves. Any
 // other refused quote cools it down; returns when it is tried again.
 function coolAfterQuote(
-  error: unknown,
+  code: SellerFailureCode,
   nodeId: string,
   context: {
     dependencies: VerifiedSelectionDependencies;
@@ -54,7 +55,7 @@ function coolAfterQuote(
   },
 ) {
   const { dependencies } = context;
-  if (sellerFailureCode(error) === CONTROL_CODES.TOOLS) return null;
+  if (code === CONTROL_CODES.TOOLS) return null;
   return recordQuote(
     dependencies.stats,
     nodeId,
@@ -259,7 +260,8 @@ async function requestCandidate(
       // Its catalog may have changed or it may be gone: the next request verifies it again. A seller
       // that only lost the race keeps its snapshot.
       dependencies.snapshots?.drop(candidate.nodeId);
-      const retryAt = coolAfterQuote(error, candidate.nodeId, {
+      const code = quoteFailureCode(error, request.tools === true);
+      const retryAt = coolAfterQuote(code, candidate.nodeId, {
         dependencies,
         elapsedMs: now() - start,
         now: now(),
@@ -268,7 +270,7 @@ async function requestCandidate(
       reportSellerFailure(dependencies.onSellerFailure, {
         nodeId: candidate.nodeId,
         phase: SELLER_FAILURE_PHASES.QUOTE,
-        code: sellerFailureCode(error),
+        code,
         ...(retryAt ? { retryAt } : {}),
       });
     }
