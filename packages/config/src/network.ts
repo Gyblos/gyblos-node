@@ -38,8 +38,9 @@ export const DEVNET_TREASURY_OWNER =
 export const DEVNET_GYBLOS_TREASURY =
   '4Ui1dfvqbFx9CtjXNcKajHdr7aKT1nbYRiYjB1s7umNy';
 
-// The network's protocol fee, added on top of every seller's price and split on chain to the treasury
-// in the same claim. Buyers and sellers both read it; changing the fee is changing bps here.
+// The surcharge is added to seller net prices. For the devnet beta only, collection uses the
+// protocol's rounded split: each payout is floored and residual goes to the payment program treasury.
+// Exact 4% collection remains unmet before mainnet; changing the surcharge means changing bps here.
 export const PROTOCOL_FEE = {
   // 4% (founder, 2026-11-10; was 3%).
   bps: 400,
