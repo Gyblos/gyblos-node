@@ -1,14 +1,15 @@
-// Founder-only enrollment commands for the discovery index, run from a checkout with a Wrangler login:
-//   pnpm index:invite --contact <email or telegram> [--days 14]   prints a one-use invite code
-//   pnpm index:revoke <NodeId>                                     stops that seller from publishing
-//   pnpm index:restore <NodeId>                                    readmits a revoked seller
-// They write to the remote D1 through Wrangler (no admin route on the index). Only the invite's SHA-256
-// reaches D1; the code is printed once here and never stored. --dry-run prints the SQL instead.
+// Owns founder-only invite/revoke/restore commands. Drizzle compiles mutations for Wrangler;
+// the index exposes no admin route. Codes are printed once and only their hashes reach D1.
+// --dry-run prints compiled SQL without executing a remote command.
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+
+import type { SQLWrapper } from 'drizzle-orm';
+import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
+import { drizzle } from 'drizzle-orm/sqlite-proxy';
 
 import { isMain } from '@gyblos/runtime';
 
@@ -17,6 +18,11 @@ import {
   REGISTRATION_STATUS,
   type RegistrationStatus,
 } from '../src/constants';
+import type { DiscoveryDatabase } from '../src/d1-client';
+import {
+  createInviteQuery,
+  setRegistrationStatusQuery,
+} from '../src/registration-queries';
 
 const WRANGLER = 'wrangler@4.151.1';
 const DATABASE = 'gyblos-discovery';
@@ -69,7 +75,7 @@ function invite(args: readonly string[], output: AdminIo) {
   });
   const contact = values.contact ?? '';
   const days = values.days ?? String(DEFAULT_DAYS);
-  // The pattern admits no quote, so the contact is safe inside the SQL literal below.
+  // Validate the supported contact shape before constructing the ORM mutation.
   if (!REGISTRATION.contact.test(contact)) {
     output.stderr(
       '--contact is required: an email or telegram handle (letters, digits, @ . _ + -)\n',
@@ -84,7 +90,14 @@ function invite(args: readonly string[], output: AdminIo) {
   const now = output.now();
   const expiresAt = now + Number(days) * REGISTRATION.dayMs;
   output.execute(
-    `INSERT INTO discovery_invites (invite_hash, contact, created_at, expires_at) VALUES ('${hash}', '${contact}', ${now}, ${expiresAt});`,
+    compileMutation((database) =>
+      createInviteQuery(database, {
+        inviteHash: hash,
+        contact,
+        createdAt: now,
+        expiresAt,
+      }),
+    ),
   );
   output.stdout(
     `Invite for ${contact}, valid until ${new Date(expiresAt).toISOString()} (one use):\n\n  ${code}\n\nSend it to the seller; it is not stored and cannot be shown again.\n`,
@@ -107,7 +120,9 @@ function setStatus(
     return 1;
   }
   output.execute(
-    `UPDATE discovery_registrations SET status = '${status}' WHERE node_id = '${nodeId}';`,
+    compileMutation((database) =>
+      setRegistrationStatusQuery(database, nodeId, status),
+    ),
   );
   output.stdout(
     status === REGISTRATION_STATUS.REVOKED
@@ -115,6 +130,17 @@ function setStatus(
       : `Restored ${nodeId}: it may publish again (no effect if it was never registered).\n`,
   );
   return 0;
+}
+
+// Wrangler accepts a SQL command rather than bind parameters. Drizzle's dialect safely renders
+// its bound values; this compilation-only client fails if a query is accidentally executed here.
+function compileMutation(build: (database: DiscoveryDatabase) => SQLWrapper) {
+  const database = drizzle(async () => {
+    throw new TypeError('Admin queries must be compiled before execution.');
+  });
+  return new SQLiteSyncDialect().sqlToQuery(
+    build(database).getSQL().inlineParams(),
+  ).sql;
 }
 
 export function runAdmin(argv: readonly string[], output: AdminIo) {

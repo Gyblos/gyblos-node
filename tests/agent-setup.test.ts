@@ -10,10 +10,11 @@ import {
   readFile,
   rm,
   stat,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import test from 'node:test';
 
 import * as legacy from '@gyblos/buyer/agent-cli';
@@ -77,10 +78,14 @@ void test('every tool gets every model with its limits, on the local endpoint', 
       'gyblos-gpt-oss-20b.config.toml',
     ],
   );
+  const [profileBody, profileDigest] = profiles[0]!.text.split(
+    CODEX_MARKS.profileDigest,
+  );
   assert.match(
-    profiles[0]!.text,
+    profileBody!,
     /^# .*\nmodel_provider = "gyblos"\nmodel = "qwen3-0.6b"\nweb_search = "disabled"\n$/,
   );
+  assert.match(profileDigest!, /^[0-9a-f]{64}\n$/);
   assert.match(profiles[2]!.text, /model = "gpt-oss-20b"/);
   // Tables only, so the block is valid at the end of any config.toml.
   const lines = codex
@@ -231,10 +236,16 @@ void test('Codex profiles never collide, and gyblos tables outside the block are
       { id: 'qwen/qwen3:8b', maxOutputTokens: 10 },
       { id: 'qwen/qwen3-8b', maxOutputTokens: 10 },
       { id: 'gyblos', maxOutputTokens: 10 },
+      // One file on macOS and Windows unless numbered apart.
+      { id: 'Qwen3', maxOutputTokens: 10 },
+      { id: 'qwen3', maxOutputTokens: 10 },
     ],
   }).map((profile) => profile.file);
-  assert.equal(new Set(files).size, files.length);
-  assert.equal(files.length, 4);
+  assert.equal(
+    new Set(files.map((file) => file.toLowerCase())).size,
+    files.length,
+  );
+  assert.equal(files.length, 6);
   for (const user of [
     '[profiles.gyblos]\nmodel = "x"\n',
     '[profiles."gyblos-a"]\nmodel = "x"\n',
@@ -308,6 +319,44 @@ void test('a profile file gyblos did not write is refused, and nothing is writte
   assert.equal(mergedCodexProfile('new', ours), 'new');
   for (const edited of [mine, `${ours}approval_policy = "never"\n`])
     assert.throws(() => mergedCodexProfile('new', edited), { code: 'FILE' });
+});
+
+void test('profiles of models no longer served are removed, but never an edited file or a link', async (t) => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-agent-stale-'));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const codexHome = join(home, '.codex');
+  await writeAgentFile(AGENT_TOOLS.CODEX, ENDPOINT, home);
+  const files = await readdir(codexHome);
+  assert.ok(files.includes('gyblos-gpt-oss-20b.config.toml'));
+  // Someone else's file with a gyblos-like name, and a link, both left alone.
+  await writeFile(join(codexHome, 'gyblos-mine.config.toml'), 'model = "x"\n');
+  await symlink(
+    join(codexHome, 'gyblos.config.toml'),
+    join(codexHome, 'gyblos-link.config.toml'),
+  );
+  const only = { ...ENDPOINT, models: [ENDPOINT.models[0]!] };
+  const result = await writeAgentFile(AGENT_TOOLS.CODEX, only, home);
+  assert.deepEqual(result.removed, [
+    join(codexHome, 'gyblos-gpt-oss-20b.config.toml'),
+  ]);
+  assert.equal(result.profileBackups?.length, 1);
+  const staleBackup = result.profileBackups![0]!;
+  assert.equal(
+    await readFile(staleBackup, 'utf8'),
+    codexProfiles(ENDPOINT)[2]!.text,
+  );
+  assert.deepEqual(
+    (await readdir(codexHome)).sort(),
+    [
+      'config.toml',
+      'config.toml.before-gyblos',
+      'gyblos-link.config.toml',
+      'gyblos-mine.config.toml',
+      'gyblos-qwen3-0-6b.config.toml',
+      'gyblos.config.toml',
+      basename(staleBackup),
+    ].sort(),
+  );
 });
 
 void test('a Codex profile carries the context size when it is known', () => {

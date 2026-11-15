@@ -14,6 +14,7 @@ import {
   type AgentEndpoint,
   type AgentModel,
 } from './agent-setup-constants';
+import { codexProfileText, profileNames } from './agent-setup-profiles';
 
 export {
   AGENT_SETUP,
@@ -24,6 +25,7 @@ export {
   type AgentModel,
   type AgentTool,
 } from './agent-setup-constants';
+export { codexProfileText, profileNames } from './agent-setup-profiles';
 
 // The file a tool reads, honoring the variables each tool uses to move its configuration.
 export function agentFilePath(
@@ -167,22 +169,23 @@ export function codexProfiles(endpoint: AgentEndpoint) {
   const profile = (name: string, model: AgentModel) => ({
     name,
     file: `${name}${AGENT_SETUP.codexProfileSuffix}`,
-    text: [
-      CODEX_MARKS.profile,
-      `model_provider = ${toml(AGENT_SETUP.provider)}`,
-      `model = ${toml(model.id)}`,
-      // No seller runs web search; leaving it out also keeps it out of every request.
-      'web_search = "disabled"',
-      // Codex has no metadata for these models; told the real size, it compacts the conversation in time.
-      // It compacts before the input leaves no room for the answer a seller reserves.
-      ...(model.contextTokens === undefined
-        ? []
-        : [
-            `model_context_window = ${model.contextTokens}`,
-            `model_auto_compact_token_limit = ${model.contextTokens - model.maxOutputTokens}`,
-          ]),
-      '',
-    ].join('\n'),
+    text: codexProfileText(
+      [
+        CODEX_MARKS.profile,
+        `model_provider = ${toml(AGENT_SETUP.provider)}`,
+        `model = ${toml(model.id)}`,
+        // No seller runs web search; leaving it out also keeps it out of every request.
+        'web_search = "disabled"',
+        // Codex compacts before the input leaves no room for the seller's reserved answer.
+        ...(model.contextTokens === undefined
+          ? []
+          : [
+              `model_context_window = ${model.contextTokens}`,
+              `model_auto_compact_token_limit = ${model.contextTokens - model.maxOutputTokens}`,
+            ]),
+        '',
+      ].join('\n'),
+    ),
   });
   return [
     profile(AGENT_SETUP.provider, models[0]!),
@@ -208,18 +211,6 @@ const CODEX_PROFILE_FIELDS: readonly string[] = [
   'model_context_window',
   'model_auto_compact_token_limit',
 ];
-// One profile name per model: its id with other characters as dashes, numbered when two ids collide.
-export function profileNames(models: readonly AgentModel[]) {
-  const used = new Set<string>([AGENT_SETUP.provider]);
-  return models.map((model) => {
-    const plain = `${AGENT_SETUP.provider}-${model.id.replaceAll(/[^A-Za-z0-9_-]/g, '-')}`;
-    let name = plain;
-    for (let count = 2; used.has(name); count++) name = `${plain}-${count}`;
-    used.add(name);
-    return name;
-  });
-}
-
 // Claude Code: environment for one shell. `/model <name>` then switches among the endpoint's models.
 export function claudeCodeEnvironment(endpoint: AgentEndpoint) {
   const { models, tokenEnv } = checked(endpoint);

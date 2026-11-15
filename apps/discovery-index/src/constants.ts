@@ -48,12 +48,14 @@ export const INDEX_ROUTES = {
   MODELS: '/v1/models',
   HEALTH: '/v1/health',
   REGISTRATIONS: '/v1/registrations',
+  UPTIME: '/v1/uptime',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.SELLERS,
   INDEX_ROUTES.MODELS,
   INDEX_ROUTES.HEALTH,
+  INDEX_ROUTES.UPTIME,
 ]);
 
 export const INDEX_HEADERS = {
@@ -87,7 +89,7 @@ export const DISCOVERY_INDEX_LIMITS = {
   maxResponseBytes: 1024 * 1024,
   // Bytes reserved for the page framing around the seller entries.
   responseFramingBytes: 128,
-  // Soft cap on tracked NodeIds, checked before a new NodeId is admitted. NodeIds are free
+  // Atomic cap on tracked NodeIds, checked while a new NodeId is admitted. NodeIds are free
   // to mint; each slot is held until its high-water retention ends (about 20 minutes),
   // bounded by the per-IP(/64) publish limit.
   maxNodes: 10_000,
@@ -102,22 +104,32 @@ export const DISCOVERY_INDEX_LIMITS = {
   maxCursorIssuedDigits: 16,
 } as const;
 
-// Cloudflare rate-limit binding names (wrangler.jsonc); keyed by IP(/64) or NodeId, never stored,
+// Cloudflare rate-limit binding names (wrangler.jsonc); keyed by IP(/64), never stored,
 // except READ, keyed by READ_LIMIT_KEY.
 export const DISCOVERY_LIMITERS = {
   IP: 'DISCOVERY_IP_LIMITER',
   PUBLISH: 'DISCOVERY_PUBLISH_LIMITER',
-  NODE: 'DISCOVERY_NODE_LIMITER',
   READ: 'DISCOVERY_READ_LIMITER',
 } as const;
 export type DiscoveryLimiterName =
   (typeof DISCOVERY_LIMITERS)[keyof typeof DISCOVERY_LIMITERS];
+
+// Accepted publications per NodeId and fixed UTC minute, shared atomically in storage.
+export const NODE_PUBLISH_QUOTA = { limit: 10, windowMs: 60_000 } as const;
 
 // Key for the read limiter. Cloudflare counts per location, so this caps storage reads per
 // Cloudflare location, not exactly worldwide.
 export const READ_LIMIT_KEY = 'global';
 
 export const DISCOVERY_DB_BINDING = 'DISCOVERY_DB';
+
+export const DISCOVERY_LISTING_INDEXES = {
+  CATALOG: 'discovery_catalogs_listing',
+  PRESENCE: 'discovery_presence_listing',
+  WITHDRAWAL: 'discovery_withdrawals_listing',
+} as const;
+export type DiscoveryListingIndex =
+  (typeof DISCOVERY_LISTING_INDEXES)[keyof typeof DISCOVERY_LISTING_INDEXES];
 
 // Worker secret naming who may publish: `*` (open) or comma-separated NodeIds. Missing,
 // empty or malformed closes publishing (503); reads stay public either way.
@@ -209,4 +221,19 @@ export const IPV6 = {
   groups: 8,
   prefixGroups: 4,
   hexRadix: 16,
+} as const;
+
+// Public seller uptime (uptime.ts): five-minute slots, kept for the longest reported window.
+export const UPTIME = {
+  // Five minutes.
+  slotMs: 300_000,
+  hourMs: 3_600_000,
+  slotsPerHour: 12,
+  // Windows reported, in days; the longest is also how long rows are kept.
+  windowDays: [1, 7, 30],
+  dayMs: 86_400_000,
+  // Old rows are pruned at most once an hour per app instance.
+  pruneIntervalMs: 3_600_000,
+  // Ratios are rounded to four decimals.
+  ratioScale: 10_000,
 } as const;

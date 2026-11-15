@@ -35,7 +35,14 @@ export interface SqliteStatement extends D1PreparedStatement {
 }
 
 // D1 accepts ordered ?NNN parameters; node:sqlite binds them reliably by name.
-export const namedSql = (sql: string) => sql.replace(/\?(\d+)/g, ':p$1');
+export function namedSql(sql: string) {
+  let next = 0;
+  return sql.replace(/\?(\d*)/g, (_match, digits: string) => {
+    const index = digits ? Number(digits) : next + 1;
+    next = Math.max(next, index);
+    return `:p${index}`;
+  });
+}
 export const namedParams = (params: D1Value[]) =>
   Object.fromEntries(params.map((value, index) => [`p${index + 1}`, value]));
 
@@ -55,21 +62,15 @@ export async function createSqliteD1(): Promise<SqliteD1 | null> {
     .filter((name) => name.endsWith('.sql'))
     .sort())
     db.exec(readFileSync(new URL(file, MIGRATIONS), 'utf8'));
-  const run = (sql: string, params: D1Value[]) => ({
-    meta: {
-      changes: Number(
-        db.prepare(namedSql(sql)).run(namedParams(params)).changes,
-      ),
-    },
-  });
+  const run = (sql: string, params: D1Value[]) => {
+    const results = db.prepare(namedSql(sql)).all(namedParams(params)).map(row);
+    const changes = Number(db.prepare('SELECT changes() AS n').get()?.n ?? 0);
+    return { meta: { changes }, results };
+  };
   const statement = (sql: string, params: D1Value[] = []): SqliteStatement => ({
     sql,
     params,
     bind: (...values) => statement(sql, values),
-    first: async () => {
-      const found = db.prepare(namedSql(sql)).get(namedParams(params));
-      return found ? row(found) : null;
-    },
     all: async () => ({
       results: db.prepare(namedSql(sql)).all(namedParams(params)).map(row),
     }),

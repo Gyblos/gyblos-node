@@ -1223,13 +1223,26 @@ request_max_retries = 0
 stream_max_retries = 0
 ```
 
-Leave MCP servers off for these sessions; switch models with `/model` and any
-name the endpoint serves. `pnpm buyer:agent codex --write` adds the provider
-block to `config.toml` and one profile file per model beside it
-(`gyblos.config.toml` for the first model, `gyblos-<model>.config.toml` for
-each), since Codex CLI 0.162 and later refuse `[profiles.*]` tables in
-`config.toml`; start with `codex --profile gyblos`. It replaces only profile
-files it wrote and drops the profile tables an earlier run put in its block.
+Leave MCP servers off for these sessions (their tools are not offered, and the
+buyer says so once on stderr); switch models with `/model` and any name the
+endpoint serves. `pnpm buyer:agent codex --write` adds the provider block to
+`config.toml` and one profile file per model beside it (`gyblos.config.toml` for
+the first model and `gyblos-<model>.config.toml` for each, with characters other
+than letters, digits, `_` and `-` as dashes, e.g. `gyblos-qwen3-0-6b`), since
+Codex CLI 0.162 and later refuse `[profiles.*]` tables in `config.toml`; start
+with `codex --profile gyblos`. It needs Codex CLI 0.162 or later, which reads
+those files. It replaces only managed profile files and drops the profile tables
+an earlier run put in its block. Profiles written by this version carry a
+content checksum. Known edits, links and older profiles without that checksum
+are left in place. A stale matching profile is moved to a unique
+`<profile>.<id>.before-gyblos` backup beside it. Backups are retained and never
+replaced by later cleanup. If an editor saves during cleanup, its bytes remain
+recoverable in that backup; a detected change is also restored to the original
+name when no newer file occupies it. The command prints each backup path.
+Updates to one Codex directory are serialized and guarded against another live
+process writing at the same time. A history item from a tool group Codex used on
+another provider (`function_call` with `namespace`) is kept as history.
+
 Codex has no metadata for these models and otherwise assumes a large context;
 pass the sellers' context size with `--context <tokens>` (each profile then
 carries `model_context_window`) so Codex sizes and compacts its requests to fit.
@@ -1330,12 +1343,17 @@ one seller. No seller is executed twice in one local request. The free runtime
 admits one orchestration at a time with no queue; overlapping requests return
 `FREE_BUYER_BUSY` rather than racing the per-peer connection limit or poisoning
 another request's cooldown. Cancelled selection attempts do not commit quote
-statistics. Control and execution admission remain occupied until pending native
-work settles. The client marks sending before the first frame write; after
-visible text, partial writes, remote errors, timeouts and lost responses never
-cause automatic failover. Native work that ignores cancellation retains its
-execution resource until it actually settles. The v1 paid proxy remains a
-separate command.
+statistics. A seller that stops answering costs at most the 10-second snapshot
+deadline: its failed connection closes in the background (a pinned seller's is
+still awaited, since it is asked again next), and while its cooldown outlasts
+the snapshot it is not contacted again unless it is pinned. Retries are
+throttled by the cooldown; a close that outlasts it can overlap a later attempt.
+A cancelled request still waits for the native work it started. Control and
+execution admission otherwise remain occupied until pending native work settles.
+The client marks sending before the first frame write; after visible text,
+partial writes, remote errors, timeouts and lost responses never cause automatic
+failover. Native work that ignores cancellation retains its execution resource
+until it actually settles. The v1 paid proxy remains a separate command.
 
 Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab
