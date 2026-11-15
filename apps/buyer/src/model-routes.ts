@@ -13,8 +13,13 @@ import {
   controlText,
 } from '@gyblos/protocol/control-validation';
 
-import { BUYER_MODELS, FREE_BUYER_CODES, FREE_CHAT_DETAILS } from './constants';
-import { FreeBuyerError } from './free-chat-error';
+import {
+  BUYER_MODELS,
+  FREE_BUYER_CODES,
+  FREE_CHAT_DETAILS,
+  OPENROUTER,
+} from './constants';
+import { FreeBuyerError, invalidChat } from './free-chat-error';
 
 export interface ModelRoute {
   // The name clients send as `model`, and the ones it also answers to.
@@ -108,21 +113,59 @@ export function endpointRoutes(settings: {
       ];
 }
 
-// The route a request body names in `model`. An unknown name is a 404 listing the names served, but only
-// when a model list is configured; anything else (no object, no text name, or the one model's endpoint)
-// falls to the first route, so the format's own parser refuses it with the 400 it always gave.
-export function requestedRoute(
+// The spellings a requested name may take for a route: as sent, without an OpenRouter routing suffix
+// (:free, :nitro, :floor) and without a provider prefix (qwen/…), so clients written for OpenRouter find
+// the same model. Exact names come first, so a route whose own name has a slash or suffix still wins.
+function spellings(name: string): string[] {
+  const suffix = OPENROUTER.routingSuffixes.find(
+    (end) => name.endsWith(end) && name.length > end.length,
+  );
+  const plain = suffix ? name.slice(0, -suffix.length) : name;
+  const slash = plain.indexOf('/');
+  return [name, plain, ...(slash > 0 ? [plain.slice(slash + 1)] : [])];
+}
+function requestedRouteFor(
+  routes: readonly ModelRoute[],
+  name: unknown,
+): ModelRoute | undefined {
+  if (typeof name !== 'string') return undefined;
+  for (const spelling of spellings(name)) {
+    const route = findModelRoute(routes, spelling);
+    if (route) return route;
+  }
+  return undefined;
+}
+
+// The names a request asks for, in order: `model`, then OpenRouter's `models` fallback list.
+function requestedNames(body: unknown): unknown[] {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return [];
+  const fallbacks: unknown = Reflect.get(body, OPENROUTER.fallbackField);
+  if (fallbacks === undefined || fallbacks === null)
+    return [Reflect.get(body, 'model')];
+  if (
+    !Array.isArray(fallbacks) ||
+    fallbacks.length > OPENROUTER.maxFallbacks ||
+    fallbacks.some((name) => typeof name !== 'string')
+  )
+    throw invalidChat(OPENROUTER.fallbackField, FREE_CHAT_DETAILS.models);
+  return [Reflect.get(body, 'model'), ...fallbacks];
+}
+
+// The route a request names, and the name it used. An unknown name is a 404 listing the names served, but
+// only when a model list is configured; anything else (no object, no text name, or the one model's endpoint)
+// falls to the first route with no name, so the format's own parser refuses it with the 400 it always gave.
+export function requestedModel(
   routes: readonly ModelRoute[],
   body: unknown,
   listed = true,
-): ModelRoute {
-  const name =
-    body && typeof body === 'object' && !Array.isArray(body)
-      ? Reflect.get(body, 'model')
-      : undefined;
-  const route = findModelRoute(routes, name);
-  if (route) return route;
-  if (!listed || typeof name !== 'string') return routes[0] as ModelRoute;
+): { route: ModelRoute; name?: string } {
+  const names = requestedNames(body);
+  for (const name of names) {
+    const route = requestedRouteFor(routes, name);
+    if (route) return { route, name: name as string };
+  }
+  if (!listed || !names.some((name) => typeof name === 'string'))
+    return { route: routes[0] as ModelRoute };
   const shown = routes
     .slice(0, BUYER_MODELS.listedInErrors)
     .map((item) => item.id);
@@ -133,4 +176,11 @@ export function requestedRoute(
       routes.length > shown.length ? [...shown, '…'] : shown,
     ),
   );
+}
+export function requestedRoute(
+  routes: readonly ModelRoute[],
+  body: unknown,
+  listed = true,
+): ModelRoute {
+  return requestedModel(routes, body, listed).route;
 }

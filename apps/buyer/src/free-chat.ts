@@ -1,12 +1,14 @@
 // Validates the supported OpenAI-compatible subset: a whole conversation of text turns, tools and tool turns.
-// Options clients send by default and that do not change what is asked are accepted and ignored; options
-// that would (structured output, several answers, stop sequences) are refused, never silently dropped.
+// Options clients send by default and that do not change what is asked are accepted and ignored; stop
+// sequences are honored by the buyer; options that would change the answer in ways no seller serves
+// (structured output, several answers, provider-run plugins) are refused, never silently dropped.
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { hasToolTurns } from '@gyblos/protocol/tools';
 
 import { chatConversation, textOf, type ChatTurn } from './chat-messages';
+import { parseStop } from './chat-stop';
 import { openAiCalls, openAiToolChoice, openAiTools } from './chat-tools';
 import {
   CHAT_MESSAGE_DETAILS,
@@ -21,7 +23,14 @@ export { FreeBuyerError, invalidChat } from './free-chat-error';
 
 export interface FreeChatInput extends FreeExecutionBuildInput {
   stream?: true;
+  // Honored by the buyer and never sent to a seller (see chat-stop.ts).
+  stop?: string[];
 }
+// The stop field when the request has sequences.
+export const stopInput = (value: unknown, field: string) => {
+  const stop = parseStop(value, field);
+  return stop ? { stop } : {};
+};
 
 type Row = Record<string, unknown>;
 
@@ -206,6 +215,7 @@ export function parseFreeChat(
       messages,
       allowTools,
     ),
+    ...stopInput(row.stop, 'stop'),
     ...stream,
   };
 }

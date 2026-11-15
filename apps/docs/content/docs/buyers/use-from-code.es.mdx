@@ -263,8 +263,15 @@ el contexto.
 Las opciones que los clientes envían por defecto y que no cambian la respuesta se aceptan y se ignoran, como
 `temperature`, `top_p`, `user`, `metadata`, `stream_options` y, en el formato de Anthropic, `thinking`
 (el razonamiento siempre está apagado). Las que sí la cambiarían se rechazan salvo que tengan su valor
-neutro: `response_format` (`text`), `n` (1), `stop` y `stop_sequences`, y `logprobs`. Las pistas de sampling
-se refieren a Chat Completions y Anthropic; Responses rechaza sampling y razonamiento no neutros.
+neutro: `response_format` (`text`), `n` (1) y `logprobs`. Las pistas de sampling se refieren a Chat
+Completions y Anthropic; Responses rechaza sampling y razonamiento no neutros.
+
+Tu comprador respeta `stop` (Chat Completions: un texto o hasta 4) y `stop_sequences` (Anthropic): la
+respuesta termina justo antes de la primera secuencia, con motivo de fin `stop` (Anthropic:
+`stop_reason: "stop_sequence"` y la secuencia en `stop_sequence`). Una respuesta cortada no trae llamadas a
+herramientas. El vendedor no recibe las secuencias, así que sigue generando hasta su propio final: un stream
+no muestra nada después de la secuencia, pero se cierra recién cuando el vendedor termina, y `usage` cuenta
+todo lo que generó.
 Chat Completions y Anthropic rechazan imágenes. Responses sustituye `input_image` por una nota de texto;
 no envía el contenido de la imagen al vendedor.
 
@@ -275,3 +282,24 @@ no envía el contenido de la imagen al vendedor.
 | 504       | El vendedor no respondió a tiempo.                                                                                                                                                                      |
 
 Los errores usan la forma de cada API, así que los SDK lanzan sus excepciones habituales.
+
+## Clientes hechos para OpenRouter [#clientes-hechos-para-openrouter]
+
+OpenRouter usa el mismo formato Chat Completions, más algunos campos propios. Un cliente o agente
+configurado para OpenRouter funciona si apuntas su URL base a tu comprador (`http://127.0.0.1:<puerto>/v1`)
+y usas su token como clave de API:
+
+- `provider`, `route`, `transforms`, `usage`, `debug`, `reasoning`, `verbosity`, `prediction` y los ajustes
+  extra de sampling `top_k`, `min_p`, `top_a` y `repetition_penalty` se aceptan y se ignoran: eligen entre
+  los proveedores de OpenRouter o ajustan el sampling, y no cambian lo que se le pide a un vendedor.
+- `models` (lista de respaldo) se respeta: responde el primer nombre, empezando por `model`, que sirve tu
+  comprador, y el `model` de la respuesta dice cuál. Si no sirve ninguno, el 404 lista los que sí.
+- Los nombres al estilo OpenRouter encuentran el mismo modelo: `qwen/qwen3-0.6b` y `qwen/qwen3-0.6b:free`
+  responden como `qwen3-0.6b`. Los sufijos `:free`, `:nitro` y `:floor` allá solo eligen proveedor; un
+  sufijo que cambia la respuesta, como `:online` (búsqueda web), no se acepta como el modelo normal.
+- `plugins` (por ejemplo, búsqueda web) y `web_search_options` se rechazan con un 400 en vez de saltarse,
+  para que un cliente nunca muestre una respuesta como buscada en internet cuando no lo fue.
+
+Más adelante, `provider` (precio tope, el más barato o el más rápido, vendedores a evitar) podría guiar la
+elección de vendedor en cada pedido, y `usage` podría informar cuánto costó cada respuesta; todavía no lo
+hacen.

@@ -65,6 +65,7 @@ export function assertPaidJsonAnswer(body: string, verdict: PaidVerdict) {
     'model',
     'choices',
     'usage',
+    'system_fingerprint',
     PAID_BUYER.paymentField,
     BUYER_EXECUTION_FIELD,
   ]);
@@ -189,6 +190,7 @@ export function assertFreeAnswer(
       'model',
       'choices',
       ...(has('usage') ? ['usage'] : []),
+      ...(has('system_fingerprint') ? ['system_fingerprint'] : []),
       ...(has(BUYER_EXECUTION_FIELD) ? [BUYER_EXECUTION_FIELD] : []),
     ]);
     assert.ok(typeof row.id === 'string');

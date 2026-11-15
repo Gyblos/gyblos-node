@@ -87,6 +87,7 @@ export function httpMultiAnswer(
     'model',
     'choices',
     'usage',
+    'system_fingerprint',
     PAID_BUYER.paymentField,
     BUYER_EXECUTION_FIELD,
   ]);

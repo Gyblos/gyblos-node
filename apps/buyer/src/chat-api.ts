@@ -67,6 +67,8 @@ const openAi: ChatApi = {
     object: FREE_BUYER.completionObject,
     created: Math.floor(Date.now() / UNITS.millisecondsPerSecond),
     model,
+    // OpenAI always sends it (null when unknown); OpenRouter's SDK requires it.
+    system_fingerprint: null,
     choices: [
       {
         index: 0,
