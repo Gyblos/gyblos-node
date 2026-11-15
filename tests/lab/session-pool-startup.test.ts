@@ -10,6 +10,7 @@ import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
 import { batchQueryClock } from '../support/batch-query-clock';
 import { NATIVE_CAPABILITY } from '../support/native-runtime';
+import { pauseSessionControl } from '../support/session-control-pause';
 import { sessionProductHost } from '../support/session-product-host';
 
 void test(
@@ -22,7 +23,11 @@ void test(
     let output = '';
     await chatSession({
       ...host.buyer().chat,
-      read: async () => (++questions <= 2 ? 'synthetic' : '/exit'),
+      read: async () => {
+        if (++questions > 2) return '/exit';
+        await pauseSessionControl();
+        return 'synthetic';
+      },
       write: (text) => {
         output += text;
       },
@@ -33,7 +38,10 @@ void test(
     questions = 0;
     await chatSession({
       ...host.buyer().chat,
-      read: async () => (++questions === 1 ? 'synthetic' : '/settle'),
+      read: async () => {
+        await pauseSessionControl();
+        return ++questions === 1 ? 'synthetic' : '/settle';
+      },
       write: (text) => {
         output += text;
       },

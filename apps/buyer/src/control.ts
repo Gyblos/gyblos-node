@@ -90,6 +90,17 @@ class BuyerControlClient {
     this.catalog = { record, signature: result.catalog.signature };
     return this.catalog;
   }
+  // A catalog this buyer verified earlier from the same seller (selection-cache.ts), so a quote binds to
+  // it without asking again. Checked like a fetched one; a seller that changed it refuses the quote.
+  async useCatalog(signed: SignedPublicV2) {
+    const record = await verifyPublicV2(signed, {
+      ...this.trust,
+      now: this.now(),
+    });
+    if (record.kind !== PUBLIC_RECORD_KINDS.CATALOG) return controlFail();
+    validatePublicV2Time(record, this.now());
+    this.catalog ??= { record, signature: signed.signature };
+  }
   async getPresence(signal?: AbortSignal) {
     if (!this.catalog) await this.getCatalog(signal);
     const current = this.catalog!;

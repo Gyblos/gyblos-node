@@ -6,15 +6,9 @@ import type { PublicRecordV2 } from '@gyblos/protocol/control-types';
 import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
 
 import { readPublishBody } from './body';
-import {
-  DISCOVERY_INDEX_LIMITS,
-  DISCOVERY_LIMITERS,
-  INDEX_ERRORS,
-} from './constants';
+import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS } from './constants';
 import { indexFail } from './errors';
-import { allowed, type ResolvedLimiters } from './limits';
 import {
-  allowlistWithin,
   claimedNodeId,
   publisherAllowed,
   type DiscoveryPublishers,
@@ -25,23 +19,27 @@ import { verifyAgainstStored, verifySelfSigned } from './verify';
 
 export interface PublishContext {
   storage: DiscoveryStorage;
-  limiters: ResolvedLimiters;
   // At least one of the two is present: the allowlist secret, the registered NodeIds, or both.
   publishers: DiscoveryPublishers | undefined;
   registrations: RegistrationStore | undefined;
   now: number;
   maxNodes: number;
+  maxPublications: number;
   // Throttled pruning, run only before admitting a new NodeId.
   prune: (now: number) => Promise<void>;
+  // Records an accepted presence for public uptime.
+  markSeen: (nodeId: string, now: number) => Promise<void>;
 }
 
 async function storedEntry(
   record: PublicRecordV2,
   signature: string,
   json: string,
+  admission: StoredEntry['admission'],
 ): Promise<StoredEntry> {
   const catalog = record.kind === PUBLIC_RECORD_KINDS.CATALOG;
   return {
+    admission,
     kind: record.kind,
     nodeId: record.nodeId,
     owner: record.owner,
@@ -85,26 +83,27 @@ export async function acceptRecord(
   if (!(await mayPublish(context, envelope)))
     indexFail(INDEX_ERRORS.PUBLISH_NOT_ALLOWED);
   const { record, signature } = await verifySelfSigned(envelope, now);
-  // Stale records are rejected before the per-NodeId limit, so replaying a seller's public
-  // records cannot exhaust its allowance; the signature already proved the NodeId.
+  // Reject known stale records cheaply. Storage checks freshness and consumes the NodeId
+  // allowance atomically, so concurrent copies cannot spend it twice.
   const state = await storage.state(record.nodeId);
   if (state && state.lastSequence >= record.sequence)
     indexFail(INDEX_ERRORS.STALE_RECORD);
-  if (
-    !(await allowed(context.limiters[DISCOVERY_LIMITERS.NODE], record.nodeId))
-  )
-    indexFail(INDEX_ERRORS.RATE_LIMITED);
   await verifyAgainstStored(envelope, record, state?.catalog ?? null, now);
   if (!state) {
     await context.prune(now);
-    // Registered NodeIds are not bounded by the allowlist, so then the stored count decides.
-    const bounded =
-      !!context.publishers &&
-      !context.registrations &&
-      allowlistWithin(context.publishers, context.maxNodes);
-    if (!bounded && (await storage.nodeCount()) >= context.maxNodes)
-      indexFail(INDEX_ERRORS.RATE_LIMITED);
   }
-  if (!(await storage.put(await storedEntry(record, signature, json))))
+  if (
+    !(await storage.put(
+      await storedEntry(record, signature, json, {
+        now,
+        maxNodes: context.maxNodes,
+        maxPublications: context.maxPublications,
+      }),
+    ))
+  )
     indexFail(INDEX_ERRORS.STALE_RECORD);
+  // Uptime counts only presence the index accepted, at the index's own clock. It is best effort: the
+  // record is already stored, so a failed uptime write must not make the seller republish it.
+  if (record.kind === PUBLIC_RECORD_KINDS.PRESENCE)
+    await context.markSeen(record.nodeId, now).catch(() => undefined);
 }

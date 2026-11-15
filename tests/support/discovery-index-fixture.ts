@@ -59,7 +59,6 @@ export const broken: FakeLimiter = {
 export const allLimiters = (limiter: FakeLimiter = allow) => ({
   [DISCOVERY_LIMITERS.IP]: limiter,
   [DISCOVERY_LIMITERS.PUBLISH]: limiter,
-  [DISCOVERY_LIMITERS.NODE]: limiter,
   [DISCOVERY_LIMITERS.READ]: limiter,
 });
 
@@ -224,7 +223,6 @@ export async function indexHarness(
     limiters: {
       [DISCOVERY_LIMITERS.IP]: switchable(DISCOVERY_LIMITERS.IP),
       [DISCOVERY_LIMITERS.PUBLISH]: switchable(DISCOVERY_LIMITERS.PUBLISH),
-      [DISCOVERY_LIMITERS.NODE]: switchable(DISCOVERY_LIMITERS.NODE),
       [DISCOVERY_LIMITERS.READ]: switchable(DISCOVERY_LIMITERS.READ),
     },
     now: () => clock.now,

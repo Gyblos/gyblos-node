@@ -4,6 +4,7 @@ import {
   DEVELOPMENT_LIMITS,
   DISCOVERY_LIMITERS,
   LOOPBACK_HOSTS,
+  NODE_PUBLISH_QUOTA,
   type DiscoveryLimiterName,
 } from './constants';
 
@@ -14,18 +15,19 @@ export interface RateLimiter {
 export type DiscoveryLimiters = Partial<
   Record<DiscoveryLimiterName, RateLimiter>
 >;
-export type ResolvedLimiters = Record<DiscoveryLimiterName, RateLimiter>;
+export type ResolvedLimiters = Record<DiscoveryLimiterName, RateLimiter> & {
+  maxNodePublications: number;
+};
 
 function complete(limiters: DiscoveryLimiters): ResolvedLimiters | null {
   const ip = limiters[DISCOVERY_LIMITERS.IP];
   const publish = limiters[DISCOVERY_LIMITERS.PUBLISH];
-  const node = limiters[DISCOVERY_LIMITERS.NODE];
   const read = limiters[DISCOVERY_LIMITERS.READ];
-  if (!ip || !publish || !node || !read) return null;
+  if (!ip || !publish || !read) return null;
   return {
+    maxNodePublications: NODE_PUBLISH_QUOTA.limit,
     [DISCOVERY_LIMITERS.IP]: ip,
     [DISCOVERY_LIMITERS.PUBLISH]: publish,
-    [DISCOVERY_LIMITERS.NODE]: node,
     [DISCOVERY_LIMITERS.READ]: read,
   };
 }
@@ -43,9 +45,9 @@ function developmentLimiters(now: () => number): ResolvedLimiters {
     },
   });
   return {
+    maxNodePublications: DEVELOPMENT_LIMITS.perMinute,
     [DISCOVERY_LIMITERS.IP]: counter(DISCOVERY_LIMITERS.IP),
     [DISCOVERY_LIMITERS.PUBLISH]: counter(DISCOVERY_LIMITERS.PUBLISH),
-    [DISCOVERY_LIMITERS.NODE]: counter(DISCOVERY_LIMITERS.NODE),
     [DISCOVERY_LIMITERS.READ]: counter(DISCOVERY_LIMITERS.READ),
   };
 }

@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
-import { PUBLISH_MODES } from '@gyblos/discovery-index/constants';
+import {
+  NODE_PUBLISH_QUOTA,
+  PUBLISH_MODES,
+} from '@gyblos/discovery-index/constants';
 import type { DiscoveryPublishers } from '@gyblos/discovery-index/publishers';
 import {
   createMemoryStorage,
@@ -82,6 +85,11 @@ function entry(
   overrides: Partial<StoredEntry> = {},
 ): StoredEntry {
   return {
+    admission: {
+      now: T0,
+      maxNodes: 10_000,
+      maxPublications: NODE_PUBLISH_QUOTA.limit,
+    },
     kind,
     nodeId,
     owner: INDEX_OWNER,
@@ -180,7 +188,7 @@ CREATE TEMP TRIGGER withdrawal_deleted AFTER DELETE ON discovery_withdrawals BEG
       entry(PUBLIC_RECORD_KINDS.PRESENCE, node, 3, {
         issuedAt: T0 + 5,
         expiresAt: T0 + 60_000,
-        digest: 'e'.repeat(64),
+        digest: 'd'.repeat(64),
       }),
     ),
     true,
@@ -192,7 +200,7 @@ CREATE TEMP TRIGGER withdrawal_deleted AFTER DELETE ON discovery_withdrawals BEG
       sequence: 3,
       issuedAt: T0 + 5,
       expiresAt: T0 + 60_000,
-      digest: 'e'.repeat(64),
+      digest: 'd'.repeat(64),
       json: '{"kind":"presence","sequence":3}',
     },
   );
@@ -214,9 +222,14 @@ CREATE TEMP TRIGGER withdrawal_deleted AFTER DELETE ON discovery_withdrawals BEG
   assert.deepEqual(deleted(), ['presence']);
   await storage.put(entry(PUBLIC_RECORD_KINDS.WITHDRAWAL, node, 5));
   await storage.put(
-    entry(PUBLIC_RECORD_KINDS.CATALOG, node, 6, { models: ['m'] }),
+    entry(PUBLIC_RECORD_KINDS.CATALOG, node, 6, {
+      models: ['m'],
+      digest: 'e'.repeat(64),
+    }),
   );
-  await storage.put(entry(PUBLIC_RECORD_KINDS.WITHDRAWAL, node, 7));
+  await storage.put(
+    entry(PUBLIC_RECORD_KINDS.WITHDRAWAL, node, 7, { digest: 'e'.repeat(64) }),
+  );
   assert.deepEqual(deleted(), ['presence']);
   const withdrawal = db.raw
     .prepare('SELECT sequence FROM discovery_withdrawals WHERE node_id = ?')
@@ -285,10 +298,10 @@ async function seedListing(storage: DiscoveryStorage) {
         json: `{"catalog":${i},"pad":"${'x'.repeat(i * 3)}"}`,
       }),
     );
-    if (i % 9 === 0) continue;
+    if (i % 9 === 0 || i % 11 === 0) continue;
     await storage.put(
       entry(PUBLIC_RECORD_KINDS.PRESENCE, nodeId, 2, {
-        digest: i % 11 === 0 ? hex(9) : digest,
+        digest,
         issuedAt,
         expiresAt: i % 13 === 0 ? T0 : T0 + 60_000,
         json: `{"presence":${i}}`,
@@ -328,31 +341,25 @@ void test('D1 and memory listings are identical across pages', async (context) =
   }
 });
 
-// Counts nodeCount calls through a publish of `count` new NodeIds.
-async function nodeCountCalls(
-  publishers: DiscoveryPublishers,
-  sellers: ReturnType<typeof indexNode>[],
-  maxNodes: number,
-) {
+// Changing admission lists must not create extra capacity over retained older identities.
+void test('changing the allowlist cannot bypass capacity held by an earlier publisher', async () => {
   const storage = createMemoryStorage();
-  let calls = 0;
-  const app = createDiscoveryIndex({
-    storage: {
-      ...storage,
-      nodeCount: async () => {
-        calls++;
-        return storage.nodeCount();
-      },
-    },
-    limiters: allLimiters(),
-    now: () => T0 + 1000,
-    publishers,
-    maxNodes,
-  });
-  const statuses: number[] = [];
-  for (const seller of sellers) {
-    const response = await app.fetch(
-      new Request(`${INDEX_ORIGIN}/v1/records`, {
+  const first = indexNode();
+  const second = indexNode();
+  const publish = async (seller: ReturnType<typeof indexNode>) => {
+    const publishers: DiscoveryPublishers = {
+      mode: PUBLISH_MODES.ALLOWLIST,
+      nodeIds: new Set([seller.nodeId]),
+    };
+    const app = createDiscoveryIndex({
+      storage,
+      publishers,
+      limiters: allLimiters(),
+      now: () => T0 + 1000,
+      maxNodes: 1,
+    });
+    return app.fetch(
+      new Request(INDEX_ORIGIN + '/v1/records', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -361,27 +368,9 @@ async function nodeCountCalls(
         body: JSON.stringify({ record: seller.catalog(1) }),
       }),
     );
-    statuses.push(response.status);
-  }
-  return { calls, statuses };
-}
-
-void test('the node cap is not counted when the allowlist alone stays within it', async () => {
-  const sellers = [indexNode(), indexNode(), indexNode()];
-  const listed = (count: number): DiscoveryPublishers => ({
-    mode: PUBLISH_MODES.ALLOWLIST,
-    nodeIds: new Set(sellers.slice(0, count).map((seller) => seller.nodeId)),
-  });
-  assert.deepEqual(await nodeCountCalls(listed(3), sellers, 3), {
-    calls: 0,
-    statuses: [201, 201, 201],
-  });
-  assert.deepEqual(await nodeCountCalls(listed(3), sellers, 2), {
-    calls: 3,
-    statuses: [201, 201, 429],
-  });
-  assert.deepEqual(
-    await nodeCountCalls({ mode: PUBLISH_MODES.OPEN }, sellers, 3),
-    { calls: 3, statuses: [201, 201, 201] },
-  );
+  };
+  assert.equal((await publish(first)).status, 201);
+  assert.equal((await publish(second)).status, 429);
+  assert.ok(await storage.state(first.nodeId));
+  assert.equal(await storage.state(second.nodeId), null);
 });
