@@ -58,7 +58,7 @@ import {
   type SellerPaid,
   type SellerPayments,
 } from './seller-paid';
-import { startSellerSessions } from './seller-sessions';
+import { startSellerSessionHost } from './seller-session-directory';
 import { loadSellerSettings, type SellerSettings } from './seller-settings';
 import { previousFailure } from './seller-status';
 import { serveSellerTransport } from './seller-transport';
@@ -114,7 +114,10 @@ export async function startSeller(
     bind?: typeof bindEndpoint;
     // Builds the payment server for paid offers from the seller's role; without it, paid offers
     // refuse startup with SELLER_PAID_EXECUTION_UNAVAILABLE.
-    payments?: (role: RoleConfig) => Promise<SellerPayments>;
+    payments?: (
+      role: RoleConfig,
+      limits?: { maxSessions: number },
+    ) => Promise<SellerPayments>;
   } = {},
 ) {
   const startedAt = Date.now();
@@ -186,23 +189,27 @@ export async function startSeller(
     let paid: SellerPaid | undefined;
     if (sellsPaid && payments) {
       await stage('payments');
-      paid = await openSellerPaid(() => payments(config), {
-        owner: owner.address,
-        mint: config.mint,
-        nodeId: config.nodeId,
-        startedAt,
-        offers: () => offers.all(),
-        telemetry: telemetry.sink
-          ? {
-              sink: telemetry.sink,
-              engineKind: (index) => settings.offers[index]!.engine.engine.kind,
-            }
-          : undefined,
-      });
+      paid = await openSellerPaid(
+        () => payments(config, { maxSessions: settings.limits.maxSessions }),
+        {
+          owner: owner.address,
+          mint: config.mint,
+          nodeId: config.nodeId,
+          startedAt,
+          offers: () => offers.all(),
+          telemetry: telemetry.sink
+            ? {
+                sink: telemetry.sink,
+                engineKind: (index) =>
+                  settings.offers[index]!.engine.engine.kind,
+              }
+            : undefined,
+        },
+      );
       disposers.push(paid.close);
     }
     const sessions = paid?.sessions
-      ? await startSellerSessions({
+      ? await startSellerSessionHost({
           ...paid.sessions,
           receipts: (index) => ({
             publisher: receipts.paidPublisher,

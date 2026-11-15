@@ -11,15 +11,12 @@ import {
   PROTOCOL_FEE,
   UPTO_CHANNEL_SETTINGS,
 } from '@gyblos/config';
-import { SELLER_SESSION_BUYER_ENV } from '@gyblos/config/batch-session';
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import {
   openUptoSellerPayments,
   type UptoSellerPaymentsOptions,
 } from '@gyblos/payments-upto';
-import { openBatchSellerBackend } from '@gyblos/payments-upto/batch-session';
 import { P2P_ROLES, PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
-import { controlHex } from '@gyblos/protocol/control-validation';
 import { PaymentError } from '@gyblos/protocol/payment';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 import { WINDOWS } from '@gyblos/runtime/private-mode';
@@ -28,6 +25,10 @@ import { GENESIS_READ_MS, NODE_ERROR_CODES } from './constants';
 import { NodeError } from './errors';
 import { roleSigner, type RoleConfig } from './roles';
 import type { SellerPayments } from './seller-paid';
+import {
+  sellerChainSessions,
+  sellerSessionBuyerIds,
+} from './seller-session-chain';
 
 // The chain the RPC serves; tests inject one so they never reach the network.
 export type GenesisReader = (rpcUrl: string) => Promise<string>;
@@ -43,11 +44,13 @@ export const readGenesis: GenesisReader = async (rpcUrl) =>
 export function sellerChainPayments(
   genesis: GenesisReader = readGenesis,
   rpc?: UptoSellerPaymentsOptions['rpc'],
-): (role: RoleConfig) => Promise<SellerPayments> {
-  return async (role) => {
-    const pinned = process.env[SELLER_SESSION_BUYER_ENV];
-    if (pinned !== undefined) {
-      controlHex(pinned);
+): (
+  role: RoleConfig,
+  limits?: { maxSessions: number },
+) => Promise<SellerPayments> {
+  return async (role, limits) => {
+    const buyerNodeIds = sellerSessionBuyerIds(process.env);
+    if (buyerNodeIds.length) {
       if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
     }
     if (
@@ -63,18 +66,14 @@ export function sellerChainPayments(
       throw new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH);
     const feePayer = await roleSigner(P2P_ROLES.SELLER, 'facilitator');
     const authorizer = await roleSigner(P2P_ROLES.SELLER, 'authorizer');
-    const sessions =
-      pinned === undefined
-        ? undefined
-        : {
-            buyerNodeId: pinned,
-            backend: openBatchSellerBackend({
-              rpcUrl: role.rpcUrl,
-              feePayer,
-              authorizer,
-              paths: batchSessionPathsIn(process.env, P2P_ROLES.SELLER),
-            }),
-          };
+    const sessions = await sellerChainSessions({
+      environment: process.env,
+      buyerNodeIds,
+      rpcUrl: role.rpcUrl,
+      feePayer,
+      authorizer,
+      maxSessions: limits?.maxSessions ?? BATCH_SESSION_DEFAULTS.maxSessions,
+    });
     const paid = await openUptoSellerPayments({
       rpcUrl: role.rpcUrl,
       ...(rpc ? { rpc } : {}),
@@ -95,13 +94,24 @@ export function sellerChainPayments(
         intervalSecs: CLEANUP.intervalSeconds,
         abandonGraceSecs: CLEANUP.abandonGraceSeconds,
       },
-    }).catch((error: unknown) => {
+    }).catch(async (error: unknown) => {
+      await sessions?.registry.dispose();
       // The only chain call while opening: making the token accounts a claim pays into exist.
       throw error instanceof PaymentError &&
         error.code === PAYMENT_ERROR_CODES.UNAVAILABLE
         ? new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE)
         : error;
     });
-    return { ...paid, sessions };
+    return {
+      ...paid,
+      sessions,
+      async close() {
+        try {
+          await sessions?.registry.dispose();
+        } finally {
+          await paid.close();
+        }
+      },
+    };
   };
 }

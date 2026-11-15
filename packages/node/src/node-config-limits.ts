@@ -8,6 +8,7 @@ import {
   TRANSPORT_LIMITS,
   type TransportLimits,
 } from '@gyblos/config';
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { FREE_EXECUTION_ADMISSION } from '@gyblos/core/constants';
 
 import { NODE_CONFIG_ISSUE_CODES, SELLER_LIMIT_CEILINGS } from './constants';
@@ -26,11 +27,13 @@ export interface NodeLimits {
   requestsPerMinute?: number;
   globalRequestsPerMinute?: number;
   maxFreeBuyersPerDay?: number;
+  maxSessions?: number;
 }
 
 export interface SellerLimits {
   transport: TransportLimits;
   maxFreeBuyers: number;
+  maxSessions: number;
 }
 
 const LIMIT_KEYS = {
@@ -38,6 +41,7 @@ const LIMIT_KEYS = {
   requests_per_minute: 'requestsPerMinute',
   global_requests_per_minute: 'globalRequestsPerMinute',
   max_free_buyers_per_day: 'maxFreeBuyersPerDay',
+  max_sessions: 'maxSessions',
 } as const satisfies Record<string, keyof NodeLimits>;
 // The key blamed when the budget does not fit: the first one the file sets, totals first.
 const BUDGET_KEYS = [
@@ -89,6 +93,7 @@ export function sellerLimits(limits: NodeLimits = {}): SellerLimits {
     },
     maxFreeBuyers:
       limits.maxFreeBuyersPerDay ?? FREE_EXECUTION_ADMISSION.maxBuyers,
+    maxSessions: limits.maxSessions ?? BATCH_SESSION_DEFAULTS.maxSessions,
   };
 }
 

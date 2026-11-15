@@ -355,3 +355,34 @@ export function buyerApiKeyPathsIn(environment: HomeEnvironment) {
     lock: rolePathIn(environment, 'buyer', ROLE_FILES.buyerApiKeysLock),
   };
 }
+
+// A seller's bounded financial directory; legacy journals remain at their original private path.
+export const BATCH_SELLER_FILES = {
+  state: 'batch-sellers-v1.json',
+  lock: 'batch-sellers.lock',
+  children: 'batch-buyers',
+} as const;
+export function batchSellerPathsIn(environment: HomeEnvironment) {
+  const legacy = batchSessionPathsIn(environment, 'seller');
+  return {
+    directory: legacy.directory,
+    children: join(legacy.directory, BATCH_SELLER_FILES.children),
+    state: join(legacy.directory, BATCH_SELLER_FILES.state),
+    lock: join(legacy.directory, BATCH_SELLER_FILES.lock),
+    legacy,
+  };
+}
+export type BatchSellerPaths = ReturnType<typeof batchSellerPathsIn>;
+export function batchSellerBuyerPaths(
+  paths: BatchSellerPaths,
+  buyerNodeId: string,
+) {
+  if (!/^[a-f0-9]{64}$/.test(buyerNodeId))
+    throw new TypeError('Invalid session slot');
+  const directory = join(paths.children, buyerNodeId);
+  return {
+    directory,
+    state: join(directory, BATCH_SESSION_FILES.state),
+    lock: join(directory, BATCH_SESSION_FILES.lock),
+  };
+}

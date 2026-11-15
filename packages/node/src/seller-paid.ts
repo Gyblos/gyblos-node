@@ -17,10 +17,10 @@ import {
 } from './paid-offers';
 import { createPaidRetry, type PaidRetryHealth } from './paid-retry';
 import type { LiveSellerOffer } from './seller-offer-set';
-import type { SellerSessionBackend } from './session-backend';
+import type { SellerSessionComposition } from './seller-session-directory';
 
 export interface SellerPayments {
-  sessions?: { buyerNodeId: string; backend: SellerSessionBackend };
+  sessions?: SellerSessionComposition;
   server: PaymentServer;
   // Re-drives claims the payment server recorded before a restart, each with its recorded charge.
   recover?(): Promise<void>;

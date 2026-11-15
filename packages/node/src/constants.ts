@@ -1,5 +1,6 @@
 // Seller node lifecycle states and the local role-config schema version. Values only; no wallet,
 // network or process actions.
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 
 export const NODE_STATES = {
@@ -234,6 +235,7 @@ export const SELLER_LIMIT_CEILINGS = {
   requestsPerMinute: 120,
   globalRequestsPerMinute: 1024,
   maxFreeBuyersPerDay: 65_536,
+  maxSessions: BATCH_SESSION_DEFAULTS.maxSessions,
 } as const;
 
 // config.toml prices are USDC per million tokens; protocol v2 will charge atomic units (10^-6 USDC) per

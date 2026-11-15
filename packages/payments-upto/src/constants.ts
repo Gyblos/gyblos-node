@@ -131,3 +131,9 @@ export const BATCH_POOL_VERSION = 1;
 export const BATCH_BLOCK_STATE = { version: 2 } as const;
 // Closed generations stay in the same atomic journal; neither count nor bytes may grow without bound.
 export const BATCH_RENEWAL_STATE = { version: 3, maxHistory: 16 } as const;
+// Financial admission is active-channel bounded; a separate finite index retains closed-buyer proof.
+export const BATCH_SELLER_REGISTRY = {
+  version: 1,
+  maxBuyers: 64,
+  stateBytes: 128 * 1024,
+} as const;

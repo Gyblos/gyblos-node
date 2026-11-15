@@ -21,7 +21,10 @@ export function serveSellerTransport(
     paid?: PaidExecutionService;
     batchSessions?: BatchChannelService;
   },
-  options: { relayOnly: boolean; limits: SellerLimits },
+  options: {
+    relayOnly: boolean;
+    limits: Pick<SellerLimits, 'transport' | 'maxFreeBuyers'>;
+  },
 ) {
   return serveIroh(
     endpoint,
