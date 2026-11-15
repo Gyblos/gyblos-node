@@ -7,6 +7,7 @@ import type { BatchExecutionRequest } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_METERING_MODES,
   OFFER_PRICING_KINDS,
+  RECEIPT_CHANNEL_CODES,
   RECEIPT_OUTCOMES,
 } from '@gyblos/protocol/constants';
 import type { ExecutionResult } from '@gyblos/protocol/free-execution';
@@ -15,7 +16,7 @@ import type {
   PaymentSessionTerms,
   SessionBill,
 } from '@gyblos/protocol/payment-session';
-import { sessionBlockRequestDigest } from '@gyblos/protocol/session-blocks';
+import { ReceiptChannelError } from '@gyblos/protocol/receipt-channel';
 import { conversationText, recordedFinishReason } from '@gyblos/protocol/tools';
 
 import type { BuyerReceiptEvidence } from './receipt-buyer';
@@ -31,7 +32,7 @@ export function sessionReceiptPayment(
     BigInt(base) + BigInt(bill.chargedAtomic) !==
     BigInt(bill.cumulativeAtomic)
   )
-    throw new RangeError('Invalid receipt authorization');
+    throw new ReceiptChannelError(RECEIPT_CHANNEL_CODES.BINDING);
   const before = settlementShares(base, terms.protocolFeeBps);
   const after = settlementShares(bill.cumulativeAtomic, terms.protocolFeeBps);
   return {
@@ -45,18 +46,19 @@ export function sessionReceiptPayment(
     feeAtomic: String(BigInt(after.feeAtomic) - BigInt(before.feeAtomic)),
   };
 }
-export async function sessionReceiptEvidence(
+export function sessionReceiptEvidence(
   request: BatchExecutionRequest,
+  requestDigest: string,
   result: ExecutionResult,
   payment: PaidReceiptPayment,
   first: number | null,
   total: number,
-): Promise<BuyerReceiptEvidence> {
+): BuyerReceiptEvidence {
   const offer = request.quote.offer;
   return {
     context: {
       requestId: request.requestId,
-      requestDigest: await sessionBlockRequestDigest(request),
+      requestDigest,
       sellerNodeId: offer.nodeId,
       buyerNodeId: offer.buyerNodeId,
       owner: offer.owner,
@@ -74,17 +76,19 @@ export async function sessionReceiptEvidence(
     payment,
   };
 }
-export async function publishSessionReceipt(
+export function publishSessionReceipt(
   options: PaidSellerReceiptOptions,
   request: BatchExecutionRequest,
+  requestDigest: string,
   result: ExecutionResult,
   payment: PaidReceiptPayment,
   receivedAt: number,
   first: number | null,
   total: number,
 ) {
-  const evidence = await sessionReceiptEvidence(
+  const evidence = sessionReceiptEvidence(
     request,
+    requestDigest,
     result,
     payment,
     first,

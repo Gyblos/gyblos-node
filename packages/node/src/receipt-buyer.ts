@@ -72,8 +72,9 @@ async function buyerPair(
   signal: AbortSignal,
 ) {
   const input = { seller: found.seller, ...evidence };
-  if (evidence.payment) await buildPaidBuyerReceipt(input);
-  else await buildFreeBuyerReceipt(input);
+  const expected = evidence.payment
+    ? await buildPaidBuyerReceipt(input)
+    : await buildFreeBuyerReceipt(input);
   receiptSignal(signal);
   const context = evidence.context;
   const local = await store.load(
@@ -89,7 +90,9 @@ async function buyerPair(
   if (held?.buyer) {
     if (
       canonicalJson(held.seller) !== canonicalJson(found.seller) ||
-      held.buyer.record.observed.outputBytes !== evidence.observed.outputBytes
+      held.buyer.record.observed.outputBytes !==
+        evidence.observed.outputBytes ||
+      (evidence.payment && !matchesPaidBuyer(expected, held.buyer.record))
     )
       throw new ReceiptChannelError(RECEIPT_CHANNEL_CODES.CONFLICT);
     return held;
@@ -97,6 +100,18 @@ async function buyerPair(
   return evidence.payment
     ? createPaidBuyerReceipt(input, signer)
     : createFreeBuyerReceipt(input, signer);
+}
+function matchesPaidBuyer(expected: BuyerReceiptV1, actual: BuyerReceiptV1) {
+  return (
+    canonicalJson({
+      ...actual,
+      observed: {
+        ...actual.observed,
+        firstTokenMs: expected.observed.firstTokenMs,
+        totalMs: expected.observed.totalMs,
+      },
+    }) === canonicalJson(expected)
+  );
 }
 export function createBuyerReceiptRuntime(options: {
   endpoint: Endpoint;

@@ -5,9 +5,13 @@ import { test } from 'node:test';
 import { type PaidSellerReceiptInput } from '@gyblos/core/receipts';
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import { ENGINE_KINDS } from '@gyblos/protocol/constants';
-import { sessionBlockRequestDigest } from '@gyblos/protocol/session-blocks';
+import {
+  SESSION_BLOCKS,
+  sessionBlockRequestDigest,
+} from '@gyblos/protocol/session-blocks';
 
 import { blockProduct } from './support/batch-block-product';
+import { within } from './support/test-deadline';
 
 void test('block receipts bind the execution digest and attribute fees across requests instead of rounding each separately', async (t) => {
   const seller: PaidSellerReceiptInput[] = [];
@@ -129,4 +133,67 @@ void test('interrupted block generation never fabricates a completed receipt or 
   );
   assert.equal(receipts, 0);
   assert.equal(f.offers.generations(), 1);
+});
+
+void test('receipt-only digest work cannot hold an answer after its terminal authorization', async (t) => {
+  let published = 0;
+  const f = await blockProduct({
+    receipts: () => ({
+      engineKind: ENGINE_KINDS.OLLAMA,
+      publisher: {
+        publish() {
+          published++;
+        },
+      },
+    }),
+    receipt() {},
+  });
+  t.after(f.close);
+  let authorized = false;
+  const financial = f.f.seller();
+  const accept = financial.acceptBlock.bind(financial);
+  t.mock.method(
+    financial,
+    'acceptBlock',
+    async (...args: Parameters<typeof financial.acceptBlock>) => {
+      await accept(...args);
+      if (args[0].terminal) authorized = true;
+    },
+  );
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  let blocked = 0;
+  t.mock.method(
+    crypto.subtle,
+    'digest',
+    async (...args: Parameters<SubtleCrypto['digest']>) => {
+      if (
+        authorized &&
+        new TextDecoder()
+          .decode(args[1])
+          .startsWith(SESSION_BLOCKS.requestDomain)
+      ) {
+        blocked++;
+        await held;
+      }
+      return digest(...args);
+    },
+  );
+  try {
+    const answer = await within(
+      f.buyer.execute(
+        await f.offers.quote(1),
+        f.offers.input,
+        new AbortController().signal,
+      ),
+    );
+    assert.equal(answer.text, 'aa bb cc');
+    assert.equal(published, 1);
+    assert.equal(blocked, 0);
+  } finally {
+    release();
+  }
 });

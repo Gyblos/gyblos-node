@@ -138,8 +138,9 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
     return batchFail(SESSION_CODES.BINDING);
   if (options.receipt) {
     try {
-      const evidence = await sessionReceiptEvidence(
+      const evidence = sessionReceiptEvidence(
         request,
+        pending.requestDigest,
         result.value,
         sessionReceiptPayment(request, terms, baseAtomic, result.bill),
         first,

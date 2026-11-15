@@ -122,9 +122,10 @@ async function executeObserved(
     const completed = plan ? await plan.complete(result.value) : result;
     if (plan && options.receipts) {
       try {
-        await publishSessionReceipt(
+        publishSessionReceipt(
           options.receipts(live.index),
           request,
+          plan.pending.requestDigest,
           result.value,
           sessionReceiptPayment(request, options.terms, base, completed.bill),
           receivedAt,
