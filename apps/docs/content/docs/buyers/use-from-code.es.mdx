@@ -34,7 +34,6 @@ contraseñas, claves ni otros secretos.
 
 ## Antes de empezar [#antes-de-empezar]
 
-- Una invitación con un **token de relay** privado.
 - El **NodeId** y la **wallet dueña** del vendedor que usarás, de una fuente en la que confíes (el vendedor
   muestra ambos con `gyblos doctor`). El vendedor debe estar registrado; el comprador verifica su identidad
   en Solana devnet.
@@ -59,10 +58,9 @@ respuesta y los endpoints.
 
 ## Iniciar el comprador [#iniciar-el-comprador]
 
-Escribe el token de relay sin que se muestre y luego inicia el comprador en la misma terminal:
+Inicia el comprador. No necesita token de relay: los relays de Gyblos admiten a todos los clientes.
 
 ```sh
-read -rs GYBLOS_RELAY_TOKEN && export GYBLOS_RELAY_TOKEN
 pnpm buyer:free
 ```
 

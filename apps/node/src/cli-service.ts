@@ -229,7 +229,7 @@ async function install(
   const values = await readEnvironmentFile(input.environmentFile);
   if (!values)
     output.stdout(
-      `No ${input.environmentFile}: put GYBLOS_RELAY_TOKEN (and any api_key_env) there, mode 0600.\n`,
+      `No ${input.environmentFile}: put any api_key_env variables there, mode 0600.\n`,
     );
   const ready = await doctor(
     {

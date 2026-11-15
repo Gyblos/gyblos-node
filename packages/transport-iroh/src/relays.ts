@@ -1,5 +1,7 @@
 // Owns the shared operator relay map and public relay admission policy.
-// Credentials come only from the environment, reach only owned relays and never enter diagnostics.
+// The Gyblos relays admit every client, bounded by per-client limits, so no credential is needed. An
+// optional token from the environment is still validated and sent, only to owned relays, for relays that
+// require one; it never enters diagnostics. Admission by registered NodeId is planned (issue #236).
 import { RelayMap, RelayMode } from '@number0/iroh';
 
 import { IROH_RELAYS } from '@gyblos/config';
@@ -37,13 +39,10 @@ function configuredRelayUrls(environment: RelayEnvironment = process.env) {
   return origins;
 }
 
+// Absent or empty (an unset line in an env file) asks for no token.
 function relayToken(environment: RelayEnvironment) {
   const authToken = environment.GYBLOS_RELAY_TOKEN;
-  if (!authToken)
-    throw new RelayConfigurationError(
-      RELAY_CONFIGURATION_CODES.MISSING_TOKEN,
-      'GYBLOS_RELAY_TOKEN is required to connect to the configured relays.',
-    );
+  if (!authToken) return undefined;
   if (!/^[\x21-\x7e]+$/.test(authToken))
     throw new RelayConfigurationError(
       RELAY_CONFIGURATION_CODES.INVALID_TOKEN,
@@ -72,7 +71,7 @@ export function relayModeFromEnv(environment: RelayEnvironment = process.env) {
     const map = RelayMap.empty();
     for (const url of urls)
       map.insert(
-        isOwnedRelay(url)
+        authToken && isOwnedRelay(url)
           ? { url, quicPort: IROH_RELAYS.quicPort, authToken }
           : { url, quicPort: IROH_RELAYS.quicPort },
       );

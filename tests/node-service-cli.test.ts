@@ -233,7 +233,10 @@ void test('install refuses when the service environment would fail doctor, writi
   scenario({ free: true }, async (run) => {
     await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
-    // The token is only in the shell, not in seller.env: the service would not see it.
+    // seller.env holds a malformed relay token: the service would fail doctor with it, even though the
+    // shell's own environment is fine.
+    const environment = join(run.home, 'seller.env');
+    await writeFile(environment, 'GYBLOS_RELAY_TOKEN=short\n', { mode: 0o600 });
     const { system, commands } = fakeSystem(run);
     const result = await service(run, ['install'], system, {
       GYBLOS_RELAY_TOKEN: RELAY_SECRET,

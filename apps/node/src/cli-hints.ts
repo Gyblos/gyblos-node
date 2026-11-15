@@ -64,15 +64,13 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'run `gyblos config validate --config <file>` on the GYBLOS_CONFIG file',
   [NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT]:
     'move the old .local layout first (docs/running-a-node.md)',
-  [RELAY_CONFIGURATION_CODES.MISSING_TOKEN]:
-    'set the relay token variable (default GYBLOS_RELAY_TOKEN)',
   [RELAY_CONFIGURATION_CODES.INVALID_TOKEN]:
     'the relay token must be printable, without spaces',
   [RELAY_CONFIGURATION_CODES.INVALID_TOKEN_LENGTH]:
     'the relay token must be 32-512 characters',
   [RELAY_CONFIGURATION_CODES.INVALID_URLS]: 'relay URLs must be HTTPS origins',
   [NODE_ERROR_CODES.SELLER_RELAY_OFFLINE]:
-    'no Gyblos relay answered: check the relay token from your invitation (GYBLOS_RELAY_TOKEN, in seller.env with Docker) and that this machine can reach the internet',
+    'no Gyblos relay answered: check that this machine can reach the internet (HTTPS and UDP 7842)',
   [DOCTOR_CODES.CLOCK_SKEWED]:
     'this clock is over 2 s off the discovery index; turn on automatic time sync (NTP): buyers refuse records issued over 5 s ahead, and a clock behind shortens every quote',
   [DOCTOR_CODES.CLOCK_UNCHECKED]:

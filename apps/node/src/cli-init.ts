@@ -236,11 +236,11 @@ function startupRefusal(config: NodeConfig, answers: InitAnswers) {
 }
 
 function nextSteps(answers: InitAnswers) {
-  const steps = [
-    'Put GYBLOS_RELAY_TOKEN=<your token> in seller.env (mode 600); docs/running-a-node.md shows how.',
-  ];
+  const steps: string[] = [];
   if (answers.apiKeyEnv)
-    steps.push(`Put ${answers.apiKeyEnv}=<your API key> in seller.env too.`);
+    steps.push(
+      `Put ${answers.apiKeyEnv}=<your API key> in seller.env (mode 600); docs/running-a-node.md shows how.`,
+    );
   if (answers.engine === ENGINE_KINDS.OLLAMA)
     steps.push(
       `Pull the model into that Ollama: OLLAMA_HOST=${new URL(answers.url).host} ollama pull ${ollamaTag(answers.model)}`,

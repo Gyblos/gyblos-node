@@ -121,9 +121,9 @@ void test('refuses a token seller.env or the relay could not hold, without writi
     try {
       const result = install.run({ GYBLOS_RELAY_TOKEN: token });
       assert.equal(result.status, 1, token);
-      assert.match(result.stderr, /relay token/);
+      assert.match(result.stderr, /GYBLOS_RELAY_TOKEN/);
       if (token.startsWith('gyb_'))
-        assert.match(result.stderr, /invite code, not the relay token/);
+        assert.match(result.stderr, /holds the gyb_ invite code/);
       assert.ok(!result.output.includes(token), token);
       assert.throws(() => install.file('seller.env'), token);
       assert.ok(!install.calls().includes('compose pull'), token);
@@ -133,13 +133,13 @@ void test('refuses a token seller.env or the relay could not hold, without writi
   }
 });
 
-void test('without a token or a terminal it stops before writing seller.env', async () => {
+void test('without a relay token it installs, asking for nothing, with a private seller.env', async () => {
   const install = await harness();
   try {
     const result = install.run();
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /No terminal .*GYBLOS_RELAY_TOKEN/);
-    assert.throws(() => install.file('seller.env'));
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.output, /relay token/i);
+    assert.doesNotMatch(install.file('seller.env'), /GYBLOS_RELAY_TOKEN/);
   } finally {
     await install.cleanup();
   }

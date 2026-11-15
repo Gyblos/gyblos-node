@@ -59,7 +59,7 @@ For each setting, the first source that sets it wins:
 | RPC URL                | `--rpc-url`            | `GYBLOS_RPC_URL`            | `node.rpc_url`            | `https://api.devnet.solana.com`         |
 | payout wallet          | `--payout-wallet`      |                             | `node.payout_wallet`      | unset                                   |
 | relays                 | `--relay` (repeated)   | `GYBLOS_RELAYS`             | `relays.urls`             | `https://na1.relay.gyblos.com/`         |
-| relay token variable   |                        |                             | `relays.relay_token_env`  | `GYBLOS_RELAY_TOKEN`                    |
+| relay token variable   |                        |                             | `relays.relay_token_env`  | `GYBLOS_RELAY_TOKEN` (optional)         |
 | seller relay-only      | `--relay-only`         | `GYBLOS_RELAY_ONLY`         | `transport.relay_only`    | off                                     |
 | Iroh bind address      | `--iroh-bind`          | `GYBLOS_IROH_BIND`          | `transport.bind`          | unset                                   |
 | Iroh external address  | `--iroh-external-addr` | `GYBLOS_IROH_EXTERNAL_ADDR` | `transport.external_addr` | unset                                   |
@@ -131,7 +131,9 @@ however many digits it has.
     not yet read this setting.
   - `rpc_url`: https, or http on loopback; no credentials or query.
 - `[relays]`: `urls` (1 to 8 HTTPS origins without path, query or credentials;
-  duplicates refused after normalization) and `relay_token_env`.
+  duplicates refused after normalization) and `relay_token_env` (optional: the
+  Gyblos relays need no token; a token is sent only to owned relays that still
+  require one).
 - `[transport]`: `relay_only` (boolean), `bind` and `external_addr` (`ip:port`,
   IPv6 in brackets).
 - `[buyer]`: `relay_only` (boolean).
@@ -335,9 +337,9 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 is not devnet), `SELLER_PAYMENT_DESCRIPTION_INVALID` (the payout is the fee
 payer or authorizer key) or `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE` (a token
 account below is missing and could not be created). After the file is accepted,
-`SELLER_RELAY_OFFLINE` means no relay answered within 30 s: a relay token the
-relays refuse, or no outbound connection. The daemon prints the code with a hint
-in one line, and `gyblos seller status` shows it until a start succeeds. A paid
+`SELLER_RELAY_OFFLINE` means no Gyblos relay answered within 30 s: check
+internet access (HTTPS and UDP 7842). The daemon prints the code with a hint in
+one line, and `gyblos seller status` shows it until a start succeeds. A paid
 seller's fee payer key needs devnet SOL: it pays every channel transaction and
 fronts each buyer channel's rent until the channel is reclaimed.
 `pnpm gyblos doctor` also names the `[[offers]]` entry a code is about.

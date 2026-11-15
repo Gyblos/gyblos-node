@@ -228,15 +228,12 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
     );
   }));
 
-void test('doctor: a missing or malformed relay token fails without echoing it', () =>
+void test('doctor: no relay token passes; a malformed one fails without echoing it', () =>
   scenario({}, async (run) => {
     await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
     const missing = await doctor(run, [], { GYBLOS_RELAY_TOKEN: '' });
-    assert.match(
-      line(missing.output, 'relays'),
-      /FAIL\s+relays\s+MISSING_RELAY_TOKEN/,
-    );
+    assert.doesNotMatch(line(missing.output, 'relays'), /FAIL/);
     const short = await doctor(run, [], {
       GYBLOS_RELAY_TOKEN: 'FAKE0SECRET',
     });

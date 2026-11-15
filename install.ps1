@@ -11,7 +11,7 @@
 #
 # Environment (all optional):
 #   GYBLOS_HOME         the seller's home, with gyblos.toml and seller.env (default: %USERPROFILE%\.gyblos)
-#   GYBLOS_RELAY_TOKEN  the relay token; asked for without echo when unset
+#   GYBLOS_RELAY_TOKEN  optional; only for a relay that still requires a token
 #   GYBLOS_REQUIRE_SIGNATURE=1  stop unless cosign verifies the seller as a Gyblos release
 #   GYBLOS_GUIDED=0     only print the steps to start selling; never ask to register or publish
 #   GYBLOS_MODIFY_PATH=0  do not add the gyblos command's folder to your user PATH
@@ -238,21 +238,20 @@ free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
   Say "Wrote $path"
 }
 
-# The relay token goes straight from the prompt or the environment into seller.env.
+# seller.env holds private variables for the seller (API keys, NAME=value per line). The Gyblos relays need
+# no token; GYBLOS_RELAY_TOKEN, when set, is kept for a relay that still requires one.
 function Write-Environment {
   $path = Join-Path $SellerHome 'seller.env'
   if (Test-Path -LiteralPath $path) { Say "Kept existing $path"; return }
   $token = $env:GYBLOS_RELAY_TOKEN
   if (-not $token) {
-    if (-not [Environment]::UserInteractive -or [Console]::IsInputRedirected) { Die 'No console to ask for the relay token: set GYBLOS_RELAY_TOKEN.' }
-    Say 'The relay token is the private key to the Gyblos relay. It is not the gyb_ invite code,'
-    Say 'which you enter later with `gyblos seller register`.'
-    $secure = Read-Host -AsSecureString 'Relay token (not shown)'
-    $token = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+    Write-Text $path "# Private seller variables (API keys), NAME=value per line. Keep this file private.`n"
+    Say "Wrote $path (readable only by you)"
+    return
   }
-  if ($token.StartsWith('gyb_')) { Die 'That is the gyb_ invite code, not the relay token. Enter the invite code later with `gyblos seller register`; rerun this with the relay token.' }
-  if ($token -notmatch '^[\x21-\x7e]+$' -or $token -match '["''`$\\#;|<>&(){}~]') { Die 'The relay token is empty or has characters a relay token never has.' }
-  if ($token.Length -lt $RelayTokenMin -or $token.Length -gt $RelayTokenMax) { Die "The relay token must have $RelayTokenMin to $RelayTokenMax characters." }
+  if ($token.StartsWith('gyb_')) { Die 'GYBLOS_RELAY_TOKEN holds the gyb_ invite code. Unset it; enter the invite code later with `gyblos seller register`.' }
+  if ($token -notmatch '^[\x21-\x7e]+$' -or $token -match '["''`$\\#;|<>&(){}~]') { Die 'GYBLOS_RELAY_TOKEN has characters a relay token never has.' }
+  if ($token.Length -lt $RelayTokenMin -or $token.Length -gt $RelayTokenMax) { Die "GYBLOS_RELAY_TOKEN must have $RelayTokenMin to $RelayTokenMax characters." }
   Write-Text $path "GYBLOS_RELAY_TOKEN=$token`n"
   $token = $null
   Say "Wrote $path (readable only by you)"
@@ -316,7 +315,7 @@ function Next-Steps {
   Say 'Next steps, to start selling:'
   Say "  1. Send about 0.02 devnet SOL to the seller's owner $script:Owner"
   Say '     (https://faucet.solana.com, choose devnet). It pays the one-time registration, about 0.01 SOL.'
-  Say '  2. Register with the gyb_ invite code from your invitation (asked for, not the relay token):'
+  Say '  2. Register with the gyb_ invite code from your invitation (asked for):'
   Say "       $(Typed 'seller register')"
   Say '  3. Publish to the discovery index:'
   Say "       $(Installer 'publish')"
@@ -337,7 +336,7 @@ function Guided-Setup {
   Say 'Next: register this seller and publish it, so buyers can find it.'
   Say 'Each step asks before it does anything. Press Ctrl+C at any time; run this script again to continue.'
   Say ''
-  Say 'Step 1 of 2: register, with the gyb_ invite code from your invitation (not the relay token).'
+  Say 'Step 1 of 2: register, with the gyb_ invite code from your invitation.'
   Say "  The owner $script:Owner pays about 0.01 devnet SOL once; registration waits for it if needed."
   Gyblos seller register
   if ($LASTEXITCODE -ne 0) {

@@ -123,9 +123,14 @@ engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
 free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 ```
 
-Create `~/gyblos-seller/seller.env` readable only by you (`chmod 600`), and in a private editor write one
-line: the variable name `GYBLOS_RELAY_TOKEN`, an equals sign and your relay token, with no spaces or
-quotes. The token is 32 to 512 printable characters, with no shell characters such as `$`, quotes or `#`. Never print that file or paste it into a terminal command.
+Create `~/gyblos-seller/seller.env` readable only by you (`chmod 600`); Compose requires the file, but it
+may stay empty. The Gyblos relays need no relay token. Only if an offer uses an `api_key_env` variable,
+write it in a private editor as `NAME=value`, one per line, with no spaces, quotes or shell characters such
+as `$` or `#`. Never print that file or paste it into a terminal command.
+
+```sh
+(umask 077; touch ~/gyblos-seller/seller.env)
+```
 
 Then pull the images and the model, create the keys, install the tokenizer, check and start:
 

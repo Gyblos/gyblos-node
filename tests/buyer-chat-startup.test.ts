@@ -11,9 +11,9 @@ import { RelayConfigurationError } from '@gyblos/transport-iroh/relays';
 
 for (const [name, error, hint] of [
   [
-    'missing relay token',
+    'malformed relay token',
     new RelayConfigurationError(
-      RELAY_CONFIGURATION_CODES.MISSING_TOKEN,
+      RELAY_CONFIGURATION_CODES.INVALID_TOKEN,
       'private-token-must-not-leak',
     ),
     /GYBLOS_RELAY_TOKEN/,

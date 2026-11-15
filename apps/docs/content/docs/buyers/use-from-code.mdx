@@ -34,7 +34,6 @@ passwords, keys or other secrets.
 
 ## Before you start [#before-you-start]
 
-- An invitation with a private **relay token**.
 - The **NodeId** and **owner wallet** of the seller you will use, from a source you trust (the seller
   prints both with `gyblos doctor`). The seller must be registered; the buyer checks its identity on
   Solana devnet.
@@ -58,10 +57,9 @@ seller or the chain. `pnpm buyer:init --advanced` also sets the model, the answe
 
 ## Start the buyer [#start-the-buyer]
 
-Type the relay token without showing it, then start the buyer in the same terminal:
+Start the buyer. It needs no relay token: the Gyblos relays admit every client.
 
 ```sh
-read -rs GYBLOS_RELAY_TOKEN && export GYBLOS_RELAY_TOKEN
 pnpm buyer:free
 ```
 

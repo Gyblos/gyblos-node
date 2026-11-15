@@ -36,8 +36,8 @@ replaceable.
 
 Cost: the Iroh library is free and open source (MIT or Apache-2.0). We run our
 own `iroh-relay` at `na1.relay.gyblos.com` (free software; we pay only for the
-server), protected by a relay token. The public n0 relays are not used. See
-[running-a-node.md](running-a-node.md#relays).
+server), open to every client and bounded by per-client rate limits. The public
+n0 relays are not used. See [running-a-node.md](running-a-node.md#relays).
 
 Limits that matter here:
 

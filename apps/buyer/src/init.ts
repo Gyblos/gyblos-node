@@ -192,7 +192,7 @@ export async function runBuyerInit(
   }
   await terminal.initialize(answers);
   terminal.write(
-    'Buyer settings saved privately. Set GYBLOS_RELAY_TOKEN privately in the chat environment, then start with: pnpm buyer:chat\nUse GYBLOS_RELAYS if your seller uses another approved relay. Never share the token or put it in selection.json.\nPositive-price execution also needs its existing funded devnet wallet and verified tokenizer; this command prepares neither funds nor downloads.\n',
+    'Buyer settings saved privately. Start with: pnpm buyer:chat\nUse GYBLOS_RELAYS if your seller uses another approved relay.\nPositive-price execution also needs its existing funded devnet wallet and verified tokenizer; this command prepares neither funds nor downloads.\n',
   );
 }
 const INITIALIZATION_HINTS: Readonly<Record<BuyerInitError['code'], string>> = {

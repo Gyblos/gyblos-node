@@ -11,7 +11,7 @@ data_dir = ".local/gyblos"
 
 [relays]
 urls = ["https://na1.relay.gyblos.com"]
-relay_token_env = "GYBLOS_RELAY_TOKEN"
+relay_token_env = "GYBLOS_RELAY_TOKEN"   # optional; only for a relay that still requires a token
 
 [transport]
 relay_only = false                # true hides this node's IP from buyers (relay still sees it)

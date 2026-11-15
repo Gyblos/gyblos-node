@@ -92,7 +92,7 @@
           "type": "string",
           "pattern": "^[A-Z_][A-Z0-9_]*$",
           "maxLength": 128,
-          "description": "Environment variable holding the relay token (default GYBLOS_RELAY_TOKEN)."
+          "description": "Optional. Environment variable holding a relay token, only for a relay that still requires one (default GYBLOS_RELAY_TOKEN). The Gyblos relays need no token."
         }
       }
     },
