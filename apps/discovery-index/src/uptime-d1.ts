@@ -1,9 +1,17 @@
 // Owns ORM persistence of public uptime; never reads request metadata or opens network connections.
-import { and, asc, eq, exists, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, gte, lt } from 'drizzle-orm';
 
 import { DISCOVERY_INDEX_LIMITS } from './constants';
 import type { DiscoveryDatabase } from './d1-client';
 import { uptimeNodes, uptimeSlots } from './schema';
+import {
+  capacityAdmission,
+  maximum,
+  mergedBits,
+  minimum,
+  singleRow,
+  valueField,
+} from './sqlite-expressions';
 import { hourOf, retainedHour, slotBit, type UptimeStorage } from './uptime';
 
 function integer(value: unknown) {
@@ -23,21 +31,24 @@ function seenQueries(
     .from(uptimeNodes)
     .where(eq(uptimeNodes.nodeId, nodeId));
   // CASE avoids a capacity scan for existing identities; both writes run in one native D1 batch.
-  const admitted = sql<boolean>`case when ${exists(identity)} then 1 else ${lt(database.$count(uptimeNodes), maxNodes)} end`;
+  const admitted = capacityAdmission(
+    exists(identity),
+    lt(database.$count(uptimeNodes), maxNodes),
+  );
   const first = database
     .insert(uptimeNodes)
     .select(
       database
         .select({
-          nodeId: sql<string>`${nodeId}`.as('nodeId'),
-          firstAt: sql<number>`${now}`.as('firstAt'),
+          nodeId: valueField(nodeId, 'nodeId'),
+          firstAt: valueField(now, 'firstAt'),
         })
-        .from(sql`(values (1))`)
+        .from(singleRow())
         .where(admitted),
     )
     .onConflictDoUpdate({
       target: uptimeNodes.nodeId,
-      set: { firstAt: sql<number>`min(${uptimeNodes.firstAt}, ${now})` },
+      set: { firstAt: minimum(uptimeNodes.firstAt, now) },
     });
   const slot = database
     .insert(uptimeSlots)
@@ -45,10 +56,10 @@ function seenQueries(
       database
         .select({
           nodeId: uptimeNodes.nodeId,
-          hour: sql<number>`${hourOf(now)}`.as('hour'),
-          slots: sql<number>`${slotBit(now)}`.as('slots'),
-          firstAt: sql<number>`${now}`.as('firstAt'),
-          lastAt: sql<number>`${now}`.as('lastAt'),
+          hour: valueField(hourOf(now), 'hour'),
+          slots: valueField(slotBit(now), 'slots'),
+          firstAt: valueField(now, 'firstAt'),
+          lastAt: valueField(now, 'lastAt'),
         })
         .from(uptimeNodes)
         .where(eq(uptimeNodes.nodeId, nodeId)),
@@ -56,9 +67,9 @@ function seenQueries(
     .onConflictDoUpdate({
       target: [uptimeSlots.nodeId, uptimeSlots.hour],
       set: {
-        slots: sql<number>`${uptimeSlots.slots} | ${slotBit(now)}`,
-        firstAt: sql<number>`min(${uptimeSlots.firstAt}, ${now})`,
-        lastAt: sql<number>`max(${uptimeSlots.lastAt}, ${now})`,
+        slots: mergedBits(uptimeSlots.slots, slotBit(now)),
+        firstAt: minimum(uptimeSlots.firstAt, now),
+        lastAt: maximum(uptimeSlots.lastAt, now),
       },
     });
   return [first, slot] as const;

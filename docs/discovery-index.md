@@ -281,18 +281,45 @@ through the index; it does not say its answers were correct or fast.
 
 `src/storage.ts` defines the storage contract and an in-memory adapter (tests
 and local runs); `src/storage-d1.ts` is the D1 adapter using Drizzle ORM, pinned
-in the app manifest. `src/schema.ts` maps typed columns; `storage-queries.ts`
-and `storage-writes.ts` build reads and mutations. `d1-client.ts` connects
-Drizzle's SQLite driver to native D1 statements and batches without an HTTP
-proxy or interactive transaction. SQLite function and index-hint expressions use
-parameterized ORM fragments; there are no handwritten runtime query blocks.
-Registration storage and founder invite/revoke/restore commands use the same ORM
-schema and mutation builders. Wrangler commands render bound values through
-Drizzle's SQLite dialect because the CLI accepts SQL rather than bind
-parameters. Existing Wrangler SQL migrations remain the physical schema
-authority and are unchanged by the ORM migration. A publish is one D1 batch (one
-transaction) that admits the high-water mark and NodeId quota together before
-writing the corresponding public record. A failed batch rolls both back.
+in the app manifest. `src/schema.ts` declares all nine tables, columns, primary
+keys, nine secondary indexes and eleven check constraints, including uptime.
+Both the D1 client and admin compiler use it. `storage-queries.ts`,
+`storage-writes.ts`, `registration-queries.ts` and `uptime-d1.ts` build every
+complete query through Drizzle. `d1-client.ts` executes only ORM-generated
+statements and native transactional batches, without an HTTP proxy or
+interactive transaction. Registration storage and founder invite/revoke/restore
+commands use the same ORM schema and mutation builders. Wrangler commands render
+bound values through Drizzle's SQLite dialect because the CLI accepts SQL rather
+than bind parameters. Schema changes start in `schema.ts`; its metadata is
+checked against the independently applied migrations. The existing migration
+chain is retained unchanged for D1 deployment history and physical
+`WITHOUT ROWID` layout, which Drizzle's SQLite table API does not represent. A
+publish is one D1 batch (one transaction) that admits the high-water mark and
+NodeId quota together before writing the corresponding public record. A failed
+batch rolls both back.
+
+The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
+
+| Expression               | Why it is retained with pinned Drizzle 0.45                                                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INDEXED BY`             | SQLite otherwise chooses primary tables containing signed JSON before pagination; the existing key-only `EXPLAIN` test enforces covering-index reads. SQLite index hints have no Drizzle builder. |
+| `(VALUES (1))`           | The SQLite select builder requires a `FROM` source. Initial admission must still check capacity and references atomically when all application tables are empty.                                  |
+| Two-argument `min`/`max` | Drizzle's functions are aggregates. The scalar operations preserve retention, quota windows and earliest/latest uptime sightings inside atomic updates.                                           |
+| `CASE`                   | No Drizzle conditional-expression builder is available. Quota increments/resets use the stored window atomically; uptime admission skips the capacity scan for existing identities.               |
+| `length`                 | No scalar builder is available. The schema must preserve the existing database text-length checks.                                                                                                |
+| Bitwise OR               | No SQLite bitwise builder is available. Concurrent uptime observations must combine their slot bits in the same database write.                                                                   |
+
+The same module's projection helpers interpolate only ORM columns, bound values
+and built-in predicates; they contain no SQL syntax. Model insertion uses a
+guarded ORM CTE and `unionAll`, with at most 68 bound parameters for 64 models,
+below
+[D1's limit of 100](https://developers.cloudflare.com/d1/platform/limits/). The
+admission CTE is limited to its single primary-key row, preventing SQLite from
+repeating the node lookup for every model. It preserves diff-only writes and
+rollback without `json_each` or a handwritten query. Counts use Drizzle
+aggregates while retaining strict runtime validation of the driver response.
+Test-only SQL remains for independent migration and query-plan inspection,
+synthetic fixtures and rollback fault injection.
 
 `migrations/0001_discovery_index.sql` creates the five tables and their indexes.
 The website's draft `0001` and `0002` (prune indexes) were never applied to any

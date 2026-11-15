@@ -23,6 +23,7 @@ import {
   createInviteQuery,
   setRegistrationStatusQuery,
 } from '../src/registration-queries';
+import * as schema from '../src/schema';
 
 const WRANGLER = 'wrangler@4.151.1';
 const DATABASE = 'gyblos-discovery';
@@ -135,9 +136,12 @@ function setStatus(
 // Wrangler accepts a SQL command rather than bind parameters. Drizzle's dialect safely renders
 // its bound values; this compilation-only client fails if a query is accidentally executed here.
 function compileMutation(build: (database: DiscoveryDatabase) => SQLWrapper) {
-  const database = drizzle(async () => {
-    throw new TypeError('Admin queries must be compiled before execution.');
-  });
+  const database = drizzle(
+    async () => {
+      throw new TypeError('Admin queries must be compiled before execution.');
+    },
+    { schema },
+  );
   return new SQLiteSyncDialect().sqlToQuery(
     build(database).getSQL().inlineParams(),
   ).sql;

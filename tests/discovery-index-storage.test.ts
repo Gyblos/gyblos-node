@@ -18,13 +18,16 @@ import {
   type StoredEntry,
 } from '@gyblos/discovery-index/storage';
 import { createD1Storage } from '@gyblos/discovery-index/storage-d1';
-import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import {
+  PUBLIC_RECORD_KINDS,
+  PUBLIC_RECORD_LIMITS,
+} from '@gyblos/protocol/constants';
 
 import {
   createSqliteD1,
-  namedParams,
-  namedSql,
+  explainD1Statement,
   type SqliteD1,
+  type SqliteQueryPlanRow,
   type SqliteStatement,
 } from './support/d1-sqlite';
 import {
@@ -40,6 +43,7 @@ const hex = (seed: number) => seed.toString(16).padStart(64, '0');
 
 interface Written {
   sql: string;
+  params: SqliteStatement['params'];
   changes: number;
 }
 
@@ -65,10 +69,18 @@ async function recordingD1() {
       return record(statement);
     },
     batch: async (statements) => {
+      for (const statement of statements) {
+        assert.ok('params' in statement && Array.isArray(statement.params));
+        assert.ok(
+          statement.params.length <= 100,
+          'D1 accepts at most 100 parameters per statement',
+        );
+      }
       const results = await db.batch(statements);
       statements.forEach((statement, index) =>
         written.push({
           sql: (statement as SqliteStatement).sql,
+          params: (statement as SqliteStatement).params,
           changes: results[index]?.meta.changes ?? 0,
         }),
       );
@@ -148,7 +160,29 @@ void test('D1 catalog republish writes only the model rows that changed', async 
   await storage.put(
     entry(PUBLIC_RECORD_KINDS.CATALOG, hex(2), 1, { models: ['b'] }),
   );
-  await storage.put(catalog(4, []));
+  const full = Array.from(
+    { length: PUBLIC_RECORD_LIMITS.maxModels },
+    (_, index) => `model-${String(index).padStart(2, '0')}`,
+  );
+  written.length = 0;
+  await storage.put(catalog(4, full));
+  assert.deepEqual(models(), full);
+  const modelInsert = written.find(({ sql }) =>
+    /\binsert\s+into\s+"?discovery_catalog_models\b/i.test(sql),
+  );
+  assert.ok(modelInsert);
+  const plan = explainD1Statement(db, modelInsert);
+  assert.equal(
+    plan.filter(({ detail }) =>
+      /\b(?:SEARCH|SCAN) discovery_nodes\b/.test(detail),
+    ).length,
+    1,
+    plan.map(({ detail }) => detail).join('\n'),
+  );
+  written.length = 0;
+  await storage.put(catalog(5, [...full].reverse()));
+  assert.equal(modelChanges(written), 0);
+  await storage.put(catalog(6, []));
   assert.deepEqual(models(), []);
   assert.equal(
     db.raw.prepare('SELECT count(*) AS n FROM discovery_catalog_models').get()
@@ -237,12 +271,6 @@ CREATE TEMP TRIGGER withdrawal_deleted AFTER DELETE ON discovery_withdrawals BEG
   assert.equal(withdrawal?.sequence, 7);
 });
 
-interface PlanRow {
-  id: number;
-  parent: number;
-  detail: string;
-}
-
 void test('D1 listing sorts and limits keys only, then reads blobs by key for the page', async (context) => {
   const made = await recordingD1();
   if (!made) return context.skip('node:sqlite unavailable');
@@ -250,16 +278,9 @@ void test('D1 listing sorts and limits keys only, then reads blobs by key for th
   await storage.list({ model: 'm', now: T0, limit: 51, after: null });
   const statement = read.at(-1);
   assert.ok(statement);
-  const plan: PlanRow[] = db.raw
-    .prepare('EXPLAIN QUERY PLAN ' + namedSql(statement.sql))
-    .all(namedParams(statement.params))
-    .map((row) => ({
-      id: Number(row.id),
-      parent: Number(row.parent),
-      detail: String(row.detail),
-    }));
+  const plan = explainD1Statement(db, statement);
   const byId = new Map(plan.map((row) => [row.id, row]));
-  const inPage = (row: PlanRow): boolean => {
+  const inPage = (row: SqliteQueryPlanRow): boolean => {
     const parent = byId.get(row.parent);
     if (!parent) return false;
     return /^(CO-ROUTINE|MATERIALIZE) /.test(parent.detail) || inPage(parent);

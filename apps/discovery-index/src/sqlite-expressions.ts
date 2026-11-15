@@ -1,0 +1,65 @@
+// Contains SQLite expressions that Drizzle 0.45 cannot build, plus typed projection bindings.
+// No complete query or external SQL text is accepted; every dynamic value stays parameterized.
+import { eq, isNull, or, sql, type GetColumnData, type SQL } from 'drizzle-orm';
+import type { AnySQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
+
+import type { DiscoveryListingIndex } from './constants';
+import type { D1Value } from './d1-client';
+
+export const valueField = <T extends D1Value>(value: T, name: string) =>
+  sql<T>`${value}`.as(name);
+export const columnField = <T extends AnySQLiteColumn>(
+  column: T,
+  name: string,
+) => sql<GetColumnData<T>>`${column}`.as(name);
+
+// Without these hints SQLite chooses the WITHOUT ROWID primary tables instead of the covering
+// indexes, reading signed blobs before pagination. The key-only EXPLAIN contract proves this need.
+export const coveringIndex = (
+  table: SQLiteTable,
+  name: DiscoveryListingIndex,
+) => sql`${table} indexed by ${sql.identifier(name)}`;
+
+// SQLite's scalar length has no Drizzle builder; schema checks must retain the physical bounds.
+export const textLength = (column: AnySQLiteColumn) =>
+  sql<number>`length(${column})`;
+export const nullableTextLength = (
+  column: AnySQLiteColumn,
+  characters: number,
+) => sql<boolean>`${or(isNull(column), eq(textLength(column), characters))}`;
+
+// Drizzle's SQLite SELECT builder requires a FROM source. This one-row source allows the initial
+// insert to enforce capacity/reference predicates even when every application table is empty.
+export const singleRow = () => sql`(values (1))`;
+
+// Drizzle's max() is an aggregate, not SQLite's two-argument scalar max. These updates must stay
+// inside the high-water write: reading the previous values in JavaScript would introduce a race.
+export const maximum = (
+  column: AnySQLiteColumn<{ data: number }>,
+  value: number,
+) => sql<number>`max(${column}, ${value})`;
+
+// Scalar min has the same API gap as max; uptime's earliest sighting must survive concurrent writes.
+export const minimum = (
+  column: AnySQLiteColumn<{ data: number }>,
+  value: number,
+) => sql<number>`min(${column}, ${value})`;
+
+// Keep the capacity count in CASE's lazy branch so an existing uptime identity never scans the table.
+export const capacityAdmission = (existing: SQL, capacity: SQL) =>
+  sql<boolean>`case when ${existing} then 1 else ${capacity} end`;
+
+// Drizzle has no SQLite bitwise-OR builder. Slots from concurrent sightings must merge in the write.
+export const mergedBits = (
+  column: AnySQLiteColumn<{ data: number }>,
+  bits: number,
+) => sql<number>`${column} | ${bits}`;
+
+// Drizzle has no CASE builder. Increment/reset must be decided atomically using the stored window;
+// a delayed request must not rewind it or lose a concurrent accepted publication.
+export const publicationCount = (
+  window: AnySQLiteColumn<{ data: number }>,
+  count: AnySQLiteColumn<{ data: number }>,
+  incoming: number,
+) =>
+  sql<number>`case when ${window} >= ${incoming} then ${count} + 1 else 1 end`;

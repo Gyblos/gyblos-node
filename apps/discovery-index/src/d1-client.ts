@@ -2,6 +2,8 @@
 // Only ORM-generated queries cross this boundary; returned values remain untrusted data.
 import { drizzle } from 'drizzle-orm/sqlite-proxy';
 
+import * as schema from './schema';
+
 export type D1Value = string | number | null;
 export type D1Row = Record<string, unknown>;
 export interface D1Result {
@@ -46,6 +48,7 @@ export function createD1Orm(database: D1Database) {
         rows: (result.results ?? []).map((row) => Object.values(row)),
       }));
     },
+    { schema },
   );
 }
 export type DiscoveryDatabase = ReturnType<typeof createD1Orm>;
