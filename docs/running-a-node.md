@@ -1223,13 +1223,26 @@ request_max_retries = 0
 stream_max_retries = 0
 ```
 
-Leave MCP servers off for these sessions; switch models with `/model` and any
-name the endpoint serves. `pnpm buyer:agent codex --write` adds the provider
-block to `config.toml` and one profile file per model beside it
-(`gyblos.config.toml` for the first model, `gyblos-<model>.config.toml` for
-each), since Codex CLI 0.162 and later refuse `[profiles.*]` tables in
-`config.toml`; start with `codex --profile gyblos`. It replaces only profile
-files it wrote and drops the profile tables an earlier run put in its block.
+Leave MCP servers off for these sessions (their tools are not offered, and the
+buyer says so once on stderr); switch models with `/model` and any name the
+endpoint serves. `pnpm buyer:agent codex --write` adds the provider block to
+`config.toml` and one profile file per model beside it (`gyblos.config.toml` for
+the first model and `gyblos-<model>.config.toml` for each, with characters other
+than letters, digits, `_` and `-` as dashes, e.g. `gyblos-qwen3-0-6b`), since
+Codex CLI 0.162 and later refuse `[profiles.*]` tables in `config.toml`; start
+with `codex --profile gyblos`. It needs Codex CLI 0.162 or later, which reads
+those files. It replaces only managed profile files and drops the profile tables
+an earlier run put in its block. Profiles written by this version carry a
+content checksum. Known edits, links and older profiles without that checksum
+are left in place. A stale matching profile is moved to a unique
+`<profile>.<id>.before-gyblos` backup beside it. Backups are retained and never
+replaced by later cleanup. If an editor saves during cleanup, its bytes remain
+recoverable in that backup; a detected change is also restored to the original
+name when no newer file occupies it. The command prints each backup path.
+Updates to one Codex directory are serialized and guarded against another live
+process writing at the same time. A history item from a tool group Codex used on
+another provider (`function_call` with `namespace`) is kept as history.
+
 Codex has no metadata for these models and otherwise assumes a large context;
 pass the sellers' context size with `--context <tokens>` (each profile then
 carries `model_context_window`) so Codex sizes and compacts its requests to fit.
