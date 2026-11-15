@@ -74,23 +74,29 @@ The fee payer pays:
 
 - once, about 0.002 SOL for each missing token account (your USDC payout account and the fee accounts),
   which the seller creates at startup;
-- the transaction fees of every paid request, and it fronts each request's channel rent, which is
-  returned once that channel is cleaned up.
+- the transaction fees of every paid request: about 0.00002 SOL per request with the default settings
+  (an estimate, not a guaranteed maximum);
+- the temporary rent of each request's channel, recovered later by a cleanup. A restart can lose track of
+  older rent, so not all of it is guaranteed to come back automatically.
 
-If it has too little SOL, the seller does not start (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) or cannot
-settle requests. Check its balance from time to time and top it up from the faucet.
+  0.05 SOL is a starting balance, not a fixed budget. If it runs low, the seller does not start
+  (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) or cannot collect. Check its balance regularly and top it up from
+  the faucet.
 
 ## How a buyer pays you [#how-payment-works]
 
 Each paid request is paid on its own:
 
 1. The buyer signs a maximum for the request and deposits it in a payment channel.
-2. Your seller answers. The buyer recounts the tokens it received.
+2. Your seller answers and measures the usage to request payment. The buyer verifies the answer it
+   received; per-request payment does not wait for a new buyer signature approving the final usage.
 3. Your seller settles that channel on chain: your share goes to the owner as USDC, the 4% fee to Gyblos,
    and the rest of the deposit back to the buyer.
 
-Settlement happens right after each answer, so there is little to lose if the seller stops. Keep the seller
-online anyway: after a restart it finishes any settlement that was interrupted.
+After each inference, the seller attempts to settle the delivered usage. Confirmation may take time or
+remain pending. After a restart, it attempts to recover pending charges whose amounts were saved, without
+repeating inference or charging twice. Keep its data and keys and fund the fee payer; network problems,
+insufficient SOL or expiry can prevent collection.
 
 ## See your earnings [#see-earnings]
 

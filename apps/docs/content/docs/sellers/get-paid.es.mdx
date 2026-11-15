@@ -75,23 +75,29 @@ El pagador de comisiones paga:
 
 - una sola vez, unos 0,002 SOL por cada cuenta de token que falte (tu cuenta de pago en USDC y las cuentas
   de la comisión), que el vendedor crea al iniciar;
-- las comisiones de transacción de cada pedido pagado, y adelanta la renta del canal de cada pedido, que se
-  devuelve cuando ese canal se limpia.
+- las comisiones de transacción de cada pedido pagado: unos 0,00002 SOL por pedido con los valores
+  predeterminados (una estimación, no un máximo garantizado);
+- la renta temporal del canal de cada pedido, que se recupera después con una limpieza. Un reinicio puede
+  perder el registro de la renta antigua, así que no se garantiza que vuelva toda automáticamente.
 
-Si tiene poco SOL, el vendedor no inicia (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) o no puede liquidar
-pedidos. Revisa su saldo de vez en cuando y recárgalo desde el faucet.
+0,05 SOL es un saldo inicial, no un presupuesto fijo. Si se acaba, el vendedor no inicia
+(`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) o no puede cobrar. Revisa su saldo con frecuencia y recárgalo desde
+el faucet.
 
 ## Cómo te paga un comprador [#como-funciona-el-pago]
 
 Cada pedido pagado se paga por separado:
 
 1. El comprador firma un máximo para el pedido y lo deposita en un canal de pago.
-2. Tu vendedor responde. El comprador recuenta los tokens que recibió.
+2. Tu vendedor responde y mide el uso para pedir el cobro. El comprador verifica la respuesta que recibió; el
+   pago por pedido no espera una nueva firma del comprador aprobando el uso final.
 3. Tu vendedor liquida ese canal en la cadena: tu parte va al dueño en USDC, el 4 % a Gyblos y lo que sobra del
    depósito vuelve al comprador.
 
-La liquidación ocurre justo después de cada respuesta, así que hay poco que perder si el vendedor se detiene.
-Igual mantenlo en línea: después de un reinicio termina cualquier liquidación que quedó interrumpida.
+Al terminar cada inferencia, el vendedor intenta liquidar lo entregado. La confirmación puede tardar o quedar
+pendiente. Al reiniciar, intenta recuperar los cobros pendientes cuyo importe alcanzó a guardar, sin repetir la
+inferencia ni cobrar dos veces. Conserva sus datos y llaves y mantén saldo en el pagador de comisiones;
+problemas de red, falta de SOL o vencimiento pueden impedir completar el cobro.
 
 ## Mira lo que ganaste [#mira-lo-que-ganaste]
 
