@@ -104,16 +104,18 @@ export const DISCOVERY_INDEX_LIMITS = {
   maxCursorIssuedDigits: 16,
 } as const;
 
-// Cloudflare rate-limit binding names (wrangler.jsonc); keyed by IP(/64) or NodeId, never stored,
+// Cloudflare rate-limit binding names (wrangler.jsonc); keyed by IP(/64), never stored,
 // except READ, keyed by READ_LIMIT_KEY.
 export const DISCOVERY_LIMITERS = {
   IP: 'DISCOVERY_IP_LIMITER',
   PUBLISH: 'DISCOVERY_PUBLISH_LIMITER',
-  NODE: 'DISCOVERY_NODE_LIMITER',
   READ: 'DISCOVERY_READ_LIMITER',
 } as const;
 export type DiscoveryLimiterName =
   (typeof DISCOVERY_LIMITERS)[keyof typeof DISCOVERY_LIMITERS];
+
+// Accepted publications per NodeId and fixed UTC minute, shared atomically in storage.
+export const NODE_PUBLISH_QUOTA = { limit: 10, windowMs: 60_000 } as const;
 
 // Key for the read limiter. Cloudflare counts per location, so this caps storage reads per
 // Cloudflare location, not exactly worldwide.

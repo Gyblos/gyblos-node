@@ -1,11 +1,19 @@
 // Owns the D1 storage port: typed ORM reads, atomic admission batches and runtime row validation.
 // The schema and query builders contain no wallet, request metadata or network initialization.
-import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import {
+  CONTROL_LIMITS,
+  PUBLIC_RECORD_KINDS,
+} from '@gyblos/protocol/constants';
 
-import { INDEX_ERRORS } from './constants';
+import { INDEX_ERRORS, NODE_PUBLISH_QUOTA } from './constants';
 import { createD1Orm, type D1Database, type D1Row } from './d1-client';
 import { indexFail } from './errors';
-import type { DiscoveryStorage, NodeState, SellerRow } from './storage';
+import type {
+  DiscoveryStorage,
+  NodeState,
+  SellerRow,
+  StoredEntry,
+} from './storage';
 import {
   listingQuery,
   modelsQuery,
@@ -56,6 +64,18 @@ function sellerRow(row: D1Row): SellerRow {
     presenceJson: text(row.presenceJson),
   };
 }
+
+function referenceMissing(row: D1Row | undefined, entry: StoredEntry) {
+  return (
+    entry.kind !== PUBLIC_RECORD_KINDS.CATALOG &&
+    (!row ||
+      row.digest !== entry.digest ||
+      integer(row.issuedAt) >
+        entry.admission.now + CONTROL_LIMITS.clockSkewMs ||
+      integer(row.expiresAt) <= entry.admission.now ||
+      integer(row.withdrawn) !== 0)
+  );
+}
 export function createD1Storage(client: D1Database): DiscoveryStorage {
   const database = createD1Orm(client);
   return {
@@ -76,6 +96,15 @@ export function createD1Storage(client: D1Database): DiscoveryStorage {
       const [current] = await nodeStateQuery(database, entry.nodeId);
       if (current && integer(current.lastSequence) >= entry.sequence)
         return false;
+      if (referenceMissing(current, entry))
+        return indexFail(INDEX_ERRORS.UNKNOWN_CATALOG);
+      if (
+        current &&
+        integer(current.publishWindow) >=
+          Math.floor(entry.admission.now / NODE_PUBLISH_QUOTA.windowMs) &&
+        integer(current.publishCount) >= entry.admission.maxPublications
+      )
+        return indexFail(INDEX_ERRORS.RATE_LIMITED);
       return indexFail(
         entry.kind === PUBLIC_RECORD_KINDS.CATALOG
           ? INDEX_ERRORS.RATE_LIMITED

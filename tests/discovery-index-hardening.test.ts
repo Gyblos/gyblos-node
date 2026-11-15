@@ -8,7 +8,6 @@ import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import {
   broken,
   CLIENT_IP,
-  counting,
   deny,
   eachStorage,
   expectError,
@@ -25,7 +24,7 @@ const modelIds = (count: number) =>
   );
 
 eachStorage(
-  'IP, publish and NodeId limits return 429 and fail closed on errors',
+  'IP and publish limits return 429 and fail closed on errors',
   async ({ publish, call }) => {
     const seller = indexNode();
     const catalog = seller.catalog(1);
@@ -53,14 +52,12 @@ eachStorage(
       limiters: {
         [DISCOVERY_LIMITERS.IP]: spy('ip'),
         [DISCOVERY_LIMITERS.PUBLISH]: spy('publish'),
-        [DISCOVERY_LIMITERS.NODE]: spy('node'),
         [DISCOVERY_LIMITERS.READ]: spy('read'),
       },
     });
     assert.deepEqual(keys, [
       ['ip', CLIENT_IP],
       ['publish', CLIENT_IP],
-      ['node', seller.nodeId],
     ]);
     const listed = await call(
       '/v1/sellers?model=qwen3-0.6b',
@@ -75,18 +72,14 @@ eachStorage(
   'replayed stale records never consume the per-NodeId limit',
   async ({ publish }) => {
     const seller = indexNode();
-    const node = counting(10);
-    const limiters = { [DISCOVERY_LIMITERS.NODE]: node.limiter };
     const first = seller.catalog(1);
-    assert.equal((await publish(first, { limiters })).status, 201);
+    assert.equal((await publish(first)).status, 201);
     for (let i = 0; i < 20; i++)
-      await expectError(
-        await publish(first, { limiters }),
-        409,
-        'STALE_RECORD',
-      );
-    assert.equal((await publish(seller.catalog(2), { limiters })).status, 201);
-    assert.equal(node.counts.get(seller.nodeId), 2);
+      await expectError(await publish(first), 409, 'STALE_RECORD');
+    assert.equal((await publish(seller.catalog(2))).status, 201);
+    for (let sequence = 3; sequence <= 10; sequence++)
+      assert.equal((await publish(seller.catalog(sequence))).status, 201);
+    await expectError(await publish(seller.catalog(11)), 429, 'RATE_LIMITED');
   },
 );
 
@@ -94,16 +87,12 @@ eachStorage(
   'unsigned junk never reaches the per-NodeId limit',
   async ({ publish }) => {
     const seller = indexNode();
-    const node = counting(10);
-    const limiters = { [DISCOVERY_LIMITERS.NODE]: node.limiter };
     const forged = indexNode().sign({ ...seller.catalog(1).record });
     for (let i = 0; i < 5; i++)
-      await expectError(
-        await publish(forged, { limiters }),
-        400,
-        'INVALID_SIGNATURE',
-      );
-    assert.equal(node.counts.size, 0);
+      await expectError(await publish(forged), 400, 'INVALID_SIGNATURE');
+    for (let sequence = 1; sequence <= 10; sequence++)
+      assert.equal((await publish(seller.catalog(sequence))).status, 201);
+    await expectError(await publish(seller.catalog(11)), 429, 'RATE_LIMITED');
   },
 );
 

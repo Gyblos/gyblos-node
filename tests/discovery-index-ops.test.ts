@@ -7,6 +7,7 @@ import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
 import {
   DISCOVERY_INDEX_LIMITS,
   DISCOVERY_LIMITERS,
+  NODE_PUBLISH_QUOTA,
   PUBLISH_MODES,
 } from '@gyblos/discovery-index/constants';
 import { ipKey } from '@gyblos/discovery-index/ip-key';
@@ -298,7 +299,11 @@ void test('D1 prune uses indexes only and drops expired rows by key', async (con
     models: string[],
   ) =>
     storage.put({
-      admission: { now: T0, maxNodes: 10_000 },
+      admission: {
+        now: T0,
+        maxNodes: 10_000,
+        maxPublications: NODE_PUBLISH_QUOTA.limit,
+      },
       kind: 'catalog',
       nodeId,
       owner: INDEX_OWNER,

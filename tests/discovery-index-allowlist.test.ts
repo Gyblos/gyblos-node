@@ -140,7 +140,6 @@ eachStorage(
 
 void test('a NodeId outside the allowlist gets 403 before signature, storage or the NodeId limit', async () => {
   const { storage, calls } = countingStorage(createMemoryStorage());
-  const node = counting(100);
   const ip = counting(100);
   const publishLimiter = counting(100);
   const app = createDiscoveryIndex({
@@ -148,7 +147,6 @@ void test('a NodeId outside the allowlist gets 403 before signature, storage or 
     limiters: {
       [DISCOVERY_LIMITERS.IP]: ip.limiter,
       [DISCOVERY_LIMITERS.PUBLISH]: publishLimiter.limiter,
-      [DISCOVERY_LIMITERS.NODE]: node.limiter,
       [DISCOVERY_LIMITERS.READ]: allow,
     },
     now: () => T0 + 1000,
@@ -164,7 +162,6 @@ void test('a NodeId outside the allowlist gets 403 before signature, storage or 
     assert.equal(response.headers.get('cache-control'), 'no-store');
   }
   assert.deepEqual(calls, []);
-  assert.equal(node.counts.size, 0);
   // The per-IP limits still apply first, as for every publish.
   assert.equal(ip.counts.get(CLIENT_IP), 2);
   assert.equal(publishLimiter.counts.get(CLIENT_IP), 2);
@@ -176,7 +173,6 @@ void test('a NodeId outside the allowlist gets 403 before signature, storage or 
   });
   await expectError(await app.fetch(junk), 400, 'INVALID_RECORD');
   assert.deepEqual(calls, []);
-  assert.equal(node.counts.size, 0);
 });
 
 void test('without publishers every publish is 503 while reads keep working', async () => {
