@@ -118,7 +118,7 @@ void test('wizard retries only invalid fields and retains accepted answers', asy
   assert.match(output, /Invalid Maximum output tokens/);
   assert.match(output, /Invalid Maximum spend/);
   assert.match(output, /GYBLOS_RELAYS/);
-  assert.match(output, /GYBLOS_RELAY_TOKEN/);
+  assert.doesNotMatch(output, /GYBLOS_RELAY_TOKEN/);
   assert.doesNotMatch(output, /private-invalid-node/);
 });
 
@@ -173,7 +173,7 @@ void test('existing selection is reported with its path before the wizard asks a
   assert.match(output, /reconfigur|edit/i);
 });
 
-void test('successful setup explains the relay token prerequisite before suggesting chat', async () => {
+void test('successful setup suggests chat without asking for a relay token', async () => {
   let output = '';
   const terminal = {
     preflight: async () => ({
@@ -192,6 +192,6 @@ void test('successful setup explains the relay token prerequisite before suggest
     initialize: async () => {},
   };
   await runBuyerInit(terminal);
-  assert.match(output, /GYBLOS_RELAY_TOKEN/);
+  assert.doesNotMatch(output, /GYBLOS_RELAY_TOKEN/);
   assert.match(output, /buyer:chat/);
 });

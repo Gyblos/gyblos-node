@@ -35,19 +35,26 @@ const SELECTION = {
   ],
 };
 
-function run(script: string, home: string, args: string[] = []) {
+function run(
+  script: string,
+  home: string,
+  args: string[] = [],
+  extra: Record<string, string> = {},
+) {
   return spawnSync(process.execPath, ['--import', 'tsx', script, ...args], {
     cwd: REPOSITORY_ROOT,
     env: {
       PATH: process.env.PATH,
       TMPDIR: process.env.TMPDIR,
       GYBLOS_HOME: home,
+      ...extra,
     },
     encoding: 'utf8',
     timeout: 60_000,
   });
 }
-const start = (home: string) => run('apps/buyer/src/free-main.ts', home);
+const start = (home: string, extra?: Record<string, string>) =>
+  run('apps/buyer/src/free-main.ts', home, [], extra);
 
 void test('buyer:free explains each startup failure without printing the home path', async () => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-free-start-'));
@@ -86,10 +93,12 @@ void test('buyer:free explains each startup failure without printing the home pa
     assert.match(start(home).stderr, /SELECTION_MAX_TOKENS_TOO_HIGH/);
 
     await writeFile(path, JSON.stringify(SELECTION));
-    const noToken = start(home);
-    assert.match(noToken.stderr, /MISSING_RELAY_TOKEN/);
+    // The relay token is optional; one that is set must still be well formed.
+    const badToken = start(home, { GYBLOS_RELAY_TOKEN: 'short' });
+    assert.match(badToken.stderr, /INVALID_RELAY_TOKEN_LENGTH/);
+    assert.equal(badToken.stderr.includes('short'), false);
 
-    for (const result of [noRole, noSelection, noToken])
+    for (const result of [noRole, noSelection, badToken])
       assert.equal(result.stderr.includes(home), false, result.stderr);
   } finally {
     await rm(home, { recursive: true, force: true });

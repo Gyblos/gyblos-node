@@ -49,7 +49,7 @@ void test('on a terminal it registers, then publishes on an empty answer', async
     assert.match(install.file('gyblos.toml'), /^publish = true$/m);
     assert.match(
       result.stdout,
-      /Step 1 of 2: register, with the gyb_ invite code .*not the relay token/,
+      /Step 1 of 2: register, with the gyb_ invite code from your invitation/,
     );
     assert.match(
       result.stdout,

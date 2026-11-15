@@ -26,8 +26,9 @@ selection, identity configuration and public tokenizer for paid execution. Stop
 any other buyer using the same home. In Payments:
 
 1. Choose the **GYBLOS_HOME root**, containing buyer/selection.json.
-2. Enter the relay token in the password field, or provide GYBLOS_RELAY_TOKEN in
-   the app's launch environment.
+2. Optionally, only for a relay that still requires one, enter a relay token in
+   the password field or provide GYBLOS_RELAY_TOKEN in the app's launch
+   environment. The Gyblos relays need no token; leave the field empty.
 3. Start the local buyer. The app uses an ephemeral loopback port and keeps its
    generated bearer credential in the trusted host.
 4. Authorize a Chat budget in the displayed asset. Each request reserves the

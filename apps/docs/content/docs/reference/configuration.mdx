@@ -51,21 +51,21 @@ Schema version **1** requires `version = 1` and `[node] network = "devnet"`. Unk
 The file limit is 64 KiB. Counts must be TOML integers, not floats or quoted numbers. Mainnet is refused
 with `MAINNET_UNSUPPORTED`. The schema accepts more settings than this seller runtime consumes.
 
-| Key                       | Type, default and supported seller behavior                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `node.network`            | Required string `"devnet"`                                                                                                   |
-| `node.data_dir`           | Optional path in the general schema; file-derived value refused by this seller; use `GYBLOS_HOME` for native paths           |
-| `node.rpc_url`            | Optional HTTPS or loopback HTTP URL in schema; file-derived value refused; seller RPC belongs to provisioned role state      |
-| `node.payout_wallet`      | Optional Solana address in schema; file-derived value refused; outside free onboarding                                       |
-| `discovery.publish`       | Boolean; default `false`                                                                                                     |
-| `discovery.url`           | HTTPS or loopback HTTP base URL; default `https://discovery.gyblos.com/v1`                                                   |
-| `relays.urls`             | 1–8 HTTPS origins; default `["https://na1.relay.gyblos.com/"]`; no nonroot path, query, credentials or normalized duplicates |
-| `relays.relay_token_env`  | Environment-variable name; default `"GYBLOS_RELAY_TOKEN"`, never the token value                                             |
-| `transport.relay_only`    | Boolean; default `false`; do not combine with an external address                                                            |
-| `transport.bind`          | Optional literal `ip:port`; IPv6 in brackets; bind port may be zero                                                          |
-| `transport.external_addr` | Optional advertised `ip:port`; port 1–65535; not with relay-only                                                             |
-| `buyer.relay_only`        | Boolean, default `false`; ignored by seller                                                                                  |
-| `telemetry.file`          | Boolean, default `false`; opt-in private local file telemetry, no external collection                                        |
+| Key                       | Type, default and supported seller behavior                                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `node.network`            | Required string `"devnet"`                                                                                                              |
+| `node.data_dir`           | Optional path in the general schema; file-derived value refused by this seller; use `GYBLOS_HOME` for native paths                      |
+| `node.rpc_url`            | Optional HTTPS or loopback HTTP URL in schema; file-derived value refused; seller RPC belongs to provisioned role state                 |
+| `node.payout_wallet`      | Optional Solana address in schema; file-derived value refused; outside free onboarding                                                  |
+| `discovery.publish`       | Boolean; default `false`                                                                                                                |
+| `discovery.url`           | HTTPS or loopback HTTP base URL; default `https://discovery.gyblos.com/v1`                                                              |
+| `relays.urls`             | 1–8 HTTPS origins; default `["https://na1.relay.gyblos.com/"]`; no nonroot path, query, credentials or normalized duplicates            |
+| `relays.relay_token_env`  | Optional environment-variable name; default `"GYBLOS_RELAY_TOKEN"`, never the token value; only for a relay that still requires a token |
+| `transport.relay_only`    | Boolean; default `false`; do not combine with an external address                                                                       |
+| `transport.bind`          | Optional literal `ip:port`; IPv6 in brackets; bind port may be zero                                                                     |
+| `transport.external_addr` | Optional advertised `ip:port`; port 1–65535; not with relay-only                                                                        |
+| `buyer.relay_only`        | Boolean, default `false`; ignored by seller                                                                                             |
+| `telemetry.file`          | Boolean, default `false`; opt-in private local file telemetry, no external collection                                                   |
 
 Keep the Docker image's `/data` home and volume wiring. The native default home is `.local/gyblos`
 relative to the working directory; changing it selects different identity state. Do not use a path change
@@ -135,7 +135,7 @@ environment; setting a variable only in your host shell does not automatically f
 | `GYBLOS_CONFIG`             | Select startup/doctor/init file; validator instead needs `--config`                          |
 | `GYBLOS_HOME`               | Select identity/data home; fixed to `/data` by the supplied image                            |
 | `GYBLOS_RELAYS`             | Comma-separated relay origins                                                                |
-| `GYBLOS_RELAY_TOKEN`        | Default secret relay-token variable; keep in private `seller.env`                            |
+| `GYBLOS_RELAY_TOKEN`        | Optional relay token, only for a relay that still requires one; keep in private `seller.env` |
 | `GYBLOS_RELAY_ONLY`         | `1` enables, `0` disables; other values disable with a warning                               |
 | `GYBLOS_IROH_BIND`          | Override bind address; empty ignored                                                         |
 | `GYBLOS_IROH_EXTERNAL_ADDR` | Override advertised address; empty ignored                                                   |

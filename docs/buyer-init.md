@@ -7,11 +7,12 @@ pnpm buyer:init
 pnpm buyer:chat
 ```
 
-Before starting chat, provide the beta relay token privately through
-`GYBLOS_RELAY_TOKEN` in that process's environment. Setup does not request,
-print or save the token. Never put it in `selection.json`, a shared shell
-command or a terminal recording. A missing or invalid token produces a static
-startup diagnostic naming the relay settings to check.
+The Gyblos relays admit every client, so chat needs no relay token.
+`GYBLOS_RELAY_TOKEN` is optional: set it privately in that process's environment
+only for a relay that still requires one. Setup does not request, print or save
+it. Never put it in `selection.json`, a shared shell command or a terminal
+recording. A malformed token produces a static startup diagnostic naming the
+relay settings to check.
 
 `buyer:init` needs an interactive terminal. `pnpm buyer:init --help` works
 without one. It prepares local configuration only: it makes no discovery or RPC

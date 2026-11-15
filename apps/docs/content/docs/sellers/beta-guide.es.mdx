@@ -4,12 +4,12 @@ description: Instala tu primer vendedor gratuito de Docker, compruébalo y conti
 ---
 
 Usa esta guía después de revisar los [requisitos de la beta](/es/getting-started/beta).
-Mantén privados el token de relay y el código de invitación. Descargar las imágenes y el modelo ocupa
+Mantén privado el código de invitación. Descargar las imágenes y el modelo ocupa
 la mayor parte de la instalación; el tiempo depende de tu conexión y equipo.
 
 ## Antes de empezar
 
-Necesitas una invitación con `install.sh` y un token privado de relay, Linux, macOS o Windows (ver [Windows](#windows)),
+Necesitas una invitación con su código `gyb_` (sin token de relay), Linux, macOS o Windows (ver [Windows](#windows)),
 Docker con Compose v2.17 o posterior, al menos 4 GB de memoria e internet saliente.
 Revisa los [requisitos completos](/es/getting-started/beta), incluido el margen de memoria, antes de instalar.
 
@@ -28,7 +28,7 @@ El instalador fija una versión firmada de la imagen del vendedor por versión y
 Para que la comprobación sea obligatoria, ejecuta `GYBLOS_REQUIRE_SIGNATURE=1 sh install.sh`: se detiene si la firma no se verifica.
 Para verificar la imagen tú mismo o preparar cada archivo a mano, consulta [Instala sin el script](/es/sellers/manual-install).
 
-El token de relay permanece oculto mientras lo introduces. El script trabaja en `~/gyblos-seller`, salvo
+El script no pide token de relay. Trabaja en `~/gyblos-seller`, salvo
 que hayas elegido otro directorio. Crea `compose.yaml`, `gyblos.toml` y el archivo privado `seller.env`,
 descarga Ollama y `qwen3:0.6b`, crea las llaves en un volumen de Docker, instala el tokenizador,
 ejecuta `gyblos doctor` e inicia el vendedor.
@@ -75,7 +75,7 @@ es distinto de la inscripción en cadena que comprueba el índice.
 
 Si la instalación se detiene, lee la línea `FAIL` o `gyblos install:` y consulta
 [solución de problemas](/es/help/troubleshooting). Corrige la causa antes de repetir el script.
-Volver a ejecutarlo conserva la configuración, el archivo del token y la identidad; no restablece esos archivos.
+Volver a ejecutarlo conserva la configuración, `seller.env` y la identidad; no restablece esos archivos.
 
 ## Comprueba el estado [#confirma-el-estado-del-servicio]
 

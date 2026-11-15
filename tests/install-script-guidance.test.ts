@@ -38,7 +38,7 @@ void test('after installing it prints the steps to start selling, with the owner
     assert.match(steps, /https:\/\/faucet\.solana\.com, choose devnet/);
     assert.match(
       steps,
-      /2\. Register with the gyb_ invite code .*not the relay token/,
+      /2\. Register with the gyb_ invite code from your invitation/,
     );
     assert.ok(
       steps.includes(

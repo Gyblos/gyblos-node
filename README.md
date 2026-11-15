@@ -108,7 +108,6 @@ Each role keeps its own directory under one local home (`.local/gyblos/`).
 Seller:
 
 ```sh
-export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
 pnpm node:setup --role seller --mint MINT   # free selling needs no payout or buyer address
 pnpm node:tokenizer             # pinned tokenizer, for offers whose usage the seller recounts
 # run your own engine (a dedicated Ollama, or an OpenAI- or Anthropic-compatible API; see the full steps)
@@ -117,10 +116,10 @@ pnpm gyblos doctor              # read-only preflight; prints the public NodeId 
 pnpm node:start
 ```
 
-Buyer: with the same relay token, run `pnpm buyer:init` for guided local
-identity and selection settings, then `pnpm buyer:chat`. Defaults accept free
-quotes without payment transactions; spending and price ceilings are explicit.
-See [guided buyer setup](docs/buyer-init.md). The legacy paid v1 entry remains
+Buyer: run `pnpm buyer:init` for guided local identity and selection settings,
+then `pnpm buyer:chat`. Defaults accept free quotes without payment
+transactions; spending and price ceilings are explicit. See
+[guided buyer setup](docs/buyer-init.md). The legacy paid v1 entry remains
 separate. Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 With Docker instead: `compose.yaml` runs a seller with its own Ollama
@@ -164,21 +163,21 @@ the published image without a checkout
 Set these in the environment; `.env` is **not** loaded
 ([.env.example](.env.example)).
 
-| Variable                                        | Used by       | Meaning                                                    |
-| ----------------------------------------------- | ------------- | ---------------------------------------------------------- |
-| `GYBLOS_RELAY_TOKEN`                            | seller, buyer | **Required.** Relay credential, 32-512 characters.         |
-| `GYBLOS_RELAYS`                                 | seller, buyer | Comma-separated relay URLs; default `na1` only.            |
-| `GYBLOS_RELAY_ONLY`                             | seller        | `1` = relay only; advertise no direct addresses.           |
-| `GYBLOS_BUYER_RELAY_ONLY`                       | buyer         | `1` = loopback binds; dial the seller only via its relay.  |
-| `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.       |
-| `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.       |
-| `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.       |
-| `GYBLOS_HOME`                                   | all           | Local home; default `.local/gyblos`. Lab: artifacts/ only. |
-| `GYBLOS_LAB_HOME`                               | lab           | Lab home; default `.local/lab`.                            |
-| `GYBLOS_GATE_CONFIG`                            | lab           | Lab config file; default `.local/lab/config.json`.         |
-| `GYBLOS_P2P_RUN_ID`                             | seller, buyer | Optional label copied into `status.json` and evidence.     |
-| `GYBLOS_GATE_RUN_ID`                            | lab           | Run label set by `gate:run`/`gate:inference` for children. |
-| `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.           |
+| Variable                                        | Used by       | Meaning                                                                                          |
+| ----------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------ |
+| `GYBLOS_RELAY_TOKEN`                            | seller, buyer | Optional. Only for a relay that still requires a credential; 32-512 characters; never commit it. |
+| `GYBLOS_RELAYS`                                 | seller, buyer | Comma-separated relay URLs; default `na1` only.                                                  |
+| `GYBLOS_RELAY_ONLY`                             | seller        | `1` = relay only; advertise no direct addresses.                                                 |
+| `GYBLOS_BUYER_RELAY_ONLY`                       | buyer         | `1` = loopback binds; dial the seller only via its relay.                                        |
+| `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.                                             |
+| `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.                                             |
+| `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.                                             |
+| `GYBLOS_HOME`                                   | all           | Local home; default `.local/gyblos`. Lab: artifacts/ only.                                       |
+| `GYBLOS_LAB_HOME`                               | lab           | Lab home; default `.local/lab`.                                                                  |
+| `GYBLOS_GATE_CONFIG`                            | lab           | Lab config file; default `.local/lab/config.json`.                                               |
+| `GYBLOS_P2P_RUN_ID`                             | seller, buyer | Optional label copied into `status.json` and evidence.                                           |
+| `GYBLOS_GATE_RUN_ID`                            | lab           | Run label set by `gate:run`/`gate:inference` for children.                                       |
+| `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.                                                 |
 
 Keep a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME` outside the repository or under
 `.local/`, the only ignored local path.

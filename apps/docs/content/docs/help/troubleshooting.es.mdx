@@ -47,12 +47,12 @@ comprueba primero Ollama. Usa `--online` solo cuando quieras añadir consultas r
 
 ### Instalador
 
-| Síntoma o salida exacta                                       | Solución                                                                                                                                                                                  |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `The relay token is empty` o `must have 32 to 512 characters` | Copia el token de la invitación sin texto adicional. No lo muestres ni lo pegues en el chat de soporte.                                                                                   |
-| `That is the gyb_ invite code, not the relay token`           | Introdujiste el código de invitación. Repite `sh install.sh` con el token de relay de la invitación; usa el código `gyb_` después en [Registra y publica](/es/sellers/register-publish).  |
-| El instalador se detiene con `gyblos install:` o `FAIL`       | Corrige la causa indicada y repite `sh install.sh` donde lo guardaste. Se conservan archivos e identidad existentes.                                                                      |
-| `The image signature did not verify`                          | No ejecutes esa imagen ni te saltes la comprobación. Descarga de nuevo el instalador desde `https://gyblos.com/install.sh` e informa la línea de la imagen por el canal de tu invitación. |
+| Síntoma o salida exacta                                                                    | Solución                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GYBLOS_RELAY_TOKEN has characters…` o `GYBLOS_RELAY_TOKEN must have 32 to 512 characters` | El token de relay opcional que definiste tiene un formato incorrecto. Los relays de Gyblos no lo necesitan: quita `GYBLOS_RELAY_TOKEN` y repite `sh install.sh`. No lo muestres ni lo pegues en el chat de soporte. |
+| `GYBLOS_RELAY_TOKEN holds the gyb_ invite code`                                            | Quita `GYBLOS_RELAY_TOKEN` y repite `sh install.sh`; introduce el código de invitación después con `gyblos seller register` ([Registra y publica](/es/sellers/register-publish)).                                   |
+| El instalador se detiene con `gyblos install:` o `FAIL`                                    | Corrige la causa indicada y repite `sh install.sh` donde lo guardaste. Se conservan archivos e identidad existentes.                                                                                                |
+| `The image signature did not verify`                                                       | No ejecutes esa imagen ni te saltes la comprobación. Descarga de nuevo el instalador desde `https://gyblos.com/install.sh` e informa la línea de la imagen por el canal de tu invitación.                           |
 
 ## Configuración [#configuración-rechazada]
 
@@ -64,19 +64,19 @@ docker compose run --rm seller gyblos config validate --config /config/gyblos.to
 Usa la ruta de clave indicada, como `offers[0].free.per_buyer_cap`. Tras `OK`, ejecuta doctor si el inicio
 sigue rechazando el archivo. Consulta intervalos y valores en la [referencia de configuración](/es/reference/configuration).
 
-| Código / síntoma                                                                                          | Solución                                                                                                                                                                  |
-| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FILE_NOT_FOUND` al validar                                                                               | Usa la ruta explícita del contenedor indicada arriba. El validador ignora `GYBLOS_CONFIG` al seleccionar el archivo.                                                      |
-| `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`                                                                | Corrige sintaxis, quita claves desconocidas o usa el tipo requerido. No dupliques `[discovery]` ni la oferta del mismo modelo.                                            |
-| `INVALID_CAP`                                                                                             | Usa enteros positivos; la cuota por comprador no puede superar la total diaria.                                                                                           |
-| `INVALID_LIMIT`                                                                                           | Respeta cada intervalo de capacidad y la restricción conexiones × tasa por comprador.                                                                                     |
-| `INLINE_SECRET`                                                                                           | Quita la credencial de TOML; usa nombre de variable y archivo privado de entorno. Rota una credencial expuesta mediante su emisor.                                        |
-| `RELAY_ONLY_CONFLICT`                                                                                     | Quita la dirección externa o desactiva relay-only; considera también las variables que prevalecen sobre el archivo.                                                       |
-| `SELLER_SETTING_UNSUPPORTED`                                                                              | Quita `node.data_dir`, `node.rpc_url` o `node.payout_wallet` procedentes del archivo; este vendedor usa el aprovisionamiento de datos/rol existente.                      |
-| `SELLER_OFFERS_MISSING`                                                                                   | Recupera al menos una oferta admitida. Una lista vacía válida para el esquema no puede servir.                                                                            |
-| `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` | Vuelve a la oferta local admitida de Qwen3 con razonamiento `off` o revisa las restricciones antes de usar un motor avanzado.                                             |
-| `SELLER_OFFER_API_KEY_MISSING`, `SELLER_OFFER_API_KEY_UNSAFE`                                             | Los proveedores avanzados necesitan la variable correcta no vacía dentro del contenedor; usa un nombre distinto que no empiece por `GYBLOS_` ni nombre el token de relay. |
-| `MAINNET_UNSUPPORTED`, `SELLER_PAYMENT_ROLE_MISSING`                                                      | Mantén devnet y una oferta gratuita en esta instalación; pagos/mainnet no forman parte de este inicio.                                                                    |
+| Código / síntoma                                                                                          | Solución                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FILE_NOT_FOUND` al validar                                                                               | Usa la ruta explícita del contenedor indicada arriba. El validador ignora `GYBLOS_CONFIG` al seleccionar el archivo.                                                               |
+| `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`                                                                | Corrige sintaxis, quita claves desconocidas o usa el tipo requerido. No dupliques `[discovery]` ni la oferta del mismo modelo.                                                     |
+| `INVALID_CAP`                                                                                             | Usa enteros positivos; la cuota por comprador no puede superar la total diaria.                                                                                                    |
+| `INVALID_LIMIT`                                                                                           | Respeta cada intervalo de capacidad y la restricción conexiones × tasa por comprador.                                                                                              |
+| `INLINE_SECRET`                                                                                           | Quita la credencial de TOML; usa nombre de variable y archivo privado de entorno. Rota una credencial expuesta mediante su emisor.                                                 |
+| `RELAY_ONLY_CONFLICT`                                                                                     | Quita la dirección externa o desactiva relay-only; considera también las variables que prevalecen sobre el archivo.                                                                |
+| `SELLER_SETTING_UNSUPPORTED`                                                                              | Quita `node.data_dir`, `node.rpc_url` o `node.payout_wallet` procedentes del archivo; este vendedor usa el aprovisionamiento de datos/rol existente.                               |
+| `SELLER_OFFERS_MISSING`                                                                                   | Recupera al menos una oferta admitida. Una lista vacía válida para el esquema no puede servir.                                                                                     |
+| `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` | Vuelve a la oferta local admitida de Qwen3 con razonamiento `off` o revisa las restricciones antes de usar un motor avanzado.                                                      |
+| `SELLER_OFFER_API_KEY_MISSING`, `SELLER_OFFER_API_KEY_UNSAFE`                                             | Los proveedores avanzados necesitan la variable correcta no vacía dentro del contenedor; usa un nombre distinto que no empiece por `GYBLOS_` ni nombre el token de relay opcional. |
+| `MAINNET_UNSUPPORTED`, `SELLER_PAYMENT_ROLE_MISSING`                                                      | Mantén devnet y una oferta gratuita en esta instalación; pagos/mainnet no forman parte de este inicio.                                                                             |
 
 ## Conexión [#motor-o-relay-no-disponible]
 
@@ -89,13 +89,14 @@ sigue rechazando el archivo. Consulta intervalos y valores en la [referencia de 
 
 ### Relay
 
-| Código / síntoma       | Solución                                                                                                             |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `SELLER_RELAY_OFFLINE` | Comprueba internet saliente y el token de la invitación. Significa que ningún relay respondió en el plazo de inicio. |
-| `CLOCK_SKEWED`         | Activa sincronización horaria automática en el anfitrión; los registros fechados en el futuro pueden rechazarse.     |
+| Código / síntoma       | Solución                                                                                                         |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `SELLER_RELAY_OFFLINE` | Ningún relay de Gyblos respondió en el plazo de inicio. Comprueba el acceso a internet (HTTPS y UDP 7842).       |
+| `CLOCK_SKEWED`         | Activa sincronización horaria automática en el anfitrión; los registros fechados en el futuro pueden rechazarse. |
 
-Si solo necesitas reemplazar el token de relay, detén el vendedor, abre `seller.env` en un editor local
-privado y cambia solo el valor del token por el correcto de tu invitación. Conserva las credenciales de proveedores.
+Los relays de Gyblos no necesitan token de relay. Si un `seller.env` antiguo todavía define `GYBLOS_RELAY_TOKEN`
+y el inicio informa `INVALID_RELAY_TOKEN` o `INVALID_RELAY_TOKEN_LENGTH`, detén el vendedor, abre `seller.env` en un
+editor local privado y borra solo esa línea. Conserva las credenciales de proveedores.
 Recrea con `docker compose up -d --force-recreate seller` para cargar el entorno cambiado. Nunca muestres
 el archivo, pongas su contenido en una línea de comando ni borres el volumen de datos.
 

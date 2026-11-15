@@ -23,7 +23,7 @@ import {
 } from './support/status-fixture';
 
 const CONTAINER = { GYBLOS_CONTAINER: '1' };
-const RELAY_HINT = /relay token from your invitation/;
+const RELAY_HINT = /can reach the internet/;
 
 const running = (home: Home) =>
   system(home, { daemonInContainer: async () => true });

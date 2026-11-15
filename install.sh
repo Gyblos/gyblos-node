@@ -15,7 +15,7 @@
 #   GYBLOS_DIR          Docker: where compose.yaml, gyblos.toml and seller.env go (default: ~/gyblos-seller)
 #   GYBLOS_HOME         native: the seller's home, with gyblos.toml and seller.env (default: ~/.gyblos)
 #   GYBLOS_IMAGE        node image (default: the release pinned below, by version and digest)
-#   GYBLOS_RELAY_TOKEN  the relay token; asked for without echo when unset
+#   GYBLOS_RELAY_TOKEN  optional; only for a relay that still requires a token
 #   GYBLOS_REQUIRE_SIGNATURE=1  stop unless cosign verifies the seller image as a Gyblos release
 #   GYBLOS_GUIDED=0     only print the steps to start selling; never ask to register or publish
 #
@@ -23,7 +23,7 @@
 # which moves to this script's release: rerunning resumes a failed install, updates the seller and
 # restarts it with the current gyblos.toml. With cosign installed, a Gyblos image must carry the release
 # signature of the release workflow (docs/running-a-node.md#image-signature).
-# The relay token is written only to seller.env (mode 0600) and never printed.
+# An optional relay token is written only to seller.env (mode 0600) and never printed.
 set -eu
 # Byte-wise character classes: [:graph:] is then exactly the printable ASCII seller.env accepts.
 LC_ALL=C
@@ -319,7 +319,8 @@ TOML
   say "Wrote $dir/gyblos.toml"
 }
 
-# The relay token goes straight from the prompt or the environment into seller.env.
+# seller.env holds private variables for the seller (API keys, NAME=value per line). The Gyblos relays need
+# no token; GYBLOS_RELAY_TOKEN, when set, is kept for a relay that still requires one.
 write_environment() {
   refuse_symlink seller.env
   if [ -e seller.env ]; then
@@ -328,31 +329,23 @@ write_environment() {
   fi
   token=${GYBLOS_RELAY_TOKEN:-}
   if [ -z "$token" ]; then
-    # Opening it, not testing its mode: /dev/tty exists even without a controlling terminal.
-    (exec </dev/tty) 2>/dev/null ||
-      die 'No terminal to ask for the relay token: set GYBLOS_RELAY_TOKEN.'
-    printf '%s\n' 'The relay token is the private key to the Gyblos relay. It is not the gyb_ invite code,' \
-      'which you enter later with `gyblos seller register`.' >/dev/tty
-    printf 'Relay token (not shown): ' >/dev/tty
-    prompting=1
-    stty -echo </dev/tty
-    IFS= read -r token </dev/tty || token=
-    stty echo </dev/tty
-    prompting=
-    printf '\n' >/dev/tty
+    printf '%s\n' '# Private seller variables (API keys), NAME=value per line. Keep this file private.' |
+      install_file seller.env 600
+    say "Wrote $dir/seller.env (mode 0600)"
+    return
   fi
-  # An invite code here would install a seller that cannot reach the relay.
+  # An invite code here would be sent to the relay instead of being registered.
   case "$token" in
-    gyb_*) die 'That is the gyb_ invite code, not the relay token. Enter the invite code later with `gyblos seller register`; rerun this with the relay token.' ;;
+    gyb_*) die 'GYBLOS_RELAY_TOKEN holds the gyb_ invite code. Unset it; enter the invite code later with `gyblos seller register`.' ;;
   esac
   # seller.env's grammar (`gyblos seller service install` reads it too): printable, no shell characters.
   case "$token" in
-    '' | *[![:graph:]]* | *[\"\'\`\$\\\#\;\|\<\>\&\(\)\{\}~]*)
-      die 'The relay token is empty or has characters a relay token never has.'
+    *[![:graph:]]* | *[\"\'\`\$\\\#\;\|\<\>\&\(\)\{\}~]*)
+      die 'GYBLOS_RELAY_TOKEN has characters a relay token never has.'
       ;;
   esac
   [ "${#token}" -ge "$RELAY_TOKEN_MIN" ] && [ "${#token}" -le "$RELAY_TOKEN_MAX" ] ||
-    die "The relay token must have $RELAY_TOKEN_MIN to $RELAY_TOKEN_MAX characters."
+    die "GYBLOS_RELAY_TOKEN must have $RELAY_TOKEN_MIN to $RELAY_TOKEN_MAX characters."
   # printf is a shell builtin: the token never appears in a process's arguments.
   printf 'GYBLOS_RELAY_TOKEN=%s\n' "$token" | install_file seller.env 600
   token=
@@ -416,7 +409,7 @@ next_steps() {
   say 'Next steps, to start selling:'
   say "  1. Send about 0.02 devnet SOL to the seller's owner${owner:+ $owner}"
   say '     (https://faucet.solana.com, choose devnet). It pays the one-time registration, about 0.01 SOL.'
-  say '  2. Register with the gyb_ invite code from your invitation (asked for, not the relay token):'
+  say '  2. Register with the gyb_ invite code from your invitation (asked for):'
   say "       $(seller_typed 'seller register')"
   say '  3. Publish to the discovery index:'
   say "       $(publish_command publish)"
@@ -443,7 +436,7 @@ guided_setup() {
   say 'Next: register this seller and publish it, so buyers can find it.'
   say 'Each step asks before it does anything. Press Ctrl+C at any time; run this script again to continue.'
   say ''
-  say 'Step 1 of 2: register, with the gyb_ invite code from your invitation (not the relay token).'
+  say 'Step 1 of 2: register, with the gyb_ invite code from your invitation.'
   say "  The owner${owner:+ $owner} pays about 0.01 devnet SOL once; registration waits for it if needed."
   if ! seller_cli seller register <"$terminal"; then
     say ''

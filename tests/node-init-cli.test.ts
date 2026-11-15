@@ -37,10 +37,7 @@ void test('seller init: without a terminal it writes the default free Ollama off
       result.stdout,
       /OLLAMA_HOST=127\.0\.0\.1:11435 ollama pull qwen3:0\.6b/,
     );
-    assert.match(
-      result.stdout,
-      /GYBLOS_RELAY_TOKEN=<your token> in seller\.env/,
-    );
+    assert.doesNotMatch(result.stdout, /GYBLOS_RELAY_TOKEN/);
     assert.match(result.stdout, /`pnpm gyblos doctor`/);
   }));
 

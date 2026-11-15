@@ -62,7 +62,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
   [FREE_BUYER_STARTUP.UNKNOWN]: 'unexpected startup failure',
 };
 const RELAY_HINT =
-  'check GYBLOS_RELAY_TOKEN and GYBLOS_RELAYS (docs/running-a-node.md "Relays")';
+  'check GYBLOS_RELAYS and, if set, GYBLOS_RELAY_TOKEN (docs/running-a-node.md "Relays")';
 
 export function startupReason(
   error: unknown,

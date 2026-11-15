@@ -152,7 +152,6 @@ after the upgrade is not supported.
 ## Seller
 
 ```sh
-export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
 pnpm node:setup --role seller --mint MINT
 pnpm node:tokenizer              # pinned tokenizer; doctor reports NOT_NEEDED when every offer's usage is declared
 # A dedicated Ollama, used only for selling, on loopback; leave it running in its own terminal:
@@ -174,9 +173,10 @@ pnpm node:start
   path), replaces an existing file only with `--force`, never writes through a
   symlink, and writes nothing when the file format or startup's offer rules
   would refuse the values (for Ollama, only the pinned `qwen3:0.6b` at a literal
-  loopback address). It handles no secret: API keys and the relay token stay in
-  the environment or `seller.env`, and it prints only their variable names.
-  `examples/seller-daemon.toml` is an equivalent file to copy instead.
+  loopback address). It handles no secret: API keys (and the optional relay
+  token) stay in the environment or `seller.env`, and it prints only their
+  variable names. `examples/seller-daemon.toml` is an equivalent file to copy
+  instead.
 - The seller serves configured free and paid offers in `gyblos.toml`; it needs
   at least one offer to start (`SELLER_OFFERS_MISSING`). A paid offer
   (`price = {...}` instead of `free`) is sold on devnet over the paid stream.
@@ -224,7 +224,7 @@ and restart with the machine. Run these as the account that owns the seller home
 and keys, never as root:
 
 ```sh
-(umask 077; printf 'GYBLOS_RELAY_TOKEN=%s\n' "$GYBLOS_RELAY_TOKEN" > "${GYBLOS_HOME:-.local/gyblos}/seller.env")
+# Only if an offer has an api_key_env: put NAME=value lines in <home>/seller.env (mode 0600).
 pnpm gyblos seller service install --dry-run   # prints the unit; changes nothing
 pnpm gyblos seller service install             # writes and starts it
 pnpm gyblos seller service uninstall           # stops and removes it
@@ -233,16 +233,17 @@ pnpm gyblos seller service uninstall           # stops and removes it
 - The service sees only `<home>/seller.env`, plus `GYBLOS_HOME` and
   `GYBLOS_CONFIG` resolved to absolute paths from the directory where you run
   `install`. Install first runs the offline doctor with exactly that environment
-  and writes nothing when it is not `READY`, so a token exported only in your
+  and writes nothing when it is not `READY`, so an API key exported only in your
   shell is reported as missing.
-- `seller.env` holds the relay token and any `api_key_env` variables: a regular
-  file you own, mode 0600, not a symlink. Each line is `NAME=value` with no
-  spaces, quotes, `$`, backticks, backslashes, `#`, `~` or shell operators in
-  the value, because systemd and the macOS agent read only that form alike. It
-  may not set `GYBLOS_HOME`, `GYBLOS_CONFIG`, `PATH`, `HOME`, shell variables
-  (`UID`, `IFS`, `BASH*` and the like) or `NODE_*`, `LD_*`, `DYLD_*`, `TSX_*`,
-  `OPENSSL_*` variables, and no line, comment included, may contain a backslash
-  or carriage return.
+- `seller.env` holds any `api_key_env` variables and, only for a relay that
+  still requires one, the optional `GYBLOS_RELAY_TOKEN`. It is optional; when
+  present it must be a regular file you own, mode 0600, not a symlink. Each line
+  is `NAME=value` with no spaces, quotes, `$`, backticks, backslashes, `#`, `~`
+  or shell operators in the value, because systemd and the macOS agent read only
+  that form alike. It may not set `GYBLOS_HOME`, `GYBLOS_CONFIG`, `PATH`,
+  `HOME`, shell variables (`UID`, `IFS`, `BASH*` and the like) or `NODE_*`,
+  `LD_*`, `DYLD_*`, `TSX_*`, `OPENSSL_*` variables, and no line, comment
+  included, may contain a backslash or carriage return.
 - Linux: a systemd user unit (`~/.config/systemd/user/gyblos-seller.service`).
   It stops when you log out and does not start at boot unless lingering is on
   (`sudo loginctl enable-linger <account>`, once). On a server where the seller
@@ -368,9 +369,9 @@ It prints the NodeId and owner, then:
 `STARTING`, `FAILING`, `STOPPED` and `NOT_CONFIRMED` (no service to confirm the
 process) exit 1. `FAILING` means the last start failed, including while the
 service restarts after it; status then names the phase, the static code and a
-hint, such as `SELLER_RELAY_OFFLINE` when no relay answered (a refused relay
-token or no network). It writes nothing and prints no buyer, prompt, key or home
-location.
+hint, such as `SELLER_RELAY_OFFLINE` when no Gyblos relay answered (check
+internet access: HTTPS and UDP 7842). It writes nothing and prints no buyer,
+prompt, key or home location.
 
 ### Docker
 
@@ -380,7 +381,7 @@ connects outbound.
 
 ```sh
 cp examples/seller-docker.toml gyblos.toml        # one free offer; edit the caps
-(umask 077; printf 'GYBLOS_RELAY_TOKEN=%s\n' "$GYBLOS_RELAY_TOKEN" > seller.env)
+(umask 077; touch seller.env)                     # API keys only if needed; keep it private
 docker compose up -d ollama
 docker compose exec ollama ollama pull qwen3:0.6b # `ollama list` must show 7df6b6e09427
 docker compose run --rm seller setup --role seller --mint MINT
@@ -400,8 +401,9 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 - Keys, journals, the public sequence and the tokenizer live in the `gyblos`
   volume (`/data`, mode 0700). `gyblos.toml` is mounted read-only at
   `/config/gyblos.toml` and must exist before the first `up` (compose refuses to
-  create it). `seller.env` holds the relay token and any `api_key_env` variables
-  (it is in `.gitignore`; keep it mode 0600).
+  create it). `seller.env` holds any `api_key_env` variables and the optional
+  `GYBLOS_RELAY_TOKEN`; it may be empty (it is in `.gitignore`; keep it mode
+  0600).
 - The Ollama engine accepts only a literal loopback URL, so the seller shares
   the Ollama container's network namespace (`network_mode: service:ollama`):
   Ollama listens on `127.0.0.1:11434` there and the example's offer points to
@@ -477,9 +479,12 @@ sh install.sh
   (`ghcr.io/gyblos/seller:<version>@sha256:<digest>`). The release workflow
   below sets it in the copy it attaches to each release; the copy in this
   repository keeps an earlier pin. `GYBLOS_IMAGE` overrides it.
-- The relay token is read without echo, or from `GYBLOS_RELAY_TOKEN`, and is
-  written only to `seller.env` (mode 0600), never printed. Without a terminal
-  (for example `ssh host sh install.sh`), set `GYBLOS_RELAY_TOKEN`.
+- It asks for no relay token: the Gyblos relays admit every client. It always
+  writes `seller.env` (mode 0600); without `GYBLOS_RELAY_TOKEN` that file holds
+  only a comment. A `GYBLOS_RELAY_TOKEN` that is set (only for a relay that
+  still requires one) is validated and written only to `seller.env`, never
+  printed. A `gyb_` invite code in `GYBLOS_RELAY_TOKEN` stops it: unset it and
+  enter the invite code later with `gyblos seller register`.
 - Rerunning it resumes a failed install and updates the seller: `gyblos.toml`,
   `seller.env` and `compose.yaml` are kept, except that a seller `image:` from
   `ghcr.io/gyblos/seller` moves to the installer's release. Any other image is
@@ -701,7 +706,6 @@ within the `selection.json` ceilings
 against the lab gates (`gate:*`).
 
 ```sh
-export GYBLOS_RELAY_TOKEN=...
 pnpm node:setup --role buyer --mint MINT
 pnpm node:tokenizer          # download and verify only the pinned tokenizer (`buyer:setup` is the same)
 # copy the seller's .local/gyblos/seller/offer.json into .local/gyblos/buyer/
@@ -776,10 +780,16 @@ and share endpoint admission before their separate control quotas. See
 
 - Default relay: `https://na1.relay.gyblos.com/` (QUIC address discovery on UDP
   7842). Public n0 relays are not used as a fallback.
-- `GYBLOS_RELAY_TOKEN` is required by both roles. There is no built-in token; a
-  missing or invalid token stops endpoint binding. It is sent only to the owned
-  hosts `na1.relay.gyblos.com` and `na2.relay.gyblos.com`. Never put it in a
-  relay URL, an offer, a config file or a committed env file.
+- The Gyblos relays run in open mode: they admit every client, bounded by
+  per-client rate limits (about 500 kB/s). Neither role needs a relay token.
+  Admission by registered NodeId is planned
+  ([#236](https://github.com/Gyblos/gyblos-node/issues/236)).
+- `GYBLOS_RELAY_TOKEN` is optional, only for a relay that still requires one
+  (`relays.relay_token_env` names a different variable). When set, it must be
+  32-512 printable characters without spaces, or endpoint binding stops. It is
+  sent only to the owned hosts `na1.relay.gyblos.com` and
+  `na2.relay.gyblos.com`. Never put it in a relay URL, an offer, a config file
+  or a committed env file, and never print it.
 - `GYBLOS_RELAYS` overrides the relay list (comma-separated HTTPS origins). Both
   roles must use the same list. The buyer accepts an offer's relay only if it is
   in that list. To add `na2` once it exists:
@@ -1075,7 +1085,7 @@ reason and a next step, for example `BUYER_ROLE_MISSING` (run `node:setup`),
 `selection.json` in the buyer home), `SELECTION_STATS_INVALID`,
 `DISCOVERY_STATE_UNAVAILABLE` or `IDENTITY_STATE_UNAVAILABLE` (a state file
 beside it), `SELECTION_MAX_TOKENS_TOO_HIGH`, `SELECTION_REASONING_UNSUPPORTED`,
-`BUYER_NODE_KEY_MISMATCH`, a relay code such as `MISSING_RELAY_TOKEN`, or
+`BUYER_NODE_KEY_MISMATCH`, a relay code such as `INVALID_RELAY_TOKEN_LENGTH`, or
 `BUYER_PORT_IN_USE`. No path or file content is printed.
 
 The endpoint speaks two chat formats over the same execution, so OpenAI- and

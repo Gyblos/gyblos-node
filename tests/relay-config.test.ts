@@ -142,13 +142,20 @@ void test(
 );
 
 void test(
-  'missing relay token stops binding without any built-in token or n0 fallback',
+  'without a relay token the Gyblos relays are used with no credential and no n0 fallback',
   OPTIONS,
   () => {
-    const result = endpointProbe();
-    assert.equal(result.error?.code, RELAY_CONFIGURATION_CODES.MISSING_TOKEN);
-    assert.match(result.error?.message ?? '', /GYBLOS_RELAY_TOKEN/);
-    assert.ok(!result.events.includes('bind'));
+    for (const environment of [{}, { GYBLOS_RELAY_TOKEN: '' }] as Record<
+      string,
+      string
+    >[]) {
+      const result = endpointProbe(environment);
+      assert.equal(result.error, undefined);
+      assert.deepEqual(result.relays, [
+        { url: OWNED_RELAY, quicPort: 7842, token: 'absent' },
+      ]);
+      assert.ok(result.events.includes('bind'));
+    }
   },
 );
 
@@ -182,15 +189,10 @@ void test(
   'invalid relay tokens fail closed without reflecting their value',
   OPTIONS,
   () => {
-    for (const value of ['', '   ', `${TOKEN}\r\nheader: value`]) {
+    for (const value of ['   ', `${TOKEN}\r\nheader: value`]) {
       const result = endpointProbe({ GYBLOS_RELAY_TOKEN: value });
       assert.ok(result.error);
-      assert.equal(
-        result.error.code,
-        value
-          ? RELAY_CONFIGURATION_CODES.INVALID_TOKEN
-          : RELAY_CONFIGURATION_CODES.MISSING_TOKEN,
-      );
+      assert.equal(result.error.code, RELAY_CONFIGURATION_CODES.INVALID_TOKEN);
       assert.ok(!result.error.message.includes('PRIVATE_SENTINEL'));
       assert.ok(!result.events.includes('bind'));
     }
