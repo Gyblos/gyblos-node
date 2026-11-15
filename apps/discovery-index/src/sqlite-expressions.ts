@@ -1,6 +1,6 @@
 // Contains SQLite expressions that Drizzle 0.45 cannot build, plus typed projection bindings.
 // No complete query or external SQL text is accepted; every dynamic value stays parameterized.
-import { eq, isNull, or, sql, type GetColumnData } from 'drizzle-orm';
+import { eq, isNull, or, sql, type GetColumnData, type SQL } from 'drizzle-orm';
 import type { AnySQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 import type { DiscoveryListingIndex } from './constants';
@@ -38,6 +38,22 @@ export const maximum = (
   column: AnySQLiteColumn<{ data: number }>,
   value: number,
 ) => sql<number>`max(${column}, ${value})`;
+
+// Scalar min has the same API gap as max; uptime's earliest sighting must survive concurrent writes.
+export const minimum = (
+  column: AnySQLiteColumn<{ data: number }>,
+  value: number,
+) => sql<number>`min(${column}, ${value})`;
+
+// Keep the capacity count in CASE's lazy branch so an existing uptime identity never scans the table.
+export const capacityAdmission = (existing: SQL, capacity: SQL) =>
+  sql<boolean>`case when ${existing} then 1 else ${capacity} end`;
+
+// Drizzle has no SQLite bitwise-OR builder. Slots from concurrent sightings must merge in the write.
+export const mergedBits = (
+  column: AnySQLiteColumn<{ data: number }>,
+  bits: number,
+) => sql<number>`${column} | ${bits}`;
 
 // Drizzle has no CASE builder. Increment/reset must be decided atomically using the stored window;
 // a delayed request must not rewind it or lose a concurrent accepted publication.

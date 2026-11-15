@@ -16,6 +16,7 @@ import {
   DISCOVERY_LISTING_INDEXES,
   REGISTRATION,
   REGISTRATION_STATUS,
+  UPTIME,
 } from './constants';
 import { nullableTextLength, textLength } from './sqlite-expressions';
 
@@ -164,10 +165,19 @@ export const registrations = sqliteTable(
   ],
 );
 
-export const uptimeNodes = sqliteTable('discovery_uptime_nodes', {
-  nodeId: text('node_id').primaryKey(),
-  firstAt: integer('first_at').notNull(),
-});
+export const uptimeNodes = sqliteTable(
+  'discovery_uptime_nodes',
+  {
+    nodeId: text('node_id').primaryKey(),
+    firstAt: integer('first_at').notNull(),
+  },
+  (table) => [
+    check(
+      'discovery_uptime_nodes_node_id',
+      eq(textLength(table.nodeId), nodeIdCharacters),
+    ),
+  ],
+);
 export const uptimeSlots = sqliteTable(
   'discovery_uptime',
   {
@@ -177,5 +187,16 @@ export const uptimeSlots = sqliteTable(
     firstAt: integer('first_at').notNull(),
     lastAt: integer('last_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.nodeId, table.hour] })],
+  (table) => [
+    primaryKey({ columns: [table.nodeId, table.hour] }),
+    index('discovery_uptime_by_hour').on(table.hour),
+    check(
+      'discovery_uptime_node_id',
+      eq(textLength(table.nodeId), nodeIdCharacters),
+    ),
+    check(
+      'discovery_uptime_slots',
+      between(table.slots, 1, 2 ** UPTIME.slotsPerHour - 1),
+    ),
+  ],
 );
