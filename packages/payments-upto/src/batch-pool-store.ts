@@ -113,6 +113,8 @@ export async function readPool(
     readPrivateFile(paths.state, BATCH_SESSION_DEFAULTS.poolBytes),
   );
   const legacy = await readBatchRecord(paths.legacy);
+  // Pool generation accounting is separate; never silently discard a renewed root's historical spend.
+  if (legacy?.history?.length) return sessionFail(SESSION_CODES.UNVERIFIED);
   if (raw === undefined) {
     if (!includeLegacy) return { version: BATCH_POOL_VERSION, entries: [] };
     if (!legacy) return { version: BATCH_POOL_VERSION, entries: [] };
@@ -151,6 +153,7 @@ export async function readPool(
 }
 export async function poolChild(paths: BatchPoolPaths, row: PoolRow) {
   const record = await readBatchRecord(poolPaths(paths, row));
+  if (record?.history?.length) return sessionFail(SESSION_CODES.UNVERIFIED);
   if (!record || canonicalJson(record.terms) !== canonicalJson(row.terms))
     return sessionFail(SESSION_CODES.UNVERIFIED);
   if (

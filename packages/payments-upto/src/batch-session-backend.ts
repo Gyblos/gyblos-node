@@ -19,9 +19,14 @@ import {
   batchSessionObserver,
   type BatchObserverOptions,
 } from './batch-session-observer';
+import { renewBatchSession } from './batch-session-renewal';
 import { createBatchSeller } from './batch-session-seller';
 import { inspectBatchSession } from './batch-session-state';
-import type { BatchPaths } from './batch-session-types';
+import type {
+  BatchBuyerBackend,
+  BatchPaths,
+  BatchSellerBackend,
+} from './batch-session-types';
 import { waitBatch } from './batch-session-wait';
 import { createBuyerObservationRpc } from './buyer-observation-transport';
 import { BATCH_OPENING_LIMITS } from './constants';
@@ -46,12 +51,34 @@ async function compatible(options: Options, terms: PaymentSessionTerms) {
 }
 export function openBatchBuyerBackend(
   options: Options & { payer: KeyPairSigner },
-) {
+): BatchBuyerBackend {
   privatePlatform();
   const rpc = options.rpc ?? createBuyerObservationRpc(options.rpcUrl);
   let observer: ReturnType<typeof batchSessionObserver> | undefined;
   return {
     inspect: () => inspectBatchSession(options.paths),
+    async renew(
+      expectedChannelId: string,
+      terms: PaymentSessionTerms,
+      totalBudgetAtomic: string,
+    ) {
+      if (options.payer.address !== terms.buyer)
+        return sessionFail(SESSION_CODES.BINDING);
+      const existing = await inspectBatchSession(options.paths);
+      if (!existing) return sessionFail(SESSION_CODES.UNAVAILABLE);
+      const oldObserver = batchSessionObserver({
+        ...options,
+        terms: existing.terms,
+      });
+      await renewBatchSession({
+        paths: options.paths,
+        expectedChannelId,
+        terms,
+        totalBudgetAtomic,
+        now: options.now ?? Date.now,
+        observe: oldObserver.settlement,
+      });
+    },
     async create(terms: PaymentSessionTerms): Promise<SessionBuyer> {
       if (options.payer.address !== terms.buyer)
         return sessionFail(SESSION_CODES.BINDING);
@@ -121,13 +148,38 @@ export function openBatchSellerBackend(
     authorizer: KeyPairSigner;
     signer?: FacilitatorSvmSigner;
   },
-) {
+): BatchSellerBackend {
   privatePlatform();
   const signer =
     options.signer ??
     toFacilitatorSvmSigner(options.feePayer, { defaultRpcUrl: options.rpcUrl });
   return {
     inspect: () => inspectBatchSession(options.paths),
+    async renew(
+      expectedChannelId: string,
+      terms: PaymentSessionTerms,
+      payload: string,
+    ) {
+      if (
+        options.feePayer.address !== terms.feePayer ||
+        options.authorizer.address !== terms.authorizer
+      )
+        return sessionFail(SESSION_CODES.BINDING);
+      const existing = await inspectBatchSession(options.paths);
+      if (!existing) return sessionFail(SESSION_CODES.UNAVAILABLE);
+      await firstProof(batchFacilitatorFor(signer, terms), terms, payload);
+      const observer = batchSessionObserver({
+        ...options,
+        terms: existing.terms,
+      });
+      await renewBatchSession({
+        paths: options.paths,
+        expectedChannelId,
+        terms,
+        now: options.now ?? Date.now,
+        observe: observer.settlement,
+      });
+    },
     async create(terms: PaymentSessionTerms, payload?: string) {
       if (
         options.feePayer.address !== terms.feePayer ||

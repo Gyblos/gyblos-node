@@ -33,9 +33,14 @@ import {
 
 import { parseBlocks } from './batch-block-state';
 import { coherentRecord } from './batch-session-consistency';
+import { parseBatchHistory } from './batch-session-history';
 import { strictBatchOpening } from './batch-session-opening';
 import type { BatchRecord } from './batch-session-types';
-import { BATCH_BLOCK_STATE, UPTO_BUYER_DISTINCT_PARTIES } from './constants';
+import {
+  BATCH_BLOCK_STATE,
+  BATCH_RENEWAL_STATE,
+  UPTO_BUYER_DISTINCT_PARTIES,
+} from './constants';
 
 export function atomic(value: unknown): string {
   return controlAtomic(value);
@@ -188,6 +193,11 @@ export function openingFor(input: unknown, terms: PaymentSessionTerms) {
   return value;
 }
 function recordFields(value: unknown) {
+  const renewalVersion =
+    !!value &&
+    typeof value === 'object' &&
+    'version' in value &&
+    value.version === BATCH_RENEWAL_STATE.version;
   const blockVersion =
     !!value &&
     typeof value === 'object' &&
@@ -208,17 +218,22 @@ function recordFields(value: unknown) {
     'closing',
     'settlement',
     'pending',
-    ...(blockVersion ? ['blocks'] : []),
+    ...(blockVersion || (renewalVersion && Object.hasOwn(value!, 'blocks'))
+      ? ['blocks']
+      : []),
+    ...(renewalVersion ? ['history'] : []),
   ]);
-  return { row, blockVersion };
+  return { row, blockVersion, renewalVersion };
 }
 export function parseRecord(
   value: unknown,
   terms: PaymentSessionTerms,
 ): BatchRecord {
-  const { row, blockVersion } = recordFields(value);
+  const { row, blockVersion, renewalVersion } = recordFields(value);
   if (
-    (row.version !== PAYMENT_SESSION.version && !blockVersion) ||
+    (row.version !== PAYMENT_SESSION.version &&
+      !blockVersion &&
+      !renewalVersion) ||
     canonicalJson(termsFor(row.terms)) !== canonicalJson(terms) ||
     !Object.values(SESSION_STATES).some((state) => state === row.state)
   )
@@ -254,7 +269,11 @@ export function parseRecord(
   const closing = parseClosing(row.closing);
   const settlement = parseSettlement(row.settlement);
   const record: BatchRecord = {
-    version: blockVersion ? BATCH_BLOCK_STATE.version : PAYMENT_SESSION.version,
+    version: renewalVersion
+      ? BATCH_RENEWAL_STATE.version
+      : blockVersion
+        ? BATCH_BLOCK_STATE.version
+        : PAYMENT_SESSION.version,
     terms,
     channelId,
     state,
@@ -268,8 +287,15 @@ export function parseRecord(
     closing,
     settlement,
     pending,
-    ...(blockVersion
+    ...(blockVersion || (renewalVersion && Object.hasOwn(row, 'blocks'))
       ? { blocks: parseBlocks(row.blocks, parsed, voucherFor) }
+      : {}),
+    ...(renewalVersion
+      ? {
+          history: parseBatchHistory(row.history, terms, (raw, ownTerms) =>
+            parseRecord(raw, termsFor(ownTerms)),
+          ),
+        }
       : {}),
   };
   coherentRecord(record);

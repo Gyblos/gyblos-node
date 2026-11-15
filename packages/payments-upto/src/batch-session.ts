@@ -12,6 +12,7 @@ export {
   openBatchSellerBackend,
 } from './batch-session-backend';
 export { batchSessionObserver } from './batch-session-observer';
+export { renewBatchSession } from './batch-session-renewal';
 export {
   recoverBatchBuyer,
   type BatchRecoveryOptions,
@@ -19,6 +20,8 @@ export {
 } from './batch-recovery';
 export { recoverBatchPool } from './batch-pool-recovery';
 export type {
+  BatchBuyerBackend,
+  BatchSellerBackend,
   BatchBuyerOptions,
   BatchSellerOptions,
 } from './batch-session-types';

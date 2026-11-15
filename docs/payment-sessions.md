@@ -1,5 +1,33 @@
 # Reusable buyer-authorized payment sessions
 
+## Pilot renewal and spending authority
+
+The ordinary beta paid path charges per request. Reusable sessions remain an
+explicitly configured paired pilot, independently of free inference.
+
+In the single-pair pilot, the buyer can prepare a new channel when the old one
+is closed, expired or cannot reserve the next quote. It first verifies the new
+quote, closes the original channel if necessary, and independently proves its
+final charge and refund. Missing or uncertain proof blocks renewal. No failed
+inference is replayed, and renewal never changes the seller or payment roles.
+
+`depositAtomic` remains the finite spending authority for this single-pair
+manager across renewals: previous actual charges plus the next deposit cannot
+exceed it. A replacement deposit is reduced by those charges. There is no
+automatic wallet top-up. A new request whose ceiling exceeds the remaining
+authority is refused before opening another channel.
+
+Closed generation proofs and the prepared replacement are published together in
+the same private atomic journal before a new opening is signed. Renewal
+introduces private journal version 3; older versions 1 and 2 remain readable and
+retain their original format until renewal. Older binaries cannot read a renewed
+journal. Keep both pilot peers on the same release; never delete a journal or
+lock to downgrade. History retains at most 16 closed generations and the
+existing 512 KiB file bound; exhaustion refuses further renewal without evicting
+proof. Pooled multi-seller renewal is separate: importing a renewed single-pair
+journal into a pool currently fails closed to preserve spending authority. No
+payment wire contract or native channel program changes.
+
 The shared buyer and seller session services use the pinned Solana x402
 `batch-settlement` client-signature mode. Trusted hosts can compose them over
 the opt-in `gyblos/session/4` Iroh channel. The buyer CLI and seller daemon can

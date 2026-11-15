@@ -19,14 +19,37 @@ import type {
   PAYMENT_SESSION,
   PaymentSessionTerms,
   SessionBill,
+  SessionBuyer,
   SessionRequest,
+  SessionSeller,
   SessionSettlement,
   SessionState,
   SessionVoucher,
 } from '@gyblos/protocol/payment-session';
 import type { SessionBlockIntent } from '@gyblos/protocol/session-blocks';
 
-import type { BATCH_BLOCK_STATE } from './constants';
+import type { BatchStoredSession } from './batch-session-state';
+import type { BATCH_BLOCK_STATE, BATCH_RENEWAL_STATE } from './constants';
+
+export interface BatchBuyerBackend {
+  inspect(): Promise<BatchStoredSession | undefined>;
+  create(terms: PaymentSessionTerms): Promise<SessionBuyer>;
+  observe(channelId: string): Promise<SessionSettlement | undefined>;
+  renew?(
+    expectedChannelId: string,
+    terms: PaymentSessionTerms,
+    totalBudgetAtomic: string,
+  ): Promise<void>;
+}
+export interface BatchSellerBackend {
+  inspect(): Promise<BatchStoredSession | undefined>;
+  create(terms: PaymentSessionTerms, payload?: string): Promise<SessionSeller>;
+  renew?(
+    expectedChannelId: string,
+    terms: PaymentSessionTerms,
+    payload: string,
+  ): Promise<void>;
+}
 
 export interface BatchRequestBlocks {
   baseAtomic: string;
@@ -47,8 +70,7 @@ export interface BatchHint {
   lastValidBlockHeight: string;
   slot: string;
 }
-export interface BatchRecord {
-  version: typeof PAYMENT_SESSION.version | typeof BATCH_BLOCK_STATE.version;
+interface BatchFinancialRecord {
   terms: PaymentSessionTerms;
   channelId: string;
   state: SessionState;
@@ -66,6 +88,13 @@ export interface BatchRecord {
   settlement: SessionSettlement | null;
   pending: Record<string, string>;
   blocks?: Record<string, BatchRequestBlocks>;
+}
+export interface BatchGeneration extends BatchFinancialRecord {
+  version: typeof PAYMENT_SESSION.version | typeof BATCH_BLOCK_STATE.version;
+}
+export interface BatchRecord extends BatchFinancialRecord {
+  version: BatchGeneration['version'] | typeof BATCH_RENEWAL_STATE.version;
+  history?: BatchGeneration[];
 }
 export interface BatchCommonOptions {
   terms: PaymentSessionTerms;
