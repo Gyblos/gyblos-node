@@ -33,6 +33,8 @@ export interface PublishContext {
   maxNodes: number;
   // Throttled pruning, run only before admitting a new NodeId.
   prune: (now: number) => Promise<void>;
+  // Records an accepted presence for public uptime.
+  markSeen: (nodeId: string, now: number) => Promise<void>;
 }
 
 async function storedEntry(
@@ -107,4 +109,8 @@ export async function acceptRecord(
   }
   if (!(await storage.put(await storedEntry(record, signature, json))))
     indexFail(INDEX_ERRORS.STALE_RECORD);
+  // Uptime counts only presence the index accepted, at the index's own clock. It is best effort: the
+  // record is already stored, so a failed uptime write must not make the seller republish it.
+  if (record.kind === PUBLIC_RECORD_KINDS.PRESENCE)
+    await context.markSeen(record.nodeId, now).catch(() => undefined);
 }

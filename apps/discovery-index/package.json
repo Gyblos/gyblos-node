@@ -13,6 +13,7 @@
     "./registration-store-d1": "./src/registration-store-d1.ts",
     "./registrations": "./src/registrations.ts",
     "./storage": "./src/storage.ts",
+    "./uptime": "./src/uptime.ts",
     "./storage-d1": "./src/storage-d1.ts",
     "./worker": "./src/worker.ts"
   },
