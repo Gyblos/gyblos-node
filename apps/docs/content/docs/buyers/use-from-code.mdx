@@ -12,24 +12,24 @@ The Responses route currently refuses `parallel_tool_calls: false`, non-default 
 
 ## What works today [#what-works-today]
 
-| Feature                                                              | Beta status                             |
-| -------------------------------------------------------------------- | --------------------------------------- |
-| Whole conversations: system message, history, new message            | Yes, up to 1024 messages                |
-| OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming        |
-| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming        |
-| `GET /v1/models`                                                     | Yes, every model your buyer serves      |
-| Free offers                                                          | Yes                                     |
-| Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                |
-| Claude Code                                                          | Only with a seller on a larger model    |
-| Cursor agent mode                                                    | No: it calls from Cursor's cloud        |
-| Images, structured output, several answers                           | Not yet: refused with a clear 400 error |
-| Paid offers                                                          | Outside this guide                      |
+| Feature                                                              | Beta status                                   |
+| -------------------------------------------------------------------- | --------------------------------------------- |
+| Whole conversations: system message, history, new message            | Yes, up to 1024 messages                      |
+| OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming              |
+| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming              |
+| `GET /v1/models`                                                     | Yes, every model your buyer serves            |
+| Free offers                                                          | Yes                                           |
+| Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                      |
+| Claude Code                                                          | Only with a seller on a larger model          |
+| Cursor agent mode                                                    | No: it calls from Cursor's cloud              |
+| Images, structured output, several answers                           | Not yet: refused with a clear 400 error       |
+| Paid offers                                                          | Pilot: ask in [Telegram](https://t.me/gyblos) |
 
 A seller serves each buyer up to **30 answers per minute** by default. An answer is at most **4096
 tokens** unless you raise the buyer's limit (up to 32768); a longer request is served up to that limit and
 ends with finish reason `length`.
 
-Your prompt reaches the seller you configured, whose machine runs the model and can read it. Do not send
+Your prompt reaches the seller that answers it, whose machine runs the model and can read it. Do not send
 passwords, keys or other secrets.
 
 ## Before you start [#before-you-start]
@@ -71,7 +71,7 @@ Leave it running. In another terminal, check that it answers:
 curl http://127.0.0.1:4031/v1/models
 ```
 
-The list names the one model your buyer asks for; use that name as `model` in your requests. For a quick
+The list names the models your buyer can use; use one of those names as `model` in your requests. For a quick
 conversation in the terminal instead, run `pnpm buyer:chat`, which starts its own buyer.
 
 ## Send a conversation [#send-a-conversation]
