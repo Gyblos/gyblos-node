@@ -1,20 +1,10 @@
 // Exercises upload retention and crash recovery using only synthetic signed receipts and isolated homes.
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import {
-  appendFile,
-  mkdtemp,
-  readFile,
-  realpath,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
-import { receiptPathsIn } from '@gyblos/config';
 import { NODE_ERROR_CODES, RECEIPT_UPLOAD } from '@gyblos/node/constants';
 import {
   createSellerReceiptRuntime,
@@ -25,9 +15,8 @@ import {
 import { canonicalJson } from '@gyblos/protocol';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
-import { signSellerReceipt } from '@gyblos/protocol/receipt';
 
-import { receiptChannelFixture } from './support/receipt-channel';
+import { receiptUploadFixture } from './support/receipt-upload-fixture';
 
 async function reopenedInChild(options: ReceiptStoreOptions) {
   const script = `
@@ -58,44 +47,8 @@ async function reopenedInChild(options: ReceiptStoreOptions) {
   return controlObject(result, ['health', 'entries']);
 }
 
-async function fixture() {
-  const sample = await receiptChannelFixture();
-  const root = await mkdtemp(
-    join(await realpath(tmpdir()), 'gyb-upload-cursor-'),
-  );
-  let now = 1700000000100;
-  const options = {
-    environment: { GYBLOS_HOME: root },
-    role: P2P_ROLES.SELLER,
-    nodeId: sample.seller.nodeId,
-    now: () => now,
-    maxEntries: 1,
-    maxBytes: 4096,
-    retentionMs: 10,
-  };
-  return {
-    ...sample,
-    options,
-    root,
-    advance: (milliseconds: number) => {
-      now += milliseconds;
-    },
-    paths: receiptPathsIn(options.environment, options.role),
-    next: async (n: number) => ({
-      seller: await signSellerReceipt(
-        {
-          ...sample.record,
-          requestId: n.toString(16).padStart(32, '0'),
-        },
-        sample.seller.sign,
-      ),
-    }),
-    close: () => rm(root, { recursive: true, force: true }),
-  };
-}
-
 void test('pending receipts survive uploaded count, byte and time retention limits across restart', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
@@ -116,7 +69,7 @@ void test('pending receipts survive uploaded count, byte and time retention limi
 });
 
 void test('upload acknowledgement is durable, fingerprint-CAS protected and never overwrites storedAt', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
@@ -151,7 +104,7 @@ void test('upload acknowledgement is durable, fingerprint-CAS protected and neve
 });
 
 void test('uploaded receipts expire while older pending receipts remain protected', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
@@ -174,7 +127,7 @@ void test('uploaded receipts expire while older pending receipts remain protecte
 });
 
 void test('full pending budget preserves old bodies and durably counts rejected new writes', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const options = { ...f.options, maxPendingEntries: 1 };
     const store = openReceiptStore(options);
@@ -202,7 +155,7 @@ void test('full pending budget preserves old bodies and durably counts rejected 
 });
 
 void test('legacy snapshots migrate to pending without discarding expired entries or changing their timestamps', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
@@ -228,7 +181,7 @@ void test('legacy snapshots migrate to pending without discarding expired entrie
 });
 
 void test('normal writes append a durable record instead of rewriting earlier receipt bytes', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
@@ -243,7 +196,7 @@ void test('normal writes append a durable record instead of rewriting earlier re
 });
 
 void test('pending bodies ignore the uploaded byte cap and the pending byte budget reports rejection', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const options = {
       ...f.options,
@@ -271,7 +224,7 @@ void test('pending bodies ignore the uploaded byte cap and the pending byte budg
 });
 
 void test('first upload confirmation is immutable and caller mutations cannot alter stored metadata', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
@@ -298,7 +251,7 @@ void test('first upload confirmation is immutable and caller mutations cannot al
 });
 
 void test('buyer roles use the same persistent pending queue without accessing any existing profile', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const options = {
       ...f.options,
@@ -320,7 +273,7 @@ void test('buyer roles use the same persistent pending queue without accessing a
 });
 
 void test('a crash-torn UTF-8 tail preserves complete receipts and is truncated before the next append', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
@@ -345,7 +298,7 @@ void test('a crash-torn UTF-8 tail preserves complete receipts and is truncated 
 });
 
 void test('compaction preserves pending records and rejection counters on reopen', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const options = { ...f.options, maxPendingEntries: 1 };
     const store = openReceiptStore(options);
@@ -374,7 +327,7 @@ void test('compaction preserves pending records and rejection counters on reopen
 });
 
 void test('competing store instances cannot spend the last pending slot twice', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const options = { ...f.options, maxPendingEntries: 1 };
     const first = openReceiptStore(options);
@@ -397,7 +350,7 @@ void test('competing store instances cannot spend the last pending slot twice', 
 });
 
 void test('legacy snapshots reject uncommitted trailing bytes because the old format was never append-only', async () => {
-  const f = await fixture();
+  const f = await receiptUploadFixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
