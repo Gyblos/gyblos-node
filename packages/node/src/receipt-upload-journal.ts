@@ -10,7 +10,7 @@ import {
 import { sellerReceiptDigest, verifyReceipt } from '@gyblos/protocol/receipt';
 
 import { RECEIPT_STORAGE, RECEIPT_UPLOAD } from './constants';
-import { receiptSignal, receiptUnavailable } from './receipt-file';
+import { receiptUnavailable } from './receipt-file';
 import {
   assertReceiptRole,
   parseReceiptSnapshot,
@@ -113,7 +113,6 @@ export async function parseReceiptJournal(
   role: HomeRole,
   nodeId: string,
   trailingBytes: number,
-  signal?: AbortSignal,
 ) {
   const lines = text.slice(0, -1).split('\n');
   const first = lines[0];
@@ -124,7 +123,7 @@ export async function parseReceiptJournal(
   const version = header.schemaVersion;
   if (version === RECEIPT_STORAGE.schemaVersion) {
     if (lines.length !== 1 || trailingBytes !== 0) receiptUnavailable();
-    const entries = await parseReceiptSnapshot(text, role, nodeId, signal);
+    const entries = await parseReceiptSnapshot(text, role, nodeId);
     return {
       legacy: true,
       state: {
@@ -160,14 +159,12 @@ export async function parseReceiptJournal(
     input.entries,
     RECEIPT_UPLOAD.maxPendingEntries + RECEIPT_STORAGE.maxEntries,
   )) {
-    receiptSignal(signal);
     const entry = await readEntry(raw, role, nodeId);
     const key = receiptKey(entry.receipt);
     if (state.entries.has(key)) receiptUnavailable();
     state.entries.set(key, entry);
   }
   for (const line of lines.slice(1)) {
-    receiptSignal(signal);
     await applyReceiptMutation(state, line, role, nodeId);
   }
   return { state, legacy: false };

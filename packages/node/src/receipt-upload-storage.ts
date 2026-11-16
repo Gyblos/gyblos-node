@@ -127,9 +127,7 @@ async function publishReceiptMutation(
 async function loadReceiptState(
   context: JournalContext,
   cached: CachedJournal | undefined,
-  signal?: AbortSignal,
 ) {
-  receiptSignal(signal);
   await assertRoleHome(context.role, context.environment);
   await receiptDirectory(context.paths.directory);
   const revision = cached
@@ -143,7 +141,6 @@ async function loadReceiptState(
           context.role,
           context.nodeId,
           disk.size - disk.complete,
-          signal,
         )
       : {
           legacy: false,
@@ -154,7 +151,6 @@ async function loadReceiptState(
         };
     cached = { ...parsed, disk };
   }
-  receiptSignal(signal);
   return cached;
 }
 
@@ -165,12 +161,15 @@ export function receiptJournal(options: ReceiptStoreOptions) {
   let current: ReceiptUploadHealth | undefined;
   async function read(signal?: AbortSignal) {
     return receiptBoundary(async () => {
-      cached = await loadReceiptState(context, cached, signal);
+      receiptSignal(signal);
+      // Finish bounded, read-only replay so a short caller deadline cannot starve every later write.
+      cached = await loadReceiptState(context, cached);
       current = uploadHealth(
         trimUploaded(cached.state, context, controlInteger(context.now()))
           .state,
         context,
       );
+      receiptSignal(signal);
       return cached;
     });
   }

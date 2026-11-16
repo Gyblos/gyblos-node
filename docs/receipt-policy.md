@@ -121,6 +121,10 @@ a crash-torn final line is ignored and removed under the exclusive update lock
 before the next append. Earlier complete records remain intact. Atomic staged
 compaction bounds the physical file at 128 MiB. The in-process index is rebuilt
 from the journal on reopen; normal writes do not rewrite all earlier bodies.
+Bounded, read-only cold replay finishes warming the cache even if its caller
+cancels; the cancelled call cannot mutate storage. This prevents a large queue
+from consuming the receipt worker's deadline again on every later write. The
+worker retains its slot until that replay settles; its deadline is unchanged.
 Private modes, no-follow/single-link checks, CAS and immutable first buyer
 confirmation remain enforced. Old version-1 snapshots migrate on the next write;
 all surviving entries start pending, even if old enough for the previous TTL. Do
