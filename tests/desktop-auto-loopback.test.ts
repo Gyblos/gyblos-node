@@ -1,4 +1,4 @@
-// Product desktop IPC/client and buyer HTTP compose over loopback; only the engine port is synthetic.
+// Product desktop IPC/client and buyer HTTP compose over loopback; the buyer execution port is synthetic.
 // No model, wallet funding, remote network, inference retries or transactions are used.
 import assert from 'node:assert/strict';
 import test from 'node:test';
