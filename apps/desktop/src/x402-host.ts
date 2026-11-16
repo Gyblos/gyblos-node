@@ -96,6 +96,11 @@ export function registerDesktopX402(
     (url) => shell.openExternal(url),
     managed,
     (value) => clipboard.writeText(value),
+    (progress) =>
+      window.webContents.mainFrame.send(
+        DESKTOP_X402.PROGRESS_CHANNEL,
+        progress,
+      ),
   );
   const apiKeys = createUsdcApiHandlers(
     client,

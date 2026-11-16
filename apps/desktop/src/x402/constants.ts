@@ -1,7 +1,10 @@
 // Bounds and fixed IPC names for the desktop's local-buyer spending permission.
+import { FREE_STREAM } from '@gyblos/protocol/constants';
+
 export const DESKTOP_X402 = {
   VERSION: 1,
   CHANNEL: 'desktop:x402',
+  PROGRESS_CHANNEL: 'desktop:x402-progress',
   MAX_BYTES: 1048576,
   MAX_RECORDS: 1000,
   MAX_ID: 128,
@@ -23,11 +26,19 @@ export const DESKTOP_X402 = {
   MAX_TRANSPORT_ADDRESS: 2048,
   SERVICE_FILE: 'buyer-service.cjs',
 } as const;
+// SSE repeats an envelope per delta and JSON can escape one character into six bytes.
+// These framing budgets do not enlarge the existing decoded answer or execution limits.
+export const DESKTOP_X402_STREAM = {
+  maxEvents: FREE_STREAM.maxEvents + 2,
+  frameBytes: DESKTOP_X402.MAX_RESPONSE * 6 + 1024,
+  wireBytes: DESKTOP_X402.MAX_RESPONSE * 6 + (FREE_STREAM.maxEvents + 2) * 1024,
+} as const;
 export const X402_ACTION = {
   STATUS: 'status',
   CONNECT: 'connect',
   AUTHORIZE: 'authorize',
   SEND: 'send',
+  STOP: 'stop',
   FINISH: 'finish',
   EXPLORER: 'explorer',
   START_BUYER: 'start-buyer',
