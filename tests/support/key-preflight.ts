@@ -21,6 +21,8 @@ import {executeApiKey} from '@gyblos/buyer/api-key-execution';
 import {PaidClientError} from '@gyblos/transport-iroh/paid-client';
 import {PAID_EXECUTION_CODES} from '@gyblos/protocol/paid/constants';
 import {ENGINE_DONE_REASONS,REASONING_LEVELS} from '@gyblos/protocol/constants';
+import {BATCH_SESSION_DEFAULTS} from '@gyblos/config/batch-session';
+import {FREE_BUYER_STARTUP,PAID_BUYER_CODES} from '@gyblos/buyer/constants';
 const {config,quote,input,scenario,target}=${JSON.stringify(data)};
 const probe={meters:0,chains:0,authorizations:0,executions:0,free:0};
 globalThis.probe=probe;
@@ -34,7 +36,7 @@ const sources={
     export async function executeSelectedBuyerFree(){globalThis.probe.free++;return {text:'synthetic',usage:{inputTokens:4,outputTokens:2},finishReason:'stop'}}\`,
   './paid-selection': \`export function paidBuyerDependencies(prepared,options){return {
     ...options,enter:()=>()=>{},unresolved:async()=>false,select:async()=>{throw Error('unexpected reselection')},
-    execute:async(winner,request)=>globalThis.executePaid(winner,request)
+    execute:async(winner,request,signal,onDelta)=>{await onDelta('synthetic');return globalThis.executePaid(winner,request)}
   }}\`,
   '@gyblos/node/buyer-chain': 'export async function buyerPaymentsUnresolved(){return false} export function buyerChainPayments(){throw Error("unexpected default chain")}'
 };
@@ -57,20 +59,21 @@ if(scenario==='model'||scenario==='warm') {
 if(scenario==='reasoning') config.request.reasoning=REASONING_LEVELS.LOW;
 if(scenario==='downgrade') config.request.lowestReasoning=REASONING_LEVELS.LOW;
 if(scenario==='network') config.request.network='solana:synthetic';
-if(scenario==='mint') role.mint='1'.repeat(32);
+if(scenario==='mint') role.mint='synthetic-other-mint';
 if(scenario==='tokens') config.request.maxTokens=32769;
 if(scenario==='quote-tokens') input.maxTokens=quote.offer.maxTokens+1;
 if(scenario==='bytes') input.messages[0].content='a'.repeat(65537);
 if(scenario==='history') input.messages.unshift({role:'system',content:'synthetic instructions'});
 if(scenario==='unrelated-model') config.models=[{id:'synthetic-free',selection:custom,maxTokens:10}];
 if(scenario.startsWith('session-')) {
-  config.session={depositAtomic:'100',lifetimeMs:600000,withdrawDelaySeconds:300};
+  config.session={depositAtomic:'100',lifetimeMs:600000,withdrawDelaySeconds:BATCH_SESSION_DEFAULTS.withdrawDelaySeconds};
   if(scenario.endsWith('-pool')) config.session.totalDepositAtomic='200';
   if(scenario.includes('model')) config.request.selection=custom;
   if(scenario.includes('context')) input.maxTokens=quote.offer.maxTokens;
   if(scenario.includes('budget')) {
     quote.offer.maxAtomic='1';
     quote.offer.prices={...quote.offer.prices,inputAtomicPerMtok:'1000000',outputAtomicPerMtok:'1000000'};
+    config.request.priceCeilings={inputAtomicPerMtok:'1000000',outputAtomicPerMtok:'1000000'};
   }
 }
 const ready=()=>keys.snapshot();
@@ -132,7 +135,16 @@ try {
     const route=scenario==='warm'?{selection:custom,maxTokens:10}:undefined;
     if(scenario==='model'||scenario==='warm'||scenario.includes('session-model')) quote.offer.selection=custom;
     if(scenario==='reasoning') quote.offer.reasoning=REASONING_LEVELS.LOW;
-    await assert.rejects(call(input,route,controller.signal));
+    const expected=scenario==='aborted'?{name:'AbortError'}
+      :scenario==='meter-load'?{message:'synthetic tokenizer unavailable'}
+      :['model','warm','session-model','session-model-pool'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_MODEL}
+      :['reasoning','downgrade'].includes(scenario)?{reason:FREE_BUYER_STARTUP.REASONING}
+      :['network','mint'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_NETWORK}
+      :scenario==='tokens'?{reason:FREE_BUYER_STARTUP.MAX_TOKENS}
+      :scenario.includes('budget')?{code:PAID_EXECUTION_CODES.BUDGET_EXHAUSTED}
+      :['quote-tokens','bytes'].includes(scenario)||scenario.includes('context')?{code:PAID_EXECUTION_CODES.LIMIT}
+      :{code:PAID_BUYER_CODES.UNSUPPORTED};
+    await assert.rejects(call(input,route,controller.signal),expected);
     const snapshot=await ready();
     assert.equal(snapshot.keys[0].reservedAtomic,'0','local rejection must not reserve API budget');
     assert.equal(snapshot.blocked,false,'local rejection must not block later requests');

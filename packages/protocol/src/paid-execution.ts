@@ -153,13 +153,12 @@ export async function paidExecutionDigest(value: unknown): Promise<string> {
   );
 }
 
-// Builds a detached request from quote-bound terms and a payment authorization; this neither
-// authenticates the quote nor signs, deposits or journals anything.
-export function buildPaidExecutionRequest(
+// Validates quote-bound input before constructing payment; this neither authenticates the quote
+// nor signs, deposits or journals anything. The full request still checks its authorization and size.
+export function paidExecutionInput(
   quote: SignedOfferV2,
   input: FreeExecutionBuildInput,
-  payment: PaymentAuthorization,
-): PaidExecutionRequest {
+) {
   return paidExecutionBoundary(() => {
     const offer = parseOfferV2(
       controlObject(quote, ['offer', 'signature']).offer,
@@ -170,11 +169,8 @@ export function buildPaidExecutionRequest(
       ...(input.tools ? ['tools'] : []),
       ...(input.toolChoice ? ['toolChoice'] : []),
     ]);
-    return parsePaidExecutionRequest({
-      version: PAID_EXECUTION.version,
-      requestId: offer.requestId,
-      quote,
-      input: {
+    const parsed = parseExecutionInput(
+      {
         messages: params.messages,
         ...(input.tools ? { tools: input.tools } : {}),
         ...(input.toolChoice ? { toolChoice: input.toolChoice } : {}),
@@ -182,9 +178,28 @@ export function buildPaidExecutionRequest(
         selection: offer.selection,
         reasoning: offer.reasoning,
       },
-      payment,
-    });
+      offer.requestId,
+      offer,
+    );
+    boundedWire({ quote, input: parsed }, PAID_EXECUTION.requestBytes);
+    return parsed;
   });
+}
+
+export function buildPaidExecutionRequest(
+  quote: SignedOfferV2,
+  input: FreeExecutionBuildInput,
+  payment: PaymentAuthorization,
+): PaidExecutionRequest {
+  return paidExecutionBoundary(() =>
+    parsePaidExecutionRequest({
+      version: PAID_EXECUTION.version,
+      requestId: quote.offer.requestId,
+      quote,
+      input: paidExecutionInput(quote, input),
+      payment,
+    }),
+  );
 }
 
 function tokens(value: unknown): number {

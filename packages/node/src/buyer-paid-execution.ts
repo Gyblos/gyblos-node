@@ -11,6 +11,7 @@ import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   buildPaidExecutionRequest,
+  paidExecutionInput,
   type PaidCharge,
   type PaidExecutionRequest,
   type PaidExecutionResponse,
@@ -231,6 +232,21 @@ interface Attempt {
   onDelta: (text: string, requestDigest?: string) => Promise<void>;
 }
 
+// Pure local preflight shared by buyer hosts; repeat it at execution before signing anything.
+export function checkBuyerPaidInput(
+  input: FreeExecutionBuildInput,
+  meter: PaidBuyerDependencies['meter'],
+  quote?: SignedOfferV2,
+): string {
+  const prompt = paidPrompt(
+    quote ? paidExecutionInput(quote, input) : input,
+    meter,
+  );
+  if (prompt === undefined)
+    throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+  return prompt;
+}
+
 // One attempt with one seller: undefined when the signed open never left the buyer and another
 // seller may serve; otherwise an outcome, or the failure once the stop is recorded.
 async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
@@ -319,9 +335,7 @@ export async function executeBuyerPaid(
     requestDigest?: string,
   ) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome> {
-  const prompt = paidPrompt(input, dependencies.meter);
-  if (prompt === undefined)
-    throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+  checkBuyerPaidInput(input, dependencies.meter);
   const release = dependencies.enter();
   try {
     const signal = AbortSignal.any([
@@ -339,6 +353,11 @@ export async function executeBuyerPaid(
       signal.throwIfAborted();
       if (excluded.has(winner.nodeId)) break;
       excluded.add(winner.nodeId);
+      const prompt = checkBuyerPaidInput(
+        input,
+        dependencies.meter,
+        winner.quote,
+      );
       const run = { dependencies, winner, input, prompt, signal, onDelta };
       const outcome = await attempt(run);
       if (outcome) return outcome;
@@ -363,9 +382,7 @@ export async function executeSelectedBuyerPaid(
   ) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome | undefined> {
   signal.throwIfAborted();
-  const prompt = paidPrompt(input, dependencies.meter);
-  if (prompt === undefined)
-    throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+  const prompt = checkBuyerPaidInput(input, dependencies.meter, winner.quote);
   if (await bounded(dependencies.unresolved(), signal))
     throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
   signal.throwIfAborted();
