@@ -7,13 +7,11 @@ import {
 } from '@gyblos/payments-upto';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
-export type SellerPaidSummary = UptoLedgerSummary;
-
 export function sellerPaidSummary(
   environment: HomeEnvironment,
   since: number,
   now: number,
-): Promise<SellerPaidSummary | undefined> {
+): Promise<UptoLedgerSummary | undefined> {
   return readUptoLedgerSummary(
     paymentPathsIn(environment, P2P_ROLES.SELLER),
     since,

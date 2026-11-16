@@ -1,7 +1,6 @@
-// A read-only summary of the seller's upto ledger for `gyblos seller status`: how many paid requests
-// settled, what they charged, and what is still settling. It never takes the ledger's lock or writes;
-// the ledger is rewritten atomically, so a read sees one whole document. Finished channels are pruned
-// after LEDGER_FILE.minRetentionMs, so the summary covers recent requests, not lifetime earnings.
+// A read-only summary of recent seller charges and pending requests, never lifetime earnings.
+// No lock or write: atomic ledger replacement lets each read see one whole document.
+// Missing or contradictory settlement amounts make the summary unavailable.
 import {
   UPTO_CHANNEL_STATES,
   type UptoChannelRecord,
@@ -15,7 +14,7 @@ import {
 
 import { LEDGER_FILE } from './constants';
 import type { UptoLedgerPaths } from './file-ledger';
-import { parseLedger } from './ledger-schema';
+import { parseLedger, unavailable } from './ledger-schema';
 
 export interface UptoLedgerSummary {
   // Settled channels changed within [since, now] with a recorded settlement amount, and the gross USDC
@@ -41,11 +40,13 @@ const FAILED: ReadonlySet<UptoChannelState> = new Set([
 
 // The amount a settled channel charged, only when its settlement records one consistently; a settled
 // record without that evidence is not shown as a confirmed charge (of zero or anything else).
-function settledAmount(record: UptoChannelRecord): bigint | undefined {
+function settledAmount(record: UptoChannelRecord): bigint {
   const charged = record.settlement?.chargedAtomic;
-  if (charged === undefined) return undefined;
-  if (record.chargedAtomic !== undefined && record.chargedAtomic !== charged)
-    return undefined;
+  if (
+    charged === undefined ||
+    (record.chargedAtomic !== undefined && record.chargedAtomic !== charged)
+  )
+    return unavailable();
   return BigInt(charged);
 }
 
@@ -57,6 +58,14 @@ export function summarizeUptoLedger(
   since: number,
   now: number,
 ): UptoLedgerSummary {
+  if (
+    !Number.isSafeInteger(since) ||
+    !Number.isSafeInteger(now) ||
+    !Number.isFinite(new Date(since).getTime()) ||
+    !Number.isFinite(new Date(now).getTime()) ||
+    since > now
+  )
+    return unavailable();
   const summary: UptoLedgerSummary = {
     settled: 0,
     chargedAtomic: 0n,
@@ -79,7 +88,6 @@ export function summarizeUptoLedger(
     if (FAILED.has(record.state)) summary.failed++;
     else if (record.state === UPTO_CHANNEL_STATES.SETTLED) {
       const charged = settledAmount(record);
-      if (charged === undefined) continue;
       summary.settled++;
       summary.chargedAtomic += charged;
       summary.lastSettledAt = Math.max(summary.lastSettledAt ?? 0, updatedAt);

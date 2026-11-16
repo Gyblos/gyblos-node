@@ -1,7 +1,5 @@
-// `gyblos seller status` shows recent paid requests from the seller's payment ledger: settled requests
-// and what they charged over the last day, what is still settling, and nothing when the seller never
-// served a paid request. Read-only and offline; amounts are gross (before the Gyblos fee). A ledger in an
-// unsafe place, a future or invalid date and a settled record without its amount never become a sale.
+// Seller status reports recent gross ledger charges and pending requests, read-only and offline.
+// Unsafe paths and invalid dates never become sales; a missing ledger creates no paid section.
 import assert from 'node:assert/strict';
 import { chmod, mkdir, rename, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -85,16 +83,12 @@ void test('the ledger summary counts the last day of settled and failed requests
   });
 });
 
-void test('a future or unsafe date and a settled record without its amount are not sales', () => {
-  const unproven = record(channel(3), UPTO_CHANNEL_STATES.SETTLED);
-  const mismatched = { ...settled(channel(4), '400'), chargedAtomic: '401' };
+void test('future and unsafe dates are not sales while explicit zero settlements count', () => {
   assert.deepEqual(
     summarizeUptoLedger(
       ledgerText([
         [settled(channel(1), '1500'), NOW + HOUR],
         [settled(channel(2), '2500'), Number.MAX_SAFE_INTEGER],
-        [unproven, NOW - HOUR],
-        [mismatched, NOW - HOUR],
         [
           record(channel(5), UPTO_CHANNEL_STATES.ADMITTED),
           Number.MAX_SAFE_INTEGER,
@@ -140,7 +134,7 @@ void test('seller status prints recent paid requests from the payment ledger', (
     assert.match(result.stdout, /^Paid requests, from the payment ledger:$/m);
     assert.match(
       result.stdout,
-      /last 24h\s+2 settled, 0\.004 USDC charged \(before the Gyblos fee\); 1 not charged$/m,
+      /last 24h\s+2 settled, 0\.004 USDC charged \(gross, including the Gyblos fee\); 1 not charged$/m,
     );
     assert.match(result.stdout, /settling now\s+2$/m);
     assert.match(

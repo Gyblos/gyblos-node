@@ -195,14 +195,14 @@ async function paidLines(homeEnvironment: HomeEnvironment, now: number) {
   try {
     summary = await sellerPaidSummary(homeEnvironment, now - STATUS.dayMs, now);
   } catch {
-    return `Paid requests:\n${line('ledger', 'unavailable (unsafe, locked or invalid file)')}`;
+    return `Paid requests:\n${line('ledger', 'unavailable (unsafe or invalid file)')}`;
   }
   if (!summary) return '';
   return [
     'Paid requests, from the payment ledger:\n',
     line(
       'last 24h',
-      `${summary.settled} settled, ${atomicUsdc(summary.chargedAtomic)} USDC charged (before the Gyblos fee); ${summary.failed} not charged`,
+      `${summary.settled} settled, ${atomicUsdc(summary.chargedAtomic)} USDC charged (gross, including the Gyblos fee); ${summary.failed} not charged`,
     ),
     line('settling now', String(summary.pending)),
     line(
