@@ -12,6 +12,11 @@ import { publicAddressBytes } from './public-validation';
 import { sign, type Signer } from './signing';
 
 export { parseOfferV2 } from './offer-v2-parser';
+export async function offerDigestV2(value: unknown): Promise<string> {
+  void value;
+  return '';
+}
+
 function base64Encode(bytes: Readonly<Uint8Array>): string {
   return btoa(String.fromCharCode(...bytes));
 }

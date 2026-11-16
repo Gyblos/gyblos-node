@@ -12,6 +12,12 @@ export const RECEIPT_UPLOAD = {
   maxBytes: 262_144,
 } as const;
 
+export const RECEIPT_UPLOAD_V2 = {
+  ...RECEIPT_UPLOAD,
+  version: 2,
+  domain: 'gyblos/receipt-upload/v2\n',
+} as const;
+
 // Which application produced the upload; it must agree with the uploader's role.
 export const RECEIPT_UPLOAD_CLIENTS = {
   SELLER_NODE: 'seller-node',
