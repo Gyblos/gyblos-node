@@ -160,14 +160,14 @@ export function receiptActivity(
   };
 }
 
-// USDC's decimals: atomic units per whole token are 10 ** USDC_DECIMALS.
+// USDC's decimals and the atomic units in one whole token.
 const USDC_DECIMALS = 6;
+const USDC_SCALE = 1_000_000n;
 
 // Atomic units of USDC as a decimal string without trailing zeros: 1500 -> "0.0015".
 export function atomicUsdc(atomic: bigint): string {
-  const scale = 10n ** BigInt(USDC_DECIMALS);
-  const whole = atomic / scale;
-  const fraction = (atomic % scale)
+  const whole = atomic / USDC_SCALE;
+  const fraction = (atomic % USDC_SCALE)
     .toString()
     .padStart(USDC_DECIMALS, '0')
     .replace(/0+$/, '');
