@@ -23,6 +23,7 @@ const PAID_TERMINAL_FRAME_BYTES = PAID_EVENT_BYTES + CONTROL_LIMITS.prefixBytes;
 export const PAID_EXECUTION = {
   version: 2,
   requestDomain: 'gyblos/paid-execution-request/v2\n',
+  unsignedRequestBytes: PAID_V1_REQUEST_BYTES,
   requestBytes: PAID_V1_REQUEST_BYTES + AUTHORIZATION_BYTES,
   responseBytes: FREE_EXECUTION.responseBytes + PAYMENT_TERMINAL_BYTES,
   // The scheme's signed channel open, base64; a Solana transaction is at most 1232 bytes.

@@ -66,7 +66,7 @@ if(scenario==='network') config.request.network='solana:synthetic';
 if(scenario==='mint') role.mint='synthetic-other-mint';
 if(scenario==='quote-model') quote.offer.selection=custom;
 if(scenario==='quote-reasoning') quote.offer.reasoning=REASONING_LEVELS.LOW;
-if(scenario==='quote-mint') quote.offer.mint='1'.repeat(32);
+if(scenario==='quote-mint') quote.offer.mint=quote.offer.owner;
 if(scenario==='tokens') config.request.maxTokens=32769;
 if(scenario==='quote-tokens') input.maxTokens=quote.offer.maxTokens+1;
 if(scenario==='bytes') input.messages[0].content='a'.repeat(65537);

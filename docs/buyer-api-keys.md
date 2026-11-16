@@ -64,9 +64,12 @@ reservation and records its verified amount before delivering the response.
 
 For each paid request, the buyer validates the selected model, network, input
 and tokenizer before reserving a key's allowance or opening financial services.
-Reusable sessions also recount the input against the quote's context and budget
-first. A local validation refusal leaves the key usable; it is not an uncertain
-payment. Other configured free models do not prevent a compatible paid request.
+The input must fit the model context and the unsigned request's existing byte
+allowance, including JSON escapes and space for authorization. Reusable sessions
+also recheck quote freshness, buyer binding, deposit policy and worst-case input
+budget after loading the tokenizer. A local validation refusal leaves the key
+usable; it is not an uncertain payment. Other configured free models do not
+prevent a compatible paid request.
 
 - Per-request settled executions consume the verified charge, including a
   charged terminal failure or a failed delivery. A transaction is required to

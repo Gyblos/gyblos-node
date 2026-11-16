@@ -181,7 +181,15 @@ export function paidExecutionInput(
       offer.requestId,
       offer,
     );
-    boundedWire({ quote, input: parsed }, PAID_EXECUTION.requestBytes);
+    boundedWire(
+      {
+        version: PAID_EXECUTION.version,
+        requestId: offer.requestId,
+        quote,
+        input: parsed,
+      },
+      PAID_EXECUTION.unsignedRequestBytes,
+    );
     return parsed;
   });
 }

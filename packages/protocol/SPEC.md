@@ -739,9 +739,13 @@ Request: the free request shape (unchanged since v3) with `version: 1`, plus `pa
   `paymentMemo(terms)` and its distribution is `paymentSplits(terms)`
   (`payment-binding`), so the buyer's wallet signs every money field and the
   protocol fee split.
-- The request digest is SHA-256 over `gyblos/paid-execution-request/v1\n` plus
+- The request digest is SHA-256 over `gyblos/paid-execution-request/v2\n` plus
   the canonical request, so it covers the authorization; the request is bounded
-  to the free bound plus 8 KiB.
+  to 136 KiB. Before constructing payment, the canonical unsigned envelope
+  (`version`, `requestId`, `quote`, `input`) must fit the existing 128 KiB
+  allowance, leaving 8 KiB for authorization. JSON escaping counts toward this
+  allowance even when raw message bytes fit the 64 KiB input cap. This local
+  preflight preserves the full wire frame limit and signing domain.
 
 ### Events and terminal
 

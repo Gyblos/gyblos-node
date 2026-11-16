@@ -11,7 +11,6 @@ import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   buildPaidExecutionRequest,
-  paidExecutionInput,
   type PaidCharge,
   type PaidExecutionRequest,
   type PaidExecutionResponse,
@@ -30,12 +29,15 @@ import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
 import { bounded } from './buyer-operation';
 import { PaidBuyerError } from './buyer-paid-error';
+import { checkBuyerPaidInput } from './buyer-paid-preflight';
 import {
   BUYER_PAID_TIMEOUTS,
   PAID_BUYER_CODES,
   PAID_VERDICTS,
   type PaidVerdict,
 } from './constants';
+
+export { checkBuyerPaidInput };
 
 export interface PaidWinner {
   nodeId: string;
@@ -232,21 +234,6 @@ interface Attempt {
   onDelta: (text: string, requestDigest?: string) => Promise<void>;
 }
 
-// Pure local preflight shared by buyer hosts; repeat it at execution before signing anything.
-export function checkBuyerPaidInput(
-  input: FreeExecutionBuildInput,
-  meter: PaidBuyerDependencies['meter'],
-  quote?: SignedOfferV2,
-): string {
-  const prompt = paidPrompt(
-    quote ? paidExecutionInput(quote, input) : input,
-    meter,
-  );
-  if (prompt === undefined)
-    throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
-  return prompt;
-}
-
 // One attempt with one seller: undefined when the signed open never left the buyer and another
 // seller may serve; otherwise an outcome, or the failure once the stop is recorded.
 async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
@@ -335,7 +322,8 @@ export async function executeBuyerPaid(
     requestDigest?: string,
   ) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome> {
-  checkBuyerPaidInput(input, dependencies.meter);
+  if (paidPrompt(input, dependencies.meter) === undefined)
+    throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
   const release = dependencies.enter();
   try {
     const signal = AbortSignal.any([

@@ -11,13 +11,14 @@ import {
   buyerSessionPoolChain,
 } from '@gyblos/node/buyer-session-chain';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
+import { sessionTerms } from '@gyblos/node/session-policy';
 import {
   batchSessionTerminal,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
-import { batchFail } from '@gyblos/protocol/batch-channel';
+import { batchFail, verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
@@ -114,13 +115,21 @@ function sessionReceipts(
       );
   };
 }
-function sessionPreflight(state: SessionState, options: Options) {
+function sessionPreflight(
+  state: SessionState,
+  options: Options,
+  context: Context,
+  policy: Parameters<typeof sessionTerms>[1],
+) {
   return async (
     quote: Parameters<typeof recountSessionInput>[0],
     input: Parameters<typeof recountSessionInput>[1],
   ) => {
     const meter = await prepareMeter(state, options);
     recountSessionInput(quote, input, meter);
+    const now = Date.now();
+    const terms = sessionTerms(quote, policy, now);
+    await verifyBatchQuote(quote, terms, context.endpoint.id().toString(), now);
   };
 }
 export function makeManager(
@@ -197,6 +206,6 @@ export function makeManager(
       : createBuyerSessionManager(common);
   return {
     ...manager,
-    preflight: sessionPreflight(state, options),
+    preflight: sessionPreflight(state, options, context, policy),
   };
 }
