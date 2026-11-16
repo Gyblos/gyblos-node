@@ -1,5 +1,6 @@
 // Exercises upload retention and crash recovery using only synthetic signed receipts and isolated homes.
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import {
   appendFile,
   mkdtemp,
@@ -11,15 +12,51 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { promisify } from 'node:util';
 
 import { receiptPathsIn } from '@gyblos/config';
 import { NODE_ERROR_CODES, RECEIPT_UPLOAD } from '@gyblos/node/constants';
-import { listReceipts, openReceiptStore } from '@gyblos/node/receipts';
+import {
+  createSellerReceiptRuntime,
+  listReceipts,
+  openReceiptStore,
+  type ReceiptStoreOptions,
+} from '@gyblos/node/receipts';
 import { canonicalJson } from '@gyblos/protocol';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { controlObject } from '@gyblos/protocol/control-validation';
 import { signSellerReceipt } from '@gyblos/protocol/receipt';
 
 import { receiptChannelFixture } from './support/receipt-channel';
+
+async function reopenedInChild(options: ReceiptStoreOptions) {
+  const script = `
+    import { openReceiptStore, listReceipts } from '@gyblos/node/receipts';
+    const { clock, ...settings } = JSON.parse(process.argv[1]);
+    settings.now = () => clock;
+    const store = openReceiptStore(settings);
+    const health = await store.uploadHealth();
+    const entries = (await listReceipts(settings)).map(({ storedAt, uploadedAt }) => ({ storedAt, uploadedAt }));
+    process.stdout.write(JSON.stringify({ health, entries }));
+  `;
+  const { stdout } = await promisify(execFile)(
+    process.execPath,
+    [
+      '--import',
+      import.meta.resolve('tsx'),
+      '--input-type=module',
+      '-e',
+      script,
+      JSON.stringify({ ...options, clock: options.now?.() ?? Date.now() }),
+    ],
+    {
+      cwd: process.cwd(),
+      env: { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR },
+    },
+  );
+  const result: unknown = JSON.parse(stdout);
+  return controlObject(result, ['health', 'entries']);
+}
 
 async function fixture() {
   const sample = await receiptChannelFixture();
@@ -150,6 +187,15 @@ void test('full pending budget preserves old bodies and durably counts rejected 
     const health = await openReceiptStore(options).uploadHealth();
     assert.equal(health.rejectedWrites, 1);
     assert.equal(health.full, true);
+    assert.deepEqual((await reopenedInChild(options)).health, health);
+    const runtime = createSellerReceiptRuntime({
+      nodeId: f.seller.nodeId,
+      store,
+      signer: f.seller.sign,
+    });
+    assert.equal(runtime.health().storage?.full, true);
+    assert.equal(runtime.health().storage?.rejectedWrites, 1);
+    await runtime.close();
   } finally {
     await f.close();
   }
@@ -237,6 +283,9 @@ void test('first upload confirmation is immutable and caller mutations cannot al
     assert.ok(held);
     assert.equal(held.uploadedAt, 1700000000101);
     assert.equal(held.storedAt, cursor.storedAt);
+    assert.deepEqual((await reopenedInChild(f.options)).entries, [
+      { storedAt: cursor.storedAt, uploadedAt: 1700000000101 },
+    ]);
     cursor.receipt.seller.signature = '00'.repeat(64);
     const fresh = await openReceiptStore(f.options).load(
       cursor.key,
