@@ -11,10 +11,6 @@ import type {
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import {
-  createLocalDiagnostics,
-  loadLocalDiagnostics,
-} from '@gyblos/node/diagnostics-startup';
-import {
   createBuyerReceiptRuntime,
   openReceiptStore,
 } from '@gyblos/node/receipts';
@@ -47,6 +43,7 @@ import type { RoutedModel } from './model-routes';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
+import { withBuyerDiagnostics } from './startup-diagnostics';
 
 // A host composition seam: transports, admission and quote verification remain in existing modules.
 export type BuyerExecutionFactory = (context: {
@@ -256,37 +253,35 @@ function buyerHost(
   receipts: ReturnType<typeof createBuyerReceiptRuntime>,
   endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
   telemetry: ReturnType<typeof createLocalTelemetry>,
-  execution: Awaited<ReturnType<BuyerExecutionFactory>> | undefined,
-  diagnostics: ReturnType<typeof createLocalDiagnostics>,
+  execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
 ) {
-  const closeResources = (runningHost?: typeof host) =>
-    closeBuyerResources(
-      receipts,
-      endpoint,
-      telemetry,
-      runningHost,
-      execution,
-    ).finally(diagnostics.close);
-  const close = () => closeResources(host);
   return {
     url: host.url,
     chat: execution?.chat(host.url) ?? freeChat(request, host.url),
     receipts: receipts.health,
     telemetry: telemetry.health,
-    diagnostics: diagnostics.health,
-    close,
+    close: () =>
+      closeBuyerResources(receipts, endpoint, telemetry, host, execution),
     inspectAndClose: execution?.inspect
       ? async (digest: string, signal?: AbortSignal) => {
           try {
             await host.close();
             return await execution?.inspect?.(digest, signal);
           } finally {
-            await closeResources();
+            await closeBuyerResources(
+              receipts,
+              endpoint,
+              telemetry,
+              undefined,
+              execution,
+            );
           }
         }
       : undefined,
   };
 }
+
+export type BuyerHost = ReturnType<typeof buyerHost>;
 
 function checkFreeRequest(
   request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
@@ -307,9 +302,9 @@ async function startOwnedFreeBuyer(
     onSellerFailure?: SellerFailureReporter;
     execution?: BuyerExecutionFactory;
   } = {},
+  diagnostics?: DiagnosticSink,
 ) {
   const telemetryEnabled = await loadLocalTelemetry(process.env);
-  const diagnosticSettings = await loadLocalDiagnostics(process.env);
   const role = await buyerRole();
   if (role.role !== P2P_ROLES.BUYER)
     return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
@@ -332,11 +327,6 @@ async function startOwnedFreeBuyer(
     role: P2P_ROLES.BUYER,
     sink: options.telemetry,
   });
-  const diagnostics = createLocalDiagnostics(
-    process.env,
-    P2P_ROLES.BUYER,
-    diagnosticSettings,
-  );
   let receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined;
   let execution: Awaited<ReturnType<BuyerExecutionFactory>> | undefined;
   try {
@@ -370,17 +360,9 @@ async function startOwnedFreeBuyer(
       options.port,
       execution,
       role,
-      diagnostics.write,
-    );
-    return buyerHost(
-      host,
-      request,
-      receipts,
-      endpoint,
-      telemetry,
-      execution,
       diagnostics,
     );
+    return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
     await closeBuyerResources(
       receipts,
@@ -388,7 +370,7 @@ async function startOwnedFreeBuyer(
       telemetry,
       undefined,
       execution,
-    ).finally(diagnostics.close);
+    );
     throw error;
   }
 }
@@ -398,5 +380,9 @@ export async function startFreeBuyer(
   options: Parameters<typeof startOwnedFreeBuyer>[0] = {},
 ) {
   await buyerRole();
-  return withBuyerRuntime(process.env, () => startOwnedFreeBuyer(options));
+  return withBuyerRuntime(process.env, () =>
+    withBuyerDiagnostics((diagnostics) =>
+      startOwnedFreeBuyer(options, diagnostics),
+    ),
+  );
 }

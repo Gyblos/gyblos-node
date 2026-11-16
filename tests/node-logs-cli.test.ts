@@ -1,3 +1,4 @@
+// Exercises read-only local diagnostic CLI output against a temporary role home.
 import assert from 'node:assert/strict';
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

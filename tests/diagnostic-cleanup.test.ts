@@ -1,3 +1,4 @@
+// Pins primary-failure precedence when cleanup or its observer also fails.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

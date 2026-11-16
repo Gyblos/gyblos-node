@@ -1,8 +1,7 @@
 // Child-only entry: fixed synthetic cases, sanitized metadata report and lifecycle-bound shutdown.
 import { isMain, onShutdown } from '@gyblos/runtime';
 
-import { ACCEPTANCE_CODES } from './constants';
-import { acceptanceAssert, AcceptanceError } from './errors';
+import { acceptanceAssert, acceptanceDiagnosticCode } from './errors';
 import { TOOL_ACCEPTANCE, TOOL_ACCEPTANCE_CASES } from './tools-constants';
 import { runToolCase } from './tools-diagnostics';
 
@@ -28,10 +27,7 @@ async function main() {
     console.log(
       JSON.stringify({
         ok: false,
-        code:
-          error instanceof AcceptanceError
-            ? error.code
-            : ACCEPTANCE_CODES.FAILED,
+        code: acceptanceDiagnosticCode(error),
       }),
     );
     return 1;

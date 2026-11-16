@@ -35,7 +35,9 @@ export function createLocalDiagnostics(
     rolePathIn(environment, role, ROLE_FILES.diagnostics),
   );
   const levels = Object.values(DIAGNOSTIC_LEVELS);
-  const write: DiagnosticSink = (record) => {
+  const write: DiagnosticSink = (input) => {
+    const record = diagnosticRecord(input);
+    if (!record) return;
     if (
       settings.enabled === false ||
       levels.indexOf(record.level) <
@@ -46,7 +48,7 @@ export function createLocalDiagnostics(
       ...record,
       version: environment[NODE_ENVIRONMENT.version] ?? record.version,
     });
-    if (projected) log.write(projected);
+    log.write(projected ?? record);
   };
   return {
     write,

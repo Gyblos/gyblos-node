@@ -1,3 +1,4 @@
+// Exercises content-free HTTP failure records with synthetic local executors and requests.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

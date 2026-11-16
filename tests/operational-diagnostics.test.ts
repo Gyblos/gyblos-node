@@ -1,3 +1,4 @@
+// Verifies safe operational envelopes, catalog validation and nonthrowing sinks.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

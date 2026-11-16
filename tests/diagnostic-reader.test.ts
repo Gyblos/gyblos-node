@@ -1,3 +1,4 @@
+// Exercises bounded read-only log snapshots and follow with synthetic private temporary files.
 import assert from 'node:assert/strict';
 import {
   appendFile,

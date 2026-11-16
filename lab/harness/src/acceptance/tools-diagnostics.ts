@@ -12,7 +12,7 @@ import {
 } from '@gyblos/runtime/diagnostics';
 
 import { ACCEPTANCE_CODES } from './constants';
-import { AcceptanceError } from './errors';
+import { acceptanceDiagnosticCode } from './errors';
 import {
   TOOL_ACCEPTANCE_CASES,
   TOOL_DIAGNOSTICS,
@@ -96,14 +96,11 @@ export async function runToolCase(
         }),
     );
   } catch (error) {
-    const code =
-      error instanceof AcceptanceError
-        ? Object.values(ACCEPTANCE_CODES).find((value) => value === error.code)
-        : undefined;
+    const code = acceptanceDiagnosticCode(error);
     operation.report({
       phase,
       scenario,
-      code: code ?? ACCEPTANCE_CODES.FAILED,
+      code,
       cause: diagnosticCause(error),
       outcome: signal.aborted
         ? DIAGNOSTIC_OUTCOMES.CANCELLED

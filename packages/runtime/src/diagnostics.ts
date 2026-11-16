@@ -67,6 +67,17 @@ export function diagnosticCause(error: unknown): DiagnosticCause {
   return DIAGNOSTIC_CAUSES.UNKNOWN;
 }
 
+function diagnosticStart() {
+  try {
+    return { correlationId: randomUUID(), started: performance.now() };
+  } catch {
+    return undefined;
+  }
+}
+function silentOperation<P, C>() {
+  return { correlationId: undefined, report(_event: DiagnosticEvent<P, C>) {} };
+}
+
 export function createDiagnostics<
   const P extends string,
   const C extends string,
@@ -86,8 +97,14 @@ export function createDiagnostics<
   return {
     health: () => ({ dropped }),
     start() {
-      const correlationId = randomUUID();
-      const started = performance.now();
+      if (options.enabled === false || !options.sink)
+        return silentOperation<P, C>();
+      const metadata = diagnosticStart();
+      if (!metadata) {
+        dropped++;
+        return silentOperation<P, C>();
+      }
+      const { correlationId, started } = metadata;
       return {
         correlationId,
         report(event: DiagnosticEvent<P, C>) {

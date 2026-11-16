@@ -1,9 +1,13 @@
+// Pins safe tool-worker phase reporting and parent observations with injected synthetic failures.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { ACCEPTANCE_CODES } from '@gyblos/lab-harness/acceptance/constants';
 import { AcceptanceError } from '@gyblos/lab-harness/acceptance/errors';
-import { TOOL_ACCEPTANCE_CASES } from '@gyblos/lab-harness/acceptance/tools-constants';
+import {
+  TOOL_ACCEPTANCE_CASES,
+  TOOL_DIAGNOSTICS,
+} from '@gyblos/lab-harness/acceptance/tools-constants';
 import { runToolCase } from '@gyblos/lab-harness/acceptance/tools-diagnostics';
 import type { DiagnosticRecord } from '@gyblos/runtime/diagnostics';
 
@@ -17,7 +21,7 @@ void test('tool worker preserves case and last phase for a synthetic failure', a
       {
         sink: (record) => records.push(record),
         run: async (_scenario, _signal, phase) => {
-          phase('verify');
+          phase(TOOL_DIAGNOSTICS.phases.VERIFY);
           throw primary;
         },
       },
@@ -42,7 +46,7 @@ void test('parent timeout retains the latest complete phase frame without a fina
     runToolCase(scenario, new AbortController().signal, {
       sink: (record) => records.push(record),
       run: async (_scenario, _signal, phase) => {
-        phase('verify');
+        phase(TOOL_DIAGNOSTICS.phases.VERIFY);
         throw new Error('SECRET-CANARY');
       },
     }),
@@ -68,4 +72,32 @@ void test('parent timeout retains the latest complete phase frame without a fina
   assert.equal(error.diagnostic.outcome, 'timeout');
   assert.equal(error.diagnostic.signal, 'SIGKILL');
   assert.ok(!JSON.stringify(error.diagnostic).includes('SECRET-CANARY'));
+});
+
+void test('hostile error code accessor cannot replace a tool failure or become diagnostic content', async () => {
+  const primary = new AcceptanceError(ACCEPTANCE_CODES.FAILED);
+  let accessed = false;
+  Object.defineProperty(primary, 'code', {
+    get() {
+      accessed = true;
+      throw new Error('SECRET-CANARY');
+    },
+  });
+  const records: DiagnosticRecord[] = [];
+  await assert.rejects(
+    runToolCase(
+      TOOL_ACCEPTANCE_CASES.OPENAI_JSON,
+      new AbortController().signal,
+      {
+        sink: (record) => records.push(record),
+        run: async () => {
+          throw primary;
+        },
+      },
+    ),
+    (error) => error === primary,
+  );
+  assert.equal(accessed, false);
+  assert.equal(records.at(-1)?.code, ACCEPTANCE_CODES.FAILED);
+  assert.ok(!JSON.stringify(records).includes('SECRET-CANARY'));
 });

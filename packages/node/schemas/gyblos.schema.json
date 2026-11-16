@@ -40,6 +40,9 @@
     },
     "telemetry": {
       "$ref": "#/definitions/telemetry"
+    },
+    "diagnostics": {
+      "$ref": "#/definitions/diagnostics"
     }
   },
   "definitions": {
@@ -393,6 +396,21 @@
           "type": "boolean",
           "default": false,
           "description": "Opt in to bounded private file telemetry for each locally started role. No external collection."
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable local operational diagnostics, independently of telemetry and receipts."
+        },
+        "level": {
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "warn"
         }
       }
     }

@@ -18,9 +18,12 @@ implementation.
   stderr is never copied into a diagnostic. If the child never starts, the last
   known phase is startup. A phase is the last observed boundary, not proof of an
   underlying cause.
-- Cleanup errors are separate records. `withDiagnosticCleanup` preserves the
-  original thrown value, including `undefined`; cleanup failure after successful
-  work still fails the operation.
+- Post-start tool-work and parent-workspace cleanup errors are separate records.
+  `withDiagnosticCleanup` preserves the original thrown value, including
+  `undefined`; cleanup failure after successful work still fails the operation.
+  Shared nested receipt-startup cleanup is not yet instrumented; a cleanup
+  failure there can still hide its original startup error. The worker can report
+  only the resulting failure and last known startup phase.
 
 This is initial coverage, not instrumentation of every seller, transport,
 discovery or payment path. Existing service output is not retroactively
