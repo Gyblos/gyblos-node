@@ -50,6 +50,7 @@ export function childFrames(text: string, scenario: ToolAcceptanceCase) {
 }
 export function childFailure(options: {
   output: string;
+  observation?: Pick<DiagnosticRecord, 'at' | 'durationMs'>;
   scenario: ToolAcceptanceCase;
   code: AcceptanceError['code'];
   exitCode: number | null;
@@ -60,6 +61,7 @@ export function childFailure(options: {
   cancelled: boolean;
   sink?: DiagnosticSink;
 }) {
+  if (!options.observation) return new ToolAcceptanceFailure(options.code);
   let records: DiagnosticRecord[] = [];
   try {
     records = childFrames(options.output, options.scenario).diagnostics;
@@ -87,6 +89,8 @@ export function childFailure(options: {
     if (!primary) return new ToolAcceptanceFailure(options.code);
     diagnostic = diagnosticRecord({
       ...primary,
+      at: options.observation.at,
+      durationMs: options.observation.durationMs,
       id: randomUUID(),
       code: options.code,
       level: DIAGNOSTIC_LEVELS.ERROR,

@@ -10,6 +10,7 @@ import { DIAGNOSTIC_OUTCOMES } from '@gyblos/runtime/constants';
 import { withDiagnosticCleanup } from '@gyblos/runtime/diagnostic-cleanup';
 import {
   diagnosticCause,
+  diagnosticTiming,
   type DiagnosticSink,
 } from '@gyblos/runtime/diagnostics';
 
@@ -78,6 +79,7 @@ async function childAcceptance(
   signal?: AbortSignal,
   diagnostics?: DiagnosticSink,
 ) {
+  const observe = diagnosticTiming();
   const child = spawn(
     process.execPath,
     [
@@ -142,6 +144,7 @@ async function childAcceptance(
     const failure = (reason: AcceptanceError['code']) =>
       childFailure({
         output,
+        observation: observe(),
         scenario,
         code: reason,
         exitCode: code,

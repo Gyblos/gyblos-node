@@ -72,6 +72,7 @@ void test('home layout defaults to one cwd-relative product home and a separate 
     root: '.local/lab',
     measurements: '.local/lab/measurements.jsonl',
     facilitatorDiagnostics: '.local/lab/facilitator-diagnostics',
+    diagnostics: '.local/lab/diagnostics',
     identityKeys: '.local/lab/identity/keys',
     identityValidator: '.local/lab/identity-validator',
     batchChannelKeys: '.local/lab/batch-channel-check/keys.json',

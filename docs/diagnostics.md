@@ -14,10 +14,12 @@ implementation.
   records successful chat/count-token completion; it never captures content.
 - Tool acceptance workers emit validated phase frames while starting,
   requesting, verifying, cancelling and closing resources. On failure the parent
-  adds observed child exit code, signal and stdout/stderr byte counts. Raw child
-  stderr is never copied into a diagnostic. If the child never starts, the last
-  known phase is startup. A phase is the last observed boundary, not proof of an
-  underlying cause.
+  adds observed child exit code, signal and stdout/stderr byte counts. Its
+  terminal timestamp is the parent's observation time; duration is monotonic
+  elapsed time since the parent began spawning the child, even if no frame
+  arrived. Raw child stderr is never copied into a diagnostic. If the child
+  never starts, the last known phase is startup. A phase is the last observed
+  boundary, not proof of an underlying cause.
 - Post-start tool-work and parent-workspace cleanup errors are separate records.
   `withDiagnosticCleanup` preserves the original thrown value, including
   `undefined`; cleanup failure after successful work still fails the operation.

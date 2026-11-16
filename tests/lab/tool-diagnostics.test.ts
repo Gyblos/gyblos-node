@@ -10,7 +10,10 @@ import {
   TOOL_ACCEPTANCE_CASES,
   TOOL_DIAGNOSTICS,
 } from '@gyblos/lab-harness/acceptance/tools-constants';
-import { runToolCase } from '@gyblos/lab-harness/acceptance/tools-diagnostics';
+import {
+  runToolCase,
+  toolDiagnostics,
+} from '@gyblos/lab-harness/acceptance/tools-diagnostics';
 import type { DiagnosticRecord } from '@gyblos/runtime/diagnostics';
 
 void test('tool worker preserves case and last phase for a synthetic failure', async () => {
@@ -60,6 +63,7 @@ void test('parent timeout retains the latest complete phase frame without a fina
       .join('\n') + '\n';
   const error = childFailure({
     output,
+    observation: { at: new Date().toISOString(), durationMs: 1 },
     scenario,
     code: ACCEPTANCE_CODES.FAILED,
     exitCode: null,
@@ -119,6 +123,7 @@ void test('parent child-failure metadata cannot replace the canonical failure wh
     syncBuiltinESMExports();
     const failure = childFailure({
       output: '',
+      observation: { at: new Date().toISOString(), durationMs: 1 },
       scenario: TOOL_ACCEPTANCE_CASES.OPENAI_JSON,
       code: ACCEPTANCE_CODES.FAILED,
       exitCode: 1,
@@ -134,3 +139,45 @@ void test('parent child-failure metadata cannot replace the canonical failure wh
     syncBuiltinESMExports();
   }
 });
+
+for (const hasFrame of [false, true]) {
+  void test(`terminal child metadata uses parent observation ${hasFrame ? 'with previous frame' : 'without frames'}`, async () => {
+    const { childFailure } =
+      await import('@gyblos/lab-harness/acceptance/tools');
+    const scenario = TOOL_ACCEPTANCE_CASES.OPENAI_JSON;
+    const observation = { at: '2026-11-16T21:00:00.000Z', durationMs: 1234 };
+    let frame: DiagnosticRecord | undefined;
+    toolDiagnostics((record) => {
+      frame = record;
+    })
+      .start()
+      .report({
+        phase: TOOL_DIAGNOSTICS.phases.VERIFY,
+        scenario,
+        code: TOOL_DIAGNOSTICS.codes.PROGRESS,
+      });
+    assert.ok(frame);
+    const prior = { ...frame, at: '2000-01-01T00:00:00.000Z', durationMs: 7 };
+    const output = hasFrame ? JSON.stringify({ diagnostic: prior }) + '\n' : '';
+    const error = childFailure({
+      output,
+      scenario,
+      observation,
+      code: ACCEPTANCE_CODES.FAILED,
+      exitCode: null,
+      signal: 'SIGKILL',
+      stdoutBytes: Buffer.byteLength(output),
+      stderrBytes: 0,
+      timedOut: true,
+      cancelled: false,
+    });
+    assert.equal(error.diagnostic?.durationMs, observation.durationMs);
+    assert.equal(error.diagnostic?.at, observation.at);
+    assert.equal(
+      error.diagnostic?.phase,
+      hasFrame
+        ? TOOL_DIAGNOSTICS.phases.VERIFY
+        : TOOL_DIAGNOSTICS.phases.STARTUP,
+    );
+  });
+}

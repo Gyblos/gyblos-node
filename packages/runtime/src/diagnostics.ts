@@ -67,6 +67,28 @@ export function diagnosticCause(error: unknown): DiagnosticCause {
   return DIAGNOSTIC_CAUSES.UNKNOWN;
 }
 
+// The parent owns the elapsed time and timestamp of its child-terminal observation.
+export function diagnosticTiming() {
+  let started: number | undefined;
+  try {
+    started = performance.now();
+  } catch {
+    /* Missing timing is not an operation failure. */
+  }
+  return (): Pick<DiagnosticRecord, 'at' | 'durationMs'> | undefined => {
+    try {
+      if (started !== undefined)
+        return {
+          at: new Date().toISOString(),
+          durationMs: Math.floor(performance.now() - started),
+        };
+    } catch {
+      /* A faulty clock drops metadata only. */
+    }
+    return undefined;
+  };
+}
+
 function diagnosticStart() {
   try {
     return { correlationId: randomUUID(), started: performance.now() };
