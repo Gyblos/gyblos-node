@@ -78,20 +78,30 @@ Opt in through the existing buyer `selection.json`:
 The value must be HTTPS or loopback HTTP, without credentials, query or
 fragment.
 
-A registry binding the buyer just read and admitted is reused for five minutes
-(`BUYER_IDENTITY.freshLookupMs`) instead of being read again for every candidate
-and request; a buyer read it about four times per request, and the public devnet
-RPC rate-limits those repeated reads, which left every seller unverified from
-the second request on. Each reuse is still evaluated against the durable state.
-Only a lookup that admitted the seller is kept, never a failure. Within the
-window a registry outage does not exclude the seller and a revocation applies
-when it expires. `"identity": { "rpcUrl": "…", "reuseMs": 0 }` reads the
-registry for every check (the acceptance harnesses do, to observe outages and
-revocations at once); `reuseMs` may be raised to an hour. The profile and
-request network remain devnet-only. No implicit RPC URL is used. The existing
-`sellers` list still owns allowed NodeIds, expected owners and Iroh endpoints:
-public catalogs intentionally contain no connection addresses. This slice does
-not enroll arbitrary sellers returned by the index.
+An independently read binding that admitted the seller is reused for up to five
+minutes (`BUYER_IDENTITY.freshLookupMs`) to avoid redundant registry calls
+across selection and execution. Each use still evaluates durable identity floors
+and revocation tombstones. Only admitted bindings are retained; failures and
+manual pins do not populate the cache. The fixed window uses both wall-clock age
+and monotonic elapsed time: a clock rollback cannot extend it, and suspension
+still expires it. Cached evidence that expires during durable evaluation is read
+again before admission.
+
+Within that window, an RPC outage does not exclude an already verified seller,
+and a previously unseen owner change or revocation is detected on the next fresh
+read. A revocation or newer floor already observed by another verifier in the
+same home takes effect immediately. Configure
+`"identity": { "rpcUrl": "…", "reuseMs": 0 }` to read on every check; values are
+safe integers from zero through `BUYER_IDENTITY.maxFreshLookupMs` (one hour),
+enforced by both configuration and the shared verifier. Identity acceptance
+harnesses use zero to observe outages and revocations immediately. The profile
+and request network remain devnet-only; no implicit RPC URL is used.
+
+In configured mode, `sellers` supplies allowed NodeIds, expected owners and Iroh
+endpoints. Explicit free open discovery can also admit indexed candidates only
+after independent registry verification and signed-record/quote checks. Index
+claims never create trust or reset durable identity history. Public catalogs
+intentionally contain no internal engine addresses.
 
 With no `identity` property, existing configured owner–NodeId bindings retain
 their manual semantics and no registry client/state is opened. In registry mode,
@@ -136,13 +146,13 @@ previously observed history. The local filesystem must be trusted. Windows and
 crash/power-loss behavior have not been operationally certified by the synthetic
 tests.
 
-Lookup decisions are never cached as usable trust. Caller cancellation reaches
-RPC; cancelled/late results cannot admit a quote or prompt. Static configured
-candidate limits bound lookup fan-out. The default buyer uses the bounded RPC
-transport described below. Read deadlines do not make multi-request chain
-observations atomic and no read can freeze ownership after its last observation.
-Real-registry/off-host/mainnet acceptance remains separate from local synthetic
-tests.
+Final admission decisions are never reused without reevaluating durable policy.
+Caller cancellation reaches RPC; cancelled/late results cannot admit a quote or
+prompt. Static configured candidate limits bound lookup fan-out. The default
+buyer uses the bounded RPC transport described below. Read deadlines do not make
+multi-request chain observations atomic and no read can freeze ownership after
+its last observation. Real-registry/off-host/mainnet acceptance remains separate
+from local synthetic tests.
 
 ### Bounded read-only RPC transport
 

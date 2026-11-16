@@ -11,7 +11,7 @@ import {
 } from '@gyblos/identity/resolution';
 import { createIdentityResolutionRpc } from '@gyblos/identity/resolution-rpc';
 
-import { BUYER_IDENTITY, IDENTITY_STATE } from './constants';
+import { identityReuse, type IdentityReuseOptions } from './identity-reuse';
 import { openBuyerIdentityState } from './identity-state';
 import type { BuyerIdentityAdmission } from './identity-state-admission';
 
@@ -26,14 +26,13 @@ export interface BuyerIdentityVerifier {
     signal?: AbortSignal,
   ): Promise<IdentityPolicyDecision>;
 }
-type Lookup = Awaited<ReturnType<typeof readRegistryIdentity>>;
-
 export async function openBuyerIdentityVerifier(
   environment: HomeEnvironment,
   rpc: IdentityResolutionRpc | string,
   admission?: BuyerIdentityAdmission,
-  options: { now?: () => number; freshLookupMs?: number } = {},
+  options: IdentityReuseOptions = {},
 ): Promise<BuyerIdentityVerifier> {
+  const reuse = identityReuse(options);
   const source =
     typeof rpc === 'string' ? createIdentityResolutionRpc(rpc) : rpc;
   const state = await openBuyerIdentityState(
@@ -41,45 +40,42 @@ export async function openBuyerIdentityVerifier(
     IDENTITY_RESOLUTION_SCOPE,
     admission,
   );
-  const now = options.now ?? Date.now;
-  const freshMs = options.freshLookupMs ?? BUYER_IDENTITY.freshLookupMs;
-  // Bound registry bindings read recently, per NodeId; only a lookup that admitted the seller is kept.
-  const recent = new Map<string, { at: number; lookup: Lookup }>();
-  const read = async (nodeId: string, signal?: AbortSignal) => {
-    const kept = recent.get(nodeId);
-    const age = kept ? now() - kept.at : Infinity;
-    if (kept && age >= 0 && age < freshMs)
-      return { lookup: kept.lookup, fresh: false };
-    recent.delete(nodeId);
-    return {
-      lookup: await readRegistryIdentity(source, nodeId, { signal }),
-      fresh: true,
-    };
+  const read = async (nodeId: string, signal?: AbortSignal, force = false) => {
+    const kept = force ? undefined : reuse.get(nodeId);
+    if (kept) return { lookup: kept.lookup, fresh: false, at: kept.at };
+    reuse.drop(nodeId);
+    const lookup = await readRegistryIdentity(source, nodeId, { signal });
+    return { lookup, fresh: true, at: reuse.time() };
   };
-  return {
-    async verify(subject, signal) {
-      signal?.throwIfAborted();
-      const registry =
-        subject.manualTrust === true
-          ? undefined
-          : await read(subject.nodeId, signal);
-      const lookup = registry?.lookup;
-      signal?.throwIfAborted();
-      const decision = await state.evaluate({
-        nodeId: subject.nodeId,
-        owner: subject.owner,
-        ...(subject.manualTrust === true
-          ? { manual: { nodeId: subject.nodeId, owner: subject.owner } }
-          : { lookup }),
-      });
-      signal?.throwIfAborted();
-      if (registry?.fresh && lookup) {
-        if (decision.ok && lookup.kind === IDENTITY_LOOKUP_KINDS.BOUND)
-          recent.set(subject.nodeId, { at: now(), lookup });
-        // Bounded like the durable identity rows; dropping entries only costs another registry read.
-        if (recent.size > IDENTITY_STATE.maxRows) recent.clear();
-      } else if (registry && !decision.ok) recent.delete(subject.nodeId);
-      return decision;
-    },
-  };
+  async function verify(
+    subject: BuyerIdentitySubject,
+    signal?: AbortSignal,
+    force = false,
+  ): Promise<IdentityPolicyDecision> {
+    signal?.throwIfAborted();
+    const registry =
+      subject.manualTrust === true
+        ? undefined
+        : await read(subject.nodeId, signal, force);
+    const lookup = registry?.lookup;
+    signal?.throwIfAborted();
+    const decision = await state.evaluate({
+      nodeId: subject.nodeId,
+      owner: subject.owner,
+      ...(subject.manualTrust === true
+        ? { manual: { nodeId: subject.nodeId, owner: subject.owner } }
+        : { lookup }),
+    });
+    signal?.throwIfAborted();
+    if (registry && !registry.fresh && !reuse.fresh(registry.at)) {
+      reuse.drop(subject.nodeId);
+      return verify(subject, signal, true);
+    }
+    if (registry?.fresh && lookup) {
+      if (decision.ok && lookup.kind === IDENTITY_LOOKUP_KINDS.BOUND)
+        reuse.keep(subject.nodeId, lookup, registry.at);
+    } else if (registry && !decision.ok) reuse.drop(subject.nodeId);
+    return decision;
+  }
+  return { verify: (subject, signal) => verify(subject, signal) };
 }
