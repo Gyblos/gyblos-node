@@ -64,8 +64,9 @@ export async function sessionProductHost(
   const engine = paidAcceptanceEngine();
   const binding = receiptNativeBinding({ calls: engine.attempts });
   globalThis.fetch = async (input, init) => {
-    const request = new Request(input, init);
-    if (buyer && request.url === buyer.url) return originalFetch(request);
+    const url = input instanceof Request ? input.url : new URL(input).href;
+    // Forward the caller's signal directly; a collected intermediate Request can sever abort propagation.
+    if (buyer && url === buyer.url) return originalFetch(input, init);
     return assert.fail('External I/O forbidden in session acceptance');
   };
   const close = async () => {
