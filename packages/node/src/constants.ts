@@ -328,6 +328,16 @@ export const NODE_CONFIG_FLAGS = {
   discoveryUrl: '--discovery-url',
 } as const;
 
+// A registry binding the buyer just read is reused for this long instead of reading it again for every
+// candidate and request: public devnet RPCs rate-limit the repeated reads, which turned every seller
+// unverified on a buyer's second request. The reuse is re-evaluated against the durable state each time;
+// after it expires, an outage excludes the seller and previously unseen revocations are checked again.
+export const BUYER_IDENTITY = {
+  freshLookupMs: 300_000,
+  // selection.json identity.reuseMs may lower it to 0, or raise it to an hour at most.
+  maxFreshLookupMs: 3_600_000,
+} as const;
+
 // Durable identity floors are never evicted; full stores fail closed.
 export const IDENTITY_STATE = {
   schemaVersion: 1,

@@ -113,7 +113,8 @@ export async function createFreeBuyer(
           !url.search &&
           !url.hash,
       );
-      config.identity = { rpcUrl: identity.rpcUrl };
+      // Read the registry for every check, so outage and revocation cases see it at once.
+      config.identity = { rpcUrl: identity.rpcUrl, reuseMs: 0 };
 
       const path = join(
         homeLayout(run.workspace.environment).roles.buyer,

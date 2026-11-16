@@ -94,7 +94,8 @@ export async function writeReceiptBuyerConfig(
       },
     ],
     discovery: { baseUrl: ACCEPTANCE.baseUrl, maxPages: 1 },
-    identity: { rpcUrl },
+    // Read the registry for every check, so outage and revocation cases see it at once.
+    identity: { rpcUrl, reuseMs: 0 },
   };
   await writeFile(
     rolePathIn(process.env, P2P_ROLES.BUYER, BUYER_SELECTION.configFile),
