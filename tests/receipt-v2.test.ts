@@ -6,6 +6,7 @@ import {
   CONTROL_CODES,
   FREE_EXECUTION_CODES,
   OFFER_PRICING_KINDS,
+  RECEIPT,
   RECEIPT_OUTCOMES,
 } from '@gyblos/protocol/constants';
 import {
@@ -179,6 +180,12 @@ void test('buyer countersignatures cannot be moved to another valid channel clai
 });
 void test('receipt/v1 and paid receipt/v2 records, signatures and halves stay version-separated', async () => {
   const f = await paired();
+  assert.throws(
+    () => parseSellerReceiptV2({ ...f.record, version: RECEIPT.version }),
+    {
+      code: CONTROL_CODES.VERSION,
+    },
+  );
   const oldRecord = sellerRecord(f.seller.nodeId, f.buyer.nodeId);
   const seller = await signSellerReceipt(oldRecord, f.seller.sign);
   const buyer = await signBuyerReceipt(
