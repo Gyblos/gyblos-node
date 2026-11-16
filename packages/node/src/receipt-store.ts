@@ -40,6 +40,7 @@ import {
   receiptKey,
   type StoredReceipt,
 } from './receipt-store-schema';
+import type { ReceiptUploadCursor, ReceiptUploadHealth } from './receipt-upload-types';
 
 export interface ReceiptStoreOptions {
   environment: HomeEnvironment;
@@ -49,9 +50,14 @@ export interface ReceiptStoreOptions {
   maxEntries?: number;
   maxBytes?: number;
   retentionMs?: number;
+  maxPendingEntries?: number;
+  maxPendingBytes?: number;
 }
 export interface LocalReceiptStore extends ReceiptStore {
   put(value: unknown, signal?: AbortSignal): Promise<void>;
+  listPending(limit?: number, signal?: AbortSignal): Promise<ReceiptUploadCursor[]>;
+  markUploaded(cursor: Pick<ReceiptUploadCursor, 'key' | 'fingerprint'>, confirmedAt: number, signal?: AbortSignal): Promise<boolean>;
+  uploadHealth(signal?: AbortSignal): Promise<ReceiptUploadHealth>;
 }
 async function applyReceipt(
   entries: StoredReceipt[],
@@ -203,6 +209,9 @@ export function openReceiptStore(
     }
   }
   return {
+    async listPending() { return []; },
+    async markUploaded() { return false; },
+    async uploadHealth() { return { pendingEntries: 0, pendingBytes: 0, uploadedEntries: 0, rejectedWrites: 0, full: false }; },
     async put(value, signal) {
       try {
         if (!(await update(value, false, signal))) receiptUnavailable();
