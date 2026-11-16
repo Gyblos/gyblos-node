@@ -37,6 +37,7 @@ import {
 import {
   conflicts,
   envelopes,
+  observations,
   receipts,
   reports,
   statusHistory,
@@ -45,7 +46,10 @@ import {
   COMMIT_RESULTS,
   type CollectorStorage,
   type CollectorWrite,
+  type CommitResult,
+  type EnvelopeRow,
 } from './storage';
+import { receiptRow, status, storedReceipt } from './storage-d1-rows';
 
 export type {
   D1Database,
@@ -55,8 +59,8 @@ export type {
   D1Value,
 } from './d1-client';
 
-type ReceiptRow = typeof receipts.$inferInsert;
 type ReportInsert = typeof reports.$inferInsert;
+type BatchItem = Parameters<CollectorDatabase['batch']>[0][number];
 
 // Splits rows so no statement exceeds D1's bound-parameter limit.
 function chunks<T>(rows: readonly T[], columns: number): T[][] {
@@ -71,109 +75,25 @@ function chunks<T>(rows: readonly T[], columns: number): T[][] {
 }
 const columnCount = (row: object) => Object.keys(row).length;
 
-function badRow(): never {
-  throw new TypeError('Unexpected collector storage row.');
-}
-function status(value: string): PublicReceiptStatus {
-  for (const item of Object.values(PUBLIC_RECEIPT_STATUSES))
-    if (value === item) return item;
-  return badRow();
-}
-function signedHalf<T>(value: unknown, parse: (record: unknown) => T) {
-  if (!value || typeof value !== 'object') return badRow();
-  const signature: unknown = Reflect.get(value, 'signature');
-  return {
-    record: parse(Reflect.get(value, 'record')),
-    signature: typeof signature === 'string' ? signature : badRow(),
-  };
-}
-// Rows are the collector's own, written after verification; they are still re-parsed strictly.
-function storedReceipt(json: string, version: number): PublicReceipt {
-  const value: unknown = JSON.parse(json);
-  if (!value || typeof value !== 'object') return badRow();
-  const seller: unknown = Reflect.get(value, 'seller');
-  const buyer: unknown = Reflect.get(value, 'buyer');
-  if (version === RECEIPT.version) {
-    const receipt: PublicReceipt = {
-      seller: signedHalf(seller, parseSellerReceipt),
-    };
-    if (buyer !== undefined)
-      receipt.buyer = signedHalf(buyer, parseBuyerReceipt);
-    return receipt;
-  }
-  if (version === RECEIPT_V2.version) {
-    const receipt: PublicReceipt = {
-      seller: signedHalf(seller, parseSellerReceiptV2),
-    };
-    if (buyer !== undefined)
-      receipt.buyer = signedHalf(buyer, parseBuyerReceiptV2);
-    return receipt;
-  }
-  return badRow();
-}
-
-function receiptRow(entry: PublicReceiptEntry, now: number): ReceiptRow {
-  const record = entry.receipt.seller.record;
-  const paid =
-    record.pricing.kind === OFFER_PRICING_KINDS.PAID ? record.pricing : null;
-  const channel = 'channel' in record ? record.channel : null;
-  return {
-    receiptKey: entry.key,
-    sellerNodeId: record.sellerNodeId,
-    buyerNodeId: record.buyerNodeId,
-    requestId: record.requestId,
-    sellerDigest: entry.sellerDigest,
-    buyerDigest: entry.buyerDigest,
-    fingerprint: entry.fingerprint,
-    status: entry.status,
-    version: entry.version,
-    paid: entry.paid ? 1 : 0,
-    owner: record.owner,
-    modelId: record.selection.modelId,
-    variant: record.selection.variant,
-    quantization: record.selection.quantization,
-    reasoning: record.reasoning,
-    engineKind: record.engineKind,
-    streaming: record.streaming ? 1 : 0,
-    outcome: record.outcome,
-    inputTokens: record.usage.inputTokens,
-    outputTokens: record.usage.outputTokens,
-    reasoningTokens: record.usage.reasoningTokens,
-    amountAtomic: record.amountAtomic,
-    feeAtomic: record.feeAtomic,
-    network: paid?.network ?? null,
-    asset: paid?.asset ?? null,
-    channelId: channel?.channelId ?? null,
-    payer: channel?.payer ?? null,
-    sellerReceivedAt: record.timing.receivedAt,
-    firstTokenMs: record.timing.firstTokenMs,
-    totalMs: record.timing.totalMs,
-    receiptJson: JSON.stringify(entry.receipt),
-    // seller_reported_at and buyer_reported_at start NULL and are set by the first-report statement.
-    insertedAt: now,
-    updatedAt: now,
-  };
-}
-
 function envelopeInsert(
   database: CollectorDatabase,
-  envelope: CollectorWrite['envelope'],
+  envelope: EnvelopeRow,
   now: number,
 ) {
-  const { upload } = envelope;
   return database.insert(envelopes).values({
     id: envelope.id,
-    uploaderNodeId: upload.uploaderNodeId,
-    role: upload.role,
-    clientKind: upload.client.kind,
-    appVersion: upload.client.appVersion,
-    platform: upload.client.platform,
-    arch: upload.client.arch,
-    nonce: upload.nonce,
-    sentAt: upload.sentAt,
+    kind: envelope.kind,
+    uploaderNodeId: envelope.uploaderNodeId,
+    role: envelope.role,
+    clientKind: envelope.client.kind,
+    appVersion: envelope.client.appVersion,
+    platform: envelope.client.platform,
+    arch: envelope.client.arch,
+    nonce: envelope.nonce,
+    sentAt: envelope.sentAt,
     receivedAt: envelope.receivedAt,
-    skewMs: envelope.receivedAt - upload.sentAt,
-    itemCount: upload.items.length,
+    skewMs: envelope.receivedAt - envelope.sentAt,
+    itemCount: envelope.itemCount,
     signature: envelope.signature,
     signedJson: envelope.json,
     insertedAt: now,
@@ -305,7 +225,7 @@ function firstReportUpdate(
   now: number,
 ) {
   const reportedAt =
-    write.envelope.upload.role === P2P_ROLES.SELLER
+    write.envelope.role === P2P_ROLES.SELLER
       ? {
           sellerReportedAt: sql`coalesce(${receipts.sellerReportedAt}, ${now})`,
         }
@@ -339,6 +259,32 @@ function writeStatements(
     historyInsert(database, write.envelope.id, now),
     firstReportUpdate(database, write, now),
   ] as const;
+}
+
+// One transaction; a unique (uploader, nonce) violation aborts it and is reported as a replay.
+async function commitBatch(
+  orm: CollectorDatabase,
+  envelope: EnvelopeRow,
+  statements: readonly [BatchItem, ...BatchItem[]] | readonly BatchItem[],
+): Promise<CommitResult> {
+  const [first, ...rest] = statements;
+  if (!first) return COMMIT_RESULTS.COMMITTED;
+  try {
+    await orm.batch([first, ...rest]);
+    return COMMIT_RESULTS.COMMITTED;
+  } catch (error) {
+    const replayed = await orm
+      .select({ id: envelopes.id })
+      .from(envelopes)
+      .where(
+        and(
+          eq(envelopes.uploaderNodeId, envelope.uploaderNodeId),
+          eq(envelopes.nonce, envelope.nonce),
+        ),
+      );
+    if (replayed.length) return COMMIT_RESULTS.REPLAYED;
+    throw error;
+  }
 }
 
 export function createD1Storage(database: D1Database): CollectorStorage {
@@ -375,26 +321,27 @@ export function createD1Storage(database: D1Database): CollectorStorage {
       }
       return found;
     },
-    async commit(write, now) {
-      const { upload } = write.envelope;
-      try {
-        const [first, ...rest] = writeStatements(orm, write, now);
-        await orm.batch([first, ...rest]);
-        return COMMIT_RESULTS.COMMITTED;
-      } catch (error) {
-        // The batch is one transaction: on a unique violation nothing was written.
-        const replayed = await orm
-          .select({ id: envelopes.id })
-          .from(envelopes)
-          .where(
-            and(
-              eq(envelopes.uploaderNodeId, upload.uploaderNodeId),
-              eq(envelopes.nonce, upload.nonce),
-            ),
-          );
-        if (replayed.length) return COMMIT_RESULTS.REPLAYED;
-        throw error;
-      }
+    commit(write, now) {
+      return commitBatch(orm, write.envelope, writeStatements(orm, write, now));
+    },
+    commitObservations(write, now) {
+      const rows = write.events.map((event) => ({
+        envelopeId: write.envelope.id,
+        eventIndex: event.index,
+        type: event.type,
+        at: event.at,
+        requestId: event.requestId,
+        sellerNodeId: event.sellerNodeId,
+        modelId: event.modelId,
+        recordJson: event.json,
+        insertedAt: now,
+      }));
+      return commitBatch(orm, write.envelope, [
+        envelopeInsert(orm, write.envelope, now),
+        ...chunks(rows, columnCount(rows[0] ?? {})).map((chunk) =>
+          orm.insert(observations).values(chunk),
+        ),
+      ]);
     },
   };
 }

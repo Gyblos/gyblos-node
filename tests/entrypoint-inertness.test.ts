@@ -96,6 +96,8 @@ void test('all executable modules are inert when imported', async (context) => {
     await import('@gyblos/metrics-collector/worker');
     await import('@gyblos/node/receipt-uploader');
     await import('@gyblos/node/receipt-uploader-startup');
+    await import('@gyblos/node/observation-buffer');
+    await import('@gyblos/protocol/observation-upload');
     await import('@gyblos/buyer/control');
     await import('@gyblos/node/control');
     await import('@gyblos/receipt-collector/main');

@@ -226,3 +226,10 @@ export function parseReceiptUpload(value: unknown): ReceiptUploadV1 {
     return controlFail(CONTROL_CODES.LIMIT);
   return upload;
 }
+
+// Shared with the observation upload envelope, which uses the same uploader identity rules.
+export {
+  client as parseUploadClient,
+  clientRole as uploadClientRole,
+  role as parseUploadRole,
+};

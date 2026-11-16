@@ -4,6 +4,11 @@
 import { RECEIPT_UPLOADER } from '@gyblos/config';
 import type { P2PRole } from '@gyblos/protocol/constants';
 import {
+  OBSERVATION_UPLOAD,
+  signObservationUpload,
+  type ObservationUploadV1,
+} from '@gyblos/protocol/observation-upload';
+import {
   RECEIPT_UPLOAD,
   signReceiptUpload,
   type ReceiptUploadClient,
@@ -17,6 +22,7 @@ import {
   RECEIPT_UPLOADER_RETRYABLE,
   type ReceiptUploaderOutcome,
 } from './constants';
+import type { ObservationBuffer } from './observation-buffer';
 import type { LocalReceiptStore } from './receipt-store';
 import type { ReceiptUploadCursor } from './receipt-upload-types';
 
@@ -30,6 +36,8 @@ export interface ReceiptUploaderOptions {
   url: string;
   fetch?: typeof fetch;
   now?: () => number;
+  // Content-free telemetry events to send alongside receipts; absent means receipts only.
+  observations?: ObservationBuffer;
 }
 export interface UploadResult {
   outcome: ReceiptUploaderOutcome;
@@ -80,7 +88,7 @@ interface UploadContext {
   options: ReceiptUploaderOptions;
   fetcher: typeof fetch;
   now: () => number;
-  endpoint: string;
+  baseUrl: string;
   // Aborted by close(): stops the request, the store read and acknowledgements in flight.
   signal: AbortSignal;
   // Collector time minus this clock, learned from a STALE_UPLOAD reply.
@@ -94,24 +102,11 @@ const retry = (): UploadResult => ({
   uploaded: 0,
 });
 
-async function send(context: UploadContext, cursors: ReceiptUploadCursor[]) {
-  const { options } = context;
-  const upload: ReceiptUploadV1 = {
-    version: RECEIPT_UPLOAD.version,
-    uploaderNodeId: options.nodeId,
-    role: options.role,
-    client: options.client,
-    sentAt: context.now() + context.offsetMs,
-    nonce: nonce(),
-    items: cursors.map((cursor) => ({
-      receipt: cursor.receipt,
-      storedAt: cursor.storedAt,
-      startedAt: null,
-      offer: null,
-    })),
-  };
-  const body = JSON.stringify(await signReceiptUpload(upload, options.signer));
-  return context.fetcher(context.endpoint, {
+// Builds the signed JSON body for one attempt at the given (possibly corrected) send time.
+type SignedBody = (sentAt: number) => Promise<string>;
+
+function post(context: UploadContext, path: string, body: string) {
+  return context.fetcher(`${context.baseUrl}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body,
@@ -124,12 +119,39 @@ async function send(context: UploadContext, cursors: ReceiptUploadCursor[]) {
   });
 }
 
+function receiptsBody(
+  context: UploadContext,
+  cursors: ReceiptUploadCursor[],
+): SignedBody {
+  const { options } = context;
+  return async (sentAt) => {
+    const upload: ReceiptUploadV1 = {
+      version: RECEIPT_UPLOAD.version,
+      uploaderNodeId: options.nodeId,
+      role: options.role,
+      client: options.client,
+      sentAt,
+      nonce: nonce(),
+      items: cursors.map((cursor) => ({
+        receipt: cursor.receipt,
+        storedAt: cursor.storedAt,
+        startedAt: null,
+        offer: null,
+      })),
+    };
+    return JSON.stringify(await signReceiptUpload(upload, options.signer));
+  };
+}
+
 // Sends once, and on STALE_UPLOAD corrects the clock from the collector's time and resends once.
 async function sendCorrected(
   context: UploadContext,
-  cursors: ReceiptUploadCursor[],
+  path: string,
+  body: SignedBody,
 ): Promise<Response | undefined> {
-  const response = await send(context, cursors);
+  const sendNow = async () =>
+    post(context, path, await body(context.now() + context.offsetMs));
+  const response = await sendNow();
   if (response.status !== RECEIPT_UPLOADER_HTTP.conflict) return response;
   const reply = await replyBody(response);
   const serverTime = safeInteger(field(reply, 'serverTime'));
@@ -139,7 +161,7 @@ async function sendCorrected(
   )
     return undefined;
   context.offsetMs = serverTime - context.now();
-  return send(context, cursors);
+  return sendNow();
 }
 
 // Only the collector's own confirmation for exactly these receipts counts as stored.
@@ -157,7 +179,11 @@ async function uploadBatch(
   context: UploadContext,
   cursors: ReceiptUploadCursor[],
 ): Promise<UploadResult | 'invalid'> {
-  const response = await sendCorrected(context, cursors);
+  const response = await sendCorrected(
+    context,
+    RECEIPT_UPLOADER.receiptsPath,
+    receiptsBody(context, cursors),
+  );
   if (!response) return retry();
   if (response.status === RECEIPT_UPLOADER_HTTP.ok) {
     if (!(await confirmed(response, cursors.length))) return retry();
@@ -200,7 +226,7 @@ async function attempt(
   return { outcome: RECEIPT_UPLOADER_OUTCOMES.UPLOADED, uploaded };
 }
 
-async function uploadOnce(context: UploadContext): Promise<UploadResult> {
+async function uploadReceipts(context: UploadContext): Promise<UploadResult> {
   try {
     const pending = (
       await context.options.store.listPending(
@@ -218,6 +244,73 @@ async function uploadOnce(context: UploadContext): Promise<UploadResult> {
   }
 }
 
+function observationsBody(
+  context: UploadContext,
+  events: Record<string, unknown>[],
+): SignedBody {
+  const { options } = context;
+  return async (sentAt) => {
+    const upload: ObservationUploadV1 = {
+      version: OBSERVATION_UPLOAD.version,
+      uploaderNodeId: options.nodeId,
+      role: options.role,
+      client: options.client,
+      sentAt,
+      nonce: nonce(),
+      events,
+    };
+    return JSON.stringify(await signObservationUpload(upload, options.signer));
+  };
+}
+
+// Observations are best effort: a failed send puts them back; a batch the collector refuses as
+// invalid is dropped (and counted) so it cannot block later observations.
+async function uploadObservations(
+  context: UploadContext,
+): Promise<UploadResult> {
+  const buffer = context.options.observations;
+  if (!buffer?.size())
+    return { outcome: RECEIPT_UPLOADER_OUTCOMES.IDLE, uploaded: 0 };
+  const events = buffer.take(OBSERVATION_UPLOAD.maxEvents);
+  try {
+    const response = await sendCorrected(
+      context,
+      RECEIPT_UPLOADER.observationsPath,
+      observationsBody(context, events),
+    );
+    if (
+      response?.status === RECEIPT_UPLOADER_HTTP.ok &&
+      (await confirmed(response, events.length))
+    )
+      return {
+        outcome: RECEIPT_UPLOADER_OUTCOMES.UPLOADED,
+        uploaded: events.length,
+      };
+    await response?.body?.cancel();
+    if (response && invalidContent(response.status))
+      return { outcome: RECEIPT_UPLOADER_OUTCOMES.REJECTED, uploaded: 0 };
+  } catch {
+    /* restored below */
+  }
+  buffer.restore(events);
+  return retry();
+}
+
+async function uploadOnce(context: UploadContext): Promise<UploadResult> {
+  const receipts = await uploadReceipts(context);
+  if (context.signal.aborted) return receipts;
+  const observations = await uploadObservations(context);
+  const failed =
+    receipts.outcome === RECEIPT_UPLOADER_OUTCOMES.RETRY ||
+    observations.outcome === RECEIPT_UPLOADER_OUTCOMES.RETRY;
+  // A full receipt page keeps the loop going at once; observations follow the regular pace.
+  return failed
+    ? retry()
+    : receipts.uploaded
+      ? receipts
+      : { outcome: observations.outcome, uploaded: 0 };
+}
+
 export function createReceiptUploader(
   options: ReceiptUploaderOptions,
 ): ReceiptUploader {
@@ -226,7 +319,7 @@ export function createReceiptUploader(
     options,
     fetcher: options.fetch ?? fetch,
     now: options.now ?? Date.now,
-    endpoint: `${options.url}${RECEIPT_UPLOADER.receiptsPath}`,
+    baseUrl: options.url,
     signal: stop.signal,
     offsetMs: 0,
     refused: new Set(),

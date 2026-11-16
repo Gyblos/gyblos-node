@@ -39,7 +39,10 @@ import { createSellerFreeOffers } from './free-offers';
 import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
 import { createSellerPublisher } from './publisher';
-import { startRoleUploader } from './receipt-uploader-startup';
+import {
+  startRoleUploader,
+  uploadObservationBuffer,
+} from './receipt-uploader-startup';
 import { createSellerReceiptRuntime, openReceiptStore } from './receipts';
 import {
   loadRole,
@@ -154,11 +157,14 @@ export async function startSeller(
     const sellsPaid = settings.offers.some(
       ({ offer }) => offer.kind === OFFER_PRICING_KINDS.PAID,
     );
+    // Seller events (latency, route, refusals, failures) also go to the metrics uploader.
+    const observations = uploadObservationBuffer(process.env);
     const telemetry = createLocalTelemetry({
       enabled: settings.telemetryFile,
       environment: process.env,
       role: P2P_ROLES.SELLER,
       sink: options.telemetry,
+      observers: observations ? [observations.sink] : [],
     });
     disposers.push(telemetry.close);
     const publicationConfig = settings.publication;
@@ -310,6 +316,7 @@ export async function startSeller(
       nodeId: config.nodeId,
       role: P2P_ROLES.SELLER,
       signer: nodeSigner,
+      observations,
     });
     if (uploader) disposers.push(uploader.close);
     const control = await prepareSellerControl({

@@ -15,10 +15,13 @@ import type {
 } from '@gyblos/core/constants';
 import type { P2PRole } from '@gyblos/protocol/constants';
 
+import type { EnvelopeKind } from './constants';
+
 export const envelopes = sqliteTable(
   'collector_envelopes',
   {
     id: text('id').primaryKey(),
+    kind: text('kind').$type<EnvelopeKind>().notNull(),
     uploaderNodeId: text('uploader_node_id').notNull(),
     role: text('role').$type<P2PRole>().notNull(),
     clientKind: text('client_kind').notNull(),
@@ -135,5 +138,25 @@ export const statusHistory = sqliteTable(
     primaryKey({
       columns: [table.receiptKey, table.changedAt, table.status],
     }),
+  ],
+);
+
+export const observations = sqliteTable(
+  'collector_observations',
+  {
+    envelopeId: text('envelope_id').notNull(),
+    eventIndex: integer('event_index').notNull(),
+    type: text('type').notNull(),
+    at: integer('at').notNull(),
+    requestId: text('request_id'),
+    sellerNodeId: text('seller_node_id'),
+    modelId: text('model_id').notNull(),
+    recordJson: text('record_json').notNull(),
+    insertedAt: integer('inserted_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.envelopeId, table.eventIndex] }),
+    index('collector_observations_by_type_time').on(table.type, table.at),
+    index('collector_observations_by_request').on(table.requestId),
   ],
 );

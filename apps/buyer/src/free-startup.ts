@@ -10,7 +10,11 @@ import type {
 } from '@gyblos/node/buyer-api-keys';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
-import { startRoleUploader } from '@gyblos/node/receipt-uploader-startup';
+import type { ObservationBuffer } from '@gyblos/node/observation-buffer';
+import {
+  startRoleUploader,
+  uploadObservationBuffer,
+} from '@gyblos/node/receipt-uploader-startup';
 import {
   createBuyerReceiptRuntime,
   openReceiptStore,
@@ -154,6 +158,7 @@ function buyerReceipts(
   endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
   nodeId: string,
   relayOnly: boolean,
+  observations?: ObservationBuffer,
 ) {
   const store = openReceiptStore({
     environment: process.env,
@@ -191,6 +196,7 @@ function buyerReceipts(
     nodeId,
     role: P2P_ROLES.BUYER,
     signer,
+    observations,
   });
   return {
     ...runtime,
@@ -335,18 +341,21 @@ async function startOwnedFreeBuyer(
       externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
     },
   );
+  // Buyer-only events (unserved demand, refusals, failures, experienced latency) feed the uploader.
+  const observations = uploadObservationBuffer(process.env);
   const telemetry = createLocalTelemetry({
     enabled: telemetryEnabled,
     environment: process.env,
     role: P2P_ROLES.BUYER,
     sink: options.telemetry,
+    observers: observations ? [observations.sink] : [],
   });
   let receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined;
   let execution: Awaited<ReturnType<BuyerExecutionFactory>> | undefined;
   try {
     if (endpoint.id().toString() !== role.nodeId)
       refuse(FREE_BUYER_STARTUP.NODE_KEY);
-    receipts = buyerReceipts(endpoint, role.nodeId, relayOnly);
+    receipts = buyerReceipts(endpoint, role.nodeId, relayOnly, observations);
     const dependencies = freeBuyerDependencies(prepared, {
       receipts,
       telemetry: telemetry.sink,

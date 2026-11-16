@@ -76,6 +76,7 @@
     "./receipt-upload": "./src/receipt-upload.ts",
     "./receipt-v2": "./src/receipt-v2.ts",
     "./vectors/receipt-upload-v1.json": "./vectors/receipt-upload-v1.json",
-    "./vectors/receipt-v2.json": "./vectors/receipt-v2.json"
+    "./vectors/receipt-v2.json": "./vectors/receipt-v2.json",
+    "./observation-upload": "./src/observation-upload.ts"
   }
 }

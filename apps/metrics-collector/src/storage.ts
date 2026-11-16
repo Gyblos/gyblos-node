@@ -3,12 +3,21 @@
 import type { PublicReceiptMerge } from '@gyblos/core/constants';
 import type { PublicReceiptEntry } from '@gyblos/core/public-receipts';
 import type { P2PRole } from '@gyblos/protocol/constants';
-import type { ReceiptUploadV1 } from '@gyblos/protocol/receipt-upload';
+import type { ReceiptUploadClient } from '@gyblos/protocol/receipt-upload';
 
-// One accepted envelope, in canonical form with its signature, so attribution can be re-verified later.
+import type { EnvelopeKind } from './constants';
+
+// One accepted envelope (receipts or observations), in canonical form with its signature, so
+// attribution can be re-verified later.
 export interface EnvelopeRow {
   id: string;
-  upload: ReceiptUploadV1;
+  kind: EnvelopeKind;
+  uploaderNodeId: string;
+  role: P2PRole;
+  client: ReceiptUploadClient;
+  sentAt: number;
+  nonce: string;
+  itemCount: number;
   signature: string;
   json: string;
   receivedAt: number;
@@ -35,6 +44,20 @@ export interface CollectorWrite {
   reports: ReportRow[];
   receipts: ReceiptWrite[];
 }
+// One content-free telemetry event, validated by core and bound to its uploader.
+export interface ObservationRow {
+  index: number;
+  type: string;
+  at: number;
+  requestId: string | null;
+  sellerNodeId: string | null;
+  modelId: string;
+  json: string;
+}
+export interface ObservationWrite {
+  envelope: EnvelopeRow;
+  events: ObservationRow[];
+}
 export const COMMIT_RESULTS = {
   COMMITTED: 'committed',
   // The (uploader, nonce) pair was already stored; nothing from this write is kept.
@@ -50,4 +73,9 @@ export interface CollectorStorage {
   // Atomic: the envelope, every report, guarded receipt writes, status history and conflicts, or
   // nothing. Conflicts and first versions are decided against the state at write time.
   commit(write: CollectorWrite, now: number): Promise<CommitResult>;
+  // Atomic: the envelope and every observation, or nothing.
+  commitObservations(
+    write: ObservationWrite,
+    now: number,
+  ): Promise<CommitResult>;
 }

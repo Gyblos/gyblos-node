@@ -10,6 +10,10 @@ import {
 } from '@gyblos/protocol/receipt-upload';
 import type { Signer } from '@gyblos/protocol/signing';
 
+import {
+  createObservationBuffer,
+  type ObservationBuffer,
+} from './observation-buffer';
 import type { LocalReceiptStore } from './receipt-store';
 import {
   createReceiptUploader,
@@ -93,6 +97,7 @@ export interface RoleUploaderOptions {
   nodeId: string;
   role: P2PRole;
   signer: Signer;
+  observations?: ObservationBuffer;
 }
 // Started uploader for this role, or undefined when uploading is off. The caller closes it on stop.
 export function startRoleUploader(
@@ -107,7 +112,15 @@ export function startRoleUploader(
     client: uploadClient(options.role, options.environment),
     signer: options.signer,
     url,
+    observations: options.observations,
   });
   uploader.start();
   return uploader;
+}
+
+// An observation buffer when this process uploads, so telemetry events are kept only to be sent.
+export function uploadObservationBuffer(
+  environment: NodeJS.ProcessEnv,
+): ObservationBuffer | undefined {
+  return collectorUrl(environment) ? createObservationBuffer() : undefined;
 }

@@ -14,6 +14,8 @@ export interface LocalTelemetryOptions {
   environment: HomeEnvironment;
   role: HomeRole;
   sink?: TelemetrySink;
+  // Always-on observers (for example the metrics uploader's buffer), independent of the file opt-in.
+  observers?: readonly TelemetrySink[];
   createSink?: (options: {
     environment: HomeEnvironment;
     role: HomeRole;
@@ -37,6 +39,8 @@ export function createLocalTelemetry(options: LocalTelemetryOptions) {
       failed = true;
     }
   }
+  if (options.observers?.length)
+    target = fanOut([...(target ? [target] : []), ...options.observers]);
   const health = () => ({
     enabled: options.enabled || options.sink !== undefined,
     owned,

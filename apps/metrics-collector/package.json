@@ -11,7 +11,8 @@
     "./storage-d1": "./src/storage-d1.ts",
     "./worker": "./src/worker.ts",
     "./schema": "./src/schema.ts",
-    "./storage-memory": "./src/storage-memory.ts"
+    "./storage-memory": "./src/storage-memory.ts",
+    "./ingest-observations": "./src/ingest-observations.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

@@ -40,7 +40,14 @@ export type CollectorStatus =
 export const COLLECTOR_ROUTES = {
   RECEIPTS: '/v1/receipts',
   HEALTH: '/v1/health',
+  OBSERVATIONS: '/v1/observations',
 } as const;
+// What an accepted envelope carried.
+export const ENVELOPE_KINDS = {
+  RECEIPTS: 'receipts',
+  OBSERVATIONS: 'observations',
+} as const;
+export type EnvelopeKind = (typeof ENVELOPE_KINDS)[keyof typeof ENVELOPE_KINDS];
 // Static code for unexpected failures; nothing else is reported.
 export const COLLECTOR_INTERNAL_ERROR = 'COLLECTOR_INTERNAL_ERROR';
 

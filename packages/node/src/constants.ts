@@ -365,6 +365,10 @@ export const RECEIPT_UPLOAD = {
   pageSize: 50,
   maxPageSize: 256,
 } as const;
+// In-memory telemetry events awaiting upload. A restart loses at most this many observations.
+export const OBSERVATION_BUFFER = {
+  capacity: 5000,
+} as const;
 // One upload attempt's outcome; drives the uploader's next delay. Not a wire value.
 export const RECEIPT_UPLOADER_OUTCOMES = {
   IDLE: 'idle',

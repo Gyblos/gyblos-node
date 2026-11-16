@@ -5,6 +5,8 @@
 -- One row per accepted signed envelope, kept verbatim so attribution can be re-verified.
 CREATE TABLE IF NOT EXISTS collector_envelopes (
   id TEXT PRIMARY KEY NOT NULL,
+  -- receipts or observations.
+  kind TEXT NOT NULL,
   uploader_node_id TEXT NOT NULL CHECK (length(uploader_node_id) = 64),
   role TEXT NOT NULL,
   client_kind TEXT NOT NULL,
@@ -102,3 +104,21 @@ CREATE TABLE IF NOT EXISTS collector_status_history (
   changed_at INTEGER NOT NULL,
   PRIMARY KEY (receipt_key, changed_at, status)
 ) WITHOUT ROWID;
+
+-- Content-free telemetry events from sellers and buyers (unserved demand, refusals, failures,
+-- first token, completion, charges). The record is core's validated projection; a few columns are
+-- lifted for indexes, the rest is read with json_extract.
+CREATE TABLE IF NOT EXISTS collector_observations (
+  envelope_id TEXT NOT NULL,
+  event_index INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  request_id TEXT,
+  seller_node_id TEXT,
+  model_id TEXT NOT NULL,
+  record_json TEXT NOT NULL,
+  inserted_at INTEGER NOT NULL,
+  PRIMARY KEY (envelope_id, event_index)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS collector_observations_by_type_time ON collector_observations (type, at);
+CREATE INDEX IF NOT EXISTS collector_observations_by_request ON collector_observations (request_id);

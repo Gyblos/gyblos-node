@@ -14,4 +14,5 @@ export const RECEIPT_UPLOADER = {
   // page limit of 256.
   maxRefused: 200,
   receiptsPath: '/receipts',
+  observationsPath: '/observations',
 } as const;
