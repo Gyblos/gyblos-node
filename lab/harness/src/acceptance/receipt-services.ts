@@ -19,8 +19,14 @@ export function createReceiptServices(
   let externalCalls = 0;
   let discoveryReads = 0;
   globalThis.fetch = async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    const method = (
+      init?.method ?? (input instanceof Request ? input.method : 'GET')
+    ).toUpperCase();
+    // Inspect without cloning: collecting an intermediate Request can detach the caller's abort signal.
+    if (url.href === registryUrl + '/' && method === 'POST')
+      return localFetch(input, init);
     const request = new Request(input, init);
-    const url = new URL(request.url);
     if (url.origin === RECEIPT_ACCEPTANCE.engineOrigin)
       return provider.request(request);
     if (url.origin === ACCEPTANCE.origin && url.pathname.startsWith('/v1/')) {
@@ -32,8 +38,6 @@ export function createReceiptServices(
         ...(request.method === 'GET' ? {} : { body: await request.text() }),
       });
     }
-    if (request.url === registryUrl + '/' && request.method === 'POST')
-      return localFetch(request);
     externalCalls++;
     throw new Error('Forbidden external I/O');
   };

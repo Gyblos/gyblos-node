@@ -14,7 +14,11 @@ import type {
 
 import { NODE_ERROR_CODES, RECEIPT_UPLOAD } from './constants';
 import { NodeError } from './errors';
-import { receiptSignal, receiptUnavailable } from './receipt-file';
+import {
+  receiptBoundary,
+  receiptSignal,
+  receiptUnavailable,
+} from './receipt-file';
 import {
   assertReceiptRole,
   lookupKey,
@@ -265,11 +269,7 @@ export function openReceiptStore(
       }
     },
     async confirm(value, signal) {
-      try {
-        return await updateReceipt(journal, value, true, signal);
-      } catch {
-        return receiptUnavailable();
-      }
+      return receiptBoundary(() => updateReceipt(journal, value, true, signal));
     },
     async load(key: ReceiptStoreKey, signal) {
       try {

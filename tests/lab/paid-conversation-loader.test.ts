@@ -1,8 +1,10 @@
 // A deferred buyer-only tokenizer proves HTTP cancellation releases routing before initialization ends.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { setTimeout as delay, setImmediate } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 
 import { PAID_BUYER } from '@gyblos/buyer/constants';
 import { rolePathIn } from '@gyblos/config';
@@ -26,6 +28,28 @@ void test(
   'cancelled HTTP history releases routing before a deferred tokenizer and prevents late finance',
   { skip: NATIVE_CAPABILITY.transportSkip },
   async (t) => {
+    const collected = spawnSync(
+      process.execPath,
+      [
+        '--expose-gc',
+        '--import',
+        import.meta.resolve('tsx'),
+        fileURLToPath(
+          new URL('../support/session-abort-gc.ts', import.meta.url),
+        ),
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 10000,
+        env: {
+          PATH: process.env.PATH,
+          TMPDIR: process.env.TMPDIR,
+          SystemRoot: process.env.SystemRoot,
+        },
+      },
+    );
+    assert.equal(collected.status, 0, collected.stderr);
+    assert.equal(collected.stdout.trim(), 'ok');
     const meter: ChatTokenizer = {
       input: () => 3,
       chat: () => 12,
