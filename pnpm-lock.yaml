@@ -57,6 +57,9 @@ importers:
       '@gyblos/lab-harness':
         specifier: workspace:*
         version: link:lab/harness
+      '@gyblos/metrics-collector':
+        specifier: workspace:*
+        version: link:apps/metrics-collector
       '@gyblos/node':
         specifier: workspace:*
         version: link:packages/node
@@ -321,6 +324,21 @@ importers:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+
+  apps/metrics-collector:
+    dependencies:
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
 
   apps/node:
     dependencies:

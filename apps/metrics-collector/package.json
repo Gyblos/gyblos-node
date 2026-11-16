@@ -1,0 +1,22 @@
+{
+  "name": "@gyblos/metrics-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./app": "./src/app.ts",
+    "./constants": "./src/constants.ts",
+    "./ingest": "./src/ingest.ts",
+    "./storage": "./src/storage.ts",
+    "./storage-d1": "./src/storage-d1.ts",
+    "./worker": "./src/worker.ts",
+    "./schema": "./src/schema.ts",
+    "./storage-memory": "./src/storage-memory.ts"
+  },
+  "dependencies": {
+    "@gyblos/core": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
+    "hono": "4.13.13",
+    "drizzle-orm": "0.45.2"
+  }
+}

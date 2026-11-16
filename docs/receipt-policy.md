@@ -112,3 +112,8 @@ clock; copied offer times originate on the seller's clock and remain
 buyer-reported claims. Existing v1 uploads/vectors stay unchanged. The public
 collector and uploader must explicitly adopt the new contract; no runtime
 activation is included here.
+
+`apps/metrics-collector` is the public collector Worker that uses v1
+(`POST /v1/receipts`), deployed at `collector.gyblos.com` with its own D1
+database. Its endpoints, order of checks, storage, query cost and operations are
+documented in [metrics-collector.md](metrics-collector.md).
