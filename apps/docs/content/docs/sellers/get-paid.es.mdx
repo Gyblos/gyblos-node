@@ -110,8 +110,13 @@ problemas de red, falta de SOL o vencimiento pueden impedir completar el cobro.
 
 ## Mira lo que ganaste [#mira-lo-que-ganaste]
 
-`gyblos seller status` muestra actividad, no dinero. Tus ganancias son el saldo de USDC de devnet de la
-dirección del **dueño**. Búscala en [Solana Explorer](https://explorer.solana.com/?cluster=devnet) (busca la
+`gyblos seller status` muestra actividad y, si existe un libro de cobros, los pedidos liquidados de las
+últimas 24 horas y sus cobros brutos en USDC, incluida la comisión de Gyblos. También muestra los cobros
+pendientes, sin sumarlos al total liquidado. Si el libro es inseguro o inválido, aparece como no disponible.
+Estos totales recientes no son tus ganancias históricas ni el saldo de tu wallet.
+
+Tus ganancias son el saldo de USDC de devnet de la dirección del **dueño**.
+Búscala en [Solana Explorer](https://explorer.solana.com/?cluster=devnet) (busca la
 dirección del dueño, red devnet). Un pago puede tardar unos minutos en aparecer.
 
 ## Piloto de canal reutilizable [#piloto-de-canal-reutilizable]
