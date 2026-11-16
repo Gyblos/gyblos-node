@@ -20,16 +20,7 @@ function ownDataObject(value: unknown) {
 function normalizeItem(value: unknown) {
   const item = ownDataObject(value);
   if (item.offer === null) return { item, offerDigest: null };
-  const offer = controlObject(item.offer, [
-    'issuedAt',
-    'expiresAt',
-    'maxAtomic',
-    'maxTokens',
-    'observedAt',
-    'catalogDigest',
-    'offerDigest',
-  ]);
-  const { offerDigest, ...facts } = offer;
+  const { offerDigest, ...facts } = ownDataObject(item.offer);
   return {
     item: { ...item, offer: facts },
     offerDigest: controlHex(offerDigest),
