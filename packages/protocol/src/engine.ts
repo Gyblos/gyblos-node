@@ -63,6 +63,9 @@ export type EngineInput = (
   | { prompt?: never; messages: readonly ToolChatMessage[] }
 ) & {
   maxTokens: number;
+  // The seller's count of the prompt, when known: the engine's deadline grows with it, so a long prompt has
+  // time to be read before the answer's own time starts.
+  inputTokens?: number;
   // Offered only to an engine whose supportsTools() is true.
   tools?: readonly ToolDefinition[];
   toolChoice?: ToolChoice;

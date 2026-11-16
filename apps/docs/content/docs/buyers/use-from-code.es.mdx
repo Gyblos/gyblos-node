@@ -236,6 +236,12 @@ Si ya llegó texto a tu cliente, una falla termina el pedido con un error: la re
 otro vendedor. Desactiva los reintentos automáticos del cliente, incluidos los de streaming: ante una
 conexión cortada puede no llegar ningún encabezado de respuesta.
 
+Algunos vendedores usan equipos lentos. Si un vendedor no alcanza a leer a tiempo un prompt largo (el de
+un agente de código, por ejemplo), el error dice que el vendedor fue demasiado lento para un pedido de
+ese tamaño, con `reason` `engine_timeout`. Vuelve a enviar el pedido: ese vendedor ahora pesa menos, así
+que normalmente responde otro. También puedes acortar la conversación (Codex y OpenCode pueden
+compactarla).
+
 Si decides volver a enviar el mensaje, comienza una selección nueva: puede ganar el mismo vendedor u
 otro. Los fallos atribuibles al vendedor afectan su peso. La preferencia por el que respondió antes es
 acotada y no garantiza afinidad ni caché. Estas preferencias se aplican aquí al recorrido gratuito;

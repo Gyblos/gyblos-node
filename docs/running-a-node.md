@@ -961,9 +961,11 @@ assistant, from and ending with the user's) with `off` reasoning, up to the
 offer's answer limit (`free.max_output_tokens`, 4096 tokens by default, at
 most 32768) within the model's context (a free Ollama offer's
 `engine.context_tokens`, 8192 by default, at most 32768). The engine's deadline
-grows with the requested answer, up to 170 seconds. The separate `buyer:free`
-entry executes free quotes; obtaining a control quote alone still does not send
-a prompt.
+has two parts: time to read the prompt, 10 ms per counted input token (so a
+7000-token agent prompt gets 70 s more), and time to answer, which grows with
+the requested answer. Together they stay under 170 seconds. The separate
+`buyer:free` entry executes free quotes; obtaining a control quote alone still
+does not send a prompt.
 
 The seller reads daily token caps from the prepared offer: `daily_token_cap`
 applies across all buyers and `per_buyer_cap` per authenticated NodeId, both
@@ -1325,10 +1327,14 @@ why: `quota_exhausted`, `rate_limited`, `engine_unavailable`,
 `engine_interrupted`, `engine_timeout` or `engine_invalid_response`. Before the
 first token this is a 503 JSON error. Mid-stream it is the final SSE error
 event, which also carries `error.usage.completion_tokens`: the tokens the seller
-delivered before it stopped. The buyer does not retry or reroute.
-`FREE_EXECUTION_ENGINE_UNAVAILABLE` remains the refusal before generation, for
-example when the seller's engine readiness has expired. A pinned model that
-disappears during a request is reported as `engine_unavailable`.
+delivered before it stopped. The buyer does not retry or reroute. For
+`engine_timeout` the message says the seller was too slow: before any text, too
+slow to read a request this size (send it again to try another seller, or
+shorten the conversation); after text, too slow to finish. This holds in the
+OpenAI, Anthropic and Responses shapes, for a JSON error and a stream's last
+event. `FREE_EXECUTION_ENGINE_UNAVAILABLE` remains the refusal before
+generation, for example when the seller's engine readiness has expired. A pinned
+model that disappears during a request is reported as `engine_unavailable`.
 
 The response contains one `choices` entry, its text/finish reason and
 `usage.prompt_tokens`, `completion_tokens` and `total_tokens`. Static failures
