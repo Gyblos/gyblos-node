@@ -16,7 +16,7 @@
   "dependencies": {
     "@gyblos/core": "workspace:*",
     "@gyblos/protocol": "workspace:*",
-    "hono": "4.13.13",
-    "drizzle-orm": "0.45.2"
+    "hono": "4.13.18",
+    "drizzle-orm": "0.45.4"
   }
 }
