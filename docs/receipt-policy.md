@@ -90,3 +90,8 @@ any different seller record (including a changed request digest) or a second
 buyer attestation is a conflict, and the first accepted version stays stored. It
 is pure policy: no storage, clock or network, and the loopback paired-free
 collector above is unchanged.
+
+The signed batch format a node will use to hand its receipts and its own
+timestamps to a collector is the protocol contract "Receipt upload envelope v1"
+(`packages/protocol/SPEC.md`). It is a contract only: no uploader, schedule or
+endpoint uses it yet.
