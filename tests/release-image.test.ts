@@ -331,3 +331,24 @@ void test('npm packages are published only by the release workflow, and only whe
     /npm:\n(?: {4}#.*\n)* {4}if: vars\.NPM_PUBLISH == 'true'\n {4}needs: \[native, publish\]\n/,
   );
 });
+
+void test('the desktop app is packaged after the release exists and attached with only the workflow token', () => {
+  const workflow = read(WORKFLOW);
+  assert.match(
+    workflow,
+    /desktop:\n {4}needs: publish\n {4}uses: \.\/\.github\/workflows\/desktop-packages\.yml\n {4}with:\n {6}tag: \$\{\{ github\.ref_name \}\}\n {4}permissions:\n {6}contents: write\n/,
+  );
+  const desktop = read('.github/workflows/desktop-packages.yml');
+  // Every package is started on its own OS before anything is attached.
+  assert.match(
+    desktop,
+    /publish:\n(?: {4}.*\n)*? {4}needs: \[macos, linux, windows\]\n/,
+  );
+  assert.match(desktop, /--smoke/);
+  // No secret other than the token, and no signing identity or environment.
+  assert.deepEqual(
+    [...desktop.matchAll(/secrets\.([A-Z_]+)/g)].map((match) => match[1]),
+    ['GITHUB_TOKEN'],
+  );
+  assert.doesNotMatch(desktop, /id-token|environment:/);
+});
