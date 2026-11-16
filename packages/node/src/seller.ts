@@ -39,6 +39,7 @@ import { createSellerFreeOffers } from './free-offers';
 import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
 import { createSellerPublisher } from './publisher';
+import { startRoleUploader } from './receipt-uploader-startup';
 import { createSellerReceiptRuntime, openReceiptStore } from './receipts';
 import {
   loadRole,
@@ -291,16 +292,26 @@ export async function startSeller(
           .sign([...bytes])
           .toBytes(),
       );
+    const receiptStore = openReceiptStore({
+      environment: process.env,
+      role: P2P_ROLES.SELLER,
+      nodeId: config.nodeId,
+    });
     const receipts = createSellerReceiptRuntime({
       nodeId: config.nodeId,
-      store: openReceiptStore({
-        environment: process.env,
-        role: P2P_ROLES.SELLER,
-        nodeId: config.nodeId,
-      }),
+      store: receiptStore,
       signer: nodeSigner,
     });
     disposers.push(receipts.close);
+    // Sends this seller's receipts to the metrics collector; failures only delay, never block serving.
+    const uploader = startRoleUploader({
+      environment: process.env,
+      store: receiptStore,
+      nodeId: config.nodeId,
+      role: P2P_ROLES.SELLER,
+      signer: nodeSigner,
+    });
+    if (uploader) disposers.push(uploader.close);
     const control = await prepareSellerControl({
       owner,
       sequence: publicSequence,

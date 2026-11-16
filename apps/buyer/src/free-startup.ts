@@ -10,10 +10,7 @@ import type {
 } from '@gyblos/node/buyer-api-keys';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
-import {
-  createBuyerReceiptRuntime,
-  openReceiptStore,
-} from '@gyblos/node/receipts';
+import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
 import { loadRole, nodeSecret, type RoleConfig } from '@gyblos/node/roles';
 import {
   createLocalTelemetry,
@@ -23,10 +20,7 @@ import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
-import {
-  assertConfiguredRelay,
-  bindEndpoint,
-} from '@gyblos/transport-iroh/endpoint';
+import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { ownedChat } from './chat-owned';
 import {
@@ -37,6 +31,7 @@ import {
 import { configuredBuyerAccess } from './desktop-api';
 import { executeBuyerFree, type FreeBuyerDependencies } from './free-execution';
 import { startFreeBuyerHttp, type ChatErrorClassifier } from './free-http';
+import { buyerReceipts } from './free-receipt-runtime';
 import { freeBuyerDependencies } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { RoutedModel } from './model-routes';
@@ -151,39 +146,6 @@ export async function buyerNodeSecret() {
   }
 }
 
-function buyerReceipts(
-  endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
-  nodeId: string,
-  relayOnly: boolean,
-) {
-  return createBuyerReceiptRuntime({
-    endpoint,
-    slots: TRANSPORT_LIMITS.maxConcurrent,
-    store: openReceiptStore({
-      environment: process.env,
-      role: P2P_ROLES.BUYER,
-      nodeId: nodeId,
-    }),
-    signer: async (bytes) =>
-      Uint8Array.from(
-        endpoint
-          .secretKey()
-          .sign([...bytes])
-          .toBytes(),
-      ),
-    transport: {
-      relayOnly,
-      relayAllowed: (origin) => {
-        try {
-          assertConfiguredRelay(origin);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-    },
-  });
-}
 // Stop admission and bound draining before the endpoint closes; only then release payment journals.
 async function closeBuyerResources(
   receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined,

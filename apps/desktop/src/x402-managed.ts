@@ -3,6 +3,7 @@ import {
   BUYER_RELAY_ONLY_ENV,
   ENVIRONMENT_SWITCH,
   NODE_ENVIRONMENT,
+  RECEIPT_UPLOADER,
 } from '@gyblos/config';
 import { BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 
@@ -12,6 +13,8 @@ export function buyerEnvironment(
   home: string,
   relayToken: string | undefined,
   environment: Readonly<NodeJS.ProcessEnv>,
+  // The packaged app's version: it turns on receipt uploads in the buyer, like a release CLI build.
+  releaseVersion?: string,
 ) {
   if (
     relayToken !== undefined &&
@@ -58,6 +61,7 @@ export function buyerEnvironment(
     ...(relayOnly !== undefined ? { [BUYER_RELAY_ONLY_ENV]: relayOnly } : {}),
     ...addresses,
     GYBLOS_HOME: home,
+    ...uploadEnvironment(environment, releaseVersion),
     ...(relayToken !== undefined ? { GYBLOS_RELAY_TOKEN: relayToken } : {}),
   };
 }
@@ -192,3 +196,22 @@ export class ManagedBuyer {
     await running?.exit;
   }
 }
+
+// Only a well-formed release version and an explicit collector URL reach the buyer; nothing else.
+function uploadEnvironment(
+  environment: Readonly<NodeJS.ProcessEnv>,
+  releaseVersion: string | undefined,
+): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = {};
+  if (releaseVersion && DESKTOP_RELEASE_VERSION.test(releaseVersion))
+    result[RECEIPT_UPLOADER.releaseEnvironment] = releaseVersion;
+  const url = environment[RECEIPT_UPLOADER.urlEnvironment];
+  if (
+    url &&
+    url.length <= DESKTOP_X402.MAX_RELAYS_LENGTH &&
+    !/[\r\n]/.test(url)
+  )
+    result[RECEIPT_UPLOADER.urlEnvironment] = url;
+  return result;
+}
+const DESKTOP_RELEASE_VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
