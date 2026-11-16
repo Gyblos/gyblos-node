@@ -8,6 +8,14 @@ import { openReceiptStore } from '@gyblos/node/receipts';
 
 import { receiptUploadFixture } from './support/receipt-upload-fixture';
 
+function replayLatch() {
+  let resolve = () => {};
+  const promise = new Promise<void>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+
 void test('buyer confirmation at a full pending budget reports FULL and preserves both saved bodies', async () => {
   const f = await receiptUploadFixture();
   try {
@@ -56,8 +64,8 @@ void test('buyer confirmation at a full pending budget reports FULL and preserve
 
 void test('a cancelled cold replay cannot repeatedly prevent the next receipt from being saved', async (context) => {
   const f = await receiptUploadFixture();
-  const replayStarted = Promise.withResolvers<void>();
-  const resumeReplay = Promise.withResolvers<void>();
+  const replayStarted = replayLatch();
+  const resumeReplay = replayLatch();
   try {
     await openReceiptStore(f.options).put(f.envelope);
     const next = await f.next(2);
