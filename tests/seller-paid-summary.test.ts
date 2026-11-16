@@ -78,13 +78,14 @@ void test('conflicting recorded and settled charges make paid status unavailable
 });
 
 void test('paid reporting windows must be ordered, finite and representable dates', () => {
-  for (const [since, now] of [
+  const windows: readonly [number, number][] = [
     [Number.NaN, NOW],
     [NOW - HOUR, Number.POSITIVE_INFINITY],
     [NOW, NOW - HOUR],
     [NOW - HOUR, Number.MAX_SAFE_INTEGER],
     [-Number.MAX_SAFE_INTEGER, NOW],
-  ]) {
+  ];
+  for (const [since, now] of windows) {
     assert.throws(
       () => summarizeUptoLedger(text(settled()), since, now),
       unavailable,
@@ -140,10 +141,12 @@ void test('a live seller ledger is read without acquiring its lock or changing i
           stat: await stat(path),
         })),
       );
-      for (let index = 0; index < before.length; index++) {
-        assert.deepEqual(after[index].data, before[index].data);
-        assert.equal(after[index].stat.mtimeMs, before[index].stat.mtimeMs);
-        assert.equal(after[index].stat.ino, before[index].stat.ino);
+      for (const [index, previous] of before.entries()) {
+        const current = after[index];
+        assert.ok(current);
+        assert.deepEqual(current.data, previous.data);
+        assert.equal(current.stat.mtimeMs, previous.stat.mtimeMs);
+        assert.equal(current.stat.ino, previous.stat.ino);
       }
       await writer.channels.put(record('NextSyntheticChannel'));
     } finally {
