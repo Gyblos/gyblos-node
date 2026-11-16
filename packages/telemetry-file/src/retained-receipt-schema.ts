@@ -1,4 +1,4 @@
-// Strict retention snapshots keep signed bodies only until expiry and private bounded replay markers afterward.
+// Validates indefinitely retained signed bodies and bounded replay markers from historical expiry snapshots.
 import {
   prepareCollectedReceipt,
   type PrivateFreeReceipt,
