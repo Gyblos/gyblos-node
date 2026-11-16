@@ -1,23 +1,16 @@
 // Verifies bounded canonical receipt bytes and signed observations; no storage, identity registry or I/O.
 import { canonicalJson } from '@gyblos/protocol';
-import {
-  CONTROL_CODES,
-  OFFER_PRICING_KINDS,
-  RECEIPT_DISPUTE_FIELDS,
-} from '@gyblos/protocol/constants';
+import { CONTROL_CODES, OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 import { verifyReceipt, type ReceiptV1 } from '@gyblos/protocol/receipt';
 
-import {
-  RECEIPT_COLLECTOR_CODES,
-  RECEIPT_COLLECTOR_FINGERPRINT_RADIX,
-  RECEIPT_COLLECTOR_LIMITS,
-} from './constants';
+import { RECEIPT_COLLECTOR_CODES, RECEIPT_COLLECTOR_LIMITS } from './constants';
 import {
   collectorFail,
   ReceiptCollectorError,
 } from './receipt-collector-errors';
 import type { PrivateFreeReceipt } from './receipt-collector-types';
+import { observedDisputes, receiptKey, sha256Hex } from './receipt-evidence';
 
 function checkDepth(value: unknown) {
   const pending = [{ value, depth: 0 }];
@@ -51,14 +44,10 @@ function confirmObservations(receipt: ReceiptV1) {
     return collectorFail(RECEIPT_COLLECTOR_CODES.PAIR_REQUIRED);
   const seller = receipt.seller.record;
   const buyer = receipt.buyer.record;
-  const expected = Object.values(RECEIPT_DISPUTE_FIELDS).filter((field) => {
-    const reported =
-      field === RECEIPT_DISPUTE_FIELDS.OUTPUT_BYTES
-        ? seller.sizes.outputBytes
-        : seller.usage[field];
-    return buyer.observed[field] !== null && buyer.observed[field] !== reported;
-  });
-  if (canonicalJson(expected) !== canonicalJson(buyer.disputed))
+  if (
+    canonicalJson(observedDisputes(seller, buyer.observed)) !==
+    canonicalJson(buyer.disputed)
+  )
     return collectorFail(RECEIPT_COLLECTOR_CODES.DISPUTE);
   return { seller: receipt.seller, buyer: receipt.buyer };
 }
@@ -83,20 +72,8 @@ export async function prepareCollectedReceipt(
       return collectorFail(RECEIPT_COLLECTOR_CODES.NOT_FREE);
     const confirmed = confirmObservations(receipt);
     const record = receipt.seller.record;
-    const key = canonicalJson([
-      record.sellerNodeId,
-      record.buyerNodeId,
-      record.requestId,
-    ]);
-    const digest = new Uint8Array(
-      await crypto.subtle.digest(
-        'SHA-256',
-        new TextEncoder().encode(canonicalJson(confirmed)),
-      ),
-    );
-    const fingerprint = Array.from(digest, (byte) =>
-      byte.toString(RECEIPT_COLLECTOR_FINGERPRINT_RADIX).padStart(2, '0'),
-    ).join('');
+    const key = receiptKey(record);
+    const fingerprint = await sha256Hex(canonicalJson(confirmed));
     return { key, fingerprint, receipt: confirmed };
   } catch (error) {
     return validationError(error);
