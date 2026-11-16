@@ -111,7 +111,9 @@ function githubResponse(
         : [],
     ]);
   }
-  return JSON.stringify(args.some((item) => item.endsWith('/labels')) ? [] : pr);
+  return JSON.stringify(
+    args.some((item) => item.endsWith('/labels')) ? [] : pr,
+  );
 }
 
 for (const branch of ['develop', 'main']) {
@@ -130,7 +132,9 @@ for (const branch of ['develop', 'main']) {
     const result = exerciseScript(script, branch);
     assert.equal(result.writes.length, 2);
     assert.ok(result.writes[0]?.includes('labels[]=ai-review:clean'));
-    assert.ok(result.writes[1]?.some((arg) => arg.includes('AI source review:')));
+    assert.ok(
+      result.writes[1]?.some((arg) => arg.includes('AI source review:')),
+    );
   });
 
   void test(`invalidator queues ${branch} and preserves its completed snapshot`, async () => {
@@ -138,7 +142,10 @@ for (const branch of ['develop', 'main']) {
     const result = exerciseScript(script, branch);
     assert.equal(result.writes.length, 1);
     assert.ok(result.writes[0]?.includes('labels[]=ai-review:queued'));
-    assert.deepEqual(exerciseScript(script, branch, { completed: true }).writes, []);
+    assert.deepEqual(
+      exerciseScript(script, branch, { completed: true }).writes,
+      [],
+    );
   });
 
   void test(`all ${branch} scripts refuse forks and stale heads`, async () => {
@@ -179,7 +186,10 @@ void test('request and state events target develop and main', async () => {
     const branches = content.match(/branches:\s*\[([^\]]+)\]/)?.[1];
     assert.ok(branches);
     assert.deepEqual(
-      branches.split(',').map((branch) => branch.trim()).sort(),
+      branches
+        .split(',')
+        .map((branch) => branch.trim())
+        .sort(),
       ['develop', 'main'],
     );
   }
