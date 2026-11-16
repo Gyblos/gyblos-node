@@ -10,7 +10,8 @@ export const RECEIPT_UPLOADER = {
   requestMs: 15_000,
   retryMs: 60_000,
   maxRetryMs: 3_600_000,
-  // Receipts per envelope (the protocol maximum).
-  batch: 50,
+  // Refused receipts skipped per process; with a full envelope (50) it stays within the store's
+  // page limit of 256.
+  maxRefused: 200,
   receiptsPath: '/receipts',
 } as const;

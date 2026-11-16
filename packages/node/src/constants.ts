@@ -382,9 +382,15 @@ export const RECEIPT_UPLOADER_HTTP = {
   serverError: 500,
   staleCode: 'STALE_UPLOAD',
   hexRadix: 16,
-  // Client errors that mean "try later" (replay/clock, size, rate), not invalid content.
-  retryableClientErrors: new Set<number>([409, 413, 429]),
+  payloadTooLarge: 413,
+  tooManyRequests: 429,
 } as const;
+// Client errors that mean "try later" (replay or clock, size, rate), not invalid content.
+export const RECEIPT_UPLOADER_RETRYABLE: ReadonlySet<number> = new Set([
+  RECEIPT_UPLOADER_HTTP.conflict,
+  RECEIPT_UPLOADER_HTTP.payloadTooLarge,
+  RECEIPT_UPLOADER_HTTP.tooManyRequests,
+]);
 
 export const RECEIPT_WORK = {
   sellerMs: 500,

@@ -14,6 +14,7 @@ import type { Signer } from '@gyblos/protocol/signing';
 import {
   RECEIPT_UPLOADER_HTTP,
   RECEIPT_UPLOADER_OUTCOMES,
+  RECEIPT_UPLOADER_RETRYABLE,
   type ReceiptUploaderOutcome,
 } from './constants';
 import type { LocalReceiptStore } from './receipt-store';
@@ -71,7 +72,7 @@ function invalidContent(status: number) {
   return (
     status >= RECEIPT_UPLOADER_HTTP.badRequest &&
     status < RECEIPT_UPLOADER_HTTP.serverError &&
-    !RECEIPT_UPLOADER_HTTP.retryableClientErrors.has(status)
+    !RECEIPT_UPLOADER_RETRYABLE.has(status)
   );
 }
 
@@ -80,11 +81,18 @@ interface UploadContext {
   fetcher: typeof fetch;
   now: () => number;
   endpoint: string;
+  // Aborted by close(): stops the request, the store read and acknowledgements in flight.
+  signal: AbortSignal;
   // Collector time minus this clock, learned from a STALE_UPLOAD reply.
   offsetMs: number;
   // Receipts the collector refused as invalid, skipped for this process so one cannot block the rest.
   refused: Set<string>;
 }
+
+const retry = (): UploadResult => ({
+  outcome: RECEIPT_UPLOADER_OUTCOMES.RETRY,
+  uploaded: 0,
+});
 
 async function send(context: UploadContext, cursors: ReceiptUploadCursor[]) {
   const { options } = context;
@@ -107,11 +115,16 @@ async function send(context: UploadContext, cursors: ReceiptUploadCursor[]) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body,
-    signal: AbortSignal.timeout(RECEIPT_UPLOADER.requestMs),
+    // A redirect is never the collector answering: refuse it rather than trust a 200 from elsewhere.
+    redirect: 'error',
+    signal: AbortSignal.any([
+      context.signal,
+      AbortSignal.timeout(RECEIPT_UPLOADER.requestMs),
+    ]),
   });
 }
 
-// Sends once, corrects the clock and resends once on STALE_UPLOAD, and acknowledges on success.
+// Sends once, and on STALE_UPLOAD corrects the clock from the collector's time and resends once.
 async function sendCorrected(
   context: UploadContext,
   cursors: ReceiptUploadCursor[],
@@ -129,71 +142,102 @@ async function sendCorrected(
   return send(context, cursors);
 }
 
-async function attempt(
+// Only the collector's own confirmation for exactly these receipts counts as stored.
+async function confirmed(response: Response, count: number) {
+  const reply = await replyBody(response);
+  const receivedAt = safeInteger(field(reply, 'receivedAt'));
+  return (
+    receivedAt !== undefined &&
+    receivedAt > 0 &&
+    field(reply, 'accepted') === count
+  );
+}
+
+async function uploadBatch(
   context: UploadContext,
   cursors: ReceiptUploadCursor[],
-): Promise<UploadResult> {
+): Promise<UploadResult | 'invalid'> {
   const response = await sendCorrected(context, cursors);
-  if (response?.status === RECEIPT_UPLOADER_HTTP.ok) {
-    const receivedAt =
-      safeInteger(field(await replyBody(response), 'receivedAt')) ??
-      context.now();
+  if (!response) return retry();
+  if (response.status === RECEIPT_UPLOADER_HTTP.ok) {
+    if (!(await confirmed(response, cursors.length))) return retry();
+    // Retention uses this node's clock, so the acknowledgement does too.
+    const at = context.now();
     for (const cursor of cursors)
-      await context.options.store.markUploaded(cursor, receivedAt);
+      await context.options.store.markUploaded(cursor, at, context.signal);
     return {
       outcome: RECEIPT_UPLOADER_OUTCOMES.UPLOADED,
       uploaded: cursors.length,
     };
   }
-  if (!response || !invalidContent(response.status))
-    return { outcome: RECEIPT_UPLOADER_OUTCOMES.RETRY, uploaded: 0 };
-  // Retry one by one so a single bad receipt is skipped instead of blocking the batch.
-  if (cursors.length > 1) {
-    let uploaded = 0;
-    for (const cursor of cursors)
-      uploaded += (await attempt(context, [cursor])).uploaded;
-    return { outcome: RECEIPT_UPLOADER_OUTCOMES.UPLOADED, uploaded };
+  await response.body?.cancel();
+  return invalidContent(response.status) ? 'invalid' : retry();
+}
+
+// A refused batch is retried one receipt at a time so a single bad receipt is skipped. If every
+// receipt is refused the envelope itself is the problem (for example a version the collector does
+// not accept): nothing is marked refused and the uploader backs off.
+async function attempt(
+  context: UploadContext,
+  cursors: ReceiptUploadCursor[],
+): Promise<UploadResult> {
+  const result = await uploadBatch(context, cursors);
+  if (result !== 'invalid') return result;
+  if (cursors.length === 1) return retry();
+  let uploaded = 0;
+  const refused: string[] = [];
+  for (const cursor of cursors) {
+    if (context.signal.aborted) return retry();
+    const single = await uploadBatch(context, [cursor]);
+    if (single === 'invalid') refused.push(cursor.fingerprint);
+    else if (single.outcome === RECEIPT_UPLOADER_OUTCOMES.RETRY) return retry();
+    else uploaded += single.uploaded;
   }
-  context.refused.add(cursors[0]!.fingerprint);
-  return { outcome: RECEIPT_UPLOADER_OUTCOMES.REJECTED, uploaded: 0 };
+  if (!uploaded) return retry();
+  for (const fingerprint of refused)
+    if (context.refused.size < RECEIPT_UPLOADER.maxRefused)
+      context.refused.add(fingerprint);
+  return { outcome: RECEIPT_UPLOADER_OUTCOMES.UPLOADED, uploaded };
 }
 
 async function uploadOnce(context: UploadContext): Promise<UploadResult> {
   try {
     const pending = (
       await context.options.store.listPending(
-        RECEIPT_UPLOADER.batch + context.refused.size,
+        RECEIPT_UPLOAD.maxItems + context.refused.size,
+        context.signal,
       )
     )
       .filter((cursor) => !context.refused.has(cursor.fingerprint))
-      .slice(0, RECEIPT_UPLOADER.batch);
+      .slice(0, RECEIPT_UPLOAD.maxItems);
     if (!pending.length)
       return { outcome: RECEIPT_UPLOADER_OUTCOMES.IDLE, uploaded: 0 };
     return await attempt(context, pending);
   } catch {
-    return { outcome: RECEIPT_UPLOADER_OUTCOMES.RETRY, uploaded: 0 };
+    return retry();
   }
 }
 
 export function createReceiptUploader(
   options: ReceiptUploaderOptions,
 ): ReceiptUploader {
+  const stop = new AbortController();
   const context: UploadContext = {
     options,
     fetcher: options.fetch ?? fetch,
     now: options.now ?? Date.now,
     endpoint: `${options.url}${RECEIPT_UPLOADER.receiptsPath}`,
+    signal: stop.signal,
     offsetMs: 0,
     refused: new Set(),
   };
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running: Promise<unknown> | undefined;
-  let closed = false;
   let retryMs: number = RECEIPT_UPLOADER.retryMs;
 
   function schedule(result: UploadResult) {
     running = undefined;
-    if (closed) return;
+    if (stop.signal.aborted) return;
     let delay: number = RECEIPT_UPLOADER.tickMs;
     if (result.outcome === RECEIPT_UPLOADER_OUTCOMES.RETRY) {
       delay = retryMs;
@@ -201,7 +245,7 @@ export function createReceiptUploader(
     } else {
       retryMs = RECEIPT_UPLOADER.retryMs;
       // A full page means more are waiting: continue right away.
-      if (result.uploaded >= RECEIPT_UPLOADER.batch) delay = 0;
+      if (result.uploaded >= RECEIPT_UPLOAD.maxItems) delay = 0;
     }
     timer = setTimeout(tick, delay);
     timer.unref?.();
@@ -214,11 +258,12 @@ export function createReceiptUploader(
   return {
     uploadOnce: () => uploadOnce(context),
     start() {
-      if (closed || timer || running) return;
+      if (stop.signal.aborted || timer || running) return;
       tick();
     },
+    // Aborts any upload in flight; receipts not acknowledged stay pending for the next start.
     async close() {
-      closed = true;
+      stop.abort();
       clearTimeout(timer);
       await running;
     },

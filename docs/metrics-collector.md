@@ -106,27 +106,56 @@ the skew is stored.
 store, which never evicts a receipt before it is uploaded. The seller daemon and
 the shared buyer (CLI and desktop) start it next to their receipt runtime.
 
-- **When:** every release build (`GYBLOS_VERSION` set) uploads to
-  `https://collector.gyblos.com/v1`, and there is no user setting to turn it
-  off. A build without `GYBLOS_VERSION` uploads only when `GYBLOS_COLLECTOR_URL`
-  is set, so tests and development never use the network. `GYBLOS_COLLECTOR_URL`
-  also overrides the URL for staging.
-- **What:** batches of up to 50 receipts in a signed envelope. The client kind
-  is `seller-node`, `buyer-cli`, or `buyer-desktop` when running inside
-  Electron. The envelope also carries the release version, platform and
-  architecture. It sends no prompts, responses or addresses.
-- **Pacing:** it uploads every minute, and immediately again after a full batch.
+**When it uploads:**
+
+- Every release build uploads to `https://collector.gyblos.com/v1`, with no user
+  setting to turn it off (founder decision 2026-11-16). This covers CLI builds
+  with `GYBLOS_VERSION` and the packaged desktop app, which passes its version
+  to the buyer it runs.
+- A build without a version uploads only when `GYBLOS_COLLECTOR_URL` is set, so
+  tests and development never use the network.
+- `GYBLOS_COLLECTOR_URL` must be `https`, or `http` on a loopback host, with no
+  credentials, query or fragment. Any other value turns uploading off.
+
+**What leaves the machine:**
+
+- Each signed receipt: both NodeIds, the seller's owner wallet, the model and
+  its settings, the engine kind, token counts, sizes, timings, outcome and price
+  fields.
+- Envelope metadata: the uploader's role, client kind (`seller-node`,
+  `buyer-cli`, `buyer-desktop`), release version, platform and architecture, and
+  the uploader's own store time.
+- The collector also sees the uploader's IP address on the connection. It uses
+  the address for rate limits and never stores it.
+- Prompts, responses, keys and endpoint addresses are never sent.
+
+**Behavior:**
+
+- **Pacing:** batches of up to 50 receipts, every minute, and immediately again
+  after a full batch.
+- **What counts as uploaded:** only a `200` carrying the collector's
+  `receivedAt` and `accepted` equal to the batch size marks receipts uploaded,
+  and the acknowledgement uses the node's own clock. Redirects are refused.
 - **Failures:**
-  - A network error, `5xx`, `429` or `413` backs off from one minute, doubling
-    up to one hour; the receipts stay pending.
-  - `STALE_UPLOAD` corrects the node's clock from `serverTime` and resends once.
-  - A batch refused as invalid is retried one receipt at a time; a single
-    refused receipt is skipped for the life of the process.
-- **Effect on inference:** it never blocks or retries inference, and closing the
-  role stops it.
-- **Not sent yet:** the buyer's request start time and offer facts (always
-  `null`), and buyer-only observations such as unserved demand. Paid v2 receipts
-  are sent once nodes emit them.
+  - A network error, `5xx`, `429`, `413`, a non-stale `409`, or an unconfirmed
+    `200` backs off from one minute, doubling up to one hour. The receipts stay
+    pending.
+  - `STALE_UPLOAD` corrects the clock from `serverTime` and resends once.
+  - A batch refused as invalid is retried one receipt at a time. Receipts
+    refused on their own are skipped for the life of the process, up to 200. If
+    every receipt is refused, the envelope itself is the problem: the uploader
+    backs off and marks nothing.
+- **Effect on inference:** it never blocks or retries inference.
+- **Stopping:** `close()` aborts an upload in flight. Anything not yet
+  acknowledged stays pending.
+- **Not sent yet:**
+  - the buyer's request start time and offer facts (always `null`);
+  - buyer-only observations such as unserved demand;
+  - paid v2 receipts, until nodes emit them.
+
+  The HTTP client lives in `@gyblos/node`. Moving it into an adapter package,
+  and the collector's route and error codes into the protocol, is follow-up
+  work.
 
 ## Order of checks
 

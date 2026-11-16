@@ -28,12 +28,35 @@ const ARCHES: Readonly<Record<string, ReceiptUploadClient['arch']>> = {
 };
 const APP_VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
 
-// The collector URL for this process, or undefined when uploading is off (non-release without a URL).
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
+  'localhost',
+  '127.0.0.1',
+  '[::1]',
+]);
+// An https URL, or http only on a loopback host; no credentials, query or fragment. Anything else
+// turns uploading off rather than sending signed receipts somewhere unexpected.
+function validCollectorUrl(value: string): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const secure =
+    url.protocol === 'https:' ||
+    (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname));
+  if (!secure || url.username || url.password || url.search || url.hash)
+    return undefined;
+  return url.toString().replace(/\/+$/, '');
+}
+
+// The collector URL for this process, or undefined when uploading is off (non-release without a URL,
+// or a configured URL that is not https or loopback http).
 export function collectorUrl(
   environment: NodeJS.ProcessEnv,
 ): string | undefined {
   const configured = environment[RECEIPT_UPLOADER.urlEnvironment];
-  if (configured) return configured.replace(/\/+$/, '');
+  if (configured) return validCollectorUrl(configured);
   return environment[RECEIPT_UPLOADER.releaseEnvironment]
     ? COLLECTOR_URL
     : undefined;

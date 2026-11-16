@@ -167,14 +167,6 @@ function buyerReceipts(
         .sign([...bytes])
         .toBytes(),
     );
-  // Sends this buyer's confirmed receipts to the metrics collector (CLI and desktop alike).
-  const uploader = startRoleUploader({
-    environment: process.env,
-    store,
-    nodeId,
-    role: P2P_ROLES.BUYER,
-    signer,
-  });
   const runtime = createBuyerReceiptRuntime({
     endpoint,
     slots: TRANSPORT_LIMITS.maxConcurrent,
@@ -191,6 +183,14 @@ function buyerReceipts(
         }
       },
     },
+  });
+  // Sends this buyer's confirmed receipts to the metrics collector (CLI and desktop alike).
+  const uploader = startRoleUploader({
+    environment: process.env,
+    store,
+    nodeId,
+    role: P2P_ROLES.BUYER,
+    signer,
   });
   return {
     ...runtime,
