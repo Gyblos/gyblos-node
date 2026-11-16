@@ -230,11 +230,12 @@ signed a record; clients re-verify everything.
 Public seller uptime comes only from records the index already verified. Each
 UTC hour has one row per NodeId (`migrations/0004_uptime.sql`) with one bit per
 five-minute slot in which the index accepted a signed presence from that NodeId,
-at the index's own clock. Catalogs and withdrawals do not count. Rows older than
-30 days are pruned at most once an hour per app instance, on the next accepted
-presence, separately from record pruning: retention holds even when no new
-NodeId publishes, and a failing uptime table never blocks a publish or the
-admission of a new NodeId.
+at the index's own clock. Catalogs and withdrawals do not count. Reports read
+only the last 30 days, but rows are kept for `UPTIME.retentionDays` (about ten
+years) as network history; older rows are pruned at most once an hour per app
+instance, on the next accepted presence, separately from record pruning:
+retention holds even when no new NodeId publishes, and a failing uptime table
+never blocks a publish or the admission of a new NodeId.
 
 `GET /v1/uptime?node=<64 lowercase hex>` answers
 
@@ -254,7 +255,7 @@ admission of a new NodeId.
 ```
 
 `firstSeenAt` is the earliest presence recorded for the NodeId: one row per
-NodeId (`discovery_uptime_nodes`) outlives the 30-day hourly rows, so a seller
+NodeId (`discovery_uptime_nodes`) outlives the retained hourly rows, so a seller
 back after a long absence is not reported as new and the absence counts in every
 window. Permanent uptime identities share the configured `maxNodes` capacity. At
 capacity, existing identities keep their history; new identities are omitted
