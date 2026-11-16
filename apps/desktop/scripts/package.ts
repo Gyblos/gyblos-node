@@ -157,6 +157,9 @@ async function debian(app: string) {
   const installed = join(root, 'opt', DESKTOP_PACKAGE.name);
   await mkdir(dirname(installed), { recursive: true });
   await cp(app, installed, { recursive: true, verbatimSymlinks: true });
+  // The packager builds in a private temporary folder (0700); installed for everyone, the app must be
+  // readable and traversable by every user, and writable by root only.
+  run('chmod', ['-R', 'u+rwX,go+rX,go-w', installed], packages);
   await mkdir(join(root, 'usr/bin'), { recursive: true });
   await symlink(
     `/opt/${DESKTOP_PACKAGE.name}/${DESKTOP_PACKAGE.executable}`,
