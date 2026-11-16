@@ -1,6 +1,7 @@
 // Verifies the free client's existing request budget during authentication without native connections.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { setImmediate } from 'node:timers/promises';
 
 import { EndpointAddr, EndpointId } from '@number0/iroh';
 
@@ -68,13 +69,16 @@ void test('free client keeps the request deadline while authentication is pendin
     remote: false,
     sent: false,
   });
+  const rejectionSettled = rejected.catch(() => undefined);
   try {
     await Promise.race([authenticating, operation]);
     context.mock.timers.tick(99);
-    await Promise.resolve();
+    await setImmediate();
     assert.equal(completed, false);
     assert.equal(item.dials(), 0);
     context.mock.timers.tick(1);
+    await setImmediate();
+    assert.equal(completed, true);
     await rejected;
     assert.equal(item.dials(), 0);
   } finally {
@@ -83,6 +87,6 @@ void test('free client keeps the request deadline while authentication is pendin
     item.client.close();
     await item.client.settled();
     await observed;
-    await rejected.catch(() => undefined);
+    await rejectionSettled;
   }
 });
