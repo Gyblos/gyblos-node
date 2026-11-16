@@ -237,6 +237,8 @@ export class ChatController {
       ),
     }));
   }
+  appendBuyer(_sessionId: string, _id: string, _text: string) {}
+  stopBuyer(_sessionId: string, _id: string) {}
   failPaypal(sessionId: string, id: string, notice: string) {
     this.updatePaypal(sessionId, id, (session) => ({
       ...session,

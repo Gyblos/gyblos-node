@@ -229,7 +229,10 @@ export class X402Client {
       this.keyRequests.delete(work);
     });
   }
-  send(id: string, prompt: string) {
+  stop(_id: string) {
+    return false;
+  }
+  send(id: string, prompt: string, _onDelta?: (text: string) => void) {
     if (this.busy || this.closed || !this.connection)
       return Promise.reject(new Error('Local buyer is unavailable'));
     if (!prompt.trim() || Buffer.byteLength(prompt) > DESKTOP_X402.MAX_PROMPT)
