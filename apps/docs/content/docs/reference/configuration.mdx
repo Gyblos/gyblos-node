@@ -161,3 +161,26 @@ Common file codes include `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`, `INLINE_SE
 unsupported settings, engines, reasoning or missing API keys. See [troubleshooting](/en/help/troubleshooting).
 
 **Related:** [CLI reference](/en/reference/cli) · [Models and offers](/en/sellers/models-offers).
+
+## Operational diagnostics
+
+The buyer reads `[diagnostics]` independently of `[telemetry].file`:
+
+```toml
+[diagnostics]
+enabled = true
+level = "warn"
+```
+
+These are the defaults. `enabled = false` disables the owned local diagnostic
+sink. Minimum levels are `debug`, `info`, `warn` and `error`; debug still excludes
+content, credentials, addresses and raw exception messages. There is no environment
+override or central log upload. This setting does not change receipt or telemetry
+policy. Seller configuration accepts the section, but initial instrumentation
+covers buyer HTTP and lab tool workers, not every seller/transport/payment path.
+
+Product logs live under `<GYBLOS_HOME>/<role>/diagnostics/`, separate from
+telemetry and receipts. Files are created lazily and have bounded size, queue and
+rotation; crashes, forced kills or exhausted storage can lose evidence. The buyer
+host exposes diagnostic health including dropped records. Use the [logs
+command](/en/reference/cli#local-operational-logs) to read local safe metadata.

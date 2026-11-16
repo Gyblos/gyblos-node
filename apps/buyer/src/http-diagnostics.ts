@@ -1,0 +1,145 @@
+// Content-free observations of the compatibility boundary. Logging never decides retry or admission.
+import type { ServerResponse } from 'node:http';
+
+import {
+  FREE_EXECUTION_CODES,
+  PROTOCOL_ERROR_CODES,
+} from '@gyblos/protocol/constants';
+import { FreeExecutionError } from '@gyblos/protocol/free-execution';
+import {
+  DIAGNOSTIC_CAUSES,
+  DIAGNOSTIC_LEVELS,
+  DIAGNOSTIC_OUTCOMES,
+} from '@gyblos/runtime/constants';
+import {
+  createDiagnostics,
+  diagnosticCause,
+  type DiagnosticSink,
+} from '@gyblos/runtime/diagnostics';
+import { FreeClientError } from '@gyblos/transport-iroh/free-client';
+
+import {
+  BUYER_HTTP_DIAGNOSTICS,
+  ERROR_DIAGNOSTICS,
+  FREE_BUYER_CODES,
+  PAID_BUYER_CODES,
+} from './constants';
+import { errorDiagnostic } from './diagnostics';
+import { FreeBuyerError } from './free-chat';
+
+const CODES = [
+  ...Object.values(PROTOCOL_ERROR_CODES),
+  ...Object.values(ERROR_DIAGNOSTICS),
+  ...Object.values(FREE_EXECUTION_CODES),
+  ...Object.values(FREE_BUYER_CODES),
+  ...Object.values(PAID_BUYER_CODES),
+  ...Object.values(BUYER_HTTP_DIAGNOSTICS.codes),
+];
+function failureCode(error: unknown) {
+  try {
+    if (
+      error instanceof FreeBuyerError ||
+      error instanceof FreeClientError ||
+      error instanceof FreeExecutionError
+    ) {
+      const code: unknown = error.code;
+      const known = CODES.find((item) => item === code);
+      if (known) return known;
+    }
+  } catch {
+    /* Untrusted thrown values are unknown. */
+  }
+  return errorDiagnostic(error);
+}
+export function httpDiagnostics(sink?: DiagnosticSink) {
+  const channel = createDiagnostics({
+    ...BUYER_HTTP_DIAGNOSTICS,
+    phases: Object.values(BUYER_HTTP_DIAGNOSTICS.phases),
+    codes: CODES,
+    level: DIAGNOSTIC_LEVELS.DEBUG,
+    sink,
+  });
+  return () => {
+    const operation = channel.start();
+    let phase: (typeof BUYER_HTTP_DIAGNOSTICS.phases)[keyof typeof BUYER_HTTP_DIAGNOSTICS.phases] =
+      BUYER_HTTP_DIAGNOSTICS.phases.ADMISSION;
+    let terminal = false;
+    const report = (event: Parameters<typeof operation.report>[0]) => {
+      if (terminal) return;
+      terminal = true;
+      operation.report(event);
+    };
+    return {
+      input: () => {
+        phase = BUYER_HTTP_DIAGNOSTICS.phases.INPUT;
+      },
+      refused: () =>
+        report({
+          phase,
+          code: BUYER_HTTP_DIAGNOSTICS.codes.REFUSED,
+          level: DIAGNOSTIC_LEVELS.WARN,
+        }),
+      executing: () => {
+        phase = BUYER_HTTP_DIAGNOSTICS.phases.EXECUTE;
+      },
+      responding: () => {
+        phase = BUYER_HTTP_DIAGNOSTICS.phases.RESPONSE;
+      },
+      failure: (error: unknown) =>
+        report({
+          phase,
+          code: failureCode(error),
+          cause: diagnosticCause(error),
+        }),
+      timeout: () =>
+        report({
+          phase,
+          code: ERROR_DIAGNOSTICS.TIMEOUT,
+          cause: DIAGNOSTIC_CAUSES.TIMEOUT,
+          outcome: DIAGNOSTIC_OUTCOMES.TIMEOUT,
+        }),
+      cancelled: () =>
+        report({
+          phase,
+          code: BUYER_HTTP_DIAGNOSTICS.codes.CLOSED,
+          cause: DIAGNOSTIC_CAUSES.ABORT,
+          outcome: DIAGNOSTIC_OUTCOMES.CANCELLED,
+          level: DIAGNOSTIC_LEVELS.WARN,
+        }),
+      success: () =>
+        report({
+          phase,
+          code: BUYER_HTTP_DIAGNOSTICS.codes.COMPLETE,
+          outcome: DIAGNOSTIC_OUTCOMES.SUCCESS,
+          level: DIAGNOSTIC_LEVELS.DEBUG,
+        }),
+    };
+  };
+}
+
+// Owns only lifecycle listeners added at the HTTP boundary; expiration remains the caller's policy.
+export function httpRequestLifecycle(
+  response: ServerResponse,
+  requestMs: number,
+  diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
+  expire: (cancel: () => void) => void,
+) {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  const disconnected = () => {
+    if (!response.writableEnded) diagnostic.cancelled();
+    cancel();
+  };
+  const timer = setTimeout(() => {
+    diagnostic.timeout();
+    expire(cancel);
+  }, requestMs);
+  response.once('close', disconnected);
+  return {
+    controller,
+    close() {
+      clearTimeout(timer);
+      response.removeListener('close', disconnected);
+    },
+  };
+}

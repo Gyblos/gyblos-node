@@ -53,6 +53,7 @@ export const ROLE_FILES = {
   trust: 'trust.json',
   status: 'status.json',
   telemetry: 'telemetry',
+  diagnostics: 'diagnostics',
   receipts: 'receipts',
   payments: 'payments',
   metrics: 'transport.jsonl',
@@ -161,6 +162,7 @@ export function labLayout(environment: HomeEnvironment) {
   );
   return {
     root,
+    diagnostics: join(root, ROLE_FILES.diagnostics),
     measurements: join(root, ROLE_FILES.measurements),
     facilitatorDiagnostics: join(root, ROLE_FILES.facilitatorDiagnostics),
     identityKeys: join(root, LAB_DIRECTORIES.identityKeys),
