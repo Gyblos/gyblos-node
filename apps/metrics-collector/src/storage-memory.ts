@@ -1,11 +1,16 @@
 // Owns the in-memory collector storage for tests and development. It applies the same write rule as
-// D1 (applyReceipt), so behavior matches the production adapter.
-import type { PublicReceiptMerge } from '@gyblos/core/constants';
-import type { PublicReceiptEntry } from '@gyblos/core/public-receipts';
+// D1 (core's mergePublicReceipt at commit time), so behavior matches the production adapter.
+import {
+  PUBLIC_RECEIPT_MERGES,
+  type PublicReceiptMerge,
+} from '@gyblos/core/constants';
+import {
+  mergePublicReceipt,
+  type PublicReceiptEntry,
+} from '@gyblos/core/public-receipts';
 import type { P2PRole } from '@gyblos/protocol/constants';
 
 import {
-  applyReceipt,
   COMMIT_RESULTS,
   type CollectorStorage,
   type EnvelopeRow,
@@ -52,23 +57,25 @@ export function createMemoryStorage(): MemoryCollector {
       memory.envelopes.push(write.envelope);
       memory.reports.push(...write.reports);
       for (const { role, incoming } of write.receipts) {
-        const applied = applyReceipt(
-          memory.entries.get(incoming.key),
+        const { merge, entry } = mergePublicReceipt(
+          memory.entries.get(incoming.key) ?? null,
           incoming,
         );
-        memory.entries.set(incoming.key, applied.stored);
-        if (applied.changed)
+        memory.entries.set(incoming.key, entry);
+        if (
+          merge === PUBLIC_RECEIPT_MERGES.INSERT ||
+          merge === PUBLIC_RECEIPT_MERGES.UPGRADE
+        )
           memory.history.push({
             key: incoming.key,
-            status: applied.stored.status,
+            status: entry.status,
             at: now,
           });
-        if (applied.conflict)
-          memory.conflicts.push({
-            key: incoming.key,
-            merge: applied.conflict,
-            entry: incoming,
-          });
+        if (
+          merge === PUBLIC_RECEIPT_MERGES.SELLER_CONFLICT ||
+          merge === PUBLIC_RECEIPT_MERGES.BUYER_CONFLICT
+        )
+          memory.conflicts.push({ key: incoming.key, merge, entry: incoming });
         const first = memory.firstReports.get(incoming.key) ?? {};
         first[role] ??= now;
         memory.firstReports.set(incoming.key, first);

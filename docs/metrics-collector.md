@@ -3,7 +3,8 @@
 `apps/metrics-collector` (`@gyblos/metrics-collector`) is the proposed public
 receipt collector: a Cloudflare Worker for `https://collector.gyblos.com`
 (proposed), built with Hono and D1. Sellers, the buyer CLI and the buyer desktop
-app send their signed receipts to it, plus their own timestamps, in the
+app will send their signed receipts to it (no uploader exists yet), plus their
+own timestamps, in the
 [receipt upload envelope](../packages/protocol/SPEC.md#receipt-upload-envelope-v1).
 It keeps the rows private. It has no public reads or aggregates yet.
 
@@ -124,8 +125,9 @@ is signed:
 
 D1 tables are declared once in `src/schema.ts` (Drizzle) and created by
 `migrations/0001_metrics_collector.sql`; a test keeps both identical. Raw rows
-are append-only. Nothing stores an IP, a request header, a prompt, a response or
-an endpoint address.
+are append-only. Envelopes are never pruned: a conflict's signed receipt is kept
+only in its envelope's `signed_json`. Nothing stores an IP, a request header, a
+prompt, a response or an endpoint address.
 
 | Table                      | One row per                      | Holds                                                                                                                                                                         |
 | -------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

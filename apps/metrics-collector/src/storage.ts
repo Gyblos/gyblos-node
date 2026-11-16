@@ -1,9 +1,6 @@
-// Owns the collector storage port and the write rule every adapter applies at commit time. Raw rows are
-// append-only; the receipt table keeps the first accepted versions and first report time per role.
-import {
-  PUBLIC_RECEIPT_MERGES,
-  type PublicReceiptMerge,
-} from '@gyblos/core/constants';
+// Owns the collector storage port. Adapters apply core's merge rule (mergePublicReceipt) at commit time.
+// Raw rows are append-only; the receipt table keeps the first accepted versions and first report times.
+import type { PublicReceiptMerge } from '@gyblos/core/constants';
 import type { PublicReceiptEntry } from '@gyblos/core/public-receipts';
 import type { P2PRole } from '@gyblos/protocol/constants';
 import type { ReceiptUploadV1 } from '@gyblos/protocol/receipt-upload';
@@ -53,35 +50,4 @@ export interface CollectorStorage {
   // Atomic: the envelope, every report, guarded receipt writes, status history and conflicts, or
   // nothing. Conflicts and first versions are decided against the state at write time.
   commit(write: CollectorWrite, now: number): Promise<CommitResult>;
-}
-
-// The write rule both stores apply at commit time: a new key is inserted; an existing one only gains
-// its first buyer half for the same seller record; any other difference is the signer's conflict.
-export function applyReceipt(
-  existing: PublicReceiptEntry | undefined,
-  incoming: PublicReceiptEntry,
-): {
-  stored: PublicReceiptEntry;
-  changed: boolean;
-  conflict: PublicReceiptMerge | null;
-} {
-  if (!existing) return { stored: incoming, changed: true, conflict: null };
-  if (existing.sellerDigest !== incoming.sellerDigest)
-    return {
-      stored: existing,
-      changed: false,
-      conflict: PUBLIC_RECEIPT_MERGES.SELLER_CONFLICT,
-    };
-  if (
-    incoming.buyerDigest === null ||
-    incoming.buyerDigest === existing.buyerDigest
-  )
-    return { stored: existing, changed: false, conflict: null };
-  if (existing.buyerDigest === null)
-    return { stored: incoming, changed: true, conflict: null };
-  return {
-    stored: existing,
-    changed: false,
-    conflict: PUBLIC_RECEIPT_MERGES.BUYER_CONFLICT,
-  };
 }

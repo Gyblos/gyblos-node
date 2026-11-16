@@ -9,12 +9,18 @@ import {
   unique,
 } from 'drizzle-orm/sqlite-core';
 
+import type {
+  PublicReceiptMerge,
+  PublicReceiptStatus,
+} from '@gyblos/core/constants';
+import type { P2PRole } from '@gyblos/protocol/constants';
+
 export const envelopes = sqliteTable(
   'collector_envelopes',
   {
     id: text('id').primaryKey(),
     uploaderNodeId: text('uploader_node_id').notNull(),
-    role: text('role').notNull(),
+    role: text('role').$type<P2PRole>().notNull(),
     clientKind: text('client_kind').notNull(),
     appVersion: text('app_version').notNull(),
     platform: text('platform').notNull(),
@@ -39,11 +45,11 @@ export const reports = sqliteTable(
   {
     envelopeId: text('envelope_id').notNull(),
     receiptKey: text('receipt_key').notNull(),
-    role: text('role').notNull(),
+    role: text('role').$type<P2PRole>().notNull(),
     fingerprint: text('fingerprint').notNull(),
     sellerDigest: text('seller_digest').notNull(),
     buyerDigest: text('buyer_digest'),
-    merge: text('merge').notNull(),
+    merge: text('merge').$type<PublicReceiptMerge>().notNull(),
     storedAt: integer('stored_at'),
     startedAt: integer('started_at'),
     offerJson: text('offer_json'),
@@ -65,7 +71,7 @@ export const receipts = sqliteTable(
     sellerDigest: text('seller_digest').notNull(),
     buyerDigest: text('buyer_digest'),
     fingerprint: text('fingerprint').notNull(),
-    status: text('status').notNull(),
+    status: text('status').$type<PublicReceiptStatus>().notNull(),
     version: integer('version').notNull(),
     paid: integer('paid').notNull(),
     owner: text('owner').notNull(),
@@ -111,7 +117,7 @@ export const conflicts = sqliteTable(
   {
     envelopeId: text('envelope_id').notNull(),
     receiptKey: text('receipt_key').notNull(),
-    merge: text('merge').notNull(),
+    merge: text('merge').$type<PublicReceiptMerge>().notNull(),
     fingerprint: text('fingerprint').notNull(),
     insertedAt: integer('inserted_at').notNull(),
   },
@@ -122,7 +128,7 @@ export const statusHistory = sqliteTable(
   'collector_status_history',
   {
     receiptKey: text('receipt_key').notNull(),
-    status: text('status').notNull(),
+    status: text('status').$type<PublicReceiptStatus>().notNull(),
     changedAt: integer('changed_at').notNull(),
   },
   (table) => [

@@ -63,11 +63,9 @@ void test('one upload costs one read and one batch whose size does not grow per 
   }
   // Envelope, reports, conflicts, receipts, history, first report time.
   assert.equal(one.batched.length, 6);
-  // Only the two multi-row inserts are chunked; everything else is set-based.
-  assert.ok(
-    full.batched.length <= 30,
-    `expected at most 30 statements for ${RECEIPT_UPLOAD.maxItems} receipts, got ${full.batched.length}`,
-  );
+  // Only the two multi-row inserts are chunked (9 report rows and 3 receipt rows per statement under
+  // the 100-parameter limit); everything else is set-based: 1 + 6 + 1 + 17 + 1 + 1.
+  assert.equal(full.batched.length, 27);
   for (const entry of full.log)
     assert.ok(
       entry.params.length <= COLLECTOR_LIMITS.maxBoundParameters,
@@ -87,17 +85,19 @@ void test('the typed schema matches the migrated tables, keys and indexes', () =
   for (const table of tables) {
     const actual = database.raw
       .prepare(
-        'SELECT name, "notnull", pk FROM pragma_table_info(?) ORDER BY cid',
+        'SELECT name, type, "notnull", pk FROM pragma_table_info(?) ORDER BY cid',
       )
       .all(table.name)
       .map((column) => ({
         name: column.name,
+        type: column.type,
         notNull: column.notnull === 1,
       }));
     assert.deepEqual(
       actual,
       table.columns.map((column) => ({
         name: column.name,
+        type: column.getSQLType().toUpperCase(),
         notNull: column.notNull,
       })),
       table.name,
@@ -121,6 +121,22 @@ void test('the typed schema matches the migrated tables, keys and indexes', () =
       indexes,
       table.indexes.map((index) => index.config.name).sort(),
       `${table.name} indexes`,
+    );
+    const uniques = database.raw
+      .prepare("SELECT name FROM pragma_index_list(?) WHERE origin = 'u'")
+      .all(table.name)
+      .map((index) =>
+        database.raw
+          .prepare('SELECT name FROM pragma_index_info(?) ORDER BY seqno')
+          .all(String(index.name))
+          .map((column) => column.name),
+      );
+    assert.deepEqual(
+      uniques,
+      table.uniqueConstraints.map((constraint) =>
+        constraint.columns.map((column) => column.name),
+      ),
+      `${table.name} unique constraints`,
     );
   }
 });

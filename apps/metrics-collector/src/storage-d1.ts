@@ -6,6 +6,7 @@ import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import {
   PUBLIC_RECEIPT_MERGES,
   PUBLIC_RECEIPT_STATUSES,
+  type PublicReceiptMerge,
   type PublicReceiptStatus,
 } from '@gyblos/core/constants';
 import type {
@@ -222,7 +223,7 @@ function conflictInsert(
           envelopeId: reports.envelopeId,
           receiptKey: reports.receiptKey,
           merge:
-            sql<string>`case when ${differentSeller} then ${PUBLIC_RECEIPT_MERGES.SELLER_CONFLICT} else ${PUBLIC_RECEIPT_MERGES.BUYER_CONFLICT} end`.as(
+            sql<PublicReceiptMerge>`case when ${differentSeller} then ${PUBLIC_RECEIPT_MERGES.SELLER_CONFLICT} else ${PUBLIC_RECEIPT_MERGES.BUYER_CONFLICT} end`.as(
               'merge',
             ),
           fingerprint: reports.fingerprint,
