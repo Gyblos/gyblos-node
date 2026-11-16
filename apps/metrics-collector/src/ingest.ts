@@ -32,6 +32,8 @@ export interface IngestContext {
   now: number;
   // Per-uploader admission, consulted only after the envelope signature verifies.
   admitNode(uploaderNodeId: string): Promise<boolean>;
+  // The shared write budget, spent only by fully verified uploads right before the write.
+  admitWrite(): Promise<boolean>;
 }
 export interface IngestResult {
   receivedAt: number;
@@ -133,6 +135,8 @@ export async function ingestUpload(
   } catch (error) {
     return verificationFailure(error);
   }
+  if (!(await context.admitWrite()))
+    return collectorReject(COLLECTOR_ERRORS.RATE_LIMITED);
   // The pre-read only labels reports; storage decides first versions and conflicts atomically.
   const stored = await context.storage.readEntries(
     entries.map((entry) => entry.key),

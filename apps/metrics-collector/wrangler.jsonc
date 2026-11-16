@@ -34,7 +34,9 @@
       "simple": { "limit": 12, "period": 60 },
     },
     {
-      // One shared write budget: a ceiling on storage growth from free node keys.
+      // One shared write budget, spent only by verified uploads right before the write: a ceiling on
+      // storage growth from free node keys. Cloudflare counts per location and eventually, so it is
+      // approximate, not an exact worldwide cap.
       "name": "COLLECTOR_GLOBAL_LIMITER",
       "namespace_id": "42621012",
       "simple": { "limit": 600, "period": 60 },

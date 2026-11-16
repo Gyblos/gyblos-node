@@ -134,14 +134,13 @@ export function createMetricsCollector(options: MetricsCollectorOptions) {
         )
       )
         return rejection(context, COLLECTOR_ERRORS.INVALID_UPLOAD);
-      if (!(await allowed(global, GLOBAL_LIMIT_KEY)))
-        return rejection(context, COLLECTOR_ERRORS.RATE_LIMITED);
       const bytes = new Uint8Array(await context.req.arrayBuffer());
       try {
         const result = await ingestUpload(bytes, {
           storage,
           now: now(),
           admitNode: (nodeId) => allowed(node, nodeId),
+          admitWrite: () => allowed(global, GLOBAL_LIMIT_KEY),
         });
         return context.json(result, COLLECTOR_STATUS.OK);
       } catch (error) {

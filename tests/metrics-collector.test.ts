@@ -170,8 +170,17 @@ void test('missing configuration fails closed; address and global limits apply; 
   const v6 = testCollector(memory.storage);
   await v6.post({}, undefined, { 'cf-connecting-ip': '2001:db8:1:2:3:4:5:6' });
   assert.deepEqual(v6.ip.keys, ['2001:db8:1:2::/64']);
-  const global = testCollector(memory.storage, { global: false });
-  assert.equal((await global.post({})).status, 429);
+  // Junk never spends the shared write budget; only a verified upload does.
+  const budget = testCollector(memory.storage, { global: false });
+  assert.equal((await budget.post({})).status, 400);
+  assert.deepEqual(budget.global.keys, []);
+  const { seller, receipt } = await freePair();
+  const verified = await signUpload(
+    sellerUpload(seller.nodeId, receipt),
+    seller.sign,
+  );
+  assert.equal((await budget.post(verified)).status, 429);
+  assert.equal(budget.global.keys.length, 1);
   assert.deepEqual(
     (
       await responseJson(
