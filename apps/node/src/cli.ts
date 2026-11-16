@@ -25,6 +25,7 @@ import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 import { initCommand, terminalPrompt, type Prompt } from './cli-init';
+import { logsCommand } from './cli-logs';
 import { registerCommand, type FundsWait } from './cli-register';
 import { serviceCommand, type ServiceSystem } from './cli-service';
 import { statusCommand } from './cli-status';
@@ -56,7 +57,7 @@ export interface CliContext {
 }
 
 const USAGE =
-  'Usage: gyblos start   (runs the seller daemon)\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or config.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n';
+  'Usage: gyblos start   (runs the seller daemon)\n       gyblos logs [--role buyer|seller|lab] [--follow] [--json]\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or config.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n';
 // `seller init`'s flags, declared once for parsing and for refusing them on other commands.
 const INIT_OPTIONS = {
   engine: { type: 'string' },
@@ -273,6 +274,7 @@ function runRegister(context: CliContext) {
 }
 
 export async function runCli(args: readonly string[], context: CliContext) {
+  if (args[0] === 'logs') return logsCommand(args.slice(1), context);
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
   if (parsed && isBareRegister(parsed)) return runRegister(context);

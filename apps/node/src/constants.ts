@@ -215,3 +215,9 @@ export const REGISTER_ERRORS = {
   IDENTITY_UNAVAILABLE: 'REGISTER_IDENTITY_UNAVAILABLE',
   CANCELLED: 'REGISTER_CANCELLED',
 } as const;
+
+export const LOG_ROLES = {
+  BUYER: 'buyer',
+  SELLER: 'seller',
+  LAB: 'lab',
+} as const;

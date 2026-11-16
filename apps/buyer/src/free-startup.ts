@@ -11,6 +11,10 @@ import type {
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import {
+  createLocalDiagnostics,
+  loadLocalDiagnostics,
+} from '@gyblos/node/diagnostics-startup';
+import {
   createBuyerReceiptRuntime,
   openReceiptStore,
 } from '@gyblos/node/receipts';
@@ -22,6 +26,7 @@ import {
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import {
   assertConfiguredRelay,
   bindEndpoint,
@@ -219,6 +224,7 @@ function buyerHttp(
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
+  diagnostics?: DiagnosticSink,
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
@@ -235,6 +241,7 @@ function buyerHttp(
         port,
         stream: run,
         apiKeys: execution?.apiKeys,
+        diagnostics,
         ...configuredBuyerAccess(request, role, execution?.token),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
@@ -249,28 +256,32 @@ function buyerHost(
   receipts: ReturnType<typeof createBuyerReceiptRuntime>,
   endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
   telemetry: ReturnType<typeof createLocalTelemetry>,
-  execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
+  execution: Awaited<ReturnType<BuyerExecutionFactory>> | undefined,
+  diagnostics: ReturnType<typeof createLocalDiagnostics>,
 ) {
+  const closeResources = (runningHost?: typeof host) =>
+    closeBuyerResources(
+      receipts,
+      endpoint,
+      telemetry,
+      runningHost,
+      execution,
+    ).finally(diagnostics.close);
+  const close = () => closeResources(host);
   return {
     url: host.url,
     chat: execution?.chat(host.url) ?? freeChat(request, host.url),
     receipts: receipts.health,
     telemetry: telemetry.health,
-    close: () =>
-      closeBuyerResources(receipts, endpoint, telemetry, host, execution),
+    diagnostics: diagnostics.health,
+    close,
     inspectAndClose: execution?.inspect
       ? async (digest: string, signal?: AbortSignal) => {
           try {
             await host.close();
             return await execution?.inspect?.(digest, signal);
           } finally {
-            await closeBuyerResources(
-              receipts,
-              endpoint,
-              telemetry,
-              undefined,
-              execution,
-            );
+            await closeResources();
           }
         }
       : undefined,
@@ -298,6 +309,7 @@ async function startOwnedFreeBuyer(
   } = {},
 ) {
   const telemetryEnabled = await loadLocalTelemetry(process.env);
+  const diagnosticSettings = await loadLocalDiagnostics(process.env);
   const role = await buyerRole();
   if (role.role !== P2P_ROLES.BUYER)
     return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
@@ -320,6 +332,11 @@ async function startOwnedFreeBuyer(
     role: P2P_ROLES.BUYER,
     sink: options.telemetry,
   });
+  const diagnostics = createLocalDiagnostics(
+    process.env,
+    P2P_ROLES.BUYER,
+    diagnosticSettings,
+  );
   let receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined;
   let execution: Awaited<ReturnType<BuyerExecutionFactory>> | undefined;
   try {
@@ -353,8 +370,17 @@ async function startOwnedFreeBuyer(
       options.port,
       execution,
       role,
+      diagnostics.write,
     );
-    return buyerHost(host, request, receipts, endpoint, telemetry, execution);
+    return buyerHost(
+      host,
+      request,
+      receipts,
+      endpoint,
+      telemetry,
+      execution,
+      diagnostics,
+    );
   } catch (error) {
     await closeBuyerResources(
       receipts,
@@ -362,7 +388,7 @@ async function startOwnedFreeBuyer(
       telemetry,
       undefined,
       execution,
-    );
+    ).finally(diagnostics.close);
     throw error;
   }
 }

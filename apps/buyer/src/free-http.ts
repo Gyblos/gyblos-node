@@ -12,25 +12,17 @@ import {
   PORTS,
   ROUTES,
   TRANSPORT_LIMITS,
-  UNITS,
 } from '@gyblos/config';
 import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
-import {
-  FREE_EXECUTION,
-  FREE_EXECUTION_CODES,
-} from '@gyblos/protocol/constants';
+import { FREE_EXECUTION } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
-import {
-  FreeExecutionError,
-  type FreeExecutionBuildInput,
-  type FreeExecutionStop,
-} from '@gyblos/protocol/free-execution';
+import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
-import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import { buyerApiCaller } from './api-key-caller';
 import { buyerApiKeyExecutors } from './api-key-execution';
@@ -50,27 +42,22 @@ import {
   CHAT_ROUTES,
   FREE_BUYER,
   FREE_BUYER_CODES,
-  FREE_CHAT_DETAILS,
   OPENROUTER,
   PAID_BUYER,
-  PAID_BUYER_CODES,
 } from './constants';
 import {
   createDesktopApi,
   desktopApiPolicy,
   type BuyerDesktopOptions,
 } from './desktop-api';
-import { FreeBuyerError, invalidChat } from './free-chat';
-import { FreeSelectionFailure } from './free-execution';
+import { FreeBuyerError } from './free-chat';
 import {
   executeFreeSse,
-  replyFreeSseError,
-  type ChatErrorCode,
-  type ChatPayment,
   type ChatResult,
   type ChatStreamFormat,
   type FreeChatStreamExecutor,
 } from './free-sse';
+import { httpDiagnostics, httpRequestLifecycle } from './http-diagnostics';
 import {
   endpointRoutes,
   requestedModel,
@@ -141,11 +128,15 @@ async function countTokens(
   request: IncomingMessage,
   response: ServerResponse,
   requestMs: number,
+  diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
 ) {
+  diagnostic.input();
   try {
     const body = await readBody(request, AbortSignal.timeout(requestMs));
     replyJson(response, estimatedTokens(body));
+    diagnostic.success();
   } catch (error) {
+    diagnostic.failure(error);
     replyError(response, error, undefined, chatApi(CHAT_ROUTES.messages));
   }
 }
@@ -217,6 +208,74 @@ function streamFormat(api: ChatApi, model: string, request: IncomingMessage) {
       PAID_BUYER.observationValue,
   );
 }
+async function serveChat(
+  request: IncomingMessage,
+  response: ServerResponse,
+  settings: ChatSettings,
+  scoped: { execute: FreeChatExecutor; stream?: FreeChatStreamExecutor },
+  api: ChatApi,
+  requestMs: number,
+  diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
+  classify?: ChatErrorClassifier,
+) {
+  let format: ChatStreamFormat | undefined;
+  const lifecycle = httpRequestLifecycle(
+    response,
+    requestMs,
+    diagnostic,
+    (cancel) =>
+      expireRequest(request, response, cancel, () =>
+        replyError(
+          response,
+          new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
+          classify,
+          api,
+          format,
+        ),
+      ),
+  );
+  const controller = lifecycle.controller;
+  try {
+    const { input, payload, route, model } = routedInput(
+      api,
+      await readBody(request, controller.signal),
+      settings,
+      scoped.stream !== undefined,
+    );
+    const run = stopping(scoped, input.stop);
+    diagnostic.executing();
+    if (input.stream && run.stream) {
+      format = streamFormat(api, model, request);
+      await executeFreeSse(
+        run.stream,
+        payload,
+        controller.signal,
+        response,
+        format,
+        route,
+      );
+      diagnostic.responding();
+      diagnostic.success();
+      return;
+    }
+    const result = await run.execute(
+      payload,
+      controller.signal,
+      undefined,
+      route,
+    );
+    diagnostic.responding();
+    if (!controller.signal.aborted) {
+      replyJson(response, api.completion(model, result));
+      diagnostic.success();
+    }
+  } catch (error) {
+    diagnostic.failure(error);
+    replyError(response, error, classify, api, format);
+  } finally {
+    lifecycle.close();
+  }
+}
 export function freeBuyerHandler(
   execute: FreeChatExecutor,
   settings: ChatSettings,
@@ -226,75 +285,48 @@ export function freeBuyerHandler(
   authorize?: (request: IncomingMessage) => boolean,
   desktopPolicy?: BuyerApiPolicy,
   apiKeys?: BuyerApiKeys,
+  diagnostics?: DiagnosticSink,
 ) {
   const desktop = createDesktopApi(desktopPolicy, authorize !== undefined);
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
+  const observe = httpDiagnostics(diagnostics);
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
+    const diagnostic = observe();
     const caller = await accept(request, response);
-    if (!caller) return;
+    if (!caller) {
+      diagnostic.refused();
+      return;
+    }
     const scoped = buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream);
-    if (desktop.handled(request, response)) return;
+    if (desktop.handled(request, response)) {
+      if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
+      return;
+    }
     if (asksTokenCount(request))
-      return countTokens(request, response, requestMs);
+      return countTokens(request, response, requestMs, diagnostic);
     const localApi = desktop.accepts(request, isJson(request))
       ? defaultChatApi
       : undefined;
     const api = admit(request, response, settings, active, localApi);
-    if (!api) return;
-    let format: ChatStreamFormat | undefined;
+    if (!api) {
+      if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
+      return;
+    }
+    diagnostic.input();
     active++;
-    const controller = new AbortController();
-    const cancel = () => controller.abort();
-    // The prompt may already be on its way, so the deadline answers with no-retry rather than a
-    // bare socket reset, which OpenAI SDKs would retry. The socket closes once the reply is out.
-    const timer = setTimeout(
-      () =>
-        expireRequest(request, response, cancel, () =>
-          replyError(
-            response,
-            new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
-            classify,
-            api,
-            format,
-          ),
-        ),
-      requestMs,
-    );
-    response.once('close', cancel);
     try {
-      const { input, payload, route, model } = routedInput(
-        api,
-        await readBody(request, controller.signal),
+      await serveChat(
+        request,
+        response,
         settings,
-        stream !== undefined,
+        scoped,
+        api,
+        requestMs,
+        diagnostic,
+        classify,
       );
-      const run = stopping(scoped, input.stop);
-      if (input.stream && run.stream) {
-        format = streamFormat(api, model, request);
-        await executeFreeSse(
-          run.stream,
-          payload,
-          controller.signal,
-          response,
-          format,
-          route,
-        );
-        return;
-      }
-      const result = await run.execute(
-        payload,
-        controller.signal,
-        undefined,
-        route,
-      );
-      if (!controller.signal.aborted)
-        replyJson(response, api.completion(model, result));
-    } catch (error) {
-      replyError(response, error, classify, api, format);
     } finally {
-      clearTimeout(timer);
-      response.removeListener('close', cancel);
       active--;
     }
   };
@@ -308,6 +340,7 @@ export async function startFreeBuyerHttp(
     stream?: FreeChatStreamExecutor;
     classify?: ChatErrorClassifier;
     apiKeys?: BuyerApiKeys;
+    diagnostics?: DiagnosticSink;
   } & BuyerDesktopOptions = {},
 ) {
   const server = createServer(
@@ -325,6 +358,7 @@ export async function startFreeBuyerHttp(
       options.token === undefined ? undefined : bearerAuthorizer(options.token),
       desktopApiPolicy(options, settings),
       options.apiKeys,
+      options.diagnostics,
     ),
   );
   await new Promise<void>((resolve, reject) => {
