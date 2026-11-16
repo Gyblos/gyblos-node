@@ -7,7 +7,8 @@ import { indexFail } from './errors';
 
 export { UPTIME } from './constants';
 
-const RETENTION_DAYS = UPTIME.windowDays.at(-1)!;
+// The longest reported window; reads never go further back than this.
+const REPORT_DAYS = UPTIME.windowDays.at(-1)!;
 
 export interface UptimeRow {
   hour: number;
@@ -24,7 +25,7 @@ export interface UptimeStorage {
   seen(nodeId: string, sinceHour: number): Promise<UptimeRow[]>;
   // When the NodeId was first seen, kept after its rows are pruned; null when never seen.
   firstSeen(nodeId: string): Promise<number | null>;
-  // Drops rows older than the longest window.
+  // Drops rows older than the retention period (UPTIME.retentionDays).
   pruneUptime(now: number): Promise<void>;
 }
 
@@ -34,7 +35,10 @@ export const slotBit = (now: number) =>
   1 << (slotOf(now) % UPTIME.slotsPerHour);
 // The first hour kept: rows before it are pruned.
 export const retainedHour = (now: number) =>
-  hourOf(now - RETENTION_DAYS * UPTIME.dayMs);
+  hourOf(now - UPTIME.retentionDays * UPTIME.dayMs);
+// The first hour a report reads.
+export const reportedHour = (now: number) =>
+  hourOf(now - REPORT_DAYS * UPTIME.dayMs);
 
 // One write per NodeId and slot per app instance: sellers refresh their presence far more often
 // than every five minutes, and the storage write is idempotent anyway. Old rows are pruned here, on
@@ -101,13 +105,13 @@ function window(rows: readonly UptimeRow[], first: number, now: number) {
   };
 }
 
-// The NodeId's uptime, or null when the index has not seen it within the retention window.
+// The NodeId's uptime, or null when the index has not seen it within the longest reported window.
 export async function uptimePage(
   storage: UptimeStorage,
   nodeId: string,
   now: number,
 ) {
-  const rows = (await storage.seen(nodeId, retainedHour(now))).filter(
+  const rows = (await storage.seen(nodeId, reportedHour(now))).filter(
     (row) => row.firstAt <= now,
   );
   // The first sighting ever, not the oldest row kept: a seller back after a long absence is not new.
@@ -117,7 +121,7 @@ export async function uptimePage(
     ...rows.map((row) => row.firstAt),
   );
   if (!Number.isFinite(firstSeenAt)) return null;
-  const firstSlot = slotOf(now - RETENTION_DAYS * UPTIME.dayMs) + 1;
+  const firstSlot = slotOf(now - REPORT_DAYS * UPTIME.dayMs) + 1;
   const recent = rows.filter((row) => slotOf(row.lastAt) >= firstSlot);
   const lastSeenAt = recent.length
     ? Math.max(...recent.map((row) => row.lastAt))
