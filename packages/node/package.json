@@ -91,7 +91,8 @@
     "./buyer-runtime": "./src/buyer-runtime.ts",
     "./buyer-routing": "./src/buyer-routing.ts",
     "./agent-setup-host": "./src/agent-setup-host.ts",
-    "./agent-setup-constants": "./src/agent-setup-constants.ts"
+    "./agent-setup-constants": "./src/agent-setup-constants.ts",
+    "./seller-paid-summary": "./src/seller-paid-summary.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

@@ -159,3 +159,14 @@ export function receiptActivity(
     ),
   };
 }
+
+// Atomic units of a 6-decimal token (USDC) as a decimal string without trailing zeros: 1500 -> "0.0015".
+export function atomicUsdc(atomic: bigint): string {
+  const scale = 1_000_000n;
+  const whole = atomic / scale;
+  const fraction = (atomic % scale)
+    .toString()
+    .padStart(6, '0')
+    .replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : whole.toString();
+}
