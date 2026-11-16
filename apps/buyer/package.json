@@ -60,7 +60,8 @@
     "./selection-busy": "./src/selection-busy.ts",
     "./session-routing": "./src/session-routing.ts",
     "./quote-startup": "./src/quote-startup.ts",
-    "./quote-selection": "./src/quote-selection.ts"
+    "./quote-selection": "./src/quote-selection.ts",
+    "./desktop-startup": "./src/desktop-startup.ts"
   },
   "dependencies": {
     "@gyblos/inference": "workspace:*",
