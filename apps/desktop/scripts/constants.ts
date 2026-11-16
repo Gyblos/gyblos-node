@@ -22,13 +22,7 @@ export const DESKTOP_PACKAGE = {
 } as const;
 
 // Release targets with an iroh native binding: no macOS x64 binding is published.
-export interface DesktopTarget {
-  name: string;
-  platform: 'darwin' | 'win32' | 'linux';
-  arch: 'arm64' | 'x64';
-  binding: string;
-}
-export const DESKTOP_TARGETS: readonly DesktopTarget[] = [
+export const DESKTOP_TARGETS = [
   {
     name: 'darwin-arm64',
     platform: 'darwin',
@@ -47,4 +41,5 @@ export const DESKTOP_TARGETS: readonly DesktopTarget[] = [
     arch: 'x64',
     binding: 'linux-x64-gnu',
   },
-];
+] as const;
+export type DesktopTarget = (typeof DESKTOP_TARGETS)[number];

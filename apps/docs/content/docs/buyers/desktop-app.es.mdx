@@ -3,8 +3,9 @@ title: App de escritorio
 description: Descarga la app de Gyblos para macOS, Windows o Linux, ábrela la primera vez y conversa con modelos de la red.
 ---
 
-La app de Gyblos te permite conversar con modelos de IA que ofrecen personas de la red Gyblos, desde tu
-propio computador. No necesitas la dirección de un vendedor, una clave de relay ni la terminal.
+Estos paquetes de escritorio están disponibles para validación. El alta automática del chat de red aún
+no está integrada: la app actual requiere una configuración de comprador preparada y un token de relay.
+Para usar hoy el comprador guiado desde una terminal, mira [Usar Gyblos desde tu código](/es/buyers/use-from-code).
 
 ## Descargar [#descargar]
 
@@ -29,7 +30,7 @@ de abrirla. Es normal; después de la primera vez se abre sin preguntar.
 
 ### macOS [#macos]
 
-1. Abre el `.zip`; aparece **Gyblos**. Arrástrala a **Aplicaciones**.
+1. Abre el `.zip`, entra en `Gyblos-darwin-arm64` y arrastra **Gyblos.app** a **Aplicaciones**.
 2. Abre Gyblos. macOS dice que no puede verificar al desarrollador; elige **OK**.
 3. Abre **Configuración del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Gyblos y elige
    **Abrir de todas formas**; confirma con tu contraseña.
@@ -37,7 +38,7 @@ de abrirla. Es normal; después de la primera vez se abre sin preguntar.
 ### Windows [#windows]
 
 1. Haz clic derecho en el `.zip` y elige **Extraer todo**.
-2. En la carpeta extraída, abre `gyblos-desktop.exe`.
+2. Entra en `gyblos-desktop-win32-x64` dentro de la carpeta extraída y abre `gyblos-desktop.exe`.
 3. Si Windows muestra "Windows protegió su PC", elige **Más información** y luego **Ejecutar de todas
    formas**.
 
@@ -53,10 +54,18 @@ En otras distribuciones, descomprime el `.tar.gz` y ejecuta `./gyblos-desktop` d
 
 ## Usarla [#usarla]
 
-La app se configura sola la primera vez: crea su propia identidad de comprador en su propia carpeta,
-separada de cualquier vendedor en el mismo computador, y usa los vendedores registrados en el índice de
-Gyblos, verificando la identidad de cada uno en Solana devnet antes de enviar nada. Durante la beta las
-respuestas son gratis.
+El comprador de escritorio actual pide elegir un `GYBLOS_HOME` existente preparado con `pnpm buyer:init`
+y proporcionar un token de relay. Que la credencial sea opcional en el nodo todavía no elimina esa
+pregunta de la app. Si no tienes esa configuración, usa la guía de CLI enlazada arriba; no inventes ni
+compartas credenciales.
+
+La configuración automática en una carpeta privada de la app, sin elegir una casa ni introducir un token
+de relay, está prevista. Las pruebas de apertura verifican el arranque y el binding nativo del transporte;
+no demuestran que esa futura alta ni una respuesta real de la red funcionen desde la interfaz.
+
+Las cotizaciones gratuitas firmadas no generan transacciones de pago. Mantén el presupuesto y los techos
+de precio en cero para aceptar solo respuestas gratuitas; una cotización con precio positivo requiere
+un presupuesto autorizado y la configuración pagada de la beta.
 
 Tus mensajes llegan al vendedor cuyo computador ejecuta el modelo, y ese vendedor puede leerlos. No envíes
 contraseñas, llaves ni otros secretos.

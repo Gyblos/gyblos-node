@@ -1,19 +1,14 @@
-// Packages the built desktop app, unsigned, for one release target: macOS arm64 (zip of the .app), Windows
-// x64 (zip) or Linux x64 (tar.gz, and a .deb where dpkg-deb exists). Any target builds on any host: Electron
-// is downloaded for the target, and the target's native iroh binding comes from node_modules, verified by
-// the lockfile (install with pnpm `supportedArchitectures` covering the target). Only built assets and that
-// binding enter the package; no operational homes, logs, keys or repository source folders.
-//
-//   pnpm desktop:package                     # this machine's target
-//   pnpm desktop:package -- --target win32-x64
-//   GYBLOS_RELEASE_VERSION=0.1.0-beta.11 pnpm desktop:package -- --target linux-x64
+// Packages one desktop release target from built public assets and its pinned native binding.
+// No operational homes or source folders enter the archive. macOS sealing requires a macOS host.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmod,
   cp,
   mkdir,
+  mkdtemp,
   readFile,
+  rename,
   rm,
   symlink,
   writeFile,
@@ -225,7 +220,14 @@ if (target.platform === 'linux') {
 } else {
   // -y keeps the macOS framework symlinks; Windows archives have none.
   const archive = join(release, `${base}.zip`);
-  run('zip', ['-qry', archive, basename(packaged)], dirname(packaged));
+  const temporary = await mkdtemp(join(release, '.zip-'));
+  try {
+    const staged = join(temporary, 'package.zip');
+    run('zip', ['-qry', staged, basename(packaged)], dirname(packaged));
+    await rename(staged, archive);
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
   outputs.push(archive);
 }
 for (const output of outputs) {

@@ -344,7 +344,17 @@ void test('the desktop app is packaged after the release exists and attached wit
     desktop,
     /publish:\n(?: {4}.*\n)*? {4}needs: \[macos, linux, windows\]\n/,
   );
-  assert.match(desktop, /--smoke/);
+  assert.match(
+    desktop,
+    /perl -e 'alarm 120; exec @ARGV' \.\/Gyblos\.app\/Contents\/MacOS\/gyblos-desktop --smoke/,
+  );
+  assert.match(desktop, /timeout 120 xvfb-run -a gyblos-desktop --smoke/);
+  assert.match(
+    desktop,
+    /Start-Process -FilePath \$exe\.FullName -ArgumentList '--smoke' -Wait -PassThru/,
+  );
+  assert.match(desktop, /if \(\$run\.ExitCode -ne 0\) \{ throw/);
+  assert.doesNotMatch(desktop, /--no-sandbox/);
   // No secret other than the token, and no signing identity or environment.
   assert.deepEqual(
     [...desktop.matchAll(/secrets\.([A-Z_]+)/g)].map((match) => match[1]),
