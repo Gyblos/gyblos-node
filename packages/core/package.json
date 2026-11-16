@@ -26,6 +26,7 @@
     "./identity-policy": "./src/identity-policy.ts",
     "./telemetry": "./src/telemetry.ts",
     "./receipts": "./src/receipts.ts",
+    "./public-receipts": "./src/public-receipts.ts",
     "./receipt-collector": "./src/receipt-collector.ts",
     "./mainnet-pilot": "./src/mainnet-pilot.ts",
     "./buyer-routing": "./src/buyer-routing.ts",
