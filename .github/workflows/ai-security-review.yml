@@ -27,7 +27,7 @@ jobs:
       merge: ${{ steps.context.outputs.merge }}
       runner: ${{ github.sha }}
     steps:
-      - name: Bind the request to a current same-repository PR into main
+      - name: Bind the request to a current same-repository PR into develop or main
         id: context
         env:
           GH_TOKEN: ${{ github.token }}
@@ -41,7 +41,7 @@ jobs:
           if (!reference || !Number.isSafeInteger(reference.number)) process.exit(0);
           const repo = process.env.GITHUB_REPOSITORY;
           const pr = JSON.parse(execFileSync('gh', ['api', 'repos/' + repo + '/pulls/' + reference.number], {encoding: 'utf8'}));
-          if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+          if (pr.state !== 'open' || !['develop', 'main'].includes(pr.base.ref) ||
               pr.head.repo?.full_name !== repo || request.head_sha !== pr.head.sha) process.exit(0);
           if (!/^[0-9a-f]{40}$/.test(pr.merge_commit_sha) || !/^[0-9a-f]{40}$/.test(pr.base.sha)) process.exit(0);
           fs.appendFileSync(process.env.GITHUB_OUTPUT,
@@ -149,7 +149,7 @@ jobs:
           if (!/^[1-9][0-9]*$/.test(number)) throw new Error('Invalid PR identity.');
           const api = (...args) => execFileSync('gh', ['api', ...args], {encoding:'utf8'});
           const pr = JSON.parse(api('repos/' + repo + '/pulls/' + number));
-          if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+          if (pr.state !== 'open' || !['develop', 'main'].includes(pr.base.ref) ||
               pr.head.repo?.full_name !== repo || pr.head.sha !== process.env.REVIEW_HEAD ||
               pr.base.sha !== process.env.REVIEW_BASE || pr.merge_commit_sha !== process.env.REVIEW_MERGE) process.exit(0);
           let status = 'error';
