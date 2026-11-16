@@ -1,5 +1,9 @@
 // Owns bounded model input from committed blobs; source is never executed or mounted in Pi.
-import { MAX_BUNDLE_BYTES } from './constants';
+import {
+  MAX_BUNDLE_BYTES,
+  MAX_RESPONSE_ITEMS,
+  REVIEW_VALUES,
+} from './constants';
 import { sourceDiff, trackedFile } from './git';
 import { reviewableFiles } from './inventory';
 import type { ReviewPlan, SourceBundle } from './types';
@@ -19,9 +23,13 @@ export async function createSourceBundle(
       });
   }
   for (const path of safePaths) {
-    for (const revision of ['head', 'base'] as const) {
-      const ref = revision === 'head' ? plan.sourceRef : plan.baseRef;
-      if (!ref || (revision === 'base' && !plan.changedFiles.includes(path)))
+    for (const revision of [REVIEW_VALUES.HEAD, REVIEW_VALUES.BASE] as const) {
+      const ref =
+        revision === REVIEW_VALUES.HEAD ? plan.sourceRef : plan.baseRef;
+      if (
+        !ref ||
+        (revision === REVIEW_VALUES.BASE && !plan.changedFiles.includes(path))
+      )
         continue;
       try {
         const text = await trackedFile(root, ref, path);
@@ -63,7 +71,9 @@ export function partitionBundle(bundle: SourceBundle): SourceBundle[] {
   for (const file of bundle.files) {
     const proposed = { ...current, files: [...current.files, file] };
     if (
-      Buffer.byteLength(JSON.stringify(proposed), 'utf8') > MAX_BUNDLE_BYTES &&
+      (Buffer.byteLength(JSON.stringify(proposed), 'utf8') > MAX_BUNDLE_BYTES ||
+        new Set(proposed.files.map((file) => file.path)).size >
+          MAX_RESPONSE_ITEMS) &&
       current.files.length
     ) {
       parts.push(current);

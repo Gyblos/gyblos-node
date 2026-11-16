@@ -7,11 +7,15 @@ Static analysis checks keep their existing roles.
 
 ## Execution
 
-Use Node 24.22.1+ and the repository pnpm version. Install Pi coding agent 1.5.0
-(`@earendil-works/pi-coding-agent`) in a trusted toolchain. No Pi dependency is
-added to the product. Select an explicit `openai/<model-id>` supported by that
-installation; the runner does not guess a model ID or use stored ChatGPT
-credentials.
+Use Node 24.22.1+ and the repository pnpm version. Install the isolated Pi
+coding agent 1.5.0 runtime with
+`npm ci --prefix tooling/security-review/runtime --ignore-scripts`. The runtime
+lock includes integrity pins from the installed Pi release manifest for all
+registry packages. Set `PI_COMMAND` to the absolute runtime
+`node_modules/.bin/pi` path, or use an already installed Pi 1.5.0. No Pi
+dependency is added to the product. Select an explicit `openai/<model-id>`
+supported by that installation; the runner does not guess a model ID or use
+stored ChatGPT credentials.
 
 ```sh
 pnpm security-review plan baseline
@@ -85,16 +89,20 @@ necessary.
    PR/head/base/repository and runs the trusted default-branch runner against
    the immutable PR merge snapshot as data.
 3. A separate publisher validates the fixed status, rechecks that the PR head is
-   current, applies a fixed label, and posts a deterministic summary. It never
-   executes or renders model text. Stale heads and forks do not receive a review
-   result.
+   current and that the reviewed base/merge remain unchanged, applies a fixed
+   label, and posts a deterministic summary. It never executes or renders model
+   text. Stale heads and forks do not receive a review result. A metadata-only
+   `AI review state` workflow invalidates old labels on each revision; it uses
+   `pull_request_target` without checking out or executing source, installing
+   packages or receiving model credentials. Failed analysis publishes error;
+   cancelled analysis leaves the pending label rather than preserving clean.
 4. `AI security baseline` accepts a manual dispatch only on `main`, records the
    exact dispatch commit and requires an explicit model and invocation budget.
 
 Enable automatic reviews with repository variable `AI_REVIEW_ENABLED=true`, set
 `PI_REVIEW_MODEL=openai/<model-id>`, and add the `OPENAI_API_KEY` Actions
 secret. The first setup PR cannot activate a default-branch workflow before it
-is merged. Precreate these labels: `ai-review:clean`,
+is merged. Precreate these labels: `ai-review:queued`, `ai-review:clean`,
 `ai-review:needs-validation`, `ai-review:error`. There is no GitHub App or
 `@bot` mention handler in this version.
 

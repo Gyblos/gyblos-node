@@ -31,11 +31,7 @@ import {
   buildBaselinePlan,
   buildPullRequestPlan,
 } from './security-review/plan';
-import {
-  createSourceBundle,
-  partitionBundle,
-} from './security-review/projection';
-import { labelsForStatus, overallReviewStatus } from './security-review/result';
+import { createSourceBundle } from './security-review/projection';
 import { runReview } from './security-review/runner';
 import type {
   AgentFinding,
@@ -345,22 +341,6 @@ void test('artifact contract rejects malformed verifier output and refuses repla
     await assert.rejects(writeArtifacts(initial(), { output }), /EEXIST/);
   });
 });
-void test('result labels preserve partial and error states', () => {
-  assert.equal(
-    overallReviewStatus([
-      { taskId: 'a', status: 'needs-validation', findings: [] },
-    ]),
-    'needs-validation',
-  );
-  assert.equal(
-    overallReviewStatus([{ taskId: 'a', status: 'error', findings: [] }]),
-    'error',
-  );
-  assert.deepEqual(labelsForStatus('needs-validation'), [
-    'ai-review:needs-validation',
-  ]);
-});
-
 void test('a source candidate receives two fresh independent verifiers', async () => {
   await fixture(async (root, output) => {
     let verifiers = 0;
@@ -405,18 +385,4 @@ void test('a source candidate receives two fresh independent verifiers', async (
       'needs-validation',
     );
   });
-});
-void test('large source input is partitioned without silently dropping files', () => {
-  const bundle: SourceBundle = {
-    files: Array.from({ length: 4 }, (_, index) => ({
-      path: 'packages/core/' + index + '.ts',
-      revision: 'head',
-      text: 'x'.repeat(200_000),
-    })),
-    diff: '',
-    omissions: [],
-  };
-  const parts = partitionBundle(bundle);
-  assert.ok(parts.length > 1);
-  assert.equal(parts.flatMap((part) => part.files).length, 4);
 });

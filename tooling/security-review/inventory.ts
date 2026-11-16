@@ -1,5 +1,5 @@
 // Owns the review inventory projection; it excludes private state and agent-control files.
-import { REVIEWABLE_FILE_PATTERN } from './constants';
+import { REVIEW_VALUES, REVIEWABLE_FILE_PATTERN } from './constants';
 import type { ReviewUnit } from './types';
 
 const INVALID_PATH = /[\x00-\x1f\x7f\\]/;
@@ -88,7 +88,7 @@ function topLevelUnit(file: string): ReviewUnit | undefined {
     return {
       id: `app-${app}`,
       label: `Application: ${app}`,
-      kind: 'app',
+      kind: REVIEW_VALUES.APP,
       paths: [],
     };
   }
@@ -98,7 +98,7 @@ function topLevelUnit(file: string): ReviewUnit | undefined {
     return {
       id: `package-${packageName}`,
       label: `Package: ${packageName}`,
-      kind: 'package',
+      kind: REVIEW_VALUES.PACKAGE,
       paths: [],
     };
   }
@@ -131,7 +131,7 @@ function unitFromDefinition(
   return {
     id: definition.id,
     label: definition.label,
-    kind: 'cross-cutting',
+    kind: REVIEW_VALUES.CROSS_CUTTING,
     paths,
   };
 }
@@ -157,7 +157,7 @@ export function buildReviewUnits(files: string[]): ReviewUnit[] {
     topLevel.set('repository-supply-chain', {
       id: 'repository-supply-chain',
       label: 'Repository supply chain',
-      kind: 'repository',
+      kind: REVIEW_VALUES.REPOSITORY,
       paths: repositoryPaths,
     });
   }
@@ -169,7 +169,7 @@ export function buildReviewUnits(files: string[]): ReviewUnit[] {
     topLevel.set('repository-other', {
       id: 'repository-other',
       label: 'Rules, tests, documentation and deployment',
-      kind: 'repository',
+      kind: REVIEW_VALUES.REPOSITORY,
       paths: otherPaths,
     });
 
@@ -180,17 +180,6 @@ export function buildReviewUnits(files: string[]): ReviewUnit[] {
   return [...topLevel.values(), ...crossCutting]
     .map((unit) => ({ ...unit, paths: [...new Set(unit.paths)].sort() }))
     .sort((left, right) => left.id.localeCompare(right.id));
-}
-
-export function unitMatchesChangedFiles(
-  unit: ReviewUnit,
-  changedFiles: string[],
-): boolean {
-  return changedFiles.some((changedFile) =>
-    unit.paths.some(
-      (path) => path === changedFile || path.startsWith(`${changedFile}/`),
-    ),
-  );
 }
 
 export function changedPathMatchesUnit(

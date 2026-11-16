@@ -3,6 +3,7 @@ import {
   MAX_AGENT_OUTPUT_BYTES,
   MAX_FIELD_CHARS,
   MAX_RESPONSE_ITEMS,
+  REVIEW_VALUES,
   REVIEWER_IDS,
   type ReviewerId,
 } from './constants';
@@ -69,7 +70,10 @@ function evidence(value: unknown): AgentEvidence[] {
       entry.line < 1
     )
       throw new Error('Evidence line must be a positive integer.');
-    if (entry.revision !== 'head' && entry.revision !== 'base')
+    if (
+      entry.revision !== REVIEW_VALUES.HEAD &&
+      entry.revision !== REVIEW_VALUES.BASE
+    )
       throw new Error('Evidence revision must be head or base.');
     return {
       file: path(entry.file),
@@ -98,7 +102,10 @@ function finding(value: unknown): AgentFinding {
     'observed_result',
     'suggested_fix',
   ]);
-  if (entry.category !== 'security' && entry.category !== 'quality')
+  if (
+    entry.category !== REVIEW_VALUES.SECURITY &&
+    entry.category !== REVIEW_VALUES.QUALITY
+  )
     throw new Error('Unknown finding category.');
   return {
     fingerprint: string(entry.fingerprint),
@@ -115,7 +122,10 @@ function finding(value: unknown): AgentFinding {
 export function parseReviewResponse(text: string): AgentReviewResponse {
   const entry = parse(text);
   keys(entry, ['status', 'reviewer', 'coverage', 'findings']);
-  if (entry.status !== 'complete' && entry.status !== 'needs-validation')
+  if (
+    entry.status !== REVIEW_VALUES.COMPLETE &&
+    entry.status !== REVIEW_VALUES.PENDING
+  )
     throw new Error('Unknown review status.');
   const coverage = object(entry.coverage);
   keys(coverage, ['reviewed_paths', 'notes']);
@@ -144,12 +154,20 @@ export function parseVerificationResponse(text: string): VerificationResponse {
     'blockers',
     'validation_plan',
   ]);
-  if (entry.decision !== 'needs_validation' && entry.decision !== 'rejected')
+  if (
+    entry.decision !== REVIEW_VALUES.NEEDS_VALIDATION &&
+    entry.decision !== REVIEW_VALUES.REJECTED
+  )
     throw new Error(
       'Source-only verification cannot issue a confirmed decision.',
     );
   const blockers = array(entry.blockers).map(string);
-  if (entry.decision === 'needs_validation' && blockers.length === 0)
+  if (entry.decision === REVIEW_VALUES.REJECTED && blockers.length > 0)
+    throw new Error('A rejected lead cannot retain unresolved blockers.');
+  if (
+    entry.decision === REVIEW_VALUES.NEEDS_VALIDATION &&
+    blockers.length === 0
+  )
     throw new Error('Pending validation requires an exact blocker.');
   return {
     decision: entry.decision,

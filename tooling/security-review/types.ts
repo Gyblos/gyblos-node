@@ -1,10 +1,14 @@
 // Owns source-review contracts; model output is data and never execution evidence.
-import type { PiThinkingLevel, ReviewerId } from './constants';
+import type { PiThinkingLevel, REVIEW_VALUES, ReviewerId } from './constants';
 
-export type ReviewMode = 'baseline' | 'pull-request';
-export type ReviewStatus = 'clean' | 'needs-validation' | 'error' | 'not-run';
-export type ReviewUnitKind = 'app' | 'package' | 'cross-cutting' | 'repository';
-export type VerificationDecision = 'needs_validation' | 'rejected';
+type Value<Key extends keyof typeof REVIEW_VALUES> =
+  (typeof REVIEW_VALUES)[Key];
+export type ReviewMode = Value<'BASELINE' | 'PR'>;
+export type ReviewStatus = Value<'CLEAN' | 'PENDING' | 'ERROR' | 'NOT_RUN'>;
+export type ReviewUnitKind = Value<
+  'APP' | 'PACKAGE' | 'CROSS_CUTTING' | 'REPOSITORY'
+>;
+export type VerificationDecision = Value<'NEEDS_VALIDATION' | 'REJECTED'>;
 
 export interface ReviewUnit {
   id: string;
@@ -30,13 +34,13 @@ export interface ReviewPlan {
 export interface AgentEvidence {
   file: string;
   line: number;
-  revision: 'head' | 'base';
+  revision: Value<'HEAD' | 'BASE'>;
   scope: string;
   description: string;
 }
 export interface AgentFinding {
   fingerprint: string;
-  category: 'security' | 'quality';
+  category: Value<'SECURITY' | 'QUALITY'>;
   title: string;
   description: string;
   evidence: AgentEvidence[];
@@ -46,14 +50,14 @@ export interface AgentFinding {
   suggested_fix: string;
 }
 export interface AgentReviewResponse {
-  status: 'complete' | 'needs-validation';
+  status: Value<'COMPLETE' | 'PENDING'>;
   reviewer: ReviewerId;
   coverage: { reviewed_paths: string[]; notes: string };
   findings: AgentFinding[];
 }
 export interface TaskResult {
   taskId: string;
-  status: 'complete' | 'error' | 'skipped' | 'needs-validation';
+  status: Value<'COMPLETE' | 'ERROR' | 'SKIPPED' | 'PENDING'>;
   findings: { fingerprint: string; title: string }[];
   error?: string;
   coverage?: string[];
@@ -69,7 +73,7 @@ export interface VerificationResponse {
 }
 export interface VerificationResult {
   fingerprint: string;
-  decision: VerificationDecision | 'error';
+  decision: VerificationDecision | Value<'ERROR'>;
   record?: VerificationResponse;
   error?: string;
 }
@@ -82,7 +86,7 @@ export interface PiProcessResult {
 }
 export interface SourceFile {
   path: string;
-  revision: 'head' | 'base';
+  revision: Value<'HEAD' | 'BASE'>;
   text: string;
 }
 export interface SourceBundle {
@@ -101,7 +105,6 @@ export interface ReviewRunResult {
   tasks: TaskResult[];
   verifications: VerificationResult[];
   findingsValidation: 'passed' | 'failed' | 'not-run';
-  findingsValidationMessage?: string;
   execution?: {
     model: string | null;
     thinking: PiThinkingLevel;

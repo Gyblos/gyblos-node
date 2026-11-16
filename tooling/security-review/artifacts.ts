@@ -2,31 +2,48 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { REVIEW_VALUES } from './constants';
 import { parseVerificationResponse } from './parsing';
 import { labelsForStatus, overallReviewStatus } from './result';
 import type { ReviewRunResult, ReviewStatus } from './types';
 
 export interface ArtifactOptions {
   output: string;
-  trustedRoot?: string;
 }
 function finalStatus(result: ReviewRunResult): ReviewStatus {
-  if (result.status === 'not-run') return 'not-run';
+  if (result.status === REVIEW_VALUES.NOT_RUN) return REVIEW_VALUES.NOT_RUN;
+  if (result.status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
+  if (
+    result.plan.changedFiles.some((path) =>
+      result.plan.excludedFiles.includes(path),
+    )
+  )
+    return REVIEW_VALUES.PENDING;
   const status = overallReviewStatus(result.tasks);
-  if (status === 'error') return 'error';
+  if (status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
   if (
     result.candidates.length !== result.verifications.length ||
-    result.verifications.some((item) => item.decision === 'error')
+    result.candidates.some(
+      (candidate, index) =>
+        result.verifications[index]?.fingerprint !== candidate.fingerprint,
+    ) ||
+    result.verifications.some((item) => item.decision === REVIEW_VALUES.ERROR)
   )
-    return 'error';
+    return REVIEW_VALUES.ERROR;
   if (
-    status === 'needs-validation' &&
-    result.tasks.some((item) => item.status !== 'complete')
+    status === REVIEW_VALUES.PENDING &&
+    result.tasks.some((item) => item.status !== REVIEW_VALUES.COMPLETE)
   )
-    return 'needs-validation';
-  if (result.verifications.some((item) => item.decision === 'needs_validation'))
-    return 'needs-validation';
-  return status === 'not-run' ? 'not-run' : 'clean';
+    return REVIEW_VALUES.PENDING;
+  if (
+    result.verifications.some(
+      (item) => item.decision === REVIEW_VALUES.NEEDS_VALIDATION,
+    )
+  )
+    return REVIEW_VALUES.PENDING;
+  return status === REVIEW_VALUES.NOT_RUN
+    ? REVIEW_VALUES.NOT_RUN
+    : REVIEW_VALUES.CLEAN;
 }
 function escape(value: string): string {
   return value
@@ -62,10 +79,8 @@ function renderReport(result: ReviewRunResult): string {
     '## Independently checked candidates',
     '',
   ];
-  for (const candidate of result.candidates) {
-    const verification = result.verifications.find(
-      (item) => item.fingerprint === candidate.fingerprint,
-    );
+  for (const [index, candidate] of result.candidates.entries()) {
+    const verification = result.verifications[index];
     lines.push(
       '### ' + escape(candidate.title),
       '',
@@ -111,12 +126,17 @@ export async function writeArtifacts(
       } catch {
         validation = 'failed';
       }
-    } else if (verification.decision !== 'error') validation = 'failed';
+    } else if (verification.decision !== REVIEW_VALUES.ERROR)
+      validation = 'failed';
   }
   const result: ReviewRunResult = {
     ...initial,
-    status: validation === 'failed' ? 'error' : finalStatus(initial),
-    findingsValidation: initial.status === 'not-run' ? 'not-run' : validation,
+    status:
+      validation === 'failed' ? REVIEW_VALUES.ERROR : finalStatus(initial),
+    findingsValidation:
+      initial.status === REVIEW_VALUES.NOT_RUN
+        ? REVIEW_VALUES.NOT_RUN
+        : validation,
   };
   const findings = result.verifications.flatMap((item) =>
     item.record ? [item.record] : [],

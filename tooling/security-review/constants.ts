@@ -48,16 +48,39 @@ export const REVIEW_LABELS = {
 export type ReviewLabel = (typeof REVIEW_LABELS)[keyof typeof REVIEW_LABELS];
 
 export const REVIEW_RESULT_VERSION = 1;
+export const REVIEW_VALUES = {
+  BASELINE: 'baseline',
+  PR: 'pull-request',
+  CLEAN: 'clean',
+  PENDING: 'needs-validation',
+  ERROR: 'error',
+  NOT_RUN: 'not-run',
+  COMPLETE: 'complete',
+  SKIPPED: 'skipped',
+  NEEDS_VALIDATION: 'needs_validation',
+  REJECTED: 'rejected',
+  SECURITY: 'security',
+  QUALITY: 'quality',
+  HEAD: 'head',
+  BASE: 'base',
+  APP: 'app',
+  PACKAGE: 'package',
+  CROSS_CUTTING: 'cross-cutting',
+  REPOSITORY: 'repository',
+} as const;
+export const PI_THINKING_LEVELS = [
+  'off',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+] as const;
 export const MAX_PROJECTION_FILE_BYTES = 1_048_576;
 export const MAX_AGENT_OUTPUT_BYTES = 5_242_880;
 export const DEFAULT_REVIEW_CONCURRENCY = 3;
 export const DEFAULT_PI_THINKING = 'high' as const;
-export const MAX_DISPLAY_TEXT_CHARS = 180;
-export const ELLIPSIS_LENGTH = 3;
-export const MAX_VALIDATOR_MESSAGE_CHARS = 500;
-export const MAX_COMMENT_FINGERPRINT_CHARS = 100;
-export const MAX_ERROR_MESSAGE_CHARS = 1_000;
-export const MAX_ERROR_PREFIX_CHARS = 997;
 export const PI_TASK_TIMEOUT_MS = 300_000;
 export const PI_TERMINATE_GRACE_MS = 1_000;
 export const DEFAULT_MAX_CALLS = 300;
@@ -66,8 +89,7 @@ export const MAX_RESPONSE_ITEMS = 100;
 export const MAX_FIELD_CHARS = 12_000;
 export const MAX_DIFF_BYTES = 200_000;
 
-export type PiThinkingLevel =
-  'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export type PiThinkingLevel = (typeof PI_THINKING_LEVELS)[number];
 
 export const REVIEWABLE_FILE_PATTERN =
   /(^|\/)(?:\.git|\.local|\.pi|node_modules|dist|coverage|evidence|captures|measurements|private|internal)(?:\/|$)|(^|\/)(?:\.env(?:\.|$)|seller\.env$|AGENTS\.local\.md$)|\.(?:key|pem|log)$|\.private\.|-private\./i;

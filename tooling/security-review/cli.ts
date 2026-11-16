@@ -7,23 +7,22 @@ import { writeArtifacts } from './artifacts';
 import {
   DEFAULT_MAX_CALLS,
   DEFAULT_PI_THINKING,
+  PI_THINKING_LEVELS,
+  REVIEW_VALUES,
   type PiThinkingLevel,
 } from './constants';
-import { changedFiles, repositoryRef, resolveRef, trackedFiles } from './git';
+import {
+  changedFiles,
+  repositoryRef,
+  resolveRef,
+  trackedFile,
+  trackedFiles,
+} from './git';
 import { buildBaselinePlan, buildPullRequestPlan } from './plan';
 import { runReview } from './runner';
 import type { CliOptions, ReviewMode } from './types';
 
 const TOOLING_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const THINKING_LEVELS: PiThinkingLevel[] = [
-  'off',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max',
-];
 
 function usage(): string {
   return [
@@ -57,9 +56,9 @@ function requiredValue(
 }
 
 function thinkingLevel(value: string): PiThinkingLevel {
-  if (!THINKING_LEVELS.includes(value as PiThinkingLevel))
-    throw new Error(`Unsupported thinking level: ${value}`);
-  return value as PiThinkingLevel;
+  const selected = PI_THINKING_LEVELS.find((level) => level === value);
+  if (!selected) throw new Error(`Unsupported thinking level: ${value}`);
+  return selected;
 }
 
 function positiveInteger(value: string, option: string): number {
@@ -168,13 +167,15 @@ function parseOptions(argumentsList: string[]): CliOptions {
   if (command !== 'run' && command !== 'plan') throw new Error(usage());
   const modeArgument = argumentsList[1];
   if (
-    modeArgument !== 'baseline' &&
+    modeArgument !== REVIEW_VALUES.BASELINE &&
     modeArgument !== 'pr' &&
-    modeArgument !== 'pull-request'
+    modeArgument !== REVIEW_VALUES.PR
   )
     throw new Error(usage());
   const mode: ReviewMode =
-    modeArgument === 'baseline' ? 'baseline' : 'pull-request';
+    modeArgument === REVIEW_VALUES.BASELINE
+      ? REVIEW_VALUES.BASELINE
+      : REVIEW_VALUES.PR;
   const state = defaultArgumentState();
   let index = 2;
   while (index < argumentsList.length)
@@ -192,7 +193,8 @@ async function createPlan(options: CliOptions) {
     ? await resolveRef(options.root, options.sourceRef)
     : await repositoryRef(options.root);
   const files = await trackedFiles(options.root, sourceRef);
-  if (options.mode === 'baseline') return buildBaselinePlan(files, sourceRef);
+  if (options.mode === REVIEW_VALUES.BASELINE)
+    return buildBaselinePlan(files, sourceRef);
   if (options.baseRef === undefined)
     throw new Error(
       'Pull-request mode requires --base-ref or GITHUB_BASE_SHA.',
@@ -218,6 +220,27 @@ async function validateOutput(options: CliOptions): Promise<void> {
     throw new Error('Output must be empty; use a new run directory.');
 }
 
+async function repositoryPolicy(): Promise<string> {
+  const ref = await repositoryRef(TOOLING_ROOT);
+  const context = [];
+  for (const file of [
+    'AGENTS.md',
+    'docs/code-standards.md',
+    'docs/public-decisions.md',
+  ]) {
+    const text = await trackedFile(TOOLING_ROOT, ref, file);
+    if (text === undefined)
+      throw new Error('Trusted repository policy is missing.');
+    context.push({ file, text });
+  }
+  return (
+    'Repository policy from trusted runner commit ' +
+    ref +
+    ':\n' +
+    JSON.stringify(context)
+  );
+}
+
 async function main(): Promise<void> {
   const argumentsList = process.argv.slice(2);
   const options = parseOptions(
@@ -240,10 +263,10 @@ async function main(): Promise<void> {
     maxCalls: options.maxCalls,
     piCommand: process.env.PI_COMMAND,
     dryRun: options.dryRun,
+    policyContext: await repositoryPolicy(),
   });
   const result = await writeArtifacts(initial, {
     output: options.output,
-    trustedRoot: TOOLING_ROOT,
   });
   process.stdout.write(
     `${JSON.stringify(

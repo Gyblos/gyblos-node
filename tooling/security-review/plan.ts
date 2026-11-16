@@ -1,5 +1,5 @@
 // Owns deterministic reviewer routing; it must not use model output to decide security coverage.
-import { REVIEWER_IDS, type ReviewerId } from './constants';
+import { REVIEW_VALUES, REVIEWER_IDS, type ReviewerId } from './constants';
 import {
   buildReviewUnits,
   changedPathMatchesUnit,
@@ -68,7 +68,11 @@ function reviewersForUnit(unit: ReviewUnit): ReviewerId[] {
     )
   )
     reviewers.add(REVIEWER_IDS.SUPPLY_CHAIN);
-  if (paths.some((path) => /(^|\/)(?:test|tests)(?:\/|\.)/.test(path)))
+  if (
+    paths.some((path) =>
+      /(^|\/)(?:test|tests)(?:\/|\.)|\.test\.[cm]?[jt]sx?$/.test(path),
+    )
+  )
     reviewers.add(REVIEWER_IDS.TESTS);
 
   return REVIEWER_ORDER.filter((reviewer) => reviewers.has(reviewer));
@@ -103,7 +107,7 @@ function plan(
     .sort();
   const allUnits = buildReviewUnits(safeFiles);
   const selectedUnits =
-    mode === 'baseline'
+    mode === REVIEW_VALUES.BASELINE
       ? allUnits
       : allUnits.filter((unit) =>
           changedFiles.some((file) => changedPathMatchesUnit(unit, file)),
@@ -122,7 +126,7 @@ function plan(
     units.push({
       id: 'pull-request-change',
       label: 'Unmapped pull-request changes',
-      kind: 'repository',
+      kind: REVIEW_VALUES.REPOSITORY,
       paths: uncoveredChanges,
     });
   }
@@ -148,7 +152,7 @@ export function buildBaselinePlan(
   files: string[],
   sourceRef: string,
 ): ReviewPlan {
-  return plan('baseline', files, [], sourceRef, undefined);
+  return plan(REVIEW_VALUES.BASELINE, files, [], sourceRef, undefined);
 }
 
 export function buildPullRequestPlan(
@@ -157,5 +161,5 @@ export function buildPullRequestPlan(
   sourceRef: string,
   baseRef: string,
 ): ReviewPlan {
-  return plan('pull-request', files, changedFiles, sourceRef, baseRef);
+  return plan(REVIEW_VALUES.PR, files, changedFiles, sourceRef, baseRef);
 }
