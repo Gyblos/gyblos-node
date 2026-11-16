@@ -4,6 +4,7 @@
 import {
   ENGINE_ERROR_CODES,
   ENGINE_ERROR_STOP_REASON,
+  FREE_EXECUTION,
   type FreeExecutionStopReason,
 } from '@gyblos/protocol/constants';
 import { EngineError } from '@gyblos/protocol/engine';
@@ -36,6 +37,7 @@ export function createPaidStreamOutput(
   checkDeadline: () => void = () => {},
 ) {
   let text = '';
+  let textBytes = 0;
   // Only text whose delivery resolved; text above may hold a fragment still in flight.
   let deliveredText = '';
   let active = true;
@@ -62,9 +64,14 @@ export function createPaidStreamOutput(
           return fail(PAID_EXECUTION_CODES.INTERNAL);
         if (tokens > usage.allowance)
           return fail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
-        // The combined text must stay sendable; otherwise the engine produced an invalid response.
+        // Validate each delta once and accumulate its bytes. Re-scanning the whole prefix for every
+        // token is quadratic for long answers; the meter still recounts the combined text above.
         try {
-          paidStreamDeltas(combined);
+          paidStreamDeltas(delta);
+          const bytes = new TextEncoder().encode(delta).length;
+          if (textBytes + bytes > FREE_EXECUTION.outputBytes)
+            throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
+          textBytes += bytes;
         } catch {
           throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
         }
@@ -136,7 +143,15 @@ export function stoppedAfterDeposit(
   meter: FreeMeter,
   allowance: number,
 ): PaidExecutionFailure {
-  const { code, reason } = stopCode(output.failure() ?? error, signal);
+  const deliveryFailure = output.failure();
+  // LIMIT raised by delivery stops an already deposited stream, rather than refusing admission.
+  // Report only the acknowledged prefix; unrelated final-validation/internal errors stay unbillable.
+  const stopped =
+    deliveryFailure instanceof PaidExecutionError &&
+    deliveryFailure.code === PAID_EXECUTION_CODES.LIMIT
+      ? new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE)
+      : (deliveryFailure ?? error);
+  const { code, reason } = stopCode(stopped, signal);
   const delivered = output.delivered();
   const reports = delivered !== '' && PAID_DELIVERED_CODES.includes(code);
   const deliveredTokens = reports ? meter.delivered(delivered, allowance) : 0;

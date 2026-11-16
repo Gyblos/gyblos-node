@@ -1382,6 +1382,28 @@ ALPNs. Free vectors, existing offers, cumulative SDK voucher signatures and
 financial journals are unchanged. Upgrade both peers together; no downgrade,
 reconstructed old request or automatic prompt replay is supported.
 
+Individual paid execution in the coordinated beta release permits up to 32768
+output tokens, additionally bounded by the signed request, recounted input plus
+output within the model context, and the deposited spending ceiling. The stream
+allows 32768 deltas plus one terminal (32769 events). Its aggregate frame budget
+is 8817668 bytes: 32768 maximum 189-byte delta envelopes including their length
+prefixes, six encoded bytes per permitted output byte (262144 bytes of text),
+and a complete maximum terminal frame of 1051652 bytes. The terminal repeats the
+answer and includes charge/settlement metadata, so it reserves a whole frame,
+not only space for a small error. Individual delta, event, response and output
+bounds still apply; JSON escaping counts toward the serialized response limit.
+Readers reject lengths exceeding the remaining aggregate budget before allocating
+the body. Admission, absolute deadlines and backpressure are unchanged. Both peers
+upgrade together; no compatibility implementation for older beta bounds is provided.
+
+If delivery reaches an event/byte limit after a deposit, the seller stops with
+`PAID_EXECUTION_SELLER_CANNOT_CONTINUE`, reason `engine_invalid_response`, and
+charges only the independently recounted acknowledged prefix. No acknowledged
+output means zero charge; the remaining deposit is refunded. A cancellation or
+deadline still takes precedence. Generic internal or final-validation failures
+do not become billable merely because a delta was seen. Settlement is attempted
+once under the existing recovery rules, and the prompt is never replayed.
+
 `InferenceInput` and `InferenceResult` own the common conversation, tools,
 choice, output and usage shapes. `@gyblos/inference` owns capability validation,
 generation, output validation and independent usage verification over injected

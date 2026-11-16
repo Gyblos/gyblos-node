@@ -11,7 +11,6 @@ import {
   PAYMENT_ERROR_CODES,
 } from '@gyblos/protocol/constants';
 import { EngineError } from '@gyblos/protocol/engine';
-import { PaidExecutionError } from '@gyblos/protocol/paid-execution';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 
 import {
@@ -106,55 +105,6 @@ void test('an engine stop reports its reason and charges only delivered output',
   assert.equal(second.error?.delivered, undefined);
   assert.equal(second.charge?.chargedAtomic, '0');
   assert.equal(second.payment?.settlement?.refundedAtomic, PAID_CEILING);
-});
-
-void test('a paid delivery limit charges only the acknowledged prefix and refunds the rest', async () => {
-  const seller = await paidSellerFixture();
-  const paid = await seller.request();
-  let deliveries = 0;
-  const { terminal, deltas } = await seller.execute(
-    paid,
-    new AbortController().signal,
-    async () => {
-      if (++deliveries === 2)
-        throw new PaidExecutionError(PAID_EXECUTION_CODES.LIMIT);
-    },
-  );
-  assert.deepEqual(deltas, ['Hi', '.']);
-  assert.deepEqual(terminal.error, {
-    code: PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
-    reason: FREE_EXECUTION_STOP_REASONS.ENGINE_INVALID_RESPONSE,
-    delivered: { outputTokens: 2 },
-  });
-  assert.equal(terminal.charge?.chargedAtomic, '8');
-  assert.equal(terminal.payment?.settlement?.refundedAtomic, '12');
-  assert.deepEqual(
-    seller.payment.calls.settle.map((call) => call.chargedAtomic),
-    ['8'],
-  );
-  assert.equal(seller.engineCalls.length, 1);
-});
-
-void test('a paid delivery limit before output and an internal delivery failure never invent usage', async () => {
-  for (const code of [
-    PAID_EXECUTION_CODES.LIMIT,
-    PAID_EXECUTION_CODES.INTERNAL,
-  ]) {
-    const seller = await paidSellerFixture();
-    let deliveries = 0;
-    const { terminal } = await seller.execute(
-      await seller.request(),
-      new AbortController().signal,
-      async () => {
-        if (code === PAID_EXECUTION_CODES.LIMIT || ++deliveries === 2)
-          throw new PaidExecutionError(code);
-      },
-    );
-    assert.equal(terminal.charge?.chargedAtomic, '0');
-    assert.equal(terminal.error?.delivered, undefined);
-    assert.equal(terminal.payment?.settlement?.refundedAtomic, PAID_CEILING);
-    assert.equal(seller.payment.calls.settle.length, 1);
-  }
 });
 
 void test('payment server refusals map to paid codes and never generate', async () => {

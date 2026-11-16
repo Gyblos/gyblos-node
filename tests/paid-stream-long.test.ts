@@ -24,7 +24,12 @@ import {
   encodePaidExecutionRequest,
   encodePaidStreamEvent,
 } from '@gyblos/protocol/paid-stream';
-import { PAID_EXECUTION, PAID_STREAM } from '@gyblos/protocol/paid/constants';
+import {
+  PAID_EXECUTION,
+  PAID_EXECUTION_CODES,
+  PAID_STREAM,
+} from '@gyblos/protocol/paid/constants';
+import { settlementShares } from '@gyblos/protocol/payment-binding';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 import type { ControlStream } from '@gyblos/transport-iroh/control-io';
 import {
@@ -138,6 +143,7 @@ async function transport(
   paid: PaidExecutionRequest,
   service: PaidExecutionService,
   peer: string,
+  abortAfter?: number,
 ) {
   const request = encodePaidExecutionRequest(paid);
   const verifier = await createPaidStreamVerifier(paid);
@@ -147,6 +153,8 @@ async function transport(
   let frames = 0;
   let closed = 0;
   let finished = 0;
+  let released = 0;
+  const controller = new AbortController();
   let terminal: PaidExecutionResponse | undefined;
   const stream: ControlStream = {
     recv: {
@@ -160,6 +168,12 @@ async function transport(
     send: {
       async writeAll(value) {
         const event = decodePaidStreamEvent(Uint8Array.from(value));
+        if (event.type === PAID_STREAM.events.DELTA && frames === abortAfter) {
+          controller.abort();
+          throw new Error(
+            'Synthetic connection closed before acknowledging this frame.',
+          );
+        }
         const accepted = await verifier.accept(event);
         frames++;
         bytes += value.length;
@@ -178,10 +192,46 @@ async function transport(
     () => {
       closed++;
     },
-    new AbortController().signal,
-    () => () => {},
+    controller.signal,
+    () => () => {
+      released++;
+    },
   );
-  return { delivered, bytes, frames, closed, finished, terminal, verifier };
+  return {
+    delivered,
+    bytes,
+    frames,
+    closed,
+    finished,
+    released,
+    terminal,
+    verifier,
+  };
+}
+
+async function completed(
+  paid: PaidExecutionRequest,
+  text: string,
+  outputTokens: number,
+): Promise<PaidExecutionResponse> {
+  const chargedAtomic = String(4 + outputTokens);
+  return {
+    version: PAID_EXECUTION.version,
+    requestId: paid.requestId,
+    requestDigest: await paidExecutionDigest(paid),
+    result: {
+      text,
+      usage: { inputTokens: 4, outputTokens },
+      finishReason: ENGINE_DONE_REASONS.STOP,
+    },
+    charge: { inputTokens: 4, outputTokens, chargedAtomic },
+    payment: {
+      settlement: {
+        ...settled(paid, chargedAtomic).settlement,
+        ...settlementShares(chargedAtomic, FEE.protocolFeeBps),
+      },
+    },
+  };
 }
 
 void test('a 20000-token paid answer finishes and charges its verified usage through the public transport', async () => {
@@ -192,6 +242,7 @@ void test('a 20000-token paid answer finishes and charges its verified usage thr
   assert.equal(result.frames, 20001);
   assert.equal(result.closed, 0);
   assert.equal(result.finished, 1);
+  assert.equal(result.released, 1);
   assert.equal(value.generations(), 1);
   assert.deepEqual(result.terminal?.charge, {
     inputTokens: 4,
@@ -212,18 +263,7 @@ void test('the maximum paid token deltas leave room for the complete terminal', 
   const service: PaidExecutionService = {
     async stream(_request, _peer, _signal, onDelta) {
       for (const character of text) await onDelta(character);
-      return {
-        version: PAID_EXECUTION.version,
-        requestId: value.paid.requestId,
-        requestDigest: await paidExecutionDigest(value.paid),
-        result: {
-          text,
-          usage: { inputTokens: 4, outputTokens: 32768 },
-          finishReason: ENGINE_DONE_REASONS.STOP,
-        },
-        charge: { inputTokens: 4, outputTokens: 32768, chargedAtomic: '32772' },
-        payment: settled(value.paid, '32772'),
-      };
+      return completed(value.paid, text, 32768);
     },
   };
   const result = await transport(value.paid, service, value.peer);
@@ -232,6 +272,50 @@ void test('the maximum paid token deltas leave room for the complete terminal', 
   assert.equal(result.terminal?.result?.text, text);
   assert.equal(result.closed, 0);
   result.verifier.finish();
+});
+
+void test('escaped paid deltas leave room for the complete correlated terminal', async () => {
+  const value = await fixture();
+  const chunk = '\u0000'.repeat(16);
+  const service: PaidExecutionService = {
+    async stream(_request, _peer, _signal, onDelta) {
+      for (let index = 0; index < 10000; index++) await onDelta(chunk);
+      return completed(value.paid, chunk.repeat(10000), 20000);
+    },
+  };
+  const result = await transport(value.paid, service, value.peer);
+  assert.equal(result.delivered, 160000);
+  assert.equal(result.frames, 10001);
+  assert.equal(result.terminal?.charge?.chargedAtomic, '20004');
+  assert.equal(result.closed, 0);
+  assert.equal(result.finished, 1);
+  result.verifier.finish();
+});
+
+void test('a broken write cancels a long paid answer and settles only acknowledged output without retry', async () => {
+  const value = await fixture();
+  let response: PaidExecutionResponse | undefined;
+  const service: PaidExecutionService = {
+    async stream(...args) {
+      response = await value.service.stream(...args);
+      return response;
+    },
+  };
+  const result = await transport(value.paid, service, value.peer, 64);
+  assert.equal(result.delivered, 64);
+  assert.equal(result.terminal, undefined);
+  assert.equal(result.closed, 1);
+  assert.equal(result.finished, 0);
+  assert.equal(result.released, 1);
+  assert.equal(response?.error?.code, PAID_EXECUTION_CODES.CANCELLED);
+  assert.equal(response?.error?.delivered?.outputTokens, 64);
+  assert.equal(response?.charge?.chargedAtomic, '68');
+  assert.equal(response?.payment?.settlement?.refundedAtomic, '99932');
+  assert.equal(value.generations(), 1);
+  assert.deepEqual(
+    value.payment.calls.settle.map((call) => call.chargedAtomic),
+    ['68'],
+  );
 });
 
 void test('paid stream byte capacity includes escaped output, every maximum delta header and a whole terminal frame', async () => {
