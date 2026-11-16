@@ -1,6 +1,9 @@
 // Pure parts of `gyblos seller status`: reading the daemon's status.json defensively and counting its signed
 // receipts by outcome over the last day and week. Nothing here touches files, the network or the clock.
-import { RECEIPT_STORAGE } from '@gyblos/node/constants';
+import {
+  RECEIPT_STORAGE,
+  USDC_ATOMIC_UNITS_PER_USDC,
+} from '@gyblos/node/constants';
 import type { StoredReceipt } from '@gyblos/node/receipts';
 import { RECEIPT_OUTCOMES } from '@gyblos/protocol/constants';
 
@@ -158,4 +161,17 @@ export function receiptActivity(
       (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
     ),
   };
+}
+
+// USDC's decimals, from the node's scale of atomic units per whole token.
+const USDC_DECIMALS = String(USDC_ATOMIC_UNITS_PER_USDC).length - 1;
+
+// Atomic units of USDC as a decimal string without trailing zeros: 1500 -> "0.0015".
+export function atomicUsdc(atomic: bigint): string {
+  const whole = atomic / USDC_ATOMIC_UNITS_PER_USDC;
+  const fraction = (atomic % USDC_ATOMIC_UNITS_PER_USDC)
+    .toString()
+    .padStart(USDC_DECIMALS, '0')
+    .replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : whole.toString();
 }

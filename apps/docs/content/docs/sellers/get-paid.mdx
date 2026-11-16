@@ -108,8 +108,13 @@ insufficient SOL or expiry can prevent collection.
 
 ## See your earnings [#see-earnings]
 
-`gyblos seller status` shows activity, not money. Your earnings are the devnet USDC balance of the
-**owner** address. Look it up on [Solana Explorer](https://explorer.solana.com/?cluster=devnet) (search
+`gyblos seller status` shows activity and, when a payment ledger exists, the last 24 hours of settled
+requests and their gross USDC charges, including the Gyblos fee. It also shows pending charges, but
+does not include them in the settled total. An unsafe or invalid ledger is reported as unavailable.
+These recent ledger totals are not your lifetime earnings or wallet balance.
+
+Your earnings are the devnet USDC balance of the **owner** address.
+Look it up on [Solana Explorer](https://explorer.solana.com/?cluster=devnet) (search
 the owner address, devnet cluster). A payment can take a few minutes to appear.
 
 ## Reusable channel pilot [#reusable-channel-pilot]
