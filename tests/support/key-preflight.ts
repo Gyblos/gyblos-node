@@ -60,6 +60,9 @@ if(scenario==='reasoning') config.request.reasoning=REASONING_LEVELS.LOW;
 if(scenario==='downgrade') config.request.lowestReasoning=REASONING_LEVELS.LOW;
 if(scenario==='network') config.request.network='solana:synthetic';
 if(scenario==='mint') role.mint='synthetic-other-mint';
+if(scenario==='quote-model') quote.offer.selection=custom;
+if(scenario==='quote-reasoning') quote.offer.reasoning=REASONING_LEVELS.LOW;
+if(scenario==='quote-mint') quote.offer.mint='1'.repeat(32);
 if(scenario==='tokens') config.request.maxTokens=32769;
 if(scenario==='quote-tokens') input.maxTokens=quote.offer.maxTokens+1;
 if(scenario==='bytes') input.messages[0].content='a'.repeat(65537);
@@ -137,9 +140,9 @@ try {
     if(scenario==='reasoning') quote.offer.reasoning=REASONING_LEVELS.LOW;
     const expected=scenario==='aborted'?{name:'AbortError'}
       :scenario==='meter-load'?{message:'synthetic tokenizer unavailable'}
-      :['model','warm','session-model','session-model-pool'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_MODEL}
-      :['reasoning','downgrade'].includes(scenario)?{reason:FREE_BUYER_STARTUP.REASONING}
-      :['network','mint'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_NETWORK}
+      :['model','quote-model','warm','session-model','session-model-pool'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_MODEL}
+      :['reasoning','quote-reasoning','downgrade'].includes(scenario)?{reason:FREE_BUYER_STARTUP.REASONING}
+      :['network','mint','quote-mint'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_NETWORK}
       :scenario==='tokens'?{reason:FREE_BUYER_STARTUP.MAX_TOKENS}
       :scenario.includes('budget')?{code:PAID_EXECUTION_CODES.BUDGET_EXHAUSTED}
       :['quote-tokens','bytes'].includes(scenario)||scenario.includes('context')?{code:PAID_EXECUTION_CODES.LIMIT}
@@ -151,7 +154,7 @@ try {
     assert.equal(probe.chains,before.chains,'local rejection must precede financial construction');
     assert.equal(probe.authorizations,before.authorizations,'local rejection must precede signing');
     assert.equal(probe.executions,before.executions,'local rejection must not transmit a prompt');
-    if(['model','reasoning','downgrade','network','mint','tokens','warm','session-model','session-model-pool','aborted'].includes(scenario))
+    if(['model','quote-model','reasoning','quote-reasoning','downgrade','network','mint','quote-mint','tokens','warm','session-model','session-model-pool','aborted'].includes(scenario))
       assert.equal(probe.meters,before.meters,'static refusal must precede tokenizer loading');
     quote.offer.maxAtomic='0';
     quote.offer.prices={...quote.offer.prices,inputAtomicPerMtok:'0',outputAtomicPerMtok:'0'};

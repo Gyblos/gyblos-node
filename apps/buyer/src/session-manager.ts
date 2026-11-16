@@ -114,6 +114,15 @@ function sessionReceipts(
       );
   };
 }
+function sessionPreflight(state: SessionState, options: Options) {
+  return async (
+    quote: Parameters<typeof recountSessionInput>[0],
+    input: Parameters<typeof recountSessionInput>[1],
+  ) => {
+    const meter = await prepareMeter(state, options);
+    recountSessionInput(quote, input, meter);
+  };
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -188,12 +197,6 @@ export function makeManager(
       : createBuyerSessionManager(common);
   return {
     ...manager,
-    preflight: async (
-      quote: Parameters<typeof recountSessionInput>[0],
-      input: Parameters<typeof recountSessionInput>[1],
-    ) => {
-      const meter = await prepareMeter(state, options);
-      recountSessionInput(quote, input, meter);
-    },
+    preflight: sessionPreflight(state, options),
   };
 }
