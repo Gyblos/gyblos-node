@@ -80,3 +80,8 @@ An optional private file implementation is available through
 `@gyblos/telemetry-file/receipt-store`; its lifecycle, bounds and persistence
 limitations are documented with the collector policy. It is not wired into
 startup or external collection.
+
+The signed batch format a node will use to hand its receipts and its own
+timestamps to a collector is the protocol contract "Receipt upload envelope v1"
+(`packages/protocol/SPEC.md`). It is a contract only: no uploader, schedule or
+endpoint uses it yet.
