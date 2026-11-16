@@ -26,13 +26,12 @@ export function receiptFingerprint(receipt: ReceiptV1) {
   return createHash('sha256').update(canonicalJson(receipt)).digest('hex');
 }
 export function orderedReceiptEntries(state: UploadState) {
-  return [...state.entries.values()].sort((leftEntry, rightEntry) => {
-    const time = leftEntry.storedAt - rightEntry.storedAt;
-    if (time) return time;
-    const left = receiptKey(leftEntry.receipt);
-    const right = receiptKey(rightEntry.receipt);
-    return left === right ? 0 : left < right ? -1 : 1;
-  });
+  return [...state.entries]
+    .sort(([leftKey, leftEntry], [rightKey, rightEntry]) => {
+      const time = leftEntry.storedAt - rightEntry.storedAt;
+      return time || (leftKey === rightKey ? 0 : leftKey < rightKey ? -1 : 1);
+    })
+    .map(([, entry]) => entry);
 }
 export function uploadHealth(
   state: UploadState,
@@ -61,9 +60,13 @@ export function trimUploaded(
   now: number,
 ) {
   const entries = new Map(state.entries);
-  const uploaded = orderedReceiptEntries(state).filter(
-    (entry) => entry.uploadedAt !== null,
+  const uploadedEntries = new Map(
+    [...state.entries].filter(([, entry]) => entry.uploadedAt !== null),
   );
+  const uploaded = orderedReceiptEntries({
+    ...state,
+    entries: uploadedEntries,
+  });
   let bytes = uploaded.reduce(
     (sum, entry) => sum + Buffer.byteLength(canonicalJson(entry)) + 1,
     0,

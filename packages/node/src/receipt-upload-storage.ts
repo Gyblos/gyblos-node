@@ -132,7 +132,9 @@ async function loadReceiptState(
   receiptSignal(signal);
   await assertRoleHome(context.role, context.environment);
   await receiptDirectory(context.paths.directory);
-  const revision = await receiptFileRevision(context.paths.state);
+  const revision = cached
+    ? await receiptFileRevision(context.paths.state)
+    : undefined;
   if (!cached || cached.disk?.revision !== revision) {
     const disk = await readReceiptFile(context.paths.state);
     const parsed = disk
