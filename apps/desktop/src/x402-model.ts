@@ -187,7 +187,6 @@ export function x402BudgetInput(
   return String(atomic);
 }
 export interface X402Result {
-  homeSelected?: boolean;
   summary: X402Summary;
   policy: BuyerApiPolicy | null;
   reply?: { text: string; model: string; metrics?: ResponseMetrics };
@@ -200,11 +199,6 @@ export function parseX402Result(input: unknown): X402Result {
     summary: parseX402Summary(value.summary),
     policy: value.policy === null ? null : x402Policy(value.policy),
   };
-  if (value.homeSelected !== undefined) {
-    if (typeof value.homeSelected !== 'boolean')
-      throw new Error('Invalid buyer selection');
-    result.homeSelected = value.homeSelected;
-  }
   if (value.error !== undefined) {
     if (
       typeof value.error !== 'string' ||

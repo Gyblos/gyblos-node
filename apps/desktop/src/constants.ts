@@ -198,3 +198,17 @@ export type ChatArchiveState =
 
 // Preserves the local hackathon engine; network agents discover their models from the buyer.
 export const PAYPAL_SANDBOX_AGENT_MODEL = 'gpt-oss:20b';
+
+// Desktop notices never install code; the host owns the sole release destination.
+export const DESKTOP_UPDATE = {
+  CHANNEL: 'desktop:update',
+  STATUS: 'status',
+  OPEN: 'open',
+  RELEASES:
+    'https://api.github.com/repos/Gyblos/gyblos-node/releases?per_page=10',
+  PAGE: 'https://github.com/Gyblos/gyblos-node/releases/tag/v',
+  TIMEOUT_MS: 3000,
+  MAX_BYTES: 262144,
+  MAX_RELEASES: 10,
+  MAX_VERSION: 128,
+} as const;

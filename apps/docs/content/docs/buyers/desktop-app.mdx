@@ -3,9 +3,10 @@ title: Desktop app
 description: Download the Gyblos app for macOS, Windows or Linux, open it the first time, and chat with models on the network.
 ---
 
-These desktop packages are available for validation. Automatic network-chat onboarding is not yet
-integrated; the current app requires a prepared buyer configuration and a relay token. For a guided
-buyer that works from a terminal today, see [Use Gyblos from your code](/en/buyers/use-from-code).
+The desktop buyer starts automatically in its own private app folder (`userData` as `GYBLOS_HOME`).
+It works without a relay token or choosing a folder. A fresh profile creates free-only settings
+with zero budget and price ceilings, and selects a registered seller through discovery and independent
+8004 verification. Existing settings and unfinished spending records are preserved.
 
 ## Download [#download]
 
@@ -53,18 +54,24 @@ On other distributions, unpack the `.tar.gz` and run `./gyblos-desktop` inside t
 
 ## Using it [#using-it]
 
-The current desktop buyer asks you to choose an existing `GYBLOS_HOME` prepared with `pnpm buyer:init`
-and provide a relay token. The node's optional relay credential does not yet remove that desktop prompt.
-If you do not have that setup, use the CLI guide linked above; do not invent or share credentials.
+Open **Chat**, write a message and send it. The first start prepares `buyer/` privately under the app's
+own data folder, separate from the CLI or seller home. The default model is `qwen3-0.6b`; a verified,
+online seller offering that model for free must be available. Discovery, the identity RPC and the
+network must be reachable. An unavailable seller or network gives an error, not a simulated reply.
 
-Automatic configuration in a private app folder, without choosing a home or supplying a relay token,
-is planned. Packaging smoke checks verify launch and the native transport binding; they do not prove
-that this future onboarding or a real network answer works from the interface.
+No wallet funding or transaction is required for these free answers. The local buyer identity is
+separate from the protected wallet shown in Settings. A positive-price configuration or connection
+still needs explicit authorization; startup never authorizes a positive budget or clears pending state.
 
-Free signed quotes cause no payment transactions. Keep the buyer's budget and price ceilings at zero
-for free answers only; a positive-price quote requires an authorized budget and the paid beta setup.
+If startup fails, **Payments → Retry local buyer** retries startup only. A failed inference is never
+resent automatically. Connecting a separately running buyer remains an advanced option.
 
-Your messages reach the seller whose machine runs the model, and that seller can read them. Do not send
-passwords, keys or other secrets.
+The app shows an update notice when a newer desktop build for your system is published. **View update**
+opens that release on GitHub; nothing is downloaded or installed automatically. This bounded public
+version check sends no identity or chat content. Offline failures stay silent; operators can disable
+it with `GYBLOS_UPDATE_CHECK=0`.
 
-To connect your own programs or coding agents instead, see [Use Gyblos from your code](/en/buyers/use-from-code).
+The seller running the model can read your messages. Transport encryption does not hide them from
+that seller. Do not send passwords, keys or other secrets.
+
+To connect your own programs or coding agents, see [Use Gyblos from your code](/en/buyers/use-from-code).

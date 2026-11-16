@@ -55,7 +55,7 @@ export function ChatPaymentSelector({
                 label={methodLabel(method)}
                 detail={
                   method === PAYMENT_METHOD.USDC
-                    ? 'Preview · simulated responses'
+                    ? 'Gyblos network · signed quotes'
                     : 'Test funds · session limit'
                 }
                 leading={<PaymentIcon method={method} />}

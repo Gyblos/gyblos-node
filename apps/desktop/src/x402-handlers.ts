@@ -15,7 +15,7 @@ function actionError(action: unknown, blocked: boolean) {
   if (blocked)
     return 'Spending status needs review. Further messages are blocked.';
   if (action === X402_ACTION.CONNECT || action === X402_ACTION.START_BUYER)
-    return 'Unable to connect. Check the buyer configuration and relay token.';
+    return 'Unable to start the local buyer. Check its configuration or try again.';
   if (action === X402_ACTION.AUTHORIZE)
     return 'Budget not authorized. It must cover the maximum cost of one response.';
   if (action === X402_ACTION.SEND)
@@ -50,9 +50,7 @@ async function referenceAction(
   return false;
 }
 export interface ManagedBuyerPorts {
-  selected(): boolean;
-  choose(): Promise<void>;
-  start(relayToken: unknown): Promise<void>;
+  start(): Promise<void>;
 }
 export function createX402Handlers(
   client: X402Client,
@@ -67,7 +65,6 @@ export function createX402Handlers(
   const summary = async () => ({
     summary: await budget.summary(),
     policy: client.policy(),
-    homeSelected: managed?.selected() ?? false,
   });
   return async (
     event: Sender,
@@ -85,12 +82,15 @@ export function createX402Handlers(
       throw new Error('Unsupported buyer request');
     const input = args[0] as Record<string, unknown>;
     try {
-      if (input.action === X402_ACTION.CHOOSE_HOME && managed)
-        await managed.choose();
-      else if (input.action === X402_ACTION.START_BUYER && managed) {
+      if (
+        (input.action === X402_ACTION.START_BUYER ||
+          input.action === X402_ACTION.STATUS) &&
+        managed &&
+        !client.policy()
+      ) {
         if ((await budget.summary()).blocked)
           throw new Error('Payment needs review');
-        await managed.start(input.relayToken);
+        await managed.start();
       } else if (input.action === X402_ACTION.CONNECT)
         await client.connect(input.url, input.token);
       else if (
