@@ -5,12 +5,7 @@ import test from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import {
-  DEVNET,
-  DEVNET_USDC,
-  INFERENCE_REQUEST_LIMITS,
-  MAX_ATOMIC,
-} from '@gyblos/config';
+import { DEVNET, DEVNET_USDC, MAX_ATOMIC } from '@gyblos/config';
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import { signInferenceOffer, verifyInferenceOffer } from '@gyblos/node/offers';
 import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
@@ -39,7 +34,7 @@ async function fixture() {
     expiresAt: now + OFFER_LIFETIME_MS,
     prices: { inputAtomic: '1', outputAtomic: '2' },
     maxAtomic: MAX_ATOMIC,
-    maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
+    maxTokens: 128,
     model: {
       name: 'synthetic-model',
       digest: 'synthetic-digest',

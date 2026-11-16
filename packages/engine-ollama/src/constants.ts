@@ -40,7 +40,7 @@ export const FREE_CONTEXT_TOKENS = 8192;
 
 export const MODEL_LIMITS = {
   // The lab's inference evidence keeps the original bounded request.
-  requestMaxOutputTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
+  requestMaxOutputTokens: 128,
   // Qwen3-0.6B's native context; the model card's longer window needs rope scaling Ollama does not set.
   minContextTokens: 1024,
   // A lone prompt on the paid and lab paths keeps its original bound.

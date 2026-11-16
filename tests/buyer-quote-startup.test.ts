@@ -121,7 +121,8 @@ void test(
     const config: BuyerSelectionConfig = {
       request: {
         ...request,
-        maxTokens: 10,
+        // Above the former paid answer bound of 128: paid preparation must still start (devnet rehearsal).
+        maxTokens: 129,
         maxAtomic: '1000',
         priceCeilings: {
           inputAtomicPerMtok: '100',

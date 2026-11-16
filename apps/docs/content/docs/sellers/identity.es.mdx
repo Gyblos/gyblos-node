@@ -3,9 +3,10 @@ title: Identidad
 description: Conserva el volumen del vendedor y distingue identificadores públicos de archivos privados.
 ---
 
-El vendedor gratuito de Docker tiene un **NodeId** y una dirección **owner** públicos, respaldados por
-llaves privadas distintas. Conserva la identidad persistente creada al instalar. `seller init` escribe
-configuración; no crea ni recupera esas llaves.
+Un vendedor tiene cuatro llaves privadas, creadas una sola vez por el instalador: la **llave del nodo** (su
+NodeId público), el **dueño** (`owner`, registrado en 8004 y que recibe tus USDC), el **autorizador** y el
+**pagador de comisiones**. Para qué sirve cada una está en [cobrar](/es/sellers/get-paid#llaves). Conserva la
+identidad persistente creada al instalar. `seller init` escribe configuración; no crea ni recupera esas llaves.
 
 ## Almacenamiento [#dónde-se-guarda-cada-cosa]
 
@@ -13,7 +14,7 @@ configuración; no crea ni recupera esas llaves.
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `~/gyblos-seller/config.toml`                   | Modelos, cuotas y publicación                                                                   | Revísalo antes de compartir; las URLs personalizadas pueden contener credenciales |
 | `~/gyblos-seller/compose.yaml`                  | Contenedores y referencias a volúmenes                                                          | Consérvalo con la instalación; revisa valores personalizados antes de compartir   |
-| `~/gyblos-seller/seller.env`                    | Credenciales de proveedores y el token de relay opcional                                        | Privado; nunca lo subas ni lo muestres                                            |
+| `~/gyblos-seller/seller.env`                    | Credenciales de proveedores (claves de API), si una oferta las necesita                         | Privado; nunca lo subas ni lo muestres                                            |
 | Volumen con nombre de Docker montado en `/data` | Llaves, estado del rol, intentos privados de registro, secuencia pública, recibos y tokenizador | Privado; nunca subas el volumen ni sus archivos                                   |
 | Volumen separado de Ollama                      | Datos del modelo descargado                                                                     | Consérvalo para evitar descargas innecesarias                                     |
 
@@ -27,10 +28,30 @@ Usa `docker compose stop seller` para dejar de servir. `docker compose down` con
 `docker compose down -v` los elimina y pierde las llaves del vendedor. Una invitación consumida está vinculada
 al NodeId original y no registra una identidad recién generada.
 
-Este manual no ofrece un procedimiento completo de copia y restauración del vendedor. La copia de cartera
-de escritorio pertenece a otra aplicación y no recupera la identidad Iroh, secuencia pública ni journals de este nodo.
-Si faltan o están dañados las llaves, el estado del rol o los bloqueos de secuencia, deja de modificar los datos y
-contacta con Gyblos. Nunca borres un bloqueo, archivo de secuencia o journal solo para conseguir que arranque.
+## Respalda las llaves [#respalda-las-llaves]
+
+Guarda una copia fuera de línea de los cuatro archivos de llaves, como mínimo `owner.json` (tus USDC y el
+registro 8004) y `node.key` (el NodeId con el que usaste tu invitación). Cópialos una vez después de instalar;
+nunca cambian. Con Docker, ejecuta esto desde `~/gyblos-seller`:
+
+```bash
+mkdir -p ~/gyblos-keys-backup && chmod 700 ~/gyblos-keys-backup
+for key in node.key owner.json authorizer.json facilitator.json; do
+  docker compose cp "seller:/data/seller/$key" ~/gyblos-keys-backup/
+done
+```
+
+Sin Docker los mismos archivos están en `~/.gyblos/seller/` (cópialos con `cp`); en Windows están en `%USERPROFILE%\.gyblos\seller\`. Pasa la copia a un pendrive o a un gestor
+de contraseñas y bórrala del computador. Quien tenga `owner.json` puede mover tus USDC; nunca lo subas, lo
+pegues en un chat ni lo envíes a soporte. `owner.json` usa el formato de par de llaves de la CLI de Solana, así
+que una billetera de Solana puede importarlo para llegar a tus fondos aunque no tengas el vendedor.
+
+Una copia de las llaves **no** es una restauración completa. No copies archivos viejos encima de un vendedor
+en marcha: los registros de pago, la secuencia pública y el estado del registro deben coincidir con lo que está
+en la cadena y en el índice, y una copia vieja puede romperlos. La copia de la cartera de escritorio pertenece a
+otra aplicación y no recupera este vendedor. Si faltan o están dañados las llaves, el estado del rol o los
+bloqueos de secuencia, deja de modificar los datos y contacta con Gyblos. Nunca borres un bloqueo, archivo de
+secuencia o journal solo para conseguir que arranque.
 
 El volumen también guarda estado privado de registro, incluida una llave de asset y posiblemente
 bytes de transacciones firmadas. Nunca compartas ese archivo ni borres su bloqueo para forzar un reintento.

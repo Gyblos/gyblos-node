@@ -26,8 +26,10 @@ hosting and internet still have a cost; a remote engine may also charge you even
 ## Before you start [#before-you-install]
 
 - An invitation containing a one-use **invite code** starting with `gyb_`. No relay token is needed.
-- Linux x86-64 or ARM64, or macOS, on a machine that stays on. This installer is not a Windows-native procedure.
-- Docker Engine with Compose on Linux, or Docker Desktop on macOS. Compose must be **v2.17 or later**.
+- A machine that stays on: Linux x86-64 or ARM64, macOS, or Windows x64.
+- With Docker (Linux or macOS): Docker Engine with Compose, or Docker Desktop. Compose must be **v2.17 or later**.
+  Without Docker (macOS Apple Silicon, Linux, Windows x64): your own [Ollama](https://ollama.com); see the
+  [seller guide](/en/sellers/beta-guide).
 - At least **4 GB of memory** and a few GB of free disk. Seller startup requires **1.5 GiB of headroom** above the seller process; Ollama needs memory too.
 - Outbound internet access. The supplied Compose setup publishes no listening ports and uses outbound relay connections.
 

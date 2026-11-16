@@ -60,7 +60,7 @@ instalada no ofrece este flujo, envía al equipo el identificador de imagen y tu
 </Callout>
 
 La cartera inscrita en 8004 es owner. Un rol pagado existente puede tener otro payout y mostrar un aviso;
-eso no cambia owner. Los roles pagados nuevos usan owner como payout, fuera de este tutorial gratuito.
+eso no cambia owner. Los roles pagados nuevos usan owner como payout ([cobrar](/es/sellers/get-paid)).
 
 `DISCOVERY_INVITE_INVALID` indica código incorrecto, usado o vencido. `DISCOVERY_RATE_LIMITED` requiere
 esperar antes de repetir; `DISCOVERY_UNAVAILABLE` indica que el índice no pudo completar la solicitud. Consulta
@@ -74,7 +74,7 @@ Con el instalador, activa la publicación desde la carpeta donde guardaste `inst
 sh install.sh publish
 ```
 
-Pone `publish = true` en `~/gyblos-seller/config.toml`, valida el archivo y recrea el vendedor; si la
+Publicar no envía ninguna transacción a la cadena y no cuesta nada. Pone `publish = true` en `~/gyblos-seller/config.toml`, valida el archivo y recrea el vendedor; si la
 validación falla o lo interrumpes, deja el archivo como estaba. Si instalaste en otra carpeta, antepone el mismo
 `GYBLOS_DIR=…` que usaste al instalar. Un `install.sh` anterior no conoce `publish`: descárgalo de nuevo antes. `gyblos seller status` también indica este paso mientras la
 publicación está desactivada.

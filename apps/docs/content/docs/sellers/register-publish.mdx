@@ -59,7 +59,7 @@ image does not offer this flow, send its image identifier and your public NodeId
 </Callout>
 
 The wallet registered in 8004 is the owner. An existing paid role may have a different payout and show
-a warning; that does not change the owner. New paid roles use owner as payout, outside this free tutorial.
+a warning; that does not change the owner. New paid roles use owner as payout ([get paid](/en/sellers/get-paid)).
 
 `DISCOVERY_INVITE_INVALID` means the code is wrong, used or expired. `DISCOVERY_RATE_LIMITED` means wait
 before retrying; `DISCOVERY_UNAVAILABLE` means the index could not complete the request. See
@@ -73,7 +73,7 @@ With the installer, turn publishing on from the folder where you saved `install.
 sh install.sh publish
 ```
 
-It sets `publish = true` in `~/gyblos-seller/config.toml`, validates the file and recreates the seller; if
+Publishing sends no blockchain transaction and costs nothing. It sets `publish = true` in `~/gyblos-seller/config.toml`, validates the file and recreates the seller; if
 validation fails or you interrupt it, it leaves the file as it was. If you installed elsewhere, prefix the same
 `GYBLOS_DIR=…` you installed with. An older `install.sh` does not know `publish`: download it again first. `gyblos seller status` also names this step while publishing
 is off.

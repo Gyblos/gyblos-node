@@ -2,16 +2,23 @@
 // peers. Paid execution is stream-only; its codes mirror the free ones under their own names.
 // Not re-exported by ../constants: this module reads FREE_* from there, so a re-export would
 // create an import cycle.
-import { FREE_EXECUTION, FREE_STREAM } from '../constants';
+import { CONTROL_LIMITS, FREE_EXECUTION, FREE_STREAM } from '../constants';
 
 // Room the payment authorization adds to a request, and the charge and payment to a terminal.
 const AUTHORIZATION_BYTES = 8192;
 const PAYMENT_TERMINAL_BYTES = 2048;
 
-// Paid v1 keeps the bounds it shipped with when free execution moved to v4 (128 KiB requests, 4096
-// events); changing them is a paid version change.
+// The request bound stays at 128 KiB before authorization. The coordinated beta profile permits
+// 32768 one-token deltas plus a terminal; it does not negotiate an older reader's smaller bounds.
 const PAID_V1_REQUEST_BYTES = 131072;
-const PAID_V1_MAX_EVENTS = 4096;
+const PAID_DELTA_EVENTS = FREE_STREAM.maxEvents;
+// Maximum canonical delta envelope including its four-byte prefix: fixed keys/version/type,
+// 32 request-id hex characters, 64 digest hex characters and a five-digit sequence. Tested on wire.
+const PAID_DELTA_HEADER_BYTES = 189;
+// A control byte may become six ASCII bytes (\\u0000) in canonical JSON.
+const JSON_ESCAPE_BYTES = 6;
+const PAID_EVENT_BYTES = FREE_STREAM.eventBytes + PAYMENT_TERMINAL_BYTES;
+const PAID_TERMINAL_FRAME_BYTES = PAID_EVENT_BYTES + CONTROL_LIMITS.prefixBytes;
 
 export const PAID_EXECUTION = {
   version: 2,
@@ -24,15 +31,18 @@ export const PAID_EXECUTION = {
   identifier: /^[A-Za-z0-9]{1,128}$/,
 } as const;
 
-// Free stream framing with room for the charge and payment in the terminal.
+// Budget escaped output and every envelope separately, then reserve a whole terminal frame,
+// which repeats the completed text. Per-frame, output, token, deposit and deadline bounds still apply.
 export const PAID_STREAM = {
   alpn: 'gyblos/paid-stream/2',
   deltaBytes: FREE_STREAM.deltaBytes,
-  eventBytes: FREE_STREAM.eventBytes + PAYMENT_TERMINAL_BYTES,
-  maxEvents: PAID_V1_MAX_EVENTS,
-  totalBytes: FREE_STREAM.totalBytes + PAYMENT_TERMINAL_BYTES,
-  terminalReserveBytes:
-    FREE_STREAM.terminalReserveBytes + PAYMENT_TERMINAL_BYTES,
+  eventBytes: PAID_EVENT_BYTES,
+  maxEvents: PAID_DELTA_EVENTS + 1,
+  totalBytes:
+    PAID_DELTA_EVENTS * PAID_DELTA_HEADER_BYTES +
+    FREE_EXECUTION.outputBytes * JSON_ESCAPE_BYTES +
+    PAID_TERMINAL_FRAME_BYTES,
+  terminalReserveBytes: PAID_TERMINAL_FRAME_BYTES,
   events: FREE_STREAM.events,
 } as const;
 

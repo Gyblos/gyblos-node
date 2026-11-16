@@ -3,9 +3,10 @@ title: Identity
 description: Preserve the seller volume and know which identifiers and diagnostics are safe to share.
 ---
 
-The free Docker seller has a public **NodeId** and **owner** address, backed by different private keys.
-Keep the persistent identity created during installation. `seller init` writes configuration; it does
-not create or recover these keys.
+A seller has four private keys, created once by the installer: the **node key** (its public NodeId), the
+**owner** (registered in 8004 and receiving your USDC), the **authorizer** and the **fee payer**. What each one
+does is in [get paid](/en/sellers/get-paid#keys). Keep the persistent identity created during installation.
+`seller init` writes configuration; it does not create or recover these keys.
 
 ## Storage [#what-lives-where]
 
@@ -13,7 +14,7 @@ not create or recover these keys.
 | -------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | `~/gyblos-seller/config.toml`          | Models, limits and publication                                                                  | Review before sharing; custom URLs can contain credentials      |
 | `~/gyblos-seller/compose.yaml`         | Container setup and volume references                                                           | Keep with the installation; review custom values before sharing |
-| `~/gyblos-seller/seller.env`           | Provider credentials, and the optional relay token                                              | Private; never upload or display it                             |
+| `~/gyblos-seller/seller.env`           | Provider credentials (API keys), if an offer needs them                                         | Private; never upload or display it                             |
 | Named Docker volume mounted at `/data` | Seller keys, role state, private registration attempts, public sequence, receipts and tokenizer | Private; never upload the volume or its files                   |
 | Separate Ollama volume                 | Downloaded model data                                                                           | Keep to avoid unnecessary downloads                             |
 
@@ -27,10 +28,28 @@ Use `docker compose stop seller` to stop serving. `docker compose down` preserve
 `docker compose down -v` deletes them and loses the seller keys. A consumed invite is tied to the
 original NodeId and cannot enroll a newly generated identity.
 
-There is no complete seller backup-and-restore procedure in this handbook. A desktop-wallet backup is
-for a different application and does not restore this seller's Iroh identity, public sequence or journals.
-If keys, role state or sequence locks are missing or damaged, stop changing the data and contact Gyblos.
-Never delete a lock, sequence file or journal merely to make startup pass.
+## Back up the keys [#back-up-keys]
+
+Keep an offline copy of the four key files, at least `owner.json` (your USDC and 8004 registration) and
+`node.key` (the NodeId your invite was used for). Copy them once after installing; they never change. With Docker, run this from `~/gyblos-seller`:
+
+```bash
+mkdir -p ~/gyblos-keys-backup && chmod 700 ~/gyblos-keys-backup
+for key in node.key owner.json authorizer.json facilitator.json; do
+  docker compose cp "seller:/data/seller/$key" ~/gyblos-keys-backup/
+done
+```
+
+Without Docker the same files are in `~/.gyblos/seller/` (copy them with `cp`); on Windows they are in `%USERPROFILE%\.gyblos\seller\`. Move the copy to a USB drive or a password
+manager and delete it from the computer. Anyone with `owner.json` can move your USDC; never upload it, paste
+it in a chat or send it to support. `owner.json` uses the Solana CLI keypair format, so a Solana wallet can
+import it to reach your funds even without the seller.
+
+A key copy is **not** a full restore. Do not copy old files back over a running seller: payment records,
+the public sequence and registration state must match what is on chain and in the index, and an old copy can
+break them. A desktop-wallet backup is for a different application and does not restore this seller. If keys,
+role state or sequence locks are missing or damaged, stop changing the data and contact Gyblos. Never delete a
+lock, sequence file or journal merely to make startup pass.
 
 The volume also holds private registration state, including an asset key and potentially signed
 transaction bytes. Never share that file or clear its lock to force a retry. A registration rerun may

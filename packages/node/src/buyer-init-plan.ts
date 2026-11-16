@@ -5,7 +5,6 @@ import {
   DEVNET_USDC,
   DISCOVERY_INDEX_URL,
   FREE_OUTPUT_TOKENS,
-  INFERENCE_REQUEST_LIMITS,
   IROH_RELAYS,
   LOOPBACK_HOST_NAMES,
 } from '@gyblos/config';
@@ -148,14 +147,9 @@ function request(row: Record<string, unknown>): SellerRequest {
   const variant = read(BUYER_INIT_FIELDS.VARIANT);
   const quantization = read(BUYER_INIT_FIELDS.QUANTIZATION);
   const maxAtomic = atomic(read(BUYER_INIT_FIELDS.MAX_USDC));
-  // Paid requests keep their smaller answer bound until paid conversations land, so a buyer who sets a
-  // spending ceiling gets at most that bound, whatever the free default.
-  const maxTokens = Math.min(
-    Number(read(BUYER_INIT_FIELDS.MAX_TOKENS)),
-    BigInt(maxAtomic) > 0n
-      ? INFERENCE_REQUEST_LIMITS.maxOutputTokens
-      : FREE_OUTPUT_TOKENS.max,
-  );
+  // The free answer bound; a paid seller is asked for at most what it quoted, so a spending ceiling does
+  // not shorten free answers.
+  const maxTokens = Number(read(BUYER_INIT_FIELDS.MAX_TOKENS));
   return {
     selection: {
       modelId: read(BUYER_INIT_FIELDS.MODEL_ID),
