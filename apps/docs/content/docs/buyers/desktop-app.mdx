@@ -35,15 +35,11 @@ it. This is expected; after the first time it opens normally.
 2. Open Gyblos. macOS says it cannot verify the developer; choose **Done**.
 3. Open **System Settings → Privacy & Security**, scroll to the message about Gyblos and choose
    **Open Anyway**, then confirm with your password.
+4. macOS then asks to let Gyblos use the key "Gyblos Safe Storage" in your keychain. Enter your Mac
+   password and choose **Always Allow**. The app keeps its wallet protected with this key. While the
+   question is open the app cannot quit and its wallet shows as unavailable.
 
-The beta can also show a macOS Keychain password dialog named **Gyblos Safe Storage**. This asks for
-access to protected local wallet storage, separately from the permission to open the app. With the
-current ad-hoc beta builds, it can appear again the first time you open a new version.
-
-Answer the macOS dialog first: while it remains unanswered, the wallet can show **Protected wallet
-unavailable** and **Quit** can wait for the dialog. Free chat uses a separate local buyer identity;
-it can work even while the protected wallet is unavailable. The password belongs in the macOS dialog,
-not in a chat message.
+Because the beta app is not signed, macOS asks steps 2 to 4 again after each update.
 
 ### Windows [#windows]
 
