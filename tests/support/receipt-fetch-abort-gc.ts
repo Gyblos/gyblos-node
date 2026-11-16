@@ -41,9 +41,10 @@ for (const requestInput of [false, true]) {
     await assert.rejects(fetch(registry + '/forbidden', { method: 'POST' }));
     assert.equal(services.externalCalls(), 1);
     const options = { method: 'POST', body: '{}', signal: controller.signal };
-    const pending = requestInput
-      ? fetch(new Request(registry + '/', options))
-      : fetch(registry + '/', options);
+    const input = requestInput
+      ? new Request(registry + '/', options)
+      : registry + '/';
+    const pending = fetch(input, requestInput ? undefined : options);
     const rejected = assert.rejects(pending, { name: 'AbortError' });
     void rejected.catch(() => {});
     await within(received.promise, 1000);
@@ -55,6 +56,8 @@ for (const requestInput of [false, true]) {
     await setImmediate();
     controller.abort();
     await within(rejected, 1000);
+    // Retain the caller-owned Request; only the fence's extra Request may be collected.
+    if (input instanceof Request) assert.equal(input.signal.aborted, true);
   } finally {
     controller.abort();
     globalThis.fetch = originalFetch;
