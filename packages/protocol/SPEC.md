@@ -1804,7 +1804,10 @@ Parsing detaches the whole envelope and checks every structural rule, including
 that the uploader is each receipt's seller (seller role) or buyer (buyer role),
 before any crypto; signing applies the same parse. Verification then checks the
 envelope signature and each receipt's own node signatures with its version's
-contract. Malformed fields and unknown keys use `INVALID`, a foreign envelope or
+contract. `verifyReceiptUploadEnvelope` performs only the parse and the envelope
+signature, for a collector that admits a signed envelope before receipt work; it
+does not verify receipts, and its caller must verify each one before trusting
+it. Malformed fields and unknown keys use `INVALID`, a foreign envelope or
 receipt version `VERSION`, a receipt the uploader is not party to or an offer
 below the signed amount `POLICY`, a bad envelope or receipt signature
 `SIGNATURE`. The `LIMIT` ceiling of 262144 canonical bytes applies to the parsed

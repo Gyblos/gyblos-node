@@ -12,6 +12,7 @@ import {
   RECEIPT_UPLOAD_PLATFORMS,
   signReceiptUpload,
   verifyReceiptUpload,
+  verifyReceiptUploadEnvelope,
   type ReceiptUploadV1,
   type SignedReceiptUpload,
 } from '@gyblos/protocol/receipt-upload';
@@ -162,4 +163,19 @@ void test('exactly the maximum number of distinct receipts is accepted', async (
     (await verifyReceiptUpload(clone(signed))).upload.items.length,
     RECEIPT_UPLOAD.maxItems,
   );
+});
+
+void test('the envelope-only check verifies the uploader signature but leaves receipts to the caller', async () => {
+  const { seller, receipt } = await freePair();
+  const broken = clone(receipt);
+  broken.seller.record.usage.outputTokens += 1;
+  const signed = await signReceiptUpload(
+    sellerUpload(seller.nodeId, broken),
+    seller.sign,
+  );
+  assert.deepEqual(await verifyReceiptUploadEnvelope(clone(signed)), signed);
+  await rejects(verifyReceiptUpload(clone(signed)), CONTROL_CODES.SIGNATURE);
+  const tampered = clone(signed);
+  tampered.upload.sentAt += 1;
+  await rejects(verifyReceiptUploadEnvelope(tampered), CONTROL_CODES.SIGNATURE);
 });
