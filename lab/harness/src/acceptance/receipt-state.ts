@@ -6,13 +6,10 @@ import {
   receiptPathsIn,
   type HomeEnvironment,
 } from '@gyblos/config';
-import { RECEIPT_STORAGE } from '@gyblos/node/constants';
-import { openReceiptStore } from '@gyblos/node/receipts';
+import { RECEIPT_STORAGE, RECEIPT_UPLOAD } from '@gyblos/node/constants';
+import { listReceipts, openReceiptStore } from '@gyblos/node/receipts';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import {
-  controlArray,
-  controlObject,
-} from '@gyblos/protocol/control-validation';
+import { controlHex, controlObject } from '@gyblos/protocol/control-validation';
 import { verifyReceipt, type ReceiptV1 } from '@gyblos/protocol/receipt';
 
 import { acceptanceAssert } from './errors';
@@ -24,7 +21,7 @@ export async function receiptSnapshot(
 ) {
   const paths = receiptPathsIn(environment, role);
   const info = await stat(paths.state);
-  acceptanceAssert(info.size <= RECEIPT_STORAGE.maxBytes);
+  acceptanceAssert(info.size <= RECEIPT_UPLOAD.maxLogBytes);
   acceptanceAssert(
     (info.mode & FILE_MODES.permissionMask) === FILE_MODES.privateFile,
   );
@@ -37,21 +34,23 @@ export async function receiptSnapshot(
     !text.includes(RECEIPT_ACCEPTANCE.text) &&
       !text.includes('synthetic acceptance input'),
   );
-  const input = controlObject(JSON.parse(text), [
+  const input = controlObject(JSON.parse(text.slice(0, text.indexOf('\n'))), [
     'schemaVersion',
     'role',
     'nodeId',
     'entries',
+    'rejectedWrites',
   ]);
   acceptanceAssert(
-    input.role === role &&
-      input.schemaVersion === RECEIPT_STORAGE.schemaVersion,
+    input.role === role && input.schemaVersion === RECEIPT_UPLOAD.schemaVersion,
   );
   const records: ReceiptV1[] = [];
-  for (const entry of controlArray(input.entries, RECEIPT_STORAGE.maxEntries)) {
-    const row = controlObject(entry, ['storedAt', 'receipt']);
+  for (const row of await listReceipts({
+    environment,
+    role,
+    nodeId: controlHex(input.nodeId),
+  }))
     records.push(await verifyReceipt(row.receipt));
-  }
   return records;
 }
 export async function confirmedSnapshots(environment: HomeEnvironment) {
@@ -92,9 +91,12 @@ export async function receiptRetention(
       now: () => Date.now() + RECEIPT_STORAGE.retentionMs,
     });
     acceptanceAssert(
-      (await expired.load(key, new AbortController().signal)) === undefined,
+      (await expired.load(key, new AbortController().signal)) !== undefined,
     );
+    const retained = (await receiptSnapshot(environment, role)).length;
     await openReceiptStore({ ...options, maxEntries: 1 }).put(receipt);
-    acceptanceAssert((await receiptSnapshot(environment, role)).length === 1);
+    acceptanceAssert(
+      (await receiptSnapshot(environment, role)).length === retained,
+    );
   }
 }

@@ -6,7 +6,7 @@ import { createSellerFreeExecution } from '@gyblos/node/free-execution';
 import { DECLARED_METER } from '@gyblos/node/free-meter';
 import {
   createSellerReceiptRuntime,
-  type LocalReceiptStore,
+  type ReceiptRuntimeStore,
 } from '@gyblos/node/receipts';
 import {
   ENGINE_KINDS,
@@ -20,7 +20,7 @@ import { freeSellerFixture } from './support/free-seller';
 function memoryStore() {
   let value: ReceiptV1 | undefined;
   let writes = 0;
-  const store: LocalReceiptStore = {
+  const store: ReceiptRuntimeStore = {
     async put(input) {
       writes++;
       value = await verifyReceipt(input);
@@ -75,7 +75,7 @@ void test('successful seller execution signs actual usage once without persistin
 void test('receipt signing or persistence errors cannot change a successful seller response', async () => {
   for (const badSigner of [false, true]) {
     const f = await freeSellerFixture();
-    const store: LocalReceiptStore = {
+    const store: ReceiptRuntimeStore = {
       async put() {
         throw new Error('synthetic-private-store-fault');
       },
@@ -203,7 +203,7 @@ void test('hung receipt work returns within its budget and does not accumulate m
   const f = await freeSellerFixture();
   let release = () => {};
   let calls = 0;
-  const store: LocalReceiptStore = {
+  const store: ReceiptRuntimeStore = {
     put: async () => {
       calls++;
       await new Promise<void>((resolve) => {

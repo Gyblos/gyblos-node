@@ -12,11 +12,12 @@ import { verifyReceipt, type ReceiptV1 } from '@gyblos/protocol/receipt';
 import type { ReceiptStoreKey } from '@gyblos/transport-iroh/receipt-service';
 
 import { RECEIPT_STORAGE } from './constants';
-import { receiptSignal, receiptUnavailable } from './receipt-file';
+import { receiptUnavailable } from './receipt-file';
 
 export interface StoredReceipt {
   storedAt: number;
   receipt: ReceiptV1;
+  uploadedAt?: number | null;
 }
 export function receiptKey(value: ReceiptV1) {
   const record = value.seller.record;
@@ -61,8 +62,6 @@ export async function parseReceiptSnapshot(
   text: string | undefined,
   role: HomeRole,
   nodeId: string,
-  now: number,
-  signal?: AbortSignal,
 ): Promise<StoredReceipt[]> {
   if (text === undefined) return [];
   const value: unknown = JSON.parse(text);
@@ -83,9 +82,8 @@ export async function parseReceiptSnapshot(
   const entries: StoredReceipt[] = [];
   const keys = new Set<string>();
   for (const item of records) {
-    receiptSignal(signal);
     const entry = controlObject(item, ['storedAt', 'receipt']);
-    const storedAt = controlInteger(entry.storedAt, 0, now);
+    const storedAt = controlInteger(entry.storedAt);
     const receipt = await verifyReceipt(entry.receipt);
     assertReceiptRole(receipt, role, nodeId);
     const key = receiptKey(receipt);
@@ -93,6 +91,5 @@ export async function parseReceiptSnapshot(
     keys.add(key);
     entries.push({ storedAt, receipt });
   }
-  receiptSignal(signal);
   return entries;
 }
