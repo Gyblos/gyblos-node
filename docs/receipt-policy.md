@@ -102,25 +102,7 @@ timestamps to a collector is the protocol contract "Receipt upload envelope v1"
 (`packages/protocol/SPEC.md`). It is a contract only: no uploader, schedule or
 endpoint uses it yet.
 
-`apps/metrics-collector` is the proposed public collector Worker that uses both.
-`POST /v1/receipts` takes one signed upload envelope. Cheapest checks run first:
-https; its storage and three rate limiters (fail closed); a per-address limit
-(IPv6 by /64; the address is never stored); a JSON content type and a body cap
-enforced before buffering; strict JSON depth; the envelope structure and party
-binding; the envelope signature (one verification); a ±10 minute clock window
-(`409 STALE_UPLOAD` returns the collector's time so the client can correct and
-resend); and only then a per-uploader limit, so unsigned junk cannot spend
-another node's allowance. A shared write budget is spent only by fully verified
-uploads, right before the write. Each receipt is then verified once by the
-public policy. One transaction writes the canonical envelope with its signature,
-client and clock skew; one report row per item with the uploader's own times
-(its merge label is advisory, read before the write); guarded receipt upserts
-that never replace a first seller record or buyer attestation; status history
-and conflict evidence decided against the stored row at write time, so
-concurrent uploads cannot lose a conflict; and the first report time per side
-(any report from that side, conflicting or not). A reused (uploader, nonce) pair
-is `409 REPLAYED_UPLOAD` and stores nothing. The response is only the accepted
-count, so an uploader cannot learn whether the other side reported. One upload
-can run about 250 D1 statements, which needs the Workers Paid plan. It has no
-public reads, aggregates or archive yet, is not deployed, and its D1 database
-does not exist.
+`apps/metrics-collector` is the proposed public collector Worker that uses both
+(`POST /v1/receipts`). It is not deployed and its database does not exist. Its
+endpoints, order of checks, storage, query cost and operations are documented in
+[metrics-collector.md](metrics-collector.md).

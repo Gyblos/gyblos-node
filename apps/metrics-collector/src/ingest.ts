@@ -118,6 +118,8 @@ export async function ingestUpload(
       key: incoming.key,
       role: upload.role,
       fingerprint: incoming.fingerprint,
+      sellerDigest: incoming.sellerDigest,
+      buyerDigest: incoming.buyerDigest,
       merge,
       storedAt: item.storedAt,
       startedAt: item.startedAt,

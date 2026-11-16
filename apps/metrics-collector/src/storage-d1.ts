@@ -1,6 +1,8 @@
-// Owns the D1 storage port: one transactional batch per upload. First versions, status history and
-// conflicts are decided in SQL against the row at write time, so concurrent uploads cannot replace a
-// first seller record or buyer attestation, nor lose the evidence of a conflict.
+// Owns the D1 storage adapter: one typed read per upload and one transactional batch of set-based,
+// chunked writes. First versions, status history and conflicts are decided in SQL against the stored
+// row at write time, so concurrent uploads can neither replace a first version nor lose a conflict.
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+
 import {
   PUBLIC_RECEIPT_MERGES,
   PUBLIC_RECEIPT_STATUSES,
@@ -25,62 +27,71 @@ import {
   RECEIPT_V2,
 } from '@gyblos/protocol/receipt-v2';
 
+import { COLLECTOR_LIMITS } from './constants';
+import {
+  createD1Orm,
+  type CollectorDatabase,
+  type D1Database,
+} from './d1-client';
+import {
+  conflicts,
+  envelopes,
+  receipts,
+  reports,
+  statusHistory,
+} from './schema';
 import {
   COMMIT_RESULTS,
   type CollectorStorage,
   type CollectorWrite,
-  type ReceiptWrite,
 } from './storage';
 
-export type D1Value = string | number | null;
-export type D1Row = Record<string, unknown>;
-export interface D1PreparedStatement {
-  bind(...values: D1Value[]): D1PreparedStatement;
-  all(): Promise<{ results: D1Row[] }>;
-  run(): Promise<unknown>;
-}
-export interface D1Database {
-  prepare(query: string): D1PreparedStatement;
-  batch(statements: D1PreparedStatement[]): Promise<unknown[]>;
-}
+export type {
+  D1Database,
+  D1PreparedStatement,
+  D1Result,
+  D1Row,
+  D1Value,
+} from './d1-client';
 
-const REPORTED_AT_COLUMN = {
-  [P2P_ROLES.SELLER]: 'seller_reported_at',
-  [P2P_ROLES.BUYER]: 'buyer_reported_at',
-} as const;
+type ReceiptRow = typeof receipts.$inferInsert;
+type ReportInsert = typeof reports.$inferInsert;
+
+// Splits rows so no statement exceeds D1's bound-parameter limit.
+function chunks<T>(rows: readonly T[], columns: number): T[][] {
+  const size = Math.max(
+    1,
+    Math.floor(COLLECTOR_LIMITS.maxBoundParameters / columns),
+  );
+  const result: T[][] = [];
+  for (let start = 0; start < rows.length; start += size)
+    result.push(rows.slice(start, start + size));
+  return result;
+}
+const columnCount = (row: object) => Object.keys(row).length;
 
 function badRow(): never {
   throw new TypeError('Unexpected collector storage row.');
 }
-function text(value: unknown): string {
-  return typeof value === 'string' ? value : badRow();
-}
-function nullableText(value: unknown): string | null {
-  return value === null ? null : text(value);
-}
-function integer(value: unknown): number {
-  return typeof value === 'number' && Number.isSafeInteger(value)
-    ? value
-    : badRow();
-}
-function status(value: unknown): PublicReceiptStatus {
+function status(value: string): PublicReceiptStatus {
   for (const item of Object.values(PUBLIC_RECEIPT_STATUSES))
     if (value === item) return item;
   return badRow();
 }
 function signedHalf<T>(value: unknown, parse: (record: unknown) => T) {
   if (!value || typeof value !== 'object') return badRow();
+  const signature: unknown = Reflect.get(value, 'signature');
   return {
     record: parse(Reflect.get(value, 'record')),
-    signature: text(Reflect.get(value, 'signature')),
+    signature: typeof signature === 'string' ? signature : badRow(),
   };
 }
-// Rows are the collector's own, written after verification; this re-parses them strictly anyway.
+// Rows are the collector's own, written after verification; they are still re-parsed strictly.
 function storedReceipt(json: string, version: number): PublicReceipt {
   const value: unknown = JSON.parse(json);
   if (!value || typeof value !== 'object') return badRow();
-  const buyer: unknown = Reflect.get(value, 'buyer');
   const seller: unknown = Reflect.get(value, 'seller');
+  const buyer: unknown = Reflect.get(value, 'buyer');
   if (version === RECEIPT.version) {
     const receipt: PublicReceipt = {
       seller: signedHalf(seller, parseSellerReceipt),
@@ -99,213 +110,288 @@ function storedReceipt(json: string, version: number): PublicReceipt {
   }
   return badRow();
 }
-function entryOf(row: D1Row): PublicReceiptEntry {
-  const version = integer(row.version);
-  const receipt = storedReceipt(text(row.receipt_json), version);
-  return {
-    key: text(row.receipt_key),
-    sellerDigest: text(row.seller_digest),
-    buyerDigest: nullableText(row.buyer_digest),
-    fingerprint: text(row.fingerprint),
-    status: status(row.status),
-    version: receipt.seller.record.version,
-    paid: integer(row.paid) === 1,
-    receipt,
-  };
-}
 
-function receiptValues(entry: PublicReceiptEntry, now: number): D1Value[] {
+function receiptRow(entry: PublicReceiptEntry, now: number): ReceiptRow {
   const record = entry.receipt.seller.record;
   const paid =
     record.pricing.kind === OFFER_PRICING_KINDS.PAID ? record.pricing : null;
   const channel = 'channel' in record ? record.channel : null;
-  return [
-    entry.key,
-    record.sellerNodeId,
-    record.buyerNodeId,
-    record.requestId,
-    entry.sellerDigest,
-    entry.buyerDigest,
-    entry.fingerprint,
-    entry.status,
-    entry.version,
-    entry.paid ? 1 : 0,
-    record.owner,
-    record.selection.modelId,
-    record.selection.variant,
-    record.selection.quantization,
-    record.reasoning,
-    record.engineKind,
-    record.streaming ? 1 : 0,
-    record.outcome,
-    record.usage.inputTokens,
-    record.usage.outputTokens,
-    record.usage.reasoningTokens,
-    record.amountAtomic,
-    record.feeAtomic,
-    paid?.network ?? null,
-    paid?.asset ?? null,
-    channel?.channelId ?? null,
-    channel?.payer ?? null,
-    record.timing.receivedAt,
-    record.timing.firstTokenMs,
-    record.timing.totalMs,
-    JSON.stringify(entry.receipt),
-    now,
-    now,
-  ];
+  return {
+    receiptKey: entry.key,
+    sellerNodeId: record.sellerNodeId,
+    buyerNodeId: record.buyerNodeId,
+    requestId: record.requestId,
+    sellerDigest: entry.sellerDigest,
+    buyerDigest: entry.buyerDigest,
+    fingerprint: entry.fingerprint,
+    status: entry.status,
+    version: entry.version,
+    paid: entry.paid ? 1 : 0,
+    owner: record.owner,
+    modelId: record.selection.modelId,
+    variant: record.selection.variant,
+    quantization: record.selection.quantization,
+    reasoning: record.reasoning,
+    engineKind: record.engineKind,
+    streaming: record.streaming ? 1 : 0,
+    outcome: record.outcome,
+    inputTokens: record.usage.inputTokens,
+    outputTokens: record.usage.outputTokens,
+    reasoningTokens: record.usage.reasoningTokens,
+    amountAtomic: record.amountAtomic,
+    feeAtomic: record.feeAtomic,
+    network: paid?.network ?? null,
+    asset: paid?.asset ?? null,
+    channelId: channel?.channelId ?? null,
+    payer: channel?.payer ?? null,
+    sellerReceivedAt: record.timing.receivedAt,
+    firstTokenMs: record.timing.firstTokenMs,
+    totalMs: record.timing.totalMs,
+    receiptJson: JSON.stringify(entry.receipt),
+    // seller_reported_at and buyer_reported_at start NULL and are set by the first-report statement.
+    insertedAt: now,
+    updatedAt: now,
+  };
 }
 
-const RECEIPT_COLUMNS = `receipt_key, seller_node_id, buyer_node_id, request_id, seller_digest,
-  buyer_digest, fingerprint, status, version, paid, owner, model_id, variant, quantization, reasoning,
-  engine_kind, streaming, outcome, input_tokens, output_tokens, reasoning_tokens, amount_atomic,
-  fee_atomic, network, asset, channel_id, payer, seller_received_at, first_token_ms, total_ms,
-  receipt_json, inserted_at, updated_at`;
-const RECEIPT_COLUMN_COUNT = RECEIPT_COLUMNS.split(',').length;
-// A new key is inserted; an existing one only gains its first buyer half for the same seller record.
-// Seller fields never change after the first insert.
-const UPSERT_RECEIPT = `INSERT INTO collector_receipts (${RECEIPT_COLUMNS})
-  VALUES (${Array.from({ length: RECEIPT_COLUMN_COUNT }, () => '?').join(', ')})
-  ON CONFLICT (receipt_key) DO UPDATE SET buyer_digest = excluded.buyer_digest,
-    fingerprint = excluded.fingerprint, status = excluded.status,
-    receipt_json = excluded.receipt_json, updated_at = excluded.updated_at
-  WHERE collector_receipts.buyer_digest IS NULL
-    AND excluded.buyer_digest IS NOT NULL
-    AND collector_receipts.seller_digest = excluded.seller_digest`;
-// History only when this write is what is now stored (inserted or upgraded at this instant).
-const RECORD_HISTORY = `INSERT OR IGNORE INTO collector_status_history (receipt_key, status, changed_at)
-  SELECT receipt_key, status, ? FROM collector_receipts
-  WHERE receipt_key = ? AND fingerprint = ? AND updated_at = ?`;
-// Evidence against the side that signed something different from the stored first version.
-const RECORD_CONFLICT = `INSERT OR IGNORE INTO collector_conflicts
-  (envelope_id, receipt_key, merge, fingerprint, receipt_json, inserted_at)
-  SELECT ?, receipt_key, CASE WHEN seller_digest <> ? THEN ? ELSE ? END, ?, ?, ?
-  FROM collector_receipts
-  WHERE receipt_key = ? AND (seller_digest <> ?
-    OR (? IS NOT NULL AND buyer_digest IS NOT NULL AND buyer_digest <> ?))`;
-
-function receiptStatements(
-  database: D1Database,
-  envelopeId: string,
-  { role, incoming }: ReceiptWrite,
+function envelopeInsert(
+  database: CollectorDatabase,
+  envelope: CollectorWrite['envelope'],
   now: number,
-): D1PreparedStatement[] {
-  const column = REPORTED_AT_COLUMN[role];
-  return [
-    database
-      .prepare(RECORD_CONFLICT)
-      .bind(
-        envelopeId,
-        incoming.sellerDigest,
-        PUBLIC_RECEIPT_MERGES.SELLER_CONFLICT,
-        PUBLIC_RECEIPT_MERGES.BUYER_CONFLICT,
-        incoming.fingerprint,
-        JSON.stringify(incoming.receipt),
-        now,
-        incoming.key,
-        incoming.sellerDigest,
-        incoming.buyerDigest,
-        incoming.buyerDigest,
-      ),
-    database.prepare(UPSERT_RECEIPT).bind(...receiptValues(incoming, now)),
-    database
-      .prepare(RECORD_HISTORY)
-      .bind(now, incoming.key, incoming.fingerprint, now),
-    database
-      .prepare(
-        `UPDATE collector_receipts SET ${column} = COALESCE(${column}, ?) WHERE receipt_key = ?`,
-      )
-      .bind(now, incoming.key),
-  ];
+) {
+  const { upload } = envelope;
+  return database.insert(envelopes).values({
+    id: envelope.id,
+    uploaderNodeId: upload.uploaderNodeId,
+    role: upload.role,
+    clientKind: upload.client.kind,
+    appVersion: upload.client.appVersion,
+    platform: upload.client.platform,
+    arch: upload.client.arch,
+    nonce: upload.nonce,
+    sentAt: upload.sentAt,
+    receivedAt: envelope.receivedAt,
+    skewMs: envelope.receivedAt - upload.sentAt,
+    itemCount: upload.items.length,
+    signature: envelope.signature,
+    signedJson: envelope.json,
+    insertedAt: now,
+  });
 }
 
-function commitStatements(
-  database: D1Database,
+function reportInserts(
+  database: CollectorDatabase,
   write: CollectorWrite,
   now: number,
-): D1PreparedStatement[] {
-  const { envelope } = write;
-  const upload = envelope.upload;
-  return [
-    database
-      .prepare(
-        `INSERT INTO collector_envelopes (id, uploader_node_id, role, client_kind, app_version,
-          platform, arch, nonce, sent_at, received_at, skew_ms, item_count, signature, signed_json,
-          inserted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        envelope.id,
-        upload.uploaderNodeId,
-        upload.role,
-        upload.client.kind,
-        upload.client.appVersion,
-        upload.client.platform,
-        upload.client.arch,
-        upload.nonce,
-        upload.sentAt,
-        envelope.receivedAt,
-        envelope.receivedAt - upload.sentAt,
-        upload.items.length,
-        envelope.signature,
-        envelope.json,
-        now,
-      ),
-    ...write.reports.map((report) =>
+) {
+  const rows: ReportInsert[] = write.reports.map((report) => ({
+    envelopeId: report.envelopeId,
+    receiptKey: report.key,
+    role: report.role,
+    fingerprint: report.fingerprint,
+    sellerDigest: report.sellerDigest,
+    buyerDigest: report.buyerDigest,
+    merge: report.merge,
+    storedAt: report.storedAt,
+    startedAt: report.startedAt,
+    offerJson: report.offerJson,
+    insertedAt: now,
+  }));
+  return chunks(rows, columnCount(rows[0] ?? {})).map((chunk) =>
+    database.insert(reports).values(chunk),
+  );
+}
+
+// Conflicts against the row as stored before this write, set-based over this envelope's reports.
+function conflictInsert(
+  database: CollectorDatabase,
+  envelopeId: string,
+  now: number,
+) {
+  const differentSeller = ne(receipts.sellerDigest, reports.sellerDigest);
+  const differentBuyer = and(
+    isNotNull(reports.buyerDigest),
+    isNotNull(receipts.buyerDigest),
+    ne(receipts.buyerDigest, reports.buyerDigest),
+  );
+  return database
+    .insert(conflicts)
+    .select(
       database
-        .prepare(
-          `INSERT INTO collector_reports (envelope_id, receipt_key, role, fingerprint, merge,
-            stored_at, started_at, offer_json, inserted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          report.envelopeId,
-          report.key,
-          report.role,
-          report.fingerprint,
-          report.merge,
-          report.storedAt,
-          report.startedAt,
-          report.offerJson,
-          now,
+        .select({
+          envelopeId: reports.envelopeId,
+          receiptKey: reports.receiptKey,
+          merge:
+            sql<string>`case when ${differentSeller} then ${PUBLIC_RECEIPT_MERGES.SELLER_CONFLICT} else ${PUBLIC_RECEIPT_MERGES.BUYER_CONFLICT} end`.as(
+              'merge',
+            ),
+          fingerprint: reports.fingerprint,
+          insertedAt: sql<number>`${now}`.as('inserted_at'),
+        })
+        .from(reports)
+        .innerJoin(receipts, eq(receipts.receiptKey, reports.receiptKey))
+        .where(
+          and(
+            eq(reports.envelopeId, envelopeId),
+            or(differentSeller, differentBuyer),
+          ),
         ),
-    ),
-    ...write.receipts.flatMap((item) =>
-      receiptStatements(database, envelope.id, item, now),
-    ),
-  ];
+    )
+    .onConflictDoNothing();
+}
+
+// New keys are inserted; an existing one only gains its first buyer half for the same seller record.
+function receiptUpserts(
+  database: CollectorDatabase,
+  write: CollectorWrite,
+  now: number,
+) {
+  const rows = write.receipts.map(({ incoming }) => receiptRow(incoming, now));
+  return chunks(rows, columnCount(rows[0] ?? {})).map((chunk) =>
+    database
+      .insert(receipts)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: receipts.receiptKey,
+        set: {
+          buyerDigest: sql`excluded.buyer_digest`,
+          fingerprint: sql`excluded.fingerprint`,
+          status: sql`excluded.status`,
+          receiptJson: sql`excluded.receipt_json`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+        setWhere: and(
+          isNull(receipts.buyerDigest),
+          sql`excluded.buyer_digest is not null`,
+          sql`${receipts.sellerDigest} = excluded.seller_digest`,
+        ),
+      }),
+  );
+}
+
+// History only where this write is what is now stored (inserted or upgraded at this instant).
+function historyInsert(
+  database: CollectorDatabase,
+  envelopeId: string,
+  now: number,
+) {
+  return database
+    .insert(statusHistory)
+    .select(
+      database
+        .select({
+          receiptKey: receipts.receiptKey,
+          status: receipts.status,
+          changedAt: sql<number>`${now}`.as('changed_at'),
+        })
+        .from(receipts)
+        .innerJoin(reports, eq(reports.receiptKey, receipts.receiptKey))
+        .where(
+          and(
+            eq(reports.envelopeId, envelopeId),
+            eq(receipts.fingerprint, reports.fingerprint),
+            eq(receipts.updatedAt, now),
+          ),
+        ),
+    )
+    .onConflictDoNothing();
+}
+
+// First report time for the uploader's side, for every key in this envelope.
+function firstReportUpdate(
+  database: CollectorDatabase,
+  write: CollectorWrite,
+  now: number,
+) {
+  const reportedAt =
+    write.envelope.upload.role === P2P_ROLES.SELLER
+      ? {
+          sellerReportedAt: sql`coalesce(${receipts.sellerReportedAt}, ${now})`,
+        }
+      : { buyerReportedAt: sql`coalesce(${receipts.buyerReportedAt}, ${now})` };
+  return database
+    .update(receipts)
+    .set(reportedAt)
+    .where(
+      inArray(
+        receipts.receiptKey,
+        database
+          .select({ receiptKey: reports.receiptKey })
+          .from(reports)
+          .where(eq(reports.envelopeId, write.envelope.id)),
+      ),
+    );
+}
+
+// Order matters: the envelope first (its unique nonce aborts a replay), conflicts before the upsert
+// (they compare with the row as stored), history and first report times after it.
+function writeStatements(
+  database: CollectorDatabase,
+  write: CollectorWrite,
+  now: number,
+) {
+  return [
+    envelopeInsert(database, write.envelope, now),
+    ...reportInserts(database, write, now),
+    conflictInsert(database, write.envelope.id, now),
+    ...receiptUpserts(database, write, now),
+    historyInsert(database, write.envelope.id, now),
+    firstReportUpdate(database, write, now),
+  ] as const;
 }
 
 export function createD1Storage(database: D1Database): CollectorStorage {
+  const orm = createD1Orm(database);
   return {
     async readEntries(keys) {
       const found = new Map<string, PublicReceiptEntry>();
       if (!keys.length) return found;
-      const { results } = await database
-        .prepare(
-          `SELECT receipt_key, seller_digest, buyer_digest, fingerprint, status, version, paid, receipt_json
-           FROM collector_receipts WHERE receipt_key IN (${keys.map(() => '?').join(', ')})`,
-        )
-        .bind(...keys)
-        .all();
-      for (const row of results) {
-        const entry = entryOf(row);
-        found.set(entry.key, entry);
+      const rows = await orm
+        .select({
+          receiptKey: receipts.receiptKey,
+          sellerDigest: receipts.sellerDigest,
+          buyerDigest: receipts.buyerDigest,
+          fingerprint: receipts.fingerprint,
+          status: receipts.status,
+          version: receipts.version,
+          paid: receipts.paid,
+          receiptJson: receipts.receiptJson,
+        })
+        .from(receipts)
+        .where(inArray(receipts.receiptKey, [...keys]));
+      for (const row of rows) {
+        const receipt = storedReceipt(row.receiptJson, row.version);
+        found.set(row.receiptKey, {
+          key: row.receiptKey,
+          sellerDigest: row.sellerDigest,
+          buyerDigest: row.buyerDigest,
+          fingerprint: row.fingerprint,
+          status: status(row.status),
+          version: receipt.seller.record.version,
+          paid: row.paid === 1,
+          receipt,
+        });
       }
       return found;
     },
     async commit(write, now) {
-      const upload = write.envelope.upload;
+      const { upload } = write.envelope;
       try {
-        await database.batch(commitStatements(database, write, now));
+        const [first, ...rest] = writeStatements(orm, write, now);
+        await orm.batch([first, ...rest]);
         return COMMIT_RESULTS.COMMITTED;
       } catch (error) {
         // The batch is one transaction: on a unique violation nothing was written.
-        const { results } = await database
-          .prepare(
-            'SELECT 1 AS found FROM collector_envelopes WHERE uploader_node_id = ? AND nonce = ?',
-          )
-          .bind(upload.uploaderNodeId, upload.nonce)
-          .all();
-        if (results.length) return COMMIT_RESULTS.REPLAYED;
+        const replayed = await orm
+          .select({ id: envelopes.id })
+          .from(envelopes)
+          .where(
+            and(
+              eq(envelopes.uploaderNodeId, upload.uploaderNodeId),
+              eq(envelopes.nonce, upload.nonce),
+            ),
+          );
+        if (replayed.length) return COMMIT_RESULTS.REPLAYED;
         throw error;
       }
     },

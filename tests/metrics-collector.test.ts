@@ -5,7 +5,7 @@ import test from 'node:test';
 
 import { PUBLIC_RECEIPT_MERGES as MERGES } from '@gyblos/core/constants';
 import { COLLECTOR_ERRORS } from '@gyblos/metrics-collector/constants';
-import { createMemoryStorage } from '@gyblos/metrics-collector/storage';
+import { createMemoryStorage } from '@gyblos/metrics-collector/storage-memory';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import {

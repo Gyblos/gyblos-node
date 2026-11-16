@@ -25,11 +25,15 @@ CREATE TABLE IF NOT EXISTS collector_envelopes (
 CREATE INDEX IF NOT EXISTS collector_envelopes_by_received ON collector_envelopes (received_at);
 
 -- One row per item per reporting side, whatever the merge result. Times are the uploader's claims.
+-- The digests let conflicts, history and first report times be decided set-based in the same batch.
 CREATE TABLE IF NOT EXISTS collector_reports (
   envelope_id TEXT NOT NULL,
   receipt_key TEXT NOT NULL,
   role TEXT NOT NULL,
   fingerprint TEXT NOT NULL,
+  seller_digest TEXT NOT NULL,
+  buyer_digest TEXT,
+  -- Advisory label from a read before the write; conflicts are decided against the stored row.
   merge TEXT NOT NULL,
   stored_at INTEGER,
   started_at INTEGER,
@@ -81,12 +85,12 @@ CREATE INDEX IF NOT EXISTS collector_receipts_by_seller_day ON collector_receipt
 CREATE INDEX IF NOT EXISTS collector_receipts_by_model_day ON collector_receipts (model_id, seller_received_at);
 
 -- Conflicting reports, kept as evidence against the side that signed them; never counted in totals.
+-- The conflicting signed receipt is in the envelope's signed_json, found by envelope_id and key.
 CREATE TABLE IF NOT EXISTS collector_conflicts (
   envelope_id TEXT NOT NULL,
   receipt_key TEXT NOT NULL,
   merge TEXT NOT NULL,
   fingerprint TEXT NOT NULL,
-  receipt_json TEXT NOT NULL,
   inserted_at INTEGER NOT NULL,
   PRIMARY KEY (envelope_id, receipt_key)
 ) WITHOUT ROWID;

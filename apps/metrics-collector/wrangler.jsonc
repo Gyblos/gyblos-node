@@ -2,7 +2,7 @@
   // Metrics collector Worker (collector.gyblos.com, proposed). Not deployed: creating the D1 database,
   // the rate-limit namespaces and the route needs founder approval. Deploy with
   // `npx wrangler@4.151.1 ...` from this directory, as for the discovery index.
-  // One upload can run about 250 D1 statements in a batch, so this needs the Workers Paid plan.
+  // One upload is one read and one batch of at most about 30 D1 statements (docs/metrics-collector.md).
   "name": "gyblos-collector",
   "main": "./src/worker.ts",
   "compatibility_date": "2026-10-01",

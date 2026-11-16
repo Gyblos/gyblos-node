@@ -75,6 +75,8 @@ export const COLLECTOR_LIMITS = {
   maxJsonDepth: 32,
   // How far `sentAt` may differ from the collector's clock, either way.
   clockWindowMs: 600_000,
+  // D1's limit of bound parameters per statement; multi-row writes are chunked under it.
+  maxBoundParameters: 100,
 } as const;
 
 // Cloudflare bindings (wrangler.jsonc); every one is required and missing ones fail closed.
