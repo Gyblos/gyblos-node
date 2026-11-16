@@ -98,8 +98,10 @@ Cada pedido pagado se paga por separado:
 1. El comprador firma un máximo para el pedido y lo deposita en un canal de pago.
 2. Tu vendedor responde y mide el uso para pedir el cobro. El comprador verifica la respuesta que recibió; el
    pago por pedido no espera una nueva firma del comprador aprobando el uso final.
-3. Tu vendedor liquida ese canal en la cadena: tu parte va al dueño en USDC, el 4 % a Gyblos y lo que sobra del
-   depósito vuelve al comprador.
+3. Tu vendedor liquida el canal: la parte del dueño y la parte de protocolo de Gyblos siguen el reparto
+   redondeado de la beta; el resto vuelve al comprador. El recargo del 4 % se suma a tu precio neto; el reparto
+   actual de la beta puede dejar un residuo de redondeo en el programa de pagos, así que la parte que cobra
+   Gyblos es aproximada.
 
 Al terminar cada inferencia, el vendedor intenta liquidar lo entregado. La confirmación puede tardar o quedar
 pendiente. Al reiniciar, intenta recuperar los cobros pendientes cuyo importe alcanzó a guardar, sin repetir la
@@ -129,6 +131,10 @@ El valor por defecto es 16, de 1 a 16. Cuenta sesiones de pago abiertas, no cone
 
 ## Volver a gratis [#volver-a-gratis]
 
-Vuelve a poner `free = {...}` en lugar de `price = {...}` y aplica el cambio como arriba.
+Antes de cambiar tu última oferta con precio a gratis, resuelve los pagos pendientes y cierra los canales del
+piloto reutilizable. Un vendedor solo gratuito no inicia la recuperación ni la limpieza de pagos. Conserva los
+datos y las llaves; si queda algo pendiente, contacta con Gyblos antes de cambiar.
+
+Después vuelve a poner `free = {...}` en lugar de `price = {...}` y aplica el cambio como arriba.
 
 **Siguiente:** [Operar y actualizar](/es/sellers/operate).

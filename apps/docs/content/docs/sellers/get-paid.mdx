@@ -97,8 +97,9 @@ Each paid request is paid on its own:
 1. The buyer signs a maximum for the request and deposits it in a payment channel.
 2. Your seller answers and measures the usage to request payment. The buyer verifies the answer it
    received; per-request payment does not wait for a new buyer signature approving the final usage.
-3. Your seller settles that channel on chain: your share goes to the owner as USDC, the 4% fee to Gyblos,
-   and the rest of the deposit back to the buyer.
+3. Your seller settles the channel: the owner's share and Gyblos's protocol share follow the rounded beta
+   split; the rest returns to the buyer. The 4% surcharge is added to your net price; the current beta split
+   can leave a rounding residual in the payment program, so Gyblos's collected share is approximate.
 
 After each inference, the seller attempts to settle the delivered usage. Confirmation may take time or
 remain pending. After a restart, it attempts to recover pending charges whose amounts were saved, without
@@ -128,6 +129,10 @@ The default is 16, from 1 to 16. It counts open payment sessions, not connection
 
 ## Back to free [#back-to-free]
 
-Replace `price = {...}` with `free = {...}` again and apply the change as above.
+Before switching your last priced offer to free, resolve pending payments and close reusable pilot channels.
+An all-free seller does not start payment recovery or cleanup. Keep your payment data and keys; if anything
+remains unresolved, contact Gyblos before switching.
+
+Then replace `price = {...}` with `free = {...}` again and apply the change as above.
 
 **Next:** [Operate and update](/en/sellers/operate).
