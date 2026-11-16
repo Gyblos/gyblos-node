@@ -207,6 +207,7 @@ export const DESKTOP_UPDATE = {
   RELEASES:
     'https://api.github.com/repos/Gyblos/gyblos-node/releases?per_page=10',
   PAGE: 'https://github.com/Gyblos/gyblos-node/releases/tag/v',
+  CHECK_INTERVAL_MS: 300000,
   TIMEOUT_MS: 3000,
   MAX_BYTES: 262144,
   MAX_RELEASES: 10,

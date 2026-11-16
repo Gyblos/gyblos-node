@@ -237,8 +237,12 @@ export const UPTIME = {
   slotMs: 300_000,
   hourMs: 3_600_000,
   slotsPerHour: 12,
-  // Windows reported, in days; the longest is also how long rows are kept.
+  // Windows reported, in days.
   windowDays: [1, 7, 30],
+  // How long hourly rows are kept: the full history for network metrics, independent of the
+  // reported windows. A row with its index costs about 160 bytes, about 1.4 MB per always-online
+  // NodeId per year, in the same D1 database as records (docs/discovery-index.md, Uptime).
+  retentionDays: 3650,
   dayMs: 86_400_000,
   // Old rows are pruned at most once an hour per app instance.
   pruneIntervalMs: 3_600_000,

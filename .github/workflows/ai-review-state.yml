@@ -2,7 +2,7 @@
 name: AI review state
 on:
   pull_request_target:
-    branches: [main]
+    branches: [develop, main]
     types: [opened, synchronize, reopened]
 permissions:
   issues: write
@@ -29,7 +29,7 @@ jobs:
           if (!/^[1-9][0-9]*$/.test(number)) throw new Error('Invalid PR identity.');
           const api = (...args) => execFileSync('gh', ['api', ...args], {encoding:'utf8'});
           const pr = JSON.parse(api('repos/' + repo + '/pulls/' + number));
-          if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+          if (pr.state !== 'open' || !['develop', 'main'].includes(pr.base.ref) ||
               pr.head.repo?.full_name !== repo || pr.head.sha !== process.env.REQUEST_HEAD) process.exit(0);
           const marker = '<!-- gyblos-ai-review:' + pr.head.sha + ':' + pr.base.sha + ':' + pr.merge_commit_sha + ' -->';
           const comments = JSON.parse(api('--paginate', '--slurp', 'repos/' + repo + '/issues/' + number + '/comments?per_page=100')).flat();

@@ -81,6 +81,43 @@ An optional private file implementation is available through
 limitations are documented with the collector policy. It is not wired into
 startup or external collection.
 
+The public collector policy (`@gyblos/core/public-receipts`) verifies a
+receipt/v1 or receipt/v2 from either party itself (node signatures and
+cross-binding), keeps a detached copy, and classifies it as bilateral, disputed
+or seller-only, free or paid, under the same key as the private collector. It
+refuses a buyer whose disputed fields do not match its own observations.
+Bilateral means two node keys agreed; it does not show that two independent
+parties exist. A buyer half completes a stored seller-only receipt. A different
+seller record under the same key (including a changed request digest) is a
+seller conflict, and a second, different buyer attestation is a buyer conflict:
+the first accepted version stays stored and keeps counting, so a seller cannot
+erase a buyer's dispute by signing again, and the conflict is evidence against
+the side that signed it. It is pure policy, not connected to any service; it
+stores nothing and never publishes individual receipts. The loopback paired-free
+collector above is unchanged and now shares the dispute, key and digest helpers
+with it.
+
+The signed batch format a node will use to hand its receipts and its own
+timestamps to a collector is the protocol contract "Receipt upload envelope v1"
+(`packages/protocol/SPEC.md`). It is a contract only: no uploader, schedule or
+endpoint uses it yet.
+
+The additive `receipt-upload/v2` contract keeps the same rules and adds a
+buyer-declared reference to the exact paid quote. `buildReceiptUploadOfferV2`
+projects an independently accepted quote to six facts plus the SHA-256
+reference; it returns no endpoint addresses or owner signature. Capture that
+projection before discarding the quote. It is not proof of identity, settlement
+or truthful metadata. Upload/store/start times originate on the uploader's
+clock; copied offer times originate on the seller's clock and remain
+buyer-reported claims. Existing v1 uploads/vectors stay unchanged. The public
+collector and uploader must explicitly adopt the new contract; no runtime
+activation is included here.
+
+`apps/metrics-collector` is the public collector Worker that uses v1
+(`POST /v1/receipts`), deployed at `collector.gyblos.com` with its own D1
+database. Its endpoints, order of checks, storage, query cost and operations are
+documented in [metrics-collector.md](metrics-collector.md).
+
 ## Local upload cursor
 
 The shared role store at `@gyblos/node/receipts` keeps every saved receipt
