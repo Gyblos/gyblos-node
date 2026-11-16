@@ -130,3 +130,45 @@ void test('an unaffordable whole engine delta is refused before any bounded chun
   );
   assert.equal(seller.engineCalls.length, 1);
 });
+
+void test('a bounded paid prefix must fit the deposit even when the full delta tokenizes smaller', async () => {
+  for (const paidPrefixes of [0, 1]) {
+    const seller = await paidSellerFixture({
+      meter: recountedMeter({
+        input: () => 4,
+        chat: () => 4,
+        count: (text) =>
+          text.length === PAID_STREAM.deltaBytes * (paidPrefixes + 1)
+            ? 9
+            : text.length === PAID_STREAM.deltaBytes
+              ? 3
+              : 5,
+      }),
+    });
+    seller.setScript({ deltas: ['x'.repeat(PAID_STREAM.deltaBytes * 3)] });
+    const paid = await seller.request();
+    const acknowledged: string[] = [];
+    const terminal = await seller.service.stream(
+      paid,
+      paid.quote.offer.buyerNodeId,
+      new AbortController().signal,
+      async (text) => {
+        acknowledged.push(text);
+      },
+    );
+    assert.equal(acknowledged.length, paidPrefixes);
+    assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
+    assert.equal(
+      terminal.error?.delivered?.outputTokens,
+      paidPrefixes ? 3 : undefined,
+    );
+    assert.equal(terminal.charge?.chargedAtomic, paidPrefixes ? '10' : '0');
+    assert.equal(
+      terminal.payment?.settlement?.refundedAtomic,
+      paidPrefixes ? '10' : PAID_CEILING,
+    );
+    assert.deepEqual(parsePaidExecutionResponse(terminal), terminal);
+    assert.equal(seller.engineCalls.length, 1);
+    assert.equal(seller.payment.calls.settle.length, 1);
+  }
+});
