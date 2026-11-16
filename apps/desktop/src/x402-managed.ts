@@ -212,6 +212,12 @@ function uploadEnvironment(
     !/[\r\n]/.test(url)
   )
     result[RECEIPT_UPLOADER.urlEnvironment] = url;
+  if (
+    environment[RECEIPT_UPLOADER.observationsEnvironment] ===
+    RECEIPT_UPLOADER.observationsOff
+  )
+    result[RECEIPT_UPLOADER.observationsEnvironment] =
+      RECEIPT_UPLOADER.observationsOff;
   return result;
 }
 const DESKTOP_RELEASE_VERSION = /^[0-9A-Za-z.+-]{1,32}$/;

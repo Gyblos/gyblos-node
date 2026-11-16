@@ -40,7 +40,14 @@ export type CollectorStatus =
 export const COLLECTOR_ROUTES = {
   RECEIPTS: '/v1/receipts',
   HEALTH: '/v1/health',
+  OBSERVATIONS: '/v1/observations',
 } as const;
+// What an accepted envelope carried.
+export const ENVELOPE_KINDS = {
+  RECEIPTS: 'receipts',
+  OBSERVATIONS: 'observations',
+} as const;
+export type EnvelopeKind = (typeof ENVELOPE_KINDS)[keyof typeof ENVELOPE_KINDS];
 // Static code for unexpected failures; nothing else is reported.
 export const COLLECTOR_INTERNAL_ERROR = 'COLLECTOR_INTERNAL_ERROR';
 
@@ -77,6 +84,8 @@ export const COLLECTOR_LIMITS = {
   clockWindowMs: 600_000,
   // D1's limit of bound parameters per statement; multi-row writes are chunked under it.
   maxBoundParameters: 100,
+  // Observations are buffered in memory on the node, so older events are not credible.
+  maxObservationAgeMs: 2_592_000_000,
 } as const;
 
 // Cloudflare bindings (wrangler.jsonc); every one is required and missing ones fail closed.

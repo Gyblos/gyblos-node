@@ -8,7 +8,12 @@ import {
 import { canonicalJson } from '@gyblos/protocol';
 import { verifyReceiptUploadEnvelope } from '@gyblos/protocol/receipt-upload';
 
-import { COLLECTOR_ERRORS, COLLECTOR_LIMITS, HEX_RADIX } from './constants';
+import {
+  COLLECTOR_ERRORS,
+  COLLECTOR_LIMITS,
+  ENVELOPE_KINDS,
+  HEX_RADIX,
+} from './constants';
 import { collectorReject, verificationFailure } from './errors';
 import {
   COMMIT_RESULTS,
@@ -37,7 +42,7 @@ export class StaleUploadError extends Error {
   }
 }
 
-function decode(bytes: Uint8Array): unknown {
+export function decode(bytes: Uint8Array): unknown {
   let value: unknown;
   try {
     value = JSON.parse(
@@ -58,7 +63,7 @@ function decode(bytes: Uint8Array): unknown {
   return value;
 }
 
-async function envelopeId(signature: string) {
+export async function envelopeId(signature: string) {
   const digest = new Uint8Array(
     await crypto.subtle.digest('SHA-256', new TextEncoder().encode(signature)),
   );
@@ -130,7 +135,13 @@ export async function ingestUpload(
     {
       envelope: {
         id,
-        upload,
+        kind: ENVELOPE_KINDS.RECEIPTS,
+        uploaderNodeId: upload.uploaderNodeId,
+        role: upload.role,
+        client: upload.client,
+        sentAt: upload.sentAt,
+        nonce: upload.nonce,
+        itemCount: upload.items.length,
         signature,
         json: canonicalJson({ upload, signature }),
         receivedAt: context.now,

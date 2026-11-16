@@ -4,6 +4,10 @@ export const COLLECTOR_URL = 'https://collector.gyblos.com/v1';
 
 export const RECEIPT_UPLOADER = {
   urlEnvironment: 'GYBLOS_COLLECTOR_URL',
+  // Telemetry observations are on by default (founder decision 2026-11-16); this turns them off.
+  // Receipts have no opt-out.
+  observationsEnvironment: 'GYBLOS_OBSERVATIONS',
+  observationsOff: 'off',
   // Set by the release build; its presence turns uploading on with the default URL.
   releaseEnvironment: 'GYBLOS_VERSION',
   tickMs: 60_000,
@@ -14,4 +18,5 @@ export const RECEIPT_UPLOADER = {
   // page limit of 256.
   maxRefused: 200,
   receiptsPath: '/receipts',
+  observationsPath: '/observations',
 } as const;

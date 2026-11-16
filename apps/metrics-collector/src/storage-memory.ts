@@ -14,6 +14,7 @@ import {
   COMMIT_RESULTS,
   type CollectorStorage,
   type EnvelopeRow,
+  type ObservationRow,
   type ReportRow,
 } from './storage';
 
@@ -24,6 +25,7 @@ export interface MemoryCollector {
   entries: Map<string, PublicReceiptEntry>;
   firstReports: Map<string, Partial<Record<P2PRole, number>>>;
   history: { key: string; status: string; at: number }[];
+  observations: ObservationRow[];
   conflicts: {
     key: string;
     merge: PublicReceiptMerge;
@@ -38,6 +40,7 @@ export function createMemoryStorage(): MemoryCollector {
     entries: new Map(),
     firstReports: new Map(),
     history: [],
+    observations: [],
     conflicts: [],
   };
   const storage: CollectorStorage = {
@@ -50,8 +53,7 @@ export function createMemoryStorage(): MemoryCollector {
       return Promise.resolve(found);
     },
     commit(write, now) {
-      const { upload } = write.envelope;
-      const nonce = `${upload.uploaderNodeId}:${upload.nonce}`;
+      const nonce = `${write.envelope.uploaderNodeId}:${write.envelope.nonce}`;
       if (nonces.has(nonce)) return Promise.resolve(COMMIT_RESULTS.REPLAYED);
       nonces.add(nonce);
       memory.envelopes.push(write.envelope);
@@ -80,6 +82,16 @@ export function createMemoryStorage(): MemoryCollector {
         first[role] ??= now;
         memory.firstReports.set(incoming.key, first);
       }
+      return Promise.resolve(COMMIT_RESULTS.COMMITTED);
+    },
+    commitObservations(write) {
+      const nonce = `${write.envelope.uploaderNodeId}:${write.envelope.nonce}`;
+      if (nonces.has(nonce)) return Promise.resolve(COMMIT_RESULTS.REPLAYED);
+      nonces.add(nonce);
+      memory.envelopes.push(write.envelope);
+      for (const event of write.events)
+        if (!memory.observations.some((row) => row.key === event.key))
+          memory.observations.push(event);
       return Promise.resolve(COMMIT_RESULTS.COMMITTED);
     },
   };

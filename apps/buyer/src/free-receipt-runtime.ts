@@ -1,6 +1,7 @@
-// The free buyer's receipt runtime and its uploader: confirmed receipts go to the metrics collector
-// from the CLI and desktop alike.
+// The free buyer's receipt runtime and its uploader: confirmed receipts and buyer observations go to
+// the metrics collector from the CLI and desktop alike.
 import { TRANSPORT_LIMITS } from '@gyblos/config';
+import type { ObservationBuffer } from '@gyblos/node/observation-buffer';
 import { startRoleUploader } from '@gyblos/node/receipt-uploader-startup';
 import {
   createBuyerReceiptRuntime,
@@ -16,6 +17,7 @@ export function buyerReceipts(
   endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
   nodeId: string,
   relayOnly: boolean,
+  observations?: ObservationBuffer,
 ) {
   const store = openReceiptStore({
     environment: process.env,
@@ -53,6 +55,7 @@ export function buyerReceipts(
     nodeId,
     role: P2P_ROLES.BUYER,
     signer,
+    observations,
   });
   return {
     ...runtime,

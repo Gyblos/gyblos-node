@@ -91,7 +91,7 @@ void test('pending receipts are uploaded, acknowledged and not sent again', asyn
     });
     assert.deepEqual(calls, [`${URL_BASE}/receipts`]);
     assert.equal(memory.entries.size, 3);
-    assert.equal(memory.envelopes[0]!.upload.client.kind, CLIENT.kind);
+    assert.equal(memory.envelopes[0]!.client.kind, CLIENT.kind);
     assert.deepEqual(await store.listPending(), []);
     assert.deepEqual(await uploader.uploadOnce(), {
       outcome: OUTCOMES.IDLE,
@@ -148,7 +148,7 @@ void test('a node with a wrong clock corrects it from the collector and still up
     assert.equal(calls.length, 2);
     assert.equal(memory.entries.size, 1);
     // The skew the node had is recorded with its corrected envelope.
-    assert.equal(memory.envelopes[0]!.upload.sentAt, 1700003600100);
+    assert.equal(memory.envelopes[0]!.sentAt, 1700003600100);
   } finally {
     await fixture.close();
   }

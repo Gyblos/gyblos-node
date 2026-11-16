@@ -20,6 +20,7 @@ import {
 } from './constants';
 import { CollectorError, statusOf } from './errors';
 import { ingestUpload, StaleUploadError } from './ingest';
+import { ingestObservations } from './ingest-observations';
 import { ipKey } from './ip-key';
 import type { CollectorStorage } from './storage';
 
@@ -118,46 +119,49 @@ export function createMetricsCollector(options: MetricsCollectorOptions) {
     context.json({ ok: true }, COLLECTOR_STATUS.OK),
   );
 
-  app.post(
-    COLLECTOR_ROUTES.RECEIPTS,
-    // Refuses an oversized body from Content-Length or while streaming, before buffering it.
-    bodyLimit({
-      maxSize: COLLECTOR_LIMITS.maxBodyBytes,
-      onError: (context) =>
-        rejection(context, COLLECTOR_ERRORS.PAYLOAD_TOO_LARGE),
-    }),
-    async (context) => {
-      const { storage, node, global } = resolved!;
-      if (
-        !JSON_CONTENT_TYPE.test(
-          context.req.header(COLLECTOR_HEADERS.CONTENT_TYPE) ?? '',
+  // Both upload routes share admission, body cap, error mapping and the write budget.
+  const upload = (ingest: typeof ingestUpload) =>
+    [
+      // Refuses an oversized body from Content-Length or while streaming, before buffering it.
+      bodyLimit({
+        maxSize: COLLECTOR_LIMITS.maxBodyBytes,
+        onError: (context) =>
+          rejection(context, COLLECTOR_ERRORS.PAYLOAD_TOO_LARGE),
+      }),
+      async (context: Context) => {
+        const { storage, node, global } = resolved!;
+        if (
+          !JSON_CONTENT_TYPE.test(
+            context.req.header(COLLECTOR_HEADERS.CONTENT_TYPE) ?? '',
+          )
         )
-      )
-        return rejection(context, COLLECTOR_ERRORS.INVALID_UPLOAD);
-      const bytes = new Uint8Array(await context.req.arrayBuffer());
-      try {
-        const result = await ingestUpload(bytes, {
-          storage,
-          now: now(),
-          admitNode: (nodeId) => allowed(node, nodeId),
-          admitWrite: () => allowed(global, GLOBAL_LIMIT_KEY),
-        });
-        return context.json(result, COLLECTOR_STATUS.OK);
-      } catch (error) {
-        if (error instanceof StaleUploadError)
-          return context.json(
-            {
-              error: COLLECTOR_ERRORS.STALE_UPLOAD,
-              serverTime: error.serverTime,
-            },
-            COLLECTOR_STATUS.CONFLICT,
-          );
-        if (error instanceof CollectorError)
-          return rejection(context, error.code);
-        throw error;
-      }
-    },
-  );
+          return rejection(context, COLLECTOR_ERRORS.INVALID_UPLOAD);
+        const bytes = new Uint8Array(await context.req.arrayBuffer());
+        try {
+          const result = await ingest(bytes, {
+            storage,
+            now: now(),
+            admitNode: (nodeId) => allowed(node, nodeId),
+            admitWrite: () => allowed(global, GLOBAL_LIMIT_KEY),
+          });
+          return context.json(result, COLLECTOR_STATUS.OK);
+        } catch (error) {
+          if (error instanceof StaleUploadError)
+            return context.json(
+              {
+                error: COLLECTOR_ERRORS.STALE_UPLOAD,
+                serverTime: error.serverTime,
+              },
+              COLLECTOR_STATUS.CONFLICT,
+            );
+          if (error instanceof CollectorError)
+            return rejection(context, error.code);
+          throw error;
+        }
+      },
+    ] as const;
+  app.post(COLLECTOR_ROUTES.RECEIPTS, ...upload(ingestUpload));
+  app.post(COLLECTOR_ROUTES.OBSERVATIONS, ...upload(ingestObservations));
 
   app.notFound((context) => rejection(context, COLLECTOR_ERRORS.NOT_FOUND));
   // Unexpected failures answer one static code and log nothing about the request.

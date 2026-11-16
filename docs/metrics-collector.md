@@ -17,10 +17,11 @@ rules.
 
 ## Endpoints
 
-| Route               | Purpose                                                |
-| ------------------- | ------------------------------------------------------ |
-| `POST /v1/receipts` | Upload one signed envelope of 1 to 50 receipts.        |
-| `GET /v1/health`    | `{ "ok": true }` once storage and every limiter exist. |
+| Route                   | Purpose                                                               |
+| ----------------------- | --------------------------------------------------------------------- |
+| `POST /v1/receipts`     | Upload one signed envelope of 1 to 50 receipts.                       |
+| `POST /v1/observations` | Upload one signed envelope of 1 to 200 content-free telemetry events. |
+| `GET /v1/health`        | `{ "ok": true }` once storage and every limiter exist.                |
 
 Every response carries `Cache-Control: no-store`, `X-Robots-Tag: noindex` and
 `X-Content-Type-Options: nosniff`. There is no CORS: only nodes call it. The
@@ -148,14 +149,62 @@ the shared buyer (CLI and desktop) start it next to their receipt runtime.
 - **Effect on inference:** it never blocks or retries inference.
 - **Stopping:** `close()` aborts an upload in flight. Anything not yet
   acknowledged stays pending.
+- **Observations are on by default and can be turned off** with
+  `GYBLOS_OBSERVATIONS=off` (founder decision 2026-11-16). Receipts have no
+  opt-out. The packaged desktop passes this setting to its buyer.
+- **Observations are self-reported.** A buyer can attach a refusal or failure to
+  any seller, and node keys are free. Totals must keep observations apart from
+  receipt-backed figures, and must never count them against a seller without a
+  confirming source. Re-sent events are stored once, keyed by uploader and the
+  exact record, and each event's `at` must fall within 30 days before `sentAt`.
+- **Observations:** the seller and buyer telemetry events go through an
+  in-memory buffer of at most 5000 events. The buffer exists only when this
+  process uploads, and does not depend on the local telemetry file opt-in. The
+  uploader sends up to 200 events after each receipt batch. A failed send puts
+  them back. A batch the collector refuses as invalid is dropped and counted, so
+  it cannot block later ones. A restart loses at most the buffered events.
 - **Not sent yet:**
-  - the buyer's request start time and offer facts (always `null`);
-  - buyer-only observations such as unserved demand;
+  - the buyer's accepted offer facts (`offer` is still `null`);
   - paid v2 receipts, until nodes emit them.
+
+  The buyer's request start time arrives through observations.
 
   The HTTP client lives in `@gyblos/node`. Moving it into an adapter package,
   and the collector's route and error codes into the protocol, is follow-up
   work.
+
+### `POST /v1/observations`
+
+The same headers, body cap, admission, clock window, replay protection and
+errors as `POST /v1/receipts`. The body is a signed
+[observation upload envelope](../packages/protocol/src/observation-upload.ts):
+the same uploader fields, with `events` in place of `items`, under its own
+signing domain `gyblos/observation-upload/v1\n`.
+
+Each event must be exactly core's validated telemetry projection
+(`toTelemetryRecord`). The kinds are request received, first token, completed,
+failed, charged, refused and unserved. Each is checked as follows:
+
+- **Undeclared fields:** an event with any undeclared field (for example a
+  prompt) is refused with `INVALID_UPLOAD`. It is never silently dropped,
+  because the signed envelope is stored verbatim.
+- **Ownership:** each event must be the uploader's own, in its role: a buyer's
+  `buyerNodeId`, or a seller's `sellerNodeId`. Otherwise it is `UPLOAD_POLICY`.
+- **Receipts:** receipt events are refused with `UPLOAD_POLICY`; receipts go to
+  `/v1/receipts`.
+
+Success is `{ "receivedAt": …, "accepted": n }`. One upload is one envelope
+insert plus chunked observation inserts in one transaction (1 + ⌈200/10⌉
+statements at most).
+
+These events carry what receipts cannot:
+
+- unserved demand and refusals before a seller is chosen;
+- connection failures;
+- the latency the buyer experienced;
+- the seller's route;
+- the time each request started (`at` on the request's events, joined by
+  `requestId`).
 
 ## Order of checks
 
@@ -192,6 +241,7 @@ prompt, a response or an endpoint address.
 | `collector_reports`        | Item per reporting side          | The receipt key and digests, the uploader's `stored_at`, `started_at` and offer facts, and an advisory merge label.                                                           |
 | `collector_receipts`       | Request (seller, buyer, request) | The first accepted version: digests, status, normalized seller fields for aggregation, the receipt, and the first report time per side.                                       |
 | `collector_conflicts`      | Conflicting report               | Seller or buyer conflict. The signed receipt is in its envelope.                                                                                                              |
+| `collector_observations`   | Telemetry event                  | Type, the uploader's `at`, request id, seller, model, and the validated record (other fields read with `json_extract`).                                                       |
 | `collector_status_history` | Status change                    | Insert as seller-only, bilateral or disputed, and a later upgrade.                                                                                                            |
 
 **Query cost.** One upload costs one typed read for all its keys and one
