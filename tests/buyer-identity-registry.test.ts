@@ -29,7 +29,7 @@ import {
   IDENTITY_RESOLUTION_SCOPE,
   readRegistryIdentity,
 } from '@gyblos/identity/resolution';
-import { IDENTITY_STATE } from '@gyblos/node/constants';
+import { BUYER_IDENTITY, IDENTITY_STATE } from '@gyblos/node/constants';
 import { openBuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 import { canonicalJson } from '@gyblos/protocol';
 
@@ -154,13 +154,18 @@ void test('configured registry buyer discovers and quotes only after independent
 void test('registry outage excludes discovery without erasing state, but an explicit manual override bypasses only the lookup', async () => {
   const source = await fixture();
   try {
+    let now = 1_000_000;
     const verifier = await openBuyerIdentityVerifier(
       source.environment,
       source.rpc.rpc,
+      undefined,
+      { now: () => now },
     );
     const seller = source.config.sellers[0]!;
     assert.equal((await verifier.verify(seller)).ok, true);
     source.rpc.state.failingMethods.add('getGenesisHash');
+    // Past the reuse of the binding just read, an outage is not trust.
+    now += BUYER_IDENTITY.freshLookupMs;
     const outage = await verifier.verify(seller);
     assert.equal(outage.ok, false);
     assert.equal(outage.state?.revoked, false);
@@ -218,15 +223,23 @@ void test('configured identity trust rejects a request network outside the pinne
 void test('oversized RPC cannot become missing identity or erase a persisted buyer binding', async () => {
   const source = await fixture();
   try {
-    const prepared = await prepareBuyerSelection(source.environment);
-    assert.ok(prepared?.identity);
+    let now = 1_000_000;
+    const verifier = await openBuyerIdentityVerifier(
+      source.environment,
+      // The buyer's own bounded RPC client, as selection opens it from rpcUrl.
+      source.rpc.url,
+      undefined,
+      { now: () => now },
+    );
     const subject = source.config.sellers[0]!;
-    assert.equal((await prepared.identity.verify(subject)).ok, true);
+    assert.equal((await verifier.verify(subject)).ok, true);
     const path = join(
       homeLayout(source.environment).roles.buyer,
       ROLE_FILES.identityState,
     );
     const before = await readFile(path, 'utf8');
+    // Past the reuse of the binding just read, the registry is read again.
+    now += BUYER_IDENTITY.freshLookupMs;
     source.rpc.state.programValue = [];
     source.rpc.state.responsePadding.set(
       'getProgramAccounts',
@@ -235,7 +248,7 @@ void test('oversized RPC cannot become missing identity or erase a persisted buy
     // The old standard SDK buffers and accepts this valid, padded JSON as absence.
     const legacy = await readRegistryIdentity(source.rpc.rpc, subject.nodeId);
     assert.equal(legacy.kind, IDENTITY_LOOKUP_KINDS.MISSING);
-    const result = await prepared.identity.verify(subject);
+    const result = await verifier.verify(subject);
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.code, IDENTITY_POLICY_CODES.LIMIT);
     assert.equal(result.state?.revoked, false);
@@ -289,6 +302,83 @@ void test('buyer startup admits fresh identities after 64 historical floors and 
       const saved = JSON.parse(await readFile(path, 'utf8'));
       assert.equal(saved.rows.length, rows.length + 1);
     }
+  } finally {
+    await source.close();
+  }
+});
+
+void test('a binding just read is reused for repeated checks without registry reads, until it expires', async () => {
+  const source = await fixture();
+  try {
+    let now = 1_000_000;
+    const verifier = await openBuyerIdentityVerifier(
+      source.environment,
+      source.rpc.rpc,
+      undefined,
+      { now: () => now },
+    );
+    const seller = source.config.sellers[0]!;
+    assert.equal((await verifier.verify(seller)).ok, true);
+    const reads = source.rpc.state.calls.length;
+    // Several candidates and requests in a row (the rehearsal's second request) need no new reads, and
+    // survive the rate limit a public RPC answers them with.
+    source.rpc.state.failingMethods.add('getGenesisHash');
+    for (let index = 0; index < 4; index++) {
+      now += BUYER_IDENTITY.freshLookupMs / 8;
+      assert.equal((await verifier.verify(seller)).ok, true);
+    }
+    assert.equal(source.rpc.state.calls.length, reads);
+    // A different owner claim is never admitted by the kept binding.
+    const other = await verifier.verify({
+      ...seller,
+      owner: source.asset,
+    });
+    assert.equal(other.ok, false);
+    // Expired: the registry is read again, and the outage now excludes the seller.
+    now += BUYER_IDENTITY.freshLookupMs;
+    assert.equal((await verifier.verify(seller)).ok, false);
+    assert.ok(source.rpc.state.calls.length > reads);
+  } finally {
+    await source.close();
+  }
+});
+
+void test('a failed or refused check keeps nothing for reuse', async () => {
+  const source = await fixture();
+  try {
+    let now = 1_000_000;
+    const verifier = await openBuyerIdentityVerifier(
+      source.environment,
+      source.rpc.rpc,
+      undefined,
+      { now: () => now },
+    );
+    const seller = source.config.sellers[0]!;
+    source.rpc.state.failingMethods.add('getGenesisHash');
+    assert.equal((await verifier.verify(seller)).ok, false);
+    source.rpc.state.failingMethods.delete('getGenesisHash');
+    const reads = source.rpc.state.calls.length;
+    now += 1;
+    assert.equal((await verifier.verify(seller)).ok, true);
+    assert.ok(source.rpc.state.calls.length > reads);
+  } finally {
+    await source.close();
+  }
+});
+
+void test('selection identity may set how long a binding is reused, from 0 to an hour', async () => {
+  const source = await fixture();
+  try {
+    const { parseBuyerSelectionConfig } =
+      await import('@gyblos/buyer/selection-config');
+    const rpcUrl = 'https://rpc.test';
+    const parse = (identity: Record<string, unknown>) =>
+      parseBuyerSelectionConfig({ ...source.config, identity }).identity;
+    assert.deepEqual(parse({ rpcUrl }), { rpcUrl });
+    for (const reuseMs of [0, 60_000, BUYER_IDENTITY.maxFreshLookupMs])
+      assert.deepEqual(parse({ rpcUrl, reuseMs }), { rpcUrl, reuseMs });
+    for (const reuseMs of [-1, 1.5, BUYER_IDENTITY.maxFreshLookupMs + 1, '0'])
+      assert.throws(() => parse({ rpcUrl, reuseMs }));
   } finally {
     await source.close();
   }

@@ -76,10 +76,22 @@ Opt in through the existing buyer `selection.json`:
 ```
 
 The value must be HTTPS or loopback HTTP, without credentials, query or
-fragment. The profile and request network remain devnet-only. No implicit RPC
-URL is used. The existing `sellers` list still owns allowed NodeIds, expected
-owners and Iroh endpoints: public catalogs intentionally contain no connection
-addresses. This slice does not enroll arbitrary sellers returned by the index.
+fragment.
+
+A registry binding the buyer just read and admitted is reused for five minutes
+(`BUYER_IDENTITY.freshLookupMs`) instead of being read again for every candidate
+and request; a buyer read it about four times per request, and the public devnet
+RPC rate-limits those repeated reads, which left every seller unverified from
+the second request on. Each reuse is still evaluated against the durable state.
+Only a lookup that admitted the seller is kept, never a failure. Within the
+window a registry outage does not exclude the seller and a revocation applies
+when it expires. `"identity": { "rpcUrl": "…", "reuseMs": 0 }` reads the
+registry for every check (the acceptance harnesses do, to observe outages and
+revocations at once); `reuseMs` may be raised to an hour. The profile and
+request network remain devnet-only. No implicit RPC URL is used. The existing
+`sellers` list still owns allowed NodeIds, expected owners and Iroh endpoints:
+public catalogs intentionally contain no connection addresses. This slice does
+not enroll arbitrary sellers returned by the index.
 
 With no `identity` property, existing configured owner–NodeId bindings retain
 their manual semantics and no registry client/state is opened. In registry mode,

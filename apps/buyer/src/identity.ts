@@ -31,6 +31,9 @@ export async function prepareBuyerIdentity(
           configuredNodeIds: config.sellers.map((seller) => seller.nodeId),
         }
       : undefined,
+    config.identity.reuseMs === undefined
+      ? {}
+      : { freshLookupMs: config.identity.reuseMs },
   );
 }
 export async function verifyBuyerIdentity(
