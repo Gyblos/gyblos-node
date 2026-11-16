@@ -17,6 +17,7 @@ const JOURNEY = [
   'sellers/manual-install',
   'sellers/register-publish',
   'sellers/models-offers',
+  'sellers/get-paid',
   'sellers/operate',
   'sellers/identity',
   'buyers/use-from-code',

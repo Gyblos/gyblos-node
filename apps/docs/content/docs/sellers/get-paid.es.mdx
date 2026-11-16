@@ -1,0 +1,140 @@
+---
+title: Cobrar
+description: Cobra por una oferta en devnet, carga el pagador de comisiones y conoce cuándo y dónde llegan tus USDC.
+---
+
+Durante la beta un vendedor puede cobrar por su modelo en **devnet**, en USDC de devnet de Circle. Los USDC de
+devnet no tienen valor de mercado: la beta prueba el camino del pago, no ingresos reales. Mainnet no está abierta.
+
+## Qué puedes vender durante la beta [#alcance-de-la-beta]
+
+| Cómo vendes                             | Quién puede comprar                | Herramientas (agentes) | Estado                                              |
+| --------------------------------------- | ---------------------------------- | ---------------------- | --------------------------------------------------- |
+| **Gratis**                              | Cualquier comprador                | Sí                     | Abierto a todos los vendedores                      |
+| **Con precio, pago por pedido**         | Cualquier comprador                | No, solo texto         | Abierto a todos los vendedores; esta página         |
+| Con precio, canal reutilizable (piloto) | Un comprador emparejado por Gyblos | Sí                     | Solo piloto emparejado; Gyblos lo configura contigo |
+
+Los agentes de programación como Codex o Claude Code usan herramientas, así que durante la beta compran a
+ofertas **gratis** o al piloto emparejado. Una oferta con precio atiende conversaciones de solo texto.
+
+Los agentes envían preguntas largas, de miles de tokens. Para atenderlos gratis, sube `context_tokens` del
+motor (hasta 32768, ver [configuración](/es/reference/configuration)) y usa una máquina rápida, con Apple
+Silicon o GPU. En un servidor solo con CPU puede ser demasiado lento, como pasó en nuestro ensayo.
+
+## Qué necesitas [#requisitos]
+
+- Un vendedor registrado ([registrar y publicar](/es/sellers/register-publish)).
+- La oferta fijada de **Qwen3 0.6B** que configura el instalador. Una oferta con precio necesita un modelo
+  cuyos tokens el comprador pueda recontar con su tokenizador público; hoy solo es `qwen3:0.6b`. Cualquier
+  otro modelo con precio detiene el inicio con `SELLER_PAID_METERING_UNRECOUNTED`.
+- Unos **0,05 SOL de devnet** en el **pagador de comisiones** (ver [más abajo](#carga-el-pagador-de-comisiones)).
+  El SOL del dueño solo paga el registro.
+
+No necesitas USDC para vender. Los compradores te pagan en USDC de devnet.
+
+## Las cuatro llaves [#llaves]
+
+El instalador crea cuatro llaves de Solana. Viven en la carpeta del rol vendedor: el volumen de Docker en
+`/data/seller/` con Docker, `~/.gyblos/seller/` sin Docker y `%USERPROFILE%\.gyblos\seller\` en Windows.
+
+| Llave                 | Archivo            | Para qué sirve                                                                     |
+| --------------------- | ------------------ | ---------------------------------------------------------------------------------- |
+| Llave del nodo        | `node.key`         | La identidad del vendedor en la red (NodeId). Los compradores se conectan a ella.  |
+| Dueño                 | `owner.json`       | Registrada en 8004, paga el registro y **recibe tus USDC** (el pago).              |
+| Autorizador           | `authorizer.json`  | Firma los permisos de pago del vendedor. No guarda fondos.                         |
+| Pagador de comisiones | `facilitator.json` | Paga las comisiones y la renta de Solana de tus transacciones de pago. Guarda SOL. |
+
+`gyblos doctor` muestra las direcciones públicas del dueño y del pagador de comisiones (`fee payer`) en la
+identidad del vendedor. Se pueden compartir. Los archivos son llaves privadas: nunca los compartas ni los
+subas. Cómo guardar una copia está en [identidad](/es/sellers/identity#respalda-las-llaves).
+
+## Pon un precio [#pon-un-precio]
+
+Reemplaza `free = {...}` de la oferta en `config.toml` por un precio, en USDC por millón de tokens:
+
+```toml
+[[offers]]
+model = "qwen3:0.6b"
+reasoning = ["off"]
+engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
+price = { input_per_mtok = "0.05", output_per_mtok = "0.20", currency = "USDC" }
+```
+
+Los precios tienen como máximo 6 decimales y no pueden ser ambos cero. Una oferta es gratis o con precio, no
+las dos cosas. Después aplica el cambio:
+
+- Docker: `docker compose up -d --force-recreate seller` en `~/gyblos-seller`.
+- Sin Docker (macOS, Linux, Windows): vuelve a ejecutar el instalador (`sh install.sh` o `install.ps1`).
+  Conserva tus llaves y reinicia el vendedor con el archivo nuevo.
+
+Los compradores ven tu precio **más la comisión de Gyblos del 4 %**. Tú fijas el precio neto; la comisión se
+suma encima.
+
+## Carga el pagador de comisiones [#carga-el-pagador-de-comisiones]
+
+Ejecuta `gyblos doctor` (Docker: `docker compose run --rm seller gyblos doctor`) y copia la dirección
+`fee payer`. Envíale unos 0,05 SOL desde [el faucet de devnet](https://faucet.solana.com).
+
+El pagador de comisiones paga:
+
+- una sola vez, unos 0,002 SOL por cada cuenta de token que falte (tu cuenta de pago en USDC y las cuentas
+  de la comisión), que el vendedor crea al iniciar;
+- las comisiones de transacción de cada pedido pagado: unos 0,00002 SOL por pedido con los valores
+  predeterminados (una estimación, no un máximo garantizado);
+- la renta temporal del canal de cada pedido, que se recupera después con una limpieza. Un reinicio puede
+  perder el registro de la renta antigua, así que no se garantiza que vuelva toda automáticamente.
+
+En nuestro ensayo en devnet, cada pedido pagado dejó unos **0,002 SOL** retenidos como renta hasta la
+limpieza. Con muchos pedidos seguidos, 0,05 SOL baja rápido; si esperas mucho uso, carga más.
+
+0,05 SOL es un saldo inicial, no un presupuesto fijo. Si se acaba, el vendedor no inicia
+(`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) o no puede cobrar. Revisa su saldo con frecuencia y recárgalo desde
+el faucet.
+
+## Cómo te paga un comprador [#como-funciona-el-pago]
+
+Cada pedido pagado se paga por separado:
+
+1. El comprador firma un máximo para el pedido y lo deposita en un canal de pago.
+2. Tu vendedor responde y mide el uso para pedir el cobro. El comprador verifica la respuesta que recibió; el
+   pago por pedido no espera una nueva firma del comprador aprobando el uso final.
+3. Tu vendedor liquida el canal: la parte del dueño y la parte de protocolo de Gyblos siguen el reparto
+   redondeado de la beta; el resto vuelve al comprador. El recargo del 4 % se suma a tu precio neto; el reparto
+   actual de la beta puede dejar un residuo de redondeo en el programa de pagos, así que la parte que cobra
+   Gyblos es aproximada.
+
+Al terminar cada inferencia, el vendedor intenta liquidar lo entregado. La confirmación puede tardar o quedar
+pendiente. Al reiniciar, intenta recuperar los cobros pendientes cuyo importe alcanzó a guardar, sin repetir la
+inferencia ni cobrar dos veces. Conserva sus datos y llaves y mantén saldo en el pagador de comisiones;
+problemas de red, falta de SOL o vencimiento pueden impedir completar el cobro.
+
+## Mira lo que ganaste [#mira-lo-que-ganaste]
+
+`gyblos seller status` muestra actividad, no dinero. Tus ganancias son el saldo de USDC de devnet de la
+dirección del **dueño**. Búscala en [Solana Explorer](https://explorer.solana.com/?cluster=devnet) (busca la
+dirección del dueño, red devnet). Un pago puede tardar unos minutos en aparecer.
+
+## Piloto de canal reutilizable [#piloto-de-canal-reutilizable]
+
+Un canal reutilizable permite que un solo depósito pague muchas respuestas, con herramientas, y se liquida
+cuando el comprador lo pide, se acaba el depósito, vencen los términos o el canal queda inactivo. Durante la
+beta solo funciona como piloto con un comprador emparejado por Gyblos, y no en Windows. Si quieres participar,
+pídelo en tu canal de invitación; Gyblos lo configura contigo. Cuántas sesiones reutilizables mantiene abiertas
+tu vendedor a la vez se fija en `config.toml`:
+
+```toml
+[limits]
+max_sessions = 16
+```
+
+El valor por defecto es 16, de 1 a 16. Cuenta sesiones de pago abiertas, no conexiones.
+
+## Volver a gratis [#volver-a-gratis]
+
+Antes de cambiar tu última oferta con precio a gratis, resuelve los pagos pendientes y cierra los canales del
+piloto reutilizable. Un vendedor solo gratuito no inicia la recuperación ni la limpieza de pagos. Conserva los
+datos y las llaves; si queda algo pendiente, contacta con Gyblos antes de cambiar.
+
+Después vuelve a poner `free = {...}` en lugar de `price = {...}` y aplica el cambio como arriba.
+
+**Siguiente:** [Operar y actualizar](/es/sellers/operate).
