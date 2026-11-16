@@ -201,6 +201,25 @@ export const RECEIPT_COLLECTOR_STATUSES = {
 export type ReceiptCollectorStatus =
   (typeof RECEIPT_COLLECTOR_STATUSES)[keyof typeof RECEIPT_COLLECTOR_STATUSES];
 
+// Public collector policy over verified receipts from either party. Internal states, not wire values.
+export const PUBLIC_RECEIPT_STATUSES = {
+  BILATERAL: 'bilateral',
+  DISPUTED: 'disputed',
+  SELLER_ONLY: 'seller-only',
+} as const;
+export type PublicReceiptStatus =
+  (typeof PUBLIC_RECEIPT_STATUSES)[keyof typeof PUBLIC_RECEIPT_STATUSES];
+// How a newly reported receipt combines with the one already stored under its key.
+export const PUBLIC_RECEIPT_MERGES = {
+  INSERT: 'insert',
+  IDENTICAL: 'identical',
+  // The stored seller-only receipt gains its first buyer half.
+  UPGRADE: 'upgrade',
+  CONFLICT: 'conflict',
+} as const;
+export type PublicReceiptMerge =
+  (typeof PUBLIC_RECEIPT_MERGES)[keyof typeof PUBLIC_RECEIPT_MERGES];
+
 // Hex radix for the private pair fingerprint, not a wire/signing domain.
 export const RECEIPT_COLLECTOR_FINGERPRINT_RADIX = 16;
 

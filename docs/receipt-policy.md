@@ -80,3 +80,13 @@ An optional private file implementation is available through
 `@gyblos/telemetry-file/receipt-store`; its lifecycle, bounds and persistence
 limitations are documented with the collector policy. It is not wired into
 startup or external collection.
+
+The public collector policy (`@gyblos/core/public-receipts`) classifies an
+already verified receipt/v1 or receipt/v2 from either party as bilateral,
+disputed or seller-only, free or paid, under the same [sellerNodeId,
+buyerNodeId, requestId] key. It refuses a buyer whose disputed fields do not
+match its own observations. A buyer half completes a stored seller-only receipt;
+any different seller record (including a changed request digest) or a second
+buyer attestation is a conflict, and the first accepted version stays stored. It
+is pure policy: no storage, clock or network, and the loopback paired-free
+collector above is unchanged.
