@@ -7,8 +7,10 @@
 # an install.sh pinned to that digest and to those archives' checksums and attaches them all to the
 # GitHub release of the tag; a release newer than the latest becomes latest, which
 # https://gyblos.com/install.sh serves, and moves `beta`. Nothing is committed and nothing else is
-# deployed. The only credential is each run's GITHUB_TOKEN. Push one release tag at a time: a newer
-# pending run replaces an older pending one. If only `publish` fails, re-run that failed job.
+# deployed. The `desktop` job then packages the unsigned desktop app for macOS, Windows and Linux
+# (.github/workflows/desktop-packages.yml) and attaches it to the same release. The only credential is each
+# run's GITHUB_TOKEN. Push one release tag at a time: a newer pending run replaces an older pending one. If
+# only `publish` fails, re-run that failed job.
 name: Release seller image
 
 on:
@@ -118,6 +120,15 @@ jobs:
           NATIVE_PINS: ${{ needs.native.outputs.native }}
           NATIVE_DIR: dist/native
         run: sh scripts/publish-installer.sh "$PINNED"
+
+  # The desktop app for macOS, Windows and Linux, attached to the release `publish` created.
+  desktop:
+    needs: publish
+    uses: ./.github/workflows/desktop-packages.yml
+    with:
+      tag: ${{ github.ref_name }}
+    permissions:
+      contents: write
 
   npm:
     # Off until the npm packages are set up (docs/running-a-node.md#npm-package): the repository variable

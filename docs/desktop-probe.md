@@ -242,15 +242,37 @@ event, including on timeout; this is not a hard completion bound if the
 operating system cannot terminate it. Native failures are intentionally reported
 without raw SDK errors, identities or socket addresses.
 
-Packaging creates an **unsigned local `.app`**, for macOS arm64 only, under
-`apps/desktop/dist/packages/`. It stages compiled assets and the pinned Iroh
-packages explicitly; it does not copy the repository or operational directories.
-The packaged executable accepts `--smoke` too. It needs neither a globally
-installed Node runtime nor workspace links at runtime.
+Packaging creates an **unsigned** app for one target under
+`apps/desktop/dist/packages/` and its release archives, with `.sha256` files,
+under `apps/desktop/dist/release/`:
 
-This is not a signed/notarized installer, release or updater. Windows/Linux
-installers, Intel Mac packaging, real P2P connectivity, application recovery and
-real inference, authenticated Connect remain outside this preview. Generated
-apps, captures and run evidence stay outside Git. The normal root checks cover
-its TypeScript/TSX, lint rules and synthetic summary/lifecycle regressions;
-Electron packaging is a separate platform-specific check.
+| Target         | Archive                          | Built on   |
+| -------------- | -------------------------------- | ---------- |
+| `darwin-arm64` | `.zip` of `Gyblos.app`           | macOS only |
+| `win32-x64`    | `.zip`                           | any OS     |
+| `linux-x64`    | `.tar.gz`, and `.deb` (dpkg-deb) | any OS     |
+
+```sh
+pnpm desktop:package                       # this machine's target
+pnpm desktop:package -- --target win32-x64
+```
+
+It stages compiled assets and the target's pinned Iroh binding explicitly; it
+does not copy the repository or operational directories. A binding for another
+OS is installed by adding pnpm `supportedArchitectures` for it (the lockfile
+verifies it). No macOS x64 Iroh binding exists, so there is no Intel Mac
+package. The macOS app is sealed ad hoc, so Gatekeeper offers to open an app
+from an unidentified developer instead of reporting it damaged. The `.deb`
+installs to `/opt/Gyblos` and makes `chrome-sandbox` setuid root, which
+Electron's sandbox needs where unprivileged user namespaces are restricted
+(Ubuntu 24.04). The packaged executable accepts `--smoke` too, and needs neither
+a globally installed Node runtime nor workspace links at runtime.
+
+`.github/workflows/desktop-packages.yml` builds all three, starts each on its
+own OS with `--smoke` (the `.deb` installed with apt), and keeps them as
+artifacts; run it by hand to try a build. The release workflow calls it with the
+tag and attaches the archives to that GitHub release. The packages are not
+signed with a Developer ID or code-signing certificate and there is no automatic
+updater; Windows SmartScreen and macOS Gatekeeper ask once before the first
+start. Electron packaging is a separate platform-specific check from the normal
+root checks.

@@ -1,6 +1,6 @@
 {
   "title": "Compradores",
-  "pages": ["use-from-code"],
+  "pages": ["desktop-app", "use-from-code"],
   "defaultOpen": true,
   "icon": "plug"
 }

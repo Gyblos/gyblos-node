@@ -1,0 +1,70 @@
+---
+title: Desktop app
+description: Download the Gyblos app for macOS, Windows or Linux, open it the first time, and chat with models on the network.
+---
+
+These desktop packages are available for validation. Automatic network-chat onboarding is not yet
+integrated; the current app requires a prepared buyer configuration and a relay token. For a guided
+buyer that works from a terminal today, see [Use Gyblos from your code](/en/buyers/use-from-code).
+
+## Download [#download]
+
+Get the file for your system from the
+[latest release](https://github.com/Gyblos/gyblos-node/releases/latest), under **Assets**:
+
+| System                             | File                                        |
+| ---------------------------------- | ------------------------------------------- |
+| macOS (Apple Silicon: M1 or newer) | `gyblos-desktop-<version>-darwin-arm64.zip` |
+| Windows 10/11 (x64)                | `gyblos-desktop-<version>-win32-x64.zip`    |
+| Linux (Ubuntu, Debian; x64)        | `gyblos-desktop-<version>-linux-x64.deb`    |
+| Other Linux (x64)                  | `gyblos-desktop-<version>-linux-x64.tar.gz` |
+
+There is no build for Intel Macs yet. Each file has a `.sha256` next to it; to check a download, put both
+in one folder and run `shasum -a 256 -c <file>.sha256` (macOS, Linux) or compare the output of
+`certutil -hashfile <file> SHA256` (Windows).
+
+## Install and open the first time [#install]
+
+During the beta the app is **not signed** by Apple or Microsoft, so your system asks once before opening
+it. This is expected; after the first time it opens normally.
+
+### macOS [#macos]
+
+1. Open the `.zip`, enter `Gyblos-darwin-arm64`, and drag **Gyblos.app** to **Applications**.
+2. Open Gyblos. macOS says it cannot verify the developer; choose **Done**.
+3. Open **System Settings → Privacy & Security**, scroll to the message about Gyblos and choose
+   **Open Anyway**, then confirm with your password.
+
+### Windows [#windows]
+
+1. Right-click the `.zip` and choose **Extract All**.
+2. Enter `gyblos-desktop-win32-x64` inside the extracted folder and open `gyblos-desktop.exe`.
+3. If Windows shows "Windows protected your PC", choose **More info**, then **Run anyway**.
+
+### Linux [#linux]
+
+On Ubuntu or Debian, install the `.deb` and open **Gyblos** from the applications menu:
+
+```sh
+sudo apt install ./gyblos-desktop-<version>-linux-x64.deb
+```
+
+On other distributions, unpack the `.tar.gz` and run `./gyblos-desktop` inside the folder.
+
+## Using it [#using-it]
+
+The current desktop buyer asks you to choose an existing `GYBLOS_HOME` prepared with `pnpm buyer:init`
+and provide a relay token. The node's optional relay credential does not yet remove that desktop prompt.
+If you do not have that setup, use the CLI guide linked above; do not invent or share credentials.
+
+Automatic configuration in a private app folder, without choosing a home or supplying a relay token,
+is planned. Packaging smoke checks verify launch and the native transport binding; they do not prove
+that this future onboarding or a real network answer works from the interface.
+
+Free signed quotes cause no payment transactions. Keep the buyer's budget and price ceilings at zero
+for free answers only; a positive-price quote requires an authorized budget and the paid beta setup.
+
+Your messages reach the seller whose machine runs the model, and that seller can read them. Do not send
+passwords, keys or other secrets.
+
+To connect your own programs or coding agents instead, see [Use Gyblos from your code](/en/buyers/use-from-code).
