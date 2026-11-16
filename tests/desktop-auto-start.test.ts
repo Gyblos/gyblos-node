@@ -239,3 +239,32 @@ void test('cancelled desktop preparation does not create selection or prepare id
     await rm(f.directory, { recursive: true, force: true });
   }
 });
+
+void test('explicit restart after a clean utility exit renews only the zero permission for the new policy', async () => {
+  const r = runtime();
+  await r.buyer.start();
+  const first = await r.budget.summary();
+  r.client.disconnect();
+  r.checked.policyId = '00000000-0000-4000-8000-000000000002';
+  await r.buyer.start();
+  assert.equal(r.starts(), 2);
+  const next = await r.budget.summary();
+  assert.equal(next.policy?.policyId, r.client.policy()?.policyId);
+  assert.notEqual(next.sessionId, first.sessionId);
+  assert.equal(next.limitAtomic, '0');
+  assert.deepEqual(next.records, first.records);
+  await r.buyer.close();
+});
+void test('a new app process rebinds a clean free permission but preserves a paid one', async () => {
+  const r = runtime();
+  await r.budget.authorize({...r.checked, policyId:'00000000-0000-4000-8000-000000000002'},'0');
+  await r.buyer.start();
+  assert.equal((await r.budget.summary()).policy?.policyId,r.client.policy()?.policyId);
+  await r.buyer.close();
+  const paid = runtime();
+  await paid.budget.authorize({...paid.checked,maxAtomic:'1'},'1');
+  const before = await paid.budget.summary();
+  await paid.buyer.start();
+  assert.deepEqual(await paid.budget.summary(),before);
+  await paid.buyer.close();
+});
