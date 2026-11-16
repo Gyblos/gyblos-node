@@ -213,6 +213,19 @@ async function paidLines(homeEnvironment: HomeEnvironment, now: number) {
   ].join('');
 }
 
+// Free activity from signed receipts, then paid requests from the payment ledger.
+async function usageLines(
+  homeEnvironment: HomeEnvironment,
+  nodeId: string,
+  now: number,
+) {
+  return [
+    `Activity, from signed receipts (at most ${RECEIPT_STORAGE.maxEntries} kept):\n`,
+    await activityLines(homeEnvironment, nodeId, now),
+    await paidLines(homeEnvironment, now),
+  ].join('');
+}
+
 function daemonLine(daemon: DaemonFile) {
   if (daemon.kind === 'missing') return 'never started in this home';
   if (daemon.kind === 'unreadable') return 'status file unreadable';
@@ -296,11 +309,7 @@ export async function statusCommand(
   output.stdout(
     line('discovery', commandsFor(runMode(output.env), listing.text)),
   );
-  output.stdout(
-    `Activity, from signed receipts (at most ${RECEIPT_STORAGE.maxEntries} kept):\n`,
-  );
-  output.stdout(await activityLines(homeEnvironment, identity.nodeId, now));
-  output.stdout(await paidLines(homeEnvironment, now));
+  output.stdout(await usageLines(homeEnvironment, identity.nodeId, now));
   const verdict = result(service, status);
   output.stdout(`Result: ${verdict}\n`);
   const failure = failureOf(status);
