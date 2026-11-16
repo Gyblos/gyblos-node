@@ -29,12 +29,15 @@ import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
 import { bounded } from './buyer-operation';
 import { PaidBuyerError } from './buyer-paid-error';
+import { checkBuyerPaidInput } from './buyer-paid-preflight';
 import {
   BUYER_PAID_TIMEOUTS,
   PAID_BUYER_CODES,
   PAID_VERDICTS,
   type PaidVerdict,
 } from './constants';
+
+export { checkBuyerPaidInput };
 
 export interface PaidWinner {
   nodeId: string;
@@ -319,8 +322,7 @@ export async function executeBuyerPaid(
     requestDigest?: string,
   ) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome> {
-  const prompt = paidPrompt(input, dependencies.meter);
-  if (prompt === undefined)
+  if (paidPrompt(input, dependencies.meter) === undefined)
     throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
   const release = dependencies.enter();
   try {
@@ -339,6 +341,11 @@ export async function executeBuyerPaid(
       signal.throwIfAborted();
       if (excluded.has(winner.nodeId)) break;
       excluded.add(winner.nodeId);
+      const prompt = checkBuyerPaidInput(
+        input,
+        dependencies.meter,
+        winner.quote,
+      );
       const run = { dependencies, winner, input, prompt, signal, onDelta };
       const outcome = await attempt(run);
       if (outcome) return outcome;
@@ -363,9 +370,7 @@ export async function executeSelectedBuyerPaid(
   ) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome | undefined> {
   signal.throwIfAborted();
-  const prompt = paidPrompt(input, dependencies.meter);
-  if (prompt === undefined)
-    throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+  const prompt = checkBuyerPaidInput(input, dependencies.meter, winner.quote);
   if (await bounded(dependencies.unresolved(), signal))
     throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
   signal.throwIfAborted();

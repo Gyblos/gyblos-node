@@ -1,5 +1,6 @@
 // Composes single-channel or shared-budget buyer sessions; all financial state stays in the adapter.
 import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import { recountSessionInput } from '@gyblos/core/session-input';
 import { buyerPaymentsUnresolved } from '@gyblos/node/buyer-chain';
 import {
   createBuyerSessionManager,
@@ -10,13 +11,14 @@ import {
   buyerSessionPoolChain,
 } from '@gyblos/node/buyer-session-chain';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
+import { sessionTerms } from '@gyblos/node/session-policy';
 import {
   batchSessionTerminal,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
-import { batchFail } from '@gyblos/protocol/batch-channel';
+import { batchFail, verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
@@ -30,11 +32,7 @@ import {
 } from './free-selection';
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
-import {
-  checkPaidRequest,
-  tokenizer,
-  type startPaidBuyer,
-} from './paid-startup';
+import { tokenizer, type startPaidBuyer } from './paid-startup';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
@@ -101,6 +99,7 @@ async function prepareMeter(state: SessionState, options: Options) {
       throw error;
     });
   state.meter = await state.meterLoading;
+  return state.meter;
 }
 function sessionReceipts(
   context: Context,
@@ -114,6 +113,23 @@ function sessionReceipts(
         evidence,
         new AbortController().signal,
       );
+  };
+}
+function sessionPreflight(
+  state: SessionState,
+  options: Options,
+  context: Context,
+  policy: Parameters<typeof sessionTerms>[1],
+) {
+  return async (
+    quote: Parameters<typeof recountSessionInput>[0],
+    input: Parameters<typeof recountSessionInput>[1],
+  ) => {
+    const meter = await prepareMeter(state, options);
+    recountSessionInput(quote, input, meter);
+    const now = Date.now();
+    const terms = sessionTerms(quote, policy, now);
+    await verifyBatchQuote(quote, terms, context.endpoint.id().toString(), now);
   };
 }
 export function makeManager(
@@ -132,7 +148,6 @@ export function makeManager(
     inspect: () =>
       inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER)),
     backend: async () => {
-      checkPaidRequest(prepared, role);
       return (options.batch ?? buyerSessionChain)(role);
     },
     destination: (terms) => {
@@ -182,35 +197,15 @@ export function makeManager(
       ? createBuyerSessionPool({
           ...common,
           inspect: () => inspectBatchPool(batchPoolPathsIn(process.env)),
-          pool: () => sharedPool(context, options, policy.totalDepositAtomic!),
+          pool: () =>
+            (options.pool ?? buyerSessionPoolChain)(
+              role,
+              policy.totalDepositAtomic!,
+            ),
         })
       : createBuyerSessionManager(common);
   return {
     ...manager,
-    prepareMeter: async (tools = false) => {
-      checkPaidRequest(prepared, role);
-      await prepareMeter(state, options);
-      if (tools && !state.meter?.output)
-        return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
-    },
-  };
-}
-
-async function sharedPool(
-  context: Context,
-  options: Options,
-  totalDepositAtomic: string,
-) {
-  const { prepared, role } = context;
-  const pool = await (options.pool ?? buyerSessionPoolChain)(
-    role,
-    totalDepositAtomic,
-  );
-  return {
-    ...pool,
-    backend: async (id: string) => {
-      checkPaidRequest(prepared, role);
-      return pool.backend(id);
-    },
+    preflight: sessionPreflight(state, options, context, policy),
   };
 }

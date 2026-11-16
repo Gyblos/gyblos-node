@@ -24,7 +24,11 @@ import type { BuyerExecutionFactory } from './free-startup';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
 import { classifyPaidError } from './paid-http';
-import { endpointToken, type startPaidBuyer } from './paid-startup';
+import {
+  checkPaidSellerRequest,
+  endpointToken,
+  type startPaidBuyer,
+} from './paid-startup';
 import { makeManager, type SessionState } from './session-manager';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 
@@ -42,7 +46,7 @@ async function executePaidSession(
   permission?: BuyerApiKeyOperation,
 ): Promise<ChatResult> {
   current.throwIfAborted();
-  await bounded(manager.prepareMeter(inferenceNeedsTools(input)), current);
+  await bounded(manager.preflight(winner.quote, input), current);
   current.throwIfAborted();
   await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
@@ -164,8 +168,9 @@ function sessionExecutor(
           input,
           current,
           onDelta,
-          (emit) =>
-            executePaidSession(
+          (emit) => {
+            checkPaidSellerRequest(request, context.role, winner.quote);
+            return executePaidSession(
               manager,
               state,
               winner,
@@ -174,7 +179,8 @@ function sessionExecutor(
               emit,
               sending,
               permission,
-            ),
+            );
+          },
         ),
     };
     const routed = router
