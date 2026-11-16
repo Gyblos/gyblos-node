@@ -49,7 +49,9 @@ export interface BuyerInitPlan {
     directAddresses: string[];
     manualTrust: false;
   }[];
-  discovery: { baseUrl: string };
+  // `open`: no seller was named, so the buyer uses any seller the index lists whose 8004 identity checks
+  // out, for free requests.
+  discovery: { baseUrl: string; open?: true };
   identity: { rpcUrl: string };
 }
 export class BuyerInitError extends Error {
@@ -67,10 +69,11 @@ export function validateBuyerInitField(
 ): string {
   try {
     switch (field) {
+      // Empty for any registered seller (open discovery); both or neither, checked by buildBuyerInit.
       case BUYER_INIT_FIELDS.SELLER_NODE_ID:
-        return controlHex(value);
+        return value === '' ? '' : controlHex(value);
       case BUYER_INIT_FIELDS.SELLER_OWNER:
-        return controlAddress(value);
+        return value === '' ? '' : controlAddress(value);
       case BUYER_INIT_FIELDS.MAX_TOKENS: {
         const text = controlText(value);
         if (!/^[1-9][0-9]*$/.test(text))
@@ -185,18 +188,23 @@ export function buildBuyerInit(input: unknown): BuyerInitPlan {
       throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
     const read = (field: BuyerInitField) =>
       validateBuyerInitField(field, row[field]);
+    const nodeId = read(BUYER_INIT_FIELDS.SELLER_NODE_ID);
+    const owner = read(BUYER_INIT_FIELDS.SELLER_OWNER);
+    if (!nodeId !== !owner)
+      throw new BuyerInitError(
+        BUYER_INIT_CODES.INVALID,
+        nodeId
+          ? BUYER_INIT_FIELDS.SELLER_OWNER
+          : BUYER_INIT_FIELDS.SELLER_NODE_ID,
+      );
+    const relayUrl = read(BUYER_INIT_FIELDS.RELAY_URL);
+    const baseUrl = read(BUYER_INIT_FIELDS.DISCOVERY_URL);
     return {
       request: policy,
-      sellers: [
-        {
-          owner: read(BUYER_INIT_FIELDS.SELLER_OWNER),
-          nodeId: read(BUYER_INIT_FIELDS.SELLER_NODE_ID),
-          relayUrl: read(BUYER_INIT_FIELDS.RELAY_URL),
-          directAddresses: [],
-          manualTrust: false,
-        },
-      ],
-      discovery: { baseUrl: read(BUYER_INIT_FIELDS.DISCOVERY_URL) },
+      sellers: nodeId
+        ? [{ owner, nodeId, relayUrl, directAddresses: [], manualTrust: false }]
+        : [],
+      discovery: nodeId ? { baseUrl } : { baseUrl, open: true },
       identity: { rpcUrl: read(BUYER_INIT_FIELDS.RPC_URL) },
     };
   } catch (error) {

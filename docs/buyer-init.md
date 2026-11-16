@@ -20,12 +20,16 @@ request, starts no engine, downloads nothing and sends no payment transaction.
 
 ## Short setup and advanced setup
 
-The default `pnpm buyer:init` asks only for the seller's NodeId, owner wallet,
-and confirmation. It shows the exact model, variant, quantization, token limit
-and zero spending/price ceilings before saving. These are the existing bounded
-Qwen3-0.6B defaults, with reasoning off; short setup does not discover a model
-or check a seller's availability. For another model, limits, relay, discovery
-index or RPC, use the complete form:
+The default `pnpm buyer:init` asks only for a seller's NodeId (Enter for any
+registered seller), its owner wallet when a NodeId was given, and confirmation.
+With no seller it saves an open-network buyer: no configured sellers and
+`"discovery": { "open": true }`, so it uses any seller the index lists whose
+8004 identity matches, for free answers only (see
+[discovery.md](discovery.md#open-discovery)). It shows the exact model, variant,
+quantization, token limit and zero spending/price ceilings before saving. These
+are the existing bounded Qwen3-0.6B defaults, with reasoning off; short setup
+does not discover a model or check a seller's availability. For another model,
+limits, relay, discovery index or RPC, use the complete form:
 
 ```sh
 pnpm buyer:init --advanced
@@ -34,10 +38,11 @@ pnpm buyer:init --advanced
 Both modes use the same shared validation, private initializer and identity
 policy. Existing settings are refused before either mode asks a question.
 
-Have the seller's public NodeId and owner wallet address from an independent,
-trusted source. A discovery listing is not identity proof. The advanced form
-also asks for the exact model/variant/quantization and the output-token limit.
-Defaults match the bounded Qwen3-0.6B offer, with reasoning off and no reasoning
+To name a seller, have its public NodeId and owner wallet address from an
+independent, trusted source. A discovery listing is not identity proof; the open
+network relies on the 8004 registry check instead. The advanced form also asks
+for the exact model/variant/quantization and the output-token limit. Defaults
+match the bounded Qwen3-0.6B offer, with reasoning off and no reasoning
 downgrade. Custom model names are preserved exactly; availability is checked by
 the existing buyer when it requests a quote. In advanced mode a name starting
 with punctuation or containing whitespace prompts for explicit confirmation.

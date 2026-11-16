@@ -22,7 +22,7 @@ import { ownedChat } from './chat-owned';
 import { PAID_BUYER, PAID_BUYER_CODES, PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
 import { executeSelectedBuyerFree } from './free-execution';
-import { selectWinner } from './free-selection';
+import { selectWinner, type FreeSelectionOptions } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
 import { buyerUnserved } from './free-telemetry';
@@ -37,6 +37,8 @@ import {
   tokenizer,
   type startPaidBuyer,
 } from './paid-startup';
+import { selectConfiguredThenOpen } from './quote-selection';
+import type { BuyerSelectionConfig } from './selection-config';
 import { startSessionQuoteRuntime } from './session-startup';
 
 type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
@@ -215,6 +217,28 @@ function paidQuoteExecutor(
       },
     );
 }
+async function selectQuoted(
+  context: Context,
+  selection: FreeSelectionOptions,
+  excluded: ReadonlySet<string>,
+  signal: AbortSignal,
+  request: BuyerSelectionConfig['request'],
+) {
+  return selectConfiguredThenOpen(
+    context.prepared.config,
+    request,
+    signal,
+    (policy, route) =>
+      selectWinner(
+        context.prepared,
+        selection,
+        excluded,
+        signal,
+        policy,
+        route,
+      ),
+  );
+}
 function quoteExecutor(
   context: Context,
   options: Options,
@@ -229,8 +253,8 @@ function quoteExecutor(
         enter: state.enter,
         unresolved: paid.unresolved,
         select: (excluded, selectionSignal) =>
-          selectWinner(
-            context.prepared,
+          selectQuoted(
+            context,
             {
               endpoint: context.endpoint,
               buyer,

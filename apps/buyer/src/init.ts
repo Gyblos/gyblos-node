@@ -41,13 +41,13 @@ const FIELDS: readonly {
 }[] = [
   {
     key: BUYER_INIT_FIELDS.SELLER_NODE_ID,
-    label: 'Seller NodeId (from an independent trusted source)',
-    hint: 'Use exactly 64 lowercase hexadecimal characters from an independent source.',
+    label: 'Seller NodeId (Enter for any registered seller)',
+    hint: 'Press Enter to use any seller registered in the index, or paste exactly 64 lowercase hexadecimal characters from a source you trust.',
   },
   {
     key: BUYER_INIT_FIELDS.SELLER_OWNER,
     label: 'Seller owner wallet (verified against 8004 at runtime)',
-    hint: 'Use the seller owner’s valid Solana address from an independent source.',
+    hint: 'Use the seller owner’s valid Solana address from the same trusted source as the NodeId.',
   },
   {
     key: BUYER_INIT_FIELDS.MODEL_ID,
@@ -164,11 +164,22 @@ export async function runBuyerInit(
     throw new BuyerInitError(BUYER_INIT_CODES.EXISTS);
   }
   terminal.write(
-    'Configure a devnet buyer. Nothing is sent to a seller or chain.\nUse seller identities from an independent source, never a discovery listing.\nDefaults accept free quotes only.\nPress Enter to accept the value in brackets. Use --advanced to configure the model, limits, or endpoints.\n',
+    'Configure a devnet buyer. Nothing is sent to a seller or chain.\nLeave the seller empty to use any seller registered in the index (free answers), or name one seller you trust.\nDefaults accept free quotes only.\nPress Enter to accept the value in brackets. Use --advanced to configure the model, limits, or endpoints.\n',
   );
   const answers = buyerInitDefaults();
   for (const field of FIELDS.filter((field) => fields.includes(field.key))) {
-    const value = await readField(terminal, field, answers[field.key]);
+    // Without a NodeId the buyer uses any registered seller, so there is no owner to ask for.
+    if (field.key === BUYER_INIT_FIELDS.SELLER_OWNER && !answers.sellerNodeId)
+      continue;
+    let value = await readField(terminal, field, answers[field.key]);
+    while (
+      value === '' &&
+      field.key === BUYER_INIT_FIELDS.SELLER_OWNER &&
+      answers.sellerNodeId
+    ) {
+      terminal.write(`Invalid ${field.label}. ${field.hint}\n`);
+      value = await readField(terminal, field, answers[field.key]);
+    }
     if (value === undefined) {
       terminal.write('Cancelled. No initialization requested.\n');
       return;
@@ -177,7 +188,7 @@ export async function runBuyerInit(
   }
   const plan = buildBuyerInit(answers);
   terminal.write(
-    `\nModel: ${plan.request.selection.modelId}; reasoning: ${plan.request.reasoning}.\nVariant: ${answers.variant || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}; Quantization: ${answers.quantization || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}.\nMaximum output tokens: ${answers.maxTokens}.\nBudget ceiling: ${answers.maxUsdc} USDC per request. Prices: ${answers.inputUsdcPerMtok} input / ${answers.outputUsdcPerMtok} output USDC per million tokens.\nFree signed quotes cause no payment transactions, including with a positive ceiling.\n8004 identity verification remains enabled. Existing settings will be refused.\n`,
+    `\nModel: ${plan.request.selection.modelId}; reasoning: ${plan.request.reasoning}.\nVariant: ${answers.variant || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}; Quantization: ${answers.quantization || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}.\nMaximum output tokens: ${answers.maxTokens}.\nBudget ceiling: ${answers.maxUsdc} USDC per request. Prices: ${answers.inputUsdcPerMtok} input / ${answers.outputUsdcPerMtok} output USDC per million tokens.\nSellers: ${plan.sellers.length ? plan.sellers[0]!.nodeId : 'any seller registered in the index, free answers only'}.\nFree signed quotes cause no payment transactions, including with a positive ceiling.\n8004 identity verification remains enabled. Existing settings will be refused.\n`,
   );
   const confirmation = await terminal.read(
     'Save these settings and prepare the local buyer identity? [y/N]: ',

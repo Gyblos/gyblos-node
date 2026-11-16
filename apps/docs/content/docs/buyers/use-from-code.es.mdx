@@ -34,9 +34,10 @@ contraseñas, claves ni otros secretos.
 
 ## Antes de empezar [#antes-de-empezar]
 
-- El **NodeId** y la **wallet dueña** del vendedor que usarás, de una fuente en la que confíes (el vendedor
-  muestra ambos con `gyblos doctor`). El vendedor debe estar registrado; el comprador verifica su identidad
-  en Solana devnet.
+- Nada sobre los vendedores: por defecto el comprador usa cualquier vendedor registrado en el índice de
+  Gyblos, para respuestas gratis, y verifica la identidad de cada uno en Solana devnet antes de enviar nada.
+  Para usar un vendedor en el que confíes (y pagarle), ten su **NodeId** y su **wallet dueña** (el vendedor
+  muestra ambos con `gyblos doctor`).
 - Git, [Node.js](https://nodejs.org) 24.22.1 o posterior y pnpm 10 (`corepack enable` lo instala).
 
 En la beta, el comprador se ejecuta desde el repositorio de código; el instalador y el paquete de npm
@@ -51,8 +52,9 @@ pnpm install --frozen-lockfile
 pnpm buyer:init
 ```
 
-`buyer:init` pide el NodeId y la wallet dueña del vendedor, muestra la configuración (modelo `qwen3-0.6b`,
-respuestas de hasta 4096 tokens, solo cotizaciones gratuitas) y la guarda cuando confirmas. No envía nada al
+`buyer:init` pide el NodeId de un vendedor: presiona Enter para usar cualquier vendedor registrado, o pega
+uno con su wallet dueña. Muestra la configuración (modelo `qwen3-0.6b`, respuestas de hasta 4096 tokens,
+solo cotizaciones gratuitas) y la guarda cuando confirmas. No envía nada al
 vendedor ni a la cadena. `pnpm buyer:init --advanced` permite además elegir el modelo, el límite de
 respuesta y los endpoints.
 

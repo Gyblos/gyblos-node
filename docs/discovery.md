@@ -156,17 +156,20 @@ seller. Such a seller is dialed by NodeId through the first configured relay
 (`GYBLOS_RELAYS`); the index supplies no address. Configured sellers come first
 and the candidate list stays within 16. Their stats live in memory only, so
 `selection-stats.json` keeps the configured sellers alone. With open discovery
-`sellers` may be empty. The usual replay and withdrawal checks still apply. Only
-`buyer:free` uses these sellers (`buyer`, `buyer:chat`, paid and session
-execution keep their configured list), and never one the request already tried.
-Each selection makes at most 16 new identity lookups; an identity the registry
-refused is not looked up again for five minutes. The separate capacity limit is
-64 **live unconfigured candidates**, counted under the discovery store lock from
-signed catalog/presence expiry and withdrawal/conflict state. Expiry, withdrawal
-or conflict frees a slot without deleting any replay floor. Registry denials
-occupy no live slot, and a temporary capacity refusal is not cached as a
-registry denial. The same candidate can be reconsidered as soon as capacity is
-available, including after restart.
+`sellers` may be empty. The usual replay and withdrawal checks still apply.
+These sellers serve free requests only, and never one the request already tried:
+`buyer:free` uses them directly, and the automatic buyer (`buyer:start`,
+`buyer:chat`, the desktop app) asks its configured sellers first at the
+request's own ceilings, then, when none can serve (or none is configured), the
+open network at zero price ceilings. Paid and session execution pay configured
+sellers only. Each selection makes at most 16 new identity lookups; an identity
+the registry refused is not looked up again for five minutes. The separate
+capacity limit is 64 **live unconfigured candidates**, counted under the
+discovery store lock from signed catalog/presence expiry and withdrawal/conflict
+state. Expiry, withdrawal or conflict frees a slot without deleting any replay
+floor. Registry denials occupy no live slot, and a temporary capacity refusal is
+not cached as a registry denial. The same candidate can be reconsidered as soon
+as capacity is available, including after restart.
 
 Configured IDs are captured from the original startup configuration and do not
 consume this live-candidate budget. If an older file or changed configuration
