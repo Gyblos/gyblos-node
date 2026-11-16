@@ -6,7 +6,10 @@ import {
 } from '@gyblos/node/buyer-chain';
 import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
-import { executeSelectedBuyerPaid } from '@gyblos/node/buyer-paid-execution';
+import {
+  checkBuyerPaidInput,
+  executeSelectedBuyerPaid,
+} from '@gyblos/node/buyer-paid-execution';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import { rolePath } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -31,7 +34,7 @@ import { classifyPaidError, PaidOutcomeError, paidSummary } from './paid-http';
 import { paidRecords } from './paid-records';
 import { paidBuyerDependencies } from './paid-selection';
 import {
-  checkPaidRequest,
+  checkPaidSellerRequest,
   endpointToken,
   payments,
   tokenizer,
@@ -84,20 +87,9 @@ async function preparePaid(
   state: ReturnType<typeof admission>,
   buyer: string,
   signal: AbortSignal,
-  input: import('@gyblos/protocol/free-execution').FreeExecutionBuildInput,
+  meter: Awaited<ReturnType<typeof tokenizer>>,
 ) {
   const { prepared, role, endpoint, relayOnly } = context;
-  checkPaidRequest(prepared, role);
-  const meter = await (options.meter ?? tokenizer)();
-  if (inferenceNeedsTools(input)) {
-    if (
-      !('chat' in meter) ||
-      typeof meter.chat !== 'function' ||
-      !('output' in meter) ||
-      typeof meter.output !== 'function'
-    )
-      throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
-  }
   signal.throwIfAborted();
   if (state.closed()) throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
   const chain = await payments(
@@ -133,16 +125,22 @@ function lazyPaid(
 ) {
   let pending: ReturnType<typeof preparePaid> | undefined;
   let opened: Awaited<ReturnType<typeof preparePaid>> | undefined;
+  let loading: ReturnType<typeof tokenizer> | undefined;
 
   return {
-    get(
-      signal: AbortSignal,
-      input: import('@gyblos/protocol/free-execution').FreeExecutionBuildInput,
-    ) {
+    meter(signal: AbortSignal) {
+      signal.throwIfAborted();
+      loading ??= (options.meter ?? tokenizer)().catch((error: unknown) => {
+        loading = undefined;
+        throw error;
+      });
+      return bounded(loading, signal);
+    },
+    get(signal: AbortSignal, meter: Awaited<ReturnType<typeof tokenizer>>) {
       signal.throwIfAborted();
       if (state.closed())
         throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-      pending ??= preparePaid(context, options, state, buyer, signal, input)
+      pending ??= preparePaid(context, options, state, buyer, signal, meter)
         .then(async (runtime) => {
           if (state.closed() || signal.aborted) {
             await runtime.chain.close();
@@ -179,6 +177,7 @@ function paidQuoteExecutor(
   input: Parameters<Runtime['execute']>[0],
   onDelta: Parameters<Runtime['execute']>[2],
   permission: Parameters<typeof reserveApiKey>[0],
+  request: BuyerSelectionConfig['request'],
 ) {
   return async (
     winner: Parameters<typeof executeSelectedBuyerFree>[2],
@@ -193,8 +192,11 @@ function paidQuoteExecutor(
       async (emit) => {
         if (inferenceNeedsTools(input))
           throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+        checkPaidSellerRequest(request, context.role, winner.quote);
+        const meter = await paid.meter(executionSignal);
+        checkBuyerPaidInput(input, meter, winner.quote);
         await reserveApiKey(permission, winner.quote, executionSignal);
-        const runtime = await paid.get(executionSignal, input);
+        const runtime = await paid.get(executionSignal, meter);
         const outcome = await executeSelectedBuyerPaid(
           input,
           runtime.paid,
@@ -288,7 +290,14 @@ function quoteExecutor(
               onDelta,
             ),
           ),
-        paid: paidQuoteExecutor(context, paid, input, onDelta, permission),
+        paid: paidQuoteExecutor(
+          context,
+          paid,
+          input,
+          onDelta,
+          permission,
+          request,
+        ),
       },
       signal,
     );

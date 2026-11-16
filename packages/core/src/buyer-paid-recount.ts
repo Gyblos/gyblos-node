@@ -21,25 +21,36 @@ import { checkToolCalls, isToolConversation } from '@gyblos/protocol/tools';
 import { paidCharge } from './paid-charge';
 
 // Legacy input preflight before payment construction/authorization; tools require an acknowledged session.
-export function paidPrompt(
+export function recountPaidInput(
   input: FreeExecutionBuildInput,
   meter: RecountTokenizer & Partial<Pick<ChatTokenizer, 'chat'>>,
-): string | undefined {
+) {
   if (inferenceNeedsTools(input)) return undefined;
   const [message, ...rest] = input.messages;
   if (!isToolConversation(input.messages)) return undefined;
   try {
     if (meter.chat) {
-      meter.chat(input.messages, input.tools, input.toolChoice);
-      return message!.content;
+      return {
+        prompt: message!.content,
+        inputTokens: meter.chat(input.messages, input.tools, input.toolChoice),
+      };
     }
     if (!message || rest.length || message.role !== FREE_CHAT_ROLES.USER)
       return undefined;
-    meter.input(message.content);
-    return message.content;
+    return {
+      prompt: message.content,
+      inputTokens: meter.input(message.content),
+    };
   } catch {
     return undefined;
   }
+}
+
+export function paidPrompt(
+  input: FreeExecutionBuildInput,
+  meter: Parameters<typeof recountPaidInput>[1],
+): string | undefined {
+  return recountPaidInput(input, meter)?.prompt;
 }
 
 const bytes = (text: string) => new TextEncoder().encode(text).length;

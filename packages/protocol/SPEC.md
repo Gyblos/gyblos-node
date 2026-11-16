@@ -1382,6 +1382,13 @@ ALPNs. Free vectors, existing offers, cumulative SDK voucher signatures and
 financial journals are unchanged. Upgrade both peers together; no downgrade,
 reconstructed old request or automatic prompt replay is supported.
 
+Before constructing individual paid authorization, the canonical unsigned
+request envelope (`version`, `requestId`, `quote`, `input`) must fit its
+existing 128 KiB allowance, leaving 8 KiB for authorization within the unchanged
+136 KiB full frame. JSON escaping counts toward this allowance even when raw
+message bytes fit the 64 KiB input cap. Local preflight shares the request
+builder's parser and preserves the active v2 signing domain and wire limit.
+
 Individual paid execution in the coordinated beta release permits up to 32768
 output tokens, additionally bounded by the signed request, recounted input plus
 output within the model context, and the deposited spending ceiling. The stream

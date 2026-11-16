@@ -22,6 +22,7 @@ import {
   PAYMENT_ERROR_CODES,
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
+import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { PaymentError } from '@gyblos/protocol/payment';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
@@ -61,7 +62,11 @@ export function checkPaidRequest(prepared: Prepared, role: RoleConfig) {
     checkPaidSellerRequest(routed, role);
 }
 
-function checkPaidSellerRequest(request: SellerRequest, role: RoleConfig) {
+export function checkPaidSellerRequest(
+  request: SellerRequest,
+  role: RoleConfig,
+  quote?: SignedOfferV2,
+) {
   if (request.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
     refuse(FREE_BUYER_STARTUP.MAX_TOKENS);
   if (
@@ -73,6 +78,17 @@ function checkPaidSellerRequest(request: SellerRequest, role: RoleConfig) {
     refuse(FREE_BUYER_STARTUP.PAID_MODEL);
   if (request.network !== DEVNET || request.asset !== role.mint)
     refuse(FREE_BUYER_STARTUP.PAID_NETWORK);
+  if (quote)
+    checkPaidSellerRequest(
+      {
+        ...request,
+        selection: quote.offer.selection,
+        reasoning: quote.offer.reasoning,
+        network: quote.offer.network,
+        asset: quote.offer.mint,
+      },
+      role,
+    );
 }
 
 export async function tokenizer(): Promise<RecountTokenizer> {
