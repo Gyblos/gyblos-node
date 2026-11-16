@@ -76,7 +76,8 @@ still needs explicit authorization; startup never authorizes a positive budget o
 If startup fails, **Payments → Retry local buyer** retries startup only. A failed inference is never
 resent automatically. Connecting a separately running buyer remains an advanced option.
 
-The app shows an update notice when a newer desktop build for your system is published. **View update**
+The app checks for updates at startup and every five minutes while it stays open. It shows a notice
+when a newer desktop build for your system is published. **View update**
 opens that release on GitHub; nothing is downloaded or installed automatically. This bounded public
 version check sends no identity or chat content. Offline failures stay silent; operators can disable
 it with `GYBLOS_UPDATE_CHECK=0`.
