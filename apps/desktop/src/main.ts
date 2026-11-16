@@ -18,6 +18,7 @@ import { cleanupDesktopSession } from './session-cleanup';
 import { armSmokeWatchdog } from './smoke-watchdog';
 import { settleDesktopStartup, startupHandoff } from './startup-window';
 import { BRAND_COLORS } from './theme';
+import { registerDesktopUpdate } from './update-host';
 import { WALLET } from './wallet/constants';
 import { registerDesktopWallet } from './wallet/host';
 import { focusExistingWindow, prepareWalletProfile } from './wallet/lifecycle';
@@ -116,6 +117,7 @@ function installDesktopServices(
   services.wallet = wallet;
   if (!smoke) {
     registerNetworkCatalog(window, signal);
+    registerDesktopUpdate(window, signal);
     services.paypal = registerDesktopPaypal(window);
     services.chats = registerChatArchive(window, app.getPath('userData'));
     services.x402 = registerDesktopX402(

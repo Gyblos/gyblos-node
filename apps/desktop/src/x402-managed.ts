@@ -10,9 +10,16 @@ import { DESKTOP_X402 } from './x402/constants';
 
 export function buyerEnvironment(
   home: string,
-  relayToken: string,
+  relayToken: string | undefined,
   environment: Readonly<NodeJS.ProcessEnv>,
 ) {
+  if (
+    relayToken !== undefined &&
+    (!relayToken ||
+      relayToken.length > DESKTOP_X402.MAX_RELAY_TOKEN ||
+      /[\r\n]/.test(relayToken))
+  )
+    throw new Error('Invalid relay token');
   if (
     environment.GYBLOS_RELAYS &&
     (environment.GYBLOS_RELAYS.length > DESKTOP_X402.MAX_RELAYS_LENGTH ||
@@ -51,7 +58,7 @@ export function buyerEnvironment(
     ...(relayOnly !== undefined ? { [BUYER_RELAY_ONLY_ENV]: relayOnly } : {}),
     ...addresses,
     GYBLOS_HOME: home,
-    GYBLOS_RELAY_TOKEN: relayToken,
+    ...(relayToken !== undefined ? { GYBLOS_RELAY_TOKEN: relayToken } : {}),
   };
 }
 
@@ -152,12 +159,15 @@ export class ManagedBuyer {
   private running: Running | null = null;
   private closed = false;
   constructor(
-    private readonly fork: (home: string, relayToken: string) => BuyerWorker,
+    private readonly fork: (
+      home: string,
+      relayToken: string | undefined,
+    ) => BuyerWorker,
     private readonly onExit: () => void,
     private readonly startMs: number = DESKTOP_X402.START_MS,
     private readonly stopMs: number = DESKTOP_X402.STOP_MS,
   ) {}
-  async start(home: string, relayToken: string) {
+  async start(home: string, relayToken?: string) {
     if (this.closed || this.running)
       throw new Error('A buyer is already running');
     const operation = supervise(

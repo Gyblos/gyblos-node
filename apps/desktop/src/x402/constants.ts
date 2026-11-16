@@ -30,7 +30,6 @@ export const X402_ACTION = {
   SEND: 'send',
   FINISH: 'finish',
   EXPLORER: 'explorer',
-  CHOOSE_HOME: 'choose-home',
   START_BUYER: 'start-buyer',
   COPY_PAYER: 'copy-payer',
   COPY_MINT: 'copy-mint',

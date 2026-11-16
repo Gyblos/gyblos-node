@@ -1,5 +1,5 @@
 // Mounts the buyer UI or the existing isolated compatibility smoke.
-// Live Chat paths use the guarded PayPal coordinator or explicitly connected x402 buyer.
+// Live Chat paths use the guarded PayPal coordinator or automatically prepared local buyer.
 import { createRoot } from 'react-dom/client';
 
 import { CompatibilityView } from './compatibility-view';

@@ -207,7 +207,7 @@ export function Chat({
     id: x402?.state.policy?.model ?? model.id,
     name: x402?.state.policy?.model ?? model.name,
     image: modelArtwork(x402?.state.policy?.model ?? model.id),
-    free: false,
+    free: x402?.state.policy?.maxAtomic === '0',
     input: 0,
     output: 0,
   };
@@ -659,7 +659,9 @@ export function Chat({
                   ? 'Generating…'
                   : usingX402
                     ? x402Ready
-                      ? 'x402 · devnet'
+                      ? x402?.state.policy?.maxAtomic === '0'
+                        ? 'Free · Gyblos network'
+                        : 'x402 · devnet'
                       : 'Authorize in Payments'
                     : usingPaypal
                       ? canSendPaypal(paypal.state)
