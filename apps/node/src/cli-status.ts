@@ -193,7 +193,7 @@ async function activityLines(
 async function paidLines(homeEnvironment: HomeEnvironment, now: number) {
   let summary;
   try {
-    summary = await sellerPaidSummary(homeEnvironment, now - STATUS.dayMs);
+    summary = await sellerPaidSummary(homeEnvironment, now - STATUS.dayMs, now);
   } catch {
     return `Paid requests:\n${line('ledger', 'unavailable (unsafe, locked or invalid file)')}`;
   }

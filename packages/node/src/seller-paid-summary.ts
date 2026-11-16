@@ -12,9 +12,11 @@ export type SellerPaidSummary = UptoLedgerSummary;
 export function sellerPaidSummary(
   environment: HomeEnvironment,
   since: number,
+  now: number,
 ): Promise<SellerPaidSummary | undefined> {
   return readUptoLedgerSummary(
     paymentPathsIn(environment, P2P_ROLES.SELLER),
     since,
+    now,
   );
 }
