@@ -31,7 +31,7 @@ git clone https://github.com/YOUR-USER/gyblos-node.git
 cd gyblos-node
 git remote add upstream https://github.com/Gyblos/gyblos-node.git
 git fetch upstream
-git worktree add --detach ../gyblos-contribution upstream/main
+git worktree add --detach ../gyblos-contribution upstream/develop
 cd ../gyblos-contribution
 git switch -c codex/describe-the-change
 ```
@@ -143,7 +143,7 @@ commands to validate a contribution.
 `git add --` followed by each explicitly reviewed path; do not stage unrelated
 work. Inspect `git diff --cached` before committing.
 
-Open a pull request from your fork's branch into `Gyblos/gyblos-node:main` and
+Open a pull request from your fork's branch into `Gyblos/gyblos-node:develop` and
 complete the template. Use English for repository content, commits and PRs.
 Link the issue when one exists. Keep unrelated fixes and structural moves out
 of the PR. Review the staged content for sensitive material before pushing.

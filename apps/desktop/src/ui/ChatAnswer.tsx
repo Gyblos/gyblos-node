@@ -103,7 +103,9 @@ export function ChatAnswer(props: Props) {
               ? 'Generating response…'
               : run
                 ? PHASE_LABEL[run.phase]
-                : 'Preparing response'}
+                : message.text
+                  ? 'Writing…'
+                  : 'Preparing response'}
           </span>
         </AssistantProgress>
       )}

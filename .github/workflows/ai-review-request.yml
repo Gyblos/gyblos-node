@@ -1,0 +1,14 @@
+# This event carries no model credentials and executes no PR code.
+name: AI review request
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  request:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - run: echo 'AI review request recorded; trusted default-branch workflow processes eligible current heads.'

@@ -2,15 +2,15 @@
 
 `apps/metrics-collector` (`@gyblos/metrics-collector`) is the proposed public
 receipt collector: a Cloudflare Worker for `https://collector.gyblos.com`
-(proposed), built with Hono and D1. Sellers, the buyer CLI and the buyer desktop
+(`collector.gyblos.com`), built with Hono and D1. Sellers, the buyer CLI and the buyer desktop
 app will send their signed receipts to it (no uploader exists yet), plus their
 own timestamps, in the
 [receipt upload envelope](../packages/protocol/SPEC.md#receipt-upload-envelope-v1).
 It keeps the rows private. It has no public reads or aggregates yet.
 
-It is **not deployed**, and its D1 database `gyblos-collector` does not exist.
-Creating Cloudflare resources, applying migrations and deploying are
-founder-approved manual steps (see [Operations](#operations)). Every
+It was first deployed on 2026-11-16 with its own D1 database `gyblos-collector`.
+Applying migrations and deploying are founder-approved manual steps (see
+[Operations](#operations)). Every
 verification goes through `@gyblos/protocol` (`verifyReceiptUploadEnvelope`) and
 `@gyblos/core/public-receipts` (`classifyPublicReceipt`); the app keeps no copy
 of the signing or receipt rules.

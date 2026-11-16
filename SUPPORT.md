@@ -5,6 +5,9 @@ by maintainers on a best-effort basis, without a response or resolution deadline
 There is no production support commitment or promise of compatibility between
 experimental revisions.
 
+Ask questions and get help from the team and other beta testers in the
+[Gyblos Telegram](https://t.me/gyblos). The group is public.
+
 Search existing [issues](https://github.com/Gyblos/gyblos-node/issues) before
 opening a bug report, usage question or feature proposal. Use the issue forms
 when applicable. Include your source revision, operating system, Node.js and

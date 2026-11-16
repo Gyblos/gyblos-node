@@ -15,8 +15,8 @@ export interface ReceiptUploadClient {
   platform: ReceiptUploadPlatform;
   arch: ReceiptUploadArch;
 }
-// Facts of the paid offer the buyer accepted. The full signed offer is not uploaded: it carries the
-// seller's endpoint addresses, which the collector must never store.
+// Buyer-reported facts of the accepted paid quote. Its timestamps originate on the seller's clock.
+// The full signed offer is not uploaded: it carries endpoint addresses the collector must not store.
 export interface ReceiptUploadOffer {
   issuedAt: number;
   expiresAt: number;
@@ -25,8 +25,8 @@ export interface ReceiptUploadOffer {
   observedAt: number;
   catalogDigest: string;
 }
-// Times are the uploader's own clock, in milliseconds since epoch. They are attested by the
-// uploader's envelope signature only, never by the peer.
+// storedAt/startedAt use the uploader's clock; copied offer times use the seller's source clock.
+// All are uploader claims in milliseconds since epoch, attested only by the envelope signature.
 export interface ReceiptUploadItem {
   receipt: ReceiptV1 | ReceiptV2;
   // When the uploader's private store first kept this receipt; null when unknown.
