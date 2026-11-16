@@ -27,6 +27,7 @@ import {
   x402Policy,
   x402Signature,
 } from './x402-model';
+import { readBuyerStream } from './x402-stream';
 
 export function buyerEndpoint(input: unknown) {
   if (typeof input !== 'string') throw new Error('Enter a local buyer URL');
@@ -139,6 +140,7 @@ export class X402Client {
   private busy = false;
   private closed = false;
   private controller: AbortController | null = null;
+  private requestId: string | null = null;
   private pending: Promise<unknown> | null = null;
   private readonly keyRequests = new Map<Promise<unknown>, AbortController>();
   constructor(
@@ -229,10 +231,17 @@ export class X402Client {
       this.keyRequests.delete(work);
     });
   }
-  stop(_id: string) {
-    return false;
+  stop(id: string) {
+    if (
+      this.requestId !== id ||
+      !this.controller ||
+      this.controller.signal.aborted
+    )
+      return false;
+    this.controller.abort();
+    return true;
   }
-  send(id: string, prompt: string, _onDelta?: (text: string) => void) {
+  send(id: string, prompt: string, onDelta?: (text: string) => void) {
     if (this.busy || this.closed || !this.connection)
       return Promise.reject(new Error('Local buyer is unavailable'));
     if (!prompt.trim() || Buffer.byteLength(prompt) > DESKTOP_X402.MAX_PROMPT)
@@ -241,11 +250,19 @@ export class X402Client {
     const connection = this.connection;
     const controller = new AbortController();
     this.controller = controller;
-    const work = this.execute(connection, id, prompt, controller.signal);
+    this.requestId = id;
+    const work = this.execute(
+      connection,
+      id,
+      prompt,
+      controller.signal,
+      onDelta,
+    );
     this.pending = work;
     return work.finally(() => {
       this.busy = false;
       this.controller = null;
+      this.requestId = null;
       this.pending = null;
     });
   }
@@ -254,23 +271,57 @@ export class X402Client {
     id: string,
     prompt: string,
     external: AbortSignal,
+    onDelta?: (text: string) => void,
   ) {
     const current = await this.budget.summary();
+    external.throwIfAborted();
     if (current.policy?.policyId !== connection.policy.policyId)
       throw new Error(
         'Buyer policy changed. Finish the previous budget before authorizing another.',
       );
     const policy = await this.budget.reserve(id);
+    let sent = false;
+    try {
+      external.throwIfAborted();
+      sent = true;
+      return await this.executeReserved(
+        connection,
+        id,
+        prompt,
+        policy,
+        external,
+        onDelta,
+      );
+    } catch (error) {
+      if (!sent) await this.budget.cancelUnsent(id);
+      else if (
+        policy.maxAtomic === '0' &&
+        (await this.budget.summary()).blocked
+      )
+        await this.budget.releaseFree(id);
+      throw error;
+    }
+  }
+  private async executeReserved(
+    connection: NonNullable<X402Client['connection']>,
+    id: string,
+    prompt: string,
+    policy: BuyerApiPolicy,
+    external: AbortSignal,
+    onDelta?: (text: string) => void,
+  ) {
     const started = performance.now();
+    const signal = AbortSignal.any([
+      external,
+      AbortSignal.timeout(DESKTOP_X402.REQUEST_MS),
+    ]);
+    signal.throwIfAborted();
     const response = await this.request(
       new URL(BUYER_API.CHAT_PATH, connection.url),
       {
         method: 'POST',
         redirect: 'error',
-        signal: AbortSignal.any([
-          external,
-          AbortSignal.timeout(DESKTOP_X402.REQUEST_MS),
-        ]),
+        signal,
         headers: {
           authorization: 'Bearer ' + connection.token,
           'content-type': 'application/json',
@@ -280,11 +331,16 @@ export class X402Client {
           model: policy.model,
           messages: [{ role: FREE_CHAT_ROLES.USER, content: prompt }],
           max_tokens: policy.maxTokens,
-          stream: false,
+          stream: !!onDelta,
         }),
       },
     );
-    const body = await readJson(response, true);
+    signal.throwIfAborted();
+    const body =
+      response.ok && onDelta
+        ? await readBuyerStream(response, policy, signal, onDelta)
+        : await readJson(response, true);
+    signal.throwIfAborted();
     const responseMs = performance.now() - started;
     if (!response.ok) {
       const error = object(object(body).error);

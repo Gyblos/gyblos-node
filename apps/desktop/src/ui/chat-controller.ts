@@ -237,8 +237,32 @@ export class ChatController {
       ),
     }));
   }
-  appendBuyer(_sessionId: string, _id: string, _text: string) {}
-  stopBuyer(_sessionId: string, _id: string) {}
+  appendBuyer(sessionId: string, id: string, text: string) {
+    this.updatePaypal(sessionId, id, (session) => ({
+      ...session,
+      messages: session.messages.map((message) =>
+        message.id === `${id}-assistant` &&
+        message.paymentMethod === PAYMENT_METHOD.USDC
+          ? { ...message, text: message.text + text }
+          : message,
+      ),
+    }));
+  }
+  stopBuyer(sessionId: string, id: string) {
+    this.updatePaypal(sessionId, id, (session) =>
+      session.messages.at(-1)?.paymentMethod !== PAYMENT_METHOD.USDC
+        ? session
+        : {
+            ...session,
+            paypalRun: null,
+            messages: session.messages.map((message) =>
+              message.id === `${id}-assistant`
+                ? { ...message, state: MESSAGE_STATE.STOPPED }
+                : message,
+            ),
+          },
+    );
+  }
   failPaypal(sessionId: string, id: string, notice: string) {
     this.updatePaypal(sessionId, id, (session) => ({
       ...session,

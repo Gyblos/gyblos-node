@@ -36,6 +36,16 @@ de abrirla. Es normal; después de la primera vez se abre sin preguntar.
 3. Abre **Configuración del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Gyblos y elige
    **Abrir de todas formas**; confirma con tu contraseña.
 
+La beta también puede mostrar un diálogo de contraseña del llavero de macOS llamado **Gyblos Safe
+Storage**. Pide acceso al almacenamiento local protegido de la wallet, separado del permiso para abrir
+la app. Con las compilaciones ad hoc actuales de la beta, puede volver a aparecer la primera vez que
+abres una versión nueva.
+
+Responde primero al diálogo de macOS: mientras quede sin responder, la wallet puede mostrar
+**Protected wallet unavailable** y **Quit** puede esperar a que contestes. El chat gratuito usa una
+identidad local del comprador separada; puede funcionar aunque la wallet protegida no esté disponible.
+La contraseña se introduce en el diálogo de macOS, nunca en un mensaje del chat.
+
 ### Windows [#windows]
 
 1. Haz clic derecho en el `.zip` y elige **Extraer todo**.
@@ -59,6 +69,12 @@ Abre **Chat**, escribe un mensaje y envíalo. El primer arranque prepara `buyer/
 la carpeta de datos de la app, separada del CLI y del vendedor. El modelo inicial es `qwen3-0.6b`;
 necesita un vendedor verificado, disponible y gratuito para ese modelo. Discovery, la RPC de identidad
 y la red deben estar accesibles. Si no lo están, se muestra un error, nunca una respuesta simulada.
+
+La respuesta aparece a medida que llega el texto. Durante la generación, el botón de enviar cambia a
+**Stop response**; también puedes pulsar **Esc**. Al detener, se conserva el texto parcial y no se
+reenvía el prompt. Una respuesta interrumpida no se marca como completa. Si el cobro de un pedido pagado
+sigue siendo incierto, permanece bloqueado para revisión en **Payments**: detenerlo no demuestra que
+no se haya cobrado.
 
 Estas respuestas gratuitas no requieren fondos ni transacciones. La identidad local del comprador
 es distinta de la wallet protegida que aparece en Settings. Una configuración o conexión de precio

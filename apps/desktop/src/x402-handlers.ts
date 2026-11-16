@@ -6,6 +6,7 @@ import {
   X402_ACTION,
   x402Explorer,
   x402Id,
+  type X402Progress,
   type X402Result,
 } from './x402-model';
 
@@ -19,7 +20,7 @@ function actionError(action: unknown, blocked: boolean) {
   if (action === X402_ACTION.AUTHORIZE)
     return 'Budget not authorized. It must cover the maximum cost of one response.';
   if (action === X402_ACTION.SEND)
-    return 'Message was not sent. Check the buyer and remaining budget.';
+    return 'Response unavailable. The request was not retried.';
   return 'The action could not complete.';
 }
 async function referenceAction(
@@ -52,6 +53,41 @@ async function referenceAction(
 export interface ManagedBuyerPorts {
   start(): Promise<void>;
 }
+function sendResponse(
+  client: X402Client,
+  owner: Owner,
+  frame: unknown,
+  id: string,
+  prompt: string,
+  progress?: (value: X402Progress) => void,
+) {
+  return client.send(
+    id,
+    prompt,
+    progress
+      ? (text) => {
+          if (owner.destroyed() || owner.mainFrame() !== frame) {
+            client.stop(id);
+            return;
+          }
+          progress({ id, text });
+        }
+      : undefined,
+  );
+}
+function buyerAction(owner: Owner, event: Sender, args: readonly unknown[]) {
+  if (
+    owner.destroyed() ||
+    event.sender !== owner.contents ||
+    event.senderFrame !== owner.mainFrame() ||
+    args.length !== 1 ||
+    !args[0] ||
+    typeof args[0] !== 'object' ||
+    Array.isArray(args[0])
+  )
+    throw new Error('Unsupported buyer request');
+  return args[0] as Record<string, unknown>;
+}
 export function createX402Handlers(
   client: X402Client,
   budget: X402Budget,
@@ -61,6 +97,7 @@ export function createX402Handlers(
   copy: (value: string) => void = () => {
     throw new Error('Clipboard unavailable');
   },
+  progress?: (value: X402Progress) => void,
 ) {
   const summary = async () => ({
     summary: await budget.summary(),
@@ -70,17 +107,7 @@ export function createX402Handlers(
     event: Sender,
     args: readonly unknown[],
   ): Promise<X402Result> => {
-    if (
-      owner.destroyed() ||
-      event.sender !== owner.contents ||
-      event.senderFrame !== owner.mainFrame() ||
-      args.length !== 1 ||
-      !args[0] ||
-      typeof args[0] !== 'object' ||
-      Array.isArray(args[0])
-    )
-      throw new Error('Unsupported buyer request');
-    const input = args[0] as Record<string, unknown>;
+    const input = buyerAction(owner, event, args);
     try {
       if (
         (input.action === X402_ACTION.START_BUYER ||
@@ -103,7 +130,14 @@ export function createX402Handlers(
         x402Id(input.id) &&
         typeof input.prompt === 'string'
       ) {
-        const reply = await client.send(input.id, input.prompt);
+        const reply = await sendResponse(
+          client,
+          owner,
+          event.senderFrame,
+          input.id,
+          input.prompt,
+          progress,
+        );
         return {
           ...(await summary()),
           reply: {
@@ -112,7 +146,9 @@ export function createX402Handlers(
             metrics: reply.metrics,
           },
         };
-      } else if (input.action === X402_ACTION.FINISH) await budget.finish();
+      } else if (input.action === X402_ACTION.STOP && x402Id(input.id))
+        client.stop(input.id);
+      else if (input.action === X402_ACTION.FINISH) await budget.finish();
       else if (
         input.action !== X402_ACTION.STATUS &&
         !(await referenceAction(input, client, budget, open, copy))
