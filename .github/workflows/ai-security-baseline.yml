@@ -1,4 +1,4 @@
-# Dispatch on main only. The exact dispatch SHA, model and invocation budget are recorded.
+# Dispatch on the default branch only. The exact SHA, model and invocation budget are recorded.
 name: AI security baseline
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   baseline:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:

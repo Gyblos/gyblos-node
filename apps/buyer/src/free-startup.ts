@@ -23,6 +23,7 @@ import {
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import {
   assertConfiguredRelay,
   bindEndpoint,
@@ -43,6 +44,7 @@ import type { RoutedModel } from './model-routes';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
+import { withBuyerDiagnostics } from './startup-diagnostics';
 
 // A host composition seam: transports, admission and quote verification remain in existing modules.
 export type BuyerExecutionFactory = (context: {
@@ -240,6 +242,7 @@ function buyerHttp(
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
+  diagnostics?: DiagnosticSink,
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
@@ -256,6 +259,7 @@ function buyerHttp(
         port,
         stream: run,
         apiKeys: execution?.apiKeys,
+        diagnostics,
         ...configuredBuyerAccess(request, role, execution?.token),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
@@ -298,6 +302,8 @@ function buyerHost(
   };
 }
 
+export type BuyerHost = ReturnType<typeof buyerHost>;
+
 function checkFreeRequest(
   request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
 ) {
@@ -317,6 +323,7 @@ async function startOwnedFreeBuyer(
     onSellerFailure?: SellerFailureReporter;
     execution?: BuyerExecutionFactory;
   } = {},
+  diagnostics?: DiagnosticSink,
 ) {
   const telemetryEnabled = await loadLocalTelemetry(process.env);
   const role = await buyerRole();
@@ -374,6 +381,7 @@ async function startOwnedFreeBuyer(
       options.port,
       execution,
       role,
+      diagnostics,
     );
     return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
@@ -393,5 +401,9 @@ export async function startFreeBuyer(
   options: Parameters<typeof startOwnedFreeBuyer>[0] = {},
 ) {
   await buyerRole();
-  return withBuyerRuntime(process.env, () => startOwnedFreeBuyer(options));
+  return withBuyerRuntime(process.env, () =>
+    withBuyerDiagnostics((diagnostics) =>
+      startOwnedFreeBuyer(options, diagnostics),
+    ),
+  );
 }

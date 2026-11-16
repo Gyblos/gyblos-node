@@ -1,7 +1,7 @@
 // Public seller uptime on the discovery index: each five-minute slot in which the index accepted a
 // signed presence from a NodeId counts as online, GET /v1/uptime?node= reports the share of slots seen
-// over a day, a week and a month (never before the NodeId was first seen), and rows older than a month
-// are pruned. Both storage adapters; fake clock.
+// over a day, a week and a month (never before the NodeId was first seen), and rows are kept long after
+// they leave the reported windows (UPTIME.retentionDays). Both storage adapters; fake clock.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -102,7 +102,22 @@ eachStorage(
   },
 );
 
-void test('windows are bounded by days, and a month-old row is pruned', async () => {
+eachStorage(
+  'rows outlive the reported windows and are pruned only after the retention period',
+  async ({ storage }) => {
+    const node = 'b'.repeat(64);
+    const seenAt = 5 * dayMs;
+    await storage.markSeen(node, seenAt);
+    // Well past the 30-day report window: still kept for network history.
+    await storage.pruneUptime(seenAt + 400 * dayMs);
+    assert.equal((await storage.seen(node, 0)).length, 1);
+    assert.ok(UPTIME.retentionDays > UPTIME.windowDays.at(-1)!);
+    await storage.pruneUptime(seenAt + (UPTIME.retentionDays + 1) * dayMs);
+    assert.equal((await storage.seen(node, 0)).length, 0);
+  },
+);
+
+void test('windows are bounded by days, and a month-old row leaves the report', async () => {
   const storage = createMemoryStorage();
   const node = 'a'.repeat(64);
   const now = 40 * dayMs;
@@ -117,7 +132,7 @@ void test('windows are bounded by days, and a month-old row is pruned', async ()
   assert.deepEqual([week.seen, week.slots], [288, 7 * 288]);
   // The month window starts at the first sighting, 20 days ago.
   assert.deepEqual([month.seen, month.slots], [289, 20 * 288 + 1]);
-  // Pruning keeps the first sighting: the old row is gone, the seller is not new.
+  // Pruning keeps the first sighting and the row; the old row only leaves the report.
   await storage.pruneUptime(now + 11 * dayMs);
   const later = JSON.parse(
     (await uptimePage(storage, node, now + 11 * dayMs))!,

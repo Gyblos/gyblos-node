@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
+    "./diagnostics": "./src/diagnostics.ts",
     "./loopback-host": "./src/loopback-host.ts",
     "./memory": "./src/memory.ts",
     "./private-log": "./src/private-log.ts",
@@ -13,7 +14,8 @@
     "./process": "./src/process.ts",
     "./private-file": "./src/private-file.ts",
     "./private-mode": "./src/private-mode.ts",
-    "./windows-acl": "./src/windows-acl.ts"
+    "./windows-acl": "./src/windows-acl.ts",
+    "./diagnostic-cleanup": "./src/diagnostic-cleanup.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*"

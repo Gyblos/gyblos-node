@@ -102,10 +102,21 @@ timestamps to a collector is the protocol contract "Receipt upload envelope v1"
 (`packages/protocol/SPEC.md`). It is a contract only: no uploader, schedule or
 endpoint uses it yet.
 
-`apps/metrics-collector` is the proposed public collector Worker that uses both
-(`POST /v1/receipts`). It is not deployed and its database does not exist. Its
-endpoints, order of checks, storage, query cost and operations are documented in
-[metrics-collector.md](metrics-collector.md).
+The additive `receipt-upload/v2` contract keeps the same rules and adds a
+buyer-declared reference to the exact paid quote. `buildReceiptUploadOfferV2`
+projects an independently accepted quote to six facts plus the SHA-256
+reference; it returns no endpoint addresses or owner signature. Capture that
+projection before discarding the quote. It is not proof of identity, settlement
+or truthful metadata. Upload/store/start times originate on the uploader's
+clock; copied offer times originate on the seller's clock and remain
+buyer-reported claims. Existing v1 uploads/vectors stay unchanged. The public
+collector and uploader must explicitly adopt the new contract; no runtime
+activation is included here.
+
+`apps/metrics-collector` is the public collector Worker that uses v1
+(`POST /v1/receipts`), deployed at `collector.gyblos.com` with its own D1
+database. Its endpoints, order of checks, storage, query cost and operations are
+documented in [metrics-collector.md](metrics-collector.md).
 
 ## Local upload cursor
 

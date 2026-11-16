@@ -2,8 +2,8 @@
 
 The runner lives in `tooling/security-review`; product packages do not import
 it. It provides a manual baseline by app/package and cross-cutting flow, and an
-advisory incremental review for PRs targeting `main`. Existing Security and
-Static analysis checks keep their existing roles.
+advisory incremental review for PRs targeting `develop` or `main`. Existing
+Security and Static analysis checks keep their existing roles.
 
 ## Execution
 
@@ -82,8 +82,8 @@ necessary.
 
 ## GitHub Actions
 
-1. `AI review request` runs on PRs into `main`, without model credentials or
-   code checkout.
+1. `AI review request` runs on PRs into `develop` or `main`, without model
+   credentials or code checkout.
 2. `AI security review` responds through `workflow_run`. GitHub loads its
    workflow from the default branch. It validates the current
    PR/head/base/repository and runs the trusted default-branch runner against
@@ -96,8 +96,9 @@ necessary.
    `pull_request_target` without checking out or executing source, installing
    packages or receiving model credentials. Failed analysis publishes error;
    cancelled analysis leaves the pending label rather than preserving clean.
-4. `AI security baseline` accepts a manual dispatch only on `main`, records the
-   exact dispatch commit and requires an explicit model and invocation budget.
+4. `AI security baseline` accepts a manual dispatch only on the repository's
+   default branch (`develop`), records the exact dispatch commit and requires an
+   explicit model and invocation budget.
 
 Enable automatic reviews with repository variable `AI_REVIEW_ENABLED=true`, set
 `PI_REVIEW_MODEL=openai/<model-id>`, and add the `OPENAI_API_KEY` Actions
@@ -105,6 +106,14 @@ secret. The first setup PR cannot activate a default-branch workflow before it
 is merged. Precreate these labels: `ai-review:queued`, `ai-review:clean`,
 `ai-review:needs-validation`, `ai-review:error`. There is no GitHub App or
 `@bot` mention handler in this version.
+
+After installing or updating the trusted workflow, validate a new PR event into
+`develop` with a small real change. The request check alone only records the
+event: the separate `AI security review` run must execute Pi, upload its report
+and publish an `AI source review` comment for the current head/base/merge. A
+green request check does not prove model execution or publication. Updates to
+the trusted workflow take effect after they merge into the default branch;
+create or update another PR after that merge to exercise the installed workflow.
 
 Actions artifacts contain candidate details and follow repository
 visibility/access rules; they expire after seven days. Avoid using public

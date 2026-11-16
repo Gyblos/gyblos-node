@@ -79,7 +79,8 @@
     "./history-presentation": "./src/ui/history-presentation.ts",
     "./paypal-limit": "./src/ui/paypal-limit.ts",
     "./x402-startup": "./src/x402-startup.ts",
-    "./update-check": "./src/update-check.ts"
+    "./update-check": "./src/update-check.ts",
+    "./update-session": "./src/update-session.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",

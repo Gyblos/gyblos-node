@@ -1,10 +1,9 @@
 // Child-only entry: fixed synthetic cases, sanitized metadata report and lifecycle-bound shutdown.
 import { isMain, onShutdown } from '@gyblos/runtime';
 
-import { ACCEPTANCE_CODES } from './constants';
-import { acceptanceAssert, AcceptanceError } from './errors';
+import { acceptanceAssert, acceptanceDiagnosticCode } from './errors';
 import { TOOL_ACCEPTANCE, TOOL_ACCEPTANCE_CASES } from './tools-constants';
-import { toolScenario } from './tools-scenario';
+import { runToolCase } from './tools-diagnostics';
 
 async function main() {
   const controller = new AbortController();
@@ -17,17 +16,18 @@ async function main() {
       scenario && process.argv.length === TOOL_ACCEPTANCE.workerArgumentCount,
     );
     console.log(
-      JSON.stringify(await toolScenario(scenario, controller.signal)),
+      JSON.stringify(
+        await runToolCase(scenario, controller.signal, {
+          sink: (diagnostic) => console.log(JSON.stringify({ diagnostic })),
+        }),
+      ),
     );
     return 0;
   } catch (error) {
     console.log(
       JSON.stringify({
         ok: false,
-        code:
-          error instanceof AcceptanceError
-            ? error.code
-            : ACCEPTANCE_CODES.FAILED,
+        code: acceptanceDiagnosticCode(error),
       }),
     );
     return 1;

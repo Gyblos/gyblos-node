@@ -61,6 +61,10 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 
 ## Safety and privacy
 
+- Operational diagnostics are separate from telemetry and receipts. Use the shared runtime diagnostic envelope and owner-owned code/phase catalogs at new or changed failure boundaries; never serialize an exception, request, response, credential or arbitrary error message. See [docs/diagnostics.md](docs/diagnostics.md).
+- Preserve the primary failure; record cleanup failures separately. Diagnostic failure, queue overflow or storage exhaustion must never change admission, payment, retry, cancellation or deadline behavior. Diagnostics are bounded local evidence, not a guarantee that every failure survives a crash.
+- Test diagnostic privacy and failure isolation with synthetic canaries and temporary homes. Keep captures ignored and report the failing phase and evidence limits when investigating a flaky test. The shared procedure is [gyblos-diagnostics](.agents/skills/gyblos-diagnostics/SKILL.md).
+
 - Never read or write a real `.local/` (keys, journals, offers, measurements); never access existing keys, make payments, touch funded wallets, use devnet, deploy, access a VPS or send messages without explicit authorization for that action.
 - Uncertain payments block further calls until reconciled; never retry or clear a journal or lock to make something pass.
 - Never commit private keys, salts, prompts/responses, raw logs, endpoint addresses, signed payment payloads, RPC credentials, role volumes or journals. `.local/`, env secrets, evidence and captures stay ignored; the curated `lab/evidence/` reports and the finalized public fixture are deliberate exceptions. Synthetic fixtures and ephemeral unfunded signers are fine. Review the staged diff before publishing.

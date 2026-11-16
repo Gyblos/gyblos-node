@@ -11,6 +11,10 @@ import {
   NODE_NETWORKS,
 } from './constants';
 import {
+  readDiagnosticSettings,
+  type DiagnosticSettings,
+} from './node-config-diagnostics';
+import {
   envName,
   flag,
   integer,
@@ -62,6 +66,7 @@ export interface NodeConfig {
   // Seller capacity; see node-config-limits.ts.
   limits?: NodeLimits;
   telemetry?: { file?: boolean };
+  diagnostics?: DiagnosticSettings;
   offers: NodeOffer[];
 }
 
@@ -83,6 +88,7 @@ const ROOT_KEYS = [
   'limits',
   'offers',
   'telemetry',
+  'diagnostics',
 ];
 const NODE_KEYS = ['network', 'data_dir', 'payout_wallet', 'rpc_url'];
 const RELAY_KEYS = ['urls', 'relay_token_env'];
@@ -285,6 +291,9 @@ export function validateNodeConfig(document: unknown): NodeConfigResult {
   const telemetry = optional(root, 'telemetry', [], (value, path) =>
     readTelemetry(value, path, issues),
   );
+  const diagnostics = optional(root, 'diagnostics', [], (value, path) =>
+    readDiagnosticSettings(value, path, issues),
+  );
   const offers = readOffers(root.offers, ['offers'], issues);
   unknownKeys(root, [], ROOT_KEYS, issues);
   if (
@@ -306,6 +315,7 @@ export function validateNodeConfig(document: unknown): NodeConfigResult {
       discovery,
       limits,
       telemetry,
+      diagnostics,
       offers,
     }),
   };

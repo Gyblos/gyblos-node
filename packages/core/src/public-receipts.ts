@@ -2,12 +2,15 @@
 // how a new report combines with a stored one. No storage, clock or I/O.
 import { canonicalJson } from '@gyblos/protocol';
 import {
+  CONTROL_LIMITS,
   OFFER_PRICING_KINDS,
   RECEIPT,
   RECEIPT_VERDICTS,
 } from '@gyblos/protocol/constants';
-import { controlObject } from '@gyblos/protocol/control-validation';
+import { controlHex, controlObject } from '@gyblos/protocol/control-validation';
 import {
+  parseBuyerReceipt,
+  parseSellerReceipt,
   sellerReceiptDigest,
   verifyReceipt,
   type ReceiptV1,
@@ -61,12 +64,32 @@ function plainObject(value: unknown) {
   // Validates descriptors before any value is read.
   return controlObject(value, Object.keys(value));
 }
+function snapshotHalf<T>(value: unknown, parse: (record: unknown) => T) {
+  const input = controlObject(value, ['record', 'signature']);
+  return {
+    record: parse(input.record),
+    signature: controlHex(input.signature, CONTROL_LIMITS.signatureBytes),
+  };
+}
+function snapshotV1(value: unknown): ReceiptV1 {
+  const hasBuyer =
+    !!value && typeof value === 'object' && Object.hasOwn(value, 'buyer');
+  const input = controlObject(value, [
+    'seller',
+    ...(hasBuyer ? ['buyer'] : []),
+  ]);
+  const receipt: ReceiptV1 = {
+    seller: snapshotHalf(input.seller, parseSellerReceipt),
+  };
+  if (hasBuyer) receipt.buyer = snapshotHalf(input.buyer, parseBuyerReceipt);
+  return receipt;
+}
 function verifyPublicReceipt(value: unknown): Promise<PublicReceipt> {
   const { version } = plainObject(
     plainObject(plainObject(value).seller).record,
   );
   return version === RECEIPT.version
-    ? verifyReceipt(value)
+    ? verifyReceipt(snapshotV1(value))
     : verifyReceiptV2(value);
 }
 
