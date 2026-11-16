@@ -195,3 +195,53 @@ void test('successful setup suggests chat without asking for a relay token', asy
   assert.doesNotMatch(output, /GYBLOS_RELAY_TOKEN/);
   assert.match(output, /buyer:chat/);
 });
+
+void test('wizard with an empty seller skips the owner and saves an open-network buyer', async () => {
+  const questions: string[] = [];
+  let output = '';
+  let received: BuyerInitAnswers | undefined;
+  const entries = ['', 'yes'];
+  await runBuyerInit({
+    preflight: async () => ({
+      path: '/synthetic/buyer/selection.json',
+      exists: false,
+    }),
+    read: async (question: string) => {
+      questions.push(question);
+      return entries.shift();
+    },
+    write: (text: string) => {
+      output += text;
+    },
+    initialize: async (input: BuyerInitAnswers) => {
+      received = input;
+    },
+  });
+  assert.ok(received);
+  assert.equal(received.sellerNodeId, '');
+  assert.equal(received.sellerOwner, '');
+  assert.equal(questions.filter((q) => q.startsWith('Seller owner')).length, 0);
+  assert.match(output, /any seller registered in the index, free answers only/);
+  assert.equal(buildBuyerInit(received).discovery.open, true);
+});
+
+void test('wizard asks again for the owner of a named seller', async () => {
+  const entries = [sellerNodeId, '', owner, 'yes'];
+  let received: BuyerInitAnswers | undefined;
+  let output = '';
+  await runBuyerInit({
+    preflight: async () => ({
+      path: '/synthetic/buyer/selection.json',
+      exists: false,
+    }),
+    read: async () => entries.shift(),
+    write: (text: string) => {
+      output += text;
+    },
+    initialize: async (input: BuyerInitAnswers) => {
+      received = input;
+    },
+  });
+  assert.equal(received?.sellerOwner, owner);
+  assert.match(output, /Invalid Seller owner wallet/);
+});
