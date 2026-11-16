@@ -30,7 +30,12 @@ import {
   WALLET_SETTINGS,
 } from './wallet/settings-model';
 import { windowPlatform } from './window-chrome';
-import { DESKTOP_X402, parseX402Result } from './x402-model';
+import {
+  DESKTOP_X402,
+  parseX402Progress,
+  parseX402Result,
+  type X402Progress,
+} from './x402-model';
 
 contextBridge.exposeInMainWorld('desktopWindow', {
   platform: windowPlatform(process.platform),
@@ -55,6 +60,15 @@ contextBridge.exposeInMainWorld('desktopUsdcApiKeys', {
 contextBridge.exposeInMainWorld('desktopX402', {
   run: async (request: unknown) =>
     parseX402Result(await ipcRenderer.invoke(DESKTOP_X402.CHANNEL, request)),
+  onProgress: (listener: (value: X402Progress) => void) => {
+    const receive = (_event: unknown, input: unknown) => {
+      const value = parseX402Progress(input);
+      if (value) listener(value);
+    };
+    ipcRenderer.on(DESKTOP_X402.PROGRESS_CHANNEL, receive);
+    return () =>
+      ipcRenderer.removeListener(DESKTOP_X402.PROGRESS_CHANNEL, receive);
+  },
 });
 
 contextBridge.exposeInMainWorld('desktopActivity', {

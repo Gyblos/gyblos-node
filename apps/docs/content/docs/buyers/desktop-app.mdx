@@ -35,6 +35,11 @@ it. This is expected; after the first time it opens normally.
 2. Open Gyblos. macOS says it cannot verify the developer; choose **Done**.
 3. Open **System Settings → Privacy & Security**, scroll to the message about Gyblos and choose
    **Open Anyway**, then confirm with your password.
+4. macOS then asks to let Gyblos use the key "Gyblos Safe Storage" in your keychain. Enter your Mac
+   password and choose **Always Allow**. The app keeps its wallet protected with this key. While the
+   question is open the app cannot quit and its wallet shows as unavailable.
+
+Because the beta app is not signed, macOS asks steps 2 to 4 again after each update.
 
 ### Windows [#windows]
 
@@ -58,6 +63,11 @@ Open **Chat**, write a message and send it. The first start prepares `buyer/` pr
 own data folder, separate from the CLI or seller home. The default model is `qwen3-0.6b`; a verified,
 online seller offering that model for free must be available. Discovery, the identity RPC and the
 network must be reachable. An unavailable seller or network gives an error, not a simulated reply.
+
+The answer appears as text arrives. While a response is running, the send button becomes **Stop
+response**; you can also press **Esc**. Stopping keeps the partial text and does not resend the prompt.
+An interrupted answer is not marked complete. A paid request whose charge is still uncertain remains
+blocked for review in **Payments**; stopping does not prove that no charge occurred.
 
 No wallet funding or transaction is required for these free answers. The local buyer identity is
 separate from the protected wallet shown in Settings. A positive-price configuration or connection
