@@ -78,7 +78,8 @@
     "./payment-reference-model": "./src/payment-reference-model.ts",
     "./history-presentation": "./src/ui/history-presentation.ts",
     "./paypal-limit": "./src/ui/paypal-limit.ts",
-    "./x402-startup": "./src/x402-startup.ts"
+    "./x402-startup": "./src/x402-startup.ts",
+    "./update-check": "./src/update-check.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
