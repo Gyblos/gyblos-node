@@ -1,10 +1,9 @@
 // Main-frame bridge and private budget storage; the buyer runs as an isolated executable.
 import { homedir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 
 import {
   clipboard,
-  dialog,
   ipcMain,
   shell,
   utilityProcess,
@@ -26,57 +25,38 @@ import { X402Client } from './x402-client';
 import { createX402Handlers } from './x402-handlers';
 import { buyerEnvironment, ManagedBuyer } from './x402-managed';
 import { DESKTOP_X402 } from './x402-model';
+import { automaticBuyer } from './x402-startup';
 
 function managedBuyer(
-  window: BrowserWindow,
+  profile: string,
   directory: string,
   client: X402Client,
+  budget: X402Budget,
 ) {
-  let selectedHome: string | null = null;
-  const managed = new ManagedBuyer(
-    (home, relayToken) =>
+  const environment = buyerEnvironment(
+    profile,
+    process.env.GYBLOS_RELAY_TOKEN || undefined,
+    process.env,
+  );
+  const service = new ManagedBuyer(
+    () =>
       utilityProcess.fork(join(directory, DESKTOP_X402.SERVICE_FILE), [], {
-        cwd: home,
+        cwd: profile,
         stdio: 'ignore',
-        env: buyerEnvironment(home, relayToken, process.env),
+        env: environment,
       }),
     () => client.disconnect(),
   );
-  return {
-    close: () => managed.close(),
-    selected: () => selectedHome !== null,
-    async choose() {
-      const chosen = await dialog.showOpenDialog(window, {
-        title: 'Choose GYBLOS_HOME containing the buyer configuration',
-        properties: ['openDirectory'],
-      });
-      const path = chosen.filePaths[0];
-      if (!chosen.canceled && path && isAbsolute(path)) selectedHome = path;
+  const managed = automaticBuyer(
+    {
+      start: () => service.start(profile),
+      stop: () => service.stop(),
+      close: () => service.close(),
     },
-    async start(input: unknown) {
-      const relayToken =
-        typeof input === 'string' && input
-          ? input
-          : process.env.GYBLOS_RELAY_TOKEN;
-      if (
-        !selectedHome ||
-        typeof relayToken !== 'string' ||
-        !relayToken ||
-        relayToken.length > DESKTOP_X402.MAX_RELAY_TOKEN ||
-        /[\r\n]/.test(relayToken)
-      )
-        throw new Error(
-          'Choose buyer configuration and provide the relay token',
-        );
-      const connection = await managed.start(selectedHome, relayToken);
-      try {
-        await client.connect(connection.url, connection.token);
-      } catch {
-        await managed.stop();
-        throw new Error('Local buyer is unavailable');
-      }
-    },
-  };
+    client,
+    budget,
+  );
+  return { environment, managed };
 }
 export function registerDesktopX402(
   window: BrowserWindow,
@@ -99,7 +79,12 @@ export function registerDesktopX402(
     },
   });
   const client = new X402Client(budget);
-  const managed = managedBuyer(window, directory, client);
+  const { environment, managed } = managedBuyer(
+    profile,
+    directory,
+    client,
+    budget,
+  );
   const handle = createX402Handlers(
     client,
     budget,
@@ -120,7 +105,7 @@ export function registerDesktopX402(
       destroyed: () => window.isDestroyed(),
     },
     (text) => clipboard.writeText(text),
-    { home: homedir(), environment: process.env },
+    { home: homedir(), environment },
   );
   ipcMain.handle(USDC_API.CHANNEL, (event, ...args: unknown[]) =>
     apiKeys.run(event, args),

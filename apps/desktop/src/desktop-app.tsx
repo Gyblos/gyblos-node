@@ -65,6 +65,7 @@ import { Settings } from './ui/Settings';
 import { SystemStatus } from './ui/SystemStatus';
 import type { ToolId } from './ui/tools';
 import { Button, IconButton } from './ui/UI';
+import { UpdateNotice } from './ui/UpdateNotice';
 import { UsdcApiKeys } from './ui/UsdcApiKeys';
 import { useActivity } from './ui/useActivity';
 import { useChatArchive } from './ui/useChatArchive';
@@ -355,6 +356,7 @@ export function DesktopApp() {
             </Button>
           )}
       </WindowTitlebar>
+      <UpdateNotice />
       <BuyerSidebar
         systemStatus={
           <SystemStatus

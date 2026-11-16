@@ -7,7 +7,12 @@ import {
   parseChatArchiveLoad,
   parseChatArchiveStatus,
 } from './chat-archive-model';
-import { CHAT_STORAGE, DESKTOP, DESKTOP_ACTIVITY } from './constants';
+import {
+  CHAT_STORAGE,
+  DESKTOP,
+  DESKTOP_ACTIVITY,
+  DESKTOP_UPDATE,
+} from './constants';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
 import { parsePaymentReferences } from './payment-reference-model';
 import {
@@ -133,4 +138,8 @@ contextBridge.exposeInMainWorld('desktopWallet', {
     parseBackupResult(await ipcRenderer.invoke(BACKUP_FLOW.CHANNEL, request)),
   summary: async () =>
     parseWalletSummary(await ipcRenderer.invoke(WALLET.CHANNEL)),
+});
+
+contextBridge.exposeInMainWorld('desktopUpdate', {
+  run: (action: unknown) => ipcRenderer.invoke(DESKTOP_UPDATE.CHANNEL, action),
 });

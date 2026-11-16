@@ -96,59 +96,26 @@ export function X402Payments({
 }
 
 function X402Connection({ buyer }: { buyer: X402View }) {
-  const [relayToken, setRelayToken] = useState('');
   const [external, setExternal] = useState(false);
   return (
     <div className="ui-form">
-      <form
-        className="ui-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void buyer
-            .run({ action: X402_ACTION.START_BUYER, relayToken })
-            .then((result) => {
-              if (result?.policy) setRelayToken('');
-            });
-        }}
-      >
-        <p>Use the same buyer configuration as the Gyblos CLI.</p>
-        <FormActions align="start">
-          <Button
-            disabled={buyer.busy}
-            onClick={() => {
-              void buyer.run({ action: X402_ACTION.CHOOSE_HOME });
-            }}
-          >
-            {buyer.state.homeSelected
-              ? 'Change configuration folder'
-              : 'Choose configuration folder'}
-          </Button>
-          {buyer.state.homeSelected && <Badge>Selected</Badge>}
-        </FormActions>
-        <p>Select the GYBLOS_HOME folder containing buyer/selection.json.</p>
-        <FormField htmlFor="x402-relay-token" label="Relay token">
-          <FormInput
-            id="x402-relay-token"
-            type="password"
-            autoComplete="off"
-            value={relayToken}
-            onChange={(event) => setRelayToken(event.target.value)}
-          />
-        </FormField>
-        <p>Leave blank to use GYBLOS_RELAY_TOKEN from the app environment.</p>
-        <FormActions align="start">
-          <Button
-            type="submit"
-            variant={BUTTON_VARIANT.PRIMARY}
-            disabled={buyer.busy || !buyer.state.homeSelected}
-          >
-            {buyer.busy ? 'Starting buyer…' : 'Start local buyer'}
-          </Button>
-          <Button disabled={buyer.busy} onClick={() => setExternal(true)}>
-            Connect a running buyer
-          </Button>
-        </FormActions>
-      </form>
+      <p>
+        The app prepares its own buyer automatically. New configurations use
+        free models only.
+      </p>
+      <FormActions align="start">
+        <Button
+          disabled={buyer.busy}
+          onClick={() => {
+            void buyer.run({ action: X402_ACTION.START_BUYER });
+          }}
+        >
+          {buyer.busy ? 'Starting buyer…' : 'Retry local buyer'}
+        </Button>
+        <Button disabled={buyer.busy} onClick={() => setExternal(true)}>
+          Connect a running buyer
+        </Button>
+      </FormActions>
       {external && (
         <Modal title="Connect a running buyer" close={() => setExternal(false)}>
           <X402ExternalConnection buyer={buyer} />
