@@ -3,9 +3,7 @@ import {
   CONTROL_CODES,
   OFFER_PRICING_KINDS,
   RECEIPT,
-  RECEIPT_DISPUTE_FIELDS,
   RECEIPT_VERDICTS,
-  type ReceiptDisputeField,
 } from '@gyblos/protocol/constants';
 import {
   controlFail,
@@ -24,6 +22,7 @@ import {
 } from '@gyblos/protocol/receipt';
 import type { Signer } from '@gyblos/protocol/signing';
 
+import { observedDisputes } from './receipt-evidence';
 import { receiptContext, sameReceiptContext } from './receipts-context';
 import { matchPaidReceipt, receiptPayment } from './receipts-payment';
 
@@ -99,15 +98,7 @@ async function prepareBuyerReceipt(value: unknown, paid = false) {
   )
     return controlFail(CONTROL_CODES.POLICY);
   if (payment) matchPaidReceipt(record, payment);
-  const disputed: ReceiptDisputeField[] = [];
-  for (const field of Object.values(RECEIPT_DISPUTE_FIELDS)) {
-    const observed = snapshot.observed[field];
-    const reported =
-      field === RECEIPT_DISPUTE_FIELDS.OUTPUT_BYTES
-        ? record.sizes.outputBytes
-        : record.usage[field];
-    if (observed !== null && observed !== reported) disputed.push(field);
-  }
+  const disputed = observedDisputes(record, snapshot.observed);
   if (
     payment &&
     (snapshot.observed.inputTokens === null ||

@@ -81,15 +81,21 @@ An optional private file implementation is available through
 limitations are documented with the collector policy. It is not wired into
 startup or external collection.
 
-The public collector policy (`@gyblos/core/public-receipts`) classifies an
-already verified receipt/v1 or receipt/v2 from either party as bilateral,
-disputed or seller-only, free or paid, under the same [sellerNodeId,
-buyerNodeId, requestId] key. It refuses a buyer whose disputed fields do not
-match its own observations. A buyer half completes a stored seller-only receipt;
-any different seller record (including a changed request digest) or a second
-buyer attestation is a conflict, and the first accepted version stays stored. It
-is pure policy: no storage, clock or network, and the loopback paired-free
-collector above is unchanged.
+The public collector policy (`@gyblos/core/public-receipts`) verifies a
+receipt/v1 or receipt/v2 from either party itself (node signatures and
+cross-binding), keeps a detached copy, and classifies it as bilateral, disputed
+or seller-only, free or paid, under the same key as the private collector. It
+refuses a buyer whose disputed fields do not match its own observations.
+Bilateral means two node keys agreed; it does not show that two independent
+parties exist. A buyer half completes a stored seller-only receipt. A different
+seller record under the same key (including a changed request digest) is a
+seller conflict, and a second, different buyer attestation is a buyer conflict:
+the first accepted version stays stored and keeps counting, so a seller cannot
+erase a buyer's dispute by signing again, and the conflict is evidence against
+the side that signed it. It is pure policy, not connected to any service; it
+stores nothing and never publishes individual receipts. The loopback paired-free
+collector above is unchanged and now shares the dispute, key and digest helpers
+with it.
 
 The signed batch format a node will use to hand its receipts and its own
 timestamps to a collector is the protocol contract "Receipt upload envelope v1"
