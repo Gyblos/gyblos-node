@@ -66,8 +66,9 @@ export function createPaidStreamOutput(
           return fail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
         // Validate each delta once and accumulate its bytes. Re-scanning the whole prefix for every
         // token is quadratic for long answers; the meter still recounts the combined text above.
+        let chunks: string[];
         try {
-          paidStreamDeltas(delta);
+          chunks = paidStreamDeltas(delta);
           const bytes = new TextEncoder().encode(delta).length;
           if (textBytes + bytes > FREE_EXECUTION.outputBytes)
             throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
@@ -75,11 +76,15 @@ export function createPaidStreamOutput(
         } catch {
           throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
         }
-        text = combined;
-        await deliver(delta);
-        checkDeadline();
-        if (active) deliveredText = combined;
-        check();
+        // Delivery acknowledges a bounded wire chunk, not a whole possibly multi-frame engine delta.
+        // A cut on a later frame must retain the earlier acknowledged prefix for settlement.
+        for (const chunk of chunks) {
+          text += chunk;
+          await deliver(chunk);
+          checkDeadline();
+          if (active) deliveredText = text;
+          check();
+        }
       } catch (error) {
         failed = true;
         failure = error;

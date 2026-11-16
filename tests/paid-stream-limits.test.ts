@@ -12,7 +12,10 @@ import {
   PaidExecutionError,
   parsePaidExecutionResponse,
 } from '@gyblos/protocol/paid-execution';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import {
+  PAID_EXECUTION_CODES,
+  PAID_STREAM,
+} from '@gyblos/protocol/paid/constants';
 
 import { PAID_CEILING, paidSellerFixture } from './support/paid-seller';
 
@@ -92,7 +95,7 @@ void test('incremental paid validation bounds total UTF-8 bytes before acknowled
       acknowledged.push(text);
     },
   );
-  assert.equal(acknowledged.length, 3);
+  assert.equal(acknowledged.join(''), chunk.repeat(3));
   assert.ok(
     new TextEncoder().encode(acknowledged.join('')).length <=
       FREE_EXECUTION.outputBytes,
@@ -109,5 +112,21 @@ void test('incremental paid validation bounds total UTF-8 bytes before acknowled
   assert.equal(terminal.charge?.chargedAtomic, '6');
   assert.equal(terminal.payment?.settlement?.refundedAtomic, '14');
   assert.deepEqual(parsePaidExecutionResponse(terminal), terminal);
+  assert.equal(seller.engineCalls.length, 1);
+});
+
+void test('an unaffordable whole engine delta is refused before any bounded chunk is delivered', async () => {
+  const seller = await paidSellerFixture();
+  seller.setScript({ deltas: ['x'.repeat(PAID_STREAM.deltaBytes * 2)] });
+  const { terminal, deltas } = await seller.execute(await seller.request());
+  assert.deepEqual(deltas, []);
+  assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
+  assert.equal(terminal.error?.delivered, undefined);
+  assert.equal(terminal.charge?.chargedAtomic, '0');
+  assert.equal(terminal.payment?.settlement?.refundedAtomic, PAID_CEILING);
+  assert.deepEqual(
+    seller.payment.calls.settle.map((call) => call.chargedAtomic),
+    ['0'],
+  );
   assert.equal(seller.engineCalls.length, 1);
 });

@@ -1392,8 +1392,9 @@ and a complete maximum terminal frame of 1051652 bytes. The terminal repeats the
 answer and includes charge/settlement metadata, so it reserves a whole frame,
 not only space for a small error. Individual delta, event, response and output
 bounds still apply; JSON escaping counts toward the serialized response limit.
-Readers reject lengths exceeding the remaining aggregate budget before allocating
-the body. Admission, absolute deadlines and backpressure are unchanged. Both peers
+Readers reject lengths exceeding the per-event bound before allocating the body;
+the verifier checks the aggregate budget after canonical decoding. Admission,
+absolute deadlines and backpressure are unchanged. Both peers
 upgrade together; no compatibility implementation for older beta bounds is provided.
 
 If delivery reaches an event/byte limit after a deposit, the seller stops with
@@ -1403,6 +1404,9 @@ output means zero charge; the remaining deposit is refunded. A cancellation or
 deadline still takes precedence. Generic internal or final-validation failures
 do not become billable merely because a delta was seen. Settlement is attempted
 once under the existing recovery rules, and the prompt is never replayed.
+The seller tracks acknowledgments per bounded wire delta, including when one
+engine delta needs several frames: a failed later frame cannot erase earlier
+acknowledged output or make its unacknowledged tail billable.
 
 `InferenceInput` and `InferenceResult` own the common conversation, tools,
 choice, output and usage shapes. `@gyblos/inference` owns capability validation,

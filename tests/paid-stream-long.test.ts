@@ -242,6 +242,7 @@ void test('a 20000-token paid answer finishes and charges its verified usage thr
   assert.equal(result.terminal?.error, undefined);
   assert.equal(result.delivered, 20000);
   assert.equal(result.frames, 20001);
+  assert.ok(result.bytes <= PAID_STREAM.totalBytes);
   assert.equal(result.closed, 0);
   assert.equal(result.finished, 1);
   assert.equal(result.released, 1);
@@ -288,6 +289,7 @@ void test('escaped paid deltas leave room for the complete correlated terminal',
   const result = await transport(value.paid, service, value.peer);
   assert.equal(result.delivered, 160000);
   assert.equal(result.frames, 10001);
+  assert.ok(result.bytes <= PAID_STREAM.totalBytes);
   assert.equal(result.terminal?.charge?.chargedAtomic, '20004');
   assert.equal(result.closed, 0);
   assert.equal(result.finished, 1);
