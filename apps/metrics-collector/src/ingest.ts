@@ -6,17 +6,7 @@ import {
   mergePublicReceipt,
 } from '@gyblos/core/public-receipts';
 import { canonicalJson } from '@gyblos/protocol';
-import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
-import {
-  controlHex,
-  controlObject,
-  controlVerify,
-} from '@gyblos/protocol/control-validation';
-import {
-  parseReceiptUpload,
-  RECEIPT_UPLOAD,
-  type ReceiptUploadV1,
-} from '@gyblos/protocol/receipt-upload';
+import { verifyReceiptUploadEnvelope } from '@gyblos/protocol/receipt-upload';
 
 import { COLLECTOR_ERRORS, COLLECTOR_LIMITS, HEX_RADIX } from './constants';
 import { collectorReject, verificationFailure } from './errors';
@@ -68,17 +58,6 @@ function decode(bytes: Uint8Array): unknown {
   return value;
 }
 
-// Input is already validated lowercase hex of an even length.
-function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let index = 0; index < bytes.length; index++)
-    bytes[index] = Number.parseInt(
-      hex.slice(index * 2, index * 2 + 2),
-      HEX_RADIX,
-    );
-  return bytes;
-}
-
 async function envelopeId(signature: string) {
   const digest = new Uint8Array(
     await crypto.subtle.digest('SHA-256', new TextEncoder().encode(signature)),
@@ -88,30 +67,13 @@ async function envelopeId(signature: string) {
   ).join('');
 }
 
-// Parses and checks only the envelope signature: one Ed25519 verification, no receipt work yet.
+// Parses and checks only the envelope signature (one Ed25519 verification), no receipt work yet.
 async function verifiedEnvelope(value: unknown) {
-  let upload: ReceiptUploadV1;
-  let signature: string;
   try {
-    const input = controlObject(value, ['upload', 'signature']);
-    upload = parseReceiptUpload(input.upload);
-    signature = controlHex(input.signature, CONTROL_LIMITS.signatureBytes);
+    return await verifyReceiptUploadEnvelope(value);
   } catch (error) {
     return verificationFailure(error);
   }
-  let valid: boolean;
-  try {
-    valid = await controlVerify(
-      RECEIPT_UPLOAD.domain,
-      upload,
-      hexToBytes(upload.uploaderNodeId),
-      hexToBytes(signature),
-    );
-  } catch (error) {
-    return verificationFailure(error);
-  }
-  if (!valid) return collectorReject(COLLECTOR_ERRORS.INVALID_SIGNATURE);
-  return { upload, signature };
 }
 
 export async function ingestUpload(
