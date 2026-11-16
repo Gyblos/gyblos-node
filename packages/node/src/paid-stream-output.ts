@@ -4,6 +4,7 @@
 import {
   ENGINE_ERROR_CODES,
   ENGINE_ERROR_STOP_REASON,
+  FREE_EXECUTION,
   type FreeExecutionStopReason,
 } from '@gyblos/protocol/constants';
 import { EngineError } from '@gyblos/protocol/engine';
@@ -36,12 +37,20 @@ export function createPaidStreamOutput(
   checkDeadline: () => void = () => {},
 ) {
   let text = '';
+  let textBytes = 0;
   // Only text whose delivery resolved; text above may hold a fragment still in flight.
   let deliveredText = '';
   let active = true;
   let inFlight = false;
   let failed = false;
   let failure: unknown;
+  function checkAllowance(value: string) {
+    const tokens = meter.streamed(value);
+    if (!Number.isSafeInteger(tokens) || tokens < 0)
+      return fail(PAID_EXECUTION_CODES.INTERNAL);
+    if (tokens > usage.allowance)
+      return fail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
+  }
   function check() {
     checkDeadline();
     if (signal.aborted || !active) return fail(PAID_EXECUTION_CODES.CANCELLED);
@@ -57,22 +66,31 @@ export function createPaidStreamOutput(
         entered = true;
         if (!delta) return;
         const combined = text + delta;
-        const tokens = meter.streamed(combined);
-        if (!Number.isSafeInteger(tokens) || tokens < 0)
-          return fail(PAID_EXECUTION_CODES.INTERNAL);
-        if (tokens > usage.allowance)
-          return fail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
-        // The combined text must stay sendable; otherwise the engine produced an invalid response.
+        checkAllowance(combined);
+        // Validate each delta once and accumulate its bytes. Re-scanning the whole prefix for every
+        // token is quadratic for long answers; the meter still recounts the combined text above.
+        let chunks: string[];
         try {
-          paidStreamDeltas(combined);
+          chunks = paidStreamDeltas(delta);
+          const bytes = new TextEncoder().encode(delta).length;
+          if (textBytes + bytes > FREE_EXECUTION.outputBytes)
+            throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
+          textBytes += bytes;
         } catch {
           throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
         }
-        text = combined;
-        await deliver(delta);
-        checkDeadline();
-        if (active) deliveredText = combined;
-        check();
+        // Delivery acknowledges a bounded wire chunk, not a whole possibly multi-frame engine delta.
+        // A cut on a later frame must retain the earlier acknowledged prefix for settlement.
+        for (const chunk of chunks) {
+          const prefix = text + chunk;
+          // BPE counts are not monotonic: an intermediate prefix can cost more than the full delta.
+          if (chunks.length > 1) checkAllowance(prefix);
+          text = prefix;
+          await deliver(chunk);
+          checkDeadline();
+          if (active) deliveredText = text;
+          check();
+        }
       } catch (error) {
         failed = true;
         failure = error;
@@ -136,7 +154,15 @@ export function stoppedAfterDeposit(
   meter: FreeMeter,
   allowance: number,
 ): PaidExecutionFailure {
-  const { code, reason } = stopCode(output.failure() ?? error, signal);
+  const deliveryFailure = output.failure();
+  // LIMIT raised by delivery stops an already deposited stream, rather than refusing admission.
+  // Report only the acknowledged prefix; unrelated final-validation/internal errors stay unbillable.
+  const stopped =
+    deliveryFailure instanceof PaidExecutionError &&
+    deliveryFailure.code === PAID_EXECUTION_CODES.LIMIT
+      ? new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE)
+      : (deliveryFailure ?? error);
+  const { code, reason } = stopCode(stopped, signal);
   const delivered = output.delivered();
   const reports = delivered !== '' && PAID_DELIVERED_CODES.includes(code);
   const deliveredTokens = reports ? meter.delivered(delivered, allowance) : 0;

@@ -103,10 +103,11 @@ export const HTTP_LIMITS = {
   facilitatorBody: '64kb',
 } as const;
 
-// Paid requests and the legacy HTTP path stay small until paid conversations land.
+// A paid answer is bounded like a free one: by the model's context and the buyer's spending ceiling, which
+// the deposit enforces. The prompt bound applies only to a lone legacy prompt; conversations use the context.
 export const INFERENCE_REQUEST_LIMITS = {
   minOutputTokens: 32,
-  maxOutputTokens: 128,
+  maxOutputTokens: 32768,
   maxPromptCharacters: 4000,
 } as const;
 

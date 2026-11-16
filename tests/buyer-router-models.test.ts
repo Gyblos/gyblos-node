@@ -285,7 +285,6 @@ void test('paid modes refuse a model list with a model or limit the paid buyer c
   assert.throws(paid([own, { id: 'big', selection: LARGE }]), {
     reason: 'BUYER_PAID_MODEL_UNSUPPORTED',
   });
-  assert.throws(paid([{ ...own, maxTokens: 2000 }]), {
-    reason: 'SELECTION_MAX_TOKENS_TOO_HIGH',
-  });
+  // A paid answer is bounded by the model and the spending ceiling, not by a short fixed limit.
+  paid([{ ...own, maxTokens: 2000 }])();
 });

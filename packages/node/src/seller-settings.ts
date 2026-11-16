@@ -139,11 +139,9 @@ function offerSettings(
   };
 }
 
-// A free Ollama offer without engine.context_tokens gets room for conversations and long answers; a paid
-// one keeps the engine's own default context, as paid execution still serves one bounded message.
+// An Ollama offer without engine.context_tokens, free or paid, gets room for conversations and long answers.
 function withFreeContext(offer: NodeOffer): NodeOffer['engine'] {
   if (
-    offer.pricing.kind !== OFFER_PRICING_KINDS.FREE ||
     offer.engine.kind !== ENGINE_KINDS.OLLAMA ||
     offer.engine.contextTokens !== undefined
   )

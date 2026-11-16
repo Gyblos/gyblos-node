@@ -4,7 +4,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import { DECLARED_METER, recountedMeter } from '@gyblos/node/free-meter';
 import {
   ENGINE_ERROR_CODES,
@@ -228,13 +227,11 @@ void test('a buyer leaving while the engine runs is a cancellation, not an engin
   });
 });
 
-void test('more output than free execution allows is refused before any deposit', async () => {
-  const seller = await paidSellerFixture({
-    maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens + 1,
-  });
+void test('a paid answer above the former 128-token bound is admitted', async () => {
+  const seller = await paidSellerFixture({ maxTokens: 129 });
   const { terminal } = await seller.execute(await seller.request());
-  assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.LIMIT);
-  assert.equal(seller.payment.calls.admit.length, 0);
+  assert.notEqual(terminal.error?.code, PAID_EXECUTION_CODES.LIMIT);
+  assert.equal(seller.payment.calls.admit.length, 1);
 });
 
 void test('an unreachable payment server is unavailable before any deposit', async () => {
