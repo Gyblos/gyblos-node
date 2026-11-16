@@ -16,6 +16,8 @@ export interface ObservationBuffer {
   take(limit: number): Record<string, unknown>[];
   // Puts events back at the front after a failed upload.
   restore(events: readonly Record<string, unknown>[]): void;
+  // Counts events that will never be sent (for example a batch the collector refused).
+  discard(count: number): void;
   size(): number;
   dropped(): number;
 }
@@ -57,6 +59,9 @@ export function createObservationBuffer(
       const room = Math.max(0, capacity - events.length);
       events = [...restored.slice(0, room), ...events];
       dropped += Math.max(0, restored.length - room);
+    },
+    discard(count) {
+      dropped += count;
     },
     size: () => events.length,
     dropped: () => dropped,

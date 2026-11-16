@@ -1,6 +1,8 @@
 // Protects the observation upload envelope: an uploader-signed, bounded batch of content-free
 // telemetry event records, detached before any signature check.
 import assert from 'node:assert/strict';
+import { createPublicKey, verify } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { CONTROL_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
@@ -17,6 +19,7 @@ import {
   RECEIPT_UPLOAD_CLIENTS,
   RECEIPT_UPLOAD_PLATFORMS,
 } from '@gyblos/protocol/receipt-upload';
+import { signingBytes } from '@gyblos/protocol/signing';
 
 import { receiptSigner } from './support/receipt-fixture';
 
@@ -128,4 +131,51 @@ void test('events are detached from the caller before signature checks yield', a
   const pending = verifyObservationUpload(input);
   input.upload.events[0]!.streaming = false;
   assert.deepEqual(await pending, signed);
+});
+
+void test('fractional or unsafe numbers in events are refused with a static code', async () => {
+  const buyer = receiptSigner();
+  await rejects(
+    signObservationUpload(
+      upload(buyer.nodeId, [{ ...unserved(buyer.nodeId), at: 1.5 }]),
+      buyer.sign,
+    ),
+    CONTROL_CODES.INVALID,
+  );
+});
+
+void test('observation upload vectors match independent canonical bytes and OpenSSL signatures', async () => {
+  const data = JSON.parse(
+    await readFile(
+      new URL(
+        import.meta
+          .resolve('@gyblos/protocol/vectors/observation-upload-v1.json'),
+      ),
+      'utf8',
+    ),
+  ) as { domain: string; cases: { signed: unknown; signingHex: string }[] };
+  assert.equal(data.domain, OBSERVATION_UPLOAD.domain);
+  for (const vector of data.cases) {
+    const signed = await verifyObservationUpload(vector.signed);
+    assert.deepEqual(signed, vector.signed);
+    const expected = Buffer.from(vector.signingHex, 'hex');
+    assert.deepEqual(
+      Buffer.from(signingBytes(OBSERVATION_UPLOAD.domain, signed.upload)),
+      expected,
+    );
+    const key = createPublicKey({
+      key: {
+        kty: 'OKP',
+        crv: 'Ed25519',
+        x: Buffer.from(signed.upload.uploaderNodeId, 'hex').toString(
+          'base64url',
+        ),
+      },
+      format: 'jwk',
+    });
+    assert.equal(
+      verify(null, expected, key, Buffer.from(signed.signature, 'hex')),
+      true,
+    );
+  }
 });

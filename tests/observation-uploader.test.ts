@@ -9,6 +9,7 @@ import { createMemoryStorage } from '@gyblos/metrics-collector/storage-memory';
 import { RECEIPT_UPLOADER_OUTCOMES as OUTCOMES } from '@gyblos/node/constants';
 import { createObservationBuffer } from '@gyblos/node/observation-buffer';
 import { createReceiptUploader } from '@gyblos/node/receipt-uploader';
+import { uploadObservationBuffer } from '@gyblos/node/receipt-uploader-startup';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   RECEIPT_UPLOAD_ARCHES,
@@ -123,13 +124,15 @@ void test('a failed send puts observations back; a refused batch is dropped and 
   const down = await uploader(buyer, buffer, () =>
     Promise.resolve(new Response('{}', { status: 503 })),
   ).uploadOnce();
-  assert.equal(down.outcome, OUTCOMES.RETRY);
+  // An observation failure never puts receipts into backoff; the events wait for the next tick.
+  assert.equal(down.outcome, OUTCOMES.IDLE);
   assert.equal(buffer.size(), 1);
   const refusedBatch = await uploader(buyer, buffer, () =>
     Promise.resolve(new Response('{"error":"UPLOAD_POLICY"}', { status: 400 })),
   ).uploadOnce();
   assert.notEqual(refusedBatch.outcome, OUTCOMES.RETRY);
   assert.equal(buffer.size(), 0);
+  assert.equal(buffer.dropped(), 1);
 });
 
 void test('the buffer is bounded, skips receipts and keeps only validated records', () => {
@@ -149,4 +152,14 @@ void test('the buffer is bounded, skips receipts and keeps only validated record
   assert.equal(taken[0]!.at, NOW - 3);
   buffer.restore(taken);
   assert.equal(buffer.take(5).length, 2);
+});
+
+void test('observations are on with uploads and can be turned off; receipts cannot', () => {
+  const release = { GYBLOS_VERSION: '0.1.0-beta.12' };
+  assert.ok(uploadObservationBuffer(release));
+  assert.equal(
+    uploadObservationBuffer({ ...release, GYBLOS_OBSERVATIONS: 'off' }),
+    undefined,
+  );
+  assert.equal(uploadObservationBuffer({}), undefined);
 });

@@ -287,8 +287,15 @@ async function uploadObservations(
         uploaded: events.length,
       };
     await response?.body?.cancel();
-    if (response && invalidContent(response.status))
+    // Invalid content, or a batch too large to ever fit, is dropped and counted rather than retried.
+    if (
+      response &&
+      (invalidContent(response.status) ||
+        response.status === RECEIPT_UPLOADER_HTTP.payloadTooLarge)
+    ) {
+      buffer.discard(events.length);
       return { outcome: RECEIPT_UPLOADER_OUTCOMES.REJECTED, uploaded: 0 };
+    }
   } catch {
     /* restored below */
   }
@@ -296,19 +303,21 @@ async function uploadObservations(
   return retry();
 }
 
+// Receipts drive backoff: an observation failure only waits for the next regular tick, so it never
+// slows receipt uploads. A full page of either continues at once.
 async function uploadOnce(context: UploadContext): Promise<UploadResult> {
   const receipts = await uploadReceipts(context);
   if (context.signal.aborted) return receipts;
   const observations = await uploadObservations(context);
-  const failed =
-    receipts.outcome === RECEIPT_UPLOADER_OUTCOMES.RETRY ||
-    observations.outcome === RECEIPT_UPLOADER_OUTCOMES.RETRY;
-  // A full receipt page keeps the loop going at once; observations follow the regular pace.
-  return failed
-    ? retry()
-    : receipts.uploaded
-      ? receipts
-      : { outcome: observations.outcome, uploaded: 0 };
+  if (receipts.outcome === RECEIPT_UPLOADER_OUTCOMES.RETRY) return receipts;
+  const uploaded = receipts.uploaded + observations.uploaded;
+  return {
+    outcome: uploaded
+      ? RECEIPT_UPLOADER_OUTCOMES.UPLOADED
+      : RECEIPT_UPLOADER_OUTCOMES.IDLE,
+    // The scheduler continues at once when this reaches a full receipt page.
+    uploaded,
+  };
 }
 
 export function createReceiptUploader(

@@ -89,7 +89,9 @@ export function createMemoryStorage(): MemoryCollector {
       if (nonces.has(nonce)) return Promise.resolve(COMMIT_RESULTS.REPLAYED);
       nonces.add(nonce);
       memory.envelopes.push(write.envelope);
-      memory.observations.push(...write.events);
+      for (const event of write.events)
+        if (!memory.observations.some((row) => row.key === event.key))
+          memory.observations.push(event);
       return Promise.resolve(COMMIT_RESULTS.COMMITTED);
     },
   };

@@ -149,6 +149,14 @@ the shared buyer (CLI and desktop) start it next to their receipt runtime.
 - **Effect on inference:** it never blocks or retries inference.
 - **Stopping:** `close()` aborts an upload in flight. Anything not yet
   acknowledged stays pending.
+- **Observations are on by default and can be turned off** with
+  `GYBLOS_OBSERVATIONS=off` (founder decision 2026-11-16). Receipts have no
+  opt-out. The packaged desktop passes this setting to its buyer.
+- **Observations are self-reported.** A buyer can attach a refusal or failure to
+  any seller, and node keys are free. Totals must keep observations apart from
+  receipt-backed figures, and must never count them against a seller without a
+  confirming source. Re-sent events are stored once, keyed by uploader and the
+  exact record, and each event's `at` must fall within 30 days before `sentAt`.
 - **Observations:** the seller and buyer telemetry events go through an
   in-memory buffer of at most 5000 events. The buffer exists only when this
   process uploads, and does not depend on the local telemetry file opt-in. The
@@ -186,7 +194,7 @@ failed, charged, refused and unserved. Each is checked as follows:
   `/v1/receipts`.
 
 Success is `{ "receivedAt": …, "accepted": n }`. One upload is one envelope
-insert plus chunked observation inserts in one transaction (1 + ⌈200/11⌉
+insert plus chunked observation inserts in one transaction (1 + ⌈200/10⌉
 statements at most).
 
 These events carry what receipts cannot:

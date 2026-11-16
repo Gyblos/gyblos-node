@@ -32,10 +32,17 @@ function event(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return controlFail();
   const input = controlObject(value, Object.keys(value));
-  const copy: unknown = JSON.parse(canonicalJson(input));
-  return copy && typeof copy === 'object' && !Array.isArray(copy)
-    ? (copy as Record<string, unknown>)
-    : controlFail();
+  let text: string;
+  try {
+    // Canonical JSON refuses unsafe or fractional numbers and non-JSON values with a plain error.
+    text = canonicalJson(input);
+  } catch {
+    return controlFail();
+  }
+  const copy: unknown = JSON.parse(text);
+  if (!copy || typeof copy !== 'object' || Array.isArray(copy))
+    return controlFail();
+  return Object.fromEntries(Object.entries(copy));
 }
 
 export function parseObservationUpload(value: unknown): ObservationUploadV1 {

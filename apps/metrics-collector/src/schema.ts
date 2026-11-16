@@ -14,6 +14,7 @@ import type {
   PublicReceiptStatus,
 } from '@gyblos/core/constants';
 import type { P2PRole } from '@gyblos/protocol/constants';
+import type { TelemetryEvent } from '@gyblos/protocol/telemetry';
 
 import type { EnvelopeKind } from './constants';
 
@@ -144,9 +145,10 @@ export const statusHistory = sqliteTable(
 export const observations = sqliteTable(
   'collector_observations',
   {
+    eventKey: text('event_key').primaryKey(),
     envelopeId: text('envelope_id').notNull(),
     eventIndex: integer('event_index').notNull(),
-    type: text('type').notNull(),
+    type: text('type').$type<TelemetryEvent['type']>().notNull(),
     at: integer('at').notNull(),
     requestId: text('request_id'),
     sellerNodeId: text('seller_node_id'),
@@ -155,7 +157,10 @@ export const observations = sqliteTable(
     insertedAt: integer('inserted_at').notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.envelopeId, table.eventIndex] }),
+    index('collector_observations_by_envelope').on(
+      table.envelopeId,
+      table.eventIndex,
+    ),
     index('collector_observations_by_type_time').on(table.type, table.at),
     index('collector_observations_by_request').on(table.requestId),
   ],

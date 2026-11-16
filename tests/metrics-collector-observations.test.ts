@@ -159,10 +159,10 @@ void test('a full batch is one envelope write plus chunked observation inserts i
     OBSERVATION_UPLOAD.maxEvents,
   );
   const batched = database.log.filter((entry) => entry.kind === 'batch');
-  // 1 envelope + ceil(200 / 11) observation chunks.
+  // 1 envelope + ceil(200 / 10) observation chunks (10 columns under the 100-parameter limit).
   assert.equal(
     batched.length,
-    1 + Math.ceil(OBSERVATION_UPLOAD.maxEvents / 11),
+    1 + Math.ceil(OBSERVATION_UPLOAD.maxEvents / 10),
   );
   for (const entry of database.log)
     assert.ok(entry.params.length <= COLLECTOR_LIMITS.maxBoundParameters);
@@ -172,4 +172,43 @@ void test('a full batch is one envelope write plus chunked observation inserts i
     database.rows('SELECT * FROM collector_observations').length,
     OBSERVATION_UPLOAD.maxEvents,
   );
+});
+
+void test('a re-sent event is stored once, and events outside the time window are refused', async () => {
+  const database = createCollectorD1();
+  const { app } = testCollector(createD1Storage(database));
+  const buyer = receiptSigner();
+  const first = await signObservationUpload(
+    envelope(buyer.nodeId, [unserved(buyer.nodeId)]),
+    buyer.sign,
+  );
+  const again = await signObservationUpload(
+    {
+      ...envelope(buyer.nodeId, [unserved(buyer.nodeId)]),
+      nonce: 'cd'.repeat(16),
+    },
+    buyer.sign,
+  );
+  assert.equal((await postObservations(app, first)).status, 200);
+  assert.equal((await postObservations(app, again)).status, 200);
+  assert.equal(database.rows('SELECT * FROM collector_observations').length, 1);
+
+  for (const at of [
+    T0 + COLLECTOR_LIMITS.clockWindowMs + 1,
+    T0 - COLLECTOR_LIMITS.maxObservationAgeMs - 1,
+  ]) {
+    const signed = await signObservationUpload(
+      {
+        ...envelope(buyer.nodeId, [unserved(buyer.nodeId, at)]),
+        nonce: 'ef'.repeat(16),
+      },
+      buyer.sign,
+    );
+    assert.deepEqual(
+      (await responseJson(await postObservations(app, signed))).body,
+      {
+        error: COLLECTOR_ERRORS.INVALID_UPLOAD,
+      },
+    );
+  }
 });

@@ -3,7 +3,7 @@
 // uploader, the shared write budget and one atomic write.
 import { toTelemetryRecord } from '@gyblos/core/telemetry';
 import { canonicalJson } from '@gyblos/protocol';
-import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 import { verifyObservationUpload } from '@gyblos/protocol/observation-upload';
 import {
   TELEMETRY_EVENTS,
@@ -26,9 +26,9 @@ import {
 import { COMMIT_RESULTS, type ObservationRow } from './storage';
 
 interface ValidatedEvent {
-  type: string;
+  type: TelemetryEvent['type'];
   at: number;
-  role: string;
+  role: P2PRole;
   requestId: string | null;
   buyerNodeId: string;
   sellerNodeId: string | null;
@@ -45,6 +45,14 @@ function nullableText(record: object, key: string) {
   return value === null ? null : text(record, key);
 }
 
+function closed<T extends string>(
+  value: string,
+  catalog: Record<string, T>,
+): T {
+  for (const item of Object.values(catalog)) if (value === item) return item;
+  return collectorReject();
+}
+
 // Core's projection validates every declared field and detaches it; receipts use their own envelope.
 function validated(value: unknown): ValidatedEvent {
   let record: object;
@@ -59,7 +67,7 @@ function validated(value: unknown): ValidatedEvent {
   // silently dropped, because the signed envelope is stored verbatim.
   if (canonicalJson(record) !== canonicalJson(value))
     return collectorReject(COLLECTOR_ERRORS.INVALID_UPLOAD);
-  const type = text(record, 'type');
+  const type = closed(text(record, 'type'), TELEMETRY_EVENTS);
   if (type === TELEMETRY_EVENTS.RECEIPT)
     return collectorReject(COLLECTOR_ERRORS.UPLOAD_POLICY);
   const at: unknown = Reflect.get(record, 'at');
@@ -67,7 +75,7 @@ function validated(value: unknown): ValidatedEvent {
   return {
     type,
     at: typeof at === 'number' ? at : collectorReject(),
-    role: text(record, 'role'),
+    role: closed(text(record, 'role'), P2P_ROLES),
     requestId: nullableText(record, 'requestId'),
     buyerNodeId: text(record, 'buyerNodeId'),
     sellerNodeId: nullableText(record, 'sellerNodeId'),
@@ -97,7 +105,8 @@ export async function ingestObservations(
   if (!(await context.admitNode(upload.uploaderNodeId)))
     return collectorReject(COLLECTOR_ERRORS.RATE_LIMITED);
   const id = await envelopeId(signature);
-  const rows: ObservationRow[] = upload.events.map((value, index) => {
+  const rows: ObservationRow[] = [];
+  for (const [index, value] of upload.events.entries()) {
     const event = validated(value);
     // Each event must be the uploader's own, in its role.
     const party =
@@ -106,16 +115,24 @@ export async function ingestObservations(
         : event.buyerNodeId === upload.uploaderNodeId;
     if (event.role !== upload.role || !party)
       return collectorReject(COLLECTOR_ERRORS.UPLOAD_POLICY);
-    return {
+    // Events are buffered in memory only, so they cannot be older than the window or in the future.
+    if (
+      event.at > upload.sentAt + COLLECTOR_LIMITS.clockWindowMs ||
+      event.at < upload.sentAt - COLLECTOR_LIMITS.maxObservationAgeMs
+    )
+      return collectorReject(COLLECTOR_ERRORS.INVALID_UPLOAD);
+    const json = canonicalJson(event.record);
+    rows.push({
+      key: await envelopeId(canonicalJson([upload.uploaderNodeId, json])),
       index,
       type: event.type,
       at: event.at,
       requestId: event.requestId,
       sellerNodeId: event.sellerNodeId,
       modelId: event.modelId,
-      json: canonicalJson(event.record),
-    };
-  });
+      json,
+    });
+  }
   if (!(await context.admitWrite()))
     return collectorReject(COLLECTOR_ERRORS.RATE_LIMITED);
   const result = await context.storage.commitObservations(

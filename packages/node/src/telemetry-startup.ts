@@ -1,5 +1,5 @@
-// Composes opt-in local file telemetry; startup closes only its own sink after the role stops.
-// Failures are static health metadata and never affect inference, admission or retry policy.
+// Composes opt-in local file telemetry plus always-on observers (the metrics uploader's buffer);
+// startup closes only its own sink after the role stops. Failures never affect inference or admission.
 import type { HomeEnvironment, HomeRole } from '@gyblos/config';
 import { fanOut } from '@gyblos/core/telemetry';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
@@ -42,7 +42,10 @@ export function createLocalTelemetry(options: LocalTelemetryOptions) {
   if (options.observers?.length)
     target = fanOut([...(target ? [target] : []), ...options.observers]);
   const health = () => ({
-    enabled: options.enabled || options.sink !== undefined,
+    enabled:
+      options.enabled ||
+      options.sink !== undefined ||
+      Boolean(options.observers?.length),
     owned,
     closed,
     failed,

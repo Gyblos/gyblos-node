@@ -4,6 +4,7 @@ import type { PublicReceiptMerge } from '@gyblos/core/constants';
 import type { PublicReceiptEntry } from '@gyblos/core/public-receipts';
 import type { P2PRole } from '@gyblos/protocol/constants';
 import type { ReceiptUploadClient } from '@gyblos/protocol/receipt-upload';
+import type { TelemetryEvent } from '@gyblos/protocol/telemetry';
 
 import type { EnvelopeKind } from './constants';
 
@@ -46,8 +47,10 @@ export interface CollectorWrite {
 }
 // One content-free telemetry event, validated by core and bound to its uploader.
 export interface ObservationRow {
+  // SHA-256 hex of the uploader and the validated record: a re-sent event is stored once.
+  key: string;
   index: number;
-  type: string;
+  type: TelemetryEvent['type'];
   at: number;
   requestId: string | null;
   sellerNodeId: string | null;

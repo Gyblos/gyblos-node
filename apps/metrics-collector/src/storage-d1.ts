@@ -265,10 +265,11 @@ function writeStatements(
 async function commitBatch(
   orm: CollectorDatabase,
   envelope: EnvelopeRow,
-  statements: readonly [BatchItem, ...BatchItem[]] | readonly BatchItem[],
+  statements: readonly BatchItem[],
 ): Promise<CommitResult> {
   const [first, ...rest] = statements;
-  if (!first) return COMMIT_RESULTS.COMMITTED;
+  // Every write starts with its envelope insert.
+  if (!first) throw new Error('Empty collector write.');
   try {
     await orm.batch([first, ...rest]);
     return COMMIT_RESULTS.COMMITTED;
@@ -326,6 +327,7 @@ export function createD1Storage(database: D1Database): CollectorStorage {
     },
     commitObservations(write, now) {
       const rows = write.events.map((event) => ({
+        eventKey: event.key,
         envelopeId: write.envelope.id,
         eventIndex: event.index,
         type: event.type,
@@ -339,7 +341,7 @@ export function createD1Storage(database: D1Database): CollectorStorage {
       return commitBatch(orm, write.envelope, [
         envelopeInsert(orm, write.envelope, now),
         ...chunks(rows, columnCount(rows[0] ?? {})).map((chunk) =>
-          orm.insert(observations).values(chunk),
+          orm.insert(observations).values(chunk).onConflictDoNothing(),
         ),
       ]);
     },

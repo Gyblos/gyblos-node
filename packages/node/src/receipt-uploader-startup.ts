@@ -122,5 +122,9 @@ export function startRoleUploader(
 export function uploadObservationBuffer(
   environment: NodeJS.ProcessEnv,
 ): ObservationBuffer | undefined {
-  return collectorUrl(environment) ? createObservationBuffer() : undefined;
+  return collectorUrl(environment) &&
+    environment[RECEIPT_UPLOADER.observationsEnvironment] !==
+      RECEIPT_UPLOADER.observationsOff
+    ? createObservationBuffer()
+    : undefined;
 }

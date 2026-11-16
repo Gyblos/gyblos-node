@@ -84,6 +84,8 @@ export const COLLECTOR_LIMITS = {
   clockWindowMs: 600_000,
   // D1's limit of bound parameters per statement; multi-row writes are chunked under it.
   maxBoundParameters: 100,
+  // Observations are buffered in memory on the node, so older events are not credible.
+  maxObservationAgeMs: 2_592_000_000,
 } as const;
 
 // Cloudflare bindings (wrangler.jsonc); every one is required and missing ones fail closed.
