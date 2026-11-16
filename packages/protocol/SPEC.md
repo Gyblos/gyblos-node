@@ -1770,7 +1770,7 @@ signed payment payload or per-token billing transaction is added to a receipt.
 is party to, plus its own timestamps, to a collector. The signed object is
 `{ upload, signature }`: `signature` is hex Ed25519 by `upload.uploaderNodeId`
 over the prefix `gyblos/receipt-upload/v1\n` (real LF), separate from every
-receipt domain. Vectors are `vectors/receipt-upload.json`, independently
+receipt domain. Vectors are `vectors/receipt-upload-v1.json`, independently
 generated with Node/OpenSSL; existing receipt vectors are unchanged.
 
 | Field            | Meaning and bounds                                                                                         |
@@ -1788,19 +1788,33 @@ unchanged receipt/v1 or receipt/v2 (by its seller record version), seller-only
 or paired. `storedAt` is when the uploader's private store first kept it, or
 null. `startedAt` (when the buyer sent the request) and `offer` are buyer-only
 and must be null from a seller. `offer` is allowed only on paid receipts and
-holds the accepted offer's `issuedAt`, `expiresAt`, `maxAtomic`, `maxTokens`,
-`availability.observedAt` (`observedAt`) and `catalogDigest`. The full signed
-offer is not uploaded because it carries the seller's endpoint addresses.
+holds the accepted offer's `issuedAt`, `expiresAt` (not earlier than
+`issuedAt`), `maxAtomic` (at least the receipt's `amountAtomic`), `maxTokens`
+(at least 1), `availability.observedAt` (`observedAt`) and `catalogDigest`. The
+full signed offer is not uploaded because it carries the seller's endpoint
+addresses.
 
-Verification parses and detaches the whole envelope before crypto yields, checks
-the envelope signature, then requires the uploader to be each receipt's seller
-(seller role) or buyer (buyer role), and verifies each receipt's own node
-signatures with its version's contract. Item times are attested only by the
-uploader's envelope signature, never by the peer. All times are safe integers
-in the uploader's own clock; the contract has no clock, so freshness, nonce
-replay, rate limits and storage belong to the collector. Malformed fields and
-unknown keys use `INVALID`, a foreign version `VERSION`, a receipt the uploader
-is not party to `POLICY`, a bad envelope or receipt signature `SIGNATURE`, and
-an envelope above 262144 canonical bytes `LIMIT`. Nothing here sends, stores or
-schedules an upload. No prompt, response, IP, endpoint address, key or payment
-payload is added.
+`storedAt`, `startedAt` and `offer` are the uploader's own claims. They are
+attested only by the uploader's envelope signature, never by the peer, and no
+receipt record binds them. A collector must store them labelled as uploader
+claims and must not derive seller pricing, reputation or settlement from them.
+All times are safe integers in the uploader's own clock.
+
+Parsing detaches the whole envelope and checks every structural rule, including
+that the uploader is each receipt's seller (seller role) or buyer (buyer role),
+before any crypto; signing applies the same parse. Verification then checks the
+envelope signature and each receipt's own node signatures with its version's
+contract. Malformed fields and unknown keys use `INVALID`, a foreign envelope or
+receipt version `VERSION`, a receipt the uploader is not party to or an offer
+below the signed amount `POLICY`, a bad envelope or receipt signature
+`SIGNATURE`. The `LIMIT` ceiling of 262144 canonical bytes applies to the parsed
+`upload` object and sits above the structural maximum (about 170 KiB): it is
+defense in depth, and the collector still caps the HTTP body before parsing.
+
+The contract has no clock and no audience: freshness, nonce replay, the target
+network or environment, rate limits applied before verification (a valid
+envelope costs up to 101 Ed25519 verifications) and storage belong to the
+collector. Node keys are free to create, so receipts where seller and buyer are
+the same entity, or self-made buyers, are not excluded here; the collector must
+flag them. Nothing here sends, stores or schedules an upload. No prompt,
+response, IP, endpoint address, key or payment payload is added.

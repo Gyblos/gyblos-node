@@ -91,14 +91,16 @@ function offer(value: unknown): ReceiptUploadOffer | null {
     'observedAt',
     'catalogDigest',
   ]);
-  return {
+  const parsed = {
     issuedAt: time(input.issuedAt),
     expiresAt: time(input.expiresAt),
     maxAtomic: controlAtomic(input.maxAtomic),
-    maxTokens: controlInteger(input.maxTokens),
+    maxTokens: controlInteger(input.maxTokens, 1),
     observedAt: time(input.observedAt),
     catalogDigest: controlHex(input.catalogDigest),
   };
+  if (parsed.expiresAt < parsed.issuedAt) return controlFail();
+  return parsed;
 }
 function signedHalf<T>(value: unknown, parse: (record: unknown) => T) {
   const input = controlObject(value, ['record', 'signature']);
@@ -116,11 +118,9 @@ function receipt(value: unknown): ReceiptV1 | ReceiptV2 {
     ...(hasBuyer ? ['buyer'] : []),
   ]);
   const seller = controlObject(input.seller, ['record', 'signature']);
-  const record = seller.record;
-  const version =
-    record && typeof record === 'object'
-      ? Reflect.get(record, 'version')
-      : undefined;
+  if (!seller.record || typeof seller.record !== 'object') return controlFail();
+  // Validate descriptors before reading the version, as the v2 parser does.
+  const { version } = controlObject(seller.record, Object.keys(seller.record));
   if (version === RECEIPT.version) {
     const parsed: ReceiptV1 = {
       seller: signedHalf(input.seller, parseSellerReceipt),
@@ -155,12 +155,26 @@ function item(value: unknown, uploaderRole: P2PRole): ReceiptUploadItem {
     (parsed.startedAt !== null || parsed.offer !== null)
   )
     return controlFail();
-  if (
-    parsed.offer !== null &&
-    parsed.receipt.seller.record.pricing.kind !== OFFER_PRICING_KINDS.PAID
-  )
-    return controlFail();
+  const record = parsed.receipt.seller.record;
+  if (parsed.offer !== null) {
+    if (record.pricing.kind !== OFFER_PRICING_KINDS.PAID) return controlFail();
+    // The offer is the buyer's claim; it must at least cover the seller-signed amount.
+    if (BigInt(record.amountAtomic) > BigInt(parsed.offer.maxAtomic))
+      return controlFail(CONTROL_CODES.POLICY);
+  }
   return parsed;
+}
+// The uploader must be the receipt's seller (seller role) or its buyer (buyer role). Checked while
+// parsing, before any signature work.
+function party(
+  value: ReceiptV1 | ReceiptV2,
+  uploaderNodeId: string,
+  uploaderRole: P2PRole,
+) {
+  const record = value.seller.record;
+  return uploaderRole === P2P_ROLES.SELLER
+    ? record.sellerNodeId === uploaderNodeId
+    : record.buyerNodeId === uploaderNodeId;
 }
 function receiptKey(value: ReceiptV1 | ReceiptV2) {
   const record = value.seller.record;
@@ -184,17 +198,21 @@ export function parseReceiptUpload(value: unknown): ReceiptUploadV1 {
   ]);
   if (input.version !== RECEIPT_UPLOAD.version)
     return controlFail(CONTROL_CODES.VERSION);
+  const uploaderNodeId = controlHex(input.uploaderNodeId);
   const uploaderRole = role(input.role);
   const uploaderClient = client(input.client);
   if (clientRole(uploaderClient.kind) !== uploaderRole) return controlFail();
   const rawItems = controlArray(input.items, RECEIPT_UPLOAD.maxItems);
   if (!rawItems.length) return controlFail();
   const items = rawItems.map((entry) => item(entry, uploaderRole));
+  for (const entry of items)
+    if (!party(entry.receipt, uploaderNodeId, uploaderRole))
+      return controlFail(CONTROL_CODES.POLICY);
   const keys = new Set(items.map((entry) => receiptKey(entry.receipt)));
   if (keys.size !== items.length) return controlFail();
   const upload: ReceiptUploadV1 = {
     version: RECEIPT_UPLOAD.version,
-    uploaderNodeId: controlHex(input.uploaderNodeId),
+    uploaderNodeId,
     role: uploaderRole,
     client: uploaderClient,
     sentAt: time(input.sentAt),

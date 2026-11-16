@@ -7,6 +7,7 @@ import {
   CONTROL_CODES,
   OFFER_PRICING_KINDS,
   P2P_ROLES,
+  RECEIPT,
 } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 import {
@@ -23,13 +24,16 @@ import {
   signReceiptUpload,
   verifyReceiptUpload,
   type ReceiptUploadV1,
+  type SignedReceiptUpload,
 } from '@gyblos/protocol/receipt-upload';
 import {
+  RECEIPT_V2,
   sellerReceiptDigestV2,
   signBuyerReceiptV2,
   signSellerReceiptV2,
   type ReceiptV2,
 } from '@gyblos/protocol/receipt-v2';
+import { sign } from '@gyblos/protocol/signing';
 
 import {
   buyerRecord,
@@ -151,9 +155,51 @@ void test('changing any signed field after signing fails the envelope signature'
     sellerUpload(seller.nodeId, receipt),
     seller.sign,
   );
-  const tampered = clone(signed);
-  tampered.upload.items[0]!.storedAt = T0;
-  await rejects(verifyReceiptUpload(tampered), CONTROL_CODES.SIGNATURE);
+  const edits: ((upload: ReceiptUploadV1) => void)[] = [
+    (u) => (u.sentAt += 1),
+    (u) => (u.nonce = 'cd'.repeat(RECEIPT_UPLOAD.nonceBytes)),
+    (u) => (u.client.appVersion = '0.1.0'),
+    (u) => (u.client.platform = RECEIPT_UPLOAD_PLATFORMS.MACOS),
+    (u) => (u.client.arch = RECEIPT_UPLOAD_ARCHES.ARM64),
+    (u) => (u.items[0]!.storedAt = T0),
+    (u) => (u.items[0]!.storedAt = null),
+  ];
+  for (const edit of edits) {
+    const tampered = clone(signed);
+    edit(tampered.upload);
+    await rejects(verifyReceiptUpload(tampered), CONTROL_CODES.SIGNATURE);
+  }
+
+  const { buyer, receipt: paid } = await paidPair();
+  const buyerSigned = await signReceiptUpload(
+    buyerUpload(buyer.nodeId, paid),
+    buyer.sign,
+  );
+  const buyerEdits: ((upload: ReceiptUploadV1) => void)[] = [
+    (u) => (u.items[0]!.startedAt = T0 - 1),
+    (u) => (u.items[0]!.offer!.maxAtomic = '2000'),
+    (u) => (u.items[0]!.offer!.expiresAt += 1),
+    (u) => (u.client.kind = RECEIPT_UPLOAD_CLIENTS.BUYER_CLI),
+  ];
+  for (const edit of buyerEdits) {
+    const tampered = clone(buyerSigned);
+    edit(tampered.upload);
+    await rejects(verifyReceiptUpload(tampered), CONTROL_CODES.SIGNATURE);
+  }
+});
+
+void test('verification detaches the envelope before signature checks yield', async () => {
+  const { seller, receipt } = await freePair();
+  const signed = await signReceiptUpload(
+    sellerUpload(seller.nodeId, receipt),
+    seller.sign,
+  );
+  const input = clone(signed);
+  const pending = verifyReceiptUpload(input);
+  input.upload.sentAt = 1;
+  input.upload.items[0]!.storedAt = 2;
+  input.upload.items[0]!.receipt.seller.record.usage.outputTokens = 999;
+  assert.deepEqual(await pending, signed);
 });
 
 void test('an uploader can only upload receipts it is party to in its role', async () => {
@@ -164,10 +210,59 @@ void test('an uploader can only upload receipts it is party to in its role', asy
     [buyer, sellerUpload(buyer.nodeId, receipt)],
     [seller, { ...buyerUpload(seller.nodeId, receipt) }],
   ] as const) {
-    // Signing succeeds: the binding is a collector-side policy, not a signing precondition.
-    const signed = await signReceiptUpload(upload, signer.sign);
-    await rejects(verifyReceiptUpload(signed), CONTROL_CODES.POLICY);
+    await rejects(signReceiptUpload(upload, signer.sign), CONTROL_CODES.POLICY);
+    // A hand-signed envelope is refused before any receipt signature is checked.
+    const forged: SignedReceiptUpload = {
+      upload,
+      signature: Buffer.from(
+        await sign(RECEIPT_UPLOAD.domain, upload, signer.sign),
+      ).toString('hex'),
+    };
+    await rejects(verifyReceiptUpload(forged), CONTROL_CODES.POLICY);
   }
+});
+
+void test('offer facts must be coherent and cover the seller-signed amount', async () => {
+  const { buyer, receipt } = await paidPair();
+  const reversed = buyerUpload(buyer.nodeId, receipt);
+  reversed.items[0]!.offer!.expiresAt = reversed.items[0]!.offer!.issuedAt - 1;
+  await rejects(signReceiptUpload(reversed, buyer.sign), CONTROL_CODES.INVALID);
+
+  const noTokens = buyerUpload(buyer.nodeId, receipt);
+  noTokens.items[0]!.offer!.maxTokens = 0;
+  await rejects(signReceiptUpload(noTokens, buyer.sign), CONTROL_CODES.INVALID);
+
+  const below = buyerUpload(buyer.nodeId, receipt);
+  below.items[0]!.offer!.maxAtomic = '69';
+  await rejects(signReceiptUpload(below, buyer.sign), CONTROL_CODES.POLICY);
+
+  const withoutOffer = buyerUpload(buyer.nodeId, receipt);
+  withoutOffer.items[0]!.offer = null;
+  const signed = await signReceiptUpload(withoutOffer, buyer.sign);
+  assert.deepEqual(await verifyReceiptUpload(clone(signed)), signed);
+});
+
+void test('exactly the maximum number of distinct receipts is accepted', async () => {
+  const seller = receiptSigner();
+  const items: ReceiptUploadV1['items'] = [];
+  for (let index = 0; index < RECEIPT_UPLOAD.maxItems; index++) {
+    const record = {
+      ...sellerRecord(seller.nodeId, receiptSigner().nodeId),
+      requestId: index.toString(16).padStart(32, '0'),
+    };
+    items.push({
+      receipt: { seller: await signSellerReceipt(record, seller.sign) },
+      storedAt: null,
+      startedAt: null,
+      offer: null,
+    });
+  }
+  const upload = { ...sellerUpload(seller.nodeId, items[0]!.receipt), items };
+  const signed = await signReceiptUpload(upload, seller.sign);
+  assert.equal(
+    (await verifyReceiptUpload(clone(signed))).upload.items.length,
+    RECEIPT_UPLOAD.maxItems,
+  );
 });
 
 void test('a receipt with a bad node signature is refused inside a valid envelope', async () => {
@@ -260,6 +355,49 @@ void test('unknown fields, foreign versions and malformed values are refused wit
     await rejects(verifyReceiptUpload(bad), CONTROL_CODES.INVALID);
   }
 
+  for (const target of ['client', 'item', 'offer'] as const) {
+    const { buyer, receipt: paid } = await paidPair();
+    const extraField = buyerUpload(buyer.nodeId, paid) as unknown as {
+      client: Record<string, unknown>;
+      items: (Record<string, unknown> & { offer: Record<string, unknown> })[];
+    };
+    if (target === 'client') extraField.client.ip = '203.0.113.1';
+    if (target === 'item') extraField.items[0]!.endpoint = 'relay';
+    if (target === 'offer') extraField.items[0]!.offer.directAddresses = [];
+    await rejects(
+      signReceiptUpload(extraField as unknown as ReceiptUploadV1, buyer.sign),
+      CONTROL_CODES.INVALID,
+    );
+  }
+
+  const sellerOffer = sellerUpload(seller.nodeId, receipt);
+  sellerOffer.items[0]!.offer = {
+    issuedAt: T0,
+    expiresAt: T0 + 1,
+    maxAtomic: '1',
+    maxTokens: 1,
+    observedAt: T0,
+    catalogDigest: '55'.repeat(32),
+  };
+  await rejects(
+    signReceiptUpload(sellerOffer, seller.sign),
+    CONTROL_CODES.INVALID,
+  );
+
+  const foreignReceipt = clone(signed) as unknown as {
+    upload: {
+      items: { receipt: { seller: { record: Record<string, unknown> } } }[];
+    };
+  };
+  foreignReceipt.upload.items[0]!.receipt.seller.record.version = 3;
+  await rejects(verifyReceiptUpload(foreignReceipt), CONTROL_CODES.VERSION);
+
+  const notObject = clone(signed) as unknown as {
+    upload: { items: { receipt: { seller: { record: unknown } } }[] };
+  };
+  notObject.upload.items[0]!.receipt.seller.record = 'record';
+  await rejects(verifyReceiptUpload(notObject), CONTROL_CODES.INVALID);
+
   const appVersion = clone(signed);
   appVersion.upload.client.appVersion = 'x'.repeat(
     RECEIPT_UPLOAD.maxAppVersionCharacters + 1,
@@ -269,4 +407,11 @@ void test('unknown fields, foreign versions and malformed values are refused wit
 
 void test('the envelope signing domain is separate from every receipt domain', () => {
   assert.equal(RECEIPT_UPLOAD.domain, 'gyblos/receipt-upload/v1\n');
+  for (const domain of [
+    RECEIPT.sellerDomain,
+    RECEIPT.buyerDomain,
+    RECEIPT_V2.sellerDomain,
+    RECEIPT_V2.buyerDomain,
+  ])
+    assert.notEqual(RECEIPT_UPLOAD.domain, domain);
 });

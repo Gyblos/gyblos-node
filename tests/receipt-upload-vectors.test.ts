@@ -18,7 +18,7 @@ void test('receipt upload vectors match independent canonical bytes and OpenSSL 
   const raw: unknown = JSON.parse(
     await readFile(
       new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/receipt-upload.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/receipt-upload-v1.json'),
       ),
       'utf8',
     ),

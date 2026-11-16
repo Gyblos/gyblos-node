@@ -1,7 +1,7 @@
 // Receipt upload envelope contract: a node signs a batch of receipts it is party to, plus its own
 // timestamps. The envelope signature attests the uploader's claims; each receipt keeps and is checked
 // against its own node signatures. Freshness, replay and storage belong to the collector.
-import { CONTROL_CODES, CONTROL_LIMITS, P2P_ROLES, RECEIPT } from './constants';
+import { CONTROL_CODES, CONTROL_LIMITS, RECEIPT } from './constants';
 import {
   controlFail,
   controlHex,
@@ -57,14 +57,6 @@ function verifyNodeReceipt(value: ReceiptV1 | ReceiptV2) {
     : verifyReceiptV2(value);
 }
 
-// The uploader must be the receipt's seller (seller role) or its buyer (buyer role).
-function party(upload: ReceiptUploadV1, value: ReceiptV1 | ReceiptV2) {
-  const record = value.seller.record;
-  return upload.role === P2P_ROLES.SELLER
-    ? record.sellerNodeId === upload.uploaderNodeId
-    : record.buyerNodeId === upload.uploaderNodeId;
-}
-
 export async function verifyReceiptUpload(
   value: unknown,
 ): Promise<SignedReceiptUpload> {
@@ -81,9 +73,7 @@ export async function verifyReceiptUpload(
     ))
   )
     return controlFail(CONTROL_CODES.SIGNATURE);
-  for (const item of upload.items) {
-    if (!party(upload, item.receipt)) return controlFail(CONTROL_CODES.POLICY);
-    await verifyNodeReceipt(item.receipt);
-  }
+  // Party binding and every structural rule were checked by the parser, before any crypto.
+  for (const item of upload.items) await verifyNodeReceipt(item.receipt);
   return { upload, signature };
 }

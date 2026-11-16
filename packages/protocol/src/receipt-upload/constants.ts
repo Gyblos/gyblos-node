@@ -6,7 +6,9 @@ export const RECEIPT_UPLOAD = {
   maxItems: 50,
   nonceBytes: 16,
   maxAppVersionCharacters: 32,
-  // Canonical bytes of the whole signed envelope (items carry receipts of a few KiB each).
+  // Canonical bytes of the parsed `upload` object. Every item is already bounded by its receipt caps,
+  // so this is a defense-in-depth ceiling above the structural maximum (about 170 KiB); the
+  // collector still caps the HTTP body before parsing.
   maxBytes: 262_144,
 } as const;
 

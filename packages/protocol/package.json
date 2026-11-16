@@ -75,7 +75,7 @@
     "./vectors/session-blocks-v5.json": "./vectors/session-blocks-v5.json",
     "./receipt-upload": "./src/receipt-upload.ts",
     "./receipt-v2": "./src/receipt-v2.ts",
-    "./vectors/receipt-upload.json": "./vectors/receipt-upload.json",
+    "./vectors/receipt-upload-v1.json": "./vectors/receipt-upload-v1.json",
     "./vectors/receipt-v2.json": "./vectors/receipt-v2.json"
   }
 }
