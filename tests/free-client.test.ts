@@ -240,7 +240,7 @@ void test('free client refuses a paid quote and a mismatched selection before se
   );
   assert.equal(changed.writes(), 0);
 });
-void test('free client correlates remote errors and rejects mismatched responses', async () => {
+void test('free client correlates remote errors and rejects mismatched responses', async (context) => {
   const remote = await fixture();
   remote.setFrame(
     encodeFreeExecutionResponse({
@@ -250,6 +250,8 @@ void test('free client correlates remote errors and rejects mismatched responses
       error: { code: FREE_EXECUTION_CODES.BUSY },
     }),
   );
+  // This case checks correlation; crypto scheduling must not consume its simulated budget.
+  context.mock.timers.enable({ apis: ['setTimeout'] });
   await assert.rejects(remote.client.execute(remote.request), {
     code: FREE_EXECUTION_CODES.BUSY,
     remote: true,
