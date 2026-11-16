@@ -1,4 +1,4 @@
-// Owns the receipt upload envelope version, signing domain and closed catalogs; no receipt domain.
+// Owns receipt upload envelope versions, signing domains and closed catalogs; no receipt domain.
 export const RECEIPT_UPLOAD = {
   version: 1,
   domain: 'gyblos/receipt-upload/v1\n',
@@ -10,6 +10,12 @@ export const RECEIPT_UPLOAD = {
   // so this is a defense-in-depth ceiling above the structural maximum (about 170 KiB); the
   // collector still caps the HTTP body before parsing.
   maxBytes: 262_144,
+} as const;
+
+export const RECEIPT_UPLOAD_V2 = {
+  ...RECEIPT_UPLOAD,
+  version: 2,
+  domain: 'gyblos/receipt-upload/v2\n',
 } as const;
 
 // Which application produced the upload; it must agree with the uploader's role.
