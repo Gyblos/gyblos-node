@@ -19,11 +19,15 @@ import {join} from 'node:path';
 import {createBuyerApiKeys} from '@gyblos/node/buyer-api-keys';
 import {executeApiKey} from '@gyblos/buyer/api-key-execution';
 import {PaidClientError} from '@gyblos/transport-iroh/paid-client';
-import {PAID_EXECUTION_CODES} from '@gyblos/protocol/paid/constants';
+import {canonicalJson} from '@gyblos/protocol';
+import {PAID_EXECUTION,PAID_EXECUTION_CODES} from '@gyblos/protocol/paid/constants';
+import {SESSION_CODES} from '@gyblos/protocol/payment-session';
 import {ENGINE_DONE_REASONS,REASONING_LEVELS} from '@gyblos/protocol/constants';
 import {BATCH_SESSION_DEFAULTS} from '@gyblos/config/batch-session';
 import {FREE_BUYER_STARTUP,PAID_BUYER_CODES} from '@gyblos/buyer/constants';
 const {config,quote,input,scenario,target}=${JSON.stringify(data)};
+let now=quote.offer.issuedAt;
+Date.now=()=>now;
 const probe={meters:0,chains:0,authorizations:0,executions:0,free:0};
 globalThis.probe=probe;
 globalThis.winner={nodeId:quote.offer.nodeId,quote};
@@ -66,12 +70,20 @@ if(scenario==='quote-mint') quote.offer.mint='1'.repeat(32);
 if(scenario==='tokens') config.request.maxTokens=32769;
 if(scenario==='quote-tokens') input.maxTokens=quote.offer.maxTokens+1;
 if(scenario==='bytes') input.messages[0].content='a'.repeat(65537);
+if(scenario==='escaped-bytes') {
+  input.messages[0].content='';
+  const envelope={quote,input:{...input,selection:quote.offer.selection,reasoning:quote.offer.reasoning}};
+  const overhead=new TextEncoder().encode(canonicalJson(envelope)).length;
+  const count=Math.floor((PAID_EXECUTION.requestBytes-64-overhead)/6);
+  input.messages[0].content=String.fromCharCode(0).repeat(count);
+}
 if(scenario==='history') input.messages.unshift({role:'system',content:'synthetic instructions'});
 if(scenario==='unrelated-model') config.models=[{id:'synthetic-free',selection:custom,maxTokens:10}];
 if(scenario.startsWith('session-')) {
   config.session={depositAtomic:'100',lifetimeMs:600000,withdrawDelaySeconds:BATCH_SESSION_DEFAULTS.withdrawDelaySeconds};
   if(scenario.endsWith('-pool')) config.session.totalDepositAtomic='200';
   if(scenario.includes('model')) config.request.selection=custom;
+  if(scenario.includes('deposit')) config.session.depositAtomic='50';
   if(scenario.includes('context')) input.maxTokens=quote.offer.maxTokens;
   if(scenario.includes('budget')) {
     quote.offer.maxAtomic='1';
@@ -96,12 +108,13 @@ const chain=async()=>{
     authorize:async terms=>{
       assert.equal((await ready()).keys[0].reservedAtomic,'100','reserve must precede authorization');
       probe.authorizations++;
-      return {channelId:'synthetic',payer:quote.offer.buyer,requestDigest:terms.requestDigest,maxAtomic:terms.maxAtomic,payload:'YQ=='};
+      return {channelId:'synthetic',payer:quote.offer.buyer,requestDigest:terms.requestDigest,maxAtomic:terms.maxAtomic,payload:scenario==='escaped-bytes'?'A'.repeat(1600):'YQ=='};
     },discard:async()=>{},checkReceipt:async()=>{},reconcile:async()=>[]
   }};
 };
 const meter=async()=>{
   probe.meters++;
+  if(scenario.includes('expired')) now=quote.offer.expiresAt;
   if(scenario==='meter-load') throw Error('synthetic tokenizer unavailable');
   const count=()=>{
     if(scenario==='meter-input') throw Error('synthetic unsupported input');
@@ -113,7 +126,7 @@ await mkdir(join(process.env.GYBLOS_HOME,'buyer'),{recursive:true,mode:0o700});
 const runtime=await quoteBuyerExecution({meter,chain,
   batch:async()=>{probe.chains++;throw Error('unexpected batch backend')},
   pool:async()=>{probe.chains++;throw Error('unexpected pool backend')}
-})({prepared:{config},role,dependencies:{},endpoint:{},relayOnly:false});
+})({prepared:{config},role,dependencies:{},endpoint:{id:()=>({toString:()=>quote.offer.buyerNodeId})},relayOnly:false});
 const call=(data=input,model,signal=new AbortController().signal)=>executeApiKey(keys,key.id,signal,
   (current,operation)=>runtime.execute(data,current,undefined,model,operation));
 try {
@@ -144,8 +157,10 @@ try {
       :['reasoning','quote-reasoning','downgrade'].includes(scenario)?{reason:FREE_BUYER_STARTUP.REASONING}
       :['network','mint','quote-mint'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_NETWORK}
       :scenario==='tokens'?{reason:FREE_BUYER_STARTUP.MAX_TOKENS}
+      :scenario.includes('expired')?{code:PAID_EXECUTION_CODES.EXPIRED}
+      :scenario.includes('deposit')?{code:SESSION_CODES.LIMIT}
       :scenario.includes('budget')?{code:PAID_EXECUTION_CODES.BUDGET_EXHAUSTED}
-      :['quote-tokens','bytes'].includes(scenario)||scenario.includes('context')?{code:PAID_EXECUTION_CODES.LIMIT}
+      :['quote-tokens','bytes','escaped-bytes'].includes(scenario)||scenario.includes('context')?{code:PAID_EXECUTION_CODES.LIMIT}
       :{code:PAID_BUYER_CODES.UNSUPPORTED};
     await assert.rejects(call(input,route,controller.signal),expected);
     const snapshot=await ready();
