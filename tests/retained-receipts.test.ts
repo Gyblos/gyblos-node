@@ -12,7 +12,28 @@ import {
 
 import { managedReceiptFixture } from './support/local-collector';
 
-void test('retained receipts remove expired bodies and keep replay decisions after restart', async (context) => {
+void test('raw collector bodies remain available after retention and restart for future upload', async (context) => {
+  const f = await managedReceiptFixture(context);
+  let now = 1000;
+  const options = { path: f.path, retentionMs: 10, now: () => now };
+  const first = f.manage(await createRetainedReceiptStore(options));
+  await first.insert(f.entry);
+  now = 2000;
+  await first.sweep();
+  await first.close();
+  const second = f.manage(await openRetainedReceiptStore(options));
+  const stored: unknown = JSON.parse(await readFile(f.path, 'utf8'));
+  assert.ok(
+    stored &&
+      typeof stored === 'object' &&
+      'entries' in stored &&
+      Array.isArray(stored.entries),
+  );
+  assert.deepEqual(stored.entries[0].receipt, f.entry.receipt);
+  assert.equal(await second.insert(f.entry), 'identical');
+});
+
+void test('retained receipts preserve raw bodies and replay decisions after restart', async (context) => {
   const f = await managedReceiptFixture(context);
   let now = 1000;
   const options = { path: f.path, retentionMs: 100, now: () => now };
@@ -24,15 +45,15 @@ void test('retained receipts remove expired bodies and keep replay decisions aft
   const second = await openRetainedReceiptStore(options);
   f.manage(second);
   const state = JSON.parse(await readFile(f.path, 'utf8'));
-  assert.equal(state.entries[0].receipt, null);
+  assert.deepEqual(state.entries[0].receipt, f.entry.receipt);
   assert.equal(await second.insert(f.entry), 'identical');
   assert.equal(await second.insert(f.conflict), 'conflict');
-  assert.equal(
+  assert.deepEqual(
     JSON.parse(await readFile(f.path, 'utf8')).entries[0].receipt,
-    null,
+    f.entry.receipt,
   );
 });
-void test('retained receipt tombstones consume capacity without eviction', async (context) => {
+void test('retained receipt bodies consume capacity without eviction', async (context) => {
   const f = await managedReceiptFixture(context);
   let now = 1000;
   const store = await createRetainedReceiptStore({
@@ -76,7 +97,7 @@ void test('retained receipt store refuses corruption and never recreates missing
     code: 'RECEIPT_FILE_CORRUPT',
   });
 });
-void test('retained receipt cancellation preserves prior bytes and clock rollback cannot revive bodies', async (context) => {
+void test('retained receipt cancellation and clock rollback preserve prior bodies', async (context) => {
   const f = await managedReceiptFixture(context);
   let now = 1000;
   const options = { path: f.path, retentionMs: 10, now: () => now };
@@ -96,9 +117,9 @@ void test('retained receipt cancellation preserves prior bytes and clock rollbac
   now = 900;
   const second = await openRetainedReceiptStore(options);
   f.manage(second);
-  assert.equal(
+  assert.deepEqual(
     JSON.parse(await readFile(f.path, 'utf8')).entries[0].receipt,
-    null,
+    f.entry.receipt,
   );
   assert.equal(await second.insert(f.entry), 'identical');
 });

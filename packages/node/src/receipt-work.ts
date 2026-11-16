@@ -1,5 +1,7 @@
 // Bounds best-effort receipt work without releasing uncancellable work early or retrying inference: at most
 // `slots` jobs at once (one per request a buyer may run side by side); another is dropped and counted.
+import type { ReceiptUploadHealth } from './receipt-upload-types';
+
 export function createReceiptWork(milliseconds: number, slots = 1) {
   const active = new Set<Promise<void>>();
   const cancels = new Set<() => void>();
@@ -77,5 +79,15 @@ export function createReceiptWork(milliseconds: number, slots = 1) {
     async settled() {
       await Promise.all(active);
     },
+  };
+}
+
+export function receiptHealth(
+  health: ReturnType<typeof createReceiptWork>['health'],
+  storage?: () => ReceiptUploadHealth | undefined,
+): () => ReturnType<typeof health> & { storage?: ReceiptUploadHealth } {
+  return () => {
+    const current = storage?.();
+    return { ...health(), ...(current ? { storage: current } : {}) };
   };
 }
