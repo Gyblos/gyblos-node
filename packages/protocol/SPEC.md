@@ -1763,3 +1763,44 @@ storage, public collection and upload activation remain separate integrations;
 no receipt/v2 is automatically sent or persisted. Existing v1 consumers remain
 in use. No prompt, response, private key, IP, internal endpoint, raw journal,
 signed payment payload or per-token billing transaction is added to a receipt.
+
+## Receipt upload envelope v1
+
+`@gyblos/protocol/receipt-upload` defines how a node hands a batch of receipts it
+is party to, plus its own timestamps, to a collector. The signed object is
+`{ upload, signature }`: `signature` is hex Ed25519 by `upload.uploaderNodeId`
+over the prefix `gyblos/receipt-upload/v1\n` (real LF), separate from every
+receipt domain. Vectors are `vectors/receipt-upload.json`, independently
+generated with Node/OpenSSL; existing receipt vectors are unchanged.
+
+| Field            | Meaning and bounds                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| `version`        | `1`; any other value is `VERSION`.                                                                         |
+| `uploaderNodeId` | 32-byte hex NodeId; it signs the envelope.                                                                 |
+| `role`           | `seller` or `buyer` (`P2P_ROLES`).                                                                         |
+| `client`         | `kind` (`seller-node`, `buyer-cli`, `buyer-desktop`, matching the role), `appVersion`, `platform`, `arch`. |
+| `sentAt`         | Uploader clock, milliseconds since epoch.                                                                  |
+| `nonce`          | 16-byte hex, chosen per envelope.                                                                          |
+| `items`          | 1 to 50 items, one per distinct (seller, buyer, requestId).                                                |
+
+Each item is `{ receipt, storedAt, startedAt, offer }`. `receipt` is an
+unchanged receipt/v1 or receipt/v2 (by its seller record version), seller-only
+or paired. `storedAt` is when the uploader's private store first kept it, or
+null. `startedAt` (when the buyer sent the request) and `offer` are buyer-only
+and must be null from a seller. `offer` is allowed only on paid receipts and
+holds the accepted offer's `issuedAt`, `expiresAt`, `maxAtomic`, `maxTokens`,
+`availability.observedAt` (`observedAt`) and `catalogDigest`. The full signed
+offer is not uploaded because it carries the seller's endpoint addresses.
+
+Verification parses and detaches the whole envelope before crypto yields, checks
+the envelope signature, then requires the uploader to be each receipt's seller
+(seller role) or buyer (buyer role), and verifies each receipt's own node
+signatures with its version's contract. Item times are attested only by the
+uploader's envelope signature, never by the peer. All times are safe integers
+in the uploader's own clock; the contract has no clock, so freshness, nonce
+replay, rate limits and storage belong to the collector. Malformed fields and
+unknown keys use `INVALID`, a foreign version `VERSION`, a receipt the uploader
+is not party to `POLICY`, a bad envelope or receipt signature `SIGNATURE`, and
+an envelope above 262144 canonical bytes `LIMIT`. Nothing here sends, stores or
+schedules an upload. No prompt, response, IP, endpoint address, key or payment
+payload is added.
