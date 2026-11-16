@@ -30,12 +30,18 @@ void test('buyer confirmation at a full pending budget reports FULL and preserve
     );
     const [waiting] = await store.listPending();
     assert.ok(waiting);
-    assert.equal(waiting.receipt.seller.record.requestId, '2'.padStart(32, '0'));
+    assert.equal(
+      waiting.receipt.seller.record.requestId,
+      '2'.padStart(32, '0'),
+    );
     assert.equal((await store.uploadHealth()).rejectedWrites, 1);
     assert.equal((await store.uploadHealth()).full, true);
     await store.markUploaded(waiting, 1700000000100);
     assert.equal(
-      await store.confirm(f.confirm.params.receipt, new AbortController().signal),
+      await store.confirm(
+        f.confirm.params.receipt,
+        new AbortController().signal,
+      ),
       true,
     );
     const [confirmed] = await store.listPending();
