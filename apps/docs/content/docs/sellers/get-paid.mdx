@@ -116,7 +116,15 @@ the owner address, devnet cluster). A payment can take a few minutes to appear.
 A reusable channel lets one deposit pay for many answers, with tools, and settles when the buyer asks, the
 deposit runs out, the terms expire or the channel is idle. During the beta it runs only as a pilot with a
 buyer paired by Gyblos, and not on Windows. If you want to join the pilot, ask in your invitation channel;
-Gyblos configures it with you. Choosing how many buyers a seller accepts at once comes in a later release.
+Gyblos configures it with you. How many reusable sessions your seller keeps open at once is set in
+`config.toml`:
+
+```toml
+[limits]
+max_sessions = 16
+```
+
+The default is 16, from 1 to 16. It counts open payment sessions, not connections.
 
 ## Back to free [#back-to-free]
 

@@ -117,8 +117,15 @@ dirección del dueño, red devnet). Un pago puede tardar unos minutos en aparece
 Un canal reutilizable permite que un solo depósito pague muchas respuestas, con herramientas, y se liquida
 cuando el comprador lo pide, se acaba el depósito, vencen los términos o el canal queda inactivo. Durante la
 beta solo funciona como piloto con un comprador emparejado por Gyblos, y no en Windows. Si quieres participar,
-pídelo en tu canal de invitación; Gyblos lo configura contigo. Elegir cuántos compradores acepta un vendedor a
-la vez llega en una versión posterior.
+pídelo en tu canal de invitación; Gyblos lo configura contigo. Cuántas sesiones reutilizables mantiene abiertas
+tu vendedor a la vez se fija en `config.toml`:
+
+```toml
+[limits]
+max_sessions = 16
+```
+
+El valor por defecto es 16, de 1 a 16. Cuenta sesiones de pago abiertas, no conexiones.
 
 ## Volver a gratis [#volver-a-gratis]
 
