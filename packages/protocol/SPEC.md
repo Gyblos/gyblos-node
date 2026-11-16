@@ -739,13 +739,9 @@ Request: the free request shape (unchanged since v3) with `version: 1`, plus `pa
   `paymentMemo(terms)` and its distribution is `paymentSplits(terms)`
   (`payment-binding`), so the buyer's wallet signs every money field and the
   protocol fee split.
-- The request digest is SHA-256 over `gyblos/paid-execution-request/v2\n` plus
+- The request digest is SHA-256 over `gyblos/paid-execution-request/v1\n` plus
   the canonical request, so it covers the authorization; the request is bounded
-  to 136 KiB. Before constructing payment, the canonical unsigned envelope
-  (`version`, `requestId`, `quote`, `input`) must fit the existing 128 KiB
-  allowance, leaving 8 KiB for authorization. JSON escaping counts toward this
-  allowance even when raw message bytes fit the 64 KiB input cap. This local
-  preflight preserves the full wire frame limit and signing domain.
+  to the free bound plus 8 KiB.
 
 ### Events and terminal
 
@@ -1385,6 +1381,13 @@ vectors document retired wire profiles; they are not additional registered
 ALPNs. Free vectors, existing offers, cumulative SDK voucher signatures and
 financial journals are unchanged. Upgrade both peers together; no downgrade,
 reconstructed old request or automatic prompt replay is supported.
+
+Before constructing individual paid authorization, the canonical unsigned
+request envelope (`version`, `requestId`, `quote`, `input`) must fit its
+existing 128 KiB allowance, leaving 8 KiB for authorization within the unchanged
+136 KiB full frame. JSON escaping counts toward this allowance even when raw
+message bytes fit the 64 KiB input cap. Local preflight shares the request
+builder's parser and preserves the active v2 signing domain and wire limit.
 
 Individual paid execution in the coordinated beta release permits up to 32768
 output tokens, additionally bounded by the signed request, recounted input plus
