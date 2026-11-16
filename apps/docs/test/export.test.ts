@@ -200,6 +200,7 @@ void test('docs export: introduction and quickstart lead the sidebar once in bot
       `/${locale}/sellers/get-paid`,
       `/${locale}/sellers/operate`,
       `/${locale}/sellers/identity`,
+      `/${locale}/buyers/desktop-app`,
       `/${locale}/buyers/use-from-code`,
       `/${locale}/reference/cli`,
       `/${locale}/reference/configuration`,

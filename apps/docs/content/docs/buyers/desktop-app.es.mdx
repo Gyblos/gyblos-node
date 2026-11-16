@@ -1,0 +1,65 @@
+---
+title: App de escritorio
+description: Descarga la app de Gyblos para macOS, Windows o Linux, ábrela la primera vez y conversa con modelos de la red.
+---
+
+La app de Gyblos te permite conversar con modelos de IA que ofrecen personas de la red Gyblos, desde tu
+propio computador. No necesitas la dirección de un vendedor, una clave de relay ni la terminal.
+
+## Descargar [#descargar]
+
+Baja el archivo de tu sistema desde la
+[última versión](https://github.com/Gyblos/gyblos-node/releases/latest), en **Assets**:
+
+| Sistema                               | Archivo                                     |
+| ------------------------------------- | ------------------------------------------- |
+| macOS (Apple Silicon: M1 o más nuevo) | `gyblos-desktop-<versión>-darwin-arm64.zip` |
+| Windows 10/11 (x64)                   | `gyblos-desktop-<versión>-win32-x64.zip`    |
+| Linux (Ubuntu, Debian; x64)           | `gyblos-desktop-<versión>-linux-x64.deb`    |
+| Otro Linux (x64)                      | `gyblos-desktop-<versión>-linux-x64.tar.gz` |
+
+Todavía no hay versión para Mac con Intel. Cada archivo tiene un `.sha256` al lado; para comprobar una
+descarga, deja ambos en una carpeta y ejecuta `shasum -a 256 -c <archivo>.sha256` (macOS, Linux) o compara
+lo que muestra `certutil -hashfile <archivo> SHA256` (Windows).
+
+## Instalar y abrir la primera vez [#instalar]
+
+Durante la beta la app **no está firmada** por Apple ni Microsoft, así que tu sistema pregunta una vez antes
+de abrirla. Es normal; después de la primera vez se abre sin preguntar.
+
+### macOS [#macos]
+
+1. Abre el `.zip`; aparece **Gyblos**. Arrástrala a **Aplicaciones**.
+2. Abre Gyblos. macOS dice que no puede verificar al desarrollador; elige **OK**.
+3. Abre **Configuración del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Gyblos y elige
+   **Abrir de todas formas**; confirma con tu contraseña.
+
+### Windows [#windows]
+
+1. Haz clic derecho en el `.zip` y elige **Extraer todo**.
+2. En la carpeta extraída, abre `gyblos-desktop.exe`.
+3. Si Windows muestra "Windows protegió su PC", elige **Más información** y luego **Ejecutar de todas
+   formas**.
+
+### Linux [#linux]
+
+En Ubuntu o Debian, instala el `.deb` y abre **Gyblos** desde el menú de aplicaciones:
+
+```sh
+sudo apt install ./gyblos-desktop-<version>-linux-x64.deb
+```
+
+En otras distribuciones, descomprime el `.tar.gz` y ejecuta `./gyblos-desktop` dentro de la carpeta.
+
+## Usarla [#usarla]
+
+La app se configura sola la primera vez: crea su propia identidad de comprador en su propia carpeta,
+separada de cualquier vendedor en el mismo computador, y usa los vendedores registrados en el índice de
+Gyblos, verificando la identidad de cada uno en Solana devnet antes de enviar nada. Durante la beta las
+respuestas son gratis.
+
+Tus mensajes llegan al vendedor cuyo computador ejecuta el modelo, y ese vendedor puede leerlos. No envíes
+contraseñas, llaves ni otros secretos.
+
+Para conectar tus propios programas o agentes de programación, mira
+[Usar Gyblos desde tu código](/es/buyers/use-from-code).
