@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { DESKTOP_UPDATE } from '../constants';
 import type { DesktopUpdate } from '../update-check';
+import { observeDesktopUpdates } from '../update-session';
 import { Button } from './UI';
 
 declare global {
@@ -13,16 +14,12 @@ declare global {
 export function UpdateNotice() {
   const [update, setUpdate] = useState<DesktopUpdate | null>(null);
   useEffect(() => {
-    let active = true;
-    void window.desktopUpdate
-      ?.run(DESKTOP_UPDATE.STATUS)
-      .then((value) => {
-        if (active) setUpdate(value);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    const bridge = window.desktopUpdate;
+    if (!bridge) return;
+    return observeDesktopUpdates(
+      () => bridge.run(DESKTOP_UPDATE.STATUS),
+      setUpdate,
+    );
   }, []);
   if (!update?.available) return null;
   return (
