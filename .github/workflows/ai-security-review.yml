@@ -1,0 +1,176 @@
+# workflow_run loads this workflow from the default branch; PR source is read only as Git blobs.
+name: AI security review
+
+on:
+  workflow_run:
+    workflows: [AI review request]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    concurrency:
+      group: ai-review-compute-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
+    if: >-
+      vars.AI_REVIEW_ENABLED == 'true' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      pr: ${{ steps.context.outputs.pr }}
+      head: ${{ steps.context.outputs.head }}
+      base: ${{ steps.context.outputs.base }}
+      merge: ${{ steps.context.outputs.merge }}
+      runner: ${{ github.sha }}
+    steps:
+      - name: Bind the request to a current same-repository PR into main
+        id: context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+          const request = event.workflow_run;
+          const reference = request.pull_requests?.[0];
+          if (!reference || !Number.isSafeInteger(reference.number)) process.exit(0);
+          const repo = process.env.GITHUB_REPOSITORY;
+          const pr = JSON.parse(execFileSync('gh', ['api', 'repos/' + repo + '/pulls/' + reference.number], {encoding: 'utf8'}));
+          if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+              pr.head.repo?.full_name !== repo || request.head_sha !== pr.head.sha) process.exit(0);
+          if (!/^[0-9a-f]{40}$/.test(pr.merge_commit_sha) || !/^[0-9a-f]{40}$/.test(pr.base.sha)) process.exit(0);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,
+            'pr=' + reference.number + '\nhead=' + pr.head.sha + '\nmerge=' + pr.merge_commit_sha + '\nbase=' + pr.base.sha + '\n');
+          NODE
+      - name: Checkout trusted runner
+        if: steps.context.outputs.pr
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: runner
+          persist-credentials: false
+      - name: Checkout immutable merge snapshot as data
+        if: steps.context.outputs.pr
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.context.outputs.merge }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: steps.context.outputs.pr
+        with:
+          package_json_file: runner/package.json
+      - name: Verify the merge snapshot parents
+        if: steps.context.outputs.pr
+        env:
+          REVIEW_MERGE: ${{ steps.context.outputs.merge }}
+          REVIEW_BASE: ${{ steps.context.outputs.base }}
+          REVIEW_HEAD: ${{ steps.context.outputs.head }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          const parents = execFileSync('git', ['show', '--no-patch', '--format=%P', process.env.REVIEW_MERGE],
+            {cwd:'source',encoding:'utf8'}).trim().split(' ');
+          if (parents.length !== 2 || parents[0] !== process.env.REVIEW_BASE || parents[1] !== process.env.REVIEW_HEAD)
+            throw new Error('Merge snapshot does not match the reviewed base and head.');
+          NODE
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.context.outputs.pr
+        with:
+          node-version: 24.22.1
+      - name: Install trusted tooling without lifecycle scripts
+        if: steps.context.outputs.pr
+        working-directory: runner
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          npm ci --prefix tooling/security-review/runtime --ignore-scripts --no-audit --no-fund
+      - name: Run advisory source review
+        if: steps.context.outputs.pr
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PI_MODEL: ${{ vars.PI_REVIEW_MODEL }}
+          PI_COMMAND: ${{ github.workspace }}/runner/tooling/security-review/runtime/node_modules/.bin/pi
+          REVIEW_HEAD: ${{ steps.context.outputs.merge }}
+          REVIEW_BASE: ${{ steps.context.outputs.base }}
+        run: |
+          test -n "$PI_MODEL"
+          test -n "$OPENAI_API_KEY"
+          pnpm --dir runner security-review run pr \
+            --root "$GITHUB_WORKSPACE/source" --source-ref "$REVIEW_HEAD" --base-ref "$REVIEW_BASE" \
+            --output "$RUNNER_TEMP/ai-review" --max-calls 300
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && steps.context.outputs.pr
+        with:
+          name: ai-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/ai-review
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    concurrency:
+      group: ai-review-label-${{ github.repository }}-${{ needs.review.outputs.pr }}
+      cancel-in-progress: false
+    needs: review
+    if: always() && needs.review.result != 'cancelled' && needs.review.outputs.pr
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.review.result == 'success'
+        with:
+          name: ai-review-${{ github.run_id }}
+          path: review-artifacts
+      - name: Publish a validated fixed summary for the current PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.review.outputs.pr }}
+          REVIEW_HEAD: ${{ needs.review.outputs.head }}
+          REVIEW_BASE: ${{ needs.review.outputs.base }}
+          REVIEW_MERGE: ${{ needs.review.outputs.merge }}
+          REVIEW_JOB_RESULT: ${{ needs.review.result }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const repo = process.env.GITHUB_REPOSITORY;
+          const number = process.env.PR_NUMBER;
+          if (!/^[1-9][0-9]*$/.test(number)) throw new Error('Invalid PR identity.');
+          const api = (...args) => execFileSync('gh', ['api', ...args], {encoding:'utf8'});
+          const pr = JSON.parse(api('repos/' + repo + '/pulls/' + number));
+          if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+              pr.head.repo?.full_name !== repo || pr.head.sha !== process.env.REVIEW_HEAD ||
+              pr.base.sha !== process.env.REVIEW_BASE || pr.merge_commit_sha !== process.env.REVIEW_MERGE) process.exit(0);
+          let status = 'error';
+          if (process.env.REVIEW_JOB_RESULT === 'success') {
+            const file = 'review-artifacts/status.txt';
+            const info = fs.lstatSync(file);
+            if (!info.isFile() || info.isSymbolicLink() || info.size > 32) throw new Error('Invalid review status.');
+            status = fs.readFileSync(file, 'utf8').trim();
+          }
+          if (!['clean','needs-validation','error','not-run'].includes(status)) throw new Error('Invalid review status.');
+          const label = 'ai-review:' + (status === 'not-run' ? 'error' : status);
+          const labels = JSON.parse(api('repos/' + repo + '/issues/' + number + '/labels'));
+          for (const item of labels) {
+            if (/^ai-review:(queued|running|clean|needs-validation|error)$/.test(item.name))
+              api('-X', 'DELETE', 'repos/' + repo + '/issues/' + number + '/labels/' + encodeURIComponent(item.name));
+          }
+          api('-X', 'POST', 'repos/' + repo + '/issues/' + number + '/labels', '-f', 'labels[]=' + label);
+          const marker = '<!-- gyblos-ai-review:' + process.env.REVIEW_HEAD + ':' + process.env.REVIEW_BASE + ':' + process.env.REVIEW_MERGE + ' -->';
+          const body = marker + '\nAI source review: **' + status + '** for ' + process.env.REVIEW_HEAD +
+            '. Advisory result; clean means no retained candidates in the reviewed source, not proof of security. ' +
+            'Coverage gaps and pending synthetic validation are recorded in this Actions run.\n' +
+            '<!-- gyblos-ai-review:' + process.env.REVIEW_HEAD + ':' + process.env.REVIEW_BASE + ':' + process.env.REVIEW_MERGE + ' -->';
+          api('-X', 'POST', 'repos/' + repo + '/issues/' + number + '/comments', '-f', 'body=' + body);
+          NODE

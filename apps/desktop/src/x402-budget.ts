@@ -185,6 +185,23 @@ export class X402Budget {
       });
     });
   }
+  // Zero spending authority cannot leave a financial obligation; this records no successful response.
+  releaseFree(id: string) {
+    return this.serial(async () => {
+      const state = await this.load();
+      if (
+        this.failed ||
+        state.pending !== id ||
+        state.summary.policy?.maxAtomic !== '0'
+      )
+        throw new Error('Payment needs review');
+      await this.save({
+        ...state,
+        pending: null,
+        summary: { ...state.summary, blocked: false },
+      });
+    });
+  }
   finish() {
     return this.serial(async () => {
       const state = await this.load();
