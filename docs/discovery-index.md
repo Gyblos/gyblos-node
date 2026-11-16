@@ -237,6 +237,12 @@ instance, on the next accepted presence, separately from record pruning:
 retention holds even when no new NodeId publishes, and a failing uptime table
 never blocks a publish or the admission of a new NodeId.
 
+Kept rows grow the shared D1 database: about 160 bytes per NodeId and hour, or
+about 1.4 MB per always-online NodeId per year. At 1,000 online sellers that is
+about 1.4 GB a year against the 10 GB D1 limit, and a full database fails every
+write, publishes included. Watch the database size; before it nears the limit,
+roll old hours into daily rows or move history to its own database.
+
 `GET /v1/uptime?node=<64 lowercase hex>` answers
 
 ```json
