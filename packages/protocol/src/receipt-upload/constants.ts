@@ -1,4 +1,4 @@
-// Owns the receipt upload envelope version, signing domain and closed catalogs; no receipt domain.
+// Owns receipt upload envelope versions, signing domains and closed catalogs; no receipt domain.
 export const RECEIPT_UPLOAD = {
   version: 1,
   domain: 'gyblos/receipt-upload/v1\n',

@@ -1,6 +1,6 @@
-// Receipt upload envelope contract: a node signs a batch of receipts it is party to, plus its own
-// timestamps. The envelope signature attests the uploader's claims; each receipt keeps and is checked
-// against its own node signatures. Freshness, replay and storage belong to the collector.
+// A node signs its receipts and uploader-reported timing/offer facts; source clocks remain distinct.
+// The envelope attests those claims only; each receipt keeps its own node signatures.
+// Freshness, replay and storage belong to the collector.
 import { CONTROL_CODES, CONTROL_LIMITS, RECEIPT } from './constants';
 import {
   controlFail,

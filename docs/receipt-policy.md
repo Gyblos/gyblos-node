@@ -101,3 +101,14 @@ The signed batch format a node will use to hand its receipts and its own
 timestamps to a collector is the protocol contract "Receipt upload envelope v1"
 (`packages/protocol/SPEC.md`). It is a contract only: no uploader, schedule or
 endpoint uses it yet.
+
+The additive `receipt-upload/v2` contract keeps the same rules and adds a
+buyer-declared reference to the exact paid quote. `buildReceiptUploadOfferV2`
+projects an independently accepted quote to six facts plus the SHA-256
+reference; it returns no endpoint addresses or owner signature. Capture that
+projection before discarding the quote. It is not proof of identity, settlement
+or truthful metadata. Upload/store/start times originate on the uploader's
+clock; copied offer times originate on the seller's clock and remain
+buyer-reported claims. Existing v1 uploads/vectors stay unchanged. The public
+collector and uploader must explicitly adopt the new contract; no runtime
+activation is included here.

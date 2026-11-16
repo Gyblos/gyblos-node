@@ -20,6 +20,7 @@ import {
 } from '@gyblos/protocol/receipt-upload-v2';
 import { sign } from '@gyblos/protocol/signing';
 
+import { receiptParserWork } from './support/receipt-parser-work';
 import {
   buyerUpload,
   clone,
@@ -183,4 +184,42 @@ void test('v2 detaches quote claims and receipt halves before signature verifica
     input.upload.items[0]!.receipt.buyer!.record.observed.outputTokens = 999;
     assert.deepEqual(await pending, signed);
   });
+});
+
+void test('v2 keeps envelope admission separate from receipt signature verification', async () => {
+  const { buyer, upload } = await referencedUpload();
+  upload.items[0]!.receipt.seller.signature = '00'.repeat(64);
+  await assert.doesNotReject(async () => {
+    const signed = await signReceiptUploadV2(upload, buyer.sign);
+    assert.deepEqual(await verifyReceiptUploadEnvelopeV2(signed), signed);
+    await rejects(verifyReceiptUploadV2(signed), CONTROL_CODES.SIGNATURE);
+  });
+});
+
+void test('wide malformed v2 upload objects stay linear and never reach crypto', async (t) => {
+  const { upload } = await referencedUpload();
+  const verify = t.mock.method(crypto.subtle, 'verify');
+  for (const kind of ['upload', 'item', 'offer', 'record'] as const) {
+    const invalid = clone(upload);
+    const target =
+      kind === 'upload'
+        ? invalid
+        : kind === 'item'
+          ? invalid.items[0]!
+          : kind === 'offer'
+            ? invalid.items[0]!.offer!
+            : invalid.items[0]!.receipt.seller.record;
+    for (let index = 0; index < 256; index++)
+      Reflect.set(target, `extra${index}`, null);
+    const bounded = receiptParserWork(t, target);
+    await rejects(
+      verifyReceiptUploadEnvelopeV2({
+        upload: invalid,
+        signature: '00'.repeat(64),
+      }),
+      CONTROL_CODES.INVALID,
+    );
+    bounded();
+  }
+  assert.equal(verify.mock.callCount(), 0);
 });

@@ -8,13 +8,21 @@ import {
   controlVerify,
 } from './control-validation';
 import { parseOfferV2 } from './offer-v2-parser';
-import { publicAddressBytes } from './public-validation';
-import { sign, type Signer } from './signing';
+import { bytesHex, publicAddressBytes } from './public-validation';
+import { sign, signingBytes, type Signer } from './signing';
 
 export { parseOfferV2 } from './offer-v2-parser';
+// A historical record reference, not signature, identity, freshness or receipt-association proof.
 export async function offerDigestV2(value: unknown): Promise<string> {
-  void value;
-  return '';
+  const offer = parseOfferV2(value);
+  return bytesHex(
+    new Uint8Array(
+      await crypto.subtle.digest(
+        'SHA-256',
+        signingBytes(CONTROL_DOMAINS.OFFER, offer),
+      ),
+    ),
+  );
 }
 
 function base64Encode(bytes: Readonly<Uint8Array>): string {

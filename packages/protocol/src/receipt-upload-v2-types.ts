@@ -7,6 +7,7 @@ import type {
 import type { RECEIPT_UPLOAD_V2 } from './receipt-upload/constants';
 
 export interface ReceiptUploadOfferV2 extends ReceiptUploadOffer {
+  // SHA-256 of full parsed offer/v2 signing bytes, excluding its signature; still a buyer claim.
   offerDigest: string;
 }
 export interface ReceiptUploadItemV2 extends Omit<ReceiptUploadItem, 'offer'> {
