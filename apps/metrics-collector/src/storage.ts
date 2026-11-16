@@ -6,17 +6,17 @@ import {
 } from '@gyblos/core/constants';
 import type { PublicReceiptEntry } from '@gyblos/core/public-receipts';
 import type { P2PRole } from '@gyblos/protocol/constants';
-import type { SignedReceiptUpload } from '@gyblos/protocol/receipt-upload';
+import type { ReceiptUploadV1 } from '@gyblos/protocol/receipt-upload';
 
-// One accepted envelope. `json` and `signature` are kept so attribution can be re-verified later.
+// One accepted envelope, in canonical form with its signature, so attribution can be re-verified later.
 export interface EnvelopeRow {
   id: string;
-  upload: SignedReceiptUpload['upload'];
+  upload: ReceiptUploadV1;
   signature: string;
   json: string;
   receivedAt: number;
 }
-// One item as reported by one side, whatever the merge result.
+// One item as reported by one side. `merge` is advisory: it comes from a read before the write.
 export interface ReportRow {
   envelopeId: string;
   key: string;
@@ -27,11 +27,8 @@ export interface ReportRow {
   startedAt: number | null;
   offerJson: string | null;
 }
-// A merge outcome for one key: the entry to keep and whether the incoming entry conflicted.
 export interface ReceiptWrite {
   role: P2PRole;
-  merge: PublicReceiptMerge;
-  stored: PublicReceiptEntry;
   incoming: PublicReceiptEntry;
 }
 export interface CollectorWrite {
@@ -51,13 +48,41 @@ export interface CollectorStorage {
   readEntries(
     keys: readonly string[],
   ): Promise<Map<string, PublicReceiptEntry>>;
-  // Atomic: the envelope, every report, receipt upserts and conflicts, or nothing.
+  // Atomic: the envelope, every report, guarded receipt writes, status history and conflicts, or
+  // nothing. Conflicts and first versions are decided against the state at write time.
   commit(write: CollectorWrite, now: number): Promise<CommitResult>;
 }
 
-export const isConflict = (merge: PublicReceiptMerge) =>
-  merge === PUBLIC_RECEIPT_MERGES.SELLER_CONFLICT ||
-  merge === PUBLIC_RECEIPT_MERGES.BUYER_CONFLICT;
+// The write rule both stores apply at commit time: a new key is inserted; an existing one only gains
+// its first buyer half for the same seller record; any other difference is the signer's conflict.
+export function applyReceipt(
+  existing: PublicReceiptEntry | undefined,
+  incoming: PublicReceiptEntry,
+): {
+  stored: PublicReceiptEntry;
+  changed: boolean;
+  conflict: PublicReceiptMerge | null;
+} {
+  if (!existing) return { stored: incoming, changed: true, conflict: null };
+  if (existing.sellerDigest !== incoming.sellerDigest)
+    return {
+      stored: existing,
+      changed: false,
+      conflict: PUBLIC_RECEIPT_MERGES.SELLER_CONFLICT,
+    };
+  if (
+    incoming.buyerDigest === null ||
+    incoming.buyerDigest === existing.buyerDigest
+  )
+    return { stored: existing, changed: false, conflict: null };
+  if (existing.buyerDigest === null)
+    return { stored: incoming, changed: true, conflict: null };
+  return {
+    stored: existing,
+    changed: false,
+    conflict: PUBLIC_RECEIPT_MERGES.BUYER_CONFLICT,
+  };
+}
 
 export interface MemoryCollector {
   storage: CollectorStorage;
@@ -65,6 +90,7 @@ export interface MemoryCollector {
   reports: ReportRow[];
   entries: Map<string, PublicReceiptEntry>;
   firstReports: Map<string, Partial<Record<P2PRole, number>>>;
+  history: { key: string; status: string; at: number }[];
   conflicts: {
     key: string;
     merge: PublicReceiptMerge;
@@ -72,16 +98,16 @@ export interface MemoryCollector {
   }[];
 }
 export function createMemoryStorage(): MemoryCollector {
-  const memory: MemoryCollector = {
-    storage: undefined as never,
+  const nonces = new Set<string>();
+  const memory: Omit<MemoryCollector, 'storage'> = {
     envelopes: [],
     reports: [],
     entries: new Map(),
     firstReports: new Map(),
+    history: [],
     conflicts: [],
   };
-  const nonces = new Set<string>();
-  memory.storage = {
+  const storage: CollectorStorage = {
     readEntries(keys) {
       const found = new Map<string, PublicReceiptEntry>();
       for (const key of keys) {
@@ -91,25 +117,36 @@ export function createMemoryStorage(): MemoryCollector {
       return Promise.resolve(found);
     },
     commit(write, now) {
-      const nonce = `${write.envelope.upload.uploaderNodeId}:${write.envelope.upload.nonce}`;
+      const { upload } = write.envelope;
+      const nonce = `${upload.uploaderNodeId}:${upload.nonce}`;
       if (nonces.has(nonce)) return Promise.resolve(COMMIT_RESULTS.REPLAYED);
       nonces.add(nonce);
       memory.envelopes.push(write.envelope);
       memory.reports.push(...write.reports);
-      for (const item of write.receipts) {
-        memory.entries.set(item.stored.key, item.stored);
-        const first = memory.firstReports.get(item.stored.key) ?? {};
-        first[item.role] ??= now;
-        memory.firstReports.set(item.stored.key, first);
-        if (isConflict(item.merge))
-          memory.conflicts.push({
-            key: item.stored.key,
-            merge: item.merge,
-            entry: item.incoming,
+      for (const { role, incoming } of write.receipts) {
+        const applied = applyReceipt(
+          memory.entries.get(incoming.key),
+          incoming,
+        );
+        memory.entries.set(incoming.key, applied.stored);
+        if (applied.changed)
+          memory.history.push({
+            key: incoming.key,
+            status: applied.stored.status,
+            at: now,
           });
+        if (applied.conflict)
+          memory.conflicts.push({
+            key: incoming.key,
+            merge: applied.conflict,
+            entry: incoming,
+          });
+        const first = memory.firstReports.get(incoming.key) ?? {};
+        first[role] ??= now;
+        memory.firstReports.set(incoming.key, first);
       }
       return Promise.resolve(COMMIT_RESULTS.COMMITTED);
     },
   };
-  return memory;
+  return { ...memory, storage };
 }

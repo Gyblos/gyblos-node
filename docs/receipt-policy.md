@@ -103,16 +103,23 @@ timestamps to a collector is the protocol contract "Receipt upload envelope v1"
 endpoint uses it yet.
 
 `apps/metrics-collector` is the proposed public collector Worker that uses both.
-`POST /v1/receipts` takes one signed upload envelope. Before any signature work,
-it checks https, its storage and rate limiters (fail closed), a per-address
-limit (the address is never stored), the body size, strict JSON depth, the
-envelope shape and a per-uploader limit. It then verifies the envelope and every
-receipt and applies a ±10 minute clock window (`409 STALE_UPLOAD` returns the
-collector's time so the client can correct and resend). Each receipt goes
-through the public policy and is written in one transaction: the verbatim
-envelope (with its signature, client and clock skew), one report row per item
-with the uploader's own times, guarded receipt upserts that never replace a
-first seller record or buyer attestation, the first report time per side, status
-history and conflicts. A reused (uploader, nonce) pair is `409 REPLAYED_UPLOAD`
-and stores nothing. It has no public reads, aggregates or archive yet, is not
-deployed, and its D1 database does not exist.
+`POST /v1/receipts` takes one signed upload envelope. Cheapest checks run first:
+https; its storage and three rate limiters (fail closed); a per-address limit
+(IPv6 by /64; the address is never stored); a JSON content type and a body cap
+enforced before buffering; a shared write budget; strict JSON depth; the
+envelope structure and party binding; the envelope signature (one verification);
+a ±10 minute clock window (`409 STALE_UPLOAD` returns the collector's time so
+the client can correct and resend); and only then a per-uploader limit, so
+unsigned junk cannot spend another node's allowance. Each receipt is then
+verified once by the public policy. One transaction writes the canonical
+envelope with its signature, client and clock skew; one report row per item with
+the uploader's own times (its merge label is advisory, read before the write);
+guarded receipt upserts that never replace a first seller record or buyer
+attestation; status history and conflict evidence decided against the stored row
+at write time, so concurrent uploads cannot lose a conflict; and the first
+report time per side (any report from that side, conflicting or not). A reused
+(uploader, nonce) pair is `409 REPLAYED_UPLOAD` and stores nothing. The response
+is only the accepted count, so an uploader cannot learn whether the other side
+reported. One upload can run about 250 D1 statements, which needs the Workers
+Paid plan. It has no public reads, aggregates or archive yet, is not deployed,
+and its D1 database does not exist.

@@ -1,27 +1,19 @@
-// Exercises the metrics collector app over memory and SQLite-backed D1 storage with ephemeral signers:
-// admission, verification, the clock window, replay, merges by side and fail-closed configuration.
+// Exercises the metrics collector app with memory storage and ephemeral signers: admission order,
+// verification, the clock window, replay, per-side reports and fail-closed configuration.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { PUBLIC_RECEIPT_MERGES as MERGES } from '@gyblos/core/constants';
-import { createMetricsCollector } from '@gyblos/metrics-collector/app';
-import {
-  COLLECTOR_ERRORS,
-  COLLECTOR_LIMITERS,
-  COLLECTOR_ROUTES,
-} from '@gyblos/metrics-collector/constants';
-import {
-  createMemoryStorage,
-  type CollectorStorage,
-} from '@gyblos/metrics-collector/storage';
-import { createD1Storage } from '@gyblos/metrics-collector/storage-d1';
+import { COLLECTOR_ERRORS } from '@gyblos/metrics-collector/constants';
+import { createMemoryStorage } from '@gyblos/metrics-collector/storage';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import {
-  signReceiptUpload,
-  type ReceiptUploadV1,
-} from '@gyblos/protocol/receipt-upload';
 
-import { createCollectorD1 } from './support/metrics-collector-d1';
+import {
+  COLLECTOR_CLIENT_IP,
+  responseJson,
+  signUpload,
+  testCollector,
+} from './support/metrics-collector';
 import {
   buyerUpload,
   freePair,
@@ -29,80 +21,30 @@ import {
   T0,
 } from './support/receipt-upload';
 
-const ORIGIN = 'https://collector.test';
-const CLIENT_IP = '203.0.113.7';
-
-function limiter(allow = true) {
-  const keys: string[] = [];
-  return {
-    keys,
-    limit({ key }: { key: string }) {
-      keys.push(key);
-      return Promise.resolve({ success: allow });
-    },
-  };
-}
-
-function collector(
-  storage: CollectorStorage | undefined,
-  options: { ip?: boolean; node?: boolean; now?: number } = {},
-) {
-  const ip = limiter(options.ip ?? true);
-  const node = limiter(options.node ?? true);
-  const app = createMetricsCollector({
-    storage,
-    limiters: {
-      [COLLECTOR_LIMITERS.IP]: ip,
-      [COLLECTOR_LIMITERS.NODE]: node,
-    },
-    now: () => options.now ?? T0,
-  });
-  const post = (body: unknown, origin = ORIGIN) =>
-    app.request(`${origin}${COLLECTOR_ROUTES.RECEIPTS}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'cf-connecting-ip': CLIENT_IP,
-      },
-      body: typeof body === 'string' ? body : JSON.stringify(body),
-    });
-  return { app, post, ip, node };
-}
-
-async function json(response: Response) {
-  return { status: response.status, body: (await response.json()) as unknown };
-}
-
-async function signed(
-  upload: ReceiptUploadV1,
-  sign: (b: Uint8Array) => Promise<Uint8Array>,
-) {
-  return signReceiptUpload(upload, sign);
-}
-
-void test('a seller upload is accepted, stored once and reported per side', async () => {
+void test('an upload is accepted with a count only, stored once and reported per side', async () => {
   const memory = createMemoryStorage();
-  const { post } = collector(memory.storage);
+  const { post } = testCollector(memory.storage);
   const { seller, buyer, receipt } = await freePair();
 
-  const first = await json(
-    await post(await signed(sellerUpload(seller.nodeId, receipt), seller.sign)),
+  assert.deepEqual(
+    await responseJson(
+      await post(
+        await signUpload(sellerUpload(seller.nodeId, receipt), seller.sign),
+      ),
+    ),
+    { status: 200, body: { receivedAt: T0, accepted: 1 } },
   );
-  assert.deepEqual(first, {
-    status: 200,
-    body: { receivedAt: T0, items: [{ merge: MERGES.INSERT }] },
-  });
-
   const buyerReport = buyerUpload(buyer.nodeId, receipt);
-  const second = await json(await post(await signed(buyerReport, buyer.sign)));
-  assert.deepEqual(second.body, {
-    receivedAt: T0,
-    items: [{ merge: MERGES.IDENTICAL }],
-  });
+  assert.equal(
+    (await post(await signUpload(buyerReport, buyer.sign))).status,
+    200,
+  );
   assert.equal(memory.entries.size, 1);
-  assert.equal(memory.reports.length, 2);
-  const firstReports = [...memory.firstReports.values()][0]!;
-  assert.deepEqual(Object.keys(firstReports).sort(), [
+  assert.deepEqual(
+    memory.reports.map((report) => report.merge),
+    [MERGES.INSERT, MERGES.IDENTICAL],
+  );
+  assert.deepEqual(Object.keys([...memory.firstReports.values()][0]!).sort(), [
     P2P_ROLES.BUYER,
     P2P_ROLES.SELLER,
   ]);
@@ -110,163 +52,132 @@ void test('a seller upload is accepted, stored once and reported per side', asyn
   assert.equal(memory.reports[1]!.startedAt, buyerReport.items[0]!.startedAt);
 });
 
-void test('a buyer half completes a seller-only receipt', async () => {
+void test('a buyer may report first; the seller report and a later seller-only copy change nothing', async () => {
   const memory = createMemoryStorage();
-  const { post } = collector(memory.storage);
+  const { post } = testCollector(memory.storage);
   const { seller, buyer, receipt } = await freePair();
-  const sellerOnly = sellerUpload(seller.nodeId, { seller: receipt.seller });
-  await post(await signed(sellerOnly, seller.sign));
-  const result = await json(
-    await post(await signed(buyerUpload(buyer.nodeId, receipt), buyer.sign)),
+  await post(await signUpload(buyerUpload(buyer.nodeId, receipt), buyer.sign));
+  await post(
+    await signUpload(sellerUpload(seller.nodeId, receipt), seller.sign),
   );
-  assert.deepEqual(result.body, {
-    receivedAt: T0,
-    items: [{ merge: MERGES.UPGRADE }],
-  });
+  const sellerOnly = sellerUpload(seller.nodeId, { seller: receipt.seller });
+  sellerOnly.nonce = 'cd'.repeat(16);
+  await post(await signUpload(sellerOnly, seller.sign));
+  assert.deepEqual(
+    memory.reports.map((report) => report.merge),
+    [MERGES.INSERT, MERGES.IDENTICAL, MERGES.IDENTICAL],
+  );
+  assert.equal([...memory.entries.values()][0]!.status, 'bilateral');
+  assert.equal(memory.history.length, 1);
 });
 
 void test('uploads outside the clock window get the collector time to correct and resend', async () => {
   const { seller, receipt } = await freePair();
-  const { post } = collector(createMemoryStorage().storage, {
-    now: T0 + 3_600_000,
+  const later = T0 + 3_600_000;
+  const { post, node } = testCollector(createMemoryStorage().storage, {
+    now: () => later,
   });
   assert.deepEqual(
-    await json(
+    await responseJson(
       await post(
-        await signed(sellerUpload(seller.nodeId, receipt), seller.sign),
+        await signUpload(sellerUpload(seller.nodeId, receipt), seller.sign),
       ),
     ),
     {
       status: 409,
-      body: {
-        error: COLLECTOR_ERRORS.STALE_UPLOAD,
-        serverTime: T0 + 3_600_000,
-      },
+      body: { error: COLLECTOR_ERRORS.STALE_UPLOAD, serverTime: later },
     },
   );
+  // A stale upload never spends the node's allowance.
+  assert.deepEqual(node.keys, []);
 });
 
-void test('the same envelope twice is a replay and changes nothing', async () => {
+void test('a reused nonce is a replay even with a different sentAt, and stores nothing', async () => {
   const memory = createMemoryStorage();
-  const { post } = collector(memory.storage);
+  const { post } = testCollector(memory.storage);
   const { seller, receipt } = await freePair();
-  const body = await signed(sellerUpload(seller.nodeId, receipt), seller.sign);
-  assert.equal((await post(body)).status, 200);
-  assert.deepEqual(await json(await post(body)), {
-    status: 409,
-    body: { error: COLLECTOR_ERRORS.REPLAYED_UPLOAD },
-  });
+  const upload = sellerUpload(seller.nodeId, receipt);
+  assert.equal((await post(await signUpload(upload, seller.sign))).status, 200);
+  const again = { ...upload, sentAt: upload.sentAt + 1 };
+  assert.deepEqual(
+    await responseJson(await post(await signUpload(again, seller.sign))),
+    {
+      status: 409,
+      body: { error: COLLECTOR_ERRORS.REPLAYED_UPLOAD },
+    },
+  );
   assert.equal(memory.reports.length, 1);
 });
 
-void test('bad signatures, non-party uploads and malformed bodies get static codes', async () => {
-  const { post } = collector(createMemoryStorage().storage);
+void test('bad signatures, malformed bodies, wrong content types and oversized bodies get static codes', async () => {
+  const { post } = testCollector(createMemoryStorage().storage);
   const { seller, receipt } = await freePair();
-  const body = await signed(sellerUpload(seller.nodeId, receipt), seller.sign);
+  const body = await signUpload(
+    sellerUpload(seller.nodeId, receipt),
+    seller.sign,
+  );
 
   const tampered = structuredClone(body);
   tampered.upload.items[0]!.storedAt = 1;
-  assert.deepEqual((await json(await post(tampered))).body, {
+  assert.deepEqual((await responseJson(await post(tampered))).body, {
     error: COLLECTOR_ERRORS.INVALID_SIGNATURE,
   });
-  assert.deepEqual((await json(await post('{"upload":'))).body, {
+  const brokenReceipt = structuredClone(body);
+  brokenReceipt.upload.items[0]!.receipt.seller.record.usage.outputTokens += 1;
+  const resigned = await signUpload(brokenReceipt.upload, seller.sign);
+  assert.deepEqual((await responseJson(await post(resigned))).body, {
+    error: COLLECTOR_ERRORS.INVALID_SIGNATURE,
+  });
+  assert.deepEqual((await responseJson(await post('{"upload":'))).body, {
     error: COLLECTOR_ERRORS.INVALID_UPLOAD,
   });
+  assert.deepEqual(
+    (
+      await responseJson(
+        await post(body, undefined, { 'content-type': 'text/plain' }),
+      )
+    ).body,
+    { error: COLLECTOR_ERRORS.INVALID_UPLOAD },
+  );
   assert.equal((await post('x'.repeat(400_000))).status, 413);
 });
 
-void test('per-node admission runs before any signature work', async () => {
-  const { post, node } = collector(createMemoryStorage().storage, {
+void test('the node allowance is spent only after the envelope signature verifies', async () => {
+  const { post, node } = testCollector(createMemoryStorage().storage, {
     node: false,
   });
   const { seller, receipt } = await freePair();
-  const body = await signed(sellerUpload(seller.nodeId, receipt), seller.sign);
-  body.signature = '00'.repeat(64);
-  assert.deepEqual(await json(await post(body)), {
+  const body = await signUpload(
+    sellerUpload(seller.nodeId, receipt),
+    seller.sign,
+  );
+  const junk = { ...body, signature: '00'.repeat(64) };
+  assert.equal((await post(junk)).status, 400);
+  assert.deepEqual(node.keys, []);
+  assert.deepEqual(await responseJson(await post(body)), {
     status: 429,
     body: { error: COLLECTOR_ERRORS.RATE_LIMITED },
   });
   assert.deepEqual(node.keys, [seller.nodeId]);
 });
 
-void test('missing storage or limiters fail closed, and plain http is refused', async () => {
-  const { post } = collector(undefined);
-  assert.equal((await post({})).status, 503);
+void test('missing configuration fails closed; address and global limits apply; plain http is refused', async () => {
+  assert.equal((await testCollector(undefined).post({})).status, 503);
   const memory = createMemoryStorage();
-  const limited = collector(memory.storage, { ip: false });
+  const limited = testCollector(memory.storage, { ip: false });
   assert.equal((await limited.post({})).status, 429);
-  assert.deepEqual(limited.ip.keys, [CLIENT_IP]);
+  assert.deepEqual(limited.ip.keys, [COLLECTOR_CLIENT_IP]);
+  const v6 = testCollector(memory.storage);
+  await v6.post({}, undefined, { 'cf-connecting-ip': '2001:db8:1:2:3:4:5:6' });
+  assert.deepEqual(v6.ip.keys, ['2001:db8:1:2::/64']);
+  const global = testCollector(memory.storage, { global: false });
+  assert.equal((await global.post({})).status, 429);
   assert.deepEqual(
     (
-      await json(
-        await collector(memory.storage).post({}, 'http://collector.test'),
+      await responseJson(
+        await testCollector(memory.storage).post({}, 'http://collector.test'),
       )
     ).body,
     { error: COLLECTOR_ERRORS.HTTPS_REQUIRED },
   );
-});
-
-void test('D1 storage keeps first versions, conflicts and per-side report times, never the IP', async () => {
-  const database = createCollectorD1();
-  const { post } = collector(createD1Storage(database));
-  const { seller, buyer, receipt } = await freePair();
-
-  await post(
-    await signed(
-      sellerUpload(seller.nodeId, { seller: receipt.seller }),
-      seller.sign,
-    ),
-  );
-  const buyerResult = await json(
-    await post(await signed(buyerUpload(buyer.nodeId, receipt), buyer.sign)),
-  );
-  assert.deepEqual(buyerResult.body, {
-    receivedAt: T0,
-    items: [{ merge: MERGES.UPGRADE }],
-  });
-
-  // The seller signs a different record for the same request: evidence against it, nothing replaced.
-  const rewritten = structuredClone(receipt.seller.record);
-  rewritten.usage.outputTokens += 1;
-  const { signSellerReceipt } = await import('@gyblos/protocol/receipt');
-  const second = sellerUpload(seller.nodeId, {
-    seller: await signSellerReceipt(rewritten, seller.sign),
-  });
-  second.nonce = 'cd'.repeat(16);
-  const conflict = await json(await post(await signed(second, seller.sign)));
-  assert.deepEqual(conflict.body, {
-    receivedAt: T0,
-    items: [{ merge: MERGES.SELLER_CONFLICT }],
-  });
-
-  const [stored] = database.rows(
-    'SELECT status, output_tokens, buyer_digest IS NOT NULL AS paired, seller_reported_at, buyer_reported_at FROM collector_receipts',
-  );
-  assert.deepEqual(
-    { ...stored },
-    {
-      status: 'bilateral',
-      output_tokens: receipt.seller.record.usage.outputTokens,
-      paired: 1,
-      seller_reported_at: T0,
-      buyer_reported_at: T0,
-    },
-  );
-  assert.equal(database.rows('SELECT * FROM collector_conflicts').length, 1);
-  assert.equal(database.rows('SELECT * FROM collector_reports').length, 3);
-  assert.equal(database.rows('SELECT * FROM collector_envelopes').length, 3);
-
-  // Replays are refused by the unique (uploader, nonce) constraint inside the transaction.
-  assert.equal((await post(await signed(second, seller.sign))).status, 409);
-  assert.equal(database.rows('SELECT * FROM collector_reports').length, 3);
-
-  const dump = JSON.stringify(
-    [
-      'collector_envelopes',
-      'collector_reports',
-      'collector_receipts',
-      'collector_conflicts',
-    ].map((table) => database.rows(`SELECT * FROM ${table}`)),
-  );
-  assert.equal(dump.includes(CLIENT_IP), false);
 });

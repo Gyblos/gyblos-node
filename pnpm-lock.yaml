@@ -48,9 +48,6 @@ importers:
       '@gyblos/inference':
         specifier: workspace:*
         version: link:packages/inference
-      '@gyblos/metrics-collector':
-        specifier: workspace:*
-        version: link:apps/metrics-collector
       '@gyblos/identity':
         specifier: workspace:*
         version: link:packages/identity
@@ -60,6 +57,9 @@ importers:
       '@gyblos/lab-harness':
         specifier: workspace:*
         version: link:lab/harness
+      '@gyblos/metrics-collector':
+        specifier: workspace:*
+        version: link:apps/metrics-collector
       '@gyblos/node':
         specifier: workspace:*
         version: link:packages/node
@@ -336,6 +336,7 @@ importers:
       hono:
         specifier: 4.13.13
         version: 4.13.13
+
   apps/node:
     dependencies:
       '@gyblos/config':

@@ -1,22 +1,26 @@
 // Owns the metrics collector HTTP app: signed receipt uploads from sellers and buyers. It never stores
 // or logs IPs, never publishes individual receipts and answers only static error codes.
 import { Hono, type Context, type Next } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 
 import {
   COLLECTOR_ERRORS,
   COLLECTOR_HEADER_VALUES,
   COLLECTOR_HEADERS,
+  COLLECTOR_INTERNAL_ERROR,
   COLLECTOR_LIMITERS,
+  COLLECTOR_LIMITS,
   COLLECTOR_PROTOCOLS,
   COLLECTOR_ROUTES,
   COLLECTOR_STATUS,
-  LOCAL_CLIENT_KEY,
+  GLOBAL_LIMIT_KEY,
   LOOPBACK_HOSTS,
   type CollectorErrorCode,
   type CollectorLimiterName,
 } from './constants';
 import { CollectorError, statusOf } from './errors';
 import { ingestUpload, StaleUploadError } from './ingest';
+import { ipKey } from './ip-key';
 import type { CollectorStorage } from './storage';
 
 // The subset of a Cloudflare rate-limit binding the collector uses.
@@ -35,6 +39,8 @@ export interface MetricsCollectorOptions {
   // Loopback hosts only: plain http is accepted. Storage and limiters are never relaxed.
   development?: boolean;
 }
+
+const JSON_CONTENT_TYPE = /^application\/json(?:\s*;\s*charset=utf-8)?$/i;
 
 function rejection(context: Context, code: CollectorErrorCode) {
   if (code === COLLECTOR_ERRORS.RATE_LIMITED)
@@ -76,22 +82,31 @@ function finishHeaders(context: Context) {
   );
 }
 
+function resolve(options: MetricsCollectorOptions) {
+  const limiters = options.limiters ?? {};
+  const ip = limiters[COLLECTOR_LIMITERS.IP];
+  const node = limiters[COLLECTOR_LIMITERS.NODE];
+  const global = limiters[COLLECTOR_LIMITERS.GLOBAL];
+  if (!options.storage || !ip || !node || !global) return null;
+  return { storage: options.storage, ip, node, global };
+}
+
 export function createMetricsCollector(options: MetricsCollectorOptions) {
   const now = options.now ?? Date.now;
   const development = options.development === true;
+  const resolved = resolve(options);
   const app = new Hono();
 
+  // Before routing: https, fail closed on storage and every limiter, then the per-address (/64) limit.
   app.use('*', async (context: Context, next: Next) => {
-    const ip = options.limiters?.[COLLECTOR_LIMITERS.IP];
-    const node = options.limiters?.[COLLECTOR_LIMITERS.NODE];
     if (!secureRequest(context.req.url, development))
       context.res = rejection(context, COLLECTOR_ERRORS.HTTPS_REQUIRED);
-    else if (!options.storage || !ip || !node)
+    else if (!resolved)
       context.res = rejection(context, COLLECTOR_ERRORS.UNAVAILABLE);
     else if (
       !(await allowed(
-        ip,
-        context.req.header(COLLECTOR_HEADERS.CLIENT_IP) ?? LOCAL_CLIENT_KEY,
+        resolved.ip,
+        ipKey(context.req.header(COLLECTOR_HEADERS.CLIENT_IP)),
       ))
     )
       context.res = rejection(context, COLLECTOR_ERRORS.RATE_LIMITED);
@@ -103,32 +118,57 @@ export function createMetricsCollector(options: MetricsCollectorOptions) {
     context.json({ ok: true }, COLLECTOR_STATUS.OK),
   );
 
-  app.post(COLLECTOR_ROUTES.RECEIPTS, async (context) => {
-    const storage = options.storage!;
-    const node = options.limiters![COLLECTOR_LIMITERS.NODE]!;
-    const bytes = await context.req.arrayBuffer();
-    try {
-      const result = await ingestUpload(bytes, {
-        storage,
-        now: now(),
-        admitNode: (nodeId) => allowed(node, nodeId),
-      });
-      return context.json(result, COLLECTOR_STATUS.OK);
-    } catch (error) {
-      if (error instanceof StaleUploadError)
-        return context.json(
-          {
-            error: COLLECTOR_ERRORS.STALE_UPLOAD,
-            serverTime: error.serverTime,
-          },
-          COLLECTOR_STATUS.CONFLICT,
-        );
-      if (error instanceof CollectorError)
-        return rejection(context, error.code);
-      throw error;
-    }
-  });
+  app.post(
+    COLLECTOR_ROUTES.RECEIPTS,
+    // Refuses an oversized body from Content-Length or while streaming, before buffering it.
+    bodyLimit({
+      maxSize: COLLECTOR_LIMITS.maxBodyBytes,
+      onError: (context) =>
+        rejection(context, COLLECTOR_ERRORS.PAYLOAD_TOO_LARGE),
+    }),
+    async (context) => {
+      const { storage, node, global } = resolved!;
+      if (
+        !JSON_CONTENT_TYPE.test(
+          context.req.header(COLLECTOR_HEADERS.CONTENT_TYPE) ?? '',
+        )
+      )
+        return rejection(context, COLLECTOR_ERRORS.INVALID_UPLOAD);
+      if (!(await allowed(global, GLOBAL_LIMIT_KEY)))
+        return rejection(context, COLLECTOR_ERRORS.RATE_LIMITED);
+      const bytes = new Uint8Array(await context.req.arrayBuffer());
+      try {
+        const result = await ingestUpload(bytes, {
+          storage,
+          now: now(),
+          admitNode: (nodeId) => allowed(node, nodeId),
+        });
+        return context.json(result, COLLECTOR_STATUS.OK);
+      } catch (error) {
+        if (error instanceof StaleUploadError)
+          return context.json(
+            {
+              error: COLLECTOR_ERRORS.STALE_UPLOAD,
+              serverTime: error.serverTime,
+            },
+            COLLECTOR_STATUS.CONFLICT,
+          );
+        if (error instanceof CollectorError)
+          return rejection(context, error.code);
+        throw error;
+      }
+    },
+  );
 
   app.notFound((context) => rejection(context, COLLECTOR_ERRORS.NOT_FOUND));
+  // Unexpected failures answer one static code and log nothing about the request.
+  app.onError((_error, context) => {
+    const response = context.json(
+      { error: COLLECTOR_INTERNAL_ERROR },
+      COLLECTOR_STATUS.INTERNAL_SERVER_ERROR,
+    );
+    finishHeaders(context);
+    return response;
+  });
   return app;
 }

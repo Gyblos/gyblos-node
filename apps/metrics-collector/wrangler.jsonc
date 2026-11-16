@@ -1,6 +1,8 @@
 {
   // Metrics collector Worker (collector.gyblos.com, proposed). Not deployed: creating the D1 database,
-  // rate-limit namespaces and the route needs founder approval.
+  // the rate-limit namespaces and the route needs founder approval. Deploy with
+  // `npx wrangler@4.151.1 ...` from this directory, as for the discovery index.
+  // One upload can run about 250 D1 statements in a batch, so this needs the Workers Paid plan.
   "name": "gyblos-collector",
   "main": "./src/worker.ts",
   "compatibility_date": "2026-10-01",
@@ -16,16 +18,26 @@
       "migrations_dir": "migrations",
     },
   ],
+  // Rate limits (Cloudflare counts 10 or 60 second windows). namespace_id values are unverified
+  // placeholders: they must be unique and unused in the account before the first deploy.
   "ratelimits": [
     {
+      // Per client address (IPv6 by /64), before the body is read.
       "name": "COLLECTOR_IP_LIMITER",
       "namespace_id": "42621010",
       "simple": { "limit": 60, "period": 60 },
     },
     {
+      // Per uploader NodeId, after its envelope signature verifies.
       "name": "COLLECTOR_NODE_LIMITER",
       "namespace_id": "42621011",
       "simple": { "limit": 12, "period": 60 },
+    },
+    {
+      // One shared write budget: a ceiling on storage growth from free node keys.
+      "name": "COLLECTOR_GLOBAL_LIMITER",
+      "namespace_id": "42621012",
+      "simple": { "limit": 600, "period": 60 },
     },
   ],
 }

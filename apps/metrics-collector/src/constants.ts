@@ -31,6 +31,7 @@ export const COLLECTOR_STATUS = {
   CONFLICT: 409,
   PAYLOAD_TOO_LARGE: 413,
   TOO_MANY_REQUESTS: 429,
+  INTERNAL_SERVER_ERROR: 500,
   SERVICE_UNAVAILABLE: 503,
 } as const;
 export type CollectorStatus =
@@ -40,6 +41,8 @@ export const COLLECTOR_ROUTES = {
   RECEIPTS: '/v1/receipts',
   HEALTH: '/v1/health',
 } as const;
+// Static code for unexpected failures; nothing else is reported.
+export const COLLECTOR_INTERNAL_ERROR = 'COLLECTOR_INTERNAL_ERROR';
 
 export const COLLECTOR_HEADERS = {
   CACHE_CONTROL: 'Cache-Control',
@@ -48,6 +51,7 @@ export const COLLECTOR_HEADERS = {
   ROBOTS: 'X-Robots-Tag',
   CONTENT_TYPE_OPTIONS: 'X-Content-Type-Options',
   CLIENT_IP: 'CF-Connecting-IP',
+  CONTENT_LENGTH: 'Content-Length',
 } as const;
 export const COLLECTOR_HEADER_VALUES = {
   NO_STORE: 'no-store',
@@ -78,8 +82,11 @@ export const COLLECTOR_DB_BINDING = 'COLLECTOR_DB';
 export const COLLECTOR_LIMITERS = {
   // Per client address, before reading the body.
   IP: 'COLLECTOR_IP_LIMITER',
-  // Per uploader NodeId, after the envelope parses and before signature work.
+  // Per uploader NodeId, after its envelope signature verifies and before receipt verification, so
+  // nobody can spend another node's allowance with unsigned junk.
   NODE: 'COLLECTOR_NODE_LIMITER',
+  // One shared write budget for the whole collector, a ceiling on storage growth from free keys.
+  GLOBAL: 'COLLECTOR_GLOBAL_LIMITER',
 } as const;
 export type CollectorLimiterName =
   (typeof COLLECTOR_LIMITERS)[keyof typeof COLLECTOR_LIMITERS];
@@ -88,3 +95,10 @@ export const HEX_RADIX = 16;
 
 // Fallback rate-limit key when no client address header is present (local development only).
 export const LOCAL_CLIENT_KEY = 'local';
+// Key of the shared write budget.
+export const GLOBAL_LIMIT_KEY = 'global';
+export const IPV6 = {
+  groups: 8,
+  prefixGroups: 4,
+  hexRadix: 16,
+} as const;

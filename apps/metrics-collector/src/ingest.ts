@@ -1,14 +1,21 @@
-// Owns one upload's acceptance: strict JSON, cheap parse and per-node admission before any signature
-// work, envelope and receipt verification, the clock window, public receipt policy and one atomic write.
+// Owns one upload's acceptance, cheapest checks first: strict JSON, envelope parse (structure and party
+// binding), the envelope signature, the clock window, per-node admission, then each receipt verified
+// once by the public receipt policy, and one atomic write.
 import {
   classifyPublicReceipt,
   mergePublicReceipt,
 } from '@gyblos/core/public-receipts';
 import { canonicalJson } from '@gyblos/protocol';
-import { controlObject } from '@gyblos/protocol/control-validation';
+import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
+import {
+  controlHex,
+  controlObject,
+  controlVerify,
+} from '@gyblos/protocol/control-validation';
 import {
   parseReceiptUpload,
-  verifyReceiptUpload,
+  RECEIPT_UPLOAD,
+  type ReceiptUploadV1,
 } from '@gyblos/protocol/receipt-upload';
 
 import { COLLECTOR_ERRORS, COLLECTOR_LIMITS, HEX_RADIX } from './constants';
@@ -23,15 +30,22 @@ import {
 export interface IngestContext {
   storage: CollectorStorage;
   now: number;
-  // Per-uploader admission, consulted after the envelope parses and before signature work.
+  // Per-uploader admission, consulted only after the envelope signature verifies.
   admitNode(uploaderNodeId: string): Promise<boolean>;
 }
 export interface IngestResult {
   receivedAt: number;
-  items: { merge: ReceiptWrite['merge'] }[];
+  accepted: number;
 }
 
-function decode(bytes: ArrayBuffer): unknown {
+export class StaleUploadError extends Error {
+  constructor(readonly serverTime: number) {
+    super(COLLECTOR_ERRORS.STALE_UPLOAD);
+    this.name = 'StaleUploadError';
+  }
+}
+
+function decode(bytes: Uint8Array): unknown {
   let value: unknown;
   try {
     value = JSON.parse(
@@ -52,6 +66,17 @@ function decode(bytes: ArrayBuffer): unknown {
   return value;
 }
 
+// Input is already validated lowercase hex of an even length.
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let index = 0; index < bytes.length; index++)
+    bytes[index] = Number.parseInt(
+      hex.slice(index * 2, index * 2 + 2),
+      HEX_RADIX,
+    );
+  return bytes;
+}
+
 async function envelopeId(signature: string) {
   const digest = new Uint8Array(
     await crypto.subtle.digest('SHA-256', new TextEncoder().encode(signature)),
@@ -61,60 +86,67 @@ async function envelopeId(signature: string) {
   ).join('');
 }
 
-export class StaleUploadError extends Error {
-  constructor(readonly serverTime: number) {
-    super(COLLECTOR_ERRORS.STALE_UPLOAD);
-    this.name = 'StaleUploadError';
+// Parses and checks only the envelope signature: one Ed25519 verification, no receipt work yet.
+async function verifiedEnvelope(value: unknown) {
+  let upload: ReceiptUploadV1;
+  let signature: string;
+  try {
+    const input = controlObject(value, ['upload', 'signature']);
+    upload = parseReceiptUpload(input.upload);
+    signature = controlHex(input.signature, CONTROL_LIMITS.signatureBytes);
+  } catch (error) {
+    return verificationFailure(error);
   }
+  let valid: boolean;
+  try {
+    valid = await controlVerify(
+      RECEIPT_UPLOAD.domain,
+      upload,
+      hexToBytes(upload.uploaderNodeId),
+      hexToBytes(signature),
+    );
+  } catch (error) {
+    return verificationFailure(error);
+  }
+  if (!valid) return collectorReject(COLLECTOR_ERRORS.INVALID_SIGNATURE);
+  return { upload, signature };
 }
 
 export async function ingestUpload(
-  bytes: ArrayBuffer,
+  bytes: Uint8Array,
   context: IngestContext,
 ): Promise<IngestResult> {
   if (bytes.byteLength > COLLECTOR_LIMITS.maxBodyBytes)
     return collectorReject(COLLECTOR_ERRORS.PAYLOAD_TOO_LARGE);
-  const value = decode(bytes);
-  let uploaderNodeId: string;
-  try {
-    const input = controlObject(value, ['upload', 'signature']);
-    uploaderNodeId = parseReceiptUpload(input.upload).uploaderNodeId;
-  } catch (error) {
-    return verificationFailure(error);
-  }
-  if (!(await context.admitNode(uploaderNodeId)))
-    return collectorReject(COLLECTOR_ERRORS.RATE_LIMITED);
-  let signed;
-  try {
-    signed = await verifyReceiptUpload(value);
-  } catch (error) {
-    return verificationFailure(error);
-  }
-  const { upload } = signed;
+  const { upload, signature } = await verifiedEnvelope(decode(bytes));
   if (Math.abs(context.now - upload.sentAt) > COLLECTOR_LIMITS.clockWindowMs)
     throw new StaleUploadError(context.now);
+  if (!(await context.admitNode(upload.uploaderNodeId)))
+    return collectorReject(COLLECTOR_ERRORS.RATE_LIMITED);
 
   let entries;
   try {
+    // The policy verifies each receipt's node signatures and binding; this is the only receipt check.
     entries = await Promise.all(
       upload.items.map((item) => classifyPublicReceipt(item.receipt)),
     );
   } catch (error) {
     return verificationFailure(error);
   }
+  // The pre-read only labels reports; storage decides first versions and conflicts atomically.
   const stored = await context.storage.readEntries(
     entries.map((entry) => entry.key),
   );
-  const id = await envelopeId(signed.signature);
+  const id = await envelopeId(signature);
   const receipts: ReceiptWrite[] = [];
   const reports: ReportRow[] = [];
   entries.forEach((incoming, index) => {
     const item = upload.items[index]!;
-    const { merge, entry } = mergePublicReceipt(
+    const { merge } = mergePublicReceipt(
       stored.get(incoming.key) ?? null,
       incoming,
     );
-    receipts.push({ role: upload.role, merge, stored: entry, incoming });
+    receipts.push({ role: upload.role, incoming });
     reports.push({
       envelopeId: id,
       key: incoming.key,
@@ -131,8 +163,8 @@ export async function ingestUpload(
       envelope: {
         id,
         upload,
-        signature: signed.signature,
-        json: canonicalJson(signed),
+        signature,
+        json: canonicalJson({ upload, signature }),
         receivedAt: context.now,
       },
       reports,
@@ -142,8 +174,5 @@ export async function ingestUpload(
   );
   if (result === COMMIT_RESULTS.REPLAYED)
     return collectorReject(COLLECTOR_ERRORS.REPLAYED_UPLOAD);
-  return {
-    receivedAt: context.now,
-    items: receipts.map(({ merge }) => ({ merge })),
-  };
+  return { receivedAt: context.now, accepted: receipts.length };
 }
