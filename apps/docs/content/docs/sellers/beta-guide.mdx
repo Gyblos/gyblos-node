@@ -106,16 +106,21 @@ docker compose run --rm seller gyblos doctor
 ```
 
 Doctor success does not prove that a buyer request completed. After registration and publication,
-ask the team through your invitation channel if you need help arranging a free external check.
+ask the team in the [Gyblos Telegram](https://t.me/gyblos) if you need help arranging a free external check.
 
 ## Next steps [#finish-onboarding]
 
 Your node starts **unlisted**. Run in a terminal, the installer then finishes onboarding with you, asking
 before each step:
 
-1. **Register.** Paste the `gyb_` invite code from your invitation. If the owner it names has too little
-   devnet SOL, the command says how much to send and waits until it arrives, then asks you to confirm the
-   one-time registration with `y`.
+1. **Register.** Paste the `gyb_` invite code from your invitation. Registering costs about 0.01 devnet
+   SOL once (devnet SOL is free test money). If the owner it names has too little, the command shows its
+   address and how much to send, and waits until it arrives:
+   1. Copy the owner address the command shows.
+   2. Open [faucet.solana.com](https://faucet.solana.com), choose **devnet**, paste the address and
+      request 0.5 SOL or less.
+   3. Go back to the terminal: it continues on its own and asks you to confirm the one-time registration
+      with `y`.
 2. **Publish.** Press Enter (or `y`) to list your offer in the discovery index.
 
 Press Ctrl+C at any step and run `sh install.sh` again later: it keeps what is done and continues. Without a

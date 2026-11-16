@@ -47,12 +47,12 @@ check Ollama first. Only use `--online` when you intend additional remote probes
 
 ### Installer
 
-| Symptom or exact output                                                                     | Remedy                                                                                                                                                                       |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GYBLOS_RELAY_TOKEN has characters…` or `GYBLOS_RELAY_TOKEN must have 32 to 512 characters` | The optional relay token you set is malformed. The Gyblos relays need none: unset `GYBLOS_RELAY_TOKEN` and rerun `sh install.sh`. Do not show or paste it into support chat. |
-| `GYBLOS_RELAY_TOKEN holds the gyb_ invite code`                                             | Unset `GYBLOS_RELAY_TOKEN` and rerun `sh install.sh`; enter the invite code later with `gyblos seller register` ([Register and publish](/en/sellers/register-publish)).      |
-| Installer stops with `gyblos install:` or `FAIL`                                            | Correct the named cause, then rerun `sh install.sh` where you saved it. Existing files and identity are preserved.                                                           |
-| `The image signature did not verify`                                                        | Do not run that image or bypass the check. Download the installer again from `https://gyblos.com/install.sh` and report the image line through your invitation channel.      |
+| Symptom or exact output                                                                     | Remedy                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GYBLOS_RELAY_TOKEN has characters…` or `GYBLOS_RELAY_TOKEN must have 32 to 512 characters` | The optional relay token you set is malformed. The Gyblos relays need none: unset `GYBLOS_RELAY_TOKEN` and rerun `sh install.sh`. Do not show or paste it into support chat.          |
+| `GYBLOS_RELAY_TOKEN holds the gyb_ invite code`                                             | Unset `GYBLOS_RELAY_TOKEN` and rerun `sh install.sh`; enter the invite code later with `gyblos seller register` ([Register and publish](/en/sellers/register-publish)).               |
+| Installer stops with `gyblos install:` or `FAIL`                                            | Correct the named cause, then rerun `sh install.sh` where you saved it. Existing files and identity are preserved.                                                                    |
+| `The image signature did not verify`                                                        | Do not run that image or bypass the check. Download the installer again from `https://gyblos.com/install.sh` and report the image line in the [Gyblos Telegram](https://t.me/gyblos). |
 
 ## Configuration [#configuration-rejected]
 
@@ -113,7 +113,7 @@ the file, put its contents on a command line or delete the data volume.
 | `DISCOVERY_IDENTITY_NOT_REGISTERED` | Rerun in an interactive terminal for devnet enrollment. Review estimated cost and approval in the registration guide first; the owner needs devnet SOL. Preserve the invite, which can still expire. |
 | `REGISTER_IDENTITY_UNAVAILABLE`     | Enrollment did not complete: read the missing-SOL, simulation or uncertain-result hint. Follow the registration guide before retrying.                                                               |
 | `REGISTER_CANCELLED`                | You answered something other than `yes` or `y`: nothing was signed or sent. Run `gyblos seller register` again.                                                                                      |
-| `DISCOVERY_INVITE_INVALID`          | Code is wrong, used or expired; request a replacement through the invitation channel.                                                                                                                |
+| `DISCOVERY_INVITE_INVALID`          | Code is wrong, used or expired; ask for a replacement in the [Gyblos Telegram](https://t.me/gyblos); do not post the old code.                                                                       |
 | `DISCOVERY_NODE_REVOKED`            | Contact Gyblos; do not generate another identity to bypass removal.                                                                                                                                  |
 | `DISCOVERY_RATE_LIMITED`            | Wait a minute before retrying registration.                                                                                                                                                          |
 | `DISCOVERY_UNAVAILABLE`             | Try later or contact Gyblos. Check the configured index origin before submitting an invite.                                                                                                          |
@@ -149,7 +149,8 @@ restore is documented here; see [Identity and private data](/en/sellers/identity
 
 ## Ask for help [#ask-for-help-safely]
 
-Reply through the invitation channel with the relevant error code and these outputs:
+Write in the [Gyblos Telegram](https://t.me/gyblos) with the relevant error code and these outputs. The group is public:
+everyone in it can read what you post.
 
 ```sh
 cd ~/gyblos-seller

@@ -13,7 +13,7 @@ they disagree, `AGENTS.md` wins.
 
 ```sh
 git -C <checkout> fetch origin
-git -C <checkout> worktree add --detach <path> origin/main
+git -C <checkout> worktree add --detach <path> origin/develop
 cd <path>
 git switch -c <prefix>/<topic>      # only when you will push a branch
 pnpm install --frozen-lockfile
@@ -46,14 +46,14 @@ pnpm test:lab
 pnpm tooling:test
 ```
 
-Compare lint warnings with `main` (`pnpm exec eslint .` on both). Report in the
+Compare lint warnings with `develop` (`pnpm exec eslint .` on both). Report in the
 PR body and to the caller using this template:
 
 ```text
 Gates on <head SHA>:
 - install --frozen-lockfile: pass
 - typecheck: pass
-- lint: 0 errors / <N> warnings (main: <N>) / <M> modules, 0 boundary violations
+- lint: 0 errors / <N> warnings (develop: <N>) / <M> modules, 0 boundary violations
 - product (pnpm test): <total> total / <p> passed / <f> failed / <c> cancelled / <s> skipped
 - lab (pnpm test:lab): <total> total / <p> passed / <f> failed / <c> cancelled / <s> skipped (<reason for skips>)
 - tooling (pnpm tooling:test): <total> total / <p> passed / <f> failed / <c> cancelled / <s> skipped
@@ -109,7 +109,8 @@ Focus lines, one per reviewer:
 A PR or green CI is never approval. Each merge needs the founder's explicit
 approval for that PR and the reviewed head:
 
-- A PR into `main` needs successful current CI, Security and Static analysis
+- Open PRs against `develop`. `main` takes only release PRs from `develop`.
+- A PR into `develop` or `main` needs successful current CI, Security and Static analysis
   checks on its combined head before merge. Check the actual PR base and head;
   an ancestor's green result does not validate a later combined tree.
 - A stacked child PR into another branch intentionally runs none of those
@@ -117,7 +118,7 @@ approval for that PR and the reviewed head:
   reviews, then separate founder approval for that child. Do not claim that
   absent or filtered hosted checks passed.
 - Merge a stack top-down into each base. Every head update can trigger another
-  main-facing run; the final push to `main` can run workflows again. This filter
+  develop-facing run; the final push to `develop` can run workflows again. This filter
   reduces duplicate stacked runs, not all repeated runs.
 - If the task prohibits remote CI, use `[skip ci]` in new commits, report hosted
   checks as not run and leave the PR open. Never trigger a rerun, bypass a hosted
@@ -126,7 +127,7 @@ approval for that PR and the reviewed head:
 After the appropriate evidence and explicit approval, use:
 
 ```sh
-# For a PR into main, verify the current combined checks first.
+# For a PR into develop or main, verify the current combined checks first.
 gh pr checks <n> --repo Gyblos/gyblos-node
 # For every approved PR, match the reviewed head and preserve a merge commit.
 gh pr merge <n> --repo Gyblos/gyblos-node --merge --match-head-commit <SHA>
@@ -134,7 +135,7 @@ gh pr merge <n> --repo Gyblos/gyblos-node --merge --match-head-commit <SHA>
 
 Merge commits only, never `--squash` or `--rebase`. Do not pass
 `--delete-branch`. When remote validation is authorized, confirm the post-merge
-CI on `main` for the merge SHA; otherwise report it as not run.
+CI on the base branch for the merge SHA; otherwise report it as not run.
 
 ## 7. Post-merge vault update
 

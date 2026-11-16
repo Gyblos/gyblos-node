@@ -1,0 +1,43 @@
+# Trusted metadata-only handling invalidates labels before a new PR revision is reviewed.
+name: AI review state
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  issues: write
+  pull-requests: read
+jobs:
+  invalidate:
+    concurrency:
+      group: ai-review-label-${{ github.repository }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    if: vars.AI_REVIEW_ENABLED == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Invalidate previous PR revision labels without checking out source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REQUEST_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          const repo = process.env.GITHUB_REPOSITORY;
+          const number = process.env.PR_NUMBER;
+          if (!/^[1-9][0-9]*$/.test(number)) throw new Error('Invalid PR identity.');
+          const api = (...args) => execFileSync('gh', ['api', ...args], {encoding:'utf8'});
+          const pr = JSON.parse(api('repos/' + repo + '/pulls/' + number));
+          if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+              pr.head.repo?.full_name !== repo || pr.head.sha !== process.env.REQUEST_HEAD) process.exit(0);
+          const marker = '<!-- gyblos-ai-review:' + pr.head.sha + ':' + pr.base.sha + ':' + pr.merge_commit_sha + ' -->';
+          const comments = JSON.parse(api('--paginate', '--slurp', 'repos/' + repo + '/issues/' + number + '/comments?per_page=100')).flat();
+          if (comments.some(comment => comment.user?.login === 'github-actions[bot]' && comment.body?.includes(marker))) process.exit(0);
+          const labels = JSON.parse(api('repos/' + repo + '/issues/' + number + '/labels'));
+          for (const item of labels) {
+            if (/^ai-review:(queued|running|clean|needs-validation|error)$/.test(item.name))
+              api('-X', 'DELETE', 'repos/' + repo + '/issues/' + number + '/labels/' + encodeURIComponent(item.name));
+          }
+          api('-X', 'POST', 'repos/' + repo + '/issues/' + number + '/labels', '-f', 'labels[]=ai-review:queued');
+          NODE
