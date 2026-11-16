@@ -112,8 +112,13 @@ y la publicación, pide ayuda por el canal de tu invitación si necesitas coordi
 Tu nodo empieza **sin publicar**. Si lo ejecutas en una terminal, el instalador termina el alta contigo y
 pregunta antes de cada paso:
 
-1. **Registro.** Pega el código `gyb_` de tu invitación. Si al owner que indica le falta SOL de devnet, el
-   comando dice cuánto enviar y espera a que llegue; después pide confirmar con `y` el registro único.
+1. **Registro.** Pega el código `gyb_` de tu invitación. Registrarte cuesta una vez unos 0,01 SOL de devnet
+   (el SOL de devnet es dinero de prueba y es gratis). Si al owner que indica le falta, el comando muestra su
+   dirección y cuánto enviar, y espera a que llegue:
+   1. Copia la dirección del owner que muestra el comando.
+   2. Abre [faucet.solana.com](https://faucet.solana.com), elige **devnet**, pega la dirección y pide 0,5
+      SOL o menos.
+   3. Vuelve a la terminal: continúa sola y te pide confirmar con `y` el registro único.
 2. **Publicación.** Pulsa Enter (o `y`) para listar tu oferta en el índice de descubrimiento.
 
 Pulsa Ctrl+C en cualquier paso y vuelve a ejecutar `sh install.sh` más tarde: conserva lo hecho y continúa. Sin
