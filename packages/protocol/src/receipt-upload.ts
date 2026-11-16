@@ -57,7 +57,11 @@ function verifyNodeReceipt(value: ReceiptV1 | ReceiptV2) {
     : verifyReceiptV2(value);
 }
 
-export async function verifyReceiptUpload(
+// Checks the envelope only: strict parse (structure, party binding) and the uploader's signature.
+// Receipt node signatures are NOT verified; the caller must verify each receipt before trusting it,
+// for example with its version's contract. This lets a collector spend admission on a signed envelope
+// before the receipt work.
+export async function verifyReceiptUploadEnvelope(
   value: unknown,
 ): Promise<SignedReceiptUpload> {
   const input = controlObject(value, ['upload', 'signature']);
@@ -73,7 +77,15 @@ export async function verifyReceiptUpload(
     ))
   )
     return controlFail(CONTROL_CODES.SIGNATURE);
-  // Party binding and every structural rule were checked by the parser, before any crypto.
-  for (const item of upload.items) await verifyNodeReceipt(item.receipt);
   return { upload, signature };
+}
+
+// Checks the envelope and every receipt's own node signatures.
+export async function verifyReceiptUpload(
+  value: unknown,
+): Promise<SignedReceiptUpload> {
+  const signed = await verifyReceiptUploadEnvelope(value);
+  // Party binding and every structural rule were checked by the parser, before any crypto.
+  for (const item of signed.upload.items) await verifyNodeReceipt(item.receipt);
+  return signed;
 }
