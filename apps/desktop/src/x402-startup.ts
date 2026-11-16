@@ -14,6 +14,7 @@ export function automaticBuyer(
 ) {
   let closed = false;
   let ready: Promise<void> | null = null;
+  let connected = false;
   const check = () => {
     if (closed) throw new Error('Local buyer is stopping');
   };
@@ -28,12 +29,27 @@ export function automaticBuyer(
       check();
       const current = await budget.summary();
       check();
+      const policy = client.policy();
+      if (
+        policy?.maxAtomic === '0' &&
+        current.active &&
+        !current.blocked &&
+        current.policy?.maxAtomic === '0' &&
+        current.limitAtomic === '0' &&
+        current.spentAtomic === '0' &&
+        current.policy.policyId !== policy.policyId
+      ) {
+        await budget.finish();
+        check();
+      }
       if (
         client.policy()?.maxAtomic === '0' &&
-        !current.active &&
+        !(await budget.summary()).active &&
         !current.blocked
       )
         await client.authorize('0');
+      check();
+      connected = true;
     } catch (error) {
       await service.stop();
       throw error;
@@ -42,6 +58,10 @@ export function automaticBuyer(
   return {
     start(): Promise<void> {
       if (closed) return Promise.reject(new Error('Local buyer is stopping'));
+      if (connected && !client.policy()) {
+        ready = null;
+        connected = false;
+      }
       ready ??= connect().catch((error: unknown) => {
         ready = null;
         throw error;

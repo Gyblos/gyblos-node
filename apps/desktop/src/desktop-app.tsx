@@ -355,8 +355,8 @@ export function DesktopApp() {
               </span>
             </Button>
           )}
+        <UpdateNotice />
       </WindowTitlebar>
-      <UpdateNotice />
       <BuyerSidebar
         systemStatus={
           <SystemStatus
