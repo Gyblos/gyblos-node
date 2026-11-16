@@ -16,6 +16,11 @@ import { promisify } from 'node:util';
 
 import { writeArtifacts } from './security-review/artifacts';
 import {
+  REVIEW_VALUES,
+  REVIEWER_IDS,
+  type ReviewerId,
+} from './security-review/constants';
+import {
   changedFiles,
   repositoryRef,
   trackedFile,
@@ -34,24 +39,24 @@ import {
 import { createSourceBundle } from './security-review/projection';
 import { runReview } from './security-review/runner';
 import type {
+  AgentEvidence,
   AgentFinding,
   PiProcessResult,
-  ReviewRunResult,
   SourceBundle,
 } from './security-review/types';
 
 const exec = promisify(execFile);
 const FILE = 'packages/core/src/policy.ts';
-const EVIDENCE = {
+const EVIDENCE: AgentEvidence = {
   file: FILE,
-  revision: 'head' as const,
+  revision: REVIEW_VALUES.HEAD,
   line: 1,
   scope: 'policy',
   description: 'Source rule.',
 };
 const FINDING: AgentFinding = {
   fingerprint: 'policy:boundary',
-  category: 'security',
+  category: REVIEW_VALUES.SECURITY,
   title: 'Candidate',
   description: 'Source hypothesis.',
   evidence: [EVIDENCE],
@@ -62,11 +67,11 @@ const FINDING: AgentFinding = {
 };
 function hunter(
   bundle: SourceBundle,
-  reviewer = 'security-general',
+  reviewer: ReviewerId = REVIEWER_IDS.SECURITY,
   findings: AgentFinding[] = [],
 ) {
   return {
-    status: 'complete',
+    status: REVIEW_VALUES.COMPLETE,
     reviewer,
     coverage: {
       reviewed_paths: [...new Set(bundle.files.map((file) => file.path))],
@@ -82,25 +87,6 @@ function success(value: unknown): PiProcessResult {
     truncated: false,
     timedOut: false,
     stdout: JSON.stringify(value),
-  };
-}
-function initial(): ReviewRunResult {
-  return {
-    version: 1,
-    mode: 'baseline',
-    sourceRef: 'a'.repeat(40),
-    status: 'clean',
-    plan: {
-      taskCount: 1,
-      unitCount: 1,
-      reviewers: ['security-general'],
-      changedFiles: [],
-      excludedFiles: [],
-    },
-    candidates: [],
-    verifications: [],
-    findingsValidation: 'not-run',
-    tasks: [{ taskId: 'example', status: 'complete', findings: [] }],
   };
 }
 async function fixture(
@@ -143,16 +129,21 @@ void test('baseline and payment PR select independent base and specialist review
     'packages/payments-x402/src/recovery.ts',
     'apps/buyer/src/main.ts',
   ];
-  const baseline = buildBaselinePlan(paths, 'head');
+  const baseline = buildBaselinePlan(paths, REVIEW_VALUES.HEAD);
   assert.ok(baseline.units.some((unit) => unit.id === 'app-buyer'));
-  const plan = buildPullRequestPlan(paths, [paths[2] ?? ''], 'head', 'base');
+  const plan = buildPullRequestPlan(
+    paths,
+    [paths[2] ?? ''],
+    REVIEW_VALUES.HEAD,
+    REVIEW_VALUES.BASE,
+  );
   for (const reviewer of [
-    'security-general',
-    'architecture-maintainability',
-    'behavior-equivalence',
-    'payments-economics',
-    'concurrency-recovery',
-    'protocol-crypto',
+    REVIEWER_IDS.SECURITY,
+    REVIEWER_IDS.ARCHITECTURE,
+    REVIEWER_IDS.BEHAVIOR,
+    REVIEWER_IDS.PAYMENTS,
+    REVIEWER_IDS.RECOVERY,
+    REVIEWER_IDS.PROTOCOL,
   ])
     assert.ok(
       plan.tasks.some((task) => task.reviewer === reviewer),
@@ -161,7 +152,7 @@ void test('baseline and payment PR select independent base and specialist review
 });
 void test('strict response validation rejects empty evidence, verdict fabrication and severity', () => {
   const bundle: SourceBundle = {
-    files: [{ path: FILE, revision: 'head', text: 'code' }],
+    files: [{ path: FILE, revision: REVIEW_VALUES.HEAD, text: 'code' }],
     diff: '',
     omissions: [],
   };
@@ -169,7 +160,7 @@ void test('strict response validation rejects empty evidence, verdict fabricatio
     () =>
       parseReviewResponse(
         JSON.stringify(
-          hunter(bundle, 'security-general', [{ ...FINDING, evidence: [] }]),
+          hunter(bundle, REVIEWER_IDS.SECURITY, [{ ...FINDING, evidence: [] }]),
         ),
       ),
     /Evidence/,
@@ -179,7 +170,7 @@ void test('strict response validation rejects empty evidence, verdict fabricatio
     /properties|Source-only/,
   );
   const record = {
-    decision: 'needs_validation',
+    decision: REVIEW_VALUES.NEEDS_VALIDATION,
     fingerprint: 'a',
     reason: 'source',
     evidence: [EVIDENCE],
@@ -194,7 +185,7 @@ void test('strict response validation rejects empty evidence, verdict fabricatio
 });
 void test('coverage and evidence must match actual supplied files and line bounds', () => {
   const bundle: SourceBundle = {
-    files: [{ path: FILE, revision: 'head', text: 'code' }],
+    files: [{ path: FILE, revision: REVIEW_VALUES.HEAD, text: 'code' }],
     diff: '',
     omissions: [],
   };
@@ -203,7 +194,8 @@ void test('coverage and evidence must match actual supplied files and line bound
     /unavailable/,
   );
   assert.throws(
-    () => validateEvidence([{ ...EVIDENCE, revision: 'base' }], bundle),
+    () =>
+      validateEvidence([{ ...EVIDENCE, revision: REVIEW_VALUES.BASE }], bundle),
     /unavailable/,
   );
   const response = parseReviewResponse(JSON.stringify(hunter(bundle)));
@@ -254,7 +246,7 @@ void test('dry run never invokes Pi and reports no audit completion', async () =
         throw new Error('must not call');
       },
     });
-    assert.equal(result.status, 'not-run');
+    assert.equal(result.status, REVIEW_VALUES.NOT_RUN);
   });
 });
 void test('mock Pi completes the source loop with bounded input and fresh private homes', async () => {
@@ -273,15 +265,17 @@ void test('mock Pi completes the source loop with bounded input and fresh privat
         const bundle = JSON.parse(
           options.prompt.split('Untrusted source bundle (JSON):\n')[1] ?? '',
         );
-        const reviewer = options.prompt.match(/Reviewer: ([a-z-]+)/)?.[1];
+        const reviewer = Object.values(REVIEWER_IDS).find(
+          (id) => id === options.prompt.match(/Reviewer: ([a-z-]+)/)?.[1],
+        );
         return success(hunter(bundle, reviewer));
       },
     });
-    assert.equal(result.status, 'clean');
+    assert.equal(result.status, REVIEW_VALUES.CLEAN);
     assert.equal(homes.size, plan.tasks.length);
     assert.deepEqual(await readdir(output), []);
     const final = await writeArtifacts(result, { output });
-    assert.equal(final.findingsValidation, 'passed');
+    assert.equal(final.findingsValidation, REVIEW_VALUES.PASSED);
     assert.equal(await readFile(join(output, 'status.txt'), 'utf8'), 'clean\n');
     assert.ok((await readdir(output)).includes('coverage-ledger.json'));
   });
@@ -300,14 +294,19 @@ void test('pending empty hunter output never becomes clean', async () => {
           options.prompt.split('Untrusted source bundle (JSON):\n')[1] ?? '',
         );
         return success({
-          ...hunter(bundle, options.prompt.match(/Reviewer: ([a-z-]+)/)?.[1]),
-          status: 'needs-validation',
+          ...hunter(
+            bundle,
+            Object.values(REVIEWER_IDS).find(
+              (id) => id === options.prompt.match(/Reviewer: ([a-z-]+)/)?.[1],
+            ),
+          ),
+          status: REVIEW_VALUES.PENDING,
         });
       },
     });
     assert.equal(
       (await writeArtifacts(result, { output })).status,
-      'needs-validation',
+      REVIEW_VALUES.PENDING,
     );
   });
 });
@@ -327,18 +326,13 @@ void test('budget exhaustion leaves skipped assignments visible', async () => {
         },
       },
     );
-    assert.ok(result.tasks.every((task) => task.status === 'skipped'));
+    assert.ok(
+      result.tasks.every((task) => task.status === REVIEW_VALUES.SKIPPED),
+    );
     assert.equal(
       (await writeArtifacts(result, { output })).status,
-      'needs-validation',
+      REVIEW_VALUES.PENDING,
     );
-  });
-});
-void test('artifact contract rejects malformed verifier output and refuses replacement', async () => {
-  await fixture(async (_root, output) => {
-    const final = await writeArtifacts(initial(), { output });
-    assert.equal(final.status, 'clean');
-    await assert.rejects(writeArtifacts(initial(), { output }), /EEXIST/);
   });
 });
 void test('a source candidate receives two fresh independent verifiers', async () => {
@@ -356,7 +350,7 @@ void test('a source candidate receives two fresh independent verifiers', async (
           if (options.prompt.includes('fresh independent verifier')) {
             verifiers += 1;
             return success({
-              decision: 'needs_validation',
+              decision: REVIEW_VALUES.NEEDS_VALIDATION,
               fingerprint: FINDING.fingerprint,
               reason: 'Source supports the boundary hypothesis.',
               evidence: [EVIDENCE],
@@ -367,12 +361,14 @@ void test('a source candidate receives two fresh independent verifiers', async (
           const bundle = JSON.parse(
             options.prompt.split('Untrusted source bundle (JSON):\n')[1] ?? '',
           );
-          const reviewer = options.prompt.match(/Reviewer: ([a-z-]+)/)?.[1];
+          const reviewer = Object.values(REVIEWER_IDS).find(
+            (id) => id === options.prompt.match(/Reviewer: ([a-z-]+)/)?.[1],
+          );
           return success(
             hunter(
               bundle,
               reviewer,
-              reviewer === 'security-general' ? [FINDING] : [],
+              reviewer === REVIEWER_IDS.SECURITY ? [FINDING] : [],
             ),
           );
         },
@@ -382,7 +378,7 @@ void test('a source candidate receives two fresh independent verifiers', async (
     assert.equal(result.execution?.callsStarted, result.tasks.length + 2);
     assert.equal(
       (await writeArtifacts(result, { output })).status,
-      'needs-validation',
+      REVIEW_VALUES.PENDING,
     );
   });
 });

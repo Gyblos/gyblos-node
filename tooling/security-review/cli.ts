@@ -164,7 +164,8 @@ function applyArgument(
 
 function parseOptions(argumentsList: string[]): CliOptions {
   const command = argumentsList[0];
-  if (command !== 'run' && command !== 'plan') throw new Error(usage());
+  if (command !== REVIEW_VALUES.RUN && command !== REVIEW_VALUES.PLAN)
+    throw new Error(usage());
   const modeArgument = argumentsList[1];
   if (
     modeArgument !== REVIEW_VALUES.BASELINE &&
@@ -247,7 +248,7 @@ async function main(): Promise<void> {
     argumentsList[0] === '--' ? argumentsList.slice(1) : argumentsList,
   );
   const plan = await createPlan(options);
-  if (options.command === 'plan') {
+  if (options.command === REVIEW_VALUES.PLAN) {
     process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
     return;
   }

@@ -112,3 +112,86 @@ void test('metadata-only label invalidation has no checkout or model credential'
   assert.ok(block);
   new vm.Script(block.replace(/^\s*import .+;\n/gm, ''));
 });
+
+void test('publisher and invalidator serialize mutations under the same PR mutex', async () => {
+  const publish = await readFile(WORKFLOW, 'utf8');
+  const invalidate = await readFile(
+    '.github/workflows/ai-review-state.yml',
+    'utf8',
+  );
+  const group = (content: string) =>
+    content
+      .match(
+        /group: (ai-review-label-[^\n]+)\n\s*cancel-in-progress: false/,
+      )?.[1]
+      ?.replaceAll('${{ needs.review.outputs.pr }}', '123')
+      .replaceAll('${{ github.event.pull_request.number }}', '123');
+  assert.ok(group(publish));
+  assert.equal(group(publish), group(invalidate));
+  assert.doesNotMatch(
+    publish.slice(0, publish.indexOf('jobs:')),
+    /cancel-in-progress: true/,
+  );
+});
+
+void test('delayed invalidation preserves a completed result for the same snapshot', async () => {
+  const content = await readFile(
+    '.github/workflows/ai-review-state.yml',
+    'utf8',
+  );
+  const block = [
+    ...content.matchAll(
+      /node --input-type=module <<'NODE'\n([\s\S]*?)\n\s*NODE/g,
+    ),
+  ][0]?.[1];
+  assert.ok(block);
+  const writes: string[][] = [];
+  const stopped = new Error('exit');
+  const pr = {
+    state: 'open',
+    base: { ref: 'main', sha: BASE },
+    merge_commit_sha: MERGE,
+    head: { sha: HEAD, repo: { full_name: 'Gyblos/gyblos-node' } },
+  };
+  try {
+    vm.runInNewContext(block.replace(/^\s*import .+;\n/gm, ''), {
+      process: {
+        env: {
+          GITHUB_REPOSITORY: 'Gyblos/gyblos-node',
+          PR_NUMBER: '1',
+          REQUEST_HEAD: HEAD,
+        },
+        exit: () => {
+          throw stopped;
+        },
+      },
+      execFileSync: (_command: string, args: string[]) => {
+        if (args.includes('POST') || args.includes('DELETE')) {
+          writes.push(args);
+          return '{}';
+        }
+        if (args.some((item) => item.includes('/comments')))
+          return JSON.stringify([
+            [
+              {
+                user: { login: 'github-actions[bot]', type: 'Bot' },
+                body:
+                  '<!-- gyblos-ai-review:' +
+                  HEAD +
+                  ':' +
+                  BASE +
+                  ':' +
+                  MERGE +
+                  ' -->',
+              },
+            ],
+          ]);
+        if (args.some((item) => item.endsWith('/labels'))) return '[]';
+        return JSON.stringify(pr);
+      },
+    });
+  } catch (error: unknown) {
+    if (error !== stopped) throw error;
+  }
+  assert.equal(writes.length, 0);
+});

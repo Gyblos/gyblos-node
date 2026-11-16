@@ -111,7 +111,7 @@ export async function writeArtifacts(
   initial: ReviewRunResult,
   options: ArtifactOptions,
 ): Promise<ReviewRunResult> {
-  let validation: 'passed' | 'failed' = 'passed';
+  let validation: ReviewRunResult['findingsValidation'] = REVIEW_VALUES.PASSED;
   for (const verification of initial.verifications) {
     if (verification.record) {
       try {
@@ -122,17 +122,19 @@ export async function writeArtifacts(
           record.fingerprint !== verification.fingerprint ||
           record.decision !== verification.decision
         )
-          validation = 'failed';
+          validation = REVIEW_VALUES.FAILED;
       } catch {
-        validation = 'failed';
+        validation = REVIEW_VALUES.FAILED;
       }
     } else if (verification.decision !== REVIEW_VALUES.ERROR)
-      validation = 'failed';
+      validation = REVIEW_VALUES.FAILED;
   }
   const result: ReviewRunResult = {
     ...initial,
     status:
-      validation === 'failed' ? REVIEW_VALUES.ERROR : finalStatus(initial),
+      validation === REVIEW_VALUES.FAILED
+        ? REVIEW_VALUES.ERROR
+        : finalStatus(initial),
     findingsValidation:
       initial.status === REVIEW_VALUES.NOT_RUN
         ? REVIEW_VALUES.NOT_RUN

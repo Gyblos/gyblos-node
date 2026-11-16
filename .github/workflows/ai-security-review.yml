@@ -9,12 +9,11 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ai-review-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: true
-
 jobs:
   review:
+    concurrency:
+      group: ai-review-compute-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
     if: >-
       vars.AI_REVIEW_ENABLED == 'true' &&
       github.event.workflow_run.event == 'pull_request' &&
@@ -116,6 +115,9 @@ jobs:
           retention-days: 7
 
   publish:
+    concurrency:
+      group: ai-review-label-${{ github.repository }}-${{ needs.review.outputs.pr }}
+      cancel-in-progress: false
     needs: review
     if: always() && needs.review.result != 'cancelled' && needs.review.outputs.pr
     runs-on: ubuntu-24.04
@@ -165,8 +167,10 @@ jobs:
               api('-X', 'DELETE', 'repos/' + repo + '/issues/' + number + '/labels/' + encodeURIComponent(item.name));
           }
           api('-X', 'POST', 'repos/' + repo + '/issues/' + number + '/labels', '-f', 'labels[]=' + label);
-          const body = 'AI source review: **' + status + '** for ' + process.env.REVIEW_HEAD +
+          const marker = '<!-- gyblos-ai-review:' + process.env.REVIEW_HEAD + ':' + process.env.REVIEW_BASE + ':' + process.env.REVIEW_MERGE + ' -->';
+          const body = marker + '\nAI source review: **' + status + '** for ' + process.env.REVIEW_HEAD +
             '. Advisory result; clean means no retained candidates in the reviewed source, not proof of security. ' +
-            'Coverage gaps and pending synthetic validation are recorded in this Actions run.';
+            'Coverage gaps and pending synthetic validation are recorded in this Actions run.\n' +
+            '<!-- gyblos-ai-review:' + process.env.REVIEW_HEAD + ':' + process.env.REVIEW_BASE + ':' + process.env.REVIEW_MERGE + ' -->';
           api('-X', 'POST', 'repos/' + repo + '/issues/' + number + '/comments', '-f', 'body=' + body);
           NODE

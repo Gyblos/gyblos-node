@@ -49,6 +49,10 @@ export type ReviewLabel = (typeof REVIEW_LABELS)[keyof typeof REVIEW_LABELS];
 
 export const REVIEW_RESULT_VERSION = 1;
 export const REVIEW_VALUES = {
+  RUN: 'run',
+  PLAN: 'plan',
+  PASSED: 'passed',
+  FAILED: 'failed',
   BASELINE: 'baseline',
   PR: 'pull-request',
   CLEAN: 'clean',

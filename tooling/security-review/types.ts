@@ -104,7 +104,7 @@ export interface ReviewRunResult {
   candidates: AgentFinding[];
   tasks: TaskResult[];
   verifications: VerificationResult[];
-  findingsValidation: 'passed' | 'failed' | 'not-run';
+  findingsValidation: Value<'PASSED' | 'FAILED' | 'NOT_RUN'>;
   execution?: {
     model: string | null;
     thinking: PiThinkingLevel;
@@ -120,7 +120,7 @@ export interface ReviewPlanSummary {
   excludedFiles: string[];
 }
 export interface CliOptions {
-  command: 'run' | 'plan';
+  command: Value<'RUN' | 'PLAN'>;
   mode: ReviewMode;
   root: string;
   output: string;

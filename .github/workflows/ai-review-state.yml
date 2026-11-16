@@ -7,11 +7,11 @@ on:
 permissions:
   issues: write
   pull-requests: read
-concurrency:
-  group: ai-review-state-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
 jobs:
   invalidate:
+    concurrency:
+      group: ai-review-label-${{ github.repository }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     if: vars.AI_REVIEW_ENABLED == 'true' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -31,6 +31,9 @@ jobs:
           const pr = JSON.parse(api('repos/' + repo + '/pulls/' + number));
           if (pr.state !== 'open' || pr.base.ref !== 'main' ||
               pr.head.repo?.full_name !== repo || pr.head.sha !== process.env.REQUEST_HEAD) process.exit(0);
+          const marker = '<!-- gyblos-ai-review:' + pr.head.sha + ':' + pr.base.sha + ':' + pr.merge_commit_sha + ' -->';
+          const comments = JSON.parse(api('--paginate', '--slurp', 'repos/' + repo + '/issues/' + number + '/comments?per_page=100')).flat();
+          if (comments.some(comment => comment.user?.login === 'github-actions[bot]' && comment.body?.includes(marker))) process.exit(0);
           const labels = JSON.parse(api('repos/' + repo + '/issues/' + number + '/labels'));
           for (const item of labels) {
             if (/^ai-review:(queued|running|clean|needs-validation|error)$/.test(item.name))

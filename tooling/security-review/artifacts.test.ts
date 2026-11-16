@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { writeArtifacts } from './artifacts';
+import { REVIEW_VALUES, REVIEWER_IDS } from './constants';
 import type {
   AgentFinding,
   ReviewRunResult,
@@ -15,20 +16,20 @@ import type {
 function result(): ReviewRunResult {
   return {
     version: 1,
-    mode: 'pull-request',
+    mode: REVIEW_VALUES.PR,
     sourceRef: 'a'.repeat(40),
-    status: 'clean',
+    status: REVIEW_VALUES.CLEAN,
     plan: {
       taskCount: 1,
       unitCount: 1,
-      reviewers: ['security-general'],
+      reviewers: [REVIEWER_IDS.SECURITY],
       changedFiles: [],
       excludedFiles: [],
     },
     candidates: [],
     verifications: [],
-    findingsValidation: 'not-run',
-    tasks: [{ taskId: 'test', status: 'complete', findings: [] }],
+    findingsValidation: REVIEW_VALUES.NOT_RUN,
+    tasks: [{ taskId: 'test', status: REVIEW_VALUES.COMPLETE, findings: [] }],
   };
 }
 async function withOutput(
@@ -48,8 +49,15 @@ void test('excluded changed paths keep an otherwise completed PR pending', async
     initial.plan.excludedFiles = [...initial.plan.changedFiles];
     assert.equal(
       (await writeArtifacts(initial, { output })).status,
-      'needs-validation',
+      REVIEW_VALUES.PENDING,
     );
+  });
+});
+
+void test('artifact output refuses to replace an existing run', async () => {
+  await withOutput(async (output) => {
+    await writeArtifacts(result(), { output });
+    await assert.rejects(writeArtifacts(result(), { output }), /EEXIST/);
   });
 });
 void test('fingerprint collisions retain each positional verification in the report', async () => {
@@ -57,13 +65,13 @@ void test('fingerprint collisions retain each positional verification in the rep
     const initial = result();
     const candidate: AgentFinding = {
       fingerprint: 'collision',
-      category: 'security',
+      category: REVIEW_VALUES.SECURITY,
       title: 'First candidate',
       description: 'Source hypothesis.',
       evidence: [
         {
           file: 'packages/core/a.ts',
-          revision: 'head',
+          revision: REVIEW_VALUES.HEAD,
           line: 1,
           scope: 'a',
           description: 'Source.',
@@ -75,7 +83,7 @@ void test('fingerprint collisions retain each positional verification in the rep
       suggested_fix: 'regression',
     };
     const rejected: VerificationResponse = {
-      decision: 'rejected',
+      decision: REVIEW_VALUES.REJECTED,
       fingerprint: 'collision',
       reason: 'Refuted.',
       evidence: candidate.evidence,
@@ -84,7 +92,7 @@ void test('fingerprint collisions retain each positional verification in the rep
     };
     const pending: VerificationResponse = {
       ...rejected,
-      decision: 'needs_validation',
+      decision: REVIEW_VALUES.NEEDS_VALIDATION,
       blockers: ['Missing fixture.'],
       validation_plan: 'Second plan.',
     };
@@ -93,10 +101,14 @@ void test('fingerprint collisions retain each positional verification in the rep
       { ...candidate, title: 'Second candidate' },
     ];
     initial.verifications = [
-      { fingerprint: 'collision', decision: 'rejected', record: rejected },
       {
         fingerprint: 'collision',
-        decision: 'needs_validation',
+        decision: REVIEW_VALUES.REJECTED,
+        record: rejected,
+      },
+      {
+        fingerprint: 'collision',
+        decision: REVIEW_VALUES.NEEDS_VALIDATION,
         record: pending,
       },
     ];
