@@ -1698,3 +1698,68 @@ stale backups or a seller absent for the entire on-chain withdrawal grace. An
 online seller/recovery worker must still claim signed totals in time. Public
 uptime and dual-signed receipts are reputation evidence, not a source of refunds;
 this session composition does not yet collect dual-signed paid usage receipts.
+
+## Paid receipt/v2: signed channel reference
+
+`@gyblos/protocol/receipt-v2` defines an additive, paid-only attestation contract.
+`SellerReceiptV2` and `BuyerReceiptV2` use `version: 2` and separate signing
+prefixes `gyblos/receipt-seller/v2\n` and `gyblos/receipt-buyer/v2\n` (real LF).
+Canonical JSON, hex Ed25519 signatures and SHA-256 seller digests retain the
+existing format. The new vectors are `vectors/receipt-v2.json`, independently
+generated with Node/OpenSSL; all receipt/v1 and receipt-channel/v1 vectors stay
+unchanged.
+
+The seller retains the common v1 observation fields, requires paid pricing
+with at least one positive price, and adds this required signed `channel`:
+
+| Field              | Meaning and bounds                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| `channelId`        | Canonical 32-byte base58 Solana channel account address.                                        |
+| `payer`            | Canonical 32-byte base58 payer wallet address.                                                  |
+| `baseAtomic`       | Cumulative authorization before this request's interval.                                        |
+| `cumulativeAtomic` | Cumulative authorization after this request's interval.                                         |
+| `protocolFeeBps`   | The channel's configured surcharge rate; whole basis points within `PAYMENT_BINDING.maxFeeBps`. |
+
+`pricing.network` qualifies the channel address and `pricing.asset` identifies
+the mint; neither is duplicated in the channel object. Later reconciliation
+must independently verify account ownership by the approved channel program,
+its network, mint, payer, participants and fee terms. A signature over a claimed
+address is not evidence that its account exists or belongs to that program.
+
+Amounts are canonical nonnegative u64 decimal strings. The end cannot precede
+the base, and `amountAtomic = cumulativeAtomic - baseAtomic`. With
+`F(x) = settlementShares(x, protocolFeeBps).feeAtomic`, the receipt requires
+`feeAtomic = F(cumulativeAtomic) - F(baseAtomic)`, using the existing native
+split and rounding. A rate of 400 bps retains the current 9616/384 native split:
+intervals `(0, 70]` and `(70, 140]` each authorize 70 and attribute fees 2 and 3,
+not two independently rounded fees of 2. This does not introduce an exact-fee
+promise or change pricing. A zero interval is allowed for an uncharged attempt
+at a positive advertised price; it requires zero amount and fee. Gaps between
+separate receipts remain possible and must be shown, not filled.
+
+The buyer record keeps its observations, verdict and ordered disputes, with
+version 2. Its `sellerReceiptDigest` hashes the complete v2 seller record under
+the v2 seller domain, including channel, payer, interval, prices and fee rate.
+Both request identities and NodeIds must match. Seller-only receipts are valid;
+a buyer half is accepted only with its matching seller half. This verifies
+attestations, not authorization by the payer wallet: buyer-node signatures do
+not prove wallet control or independent customers. Independent metering,
+verified session terms and chain evidence remain consumer responsibilities.
+`amountAtomic` is usage authorization, not a claim that it has settled on chain.
+No transaction is required to create or verify these historical records.
+
+Parsers reject unknown fields at every level and detach all data before crypto
+yields. Existing common-field/outcome/dispute rules are reused, with final
+canonical-record caps of 2048 bytes for sellers and 1024 for buyers. There is
+no expiry clock. Malformed fields use static `CONTROL_CODES.INVALID`, a foreign
+version uses `VERSION`, inconsistent intervals/fees or cross-binding use
+`POLICY`, invalid signatures use `SIGNATURE`, and record-size overflow uses
+`LIMIT`. The codes never contain supplied content. A v1 signature, record or
+half cannot be reused as v2, and there is no downgrade by removing `channel`.
+
+This contract does not register a new ALPN or widen `gyblos/receipt/1`, the v1
+private store or its paired-free collector policy. Runtime emission/transport,
+storage, public collection and upload activation remain separate integrations;
+no receipt/v2 is automatically sent or persisted. Existing v1 consumers remain
+in use. No prompt, response, private key, IP, internal endpoint, raw journal,
+signed payment payload or per-token billing transaction is added to a receipt.

@@ -95,7 +95,12 @@ void test('paid receipt/v2 rejects inconsistent authorization intervals and fee 
     { ...record, amountAtomic: '69' },
     { ...record, feeAtomic: '1' },
     { ...record, channel: { ...record.channel, baseAtomic: '71' } },
-    { ...record, pricing: { kind: OFFER_PRICING_KINDS.FREE } },
+    {
+      ...record,
+      pricing: { kind: OFFER_PRICING_KINDS.FREE },
+      amountAtomic: '0',
+      feeAtomic: '0',
+    },
     {
       ...record,
       pricing: {
