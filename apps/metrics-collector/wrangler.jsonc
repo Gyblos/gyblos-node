@@ -1,7 +1,6 @@
 {
-  // Metrics collector Worker (collector.gyblos.com, proposed). Not deployed: creating the D1 database,
-  // the rate-limit namespaces and the route needs founder approval. Deploy with
-  // `npx wrangler@4.151.1 ...` from this directory, as for the discovery index.
+  // Metrics collector Worker at collector.gyblos.com. Deploy with `npx wrangler@4.151.1 ...` from
+  // this directory, as for the discovery index; apply migrations with `d1 migrations apply --remote`.
   // One upload is one read and one batch of at most about 30 D1 statements (docs/metrics-collector.md).
   "name": "gyblos-collector",
   "main": "./src/worker.ts",
@@ -13,13 +12,12 @@
     {
       "binding": "COLLECTOR_DB",
       "database_name": "gyblos-collector",
-      // Placeholder until the database is created with approval.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "f6c2dddf-5911-414c-82ff-1f402d7db193",
       "migrations_dir": "migrations",
     },
   ],
-  // Rate limits (Cloudflare counts 10 or 60 second windows). namespace_id values are unverified
-  // placeholders: they must be unique and unused in the account before the first deploy.
+  // Rate limits (Cloudflare counts 10 or 60 second windows). namespace_id values must be unique in
+  // the account (the discovery index uses 42621004, 42621005 and 42621007).
   "ratelimits": [
     {
       // Per client address (IPv6 by /64), before the body is read.
@@ -42,4 +40,5 @@
       "simple": { "limit": 600, "period": 60 },
     },
   ],
+  "routes": [{ "pattern": "collector.gyblos.com", "custom_domain": true }],
 }
