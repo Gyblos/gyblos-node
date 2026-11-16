@@ -162,3 +162,28 @@ Entre los códigos del archivo están `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`
 razonamiento no admitidos, o keys ausentes. Consulta [solución de problemas](/es/help/troubleshooting).
 
 **Relacionado:** [CLI](/es/reference/cli) · [Modelos y ofertas](/es/sellers/models-offers).
+
+## Diagnósticos operativos
+
+El buyer lee `[diagnostics]` de forma independiente de `[telemetry].file`:
+
+```toml
+[diagnostics]
+enabled = true
+level = "warn"
+```
+
+Estos son los valores por defecto. `enabled = false` desactiva el destino de
+diagnóstico local propio. Los niveles mínimos son `debug`, `info`, `warn` y
+`error`; debug sigue excluyendo contenido, credenciales, direcciones y mensajes
+crudos de excepciones. No hay override de entorno ni subida central de logs. Esta
+opción no cambia la política de recibos o telemetría. La configuración del seller
+acepta la sección, pero la instrumentación inicial cubre HTTP del buyer y workers
+de tools de lab, no todos los caminos del seller, transporte o pagos.
+
+Los logs del producto se guardan en `<GYBLOS_HOME>/<role>/diagnostics/`, separados
+de telemetría y recibos. Los archivos se crean al primer registro y tienen límites
+de tamaño, cola y rotación; una caída, cierre forzado o falta de almacenamiento
+puede perder evidencia. El host del buyer expone la salud del diagnóstico y los
+registros descartados. Usa el [comando de logs](/es/reference/cli#logs-operativos-locales)
+para leer los metadatos locales seguros.

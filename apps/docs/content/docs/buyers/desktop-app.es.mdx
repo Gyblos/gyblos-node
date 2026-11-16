@@ -35,6 +35,11 @@ de abrirla. Es normal; después de la primera vez se abre sin preguntar.
 2. Abre Gyblos. macOS dice que no puede verificar al desarrollador; elige **OK**.
 3. Abre **Configuración del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Gyblos y elige
    **Abrir de todas formas**; confirma con tu contraseña.
+4. Después macOS pide permiso para que Gyblos use la llave "Gyblos Safe Storage" de tu llavero. Escribe
+   la contraseña de tu Mac y elige **Permitir siempre**. La app protege su wallet con esa llave. Mientras
+   la pregunta está abierta, la app no se puede cerrar y su wallet aparece como no disponible.
+
+Como la app de la beta no está firmada, macOS repite los pasos 2 a 4 después de cada actualización.
 
 ### Windows [#windows]
 
@@ -60,6 +65,12 @@ la carpeta de datos de la app, separada del CLI y del vendedor. El modelo inicia
 necesita un vendedor verificado, disponible y gratuito para ese modelo. Discovery, la RPC de identidad
 y la red deben estar accesibles. Si no lo están, se muestra un error, nunca una respuesta simulada.
 
+La respuesta aparece a medida que llega el texto. Durante la generación, el botón de enviar cambia a
+**Stop response**; también puedes pulsar **Esc**. Al detener, se conserva el texto parcial y no se
+reenvía el prompt. Una respuesta interrumpida no se marca como completa. Si el cobro de un pedido pagado
+sigue siendo incierto, permanece bloqueado para revisión en **Payments**: detenerlo no demuestra que
+no se haya cobrado.
+
 Estas respuestas gratuitas no requieren fondos ni transacciones. La identidad local del comprador
 es distinta de la wallet protegida que aparece en Settings. Una configuración o conexión de precio
 positivo sigue necesitando autorización explícita: el arranque no autoriza un presupuesto positivo
@@ -68,7 +79,8 @@ ni borra registros pendientes.
 Si falla el inicio, **Payments → Retry local buyer** permite reintentar solo el arranque. Una inferencia
 fallida nunca se reenvía automáticamente. Conectar otro comprador ya iniciado queda como opción avanzada.
 
-Cuando se publica una versión de escritorio posterior para tu sistema, aparece un aviso de actualización.
+La app busca actualizaciones al arrancar y cada cinco minutos mientras sigue abierta. Cuando se publica
+una versión de escritorio posterior para tu sistema, aparece un aviso de actualización.
 **View update** abre esa versión en GitHub; no descarga ni instala nada automáticamente. Esta consulta
 pública y acotada no envía tu identidad ni conversaciones. Los fallos de red son silenciosos; se puede
 desactivar con `GYBLOS_UPDATE_CHECK=0`.
@@ -77,3 +89,6 @@ El vendedor que ejecuta el modelo puede leer tus mensajes. El cifrado del transp
 frente a ese vendedor. No envíes contraseñas, claves ni otros secretos.
 
 Para conectar tus programas o agentes, consulta [Usa Gyblos desde tu código](/es/buyers/use-from-code).
+
+¿Dudas o problemas? Escribe en el [Telegram de Gyblos](https://t.me/gyblos). El grupo es público; no publiques llaves,
+contraseñas ni conversaciones que quieras mantener privadas.

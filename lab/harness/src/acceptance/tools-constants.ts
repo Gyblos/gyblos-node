@@ -42,3 +42,19 @@ export interface ToolAcceptanceReport {
   paymentsEnabled: false;
   cases: ToolCaseReport[];
 }
+
+export const TOOL_DIAGNOSTICS = {
+  component: 'lab-tools',
+  operation: 'acceptance',
+  phases: {
+    STARTUP: 'startup',
+    REQUEST: 'request',
+    VERIFY: 'verify',
+    CANCEL: 'cancel',
+    TEARDOWN: 'teardown',
+    CLEANUP: 'cleanup',
+  },
+  codes: { PROGRESS: 'TOOL_PROGRESS' },
+} as const;
+export type ToolDiagnosticPhase =
+  (typeof TOOL_DIAGNOSTICS.phases)[keyof typeof TOOL_DIAGNOSTICS.phases];

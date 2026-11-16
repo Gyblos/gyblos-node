@@ -14,7 +14,7 @@ export const UPDATE = {
   latestUrl: 'https://api.github.com/repos/Gyblos/gyblos-node/releases/latest',
   timeoutMs: 3_000,
   maxBytes: 65_536,
-  versionEnv: 'GYBLOS_VERSION',
+  versionEnv: NODE_ENVIRONMENT.version,
   switchEnv: 'GYBLOS_UPDATE_CHECK',
 } as const;
 

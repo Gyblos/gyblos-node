@@ -3,6 +3,7 @@
 // environment it is given.
 export const NODE_ENVIRONMENT = {
   rpcUrl: 'GYBLOS_RPC_URL',
+  version: 'GYBLOS_VERSION',
   relays: 'GYBLOS_RELAYS',
   relayToken: 'GYBLOS_RELAY_TOKEN',
   relayOnly: 'GYBLOS_RELAY_ONLY',

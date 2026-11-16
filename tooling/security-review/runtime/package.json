@@ -1,0 +1,11 @@
+{
+  "name": "@gyblos/security-review-pi",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "1.5.0"
+  },
+  "engines": {
+    "node": ">=24.22.1"
+  }
+}

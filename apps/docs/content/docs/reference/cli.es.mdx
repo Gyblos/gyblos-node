@@ -121,3 +121,31 @@ al instalarse. Uninstall elimina el registro del servicio, no las llaves ni la c
 El aprovisionamiento nativo está fuera del tutorial de Docker; no ejecutes service install dentro del contenedor.
 
 **Relacionado:** [Configuración](/es/reference/configuration) · [Operación](/es/sellers/operate).
+
+## Logs operativos locales
+
+```sh
+pnpm gyblos logs --role buyer
+pnpm gyblos logs --role buyer --follow --level error
+pnpm gyblos logs --role buyer --json --component buyer-http --operation chat
+```
+
+Las versiones instaladas usan `gyblos` sin el prefijo `pnpm`. El comando lee solo
+diagnósticos estructurados locales; no inicia un nodo ni contacta servicios.
+`--role` acepta `buyer`, `seller` (por defecto) o `lab`. Los filtros son `--level`
+(`debug`, `info`, `warn`, `error`, severidad mínima), `--component`, `--operation`
+y `--correlation-id`. `--limit` acepta de 1 a 1000 registros, 100 por defecto;
+con `--follow` limita la lectura inicial y después imprime nuevos registros hasta
+Ctrl+C. `--json` imprime los mismos metadatos seguros como JSONL. Los códigos de
+salida son 0 al completar la lectura o seguimiento y 1 para uso incorrecto o datos
+inseguros o ilegibles (`DIAGNOSTICS_UNAVAILABLE`). Un directorio ausente da un
+resultado vacío correcto y no se crea.
+
+La cobertura inicial incluye rechazos HTTP del buyer, errores de entrada y
+ejecución, vencimientos y desconexiones, además de fases y errores de limpieza de
+los workers de aceptación de tools. Este canal aún no instrumenta los límites del
+seller. La aceptación de lab escribe JSONL seguro de fallos en stderr por defecto;
+el llamador debe componer explícitamente un destino local para que `--role lab`
+lea diagnósticos guardados. El comando no lee la salida del servicio, telemetría,
+recibos ni journals de pagos. Los logs son metadatos locales acotados, sin subida
+central; la ausencia de evidencia no demuestra éxito.

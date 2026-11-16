@@ -102,10 +102,21 @@ timestamps to a collector is the protocol contract "Receipt upload envelope v1"
 (`packages/protocol/SPEC.md`). It is a contract only: no uploader, schedule or
 endpoint uses it yet.
 
-`apps/metrics-collector` is the proposed public collector Worker that uses both
-(`POST /v1/receipts`). It is not deployed and its database does not exist. Its
-endpoints, order of checks, storage, query cost and operations are documented in
-[metrics-collector.md](metrics-collector.md).
+The additive `receipt-upload/v2` contract keeps the same rules and adds a
+buyer-declared reference to the exact paid quote. `buildReceiptUploadOfferV2`
+projects an independently accepted quote to six facts plus the SHA-256
+reference; it returns no endpoint addresses or owner signature. Capture that
+projection before discarding the quote. It is not proof of identity, settlement
+or truthful metadata. Upload/store/start times originate on the uploader's
+clock; copied offer times originate on the seller's clock and remain
+buyer-reported claims. Existing v1 uploads/vectors stay unchanged. The public
+collector and uploader must explicitly adopt the new contract; no runtime
+activation is included here.
+
+`apps/metrics-collector` is the public collector Worker that uses v1
+(`POST /v1/receipts`), deployed at `collector.gyblos.com` with its own D1
+database. Its endpoints, order of checks, storage, query cost and operations are
+documented in [metrics-collector.md](metrics-collector.md).
 
 ## Local upload cursor
 
@@ -147,6 +158,10 @@ a crash-torn final line is ignored and removed under the exclusive update lock
 before the next append. Earlier complete records remain intact. Atomic staged
 compaction bounds the physical file at 128 MiB. The in-process index is rebuilt
 from the journal on reopen; normal writes do not rewrite all earlier bodies.
+Bounded, read-only cold replay finishes warming the cache even if its caller
+cancels; the cancelled call cannot mutate storage. This prevents a large queue
+from consuming the receipt worker's deadline again on every later write. The
+worker retains its slot until that replay settles; its deadline is unchanged.
 Private modes, no-follow/single-link checks, CAS and immutable first buyer
 confirmation remain enforced. Old version-1 snapshots migrate on the next write;
 all surviving entries start pending, even if old enough for the previous TTL. Do

@@ -20,6 +20,7 @@ import {
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { ownedChat } from './chat-owned';
@@ -38,6 +39,7 @@ import type { RoutedModel } from './model-routes';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
+import { withBuyerDiagnostics } from './startup-diagnostics';
 
 // A host composition seam: transports, admission and quote verification remain in existing modules.
 export type BuyerExecutionFactory = (context: {
@@ -182,6 +184,7 @@ function buyerHttp(
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
+  diagnostics?: DiagnosticSink,
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
@@ -198,6 +201,7 @@ function buyerHttp(
         port,
         stream: run,
         apiKeys: execution?.apiKeys,
+        diagnostics,
         ...configuredBuyerAccess(request, role, execution?.token),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
@@ -240,6 +244,8 @@ function buyerHost(
   };
 }
 
+export type BuyerHost = ReturnType<typeof buyerHost>;
+
 function checkFreeRequest(
   request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
 ) {
@@ -251,6 +257,19 @@ function checkFreeRequest(
   )
     refuse(FREE_BUYER_STARTUP.REASONING);
 }
+// Buyer-only events (unserved demand, refusals, failures, experienced latency) feed the uploader.
+function buyerTelemetry(enabled: boolean, sink?: TelemetrySink) {
+  const observations = uploadObservationBuffer(process.env);
+  const telemetry = createLocalTelemetry({
+    enabled,
+    environment: process.env,
+    role: P2P_ROLES.BUYER,
+    sink,
+    observers: observations ? [observations.sink] : [],
+  });
+  return { telemetry, observations };
+}
+
 async function startOwnedFreeBuyer(
   options: {
     bind?: typeof bindEndpoint;
@@ -259,6 +278,7 @@ async function startOwnedFreeBuyer(
     onSellerFailure?: SellerFailureReporter;
     execution?: BuyerExecutionFactory;
   } = {},
+  diagnostics?: DiagnosticSink,
 ) {
   const telemetryEnabled = await loadLocalTelemetry(process.env);
   const role = await buyerRole();
@@ -277,15 +297,10 @@ async function startOwnedFreeBuyer(
       externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
     },
   );
-  // Buyer-only events (unserved demand, refusals, failures, experienced latency) feed the uploader.
-  const observations = uploadObservationBuffer(process.env);
-  const telemetry = createLocalTelemetry({
-    enabled: telemetryEnabled,
-    environment: process.env,
-    role: P2P_ROLES.BUYER,
-    sink: options.telemetry,
-    observers: observations ? [observations.sink] : [],
-  });
+  const { telemetry, observations } = buyerTelemetry(
+    telemetryEnabled,
+    options.telemetry,
+  );
   let receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined;
   let execution: Awaited<ReturnType<BuyerExecutionFactory>> | undefined;
   try {
@@ -319,6 +334,7 @@ async function startOwnedFreeBuyer(
       options.port,
       execution,
       role,
+      diagnostics,
     );
     return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
@@ -338,5 +354,9 @@ export async function startFreeBuyer(
   options: Parameters<typeof startOwnedFreeBuyer>[0] = {},
 ) {
   await buyerRole();
-  return withBuyerRuntime(process.env, () => startOwnedFreeBuyer(options));
+  return withBuyerRuntime(process.env, () =>
+    withBuyerDiagnostics((diagnostics) =>
+      startOwnedFreeBuyer(options, diagnostics),
+    ),
+  );
 }
