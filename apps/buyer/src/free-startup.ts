@@ -10,15 +10,8 @@ import type {
 } from '@gyblos/node/buyer-api-keys';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
-import type { ObservationBuffer } from '@gyblos/node/observation-buffer';
-import {
-  startRoleUploader,
-  uploadObservationBuffer,
-} from '@gyblos/node/receipt-uploader-startup';
-import {
-  createBuyerReceiptRuntime,
-  openReceiptStore,
-} from '@gyblos/node/receipts';
+import { uploadObservationBuffer } from '@gyblos/node/receipt-uploader-startup';
+import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
 import { loadRole, nodeSecret, type RoleConfig } from '@gyblos/node/roles';
 import {
   createLocalTelemetry,
@@ -27,10 +20,7 @@ import {
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
-import {
-  assertConfiguredRelay,
-  bindEndpoint,
-} from '@gyblos/transport-iroh/endpoint';
+import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { ownedChat } from './chat-owned';
 import {
@@ -41,6 +31,7 @@ import {
 import { configuredBuyerAccess } from './desktop-api';
 import { executeBuyerFree, type FreeBuyerDependencies } from './free-execution';
 import { startFreeBuyerHttp, type ChatErrorClassifier } from './free-http';
+import { buyerReceipts } from './free-receipt-runtime';
 import { freeBuyerDependencies } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { RoutedModel } from './model-routes';
@@ -154,61 +145,6 @@ export async function buyerNodeSecret() {
   }
 }
 
-function buyerReceipts(
-  endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
-  nodeId: string,
-  relayOnly: boolean,
-  observations?: ObservationBuffer,
-) {
-  const store = openReceiptStore({
-    environment: process.env,
-    role: P2P_ROLES.BUYER,
-    nodeId: nodeId,
-  });
-  const signer = async (bytes: Uint8Array<ArrayBuffer>) =>
-    Uint8Array.from(
-      endpoint
-        .secretKey()
-        .sign([...bytes])
-        .toBytes(),
-    );
-  const runtime = createBuyerReceiptRuntime({
-    endpoint,
-    slots: TRANSPORT_LIMITS.maxConcurrent,
-    store,
-    signer,
-    transport: {
-      relayOnly,
-      relayAllowed: (origin) => {
-        try {
-          assertConfiguredRelay(origin);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-    },
-  });
-  // Sends this buyer's confirmed receipts to the metrics collector (CLI and desktop alike).
-  const uploader = startRoleUploader({
-    environment: process.env,
-    store,
-    nodeId,
-    role: P2P_ROLES.BUYER,
-    signer,
-    observations,
-  });
-  return {
-    ...runtime,
-    async close() {
-      try {
-        await uploader?.close();
-      } finally {
-        await runtime.close();
-      }
-    },
-  };
-}
 // Stop admission and bound draining before the endpoint closes; only then release payment journals.
 async function closeBuyerResources(
   receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined,
