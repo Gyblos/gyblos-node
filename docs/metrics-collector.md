@@ -100,6 +100,34 @@ Errors are `{ "error": "<CODE>" }` with a static code; input is never echoed.
 the corrected `sentAt`. A node with a wrong clock still gets its data in, and
 the skew is stored.
 
+## Uploader (nodes)
+
+`@gyblos/node/receipt-uploader` sends a role's pending receipts from its private
+store, which never evicts a receipt before it is uploaded. The seller daemon and
+the shared buyer (CLI and desktop) start it next to their receipt runtime.
+
+- **When:** every release build (`GYBLOS_VERSION` set) uploads to
+  `https://collector.gyblos.com/v1`, and there is no user setting to turn it
+  off. A build without `GYBLOS_VERSION` uploads only when `GYBLOS_COLLECTOR_URL`
+  is set, so tests and development never use the network. `GYBLOS_COLLECTOR_URL`
+  also overrides the URL for staging.
+- **What:** batches of up to 50 receipts in a signed envelope. The client kind
+  is `seller-node`, `buyer-cli`, or `buyer-desktop` when running inside
+  Electron. The envelope also carries the release version, platform and
+  architecture. It sends no prompts, responses or addresses.
+- **Pacing:** it uploads every minute, and immediately again after a full batch.
+- **Failures:**
+  - A network error, `5xx`, `429` or `413` backs off from one minute, doubling
+    up to one hour; the receipts stay pending.
+  - `STALE_UPLOAD` corrects the node's clock from `serverTime` and resends once.
+  - A batch refused as invalid is retried one receipt at a time; a single
+    refused receipt is skipped for the life of the process.
+- **Effect on inference:** it never blocks or retries inference, and closing the
+  role stops it.
+- **Not sent yet:** the buyer's request start time and offer facts (always
+  `null`), and buyer-only observations such as unserved demand. Paid v2 receipts
+  are sent once nodes emit them.
+
 ## Order of checks
 
 The cheapest checks run first, and nothing expensive happens before the request

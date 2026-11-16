@@ -10,6 +10,7 @@ import type {
 } from '@gyblos/node/buyer-api-keys';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { startRoleUploader } from '@gyblos/node/receipt-uploader-startup';
 import {
   createBuyerReceiptRuntime,
   openReceiptStore,
@@ -154,21 +155,31 @@ function buyerReceipts(
   nodeId: string,
   relayOnly: boolean,
 ) {
-  return createBuyerReceiptRuntime({
+  const store = openReceiptStore({
+    environment: process.env,
+    role: P2P_ROLES.BUYER,
+    nodeId: nodeId,
+  });
+  const signer = async (bytes: Uint8Array<ArrayBuffer>) =>
+    Uint8Array.from(
+      endpoint
+        .secretKey()
+        .sign([...bytes])
+        .toBytes(),
+    );
+  // Sends this buyer's confirmed receipts to the metrics collector (CLI and desktop alike).
+  const uploader = startRoleUploader({
+    environment: process.env,
+    store,
+    nodeId,
+    role: P2P_ROLES.BUYER,
+    signer,
+  });
+  const runtime = createBuyerReceiptRuntime({
     endpoint,
     slots: TRANSPORT_LIMITS.maxConcurrent,
-    store: openReceiptStore({
-      environment: process.env,
-      role: P2P_ROLES.BUYER,
-      nodeId: nodeId,
-    }),
-    signer: async (bytes) =>
-      Uint8Array.from(
-        endpoint
-          .secretKey()
-          .sign([...bytes])
-          .toBytes(),
-      ),
+    store,
+    signer,
     transport: {
       relayOnly,
       relayAllowed: (origin) => {
@@ -181,6 +192,16 @@ function buyerReceipts(
       },
     },
   });
+  return {
+    ...runtime,
+    async close() {
+      try {
+        await uploader?.close();
+      } finally {
+        await runtime.close();
+      }
+    },
+  };
 }
 // Stop admission and bound draining before the endpoint closes; only then release payment journals.
 async function closeBuyerResources(
