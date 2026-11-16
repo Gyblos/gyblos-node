@@ -14,22 +14,44 @@ void test('desktop Stop during final persistence rejects the late reply and reta
   const release = latch();
   let saved: string | undefined;
   let posts = 0;
-  const files = { read: async () => saved, write: async (text: string) => {
-    if (JSON.parse(text).summary.records.length) { committing.resolve(); await release.promise; }
-    saved = text;
-  } };
+  const files = {
+    read: async () => saved,
+    write: async (text: string) => {
+      if (JSON.parse(text).summary.records.length) {
+        committing.resolve();
+        await release.promise;
+      }
+      saved = text;
+    },
+  };
   const budget = new X402Budget(files);
   const paid = { ...policy, maxAtomic: '100' };
   const client = new X402Client(budget, async (_url, options) => {
     if (options?.method !== 'POST') return Response.json(paid);
     posts++;
-    return Response.json({ model: policy.model,
-      choices: [{ message: { role: 'assistant', content: 'Verified answer' }, finish_reason: 'stop' }],
+    return Response.json({
+      model: policy.model,
+      choices: [
+        {
+          message: { role: 'assistant', content: 'Verified answer' },
+          finish_reason: 'stop',
+        },
+      ],
       [BUYER_API.EXECUTION_FIELD]: OFFER_PRICING_KINDS.PAID,
-      [BUYER_API.PAYMENT_FIELD]: { verdict: 'settled', maxAtomic: '100', expectedAtomic: '30', chargedAtomic: '30', refundedAtomic: '70', transaction: '2'.repeat(88) },
+      [BUYER_API.PAYMENT_FIELD]: {
+        verdict: 'settled',
+        maxAtomic: '100',
+        expectedAtomic: '30',
+        chargedAtomic: '30',
+        refundedAtomic: '70',
+        transaction: '2'.repeat(88),
+      },
     });
   });
-  await client.connect('http://127.0.0.1:8090/v1/chat/completions', 'synthetic-local-buyer-token');
+  await client.connect(
+    'http://127.0.0.1:8090/v1/chat/completions',
+    'synthetic-local-buyer-token',
+  );
   await client.authorize('100');
   const pending = client.send('persist-one', 'Synthetic question');
   const settled = Promise.allSettled([pending]);
@@ -43,5 +65,9 @@ void test('desktop Stop during final persistence rejects the late reply and reta
     assert.equal(summary.spentAtomic, '30');
     assert.equal(summary.records[0]?.transaction, '2'.repeat(88));
     assert.equal(posts, 1);
-  } finally { release.resolve(); await settled; await client.close(); }
+  } finally {
+    release.resolve();
+    await settled;
+    await client.close();
+  }
 });

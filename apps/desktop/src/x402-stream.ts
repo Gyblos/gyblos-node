@@ -24,6 +24,14 @@ interface StreamState {
   done: boolean;
   terminal?: Record<string, unknown>;
 }
+function hasExecution(value: Record<string, unknown>) {
+  const kind = value[BUYER_API.EXECUTION_FIELD];
+  // The existing paid-only endpoint omits this marker. Its payment still requires
+  // the complete parseBuyerReply checks before any permission is completed.
+  return kind === undefined
+    ? value[BUYER_API.PAYMENT_FIELD] !== undefined
+    : Object.values(OFFER_PRICING_KINDS).some((entry) => entry === kind);
+}
 function streamFrame(
   state: StreamState,
   data: string,
@@ -70,9 +78,7 @@ function streamFrame(
       (choice.finish_reason !== ENGINE_DONE_REASONS.STOP &&
         choice.finish_reason !== ENGINE_DONE_REASONS.LENGTH) ||
       !reportedUsage(value.usage, policy.maxTokens) ||
-      !Object.values(OFFER_PRICING_KINDS).some(
-        (kind) => kind === value[BUYER_API.EXECUTION_FIELD],
-      )
+      !hasExecution(value)
     )
       throw new Error('Incomplete buyer stream');
     state.terminal = {

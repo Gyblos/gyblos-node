@@ -353,6 +353,7 @@ export class X402Client {
     }
     const reply = parseBuyerReply(body, policy);
     const summary = await this.budget.complete(id, reply);
+    signal.throwIfAborted();
     const metrics = observedResponse(
       responseMs,
       {

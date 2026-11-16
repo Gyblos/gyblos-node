@@ -82,6 +82,15 @@ void test('desktop stream accepts fragmented UTF-8 and many tiny deltas without 
 });
 
 const invalid = [
+  { name: 'duplicate done', bytes: () => [frame(chunk('', true)), done, done] },
+  {
+    name: 'missing execution without payment',
+    bytes: () => {
+      const terminal: Record<string, unknown> = chunk('', true);
+      delete terminal[BUYER_API.EXECUTION_FIELD];
+      return [frame(terminal), done];
+    },
+  },
   {
     name: 'missing done',
     bytes: () => [frame(chunk('Hello')), frame(chunk('', true))],

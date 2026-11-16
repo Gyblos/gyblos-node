@@ -180,3 +180,30 @@ void test('desktop pending partial survives archive restoration without resuming
   assert.equal(restored.sessions[0]?.paypalRun, null);
   assert.equal(restored.sessions[0]?.run, null);
 });
+void test('desktop zero-authority release refuses paid permissions and mismatched requests', async () => {
+  let saved: string | undefined;
+  const files = {
+    read: async () => saved,
+    write: async (text: string) => {
+      saved = text;
+    },
+  };
+  for (const maxAtomic of ['0', '100']) {
+    saved = undefined;
+    const budget = new X402Budget(files);
+    await budget.authorize({ ...policy, maxAtomic }, maxAtomic);
+    await budget.reserve('held-one');
+    const before = saved;
+    await assert.rejects(() => budget.releaseFree('wrong-request'));
+    assert.equal(saved, before);
+    if (maxAtomic === '0') {
+      await budget.releaseFree('held-one');
+      assert.equal((await budget.summary()).blocked, false);
+      assert.deepEqual((await budget.summary()).records, []);
+    } else {
+      await assert.rejects(() => budget.releaseFree('held-one'));
+      assert.equal(saved, before);
+      assert.equal((await new X402Budget(files).summary()).blocked, true);
+    }
+  }
+});
