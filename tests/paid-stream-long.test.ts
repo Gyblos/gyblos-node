@@ -41,7 +41,7 @@ import { controlFixture } from './support/control-fixture';
 import { settled } from './support/paid-fixture';
 import { FEE, recordingPayment } from './support/paid-seller';
 
-async function fixture(maxTokens = 20000) {
+async function fixture(maxTokens = 20000, chunkSize = 1) {
   const source = await controlFixture(false);
   const prices = {
     inputAtomicPerMtok: '1000000',
@@ -113,8 +113,10 @@ async function fixture(maxTokens = 20000) {
       capabilities: () => model.capabilities,
       async generate(input) {
         generations++;
-        for (let index = 0; index < maxTokens; index++)
-          await input.onText?.('x');
+        for (let index = 0; index < maxTokens; index += chunkSize)
+          await input.onText?.(
+            'x'.repeat(Math.min(chunkSize, maxTokens - index)),
+          );
         return {
           text: 'x'.repeat(maxTokens),
           finishReason: ENGINE_DONE_REASONS.STOP,
@@ -335,4 +337,30 @@ void test('paid stream byte capacity includes escaped output, every maximum delt
     PAID_STREAM.totalBytes - PAID_STREAM.terminalReserveBytes,
     overhead * (PAID_STREAM.maxEvents - 1) + FREE_EXECUTION.outputBytes * 6,
   );
+});
+
+void test('a cut within a fragmented engine delta preserves each acknowledged paid frame', async () => {
+  const value = await fixture(20000, 16384);
+  let response: PaidExecutionResponse | undefined;
+  const service: PaidExecutionService = {
+    async stream(...args) {
+      response = await value.service.stream(...args);
+      return response;
+    },
+  };
+  const result = await transport(value.paid, service, value.peer, 1);
+  assert.equal(result.delivered, 8192);
+  assert.equal(result.closed, 1);
+  assert.equal(result.finished, 0);
+  assert.equal(result.released, 1);
+  assert.equal(result.terminal, undefined);
+  assert.equal(response?.error?.code, PAID_EXECUTION_CODES.CANCELLED);
+  assert.equal(response?.error?.delivered?.outputTokens, 8192);
+  assert.equal(response?.charge?.chargedAtomic, '8196');
+  assert.equal(response?.payment?.settlement?.refundedAtomic, '91804');
+  assert.deepEqual(
+    value.payment.calls.settle.map((call) => call.chargedAtomic),
+    ['8196'],
+  );
+  assert.equal(value.generations(), 1);
 });
