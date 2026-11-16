@@ -17,6 +17,7 @@ import { receiptSignal, receiptUnavailable } from './receipt-file';
 export interface StoredReceipt {
   storedAt: number;
   receipt: ReceiptV1;
+  uploadedAt?: number | null;
 }
 export function receiptKey(value: ReceiptV1) {
   const record = value.seller.record;
@@ -61,7 +62,6 @@ export async function parseReceiptSnapshot(
   text: string | undefined,
   role: HomeRole,
   nodeId: string,
-  now: number,
   signal?: AbortSignal,
 ): Promise<StoredReceipt[]> {
   if (text === undefined) return [];
@@ -85,7 +85,7 @@ export async function parseReceiptSnapshot(
   for (const item of records) {
     receiptSignal(signal);
     const entry = controlObject(item, ['storedAt', 'receipt']);
-    const storedAt = controlInteger(entry.storedAt, 0, now);
+    const storedAt = controlInteger(entry.storedAt);
     const receipt = await verifyReceipt(entry.receipt);
     assertReceiptRole(receipt, role, nodeId);
     const key = receiptKey(receipt);

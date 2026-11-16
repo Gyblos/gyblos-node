@@ -35,6 +35,7 @@ export const NODE_ERROR_CODES = {
   DISCOVERY_PUBLISH_FAILED: 'DISCOVERY_PUBLISH_FAILED',
   INVALID_PRICE: 'INVALID_PRICE',
   RECEIPT_STORAGE_UNAVAILABLE: 'RECEIPT_STORAGE_UNAVAILABLE',
+  RECEIPT_STORAGE_FULL: 'RECEIPT_STORAGE_FULL',
   // config.toml at seller startup; `pnpm gyblos config validate` explains file problems.
   NODE_CONFIG_INVALID: 'NODE_CONFIG_INVALID',
   SELLER_SETTING_UNSUPPORTED: 'SELLER_SETTING_UNSUPPORTED',
@@ -351,6 +352,18 @@ export const RECEIPT_STORAGE = {
   maxEntries: 256,
   maxBytes: 1_048_576,
   retentionMs: 604_800_000,
+} as const;
+// Pending bodies reserve room for the buyer half; uploaded history retains the existing small bounds.
+export const RECEIPT_UPLOAD = {
+  schemaVersion: 2,
+  maxPendingEntries: 16_384,
+  maxPendingBytes: 67_108_864,
+  reservedEntryBytes: 4096,
+  maxLogBytes: 134_217_728,
+  compactAfterBytes: 65_536,
+  compactionRatio: 2,
+  pageSize: 50,
+  maxPageSize: 256,
 } as const;
 export const RECEIPT_WORK = {
   sellerMs: 500,

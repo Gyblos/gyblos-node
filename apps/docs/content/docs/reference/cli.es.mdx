@@ -71,6 +71,9 @@ docker compose exec seller gyblos seller register
 
 Status es de solo lectura. `--online` consulta descubrimiento por modelo para buscar el NodeId público.
 Su resumen de actividad es un historial limitado de recibos conservados, no un saldo de cuotas.
+La línea `receipt queue` muestra los pendientes, los bytes reservados y las escrituras rechazadas.
+Los pendientes quedan protegidos frente al borrado; `FULL` indica que no se pueden guardar recibos nuevos
+hasta liberar capacidad. La subida automática todavía no está habilitada.
 
 Register recibe la invitación por terminal interactiva o `GYBLOS_INVITE`, nunca como argumento de línea
 de comandos. La entrada interactiva es visible. Concede permiso para publicar cuando el índice verifica

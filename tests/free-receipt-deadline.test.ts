@@ -5,7 +5,7 @@ import test from 'node:test';
 import { createSellerFreeExecution } from '@gyblos/node/free-execution';
 import {
   createSellerReceiptRuntime,
-  type LocalReceiptStore,
+  type ReceiptRuntimeStore,
 } from '@gyblos/node/receipts';
 import { ENGINE_KINDS } from '@gyblos/protocol/constants';
 import { encodeFreeExecutionRequest } from '@gyblos/protocol/free-execution-framing';
@@ -20,7 +20,7 @@ void test('slow receipt storage cannot discard a successful inference at the tra
   let offset = 0;
   let writes = 0;
   let closes = 0;
-  const store: LocalReceiptStore = {
+  const store: ReceiptRuntimeStore = {
     async put() {
       await new Promise<void>((resolve) => setTimeout(resolve, 150));
     },

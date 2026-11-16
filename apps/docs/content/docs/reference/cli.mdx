@@ -71,6 +71,9 @@ docker compose exec seller gyblos seller register
 
 Status is read-only. `--online` queries discovery by model to look for the public NodeId.
 Its activity summary is bounded retained-receipt history, not a quota balance.
+The `receipt queue` line shows pending records, reserved bytes and rejected storage writes. Pending
+receipts are protected from retention; `FULL` means new receipts cannot be saved until capacity is freed.
+Automatic upload is not enabled yet.
 
 Register accepts the invite through an interactive terminal or `GYBLOS_INVITE`, never a command-line
 argument. The interactive input is visible. It grants discovery publication permission after the index

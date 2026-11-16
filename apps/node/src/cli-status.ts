@@ -6,7 +6,7 @@
 import { runMode } from '@gyblos/config';
 import { fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
-import { listReceipts } from '@gyblos/node/receipts';
+import { listReceipts, receiptUploadHealth } from '@gyblos/node/receipts';
 import { sellerPaidSummary } from '@gyblos/node/seller-paid-summary';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
@@ -220,10 +220,30 @@ async function usageLines(
   now: number,
 ) {
   return [
-    `Activity, from signed receipts (at most ${RECEIPT_STORAGE.maxEntries} kept):\n`,
+    `Activity, from signed receipts (pending protected; at most ${RECEIPT_STORAGE.maxEntries} uploaded kept):\n`,
+    await receiptQueueLine(homeEnvironment, nodeId),
     await activityLines(homeEnvironment, nodeId, now),
     await paidLines(homeEnvironment, now),
   ].join('');
+}
+
+async function receiptQueueLine(environment: HomeEnvironment, nodeId: string) {
+  try {
+    const health = await receiptUploadHealth({
+      environment,
+      nodeId,
+      role: P2P_ROLES.SELLER,
+    });
+    return line(
+      'receipt queue',
+      `${health.pendingEntries} pending; ${health.pendingBytes} reserved bytes; ${health.rejectedWrites} rejected writes${health.full ? '; FULL: new receipts cannot be saved' : ''}`,
+    );
+  } catch {
+    return line(
+      'receipt queue',
+      'unavailable; receipt storage needs attention',
+    );
+  }
 }
 
 function daemonLine(daemon: DaemonFile) {

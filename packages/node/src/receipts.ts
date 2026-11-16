@@ -1,11 +1,16 @@
 // Public receipt integration surface; importing it never reads files, creates signers or starts tasks.
 export type { StoredReceipt } from './receipt-store-schema';
-export type { ReceiptUploadCursor, ReceiptUploadHealth } from './receipt-upload-types';
+export type {
+  ReceiptUploadCursor,
+  ReceiptUploadHealth,
+} from './receipt-upload-types';
 export {
   listReceipts,
+  receiptUploadHealth,
   openReceiptStore,
   type LocalReceiptStore,
   type ReceiptStoreOptions,
+  type ReceiptRuntimeStore,
 } from './receipt-store';
 export {
   createSellerReceiptRuntime,

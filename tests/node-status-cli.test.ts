@@ -7,11 +7,15 @@ import { readdir, rm, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { openReceiptStore } from '@gyblos/node/receipts';
 import {
   ENGINE_DONE_REASONS,
   FREE_EXECUTION_CODES,
+  P2P_ROLES,
   RECEIPT_OUTCOMES,
 } from '@gyblos/protocol/constants';
+import { signSellerReceipt } from '@gyblos/protocol/receipt';
 
 import { snapshot } from './support/doctor-fixture';
 import {
@@ -32,6 +36,34 @@ import {
 const iso = (time: number) =>
   new Date(time).toISOString().replace(/\.\d+Z$/, 'Z');
 const stoppedProbe = async () => ({ code: 3, output: '' });
+
+void test('seller status exposes persistent unsaved receipt writes without changing storage', () =>
+  withHome(async (home) => {
+    await storeReceipt(home, 1, at(HOUR));
+    const store = openReceiptStore({
+      environment: { GYBLOS_HOME: home.home },
+      role: P2P_ROLES.SELLER,
+      nodeId: home.nodeId,
+      maxPendingEntries: 1,
+      now: () => NOW,
+    });
+    const [pending] = await store.listPending();
+    assert.ok(pending);
+    const seller = await signSellerReceipt(
+      { ...pending.receipt.seller.record, requestId: 'ff'.repeat(16) },
+      home.sign,
+    );
+    await assert.rejects(store.put({ seller }), {
+      code: NODE_ERROR_CODES.RECEIPT_STORAGE_FULL,
+    });
+    const before = await snapshot(home.root);
+    const output = await status(home, system(home));
+    assert.match(
+      output.stdout,
+      /receipt queue\s+1 pending; 4096 reserved bytes; 1 rejected writes/,
+    );
+    assert.deepEqual(await snapshot(home.root), before);
+  }));
 
 void test('seller status: an active service with a ready daemon is RUNNING, with its receipts counted by day and week', () =>
   withHome(async (home) => {

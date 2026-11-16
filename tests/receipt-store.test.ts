@@ -10,6 +10,7 @@ import {
   rename,
   rm,
   symlink,
+  truncate,
   unlink,
   writeFile,
 } from 'node:fs/promises';
@@ -19,7 +20,7 @@ import test from 'node:test';
 
 import { receiptPathsIn } from '@gyblos/config';
 import { createFreeBuyerReceipt } from '@gyblos/core/receipts';
-import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { NODE_ERROR_CODES, RECEIPT_UPLOAD } from '@gyblos/node/constants';
 import { openReceiptStore } from '@gyblos/node/receipts';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { signSellerReceipt } from '@gyblos/protocol/receipt';
@@ -105,11 +106,14 @@ void test('receipt storage rejects unknown content and tampered signatures witho
     await f.close();
   }
 });
-void test('receipt snapshot expires old records and evicts oldest only at the configured entry bound', async () => {
+void test('uploaded receipt history expires and evicts oldest only at the configured entry bound', async () => {
   const f = await fixture();
   try {
     const store = openReceiptStore(f.options);
     await store.put(f.envelope);
+    const [original] = await store.listPending();
+    assert.ok(original);
+    await store.markUploaded(original, 1700000000100);
     for (const n of [2, 3]) {
       f.advance(1);
       await store.put({
@@ -118,6 +122,9 @@ void test('receipt snapshot expires old records and evicts oldest only at the co
           f.seller.sign,
         ),
       });
+      const [pending] = await store.listPending();
+      assert.ok(pending);
+      await store.markUploaded(pending, 1700000000100);
     }
     assert.equal(
       await store.load(f.key, new AbortController().signal),
@@ -191,7 +198,7 @@ void test('receipt storage refuses unsafe files, oversized data and cancellation
       });
       await chmod(f.paths.state, 0o600);
     }
-    await writeFile(f.paths.state, ' '.repeat(1_048_577));
+    await truncate(f.paths.state, RECEIPT_UPLOAD.maxLogBytes + 1);
     await assert.rejects(store.load(f.key, new AbortController().signal));
   } finally {
     await f.close();
@@ -213,21 +220,25 @@ void test('receipt files never follow symlinks or overwrite an unsafe target', a
   }
 });
 
-void test('receipt byte capacity evicts oldest metadata rather than locking out new records', async () => {
+void test('uploaded receipt byte capacity evicts acknowledged history without deleting pending records', async () => {
   const f = await fixture();
   try {
     const maxBytes = Buffer.byteLength(JSON.stringify(f.envelope)) * 2;
     const store = openReceiptStore({ ...f.options, maxEntries: 256, maxBytes });
     await store.put(f.envelope);
+    const [original] = await store.listPending();
+    assert.ok(original);
+    await store.markUploaded(original, 1700000000100);
     f.advance(1);
     const seller = await signSellerReceipt(
       { ...f.record, requestId: '12'.repeat(16) },
       f.seller.sign,
     );
     await store.put({ seller });
-    assert.ok(
-      Buffer.byteLength(await readFile(f.paths.state, 'utf8')) <= maxBytes,
-    );
+    const [pending] = await store.listPending();
+    assert.ok(pending);
+    await store.markUploaded(pending, 1700000000100);
+    assert.equal((await store.uploadHealth()).uploadedEntries, 1);
     assert.equal(
       await store.load(f.key, new AbortController().signal),
       undefined,
