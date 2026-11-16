@@ -52,7 +52,7 @@ comprueba primero Ollama. Usa `--online` solo cuando quieras añadir consultas r
 | `GYBLOS_RELAY_TOKEN has characters…` o `GYBLOS_RELAY_TOKEN must have 32 to 512 characters` | El token de relay opcional que definiste tiene un formato incorrecto. Los relays de Gyblos no lo necesitan: quita `GYBLOS_RELAY_TOKEN` y repite `sh install.sh`. No lo muestres ni lo pegues en el chat de soporte. |
 | `GYBLOS_RELAY_TOKEN holds the gyb_ invite code`                                            | Quita `GYBLOS_RELAY_TOKEN` y repite `sh install.sh`; introduce el código de invitación después con `gyblos seller register` ([Registra y publica](/es/sellers/register-publish)).                                   |
 | El instalador se detiene con `gyblos install:` o `FAIL`                                    | Corrige la causa indicada y repite `sh install.sh` donde lo guardaste. Se conservan archivos e identidad existentes.                                                                                                |
-| `The image signature did not verify`                                                       | No ejecutes esa imagen ni te saltes la comprobación. Descarga de nuevo el instalador desde `https://gyblos.com/install.sh` e informa la línea de la imagen por el canal de tu invitación.                           |
+| `The image signature did not verify`                                                       | No ejecutes esa imagen ni te saltes la comprobación. Descarga de nuevo el instalador desde `https://gyblos.com/install.sh` e informa la línea de la imagen en el [Telegram de Gyblos](https://t.me/gyblos).         |
 
 ## Configuración [#configuración-rechazada]
 
@@ -113,7 +113,7 @@ el archivo, pongas su contenido en una línea de comando ni borres el volumen de
 | `DISCOVERY_IDENTITY_NOT_REGISTERED`    | Repite en terminal interactiva para la inscripción devnet. Revisa primero el coste y la aprobación en la guía de registro; owner necesita SOL de devnet. Conserva la invitación, que puede vencer. |
 | `REGISTER_IDENTITY_UNAVAILABLE`        | La inscripción no se completó: lee el consejo sobre SOL faltante, simulación o resultado incierto. Sigue la guía antes de repetir.                                                                 |
 | `REGISTER_CANCELLED`                   | Respondiste algo distinto de `yes` o `y`: no se firmó ni envió nada. Vuelve a ejecutar `gyblos seller register`.                                                                                   |
-| `DISCOVERY_INVITE_INVALID`             | Código incorrecto, usado o vencido; pide otro por el canal de tu invitación.                                                                                                                       |
+| `DISCOVERY_INVITE_INVALID`             | Código incorrecto, usado o vencido; pide otro en el [Telegram de Gyblos](https://t.me/gyblos); no publiques el código anterior.                                                                    |
 | `DISCOVERY_NODE_REVOKED`               | Contacta con Gyblos; no generes otra identidad para saltarte la retirada.                                                                                                                          |
 | `DISCOVERY_RATE_LIMITED`               | Espera un minuto antes de repetir el registro.                                                                                                                                                     |
 | `DISCOVERY_UNAVAILABLE`                | Prueba más tarde o contacta con Gyblos. Comprueba el origen del índice antes de enviar una invitación.                                                                                             |
@@ -149,7 +149,8 @@ Aquí no se documenta una restauración completa; consulta [Identidad y datos pr
 
 ## Pide ayuda [#pide-ayuda-de-forma-segura]
 
-Responde por el canal de tu invitación con el código relevante y estas salidas:
+Escribe en el [Telegram de Gyblos](https://t.me/gyblos) con el código relevante y estas salidas. El grupo es público:
+todos sus miembros pueden leer lo que publiques.
 
 ```sh
 cd ~/gyblos-seller
