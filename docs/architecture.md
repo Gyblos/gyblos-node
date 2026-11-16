@@ -37,6 +37,7 @@ are in [stack.md](stack.md).
 | `apps/desktop`           | `desktop:start`, `desktop:smoke`                | Electron desktop host (provisional): simulated Chat/Connect preview and loopback Iroh probe ([desktop-probe.md](desktop-probe.md)).                                                                                         |
 | `apps/discovery-index`   | none (Cloudflare Worker, manual deploy)         | Reference HTTP discovery index for `discovery.gyblos.com` (Hono, D1); verifies records only through protocol ([discovery-index.md](discovery-index.md)).                                                                    |
 | `apps/receipt-collector` | `pnpm --filter @gyblos/receipt-collector start` | Explicit private loopback receipt receiver with buyer-scoped capabilities and bounded retention; no uploader, payments or public aggregates.                                                                                |
+| `apps/metrics-collector` | none (Cloudflare Worker, not deployed)          | Proposed public receipt collector (Hono, D1): verifies signed upload envelopes from sellers and buyers, applies the core public receipt policy and stores private rows; no public reads or aggregates yet.                  |
 
 The paid buyer's single-request orchestration is available in process through
 `@gyblos/node/buyer-paid-execution`. Hosts supply seller selection, payment,

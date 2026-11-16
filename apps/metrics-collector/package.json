@@ -1,0 +1,19 @@
+{
+  "name": "@gyblos/metrics-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./app": "./src/app.ts",
+    "./constants": "./src/constants.ts",
+    "./ingest": "./src/ingest.ts",
+    "./storage": "./src/storage.ts",
+    "./storage-d1": "./src/storage-d1.ts",
+    "./worker": "./src/worker.ts"
+  },
+  "dependencies": {
+    "@gyblos/core": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
+    "hono": "4.13.13"
+  }
+}

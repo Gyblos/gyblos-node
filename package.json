@@ -93,6 +93,7 @@
     "@gyblos/desktop": "workspace:*",
     "@gyblos/discovery-http": "workspace:*",
     "@gyblos/discovery-index": "workspace:*",
+    "@gyblos/metrics-collector": "workspace:*",
     "@gyblos/telemetry-file": "workspace:*",
     "@gyblos/telemetry-console": "workspace:*",
     "@gyblos/telemetry-otel": "workspace:*",

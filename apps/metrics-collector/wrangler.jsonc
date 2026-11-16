@@ -1,0 +1,31 @@
+{
+  // Metrics collector Worker (collector.gyblos.com, proposed). Not deployed: creating the D1 database,
+  // rate-limit namespaces and the route needs founder approval.
+  "name": "gyblos-collector",
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "d1_databases": [
+    {
+      "binding": "COLLECTOR_DB",
+      "database_name": "gyblos-collector",
+      // Placeholder until the database is created with approval.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "COLLECTOR_IP_LIMITER",
+      "namespace_id": "42621010",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "COLLECTOR_NODE_LIMITER",
+      "namespace_id": "42621011",
+      "simple": { "limit": 12, "period": 60 },
+    },
+  ],
+}
