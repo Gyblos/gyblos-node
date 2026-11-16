@@ -1407,6 +1407,11 @@ once under the existing recovery rules, and the prompt is never replayed.
 The seller tracks acknowledgments per bounded wire delta, including when one
 engine delta needs several frames: a failed later frame cannot erase earlier
 acknowledged output or make its unacknowledged tail billable.
+Each intermediate frame prefix must itself fit the recounted token allowance
+before writing: token counts can decrease when a suffix merges earlier tokens.
+An unaffordable intermediate prefix stops with `BUDGET_EXHAUSTED` before delivery,
+even when the whole engine delta would fit. Already acknowledged output remains
+billable within its verified allowance; no tokens or prices are guessed or clamped.
 
 `InferenceInput` and `InferenceResult` own the common conversation, tools,
 choice, output and usage shapes. `@gyblos/inference` owns capability validation,

@@ -44,6 +44,13 @@ export function createPaidStreamOutput(
   let inFlight = false;
   let failed = false;
   let failure: unknown;
+  function checkAllowance(value: string) {
+    const tokens = meter.streamed(value);
+    if (!Number.isSafeInteger(tokens) || tokens < 0)
+      return fail(PAID_EXECUTION_CODES.INTERNAL);
+    if (tokens > usage.allowance)
+      return fail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
+  }
   function check() {
     checkDeadline();
     if (signal.aborted || !active) return fail(PAID_EXECUTION_CODES.CANCELLED);
@@ -59,11 +66,7 @@ export function createPaidStreamOutput(
         entered = true;
         if (!delta) return;
         const combined = text + delta;
-        const tokens = meter.streamed(combined);
-        if (!Number.isSafeInteger(tokens) || tokens < 0)
-          return fail(PAID_EXECUTION_CODES.INTERNAL);
-        if (tokens > usage.allowance)
-          return fail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
+        checkAllowance(combined);
         // Validate each delta once and accumulate its bytes. Re-scanning the whole prefix for every
         // token is quadratic for long answers; the meter still recounts the combined text above.
         let chunks: string[];
@@ -79,7 +82,10 @@ export function createPaidStreamOutput(
         // Delivery acknowledges a bounded wire chunk, not a whole possibly multi-frame engine delta.
         // A cut on a later frame must retain the earlier acknowledged prefix for settlement.
         for (const chunk of chunks) {
-          text += chunk;
+          const prefix = text + chunk;
+          // BPE counts are not monotonic: an intermediate prefix can cost more than the full delta.
+          if (chunks.length > 1) checkAllowance(prefix);
+          text = prefix;
           await deliver(chunk);
           checkDeadline();
           if (active) deliveredText = text;
