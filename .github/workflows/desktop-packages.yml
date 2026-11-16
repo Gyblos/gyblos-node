@@ -1,13 +1,19 @@
 # Builds the unsigned desktop app for macOS arm64, Windows x64 and Linux x64 (scripts in apps/desktop),
 # starts each package on its own OS in --smoke mode (temporary profile, no wallet; it proves the window
 # and the native iroh binding load), and keeps them as workflow artifacts. Run it by hand (Actions >
-# Desktop packages > Run workflow) to try a build; the release workflow calls it with the tag, and then
+# Desktop packages > Run workflow) to try a build, and it runs on pull requests that change the packaging;
+# the release workflow calls it with the tag, and then
 # it also attaches the packages and their .sha256 files to that GitHub release. No secrets, signing
 # identities, wallets or network services; the only credential is GITHUB_TOKEN for the upload.
 name: Desktop packages
 
 on:
   workflow_dispatch:
+  # Only pull requests that change the packaging, since macOS and Windows runners cost more minutes.
+  pull_request:
+    paths:
+      - .github/workflows/desktop-packages.yml
+      - apps/desktop/scripts/**
   workflow_call:
     inputs:
       tag:
