@@ -106,12 +106,17 @@ void test(
       assert.equal(log.health().dropped, 1);
     } finally {
       release();
-      fs.open = original;
-      syncBuiltinESMExports();
-      await log.close();
-      // flush joins any late open/close through the same bounded lifecycle.
-      await log.flush();
-      await fs.rm(root, { recursive: true, force: true });
+      try {
+        await log.close();
+        // Keep interception until the late open and close have both completed.
+        await log.flush();
+        assert.ok(openedFiles > 0);
+        assert.equal(closedFiles, openedFiles);
+      } finally {
+        fs.open = original;
+        syncBuiltinESMExports();
+        await fs.rm(root, { recursive: true, force: true });
+      }
     }
   },
 );

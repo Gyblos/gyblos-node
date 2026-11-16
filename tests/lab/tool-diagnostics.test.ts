@@ -1,5 +1,7 @@
 // Pins safe tool-worker phase reporting and parent observations with injected synthetic failures.
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 
 import { ACCEPTANCE_CODES } from '@gyblos/lab-harness/acceptance/constants';
@@ -67,6 +69,7 @@ void test('parent timeout retains the latest complete phase frame without a fina
     timedOut: true,
     cancelled: false,
   });
+  assert.ok(error.diagnostic);
   assert.equal(error.diagnostic.phase, 'verify');
   assert.equal(error.diagnostic.level, 'error');
   assert.equal(error.diagnostic.outcome, 'timeout');
@@ -100,4 +103,34 @@ void test('hostile error code accessor cannot replace a tool failure or become d
   assert.equal(accessed, false);
   assert.equal(records.at(-1)?.code, ACCEPTANCE_CODES.FAILED);
   assert.ok(!JSON.stringify(records).includes('SECRET-CANARY'));
+});
+
+void test('parent child-failure metadata cannot replace the canonical failure when entropy is unavailable', async () => {
+  const { childFailure } = await import('@gyblos/lab-harness/acceptance/tools');
+  const { TOOL_ACCEPTANCE_CASES } =
+    await import('@gyblos/lab-harness/acceptance/tools-constants');
+  const { ACCEPTANCE_CODES } =
+    await import('@gyblos/lab-harness/acceptance/constants');
+  const original = crypto.randomUUID;
+  try {
+    crypto.randomUUID = () => {
+      throw new Error('synthetic entropy failure');
+    };
+    syncBuiltinESMExports();
+    const failure = childFailure({
+      output: '',
+      scenario: TOOL_ACCEPTANCE_CASES.OPENAI_JSON,
+      code: ACCEPTANCE_CODES.FAILED,
+      exitCode: 1,
+      signal: null,
+      stdoutBytes: 0,
+      stderrBytes: 0,
+      timedOut: false,
+      cancelled: false,
+    });
+    assert.equal(failure.code, ACCEPTANCE_CODES.FAILED);
+  } finally {
+    crypto.randomUUID = original;
+    syncBuiltinESMExports();
+  }
 });

@@ -20,7 +20,7 @@ import { toolDiagnostic, toolDiagnostics } from './tools-diagnostics';
 export class ToolAcceptanceFailure extends AcceptanceError {
   constructor(
     code: AcceptanceError['code'],
-    readonly diagnostic: DiagnosticRecord,
+    readonly diagnostic?: DiagnosticRecord,
   ) {
     super(code);
   }
@@ -66,50 +66,59 @@ export function childFailure(options: {
   } catch {
     /* Malformed output remains a static failure. */
   }
-  let fallback: DiagnosticRecord | undefined;
-  toolDiagnostics((record) => {
-    fallback = record;
-  })
-    .start()
-    .report({
-      phase: TOOL_DIAGNOSTICS.phases.STARTUP,
-      scenario: options.scenario,
-      code: options.code,
-    });
-  const primary =
-    records
-      .filter((record) => record.outcome === DIAGNOSTIC_OUTCOMES.FAILURE)
-      .at(-1) ??
-    records.at(-1) ??
-    fallback!;
-  const diagnostic = diagnosticRecord({
-    ...primary,
-    id: randomUUID(),
-    code: options.code,
-    level: DIAGNOSTIC_LEVELS.ERROR,
-    cause: options.timedOut
-      ? DIAGNOSTIC_CAUSES.TIMEOUT
-      : options.cancelled
-        ? DIAGNOSTIC_CAUSES.ABORT
-        : primary.cause,
-    exitCode: options.exitCode,
-    signal: options.signal,
-    stdoutBytes: options.stdoutBytes,
-    stderrBytes: options.stderrBytes,
-    outcome: options.cancelled
-      ? DIAGNOSTIC_OUTCOMES.CANCELLED
-      : options.timedOut
-        ? DIAGNOSTIC_OUTCOMES.TIMEOUT
-        : DIAGNOSTIC_OUTCOMES.FAILURE,
-  })!;
+  let diagnostic: DiagnosticRecord | undefined;
   try {
-    for (const record of records.filter(
-      (record) => record.outcome === DIAGNOSTIC_OUTCOMES.CLEANUP_FAILURE,
-    ))
-      options.sink?.(record);
-    options.sink?.(diagnostic);
+    let fallback: DiagnosticRecord | undefined;
+    toolDiagnostics((record) => {
+      fallback = record;
+    })
+      .start()
+      .report({
+        phase: TOOL_DIAGNOSTICS.phases.STARTUP,
+        scenario: options.scenario,
+        code: options.code,
+      });
+    const primary =
+      records
+        .filter((record) => record.outcome === DIAGNOSTIC_OUTCOMES.FAILURE)
+        .at(-1) ??
+      records.at(-1) ??
+      fallback;
+    if (!primary) return new ToolAcceptanceFailure(options.code);
+    diagnostic = diagnosticRecord({
+      ...primary,
+      id: randomUUID(),
+      code: options.code,
+      level: DIAGNOSTIC_LEVELS.ERROR,
+      cause: options.timedOut
+        ? DIAGNOSTIC_CAUSES.TIMEOUT
+        : options.cancelled
+          ? DIAGNOSTIC_CAUSES.ABORT
+          : primary.cause,
+      exitCode: options.exitCode,
+      signal: options.signal,
+      stdoutBytes: options.stdoutBytes,
+      stderrBytes: options.stderrBytes,
+      outcome: options.cancelled
+        ? DIAGNOSTIC_OUTCOMES.CANCELLED
+        : options.timedOut
+          ? DIAGNOSTIC_OUTCOMES.TIMEOUT
+          : DIAGNOSTIC_OUTCOMES.FAILURE,
+    })!;
   } catch {
-    /* Observational output cannot replace the original failure. */
+    /* Metadata failure must not replace the canonical operation failure. */
   }
+  const emit = (record: DiagnosticRecord) => {
+    try {
+      options.sink?.(record);
+    } catch {
+      /* Observational output is best effort. */
+    }
+  };
+  for (const record of records.filter(
+    (record) => record.outcome === DIAGNOSTIC_OUTCOMES.CLEANUP_FAILURE,
+  ))
+    emit(record);
+  if (diagnostic) emit(diagnostic);
   return new ToolAcceptanceFailure(options.code, diagnostic);
 }
