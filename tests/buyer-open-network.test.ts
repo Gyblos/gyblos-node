@@ -1,13 +1,11 @@
-// A buyer that names no seller uses the open network: any seller the index lists whose 8004 identity checks
-// out, for free answers only. `buyer:init` writes that when the seller is left empty, and the automatic
-// buyer (buyer:start, buyer:chat, the desktop app) asks its configured sellers first and falls back to the
-// open network at zero ceilings, so a discovered seller is never paid.
+// The shared init and automatic-buyer selection use verified open discovery at zero price ceilings.
+// Configured sellers keep their original policy; cancellation and explicit opt-in precede selection.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { FreeSelectionFailure } from '@gyblos/buyer/free-execution';
 import { selectConfiguredThenOpen } from '@gyblos/buyer/quote-selection';
-import { parseBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
+import { parseBuyerSelectionConfig, type BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { buildBuyerInit, BuyerInitError } from '@gyblos/node/buyer-init';
 import { BUYER_INIT_CODES } from '@gyblos/node/buyer-init-constants';
@@ -26,16 +24,18 @@ const unavailable = () =>
   new FreeSelectionFailure({
     ok: false,
     code: SELLER_SELECTION_CODES.NO_CANDIDATES,
-  } as never);
+  });
+
+type Request = BuyerSelectionConfig['request'];
 
 function recorder(results: (() => Promise<string>)[]) {
-  const calls: { request: Record<string, unknown>; route?: { open: true } }[] =
+  const calls: { request: Request; route?: { open: true } }[] =
     [];
   return {
     calls,
-    select: (request: object, route?: { open: true }) => {
+    select: (request: Request, route?: { open: true }) => {
       calls.push({
-        request: request as Record<string, unknown>,
+        request,
         ...(route ? { route } : {}),
       });
       return results[calls.length - 1]!();
@@ -43,16 +43,18 @@ function recorder(results: (() => Promise<string>)[]) {
   };
 }
 
-const config = (sellers: number, open: boolean) =>
-  ({
+function config(sellers: number, open: boolean): BuyerSelectionConfig {
+  const plan = buildBuyerInit(answers());
+  return parseBuyerSelectionConfig({
+    ...plan,
     sellers: Array.from({ length: sellers }, (_, index) => ({
-      nodeId: String(index),
+      ...plan.sellers[0],
+      nodeId: index.toString(16).padStart(64, '0'),
     })),
-    ...(open
-      ? { discovery: { baseUrl: 'https://index.test', open: true } }
-      : {}),
-  }) as never;
-const request = { ...PAID, maxTokens: 4096 } as never;
+    discovery: { ...plan.discovery, ...(open ? { open: true } : {}) },
+  });
+}
+const request: Request = { ...config(1, false).request, ...PAID, maxTokens: 4096 };
 
 void test('buyer:init with no seller writes an open-network buyer the runtime accepts', () => {
   const plan = buildBuyerInit({
@@ -183,4 +185,43 @@ void test('without open discovery, after another error or after cancellation, no
     FreeSelectionFailure,
   );
   assert.equal(aborted.calls.length, 1);
+});
+
+void test('an already-cancelled selection never calls configured or open candidates', async () => {
+  for (const policy of [config(0, true), config(1, true)]) {
+    const controller = new AbortController();
+    const reason = new Error('synthetic cancellation');
+    controller.abort(reason);
+    const run = recorder([async () => 'late winner']);
+    await assert.rejects(
+      selectConfiguredThenOpen(policy, request, controller.signal, run.select),
+      (error: unknown) => error === reason,
+    );
+    assert.equal(run.calls.length, 0);
+  }
+});
+
+void test('an empty candidate list does not authorize open discovery by itself', async () => {
+  const run = recorder([async () => 'unrequested open winner']);
+  await assert.rejects(
+    selectConfiguredThenOpen({ sellers: [] }, request, new AbortController().signal, run.select),
+    (error: unknown) => error instanceof FreeSelectionFailure && error.decision.code === SELLER_SELECTION_CODES.NO_CANDIDATES,
+  );
+  assert.equal(run.calls.length, 0);
+});
+
+void test('a winner resolving after cancellation cannot escape either selection route', async () => {
+  for (const policy of [config(0, true), config(1, true)]) {
+    const controller = new AbortController();
+    const reason = new Error('synthetic late cancellation');
+    const run = recorder([async () => {
+      controller.abort(reason);
+      return 'late winner';
+    }]);
+    await assert.rejects(
+      selectConfiguredThenOpen(policy, request, controller.signal, run.select),
+      (error: unknown) => error === reason,
+    );
+    assert.equal(run.calls.length, 1);
+  }
 });
