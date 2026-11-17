@@ -203,6 +203,7 @@ void test('docs export: the sidebar follows the public seller and buyer paths', 
       `/${locale}/buyers/desktop-app`,
       `/${locale}/reference/cli`,
       `/${locale}/reference/configuration`,
+      `/${locale}/buyers/use-from-code`,
       `/${locale}/help/troubleshooting`,
     ]);
     assert.ok(
@@ -210,10 +211,6 @@ void test('docs export: the sidebar follows the public seller and buyer paths', 
     );
     assert.ok(
       links[3]?.[2]?.includes(locale === 'es' ? 'Inicio rápido' : 'Quickstart'),
-    );
-    assert.ok(
-      !destinations.includes(`/${locale}/buyers/use-from-code`),
-      `${locale}: code integration must not be a buyer navigation entry`,
     );
   }
 });
