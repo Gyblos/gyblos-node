@@ -1,6 +1,6 @@
 // Reveals one delegated key only on request, retaining it solely while this field is visible.
 // Hiding, scope changes and unmount invalidate late reads; nothing is written or copied implicitly.
-import { Eye, EyeSlash } from '@phosphor-icons/react';
+import { Copy, Eye, EyeSlash } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { USDC_API_ACTION } from '../usdc-api-model';
@@ -39,6 +39,7 @@ function KeyFieldActions({
         disabled={busy || !available}
         onClick={copy}
       >
+        <Copy size={16} />
         Copy
       </Button>
     </>
@@ -86,7 +87,7 @@ export function UsdcApiKeyField({
   return (
     <div className="ui-field">
       <label htmlFor="usdc-tool-key">API key</label>
-      <div className="ui-copy-field">
+      <div className="ui-copy-field ui-copy-field--reveal">
         <FormInput
           id="usdc-tool-key"
           readOnly
