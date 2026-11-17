@@ -32,12 +32,16 @@ The brand source is [web-gyblos](https://github.com/Gyblos/web-gyblos):
 `web/public/brand-assets/` distribution. No private vault content is required to
 build this preview.
 
-`build.ts` applies only the theme-token and terminal-mark substitutions in
-memory while bundling the preview. It refuses changed desktop hook shapes rather
-than silently skipping them. The desktop source, native application and seller
-are unchanged. `preview.css` adds only the supplied mark's presentation and a
-browser illustration of native macOS controls; it introduces no separate
-component scale.
+`build.ts` applies only the theme-token, terminal-mark and composer-copy
+substitutions in memory while bundling the preview. It refuses changed desktop
+hook shapes rather than silently skipping them. The desktop source, native
+application and seller are unchanged. `preview.css` adds only the supplied
+mark's presentation and a browser illustration of native macOS controls; it
+introduces no separate component scale.
+
+The free-network caption beside Send is omitted in this proposal. The model
+name, Free badge and actionable authorization/generation status copy remain
+visible.
 
 Follow the root `AGENTS.md` and `apps/desktop/DESIGN.md`: show the mockup,
 obtain explicit approval, then port the accepted visual proposal to the desktop

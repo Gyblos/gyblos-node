@@ -330,3 +330,23 @@ void test('preview brand hooks accept Windows CRLF source files', async () => {
     /#090909/,
   );
 });
+void test('preview omits the free-network composer caption and retains operational status copy', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const chat = await readFile(
+    new URL('../../apps/desktop/src/ui/Chat.tsx', import.meta.url),
+    'utf8',
+  );
+  const preview =
+    transformBrand(chat, '/desktop/src/ui/Chat.tsx', '/desktop') ?? chat;
+  assert.doesNotMatch(preview, /Free · Gyblos network/);
+  for (const status of [
+    'Generating…',
+    'Authorize in Payments',
+    'x402 · devnet',
+    'PayPal Sandbox',
+    'Set up in Payments',
+    'Esc to stop',
+  ])
+    assert.ok(preview.includes(status));
+});

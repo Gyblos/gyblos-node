@@ -1,4 +1,4 @@
-// Applies the versioned public brand proposal only to browser bundles, with portable module IDs.
+// Applies the public brand and composer-copy proposals only to browser bundles, with portable IDs.
 // Shipped desktop sources and operational configuration are never changed.
 
 import type { InlineConfig, Plugin } from 'vite';
@@ -21,6 +21,8 @@ export function transformBrand(source: string, id: string, desktop: string) {
   source = source.replaceAll('\r\n', '\n');
   const target = moduleId(id);
   const base = moduleId(desktop).replace(/\/$/, '');
+  if (target === `${base}/src/ui/Chat.tsx`)
+    return replaceOnce(source, "'Free · Gyblos network'", "''");
   if (target === `${base}/src/theme.ts`) {
     for (const [name, value] of Object.entries(brand.themeTokens)) {
       const pattern = new RegExp(`  ${name}: '[^']+',`);
