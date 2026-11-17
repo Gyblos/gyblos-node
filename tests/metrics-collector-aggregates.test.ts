@@ -71,7 +71,12 @@ void test('network and seller totals follow the metric definitions', async () =>
   });
 
   const result = await runAggregation(database, NOW);
-  assert.deepEqual(result, { days: [DAY], failed: [], more: false });
+  assert.deepEqual(result, {
+    days: [DAY],
+    failed: [],
+    more: false,
+    chain: { days: [], failed: [], more: false, scanFailed: false },
+  });
 
   const [free, paid] = rowsOf(
     database,
@@ -303,5 +308,6 @@ void test('a run recomputes at most maxDaysPerRun days, newest first, and leaves
     days: [oldest],
     failed: [],
     more: false,
+    chain: { days: [], failed: [], more: false, scanFailed: false },
   });
 });

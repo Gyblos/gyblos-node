@@ -18,14 +18,15 @@ rules.
 
 ## Endpoints
 
-| Route                           | Purpose                                                               |
-| ------------------------------- | --------------------------------------------------------------------- |
-| `POST /v1/receipts`             | Upload one signed envelope of 1 to 50 receipts.                       |
-| `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events. |
-| `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                |
-| `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).       |
-| `GET /v1/stats/models`          | Totals per model over a day range.                                    |
-| `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                            |
+| Route                           | Purpose                                                                |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| `POST /v1/receipts`             | Upload one signed envelope of 1 to 50 receipts.                        |
+| `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events.  |
+| `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                 |
+| `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).        |
+| `GET /v1/stats/models`          | Totals per model over a day range.                                     |
+| `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                             |
+| `GET /v1/stats/chain`           | Payment-channels program activity per UTC day ([chain](#chain-stats)). |
 
 Every response carries `Cache-Control: no-store`, except a successful stats
 answer, which is `public, max-age=300`. Every response also carries
@@ -304,8 +305,8 @@ Read every figure as what nodes reported and signed, not as proof of real use;
 only chain settlement (#349) proves payment.
 
 Not yet included: the daily signed snapshot with a Merkle root and inclusion
-proofs, chain metrics (transactions, settled USDC, fees; they need the indexer
-in #349), and online sellers from presence (they live in the discovery index).
+proofs, and online sellers from presence (they live in the discovery index).
+Chain metrics are below ([chain aggregates](#chain-aggregates)).
 
 ## Public stats API
 
@@ -351,8 +352,30 @@ with one buyer they describe that one pseudonymous buyer's use of that seller.
 | `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                     |
 
 Each stats request is one batch of reads over aggregate tables: three statements
-for the network and seller answers, one for models, whatever the range.
-Histograms are summed and lists are capped in SQL.
+for the network and seller answers, one for models, two for chain, whatever the
+range. Histograms are summed and lists are capped in SQL.
+
+### Chain stats
+
+`GET /v1/stats/chain` takes the same range and envelope, plus `network` (the
+CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`: whether the
+program's history is fully read (`backfillDone`) and when the index last moved
+(`updatedAt`), or `null` before its first run. Until `backfillDone`, older days
+may still be missing. `days` lists every day of the range with `program` and
+`gyblosClaimed`, each `null` without activity that day:
+
+- `transactions`, `channels`, `payers`, `payees`;
+- `instructions`: `open`, `settle`, `topUp`, `settleAndSeal`, `requestClose`,
+  `seal`, `distribute`, `reclaim`;
+- `usdc`: `depositedAtomic`, `settledAtomic`, `gyblosFeesAtomic`,
+  `programTreasuryAtomic`, `refundedAtomic`, `paidOutAtomic`, as decimal
+  strings;
+- `program` only: `failed` and `undecodable`.
+
+This is the only source of settled USDC and fees: a paid receipt's
+`authorizedAtomic` is usage both sides signed for, not payment. `gyblosClaimed`
+is a self-declared label ([chain index](#chain-index)); wallets are public on
+chain, so payer and payee counts are not withheld.
 
 ## Chain index
 
@@ -428,9 +451,64 @@ session (`gyblos/payment-session/v1:`), or when a distribute paid the Gyblos
 treasury. Anyone can make either claim, with any mint: metrics built on it must
 filter by the USDC mint and say the label is self-declared.
 
-Not yet included: daily chain aggregates and their public API (transactions by
-kind, settled USDC, fees), the explorer reading them, the mainnet treasury, and
-the reconciliation of paid receipt v2 intervals against settled amounts — no
+### Chain aggregates
+
+The same scheduled run recomputes chain days (`src/aggregate-chain.ts`,
+migration `0004_chain_aggregates.sql`, table `collector_agg_chain_daily`) after
+the receipt days, with their own scan cursor (`collector_agg_chain_state`),
+dirty set (`collector_agg_chain_dirty_days`) and batch per day. The chain step
+never throws: a failed chain scan (logged
+`COLLECTOR_AGGREGATION_FAILED chain scan`) or chain day (`chain <days>`) is
+retried next run and never holds back receipt or observation days or the chain
+index that runs after. A day is the UTC day of the block time. The chain scan
+marks dirty:
+
+- the days of transactions indexed since the previous scan (`indexed_at`);
+- every day of a channel that a newly indexed open or distribute names, so an
+  open read after its settles (history is read newest first) or a later Gyblos
+  claim recomputes the channel's earlier days;
+- the days of a channel's settles at or after a newly indexed settle, since an
+  older settle changes what later ones added, and every settle day of a channel
+  after a newly indexed top-up, since deposits cap what settles count. Every
+  mark is driven from the newly indexed transactions through indexes, so its
+  cost follows what is new, and a new settle never re-marks the channel's whole
+  history.
+
+Before the first chain scan every indexed day is marked, and a formula change
+re-marks every chain day aggregated with another version. Each dirty day gets
+one row per scope: `program` (the whole program) and `gyblos` (channels claiming
+Gyblos traffic); a scope with no activity that day has no row.
+
+- **Counts:** successful transactions with an instruction in scope; top-level
+  instructions by kind; distinct channels, payers and payees. Failed
+  transactions name no channel, so they count in the `program` scope only, as do
+  successful transactions with a program instruction the decoder could not read
+  (`undecodable`; such a transaction is also in `transactions` when another of
+  its instructions was read).
+- **Amounts** count channels in the devnet USDC mint only, as decimal strings.
+  `deposited`: open deposits plus top-ups. `settled`: each settle's signed
+  cumulative, capped at the channel's deposits, above the highest one the
+  channel settled before it, in chain order (a channel address derives from its
+  open slot, so it is never reopened): alternating vouchers never add twice, and
+  a self-signed cumulative never settles money the channel never held.
+- **Payouts** are the positive USDC changes in distribute and reclaim
+  transactions, by who received them: `gyblosFees` (the Gyblos fee treasury),
+  `programTreasury` (the program's own treasury: rounding residual and
+  redirected payouts), `refunded` (the payer of a channel the transaction names)
+  and `paidOut` (a payee or distribute recipient). Owners the channels do not
+  name never count, and a transaction whose payouts exceed what left its
+  channels' vaults (a transfer bundled with the payout) counts none, so payouts
+  never exceed what the program released. Within that bound a payer can still
+  move its own refund to a payee it controls. Payouts are per transaction, so in
+  the `gyblos` scope a transaction counts only when every distribute and reclaim
+  in it is for a Gyblos channel.
+- **Bounds:** sums use SQLite `total()`, so no value, however large, makes a day
+  fail; they are exact below 2^53 atomic units (about 9 billion USDC) and
+  saturate above. Instructions run through another program (CPI) are not read,
+  so they are not counted.
+
+Not yet included: the explorer reading these aggregates, the mainnet treasury,
+and the reconciliation of paid receipt v2 intervals against settled amounts — no
 node signs v2 receipts yet (#346).
 
 ## Order of checks
@@ -498,20 +576,20 @@ is written.
 
 ## Code layout
 
-| Layer            | File                                                                                                                                 | Owns                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| Entry            | `src/worker.ts`                                                                                                                      | Cloudflare bindings, the scheduled run and the stats edge cache; fails closed; inert on import. |
-| HTTP             | `src/app.ts`, `src/ip-key.ts`                                                                                                        | Routes, admission middleware, body cap, error mapping.                                          |
-| Use case         | `src/ingest.ts`                                                                                                                      | The order of checks and building one write.                                                     |
-| Policy           | `@gyblos/core/public-receipts`                                                                                                       | Receipt verification, classification and merge rules.                                           |
-| Storage port     | `src/storage.ts`                                                                                                                     | The `CollectorStorage` interface and the shared write rule.                                     |
-| Storage adapters | `src/storage-d1.ts`, `src/storage-memory.ts`                                                                                         | D1 (Drizzle, `src/schema.ts`, `src/d1-client.ts`) and in-memory.                                |
-| Values           | `src/constants.ts`, `src/errors.ts`                                                                                                  | Wire codes, statuses, limits, binding names, error mapping.                                     |
-| Aggregation      | `src/aggregate.ts`, `src/aggregate-sql.ts`, `src/aggregate-first-seen.ts`, `src/sql-primitives.ts`, `src/schema-aggregates.ts`       | The scheduled run, metric formulas, SQL building blocks and the aggregate tables.               |
-| Chain index      | `src/chain/` (`indexer.ts`, `decode.ts`, `rpc.ts`, `writes.ts`, `channel-account.ts`, `base58.ts`, `json.ts`), `src/schema-chain.ts` | The scheduled chain read, transaction decoding, the RPC client and the chain tables.            |
-| Stats use case   | `src/stats.ts`, `src/stats-shape.ts`, `src/days.ts`                                                                                  | Typed answers, free/paid sections, percentiles, UTC day ranges.                                 |
-| Stats port       | `src/stats-store.ts`, `src/stats-read.ts`                                                                                            | The `StatsReader` interface and its D1 adapter.                                                 |
-| Stats HTTP       | `src/stats-routes.ts`, `src/http.ts`                                                                                                 | Query parsing, cacheable answers, shared rejection.                                             |
+| Layer            | File                                                                                                                                                     | Owns                                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Entry            | `src/worker.ts`                                                                                                                                          | Cloudflare bindings, the scheduled run and the stats edge cache; fails closed; inert on import.        |
+| HTTP             | `src/app.ts`, `src/ip-key.ts`                                                                                                                            | Routes, admission middleware, body cap, error mapping.                                                 |
+| Use case         | `src/ingest.ts`                                                                                                                                          | The order of checks and building one write.                                                            |
+| Policy           | `@gyblos/core/public-receipts`                                                                                                                           | Receipt verification, classification and merge rules.                                                  |
+| Storage port     | `src/storage.ts`                                                                                                                                         | The `CollectorStorage` interface and the shared write rule.                                            |
+| Storage adapters | `src/storage-d1.ts`, `src/storage-memory.ts`                                                                                                             | D1 (Drizzle, `src/schema.ts`, `src/d1-client.ts`) and in-memory.                                       |
+| Values           | `src/constants.ts`, `src/errors.ts`                                                                                                                      | Wire codes, statuses, limits, binding names, error mapping.                                            |
+| Aggregation      | `src/aggregate.ts`, `src/aggregate-sql.ts`, `src/aggregate-first-seen.ts`, `src/aggregate-chain.ts`, `src/sql-primitives.ts`, `src/schema-aggregates.ts` | The scheduled run, metric formulas (receipts and chain), SQL building blocks and the aggregate tables. |
+| Chain index      | `src/chain/` (`indexer.ts`, `decode.ts`, `rpc.ts`, `writes.ts`, `channel-account.ts`, `base58.ts`, `json.ts`), `src/schema-chain.ts`                     | The scheduled chain read, transaction decoding, the RPC client and the chain tables.                   |
+| Stats use case   | `src/stats.ts`, `src/stats-chain.ts`, `src/stats-shape.ts`, `src/days.ts`                                                                                | Typed answers, free/paid sections, percentiles, UTC day ranges.                                        |
+| Stats port       | `src/stats-store.ts`, `src/stats-read.ts`                                                                                                                | The `StatsReader` interface and its D1 adapter.                                                        |
+| Stats HTTP       | `src/stats-routes.ts`, `src/http.ts`                                                                                                                     | Query parsing, cacheable answers, shared rejection.                                                    |
 
 ## Operations
 
@@ -529,6 +607,12 @@ To ship a change, from `apps/metrics-collector`:
    secret: a dedicated provider over https, since the public devnet RPC
    rate-limits `getTransaction` to a few calls per window:
    `npx wrangler@4.151.1 secret put COLLECTOR_SOLANA_RPC_URL`.
+
+Migration `0004` (chain aggregates) needs no new binding. Apply it before
+deploying the Worker that reads it (until then the chain step fails and is
+logged, while receipt aggregates and the chain index keep running); the first
+chain scan then aggregates every day the chain index already holds, whatever
+Worker version ran in between.
 
 After `0002`, the first scheduled run marks every day with data dirty and
 recomputes up to 31 days per run, newest first.

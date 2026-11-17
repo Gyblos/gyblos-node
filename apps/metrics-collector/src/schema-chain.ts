@@ -1,5 +1,5 @@
-// Owns the typed chain index tables (#349), matching migrations/0003 exactly (the schema test compares
-// them). These declarations perform no I/O.
+// Owns the typed chain index tables (#349) and their daily aggregates, matching migrations/0003 and 0004
+// exactly (the schema test compares them). These declarations perform no I/O.
 import {
   index,
   integer,
@@ -8,7 +8,7 @@ import {
   text,
 } from 'drizzle-orm/sqlite-core';
 
-import type { ChainInstructionKind } from './constants';
+import type { ChainAggregateScope, ChainInstructionKind } from './constants';
 
 export const chainCursor = sqliteTable('collector_chain_cursor', {
   id: integer('id').primaryKey(),
@@ -33,7 +33,10 @@ export const chainTxs = sqliteTable(
     memo: text('memo'),
     indexedAt: integer('indexed_at').notNull(),
   },
-  (table) => [index('collector_chain_txs_by_time').on(table.blockTime)],
+  (table) => [
+    index('collector_chain_txs_by_time').on(table.blockTime),
+    index('collector_chain_txs_by_indexed').on(table.indexedAt),
+  ],
 );
 
 export const chainInstructions = sqliteTable(
@@ -93,4 +96,45 @@ export const chainChannels = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [index('collector_chain_channels_by_payer').on(table.payer)],
+);
+
+export const aggChainState = sqliteTable('collector_agg_chain_state', {
+  id: integer('id').primaryKey(),
+  scannedAt: integer('scanned_at').notNull(),
+  formulaVersion: integer('formula_version').notNull(),
+});
+
+export const aggChainDirtyDays = sqliteTable('collector_agg_chain_dirty_days', {
+  day: text('day').primaryKey(),
+});
+
+export const aggChainDaily = sqliteTable(
+  'collector_agg_chain_daily',
+  {
+    day: text('day').notNull(),
+    scope: text('scope').$type<ChainAggregateScope>().notNull(),
+    transactions: integer('transactions').notNull(),
+    failed: integer('failed').notNull(),
+    undecodable: integer('undecodable').notNull(),
+    opens: integer('opens').notNull(),
+    settles: integer('settles').notNull(),
+    topUps: integer('top_ups').notNull(),
+    settleAndSeals: integer('settle_and_seals').notNull(),
+    requestCloses: integer('request_closes').notNull(),
+    seals: integer('seals').notNull(),
+    distributes: integer('distributes').notNull(),
+    reclaims: integer('reclaims').notNull(),
+    channels: integer('channels').notNull(),
+    payers: integer('payers').notNull(),
+    payees: integer('payees').notNull(),
+    depositedAtomic: text('deposited_atomic').notNull(),
+    settledAtomic: text('settled_atomic').notNull(),
+    gyblosFeesAtomic: text('gyblos_fees_atomic').notNull(),
+    programTreasuryAtomic: text('program_treasury_atomic').notNull(),
+    refundedAtomic: text('refunded_atomic').notNull(),
+    paidOutAtomic: text('paid_out_atomic').notNull(),
+    formulaVersion: integer('formula_version').notNull(),
+    aggregatedAt: integer('aggregated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.day, table.scope] })],
 );
