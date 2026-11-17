@@ -14,3 +14,12 @@ export async function prepareDesktopBuyer(
   const current = await checkBuyerInit(options.environment);
   if (!current.exists) await initializeBuyer(buyerInitDefaults(), options);
 }
+
+// The host owns transport creation, and preparation never replaces existing settings.
+export async function startDesktopBuyer<Host>(
+  options: BuyerInitOptions,
+  start: (options: { port: number }) => Promise<Host>,
+): Promise<Host> {
+  await prepareDesktopBuyer(options);
+  return start({ port: 0 });
+}
