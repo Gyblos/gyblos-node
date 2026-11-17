@@ -35,6 +35,7 @@ import {
 import { FreeBuyerError } from './free-chat';
 import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
+import { slowSellerMessage } from './slow-seller';
 
 // What a paid request cost, as the buyer counted it and as the seller claimed; amounts are atomic
 // units of the test token. A free request carries none.
@@ -242,7 +243,7 @@ export function openAiStream(
     error: (code, stop, payment) =>
       sse({
         error: {
-          message: code,
+          message: slowSellerMessage(stop) ?? code,
           type: FREE_BUYER.errorType,
           param: null,
           code,

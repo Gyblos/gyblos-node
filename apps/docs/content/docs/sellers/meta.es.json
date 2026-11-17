@@ -2,12 +2,12 @@
   "title": "Vendedores",
   "pages": [
     "beta-guide",
-    "manual-install",
     "register-publish",
     "models-offers",
     "get-paid",
     "operate",
-    "identity"
+    "identity",
+    "manual-install"
   ],
   "defaultOpen": true,
   "icon": "server"

@@ -113,6 +113,13 @@ export async function scheduledAggregation(bindings: unknown, now: number) {
   // Day names only (no request data): a day that keeps failing must be visible in the Worker logs.
   if (result.failed.length)
     console.warn(COLLECTOR_AGGREGATION_FAILED, result.failed.join(','));
+  if (result.chain.scanFailed)
+    console.warn(COLLECTOR_AGGREGATION_FAILED, 'chain scan');
+  if (result.chain.failed.length)
+    console.warn(
+      COLLECTOR_AGGREGATION_FAILED,
+      `chain ${result.chain.failed.join(',')}`,
+    );
   return result;
 }
 

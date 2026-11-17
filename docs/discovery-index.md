@@ -1,138 +1,152 @@
 # Discovery index Worker
 
-`apps/discovery-index` (`@gyblos/discovery-index`) is the reference HTTP
-discovery index: a Cloudflare Worker for `https://discovery.gyblos.com`, built
-with Hono. It implements the wire contract in
+`apps/discovery-index` (`@gyblos/discovery-index`) is the reference discovery
+index: a Cloudflare Worker built with Hono and served at
+`https://discovery.gyblos.com`. It implements the wire contract in
 [discovery.md](discovery.md#running-an-index-wire-contract), which the
-`@gyblos/discovery-http` client follows. It moved here from the website so that
-record verification has a single source: every record check goes through
+`@gyblos/discovery-http` client follows. Every record check goes through
 `@gyblos/protocol` (`parsePublicV2`, `validatePublicV2Time`, `controlVerify` and
 `verifyPublicV2`); the app keeps no copy of the record rules.
 
-It is deployed at `https://discovery.gyblos.com` with the D1 database
-`gyblos-discovery`. Changing Cloudflare resources, applying migrations to the
-remote database and deploying are founder-approved manual steps (see
-[Operations](#operations)).
+This page is the contributor reference: endpoints, publish modes, security
+model, caching, uptime and storage. Deploying the Worker, applying remote
+migrations, changing its secrets and issuing invite codes are maintainer
+procedures kept outside the repository, and each needs founder approval.
 
 ## Endpoints
 
-Routes sit at the root of the index host; the client base URL is
+Routes sit at the root of the index host. The client base URL is
 `https://discovery.gyblos.com/v1` (`DISCOVERY_INDEX_URL` in `@gyblos/config`).
 
-| Route                    | Purpose                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------ |
-| `POST /v1/records`       | Publish one signed public v2 catalog, presence or withdrawal.                              |
-| `GET /v1/sellers`        | List live sellers of one model, paged by an opaque cursor.                                 |
-| `GET /v1/models`         | List models from live sellers, ordered by seller count; no query parameters.               |
-| `GET /v1/uptime?node=`   | Public uptime of one NodeId over the last day, week and month (below).                     |
-| `GET /v1/health`         | `{ ok: true, records, publish }` (see below).                                              |
-| `POST /v1/registrations` | Trade a beta invite for publishing, once the NodeId is bound in the 8004 registry (below). |
+| Route                    | Purpose                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| `POST /v1/records`       | Publish one signed public v2 catalog, presence or withdrawal.                                |
+| `GET /v1/sellers`        | List live sellers of one model, paged by an opaque cursor.                                   |
+| `GET /v1/models`         | List models from live sellers, ordered by seller count; no query parameters.                 |
+| `GET /v1/uptime?node=`   | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).           |
+| `GET /v1/health`         | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes). |
+| `POST /v1/registrations` | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.    |
 
-The index is HTTPS only: a request whose URL is not `https` gets
-`400 {"error":"HTTPS_REQUIRED"}` for every method and path, before storage or
-any rate limit is touched. There is deliberately no redirect, so a `POST` body
-sent over plain `http` is never replayed and clients learn to fix their base
-URL. The check reads the scheme of the request URL, which on Workers is the
-scheme the client used; it needs no `CF-Visitor` header.
+Common behavior:
 
-Anything else is a real `404 {"error":"NOT_FOUND"}`. Every response carries
-`X-Robots-Tag: noindex`; responses other than `/v1/sellers` carry
-`Cache-Control: no-store`. `GET`/`HEAD` on `/v1/sellers` and `/v1/health` carry
-`Access-Control-Allow-Origin: *` on every status, errors included.
+- **HTTPS only.** A request whose URL is not `https` gets
+  `400 {"error":"HTTPS_REQUIRED"}` for every method and path, before storage or
+  any rate limit. There is no redirect, so a `POST` body sent over `http` is
+  never replayed. The check reads the scheme the client used; it needs no
+  `CF-Visitor` header.
+- **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
+- **Headers.** Every response carries `X-Robots-Tag: noindex` and
+  `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
+  `/v1/models`, `/v1/uptime` and `/v1/health` carry
+  `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
+  from `/v1/sellers`, `/v1/models` or `/v1/uptime` carries
+  `Cache-Control: public, max-age=10`; everything else carries
+  `Cache-Control: no-store`.
 
-`records` in the health body is the count of unexpired records; `publish` is
-`"closed"`, `"allowlist"`, `"registered"` or `"open"` (the publish mode, never
-the listed or registered NodeIds). `publish` is a reference-index extension that
-clients must not rely on.
+## Publish modes
 
-## Publish allowlist (devnet)
+Reads are always public. Who may publish depends on two inputs: the optional
+Worker secret `DISCOVERY_PUBLISH_ALLOWLIST` and whether the `DISCOVERY_DB`
+database is bound (registrations live there). `/v1/health` reports the mode in
+`publish`, never the NodeIds.
 
-Reads are public. During devnet only approved NodeIds may publish: the Worker
-secret `DISCOVERY_PUBLISH_ALLOWLIST` holds them as comma-separated lowercase
-64-hex NodeIds (whitespace around commas is ignored, duplicates collapse), at
-most 1000 entries. The single value `*` opens publishing to any self-signed
-NodeId, the permissionless design for later.
+| Mode         | When                                       | Who may publish                                                    | Others get                  |
+| ------------ | ------------------------------------------ | ------------------------------------------------------------------ | --------------------------- |
+| `registered` | No usable allowlist secret, database bound | NodeIds admitted through `POST /v1/registrations`                  | `403 PUBLISH_NOT_ALLOWED`   |
+| `allowlist`  | The secret lists NodeIds                   | Listed NodeIds, plus registered NodeIds when the database is bound | `403 PUBLISH_NOT_ALLOWED`   |
+| `open`       | The secret is exactly `*`                  | Any NodeId with a valid self-signature                             | (none)                      |
+| `closed`     | No usable allowlist secret and no database | Nobody: `POST /v1/records` answers `503` before the body is read   | `503 DISCOVERY_UNAVAILABLE` |
 
-- **Without a usable secret:** if the secret is missing, empty, or has any
-  malformed entry (uppercase, wrong length, an empty item such as a trailing
-  comma, `*` mixed with NodeIds, more than 1000 entries), only NodeIds admitted
-  through `POST /v1/registrations` may publish (health reports `registered`);
-  every other NodeId gets `403 PUBLISH_NOT_ALLOWED`. Without storage either,
-  every `POST /v1/records` answers `503 DISCOVERY_UNAVAILABLE` before the body
-  is read. `GET /v1/sellers` and `GET /v1/health` keep working.
-- **Allowlist first:** an allowlisted NodeId is accepted without reading the
-  registration tables, so allowlisted sellers keep publishing before migration
-  0003 is applied; until then any other NodeId gets `503` instead of `403`.
-- **In production** D1 is always bound, so the mode is never `closed`: health
-  reports `registered` even before the RPC secret is set (then
-  `/v1/registrations` answers 503) or the migration is applied. Registered
-  NodeIds count toward `maxNodes` like any other, so with registrations on the
-  stored node count is always checked, allowlisted NodeIds included.
-- **Cheap rejection:** after the per-IP and publish limits and the strict body
-  checks, the record's claimed `nodeId` is looked up first. An unlisted NodeId
-  gets `403 PUBLISH_NOT_ALLOWED` before signature verification, any storage read
-  and the per-NodeId limit, so it consumes no NodeId allowance. A listed NodeId
-  continues through the unchanged path (signature, stale check, per-NodeId
-  limit, references, caps), so the claim is still proven by the signature.
-- **Not secret, but a secret:** NodeIds are public keys. The list is kept as a
-  Worker secret only so that it lives outside the repository and can change
-  without a commit. It is never logged or returned; health shows the mode only.
-- **Size:** Cloudflare caps one variable or secret at 5 KB, so in practice the
-  list holds about 78 NodeIds (65 bytes each with the comma), well below the
-  1000-entry cap.
-- The Worker parses the secret once per isolate, with the app it caches.
-  `createDiscoveryIndex` takes it as `publishers`: `{ mode: 'open' }`,
-  `{ mode: 'allowlist', nodeIds }`, or undefined (closed).
+The deployed Worker always binds the database, so in production the mode is
+`registered` unless an allowlist secret is set. Deleting the allowlist secret
+therefore does not stop publishing: registered NodeIds keep publishing.
+
+The allowlist secret holds comma-separated lowercase 64-hex NodeIds, at most
+1,000 (Cloudflare's 5 KB secret limit allows fewer in practice). Whitespace
+around commas is ignored and duplicates collapse. A missing or empty value, or
+any malformed entry (uppercase, wrong length, an empty item such as a trailing
+comma, `*` mixed with NodeIds, too many entries), counts as no allowlist.
+NodeIds are public keys; the list is a secret only so that it lives outside the
+repository and changes without a commit. It is never logged or returned.
+
+Admission is a cheap check on the claimed `nodeId`, before the signature:
+
+1. An allowlisted NodeId is accepted without reading the registration tables.
+   Revoking a NodeId therefore has no effect while it stays on the allowlist.
+2. Otherwise, with the database bound, the index reads whether the NodeId's
+   registration is `active`.
+3. A refused NodeId gets `403 PUBLISH_NOT_ALLOWED` before signature
+   verification, any record storage read and the per-NodeId limit, so it
+   consumes no NodeId allowance.
+
+An admitted NodeId continues through the full path (signature, stale check,
+per-NodeId limit, references, caps), so the signature still proves the claim.
+Registered NodeIds count toward `maxNodes` like any other.
+
+`createDiscoveryIndex` takes the parsed allowlist as `publishers`
+(`{ mode: 'open' }`, `{ mode: 'allowlist', nodeIds }` or undefined) and the
+registration store as `registrations`. The Worker parses the secret once per
+isolate.
 
 ## Beta registration (invites)
 
-The beta replaces the allowlist with one-use invites (vault
-`20 Decisions/Alta de vendedores.md` §2). The seller registers its NodeId in the
-8004-solana registry, paying with its own wallet, then sends (with
-`gyblos seller register`;
-[running-a-node.md](running-a-node.md#seller-registration-beta-invite))
-`POST /v1/registrations` with `{"invite":"gyb_<26 base32>","nodeId":"<64 hex>"}`
-(JSON, at most 512 bytes).
+A seller is admitted with a one-use invite code:
 
-- **Order of checks:** per-IP and publish limits, content type, size and strict
-  shape (`400 INVALID_REGISTRATION`). The invite comes next, so without a usable
-  invite (or the one that admitted that NodeId) nothing reveals whether a NodeId
-  is registered: an unknown, expired or already spent invite is
-  `403 INVITE_INVALID`, before the chain is read. A retry with the invite that
-  already admitted this NodeId answers `200 {"ok":true,"status":"active"}`, or
-  `403 NODE_REVOKED` once revoked, without reading the chain. Then the registry
-  is read through the RPC secret: no binding for the NodeId is
-  `403 IDENTITY_NOT_REGISTERED`; an RPC outage or a binding for another NodeId
-  is `503 DISCOVERY_UNAVAILABLE`. A NodeId already active answers `200` and a
-  revoked one `403 NODE_REVOKED`. None of these spends the invite, so a holder
-  of a usable invite can learn the status of NodeIds bound on chain until it is
-  spent or expires (one RPC read each, per-IP limited). Success is
-  `201 {"ok":true,"status":"active"}`.
-- **What is stored** (migration `0003_registrations.sql`): the invite's SHA-256
-  (never the code), the contact it was issued to, its creation, expiry and use
-  time and the NodeId it admitted; for the NodeId, the owner and asset the
-  registry bound (from the chain, not the request), `active` or `revoked`, and
-  the two-letter country Cloudflare derives from the request IP, when present
-  (the vault decision; it is joinable to the invite's contact). No IP or IP
-  fingerprint.
-- **Invites and revocation** are founder commands that write to the remote D1
-  through a Wrangler login; the index has no admin route:
+1. The seller registers its NodeId in the 8004 agent registry, paying with its
+   own wallet.
+2. The seller sends the invite code with `gyblos seller register` (see
+   [running-a-node.md](running-a-node.md#seller-registration-beta-invite)). The
+   client posts `{"invite":"gyb_<26 base32>","nodeId":"<64 hex>"}` to
+   `POST /v1/registrations` (JSON, at most 512 bytes).
+3. The index reads the registry itself and stores the NodeId as `active`.
 
-  ```sh
-  pnpm index:invite --contact seller@example.com   # prints a gyb_… code, valid 14 days (--days 1-90)
-  pnpm index:revoke <NodeId>                       # its publishes and registrations are refused
-  pnpm index:restore <NodeId>                      # readmits a revoked NodeId; invites never do
-  ```
+The index checks the request in this order:
 
-  Add `--dry-run` to print the SQL instead. The code is printed once and cannot
-  be shown again.
+1. Per-IP and publish rate limits, then content type, size and strict shape. A
+   malformed request is `400 INVALID_REGISTRATION`.
+2. The invite code. An unknown, expired or spent code is `403 INVITE_INVALID`,
+   before the chain is read. Without a usable code, nothing reveals whether a
+   NodeId is registered.
+3. A retry with the code that already admitted this NodeId answers
+   `200 {"ok":true,"status":"active"}`, or `403 NODE_REVOKED` once revoked,
+   without reading the chain.
+4. The registry, through the RPC secret. No binding for the NodeId is
+   `403 IDENTITY_NOT_REGISTERED`. An RPC outage, or a binding for another
+   NodeId, is `503 DISCOVERY_UNAVAILABLE`.
+5. A NodeId already active answers `200`; a revoked one `403 NODE_REVOKED`.
+6. Success spends the code: `201 {"ok":true,"status":"active"}`.
+
+Steps 3 to 5 do not spend the code. A holder of a usable code can therefore
+learn the status of NodeIds bound on chain until the code is spent or expires,
+at one RPC read per request, limited per IP.
+
+What the index stores (migration `0003_registrations.sql`):
+
+- for the invite code: its SHA-256 (never the code), the contact it was issued
+  to, its creation, expiry and use times, and the NodeId it admitted;
+- for the NodeId: the owner and asset the registry bound (read from the chain,
+  not the request), `active` or `revoked`, and the two-letter country Cloudflare
+  derives from the request IP, when present. The country can be joined to the
+  invite's contact.
+
+No IP address or IP fingerprint is stored.
+
+The index has no admin route. Maintainers issue invite codes (valid 14 days by
+default, 1 to 90), revoke NodeIds and readmit them with
+`apps/discovery-index/scripts/admin.ts` (`pnpm index:invite`,
+`pnpm index:revoke`, `pnpm index:restore`), which write to the remote database
+through Wrangler. A revoked NodeId's publishes and registrations are refused; an
+invite code never readmits it. `--dry-run` prints the compiled SQL without
+running anything.
+
+Registration needs two more pieces of configuration:
 
 - **RPC secret:** `DISCOVERY_SOLANA_RPC_URL`, a devnet RPC URL. The reader
-  refuses query strings, so the provider key must be in the path (Alchemy- or
-  QuickNode-style URLs; a `?api-key=` URL is refused). Without it the route
-  answers 503. The public `api.devnet.solana.com` answers 403 to Workers.
+  refuses query strings, so a provider key must be in the URL path; a
+  `?api-key=` URL is refused. Without the secret, `/v1/registrations` answers
+  `503`. The public `api.devnet.solana.com` answers `403` to Workers.
 - **Workers runtime:** the reader comes from `@gyblos/identity`, which pulls
-  `@gyblos/config`; the Worker sets `nodejs_compat` for its Node path helpers,
+  `@gyblos/config`. The Worker sets `nodejs_compat` for its Node path helpers,
   and maps the reader's `redirect: 'error'` (unsupported on Workers) to
   `manual`, so a redirect is refused as a non-OK response.
 
@@ -141,88 +155,81 @@ The beta replaces the allowlist with one-use invites (vault
 The index is an untrusted cache. Acceptance proves only that the NodeId key
 signed a record; clients re-verify everything.
 
-- **Fail closed:** without the `DISCOVERY_DB` binding or any of the three
+- **Fail closed.** Without the `DISCOVERY_DB` binding or any of the three
   rate-limit bindings, every route answers `503 DISCOVERY_UNAVAILABLE`, as does
-  any storage failure. Without a valid publish allowlist, only publishing is
-  `503`. Errors are static codes; input is never echoed, and nothing is logged.
-- **Development relaxation:** `createDiscoveryIndex({ development: true })`
-  replaces missing limiters with in-memory counters and accepts plain `http`,
-  only for requests to a loopback host, and never relaxes storage or the publish
-  allowlist. The Worker entry (`src/worker.ts`) always passes
-  `development: false`, so a local `wrangler dev` needs
-  `--local-protocol https`.
-- **Rate limits:** `DISCOVERY_IP_LIMITER` on every request and
-  `DISCOVERY_PUBLISH_LIMITER` on publishes, keyed by client address (IPv4 by
-  full address, IPv6 by its /64 prefix). A limiter that refuses or fails is
-  `429 RATE_LIMITED` with `Retry-After: 60`. NodeId publishing uses a separate
-  storage-backed budget: ten accepted records per fixed UTC minute, shared
-  across Worker isolates and locations. Its counter advances atomically with the
-  high-water mark; rejected, stale and concurrent duplicate records consume no
-  NodeId allowance. Delayed requests cannot move its window backwards. The old
-  `DISCOVERY_NODE_LIMITER` binding is no longer used. Explicit development apps
-  on loopback retain their previous allowance of 120 accepted records per NodeId
-  per minute, using the same atomic counter. The development flag does not raise
-  the ten-record allowance on other hosts; the deployed Worker always disables
-  development mode.
-- **Global read cap:** `DISCOVERY_READ_LIMITER` (300 per 60 seconds, constant
-  key `global`) is consumed only by storage reads: a `GET /v1/sellers`,
-  `/v1/models` or `/v1/uptime` cache miss and a `/v1/health` whose cached count
-  is stale. Cache hits and fresh health counts never consume it, so many cursors
-  or clients cannot multiply D1 reads past it. Cloudflare counts rate limits per
-  location, so this is a cap per Cloudflare location, not an exact worldwide
-  one; a Durable Object counter would be the exact alternative if that is ever
-  needed. Any well-formed cursor, `limit` or `model` makes a cache miss, so a
-  few clients at one location can spend its budget; the other clients there then
-  get `429` on uncached pages for up to 60 seconds while cached pages keep
-  serving. This is the accepted cost of one shared key. Its `429` is `no-store`
-  and never enters the response cache. The per-IP limit still applies first to
-  every request.
-- **Publish order:** per-IP limit, the 34816-byte body cap (`413`), publish
-  limit, content type, strict JSON, the allowlist check on the claimed NodeId
+  any storage failure. Errors are static codes; input is never echoed and
+  nothing is logged.
+- **Development relaxation.** `createDiscoveryIndex({ development: true })`
+  replaces missing limiters with in-memory counters (120 accepted records per
+  NodeId per minute) and accepts `http`, only for requests to a loopback host.
+  It never relaxes storage or publish admission. The Worker entry
+  (`src/worker.ts`) always passes `development: false`, so a local
+  `wrangler dev` needs `--local-protocol https`.
+- **Publish order.** Per-IP limit, the 34,816-byte body cap (`413`), publish
+  limit, content type, strict JSON, the admission check on the claimed NodeId
   (`403`), then shape, lifetime and the self-signature. Only then is the stored
-  high-water mark checked: stale replays are `409`. Catalog reference validation
-  follows, then the atomic write checks freshness, the current catalog, capacity
-  and the NodeId allowance together. Invalid references are `400` without
-  spending allowance; full NodeId budgets are `429` without advancing the
-  sequence. Unsigned junk never reaches storage admission.
-- **Strict JSON:** invalid UTF-8, a BOM, duplicate members, nesting deeper than
+  high-water mark checked: stale replays are `409`. Catalog references follow,
+  then one atomic write checks freshness, the current catalog, capacity and the
+  NodeId allowance together. Invalid references are `400` without spending
+  allowance; a full NodeId budget is `429` without advancing the sequence.
+- **Strict JSON.** Invalid UTF-8, a BOM, duplicate members, nesting deeper than
   16, non-canonical or unsafe numbers, `-0` and bad escapes are
-  `400 INVALID_RECORD`. The signed envelope must be posted compact (no padding,
-  no needless escapes) and is stored and served byte-for-byte as posted.
-- **Sequence and references:** one high-water mark per NodeId shared by all
+  `400 INVALID_RECORD`. Post the signed envelope compact (no padding, no
+  needless escapes); it is stored and served byte-for-byte as posted.
+- **Sequence and references.** One high-water mark per NodeId, shared by all
   three kinds, kept for one maximum catalog lifetime past the record's expiry.
   Presence and withdrawal must reference the NodeId's current, live,
-  non-withdrawn stored catalog under `verifyPublicV2` reference rules, else
-  `UNKNOWN_CATALOG`. A withdrawal hides the seller; only a higher catalog
-  revives it. An expired withdrawal remains effective until its catalog expires
-  or is replaced; its signed lifetime does not shorten tombstone retention.
-- **Capacity:** at most 10,000 tracked NodeIds (new NodeIds beyond that are
-  `429`). Capacity and the current catalog reference are checked in the same
-  atomic write as the high-water update, including concurrent publishers and
-  changes to the allowlist. Expired rows are pruned when a new NodeId publishes,
-  at most once a minute per isolate, with index-only deletes. In open mode,
-  distributed publishers can fill and renew these slots, blocking admission of
-  new sellers. The cap bounds storage; it is not Sybil resistance. The index
-  keeps current records and accepted-presence slot history for the uptime
-  windows below. Those observations do not prove engine availability or measure
-  direct/relay transport quality.
-- **Privacy:** no IP address, header, session or request metadata is stored or
+  non-withdrawn catalog under `verifyPublicV2` reference rules, else
+  `UNKNOWN_CATALOG`. A withdrawal hides the seller until a higher catalog
+  arrives. An expired withdrawal stays effective until its catalog expires or is
+  replaced.
+- **Capacity.** At most 10,000 tracked NodeIds; a new NodeId beyond that is
+  `429`. Capacity and the current catalog are checked in the same atomic write
+  as the high-water update. Expired rows are pruned when a new NodeId publishes,
+  at most once a minute per isolate. In open mode, distributed publishers can
+  fill and renew these slots and block new sellers: the cap bounds storage; it
+  is not Sybil resistance.
+- **Privacy.** No IP address, header, session or request metadata is stored or
   logged; rate-limit keys go only to Cloudflare limiters.
+
+Rate limits:
+
+| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                        |
+| ----------------------------------- | --------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                      |
+| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                        |
+| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models` or `/v1/uptime` cache miss, a stale health count |
+| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                              |
+
+- A Cloudflare limiter that refuses or fails gives `429 RATE_LIMITED` with
+  `Retry-After: 60`. That `429` is `no-store` and never cached.
+- Cloudflare counts rate limits per location, so the read cap is per location,
+  not worldwide. Any well-formed cursor, `limit` or `model` misses the cache, so
+  a few clients at one location can spend its budget; the other clients there
+  then get `429` on uncached pages for up to 60 seconds while cached pages keep
+  serving.
+- The NodeId quota is shared across isolates and locations. Its counter advances
+  atomically with the high-water mark; rejected, stale and concurrent duplicate
+  records consume nothing, and delayed requests cannot move its window
+  backwards.
 
 ## Caching
 
-- **Sellers pages:** `GET /v1/sellers` answers
-  `Cache-Control: public, max-age=10`, and the Worker also keeps `200` pages in
-  the Workers Cache API (`caches.default`, per Cloudflare location) for those 10
-  seconds. The key is normalized from the parsed query: `cursor`, `limit` (the
-  effective value, so `limit=5000` and `limit=200` share it) and `model`, in
-  that order, on `/v1/sellers` of the request's origin. Invalid queries are
-  rejected before the cache, and errors, publishes and health are never cached.
-  CORS, `noindex` and `nosniff` headers are added to cached pages exactly as to
+- **Public reads.** `/v1/sellers`, `/v1/models` and `/v1/uptime` keep `200`
+  answers in the Workers Cache API (`caches.default`, per Cloudflare location)
+  for 10 seconds, matching their `max-age`. Keys are normalized:
+  - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
+    share an entry) and `model`, in that order;
+  - models: the route alone;
+  - uptime: `?node=<NodeId>`, however the query was spelled.
+
+  Invalid queries are rejected before the cache. Errors and publishes are never
+  cached. Cached answers get the same CORS, `noindex` and `nosniff` headers as
   fresh ones. A cache failure falls back to storage.
   `createDiscoveryIndex({ cache })` takes any object with `match(key)` and
   `put(key, response)`; without it there is no response cache.
-- **Health:** each isolate reuses its `records` count for 30 seconds and counts
+
+- **Health.** Each isolate reuses its `records` count for 30 seconds and counts
   again after it accepts a publish. `publish` always reflects the current mode.
 
 ## Uptime
@@ -230,20 +237,9 @@ signed a record; clients re-verify everything.
 Public seller uptime comes only from records the index already verified. Each
 UTC hour has one row per NodeId (`migrations/0004_uptime.sql`) with one bit per
 five-minute slot in which the index accepted a signed presence from that NodeId,
-at the index's own clock. Catalogs and withdrawals do not count. Reports read
-only the last 30 days, but rows are kept for `UPTIME.retentionDays` (about ten
-years) as network history; older rows are pruned at most once an hour per app
-instance, on the next accepted presence, separately from record pruning:
-retention holds even when no new NodeId publishes, and a failing uptime table
-never blocks a publish or the admission of a new NodeId.
+by the index's own clock. Catalogs and withdrawals do not count.
 
-Kept rows grow the shared D1 database: about 160 bytes per NodeId and hour, or
-about 1.4 MB per always-online NodeId per year. At 1,000 online sellers that is
-about 1.4 GB a year against the 10 GB D1 limit, and a full database fails every
-write, publishes included. Watch the database size; before it nears the limit,
-roll old hours into daily rows or move history to its own database.
-
-`GET /v1/uptime?node=<64 lowercase hex>` answers
+`GET /v1/uptime?node=<64 lowercase hex>` answers:
 
 ```json
 {
@@ -260,210 +256,111 @@ roll old hours into daily rows or move history to its own database.
 }
 ```
 
-`firstSeenAt` is the earliest presence recorded for the NodeId: one row per
-NodeId (`discovery_uptime_nodes`) outlives the retained hourly rows, so a seller
-back after a long absence is not reported as new and the absence counts in every
-window. Permanent uptime identities share the configured `maxNodes` capacity. At
-capacity, existing identities keep their history; new identities are omitted
-from uptime (404) while ordinary signed publication still succeeds. The capacity
-check and first-sighting/hourly writes are one D1 transaction. `lastSeenAt` is
-the last recorded presence, at five-minute resolution (each app instance writes
-a NodeId once per slot), or `null` when none falls within the last 30 days.
-`seen` counts slots with a presence and `slots` counts the window's slots up to
-and including the current one: a full day is 288 slots, so a seller online all
-day reports `1`. A window starts no earlier than `firstSeenAt`, so a new seller
-is not counted down for time before it existed. A NodeId never seen is
-`404 NOT_FOUND`; a malformed or repeated `node`, or any other parameter, is
-`400 INVALID_QUERY`. Answers are cached and CORS-readable like `/v1/models`,
-with one cache entry per NodeId however the query is spelled.
+- `firstSeenAt` is the earliest presence recorded for the NodeId. A separate row
+  per NodeId (`discovery_uptime_nodes`) outlives the hourly rows, so a seller
+  back after a long absence is not reported as new, and the absence counts in
+  every window.
+- `lastSeenAt` is the last recorded presence at five-minute resolution, or
+  `null` when none falls within the last 30 days.
+- `seen` counts slots with a presence; `slots` counts the window's slots up to
+  and including the current one. A full day is 288 slots, so a seller online all
+  day reports `1`. A window starts no earlier than `firstSeenAt`.
+- A NodeId never seen is `404 NOT_FOUND`. A malformed or repeated `node`, or any
+  other parameter, is `400 INVALID_QUERY`.
 
-Each app instance reserves a NodeId's slot before starting storage work, so
-concurrent refreshes share the pending write. A successful write is remembered
-for that slot, and the write is an idempotent bitwise OR. Uptime is best effort:
-a failed write still accepts the presence and releases the reservation, so a
-later accepted presence can retry that slot. Uptime says a seller was reachable
-through the index; it does not say its answers were correct or fast.
+Uptime says a seller was reachable through the index; it doesn't say its answers
+were correct or fast, and it doesn't measure direct or relay transport quality.
+
+Implementation rules:
+
+- Permanent uptime identities share the `maxNodes` capacity. At capacity,
+  existing identities keep their history; new identities are left out of uptime
+  (`404`) while their publication still succeeds. The capacity check and the
+  first-sighting and hourly writes are one D1 transaction.
+- Each app instance reserves a NodeId's slot before storage work, so concurrent
+  refreshes share the pending write, and writes a NodeId at most once per slot.
+  The write is an idempotent bitwise OR.
+- Uptime is best effort: a failed write still accepts the presence and releases
+  the reservation, so a later presence can retry that slot. A failing uptime
+  table never blocks a publish or a new NodeId.
+- Reports read only the last 30 days, but rows are kept for
+  `UPTIME.retentionDays` (about ten years) as network history. Older rows are
+  pruned at most once an hour per app instance, on the next accepted presence.
+
+Kept rows grow the shared D1 database by about 160 bytes per NodeId and hour, or
+about 1.4 MB per always-online NodeId per year. At 1,000 online sellers that is
+about 1.4 GB a year against the 10 GB D1 limit, and a full database fails every
+write, publishes included. Before the database nears the limit, roll old hours
+into daily rows or move history to its own database.
 
 ## Storage
 
-`src/storage.ts` defines the storage contract and an in-memory adapter (tests
-and local runs); `src/storage-d1.ts` is the D1 adapter using Drizzle ORM, pinned
-in the app manifest. `src/schema.ts` declares all nine tables, columns, primary
-keys, nine secondary indexes and eleven check constraints, including uptime.
-Both the D1 client and admin compiler use it. `storage-queries.ts`,
-`storage-writes.ts`, `registration-queries.ts` and `uptime-d1.ts` build every
-complete query through Drizzle. `d1-client.ts` executes only ORM-generated
-statements and native transactional batches, without an HTTP proxy or
-interactive transaction. Registration storage and founder invite/revoke/restore
-commands use the same ORM schema and mutation builders. Wrangler commands render
-bound values through Drizzle's SQLite dialect because the CLI accepts SQL rather
-than bind parameters. Schema changes start in `schema.ts`; its metadata is
-checked against the independently applied migrations. The existing migration
-chain is retained unchanged for D1 deployment history and physical
-`WITHOUT ROWID` layout, which Drizzle's SQLite table API does not represent. A
-publish is one D1 batch (one transaction) that admits the high-water mark and
-NodeId quota together before writing the corresponding public record. A failed
-batch rolls both back.
+- `src/storage.ts` defines the storage contract and an in-memory adapter for
+  tests and local runs. `src/storage-d1.ts` is the D1 adapter, using Drizzle ORM
+  (pinned in the app manifest).
+- `src/schema.ts` declares every table, column, key, secondary index and check
+  constraint, including registrations and uptime. Schema changes start there;
+  tests check its metadata against the migrations.
+- `storage-queries.ts`, `storage-writes.ts`, `registration-queries.ts` and
+  `uptime-d1.ts` build every query through Drizzle. `d1-client.ts` runs only
+  ORM-generated statements and native transactional batches. The admin script
+  uses the same schema and mutation builders, rendered through Drizzle's SQLite
+  dialect because the Wrangler CLI takes SQL rather than bind parameters.
+- A publish is one D1 batch (one transaction) that admits the high-water mark
+  and NodeId quota together before writing the record. A failed batch rolls both
+  back.
+- Listing is two-phase. A `page` CTE filters, sorts and limits only keys,
+  digests and times from covering indexes, then reads the signed JSON of the
+  page rows by primary key, at most `limit + 1` catalog and presence blobs.
+- Writes update in place: catalog, presence and withdrawal rows are upserted
+  under the high-water guard, and a catalog republish writes only the model ids
+  that changed. Model insertion binds at most 68 parameters for 64 models, below
+  [D1's limit of 100](https://developers.cloudflare.com/d1/platform/limits/).
 
 The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 
-| Expression               | Why it is retained with pinned Drizzle 0.45                                                                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `INDEXED BY`             | SQLite otherwise chooses primary tables containing signed JSON before pagination; the existing key-only `EXPLAIN` test enforces covering-index reads. SQLite index hints have no Drizzle builder. |
-| `(VALUES (1))`           | The SQLite select builder requires a `FROM` source. Initial admission must still check capacity and references atomically when all application tables are empty.                                  |
-| Two-argument `min`/`max` | Drizzle's functions are aggregates. The scalar operations preserve retention, quota windows and earliest/latest uptime sightings inside atomic updates.                                           |
-| `CASE`                   | No Drizzle conditional-expression builder is available. Quota increments/resets use the stored window atomically; uptime admission skips the capacity scan for existing identities.               |
-| `length`                 | No scalar builder is available. The schema must preserve the existing database text-length checks.                                                                                                |
-| Bitwise OR               | No SQLite bitwise builder is available. Concurrent uptime observations must combine their slot bits in the same database write.                                                                   |
+| Expression               | Why Drizzle can't express it                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `INDEXED BY`             | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it. |
+| `(VALUES (1))`           | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.       |
+| Two-argument `min`/`max` | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.    |
+| `CASE`                   | No conditional builder; quota resets and uptime admission use it atomically.                                                    |
+| `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
+| Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
 
-The same module's projection helpers interpolate only ORM columns, bound values
-and built-in predicates; they contain no SQL syntax. Model insertion uses a
-guarded ORM CTE and `unionAll`, with at most 68 bound parameters for 64 models,
-below
-[D1's limit of 100](https://developers.cloudflare.com/d1/platform/limits/). The
-admission CTE is limited to its single primary-key row, preventing SQLite from
-repeating the node lookup for every model. It preserves diff-only writes and
-rollback without `json_each` or a handwritten query. Counts use Drizzle
-aggregates while retaining strict runtime validation of the driver response.
-Test-only SQL remains for independent migration and query-plan inspection,
-synthetic fixtures and rollback fault injection.
+Migrations, applied in order:
 
-`migrations/0001_discovery_index.sql` creates the five tables and their indexes.
-The website's draft `0001` and `0002` (prune indexes) were never applied to any
-database, so they are combined into this one clean migration.
-`migrations/0002_listing_indexes.sql` changes indexes only (idempotent
-`CREATE INDEX IF NOT EXISTS` / `DROP INDEX IF EXISTS`): covering listing indexes
-on catalogs `(node_id, digest, issued_at, expires_at)`, presence
-`(node_id, catalog_digest, issued_at, expires_at)` and withdrawals
-`(node_id, catalog_digest)`, and it drops the unused
-`discovery_presence_by_issue`. Migration `0005_node_publish_quota.sql` adds the
-accepted-publication window and counter to `discovery_nodes`; rollout and
-rollback requirements are described below.
+| Migration                     | Adds                                                                         |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| `0001_discovery_index.sql`    | Record tables and their indexes.                                             |
+| `0002_listing_indexes.sql`    | Covering listing indexes (index-only; listing answers `503` without them).   |
+| `0003_registrations.sql`      | Invite and registration tables.                                              |
+| `0004_uptime.sql`             | Uptime tables.                                                               |
+| `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it). |
 
-- **Listing is two-phase.** A `page` CTE filters, sorts and limits only keys,
-  digests and times read from those covering indexes; the signed JSON of the
-  page rows is then read by primary key. The sort never carries a blob, and a
-  page reads at most `limit + 1` catalog and presence blobs. The query names the
-  indexes with `INDEXED BY` (D1 may have no statistics to choose them), so
-  `0002` must be applied before code that uses them is deployed; without it
-  listing answers `503`.
-- **Writes update in place.** Catalog, presence and withdrawal rows are upserted
-  (`ON CONFLICT (node_id) DO UPDATE`) under the same high-water guard, and a
-  catalog republish deletes and inserts only the model ids that changed, so an
-  unchanged model list writes no model row.
+Apply a migration before deploying code that needs it. Each migration adds
+tables, columns (with defaults) or indexes; `0002` also drops one unused index.
+The running version therefore keeps working while a migration applies, and a
+code rollback leaves the additions unused. Never edit an applied migration.
 
 Tests run the same HTTP cases against the in-memory adapter and a `node:sqlite`
 D1 double that applies every real migration in order
-(`tests/support/d1-sqlite.ts`), check the listing query plan and count written
-rows; CI needs no Cloudflare account.
+(`tests/support/d1-sqlite.ts`). They also check the listing query plan and count
+written rows, so CI needs no Cloudflare account.
 
 ## Operations
 
-The resources in `wrangler.jsonc` already exist. Do not recreate the database or
-replace its ID when updating this deployment. Every step below needs explicit
-founder approval. Run from `apps/discovery-index` after
-`pnpm install --frozen-lockfile` at the repository root. Wrangler is not a
-workspace dependency (it would add a large toolchain to the lockfile for a
-manual, rare step); use the version the website already pins:
+Deploying, applying remote migrations, changing secrets, rolling back and
+issuing invite codes for this service is a maintainer procedure kept outside the
+repository. The resource names and bindings are in
+`apps/discovery-index/wrangler.jsonc`. To check the deployed index:
 
 ```sh
-npx wrangler@4.151.1 login   # pick the account that holds the gyblos.com zone
-npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote
-# apply only pending migrations before deploying code that needs them
-npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote
-npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote
-npx wrangler@4.151.1 deploy
 curl -s https://discovery.gyblos.com/v1/health
-# expected: 200 with ok=true, the current record count and the configured publish mode
-# change the publish allowlist only when explicitly approved;
-# paste the full comma-separated approved NodeIds at the prompt;
-# this deploys a new version with the secret
-npx wrangler@4.151.1 secret put DISCOVERY_PUBLISH_ALLOWLIST
-curl -s https://discovery.gyblos.com/v1/health
-# expected: "publish":"allowlist" (or "open" if the value was `*`)
-curl -si https://discovery.gyblos.com/nope | grep -i x-robots-tag
-# expected: 404 with noindex
-curl -si 'https://discovery.gyblos.com/v1/sellers?model=x' | grep -i access-control
-# expected: Access-Control-Allow-Origin: *
 ```
 
-### Updating the deployed index
+The output is similar to the following:
 
-Apply new migrations before deploying the code that needs them (for `0002`, the
-listing query names its indexes). Migration `0002` only adds and drops indexes,
-so the running version keeps working while it applies:
-
-```sh
-npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote    # 0002 pending
-npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote
-npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote    # nothing pending
-npx wrangler@4.151.1 deploy
-curl -s https://discovery.gyblos.com/v1/health
-curl -s -o /dev/null -w '%{http_code}\n' 'https://discovery.gyblos.com/v1/sellers?model=x'
-# expected: 200
-curl -s http://discovery.gyblos.com/v1/health
-# expected: 400 {"error":"HTTPS_REQUIRED"} (unless the zone's Always Use HTTPS
-# redirects first; either way nothing is served over http)
+```text
+{"ok":true,"records":4,"publish":"registered"}
 ```
-
-For beta registration (migration `0003`, `nodejs_compat`, the RPC secret), apply
-the migration first; it only adds tables, so the running version keeps working.
-Keep the allowlist secret during the switch, so the allowlisted seller keeps
-publishing, and remove it once that seller is registered:
-
-```sh
-npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote   # 0003
-npx wrangler@4.151.1 deploy
-npx wrangler@4.151.1 secret put DISCOVERY_SOLANA_RPC_URL             # devnet URL, key in the path
-curl -s https://discovery.gyblos.com/v1/health                       # "publish":"allowlist" while the secret stays
-curl -s -X POST https://discovery.gyblos.com/v1/registrations \
-  -H 'content-type: application/json' -d '{"invite":"gyb_aaaaaaaaaaaaaaaaaaaaaaaaaa","nodeId":"'"$(printf 'ab%.0s' $(seq 32))"'"}'
-# expected: 403 {"error":"INVITE_INVALID"} (503 means the RPC secret is missing or refused)
-```
-
-Rolling that code back leaves the `0003` tables unused; nothing needs reverting.
-
-Public uptime (migration `0004`) follows the same order: apply the migration,
-then deploy. It only adds two uptime tables, so the running version keeps
-working, and rolling the code back leaves those tables unused.
-
-```sh
-npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote   # 0004
-npx wrangler@4.151.1 deploy
-curl -s "https://discovery.gyblos.com/v1/uptime?node=<a live seller NodeId>"  # 200 after its next presence
-```
-
-The global read limiter (`DISCOVERY_READ_LIMITER`, namespace `42621007`) ships
-in the same deploy as the code that requires it; deploying the code without the
-binding answers `503` everywhere. After deploying it, check that sellers pages
-still answer `200` and a repeat within 10 seconds is a cache hit. For a
-rollback, inspect `npx wrangler@4.151.1 deployments list` and select an approved
-compatible version with `npx wrangler@4.151.1 rollback <version-id>`; do not
-assume an old version from a previous feature rollout is compatible with today's
-bindings.
-
-Rolling the code back does not require reverting `0002`: earlier code names no
-index and no query used `discovery_presence_by_issue`.
-`migrations/0005_node_publish_quota.sql` adds the accepted-publication window
-and counter to `discovery_nodes`. Apply it before deploying this version;
-without it publishing fails closed with `503`. The columns have defaults, so
-older code remains compatible during rollout. When rolling back, retain the
-three remaining rate-limit bindings and restore `DISCOVERY_NODE_LIMITER` for any
-older Worker that still requires it. Do not revert the added columns. A rollback
-to the older Worker also restores its earlier per-location quota and concurrent
-duplicate-consumption behavior.
-
-Rollback: `npx wrangler@4.151.1 rollback` returns to the previous version (it
-asks for confirmation when secrets changed since that version; decline unless
-you mean to run the older code with the current secret); or comment out
-`d1_databases` (or a rate limit) and deploy again; the index then answers
-`503 DISCOVERY_UNAVAILABLE` everywhere without losing data. Removing the custom
-domain takes it offline entirely. Clients treat `503` as `DISCOVERY_UNAVAILABLE`
-and keep their own state.
-
-To change who may publish, run `secret put DISCOVERY_PUBLISH_ALLOWLIST` again
-with the full new list (it replaces the old value; do not rely on `rollback` to
-restore a previous list). Opening publishing later is the same command with the
-value `*`. To stop all publishing while keeping reads,
-`npx wrangler@4.151.1 secret delete DISCOVERY_PUBLISH_ALLOWLIST` (publishes then
-answer `503`).

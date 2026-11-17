@@ -1,13 +1,15 @@
 ---
-title: Problemas
-description: Encuentra soluciones seguras para fallos de instalación, configuración, motor y descubrimiento.
+title: Solución de problemas
+description: Encuentra tu síntoma o código de error y resuélvelo de forma segura, para el vendedor Docker o nativo, la app de escritorio y el comprador local.
 ---
 
-Esta página corresponde al vendedor gratuito de Docker de tu invitación. Ejecuta los comandos desde
-`~/gyblos-seller` o tu carpeta elegida. Lee el código exacto antes de cambiar nada. Conserva la identidad
-y los volúmenes existentes durante el diagnóstico.
+Busca el síntoma o el error exacto y sigue su solución. Mientras diagnosticas, conserva las llaves del
+vendedor, su carpeta home y los volúmenes Docker: borrarlos nunca arregla un vendedor y puede hacerle perder
+su identidad para siempre.
 
-## Diagnóstico [#empieza-por-el-estado-del-servicio]
+## Revisa el estado del vendedor [#empieza-por-el-estado-del-servicio]
+
+Para el vendedor Docker:
 
 ```sh
 cd ~/gyblos-seller
@@ -15,142 +17,181 @@ docker compose ps
 docker compose exec seller gyblos seller status
 ```
 
-Con `STARTING`, espera un momento y repite. Con `FAILING`, lee fase, código y consejo.
-Con `NOT_CONFIRMED`, comprueba si el contenedor está activo. Con `STOPPED`, inicia con
-`docker compose up -d --force-recreate seller`. `RUNNING` no demuestra publicación ni una solicitud externa.
+Para el vendedor nativo:
 
-Si `exec` informa que el servicio está detenido o reiniciándose:
+```sh
+gyblos seller status
+```
+
+| Resultado       | Qué hacer                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------- |
+| `RUNNING`       | El vendedor está atendiendo. Eso no prueba que esté listado ni que un comprador haya llegado a él       |
+| `STARTING`      | Espera un momento y vuelve a revisar                                                                    |
+| `FAILING`       | Lee la fase, el código y la pista, y busca el código en esta página                                     |
+| `STOPPED`       | Docker: `docker compose up -d --force-recreate seller`. Nativo: vuelve a ejecutar el instalador         |
+| `NOT_CONFIRMED` | Status no pudo confirmar el proceso: comprueba que el contenedor o el servicio esté realmente en marcha |
+
+Si `exec` dice que el servicio está detenido o reiniciándose, ejecuta doctor:
 
 ```sh
 cd ~/gyblos-seller
 docker compose run --rm seller gyblos doctor
 ```
 
-Doctor consulta dependencias y muestra identidad pública, códigos y consejos. Para el caso local predeterminado,
-comprueba primero Ollama. Usa `--online` solo cuando quieras añadir consultas remotas.
+Doctor prueba las dependencias del vendedor e imprime su identidad pública, con un código y una pista por cada
+fallo. Con la configuración por defecto, revisa primero Ollama. Añade `--online` solo si quieres que también
+contacte motores remotos y el índice de descubrimiento.
 
-## Instalación [#errores-de-instalación]
+## El instalador se detiene [#errores-de-instalación]
 
-### Docker
+Todos los errores del instalador empiezan por `gyblos install:`. Corrige la causa indicada y vuelve a ejecutar
+el instalador desde donde lo guardaste: conserva los archivos, las llaves y la identidad existentes, y sigue
+donde se detuvo.
 
-| Síntoma o salida exacta                                    | Solución                                                                                                  |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `Docker is not installed` o `Docker Compose v2 is missing` | Instala Docker con el plugin de Compose v2.17 o posterior siguiendo el proceso habitual de la plataforma. |
-| `Docker is not running`                                    | Inicia Docker Desktop o el servicio autorizado de Docker y repite el instalador.                          |
-| `Docker Compose … is too old`                              | Actualiza Docker o Compose a v2.17 o posterior.                                                           |
+### Docker [#docker]
 
-### Ollama
+| Salida exacta                                              | Solución                                                                                                                                                        |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Docker is not installed` o `Docker Compose v2 is missing` | Instala Docker con el plugin Compose, v2.17 o posterior                                                                                                         |
+| `Docker is not running, or this account may not use it`    | Arranca Docker Desktop o el servicio de Docker. En Linux, quizá la cuenta también necesite acceso a Docker; consulta los [requisitos](/es/getting-started/beta) |
+| `Docker Compose … is too old`                              | Actualiza Docker o Compose a v2.17 o posterior                                                                                                                  |
 
-| Síntoma o salida exacta | Solución                                                                                     |
-| ----------------------- | -------------------------------------------------------------------------------------------- |
-| `Ollama did not start`  | Revisa `docker compose logs ollama` en privado; comprueba memoria, disco y estado de Docker. |
+Si Docker está instalado pero esta cuenta no puede usarlo, una instalación nueva configura el vendedor nativo
+y lo avisa. Ejecuta `GYBLOS_MODE=docker sh install.sh` para forzar Docker.
 
-### Instalador
+### Ollama [#ollama]
 
-| Síntoma o salida exacta                                                                    | Solución                                                                                                                                                                                                            |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GYBLOS_RELAY_TOKEN has characters…` o `GYBLOS_RELAY_TOKEN must have 32 to 512 characters` | El token de relay opcional que definiste tiene un formato incorrecto. Los relays de Gyblos no lo necesitan: quita `GYBLOS_RELAY_TOKEN` y repite `sh install.sh`. No lo muestres ni lo pegues en el chat de soporte. |
-| `GYBLOS_RELAY_TOKEN holds the gyb_ invite code`                                            | Quita `GYBLOS_RELAY_TOKEN` y repite `sh install.sh`; introduce el código de invitación después con `gyblos seller register` ([Registra y publica](/es/sellers/register-publish)).                                   |
-| El instalador se detiene con `gyblos install:` o `FAIL`                                    | Corrige la causa indicada y repite `sh install.sh` donde lo guardaste. Se conservan archivos e identidad existentes.                                                                                                |
-| `The image signature did not verify`                                                       | No ejecutes esa imagen ni te saltes la comprobación. Descarga de nuevo el instalador desde `https://gyblos.com/install.sh` e informa la línea de la imagen en el [Telegram de Gyblos](https://t.me/gyblos).         |
+| Salida exacta                                                        | Solución                                                                                                          |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `Ollama did not start`                                               | Lee `docker compose logs ollama` en privado; revisa la memoria, el espacio en disco y el estado de Docker         |
+| `The seller serves its model with Ollama, which is not running here` | Instala Ollama desde [ollama.com/download](https://ollama.com/download), ábrelo y vuelve a ejecutar el instalador |
+| `Ollama could not pull qwen3:0.6b`                                   | Ejecuta `ollama pull qwen3:0.6b` y vuelve a ejecutar el instalador                                                |
 
-## Configuración [#configuración-rechazada]
+### Vendedor nativo [#errores-del-vendedor-nativo]
+
+| Salida exacta                                                    | Solución                                                                                               |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `The packaged seller needs glibc`                                | Alpine y otros sistemas musl usan el vendedor Docker: instala Docker y vuelve a ejecutar el instalador |
+| `Intel Macs install the seller with Docker`                      | Instala Docker Desktop y vuelve a ejecutar el instalador                                               |
+| `The seller is not ready; fix the failures above`                | Corrige cada fallo de doctor impreso arriba y vuelve a ejecutar el instalador                          |
+| `The background service could not be installed`                  | Corrige lo que imprimió el paso del servicio y vuelve a ejecutar el instalador                         |
+| `config.toml is changed, but the seller service did not restart` | Vuelve a ejecutar el instalador, o `gyblos seller service install`, para que el cambio se aplique      |
+
+### Cualquier instalación [#comprobaciones-del-instalador]
+
+| Salida exacta                                                                              | Solución                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GYBLOS_RELAY_TOKEN has characters…` o `GYBLOS_RELAY_TOKEN must have 32 to 512 characters` | El token de relay opcional que definiste está mal formado. Los relays de Gyblos no necesitan ninguno: quita `GYBLOS_RELAY_TOKEN` y vuelve a ejecutar el instalador. Nunca pegues el token en un chat |
+| `GYBLOS_RELAY_TOKEN holds the gyb_ invite code`                                            | Quita `GYBLOS_RELAY_TOKEN` y vuelve a ejecutar el instalador. Escribe el código de invitación después con `gyblos seller register` ([Registra y publica](/es/sellers/register-publish))              |
+| `The image signature did not verify`, o una descarga que no coincide con su checksum       | No ejecutes ese archivo ni te saltes la comprobación. Descarga de nuevo el instalador desde `https://gyblos.com/install.sh` y avísalo en el [Telegram de Gyblos](https://t.me/gyblos)                |
+
+## La configuración se rechaza [#configuración-rechazada]
 
 ```sh
 cd ~/gyblos-seller
 docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
-Usa la ruta de clave indicada, como `offers[0].free.per_buyer_cap`. Tras `OK`, ejecuta doctor si el inicio
-sigue rechazando el archivo. Consulta intervalos y valores en la [referencia de configuración](/es/reference/configuration).
+Corrige cada problema en la ruta de clave que indica, como `offers[0].free.per_buyer_cap`. Si el arranque
+sigue rechazando un archivo que valida, ejecuta doctor. Los valores por defecto y los rangos están en la
+[referencia de configuración](/es/reference/configuration).
 
-| Código / síntoma                                                                                          | Solución                                                                                                                                                                                                                 |
-| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `FILE_NOT_FOUND` al validar                                                                               | Usa la ruta explícita del contenedor indicada arriba. El validador ignora `GYBLOS_CONFIG` al seleccionar el archivo.                                                                                                     |
-| `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`                                                                | Corrige sintaxis, quita claves desconocidas o usa el tipo requerido. No dupliques `[discovery]` ni la oferta del mismo modelo.                                                                                           |
-| `INVALID_CAP`                                                                                             | Usa enteros positivos; la cuota por comprador no puede superar la total diaria.                                                                                                                                          |
-| `INVALID_LIMIT`                                                                                           | Respeta cada intervalo de capacidad y la restricción conexiones × tasa por comprador.                                                                                                                                    |
-| `INLINE_SECRET`                                                                                           | Quita la credencial de TOML; usa nombre de variable y archivo privado de entorno. Rota una credencial expuesta mediante su emisor.                                                                                       |
-| `RELAY_ONLY_CONFLICT`                                                                                     | Quita la dirección externa o desactiva relay-only; considera también las variables que prevalecen sobre el archivo.                                                                                                      |
-| `SELLER_SETTING_UNSUPPORTED`                                                                              | Quita `node.data_dir`, `node.rpc_url` o `node.payout_wallet` procedentes del archivo; este vendedor usa el aprovisionamiento de datos/rol existente.                                                                     |
-| `SELLER_OFFERS_MISSING`                                                                                   | Recupera al menos una oferta admitida. Una lista vacía válida para el esquema no puede servir.                                                                                                                           |
-| `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` | Vuelve a la oferta local admitida de Qwen3 con razonamiento `off` o revisa las restricciones antes de usar un motor avanzado.                                                                                            |
-| `SELLER_OFFER_API_KEY_MISSING`, `SELLER_OFFER_API_KEY_UNSAFE`                                             | Los proveedores avanzados necesitan la variable correcta no vacía dentro del contenedor; usa un nombre distinto que no empiece por `GYBLOS_` ni nombre el token de relay opcional.                                       |
-| `MAINNET_UNSUPPORTED`                                                                                     | Mantén esta instalación en devnet; mainnet no está abierta.                                                                                                                                                              |
-| `SELLER_PAYMENT_ROLE_MISSING`                                                                             | Faltan las llaves de pago: vuelve a ejecutar el instalador (conserva el NodeId y el dueño) y luego carga el pagador de comisiones. Mira [cobrar](/es/sellers/get-paid).                                                  |
-| `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`, `PAYMENT_ACCOUNTS_MISSING`, `PAYMENT_ACCOUNTS_UNCHECKED`           | Envía SOL de devnet a la dirección `fee payer` que muestra `gyblos doctor` y vuelve a intentar; el inicio crea las cuentas de token que falten (unos 0,002 SOL cada una). `UNCHECKED` significa que el RPC no respondió. |
-| `PAYMENT_ACCOUNTS_UNUSABLE`                                                                               | Una cuenta de token de pago o de comisión está congelada o no es una cuenta de token. No inicies una oferta con precio; contacta con Gyblos.                                                                             |
-| `SELLER_PAID_METERING_UNRECOUNTED`                                                                        | Hoy solo se puede poner precio a `qwen3:0.6b`. Usa `free` para otros modelos.                                                                                                                                            |
+| Código                                                                                                    | Solución                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FILE_NOT_FOUND` al validar                                                                               | Pasa la ruta de forma explícita, como arriba. El validador ignora `GYBLOS_CONFIG`                                                                                            |
+| `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`                                                                | Corrige la sintaxis, quita la clave desconocida o usa el tipo exigido. No repitas `[discovery]` ni la oferta de un modelo                                                    |
+| `INVALID_CAP`                                                                                             | Usa enteros positivos; el límite por comprador no puede superar el total diario                                                                                              |
+| `INVALID_LIMIT`                                                                                           | Mantén cada valor de capacidad en su rango, y conexiones × tasa por comprador dentro de la tasa global                                                                       |
+| `INLINE_SECRET`                                                                                           | Quita la credencial del TOML; nombra una variable y defínela en `seller.env`. Rota con su emisor una credencial expuesta                                                     |
+| `RELAY_ONLY_CONFLICT`                                                                                     | Quita la dirección externa o desactiva el modo solo relay, incluidas las variables de entorno                                                                                |
+| `SELLER_SETTING_UNSUPPORTED`                                                                              | Quita `node.data_dir`, `node.rpc_url` o `node.payout_wallet` del archivo                                                                                                     |
+| `SELLER_OFFERS_MISSING`                                                                                   | Vuelve a poner al menos una oferta admitida                                                                                                                                  |
+| `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` | Vuelve a la oferta local de Qwen3 con reasoning `off`, o revisa las [reglas de motores](/es/reference/configuration#compatibilidad-de-motores-al-iniciar)                    |
+| `SELLER_OFFER_API_KEY_MISSING`, `SELLER_OFFER_API_KEY_UNSAFE`                                             | Define la llave del proveedor en `seller.env`, con un nombre que no empiece por `GYBLOS_` y que no sea el del token de relay                                                 |
+| `MAINNET_UNSUPPORTED`                                                                                     | Mantén `network = "devnet"`; mainnet no está abierta                                                                                                                         |
+| `SELLER_PAYMENT_ROLE_MISSING`                                                                             | Faltan las llaves de pago: vuelve a ejecutar el instalador (conserva el NodeId y el dueño) y fondea el pagador de comisiones (`fee payer`) ([Cobrar](/es/sellers/get-paid))  |
+| `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`, `PAYMENT_ACCOUNTS_MISSING`, `PAYMENT_ACCOUNTS_UNCHECKED`           | Envía SOL de devnet a la dirección `fee payer` que imprime `gyblos doctor` y reintenta; el arranque crea las cuentas de token. `UNCHECKED` significa que el RPC no respondió |
+| `PAYMENT_ACCOUNTS_UNUSABLE`                                                                               | Una cuenta de token de cobro o de comisión está congelada o no es una cuenta de token. No arranques una oferta con precio; contacta a Gyblos                                 |
+| `SELLER_PAID_METERING_UNRECOUNTED`                                                                        | Solo `qwen3:0.6b` puede tener precio. Deja gratis los demás modelos                                                                                                          |
 
-## Conexión [#motor-o-relay-no-disponible]
+## El motor o el relay no está disponible [#motor-o-relay-no-disponible]
 
-### Motor
+### Motor [#motor]
 
-| Código / síntoma                                | Solución                                                                                                                   |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `ENGINE_UNAVAILABLE`, `ENGINE_TIMEOUT`          | Comprueba Ollama y que `qwen3:0.6b` esté descargado. Revisa sus logs en privado. Conserva la URL de loopback suministrada. |
-| El vendedor falla después de reiniciarse Ollama | Ejecuta `docker compose restart seller` y comprueba el estado; comparten espacio de red.                                   |
+| Código o síntoma                                 | Solución                                                                                                                                              |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ENGINE_UNAVAILABLE`, `ENGINE_TIMEOUT`           | Comprueba que Ollama funcione y que `qwen3:0.6b` esté descargado. Lee los logs de Ollama en privado. Conserva la URL del motor que puso el instalador |
+| El vendedor Docker falla tras reiniciarse Ollama | Ejecuta `docker compose restart seller` y revisa el estado: ambos comparten un mismo espacio de red                                                   |
 
-### Relay
+### Relay [#relay]
 
-| Código / síntoma       | Solución                                                                                                         |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `SELLER_RELAY_OFFLINE` | Ningún relay de Gyblos respondió en el plazo de inicio. Comprueba el acceso a internet (HTTPS y UDP 7842).       |
-| `CLOCK_SKEWED`         | Activa sincronización horaria automática en el anfitrión; los registros fechados en el futuro pueden rechazarse. |
+| Código o síntoma                                    | Solución                                                                                                                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SELLER_RELAY_OFFLINE`                              | Ningún relay de Gyblos respondió al arrancar. Comprueba el acceso a internet por HTTPS y por el puerto UDP 7842                                                     |
+| `INVALID_RELAY_TOKEN`, `INVALID_RELAY_TOKEN_LENGTH` | Los relays de Gyblos no necesitan token. Borra la línea `GYBLOS_RELAY_TOKEN` de `seller.env` en un editor privado, conserva las demás líneas y reinicia el vendedor |
 
-Los relays de Gyblos no necesitan token de relay. Si un `seller.env` antiguo todavía define `GYBLOS_RELAY_TOKEN`
-y el inicio informa `INVALID_RELAY_TOKEN` o `INVALID_RELAY_TOKEN_LENGTH`, detén el vendedor, abre `seller.env` en un
-editor local privado y borra solo esa línea. Conserva las credenciales de proveedores.
-Recrea con `docker compose up -d --force-recreate seller` para cargar el entorno cambiado. Nunca muestres
-el archivo, pongas su contenido en una línea de comando ni borres el volumen de datos.
+## Funciona pero no aparece listado [#funciona-pero-no-aparece-publicado]
 
-## Publicación [#funciona-pero-no-aparece-publicado]
+Sigue [Registra y publica](/es/sellers/register-publish): confirma el registro, `publish = true`, un reinicio
+tras la edición y luego `gyblos seller status --online`. Comprueba que consultas el mismo índice donde te
+registraste y que al menos una oferta está lista.
 
-### Registro
+### Registro [#registro]
 
-| Código de descubrimiento / observación | Solución o interpretación                                                                                                                                                                          |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DISCOVERY_IDENTITY_NOT_REGISTERED`    | Repite en terminal interactiva para la inscripción devnet. Revisa primero el coste y la aprobación en la guía de registro; owner necesita SOL de devnet. Conserva la invitación, que puede vencer. |
-| `REGISTER_IDENTITY_UNAVAILABLE`        | La inscripción no se completó: lee el consejo sobre SOL faltante, simulación o resultado incierto. Sigue la guía antes de repetir.                                                                 |
-| `REGISTER_CANCELLED`                   | Respondiste algo distinto de `yes` o `y`: no se firmó ni envió nada. Vuelve a ejecutar `gyblos seller register`.                                                                                   |
-| `DISCOVERY_INVITE_INVALID`             | Código incorrecto, usado o vencido; pide otro en el [Telegram de Gyblos](https://t.me/gyblos); no publiques el código anterior.                                                                    |
-| `DISCOVERY_NODE_REVOKED`               | Contacta con Gyblos; no generes otra identidad para saltarte la retirada.                                                                                                                          |
-| `DISCOVERY_RATE_LIMITED`               | Espera un minuto antes de repetir el registro.                                                                                                                                                     |
-| `DISCOVERY_UNAVAILABLE`                | Prueba más tarde o contacta con Gyblos. Comprueba el origen del índice antes de enviar una invitación.                                                                                             |
+| Código o salida                     | Significado y solución                                                                                                                             |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IDENTITY_NOT_REGISTERED` | Vuelve a ejecutar `gyblos seller register` en una terminal interactiva. El dueño necesita SOL de devnet; lee antes los pasos de costo y aprobación |
+| `REGISTER_IDENTITY_UNAVAILABLE`     | El registro no terminó: lee la pista sobre SOL faltante, la simulación o un resultado incierto antes de reintentar                                 |
+| `REGISTER_CANCELLED`                | Respondiste algo distinto de `yes` o `y`: no se firmó ni se envió nada. Vuelve a ejecutar `gyblos seller register`                                 |
+| `DISCOVERY_INVITE_INVALID`          | El código es incorrecto, ya se usó o venció. Pide uno nuevo en el [Telegram de Gyblos](https://t.me/gyblos); no publiques el código anterior       |
+| `DISCOVERY_NODE_REVOKED`            | Contacta a Gyblos. No crees otra identidad para saltarte la baja                                                                                   |
+| `DISCOVERY_RATE_LIMITED`            | Espera un minuto antes de reintentar                                                                                                               |
+| `DISCOVERY_UNAVAILABLE`             | Inténtalo más tarde o contacta a Gyblos. Revisa el índice configurado antes de enviar una invitación                                               |
 
-Repetir el registro comprueba el estado guardado y puede reenviar la misma transacción ya aprobada
-sin otra pregunta. Conserva archivos y bloqueos. El vencimiento por sí solo no demuestra ausencia de
-transacción o comisión; un estado parcial/inconcluso necesita ayuda. Lee los [límites de recuperación
-del registro](/es/sellers/register-publish) antes de repetir. Nunca borres estado para forzar otro intento.
+Repetir `register` revisa su estado guardado y puede reenviar la transacción que ya aprobaste. Conserva todos
+los archivos y locks. Lee los [límites de recuperación](/es/sellers/register-publish) antes de ejecutarlo de
+nuevo, y nunca borres estado para forzar otro intento.
 
-### Visibilidad
+### Visibilidad [#visibilidad]
 
-Sigue [Registra y publica](/es/sellers/register-publish): confirma registro, `publish = true`, recreación
-tras el cambio y después `seller status --online`. Comprueba que consultas el índice donde te registraste
-y que al menos una oferta esté lista.
+Si el vendedor está registrado y tiene `publish = true`, pero `gyblos seller status --online` sigue sin mostrarlo listado:
 
-| Código de descubrimiento / observación | Solución o interpretación                                                             |
-| -------------------------------------- | ------------------------------------------------------------------------------------- |
-| `not in the first 2000 sellers`        | Se agotó el límite de búsqueda; no demuestra ausencia.                                |
-| `index unreachable`                    | Estado de publicación desconocido; resuelve conectividad antes de sacar conclusiones. |
+| Código o salida                                          | Significado y solución                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `not found in the index` dos minutos después de arrancar | Durante la beta solo se listan vendedores cuya identidad canjeó una invitación. Comprueba que `gyblos seller register` mostró `Registered` o `Already registered` para esta identidad, o ejecútalo de nuevo. Si lo mostró, pide ayuda en el [Telegram de Gyblos](https://t.me/gyblos) con tu NodeId público, nunca con el código de invitación |
+| `not in the first 2000 sellers`                          | La búsqueda se detuvo antes; eso no prueba que el vendedor no esté                                                                                                                                                                                                                                                                             |
+| `index unreachable`                                      | No se sabe si está listado; arregla primero la conectividad                                                                                                                                                                                                                                                                                    |
+| `CLOCK_SKEWED`                                           | Activa la sincronización automática de la hora; el índice puede rechazar registros con fecha futura                                                                                                                                                                                                                                            |
 
-## Solicitudes [#solicitudes-gratuitas-rechazadas-o-sin-actividad]
+## Las solicitudes se rechazan o no hay actividad [#solicitudes-gratuitas-rechazadas-o-sin-actividad]
 
-La oferta reserva entrada más salida máxima en la admisión. Una solicitud puede superar el saldo diario
-o por comprador aunque queden tokens. La capacidad y el límite de compradores distintos también pueden
-rechazar solicitudes. Revisa [Modelos y ofertas](/es/sellers/models-offers); no reinicies para saltarte cuotas.
-Una publicación no genera demanda por sí sola y el resumen de recibos de 24 horas no es un saldo de cuotas.
+Cuando llega una solicitud, una oferta reserva su entrada más su salida máxima. Por eso una solicitud puede
+rechazarse aunque quede algo de la cuota diaria o por comprador. Los límites de capacidad y de compradores
+distintos también pueden rechazar solicitudes. Revisa [Cambia modelos y límites](/es/sellers/models-offers);
+no reinicies para saltarte un límite. Aparecer listado no trae compradores por sí solo.
 
-## Identidad y recuperación [#llaves-ausentes-estado-corrupto-o-bloqueos]
+## Faltan llaves, el estado está dañado o hay locks [#llaves-ausentes-estado-corrupto-o-bloqueos]
 
-Conserva el volumen y pide ayuda. No borres bloqueos de secuencia, journals, archivos de rol ni llaves para
-superar comprobaciones. No repitas setup en otro directorio de datos ni uses `docker compose down -v`.
-Aquí no se documenta una restauración completa; consulta [Identidad y datos privados](/es/sellers/identity).
+Deja el volumen o la carpeta home como está y pide ayuda. No borres un lock, un journal, un archivo de rol ni
+una llave para que una comprobación pase, no ejecutes setup en otro home y nunca ejecutes
+`docker compose down -v`. Consulta [Identidad](/es/sellers/identity).
 
-## Pide ayuda [#pide-ayuda-de-forma-segura]
+## App de escritorio y comprador local [#escritorio-y-comprador-local]
 
-Escribe en el [Telegram de Gyblos](https://t.me/gyblos) con el código relevante y estas salidas. El grupo es público:
-todos sus miembros pueden leer lo que publiques.
+| Síntoma o salida exacta                                                                        | Solución                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS dice que no puede verificar al desarrollador, o Windows muestra "Windows protegió su PC" | Es lo esperado con la app de la beta sin firmar; sigue los [pasos de la primera vez](/es/buyers/desktop-app#instalar)                                                        |
+| La billetera aparece como **Locked**                                                           | Es lo esperado hasta que la desbloquees; el chat gratis no la necesita. Para usarla, consulta [Billetera protegida](/es/buyers/desktop-app#billetera-protegida)              |
+| La billetera aparece como **Not available**                                                    | macOS: permite "Gyblos Safe Storage" en el diálogo del llavero. Linux: arranca GNOME Keyring o KWallet y reinicia la app. Después elige otra vez **Set up or unlock wallet** |
+| `Local buyer is unavailable`                                                                   | Elige **Payments → Retry local buyer**. Solo reintenta el arranque                                                                                                           |
+| Una respuesta falla con HTTP 503, o no hay vendedor disponible                                 | Ahora no hay ningún vendedor registrado en línea para ese modelo. Espera y vuelve a intentarlo; comprueba que llegas a internet                                              |
+| Un error dice que el vendedor fue demasiado lento (`engine_timeout`)                           | Envía el mensaje de nuevo; normalmente responde otro vendedor. Con un agente de código, también puedes acortar o compactar la conversación                                   |
+| `An unfinished payment needs review. New messages are blocked.`                                | Abre **Payments** y revisa el pago. No borres datos de la app para desbloquearlo; pide ayuda si sigue sin resolverse                                                         |
+
+## Pide ayuda de forma segura [#pide-ayuda-de-forma-segura]
+
+Escribe en el [Telegram de Gyblos](https://t.me/gyblos) con el código de error y estas salidas. El grupo es
+público: cualquiera que esté en él puede leer lo que publiques.
 
 ```sh
 cd ~/gyblos-seller
@@ -158,5 +199,7 @@ docker compose exec seller gyblos seller status
 docker compose images seller
 ```
 
-Si `exec` no está disponible, comparte el código relevante de doctor. Revisa la salida antes de enviarla.
-No envíes `seller.env`, códigos de invitación, logs completos, volcados del entorno, `docker inspect`, recibos ni volúmenes.
+Con un vendedor nativo, envía la salida de `gyblos seller status` y `gyblos --version`. Si status no
+funciona, envía el código de doctor. Revisa la salida antes de enviarla. Nunca envíes `seller.env`, códigos de
+invitación, logs sin procesar, volcados del entorno, la salida de `docker inspect`, recibos, archivos de llaves
+ni el contenido de volúmenes.

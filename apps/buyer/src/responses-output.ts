@@ -17,6 +17,7 @@ import {
   type ChatResult,
   type ChatStreamFormat,
 } from './free-sse';
+import { slowSellerMessage } from './slow-seller';
 
 const hexId = (prefix: string) =>
   `${prefix}_${randomUUID().replaceAll('-', '')}`;
@@ -153,7 +154,7 @@ const failed = (
   output: [],
   error: {
     code: RESPONSES_CODES.stopped,
-    message: RESPONSES_CODES.stoppedMessage(code),
+    message: slowSellerMessage(stop) ?? RESPONSES_CODES.stoppedMessage(code),
     [RESPONSES_CODES.field]: code,
     ...(stop.reason ? { reason: stop.reason } : {}),
   },

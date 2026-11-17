@@ -1,10 +1,6 @@
 {
   "title": "Referencia",
-  "pages": [
-    "cli",
-    "configuration",
-    "[Integración avanzada](/es/buyers/use-from-code)"
-  ],
+  "pages": ["cli", "configuration", "data-and-privacy"],
   "defaultOpen": true,
   "icon": "book-open"
 }

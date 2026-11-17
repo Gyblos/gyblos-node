@@ -328,7 +328,11 @@ export function createOllama(
       await assertModel(input.signal);
       input.signal?.throwIfAborted();
       const deadline = AbortSignal.timeout(
-        generationDeadlineMs(generationTimeoutMs, input.maxTokens),
+        generationDeadlineMs(
+          generationTimeoutMs,
+          input.maxTokens,
+          input.inputTokens,
+        ),
       );
       const attempt: EngineAttempt = {
         caller: input.signal,
