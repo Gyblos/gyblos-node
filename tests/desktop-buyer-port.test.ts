@@ -11,15 +11,23 @@ import { home, role } from './support/buyer-init';
 
 function listen(options: { port: number }) {
   return startFreeBuyerHttp(
-    async () => { throw new Error('inference must not run'); },
-    { selection: { modelId: 'synthetic', variant: null, quantization: null }, maxTokens: 1 },
+    async () => {
+      throw new Error('inference must not run');
+    },
+    {
+      selection: { modelId: 'synthetic', variant: null, quantization: null },
+      maxTokens: 1,
+    },
     options,
   );
 }
 
 void test('desktop restarts keep the same dedicated agent API origin', async () => {
   const fixture = await home();
-  const options = { environment: fixture.environment, prepareRole: async () => role() };
+  const options = {
+    environment: fixture.environment,
+    prepareRole: async () => role(),
+  };
   try {
     const first = await startDesktopBuyer(options, listen);
     const original = new URL(first.url).origin;
@@ -42,12 +50,15 @@ void test('an occupied desktop API port fails closed without choosing a new orig
   const existing = await listen({ port: 4033 });
   let started: Awaited<ReturnType<typeof listen>> | undefined;
   try {
-    await assert.rejects(async () => {
-      started = await startDesktopBuyer(
-        { environment: fixture.environment, prepareRole: async () => role() },
-        listen,
-      );
-    }, { code: 'EADDRINUSE' });
+    await assert.rejects(
+      async () => {
+        started = await startDesktopBuyer(
+          { environment: fixture.environment, prepareRole: async () => role() },
+          listen,
+        );
+      },
+      { code: 'EADDRINUSE' },
+    );
   } finally {
     await started?.close();
     await existing.close();

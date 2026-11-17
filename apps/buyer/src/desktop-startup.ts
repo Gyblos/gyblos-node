@@ -1,5 +1,6 @@
 // Prepares the desktop's dedicated buyer home through the shared, exclusive initializer.
 // The caller owns the environment and role port; no state is replaced or network started here.
+import { PORTS } from '@gyblos/config';
 import {
   buyerInitDefaults,
   checkBuyerInit,
@@ -21,5 +22,5 @@ export async function startDesktopBuyer<Host>(
   start: (options: { port: number }) => Promise<Host>,
 ): Promise<Host> {
   await prepareDesktopBuyer(options);
-  return start({ port: 0 });
+  return start({ port: PORTS.desktopBuyer });
 }

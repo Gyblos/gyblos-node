@@ -17,11 +17,14 @@ export async function startBuyerWorker() {
   await runBuyerSidecar(
     port,
     () =>
-      startDesktopBuyer({
-        environment: process.env,
-        prepareRole: () =>
-          setupRole({ role: P2P_ROLES.BUYER, mint: DEVNET_USDC }),
-      }, startBuyer),
+      startDesktopBuyer(
+        {
+          environment: process.env,
+          prepareRole: () =>
+            setupRole({ role: P2P_ROLES.BUYER, mint: DEVNET_USDC }),
+        },
+        startBuyer,
+      ),
     endpointToken,
     (code) => process.exit(code),
   );
