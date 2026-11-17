@@ -100,7 +100,9 @@ docker compose exec seller gyblos seller status --online
 docker compose exec seller gyblos seller register
 ```
 
-`seller status` is read-only. `--online` also looks up the seller's NodeId in the discovery index. The
+`seller status` is read-only. `--online` also looks up the seller's NodeId in the discovery index. While
+the index refuses or fails this seller's publication, the discovery line adds `publishing refused:` and a
+static code. The
 activity summary comes from signed receipts kept on the machine; it is not a quota balance. The
 `receipt queue` line shows receipts waiting to upload to the metrics collector, the bytes reserved for
 them and any rejected writes. `FULL` means new receipts can't be saved until some are uploaded. On a

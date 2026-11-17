@@ -128,7 +128,9 @@ On a native seller, run `gyblos seller status --online`. The discovery line repo
 | `not in the first N sellers of the index` | The lookup stopped early; the listing is unknown. |
 | `index unreachable`                       | The lookup failed; the listing is unknown.        |
 
-During the beta, the index lists only sellers whose identity redeemed an invitation. If the seller still
+During the beta, the index lists only sellers whose identity redeemed an invitation. When the index
+refuses your seller, `gyblos seller status` adds `publishing refused: DISCOVERY_PUBLISH_NOT_ALLOWED` to
+the discovery line (from beta.12; earlier releases don't show the reason). If the seller still
 shows `not found in the index` two minutes after it starts, check that `gyblos seller register` printed
 `Registered` or `Already registered` for this same identity, and run it again if it didn't. If it did and
 the seller is still not listed, ask in the [Gyblos Telegram](https://t.me/gyblos) with your public NodeId.
