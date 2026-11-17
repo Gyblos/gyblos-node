@@ -1,46 +1,49 @@
 ---
 title: App de escritorio
-description: Descarga la app de Gyblos para macOS, Windows o Linux, ábrela la primera vez y conversa con modelos de la red.
+description: Descarga la app de Gyblos para macOS, Windows o Linux, chatea con modelos que sirven los vendedores de Gyblos y conecta tus propias herramientas con una API key.
 ---
 
-Si quieres usar Gyblos como comprador, empieza aquí. Para la mayoría, la app de escritorio es la única
-configuración que necesitas. Arranca automáticamente en la carpeta privada de la app (`userData` como `GYBLOS_HOME`).
-No tienes que elegir una carpeta: funciona sin token de relay. Un perfil nuevo crea una configuración
-solo gratuita, con presupuesto y precios máximos en cero. Busca un vendedor registrado mediante discovery
-y verificación 8004 independiente. Conserva la configuración y los registros pendientes existentes.
+La app de escritorio de Gyblos te permite chatear con modelos que sirven los vendedores de la red Gyblos.
+Las respuestas de ofertas gratis no cuestan nada y no necesitan fondos en una billetera. Para la mayoría de
+los compradores, la app es todo lo que necesitas.
 
-## Descargar [#descargar]
+La app se configura sola la primera vez que la abres. Guarda sus datos en su propia carpeta privada
+(`userData`), funciona sin token de relay y empieza con un presupuesto de gasto en cero, así que nunca paga
+una respuesta salvo que tú lo autorices.
 
-Baja el archivo de tu sistema desde la
+## Descarga [#descargar]
+
+Descarga el archivo para tu sistema desde la
 [última versión](https://github.com/Gyblos/gyblos-node/releases/latest), en **Assets**:
 
 | Sistema                               | Archivo                                     |
 | ------------------------------------- | ------------------------------------------- |
-| macOS (Apple Silicon: M1 o más nuevo) | `gyblos-desktop-<versión>-darwin-arm64.zip` |
-| Windows 10/11 (x64)                   | `gyblos-desktop-<versión>-win32-x64.zip`    |
-| Linux (Ubuntu, Debian; x64)           | `gyblos-desktop-<versión>-linux-x64.deb`    |
-| Otro Linux (x64)                      | `gyblos-desktop-<versión>-linux-x64.tar.gz` |
+| macOS (Apple Silicon: M1 o más nuevo) | `gyblos-desktop-<version>-darwin-arm64.zip` |
+| Windows 10/11 (x64)                   | `gyblos-desktop-<version>-win32-x64.zip`    |
+| Linux (Ubuntu, Debian; x64)           | `gyblos-desktop-<version>-linux-x64.deb`    |
+| Otro Linux (x64)                      | `gyblos-desktop-<version>-linux-x64.tar.gz` |
 
-Todavía no hay versión para Mac con Intel. Cada archivo tiene un `.sha256` al lado; para comprobar una
-descarga, deja ambos en una carpeta y ejecuta `shasum -a 256 -c <archivo>.sha256` (macOS, Linux) o compara
-lo que muestra `certutil -hashfile <archivo> SHA256` (Windows).
+No hay versión para Mac con Intel. Cada archivo tiene al lado un archivo `.sha256`. Para comprobar una
+descarga, pon ambos en una carpeta y ejecuta `shasum -a 256 -c <file>.sha256` (macOS, Linux), o compara la
+salida de `certutil -hashfile <file> SHA256` (Windows).
 
-## Instalar y abrir la primera vez [#instalar]
+## Instala y ábrela por primera vez [#instalar]
 
-Durante la beta la app **no está firmada** por Apple ni Microsoft, así que tu sistema pregunta una vez antes
-de abrirla. Es normal; después de la primera vez se abre sin preguntar.
+Durante la beta, Apple y Microsoft no han firmado la app, así que tu sistema pregunta una vez antes de
+abrirla. Después se abre con normalidad.
 
 ### macOS [#macos]
 
 1. Abre el `.zip`, entra en `Gyblos-darwin-arm64` y arrastra **Gyblos.app** a **Aplicaciones**.
 2. Abre Gyblos. macOS dice que no puede verificar al desarrollador; elige **OK**.
-3. Abre **Configuración del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Gyblos y elige
-   **Abrir de todas formas**; confirma con tu contraseña.
-4. El chat se abre sin pedir desbloquear una wallet. Gyblos crea su carpeta de datos automáticamente;
-   no tienes que elegir ni abrir una carpeta.
+3. Abre **Configuración del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Gyblos, elige
+   **Abrir de todas formas** y confirma con tu contraseña.
+4. Se abre el Chat. La app crea su carpeta de datos sola; no eliges ni abres ninguna carpeta, y no te pide
+   desbloquear una billetera.
 
-El sistema puede repetir el aviso de instalación después de actualizar. El acceso a la wallet es
-una acción separada, explicada abajo; abrir la app no solicita «Gyblos Safe Storage».
+Después de una actualización, macOS puede volver a avisarte antes de abrir la app. Abrir la app nunca pide
+"Gyblos Safe Storage": el acceso a la billetera es un paso aparte, descrito en
+[Billetera protegida](#billetera-protegida).
 
 ### Windows [#windows]
 
@@ -59,54 +62,109 @@ sudo apt install ./gyblos-desktop-<version>-linux-x64.deb
 
 En otras distribuciones, descomprime el `.tar.gz` y ejecuta `./gyblos-desktop` dentro de la carpeta.
 
-## Cuando elijas usar la wallet protegida [#wallet-protegida]
+## Chat [#usarla]
 
-El chat gratuito no requiere desbloquear esta wallet. En **Payments → Wallet details**, elige
-**Set up or unlock wallet**. Gyblos explica lo que ocurrirá antes de consultar el almacenamiento
-seguro del sistema. Elige **Continue** para seguir o **Cancel** para conversar sin desbloquearla.
+1. Abre **Chat**.
+2. Escribe un mensaje y envíalo.
 
-En **macOS**, el llavero usa «Gyblos Safe Storage» para proteger la clave de cifrado de la wallet local. Escribe la
-contraseña de tu Mac solo en el diálogo de macOS, nunca en un formulario de Gyblos. En **Windows**, la
-protección normalmente funciona sin preguntas mediante tu cuenta de Windows. En **Linux**, GNOME
-Keyring o KWallet puede pedir desbloquearse; sin un almacén seguro compatible, la wallet permanece
-no disponible y no se guardan claves sin protección.
+La respuesta aparece a medida que llega el texto. La app busca un vendedor registrado que ofrezca el modelo
+gratis, comprueba su identidad y solo entonces envía tu mensaje. El modelo por defecto es `qwen3-0.6b`. La
+app necesita llegar al índice de descubrimiento, al RPC de Solana devnet y a la red; si no hay ningún
+vendedor disponible, recibes un error, nunca una respuesta inventada.
 
-Desbloquear no autoriza pagos ni habilita fondos. Esta wallet sigue separada de la identidad del
-comprador que usa el chat. Se conservan wallets y registros de recuperación existentes. Los selectores
-de respaldo aparecen solo al elegir guardar o restaurar un archivo. Si ya hay un diálogo del sistema
-abierto, cerrar la app puede esperar a que termine; respóndelo o cancélalo para finalizar con seguridad.
+Mientras una respuesta está en curso, el botón de enviar pasa a ser **Stop response**; también puedes pulsar
+**Esc**. Detenerla conserva el texto parcial y no reenvía tu mensaje. Una respuesta interrumpida no se marca
+como completa.
 
-## Usarla [#usarla]
+El vendedor que ejecuta el modelo puede leer tus mensajes, y también su proveedor de motor, si usa uno. No
+envíes contraseñas, llaves ni otros secretos. Consulta [Datos y privacidad](/es/reference/data-and-privacy).
 
-Abre **Chat**, escribe un mensaje y envíalo. El primer arranque prepara `buyer/` de forma privada en
-la carpeta de datos de la app, separada del CLI y del vendedor. El modelo inicial es `qwen3-0.6b`;
-necesita un vendedor verificado, disponible y gratuito para ese modelo. Discovery, la RPC de identidad
-y la red deben estar accesibles. Si no lo están, se muestra un error, nunca una respuesta simulada.
+## Usa Gyblos desde otras herramientas [#llaves-de-api]
 
-La respuesta aparece a medida que llega el texto. Durante la generación, el botón de enviar cambia a
-**Stop response**; también puedes pulsar **Esc**. Al detener, se conserva el texto parcial y no se
-reenvía el prompt. Una respuesta interrumpida no se marca como completa. Si el cobro de un pedido pagado
-sigue siendo incierto, permanece bloqueado para revisión en **Payments**: detenerlo no demuestra que
-no se haya cobrado.
+**Connections** da a tus propios programas y agentes de código acceso a Gyblos a través de la app, con una
+API key y un límite de gasto. Las herramientas pueden usar las API OpenAI Chat Completions, OpenAI Responses
+y Anthropic Messages.
 
-Estas respuestas gratuitas no requieren fondos ni transacciones. La identidad local del comprador
-es distinta de la wallet protegida que aparece en Settings. Una configuración o conexión de precio
-positivo sigue necesitando autorización explícita: el arranque no autoriza un presupuesto positivo
-ni borra registros pendientes.
+1. Abre **Connections**. Si te pide conectar tu comprador, elige **Go to Payments** y arranca ahí el
+   comprador local.
+2. En **Create an API key**, escribe un **Name** y un **Spend limit**, y elige **Create API key**. El límite
+   es el total que puede gastar esta llave, en USDC de devnet, sin reinicio automático. Un límite de `0`
+   permite solo modelos gratis.
+3. Elige **Copy Base URL** y **Copy API key**, y pega ambos en tu herramienta. Solo puedes copiar la llave en
+   la sesión de la app que la creó. Una herramienta que ya la tiene sigue funcionando después de reiniciar.
+4. Opcional: elige **Connect agent** para configurar OpenCode, pi, Codex CLI o Claude Code. La app muestra la
+   configuración y puede escribirla por ti, salvo para Claude Code, que copias en tu terminal. La
+   configuración lee la llave de la variable `GYBLOS_API_KEY`: defínela en la terminal que arranca el agente.
 
-Si falla el inicio, **Payments → Retry local buyer** permite reintentar solo el arranque. Una inferencia
-fallida nunca se reenvía automáticamente. Conectar otro comprador ya iniciado queda como opción avanzada.
+Mantén Gyblos abierto mientras tus herramientas lo usan. **Revoke key** detiene las solicitudes nuevas con
+esa llave; lo que ya gastó queda registrado. El Chat tiene su propio presupuesto y no usa el límite de una
+llave.
 
-La app busca actualizaciones al arrancar y cada cinco minutos mientras sigue abierta. Cuando se publica
-una versión de escritorio posterior para tu sistema, aparece un aviso de actualización.
-**View update** abre esa versión en GitHub; no descarga ni instala nada automáticamente. Esta consulta
-pública y acotada no envía tu identidad ni conversaciones. Los fallos de red son silenciosos; se puede
-desactivar con `GYBLOS_UPDATE_CHECK=0`.
+Para ejemplos con SDK, opciones admitidas y errores, consulta [Conecta tus herramientas de código](/es/buyers/use-from-code).
 
-El vendedor que ejecuta el modelo puede leer tus mensajes. El cifrado del transporte no los oculta
-frente a ese vendedor. No envíes contraseñas, claves ni otros secretos.
+## Pagos [#pagos]
 
-Para integraciones avanzadas, consulta [conectar Gyblos desde tu código](/es/buyers/use-from-code).
+Las respuestas gratis no necesitan fondos, transacciones ni billetera. La identidad del comprador local es
+distinta de la billetera protegida de **Payments**.
 
-¿Dudas o problemas? Escribe en el [Telegram de Gyblos](https://t.me/gyblos). El grupo es público; no publiques llaves,
-contraseñas ni conversaciones que quieras mantener privadas.
+Una respuesta con precio necesita un presupuesto que autorizas en **Payments**; la app nunca lo autoriza
+sola. Si el resultado de una solicitud pagada es incierto, la app bloquea los mensajes nuevos hasta que lo
+revises en **Payments**. Detener una respuesta no prueba que no hubo cobro.
+
+Si el comprador local no arranca, elige **Payments → Retry local buyer**. Eso solo reintenta el arranque: la
+app nunca reenvía sola un mensaje que falló. **Activity** guarda el historial de tus sesiones y sus
+referencias de pago.
+
+## Billetera protegida [#billetera-protegida]
+
+La billetera empieza bloqueada, y el chat gratis nunca la necesita. Para usarla:
+
+1. Abre **Payments → Wallet details** y elige **Set up or unlock wallet**.
+2. Gyblos te explica qué va a pasar antes de tocar el almacenamiento seguro de tu sistema. Elige
+   **Continue** para seguir, o **Cancel** para seguir chateando sin la billetera.
+3. Después tu sistema puede pedirte acceso:
+   - **macOS**: el llavero usa "Gyblos Safe Storage" para proteger la llave de cifrado de la billetera.
+     Escribe la contraseña de tu Mac solo en el diálogo de macOS, nunca en un formulario de Gyblos.
+   - **Windows**: la protección normalmente funciona con tu cuenta de Windows, sin preguntar.
+   - **Linux**: GNOME Keyring o KWallet puede pedirte desbloquearlo. Sin un almacén de secretos compatible,
+     la billetera queda no disponible; la app nunca guarda sus llaves sin protección.
+
+Desbloquearla no autoriza ningún pago ni habilita fondos. Las billeteras y los registros de recuperación que
+ya existen se conservan. La app solo te pide un archivo cuando eliges hacer una copia o restaurar la
+billetera. Si hay un diálogo del sistema abierto cuando cierras la app, puede esperar a que termine:
+respóndelo o cancélalo para terminar de cerrarla.
+
+## Actualizaciones [#actualizaciones]
+
+La app busca actualizaciones al iniciar y cada cinco minutos mientras sigue abierta. Cuando se publica una
+versión más nueva para tu sistema, muestra un aviso. **View update** abre esa versión en GitHub; la app nunca
+descarga ni instala nada por su cuenta. La búsqueda no envía identidad ni contenido de chats. Para
+desactivarla, consulta [Datos y privacidad](/es/reference/data-and-privacy#búsqueda-de-actualizaciones).
+
+## Dónde guarda tus datos la app [#datos]
+
+La app guarda tus conversaciones, tu actividad y su comprador local en una carpeta `gyblos-desktop`, y, cuando
+la configuras, su billetera en una carpeta `gyblos-wallet`, ambas dentro de la carpeta de datos de aplicaciones del sistema:
+
+| Sistema | Carpeta                         |
+| ------- | ------------------------------- |
+| macOS   | `~/Library/Application Support` |
+| Windows | `%APPDATA%`                     |
+| Linux   | `~/.config`                     |
+
+Las versiones publicadas también suben recibos firmados sin contenido y observaciones de telemetría;
+consulta [Datos y privacidad](/es/reference/data-and-privacy).
+
+Para desinstalarla, borra la app. Las carpetas de datos se quedan hasta que las borres.
+
+<Callout type="warn" title="Borrar gyblos-wallet borra tu billetera">
+  Borrar la carpeta `gyblos-wallet` elimina para siempre las llaves de la
+  billetera y los fondos que tengan. No se puede deshacer. Antes, haz una copia
+  de la billetera desde **Payments**, o conserva la carpeta.
+</Callout>
+
+## Ayuda [#ayuda]
+
+Consulta [Solución de problemas](/es/help/troubleshooting#escritorio-y-comprador-local), o escribe en el
+[Telegram de Gyblos](https://t.me/gyblos). El grupo es público: no publiques llaves, contraseñas ni
+conversaciones que quieras mantener privadas.

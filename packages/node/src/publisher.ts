@@ -22,7 +22,11 @@ export interface SellerPublisherOptions {
   now?: () => number;
   tickMs?: number;
   retryMs?: number;
+  // Called when the last publication error changes: its static code, or null once publishing works again.
+  onError?: (code: SellerPublicationError | null) => void;
 }
+export type SellerPublicationError =
+  DiscoveryErrorCode | typeof NODE_ERROR_CODES.DISCOVERY_PUBLISH_FAILED;
 function wait(milliseconds: number, signal: AbortSignal) {
   return new Promise<void>((resolve) => {
     if (signal.aborted) {
@@ -52,10 +56,7 @@ class SellerPublisher {
   private failures = 0;
   private retryAt = 0;
   private status: SellerPublicationState = SELLER_PUBLICATION_STATES.IDLE;
-  private lastError:
-    | DiscoveryErrorCode
-    | typeof NODE_ERROR_CODES.DISCOVERY_PUBLISH_FAILED
-    | null = null;
+  private lastError: SellerPublicationError | null = null;
   constructor(private readonly options: SellerPublisherOptions) {
     this.now = options.now ?? Date.now;
     this.tickMs = controlInteger(
@@ -76,12 +77,19 @@ class SellerPublisher {
       lastError: this.lastError,
     };
   }
+  private setError(code: SellerPublicationError | null) {
+    if (code === this.lastError) return;
+    this.lastError = code;
+    // Shutdown failures are not reported: the seller is going away and its status is no longer ready.
+    if (!this.stopped) this.options.onError?.(code);
+  }
   private failure(error?: unknown) {
     this.failures++;
-    this.lastError =
+    this.setError(
       error instanceof DiscoveryError
         ? error.code
-        : NODE_ERROR_CODES.DISCOVERY_PUBLISH_FAILED;
+        : NODE_ERROR_CODES.DISCOVERY_PUBLISH_FAILED,
+    );
     this.status = SELLER_PUBLICATION_STATES.DEGRADED;
     // Saturate the exponent as well as the delay, even after very long outages.
     const exponent = Math.min(
@@ -123,7 +131,7 @@ class SellerPublisher {
       this.forceCatalog = false;
       this.failures = 0;
       this.retryAt = 0;
-      this.lastError = null;
+      this.setError(null);
       this.status = SELLER_PUBLICATION_STATES.RUNNING;
       return true;
     } catch (error) {

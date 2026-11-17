@@ -17,6 +17,7 @@
     "./stats-read": "./src/stats-read.ts",
     "./stats-shape": "./src/stats-shape.ts",
     "./stats": "./src/stats.ts",
+    "./stats-chain": "./src/stats-chain.ts",
     "./chain/base58": "./src/chain/base58.ts",
     "./chain/channel-account": "./src/chain/channel-account.ts",
     "./chain/decode": "./src/chain/decode.ts",

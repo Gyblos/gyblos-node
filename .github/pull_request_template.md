@@ -14,10 +14,12 @@ passing result afterward. Documentation-only changes may mark this not applicabl
 
 ## Review and remaining risks
 
+- [ ] This PR targets `develop` (only release PRs target `main`).
 - [ ] I read the contribution guide and kept behavior changes separate from structural moves.
 - [ ] I reviewed the diff for secrets and sensitive data; it contains no real keys, prompts, responses, journals, wallet backups or payment payloads.
 - [ ] Documentation reflects the change, its limits and any unverified behavior.
+- [ ] Changed docs claims are verified against the current code, and every changed docs site page (`apps/docs`) has its English and Spanish files updated together.
 
 List remaining risks or decisions. Maintainers arrange the independent reviews
 and decide whether to merge. Contributors do not need private vault access or
-AI tooling, and are not responsible for hiring or coordinating reviewers.
+AI tooling, and are not responsible for arranging reviewers.
