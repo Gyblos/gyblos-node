@@ -113,6 +113,16 @@ export function parseUsdcApiState(input: unknown): UsdcApiState {
 export function usdcApiAmount(atomic: string, scope: BuyerKeyScope) {
   return `${x402Amount(atomic, scope)} ${scope.mint === DEVNET_USDC ? 'USDC' : 'atomic units'}`;
 }
+export function usdcApiKeyBadge(state: UsdcApiState, key: BuyerApiKeySummary) {
+  return key.revoked ? 'Revoked' : state.snapshot?.blocked ? 'Needs review' :
+    key.spentAtomic === key.limitAtomic ? 'Paid limit reached' : 'Active';
+}
+
+export interface UsdcApiSecret {
+  id: string;
+  policyId: string;
+  secret: string;
+}
 export function usdcApiKeyListDetail(
   state: UsdcApiState,
   key: BuyerApiKeySummary,

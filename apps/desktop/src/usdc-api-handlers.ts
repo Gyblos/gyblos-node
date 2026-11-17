@@ -13,6 +13,7 @@ import {
   emptyUsdcApi,
   USDC_API_ACTION,
   type UsdcApiState,
+  type UsdcApiSecret,
 } from './usdc-api-model';
 import type { X402Client } from './x402-client';
 
@@ -35,6 +36,9 @@ class UsdcApiHost {
   close() {
     this.closed = true;
     this.secrets.clear();
+  }
+  async reveal(_event: Sender, _args: readonly unknown[]): Promise<UsdcApiSecret> {
+    throw new Error('API key is unavailable');
   }
   private current() {
     const policy = this.client.policy();
