@@ -7,7 +7,6 @@ import {
   type StartupProgressBridge,
 } from '../startup-progress';
 import { prefersLightTheme, themeStyle } from '../theme';
-import { SignalMark } from './Signal';
 
 declare global {
   interface Window {
@@ -16,15 +15,22 @@ declare global {
 }
 
 export function StartupSplash() {
+  const light = prefersLightTheme();
   const [percentage, setPercentage] = useState<number>(STARTUP_PROGRESS.MIN);
   useEffect(() => {
     const bridge = window.desktopStartup;
     if (bridge) return observeStartupProgress(bridge, setPercentage);
   }, []);
   return (
-    <main className="startup-splash" style={themeStyle(prefersLightTheme())}>
+    <main className="startup-splash" style={themeStyle(light)}>
       <div className="startup-splash-brand">
-        <SignalMark /> Gyblos
+        <img
+          src={`./assets/startup-mark-${light ? 'light' : 'dark'}.svg`}
+          width={32}
+          height={32}
+          alt=""
+        />{' '}
+        Gyblos
       </div>
       <div
         className="startup-ascii"

@@ -17,10 +17,6 @@
   font-size: 15px;
   font-weight: 500;
 }
-.startup-splash-brand .signal-mark {
-  width: 32px;
-  height: 32px;
-}
 .startup-ascii {
   display: flex;
   margin: 24px 0 16px;
