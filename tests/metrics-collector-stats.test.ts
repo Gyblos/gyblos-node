@@ -193,7 +193,7 @@ void test('the default range is the last days up to today, each endpoint one bat
   assert.equal(answer.body.aggregatedAt, null);
   const batches = new Set(database.log.map((entry) => entry.batch));
   assert.equal(batches.size, 1);
-  assert.equal(database.log.length, 3);
+  assert.equal(database.log.length, 5);
 
   database.log.length = 0;
   await get(app, `/v1/stats/sellers/${SELLER_A}`);

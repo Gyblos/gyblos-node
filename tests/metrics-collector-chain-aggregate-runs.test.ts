@@ -158,9 +158,9 @@ void test('days indexed before the first chain scan are all aggregated', async (
   // The receipt scan cursor is already far past these rows; the chain scan has its own.
   database.raw
     .prepare(
-      'INSERT INTO collector_agg_state (id, scanned_at, formula_version) VALUES (1, ?, 1)',
+      'INSERT INTO collector_agg_state (id, scanned_at, formula_version) VALUES (1, ?, ?)',
     )
-    .run(DAY1 + 10 * DAY_MS);
+    .run(DAY1 + 10 * DAY_MS, AGGREGATES.formulaVersion);
   const result = await runAggregation(database, DAY1 + 10 * DAY_MS + 1);
   assert.deepEqual(result.chain.days, [day(DAY1)]);
   assert.equal(chainRows(database, 'program').length, 1);
@@ -269,7 +269,7 @@ void test('GET /v1/stats/chain answers every day with both scopes and the index 
     [
       '2026-11-01',
       '2026-11-03',
-      1,
+      AGGREGATES.formulaVersion,
       2000,
       DEVNET_USDC,
       { backfillDone: true, updatedAt: 1000 },

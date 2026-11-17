@@ -100,7 +100,7 @@ void test('a formula version change recomputes every day aggregated with another
   );
 });
 
-void test('a run is four reads, a receipt scan batch of 4, 17 statements per day and a chain scan batch of 4', async () => {
+void test('a run is four reads, a receipt scan batch of 4, 21 statements per day and a chain scan batch of 4', async () => {
   const database = createCollectorD1();
   insertReceipt(database);
   database.log.length = 0;
@@ -108,7 +108,7 @@ void test('a run is four reads, a receipt scan batch of 4, 17 statements per day
   const sizes = new Map<number, number>();
   for (const entry of database.log)
     sizes.set(entry.batch, (sizes.get(entry.batch) ?? 0) + 1);
-  assert.deepEqual([...sizes.values()], [4, 4, 17, 4]);
+  assert.deepEqual([...sizes.values()], [4, 4, 21, 4]);
 });
 
 void test('hourly rows hold their hour and are replaced when the day is recomputed', async () => {

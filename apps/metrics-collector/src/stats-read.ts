@@ -24,8 +24,10 @@ import type { DayRange } from './days';
 import {
   aggChainDaily,
   aggDemandDaily,
+  aggFailuresDaily,
   aggNetworkDaily,
   aggObservedDaily,
+  aggOriginDaily,
   aggSellerBuyersDaily,
   aggSellerDaily,
   chainCursor,
@@ -124,6 +126,27 @@ function network(orm: CollectorDatabase, range: DayRange) {
       .from(ranked)
       .where(lte(ranked.rank, AGGREGATES.maxPublicDemandPerDay))
       .orderBy(asc(ranked.day), asc(ranked.rank)),
+    orm
+      .select()
+      .from(aggOriginDaily)
+      .where(within(aggOriginDaily.day, range))
+      .orderBy(
+        asc(aggOriginDaily.day),
+        asc(aggOriginDaily.paid),
+        asc(aggOriginDaily.clientKind),
+      ),
+    orm
+      .select()
+      .from(aggFailuresDaily)
+      .where(within(aggFailuresDaily.day, range))
+      .orderBy(
+        asc(aggFailuresDaily.day),
+        desc(aggFailuresDaily.events),
+        asc(aggFailuresDaily.side),
+        asc(aggFailuresDaily.clientKind),
+        asc(aggFailuresDaily.event),
+        asc(aggFailuresDaily.reason),
+      ),
   ]);
 }
 
@@ -230,8 +253,11 @@ export function statsReader(database: D1Database): StatsReader {
   const orm = createD1Orm(database);
   return {
     async network(range) {
-      const [networkRows, observed, demand] = await network(orm, range);
-      return { network: networkRows, observed, demand };
+      const [networkRows, observed, demand, origins, failures] = await network(
+        orm,
+        range,
+      );
+      return { network: networkRows, observed, demand, origins, failures };
     },
     models: async (range) => models(orm, range),
     async seller(nodeId, range) {

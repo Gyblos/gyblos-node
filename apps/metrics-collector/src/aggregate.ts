@@ -15,6 +15,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 
+import { breakdownRollups } from './aggregate-breakdowns';
 import {
   runChainAggregation,
   type ChainAggregationResult,
@@ -46,6 +47,7 @@ import {
   aggDirtyDays,
   aggNetworkDaily,
   aggObservedDaily,
+  aggOriginDaily,
   aggSellerBuyersDaily,
   aggSellerDaily,
   aggSellerHourly,
@@ -75,7 +77,7 @@ function staleVersionMarks(
   database: CollectorDatabase,
   day: (value: ReturnType<typeof dayOf>) => { day: SQL.Aliased<string> },
 ): BatchItem[] {
-  return [aggSellerDaily, aggObservedDaily].map((table) =>
+  return [aggSellerDaily, aggObservedDaily, aggOriginDaily].map((table) =>
     database
       .insert(aggDirtyDays)
       .select(
@@ -293,6 +295,7 @@ export function dayBatch(
     ...networkRollup(database, bounds, now),
     ...observationRollups(database, bounds, now),
     ...firstSeenUpserts(database, bounds),
+    ...breakdownRollups(database, bounds, now),
   ];
 }
 
