@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./collector": "./lib/collector.ts",
+    "./collector-shape": "./lib/collector-shape.ts",
     "./latency": "./lib/latency.ts",
     "./offers": "./lib/offers.ts",
     "./payments": "./lib/payments.ts",

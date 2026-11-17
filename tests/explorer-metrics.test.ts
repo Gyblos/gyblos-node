@@ -7,7 +7,7 @@ import test from 'node:test';
 import {
   parseNetworkDay,
   type CollectorSnapshot,
-} from '@gyblos/explorer/collector';
+} from '@gyblos/explorer/collector-shape';
 import { mergedLatency, type Latency } from '@gyblos/explorer/latency';
 import { summarizeOffers } from '@gyblos/explorer/offers';
 import { ratioText, summarizePayments } from '@gyblos/explorer/payments';

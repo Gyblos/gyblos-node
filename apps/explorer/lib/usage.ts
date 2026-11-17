@@ -1,7 +1,7 @@
 // Owns what the Usage section computes over the collector's daily answers. Free and paid are never
 // added up: every figure is computed per side and shown as a "free · paid" pair. Percentiles come from
 // summed histograms, never from averaged percentiles. Pure functions, no I/O.
-import type { CollectorSnapshot, NetworkDay, Totals } from './collector';
+import type { CollectorSnapshot, NetworkDay, Totals } from './collector-shape';
 import { DISPLAY } from './constants';
 import { count, latencyMs, percent } from './format';
 import { mergedLatency } from './latency';

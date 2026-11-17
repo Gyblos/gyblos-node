@@ -11,7 +11,7 @@ import { connection } from 'next/server';
 import { GYBLOS_TREASURY, SOLANA_RPC_URL, TOKEN_PROGRAM } from './config';
 import { CACHE_LIFE, SOLANA_RPC } from './constants';
 import { classify, type Settlement } from './settlement';
-import { list, record, text } from './validate';
+import { list, record, SourceShapeError, text } from './validate';
 
 export type { Settlement } from './settlement';
 
@@ -161,6 +161,17 @@ async function listSignatures(): Promise<{
   return { listedAt: Date.now(), signatures: await treasurySignatures() };
 }
 
+// A transaction with an unexpected shape is stored as not a settlement, so it never stalls the rest.
+function readSettlement(tx: unknown): Stored | null {
+  try {
+    const settlement = classify(tx);
+    return settlement ? toStored(settlement) : null;
+  } catch (error) {
+    if (error instanceof SourceShapeError) return null;
+    throw error;
+  }
+}
+
 let filling: Promise<void> | null = null;
 // Fetches missing transactions one at a time in the background, respecting the rate limit.
 function fillMissing(signatures: string[]) {
@@ -176,10 +187,10 @@ function fillMissing(signatures: string[]) {
             commitment: 'confirmed',
           },
         ]);
-        const settlement = classify(tx);
-        await writeStored(signature, settlement ? toStored(settlement) : null);
+        await writeStored(signature, readSettlement(tx));
         await sleep(SOLANA_RPC.fillSpacingMs);
       } catch {
+        // An RPC failure (rate limit, network): stop and continue on the next request.
         break;
       }
     }
