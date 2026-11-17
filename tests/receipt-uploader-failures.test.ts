@@ -145,7 +145,7 @@ void test('one bad receipt is skipped while the others upload; a rate limit mid-
   }
 });
 
-void test('close() aborts an upload in flight and leaves receipts pending', async () => {
+void test('close() aborts an upload still in flight at the flush deadline and leaves receipts pending', async () => {
   let aborted = false;
   const { fixture, store, uploader } = await setup(
     1,
