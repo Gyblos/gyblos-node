@@ -112,3 +112,36 @@ void test('buyer resolves its runtime payment adapter using only declared worksp
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+void test('payment session adapter declares the SDK contract imported by its public types', async () => {
+  const manifest: unknown = JSON.parse(
+    await readFile('packages/payments-upto/package.json', 'utf8'),
+  );
+  const root: unknown = JSON.parse(await readFile('package.json', 'utf8'));
+  assert.ok(isRecord(manifest) && isRecord(manifest.dependencies));
+  assert.ok(isRecord(root) && isRecord(root.dependencies));
+  for (const path of [
+    'packages/payments-upto/src/batch-session-checks.ts',
+    'packages/payments-upto/src/batch-session-types.ts',
+  ]) {
+    const source = ts.createSourceFile(
+      path,
+      await readFile(path, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    assert.ok(
+      source.statements.some(
+        (statement) =>
+          ts.isImportDeclaration(statement) &&
+          ts.isStringLiteral(statement.moduleSpecifier) &&
+          statement.moduleSpecifier.text === '@x402/core/types',
+      ),
+    );
+  }
+  assert.equal(
+    manifest.dependencies['@x402/core'],
+    root.dependencies['@x402/core'],
+    'The adapter must declare the SDK contract using the repository pin.',
+  );
+});
