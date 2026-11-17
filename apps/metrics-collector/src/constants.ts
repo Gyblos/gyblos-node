@@ -20,6 +20,8 @@ export const COLLECTOR_ERRORS = {
   HTTPS_REQUIRED: 'HTTPS_REQUIRED',
   NOT_FOUND: 'NOT_FOUND',
   UNAVAILABLE: 'COLLECTOR_UNAVAILABLE',
+  // A stats query with a malformed day range or NodeId.
+  INVALID_QUERY: 'INVALID_QUERY',
 } as const;
 export type CollectorErrorCode =
   (typeof COLLECTOR_ERRORS)[keyof typeof COLLECTOR_ERRORS];
@@ -41,6 +43,11 @@ export const COLLECTOR_ROUTES = {
   RECEIPTS: '/v1/receipts',
   HEALTH: '/v1/health',
   OBSERVATIONS: '/v1/observations',
+  // Every public stats route starts with this; it selects the read limiter.
+  STATS_PREFIX: '/v1/stats/',
+  STATS_NETWORK: '/v1/stats/network',
+  STATS_MODELS: '/v1/stats/models',
+  STATS_SELLER: '/v1/stats/sellers/:nodeId',
 } as const;
 // What an accepted envelope carried.
 export const ENVELOPE_KINDS = {
@@ -50,6 +57,8 @@ export const ENVELOPE_KINDS = {
 export type EnvelopeKind = (typeof ENVELOPE_KINDS)[keyof typeof ENVELOPE_KINDS];
 // Static code for unexpected failures; nothing else is reported.
 export const COLLECTOR_INTERNAL_ERROR = 'COLLECTOR_INTERNAL_ERROR';
+// Log code of a scheduled run whose days failed; followed by the UTC day names only.
+export const COLLECTOR_AGGREGATION_FAILED = 'COLLECTOR_AGGREGATION_FAILED';
 
 export const COLLECTOR_HEADERS = {
   CACHE_CONTROL: 'Cache-Control',
@@ -62,6 +71,8 @@ export const COLLECTOR_HEADERS = {
 } as const;
 export const COLLECTOR_HEADER_VALUES = {
   NO_STORE: 'no-store',
+  // Public aggregates: shared caches may keep them for the aggregation interval.
+  PUBLIC_STATS: 'public, max-age=300',
   NOINDEX: 'noindex',
   NOSNIFF: 'nosniff',
   RETRY_AFTER_SECONDS: '60',
@@ -86,6 +97,14 @@ export const COLLECTOR_LIMITS = {
   maxBoundParameters: 100,
   // Observations are buffered in memory on the node, so older events are not credible.
   maxObservationAgeMs: 2_592_000_000,
+  // A receipt's signed receivedAt (the seller's clock) must fall within maxReceiptAgeMs before the
+  // envelope's sentAt and at most receiptClockSkewMs after it: old days cannot be rewritten, and two
+  // nodes' clocks may disagree. Keeps every aggregate day real and recent.
+  maxReceiptAgeMs: 2_592_000_000,
+  receiptClockSkewMs: 3_600_000,
+  // Plausibility ceilings for one receipt, far above any real request, so aggregate sums stay exact.
+  maxReceiptAtomic: 1_000_000_000_000,
+  maxReceiptTokens: 100_000_000,
 } as const;
 
 // Cloudflare bindings (wrangler.jsonc); every one is required and missing ones fail closed.
@@ -98,6 +117,8 @@ export const COLLECTOR_LIMITERS = {
   NODE: 'COLLECTOR_NODE_LIMITER',
   // One shared write budget for the whole collector, a ceiling on storage growth from free keys.
   GLOBAL: 'COLLECTOR_GLOBAL_LIMITER',
+  // Per client address for the public stats reads, apart from uploads.
+  READ: 'COLLECTOR_READ_LIMITER',
 } as const;
 export type CollectorLimiterName =
   (typeof COLLECTOR_LIMITERS)[keyof typeof COLLECTOR_LIMITERS];
@@ -113,3 +134,37 @@ export const IPV6 = {
   prefixGroups: 4,
   hexRadix: 16,
 } as const;
+
+// Aggregates (#351). Changing a formula bumps formulaVersion; rows are then rebuilt from raw.
+export const AGGREGATES = {
+  formulaVersion: 1,
+  // Upper bounds of the latency histogram buckets, in ms; one more bucket holds everything above.
+  // Fixed so histograms can be summed across hours, days, sellers and models.
+  latencyBucketsMs: [
+    100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000, 60_000,
+  ],
+  // Raw rows changed up to this long before the previous scan are scanned again, so an upload
+  // committed while a scan ran is never missed. Recomputing a day twice is harmless.
+  scanOverlapMs: 900_000,
+  // Days recomputed per scheduled run; the rest stay dirty for the next run.
+  maxDaysPerRun: 31,
+  // Unique buyer counts (per seller and per network day) are public only at this count or more.
+  minPublicBuyers: 5,
+  // Public list caps: models per answer, and unserved-demand models per day.
+  maxPublicModels: 100,
+  maxPublicDemandPerDay: 20,
+  // Public day ranges.
+  maxRangeDays: 92,
+  defaultRangeDays: 30,
+  dayMs: 86_400_000,
+  hourMs: 3_600_000,
+} as const;
+export const FIRST_SEEN_KINDS = {
+  SELLER: 'seller',
+  // Free buyers are counted by NodeId, paid buyers by wallet; never merged.
+  BUYER_FREE: 'buyer-free',
+  BUYER_PAID: 'buyer-paid',
+  MODEL: 'model',
+} as const;
+// The single row of collector_agg_state.
+export const AGG_STATE_ID = 1;

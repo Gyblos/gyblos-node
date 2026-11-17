@@ -1,11 +1,19 @@
 // Owns the Cloudflare Worker entry: maps the D1 binding and rate limiters to the app and fails closed.
 // Development relaxations are never enabled here; nothing runs on import.
+import { runAggregation } from './aggregate';
 import {
   createMetricsCollector,
   type CollectorLimiters,
   type RateLimiter,
 } from './app';
-import { COLLECTOR_DB_BINDING, COLLECTOR_LIMITERS } from './constants';
+import {
+  COLLECTOR_AGGREGATION_FAILED,
+  COLLECTOR_DB_BINDING,
+  COLLECTOR_LIMITERS,
+  COLLECTOR_ROUTES,
+  COLLECTOR_STATUS,
+} from './constants';
+import { statsReader } from './stats-read';
 import { createD1Storage, type D1Database } from './storage-d1';
 
 function binding(bindings: unknown, name: string): unknown {
@@ -36,6 +44,7 @@ function appFor(bindings: unknown) {
   }
   return createMetricsCollector({
     storage: isDatabase(database) ? createD1Storage(database) : undefined,
+    stats: isDatabase(database) ? statsReader(database) : undefined,
     limiters,
     development: false,
   });
@@ -57,10 +66,67 @@ export function createWorker() {
   };
 }
 
+// The subset of the Workers Cache API used for public stats answers.
+export interface EdgeCache {
+  match(request: Request): Promise<Response | undefined>;
+  put(request: Request, response: Response): Promise<void>;
+}
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+// Public stats answers are served from the edge cache when present, so repeated reads cost no D1
+// query and no rate-limit budget. Only successful GET answers are stored, keyed by URL alone.
+export async function cachedFetch(
+  request: Request,
+  cache: EdgeCache | undefined,
+  context: ExecutionContext,
+  answer: (request: Request) => Response | Promise<Response>,
+) {
+  const url = new URL(request.url);
+  if (
+    !cache ||
+    request.method !== 'GET' ||
+    !url.pathname.startsWith(COLLECTOR_ROUTES.STATS_PREFIX)
+  )
+    return answer(request);
+  const key = new Request(url.toString(), { method: 'GET' });
+  // A cache failure only costs a database read; it never fails the answer.
+  const hit = await cache.match(key).catch(() => undefined);
+  if (hit) return hit;
+  const response = await answer(request);
+  if (response.status === COLLECTOR_STATUS.OK)
+    context.waitUntil(cache.put(key, response.clone()).catch(() => undefined));
+  return response;
+}
+
+// The scheduled run recomputes the days whose raw rows changed. Without a database it does nothing;
+// a failed day stays dirty for the next run.
+export async function scheduledAggregation(bindings: unknown, now: number) {
+  const database = binding(bindings, COLLECTOR_DB_BINDING);
+  if (!isDatabase(database)) return undefined;
+  const result = await runAggregation(database, now);
+  // Day names only (no request data): a day that keeps failing must be visible in the Worker logs.
+  if (result.failed.length)
+    console.warn(COLLECTOR_AGGREGATION_FAILED, result.failed.join(','));
+  return result;
+}
+
+const edgeCache = () =>
+  (globalThis as { caches?: { default?: EdgeCache } }).caches?.default;
 let worker: ReturnType<typeof createWorker> | undefined;
 export default {
-  fetch(request: Request, bindings: unknown) {
+  fetch(request: Request, bindings: unknown, context: ExecutionContext) {
     worker ??= createWorker();
-    return worker.fetch(request, bindings);
+    const app = worker;
+    return cachedFetch(request, edgeCache(), context, (incoming) =>
+      app.fetch(incoming, bindings),
+    );
+  },
+  scheduled(
+    controller: { scheduledTime: number },
+    bindings: unknown,
+    context: ExecutionContext,
+  ) {
+    context.waitUntil(scheduledAggregation(bindings, controller.scheduledTime));
   },
 };
