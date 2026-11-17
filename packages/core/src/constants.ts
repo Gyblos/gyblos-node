@@ -201,7 +201,31 @@ export const RECEIPT_COLLECTOR_STATUSES = {
 export type ReceiptCollectorStatus =
   (typeof RECEIPT_COLLECTOR_STATUSES)[keyof typeof RECEIPT_COLLECTOR_STATUSES];
 
-// Hex radix for the private pair fingerprint, not a wire/signing domain.
+// Public collector policy over verified receipts from either party. Internal states, not wire values.
+// DISPUTED mirrors the buyer's signed verdict; the status is a collector state, not that wire value.
+export const PUBLIC_RECEIPT_STATUSES = {
+  BILATERAL: 'bilateral',
+  DISPUTED: 'disputed',
+  SELLER_ONLY: 'seller-only',
+} as const;
+export type PublicReceiptStatus =
+  (typeof PUBLIC_RECEIPT_STATUSES)[keyof typeof PUBLIC_RECEIPT_STATUSES];
+// How a newly reported receipt combines with the one already stored under its key.
+export const PUBLIC_RECEIPT_MERGES = {
+  INSERT: 'insert',
+  IDENTICAL: 'identical',
+  // The stored seller-only receipt gains its first buyer half.
+  UPGRADE: 'upgrade',
+  // A different signed seller record under the same key: evidence against the seller. The stored
+  // receipt (and any buyer dispute it carries) stays and still counts.
+  SELLER_CONFLICT: 'seller-conflict',
+  // A second, different buyer attestation: evidence against the buyer. The first one stays.
+  BUYER_CONFLICT: 'buyer-conflict',
+} as const;
+export type PublicReceiptMerge =
+  (typeof PUBLIC_RECEIPT_MERGES)[keyof typeof PUBLIC_RECEIPT_MERGES];
+
+// Hex radix for receipt fingerprints and digests computed by collection policy, not a wire/signing domain.
 export const RECEIPT_COLLECTOR_FINGERPRINT_RADIX = 16;
 
 // Pilot ceiling in atomic units of six-decimal USDC; applies to one channel deposit.

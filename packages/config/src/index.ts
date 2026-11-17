@@ -19,4 +19,6 @@ export * from './identity';
 
 export * from './discovery';
 
+export * from './collector';
+
 export * from './environment';

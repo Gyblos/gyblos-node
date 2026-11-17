@@ -1763,3 +1763,129 @@ storage, public collection and upload activation remain separate integrations;
 no receipt/v2 is automatically sent or persisted. Existing v1 consumers remain
 in use. No prompt, response, private key, IP, internal endpoint, raw journal,
 signed payment payload or per-token billing transaction is added to a receipt.
+
+## Receipt upload envelope v1
+
+`@gyblos/protocol/receipt-upload` defines how a node hands a batch of receipts it
+is party to, plus its own timestamps, to a collector. The signed object is
+`{ upload, signature }`: `signature` is hex Ed25519 by `upload.uploaderNodeId`
+over the prefix `gyblos/receipt-upload/v1\n` (real LF), separate from every
+receipt domain. Vectors are `vectors/receipt-upload-v1.json`, independently
+generated with Node/OpenSSL; existing receipt vectors are unchanged.
+
+| Field            | Meaning and bounds                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| `version`        | `1`; any other value is `VERSION`.                                                                         |
+| `uploaderNodeId` | 32-byte hex NodeId; it signs the envelope.                                                                 |
+| `role`           | `seller` or `buyer` (`P2P_ROLES`).                                                                         |
+| `client`         | `kind` (`seller-node`, `buyer-cli`, `buyer-desktop`, matching the role), `appVersion`, `platform`, `arch`. |
+| `sentAt`         | Uploader clock, milliseconds since epoch.                                                                  |
+| `nonce`          | 16-byte hex, chosen per envelope.                                                                          |
+| `items`          | 1 to 50 items, one per distinct (seller, buyer, requestId).                                                |
+
+Each item is `{ receipt, storedAt, startedAt, offer }`. `receipt` is an
+unchanged receipt/v1 or receipt/v2 (by its seller record version), seller-only
+or paired. `storedAt` is when the uploader's private store first kept it, or
+null. `startedAt` (when the buyer sent the request) and `offer` are buyer-only
+and must be null from a seller. `offer` is allowed only on paid receipts and
+holds the accepted offer's `issuedAt`, `expiresAt` (not earlier than
+`issuedAt`), `maxAtomic` (at least the receipt's `amountAtomic`), `maxTokens`
+(at least 1), `availability.observedAt` (`observedAt`) and `catalogDigest`. The
+full signed offer is not uploaded because it carries the seller's endpoint
+addresses.
+
+`storedAt`, `startedAt` and `offer` are the uploader's own claims. They are
+attested only by the uploader's envelope signature, never by the peer, and no
+receipt record binds them. A collector must store them labelled as uploader
+claims and must not derive seller pricing, reputation or settlement from them.
+All times are safe integers in milliseconds since epoch. `sentAt`, `storedAt`
+and `startedAt` originate on the uploader's clock. The copied offer's `issuedAt`,
+`expiresAt` and `observedAt` originate on the seller's clock but are reported by
+the buyer. Their inclusion in an uploader-signed envelope is not a seller
+attestation of those claims. No cross-clock comparison is introduced here.
+
+Parsing detaches the whole envelope and checks every structural rule, including
+that the uploader is each receipt's seller (seller role) or buyer (buyer role),
+before any crypto; signing applies the same parse. Verification then checks the
+envelope signature and each receipt's own node signatures with its version's
+contract. `verifyReceiptUploadEnvelope` performs only the parse and the envelope
+signature, for a collector that admits a signed envelope before receipt work; it
+does not verify receipts, and its caller must verify each one before trusting
+it. Malformed fields and unknown keys use `INVALID`, a foreign envelope or
+receipt version `VERSION`, a receipt the uploader is not party to or an offer
+below the signed amount `POLICY`, a bad envelope or receipt signature
+`SIGNATURE`. The `LIMIT` ceiling of 262144 canonical bytes applies to the parsed
+`upload` object and sits above the structural maximum (about 170 KiB): it is
+defense in depth, and the collector still caps the HTTP body before parsing.
+
+The contract has no clock and no audience: freshness, nonce replay, the target
+network or environment, rate limits applied before verification (a valid
+envelope costs up to 101 Ed25519 verifications) and storage belong to the
+collector. Node keys are free to create, so receipts where seller and buyer are
+the same entity, or self-made buyers, are not excluded here; the collector must
+flag them. Nothing here sends, stores or schedules an upload. No prompt,
+response, IP, endpoint address, key or payment payload is added.
+
+## Receipt upload envelope v2
+
+`@gyblos/protocol/receipt-upload-v2` adds an exact-quote reference without
+changing receipt-upload/v1, either receipt record version or existing vectors.
+The envelope has `version: 2` and its own signing domain
+`gyblos/receipt-upload/v2\n` (real LF). New vectors are
+`vectors/receipt-upload-v2.json`, generated independently with Node/OpenSSL and
+synthetic keys. The separate synthetic quote in that fixture is an oracle input,
+not an uploaded field.
+
+The v1 structural, party-binding, role, duplicate, amount and timestamp rules
+remain. Each non-null buyer paid `offer` additionally requires `offerDigest`,
+exactly 32 bytes of lowercase hex. When quote metadata is unavailable, `offer`
+stays null; a producer must not invent a reference. Seller/free items keep their
+existing null-offer rules. The parsed v2 `upload` has the same 262144-byte cap,
+checked after including the reference. Unknown fields and accessors are rejected
+rather than stripped during v2-to-v1 validation; only this validated extension
+is removed internally, then restored to the detached parsed result. All fields
+are included in the v2 envelope signature.
+
+The reference is defined as:
+
+```text
+offerDigest = lowercase_hex(SHA-256(
+  UTF8("gyblos/signed-inference-offer/v2\n" + canonicalJson(parseOfferV2(offer)))
+))
+```
+
+`offerDigestV2` in `@gyblos/protocol/offer-v2` snapshots and validates the full
+offer record before hashing. The preimage contains every quote field, including
+endpoint fields; it excludes the detached owner signature. It does not hash a
+redacted projection, six facts or an execution request. `buildReceiptUploadOfferV2`
+returns those six existing facts and this reference from the same detached
+quote snapshot, without returning its endpoints, owner signature or full record.
+It accepts historical quotes without checking the current clock. The caller
+must independently verify signature/identity, validity at execution and the
+association with its receipt before retaining this safe projection. Quote and
+receipt `requestDigest` identify control and execution requests under different
+domains and must not be equated.
+
+Both the reference and copied facts remain buyer-reported claims. A collector
+without the original quote cannot authenticate them or verify that the facts
+match the hash. This reference enables matching known quote records; it is not
+settlement proof, anonymity or a hiding commitment. Equal quotes correlate, and
+known candidate records can be tested against an unsalted hash. Keep the
+reference private with receipt metadata, not as public per-buyer activity.
+Clock provenance is unchanged: envelope/store/start times come from the uploader;
+copied offer times come from the seller's clock and are reported by the buyer.
+
+`parseReceiptUploadV2`, `signReceiptUploadV2`,
+`verifyReceiptUploadEnvelopeV2` and `verifyReceiptUploadV2` are version-specific.
+The envelope-only verifier leaves each receipt signature to the collector's
+classifier; the full verifier checks every receipt too. Existing v1 APIs remain
+strictly v1. A collector accepting both must dispatch on a validated version and
+never silently drop `offerDigest`; a v1 upload has no exact-quote reference.
+Re-signing as v2 is explicit, not a conversion preserving the old signature.
+
+This remains a contract, not uploader or Worker wiring. Producers must capture
+the projection while they still hold the independently accepted quote; its
+reference cannot be recovered later from the six facts or a receipt alone.
+No endpoint, prompt, response or payment payload is added to an upload, and
+freshness, nonce replay, pre-verification admission and private storage remain
+collector responsibilities.

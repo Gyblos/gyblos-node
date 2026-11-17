@@ -324,3 +324,20 @@ export const BUYER_INIT_FLAGS = {
   ADVANCED: '--advanced',
   HELP: '--help',
 } as const;
+
+// Operational HTTP diagnostics, separate from inference observations and receipts.
+export const BUYER_HTTP_DIAGNOSTICS = {
+  component: 'buyer-http',
+  operation: 'chat',
+  phases: {
+    ADMISSION: 'admission',
+    INPUT: 'input',
+    EXECUTE: 'execute',
+    RESPONSE: 'response',
+  },
+  codes: {
+    COMPLETE: 'HTTP_COMPLETE',
+    CLOSED: 'HTTP_CONNECTION_CLOSED',
+    REFUSED: 'HTTP_REFUSED',
+  },
+} as const;

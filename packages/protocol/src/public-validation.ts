@@ -29,11 +29,13 @@ export function publicObject(value: unknown, keys: readonly string[]) {
     return invalidRecord();
   const ownKeys = Reflect.ownKeys(value);
   if (ownKeys.length !== keys.length) return invalidRecord();
+  // Membership stays linear even when a version dispatcher supplies the record's own keys.
+  const allowed = new Set(keys);
   for (const key of ownKeys) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (
       typeof key !== 'string' ||
-      !keys.includes(key) ||
+      !allowed.has(key) ||
       !descriptor ||
       !descriptor.enumerable ||
       !('value' in descriptor)

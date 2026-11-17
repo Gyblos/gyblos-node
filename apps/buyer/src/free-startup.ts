@@ -10,10 +10,8 @@ import type {
 } from '@gyblos/node/buyer-api-keys';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
-import {
-  createBuyerReceiptRuntime,
-  openReceiptStore,
-} from '@gyblos/node/receipts';
+import { uploadObservationBuffer } from '@gyblos/node/receipt-uploader-startup';
+import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
 import { loadRole, nodeSecret, type RoleConfig } from '@gyblos/node/roles';
 import {
   createLocalTelemetry,
@@ -22,10 +20,8 @@ import {
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
-import {
-  assertConfiguredRelay,
-  bindEndpoint,
-} from '@gyblos/transport-iroh/endpoint';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
+import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { ownedChat } from './chat-owned';
 import {
@@ -36,12 +32,14 @@ import {
 import { configuredBuyerAccess } from './desktop-api';
 import { executeBuyerFree, type FreeBuyerDependencies } from './free-execution';
 import { startFreeBuyerHttp, type ChatErrorClassifier } from './free-http';
+import { buyerReceipts } from './free-receipt-runtime';
 import { freeBuyerDependencies } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { RoutedModel } from './model-routes';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
+import { withBuyerDiagnostics } from './startup-diagnostics';
 
 // A host composition seam: transports, admission and quote verification remain in existing modules.
 export type BuyerExecutionFactory = (context: {
@@ -149,39 +147,6 @@ export async function buyerNodeSecret() {
   }
 }
 
-function buyerReceipts(
-  endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
-  nodeId: string,
-  relayOnly: boolean,
-) {
-  return createBuyerReceiptRuntime({
-    endpoint,
-    slots: TRANSPORT_LIMITS.maxConcurrent,
-    store: openReceiptStore({
-      environment: process.env,
-      role: P2P_ROLES.BUYER,
-      nodeId: nodeId,
-    }),
-    signer: async (bytes) =>
-      Uint8Array.from(
-        endpoint
-          .secretKey()
-          .sign([...bytes])
-          .toBytes(),
-      ),
-    transport: {
-      relayOnly,
-      relayAllowed: (origin) => {
-        try {
-          assertConfiguredRelay(origin);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-    },
-  });
-}
 // Stop admission and bound draining before the endpoint closes; only then release payment journals.
 async function closeBuyerResources(
   receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined,
@@ -219,6 +184,7 @@ function buyerHttp(
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
+  diagnostics?: DiagnosticSink,
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
@@ -235,6 +201,7 @@ function buyerHttp(
         port,
         stream: run,
         apiKeys: execution?.apiKeys,
+        diagnostics,
         ...configuredBuyerAccess(request, role, execution?.token),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
@@ -277,6 +244,8 @@ function buyerHost(
   };
 }
 
+export type BuyerHost = ReturnType<typeof buyerHost>;
+
 function checkFreeRequest(
   request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
 ) {
@@ -288,6 +257,19 @@ function checkFreeRequest(
   )
     refuse(FREE_BUYER_STARTUP.REASONING);
 }
+// Buyer-only events (unserved demand, refusals, failures, experienced latency) feed the uploader.
+function buyerTelemetry(enabled: boolean, sink?: TelemetrySink) {
+  const observations = uploadObservationBuffer(process.env);
+  const telemetry = createLocalTelemetry({
+    enabled,
+    environment: process.env,
+    role: P2P_ROLES.BUYER,
+    sink,
+    observers: observations ? [observations.sink] : [],
+  });
+  return { telemetry, observations };
+}
+
 async function startOwnedFreeBuyer(
   options: {
     bind?: typeof bindEndpoint;
@@ -296,6 +278,7 @@ async function startOwnedFreeBuyer(
     onSellerFailure?: SellerFailureReporter;
     execution?: BuyerExecutionFactory;
   } = {},
+  diagnostics?: DiagnosticSink,
 ) {
   const telemetryEnabled = await loadLocalTelemetry(process.env);
   const role = await buyerRole();
@@ -314,18 +297,16 @@ async function startOwnedFreeBuyer(
       externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
     },
   );
-  const telemetry = createLocalTelemetry({
-    enabled: telemetryEnabled,
-    environment: process.env,
-    role: P2P_ROLES.BUYER,
-    sink: options.telemetry,
-  });
+  const { telemetry, observations } = buyerTelemetry(
+    telemetryEnabled,
+    options.telemetry,
+  );
   let receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined;
   let execution: Awaited<ReturnType<BuyerExecutionFactory>> | undefined;
   try {
     if (endpoint.id().toString() !== role.nodeId)
       refuse(FREE_BUYER_STARTUP.NODE_KEY);
-    receipts = buyerReceipts(endpoint, role.nodeId, relayOnly);
+    receipts = buyerReceipts(endpoint, role.nodeId, relayOnly, observations);
     const dependencies = freeBuyerDependencies(prepared, {
       receipts,
       telemetry: telemetry.sink,
@@ -353,6 +334,7 @@ async function startOwnedFreeBuyer(
       options.port,
       execution,
       role,
+      diagnostics,
     );
     return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
@@ -372,5 +354,9 @@ export async function startFreeBuyer(
   options: Parameters<typeof startOwnedFreeBuyer>[0] = {},
 ) {
   await buyerRole();
-  return withBuyerRuntime(process.env, () => startOwnedFreeBuyer(options));
+  return withBuyerRuntime(process.env, () =>
+    withBuyerDiagnostics((diagnostics) =>
+      startOwnedFreeBuyer(options, diagnostics),
+    ),
+  );
 }

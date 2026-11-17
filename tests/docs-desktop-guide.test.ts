@@ -21,5 +21,9 @@ for (const language of ['en', 'es']) {
     assert.doesNotMatch(text, /Choose configuration folder|Choose GYBLOS_HOME/);
     assert.match(text, /Gyblos-darwin-arm64/);
     assert.match(text, /gyblos-desktop-win32-x64/);
+    assert.match(text, /Gyblos Safe\s+Storage/);
+    assert.match(text, /keychain|llavero/i);
+    assert.match(text, /Stop\s+response/);
+    assert.match(text, /partial|parcial/);
   });
 }

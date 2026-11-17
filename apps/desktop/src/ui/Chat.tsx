@@ -190,10 +190,16 @@ export function Chat({
   const run = session.run;
   const loadingHistory = storageState === CHAT_STORAGE_STATE.LOADING;
   const busy = Boolean(run || session.paypalRun);
+  const canStop = Boolean(
+    run ||
+    (session.paypalRun &&
+      session.messages.at(-1)?.paymentMethod === PAYMENT_METHOD.USDC),
+  );
   const canSend =
     !loadingHistory &&
     online &&
     !busy &&
+    (!usingX402 || !x402?.busy) &&
     (!usingPaypal || canSendPaypal(paypal.state));
   const sandboxModel: ModelOption = {
     id: paypal.state.model ?? 'Local model',
@@ -230,6 +236,20 @@ export function Chat({
     chat.setDraft(text);
   }
   function stop() {
+    const snapshot = chat.getSnapshot();
+    const current = snapshot.sessions.find(
+      (item) => item.id === snapshot.activeId,
+    );
+    if (
+      current?.paypalRun &&
+      current.messages.at(-1)?.paymentMethod === PAYMENT_METHOD.USDC &&
+      x402
+    ) {
+      const id = current.paypalRun.id;
+      chat.stopBuyer(current.id, id);
+      void x402.stop(id);
+      return;
+    }
     chat.stop();
   }
   function captureComposer() {
@@ -288,7 +308,7 @@ export function Chat({
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [active, activeId]);
+  }, [active, activeId, chat, x402?.stop]);
   useEffect(() => {
     setModelPulse(true);
     const timer = window.setTimeout(
@@ -381,7 +401,9 @@ export function Chat({
       );
       if (!conversation) return;
       void x402
-        .run({ action: X402_ACTION.SEND, id, prompt: session.draft })
+        .run({ action: X402_ACTION.SEND, id, prompt: session.draft }, (text) =>
+          chat.appendBuyer(conversation, id, text),
+        )
         .then((result) => {
           if (result?.reply)
             chat.completePaypal(
@@ -674,20 +696,20 @@ export function Chat({
                           : 'Uses wallet balance'}
               </span>
               <IconButton
-                variant={run ? 'secondary' : 'primary'}
+                variant={canStop ? 'secondary' : 'primary'}
                 className="ui-composer-action"
-                type={run ? 'button' : 'submit'}
-                label={run ? 'Stop response' : 'Send message'}
-                data-busy={!!run}
+                type={canStop ? 'button' : 'submit'}
+                label={canStop ? 'Stop response' : 'Send message'}
+                data-busy={canStop}
                 onClick={
-                  run
+                  canStop
                     ? (event) => {
                         event.preventDefault();
                         stop();
                       }
                     : undefined
                 }
-                disabled={!run && (!session.draft.trim() || !canSend)}
+                disabled={!canStop && (!session.draft.trim() || !canSend)}
               >
                 <span className="composer-send-glyph" aria-hidden="true">
                   <ArrowUp size={16} weight="bold" />

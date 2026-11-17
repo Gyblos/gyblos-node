@@ -142,3 +142,18 @@ void test('the schema decimal pattern and the validator agree on every price spe
     );
   }
 });
+
+void test('diagnostic editor schema and runtime validator accept the same independent controls', async () => {
+  const { DIAGNOSTIC_LEVELS } = await import('@gyblos/runtime/constants');
+  assert.deepEqual(
+    property(definition('diagnostics'), 'level')?.enum,
+    Object.values(DIAGNOSTIC_LEVELS),
+  );
+  for (const level of [...Object.values(DIAGNOSTIC_LEVELS), 'SECRET-CANARY']) {
+    for (const enabled of ['true', 'false', '"invalid"']) {
+      const toml =
+        BASE + `\n[diagnostics]\nenabled = ${enabled}\nlevel = "${level}"\n`;
+      assert.equal(validate(parse(toml)), parseNodeConfig(toml).ok);
+    }
+  }
+});

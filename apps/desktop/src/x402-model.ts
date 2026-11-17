@@ -192,6 +192,22 @@ export interface X402Result {
   reply?: { text: string; model: string; metrics?: ResponseMetrics };
   error?: string;
 }
+export interface X402Progress {
+  id: string;
+  text: string;
+}
+export function parseX402Progress(input: unknown): X402Progress | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const value = input as Record<string, unknown>;
+  if (
+    !x402Id(value.id) ||
+    typeof value.text !== 'string' ||
+    value.text.length > DESKTOP_X402.MAX_RESPONSE ||
+    new TextEncoder().encode(value.text).byteLength > DESKTOP_X402.MAX_RESPONSE
+  )
+    return null;
+  return { id: value.id, text: value.text };
+}
 export function parseX402Result(input: unknown): X402Result {
   if (!input || typeof input !== 'object') throw new Error('Buyer unavailable');
   const value = input as Record<string, unknown>;

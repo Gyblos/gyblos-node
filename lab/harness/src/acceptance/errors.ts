@@ -13,3 +13,22 @@ export function acceptanceAssert(condition: unknown): asserts condition {
 export function assertAcceptanceActive(signal: AbortSignal) {
   if (signal.aborted) throw new AcceptanceError(ACCEPTANCE_CODES.CANCELLED);
 }
+
+// Error metadata is untrusted even when the prototype is familiar; never invoke accessors.
+export function acceptanceDiagnosticCode(error: unknown) {
+  try {
+    if (error instanceof AcceptanceError) {
+      const value: unknown = Object.getOwnPropertyDescriptor(
+        error,
+        'code',
+      )?.value;
+      return (
+        Object.values(ACCEPTANCE_CODES).find((code) => code === value) ??
+        ACCEPTANCE_CODES.FAILED
+      );
+    }
+  } catch {
+    /* Hostile thrown values remain unknown. */
+  }
+  return ACCEPTANCE_CODES.FAILED;
+}

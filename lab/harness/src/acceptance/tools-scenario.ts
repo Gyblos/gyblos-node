@@ -6,6 +6,7 @@ import { PAID_BUYER } from '@gyblos/buyer/constants';
 import { HTTP_STATUS, rolePathIn } from '@gyblos/config';
 import { createSellerEngine } from '@gyblos/node/engine-registry';
 import { GYBLOS_ALPN, P2P_ROLES } from '@gyblos/protocol/constants';
+import { withDiagnosticCleanup } from '@gyblos/runtime/diagnostic-cleanup';
 
 import { acceptanceAssert } from './errors';
 import { receiptBody } from './receipt-http';
@@ -13,8 +14,10 @@ import { receiptWait, startReceiptScenario } from './receipt-startup';
 import {
   TOOL_ACCEPTANCE,
   TOOL_ACCEPTANCE_CASES,
+  TOOL_DIAGNOSTICS,
   type ToolAcceptanceCase,
   type ToolCaseReport,
+  type ToolDiagnosticPhase,
 } from './tools-constants';
 import { toolRequest } from './tools-fixtures';
 import { toolHttp, verifyToolAnswer } from './tools-http';
@@ -52,6 +55,8 @@ function invalidBody(scenario: ToolAcceptanceCase) {
 export async function toolScenario(
   scenario: ToolAcceptanceCase,
   signal: AbortSignal,
+  phase: (value: ToolDiagnosticPhase) => void = () => {},
+  cleanupFailure: (error: unknown) => void = () => {},
 ): Promise<ToolCaseReport> {
   const provider = createToolProvider(scenario);
   let forbiddenCalls = 0;
@@ -85,56 +90,19 @@ export async function toolScenario(
         }
       : {}),
   });
-  try {
-    acceptanceAssert(provider.calls() === 0 && run.binding.dials() === 0);
-    const anthropic =
-      scenario === TOOL_ACCEPTANCE_CASES.ANTHROPIC_JSON ||
-      scenario === TOOL_ACCEPTANCE_CASES.ANTHROPIC_STREAM;
-    const streaming =
-      scenario === TOOL_ACCEPTANCE_CASES.OPENAI_STREAM ||
-      scenario === TOOL_ACCEPTANCE_CASES.ANTHROPIC_STREAM;
-    const url = anthropic
-      ? run.buyer().url.replace('/v1/chat/completions', '/v1/messages')
-      : run.buyer().url;
-    const token = automatic
-      ? (
-          await readFile(
-            rolePathIn(run.environment, P2P_ROLES.BUYER, PAID_BUYER.tokenFile),
-            'utf8',
-          )
-        ).trim()
-      : undefined;
-    if (positive(scenario)) {
-      for (const followup of [false, true]) {
-        const response = await toolHttp(
-          url,
-          toolRequest(anthropic, streaming, followup),
-          signal,
-          token,
-        ).response;
-        await verifyToolAnswer(response, anthropic, streaming, followup);
-      }
-      acceptanceAssert(
-        provider.calls() === 2 &&
-          provider.verifiedTurns() === 2 &&
-          run.binding.dials() === 2 &&
-          run.binding.beforeFirst() === 0,
-      );
-      acceptanceAssert(
-        run.discoveryReads() >= 2 &&
-          run.registry.counts().reads > 0 &&
-          run.binding.controlDials() >= 2,
-      );
-    } else if (scenario === TOOL_ACCEPTANCE_CASES.CANCEL) {
-      const outgoing = toolHttp(url, toolRequest(false, true), signal);
-      const completion = outgoing.response.then(receiptBody).catch(() => '');
-      await receiptWait(() => provider.calls() === 1, signal);
-      outgoing.cancel();
-      await completion;
-      await receiptWait(() => provider.cancellations() > 0, signal);
-      provider.release();
-      acceptanceAssert(provider.calls() === 1 && run.binding.dials() === 1);
-    } else {
+  return withDiagnosticCleanup(
+    async () => {
+      phase(TOOL_DIAGNOSTICS.phases.REQUEST);
+      acceptanceAssert(provider.calls() === 0 && run.binding.dials() === 0);
+      const anthropic =
+        scenario === TOOL_ACCEPTANCE_CASES.ANTHROPIC_JSON ||
+        scenario === TOOL_ACCEPTANCE_CASES.ANTHROPIC_STREAM;
+      const streaming =
+        scenario === TOOL_ACCEPTANCE_CASES.OPENAI_STREAM ||
+        scenario === TOOL_ACCEPTANCE_CASES.ANTHROPIC_STREAM;
+      const url = anthropic
+        ? run.buyer().url.replace('/v1/chat/completions', '/v1/messages')
+        : run.buyer().url;
       const token = automatic
         ? (
             await readFile(
@@ -147,56 +115,107 @@ export async function toolScenario(
             )
           ).trim()
         : undefined;
-      const response = await toolHttp(
-        url,
-        scenario === TOOL_ACCEPTANCE_CASES.CUT
-          ? toolRequest(false, true)
-          : invalidBody(scenario),
-        signal,
-        token,
-      ).response;
-      const body = await receiptBody(response);
-      const executed =
-        scenario === TOOL_ACCEPTANCE_CASES.PROVIDER ||
-        scenario === TOOL_ACCEPTANCE_CASES.CUT;
-      acceptanceAssert(
-        response.statusCode !== HTTP_STATUS.ok &&
-          !body.includes('"tool_calls":['),
-      );
-      acceptanceAssert(
-        provider.calls() === (executed ? 1 : 0) &&
-          run.binding.dials() === (executed ? 1 : 0),
-      );
-      if (executed)
-        acceptanceAssert(response.headers['x-should-retry'] === 'false');
-      else if (scenario !== TOOL_ACCEPTANCE_CASES.UNSUPPORTED)
+      if (positive(scenario)) {
+        for (const followup of [false, true]) {
+          phase(TOOL_DIAGNOSTICS.phases.REQUEST);
+          const response = await toolHttp(
+            url,
+            toolRequest(anthropic, streaming, followup),
+            signal,
+            token,
+          ).response;
+          phase(TOOL_DIAGNOSTICS.phases.VERIFY);
+          await verifyToolAnswer(response, anthropic, streaming, followup);
+        }
         acceptanceAssert(
-          response.statusCode === HTTP_STATUS.badRequest &&
-            run.binding.controlDials() === 0,
+          provider.calls() === 2 &&
+            provider.verifiedTurns() === 2 &&
+            run.binding.dials() === 2 &&
+            run.binding.beforeFirst() === 0,
         );
-    }
-    // Closing drains receipt work and aborts late provider activity before final no-retry counters are sampled.
-    await run.close();
-    acceptanceAssert(
-      run.externalCalls() === 0 &&
-        run.registry.counts().forbidden === 0 &&
-        forbiddenCalls === 0,
-    );
-    acceptanceAssert(
-      run.binding.protocols().every((values) => !values.includes(GYBLOS_ALPN)),
-    );
-    return {
-      case: scenario,
-      generations: provider.calls(),
-      executionDials: run.binding.dials(),
-      controlConnections: run.binding.controlDials(),
-      discoveryReads: run.discoveryReads(),
-      registryReads: run.registry.counts().reads,
-      cancellations: provider.cancellations(),
-      verifiedTurns: provider.verifiedTurns(),
-      forbiddenCalls,
-    };
-  } finally {
-    await run.close();
-  }
+        acceptanceAssert(
+          run.discoveryReads() >= 2 &&
+            run.registry.counts().reads > 0 &&
+            run.binding.controlDials() >= 2,
+        );
+      } else if (scenario === TOOL_ACCEPTANCE_CASES.CANCEL) {
+        const outgoing = toolHttp(url, toolRequest(false, true), signal);
+        const completion = outgoing.response.then(receiptBody).catch(() => '');
+        await receiptWait(() => provider.calls() === 1, signal);
+        phase(TOOL_DIAGNOSTICS.phases.CANCEL);
+        outgoing.cancel();
+        await completion;
+        await receiptWait(() => provider.cancellations() > 0, signal);
+        provider.release();
+        acceptanceAssert(provider.calls() === 1 && run.binding.dials() === 1);
+      } else {
+        const token = automatic
+          ? (
+              await readFile(
+                rolePathIn(
+                  run.environment,
+                  P2P_ROLES.BUYER,
+                  PAID_BUYER.tokenFile,
+                ),
+                'utf8',
+              )
+            ).trim()
+          : undefined;
+        const response = await toolHttp(
+          url,
+          scenario === TOOL_ACCEPTANCE_CASES.CUT
+            ? toolRequest(false, true)
+            : invalidBody(scenario),
+          signal,
+          token,
+        ).response;
+        const body = await receiptBody(response);
+        phase(TOOL_DIAGNOSTICS.phases.VERIFY);
+        const executed =
+          scenario === TOOL_ACCEPTANCE_CASES.PROVIDER ||
+          scenario === TOOL_ACCEPTANCE_CASES.CUT;
+        acceptanceAssert(
+          response.statusCode !== HTTP_STATUS.ok &&
+            !body.includes('"tool_calls":['),
+        );
+        acceptanceAssert(
+          provider.calls() === (executed ? 1 : 0) &&
+            run.binding.dials() === (executed ? 1 : 0),
+        );
+        if (executed)
+          acceptanceAssert(response.headers['x-should-retry'] === 'false');
+        else if (scenario !== TOOL_ACCEPTANCE_CASES.UNSUPPORTED)
+          acceptanceAssert(
+            response.statusCode === HTTP_STATUS.badRequest &&
+              run.binding.controlDials() === 0,
+          );
+      }
+      // Closing drains receipt work and aborts late provider activity before final no-retry counters are sampled.
+      phase(TOOL_DIAGNOSTICS.phases.TEARDOWN);
+      await run.close();
+      acceptanceAssert(
+        run.externalCalls() === 0 &&
+          run.registry.counts().forbidden === 0 &&
+          forbiddenCalls === 0,
+      );
+      acceptanceAssert(
+        run.binding
+          .protocols()
+          .every((values) => !values.includes(GYBLOS_ALPN)),
+      );
+      return {
+        case: scenario,
+        generations: provider.calls(),
+        executionDials: run.binding.dials(),
+        controlConnections: run.binding.controlDials(),
+        discoveryReads: run.discoveryReads(),
+        registryReads: run.registry.counts().reads,
+        cancellations: provider.cancellations(),
+        verifiedTurns: provider.verifiedTurns(),
+        forbiddenCalls,
+      };
+    },
+    () => run.close(),
+    cleanupFailure,
+  );
 }

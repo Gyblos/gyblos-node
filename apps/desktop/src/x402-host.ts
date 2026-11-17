@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  app,
   clipboard,
   ipcMain,
   shell,
@@ -37,6 +38,8 @@ function managedBuyer(
     profile,
     process.env.GYBLOS_RELAY_TOKEN || undefined,
     process.env,
+    // Packaged releases upload receipts to the metrics collector; development runs do not.
+    app.isPackaged ? app.getVersion() : undefined,
   );
   const service = new ManagedBuyer(
     () =>
@@ -96,6 +99,11 @@ export function registerDesktopX402(
     (url) => shell.openExternal(url),
     managed,
     (value) => clipboard.writeText(value),
+    (progress) =>
+      window.webContents.mainFrame.send(
+        DESKTOP_X402.PROGRESS_CHANNEL,
+        progress,
+      ),
   );
   const apiKeys = createUsdcApiHandlers(
     client,

@@ -35,3 +35,28 @@ void test('managed buyer preserves custom relays without inheriting unrelated se
     }),
   );
 });
+
+void test('a packaged desktop passes only its release version and a configured collector URL', () => {
+  const environment: NodeJS.ProcessEnv = buyerEnvironment(
+    '/synthetic-home',
+    undefined,
+    { GYBLOS_COLLECTOR_URL: 'https://staging.example/v1', UNRELATED: 'x' },
+    '0.1.0-beta.12',
+  );
+  assert.equal(environment.GYBLOS_VERSION, '0.1.0-beta.12');
+  assert.equal(environment.GYBLOS_COLLECTOR_URL, 'https://staging.example/v1');
+  assert.equal(environment.UNRELATED, undefined);
+  const development: NodeJS.ProcessEnv = buyerEnvironment(
+    '/synthetic-home',
+    undefined,
+    {},
+  );
+  assert.equal(development.GYBLOS_VERSION, undefined);
+  const malformed: NodeJS.ProcessEnv = buyerEnvironment(
+    '/synthetic-home',
+    undefined,
+    {},
+    'bad version!',
+  );
+  assert.equal(malformed.GYBLOS_VERSION, undefined);
+});

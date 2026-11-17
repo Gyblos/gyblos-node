@@ -271,6 +271,8 @@ export async function indexHarness(
     sellers,
     dump,
     entries: recorded.entries,
+    // The adapter itself, for storage-level checks such as uptime retention.
+    storage: made.storage,
   };
 }
 export type IndexHarness = NonNullable<

@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
 
 import { FILE_MODES, receiptPathsIn } from '@gyblos/config';
-import { RECEIPT_WORK } from '@gyblos/node/constants';
+import { RECEIPT_UPLOAD, RECEIPT_WORK } from '@gyblos/node/constants';
 import {
   P2P_ROLES,
   RECEIPT_CHANNEL,
@@ -207,6 +207,13 @@ void test(
         saved: 1,
         failed: 0,
         dropped: 0,
+        storage: {
+          pendingEntries: 1,
+          pendingBytes: RECEIPT_UPLOAD.reservedEntryBytes,
+          uploadedEntries: 0,
+          rejectedWrites: 0,
+          full: false,
+        },
       });
       assert.equal(f.buyerReceipts.health().saved, 1);
       assert.equal(f.sellerReceipts.health().saved, 1);
