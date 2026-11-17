@@ -81,6 +81,12 @@ envíes contraseñas, llaves ni otros secretos. Consulta [Datos y privacidad](/e
 
 ## Usa Gyblos desde otras herramientas [#llaves-de-api]
 
+Para el comprador gestionado por la app, **Connections → Connect agent** usa el puerto local fijo `4033`: reiniciar Gyblos conserva
+la misma Base URL. Si está ocupado, detén el otro servicio local y reintenta el comprador;
+Gyblos no elige otro puerto de forma silenciosa. Las configuraciones generadas por versiones anteriores
+con un puerto variable deben copiarse o escribirse de nuevo una vez. Comprueba la Base URL en Connections.
+Un comprador externo conectado explícitamente conserva su propia Base URL.
+
 **Connections** da a tus propios programas y agentes de código acceso a Gyblos a través de la app, con una
 API key y un límite de gasto. Las herramientas pueden usar las API OpenAI Chat Completions, OpenAI Responses
 y Anthropic Messages.
