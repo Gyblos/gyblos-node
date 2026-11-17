@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import test from 'node:test';
 
-import { startDesktopBuyer } from '@gyblos/buyer/desktop-startup';
+import {
+  prepareDesktopBuyer,
+  startDesktopBuyer,
+} from '@gyblos/buyer/desktop-startup';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { PORTS } from '@gyblos/config';
 
@@ -62,6 +65,31 @@ void test('an occupied desktop API port fails closed without choosing a new orig
   } finally {
     await started?.close();
     await existing.close();
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+void test('cancelling an existing desktop profile before preparation returns never starts a listener', async () => {
+  const fixture = await home();
+  const controller = new AbortController();
+  let starts = 0;
+  const options = {
+    environment: fixture.environment,
+    prepareRole: async () => role(),
+  };
+  try {
+    await prepareDesktopBuyer(options);
+    const starting = startDesktopBuyer(
+      { ...options, signal: controller.signal },
+      async () => {
+        starts++;
+        return {};
+      },
+    );
+    controller.abort();
+    await assert.rejects(starting, { name: 'AbortError' });
+    assert.equal(starts, 0);
+  } finally {
     await rm(fixture.directory, { recursive: true, force: true });
   }
 });

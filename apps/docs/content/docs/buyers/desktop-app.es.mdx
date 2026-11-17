@@ -97,10 +97,11 @@ ni borra registros pendientes.
 Si falla el inicio, **Payments → Retry local buyer** permite reintentar solo el arranque. Una inferencia
 fallida nunca se reenvía automáticamente. Conectar otro comprador ya iniciado queda como opción avanzada.
 
-**Connections → Connect agent** usa el puerto local fijo `4033` de la app: reiniciar Gyblos conserva
+Para el comprador gestionado por la app, **Connections → Connect agent** usa el puerto local fijo `4033`: reiniciar Gyblos conserva
 la misma Base URL. Si está ocupado, detén el otro servicio local y reintenta el comprador;
 Gyblos no elige otro puerto de forma silenciosa. Las configuraciones generadas por versiones anteriores
 con un puerto variable deben copiarse o escribirse de nuevo una vez. Comprueba la Base URL en Connections.
+Un comprador externo conectado explícitamente conserva su propia Base URL.
 
 La app busca actualizaciones al arrancar y cada cinco minutos mientras sigue abierta. Cuando se publica
 una versión de escritorio posterior para tu sistema, aparece un aviso de actualización.
