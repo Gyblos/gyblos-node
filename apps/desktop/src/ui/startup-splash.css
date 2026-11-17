@@ -46,7 +46,6 @@
 }
 .startup-ascii-row.is-filled {
   color: var(--accent);
-  animation: startup-battery-charge 2.8s steps(20, end) infinite;
 }
 
 .startup-splash p {
@@ -57,22 +56,6 @@
   margin-top: 8px;
   color: var(--muted);
   font-size: 11px;
-}
-@keyframes startup-battery-charge {
-  0%,
-  100% {
-    clip-path: inset(0 100% 0 0);
-  }
-  45%,
-  55% {
-    clip-path: inset(0 0 0 0);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .startup-ascii-row.is-filled {
-    animation: none;
-    clip-path: inset(0 45% 0 0);
-  }
 }
 /* Setup uses the same native surface, controls and fields as Wallet. */
 .desktop-frame.wallet-setup {

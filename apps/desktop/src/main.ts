@@ -16,6 +16,7 @@ import { probeInUtility } from './probe-host';
 import { failedProbe, type ProbeResult } from './probe-model';
 import { cleanupDesktopSession } from './session-cleanup';
 import { armSmokeWatchdog } from './smoke-watchdog';
+import { registerStartupProgress } from './startup-progress-host';
 import { settleDesktopStartup, startupHandoff } from './startup-window';
 import { BRAND_COLORS } from './theme';
 import { registerDesktopUpdate } from './update-host';
@@ -69,7 +70,12 @@ async function loadDesktopWindows(
     await window.loadFile(file, { query: { probe: '1' } });
     return;
   }
-  const handoff = startupHandoff(window, loading, signal);
+  const handoff = startupHandoff(
+    window,
+    loading,
+    signal,
+    registerStartupProgress(loading, signal),
+  );
   // Storage errors are displayed by the main wallet UI, never by the splash.
   const settled = preparation.then(
     () => handoff.prepared(),

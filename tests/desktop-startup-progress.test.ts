@@ -100,7 +100,19 @@ void test('cancelled startup never publishes late completion or reveals the app'
 void test('startup progress parser accepts only percentages of completed milestones', () => {
   for (const value of [0, 50, 100])
     assert.equal(parseStartupProgress(value), value);
-  for (const value of [null, undefined, '50', {}, [], NaN, Infinity, -1, 101, 25, 0.5])
+  for (const value of [
+    null,
+    undefined,
+    '50',
+    {},
+    [],
+    NaN,
+    Infinity,
+    -1,
+    101,
+    25,
+    0.5,
+  ])
     assert.equal(parseStartupProgress(value), null);
 });
 
