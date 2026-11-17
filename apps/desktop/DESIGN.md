@@ -5,6 +5,26 @@ Applications, Activity, Payments and Settings. A visual state never proves a
 payment, model or remote service is available. Render capabilities from the
 existing controllers and validated host bridges.
 
+## Mockup approval before desktop implementation
+
+Develop visual proposals in the isolated browser preview first:
+
+1. Run `pnpm desktop:preview:build` and serve the generated preview as described in
+   `lab/tools/desktop-preview/README.md`.
+2. Review all seven screens, wide and narrow layouts, both themes, keyboard
+   interaction, reduced motion and relevant states. Show the preview to the founder.
+3. Wait for explicit approval of that visual proposal and its desktop implementation.
+   Saving or publishing a mockup or opening its PR is not implementation approval.
+4. Port only the approved shared design to the desktop renderer, then open the app
+   and compare it with the approved mockup at the same viewport size.
+
+The preview reuses desktop components and can apply a browser-only brand proposal.
+Those proposed colors and artwork are not shipped in the desktop app until approved.
+The current preview uses the supplied brand kit 3.0.0 terminal mark, the single blue
+`#0a28f0`, and the published landing's darker neutral surfaces. Its source and tokens
+are documented beside the fixture. Product controllers never import the fixture.
+See the root `AGENTS.md` for the binding contributor workflow.
+
 ## Shared sources
 
 - `src/theme.ts`: light/dark semantic colors. The primary accent is `#0a28f0`.

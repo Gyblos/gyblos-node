@@ -70,7 +70,8 @@
     "acceptance:paid": "node --import tsx tests/support/paid-acceptance-cli.ts",
     "buyer:init": "node --import tsx apps/buyer/src/init.ts",
     "explorer:dev": "pnpm --filter @gyblos/explorer dev",
-    "explorer:build": "pnpm --filter @gyblos/explorer build"
+    "explorer:build": "pnpm --filter @gyblos/explorer build",
+    "desktop:preview:build": "node --import tsx lab/tools/desktop-preview/build.js"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
