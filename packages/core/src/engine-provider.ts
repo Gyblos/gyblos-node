@@ -104,7 +104,7 @@ export function generationAttempt(
   const messages = engineToolConversation(input);
   input.signal?.throwIfAborted();
   const deadline = AbortSignal.timeout(
-    generationDeadlineMs(limits.timeoutMs, input.maxTokens),
+    generationDeadlineMs(limits.timeoutMs, input.maxTokens, input.inputTokens),
   );
   const attempt: EngineAttempt = {
     caller: input.signal,

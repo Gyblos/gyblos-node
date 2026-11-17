@@ -236,6 +236,11 @@ Once text reached your client, a failure ends the request with an error: the ans
 elsewhere. Disable client HTTP and stream retries: a broken connection may deliver no response headers
 at all.
 
+Some sellers run on slow hardware. If a seller cannot read a long prompt (a coding agent's, for
+example) in time, the error says the seller was too slow for a request this size, with `reason`
+`engine_timeout`. Send the request again: that seller now weighs less, so another one usually answers.
+You can also shorten the conversation (Codex and OpenCode can compact it).
+
 A manual resend starts a new selection: the same seller or another one may win. Seller-attributable
 failures affect its weight. Preference for the seller that answered earlier is bounded and guarantees
 neither affinity nor a warm cache. These preferences apply here to free execution; paid modes retain
