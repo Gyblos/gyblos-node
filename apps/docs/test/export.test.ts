@@ -148,7 +148,7 @@ void test('docs export: article links resolve to exported pages and existing anc
 
 void test('docs export: all five sidebar groups have decorative icons and localized labels', async () => {
   const groups = [
-    { en: 'Get started', es: 'Inicio', icon: 'compass' },
+    { en: 'Get started', es: 'Empieza aquí', icon: 'compass' },
     { en: 'Sellers', es: 'Vendedores', icon: 'server' },
     { en: 'Buyers', es: 'Compradores', icon: 'plug' },
     { en: 'Reference', es: 'Referencia', icon: 'book-open' },
@@ -177,7 +177,7 @@ void test('docs export: all five sidebar groups have decorative icons and locali
   }
 });
 
-void test('docs export: introduction and quickstart lead the sidebar once in both languages', async () => {
+void test('docs export: the sidebar follows the public seller and buyer paths', async () => {
   for (const locale of ['en', 'es']) {
     const output = await read(`${locale}.html`);
     assert.match(output, /<h1\b[^>]*>Docs<\/h1>/);
@@ -192,8 +192,8 @@ void test('docs export: introduction and quickstart lead the sidebar once in bot
     assert.deepEqual(destinations, [
       `/${locale}`, // Brand home link.
       `/${locale}`,
-      `/${locale}/sellers/beta-guide`,
       `/${locale}/getting-started/beta`,
+      `/${locale}/sellers/beta-guide`,
       `/${locale}/sellers/manual-install`,
       `/${locale}/sellers/register-publish`,
       `/${locale}/sellers/models-offers`,
@@ -201,14 +201,19 @@ void test('docs export: introduction and quickstart lead the sidebar once in bot
       `/${locale}/sellers/operate`,
       `/${locale}/sellers/identity`,
       `/${locale}/buyers/desktop-app`,
-      `/${locale}/buyers/use-from-code`,
       `/${locale}/reference/cli`,
       `/${locale}/reference/configuration`,
       `/${locale}/help/troubleshooting`,
     ]);
-    assert.ok(links[1]?.[2]?.includes('Intro'));
     assert.ok(
-      links[2]?.[2]?.includes(locale === 'es' ? 'Inicio rápido' : 'Quickstart'),
+      links[1]?.[2]?.includes(locale === 'es' ? 'Resumen' : 'Overview'),
+    );
+    assert.ok(
+      links[3]?.[2]?.includes(locale === 'es' ? 'Inicio rápido' : 'Quickstart'),
+    );
+    assert.ok(
+      !destinations.includes(`/${locale}/buyers/use-from-code`),
+      `${locale}: code integration must not be a buyer navigation entry`,
     );
   }
 });
