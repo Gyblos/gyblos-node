@@ -335,11 +335,12 @@ export function createReceiptUploader(
   };
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running: Promise<unknown> | undefined;
+  let closing: Promise<void> | undefined;
   let retryMs: number = RECEIPT_UPLOADER.retryMs;
 
   function schedule(result: UploadResult) {
     running = undefined;
-    if (stop.signal.aborted) return;
+    if (stop.signal.aborted || closing) return;
     let delay: number = RECEIPT_UPLOADER.tickMs;
     if (result.outcome === RECEIPT_UPLOADER_OUTCOMES.RETRY) {
       delay = retryMs;
@@ -360,14 +361,36 @@ export function createReceiptUploader(
   return {
     uploadOnce: () => uploadOnce(context),
     start() {
-      if (stop.signal.aborted || timer || running) return;
+      if (stop.signal.aborted || closing || timer || running) return;
       tick();
     },
-    // Aborts any upload in flight; receipts not acknowledged stay pending for the next start.
-    async close() {
-      stop.abort();
-      clearTimeout(timer);
-      await running;
+    // Lets the upload in flight finish, then sends buffered observations (held only in memory) and
+    // pending receipts, all within RECEIPT_UPLOADER.closeFlushMs; then aborts whatever is left.
+    // Receipts not acknowledged stay pending for the next start.
+    close() {
+      closing ??= (async () => {
+        clearTimeout(timer);
+        timer = undefined;
+        const deadline = setTimeout(
+          () => stop.abort(),
+          RECEIPT_UPLOADER.closeFlushMs,
+        );
+        deadline.unref?.();
+        try {
+          await running;
+          // Every buffered batch, while each one is accepted.
+          while (
+            !stop.signal.aborted &&
+            (await uploadObservations(context)).outcome ===
+              RECEIPT_UPLOADER_OUTCOMES.UPLOADED
+          );
+          if (!stop.signal.aborted) await uploadReceipts(context);
+        } finally {
+          clearTimeout(deadline);
+          stop.abort();
+        }
+      })();
+      return closing;
     },
   };
 }
