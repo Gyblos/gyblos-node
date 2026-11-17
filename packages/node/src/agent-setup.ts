@@ -10,10 +10,16 @@ import {
   AGENT_SETUP,
   AGENT_SETUP_CODES,
   AGENT_TOOLS,
+  CODEX_LEGACY_MARKS,
   CODEX_MARKS,
   type AgentEndpoint,
   type AgentModel,
 } from './agent-setup-constants';
+import {
+  agentModelDefaults,
+  AgentSetupError,
+  codexStartMarker,
+} from './agent-setup-metadata';
 import { codexProfileText, profileNames } from './agent-setup-profiles';
 
 export {
@@ -26,6 +32,7 @@ export {
   type AgentTool,
 } from './agent-setup-constants';
 export { codexProfileText, profileNames } from './agent-setup-profiles';
+export { AgentSetupError } from './agent-setup-metadata';
 
 // The file a tool reads, honoring the variables each tool uses to move its configuration.
 export function agentFilePath(
@@ -53,15 +60,6 @@ export function agentFilePath(
   );
 }
 
-export class AgentSetupError extends Error {
-  constructor(
-    readonly code: (typeof AGENT_SETUP_CODES)[keyof typeof AGENT_SETUP_CODES],
-  ) {
-    super(code);
-    this.name = 'AgentSetupError';
-  }
-}
-
 function checked(endpoint: AgentEndpoint): AgentEndpoint {
   const url = new URL(endpoint.origin);
   const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
@@ -85,7 +83,7 @@ function checked(endpoint: AgentEndpoint): AgentEndpoint {
       !AGENT_SETUP.envPattern.test(endpoint.tokenEnv))
   )
     throw new AgentSetupError(AGENT_SETUP_CODES.ENDPOINT);
-  return endpoint;
+  return { ...endpoint, models: endpoint.models.map(agentModelDefaults) };
 }
 const context = (model: AgentModel) =>
   model.contextTokens ?? AGENT_SETUP.contextTokens;
@@ -198,7 +196,8 @@ export function mergedCodexProfile(text: string, existing: string | undefined) {
   const lines = existing.split('\n').map((line) => line.replace(/\r$/, ''));
   const fields = Object.keys(configToml(existing));
   if (
-    lines[0] !== CODEX_MARKS.profile ||
+    (lines[0] !== CODEX_MARKS.profile &&
+      lines[0] !== CODEX_LEGACY_MARKS.profile) ||
     fields.some((field) => !CODEX_PROFILE_FIELDS.includes(field))
   )
     throw new AgentSetupError(AGENT_SETUP_CODES.FILE);
@@ -333,7 +332,8 @@ export function mergedCodexConfig(
   const block = codexBlock(endpoint);
   const text = existing ?? '';
   const original = configToml(text);
-  const start = text.indexOf(CODEX_MARKS.start);
+  const startMarker = codexStartMarker(text);
+  const start = text.indexOf(startMarker);
   const end = text.indexOf(CODEX_MARKS.end);
   let outside = text;
   let merged: string;
@@ -343,9 +343,9 @@ export function mergedCodexConfig(
     if (
       start < 0 ||
       end < start ||
-      text.indexOf(CODEX_MARKS.start, start + 1) >= 0 ||
+      text.indexOf(startMarker, start + 1) >= 0 ||
       text.indexOf(CODEX_MARKS.end, end + 1) >= 0 ||
-      !lines.includes(CODEX_MARKS.start) ||
+      !lines.includes(startMarker) ||
       !lines.includes(CODEX_MARKS.end)
     )
       throw new AgentSetupError(AGENT_SETUP_CODES.FILE);

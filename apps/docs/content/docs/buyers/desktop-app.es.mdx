@@ -106,6 +106,13 @@ Mantén Gyblos abierto mientras tus herramientas lo usan. **Revoke key** detiene
 esa llave; lo que ya gastó queda registrado. El Chat tiene su propio presupuesto y no usa el límite de una
 llave.
 
+**Connect agent** conserva el contexto explícito que comunique el comprador local autenticado. Si no
+lo comunica, la configuración usa un contexto conservador de 8.192 tokens y como máximo 4.096 de salida
+(o el límite menor del comprador). Los perfiles de Codex incluyen ese tope para compactar antes.
+Este valor no acredita la capacidad del vendedor: puede ofrecer una ventana menor y rechazar el pedido.
+Actualiza y vuelve a escribir la configuración si cambian los metadatos del modelo. El generador del
+CLI usa el mismo valor; un `--context` explícito debe corresponder a los límites verificados del modelo.
+
 Para ejemplos con SDK, opciones admitidas y errores, consulta [Conecta tus herramientas de código](/es/buyers/use-from-code).
 
 ## Pagos [#pagos]
