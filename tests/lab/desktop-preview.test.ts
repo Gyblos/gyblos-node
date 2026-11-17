@@ -314,3 +314,19 @@ void test('preview brand hooks normalize Windows module identifiers', async () =
     /preview-brand-mark/,
   );
 });
+void test('preview brand hooks accept Windows CRLF source files', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const theme = await readFile(
+    new URL('../../apps/desktop/src/theme.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(
+    transformBrand(
+      theme.replaceAll('\n', '\r\n'),
+      'C:/repo/apps/desktop/src/theme.ts',
+      'C:/repo/apps/desktop',
+    ) ?? '',
+    /#090909/,
+  );
+});

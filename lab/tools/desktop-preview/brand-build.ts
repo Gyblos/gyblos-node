@@ -18,6 +18,7 @@ function replaceOnce(source: string, before: string, after: string) {
   return source.replace(before, after);
 }
 export function transformBrand(source: string, id: string, desktop: string) {
+  source = source.replaceAll('\r\n', '\n');
   const target = moduleId(id);
   const base = moduleId(desktop).replace(/\/$/, '');
   if (target === `${base}/src/theme.ts`) {
