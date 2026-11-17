@@ -106,6 +106,12 @@ desactivar con `GYBLOS_UPDATE_CHECK=0`.
 El vendedor que ejecuta el modelo puede leer tus mensajes. El cifrado del transporte no los oculta
 frente a ese vendedor. No envíes contraseñas, claves ni otros secretos.
 
+En **Connections**, una key con presupuesto cero muestra **Free only**. El botón del ojo revela la
+key solo cuando lo pides y durante la sesión de la app que la creó. Ocúltala antes de compartir la
+pantalla. Al ocultarla, seleccionar otra key o revocarla, desaparece el valor visible. El secreto no
+entra en consultas periódicas de estado, configuraciones guardadas del agente ni historial de chat.
+Tras reiniciar, la key guardada en tu agente sigue funcionando, pero la app no puede recuperar su secreto.
+
 Para integraciones avanzadas, consulta [conectar Gyblos desde tu código](/es/buyers/use-from-code).
 
 ¿Dudas o problemas? Escribe en el [Telegram de Gyblos](https://t.me/gyblos). El grupo es público; no publiques llaves,
