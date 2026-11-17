@@ -84,6 +84,10 @@ void test('every wallet handler refuses foreign frames, destroyed windows, wrong
   let calls = 0;
   let closed = false;
   const session = {
+    activate: async () => {
+      calls++;
+      return { wallet, wallets: [wallet] };
+    },
     summary: async () => {
       calls++;
       return wallet;

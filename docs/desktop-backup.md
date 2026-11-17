@@ -9,10 +9,11 @@ encrypted-file backup and same-address verification through native file dialogs.
 The renderer sends a password and receives a fixed status; it never receives a
 key, path, file contents or decrypted material. Funding remains disabled.
 Successful saved-file checks can now be remembered for the current address; this
-indicator is not a spending authorization. The loader automatically prepares a
-wallet for a new installation. Settings-only restoration adds a separate
-protected identity without replacing the current wallet or automatically
-selecting the import.
+indicator is not a spending authorization. Protected custody starts only after
+**Set up or unlock wallet** and the native explanation are explicitly approved;
+normal startup and passive status never consult the OS store. Settings-only
+restoration adds a separate protected identity without replacing the current
+wallet or automatically selecting the import.
 
 Version 1 is compact UTF-8 JSON with exactly these fields: `format`, `version`,
 `kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Duplicate
@@ -119,12 +120,14 @@ The bridge accepts only bounded action/password/address requests from the main
 window's current main frame; paths, backup bytes and keys stay in the host. The
 startup window renders only the shared ASCII loader and is not authorized to
 perform wallet actions; the host rejects calls originating from its frame.
-Public reads are coalesced, and restore/select/backup/copy are serialized so an
-overlapping status request cannot invalidate or change the selected wallet. Quit
-cancels the handoff and waits for automatic initialization, native file dialogs
-and in-flight backup/restore work. An already-started encrypted write may
-finish; the main window must not appear afterward. The legacy first-run setup
-helper remains internally testable but is no longer registered with Electron.
+Public reads return only the session snapshot; they never decrypt or open native
+dialogs. Explicit activation is coalesced, and restore/select/backup/copy are
+serialized. Locked wallets reject those operations without activating custody.
+Quit waits only for an already-started approval, protected preparation, native
+dialog or backup/restore operation, not for an unused wallet. An already-started
+encrypted write may finish; the main window must not appear afterward. The
+legacy first-run setup helper remains internally testable but is no longer
+registered with Electron.
 
 ## Remembered verification
 
@@ -137,11 +140,13 @@ Equivalent PKCS8 encodings are accepted when they derive the current address;
 metadata authentication still uses the installed wallet material. The existing
 portable backup and wallet record formats are unchanged.
 
-Wallet revalidates this record on restart, when opened and after an operation.
-Missing, malformed, oversized, altered, wrong-identity, unsupported-version or
-inaccessible metadata means unverified; invalid metadata is retained until a
-successful check replaces only that metadata. POSIX storage must be private;
-Windows does not claim equivalent POSIX permission enforcement.
+Wallet revalidates this record on explicitly approved access after a restart and
+after a wallet operation. Merely opening a page or polling status does not
+access the protected store. Missing, malformed, oversized, altered,
+wrong-identity, unsupported-version or inaccessible metadata means unverified;
+invalid metadata is retained until a successful check replaces only that
+metadata. POSIX storage must be private; Windows does not claim equivalent POSIX
+permission enforcement.
 
 Saving a file or restoring a wallet does not create this record. A failed check
 does not erase an earlier valid verification. Cancellation before publication

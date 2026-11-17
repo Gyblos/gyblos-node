@@ -1,4 +1,4 @@
-// Automatic startup owns initialization only for an absent or empty dedicated root.
+// Explicitly approved access initializes only an absent or empty dedicated root.
 // Any retained state is read without creating a replacement identity.
 import { readdir } from 'node:fs/promises';
 

@@ -139,14 +139,27 @@ address and serialized with restore/select.
 
 ## Protected local wallet
 
-On first launch the small ASCII loader automatically prepares a protected wallet
-only when its dedicated root is absent or empty. It offers no creation choice,
-backup prompt or startup wallet modal. Existing state is read without
-initialization; a missing original inside a retained library never generates a
-replacement. Settings can restore an encrypted backup alongside the original,
-then explicitly select which wallet to use. The selected address and its
-verified-backup indicator are reloaded on the next launch. See
-[portable backup and recovery](desktop-backup.md) for the flow and its limits.
+The app creates its private data folder automatically and starts the buyer
+without choosing a folder or accessing protected desktop custody. Wallet status
+begins **locked**: no address, verified-backup claim or balance is exposed.
+Passive status, opening Payments and unused shutdown never consult OS
+encryption.
+
+In **Payments → Wallet details**, choose **Set up or unlock wallet**. A native
+explanation appears before any secure-storage availability check, encryption or
+decryption. Continue to permit access; cancel to keep using free models without
+unlocking. On macOS, any “Gyblos Safe Storage” password is entered only in the
+system dialog, never a Gyblos form. Windows normally uses the account's DPAPI
+without a matching prompt; Linux may ask to unlock GNOME Keyring or KWallet.
+Denied or unavailable access does not retry until another explicit action.
+
+Approved access initializes only an absent or empty dedicated wallet root.
+Existing state is read without creating another identity; a missing original in
+a retained library never generates a replacement. Settings can restore a backup
+alongside the original and explicitly select which wallet to use. The active
+address and backup-verification metadata are checked again on approved access in
+the next process and after a wallet operation, not by background polling. See
+[portable backup and recovery](desktop-backup.md) for limits.
 
 The main process retains the original Ed25519 wallet under
 `app.getPath('appData')/gyblos-wallet/wallet-v1`. Imported identities have
@@ -170,14 +183,15 @@ See
 [Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage).
 
 The persistent instance-lock profile is separate from disposable Chromium
-session data. Initialization is shared, and orderly quit waits for it; an
-unresponsive OS secret-store prompt may delay quit. Existing, interrupted,
-corrupt or inaccessible wallet data is never silently replaced. POSIX
-directories/files use owner-only permissions and file/directory flushes; Windows
-uses the OS user profile and DPAPI, without claiming equivalent
-sudden-power-loss durability. Repeated launches reuse the stored identity.
-Partial/corrupt local state is retained for inspection; importing a backup does
-not silently repair or replace that state.
+session data. Explicit activation is shared, and orderly quit waits only for
+wallet work already started; an unresponsive OS secret-store prompt may delay
+quit after approval, but never because an unused wallet is waiting to
+initialize. Existing, interrupted, corrupt or inaccessible wallet data is never
+silently replaced. POSIX directories/files use owner-only permissions and
+file/directory flushes; Windows uses the OS user profile and DPAPI, without
+claiming equivalent sudden-power-loss durability. Repeated launches reuse the
+stored identity. Partial/corrupt local state is retained for inspection;
+importing a backup does not silently repair or replace that state.
 
 OS encryption protects stored data, not a compromised app or account. Plaintext
 is temporarily present in main-process memory; JavaScript strings cannot be

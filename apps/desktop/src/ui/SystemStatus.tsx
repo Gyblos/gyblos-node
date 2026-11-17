@@ -16,8 +16,9 @@ export function SystemStatus({ state, onRetry, onPayments }: Props) {
   const wallet = useDesktopWallet();
   const attention =
     state !== LOCAL_NODE_STATE.READY ||
-    wallet.status !== WALLET_STATUS.READY ||
-    !wallet.backupVerified;
+    wallet.status === WALLET_STATUS.UNAVAILABLE ||
+    wallet.status === WALLET_STATUS.RECOVERY_REQUIRED ||
+    (wallet.status === WALLET_STATUS.READY && !wallet.backupVerified);
   return (
     <>
       <Button
@@ -48,7 +49,9 @@ export function SystemStatus({ state, onRetry, onPayments }: Props) {
                   ? wallet.backupVerified
                     ? 'Protected wallet ready.'
                     : 'Recovery backup needed.'
-                  : 'Protected wallet unavailable.'}
+                  : wallet.status === WALLET_STATUS.LOCKED
+                    ? 'Wallet locked. Free chat is available without unlocking it.'
+                    : 'Protected wallet unavailable.'}
               </p>
               <Button
                 onClick={() => {

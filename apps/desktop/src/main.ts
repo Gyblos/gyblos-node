@@ -70,7 +70,7 @@ async function loadDesktopWindows(
     return;
   }
   const handoff = startupHandoff(window, loading, signal);
-  // Storage errors are displayed by the main wallet UI, never by the splash.
+  // Startup prepares local services; protected custody is activated from Wallet.
   const settled = preparation.then(
     () => handoff.prepared(),
     () => handoff.prepared(),
@@ -127,7 +127,7 @@ function installDesktopServices(
     );
     services.node = registerDesktopNode(window, __dirname, signal);
   }
-  return wallet.ready;
+  return Promise.resolve();
 }
 
 function registerDesktopQuit(

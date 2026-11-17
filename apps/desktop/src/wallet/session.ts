@@ -1,4 +1,4 @@
-// Coordinates automatic preparation and mutually exclusive Settings operations.
+// Defers protected custody until explicitly approved; serializes wallet operations.
 // Native dialogs and all keys stay in the host; only public status crosses IPC.
 import { readBackupFile } from './backup-files';
 import type { BackupDialogs } from './backup-flow';
@@ -59,9 +59,8 @@ function operationFailure(
 class DesktopWalletSession {
   private readonly library;
   private pending: Promise<unknown> | undefined;
-  private reading: Promise<WalletCollection> | undefined;
-  private current = unavailableCollection(WALLET_STATUS.LOADING);
-  readonly ready: Promise<WalletCollection>;
+  private activation: Promise<WalletCollection> | undefined;
+  private current = unavailableCollection(WALLET_STATUS.LOCKED);
   constructor(
     private readonly root: string,
     private readonly protection: WalletProtection | null,
@@ -70,19 +69,16 @@ class DesktopWalletSession {
     private readonly approveAccess: () => Promise<boolean> = async () => false,
   ) {
     this.library = createWalletLibrary(root, protection);
-    this.ready = prepareDesktopWallet(root, protection, signal).then(
-      (value) => {
-        this.current = value;
-        return value;
-      },
-    );
   }
   private async reload() {
     if (this.signal.aborted) return unavailableCollection();
     try {
-      this.current = await readWalletCollection(this.root, this.protection);
+      const value = await readWalletCollection(this.root, this.protection);
+      this.current = this.signal.aborted ? unavailableCollection() : value;
     } catch (error) {
-      this.current = failedWalletCollection(error);
+      this.current = this.signal.aborted
+        ? unavailableCollection()
+        : failedWalletCollection(error);
     }
     return this.current;
   }
@@ -90,10 +86,7 @@ class DesktopWalletSession {
     if (this.signal.aborted) return Promise.resolve(cancelled);
     if (this.pending) return Promise.resolve(busy);
     const operation = Promise.resolve()
-      .then(async () => {
-        await this.reading;
-        return execute();
-      })
+      .then(execute)
       .finally(() => {
         this.pending = undefined;
       });
@@ -103,9 +96,8 @@ class DesktopWalletSession {
   private async manage(value: unknown): Promise<WalletSettingsResult> {
     const request = parseWalletSettingsRequest(value);
     if (!request) return WALLET_SETTINGS_RESULT.FAILED;
-    const prepared = await this.ready;
     if (this.signal.aborted) return WALLET_SETTINGS_RESULT.CANCELLED;
-    if (prepared.wallet.status !== WALLET_STATUS.READY)
+    if (this.current.wallet.status !== WALLET_STATUS.READY)
       return WALLET_SETTINGS_RESULT.UNAVAILABLE;
     try {
       let result: WalletSettingsResult;
@@ -130,8 +122,9 @@ class DesktopWalletSession {
   private async executeBackup(value: unknown): Promise<BackupResult> {
     const request = parseActiveBackupRequest(value);
     if (!request) return BACKUP_RESULT.FAILED;
-    await this.ready;
     if (this.signal.aborted) return BACKUP_RESULT.CANCELLED;
+    if (this.current.wallet.status !== WALLET_STATUS.READY)
+      return BACKUP_RESULT.FAILED;
     try {
       return await this.library.backup(
         request.address,
@@ -147,25 +140,43 @@ class DesktopWalletSession {
       await this.reload();
     }
   }
-  async collection(): Promise<WalletCollection> {
-    const prepared = await this.ready;
-    if (this.pending) {
-      await this.pending;
-      return this.collection();
-    }
-    if (prepared.wallet.status !== WALLET_STATUS.READY)
-      return this.signal.aborted ? unavailableCollection() : this.current;
-    // Reserve the read synchronously; writers wait for it and later readers share it.
-    this.reading ??= this.reload().finally(() => {
-      this.reading = undefined;
-    });
-    return this.reading;
+  collection(): Promise<WalletCollection> {
+    // Passive status never decrypts, even after the wallet was activated.
+    return Promise.resolve(
+      this.signal.aborted ? unavailableCollection() : this.current,
+    );
   }
   async summary() {
     return (await this.collection()).wallet;
   }
   activate(): Promise<WalletCollection> {
-    return Promise.resolve(unavailableCollection());
+    if (this.signal.aborted) return Promise.resolve(unavailableCollection());
+    if (this.current.wallet.status === WALLET_STATUS.READY)
+      return this.collection();
+    this.activation ??= this.exclusive(
+      this.current,
+      unavailableCollection(),
+      () => this.prepare(),
+    ).finally(() => {
+      this.activation = undefined;
+    });
+    return this.activation;
+  }
+  private async prepare() {
+    try {
+      if (!(await this.approveAccess()) || this.signal.aborted)
+        return this.signal.aborted ? unavailableCollection() : this.current;
+      this.current = unavailableCollection(WALLET_STATUS.LOADING);
+      const value = await prepareDesktopWallet(
+        this.root,
+        this.protection,
+        this.signal,
+      );
+      this.current = this.signal.aborted ? unavailableCollection() : value;
+    } catch {
+      this.current = unavailableCollection();
+    }
+    return this.current;
   }
   run(value: unknown) {
     return this.exclusive(
@@ -181,18 +192,11 @@ class DesktopWalletSession {
   }
   copy(args: readonly unknown[], writeText: (text: string) => void) {
     return this.exclusive(false, false, async () => {
-      await this.ready;
-      return copyPublicWalletAddress(
-        (await this.reload()).wallet,
-        args,
-        writeText,
-      );
+      return copyPublicWalletAddress(this.current.wallet, args, writeText);
     });
   }
   async settled() {
-    await this.ready;
     await this.pending;
-    await this.reading;
   }
 }
 export function createDesktopWalletSession(
@@ -202,5 +206,11 @@ export function createDesktopWalletSession(
   signal: AbortSignal,
   approveAccess?: () => Promise<boolean>,
 ) {
-  return new DesktopWalletSession(root, protection, dialogs, signal, approveAccess);
+  return new DesktopWalletSession(
+    root,
+    protection,
+    dialogs,
+    signal,
+    approveAccess,
+  );
 }

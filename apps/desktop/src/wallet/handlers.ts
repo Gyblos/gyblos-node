@@ -40,8 +40,11 @@ export function createWalletHandlers(
     );
   }
   return {
-    activate: (_event: WalletSender, _args: readonly unknown[]) =>
-      Promise.resolve(unavailableCollection()),
+    activate: async (event: WalletSender, args: readonly unknown[]) => {
+      if (!accepts(event, args, 0) || !session) return unavailableCollection();
+      const value = await session.activate();
+      return accepts(event, args, 0) ? value : unavailableCollection();
+    },
     summary: (event: WalletSender, args: readonly unknown[]) =>
       accepts(event, args, 0) && session
         ? session.summary()
