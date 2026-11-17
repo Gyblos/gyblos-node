@@ -6,11 +6,16 @@ import {
   type CollectorLimiters,
   type RateLimiter,
 } from './app';
+import { ChainIndexError, runChainIndex } from './chain/indexer';
+import { ChainShapeError } from './chain/json';
+import { ChainRpcError, chainRpcUrl, createChainRpc } from './chain/rpc';
 import {
   COLLECTOR_AGGREGATION_FAILED,
+  COLLECTOR_CHAIN_INDEX_FAILED,
   COLLECTOR_DB_BINDING,
   COLLECTOR_LIMITERS,
   COLLECTOR_ROUTES,
+  COLLECTOR_SOLANA_RPC_BINDING,
   COLLECTOR_STATUS,
 } from './constants';
 import { statsReader } from './stats-read';
@@ -111,6 +116,47 @@ export async function scheduledAggregation(bindings: unknown, now: number) {
   return result;
 }
 
+// The scheduled chain read, when a database and a valid Solana RPC URL are bound. A failure logs a
+// static code with the phase and the error's class only (never the URL, which may carry a provider
+// key) and leaves the cursor at the last stored batch.
+const chainFailureReason = (cause: unknown) =>
+  cause instanceof ChainRpcError || cause instanceof ChainShapeError
+    ? cause.message
+    : '';
+
+export async function scheduledChainIndex(
+  bindings: unknown,
+  now: number,
+  fetcher: typeof fetch = fetch,
+) {
+  const database = binding(bindings, COLLECTOR_DB_BINDING);
+  const configured = binding(bindings, COLLECTOR_SOLANA_RPC_BINDING);
+  const url = chainRpcUrl(configured);
+  // A secret that is set but not usable (http, credentials, a key in the query) must be visible.
+  if (configured !== undefined && configured !== '' && !url)
+    console.warn(COLLECTOR_CHAIN_INDEX_FAILED, 'config', 'rejected rpc url');
+  if (!isDatabase(database) || !url) return undefined;
+  try {
+    return await runChainIndex(database, createChainRpc(url, fetcher), now);
+  } catch (error) {
+    const phase = error instanceof ChainIndexError ? error.phase : 'start';
+    const cause = error instanceof ChainIndexError ? error.cause : error;
+    // Static reasons only (an HTTP status, an RPC error code, a shape location), never the URL.
+    console.warn(
+      COLLECTOR_CHAIN_INDEX_FAILED,
+      phase,
+      cause instanceof Error ? cause.name : 'unknown',
+      chainFailureReason(cause),
+    );
+    return undefined;
+  }
+}
+// Aggregates first (cheap, bounded), then the chain read, so a slow RPC never delays the stats.
+async function scheduledRun(bindings: unknown, now: number) {
+  await scheduledAggregation(bindings, now);
+  await scheduledChainIndex(bindings, now);
+}
+
 const edgeCache = () =>
   (globalThis as { caches?: { default?: EdgeCache } }).caches?.default;
 let worker: ReturnType<typeof createWorker> | undefined;
@@ -127,6 +173,6 @@ export default {
     bindings: unknown,
     context: ExecutionContext,
   ) {
-    context.waitUntil(scheduledAggregation(bindings, controller.scheduledTime));
+    context.waitUntil(scheduledRun(bindings, controller.scheduledTime));
   },
 };
