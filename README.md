@@ -1,242 +1,159 @@
 # Gyblos Node
 
-Peer-to-peer inference with pay-per-use payments. The buyer signs a spending
-ceiling, the seller charges only the tokens it used, and the unused deposit goes
-back to the buyer.
+Gyblos is a peer-to-peer network for AI inference: sellers run a node that
+serves models, and buyers find them through a public discovery index and connect
+directly or through a relay. Inference is free or paid per use in devnet USDC:
+the buyer authorizes a ceiling, the seller charges only the tokens it used, and
+the rest of the deposit returns to the buyer.
 
-> **Status:** experimental, Solana **devnet** only. Not audited. Never use
-> mainnet keys. Part of [Gyblos](https://gyblos.com) ·
-> [Paper](https://gyblos.com/paper).
+**Status:** experimental, Solana devnet only, not audited. Never use mainnet
+keys. See the [known limitations](docs/limitations.md).
 
-## What it does
+## Start here
 
-- **Seller node** (`pnpm node:start`): Ollama + signed offer, served over Iroh.
-- **Buyer proxy** (`pnpm buyer:start`): checks the offer, listens on `:4031`.
-- **Payments**: x402 `upto`, local facilitator, devnet test token (not USDC).
-- **Transport**: Iroh over our relay `na1.relay.gyblos.com`, or direct.
-- **Private receipt collector**: standalone loopback-only receiver with explicit
-  access and retention
-  ([configuration and limits](docs/private-receipt-collector.md#standalone-local-receiver)).
-- **Identity**: opt-in read-only 8004 admission, persistent trust state and
-  explicit manual overrides.
+| You want to                  | Go to                                                                                                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Run a seller                 | [Install a seller](https://docs.gyblos.com/en/sellers/beta-guide): install a Docker or native seller, register it with your invite code and list it.                                       |
+| Use Gyblos                   | [Desktop app](https://docs.gyblos.com/en/buyers/desktop-app) for macOS (Apple Silicon), Windows x64 and Linux x64, or [use it from code](https://docs.gyblos.com/en/buyers/use-from-code). |
+| Develop or contribute        | [Develop locally](#develop-locally) below, then [CONTRIBUTING.md](CONTRIBUTING.md).                                                                                                        |
+| Get help or report a problem | [SUPPORT.md](SUPPORT.md); report vulnerabilities privately through [SECURITY.md](SECURITY.md).                                                                                             |
+
+The public guides at [docs.gyblos.com](https://docs.gyblos.com) are in English
+and Spanish. Their source is [apps/docs](apps/docs/README.md).
+
+## How it fits together
 
 ```text
-app ─▶ buyer proxy ══ Iroh (direct or na1 relay) ══▶ seller node ─▶ Ollama
-        signs ceiling ─▶ Solana devnet channel ◀─ facilitator settles usage
+app ─▶ local buyer ══ Iroh (direct or relay) ══▶ seller node ─▶ engine
+        │                                                         (Ollama, or an OpenAI- or
+        ├─ finds sellers in the discovery index                    Anthropic-compatible API)
+        ├─ checks each seller's owner in the 8004 agent registry
+        └─ paid offers: payment channel on Solana devnet, settled per use
 ```
 
-## Desktop preview
+- The **seller node** serves each offer in its `config.toml`, free or paid.
+- The **local buyer** verifies the seller's signed quote, then runs a free
+  request, or pays for a priced one through a per-request payment channel (or a
+  payment session, when the buyer has one configured and the seller allowlists
+  it). Its **buyer endpoint** is an OpenAI- and Anthropic-compatible HTTP API on
+  your machine.
+- The **desktop app** runs the same local buyer inside an Electron app.
 
-The Electron preview in `apps/desktop` targets macOS, Windows and Linux and
-reuses the compact Chat and Connect mockup, with local conversation history and
-simulated USDC responses/connections. The same Chat screen can use the
-[PayPal Sandbox prototype](docs/paypal-sandbox.md) for real local inference with
-simulated payments for one local seller. Normal startup prepares a protected
-local wallet; saving, same-address backup verification and Settings-only
-restoration are implemented, while funding remains disabled. Native OS custody
-and cross-platform recovery still need separate acceptance. Local packaging is
-macOS arm64 only. A separate wallet-free smoke retains the isolated Iroh
-loopback check. See [running and packaging the preview](docs/desktop-probe.md).
+## Data that leaves your machine
 
-## Status
+- Release builds (the Docker seller, the packaged seller and the desktop app)
+  upload signed, content-free receipts to the metrics collector at
+  `collector.gyblos.com`. Receipts have no opt-out.
+- The same builds upload content-free observations. Set
+  `GYBLOS_OBSERVATIONS=off` in the process environment to turn them off (for the
+  Docker seller, add it to `seller.env`).
+- A listed seller publishes signed public records (its catalog and presence) to
+  the discovery index.
+- A development checkout uploads nothing unless you set `GYBLOS_COLLECTOR_URL`.
 
-- **Paid on devnet:** three sequential inferences, VPS buyer to Mac seller over
-  direct Iroh ([gate-0008.json](lab/evidence/gate-0008.json), source `ba168c4`).
-- **Offline on every change:** payments, recovery, transport, relay config.
-- **Not tested:** paid runs on this head, relay-only privacy off-host, CGNAT,
-  mainnet ([all limits](docs/limitations.md)).
+Details:
+[data and privacy](https://docs.gyblos.com/en/reference/data-and-privacy),
+[receipts](docs/receipts.md) and [telemetry](docs/telemetry.md).
 
-## Quickstart
+## Develop locally
 
-For a first contribution, start with [CONTRIBUTING.md](CONTRIBUTING.md): it
-covers forks, toolchain setup, offline checks and pull requests. Use
-[SUPPORT.md](SUPPORT.md) for questions and [SECURITY.md](SECURITY.md) for
-private vulnerability reports.
+### Prerequisites
 
-Requirements: Node.js 24.22.1+, pnpm 10.12.1 and a native Iroh platform (macOS
-ARM64 or Linux x64/ARM64; no Intel Mac, Windows untested). Paid runs need devnet
-SOL from [faucet.solana.com](https://faucet.solana.com); inference needs
-[Ollama](https://ollama.com).
+- Node.js 24.22.1 or newer and the pnpm version pinned in
+  [package.json](package.json). See the
+  [toolchain setup](CONTRIBUTING.md#set-up-nodejs-and-pnpm).
+- For native transport tests: macOS ARM64, Linux x64/ARM64 or Windows x64. There
+  is no Intel Mac binding. On other platforms those cases skip, and a skip
+  proves nothing.
 
-### 1. Offline checks
+No funded wallet, engine, Docker or network access is needed beyond installing
+packages.
 
-First check the active Node.js and pnpm versions; see the
-[toolchain setup guide](CONTRIBUTING.md#set-up-nodejs-and-pnpm).
+### Install and check
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm check
 ```
 
-Installing dependencies requires registry access unless all packages are cached.
-The checks themselves need no funded wallet, running model or external network;
-unsupported native cases skip explicitly and do not prove platform support.
+`pnpm check` runs typecheck, lint and every product, standalone package and lab
+test. It exits with status 0 when everything passes; report the passed, failed,
+cancelled and skipped counts.
 
-### Local node and discovery acceptance (no payments)
+### Run from a checkout
 
-```sh
-pnpm --filter @gyblos/lab-harness acceptance:node-discovery # publication to signed quote
-pnpm --filter @gyblos/lab-harness acceptance:free           # publication to complete answer
-pnpm --filter @gyblos/lab-harness acceptance:free-stream    # early fragments and cancellation
-pnpm acceptance:receipts                                  # product startup to confirmed receipts
-```
+- Seller: follow [running a seller and a buyer](docs/running-a-node.md). In
+  short, prepare keys and the tokenizer, start an engine, run
+  `pnpm gyblos seller init` to write `config.toml`, check it with
+  `pnpm gyblos doctor` and start it with `pnpm node:start`.
+- Buyer: run `pnpm buyer:init`, then `pnpm buyer:chat`. The defaults accept free
+  quotes only, with zero spending and price ceilings. See
+  [guided buyer setup](docs/buyer-init.md).
+- Desktop app: `pnpm desktop:start`. See [desktop app](docs/desktop.md).
+- Synthetic acceptance runs and lab devnet checks:
+  [lab/README.md](lab/README.md).
 
-Uses a synthetic engine, native loopback Iroh and an in-process memory index.
-Temporary identities/state only; never contacts the deployed index or RPC.
-[Coverage, evidence limits and explicit real-engine mode](docs/node-discovery-acceptance.md).
+### Common commands
 
-### 2. Lab: a devnet payment on one machine
+| Command                                                  | What it does                                                                                   |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `pnpm gyblos <command>`                                  | The seller CLI: `seller init\|status\|register\|service`, `doctor`, `logs`, `config validate`. |
+| `pnpm node:setup --role seller --mint MINT`              | Create isolated seller keys, without RPC or funding.                                           |
+| `pnpm node:tokenizer`                                    | Download and verify the pinned tokenizer.                                                      |
+| `pnpm node:start`                                        | Start the seller node.                                                                         |
+| `pnpm buyer:init`                                        | Write the buyer's settings and identity, without network requests.                             |
+| `pnpm buyer`, `buyer:chat`                               | Start the local buyer endpoint; or chat with it in the terminal.                               |
+| `pnpm buyer:free`                                        | Start a buyer endpoint that runs free offers only.                                             |
+| `pnpm buyer:agent`                                       | Print or write the settings that connect a coding agent to the buyer endpoint.                 |
+| `pnpm buyer:reconcile:paid`, `buyer:withdraw:paid`       | Check open payment channels against devnet; move a stuck channel toward a refund.              |
+| `pnpm desktop:build`, `desktop:start`, `desktop:package` | Build, run or package the desktop app.                                                         |
+| `pnpm docs:dev`, `docs:test`                             | Preview the docs site; check its static export.                                                |
+| `pnpm check`                                             | Typecheck, lint and all tests; run before every PR.                                            |
+| `pnpm test`, `test:lab`, `tooling:test`                  | Product and standalone package tests (required checks); lab tests; tooling tests.              |
+| `pnpm format`                                            | Format files and sort imports.                                                                 |
 
-The `gate:*` commands are lab proof-of-concept checks, not seller or buyer
-setup.
+Replace `MINT` with the devnet USDC mint
+`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`. The legacy paid v1 commands
+(`buyer:start`, `buyer:trust`, `buyer:call`, `buyer:reconcile`) and the `gate:*`
+commands work only with the lab; see
+[lab/README.md](lab/README.md#legacy-v1-buyer).
 
-```sh
-pnpm gate:setup              # creates isolated keys in .local/lab/
-# fund the printed facilitator address with at least 0.05 devnet SOL
-pnpm gate:fund --test-mint   # creates the six-decimal test token
-pnpm gate:preflight          # checks devnet, program, mint and funding
-pnpm gate:challenge          # unpaid request must get HTTP 402
-pnpm gate:run                # 10,000 deposited, 4,000 charged, 6,000 returned
-pnpm gate:inference:setup && pnpm gate:inference   # metered, real model (523 MB)
-```
-
-Details: [docs/payments.md](docs/payments.md).
-
-### 3. Run a seller and a buyer
-
-Each role keeps its own directory under one local home (`.local/gyblos/`).
-Seller:
-
-```sh
-pnpm node:setup --role seller --mint MINT   # free selling needs no payout or buyer address
-pnpm node:tokenizer             # pinned tokenizer, for offers whose usage the seller recounts
-# run your own engine (a dedicated Ollama, or an OpenAI- or Anthropic-compatible API; see the full steps)
-cp examples/seller-daemon.toml config.toml   # example free offer
-pnpm gyblos doctor              # read-only preflight; prints the public NodeId and owner
-pnpm node:start
-```
-
-Buyer: run `pnpm buyer:init` for guided local identity and selection settings,
-then `pnpm buyer:chat`. Defaults accept free quotes without payment
-transactions; spending and price ceilings are explicit. See
-[guided buyer setup](docs/buyer-init.md). The legacy paid v1 entry remains
-separate. Full steps: [docs/running-a-node.md](docs/running-a-node.md).
-
-With Docker instead: `compose.yaml` runs a seller with its own Ollama
-([Docker](docs/running-a-node.md#docker)), and `sh install.sh` sets one up from
-the published image without a checkout
-([Install script](docs/running-a-node.md#install-script)).
-
-## Commands
-
-| Group  | Command                                              | What it does                                                                           |
-| ------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).                                |
-| Node   | `pnpm gyblos config validate --config config.toml`   | Check a node config file and the environment ([configuration](docs/configuration.md)). |
-| Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                                      |
-| Node   | `pnpm gyblos seller service install\|uninstall`      | Run the seller in the background (systemd or launchd) after an offline doctor check.   |
-| Node   | `pnpm node:tokenizer`                                | Download and verify the pinned tokenizer for either role, without an engine.           |
-| Node   | `pnpm buyer:init`                                    | Guide initial buyer settings and identity, without network requests or overwrites.     |
-| Node   | `pnpm buyer:setup`                                   | The same tokenizer download, under the buyer's older name.                             |
-| Node   | `pnpm buyer:free`                                    | Start the separate free v2 chat endpoint (complete or SSE) (`:4031`).                  |
-| Node   | `pnpm buyer:trust`                                   | Verify the offer against explicit seller identities and create trust.                  |
-| Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block.                  |
-| Lab    | `pnpm gate:setup`                                    | Create isolated lab devnet keys.                                                       |
-| Lab    | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.                                  |
-| Lab    | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.                                 |
-| Lab    | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.                                      |
-| Lab    | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).                                    |
-| Lab    | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021).                            |
-| Lab    | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.                                   |
-| Lab    | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                                             |
-| Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.                                         |
-| Lab    | `pnpm identity:fixtures`                             | Recapture the public registry fixture (read-only devnet).                              |
-| Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                                              |
-| Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                                           |
-| Checks | `pnpm check`                                         | Typecheck, lint (including tooling), product and lab tests.                            |
-| Checks | `pnpm lint`                                          | ESLint, Prettier, tooling tests, skill layout and import boundaries.                   |
-| Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules.                        |
-| Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                                                   |
-
-## Configuration
-
-Set these in the environment; `.env` is **not** loaded
-([.env.example](.env.example)).
-
-| Variable                                        | Used by       | Meaning                                                                                          |
-| ----------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------ |
-| `GYBLOS_RELAY_TOKEN`                            | seller, buyer | Optional. Only for a relay that still requires a credential; 32-512 characters; never commit it. |
-| `GYBLOS_RELAYS`                                 | seller, buyer | Comma-separated relay URLs; default `na1` only.                                                  |
-| `GYBLOS_RELAY_ONLY`                             | seller        | `1` = relay only; advertise no direct addresses.                                                 |
-| `GYBLOS_BUYER_RELAY_ONLY`                       | buyer         | `1` = loopback binds; dial the seller only via its relay.                                        |
-| `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.                                             |
-| `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.                                             |
-| `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.                                             |
-| `GYBLOS_HOME`                                   | all           | Local home; default `.local/gyblos`. Lab: artifacts/ only.                                       |
-| `GYBLOS_LAB_HOME`                               | lab           | Lab home; default `.local/lab`.                                                                  |
-| `GYBLOS_GATE_CONFIG`                            | lab           | Lab config file; default `.local/lab/config.json`.                                               |
-| `GYBLOS_P2P_RUN_ID`                             | seller, buyer | Optional label copied into `status.json` and evidence.                                           |
-| `GYBLOS_GATE_RUN_ID`                            | lab           | Run label set by `gate:run`/`gate:inference` for children.                                       |
-| `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.                                                 |
-
-Keep a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME` outside the repository or under
-`.local/`, the only ignored local path.
+Commands read settings from the environment and never load a `.env` file.
+[.env.example](.env.example) lists the environment variables, and
+[configuration](docs/configuration.md) covers `config.toml`.
 
 ## Repository layout
 
-`apps/` holds the product executables (seller node, buyer, desktop host and the
-discovery index Worker), `packages/` the libraries they share, `lab/` the gate
-checks, the standalone lab facilitator and their evidence, and `tests/` and
-`tooling/` the offline checks. Package-by-package map:
-[docs/architecture.md](docs/architecture.md).
+| Path        | Contents                                                                                                                                                 |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/`     | Executables: seller node and `gyblos` CLI, local buyer, desktop app, discovery index, metrics collector, local receipt receiver, docs site and explorer. |
+| `packages/` | Libraries the apps share: protocol, policy, adapters and the node library.                                                                               |
+| `lab/`      | Validation outside the product: devnet checks, a local facilitator and published evidence.                                                               |
+| `tests/`    | Product and lab test suites; see [tests/README.md](tests/README.md).                                                                                     |
+| `tooling/`  | Boundary checker, lint rules and build tools.                                                                                                            |
+
+Package-by-package map: [docs/architecture.md](docs/architecture.md).
 
 ## Safety
 
-- A timeout is **not** a refund; uncertain payments block new ones until
-  reconciled. Never delete `buyer.lock` or a journal to retry
-  ([recovery](docs/recovery.md)).
+- A timeout is not a refund. An uncertain payment blocks new payments until it
+  is reconciled. Never delete `buyer.lock` or a journal to retry; follow
+  [recovery](docs/recovery.md).
 - Use only generated devnet keys. Never commit keys, tokens, journals or logs.
 
 ## Documentation
 
-Public guides for sellers and buyers, in English and Spanish, live in
-[apps/docs](apps/docs/README.md) (docs.gyblos.com). Repository documentation:
-
-[Architecture](docs/architecture.md) · [Running a node](docs/running-a-node.md)
-· [Configuration](docs/configuration.md) · [Payments](docs/payments.md) ·
-[Inference](docs/inference.md) · [Recovery](docs/recovery.md) ·
-[Identity](docs/identity.md) · [Discovery](docs/discovery.md) ·
-[Discovery index](docs/discovery-index.md) · [Stack](docs/stack.md) ·
-[Limitations](docs/limitations.md) · [Protocol spec](packages/protocol/SPEC.md)
-· [Tests](tests/README.md) · [Code standards](docs/code-standards.md) ·
-[Contributing](CONTRIBUTING.md) · [Repository rules](AGENTS.md) ·
-[AI-assisted contribution workflow](docs/ai-assisted-contributing.md)
-
-## Telemetry adapters
-
-The optional [aggregate OpenTelemetry adapter](docs/telemetry-otel.md) exports
-metrics only when explicitly constructed and flushed by a caller. It is not
-wired into node startup. Local record adapters remain separate.
-
-The free seller and buyer APIs support explicitly supplied local event sinks;
-see [local telemetry composition and event semantics](docs/local-telemetry.md).
-Seller and free-buyer startup can opt in with `[telemetry] file = true` in
-`config.toml`.
-
-Simulated paid product-startup verification: `pnpm acceptance:paid`
-([scope and limits](docs/paid-acceptance.md)).
-
-## PayPal Sandbox prototype
-
-The local single-seller prototype and its limitations are documented in
-[docs/paypal-sandbox.md](docs/paypal-sandbox.md).
+- [docs/README.md](docs/README.md): every repository document, grouped by
+  audience.
+- [docs.gyblos.com](https://docs.gyblos.com): guides for sellers and buyers.
+- [packages/protocol/SPEC.md](packages/protocol/SPEC.md): the wire protocol.
+- [AGENTS.md](AGENTS.md): repository rules for every contributor.
 
 ## License and community
 
 Original code is licensed under [Apache 2.0](LICENSE). Third-party components
-and marks retain their own terms; see
+and marks keep their own terms; see the
 [third-party notices](docs/third-party-notices.md). Contributions follow
 [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[code of conduct](CODE_OF_CONDUCT.md). Maintainer responsibilities and the
-[opening checklist](docs/repository-maintenance.md) describe how the repository
-is maintained.
+[code of conduct](CODE_OF_CONDUCT.md). Gyblos: [gyblos.com](https://gyblos.com)
+· [paper](https://gyblos.com/paper).

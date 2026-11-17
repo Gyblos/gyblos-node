@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/main.cjs",
   "exports": {
+    "./buyer-error": "./src/buyer-error.ts",
     "./usdc-api-model": "./src/usdc-api-model.ts",
     "./usdc-api-handlers": "./src/usdc-api-handlers.ts",
     "./usdc-api-client": "./src/usdc-api-client.ts",
@@ -90,6 +91,7 @@
     "package": "tsx scripts/package.ts"
   },
   "dependencies": {
+    "@gyblos/core": "workspace:*",
     "@gyblos/node": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/protocol": "workspace:*",

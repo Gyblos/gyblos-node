@@ -45,6 +45,9 @@ importers:
       '@gyblos/engine-openai':
         specifier: workspace:*
         version: link:packages/engine-openai
+      '@gyblos/explorer':
+        specifier: workspace:*
+        version: link:apps/explorer
       '@gyblos/inference':
         specifier: workspace:*
         version: link:packages/inference
@@ -211,6 +214,9 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@gyblos/discovery-http':
         specifier: workspace:*
         version: link:../../packages/discovery-http
@@ -325,8 +331,45 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  apps/explorer:
+    dependencies:
+      next:
+        specifier: 16.4.5
+        version: 16.4.5(@opentelemetry/api@1.9.0)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: 4.3.3
+        version: 4.3.3
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      postcss:
+        specifier: 8.5.32
+        version: 8.5.32
+      tailwindcss:
+        specifier: 4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   apps/metrics-collector:
     dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@gyblos/core':
         specifier: workspace:*
         version: link:../../packages/core

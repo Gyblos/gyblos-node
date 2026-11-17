@@ -1,12 +1,13 @@
 {
   "title": "Sellers",
   "pages": [
-    "manual-install",
+    "beta-guide",
     "register-publish",
     "models-offers",
     "get-paid",
     "operate",
-    "identity"
+    "identity",
+    "manual-install"
   ],
   "defaultOpen": true,
   "icon": "server"

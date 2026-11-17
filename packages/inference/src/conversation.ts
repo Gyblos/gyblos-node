@@ -80,6 +80,7 @@ export async function generateInference(options: {
   const output = await options.engine.generate({
     messages: options.input.messages,
     maxTokens: options.input.maxTokens,
+    inputTokens: options.inputTokens,
     ...(options.input.tools ? { tools: options.input.tools } : {}),
     ...(options.input.toolChoice
       ? { toolChoice: options.input.toolChoice }

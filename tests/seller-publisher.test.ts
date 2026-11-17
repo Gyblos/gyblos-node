@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { DISCOVERY_ERROR_CODES, DiscoveryError } from '@gyblos/discovery-http';
 import { createSellerPublisher } from '@gyblos/node/publisher';
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
@@ -208,6 +209,42 @@ void test('retirement bypasses publication backoff and immediately disables the 
     assert.equal(await publisher.tick(), false);
     assert.throws(() => run.records.current());
     assert.equal(sent.at(-1)!.record.kind, PUBLIC_RECORD_KINDS.WITHDRAWAL);
+  } finally {
+    await publisher.stop();
+    await run.close();
+  }
+});
+void test('a refused publication reports its static code once per change, and recovery reports it cleared', async () => {
+  const run = await sellerPublicationFixture();
+  const reported: (string | null)[] = [];
+  let refuse = true;
+  const publisher = createSellerPublisher({
+    records: run.records,
+    canPublish: () => true,
+    now: run.context.now,
+    retryMs: 100,
+    onError: (code) => reported.push(code),
+    publish: async () => {
+      if (refuse)
+        throw new DiscoveryError(
+          DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED,
+          403,
+        );
+    },
+  });
+  try {
+    assert.equal(await publisher.tick(), false);
+    run.setNow(run.context.now() + 100);
+    assert.equal(await publisher.tick(), false);
+    assert.deepEqual(reported, [DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED]);
+    refuse = false;
+    run.setNow(run.context.now() + 1000);
+    assert.equal(await publisher.tick(), true);
+    assert.equal(await publisher.tick(), true);
+    assert.deepEqual(reported, [
+      DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED,
+      null,
+    ]);
   } finally {
     await publisher.stop();
     await run.close();

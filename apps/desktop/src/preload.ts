@@ -23,7 +23,11 @@ import {
 import { DESKTOP_PAYPAL, parsePaypalResult } from './paypal-model';
 import { parseProbeResult } from './probe-model';
 import { parseStartupProgress } from './startup-progress';
-import { parseUsdcApiState, USDC_API } from './usdc-api-model';
+import {
+  parseUsdcApiSecret,
+  parseUsdcApiState,
+  USDC_API,
+} from './usdc-api-model';
 import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model';
 import { parseWalletSummary, WALLET } from './wallet/model';
 import {
@@ -74,6 +78,10 @@ contextBridge.exposeInMainWorld('desktopConversations', {
 contextBridge.exposeInMainWorld('desktopUsdcApiKeys', {
   run: async (request: unknown) =>
     parseUsdcApiState(await ipcRenderer.invoke(USDC_API.CHANNEL, request)),
+  reveal: async (request: unknown) =>
+    parseUsdcApiSecret(
+      await ipcRenderer.invoke(USDC_API.REVEAL_CHANNEL, request),
+    ),
 });
 contextBridge.exposeInMainWorld('desktopX402', {
   run: async (request: unknown) =>
@@ -156,6 +164,10 @@ contextBridge.exposeInMainWorld('desktopProbe', {
   run: async () => parseProbeResult(await ipcRenderer.invoke(DESKTOP.CHANNEL)),
 });
 contextBridge.exposeInMainWorld('desktopWallet', {
+  activate: async () =>
+    parseWalletCollection(
+      await ipcRenderer.invoke(WALLET_SETTINGS.ACTIVATE_CHANNEL),
+    ),
   collection: async () =>
     parseWalletCollection(
       await ipcRenderer.invoke(WALLET_SETTINGS.COLLECTION_CHANNEL),

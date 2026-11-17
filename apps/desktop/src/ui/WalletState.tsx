@@ -26,6 +26,7 @@ import {
 declare global {
   interface Window {
     desktopWallet?: {
+      activate(): Promise<WalletCollection>;
       summary(): Promise<WalletSummary>;
       collection(): Promise<WalletCollection>;
       manage(request: WalletSettingsRequest): Promise<WalletSettingsResult>;
@@ -53,6 +54,10 @@ function useWalletActions(refresh: () => Promise<void>) {
   }
   return {
     busy,
+    activate: () =>
+      run(unavailableCollection(), unavailableCollection(), async () =>
+        parseWalletCollection(await window.desktopWallet?.activate()),
+      ),
     manage: (request: WalletSettingsRequest) =>
       run(
         WALLET_SETTINGS_RESULT.BUSY,
@@ -72,9 +77,10 @@ function useWalletActions(refresh: () => Promise<void>) {
   };
 }
 const WalletContext = createContext({
-  collection: unavailableCollection(WALLET_STATUS.LOADING),
+  collection: unavailableCollection(WALLET_STATUS.LOCKED),
   refresh: async () => {},
   busy: false,
+  activate: async (): Promise<WalletCollection> => unavailableCollection(),
   manage: async (
     _request: WalletSettingsRequest,
   ): Promise<WalletSettingsResult> => WALLET_SETTINGS_RESULT.FAILED,
@@ -83,7 +89,7 @@ const WalletContext = createContext({
 });
 export function DesktopWalletProvider({ children }: { children: ReactNode }) {
   const [collection, setCollection] = useState(() =>
-    unavailableCollection(WALLET_STATUS.LOADING),
+    unavailableCollection(WALLET_STATUS.LOCKED),
   );
   const active = useRef(false);
   const sequence = useRef(0);
@@ -121,6 +127,6 @@ export function useRefreshDesktopWallet() {
   return useContext(WalletContext).refresh;
 }
 export function useDesktopWalletActions() {
-  const { busy, manage, backup } = useContext(WalletContext);
-  return { busy, manage, backup };
+  const { busy, activate, manage, backup } = useContext(WalletContext);
+  return { busy, activate, manage, backup };
 }

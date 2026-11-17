@@ -1,4 +1,4 @@
-// Concurrent public reads must not race the private filesystem lock or active selection.
+// Passive public reads use a snapshot; explicit selection publishes the updated identity.
 // This exercises the production coordinator with disposable injected storage only.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -32,8 +32,9 @@ void test('concurrent public collection reads all retain the ready wallet instea
       select: async () => null,
     },
     new AbortController().signal,
+    async () => true,
   );
-  const initial = await session.ready;
+  const initial = await session.activate();
   const views = await Promise.all(
     Array.from({ length: 8 }, () => session.collection()),
   );
@@ -45,7 +46,7 @@ void test('concurrent public collection reads all retain the ready wallet instea
     ),
   );
 });
-void test('a Settings selection waits for overlapping public reads and every later view reflects the selected address', async (context) => {
+void test('a Settings selection updates the cached address while concurrent public reads stay harmless', async (context) => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-wallet-read-switch-'));
   context.after(() => rm(home, { recursive: true, force: true }));
   const identity = disposableIdentity();
@@ -63,8 +64,9 @@ void test('a Settings selection waits for overlapping public reads and every lat
       select: async () => path,
     },
     new AbortController().signal,
+    async () => true,
   );
-  await session.ready;
+  await session.activate();
   await session.run({
     action: WALLET_SETTINGS_ACTION.RESTORE,
     password: TEST_BACKUP_PASSWORD,
@@ -84,7 +86,7 @@ void test('a Settings selection waits for overlapping public reads and every lat
   assert.ok(later.every((view) => view.wallet.address === identity.address));
 });
 
-void test('quit also waits for an already-started public wallet read', async (context) => {
+void test('passive reads and quit do not decrypt an already activated wallet again', async (context) => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-wallet-read-quit-'));
   context.after(() => rm(home, { recursive: true, force: true }));
   const protection = disposableProtection();
@@ -98,35 +100,17 @@ void test('quit also waits for an already-started public wallet read', async (co
       select: async () => null,
     },
     controller.signal,
+    async () => true,
   );
-  await session.ready;
-  let release: () => void = () => {};
-  let entered: () => void = () => {};
-  const blocked = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const reached = new Promise<void>((resolve) => {
-    entered = resolve;
-  });
-  const decrypt = protection.decrypt;
-  protection.decrypt = async (bytes) => {
-    entered();
-    await blocked;
-    return decrypt(bytes);
-  };
-  const reading = session.collection();
-  await reached;
+  const initial = await session.activate();
+  protection.available = async () =>
+    assert.fail('passive read must not consult OS storage');
+  protection.decrypt = async () => assert.fail('passive read must not decrypt');
+  assert.deepEqual(await session.collection(), initial);
   controller.abort();
-  let settled = false;
-  const stopping = session.settled().then(() => {
-    settled = true;
-  });
-  await new Promise((resolve) => setImmediate(resolve));
-  try {
-    assert.equal(settled, false);
-  } finally {
-    release();
-    await reading;
-    await stopping;
-  }
+  await session.settled();
+  assert.equal(
+    (await session.collection()).wallet.status,
+    WALLET_STATUS.UNAVAILABLE,
+  );
 });

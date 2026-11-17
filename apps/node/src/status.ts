@@ -28,6 +28,8 @@ export interface DaemonStatus {
   // A failed start's static code, or while starting again, the previous start's failure.
   code?: string;
   lastFailure?: DaemonFailure;
+  // The static code of the seller's last refused or failed publication to the index, while it lasts.
+  publicationError?: string;
 }
 
 export interface ActivityWindow {
@@ -58,6 +60,11 @@ function daemonFailure(value: unknown): DaemonFailure | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const entry = value as Record<string, unknown>;
   return { code: printable(entry.code), phase: printable(entry.phase) };
+}
+
+function publicationError(value: unknown) {
+  if (typeof value !== 'object' || value === null) return undefined;
+  return printable((value as Record<string, unknown>).lastError);
 }
 
 function statusOffer(value: unknown): StatusOffer | undefined {
@@ -94,6 +101,7 @@ export function parseDaemonStatus(text: string): DaemonStatus | undefined {
     offers: valid,
     code: printable(record.code),
     lastFailure: daemonFailure(record.lastFailure),
+    publicationError: publicationError(record.publication),
   };
 }
 

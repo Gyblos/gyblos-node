@@ -1,0 +1,88 @@
+{
+  "blockTime": 1793582180,
+  "meta": {
+    "computeUnitsConsumed": 617,
+    "costUnits": 1964,
+    "err": null,
+    "fee": 5001,
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX invoke [1]",
+      "Program CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX consumed 317 of 29700 compute units",
+      "Program CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX success"
+    ],
+    "postBalances": [149974997, 0, 1141440, 1],
+    "postTokenBalances": [],
+    "preBalances": [148029278, 1950720, 1141440, 1],
+    "preTokenBalances": [],
+    "rewards": [],
+    "status": {
+      "Ok": null
+    }
+  },
+  "slot": 517686708,
+  "transaction": {
+    "message": {
+      "accountKeys": [
+        {
+          "pubkey": "EY4sLR2AUSPr4xdcA66CEMApstEMvNWECYc77vGG8CH7",
+          "signer": true,
+          "source": "transaction",
+          "writable": true
+        },
+        {
+          "pubkey": "EVQfRwtXxHj13yGVrbU8DnPLbvC1pNe2qxpMMZ3pR3jN",
+          "signer": false,
+          "source": "transaction",
+          "writable": true
+        },
+        {
+          "pubkey": "CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX",
+          "signer": false,
+          "source": "transaction",
+          "writable": false
+        },
+        {
+          "pubkey": "ComputeBudget111111111111111111111111111111",
+          "signer": false,
+          "source": "transaction",
+          "writable": false
+        }
+      ],
+      "addressTableLookups": [],
+      "instructions": [
+        {
+          "accounts": [],
+          "data": "FKuNA3",
+          "programId": "ComputeBudget111111111111111111111111111111",
+          "stackHeight": 1
+        },
+        {
+          "accounts": [],
+          "data": "3DdGGhkhJbjm",
+          "programId": "ComputeBudget111111111111111111111111111111",
+          "stackHeight": 1
+        },
+        {
+          "accounts": [
+            "EVQfRwtXxHj13yGVrbU8DnPLbvC1pNe2qxpMMZ3pR3jN",
+            "EY4sLR2AUSPr4xdcA66CEMApstEMvNWECYc77vGG8CH7"
+          ],
+          "data": "A",
+          "programId": "CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX",
+          "stackHeight": 1
+        }
+      ],
+      "recentBlockhash": "7zrSvfAoiEF7GeMfdkJHvCYzfm4s7SxqnhCvZVb14yeN"
+    },
+    "signatures": [
+      "2Sz5BoAZ1fRB1pFHzau4uMDEh7ExpYQKsp48jdFj44jVCMCeogcVdo99xpmk5pSkGrvQ7QxCvdZnzaMRrbN1phT8"
+    ]
+  },
+  "transactionIndex": 25,
+  "version": 0
+}

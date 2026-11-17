@@ -208,6 +208,32 @@ void test('engine-ollama: a failing or malformed model inventory is unavailable 
     assert.equal(calls.generate, 0);
   }
 });
+void test('engine-ollama: a long prompt gets time to be read before its deadline', async () => {
+  // The engine answers after 500 ms, past the 200 ms base deadline: too slow for a short request, in time
+  // for one whose counted input adds reading time (50 tokens, 500 ms).
+  const slow: Handler = (_request, response) => {
+    setTimeout(() => response.writeHead(200, HEADERS).end(complete), 500);
+  };
+  const started = await serve(servedTags, slow, SHORT);
+  try {
+    const short = await started.engine
+      .generate({ prompt: 'synthetic', maxTokens: 8 })
+      .then(
+        () => assert.fail('a short request should time out'),
+        (rejected: unknown) => rejected,
+      );
+    assert.ok(short instanceof EngineError, String(short));
+    assert.equal(short.code, ENGINE_ERROR_CODES.TIMEOUT);
+    const long = await started.engine.generate({
+      prompt: 'synthetic',
+      maxTokens: 8,
+      inputTokens: 50,
+    });
+    assert.ok(long.text);
+  } finally {
+    await started.close();
+  }
+});
 void test('engine-ollama: a stalled model inventory times out on its own deadline', async () => {
   await failure(() => {}, generated, ENGINE_ERROR_CODES.TIMEOUT);
 });

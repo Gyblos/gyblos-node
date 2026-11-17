@@ -3,14 +3,11 @@
 // token accounts every claim pays into, recovery of earlier claims and the SDK's rent cleanup. Keys
 // are the caller's; nothing here reads key files.
 import { createSolanaRpc, type KeyPairSigner } from '@solana/kit';
-import { toFacilitatorSvmSigner } from '@x402/svm';
 import {
   createUptoChannelReaders,
-  createUptoFacilitator,
   createUptoRecipientAccounts,
   createUptoSdkChain,
   createUptoSeller,
-  createUptoVerifier,
   UPTO_COMMITMENT,
   uptoChannelRpc,
   UptoError,
@@ -26,6 +23,7 @@ import {
 } from '@gyblos/protocol/payment';
 
 import { LEDGER_FILE, UPTO_SELLER } from './constants';
+import { sellerUptoFeePolicy } from './fee-payer';
 import { openUptoFileLedger, type UptoLedgerPaths } from './file-ledger';
 import { assertPaymentNetworkEnabled } from './mainnet';
 import { verifyPaymentNetwork, type PaymentGenesisRpc } from './seller-network';
@@ -99,20 +97,19 @@ export async function openUptoSellerPayments(
         ? new PaymentError(PAYMENT_ERROR_CODES.UNAVAILABLE)
         : error;
     });
-    const facilitator = createUptoFacilitator(
-      toFacilitatorSvmSigner(feePayer, { defaultRpcUrl: rpcUrl }),
-      ledger.chain,
-    );
+    const financial = sellerUptoFeePolicy({
+      feePayer,
+      rpcUrl,
+      store: ledger.chain,
+      slot: () => rpc.getSlot({ commitment: UPTO_COMMITMENT }).send(),
+    });
     const readers = createUptoChannelReaders(uptoChannelRpc(rpc), {
       network: own.network,
       rentPayer: feePayer.address,
     });
     const seller = createUptoSeller({
       chain: createUptoSdkChain({
-        facilitator,
-        verify: createUptoVerifier(feePayer.address, () =>
-          rpc.getSlot({ commitment: UPTO_COMMITMENT }).send(),
-        ),
+        ...financial,
         authorizer,
         store: ledger.chain,
         channelExists: readers.channelExists,
@@ -128,7 +125,7 @@ export async function openUptoSellerPayments(
     const payment = { description, settings, seller, now };
     const server = createUptoPaymentServer(payment);
     // Last, so no failure above leaves its timer signing with the fee payer.
-    const cleanup = facilitator.createRentCleanupManager(own.network);
+    const cleanup = financial.facilitator.createRentCleanupManager(own.network);
     cleanup.start(options.cleanup);
     return {
       server,

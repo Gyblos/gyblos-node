@@ -4,7 +4,7 @@
 
 - GitHub repo `Gyblos/gyblos-node`; the local checkout directory is still named `gyblos-payments`. It holds the node, buyer, desktop and discovery index applications, not the landing website in `../gyblos` (`web-gyblos`).
 - Use English for repository content, comments, commits and PRs; conversation language follows the founder.
-- This file is the single public source of agent rules. `CLAUDE.md` imports it and `CONTRIBUTING.md` points here. Detailed style is in [docs/code-standards.md](docs/code-standards.md); the shared contributor workflow is in [docs/ai-assisted-contributing.md](docs/ai-assisted-contributing.md). Repository skills are canonical in `.agents/skills/` and mirrored to `.claude/skills/`, adding procedures but never rules. Optional personal notes go in ignored `AGENTS.local.md`.
+- This file is the single public source of agent rules. `CLAUDE.md` imports it and `CONTRIBUTING.md` points here. Detailed style is in [docs/code-standards.md](docs/code-standards.md); the shared contributor workflow is in [CONTRIBUTING.md](CONTRIBUTING.md). Repository skills are canonical in `.agents/skills/` and mirrored to `.claude/skills/`, adding procedures but never rules. Optional personal notes go in ignored `AGENTS.local.md`.
 
 ## Layers and ownership
 
@@ -16,7 +16,7 @@ Dependency direction is protocol → core → inference/adapters → node → ap
 - Standalone packages (`STANDALONE_NAMES` in `tooling/boundaries/config.ts`) are meant to leave the monorepo under their own license: they import no workspace package, app, lab or test code, keep their tests in `packages/<name>/test/`, and only `payments-*` adapters (plus tests and tooling) may import them.
 - `packages/inference`: shared SDK-free inference orchestration over protocol ports and core policy. It imports no concrete adapters, node or apps; core and adapters do not import it. Node supplies the engine, economic policy and observation ports.
 - `packages/node`: local-node library for both roles; composes adapters, including seller control, free channels and conditional paid-v2 execution when a payment server is supplied.
-- `apps/node` (seller daemon and the `gyblos` CLI), `apps/buyer`, `apps/desktop` (Electron, the provisional desktop host per vault GYB-DOC-001), `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval), `apps/metrics-collector` (the proposed public receipt collector Cloudflare Worker; not deployed, and creating its database or deploying needs founder approval) and `apps/docs` (the public docs site, docs.gyblos.com: a Fumadocs static export; publishing needs founder approval) are independent executables; apps never import each other. Every docs page has an English and a Spanish file, updated together; a change to output the seller guide quotes updates the guide in the same PR (`tests/docs-content.test.ts`).
+- `apps/node` (seller daemon and the `gyblos` CLI), `apps/buyer`, `apps/desktop` (the desktop app: Electron, the provisional desktop host), `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval), `apps/metrics-collector` (the metrics collector: the public receipt Cloudflare Worker at collector.gyblos.com, with scheduled aggregates and a public stats API; migrations and deploys need founder approval), `apps/docs` (the public docs site, docs.gyblos.com: a Fumadocs static export; publishing needs founder approval), `apps/explorer` (the public metrics explorer: a server-rendered Next.js app over the discovery index, the metrics collector's stats API and Solana; not deployed, and hosting it needs founder approval) and `apps/receipt-collector` (the local receipt receiver: a standalone loopback-only process) are independent executables; apps never import each other. Every docs page has an English and a Spanish file, updated together; a change to output the seller guide quotes updates the guide in the same PR (`tests/docs-content.test.ts`).
 - `packages/config`: operator values; `config/src/home.ts` is the only owner of local paths. `packages/runtime`: platform helpers.
 - `lab/`: validation outside product (`harness`, `facilitator`, `tools`; `evidence` is historical). "Gate" is a lab word only: no product code, route, variable, message or product script uses it.
 - Product never imports `lab/`, `tests/` or `tooling/`. Import other workspaces by name through explicit `exports`; relative imports stay inside one package.
@@ -32,7 +32,7 @@ pnpm install --frozen-lockfile
 pnpm check          # typecheck + lint + test:all; run before every PR
 pnpm typecheck      # includes tests and the desktop renderer
 pnpm lint           # eslint + prettier --check + tooling:test + skills:check + boundaries
-pnpm test           # product suites tests/*.test.ts (the PR gate)
+pnpm test           # product suites tests/*.test.ts and packages/*/test (required checks)
 pnpm test:lab       # lab suites tests/lab/
 pnpm tooling:test   # boundary checker and lint rule tests
 pnpm format         # prettier --write, sorts imports
@@ -43,7 +43,7 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 
 ## Shared contributor workflow
 
-- Humans and AI-assisted contributors follow the same change loop: orient, define scope, inspect, implement, verify locally, review and hand off. The procedure is [`.agents/skills/gyblos-contributor-workflow/SKILL.md`](.agents/skills/gyblos-contributor-workflow/SKILL.md); its public onboarding explanation is [docs/ai-assisted-contributing.md](docs/ai-assisted-contributing.md).
+- Humans and AI-assisted contributors follow the same change loop: orient, define scope, inspect, implement, verify locally, review and hand off. The procedure is [`.agents/skills/gyblos-contributor-workflow/SKILL.md`](.agents/skills/gyblos-contributor-workflow/SKILL.md); its public onboarding explanation is [CONTRIBUTING.md](CONTRIBUTING.md#using-ai-tools).
 - Provider-specific files may help a tool load this repository, but they do not add rules or replace project context. A handoff must be reproducible from the branch, repository files and reported checks, without a private prompt or transcript.
 
 ## Hard rules
@@ -73,7 +73,7 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 
 - Small coherent commits; never rewrite pushed commits without authorization.
 - Every substantive PR gets three independent read-only reviews (structure, behavior equivalence, security), each in its own worktree; one writer fixes confirmed findings and re-runs the gates.
-- PRs are merged with merge commits, never squash (GYB-DOC-024, amended 2026-10-23).
+- PRs are merged with merge commits, never squash.
 - Branches: work lands in `develop`; open every PR against `develop`. `main` receives only release PRs from `develop`, and release tags are cut from `main`. Both branches are protected: changes arrive only through PRs, with merge commits.
 - Opening a PR or green CI never authorizes a merge; merge only on explicit founder approval for that PR. CI, Security and Static analysis run on PRs into `develop` or `main` and on pushes to them. A stacked child PR intentionally has no hosted run: it still requires exact-head local gates, three independent reviews and separate founder approval before merging into its base. Merge stacks top-down; the final PR into `develop` requires successful current checks on the combined head. A missing or filtered check is never a passing check. Head updates and the final push to `develop` can run checks again. Default CI uses Linux plus targeted Windows checks; the broader wallet and backup-exchange platform jobs are manual (`desktop-platforms.yml`), so run them before desktop distribution or after wallet/backup/restore changes. A local-only task does not authorize triggering or rerunning remote workflows; report them as not run and leave the PR open.
 - Procedures and reviewer templates: `.agents/skills/gyblos-pr-workflow/SKILL.md`.
