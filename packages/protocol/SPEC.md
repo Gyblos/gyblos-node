@@ -1,10 +1,67 @@
-# Protocol compatibility, version 1
+# Gyblos protocol specification
 
 This package owns canonical JSON, domain-separated signature bytes, the signed
 inference offer wire shape, the Engine contract and the shared error taxonomy.
 It has no SDK or workspace dependencies, filesystem access, network calls or
 import-time process lifecycle. It uses the standard TextEncoder and Web Crypto
 APIs; callers adapt their wallets.
+
+Sections are ordered as the contracts were added, so a later section can
+supersede an earlier one. The matrix below names the active version of each
+channel and envelope; sections for retired versions explain frozen vector bytes
+only.
+
+## Version matrix
+
+Iroh channels (ALPNs). A seller registers each one only when its host composes
+the matching service (`packages/transport-iroh/src/endpoint.ts`).
+
+| ALPN                   | Version | Status                                                                                           | Golden vectors                                                                                                           | Section                                                                   |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `gyblos/control/1`     | 1       | Active; carries v2 public records and offers                                                     | `control-v2.json`, `control-v2-mtok.json`                                                                                | [Control contracts](#control-contracts-and-iroh-runtime)                  |
+| `gyblos/free/4`        | 4       | Active                                                                                           | `free-execution-v4.json`                                                                                                 | [Free inference execution v4](#free-inference-execution-v4)               |
+| `gyblos/free-stream/4` | 4       | Active                                                                                           | `free-stream-v4.json`                                                                                                    | [Free streaming execution v4](#free-streaming-execution-v4)               |
+| `gyblos/paid-stream/2` | 2       | Active when the seller has a payment server                                                      | `paid-execution-v2.json` (`paid-execution-v1.json` is retired)                                                           | [Paid inference execution](#paid-inference-execution)                     |
+| `gyblos/session/4`     | 4       | Active when the seller has reusable sessions                                                     | `batch-channel-v4.json`, `batch-prepare-v4.json`, `batch-startup-v4.json`, `batch-stream-v4.json`, `batch-tools-v4.json` | [Active common tool-aware execution](#active-common-tool-aware-execution) |
+| `gyblos/session/5`     | 5       | Active alongside `gyblos/session/4` (response blocks)                                            | `session-blocks-v5.json`                                                                                                 | [Session block checkpoints](#reusable-session-block-checkpoints-v5)       |
+| `gyblos/receipt/1`     | 1       | Active                                                                                           | `receipt-channel-v1.json`                                                                                                | [Receipt exchange channel v1](#receipt-exchange-channel-v1)               |
+| `gyblos/http/1`        | 1       | HTTP over Iroh; endpoints register it by default, but the seller node and buyer apps turn it off | `signed-inference-offer-v1.json`                                                                                         | [Canonical JSON and signing bytes](#canonical-json-and-signing-bytes)     |
+| `gyblos/http/2`        | —       | Reserved identifier; never registered                                                            | —                                                                                                                        | [Control contracts](#control-contracts-and-iroh-runtime)                  |
+
+Retired channels: `gyblos/session/1`, `/2` and `/3` (vectors
+`batch-*-v1.json` to `batch-*-v3.json`) and `gyblos/paid-stream/1`. Active
+parsers reject them.
+
+Signed records and envelopes outside the Iroh channels:
+
+| Contract                    | Active version                   | Golden vectors                                     | Section                                                                                              |
+| --------------------------- | -------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Public discovery records    | v1 and v2                        | `public-discovery-v1.json`, `control-v2.json`      | [Public discovery records](#public-discovery-records-version-1)                                      |
+| Usage receipts              | v1 (free), v2 (paid)             | `receipt-v1.json`, `receipt-v2.json`               | [Usage receipts v1](#usage-receipts-v1), [Paid receipt/v2](#paid-receiptv2-signed-channel-reference) |
+| Receipt upload envelope     | v1 (v2 contract only, not wired) | `receipt-upload-v1.json`, `receipt-upload-v2.json` | [v1](#receipt-upload-envelope-v1), [v2](#receipt-upload-envelope-v2)                                 |
+| Observation upload envelope | v1                               | `observation-upload-v1.json`                       | [Observation upload envelope v1](#observation-upload-envelope-v1)                                    |
+
+## Contents
+
+- [Version matrix](#version-matrix)
+- [Canonical JSON and signing bytes](#canonical-json-and-signing-bytes)
+- [Signatures, contracts and compatibility](#signatures-contracts-and-compatibility)
+- [Public discovery records, version 1](#public-discovery-records-version-1)
+- [Control contracts and Iroh runtime](#control-contracts-and-iroh-runtime)
+- [Free inference execution v4](#free-inference-execution-v4)
+- [Paid inference execution](#paid-inference-execution)
+- [Usage receipts v1](#usage-receipts-v1)
+- [Receipt exchange channel v1](#receipt-exchange-channel-v1)
+- [Reusable buyer-authorized payment session port](#reusable-buyer-authorized-payment-session-port)
+- [Reusable session v3 streaming (retired)](#reusable-session-v3-streaming-retired)
+- [Reusable conversation session channel v2 (retired)](#reusable-conversation-session-channel-v2-retired)
+- [Reusable single-seller session channel v1 (retired)](#reusable-single-seller-session-channel-v1-retired)
+- [Active common tool-aware execution](#active-common-tool-aware-execution)
+- [Reusable session block checkpoints (v5)](#reusable-session-block-checkpoints-v5)
+- [Paid receipt/v2: signed channel reference](#paid-receiptv2-signed-channel-reference)
+- [Receipt upload envelope v1](#receipt-upload-envelope-v1)
+- [Receipt upload envelope v2](#receipt-upload-envelope-v2)
+- [Observation upload envelope v1](#observation-upload-envelope-v1)
 
 ## Canonical JSON and signing bytes
 
@@ -172,9 +229,9 @@ IP privacy or Sybil resistance is established by a signature.
 
 ### Shared model catalog
 
-`MODEL_CATALOG` / `resolveModel` live at `./models`. Initial canonical IDs copy
-the nine names in GYB-DOC-026 / the website's `web/src/content.ts`, plus
-`qwen3-0.6b` for small tests. Explicit aliases currently cover
+`MODEL_CATALOG` / `resolveModel` live at `./models`. The canonical IDs are the
+names in `MODEL_IDS` (`packages/protocol/src/constants.ts`): nine model names
+plus `qwen3-0.6b` for small tests. Explicit aliases currently cover
 `qwen3:30b-a3b-q4_K_M` (the hybrid build; Ollama's bare `qwen3:30b-a3b` tag now
 points at a thinking-only build) and `qwen3:0.6b` from documented setup
 examples. Matching is exact and
@@ -184,7 +241,7 @@ model weights, a license or an audit. Entries and aliases are frozen.
 
 `reasoning` lists the levels a model supports (`levels`, in `REASONING_LEVELS`
 order, plus `defaultReasoning`, one of them) from the closed set `off`, `low`,
-`medium`, `high` (GYB-DOC-028); an on/off thinking switch is `off` and `high`.
+`medium`, `high`; an on/off thinking switch is `off` and `high`.
 `reasoning: null` means not verified from a primary model source or not mapped
 onto the closed set yet. The per-model table and sources are in
 `docs/configuration.md`. This catalog metadata changes no signed record or
@@ -711,22 +768,25 @@ Expiry has no grace: quote expiry is rechecked immediately before the first
 write. Streaming does not authorize payments, call a
 facilitator, modify the v1 flow or reserve capacity during quotation.
 
-## Paid inference execution v1
+## Paid inference execution
 
 `@gyblos/protocol/paid-execution`, `./paid-stream` and `./paid/constants` define
 the paid execution wire. They perform no I/O and admit no payment: quote
 authentication, replay, the payment adapter (`PaymentServer`), metering and
-settlement belong to the seller runtime, which does not register this channel
-yet. Vectors: `vectors/paid-execution-v1.json`.
+settlement belong to the seller runtime, which registers this channel when it
+has a payment server. The active request is version 2; its bounds and tool
+rules are in [Active common tool-aware execution](#active-common-tool-aware-execution).
+Vectors: `vectors/paid-execution-v2.json` (active) and
+`vectors/paid-execution-v1.json` (retired).
 
 ### Channel and request
 
-The ALPN is **`gyblos/paid-stream/1`**, stream-only: a one-shot response cannot
+The ALPN is **`gyblos/paid-stream/2`**, stream-only: a one-shot response cannot
 show delivery before settlement. One bidirectional stream carries one request
 frame, then ordered events, each with a four-byte big-endian length and
 canonical UTF-8 JSON. The free ALPNs are unchanged and never carry payments.
 
-Request: the free request shape (unchanged since v3) with `version: 1`, plus `payment`, a
+Request: the free request shape (unchanged since v3) with `version: 2`, plus `payment`, a
 `PaymentAuthorization` `{channelId, payer, requestDigest, maxAtomic, payload}`:
 
 - `quote` must be priced (`maxAtomic` above `"0"`), otherwise
@@ -739,7 +799,7 @@ Request: the free request shape (unchanged since v3) with `version: 1`, plus `pa
   `paymentMemo(terms)` and its distribution is `paymentSplits(terms)`
   (`payment-binding`), so the buyer's wallet signs every money field and the
   protocol fee split.
-- The request digest is SHA-256 over `gyblos/paid-execution-request/v1\n` plus
+- The request digest is SHA-256 over `gyblos/paid-execution-request/v2\n` plus
   the canonical request, so it covers the authorization; the request is bounded
   to the free bound plus 8 KiB.
 
@@ -947,7 +1007,7 @@ private storage are bounded best-effort metadata work: a failure cannot change
 the answer, release financial uncertainty or trigger inference again. Existing
 free-only collection policy is unchanged; paid aggregate ingestion is separate.
 
-### Telemetry port (not connected)
+### Telemetry port
 
 `TelemetrySink.emit` is synchronous and must never throw. `flush` drains
 accepted work; `close` returns `{ emitted, dropped, failed }`. Both are
@@ -971,8 +1031,9 @@ log. Its open buffer is bounded by `PRIVATE_LOG_LIMITS.pendingRecords`.
 Serialized records including newline are capped at 4096 bytes. Accepted events
 increment emitted; buffer/projection drops and runtime log drops increment
 dropped; persistence failure sets failed. The console plugin uses only its
-injected write and emits one JSON line per projected event. No plugin is
-installed into a live role by this change.
+injected write and emits one JSON line per projected event. The node installs
+the file plugin only when file telemetry is enabled at startup, next to its
+always-on metrics uploader observer; it never composes the console plugin.
 
 ## Receipt exchange channel v1
 
@@ -1109,9 +1170,12 @@ or disconnected HTTP stream does not itself execute settlement or a refund.
 No existing offer, free/paid execution or golden vector is modified by this port.
 [Session composition and limitations](../../docs/payment-sessions.md).
 
-## Reusable session v3 streaming
+## Reusable session v3 streaming (retired)
 
-The active reusable-session channel is `gyblos/session/3`, envelope version 3,
+Retired: the active reusable-session channels are `gyblos/session/4` and
+`gyblos/session/5` (see the [version matrix](#version-matrix)). This section
+explains the frozen v3 vector bytes. At the time, the active reusable-session
+channel was `gyblos/session/3`, envelope version 3,
 with `gyblos/session-request/v3\n` for the canonical inner execution and
 `gyblos/session-rpc/v3\n` for the outer RPC. Both peers upgrade together;
 preparation fails before a new deposit opening on a v1/v2-only peer. Only one
@@ -1193,9 +1257,9 @@ full transport capacity can still refuse those operations; this is no bypass
 of abuse controls and grants no priority over active work. Reconnection never
 erases spent inference quota, changes a financial intent or retries a prompt.
 
-## Reusable conversation session channel v2
+## Reusable conversation session channel v2 (retired)
 
-`gyblos/session/2` replaces the active session v1 transport. Both peers must
+Retired; see the [version matrix](#version-matrix). `gyblos/session/2` replaced the active session v1 transport. Both peers must
 upgrade; the buyer requires successful v2 preparation before calling its opening
 or signing port. It never falls back to session v1 or to per-request payment.
 The previous v1 contract below is frozen historical context, not a second
@@ -1240,9 +1304,9 @@ Independent Node/OpenSSL vectors are `batch-channel-v2.json`,
 `batch-prepare-v2.json` and `batch-startup-v2.json`. All v1 fixtures remain
 byte-identical and are tested independently along with explicit v1 rejection.
 
-## Reusable single-seller session channel v1
+## Reusable single-seller session channel v1 (retired)
 
-`gyblos/session/1` is a separate, opt-in Iroh ALPN. It is registered only by a host
+Retired; see the [version matrix](#version-matrix). `gyblos/session/1` was a separate, opt-in Iroh ALPN. It is registered only by a host
 that supplies a matching session service. Existing control, free, paid-stream,
 receipt and reserved HTTP ALPNs, signed quote formats and vectors are unchanged.
 A quote's existing protocol field does not advertise this optional channel.
@@ -1889,3 +1953,22 @@ reference cannot be recovered later from the six facts or a receipt alone.
 No endpoint, prompt, response or payment payload is added to an upload, and
 freshness, nonce replay, pre-verification admission and private storage remain
 collector responsibilities.
+
+## Observation upload envelope v1
+
+`@gyblos/protocol/observation-upload` defines how a node hands a batch of its
+own content-free telemetry events to a collector, such as a buyer's unserved
+demand or observed latency. The signed object is `{ upload, signature }`:
+`signature` is hex Ed25519 by `upload.uploaderNodeId` over the prefix
+`gyblos/observation-upload/v1\n` (real LF). Vectors are
+`vectors/observation-upload-v1.json`.
+
+`upload` has exactly the fields `version` (`1`; any other value is `VERSION`),
+`uploaderNodeId`, `role`, `client`, `sentAt` and `nonce`, with the same rules as
+[receipt upload envelope v1](#receipt-upload-envelope-v1), plus `events`: 1 to
+200 plain JSON objects. The canonical `upload` is at most 262144 bytes, otherwise
+`LIMIT`.
+
+This contract owns shape, bounds and the signature only. Each event is copied
+through canonical JSON and not interpreted here; the collector validates event
+semantics with core's telemetry projection.

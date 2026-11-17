@@ -1,66 +1,97 @@
 ---
 title: CLI
-description: Supported seller commands, accepted flags, configuration selection and exit codes.
+description: Every gyblos command, its options and exit codes, how to run it for each install type, and the installer's commands.
 ---
 
-This reference lists the implemented `gyblos` commands. For the invitation's Docker installation,
-run from `~/gyblos-seller` and prefix a command with `docker compose exec seller`.
-If the seller container is unavailable, use `docker compose run --rm seller` before `gyblos` instead.
-Native checkout commands use `pnpm gyblos`; they are not a replacement for the Docker installation.
+The `gyblos` command runs and manages a seller node. This page lists every command, its options and its
+exit codes.
+
+## How to run gyblos [#how-to-run]
+
+| Install                                 | Run a command as                                                        |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| Docker seller, container running        | `docker compose exec seller gyblos COMMAND`, from `~/gyblos-seller`     |
+| Docker seller, container stopped        | `docker compose run --rm seller gyblos COMMAND`, from `~/gyblos-seller` |
+| Native seller (macOS, Linux or Windows) | `gyblos COMMAND`                                                        |
+| Source checkout                         | `pnpm gyblos COMMAND`, from the repository                              |
+
+Replace `COMMAND` with a command from the table below. The examples on this page use the Docker form.
 
 ## Commands [#command-index]
 
-| Command                           | Accepted options                                     | Exit codes                                         |
-| --------------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
-| `gyblos config validate`          | `--config <path>`                                    | 0 valid; 1 invalid or usage error                  |
-| `gyblos doctor`                   | `--online`                                           | 0 no failed checks, even with warnings; 1 failure  |
-| `gyblos seller status`            | `--online`                                           | 0 only for `RUNNING`; 1 for other states or errors |
-| `gyblos seller register`          | None                                                 | 0 registered/already registered; 1 failure         |
-| `gyblos seller init`              | See init flags below                                 | 0 written; 1 failure; 130 cancelled prompt         |
-| `gyblos seller service install`   | `--memory <size>`, `--cpu <percentage>`, `--dry-run` | 0 success; 1 failure                               |
-| `gyblos seller service uninstall` | `--dry-run`                                          | 0 success; 1 failure                               |
+| Command                           | Options                                                | Exit codes                                           |
+| --------------------------------- | ------------------------------------------------------ | ---------------------------------------------------- |
+| `gyblos start`                    | None                                                   | Runs until stopped                                   |
+| `gyblos setup`                    | `--role seller --mint MINT`                            | 0 keys ready; non-zero on failure                    |
+| `gyblos tokenizer`                | None                                                   | 0 verified; non-zero on failure                      |
+| `gyblos --version`                | None                                                   | 0                                                    |
+| `gyblos config validate`          | `--config PATH`                                        | 0 valid; 1 invalid or usage error                    |
+| `gyblos doctor`                   | `--online`                                             | 0 no failed check, even with warnings; 1 a failure   |
+| `gyblos seller status`            | `--online`                                             | 0 only for `RUNNING`; 1 for any other state or error |
+| `gyblos seller register`          | None                                                   | 0 registered or already registered; 1 failure        |
+| `gyblos seller init`              | See [`seller init`](#init-flags-for-a-native-checkout) | 0 written; 1 failure; 130 prompt cancelled           |
+| `gyblos seller service install`   | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`          | 0 success; 1 failure                                 |
+| `gyblos seller service uninstall` | `--dry-run`                                            | 0 success; 1 failure                                 |
+| `gyblos logs`                     | See [`logs`](#local-operational-logs)                  | 0 read completed; 1 usage error or unreadable data   |
 
-There is no general `gyblos start` or `gyblos stop` command, or general `--home`, `--relay`,
-`--rpc-url` or `--discovery-url` CLI flag. Use Compose for the Docker lifecycle and the
-[documented environment variables](/en/reference/configuration) for supported overrides.
+There is no `gyblos stop`, and no general `--home`, `--relay`, `--rpc-url` or `--discovery-url` flag.
+Stop a Docker seller with Compose and a native seller through its service (see
+[Operate and update](/en/sellers/operate)). Use the
+[environment variables](/en/reference/configuration#environment-overrides) for other overrides.
 
-## Docker commands
+### start [#start]
 
-### Validation [#validate-the-mounted-configuration]
+`gyblos start` runs the seller node in the foreground with `GYBLOS_CONFIG`, or `./config.toml`. The
+Docker image and the background service run it for you. Don't start a second seller on the same home.
+
+### setup and tokenizer [#setup-and-tokenizer]
+
+`gyblos setup --role seller --mint MINT` creates the seller's owner, node and payment keys and prints its
+public role. It keeps keys that already exist, and adds payment keys to a seller that lacks them. It
+contacts no RPC and funds nothing. `gyblos tokenizer` downloads and verifies the pinned public tokenizer
+and prints `Pinned tokenizer verified.` The installer runs both for you.
+
+### --version [#version]
+
+`gyblos --version` prints the release version. A source checkout prints `source`.
+
+## Check the configuration [#validate-the-mounted-configuration]
 
 ```sh
 cd ~/gyblos-seller
 docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
-Success prints `OK`, effective settings and their source, offers, and secret variable names with
-`set` or `not set`. Failure prints issue codes and key paths. Values from the environment are hidden;
-file/default URLs are reduced to origins with paths hidden. Still review customized output before sharing.
-The command parses the file and resolves the environment; it does not check engine readiness or
-all seller startup restrictions.
+On success it prints `OK`, the effective settings and where each came from, the offers, and the names of
+secret variables with `set` or `not set`. On failure it prints issue codes and key paths. It never prints a
+value from the environment, and it shows URLs as origins only. Still review the output before you share
+it. `config validate` parses the file and the environment; it doesn't check the engine or other startup
+conditions. `gyblos doctor` does.
 
-<Callout title="Configuration selection differs by command">
-  `config validate` uses `--config`, otherwise `./config.toml`; it does not read
-  `GYBLOS_CONFIG` to select the file. In the supplied container use
-  `/config/config.toml` explicitly. Doctor, init and startup use
-  `GYBLOS_CONFIG`, otherwise the working directory's `config.toml`. Doctor,
-  init, status, register and service do not accept `--config`.
-</Callout>
+Each command picks its configuration file differently:
 
-### Diagnostics [#diagnose-startup]
+| Command                                | Configuration file                                                  |
+| -------------------------------------- | ------------------------------------------------------------------- |
+| `config validate`                      | `--config PATH`, otherwise `./config.toml`; ignores `GYBLOS_CONFIG` |
+| `start`, `doctor`, `seller init`       | `GYBLOS_CONFIG`, otherwise `./config.toml`                          |
+| `seller status`, `register`, `service` | Don't accept `--config`                                             |
+
+In the Docker container, pass `/config/config.toml` to `config validate` explicitly.
+
+## Diagnose startup [#diagnose-startup]
 
 ```sh
 cd ~/gyblos-seller
 docker compose run --rm seller gyblos doctor
 ```
 
-Doctor prints `OK`, `WARN` or `FAIL` with codes and hints, effective seller limits and public identity.
-It does not start a seller, generate inference or write state. It probes loopback engines.
-`--online` additionally checks remote engine model lists and discovery clock; provider credentials may
-be sent to the configured provider. A successful probe is not proof of generation, memory headroom or
-valid private-key contents. Use [troubleshooting](/en/help/troubleshooting) for failures.
+Doctor prints `OK`, `WARN` or `FAIL` for each check, with codes and hints, then the effective seller limits
+and the seller's public identity. It doesn't start a seller, generate an answer or write state. It probes
+local engines only. `--online` also asks remote engines for their model lists and checks the clock against
+the discovery index; it sends provider credentials to the configured provider. A passing doctor doesn't
+prove that the model can generate. See [Troubleshooting](/en/help/troubleshooting) for failures.
 
-### Status and registration [#status-and-registration]
+## Status and registration [#status-and-registration]
 
 ```sh
 cd ~/gyblos-seller
@@ -69,81 +100,113 @@ docker compose exec seller gyblos seller status --online
 docker compose exec seller gyblos seller register
 ```
 
-Status is read-only. `--online` queries discovery by model to look for the public NodeId.
-Its activity summary is bounded retained-receipt history, not a quota balance.
-The `receipt queue` line shows pending records, reserved bytes and rejected storage writes. Pending
-receipts are protected from retention; `FULL` means new receipts cannot be saved until capacity is freed.
-Automatic upload is not enabled yet.
+`seller status` is read-only. `--online` also looks up the seller's NodeId in the discovery index. While
+the index refuses or fails this seller's publication, the discovery line adds `publishing refused:` and a
+static code. The
+activity summary comes from signed receipts kept on the machine; it is not a quota balance. The
+`receipt queue` line shows receipts waiting to upload to the metrics collector, the bytes reserved for
+them and any rejected writes. `FULL` means new receipts can't be saved until some are uploaded. On a
+release build, status also reports when a newer release exists (see
+[Data and privacy](/en/reference/data-and-privacy#update-checks)).
 
-Register accepts the invite through an interactive terminal or `GYBLOS_INVITE`, never a command-line
-argument. The interactive input is visible. It grants discovery publication permission after the index
-checks enrollment. With an interactive terminal it can create missing devnet enrollment using the
-owner wallet: it estimates cost, simulates and asks for `yes` before a new signed submission. It writes
-private registration state and may resend a saved approved transaction without a fresh prompt on rerun.
-It does not change TOML or publish. `REGISTER_IDENTITY_UNAVAILABLE` reports an enrollment that did not
-complete; read its funding, simulation or uncertain-state hint. See [Register and publish](/en/sellers/register-publish)
-for prerequisites and recovery limits before running it.
+`seller register` reads the invite code from an interactive terminal or from `GYBLOS_INVITE`, never from a
+command-line argument. It asks before it signs and submits a devnet registration that costs SOL, and it
+doesn't change `config.toml` or publish. Read [Register and publish](/en/sellers/register-publish) before
+you run it.
 
-## Native checkout
+## seller init [#init-flags-for-a-native-checkout]
 
-### Init [#init-flags-for-a-native-checkout]
-
-`gyblos seller init` writes one free devnet offer. It does not install Docker, create keys, download
-models or start an engine. In Docker edit the host file: the container configuration mount is read-only.
+`gyblos seller init` writes a starting `config.toml` with one free devnet offer. It doesn't install Docker,
+create keys, download models or start an engine. The installer writes its own `config.toml`, so you need
+`seller init` only for a source checkout or a hand-made setup. For the Docker seller, edit the host file
+instead: the container mounts the configuration read-only.
 
 | Flag                                 | Meaning and default                                                                                                |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | `--engine ollama\|openai\|anthropic` | Engine kind; default `ollama`                                                                                      |
-| `--url <url>`                        | Default Ollama `http://127.0.0.1:11435`; OpenAI `https://api.openai.com/v1`; Anthropic `https://api.anthropic.com` |
-| `--model <id>`                       | Default `qwen3:0.6b` for Ollama; required/prompted for remote engines                                              |
-| `--upstream-model <name>`            | Engine's model name; defaults to offered model                                                                     |
-| `--context-tokens <n>`               | Required/prompted for OpenAI/Anthropic; omit for Ollama                                                            |
-| `--api-key-env <NAME>`               | Name of a secret variable; remote defaults `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`                                 |
-| `--api-key-env none`                 | Omit an API key for OpenAI; not accepted for Anthropic                                                             |
-| `--daily-cap <n>`                    | Default `200000` tokens                                                                                            |
-| `--per-buyer-cap <n>`                | Default `50000` tokens                                                                                             |
-| `--publish` / `--no-publish`         | Publication; default off; mutually exclusive                                                                       |
-| `--force`                            | Replace an existing regular configuration file; does not authorize following a symlink                             |
+| `--url URL`                          | Default Ollama `http://127.0.0.1:11435`; OpenAI `https://api.openai.com/v1`; Anthropic `https://api.anthropic.com` |
+| `--model ID`                         | Default `qwen3:0.6b` for Ollama; required, or asked, for remote engines                                            |
+| `--upstream-model NAME`              | The engine's name for the model; defaults to the offered model                                                     |
+| `--context-tokens N`                 | Required, or asked, for OpenAI and Anthropic; omit for Ollama                                                      |
+| `--api-key-env NAME`                 | Name of the API key variable; defaults `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`                                     |
+| `--api-key-env none`                 | No API key, for OpenAI only                                                                                        |
+| `--daily-cap N`                      | Default `200000` tokens                                                                                            |
+| `--per-buyer-cap N`                  | Default `50000` tokens                                                                                             |
+| `--publish` / `--no-publish`         | Publication; default off; use one or the other                                                                     |
+| `--force`                            | Replace an existing regular file; never follows a symlink                                                          |
 
-On a terminal it asks for missing choices; scripted runs use flags and defaults. Without `--force`,
-an existing file is refused. Init checks settings with a placeholder for provider credentials; it does
-not validate the actual credential. Its native Ollama port `11435` differs from the Docker installer's `11434`.
+On a terminal it asks for missing choices; a script gets the flags and defaults. Without `--force` it
+refuses to replace an existing file. It checks the settings with a placeholder credential, so it doesn't
+prove that your API key works. Its default Ollama port, `11435`, differs from the installers, which use
+`11434`.
 
-### Background services [#native-background-services]
+## Background service [#native-background-services]
 
-These commands target Linux user systemd or macOS launchd, **not Docker**. Run as the seller account,
-never root. Install defaults to `2048M` memory (also the minimum) and `100%` CPU. `--dry-run` previews
-without installing. macOS does not enforce these resource limits.
+`gyblos seller service install` runs a native seller in the background as the account that installs it:
+a user systemd unit on Linux, a launch agent on macOS, or a scheduled task at logon on Windows (packaged
+release only). Run it as the seller's account, never as root, and never inside the Docker container. The
+installer runs it for you.
 
-The native service uses its product-home `seller.env`, with strict `NAME=value` lines and owner-only
-permissions, rather than inheriting all variables from your shell. It captures the home and configuration
-paths during installation. Uninstall removes service registration, not keys or configuration.
-Native provisioning is outside this Docker tutorial; do not run service install inside the container.
+- Before it installs, it runs `doctor` with the service's own environment and refuses a seller that
+  could not start.
+- The service reads only the home's `seller.env` (strict `NAME=value` lines, owner-only permissions), plus
+  the home and configuration paths captured at install time. It doesn't inherit your shell's variables.
+- `--memory` defaults to `2048M`, which is also the minimum. `--cpu` defaults to `100%`. Only Linux
+  enforces these limits.
+- `--dry-run` shows what it would do without installing.
+- `uninstall` stops the seller and removes the service. It keeps keys and configuration.
 
-**Related:** [Configuration reference](/en/reference/configuration) · [Operation](/en/sellers/operate).
-
-## Local operational logs
+## logs [#local-operational-logs]
 
 ```sh
-pnpm gyblos logs --role buyer
-pnpm gyblos logs --role buyer --follow --level error
-pnpm gyblos logs --role buyer --json --component buyer-http --operation chat
+gyblos logs --role buyer
+gyblos logs --role buyer --follow --level error
+gyblos logs --role buyer --json --component buyer-http --operation chat
 ```
 
-Installed releases use `gyblos` without the `pnpm` prefix. The command reads only
-local structured diagnostics and never starts a node or contacts a service.
-`--role` accepts `buyer`, `seller` (default) or `lab`. Filters are `--level`
-(`debug`, `info`, `warn`, `error`, minimum severity), `--component`, `--operation`
-and `--correlation-id`. `--limit` accepts 1–1000 records, default 100; with
-`--follow` it limits the initial tail, then prints new matches until Ctrl+C.
-`--json` prints the same safe metadata as JSONL. Exit codes are 0 for a completed
-read/follow and 1 for usage or unsafe/unreadable data (`DIAGNOSTICS_UNAVAILABLE`).
-A missing directory is an empty successful result and is never created.
+`gyblos logs` reads the local, content-free diagnostic log of a role. It never starts a node or contacts
+a service. The local buyer writes this log; the seller node writes its output to its service log
+instead (`docker compose logs seller`, `service.log` in the home, or `journalctl --user -u gyblos-seller`).
 
-Initial coverage is buyer HTTP refusals, input/execution failures, deadlines and
-disconnects, plus tool acceptance worker phases and cleanup failures. Seller
-boundaries are not yet instrumented by this channel. Lab acceptance writes safe
-failure JSONL to stderr by default; a caller must explicitly compose a local file
-sink for `--role lab` to read retained diagnostics. The command does not read
-service output, telemetry, receipts or payment journals. Logs are bounded local
-metadata, with no central upload; missing evidence does not prove success.
+| Option                                                        | Meaning                                                     |
+| ------------------------------------------------------------- | ----------------------------------------------------------- |
+| `--role buyer\|seller`                                        | Whose log to read; default `seller`                         |
+| `--level debug\|info\|warn\|error`                            | Minimum severity                                            |
+| `--component NAME`, `--operation NAME`, `--correlation-id ID` | Filters                                                     |
+| `--limit N`                                                   | 1 to 1000 records; default 100                              |
+| `--follow`                                                    | After the last records, keep printing new ones until Ctrl+C |
+| `--json`                                                      | Print the same records as JSON lines                        |
+
+A missing log is an empty result, not an error. Logs are bounded and stay on the machine; a missing
+record doesn't prove that nothing failed. Unreadable or unsafe data exits with `DIAGNOSTICS_UNAVAILABLE`.
+
+## Installer commands [#installer-commands]
+
+Run the installer again from where you saved it:
+
+| Command                   | What it does                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| `sh install.sh`           | Install or update the seller; on a terminal it then offers to register and publish |
+| `sh install.sh publish`   | List the installed seller in the discovery index (after registering it)            |
+| `sh install.sh unpublish` | Withdraw it from the index; it keeps running                                       |
+| `sh install.sh update`    | Download the latest release's installer, check it and run it                       |
+
+On Windows, run the same subcommands with
+`powershell -ExecutionPolicy Bypass -File install.ps1 SUBCOMMAND`.
+
+The installer reads these optional variables:
+
+| Variable                     | Meaning                                                                                             |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| `GYBLOS_MODE`                | `docker` or `native` (`install.sh` only); default: the existing install's, else Docker when it runs |
+| `GYBLOS_DIR`                 | `install.sh` only: Docker seller folder; default `~/gyblos-seller`                                  |
+| `GYBLOS_HOME`                | Native seller home; default `~/.gyblos` (Windows: `%USERPROFILE%\.gyblos`)                          |
+| `GYBLOS_IMAGE`               | `install.sh` only: seller image; default the release pinned in the installer                        |
+| `GYBLOS_RELAY_TOKEN`         | Only for a relay that requires a token                                                              |
+| `GYBLOS_REQUIRE_SIGNATURE=1` | Stop unless cosign verifies the release signature                                                   |
+| `GYBLOS_GUIDED=0`            | Print the steps to register and publish instead of asking                                           |
+| `GYBLOS_MODIFY_PATH=0`       | `install.ps1` only: don't add `gyblos` to your user `PATH`                                          |
+| `GYBLOS_RELEASE_URL`         | `install.ps1` only: where to download releases from; the checksum still applies                     |
+
+**Related:** [Configuration reference](/en/reference/configuration) ·
+[Operate and update](/en/sellers/operate) · [Troubleshooting](/en/help/troubleshooting).
