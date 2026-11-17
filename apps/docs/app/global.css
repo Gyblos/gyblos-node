@@ -87,10 +87,6 @@ html > body[data-scroll-locked] {
 }
 
 .docs-page-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 1rem 2rem;
   margin-bottom: 2.5rem;
 }
 
@@ -98,12 +94,19 @@ html > body[data-scroll-locked] {
   min-width: 0;
 }
 
+.docs-page-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+
 .docs-page-actions {
-  margin: 0 0 0.25rem;
+  margin: 0;
 }
 
 .docs-page-actions > div {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .docs-home-page > .prose > h2:first-child {
@@ -112,18 +115,7 @@ html > body[data-scroll-locked] {
 
 @media (max-width: 48rem) {
   .docs-page-header {
-    grid-template-columns: 1fr;
-    align-items: start;
     margin-bottom: 2rem;
-  }
-
-  .docs-page-actions {
-    justify-self: start;
-    margin-bottom: 0;
-  }
-
-  .docs-page-actions > div {
-    justify-content: flex-start;
   }
 }
 

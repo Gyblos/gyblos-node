@@ -37,16 +37,18 @@ export default async function Page(props: PageProps) {
     >
       <div className="docs-page-header">
         <div className="docs-page-heading">
-          <DocsTitle>{page.data.title}</DocsTitle>
+          <div className="docs-page-title-row">
+            <DocsTitle>{page.data.title}</DocsTitle>
+            <PageActions
+              key={page.url}
+              markdownUrl={markdownUrl(page.url)}
+              spanish={lang === 'es'}
+            />
+          </div>
           <DocsDescription className="mb-0">
             {page.data.description}
           </DocsDescription>
         </div>
-        <PageActions
-          key={page.url}
-          markdownUrl={markdownUrl(page.url)}
-          spanish={lang === 'es'}
-        />
       </div>
       <DocsBody>
         <MDX
