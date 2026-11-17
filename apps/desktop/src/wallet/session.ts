@@ -67,6 +67,7 @@ class DesktopWalletSession {
     private readonly protection: WalletProtection | null,
     private readonly dialogs: BackupDialogs,
     private readonly signal: AbortSignal,
+    private readonly approveAccess: () => Promise<boolean> = async () => false,
   ) {
     this.library = createWalletLibrary(root, protection);
     this.ready = prepareDesktopWallet(root, protection, signal).then(
@@ -163,6 +164,9 @@ class DesktopWalletSession {
   async summary() {
     return (await this.collection()).wallet;
   }
+  activate(): Promise<WalletCollection> {
+    return Promise.resolve(unavailableCollection());
+  }
   run(value: unknown) {
     return this.exclusive(
       WALLET_SETTINGS_RESULT.BUSY,
@@ -196,6 +200,7 @@ export function createDesktopWalletSession(
   protection: WalletProtection | null,
   dialogs: BackupDialogs,
   signal: AbortSignal,
+  approveAccess?: () => Promise<boolean>,
 ) {
-  return new DesktopWalletSession(root, protection, dialogs, signal);
+  return new DesktopWalletSession(root, protection, dialogs, signal, approveAccess);
 }

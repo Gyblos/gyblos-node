@@ -10,7 +10,7 @@ import {
 
 type WalletHandlerSession = Pick<
   ReturnType<typeof createDesktopWalletSession>,
-  'summary' | 'collection' | 'run' | 'backup' | 'copy'
+  'summary' | 'collection' | 'run' | 'backup' | 'copy' | 'activate'
 >;
 interface WalletSender {
   sender: unknown;
@@ -40,6 +40,8 @@ export function createWalletHandlers(
     );
   }
   return {
+    activate: (_event: WalletSender, _args: readonly unknown[]) =>
+      Promise.resolve(unavailableCollection()),
     summary: (event: WalletSender, args: readonly unknown[]) =>
       accepts(event, args, 0) && session
         ? session.summary()
