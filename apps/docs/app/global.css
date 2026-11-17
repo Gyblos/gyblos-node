@@ -233,9 +233,10 @@ html > body[data-scroll-locked] {
   color: var(--color-fd-muted-foreground);
 }
 
-/* The docs lockup draws the mark and the name at the same size and keeps its aspect ratio in both themes. */
+/* The docs lockup draws the mark and the name at the same size and keeps its aspect ratio in both themes. It sits
+   at the scale of the sidebar text, not of a page title. */
 .docs-wordmark {
-  width: 160px;
+  width: 104px;
   height: auto;
   flex-shrink: 0;
 }
