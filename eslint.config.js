@@ -25,6 +25,9 @@ export default [
       'apps/docs/out/**',
       'apps/docs/.source/**',
       'apps/docs/next-env.d.ts',
+      'apps/explorer/.next/**',
+      'apps/explorer/.cache/**',
+      'apps/explorer/next-env.d.ts',
     ],
   },
   {
@@ -44,6 +47,7 @@ export default [
           './tsconfig.tests.json',
           './apps/desktop/tsconfig.renderer.json',
           './apps/docs/tsconfig.json',
+          './apps/explorer/tsconfig.json',
         ],
         tsconfigRootDir: ROOT,
       },

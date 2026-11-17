@@ -1,0 +1,139 @@
+// Owns the read of the discovery index: models offered now, sellers online and their uptime, fetched,
+// checked at the boundary and cached for about a presence interval.
+import { cacheLife } from 'next/cache';
+import { connection } from 'next/server';
+
+import { DISCOVERY_URL } from './config';
+import { CACHE_LIFE, DISCOVERY } from './constants';
+import { fetchJson } from './fetch-json';
+import { list, nullable, num, record, text } from './validate';
+
+export interface OfferedModel {
+  modelId: string;
+  variant: string | null;
+  quantization: string | null;
+  contextTokens: number;
+  pricing: { inputAtomicPerMtok: string; outputAtomicPerMtok: string };
+}
+export interface Uptime {
+  firstSeenAt: number;
+  windows: { days: number; ratio: number }[];
+}
+export interface Seller {
+  nodeId: string;
+  owner: string;
+  models: OfferedModel[];
+  uptime: Uptime | null;
+}
+export interface DiscoverySnapshot {
+  generatedAt: number;
+  sellers: Seller[];
+  error: string | null;
+}
+
+const read = (path: string) =>
+  fetchJson(`${DISCOVERY_URL}${path}`, `discovery ${path}`);
+
+function offeredModel(value: unknown): OfferedModel {
+  const source = record(value, 'model');
+  const pricing = record(source.pricing, 'model.pricing');
+  const optional = (field: unknown, where: string) =>
+    nullable(field, (present) => text(present, where));
+  return {
+    modelId: text(source.modelId, 'model.modelId'),
+    variant: optional(source.variant, 'model.variant'),
+    quantization: optional(source.quantization, 'model.quantization'),
+    contextTokens: num(source.contextTokens, 'model.contextTokens'),
+    pricing: {
+      inputAtomicPerMtok: text(pricing.inputAtomicPerMtok, 'pricing.input'),
+      outputAtomicPerMtok: text(pricing.outputAtomicPerMtok, 'pricing.output'),
+    },
+  };
+}
+function uptime(value: unknown): Uptime {
+  const source = record(value, 'uptime');
+  return {
+    firstSeenAt: num(source.firstSeenAt, 'uptime.firstSeenAt'),
+    windows: list(source.windows, 'uptime.windows').map((entry) => {
+      const window = record(entry, 'uptime.window');
+      return {
+        days: num(window.days, 'window.days'),
+        ratio: num(window.ratio, 'window.ratio'),
+      };
+    }),
+  };
+}
+
+// Every seller offering any listed model, from the paged /sellers answers.
+async function sellersOf(modelIds: string[]): Promise<Map<string, Seller>> {
+  const byNode = new Map<string, Seller>();
+  for (const modelId of modelIds) {
+    let cursor: string | null = null;
+    for (
+      let pages = 0;
+      pages < DISCOVERY.maxSellerPages && (pages === 0 || cursor);
+      pages += 1
+    ) {
+      const query = new URLSearchParams({ model: modelId });
+      if (cursor) query.set('cursor', cursor);
+      const page = record(await read(`/sellers?${query}`), 'sellers page');
+      for (const entry of list(page.sellers, 'sellers')) {
+        const catalog = record(record(entry, 'seller').catalog, 'catalog');
+        const signed = record(catalog.record, 'catalog.record');
+        const nodeId = text(signed.nodeId, 'record.nodeId');
+        if (!byNode.has(nodeId))
+          byNode.set(nodeId, {
+            nodeId,
+            owner: text(signed.owner, 'record.owner'),
+            models: list(signed.models, 'record.models').map(offeredModel),
+            uptime: null,
+          });
+      }
+      cursor = nullable(page.next, (present) => text(present, 'next'));
+    }
+  }
+  return byNode;
+}
+
+// Live view of the discovery index: models offered now, sellers online and their uptime.
+export async function getDiscovery(): Promise<DiscoverySnapshot> {
+  try {
+    return await loadDiscovery();
+  } catch (error) {
+    // A failed read is never prerendered: it is retried on the next request.
+    await connection();
+    return {
+      generatedAt: 0,
+      sellers: [],
+      error: error instanceof Error ? error.message : 'discovery unavailable',
+    };
+  }
+}
+
+// Throws on failure so an error is never stored in the cache. A seller whose uptime cannot be read
+// shows none for this cache window.
+async function loadDiscovery(): Promise<DiscoverySnapshot> {
+  'use cache';
+  cacheLife(CACHE_LIFE.discovery);
+  const listed = record(await read('/models'), 'models');
+  const modelIds = list(listed.models, 'models.models').map((entry) =>
+    text(record(entry, 'models.model').id, 'model.id'),
+  );
+  const sellers = [...(await sellersOf(modelIds)).values()];
+  await Promise.all(
+    sellers.map(async (seller) => {
+      try {
+        seller.uptime = uptime(
+          await read(`/uptime?node=${encodeURIComponent(seller.nodeId)}`),
+        );
+      } catch {
+        seller.uptime = null;
+      }
+    }),
+  );
+  return {
+    generatedAt: num(listed.generatedAt, 'models.generatedAt'),
+    sellers,
+    error: null,
+  };
+}
