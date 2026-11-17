@@ -86,7 +86,7 @@ class DesktopWalletSession {
     if (this.signal.aborted) return Promise.resolve(cancelled);
     if (this.pending) return Promise.resolve(busy);
     const operation = Promise.resolve()
-      .then(execute)
+      .then(() => (this.signal.aborted ? cancelled : execute()))
       .finally(() => {
         this.pending = undefined;
       });
