@@ -12,8 +12,8 @@ export const AGENT_SETUP = {
   name: 'Gyblos',
   // What a free endpoint accepts as a key: anything, but some clients refuse an empty one.
   freeKey: 'gyblos-local',
-  // A context size for tools that need one when the buyer does not know the sellers' own.
-  contextTokens: 32768,
+  // Conservative configuration fallback, not a verified capacity claim for an unknown seller.
+  contextTokens: 8192,
   maxContextTokens: 10_000_000,
   maxModels: 32,
   namePattern: /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/,
@@ -43,10 +43,15 @@ export interface AgentEndpoint {
 }
 
 export const CODEX_MARKS = {
-  start: '# >>> gyblos (managed by pnpm buyer:agent codex)',
+  start: '# >>> gyblos (managed by Gyblos)',
   end: '# <<< gyblos',
-  profile: '# gyblos profile (managed by pnpm buyer:agent codex)',
+  profile: '# gyblos profile (managed by Gyblos)',
   profileDigest: '# gyblos profile sha256: ',
+} as const;
+
+export const CODEX_LEGACY_MARKS = {
+  start: '# >>> gyblos (managed by pnpm buyer:agent codex)',
+  profile: '# gyblos profile (managed by pnpm buyer:agent codex)',
 } as const;
 
 // Canonical configuration-generator error codes, shared with the host commands.

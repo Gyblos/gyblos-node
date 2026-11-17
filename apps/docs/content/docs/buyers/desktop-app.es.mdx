@@ -108,5 +108,12 @@ frente a ese vendedor. No envíes contraseñas, claves ni otros secretos.
 
 Para integraciones avanzadas, consulta [conectar Gyblos desde tu código](/es/buyers/use-from-code).
 
+**Connect agent** conserva el contexto explícito que comunique el comprador local autenticado. Si no
+lo comunica, la configuración usa un contexto conservador de 8.192 tokens y como máximo 4.096 de salida
+(o el límite menor del comprador). Los perfiles de Codex incluyen ese tope para compactar antes.
+Este valor no acredita la capacidad del vendedor: puede ofrecer una ventana menor y rechazar el pedido.
+Actualiza y vuelve a escribir la configuración si cambian los metadatos del modelo. El generador del
+CLI usa el mismo valor; un `--context` explícito debe corresponder a los límites verificados del modelo.
+
 ¿Dudas o problemas? Escribe en el [Telegram de Gyblos](https://t.me/gyblos). El grupo es público; no publiques llaves,
 contraseñas ni conversaciones que quieras mantener privadas.

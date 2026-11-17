@@ -104,5 +104,12 @@ that seller. Do not send passwords, keys or other secrets.
 
 For advanced integrations, see [connect Gyblos from code](/en/buyers/use-from-code).
 
+**Connect agent** keeps an explicit context size reported by the authenticated local buyer. When none
+is available, generated settings use a conservative 8,192-token context and at most 4,096 output tokens
+(or the buyer's lower output limit). Codex profiles include this limit so compaction can happen earlier.
+This fallback is not a verified seller capacity: a seller can offer a smaller window and reject the
+request. Refresh and rewrite the agent settings when the buyer's model metadata changes. The shared
+CLI generator uses the same fallback; an explicit `--context` must match your verified model limits.
+
 Questions or problems? Write in the [Gyblos Telegram](https://t.me/gyblos). The group is public; do not post keys,
 passwords or conversations you want to keep private.

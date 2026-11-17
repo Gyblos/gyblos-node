@@ -34,7 +34,14 @@ function models(value: unknown): AgentEndpoint['models'] {
       typeof row.max_output_tokens !== 'number'
     )
       throw new AgentSetupError(AGENT_SETUP_CODES.ENDPOINT);
-    return { id: row.id, maxOutputTokens: row.max_output_tokens };
+    const context = 'context_length' in row ? row.context_length : undefined;
+    if (context !== undefined && typeof context !== 'number')
+      throw new AgentSetupError(AGENT_SETUP_CODES.ENDPOINT);
+    return {
+      id: row.id,
+      maxOutputTokens: row.max_output_tokens,
+      ...(context !== undefined ? { contextTokens: context } : {}),
+    };
   });
   if (new Set(result.map((row) => row.id)).size !== result.length)
     throw new AgentSetupError(AGENT_SETUP_CODES.ENDPOINT);
