@@ -1,13 +1,17 @@
-// Owns the chain index writes: set-based, chunked under D1's bound-parameter limit, idempotent (a
-// transaction read twice is stored once). u64 amounts are bound as decimal text, which the INTEGER
-// columns store exactly. Channel rows merge: parties only from an open, Gyblos once marked stays marked,
-// and the last signature only moves forward.
-import { sql, type SQL } from 'drizzle-orm';
-import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
+// Owns the chain index writes: set-based, idempotent (a transaction read twice is stored once) and
+// chunked by the table's column count, so no statement passes D1's bound-parameter limit whatever the
+// rows hold. Amounts are exact decimal text. Channel rows merge: parties only from an open, a Gyblos
+// claim once made stays, the last signature only moves forward.
+import { getTableColumns, sql } from 'drizzle-orm';
+import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 import { DEVNET_GYBLOS_TREASURY } from '@gyblos/config/network';
 
-import { COLLECTOR_LIMITS, GYBLOS_OPEN_MEMOS } from '../constants';
+import {
+  CHAIN_INSTRUCTIONS,
+  COLLECTOR_LIMITS,
+  GYBLOS_OPEN_MEMOS,
+} from '../constants';
 import type { CollectorDatabase } from '../d1-client';
 import {
   chainChannels,
@@ -20,11 +24,19 @@ import type { ChannelState } from './channel-account';
 import type { ChainTransaction } from './decode';
 
 type BatchItem = Parameters<CollectorDatabase['batch']>[0][number];
+export interface ChainCursorState {
+  newest: string | null;
+  gapUntil: string | null;
+  gapBefore: string | null;
+  backfillBefore: string | null;
+  backfillDone: boolean;
+}
 
-const atomic = (value: bigint | null): SQL | null =>
-  value === null ? null : sql`${value.toString()}`;
-function chunks<T extends object>(rows: readonly T[]): T[][] {
-  const columns = Math.max(1, Object.keys(rows[0] ?? {}).length);
+const atomic = (value: bigint | null) =>
+  value === null ? null : value.toString();
+// Rows per statement so every column of `table` fits under the parameter limit.
+function chunksFor<T>(table: SQLiteTable, rows: readonly T[]): T[][] {
+  const columns = Object.keys(getTableColumns(table)).length;
   const size = Math.max(
     1,
     Math.floor(COLLECTOR_LIMITS.maxBoundParameters / columns),
@@ -38,15 +50,13 @@ function chunks<T extends object>(rows: readonly T[]): T[][] {
 export function cursorUpsert(
   orm: CollectorDatabase,
   id: number,
-  cursor: {
-    newest: string | null;
-    backfillBefore: string | null;
-    backfillDone: boolean;
-  },
+  cursor: ChainCursorState,
   now: number,
 ) {
   const values = {
     newestSignature: cursor.newest,
+    gapUntil: cursor.gapUntil,
+    gapBefore: cursor.gapBefore,
     backfillBefore: cursor.backfillBefore,
     backfillDone: cursor.backfillDone ? 1 : 0,
     updatedAt: now,
@@ -59,10 +69,36 @@ export function cursorUpsert(
 
 const isGyblosMemo = (memo: string) =>
   GYBLOS_OPEN_MEMOS.some((prefix) => memo.startsWith(prefix));
+type ChannelRow = typeof chainChannels.$inferInsert;
+const blankChannel = (
+  channel: string,
+  signature: string,
+  slot: number,
+  now: number,
+): ChannelRow => ({
+  channel,
+  payer: null,
+  payee: null,
+  mint: null,
+  authorizedSigner: null,
+  salt: null,
+  openSlot: null,
+  openedAt: null,
+  gyblos: 0,
+  recipientsJson: null,
+  depositAtomic: null,
+  settledAtomic: null,
+  payoutAtomic: null,
+  status: null,
+  lastSignature: signature,
+  lastSlot: slot,
+  accountReadAt: null,
+  updatedAt: now,
+});
 
-// One merged row per channel touched by these transactions.
+// One merged row per channel the successful transactions name (every row has every column).
 function channelRows(transactions: ChainTransaction[], now: number) {
-  const rows = new Map<string, typeof chainChannels.$inferInsert>();
+  const rows = new Map<string, ChannelRow>();
   for (const tx of transactions) {
     const gyblosMemo = tx.memos.some(isGyblosMemo);
     const paidGyblos = tx.deltas.some(
@@ -70,14 +106,10 @@ function channelRows(transactions: ChainTransaction[], now: number) {
         delta.owner === DEVNET_GYBLOS_TREASURY && delta.deltaAtomic > 0n,
     );
     for (const instruction of tx.instructions) {
-      const row = rows.get(instruction.channel) ?? {
-        channel: instruction.channel,
-        gyblos: 0,
-        lastSignature: tx.signature,
-        lastSlot: tx.slot,
-        updatedAt: now,
-      };
-      if (instruction.kind === 'open') {
+      const row =
+        rows.get(instruction.channel) ??
+        blankChannel(instruction.channel, tx.signature, tx.slot, now);
+      if (instruction.kind === CHAIN_INSTRUCTIONS.OPEN) {
         Object.assign(row, {
           payer: instruction.payer,
           payee: instruction.payee,
@@ -90,8 +122,9 @@ function channelRows(transactions: ChainTransaction[], now: number) {
         });
         if (gyblosMemo) row.gyblos = 1;
       }
-      if (instruction.kind === 'distribute' && paidGyblos) row.gyblos = 1;
-      if (tx.slot >= row.lastSlot) {
+      if (instruction.kind === CHAIN_INSTRUCTIONS.DISTRIBUTE && paidGyblos)
+        row.gyblos = 1;
+      if (tx.slot >= row.lastSlot!) {
         row.lastSignature = tx.signature;
         row.lastSlot = tx.slot;
       }
@@ -104,106 +137,105 @@ function channelRows(transactions: ChainTransaction[], now: number) {
 // The incoming value when it has one, else the stored one.
 const keep = (column: SQLiteColumn) =>
   sql`coalesce(excluded.${sql.identifier(column.name)}, ${column})`;
+const channelMerge = {
+  payer: keep(chainChannels.payer),
+  payee: keep(chainChannels.payee),
+  mint: keep(chainChannels.mint),
+  authorizedSigner: keep(chainChannels.authorizedSigner),
+  salt: keep(chainChannels.salt),
+  openSlot: keep(chainChannels.openSlot),
+  openedAt: keep(chainChannels.openedAt),
+  recipientsJson: keep(chainChannels.recipientsJson),
+  gyblos: sql`max(${chainChannels.gyblos}, excluded.gyblos)`,
+  lastSignature: sql`case when excluded.last_slot >= ${chainChannels.lastSlot} then excluded.last_signature else ${chainChannels.lastSignature} end`,
+  lastSlot: sql`max(${chainChannels.lastSlot}, excluded.last_slot)`,
+  updatedAt: sql`excluded.updated_at`,
+};
+
+function rowsOf(transactions: ChainTransaction[], now: number) {
+  const succeeded = transactions.filter((tx) => !tx.failed);
+  return {
+    txs: transactions.map((tx) => ({
+      signature: tx.signature,
+      slot: tx.slot,
+      blockTime: tx.blockTimeMs,
+      failed: tx.failed ? 1 : 0,
+      undecodable: tx.undecodable,
+      memo: tx.memos[0] ?? null,
+      indexedAt: now,
+    })),
+    instructions: succeeded.flatMap((tx) =>
+      tx.instructions.map((instruction) => ({
+        signature: tx.signature,
+        instructionIndex: instruction.index,
+        kind: instruction.kind,
+        channel: instruction.channel,
+        payer: instruction.payer,
+        payee: instruction.payee,
+        mint: instruction.mint,
+        amountAtomic: atomic(instruction.amountAtomic),
+        cumulativeAtomic: atomic(instruction.cumulativeAtomic),
+        recipientsJson: instruction.recipients
+          ? JSON.stringify(instruction.recipients)
+          : null,
+      })),
+    ),
+    deltas: succeeded.flatMap((tx) =>
+      tx.deltas.map((delta) => ({
+        signature: tx.signature,
+        owner: delta.owner,
+        mint: delta.mint,
+        deltaAtomic: delta.deltaAtomic.toString(),
+      })),
+    ),
+    channels: channelRows(succeeded, now),
+  };
+}
 
 export function transactionWrites(
   orm: CollectorDatabase,
   transactions: ChainTransaction[],
   now: number,
 ): BatchItem[] {
-  const txRows = transactions.map((tx) => ({
-    signature: tx.signature,
-    slot: tx.slot,
-    blockTime: tx.blockTimeMs,
-    failed: tx.failed ? 1 : 0,
-    memo: tx.memos[0] ?? null,
-    indexedAt: now,
-  }));
-  const instructionRows = transactions.flatMap((tx) =>
-    tx.failed
-      ? []
-      : tx.instructions.map((instruction) => ({
-          signature: tx.signature,
-          instructionIndex: instruction.index,
-          kind: instruction.kind,
-          channel: instruction.channel,
-          payer: instruction.payer,
-          payee: instruction.payee,
-          mint: instruction.mint,
-          amountAtomic: atomic(instruction.amountAtomic),
-          cumulativeAtomic: atomic(instruction.cumulativeAtomic),
-          recipientsJson: instruction.recipients
-            ? JSON.stringify(instruction.recipients)
-            : null,
-        })),
-  );
-  const deltaRows = transactions.flatMap((tx) =>
-    tx.failed
-      ? []
-      : tx.deltas.map((delta) => ({
-          signature: tx.signature,
-          owner: delta.owner,
-          mint: delta.mint,
-          deltaAtomic: atomic(delta.deltaAtomic)!,
-        })),
-  );
-  const channels = channelRows(
-    transactions.filter((tx) => !tx.failed),
-    now,
-  );
+  const rows = rowsOf(transactions, now);
   return [
-    ...chunks(txRows).map((rows) =>
-      orm.insert(chainTxs).values(rows).onConflictDoNothing(),
+    ...chunksFor(chainTxs, rows.txs).map((chunk) =>
+      orm.insert(chainTxs).values(chunk).onConflictDoNothing(),
     ),
-    ...chunks(instructionRows).map((rows) =>
-      orm.insert(chainInstructions).values(rows).onConflictDoNothing(),
+    ...chunksFor(chainInstructions, rows.instructions).map((chunk) =>
+      orm.insert(chainInstructions).values(chunk).onConflictDoNothing(),
     ),
-    ...chunks(deltaRows).map((rows) =>
-      orm.insert(chainTokenDeltas).values(rows).onConflictDoNothing(),
+    ...chunksFor(chainTokenDeltas, rows.deltas).map((chunk) =>
+      orm.insert(chainTokenDeltas).values(chunk).onConflictDoNothing(),
     ),
-    ...chunks(channels).map((rows) =>
+    ...chunksFor(chainChannels, rows.channels).map((chunk) =>
       orm
         .insert(chainChannels)
-        .values(rows)
+        .values(chunk)
         .onConflictDoUpdate({
           target: chainChannels.channel,
-          set: {
-            payer: keep(chainChannels.payer),
-            payee: keep(chainChannels.payee),
-            mint: keep(chainChannels.mint),
-            authorizedSigner: keep(chainChannels.authorizedSigner),
-            salt: keep(chainChannels.salt),
-            openSlot: keep(chainChannels.openSlot),
-            openedAt: keep(chainChannels.openedAt),
-            recipientsJson: keep(chainChannels.recipientsJson),
-            gyblos: sql`max(${chainChannels.gyblos}, excluded.gyblos)`,
-            lastSignature: sql`case when excluded.last_slot >= ${chainChannels.lastSlot} then excluded.last_signature else ${chainChannels.lastSignature} end`,
-            lastSlot: sql`max(${chainChannels.lastSlot}, excluded.last_slot)`,
-            updatedAt: sql`excluded.updated_at`,
-          },
+          set: channelMerge,
         }),
     ),
   ];
 }
 
-// Account state for read channels: what the chain holds now (closed once reclaimed).
+// Account state for channels the index already stored (rows exist: they come from stored
+// instructions). A closed or unknown channel keeps its last known amounts.
 export function channelStateUpserts(
   orm: CollectorDatabase,
   states: { channel: string; state: ChannelState }[],
   now: number,
 ): BatchItem[] {
   const rows = states.map(({ channel, state }) => ({
-    channel,
-    gyblos: 0,
-    lastSignature: '',
-    lastSlot: 0,
+    ...blankChannel(channel, '', 0, now),
     status: state.status,
     depositAtomic: atomic(state.depositAtomic),
     settledAtomic: atomic(state.settledAtomic),
     payoutAtomic: atomic(state.payoutAtomic),
     accountReadAt: now,
-    updatedAt: now,
   }));
-  return chunks(rows).map((chunk) =>
+  return chunksFor(chainChannels, rows).map((chunk) =>
     orm
       .insert(chainChannels)
       .values(chunk)
@@ -211,7 +243,6 @@ export function channelStateUpserts(
         target: chainChannels.channel,
         set: {
           status: sql`excluded.status`,
-          // A closed channel keeps its last known amounts.
           depositAtomic: sql`coalesce(excluded.deposit_atomic, ${chainChannels.depositAtomic})`,
           settledAtomic: sql`coalesce(excluded.settled_atomic, ${chainChannels.settledAtomic})`,
           payoutAtomic: sql`coalesce(excluded.payout_atomic, ${chainChannels.payoutAtomic})`,

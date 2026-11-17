@@ -1,9 +1,10 @@
-// Owns one scheduled chain read. New signatures are read first (oldest first, from the newest one
-// already read), then history backwards with the remaining budget: at most
-// CHAIN_INDEX.maxTransactionsPerRun transactions per run. Each batch of transactions is stored together with
-// the cursor that covers it, so a failed run neither loses nor repeats a transaction; the accounts of
-// the channels touched are then read for their deposit, settled amount, payout and status.
-import { sql } from 'drizzle-orm';
+// Owns one scheduled chain read, at most CHAIN_INDEX.maxTransactionsPerRun transactions and one page of
+// signatures per phase: (1) the gap of new signatures a previous run could not finish, (2) signatures
+// newer than the newest one known (leaving a gap when they do not all fit), (3) history backwards until
+// the program's first transaction. Each phase reads newest first, and every batch is stored together
+// with the cursor that covers it, so each signature is read exactly once and a failed run resumes where
+// it stopped. The accounts of the channels touched (and any left unread) are then read for their state.
+import { isNull } from 'drizzle-orm';
 
 import { CHAIN_INDEX } from '../constants';
 import {
@@ -13,115 +14,198 @@ import {
 } from '../d1-client';
 import { chainChannels, chainCursor } from '../schema';
 import { channelState } from './channel-account';
-import { decodeTransaction, type ChainTransaction } from './decode';
+import { decodeTransaction } from './decode';
 import type { ChainRpc } from './rpc';
-import { channelStateUpserts, cursorUpsert, transactionWrites } from './writes';
+import {
+  channelStateUpserts,
+  cursorUpsert,
+  transactionWrites,
+  type ChainCursorState,
+} from './writes';
 
 const CURSOR_ID = 1;
+export const CHAIN_PHASES = {
+  GAP: 'gap',
+  FORWARD: 'forward',
+  BACKFILL: 'backfill',
+  ACCOUNTS: 'accounts',
+} as const;
+export type ChainPhase = (typeof CHAIN_PHASES)[keyof typeof CHAIN_PHASES];
+
+// A failure with the phase it happened in, for the scheduled run's log.
+export class ChainIndexError extends Error {
+  constructor(
+    readonly phase: ChainPhase,
+    readonly cause: unknown,
+  ) {
+    super(`chain index failed in ${phase}`);
+    this.name = 'ChainIndexError';
+  }
+}
 
 export interface ChainIndexResult {
-  // Transactions stored by this run (forward, then backfill).
+  // Transactions stored by each phase, and channels whose account was read.
+  gap: number;
   forward: number;
   backfill: number;
-  // Channels whose account was read.
   channels: number;
-  backfillDone: boolean;
-}
-interface Cursor {
-  newest: string | null;
-  backfillBefore: string | null;
-  backfillDone: boolean;
+  undecodable: number;
+  cursor: ChainCursorState;
 }
 
-async function readCursor(orm: CollectorDatabase): Promise<Cursor> {
+async function readCursor(orm: CollectorDatabase): Promise<ChainCursorState> {
   const [row] = await orm.select().from(chainCursor).limit(1);
   return {
     newest: row?.newestSignature ?? null,
+    gapUntil: row?.gapUntil ?? null,
+    gapBefore: row?.gapBefore ?? null,
     backfillBefore: row?.backfillBefore ?? null,
     backfillDone: row?.backfillDone === 1,
   };
 }
 
-// Signatures newer than the newest one read, oldest first, at most `budget`.
-async function forwardSignatures(
-  rpc: ChainRpc,
-  newest: string,
-  budget: number,
-) {
-  const newer: string[] = [];
-  let before: string | undefined;
-  for (;;) {
-    const page = await rpc.signatures({ until: newest, before });
-    newer.push(...page.map((entry) => entry.signature));
-    const last = page.at(-1);
-    if (page.length < CHAIN_INDEX.signaturesPerPage || !last) break;
-    before = last.signature;
-  }
-  return newer.reverse().slice(0, budget);
+interface Run {
+  orm: CollectorDatabase;
+  rpc: ChainRpc;
+  now: number;
+  budget: number;
+  cursor: ChainCursorState;
+  touched: Set<string>;
+  undecodable: number;
 }
 
-// Reads `signatures` in RPC batches and stores each batch with the cursor it leaves behind.
-async function store(
-  orm: CollectorDatabase,
-  rpc: ChainRpc,
-  signatures: string[],
-  cursorAfter: (stored: string[]) => Cursor,
-  now: number,
-  touched: Set<string>,
+// Stores a page (newest first) up to the budget, in RPC batches, each with the cursor it leaves.
+// `after(stored, complete)` is that cursor; complete means the whole page was stored and it was the
+// last page of its range.
+async function storePage(
+  run: Run,
+  page: string[],
+  after: (stored: string[], complete: boolean) => ChainCursorState,
 ) {
+  const take = page.slice(0, run.budget);
+  const lastPage = page.length < CHAIN_INDEX.signaturesPerPage;
   for (
     let start = 0;
-    start < signatures.length;
+    start < take.length;
     start += CHAIN_INDEX.transactionsPerRequest
   ) {
-    const batch = signatures.slice(
-      start,
-      start + CHAIN_INDEX.transactionsPerRequest,
-    );
-    const answers = await rpc.transactions(batch);
-    const decoded: ChainTransaction[] = [];
-    for (const answer of answers)
-      if (answer !== null) decoded.push(decodeTransaction(answer));
-    for (const tx of decoded)
+    const batch = take.slice(start, start + CHAIN_INDEX.transactionsPerRequest);
+    const decoded = (await run.rpc.transactions(batch)).map(decodeTransaction);
+    for (const tx of decoded) {
+      run.undecodable += tx.undecodable;
       for (const instruction of tx.instructions)
-        touched.add(instruction.channel);
-    const stored = signatures.slice(0, start + batch.length);
-    await orm.batch([
-      cursorUpsert(orm, CURSOR_ID, cursorAfter(stored), now),
-      ...transactionWrites(orm, decoded, now),
+        run.touched.add(instruction.channel);
+    }
+    const stored = take.slice(0, start + batch.length);
+    const cursor = after(stored, lastPage && stored.length === page.length);
+    await run.orm.batch([
+      cursorUpsert(run.orm, CURSOR_ID, cursor, run.now),
+      ...transactionWrites(run.orm, decoded, run.now),
     ]);
+    run.cursor = cursor;
   }
+  run.budget -= take.length;
+  return take.length;
+}
+const signaturesOf = (page: { signature: string }[]) =>
+  page.map((entry) => entry.signature);
+
+// (1) New signatures strictly between gapUntil and gapBefore.
+async function fillGap(run: Run) {
+  const { gapUntil, gapBefore } = run.cursor;
+  if (!gapUntil || !gapBefore || run.budget <= 0) return 0;
+  const page = signaturesOf(
+    await run.rpc.signatures({ until: gapUntil, before: gapBefore }),
+  );
+  if (!page.length) {
+    run.cursor = { ...run.cursor, gapUntil: null, gapBefore: null };
+    await run.orm.batch([
+      cursorUpsert(run.orm, CURSOR_ID, run.cursor, run.now),
+    ]);
+    return 0;
+  }
+  return storePage(run, page, (stored, complete) => ({
+    ...run.cursor,
+    gapUntil: complete ? null : gapUntil,
+    gapBefore: complete ? null : stored.at(-1)!,
+  }));
 }
 
-// Reads every touched channel's account and stores its state.
-async function refreshChannels(
-  orm: CollectorDatabase,
-  rpc: ChainRpc,
-  channels: string[],
-  now: number,
-) {
+// (2) Signatures newer than the newest known; what does not fit becomes the gap.
+async function readForward(run: Run) {
+  const known = run.cursor.newest;
+  if (!known || run.cursor.gapUntil || run.budget <= 0) return 0;
+  const page = signaturesOf(await run.rpc.signatures({ until: known }));
+  if (!page.length) return 0;
+  const newest = page[0]!;
+  return storePage(run, page, (stored, complete) => ({
+    ...run.cursor,
+    newest,
+    gapUntil: complete ? null : known,
+    gapBefore: complete ? null : stored.at(-1)!,
+  }));
+}
+
+// (3) History before the oldest signature read; the first run starts from the newest signature.
+async function readBackfill(run: Run) {
+  if (run.cursor.backfillDone || run.budget <= 0) return 0;
+  const before = run.cursor.backfillBefore ?? undefined;
+  const page = signaturesOf(await run.rpc.signatures({ before }));
+  // An empty program is not marked done: its first transactions are read when they come.
+  if (!page.length) {
+    if (run.cursor.newest) {
+      run.cursor = { ...run.cursor, backfillDone: true };
+      await run.orm.batch([
+        cursorUpsert(run.orm, CURSOR_ID, run.cursor, run.now),
+      ]);
+    }
+    return 0;
+  }
+  const newest = run.cursor.newest ?? page[0]!;
+  return storePage(run, page, (stored, complete) => ({
+    ...run.cursor,
+    newest,
+    backfillBefore: stored.at(-1)!,
+    backfillDone: complete,
+  }));
+}
+
+// Reads the account of every touched channel, and of channels never read, and stores their state.
+async function refreshChannels(run: Run) {
+  const unread = await run.orm
+    .select({ channel: chainChannels.channel })
+    .from(chainChannels)
+    .where(isNull(chainChannels.accountReadAt))
+    .limit(CHAIN_INDEX.accountsPerRequest);
+  for (const { channel } of unread) run.touched.add(channel);
+  const channels = [...run.touched];
   for (
     let start = 0;
     start < channels.length;
     start += CHAIN_INDEX.accountsPerRequest
   ) {
     const batch = channels.slice(start, start + CHAIN_INDEX.accountsPerRequest);
-    const accounts = await rpc.accounts(batch);
-    const states = batch.map((channel, index) => ({
-      channel,
-      state: channelState(accounts[index] ?? null),
-    }));
-    const [first, ...rest] = channelStateUpserts(orm, states, now);
-    if (first) await orm.batch([first, ...rest]);
+    const accounts = await run.rpc.accounts(batch);
+    const [first, ...rest] = channelStateUpserts(
+      run.orm,
+      batch.map((channel, index) => ({
+        channel,
+        state: channelState(accounts[index] ?? null),
+      })),
+      run.now,
+    );
+    if (first) await run.orm.batch([first, ...rest]);
   }
+  return channels.length;
 }
 
-// Channels the index knows whose account was never read (for example after a failed account read).
-export const unreadChannels = (orm: CollectorDatabase) =>
-  orm
-    .select({ channel: chainChannels.channel })
-    .from(chainChannels)
-    .where(sql`${chainChannels.accountReadAt} is null`);
+async function phase<T>(name: ChainPhase, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    throw new ChainIndexError(name, error);
+  }
+}
 
 export async function runChainIndex(
   database: D1Database,
@@ -129,74 +213,27 @@ export async function runChainIndex(
   now: number,
 ): Promise<ChainIndexResult> {
   const orm = createD1Orm(database);
-  const cursor = await readCursor(orm);
-  const touched = new Set<string>();
-  let budget: number = CHAIN_INDEX.maxTransactionsPerRun;
-
-  let forward: string[] = [];
-  if (cursor.newest) {
-    forward = await forwardSignatures(rpc, cursor.newest, budget);
-    await store(
-      orm,
-      rpc,
-      forward,
-      (stored) => ({ ...cursor, newest: stored.at(-1) ?? cursor.newest }),
-      now,
-      touched,
-    );
-    budget -= forward.length;
-  }
-
-  // History, newest to oldest from where the backfill stopped (from the top on the first run).
-  let backfill: string[] = [];
-  let backfillDone = cursor.backfillDone;
-  if (!backfillDone && budget > 0) {
-    const page = await rpc.signatures({
-      before: cursor.backfillBefore ?? undefined,
-    });
-    backfill = page.map((entry) => entry.signature).slice(0, budget);
-    const newest = cursor.newest ?? backfill[0] ?? null;
-    const exhausted =
-      page.length < CHAIN_INDEX.signaturesPerPage &&
-      backfill.length === page.length;
-    await store(
-      orm,
-      rpc,
-      backfill,
-      (stored) => ({
-        newest,
-        backfillBefore: stored.at(-1) ?? cursor.backfillBefore,
-        backfillDone: exhausted && stored.length === backfill.length,
-      }),
-      now,
-      touched,
-    );
-    if (!backfill.length)
-      await orm.batch([
-        cursorUpsert(
-          orm,
-          CURSOR_ID,
-          {
-            newest,
-            backfillBefore: cursor.backfillBefore,
-            backfillDone: exhausted,
-          },
-          now,
-        ),
-      ]);
-    backfillDone = exhausted;
-  }
-
-  // Channels left unread by an earlier failed run are read again too.
-  for (const { channel } of await unreadChannels(orm).limit(
-    CHAIN_INDEX.accountsPerRequest,
-  ))
-    touched.add(channel);
-  await refreshChannels(orm, rpc, [...touched], now);
+  const run: Run = {
+    orm,
+    rpc,
+    now,
+    budget: CHAIN_INDEX.maxTransactionsPerRun,
+    cursor: await readCursor(orm),
+    touched: new Set(),
+    undecodable: 0,
+  };
+  const gap = await phase(CHAIN_PHASES.GAP, () => fillGap(run));
+  const forward = await phase(CHAIN_PHASES.FORWARD, () => readForward(run));
+  const backfill = await phase(CHAIN_PHASES.BACKFILL, () => readBackfill(run));
+  const channels = await phase(CHAIN_PHASES.ACCOUNTS, () =>
+    refreshChannels(run),
+  );
   return {
-    forward: forward.length,
-    backfill: backfill.length,
-    channels: touched.size,
-    backfillDone,
+    gap,
+    forward,
+    backfill,
+    channels,
+    undecodable: run.undecodable,
+    cursor: run.cursor,
   };
 }

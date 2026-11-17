@@ -356,56 +356,77 @@ Histograms are summed and lists are capped in SQL.
 
 ## Chain index
 
-The scheduled run first reads the Solana payment-channels program
-(`CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX`, `src/chain/`), then aggregates.
-The chain is the only source of settled USDC and fees: nothing here comes from
-node reports. Without a database or the `COLLECTOR_SOLANA_RPC_URL` secret the
-read is skipped; aggregation runs either way.
+The scheduled run aggregates first, then reads the Solana payment-channels
+program (`CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX`, `src/chain/`), so a
+slow RPC never delays the stats. The chain is the only source of settled USDC
+and fees: nothing here comes from node reports. Without a database or a valid
+`COLLECTOR_SOLANA_RPC_URL` secret (https, or http on loopback, with no
+credentials, query or fragment) the read is skipped.
 
-**What is read.** Finalized transactions of the program, through
+**What is read, and when.** Finalized transactions of the program, through
 `getSignaturesForAddress`, `getTransaction` (jsonParsed, transaction versions 0
-and 1) in batched JSON-RPC requests, and `getMultipleAccounts`. Each run reads
-new signatures first, oldest first from the newest one already read, then
-history backwards with what is left of its budget (200 transactions per run, 25
-per request), until the program's first transaction. Each batch of transactions
-is stored in one transaction together with the cursor that covers it
-(`collector_chain_cursor`), so a failed run neither loses nor repeats a
-transaction; it logs `COLLECTOR_CHAIN_INDEX_FAILED` with the error class only,
-never the URL (which may carry a provider key).
+and 1) in batched JSON-RPC requests (redirects refused, answers capped at 8 MiB
+and matched by id), and `getMultipleAccounts`. A run reads at most 200
+transactions and one page of signatures per phase, newest first within each:
+
+1. **Gap:** new signatures an earlier run could not fit, strictly between
+   `gap_until` and `gap_before`.
+2. **Forward:** signatures newer than `newest_signature`. When they do not all
+   fit, the newest are read and the rest becomes the gap.
+3. **History:** signatures before `backfill_before`, until the program's first
+   transaction. An empty program is not marked done.
+
+Each batch of transactions is stored in one transaction together with the cursor
+that covers it (`collector_chain_cursor`), so every signature is read exactly
+once and a failed run resumes where it stopped. A transaction the RPC lists but
+cannot return (`null`), a missing batch reply or any RPC error stops the run
+before that batch. A failure logs `COLLECTOR_CHAIN_INDEX_FAILED` with the phase
+(`gap`, `forward`, `backfill`, `accounts`) and the error class only, never the
+URL, which may carry a provider key.
 
 **How a transaction is read** (`src/chain/decode.ts`, @x402/svm 2.28): every
 top-level program instruction by its one-byte discriminator — open (1), settle
 (2), top_up (3), settle_and_seal (4), request_close (5), seal (6), distribute
 (7), reclaim (9) — with its channel and parties from the account list, open's
 salt, deposit, open slot and splits, top_up's amount, and distribute's splits. A
-settle's cumulative amount is the voucher the preceding Ed25519 instruction
-verifies, counted only when the voucher names the same channel. The net token
-change per owner and mint is stored as it happened: what distribute actually
-paid (seller, Gyblos fee, refund, or a payout the program redirected to its
-treasury), and what open and top_up deposited. u64 amounts are stored exactly.
+settle's cumulative amount is the voucher of the Ed25519 instruction right
+before it, counted only when the voucher names the same channel (and, for
+settle_and_seal, when it says it carries one). The net token change per owner
+and mint is stored as it happened: what distribute actually paid (seller, Gyblos
+fee, refund, or a payout the program redirected to its treasury), and what open
+and top_up deposited. Amounts are exact decimal text.
+
+Anyone can send transactions to the program. A **failed** transaction is stored
+with no instructions or token changes. A program instruction of a successful
+transaction this decoder cannot read is counted in `undecodable`, never guessed
+and never fatal. Program calls made through another program (inner instructions)
+are not read; their token changes are.
 
 | Table                          | One row per                | Notes                                                                           |
 | ------------------------------ | -------------------------- | ------------------------------------------------------------------------------- |
-| `collector_chain_txs`          | Finalized transaction      | Slot, block time (ms), failed, first memo.                                      |
+| `collector_chain_txs`          | Finalized transaction      | Slot, block time (ms), failed, undecodable, first memo (untrusted text).        |
 | `collector_chain_instructions` | Program instruction        | Kind, channel, parties, amount, voucher cumulative, splits.                     |
 | `collector_chain_token_deltas` | Transaction × owner × mint | Net token change; the basis of settled USDC, fees and refunds.                  |
 | `collector_chain_channels`     | Channel                    | Parties and terms from open; deposit, settled, payout, status from its account. |
-| `collector_chain_cursor`       | Run state                  | Newest signature read; where the history read stopped; done.                    |
+| `collector_chain_cursor`       | Run state                  | Newest signature known, the open gap, where history stopped, done.              |
 
-**Channel state.** After storing, the run reads the account of every channel it
-touched (and any left unread by an earlier run): status (open, sealed, closing,
-distributed), deposit, settled cumulative amount and payout watermark. A missing
-account was reclaimed: status `closed`, last amounts kept.
+**Channel state.** After storing, the run reads the account of every channel a
+successful instruction named (and any never read): status (open, sealed,
+closing, distributed), deposit, settled cumulative amount and payout watermark.
+A missing account was reclaimed (`closed`); an account the program does not own,
+or of another size, holds no channel (`unknown`). Both keep the last known
+amounts.
 
-**Gyblos traffic.** The program is shared. A channel is marked `gyblos` when its
-open memo is Gyblos terms (`gyblos:`) or a Gyblos payment session
-(`gyblos/payment-session/v1:`), or when a distribute paid the Gyblos treasury.
-Everything is stored; aggregates read only Gyblos channels.
+**Gyblos traffic is a claim.** The program is shared. A channel is marked
+`gyblos` when its open memo is Gyblos terms (`gyblos:`) or a Gyblos payment
+session (`gyblos/payment-session/v1:`), or when a distribute paid the Gyblos
+treasury. Anyone can make either claim, with any mint: metrics built on it must
+filter by the USDC mint and say the label is self-declared.
 
 Not yet included: daily chain aggregates and their public API (transactions by
-kind, settled USDC, fees), the explorer reading them, and the reconciliation of
-paid receipt v2 intervals against settled amounts — no node signs v2 receipts
-yet (#346).
+kind, settled USDC, fees), the explorer reading them, the mainnet treasury, and
+the reconciliation of paid receipt v2 intervals against settled amounts — no
+node signs v2 receipts yet (#346).
 
 ## Order of checks
 
@@ -499,9 +520,10 @@ To ship a change, from `apps/metrics-collector`:
 2. Deploy: `npx wrangler@4.151.1 deploy`. This also registers the Cron Trigger
    and the read limiter (`namespace_id` 42621013, which must be unused in the
    account).
-3. For the chain index, set the Solana RPC URL as a secret (a dedicated
-   provider: the public devnet RPC rate-limits `getTransaction` to a few calls
-   per window): `npx wrangler@4.151.1 secret put COLLECTOR_SOLANA_RPC_URL`.
+3. For the chain index, after migration `0003`, set the Solana RPC URL as a
+   secret: a dedicated provider over https, since the public devnet RPC
+   rate-limits `getTransaction` to a few calls per window:
+   `npx wrangler@4.151.1 secret put COLLECTOR_SOLANA_RPC_URL`.
 
 After `0002`, the first scheduled run marks every day with data dirty and
 recomputes up to 31 days per run, newest first.

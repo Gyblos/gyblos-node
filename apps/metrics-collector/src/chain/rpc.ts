@@ -1,53 +1,106 @@
 // Owns the Solana JSON-RPC reads the chain index makes: program signatures (finalized, newest first),
-// transactions in batched requests, and channel accounts. Answers are returned as unknown, checked by
-// the callers; any HTTP or RPC error throws, and the run stops without moving its cursor.
+// transactions in batched requests, and accounts with their owner. The URL must be https (http only on
+// loopback) with no credentials, query or fragment; redirects are refused, answers are size-capped and
+// matched by id. Answers are returned as unknown, checked by the callers. Any HTTP or RPC error, or a
+// transaction the RPC cannot return, throws: the run stops and nothing past it is marked as read.
 import { CHANNEL_PROGRAM } from '@gyblos/config/network';
 
-import { CHAIN_INDEX } from '../constants';
-import { list, record, text } from './json';
+import { CHAIN_INDEX, LOOPBACK_HOSTS } from '../constants';
+import { ChainShapeError, list, nullable, record, text } from './json';
 
 const FINALIZED = 'finalized';
 const JSON_RPC = '2.0';
+const HTTPS = 'https:';
+const HTTP = 'http:';
 
+export class ChainRpcError extends Error {
+  constructor(readonly reason: string) {
+    super(`solana rpc: ${reason}`);
+    this.name = 'ChainRpcError';
+  }
+}
+
+// The configured RPC URL, or undefined when it is not one the index may call.
+export function chainRpcUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const allowed =
+    url.protocol === HTTPS ||
+    (url.protocol === HTTP && LOOPBACK_HOSTS.has(url.hostname));
+  return allowed && !url.username && !url.password && !url.search && !url.hash
+    ? url.toString()
+    : undefined;
+}
+
+export interface ChainAccount {
+  owner: string;
+  data: string;
+}
 export interface ChainRpc {
-  // Signatures of the program, newest first; `until` stops before a known one, `before` pages back.
+  // Signatures of the program, newest first: newer than `until`, older than `before`, one page.
   signatures(options: {
     until?: string;
     before?: string;
   }): Promise<{ signature: string }[]>;
-  // jsonParsed transactions, in the order asked; null when the RPC does not have one.
+  // jsonParsed transactions, in the order asked.
   transactions(signatures: string[]): Promise<unknown[]>;
-  // Base64 account data for each address, in the order asked; null when the account does not exist.
-  accounts(addresses: string[]): Promise<(string | null)[]>;
+  // Each address's owner and base64 data, in the order asked; null when the account does not exist.
+  accounts(addresses: string[]): Promise<(ChainAccount | null)[]>;
+}
+
+async function readCapped(response: Response): Promise<unknown> {
+  const declared = Number(response.headers.get('content-length') ?? 0);
+  if (declared > CHAIN_INDEX.maxResponseBytes)
+    throw new ChainRpcError('answer too large');
+  const body = await response.text();
+  if (body.length > CHAIN_INDEX.maxResponseBytes)
+    throw new ChainRpcError('answer too large');
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    throw new ChainRpcError('answer not json');
+  }
 }
 
 // Sends JSON-RPC calls in one batched request and returns their results in the order asked.
 function batchPoster(url: string, fetcher: typeof fetch) {
-  let id = 0;
+  let nextId = 0;
   return async (calls: { method: string; params: unknown[] }[]) => {
+    const ids = calls.map(() => ++nextId);
     const response = await fetcher(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(
-        calls.map((call) => ({ jsonrpc: JSON_RPC, id: ++id, ...call })),
+        calls.map((call, index) => ({
+          jsonrpc: JSON_RPC,
+          id: ids[index],
+          ...call,
+        })),
       ),
+      redirect: 'error',
       signal: AbortSignal.timeout(CHAIN_INDEX.requestTimeoutMs),
     });
-    if (!response.ok) throw new Error(`solana rpc: HTTP ${response.status}`);
-    const answers = list((await response.json()) as unknown, 'rpc batch');
-    // A batch answer may come in any order: match by id.
-    const byId = new Map(
-      answers.map((answer) => {
-        const reply = record(answer, 'rpc reply');
-        if (reply.error)
-          throw new Error(
-            `solana rpc: error ${String(record(reply.error, 'rpc error').code)}`,
-          );
-        return [reply.id, reply.result];
-      }),
-    );
-    const first = id - calls.length + 1;
-    return calls.map((_, index) => byId.get(first + index));
+    if (!response.ok) throw new ChainRpcError(`HTTP ${response.status}`);
+    const byId = new Map<number, unknown>();
+    for (const answer of list(await readCapped(response), 'rpc batch')) {
+      const reply = record(answer, 'rpc reply');
+      if (reply.jsonrpc !== JSON_RPC || typeof reply.id !== 'number')
+        throw new ChainShapeError('rpc reply');
+      if (reply.error)
+        throw new ChainRpcError(
+          `error ${String(record(reply.error, 'rpc error').code)}`,
+        );
+      byId.set(reply.id, reply.result);
+    }
+    return ids.map((id) => {
+      if (!byId.has(id)) throw new ChainRpcError('missing reply');
+      return byId.get(id);
+    });
   };
 }
 
@@ -78,22 +131,24 @@ export function createChainRpc(
     },
     async transactions(signatures) {
       if (!signatures.length) return [];
-      return (
-        await post(
-          signatures.map((signature) => ({
-            method: 'getTransaction',
-            params: [
-              signature,
-              {
-                encoding: 'jsonParsed',
-                maxSupportedTransactionVersion:
-                  CHAIN_INDEX.maxTransactionVersion,
-                commitment: FINALIZED,
-              },
-            ],
-          })),
-        )
-      ).map((result) => result ?? null);
+      const results = await post(
+        signatures.map((signature) => ({
+          method: 'getTransaction',
+          params: [
+            signature,
+            {
+              encoding: 'jsonParsed',
+              maxSupportedTransactionVersion: CHAIN_INDEX.maxTransactionVersion,
+              commitment: FINALIZED,
+            },
+          ],
+        })),
+      );
+      // A listed, finalized transaction the RPC cannot return now (a lagging backend): retry later.
+      for (const result of results)
+        if (result === null || result === undefined)
+          throw new ChainRpcError('transaction unavailable');
+      return results;
     },
     async accounts(addresses) {
       if (!addresses.length) return [];
@@ -105,12 +160,13 @@ export function createChainRpc(
       ]);
       return list(record(result, 'accounts').value, 'accounts.value').map(
         (entry) =>
-          entry === null
-            ? null
-            : text(
-                list(record(entry, 'account').data, 'account.data')[0],
-                'data',
-              ),
+          nullable(entry, (present) => {
+            const account = record(present, 'account');
+            return {
+              owner: text(account.owner, 'account.owner'),
+              data: text(list(account.data, 'account.data')[0], 'data'),
+            };
+          }),
       );
     },
   };

@@ -6,8 +6,8 @@ import {
   type CollectorLimiters,
   type RateLimiter,
 } from './app';
-import { runChainIndex } from './chain/indexer';
-import { createChainRpc } from './chain/rpc';
+import { ChainIndexError, runChainIndex } from './chain/indexer';
+import { chainRpcUrl, createChainRpc } from './chain/rpc';
 import {
   COLLECTOR_AGGREGATION_FAILED,
   COLLECTOR_CHAIN_INDEX_FAILED,
@@ -115,31 +115,34 @@ export async function scheduledAggregation(bindings: unknown, now: number) {
   return result;
 }
 
-// The scheduled chain read, when a database and a Solana RPC URL are bound. A failure logs a static
-// code and leaves the cursor where it was; aggregation runs either way.
+// The scheduled chain read, when a database and a valid Solana RPC URL are bound. A failure logs a
+// static code with the phase and the error's class only (never the URL, which may carry a provider
+// key) and leaves the cursor at the last stored batch.
 export async function scheduledChainIndex(
   bindings: unknown,
   now: number,
   fetcher: typeof fetch = fetch,
 ) {
   const database = binding(bindings, COLLECTOR_DB_BINDING);
-  const url = binding(bindings, COLLECTOR_SOLANA_RPC_BINDING);
-  if (!isDatabase(database) || typeof url !== 'string' || !url)
-    return undefined;
+  const url = chainRpcUrl(binding(bindings, COLLECTOR_SOLANA_RPC_BINDING));
+  if (!isDatabase(database) || !url) return undefined;
   try {
     return await runChainIndex(database, createChainRpc(url, fetcher), now);
   } catch (error) {
-    // The error's class only: never the RPC URL, which may carry a provider key.
+    const phase = error instanceof ChainIndexError ? error.phase : 'start';
+    const cause = error instanceof ChainIndexError ? error.cause : error;
     console.warn(
       COLLECTOR_CHAIN_INDEX_FAILED,
-      error instanceof Error ? error.name : 'unknown',
+      phase,
+      cause instanceof Error ? cause.name : 'unknown',
     );
     return undefined;
   }
 }
+// Aggregates first (cheap, bounded), then the chain read, so a slow RPC never delays the stats.
 async function scheduledRun(bindings: unknown, now: number) {
-  await scheduledChainIndex(bindings, now);
   await scheduledAggregation(bindings, now);
+  await scheduledChainIndex(bindings, now);
 }
 
 const edgeCache = () =>

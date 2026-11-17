@@ -243,6 +243,8 @@ export const CHAIN_CHANNEL_STATUSES = [
   'distributed',
 ] as const;
 export const CHAIN_CHANNEL_CLOSED = 'closed';
+// The address holds no channel of this program (another owner, or another size).
+export const CHAIN_CHANNEL_UNKNOWN = 'unknown';
 export const CHAIN_PROGRAMS = {
   ED25519: 'Ed25519SigVerify111111111111111111111111111',
   MEMO: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
@@ -261,6 +263,8 @@ export const CHAIN_INDEX = {
   // Channel accounts read per getMultipleAccounts request (the RPC maximum).
   accountsPerRequest: 100,
   requestTimeoutMs: 15_000,
+  // Largest RPC answer read (25 jsonParsed transactions are well under 1 MiB).
+  maxResponseBytes: 8_388_608,
   // Highest Solana transaction version asked for: devnet already carries version 1 transactions.
   maxTransactionVersion: 1,
   msPerSecond: 1000,

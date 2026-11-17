@@ -48,6 +48,8 @@ export interface ChainTransaction {
   slot: number;
   blockTimeMs: number | null;
   failed: boolean;
+  // Program instructions of a successful transaction this decoder could not read.
+  undecodable: number;
   instructions: ChainInstruction[];
   memos: string[];
   deltas: TokenDelta[];
@@ -195,10 +197,12 @@ export function decodeInstruction(
     case CHAIN_INSTRUCTIONS.SETTLE_AND_SEAL: {
       const at = CHAIN_ACCOUNTS.settleAndSeal;
       const channel = account(accounts, at.channel);
+      // hasVoucher: a zero byte seals at the amount already settled, with no new voucher.
+      const hasVoucher = data[CHAIN_LAYOUT.discriminatorBytes] !== 0;
       return {
         ...empty(index, kind, channel),
         payee: account(accounts, at.payee),
-        cumulativeAtomic: cumulative(channel),
+        cumulativeAtomic: hasVoucher ? cumulative(channel) : null,
       };
     }
     case CHAIN_INSTRUCTIONS.REQUEST_CLOSE: {
@@ -252,18 +256,15 @@ function tokenDeltas(meta: Record<string, unknown>): TokenDelta[] {
   return [...deltas.values()].filter((delta) => delta.deltaAtomic !== 0n);
 }
 
-export function decodeTransaction(value: unknown): ChainTransaction {
-  const tx = record(value, 'transaction');
-  const meta = record(tx.meta, 'meta');
-  const transaction = record(tx.transaction, 'transaction.transaction');
-  const message = record(transaction.message, 'message');
-  const signature = text(
-    list(transaction.signatures, 'signatures')[0],
-    'signature',
-  );
+// Program instructions in order. The voucher a settle uses is the Ed25519 instruction immediately
+// before it (the program reads instruction index - 1). An instruction this decoder cannot read is
+// counted, never guessed and never fatal: a successful transaction already passed the program.
+function programInstructions(message: Record<string, unknown>) {
   const instructions: ChainInstruction[] = [];
   const memos: string[] = [];
-  let voucher: ReturnType<typeof voucherOf> = null;
+  let undecodable = 0;
+  let voucher: { index: number; value: ReturnType<typeof voucherOf> } | null =
+    null;
   for (const [index, entry] of list(
     message.instructions,
     'instructions',
@@ -277,18 +278,39 @@ export function decodeTransaction(value: unknown): ChainTransaction {
       memos.push(instruction.parsed);
     if (typeof instruction.data !== 'string') continue;
     const data = base58Decode(instruction.data);
-    if (programId === CHAIN_PROGRAMS.ED25519) {
-      voucher = voucherOf(data);
-      continue;
-    }
+    if (programId === CHAIN_PROGRAMS.ED25519)
+      voucher = { index, value: voucherOf(data) };
     if (programId !== CHANNEL_PROGRAM) continue;
-    const accounts = list(instruction.accounts, 'accounts').map((key) =>
-      text(key, 'account'),
-    );
-    const decoded = decodeInstruction(index, data, accounts, voucher);
-    if (decoded) instructions.push(decoded);
-    voucher = null;
+    try {
+      const accounts = list(instruction.accounts, 'accounts').map((key) =>
+        text(key, 'account'),
+      );
+      const adjacent = voucher?.index === index - 1 ? voucher.value : null;
+      const decoded = decodeInstruction(index, data, accounts, adjacent);
+      if (decoded) instructions.push(decoded);
+      else undecodable += 1;
+    } catch (error) {
+      if (!(error instanceof ChainShapeError)) throw error;
+      undecodable += 1;
+    }
   }
+  return { instructions, memos, undecodable };
+}
+
+export function decodeTransaction(value: unknown): ChainTransaction {
+  const tx = record(value, 'transaction');
+  const meta = record(tx.meta, 'meta');
+  const transaction = record(tx.transaction, 'transaction.transaction');
+  const message = record(transaction.message, 'message');
+  const signature = text(
+    list(transaction.signatures, 'signatures')[0],
+    'signature',
+  );
+  // A failed transaction changed nothing: its instructions are not read (anyone can send garbage).
+  const failed = meta.err !== null && meta.err !== undefined;
+  const { instructions, memos, undecodable } = failed
+    ? { instructions: [], memos: [], undecodable: 0 }
+    : programInstructions(message);
   const blockTime = nullable(tx.blockTime, (present) =>
     num(present, 'blockTime'),
   );
@@ -297,9 +319,10 @@ export function decodeTransaction(value: unknown): ChainTransaction {
     slot: num(tx.slot, 'slot'),
     blockTimeMs:
       blockTime === null ? null : blockTime * CHAIN_INDEX.msPerSecond,
-    failed: meta.err !== null && meta.err !== undefined,
+    failed,
+    undecodable,
     instructions,
     memos,
-    deltas: tokenDeltas(meta),
+    deltas: failed ? [] : tokenDeltas(meta),
   };
 }
