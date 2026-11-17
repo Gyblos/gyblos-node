@@ -1,7 +1,17 @@
-// Owns the scheduled aggregation run. One scan batch marks the days whose raw rows changed since the
-// previous scan (with an overlap), then each dirty day is recomputed in one transactional batch:
-// readers see the old day or the new one, never a mix. Late data simply marks its day dirty again.
-import { and, asc, countDistinct, eq, gte, inArray, sql } from 'drizzle-orm';
+// Owns the scheduled aggregation run. One scan batch marks dirty the days whose raw rows changed since
+// the previous scan (with an overlap) or whose aggregates use an older formula version; then each
+// dirty day, newest first, is recomputed in one transactional batch, so readers see the old day or the
+// new one, never a mix. A day that fails stays dirty and never blocks the others.
+import {
+  and,
+  countDistinct,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  ne,
+  sql,
+} from 'drizzle-orm';
 
 import { firstSeenUpserts } from './aggregate-first-seen';
 import {
@@ -9,19 +19,14 @@ import {
   buyerIdentity,
   completedHeadline,
   conflictCount,
-  dayBounds,
-  dayOf,
   demandEvents,
   demandFields,
   headlineReceipt,
-  inRange,
   modelKey,
   observationJoin,
   observedFields,
-  ordered,
-  receiptTotals,
+  receiptTotalsSelect,
   versionFields,
-  type DayBounds,
 } from './aggregate-sql';
 import { AGG_STATE_ID, AGGREGATES } from './constants';
 import {
@@ -29,6 +34,7 @@ import {
   type CollectorDatabase,
   type D1Database,
 } from './d1-client';
+import { dayBounds, type DayBounds } from './days';
 import {
   aggDemandDaily,
   aggDirtyDays,
@@ -43,53 +49,80 @@ import {
   observations,
   receipts,
 } from './schema';
+import { dayOf, distinctWhere, inRange, ordered } from './sql-primitives';
 
 export interface AggregationResult {
-  // Days recomputed by this run, oldest first.
+  // Days recomputed by this run, newest first.
   days: string[];
+  // Days whose batch failed; they stay dirty for the next run.
+  failed: string[];
   // Dirty days are left for the next run.
   more: boolean;
 }
+type BatchItem = Parameters<CollectorDatabase['batch']>[0][number];
 
-// Marks dirty every day touched since the previous scan, then moves the cursor, in one batch.
+// Marks dirty every day touched since the previous scan, or aggregated with an older formula, and
+// moves the cursor, in one batch.
 async function scan(database: CollectorDatabase, now: number) {
   const [state] = await database
     .select({ scannedAt: aggState.scannedAt })
     .from(aggState)
     .where(eq(aggState.id, AGG_STATE_ID));
   const since = (state?.scannedAt ?? 0) - AGGREGATES.scanOverlapMs;
-  const mark = (day: ReturnType<typeof dayOf>) => ({ day });
+  const receiptDay = dayOf(receipts.sellerReceivedAt);
+  const observationDay = dayOf(observations.at);
+  const day = (value: ReturnType<typeof dayOf>) =>
+    ordered(aggDirtyDays, { day: value });
   await database.batch([
     database
       .insert(aggDirtyDays)
       .select(
         database
-          .selectDistinct(
-            ordered(aggDirtyDays, mark(dayOf(receipts.sellerReceivedAt))),
-          )
+          .selectDistinct(day(receiptDay))
           .from(receipts)
-          .where(gte(receipts.updatedAt, since)),
+          .where(and(gte(receipts.updatedAt, since), isNotNull(receiptDay))),
       )
       .onConflictDoNothing(),
     database
       .insert(aggDirtyDays)
       .select(
         database
-          .selectDistinct(ordered(aggDirtyDays, mark(dayOf(observations.at))))
+          .selectDistinct(day(observationDay))
           .from(observations)
-          .where(gte(observations.insertedAt, since)),
+          .where(
+            and(gte(observations.insertedAt, since), isNotNull(observationDay)),
+          ),
       )
       .onConflictDoNothing(),
     database
       .insert(aggDirtyDays)
       .select(
         database
-          .selectDistinct(
-            ordered(aggDirtyDays, mark(dayOf(receipts.sellerReceivedAt))),
-          )
+          .selectDistinct(day(receiptDay))
           .from(conflicts)
           .innerJoin(receipts, eq(receipts.receiptKey, conflicts.receiptKey))
-          .where(gte(conflicts.insertedAt, since)),
+          .where(and(gte(conflicts.insertedAt, since), isNotNull(receiptDay))),
+      )
+      .onConflictDoNothing(),
+    // A formula change: every day aggregated with another version is recomputed.
+    database
+      .insert(aggDirtyDays)
+      .select(
+        database
+          .selectDistinct(day(sql<string>`${aggSellerDaily.day}`))
+          .from(aggSellerDaily)
+          .where(ne(aggSellerDaily.formulaVersion, AGGREGATES.formulaVersion)),
+      )
+      .onConflictDoNothing(),
+    database
+      .insert(aggDirtyDays)
+      .select(
+        database
+          .selectDistinct(day(sql<string>`${aggObservedDaily.day}`))
+          .from(aggObservedDaily)
+          .where(
+            ne(aggObservedDaily.formulaVersion, AGGREGATES.formulaVersion),
+          ),
       )
       .onConflictDoNothing(),
     database
@@ -104,51 +137,37 @@ function sellerRollups(
   bounds: DayBounds,
   now: number,
 ) {
-  const group = [
-    receipts.sellerNodeId,
-    receipts.modelId,
-    blank(receipts.variant),
-    blank(receipts.quantization),
-    receipts.paid,
-  ];
   const model = {
     sellerNodeId: receipts.sellerNodeId,
     modelId: receipts.modelId,
     variant: blank(receipts.variant),
     quantization: blank(receipts.quantization),
   };
+  const group = [...Object.values(model), receipts.paid];
   const day = sql<string>`${bounds.day}`;
   const hour = sql<number>`${receipts.sellerReceivedAt} / ${sql.raw(String(AGGREGATES.hourMs))}`;
+  // The day's epoch hours, [start, end).
+  const hours = {
+    start: bounds.start / AGGREGATES.hourMs,
+    end: bounds.end / AGGREGATES.hourMs,
+  };
   const where = inRange(receipts.sellerReceivedAt, bounds);
+  const totals = { ...receiptTotalsSelect(), ...versionFields(now) };
   return [
     database.delete(aggSellerDaily).where(eq(aggSellerDaily.day, bounds.day)),
     database.insert(aggSellerDaily).select(
       database
-        .select(
-          ordered(aggSellerDaily, {
-            day,
-            ...model,
-            ...receiptTotals(),
-            ...versionFields(now),
-          }),
-        )
+        .select(ordered(aggSellerDaily, { day, ...model, ...totals }))
         .from(receipts)
         .where(where)
         .groupBy(...group),
     ),
     database
       .delete(aggSellerHourly)
-      .where(inRange(aggSellerHourly.hour, hourBounds(bounds))),
+      .where(inRange(aggSellerHourly.hour, hours)),
     database.insert(aggSellerHourly).select(
       database
-        .select(
-          ordered(aggSellerHourly, {
-            hour,
-            ...model,
-            ...receiptTotals(),
-            ...versionFields(now),
-          }),
-        )
+        .select(ordered(aggSellerHourly, { hour, ...model, ...totals }))
         .from(receipts)
         .where(where)
         .groupBy(hour, ...group),
@@ -173,19 +192,12 @@ function sellerRollups(
     ),
   ];
 }
-const hourBounds = (bounds: DayBounds): DayBounds => ({
-  day: bounds.day,
-  start: bounds.start / AGGREGATES.hourMs,
-  end: bounds.end / AGGREGATES.hourMs,
-});
 
 function networkRollup(
   database: CollectorDatabase,
   bounds: DayBounds,
   now: number,
 ) {
-  const distinctWhere = (value: unknown, condition: unknown) =>
-    sql<number>`count(distinct case when ${condition} then ${value} end)`;
   return [
     database.delete(aggNetworkDaily).where(eq(aggNetworkDaily.day, bounds.day)),
     database.insert(aggNetworkDaily).select(
@@ -193,7 +205,7 @@ function networkRollup(
         .select(
           ordered(aggNetworkDaily, {
             day: sql<string>`${bounds.day}`,
-            ...receiptTotals(),
+            ...receiptTotalsSelect(),
             conflicts: conflictCount(bounds),
             activeSellers: distinctWhere(
               receipts.sellerNodeId,
@@ -256,8 +268,7 @@ function observationRollups(
 }
 
 // Every statement for one day, in one transactional batch; the day leaves the dirty set with it.
-type BatchItem = Parameters<CollectorDatabase['batch']>[0][number];
-function dayBatch(
+export function dayBatch(
   database: CollectorDatabase,
   bounds: DayBounds,
   now: number,
@@ -277,21 +288,30 @@ export async function runAggregation(
 ): Promise<AggregationResult> {
   const orm = createD1Orm(database);
   await scan(orm, now);
+  // Newest first: today's numbers are never starved by old days marked dirty.
   const dirty = await orm
     .select({ day: aggDirtyDays.day })
     .from(aggDirtyDays)
-    .orderBy(asc(aggDirtyDays.day))
+    .orderBy(desc(aggDirtyDays.day))
     .limit(AGGREGATES.maxDaysPerRun + 1);
-  const days: string[] = [];
+  const result: AggregationResult = {
+    days: [],
+    failed: [],
+    more: dirty.length > AGGREGATES.maxDaysPerRun,
+  };
   for (const { day } of dirty.slice(0, AGGREGATES.maxDaysPerRun)) {
     const bounds = dayBounds(day);
-    // A day outside the calendar cannot come from strftime; drop it rather than loop on it.
-    if (!bounds) {
-      await orm.delete(aggDirtyDays).where(inArray(aggDirtyDays.day, [day]));
-      continue;
+    try {
+      // A day outside the calendar cannot come from strftime; drop it rather than keep it dirty.
+      if (!bounds)
+        await orm.delete(aggDirtyDays).where(eq(aggDirtyDays.day, day));
+      else {
+        await orm.batch(dayBatch(orm, bounds, now));
+        result.days.push(day);
+      }
+    } catch {
+      result.failed.push(day);
     }
-    await orm.batch(dayBatch(orm, bounds, now));
-    days.push(day);
   }
-  return { days, more: dirty.length > AGGREGATES.maxDaysPerRun };
+  return result;
 }

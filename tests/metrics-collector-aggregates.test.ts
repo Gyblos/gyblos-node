@@ -62,9 +62,16 @@ void test('network and seller totals follow the metric definitions', async () =>
     feeAtomic: '40',
   });
   insertConflict(database, paidKey, NOW - HOUR);
+  // A paid amount only the seller signed is counted as a request, never as authorized usage.
+  insertReceipt(database, {
+    paid: true,
+    status: 'seller-only',
+    amountAtomic: '500',
+    feeAtomic: '20',
+  });
 
   const result = await runAggregation(database, NOW);
-  assert.deepEqual(result, { days: [DAY], more: false });
+  assert.deepEqual(result, { days: [DAY], failed: [], more: false });
 
   const [free, paid] = rowsOf(
     database,
@@ -86,8 +93,14 @@ void test('network and seller totals follow the metric definitions', async () =>
   // Total latency only for completed receipts.
   assert.equal(free!.total_hist, buckets(900, 3000, 900));
   assert.deepEqual(
-    [paid!.amount_atomic, paid!.fee_atomic, paid!.buyers, paid!.conflicts],
-    [1000, 40, 1, 1],
+    [
+      paid!.seller_only,
+      paid!.amount_atomic,
+      paid!.fee_atomic,
+      paid!.buyers,
+      paid!.conflicts,
+    ],
+    [1, 1000, 40, 2, 1],
   );
 
   const sellers = rowsOf(
@@ -103,7 +116,7 @@ void test('network and seller totals follow the metric definitions', async () =>
     ]),
     [
       [SELLER_A, '', 0, 2],
-      [SELLER_A, '', 1, 1],
+      [SELLER_A, '', 1, 2],
       [SELLER_B, 'q4', 0, 1],
     ],
   );
@@ -120,7 +133,7 @@ void test('network and seller totals follow the metric definitions', async () =>
     buyers.map((row) => [row.seller_node_id, row.paid, row.buyers]),
     [
       [SELLER_A, 0, 2],
-      [SELLER_A, 1, 1],
+      [SELLER_A, 1, 2],
       [SELLER_B, 0, 1],
     ],
   );
@@ -273,13 +286,22 @@ void test('a day costs a fixed set of statements whatever its rows, under the pa
   assert.equal(await statementsFor(1), await statementsFor(60));
 });
 
-void test('a run recomputes at most maxDaysPerRun days and leaves the rest dirty', async () => {
+void test('a run recomputes at most maxDaysPerRun days, newest first, and leaves the rest dirty', async () => {
   const database = createCollectorD1();
   for (let day = 0; day <= AGGREGATES.maxDaysPerRun; day++)
     insertReceipt(database, { receivedAt: DAY_START - day * AGGREGATES.dayMs });
   const first = await runAggregation(database, NOW);
   assert.equal(first.days.length, AGGREGATES.maxDaysPerRun);
+  assert.equal(first.days[0], DAY);
   assert.equal(first.more, true);
-  const second = await runAggregation(database, NOW + 1);
-  assert.deepEqual(second, { days: [DAY], more: false });
+  const oldest = new Date(
+    DAY_START - AGGREGATES.maxDaysPerRun * AGGREGATES.dayMs,
+  )
+    .toISOString()
+    .split('T')[0]!;
+  assert.deepEqual(await runAggregation(database, NOW + 1), {
+    days: [oldest],
+    failed: [],
+    more: false,
+  });
 });

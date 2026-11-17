@@ -43,6 +43,8 @@ export const COLLECTOR_ROUTES = {
   RECEIPTS: '/v1/receipts',
   HEALTH: '/v1/health',
   OBSERVATIONS: '/v1/observations',
+  // Every public stats route starts with this; it selects the read limiter.
+  STATS_PREFIX: '/v1/stats/',
   STATS_NETWORK: '/v1/stats/network',
   STATS_MODELS: '/v1/stats/models',
   STATS_SELLER: '/v1/stats/sellers/:nodeId',
@@ -93,6 +95,12 @@ export const COLLECTOR_LIMITS = {
   maxBoundParameters: 100,
   // Observations are buffered in memory on the node, so older events are not credible.
   maxObservationAgeMs: 2_592_000_000,
+  // A receipt's signed receivedAt must fall after this time (2023-01-01T00:00:00Z, before any Gyblos
+  // release) and at most clockWindowMs after the envelope's sentAt. Keeps every aggregate day real.
+  earliestReceiptAt: 1_672_531_200_000,
+  // Plausibility ceilings for one receipt, far above any real request, so aggregate sums stay exact.
+  maxReceiptAtomic: 1_000_000_000_000,
+  maxReceiptTokens: 100_000_000,
 } as const;
 
 // Cloudflare bindings (wrangler.jsonc); every one is required and missing ones fail closed.
@@ -105,6 +113,8 @@ export const COLLECTOR_LIMITERS = {
   NODE: 'COLLECTOR_NODE_LIMITER',
   // One shared write budget for the whole collector, a ceiling on storage growth from free keys.
   GLOBAL: 'COLLECTOR_GLOBAL_LIMITER',
+  // Per client address for the public stats reads, apart from uploads.
+  READ: 'COLLECTOR_READ_LIMITER',
 } as const;
 export type CollectorLimiterName =
   (typeof COLLECTOR_LIMITERS)[keyof typeof COLLECTOR_LIMITERS];
@@ -134,8 +144,11 @@ export const AGGREGATES = {
   scanOverlapMs: 900_000,
   // Days recomputed per scheduled run; the rest stay dirty for the next run.
   maxDaysPerRun: 31,
-  // Per-seller unique buyers are public only at this count or more.
+  // Unique buyer counts (per seller and per network day) are public only at this count or more.
   minPublicBuyers: 5,
+  // Public list caps: models per answer, and unserved-demand models per day.
+  maxPublicModels: 100,
+  maxPublicDemandPerDay: 20,
   // Public day ranges.
   maxRangeDays: 92,
   defaultRangeDays: 30,

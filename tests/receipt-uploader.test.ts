@@ -38,6 +38,7 @@ function collectorFetch(
       [COLLECTOR_LIMITERS.IP]: fakeLimiter(),
       [COLLECTOR_LIMITERS.NODE]: fakeLimiter(),
       [COLLECTOR_LIMITERS.GLOBAL]: fakeLimiter(),
+      [COLLECTOR_LIMITERS.READ]: fakeLimiter(),
     },
     now,
   });

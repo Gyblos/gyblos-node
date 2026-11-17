@@ -9,7 +9,7 @@ import {
 
 // Additive receipt columns shared by the seller hourly, seller daily and network tables. Fresh
 // builders per table, as Drizzle requires.
-function receiptTotals() {
+function receiptTotalColumns() {
   return {
     paid: integer('paid').notNull(),
     bilateral: integer('bilateral').notNull(),
@@ -57,7 +57,7 @@ export const aggSellerDaily = sqliteTable(
   {
     day: text('day').notNull(),
     ...sellerModel(),
-    ...receiptTotals(),
+    ...receiptTotalColumns(),
     ...version(),
   },
   (table) => [
@@ -79,7 +79,7 @@ export const aggSellerHourly = sqliteTable(
   {
     hour: integer('hour').notNull(),
     ...sellerModel(),
-    ...receiptTotals(),
+    ...receiptTotalColumns(),
     ...version(),
   },
   (table) => [
@@ -114,7 +114,7 @@ export const aggNetworkDaily = sqliteTable(
   'collector_agg_network_daily',
   {
     day: text('day').notNull(),
-    ...receiptTotals(),
+    ...receiptTotalColumns(),
     conflicts: integer('conflicts').notNull(),
     activeSellers: integer('active_sellers').notNull(),
     buyers: integer('buyers').notNull(),
@@ -157,3 +157,19 @@ export const firstSeen = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.kind, table.id] })],
 );
+
+// The receipt total columns, in table order: the one list the aggregation, the reads and the response
+// shapes follow.
+export type ReceiptTotalKey = keyof ReturnType<typeof receiptTotalColumns>;
+export const RECEIPT_TOTAL_KEYS = Object.keys(
+  receiptTotalColumns(),
+) as ReceiptTotalKey[];
+// Histogram columns among them: summed bucket by bucket, never as numbers.
+export const HISTOGRAM_KEYS: ReadonlySet<ReceiptTotalKey> = new Set([
+  'firstTokenHist',
+  'totalHist',
+]);
+export type ReceiptTotals = Pick<
+  typeof aggSellerDaily.$inferSelect,
+  ReceiptTotalKey
+>;

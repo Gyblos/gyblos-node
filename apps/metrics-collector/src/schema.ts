@@ -174,4 +174,14 @@ export const observations = sqliteTable(
 );
 
 // Aggregate tables (#351), recomputed from the raw tables above.
-export * from './schema-aggregates';
+export {
+  aggDemandDaily,
+  aggDirtyDays,
+  aggNetworkDaily,
+  aggObservedDaily,
+  aggSellerBuyersDaily,
+  aggSellerDaily,
+  aggSellerHourly,
+  aggState,
+  firstSeen,
+} from './schema-aggregates';

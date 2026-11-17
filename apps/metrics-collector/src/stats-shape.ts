@@ -1,29 +1,21 @@
-// Owns the public stats response shapes. Free and paid totals are always separate sections and never
-// summed; free volume is labelled as not backed by payment; paid amounts are authorized usage, not
-// revenue; per-seller buyer counts below AGGREGATES.minPublicBuyers are withheld.
+// Owns the public shapes of summed totals: latency percentiles from fixed buckets, success rate, and the
+// free/paid split. Free volume is labelled as not backed by payment; paid amounts are authorized usage
+// signed by both sides, not revenue; unique buyer counts below AGGREGATES.minPublicBuyers are withheld.
 import { AGGREGATES } from './constants';
-import type { DayRange } from './stats-read';
+import type { ReceiptTotals } from './schema-aggregates';
 
-// The additive columns every totals row shares (seller or network, one paid flag).
-export interface TotalsFields {
-  paid: number;
-  bilateral: number;
-  sellerOnly: number;
-  disputed: number;
-  completed: number;
-  failed: number;
-  cancelled: number;
-  inputTokens: number;
-  outputTokens: number;
-  reasoningTokens: number;
-  reasoningUnknown: number;
-  amountAtomic: number;
-  feeAtomic: number;
-  firstTokenHist: string;
-  totalHist: string;
-}
 const BUCKETS = AGGREGATES.latencyBucketsMs;
 const PERCENTILES = { p50: 0.5, p95: 0.95 } as const;
+
+export interface Latency {
+  samples: number;
+  // Upper bound (ms) of the bucket holding the percentile; null when empty or above the last bound.
+  p50Ms: number | null;
+  p95Ms: number | null;
+  // Upper bounds in ms; the last count is everything above the last bound.
+  bucketsMs: readonly number[];
+  counts: number[];
+}
 
 // A stored histogram; anything malformed reads as empty rather than failing the response.
 export function counts(text: string): number[] {
@@ -41,7 +33,6 @@ export function counts(text: string): number[] {
   }
   return empty;
 }
-// The upper bound (ms) of the bucket holding the percentile; null when empty or above the last bound.
 function percentile(values: readonly number[], share: number): number | null {
   const samples = values.reduce((sum, value) => sum + value, 0);
   if (!samples) return null;
@@ -52,24 +43,47 @@ function percentile(values: readonly number[], share: number): number | null {
   }
   return null;
 }
-export function latency(text: string) {
+export function latency(text: string): Latency {
   const values = counts(text);
   return {
     samples: values.reduce((sum, value) => sum + value, 0),
     p50Ms: percentile(values, PERCENTILES.p50),
     p95Ms: percentile(values, PERCENTILES.p95),
-    // Upper bounds in ms; the last count is everything above the last bound.
     bucketsMs: BUCKETS,
     counts: values,
   };
 }
-const ratio = (part: number, whole: number) => (whole ? part / whole : null);
 
-export function totalsSection(row: TotalsFields) {
-  const settledOutcomes = row.completed + row.failed + row.cancelled;
-  const common = {
+export interface TotalsSection {
+  requests: {
+    // Receipts confirmed by both sides plus seller-only ones.
+    headline: number;
+    bilateral: number;
+    sellerOnly: number;
+    disputed: number;
+  };
+  outcomes: { completed: number; failed: number; cancelled: number };
+  successRate: number | null;
+  tokens: {
+    input: number;
+    output: number;
+    reasoning: number;
+    // Receipts whose reasoning token count is unknown (not zero).
+    reasoningUnknown: number;
+  };
+  sellerLatency: { firstToken: Latency; total: Latency };
+}
+export type FreeSection = TotalsSection & { backedByPayment: false };
+export type PaidSection = TotalsSection & {
+  // Usage both sides signed for, in USDC atomic units; settled USDC comes only from the chain.
+  authorizedAtomic: string;
+  feeAtomic: string;
+};
+
+function totalsSection(row: ReceiptTotals): TotalsSection {
+  const finished = row.completed + row.failed + row.cancelled;
+  return {
     requests: {
-      // Headline: receipts confirmed by both sides plus seller-only ones.
       headline: row.bilateral + row.sellerOnly,
       bilateral: row.bilateral,
       sellerOnly: row.sellerOnly,
@@ -80,12 +94,11 @@ export function totalsSection(row: TotalsFields) {
       failed: row.failed,
       cancelled: row.cancelled,
     },
-    successRate: ratio(row.completed, settledOutcomes),
+    successRate: finished ? row.completed / finished : null,
     tokens: {
       input: row.inputTokens,
       output: row.outputTokens,
       reasoning: row.reasoningTokens,
-      // Receipts whose reasoning token count is unknown (not zero).
       reasoningUnknown: row.reasoningUnknown,
     },
     sellerLatency: {
@@ -93,43 +106,38 @@ export function totalsSection(row: TotalsFields) {
       total: latency(row.totalHist),
     },
   };
-  return row.paid
-    ? {
-        ...common,
-        // Signed authorized usage; settled USDC comes only from the chain.
-        authorizedAtomic: String(row.amountAtomic),
-        feeAtomic: String(row.feeAtomic),
-      }
-    : { ...common, backedByPayment: false as const };
 }
+export const freeSection = (row: ReceiptTotals): FreeSection => ({
+  ...totalsSection(row),
+  backedByPayment: false,
+});
+export const paidSection = (row: ReceiptTotals): PaidSection => ({
+  ...totalsSection(row),
+  authorizedAtomic: String(row.amountAtomic),
+  feeAtomic: String(row.feeAtomic),
+});
 
-// Splits free and paid rows into their own sections; a missing side is null.
-export function bySide<T extends { paid: number }, S>(
+// Free and paid rows in their own sections, each extended by `extra`; a missing side is null.
+export function bySide<T extends ReceiptTotals, E extends object>(
   rows: readonly T[],
-  shape: (row: T) => S,
+  extra: (row: T) => E,
 ) {
   const free = rows.find((row) => !row.paid);
   const paid = rows.find((row) => row.paid);
   return {
-    free: free ? shape(free) : null,
-    paid: paid ? shape(paid) : null,
+    free: free ? { ...freeSection(free), ...extra(free) } : null,
+    paid: paid ? { ...paidSection(paid), ...extra(paid) } : null,
   };
 }
-// Every UTC day of the range, oldest first.
-export function daysOf(range: DayRange): string[] {
-  const days: string[] = [];
-  for (
-    let at = Date.parse(`${range.from}T00:00:00.000Z`);
-    at <= Date.parse(`${range.to}T00:00:00.000Z`);
-    at += AGGREGATES.dayMs
-  )
-    days.push(new Date(at).toISOString().split('T')[0]!);
-  return days;
+
+export interface PublicBuyers {
+  // Distinct NodeIds (free) or wallets (paid); null when withheld.
+  buyers: number | null;
+  withheld: boolean;
 }
-// A per-seller buyer count, withheld below the public minimum.
-export function publicBuyers(buyers: number | undefined) {
-  if (buyers === undefined) return { buyers: 0, withheld: false };
-  return buyers >= AGGREGATES.minPublicBuyers
+// A unique buyer count, withheld below the public minimum (zero included).
+export function publicBuyers(buyers: number | undefined): PublicBuyers {
+  return buyers !== undefined && buyers >= AGGREGATES.minPublicBuyers
     ? { buyers, withheld: false }
     : { buyers: null, withheld: true };
 }

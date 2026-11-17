@@ -17,6 +17,8 @@ import { createD1Storage } from '@gyblos/metrics-collector/storage-d1';
 import { fakeLimiter, signUpload } from './support/metrics-collector';
 import {
   DAY,
+  insertEnvelope,
+  insertObservation,
   insertReceipt,
   NOW,
   SELLER_A,
@@ -45,24 +47,32 @@ interface Side {
 interface Answer {
   error?: string;
   to?: string;
+  formulaVersion?: number | null;
   aggregatedAt?: number | null;
-  days: { day: string; free: Side; paid: Side | null }[];
-  models: { variant: string | null; free: Side; paid: Side }[];
+  days: {
+    day: string;
+    free: Side;
+    paid: Side | null;
+    demand: { modelId: string }[];
+  }[];
+  models: { modelId: string; variant: string | null; free: Side; paid: Side }[];
 }
 
 function collector(
   database: ReturnType<typeof createCollectorD1>,
   now: number,
   withStats = true,
+  limiters = {
+    [COLLECTOR_LIMITERS.IP]: fakeLimiter(),
+    [COLLECTOR_LIMITERS.NODE]: fakeLimiter(),
+    [COLLECTOR_LIMITERS.GLOBAL]: fakeLimiter(),
+    [COLLECTOR_LIMITERS.READ]: fakeLimiter(),
+  },
 ) {
   return createMetricsCollector({
     storage: createD1Storage(database),
     stats: withStats ? statsReader(database) : undefined,
-    limiters: {
-      [COLLECTOR_LIMITERS.IP]: fakeLimiter(),
-      [COLLECTOR_LIMITERS.NODE]: fakeLimiter(),
-      [COLLECTOR_LIMITERS.GLOBAL]: fakeLimiter(),
-    },
+    limiters,
     now: () => now,
   });
 }
@@ -110,7 +120,8 @@ void test('a signed receipt from both sides reaches the public network totals', 
   });
   assert.equal(only!.free.backedByPayment, false);
   assert.equal(only!.free.successRate, 1);
-  assert.equal(only!.free.buyers, 1);
+  // One buyer: below the public minimum, so the count is withheld at network level too.
+  assert.deepEqual([only!.free.buyers, only!.free.withheld], [null, true]);
 });
 
 void test('models keep free and paid apart; sellers withhold buyers below the minimum', async () => {
@@ -190,4 +201,77 @@ void test('the default range is the last days up to today, each endpoint one bat
   database.log.length = 0;
   await get(app, '/v1/stats/models');
   assert.equal(database.log.length, 1);
+});
+
+void test('the network withholds unique buyers below the minimum and shows them at it', async () => {
+  const database = createCollectorD1();
+  for (let index = 0; index < AGGREGATES.minPublicBuyers; index++)
+    insertReceipt(database, { buyer: index.toString(16).padStart(64, '0') });
+  insertReceipt(database, { paid: true, payer: 'Wallet' });
+  await runAggregation(database, NOW);
+  const { body } = await get(
+    collector(database, NOW),
+    `/v1/stats/network?from=${DAY}&to=${DAY}`,
+  );
+  const [day] = body.days;
+  assert.deepEqual(
+    [day!.free.buyers, day!.free.withheld],
+    [AGGREGATES.minPublicBuyers, false],
+  );
+  assert.deepEqual([day!.paid?.buyers, day!.paid?.withheld], [null, true]);
+  assert.equal(body.formulaVersion, AGGREGATES.formulaVersion);
+});
+
+void test('a range of maxRangeDays days is accepted and one more day is refused', async () => {
+  const app = collector(createCollectorD1(), NOW);
+  const from = (days: number) =>
+    new Date(Date.parse(`${DAY}T00:00:00.000Z`) - (days - 1) * AGGREGATES.dayMs)
+      .toISOString()
+      .split('T')[0]!;
+  const ok = await get(
+    app,
+    `/v1/stats/network?from=${from(AGGREGATES.maxRangeDays)}&to=${DAY}`,
+  );
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.days.length, AGGREGATES.maxRangeDays);
+  const tooLong = await get(
+    app,
+    `/v1/stats/network?from=${from(AGGREGATES.maxRangeDays + 1)}&to=${DAY}`,
+  );
+  assert.equal(tooLong.status, 400);
+});
+
+void test('answers cap models and per-day demand, largest first', async () => {
+  const database = createCollectorD1();
+  for (let index = 0; index <= AGGREGATES.maxPublicModels; index++)
+    insertReceipt(database, { model: `model/${index}` });
+  insertReceipt(database, { model: 'model/top' });
+  insertReceipt(database, { model: 'model/top' });
+  const at = Date.parse(`${DAY}T05:00:00.000Z`);
+  const buyer = insertEnvelope(database, 'buyer', at);
+  for (let index = 0; index <= AGGREGATES.maxPublicDemandPerDay; index++)
+    insertObservation(database, buyer, {
+      type: 'unserved',
+      at,
+      model: `want/${index}`,
+    });
+  insertObservation(database, buyer, {
+    type: 'unserved',
+    at,
+    model: 'want/top',
+  });
+  insertObservation(database, buyer, {
+    type: 'unserved',
+    at,
+    model: 'want/top',
+  });
+  await runAggregation(database, NOW);
+  const app = collector(database, NOW);
+  const models = await get(app, `/v1/stats/models?from=${DAY}&to=${DAY}`);
+  assert.equal(models.body.models.length, AGGREGATES.maxPublicModels);
+  assert.equal(models.body.models[0]!.modelId, 'model/top');
+  const network = await get(app, `/v1/stats/network?from=${DAY}&to=${DAY}`);
+  const demand = network.body.days[0]!.demand;
+  assert.equal(demand.length, AGGREGATES.maxPublicDemandPerDay);
+  assert.equal(demand[0]!.modelId, 'want/top');
 });

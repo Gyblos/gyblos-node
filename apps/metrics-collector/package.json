@@ -15,8 +15,10 @@
     "./ingest-observations": "./src/ingest-observations.ts",
     "./aggregate": "./src/aggregate.ts",
     "./stats-read": "./src/stats-read.ts",
-    "./stats-routes": "./src/stats-routes.ts",
-    "./stats-shape": "./src/stats-shape.ts"
+    "./stats-shape": "./src/stats-shape.ts",
+    "./stats": "./src/stats.ts",
+    "./stats-store": "./src/stats-store.ts",
+    "./days": "./src/days.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

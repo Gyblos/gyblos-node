@@ -1,9 +1,11 @@
 // Owns one upload's acceptance, cheapest checks first: strict JSON, envelope parse (structure and party
 // binding), the envelope signature, the clock window, per-node admission, then each receipt verified
-// once by the public receipt policy, and one atomic write.
+// once by the public receipt policy and checked for plausible time, amounts and tokens, and one atomic
+// write.
 import {
   classifyPublicReceipt,
   mergePublicReceipt,
+  type PublicReceiptEntry,
 } from '@gyblos/core/public-receipts';
 import { canonicalJson } from '@gyblos/protocol';
 import { verifyReceiptUploadEnvelope } from '@gyblos/protocol/receipt-upload';
@@ -72,6 +74,23 @@ export async function envelopeId(signature: string) {
   ).join('');
 }
 
+// A signed time the collector can place on a real UTC day near the upload, and amounts and token
+// counts no real request reaches, so a crafted receipt can neither break nor dominate aggregates.
+export function plausibleReceipt(entry: PublicReceiptEntry, sentAt: number) {
+  const { timing, usage, amountAtomic, feeAtomic } =
+    entry.receipt.seller.record;
+  const tokens = [usage.inputTokens, usage.outputTokens, usage.reasoningTokens];
+  return (
+    timing.receivedAt >= COLLECTOR_LIMITS.earliestReceiptAt &&
+    timing.receivedAt <= sentAt + COLLECTOR_LIMITS.clockWindowMs &&
+    BigInt(amountAtomic) <= BigInt(COLLECTOR_LIMITS.maxReceiptAtomic) &&
+    BigInt(feeAtomic) <= BigInt(COLLECTOR_LIMITS.maxReceiptAtomic) &&
+    tokens.every(
+      (count) => count === null || count <= COLLECTOR_LIMITS.maxReceiptTokens,
+    )
+  );
+}
+
 // Parses and checks only the envelope signature (one Ed25519 verification), no receipt work yet.
 async function verifiedEnvelope(value: unknown) {
   try {
@@ -102,6 +121,8 @@ export async function ingestUpload(
   } catch (error) {
     return verificationFailure(error);
   }
+  if (!entries.every((entry) => plausibleReceipt(entry, upload.sentAt)))
+    return collectorReject();
   if (!(await context.admitWrite()))
     return collectorReject(COLLECTOR_ERRORS.RATE_LIMITED);
   // The pre-read only labels reports; storage decides first versions and conflicts atomically.

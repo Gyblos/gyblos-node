@@ -1,6 +1,6 @@
-// Owns the public stats reads: typed, set-based selects over aggregate tables only, never raw rows.
-// Each endpoint is a fixed number of statements for any day range; histograms are summed bucket by
-// bucket in SQL, so a range costs one grouped scan per table.
+// Owns the D1 adapter of the stats read port: typed, set-based selects over aggregate tables only,
+// never raw rows. Each answer is one batch with a fixed number of statements for any day range;
+// histograms are summed in SQL and list sizes are capped in SQL with window functions.
 import {
   and,
   asc,
@@ -8,6 +8,7 @@ import {
   countDistinct,
   desc,
   eq,
+  lte,
   sql,
   type SQL,
 } from 'drizzle-orm';
@@ -19,6 +20,7 @@ import {
   type CollectorDatabase,
   type D1Database,
 } from './d1-client';
+import type { DayRange } from './days';
 import {
   aggDemandDaily,
   aggNetworkDaily,
@@ -26,145 +28,188 @@ import {
   aggSellerBuyersDaily,
   aggSellerDaily,
 } from './schema';
+import {
+  HISTOGRAM_KEYS,
+  RECEIPT_TOTAL_KEYS,
+  type ReceiptTotalKey,
+  type ReceiptTotals,
+} from './schema-aggregates';
+import { histogramSum, total } from './sql-primitives';
+import type { StatsReader } from './stats-store';
 
-export interface DayRange {
-  from: string;
-  to: string;
-}
-// Summed bucket counts of a histogram column, as a JSON array text.
-function histogramSum(column: SQLiteColumn) {
-  const parts = Array.from(
-    { length: AGGREGATES.latencyBucketsMs.length + 1 },
-    (_, index) =>
-      sql`coalesce(sum(json_extract(${column}, ${sql.raw(`'$[${index}]'`)})), 0)`,
-  );
-  return sql<string>`json_array(${sql.join(parts, sql`, `)})`;
-}
-const sum = (column: SQLiteColumn) => sql<number>`coalesce(sum(${column}), 0)`;
-
-type Totals = typeof aggSellerDaily | typeof aggNetworkDaily;
-// Additive receipt totals of a seller or network table, summed over the grouped rows.
-function totals(table: Totals) {
+type TotalsTable = typeof aggSellerDaily | typeof aggNetworkDaily;
+// Each summed field keeps its schema type: numbers stay numbers, histograms stay JSON text.
+type SummedTotals = {
+  [K in ReceiptTotalKey]: K extends 'paid'
+    ? TotalsTable['paid']
+    : SQL<ReceiptTotals[K]>;
+};
+// The receipt totals of a seller or network table, summed over the grouped rows: the paid flag is a
+// group column, histograms are summed bucket by bucket, everything else is added.
+function totals(table: TotalsTable) {
+  const fields = Object.fromEntries(
+    RECEIPT_TOTAL_KEYS.map((key) => [
+      key,
+      key === 'paid'
+        ? table.paid
+        : HISTOGRAM_KEYS.has(key)
+          ? histogramSum(table[key])
+          : total(table[key]),
+    ]),
+  ) as SummedTotals;
   return {
-    paid: table.paid,
-    bilateral: sum(table.bilateral),
-    sellerOnly: sum(table.sellerOnly),
-    disputed: sum(table.disputed),
-    completed: sum(table.completed),
-    failed: sum(table.failed),
-    cancelled: sum(table.cancelled),
-    inputTokens: sum(table.inputTokens),
-    outputTokens: sum(table.outputTokens),
-    reasoningTokens: sum(table.reasoningTokens),
-    reasoningUnknown: sum(table.reasoningUnknown),
-    amountAtomic: sum(table.amountAtomic),
-    feeAtomic: sum(table.feeAtomic),
-    firstTokenHist: histogramSum(table.firstTokenHist),
-    totalHist: histogramSum(table.totalHist),
-    aggregatedAt: sql<number>`max(${table.aggregatedAt})`,
+    ...fields,
+    aggregatedAt: sql<number | null>`max(${table.aggregatedAt})`,
+    minFormulaVersion: sql<number | null>`min(${table.formulaVersion})`,
+    maxFormulaVersion: sql<number | null>`max(${table.formulaVersion})`,
   };
 }
-export type TotalsRow = Awaited<
-  ReturnType<typeof readNetwork>
->['network'][number];
-
-const within = (column: SQLiteColumn, range: DayRange): SQL =>
+const within = (column: SQLiteColumn, range: DayRange) =>
   between(column, range.from, range.to);
+const modelColumns = (table: typeof aggSellerDaily) =>
+  [table.modelId, table.variant, table.quantization] as const;
 
-export function statsReader(database: D1Database) {
-  const orm = createD1Orm(database);
-  return {
-    network: (range: DayRange) => readNetwork(orm, range),
-    models: (range: DayRange) => readModels(orm, range),
-    seller: (nodeId: string, range: DayRange) => readSeller(orm, nodeId, range),
-  };
-}
-export type StatsReader = ReturnType<typeof statsReader>;
-
-async function readNetwork(orm: CollectorDatabase, range: DayRange) {
-  const [network, observed, demand] = await orm.batch([
+function network(orm: CollectorDatabase, range: DayRange) {
+  const net = aggNetworkDaily;
+  const dem = aggDemandDaily;
+  // The largest demand rows of each day, in SQL.
+  const ranked = orm
+    .select({
+      day: dem.day,
+      modelId: dem.modelId,
+      unserved: dem.unserved,
+      refusedBeforeSelection: dem.refusedBeforeSelection,
+      connectFailed: dem.connectFailed,
+      formulaVersion: dem.formulaVersion,
+      aggregatedAt: dem.aggregatedAt,
+      rank: sql<number>`row_number() over (partition by ${dem.day} order by ${dem.unserved} + ${dem.refusedBeforeSelection} + ${dem.connectFailed} desc, ${dem.modelId})`.as(
+        'rank',
+      ),
+    })
+    .from(dem)
+    .where(within(dem.day, range))
+    .as('ranked');
+  const { rank: _rank, ...demand } = ranked._.selectedFields;
+  return orm.batch([
     orm
       .select({
-        day: aggNetworkDaily.day,
-        ...totals(aggNetworkDaily),
-        conflicts: sum(aggNetworkDaily.conflicts),
-        activeSellers: sum(aggNetworkDaily.activeSellers),
-        buyers: sum(aggNetworkDaily.buyers),
-        modelsServed: sum(aggNetworkDaily.modelsServed),
+        day: net.day,
+        ...totals(net),
+        conflicts: total(net.conflicts),
+        activeSellers: total(net.activeSellers),
+        buyers: total(net.buyers),
+        modelsServed: total(net.modelsServed),
       })
-      .from(aggNetworkDaily)
-      .where(within(aggNetworkDaily.day, range))
-      .groupBy(aggNetworkDaily.day, aggNetworkDaily.paid)
-      .orderBy(asc(aggNetworkDaily.day), asc(aggNetworkDaily.paid)),
+      .from(net)
+      .where(within(net.day, range))
+      .groupBy(net.day, net.paid)
+      .orderBy(asc(net.day), asc(net.paid)),
     orm
       .select()
       .from(aggObservedDaily)
       .where(within(aggObservedDaily.day, range))
       .orderBy(asc(aggObservedDaily.day)),
     orm
-      .select()
-      .from(aggDemandDaily)
-      .where(within(aggDemandDaily.day, range))
-      .orderBy(asc(aggDemandDaily.day), desc(aggDemandDaily.unserved)),
+      .select(demand)
+      .from(ranked)
+      .where(lte(ranked.rank, AGGREGATES.maxPublicDemandPerDay))
+      .orderBy(asc(ranked.day), asc(ranked.rank)),
   ]);
-  return { network, observed, demand };
 }
 
-async function readModels(orm: CollectorDatabase, range: DayRange) {
-  const t = aggSellerDaily;
+// Only the AGGREGATES.maxPublicModels models with the most completed requests (free and paid
+// together) under `condition`; an uncorrelated subquery, so the cap counts models, not rows.
+function topModels(orm: CollectorDatabase, condition: SQL | undefined) {
+  const daily = aggSellerDaily;
+  const top = orm
+    .select({
+      modelId: daily.modelId,
+      variant: daily.variant,
+      quantization: daily.quantization,
+    })
+    .from(daily)
+    .where(condition)
+    .groupBy(...modelColumns(daily))
+    .orderBy(desc(total(daily.completed)), ...modelColumns(daily).map(asc))
+    .limit(AGGREGATES.maxPublicModels);
+  return sql`(${daily.modelId}, ${daily.variant}, ${daily.quantization}) in ${top}`;
+}
+// Most completed first, free and paid of one model together.
+const byModelCompleted = (daily: typeof aggSellerDaily) => [
+  desc(
+    sql`sum(sum(${daily.completed})) over (partition by ${daily.modelId}, ${daily.variant}, ${daily.quantization})`,
+  ),
+  ...modelColumns(daily).map(asc),
+  asc(daily.paid),
+];
+
+function models(orm: CollectorDatabase, range: DayRange) {
+  const daily = aggSellerDaily;
+  const inRange = within(daily.day, range);
   return orm
     .select({
-      modelId: t.modelId,
-      variant: t.variant,
-      quantization: t.quantization,
-      ...totals(t),
-      sellers: countDistinct(t.sellerNodeId),
+      ...totals(daily),
+      modelId: daily.modelId,
+      variant: daily.variant,
+      quantization: daily.quantization,
+      sellers: countDistinct(daily.sellerNodeId),
     })
-    .from(t)
-    .where(within(t.day, range))
-    .groupBy(t.modelId, t.variant, t.quantization, t.paid)
-    .orderBy(desc(sum(t.completed)), asc(t.modelId));
+    .from(daily)
+    .where(and(inRange, topModels(orm, inRange)))
+    .groupBy(...modelColumns(daily), daily.paid)
+    .orderBy(...byModelCompleted(daily));
 }
 
-async function readSeller(
-  orm: CollectorDatabase,
-  nodeId: string,
-  range: DayRange,
-) {
-  const t = aggSellerDaily;
-  const mine = and(eq(t.sellerNodeId, nodeId), within(t.day, range));
-  const [days, models, buyers] = await orm.batch([
+function seller(orm: CollectorDatabase, nodeId: string, range: DayRange) {
+  const daily = aggSellerDaily;
+  const buyersTable = aggSellerBuyersDaily;
+  const mine = and(eq(daily.sellerNodeId, nodeId), within(daily.day, range));
+  return orm.batch([
     orm
-      .select({ day: t.day, ...totals(t) })
-      .from(t)
+      .select({ day: daily.day, ...totals(daily) })
+      .from(daily)
       .where(mine)
-      .groupBy(t.day, t.paid)
-      .orderBy(asc(t.day), asc(t.paid)),
+      .groupBy(daily.day, daily.paid)
+      .orderBy(asc(daily.day), asc(daily.paid)),
     orm
       .select({
-        modelId: t.modelId,
-        variant: t.variant,
-        quantization: t.quantization,
-        ...totals(t),
+        ...totals(daily),
+        modelId: daily.modelId,
+        variant: daily.variant,
+        quantization: daily.quantization,
       })
-      .from(t)
-      .where(mine)
-      .groupBy(t.modelId, t.variant, t.quantization, t.paid)
-      .orderBy(desc(sum(t.completed)), asc(t.modelId)),
+      .from(daily)
+      .where(and(mine, topModels(orm, mine)))
+      .groupBy(...modelColumns(daily), daily.paid)
+      .orderBy(...byModelCompleted(daily)),
     orm
       .select({
-        day: aggSellerBuyersDaily.day,
-        paid: aggSellerBuyersDaily.paid,
-        buyers: aggSellerBuyersDaily.buyers,
+        day: buyersTable.day,
+        paid: buyersTable.paid,
+        buyers: buyersTable.buyers,
       })
-      .from(aggSellerBuyersDaily)
+      .from(buyersTable)
       .where(
         and(
-          eq(aggSellerBuyersDaily.sellerNodeId, nodeId),
-          within(aggSellerBuyersDaily.day, range),
+          eq(buyersTable.sellerNodeId, nodeId),
+          within(buyersTable.day, range),
         ),
       )
-      .orderBy(asc(aggSellerBuyersDaily.day)),
+      .orderBy(asc(buyersTable.day), asc(buyersTable.paid)),
   ]);
-  return { days, models, buyers };
+}
+
+export function statsReader(database: D1Database): StatsReader {
+  const orm = createD1Orm(database);
+  return {
+    async network(range) {
+      const [networkRows, observed, demand] = await network(orm, range);
+      return { network: networkRows, observed, demand };
+    },
+    models: async (range) => models(orm, range),
+    async seller(nodeId, range) {
+      const [days, sellerModels, buyers] = await seller(orm, nodeId, range);
+      return { days, models: sellerModels, buyers };
+    },
+  };
 }

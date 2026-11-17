@@ -19,11 +19,12 @@ import {
   type CollectorLimiterName,
 } from './constants';
 import { CollectorError, statusOf } from './errors';
+import { rejection } from './http';
 import { ingestUpload, StaleUploadError } from './ingest';
 import { ingestObservations } from './ingest-observations';
 import { ipKey } from './ip-key';
-import type { StatsReader } from './stats-read';
 import { statsRoutes } from './stats-routes';
+import type { StatsReader } from './stats-store';
 import type { CollectorStorage } from './storage';
 
 // The subset of a Cloudflare rate-limit binding the collector uses.
@@ -46,15 +47,6 @@ export interface MetricsCollectorOptions {
 }
 
 const JSON_CONTENT_TYPE = /^application\/json(?:\s*;\s*charset=utf-8)?$/i;
-
-function rejection(context: Context, code: CollectorErrorCode) {
-  if (code === COLLECTOR_ERRORS.RATE_LIMITED)
-    context.header(
-      COLLECTOR_HEADERS.RETRY_AFTER,
-      COLLECTOR_HEADER_VALUES.RETRY_AFTER_SECONDS,
-    );
-  return context.json({ error: code }, statusOf(code));
-}
 
 function secureRequest(url: string, development: boolean) {
   const { protocol, hostname } = new URL(url);
@@ -97,8 +89,9 @@ function resolve(options: MetricsCollectorOptions) {
   const ip = limiters[COLLECTOR_LIMITERS.IP];
   const node = limiters[COLLECTOR_LIMITERS.NODE];
   const global = limiters[COLLECTOR_LIMITERS.GLOBAL];
-  if (!options.storage || !ip || !node || !global) return null;
-  return { storage: options.storage, ip, node, global };
+  const read = limiters[COLLECTOR_LIMITERS.READ];
+  if (!options.storage || !ip || !node || !global || !read) return null;
+  return { storage: options.storage, ip, node, global, read };
 }
 
 export function createMetricsCollector(options: MetricsCollectorOptions) {
@@ -108,6 +101,7 @@ export function createMetricsCollector(options: MetricsCollectorOptions) {
   const app = new Hono();
 
   // Before routing: https, fail closed on storage and every limiter, then the per-address (/64) limit.
+  // Public stats reads have their own per-address budget, so readers and uploads never block each other.
   app.use('*', async (context: Context, next: Next) => {
     if (!secureRequest(context.req.url, development))
       context.res = rejection(context, COLLECTOR_ERRORS.HTTPS_REQUIRED);
@@ -115,7 +109,9 @@ export function createMetricsCollector(options: MetricsCollectorOptions) {
       context.res = rejection(context, COLLECTOR_ERRORS.UNAVAILABLE);
     else if (
       !(await allowed(
-        resolved.ip,
+        context.req.path.startsWith(COLLECTOR_ROUTES.STATS_PREFIX)
+          ? resolved.read
+          : resolved.ip,
         ipKey(context.req.header(COLLECTOR_HEADERS.CLIENT_IP)),
       ))
     )

@@ -1,7 +1,8 @@
 -- Metrics collector aggregates (#351): rollups recomputed from raw rows, never edited by hand.
 -- Every item falls on the UTC day of its own source time: receipts by the seller's receivedAt,
--- observations by their own `at`. Each aggregate row stores its formula version and when it was
--- computed; dropping every collector_agg_* row and rerunning rebuilds them from raw.
+-- observations by their own `at`. Each collector_agg_*_daily/hourly row stores its formula version and
+-- when it was computed. Deleting every collector_agg_* row and every collector_first_seen row, then
+-- rerunning, rebuilds them from raw.
 
 -- Indexes that find the days changed since the last run, and scan one day of raw rows.
 CREATE INDEX IF NOT EXISTS collector_receipts_by_updated ON collector_receipts (updated_at);

@@ -33,18 +33,21 @@ export function testCollector(
     ip?: boolean;
     node?: boolean;
     global?: boolean;
+    read?: boolean;
     now?: () => number;
   } = {},
 ) {
   const ip = fakeLimiter(options.ip ?? true);
   const node = fakeLimiter(options.node ?? true);
   const global = fakeLimiter(options.global ?? true);
+  const read = fakeLimiter(options.read ?? true);
   const app = createMetricsCollector({
     storage,
     limiters: {
       [COLLECTOR_LIMITERS.IP]: ip,
       [COLLECTOR_LIMITERS.NODE]: node,
       [COLLECTOR_LIMITERS.GLOBAL]: global,
+      [COLLECTOR_LIMITERS.READ]: read,
     },
     now: options.now ?? (() => T0),
   });
@@ -62,7 +65,7 @@ export function testCollector(
       },
       body: typeof body === 'string' ? body : JSON.stringify(body),
     });
-  return { app, post, ip, node, global };
+  return { app, post, ip, node, global, read };
 }
 
 export async function responseJson(response: Response) {

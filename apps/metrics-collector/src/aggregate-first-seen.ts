@@ -3,19 +3,12 @@
 import { and, eq, min, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 
-import {
-  buyerIdentity,
-  dayOf,
-  headlineReceipt,
-  inRange,
-  literal,
-  modelKey,
-  ordered,
-  type DayBounds,
-} from './aggregate-sql';
+import { buyerIdentity, headlineReceipt, modelKey } from './aggregate-sql';
 import { FIRST_SEEN_KINDS } from './constants';
 import type { CollectorDatabase } from './d1-client';
+import type { DayBounds } from './days';
 import { firstSeen, receipts } from './schema';
+import { dayOf, inRange, literal, ordered } from './sql-primitives';
 
 function upsert(
   database: CollectorDatabase,
