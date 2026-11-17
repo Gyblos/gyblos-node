@@ -1,0 +1,2 @@
+Synthetic fixture for administrative PR-label validation.
+This test branch is not intended to merge.
