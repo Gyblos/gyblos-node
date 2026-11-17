@@ -68,8 +68,10 @@ Cada envío indica además el rol de quien sube, el tipo de cliente (`seller-nod
 escritorio suben recibos a `https://collector.gyblos.com/v1`. Los recibos no se pueden desactivar.
 
 **Cómo.** El nodo envía hasta 50 recibos cada minuto. Si un envío falla, los recibos quedan pendientes en
-tu equipo y se reintentan después, con esperas de hasta una hora. La subida nunca retrasa ni bloquea una
-respuesta.
+tu equipo y se reintentan después, con esperas de hasta una hora. Al cerrarse la app, el vendedor o un
+comando, se dedican hasta 3 segundos a enviar las observaciones en memoria y los recibos pendientes. Los
+recibos que sigan pendientes esperan en disco al siguiente arranque; las observaciones no enviadas se
+descartan. La subida nunca retrasa ni bloquea una respuesta.
 
 **Qué es público.** El recolector guarda los recibos en privado y solo publica agregados: totales diarios
 de la red, por modelo y por vendedor, identificados por NodeId. Usa tu dirección IP para limitar la tasa

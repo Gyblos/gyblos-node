@@ -68,8 +68,9 @@ Each upload also names the uploader's role, client kind (`seller-node`, `buyer-c
 receipts to `https://collector.gyblos.com/v1`. Receipts have no opt-out.
 
 **How.** The node sends up to 50 receipts every minute. A failed upload keeps them pending on your
-machine and retries later, waiting up to one hour between attempts. Uploading never delays or blocks
-an answer.
+machine and retries later, waiting up to one hour between attempts. When the app, the seller or a command
+closes, it spends up to 3 seconds sending buffered observations and pending receipts. Receipts still
+pending wait on disk for the next start; observations not sent by then are dropped. Uploading never delays or blocks an answer.
 
 **What is public.** The collector keeps the raw receipts private and publishes aggregates only: network,
 model and per-seller daily totals, keyed by NodeId. It uses your IP address for rate limiting and does
