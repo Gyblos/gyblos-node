@@ -318,3 +318,30 @@ void test('a batch of many opens stays under the parameter limit, and failed tra
     [{ failed: 1 }],
   );
 });
+
+void test('an empty answer from a lagging RPC never closes a gap known to hold signatures', async () => {
+  const database = createCollectorD1();
+  const history = Array.from({ length: 10 }, (_, index) =>
+    withSignature(`old${index}`),
+  );
+  const { rpc } = fakeChainRpc(history);
+  await runChainIndex(database, rpc, 1000);
+  const backlog = 500;
+  history.unshift(
+    ...Array.from({ length: backlog }, (_, index) =>
+      withSignature(`new${backlog - index}`),
+    ),
+  );
+  await runChainIndex(database, rpc, 2000);
+  // The backend cannot find gapBefore yet and answers an empty page.
+  const lagging = { ...rpc, signatures: () => Promise.resolve([]) };
+  await assert.rejects(runChainIndex(database, lagging, 3000), {
+    name: 'ChainIndexError',
+  });
+  for (let run = 0; run < 3; run++)
+    await runChainIndex(database, rpc, 4000 + run);
+  assert.equal(
+    rowsOf(database, 'SELECT * FROM collector_chain_txs').length,
+    10 + backlog,
+  );
+});

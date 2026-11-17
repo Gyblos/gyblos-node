@@ -7,7 +7,8 @@ import {
   type RateLimiter,
 } from './app';
 import { ChainIndexError, runChainIndex } from './chain/indexer';
-import { chainRpcUrl, createChainRpc } from './chain/rpc';
+import { ChainShapeError } from './chain/json';
+import { ChainRpcError, chainRpcUrl, createChainRpc } from './chain/rpc';
 import {
   COLLECTOR_AGGREGATION_FAILED,
   COLLECTOR_CHAIN_INDEX_FAILED,
@@ -118,23 +119,34 @@ export async function scheduledAggregation(bindings: unknown, now: number) {
 // The scheduled chain read, when a database and a valid Solana RPC URL are bound. A failure logs a
 // static code with the phase and the error's class only (never the URL, which may carry a provider
 // key) and leaves the cursor at the last stored batch.
+const chainFailureReason = (cause: unknown) =>
+  cause instanceof ChainRpcError || cause instanceof ChainShapeError
+    ? cause.message
+    : '';
+
 export async function scheduledChainIndex(
   bindings: unknown,
   now: number,
   fetcher: typeof fetch = fetch,
 ) {
   const database = binding(bindings, COLLECTOR_DB_BINDING);
-  const url = chainRpcUrl(binding(bindings, COLLECTOR_SOLANA_RPC_BINDING));
+  const configured = binding(bindings, COLLECTOR_SOLANA_RPC_BINDING);
+  const url = chainRpcUrl(configured);
+  // A secret that is set but not usable (http, credentials, a key in the query) must be visible.
+  if (configured !== undefined && !url)
+    console.warn(COLLECTOR_CHAIN_INDEX_FAILED, 'config', 'rejected rpc url');
   if (!isDatabase(database) || !url) return undefined;
   try {
     return await runChainIndex(database, createChainRpc(url, fetcher), now);
   } catch (error) {
     const phase = error instanceof ChainIndexError ? error.phase : 'start';
     const cause = error instanceof ChainIndexError ? error.cause : error;
+    // Static reasons only (an HTTP status, an RPC error code, a shape location), never the URL.
     console.warn(
       COLLECTOR_CHAIN_INDEX_FAILED,
       phase,
       cause instanceof Error ? cause.name : 'unknown',
+      chainFailureReason(cause),
     );
     return undefined;
   }

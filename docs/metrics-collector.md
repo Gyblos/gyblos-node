@@ -377,12 +377,17 @@ transactions and one page of signatures per phase, newest first within each:
    transaction. An empty program is not marked done.
 
 Each batch of transactions is stored in one transaction together with the cursor
-that covers it (`collector_chain_cursor`), so every signature is read exactly
-once and a failed run resumes where it stopped. A transaction the RPC lists but
-cannot return (`null`), a missing batch reply or any RPC error stops the run
-before that batch. A failure logs `COLLECTOR_CHAIN_INDEX_FAILED` with the phase
-(`gap`, `forward`, `backfill`, `accounts`) and the error class only, never the
-URL, which may carry a provider key.
+that covers it (`collector_chain_cursor`), so every signature is stored exactly
+once and a failed run resumes where it stopped, reading the failed batch again.
+A transaction the RPC lists but cannot return (`null`), a missing batch reply,
+an empty page for a range known to hold signatures (a lagging RPC; the cursor
+records whether the page that last moved a range was full) or any RPC error
+stops the run before that batch; a signature the RPC keeps failing on stops the
+read there until it is resolved. A failure logs `COLLECTOR_CHAIN_INDEX_FAILED`
+with the phase (`gap`, `forward`, `backfill`, `accounts`), the error class and a
+static reason (an HTTP status, an RPC error code, a shape location), never the
+URL, which may carry a provider key. A secret that is set but rejected (http,
+credentials, a key in the query) logs `COLLECTOR_CHAIN_INDEX_FAILED config`.
 
 **How a transaction is read** (`src/chain/decode.ts`, @x402/svm 2.28): every
 top-level program instruction by its one-byte discriminator — open (1), settle

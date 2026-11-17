@@ -28,7 +28,10 @@ export interface ChainCursorState {
   newest: string | null;
   gapUntil: string | null;
   gapBefore: string | null;
+  // The page that last moved the range was full: an empty answer may mean the range is done.
+  gapFull: boolean;
   backfillBefore: string | null;
+  backfillFull: boolean;
   backfillDone: boolean;
 }
 
@@ -57,7 +60,9 @@ export function cursorUpsert(
     newestSignature: cursor.newest,
     gapUntil: cursor.gapUntil,
     gapBefore: cursor.gapBefore,
+    gapFull: cursor.gapFull ? 1 : 0,
     backfillBefore: cursor.backfillBefore,
+    backfillFull: cursor.backfillFull ? 1 : 0,
     backfillDone: cursor.backfillDone ? 1 : 0,
     updatedAt: now,
   };
@@ -209,13 +214,10 @@ export function transactionWrites(
       orm.insert(chainTokenDeltas).values(chunk).onConflictDoNothing(),
     ),
     ...chunksFor(chainChannels, rows.channels).map((chunk) =>
-      orm
-        .insert(chainChannels)
-        .values(chunk)
-        .onConflictDoUpdate({
-          target: chainChannels.channel,
-          set: channelMerge,
-        }),
+      orm.insert(chainChannels).values(chunk).onConflictDoUpdate({
+        target: chainChannels.channel,
+        set: channelMerge,
+      }),
     ),
   ];
 }

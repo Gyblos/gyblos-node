@@ -15,7 +15,9 @@ export const chainCursor = sqliteTable('collector_chain_cursor', {
   newestSignature: text('newest_signature'),
   gapUntil: text('gap_until'),
   gapBefore: text('gap_before'),
+  gapFull: integer('gap_full').notNull(),
   backfillBefore: text('backfill_before'),
+  backfillFull: integer('backfill_full').notNull(),
   backfillDone: integer('backfill_done').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

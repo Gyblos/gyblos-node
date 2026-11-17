@@ -2,8 +2,8 @@
 // signatures per phase: (1) the gap of new signatures a previous run could not finish, (2) signatures
 // newer than the newest one known (leaving a gap when they do not all fit), (3) history backwards until
 // the program's first transaction. Each phase reads newest first, and every batch is stored together
-// with the cursor that covers it, so each signature is read exactly once and a failed run resumes where
-// it stopped. The accounts of the channels touched (and any left unread) are then read for their state.
+// with the cursor that covers it, so each signature is stored exactly once and a failed run resumes
+// where it stopped (re-reading the batch that failed). The accounts of the channels touched (and any left unread) are then read for their state.
 import { isNull } from 'drizzle-orm';
 
 import { CHAIN_INDEX } from '../constants';
@@ -15,7 +15,7 @@ import {
 import { chainChannels, chainCursor } from '../schema';
 import { channelState } from './channel-account';
 import { decodeTransaction } from './decode';
-import type { ChainRpc } from './rpc';
+import { ChainRpcError, type ChainRpc } from './rpc';
 import {
   channelStateUpserts,
   cursorUpsert,
@@ -59,7 +59,9 @@ async function readCursor(orm: CollectorDatabase): Promise<ChainCursorState> {
     newest: row?.newestSignature ?? null,
     gapUntil: row?.gapUntil ?? null,
     gapBefore: row?.gapBefore ?? null,
+    gapFull: row?.gapFull === 1,
     backfillBefore: row?.backfillBefore ?? null,
+    backfillFull: row?.backfillFull === 1,
     backfillDone: row?.backfillDone === 1,
   };
 }
@@ -118,7 +120,14 @@ async function fillGap(run: Run) {
     await run.rpc.signatures({ until: gapUntil, before: gapBefore }),
   );
   if (!page.length) {
-    run.cursor = { ...run.cursor, gapUntil: null, gapBefore: null };
+    // Known to hold signatures: a lagging RPC that cannot find gapBefore. Retry next run.
+    if (!run.cursor.gapFull) throw new ChainRpcError('gap page empty');
+    run.cursor = {
+      ...run.cursor,
+      gapUntil: null,
+      gapBefore: null,
+      gapFull: false,
+    };
     await run.orm.batch([
       cursorUpsert(run.orm, CURSOR_ID, run.cursor, run.now),
     ]);
@@ -128,6 +137,7 @@ async function fillGap(run: Run) {
     ...run.cursor,
     gapUntil: complete ? null : gapUntil,
     gapBefore: complete ? null : stored.at(-1)!,
+    gapFull: !complete && page.length === CHAIN_INDEX.signaturesPerPage,
   }));
 }
 
@@ -143,6 +153,7 @@ async function readForward(run: Run) {
     newest,
     gapUntil: complete ? null : known,
     gapBefore: complete ? null : stored.at(-1)!,
+    gapFull: !complete && page.length === CHAIN_INDEX.signaturesPerPage,
   }));
 }
 
@@ -151,14 +162,15 @@ async function readBackfill(run: Run) {
   if (run.cursor.backfillDone || run.budget <= 0) return 0;
   const before = run.cursor.backfillBefore ?? undefined;
   const page = signaturesOf(await run.rpc.signatures({ before }));
-  // An empty program is not marked done: its first transactions are read when they come.
   if (!page.length) {
-    if (run.cursor.newest) {
-      run.cursor = { ...run.cursor, backfillDone: true };
-      await run.orm.batch([
-        cursorUpsert(run.orm, CURSOR_ID, run.cursor, run.now),
-      ]);
-    }
+    // An empty program is not marked done: its first transactions are read when they come.
+    if (!run.cursor.newest) return 0;
+    // History known to continue (the last page was cut by the budget): a lagging RPC. Retry.
+    if (!run.cursor.backfillFull) throw new ChainRpcError('history page empty');
+    run.cursor = { ...run.cursor, backfillDone: true };
+    await run.orm.batch([
+      cursorUpsert(run.orm, CURSOR_ID, run.cursor, run.now),
+    ]);
     return 0;
   }
   const newest = run.cursor.newest ?? page[0]!;
@@ -166,6 +178,7 @@ async function readBackfill(run: Run) {
     ...run.cursor,
     newest,
     backfillBefore: stored.at(-1)!,
+    backfillFull: page.length === CHAIN_INDEX.signaturesPerPage,
     backfillDone: complete,
   }));
 }

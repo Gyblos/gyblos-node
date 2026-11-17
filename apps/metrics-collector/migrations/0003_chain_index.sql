@@ -5,13 +5,17 @@
 -- The read cursors. `newest_signature`: the newest signature known, where the next forward read
 -- stops. `gap_until` / `gap_before`: new signatures not read yet, strictly between these two (read
 -- first, newest first). `backfill_before`: the oldest signature read, so history continues before it.
--- Every signature is read exactly once, newest first within each range.
+-- `gap_full` / `backfill_full`: 1 when the page that last moved that range was a full page, so the
+-- range may legitimately be empty; otherwise it is known to hold signatures, and an empty answer is a
+-- lagging RPC to retry, never the end of the range. Every signature is stored exactly once.
 CREATE TABLE IF NOT EXISTS collector_chain_cursor (
   id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
   newest_signature TEXT,
   gap_until TEXT,
   gap_before TEXT,
+  gap_full INTEGER NOT NULL,
   backfill_before TEXT,
+  backfill_full INTEGER NOT NULL,
   backfill_done INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
