@@ -1,4 +1,4 @@
-// Concurrent public reads must not race the private filesystem lock or active selection.
+// Passive public reads use a snapshot; explicit selection publishes the updated identity.
 // This exercises the production coordinator with disposable injected storage only.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -46,7 +46,7 @@ void test('concurrent public collection reads all retain the ready wallet instea
     ),
   );
 });
-void test('a Settings selection waits for overlapping public reads and every later view reflects the selected address', async (context) => {
+void test('a Settings selection updates the cached address while concurrent public reads stay harmless', async (context) => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-wallet-read-switch-'));
   context.after(() => rm(home, { recursive: true, force: true }));
   const identity = disposableIdentity();
