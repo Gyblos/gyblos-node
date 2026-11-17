@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+
+/* Gyblos brand tokens (DESIGN.md): one blue, neutral surfaces. */
+:root {
+  --brand-blue: #0a28f0;
+  --bg: #ffffff;
+  --panel: #f5f5f5;
+  --raised: #ebebeb;
+  --line: #e0e0e0;
+  --ink: #111111;
+  --muted: #555555;
+  --dim: #6b6b6b;
+  --money: #0f7a3d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #090909;
+    --panel: #151515;
+    --raised: #222222;
+    --line: #303030;
+    --ink: #f5f5f5;
+    --muted: #b8b8b8;
+    --dim: #a0a0a0;
+    --money: #4ade80;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-dim: var(--dim);
+  --color-brand: var(--brand-blue);
+  --color-money: var(--money);
+  --font-sans: var(--font-instrument), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-instrument), system-ui, sans-serif;
+}

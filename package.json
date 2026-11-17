@@ -12,7 +12,7 @@
     "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm skills:check && pnpm boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json && tsc -p apps/docs/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json && tsc -p apps/docs/tsconfig.json && tsc -p apps/explorer/tsconfig.json",
     "test": "node --import tsx --test \"tests/*.test.ts\" \"packages/*/test/**/*.test.ts\"",
     "test:lab": "node --import tsx --test \"tests/lab/**/*.test.ts\"",
     "test:all": "node --import tsx --test \"tests/**/*.test.ts\" \"packages/*/test/**/*.test.ts\"",
@@ -68,7 +68,9 @@
     "buyer:free": "node --import tsx apps/buyer/src/free-main.ts",
     "acceptance:receipts": "pnpm --filter @gyblos/lab-harness acceptance:receipts",
     "acceptance:paid": "node --import tsx tests/support/paid-acceptance-cli.ts",
-    "buyer:init": "node --import tsx apps/buyer/src/init.ts"
+    "buyer:init": "node --import tsx apps/buyer/src/init.ts",
+    "explorer:dev": "pnpm --filter @gyblos/explorer dev",
+    "explorer:build": "pnpm --filter @gyblos/explorer build"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
