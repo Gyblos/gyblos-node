@@ -109,6 +109,11 @@ async function storePage(
   run.budget -= take.length;
   return take.length;
 }
+// Only a full page stored completely may be followed by an empty range; a page the budget cut is
+// known to continue, so an empty answer after it is a lagging RPC.
+const fullyStoredFullPage = (page: string[], stored: string[]) =>
+  page.length === CHAIN_INDEX.signaturesPerPage &&
+  stored.length === page.length;
 const signaturesOf = (page: { signature: string }[]) =>
   page.map((entry) => entry.signature);
 
@@ -137,7 +142,7 @@ async function fillGap(run: Run) {
     ...run.cursor,
     gapUntil: complete ? null : gapUntil,
     gapBefore: complete ? null : stored.at(-1)!,
-    gapFull: !complete && page.length === CHAIN_INDEX.signaturesPerPage,
+    gapFull: !complete && fullyStoredFullPage(page, stored),
   }));
 }
 
@@ -153,7 +158,7 @@ async function readForward(run: Run) {
     newest,
     gapUntil: complete ? null : known,
     gapBefore: complete ? null : stored.at(-1)!,
-    gapFull: !complete && page.length === CHAIN_INDEX.signaturesPerPage,
+    gapFull: !complete && fullyStoredFullPage(page, stored),
   }));
 }
 
@@ -178,7 +183,7 @@ async function readBackfill(run: Run) {
     ...run.cursor,
     newest,
     backfillBefore: stored.at(-1)!,
-    backfillFull: page.length === CHAIN_INDEX.signaturesPerPage,
+    backfillFull: fullyStoredFullPage(page, stored),
     backfillDone: complete,
   }));
 }

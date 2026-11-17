@@ -133,7 +133,7 @@ export async function scheduledChainIndex(
   const configured = binding(bindings, COLLECTOR_SOLANA_RPC_BINDING);
   const url = chainRpcUrl(configured);
   // A secret that is set but not usable (http, credentials, a key in the query) must be visible.
-  if (configured !== undefined && !url)
+  if (configured !== undefined && configured !== '' && !url)
     console.warn(COLLECTOR_CHAIN_INDEX_FAILED, 'config', 'rejected rpc url');
   if (!isDatabase(database) || !url) return undefined;
   try {

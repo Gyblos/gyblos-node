@@ -345,3 +345,49 @@ void test('an empty answer from a lagging RPC never closes a gap known to hold s
     10 + backlog,
   );
 });
+
+void test('a lagging RPC never ends a gap or the history cut by the budget, even past a full page', async () => {
+  const pending = 1500;
+  const lagging = (rpc: ReturnType<typeof fakeChainRpc>['rpc']) => ({
+    ...rpc,
+    signatures: () => Promise.resolve([]),
+  });
+  // Gap: 10 old signatures, then more new ones than one page.
+  const gapDatabase = createCollectorD1();
+  const gapHistory = Array.from({ length: 10 }, (_, index) =>
+    withSignature(`old${index}`),
+  );
+  const gap = fakeChainRpc(gapHistory);
+  await runChainIndex(gapDatabase, gap.rpc, 1000);
+  gapHistory.unshift(
+    ...Array.from({ length: pending }, (_, index) =>
+      withSignature(`new${pending - index}`),
+    ),
+  );
+  await runChainIndex(gapDatabase, gap.rpc, 2000);
+  await assert.rejects(runChainIndex(gapDatabase, lagging(gap.rpc), 3000));
+  // History: more than one page, cut by the budget.
+  const historyDatabase = createCollectorD1();
+  const history = fakeChainRpc(
+    Array.from({ length: pending }, (_, index) =>
+      withSignature(`h${pending - index}`),
+    ),
+  );
+  await runChainIndex(historyDatabase, history.rpc, 1000);
+  await assert.rejects(
+    runChainIndex(historyDatabase, lagging(history.rpc), 2000),
+  );
+  const runs = Math.ceil(pending / CHAIN_INDEX.maxTransactionsPerRun) + 1;
+  for (let run = 0; run < runs; run++) {
+    await runChainIndex(gapDatabase, gap.rpc, 4000 + run);
+    await runChainIndex(historyDatabase, history.rpc, 4000 + run);
+  }
+  assert.equal(
+    rowsOf(gapDatabase, 'SELECT * FROM collector_chain_txs').length,
+    10 + pending,
+  );
+  assert.equal(
+    rowsOf(historyDatabase, 'SELECT * FROM collector_chain_txs').length,
+    pending,
+  );
+});
