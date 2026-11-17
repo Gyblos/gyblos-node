@@ -9,6 +9,9 @@ permissions:
   pull-requests: read
 jobs:
   invalidate:
+    permissions:
+      issues: write
+      pull-requests: write
     concurrency:
       group: ai-review-label-${{ github.repository }}-${{ github.event.pull_request.number }}
       cancel-in-progress: false

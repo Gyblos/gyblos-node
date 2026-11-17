@@ -113,6 +113,23 @@ void test('metadata-only label invalidation has no checkout or model credential'
   new vm.Script(block.replace(/^\s*import .+;\n/gm, ''));
 });
 
+void test('PR label write permission belongs to the invalidator job only', async () => {
+  const content = await readFile(
+    '.github/workflows/ai-review-state.yml',
+    'utf8',
+  );
+  assert.match(
+    content,
+    /^permissions:\n  issues: write\n  pull-requests: read\n/m,
+    'Keep the workflow default from granting PR write to other jobs.',
+  );
+  assert.match(
+    content,
+    /^  invalidate:\n    permissions:\n      issues: write\n      pull-requests: write\n/m,
+    'The invalidator needs its own complete permission map to label PRs.',
+  );
+});
+
 void test('publisher and invalidator serialize mutations under the same PR mutex', async () => {
   const publish = await readFile(WORKFLOW, 'utf8');
   const invalidate = await readFile(
