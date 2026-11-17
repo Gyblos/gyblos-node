@@ -86,29 +86,37 @@ html > body[data-scroll-locked] {
   padding-bottom: 3rem;
 }
 
-.docs-page-actions {
-  margin-bottom: 0.5rem;
+.docs-page-header {
+  margin-bottom: 2.5rem;
 }
 
-/* Give the first installation step clear priority over the secondary guide links. */
-.docs-quickstart {
-  display: inline-flex;
+.docs-page-heading {
+  min-width: 0;
+}
+
+.docs-page-title-row {
+  display: flex;
   align-items: center;
-  min-height: 2.75rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  background: var(--color-fd-primary);
-  color: var(--color-fd-primary-foreground);
-  font-weight: 600;
-  text-decoration: none;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
 }
 
-.docs-quickstart:hover {
-  opacity: 0.9;
-}
-
-.docs-quickstart > p {
+.docs-page-actions {
   margin: 0;
+}
+
+.docs-page-actions > div {
+  justify-content: flex-start;
+}
+
+.docs-home-page > .prose > h2:first-child {
+  margin-top: 0;
+}
+
+@media (max-width: 48rem) {
+  .docs-page-header {
+    margin-bottom: 2rem;
+  }
 }
 
 .docs-action-button {
@@ -240,7 +248,7 @@ body {
 /* Reading text stays neutral; the single brand blue belongs to actions and artwork.
    In particular, blue-on-charcoal active text would lose contrast. */
 .text-fd-primary,
-.prose a:not(.docs-quickstart),
+.prose a,
 :is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true'],
 #nd-toc a[data-active='true'],
 [data-toc-popover] a[data-active='true'] {
