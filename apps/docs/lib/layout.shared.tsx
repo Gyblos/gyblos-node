@@ -87,17 +87,17 @@ export function baseOptions(locale: string): BaseLayoutProps {
         <span className="docs-brand flex items-center gap-2 font-medium">
           <span className="sr-only">Gyblos</span>
           <img
-            src="/brand/gyblos-wordmark-solid-dark.svg"
+            src="/brand/gyblos-docs-lockup-dark.svg"
             alt=""
-            width={160}
-            height={43}
+            width={130}
+            height={30}
             className="docs-wordmark hidden dark:block"
           />
           <img
-            src="/brand/gyblos-wordmark-solid-light.svg"
+            src="/brand/gyblos-docs-lockup-light.svg"
             alt=""
-            width={160}
-            height={43}
+            width={130}
+            height={30}
             className="docs-wordmark dark:hidden"
           />
           <span className="text-sm text-fd-muted-foreground">docs</span>

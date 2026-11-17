@@ -86,8 +86,9 @@ html > body[data-scroll-locked] {
   padding-bottom: 3rem;
 }
 
+/* Title and page actions share one row; the page's own 1rem gap separates them from the content. */
 .docs-page-header {
-  margin-bottom: 2.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .docs-page-heading {
@@ -97,25 +98,32 @@ html > body[data-scroll-locked] {
 .docs-page-title-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem 1.25rem;
 }
 
 .docs-page-actions {
   margin: 0;
+  margin-left: auto;
 }
 
 .docs-page-actions > div {
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .docs-home-page > .prose > h2:first-child {
   margin-top: 0;
 }
 
+/* On narrow screens the actions wrap under the title and start at the left edge. */
 @media (max-width: 48rem) {
-  .docs-page-header {
-    margin-bottom: 2rem;
+  .docs-page-actions {
+    margin-left: 0;
+  }
+
+  .docs-page-actions > div {
+    justify-content: flex-start;
   }
 }
 
@@ -225,9 +233,9 @@ html > body[data-scroll-locked] {
   color: var(--color-fd-muted-foreground);
 }
 
-/* The official outlined wordmark keeps its supplied aspect ratio in both themes. */
+/* The docs lockup draws the mark and the name at the same size and keeps its aspect ratio in both themes. */
 .docs-wordmark {
-  width: 160px;
+  width: 130px;
   height: auto;
   flex-shrink: 0;
 }
