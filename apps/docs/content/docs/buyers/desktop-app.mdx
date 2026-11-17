@@ -100,6 +100,12 @@ Messages APIs.
    configuration reads the key from the `GYBLOS_API_KEY` variable: set it in the shell that starts the
    agent.
 
+In **Connections**, a key with a zero spend limit is labelled **Free only**. The eye button reveals
+that key only when you request it, in the app session that created it. Hide it before sharing your
+screen. Hiding, changing the selected key or revoking it removes the visible value. No secret is
+included in periodic status replies, saved agent configuration or chat history. After restarting the
+app, a key already saved in your agent still works, but the app cannot recover its secret for display.
+
 Keep Gyblos open while your tools use it. **Revoke key** stops new requests with that key; what it
 already spent stays recorded. Chat has its own budget and doesn't use a key's limit.
 

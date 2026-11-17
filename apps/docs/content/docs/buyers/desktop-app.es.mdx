@@ -102,6 +102,12 @@ y Anthropic Messages.
    configuración y puede escribirla por ti, salvo para Claude Code, que copias en tu terminal. La
    configuración lee la llave de la variable `GYBLOS_API_KEY`: defínela en la terminal que arranca el agente.
 
+En **Connections**, una key con presupuesto cero muestra **Free only**. El botón del ojo revela la
+key solo cuando lo pides y durante la sesión de la app que la creó. Ocúltala antes de compartir la
+pantalla. Al ocultarla, seleccionar otra key o revocarla, desaparece el valor visible. El secreto no
+entra en consultas periódicas de estado, configuraciones guardadas del agente ni historial de chat.
+Tras reiniciar, la key guardada en tu agente sigue funcionando, pero la app no puede recuperar su secreto.
+
 Mantén Gyblos abierto mientras tus herramientas lo usan. **Revoke key** detiene las solicitudes nuevas con
 esa llave; lo que ya gastó queda registrado. El Chat tiene su propio presupuesto y no usa el límite de una
 llave.

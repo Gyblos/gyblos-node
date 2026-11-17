@@ -118,6 +118,9 @@ export function registerDesktopX402(
   ipcMain.handle(USDC_API.CHANNEL, (event, ...args: unknown[]) =>
     apiKeys.run(event, args),
   );
+  ipcMain.handle(USDC_API.REVEAL_CHANNEL, (event, ...args: unknown[]) =>
+    apiKeys.reveal(event, args),
+  );
   ipcMain.handle(DESKTOP_X402.CHANNEL, (event, ...args: unknown[]) =>
     handle(event, args),
   );
@@ -125,6 +128,7 @@ export function registerDesktopX402(
     async close() {
       apiKeys.close();
       ipcMain.removeHandler(USDC_API.CHANNEL);
+      ipcMain.removeHandler(USDC_API.REVEAL_CHANNEL);
       await client.close();
       await managed.close();
       ipcMain.removeHandler(DESKTOP_X402.CHANNEL);
