@@ -26,6 +26,26 @@ mode switch (see [Buyer routing](payment-sessions.md#buyer-routing)).
 Per-request paid serves text conversations without tools. Tools on a priced
 offer need a payment session.
 
+## Seller-sponsored channel transaction limits
+
+Paid-v2 channel openings, top-ups and SDK settlement signing share
+`PAYMENT_TRANSACTION_LIMITS` in `packages/config/src/payment-fees.ts`: at most
+400,000 compute units, 5,000 micro-lamports per compute unit and two required
+signatures. An explicit positive compute-unit limit is mandatory; duplicate,
+malformed or unsupported compute-budget instructions and lookup-table messages
+are refused before the seller signs. Omitting the price means zero priority fee.
+Both SDK signing APIs are guarded, including the message-signing path used for
+buyer-supplied opens and the transaction-signing path used for settlement.
+
+These are per-transaction instruction and signer-count bounds, not a total
+wallet, daily SOL, token-account creation or rent budget. The priority component
+is at most 2,000 lamports per guarded transaction; network base fees remain
+separate. Existing SDK-generated openings and settlements fit these limits. A
+recovery retains the original recorded attempt: a refusal never clears
+uncertainty or rebuilds a channel. The independent standalone SDK wrapper
+accepts optional host limits and keeps its unconfigured defaults. The legacy v1
+path and the protocol commission are unchanged.
+
 ## How a per-request payment works
 
 1. The buyer verifies the seller's signed quote, then signs a channel open whose
