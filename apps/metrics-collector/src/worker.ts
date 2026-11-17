@@ -7,6 +7,7 @@ import {
   type RateLimiter,
 } from './app';
 import {
+  COLLECTOR_AGGREGATION_FAILED,
   COLLECTOR_DB_BINDING,
   COLLECTOR_LIMITERS,
   COLLECTOR_ROUTES,
@@ -89,11 +90,12 @@ export async function cachedFetch(
   )
     return answer(request);
   const key = new Request(url.toString(), { method: 'GET' });
-  const hit = await cache.match(key);
+  // A cache failure only costs a database read; it never fails the answer.
+  const hit = await cache.match(key).catch(() => undefined);
   if (hit) return hit;
   const response = await answer(request);
   if (response.status === COLLECTOR_STATUS.OK)
-    context.waitUntil(cache.put(key, response.clone()));
+    context.waitUntil(cache.put(key, response.clone()).catch(() => undefined));
   return response;
 }
 
@@ -101,7 +103,12 @@ export async function cachedFetch(
 // a failed day stays dirty for the next run.
 export async function scheduledAggregation(bindings: unknown, now: number) {
   const database = binding(bindings, COLLECTOR_DB_BINDING);
-  return isDatabase(database) ? runAggregation(database, now) : undefined;
+  if (!isDatabase(database)) return undefined;
+  const result = await runAggregation(database, now);
+  // Day names only (no request data): a day that keeps failing must be visible in the Worker logs.
+  if (result.failed.length)
+    console.warn(COLLECTOR_AGGREGATION_FAILED, result.failed.join(','));
+  return result;
 }
 
 const edgeCache = () =>

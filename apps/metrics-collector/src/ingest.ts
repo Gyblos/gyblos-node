@@ -74,15 +74,16 @@ export async function envelopeId(signature: string) {
   ).join('');
 }
 
-// A signed time the collector can place on a real UTC day near the upload, and amounts and token
-// counts no real request reaches, so a crafted receipt can neither break nor dominate aggregates.
+// A signed time within the last 30 days of the upload (with clock skew between nodes), and amounts and
+// token counts no real request reaches, so a crafted receipt can neither rewrite old days nor break or
+// dominate aggregates.
 export function plausibleReceipt(entry: PublicReceiptEntry, sentAt: number) {
   const { timing, usage, amountAtomic, feeAtomic } =
     entry.receipt.seller.record;
   const tokens = [usage.inputTokens, usage.outputTokens, usage.reasoningTokens];
   return (
-    timing.receivedAt >= COLLECTOR_LIMITS.earliestReceiptAt &&
-    timing.receivedAt <= sentAt + COLLECTOR_LIMITS.clockWindowMs &&
+    timing.receivedAt >= sentAt - COLLECTOR_LIMITS.maxReceiptAgeMs &&
+    timing.receivedAt <= sentAt + COLLECTOR_LIMITS.receiptClockSkewMs &&
     BigInt(amountAtomic) <= BigInt(COLLECTOR_LIMITS.maxReceiptAtomic) &&
     BigInt(feeAtomic) <= BigInt(COLLECTOR_LIMITS.maxReceiptAtomic) &&
     tokens.every(

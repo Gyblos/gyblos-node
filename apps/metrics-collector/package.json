@@ -16,9 +16,7 @@
     "./aggregate": "./src/aggregate.ts",
     "./stats-read": "./src/stats-read.ts",
     "./stats-shape": "./src/stats-shape.ts",
-    "./stats": "./src/stats.ts",
-    "./stats-store": "./src/stats-store.ts",
-    "./days": "./src/days.ts"
+    "./stats": "./src/stats.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

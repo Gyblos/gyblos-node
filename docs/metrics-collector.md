@@ -220,27 +220,33 @@ A Cron Trigger runs every 10 minutes (`*/10 * * * *`, `scheduled` in
 **Which days.** One scan batch marks a UTC day dirty when a receipt changed
 (`updated_at`), an observation arrived (`inserted_at`) or a conflict was stored
 since the previous scan, minus a 15-minute overlap so an upload committed during
-a scan is never missed. It also marks every day whose aggregates carry another
-`formula_version`, so a formula change recomputes history by itself. The cursor
-is `collector_agg_state`. A run recomputes at most 31 dirty days, newest first,
-so old days marked dirty can never starve today; the rest wait for the next run.
+a scan is never missed. After a deploy with a new `AGGREGATES.formulaVersion`,
+the scan also marks, once, every day aggregated with another version, so a
+formula change recomputes history by itself. The cursor, with the last applied
+formula version, is `collector_agg_state`. A run recomputes at most 31 dirty
+days, newest first, so old days marked dirty can never starve today; the rest
+wait for the next run.
 
 **Source time.** Every item falls on the day of its own source time: a receipt
 on the day of the seller's signed `receivedAt`, an observation on the day of its
 own `at`. Never on the collector's arrival time. Late data marks its day dirty
 again and the day is recomputed with a new `aggregated_at`. Ingest bounds
-(`receivedAt` from 2023 to 10 minutes after the upload, see
-[Order of checks](#order-of-checks)) keep every day real; a raw time past year
-9999 is skipped by the scan rather than stopping it.
+(`receivedAt` within the 30 days before the upload, see
+[Order of checks](#order-of-checks)) keep every day real and recent, so only the
+last 30 days can still change; a raw time past year 9999 is skipped by the scan
+rather than stopping it.
 
 **One day, one transaction.** Each table is a `DELETE` of the day plus one
 `INSERT … SELECT … GROUP BY` over that day's raw rows. The day leaves the dirty
 set in the same batch, so readers see the old day or the new one, never a mix. A
 day whose batch fails stays dirty for the next run and never blocks the others.
-A run is two reads, one scan batch of 6 statements and 17 statements per day,
-whatever the day's row count; no statement binds more than a few values. Sums
-use SQLite `total()`, which cannot overflow. Every aggregate row stores
-`formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
+A run is two reads, one scan batch of 4 statements (6 once after a formula
+change) and 17 statements per day, whatever the day's row count; no statement
+binds more than a few values. Sums use SQLite `total()`, which cannot overflow:
+they are exact while a day's total stays below 2^53 (about 9 billion USDC in
+atomic units) and approximate above. A run whose days fail logs
+`COLLECTOR_AGGREGATION_FAILED` with the day names only. Every aggregate row
+stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
 
 | Table                               | One row per                             | Notes                                                         |
 | ----------------------------------- | --------------------------------------- | ------------------------------------------------------------- |
@@ -333,7 +339,10 @@ section has:
   decimal strings.
 
 Unique buyer counts (`buyers`) come with `withheld`: below 5 (zero included) the
-count is `null` and `withheld` is `true`, per seller and for the network.
+count is `null` and `withheld` is `true`, per seller and for the network. Only
+the count is withheld: a seller's day and model totals (requests, tokens,
+authorized amounts) are published whatever its number of buyers, so on a day
+with one buyer they describe that one pseudonymous buyer's use of that seller.
 
 | Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -365,11 +374,12 @@ is signed:
 8. Each receipt verified once, by the public policy: up to 100 Ed25519
    verifications.
 9. Each receipt plausible (`plausibleReceipt`): the seller's signed `receivedAt`
-   after 2023-01-01T00:00:00Z and at most 10 minutes after the envelope's
-   `sentAt`; `amountAtomic` and `feeAtomic` at most 10^12; every token count at
-   most 10^8. One implausible receipt refuses the envelope with
-   `INVALID_UPLOAD`; the uploader then retries one receipt at a time and skips
-   it. This keeps every aggregate on a real UTC day and every sum exact.
+   at most 30 days before the envelope's `sentAt` and at most one hour after it
+   (the seller's and the uploader's clocks may differ); `amountAtomic` and
+   `feeAtomic` at most 10^12; every token count at most 10^8. One implausible
+   receipt refuses the envelope with `INVALID_UPLOAD`; the uploader then retries
+   one receipt at a time and skips it. Old days cannot be rewritten, and a
+   receipt kept on a node for more than 30 days is no longer counted.
 10. The shared write budget, spent only by fully verified uploads.
 11. One storage read and one transactional write.
 
@@ -409,19 +419,19 @@ is written.
 
 ## Code layout
 
-| Layer            | File                                                                                                                           | Owns                                                                              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| Entry            | `src/worker.ts`                                                                                                                | Cloudflare bindings to the app; fails closed; inert on import.                    |
-| HTTP             | `src/app.ts`, `src/ip-key.ts`                                                                                                  | Routes, admission middleware, body cap, error mapping.                            |
-| Use case         | `src/ingest.ts`                                                                                                                | The order of checks and building one write.                                       |
-| Policy           | `@gyblos/core/public-receipts`                                                                                                 | Receipt verification, classification and merge rules.                             |
-| Storage port     | `src/storage.ts`                                                                                                               | The `CollectorStorage` interface and the shared write rule.                       |
-| Storage adapters | `src/storage-d1.ts`, `src/storage-memory.ts`                                                                                   | D1 (Drizzle, `src/schema.ts`, `src/d1-client.ts`) and in-memory.                  |
-| Values           | `src/constants.ts`, `src/errors.ts`                                                                                            | Wire codes, statuses, limits, binding names, error mapping.                       |
-| Aggregation      | `src/aggregate.ts`, `src/aggregate-sql.ts`, `src/aggregate-first-seen.ts`, `src/sql-primitives.ts`, `src/schema-aggregates.ts` | The scheduled run, metric formulas, SQL building blocks and the aggregate tables. |
-| Stats use case   | `src/stats.ts`, `src/stats-shape.ts`, `src/days.ts`                                                                            | Typed answers, free/paid sections, percentiles, UTC day ranges.                   |
-| Stats port       | `src/stats-store.ts`, `src/stats-read.ts`                                                                                      | The `StatsReader` interface and its D1 adapter.                                   |
-| Stats HTTP       | `src/stats-routes.ts`, `src/http.ts`                                                                                           | Range parsing, cacheable answers, shared rejection.                               |
+| Layer            | File                                                                                                                           | Owns                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Entry            | `src/worker.ts`                                                                                                                | Cloudflare bindings, the scheduled run and the stats edge cache; fails closed; inert on import. |
+| HTTP             | `src/app.ts`, `src/ip-key.ts`                                                                                                  | Routes, admission middleware, body cap, error mapping.                                          |
+| Use case         | `src/ingest.ts`                                                                                                                | The order of checks and building one write.                                                     |
+| Policy           | `@gyblos/core/public-receipts`                                                                                                 | Receipt verification, classification and merge rules.                                           |
+| Storage port     | `src/storage.ts`                                                                                                               | The `CollectorStorage` interface and the shared write rule.                                     |
+| Storage adapters | `src/storage-d1.ts`, `src/storage-memory.ts`                                                                                   | D1 (Drizzle, `src/schema.ts`, `src/d1-client.ts`) and in-memory.                                |
+| Values           | `src/constants.ts`, `src/errors.ts`                                                                                            | Wire codes, statuses, limits, binding names, error mapping.                                     |
+| Aggregation      | `src/aggregate.ts`, `src/aggregate-sql.ts`, `src/aggregate-first-seen.ts`, `src/sql-primitives.ts`, `src/schema-aggregates.ts` | The scheduled run, metric formulas, SQL building blocks and the aggregate tables.               |
+| Stats use case   | `src/stats.ts`, `src/stats-shape.ts`, `src/days.ts`                                                                            | Typed answers, free/paid sections, percentiles, UTC day ranges.                                 |
+| Stats port       | `src/stats-store.ts`, `src/stats-read.ts`                                                                                      | The `StatsReader` interface and its D1 adapter.                                                 |
+| Stats HTTP       | `src/stats-routes.ts`, `src/http.ts`                                                                                           | Query parsing, cacheable answers, shared rejection.                                             |
 
 ## Operations
 

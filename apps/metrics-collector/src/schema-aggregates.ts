@@ -46,6 +46,7 @@ function sellerModel() {
 export const aggState = sqliteTable('collector_agg_state', {
   id: integer('id').primaryKey(),
   scannedAt: integer('scanned_at').notNull(),
+  formulaVersion: integer('formula_version').notNull(),
 });
 
 export const aggDirtyDays = sqliteTable('collector_agg_dirty_days', {

@@ -65,10 +65,28 @@ export interface SellerStats extends StatsEnvelope {
   models: ModelEntry[];
 }
 
-function envelope(
-  range: DayRange,
-  rows: readonly TotalsRowLike[],
-): StatsEnvelope {
+// What the answer's envelope needs from any row: when it was computed and with which formula
+// versions (one version for a plain aggregate row, a min/max pair for grouped totals).
+interface Computed {
+  aggregatedAt: number | null;
+  minVersion: number | null;
+  maxVersion: number | null;
+}
+const fromTotals = (row: TotalsRow): Computed => ({
+  aggregatedAt: row.aggregatedAt,
+  minVersion: row.minFormulaVersion,
+  maxVersion: row.maxFormulaVersion,
+});
+const fromRow = (row: {
+  aggregatedAt: number;
+  formulaVersion: number;
+}): Computed => ({
+  aggregatedAt: row.aggregatedAt,
+  minVersion: row.formulaVersion,
+  maxVersion: row.formulaVersion,
+});
+
+function envelope(range: DayRange, rows: readonly Computed[]): StatsEnvelope {
   let aggregatedAt: number | null = null;
   const versions = new Set<number | null>();
   for (const row of rows) {
@@ -77,8 +95,8 @@ function envelope(
       (aggregatedAt === null || row.aggregatedAt > aggregatedAt)
     )
       aggregatedAt = row.aggregatedAt;
-    versions.add(row.minFormulaVersion ?? row.formulaVersion ?? null);
-    versions.add(row.maxFormulaVersion ?? row.formulaVersion ?? null);
+    versions.add(row.minVersion);
+    versions.add(row.maxVersion);
   }
   const [only] = versions;
   return {
@@ -87,12 +105,6 @@ function envelope(
     aggregatedAt,
   };
 }
-type TotalsRowLike = {
-  aggregatedAt: number | null;
-  minFormulaVersion?: number | null;
-  maxFormulaVersion?: number | null;
-  formulaVersion?: number;
-};
 
 // Groups rows by a key once, so per-day assembly is linear in the rows.
 function groupBy<T>(rows: readonly T[], key: (row: T) => string) {
@@ -142,7 +154,14 @@ export async function networkStats(
       })),
     };
   });
-  return { ...envelope(range, [...network, ...observed, ...demand]), days };
+  return {
+    ...envelope(range, [
+      ...network.map(fromTotals),
+      ...observed.map(fromRow),
+      ...demand.map(fromRow),
+    ]),
+    days,
+  };
 }
 
 // Joins the free and paid rows of each model, keeping the reader's order (most completed first).
@@ -167,7 +186,7 @@ export async function modelStats(
 ): Promise<ModelStats> {
   const rows = await reader.models(range);
   return {
-    ...envelope(range, rows),
+    ...envelope(range, rows.map(fromTotals)),
     models: modelEntries(rows, (row) => ({ sellers: row.sellers })),
   };
 }
@@ -182,10 +201,9 @@ export async function sellerStats(
   const buyersOf = new Map(
     buyers.map((row) => [`${row.day}/${row.paid}`, row.buyers]),
   );
-  const rows: TotalsRow[] = [...days, ...models];
   return {
     nodeId,
-    ...envelope(range, rows),
+    ...envelope(range, [...days, ...models].map(fromTotals)),
     days: daysOf(range).map((day) => ({
       day,
       ...bySide(daysByDay.get(day) ?? [], (row) =>

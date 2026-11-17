@@ -57,6 +57,8 @@ export const ENVELOPE_KINDS = {
 export type EnvelopeKind = (typeof ENVELOPE_KINDS)[keyof typeof ENVELOPE_KINDS];
 // Static code for unexpected failures; nothing else is reported.
 export const COLLECTOR_INTERNAL_ERROR = 'COLLECTOR_INTERNAL_ERROR';
+// Log code of a scheduled run whose days failed; followed by the UTC day names only.
+export const COLLECTOR_AGGREGATION_FAILED = 'COLLECTOR_AGGREGATION_FAILED';
 
 export const COLLECTOR_HEADERS = {
   CACHE_CONTROL: 'Cache-Control',
@@ -95,9 +97,11 @@ export const COLLECTOR_LIMITS = {
   maxBoundParameters: 100,
   // Observations are buffered in memory on the node, so older events are not credible.
   maxObservationAgeMs: 2_592_000_000,
-  // A receipt's signed receivedAt must fall after this time (2023-01-01T00:00:00Z, before any Gyblos
-  // release) and at most clockWindowMs after the envelope's sentAt. Keeps every aggregate day real.
-  earliestReceiptAt: 1_672_531_200_000,
+  // A receipt's signed receivedAt (the seller's clock) must fall within maxReceiptAgeMs before the
+  // envelope's sentAt and at most receiptClockSkewMs after it: old days cannot be rewritten, and two
+  // nodes' clocks may disagree. Keeps every aggregate day real and recent.
+  maxReceiptAgeMs: 2_592_000_000,
+  receiptClockSkewMs: 3_600_000,
   // Plausibility ceilings for one receipt, far above any real request, so aggregate sums stay exact.
   maxReceiptAtomic: 1_000_000_000_000,
   maxReceiptTokens: 100_000_000,

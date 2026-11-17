@@ -12,9 +12,12 @@ CREATE INDEX IF NOT EXISTS collector_observations_by_at ON collector_observation
 CREATE INDEX IF NOT EXISTS collector_conflicts_by_inserted ON collector_conflicts (inserted_at);
 
 -- The one aggregation cursor: raw rows changed at or after scanned_at - overlap mark their days dirty.
+-- formula_version is the version the last scan applied; a different running version re-marks every
+-- day aggregated with another version, once.
 CREATE TABLE IF NOT EXISTS collector_agg_state (
   id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
-  scanned_at INTEGER NOT NULL
+  scanned_at INTEGER NOT NULL,
+  formula_version INTEGER NOT NULL
 );
 -- UTC days waiting to be recomputed (YYYY-MM-DD); removed in the same batch that recomputes them.
 CREATE TABLE IF NOT EXISTS collector_agg_dirty_days (

@@ -11,7 +11,12 @@ import {
 } from './constants';
 import { dayRange, type DayRange } from './days';
 import { rejection } from './http';
-import { modelStats, networkStats, sellerStats } from './stats';
+import {
+  modelStats,
+  networkStats,
+  sellerStats,
+  type StatsEnvelope,
+} from './stats';
 import type { StatsReader } from './stats-store';
 
 const NODE_ID = /^[0-9a-f]{64}$/;
@@ -22,12 +27,12 @@ export function statsRoutes(
   now: () => number,
 ) {
   const handle =
-    (
+    <Answer extends StatsEnvelope>(
       answer: (
         reader: StatsReader,
         range: DayRange,
         context: Context,
-      ) => Promise<object> | undefined,
+      ) => Promise<Answer> | undefined,
     ) =>
     async (context: Context) => {
       if (!reader) return rejection(context, COLLECTOR_ERRORS.UNAVAILABLE);

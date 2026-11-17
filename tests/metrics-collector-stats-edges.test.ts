@@ -10,6 +10,7 @@ import {
   COLLECTOR_LIMITERS,
   COLLECTOR_LIMITS,
 } from '@gyblos/metrics-collector/constants';
+import { plausibleReceipt } from '@gyblos/metrics-collector/ingest';
 import { statsReader } from '@gyblos/metrics-collector/stats-read';
 import { counts, latency } from '@gyblos/metrics-collector/stats-shape';
 import { createD1Storage } from '@gyblos/metrics-collector/storage-d1';
@@ -108,14 +109,14 @@ void test('a receipt with an implausible time, amount or token count is refused 
       ...base,
       timing: {
         ...base.timing,
-        receivedAt: T0 + COLLECTOR_LIMITS.clockWindowMs + 1,
+        receivedAt: T0 + COLLECTOR_LIMITS.receiptClockSkewMs + 1,
       },
     },
     {
       ...base,
       timing: {
         ...base.timing,
-        receivedAt: COLLECTOR_LIMITS.earliestReceiptAt - 1,
+        receivedAt: T0 - COLLECTOR_LIMITS.maxReceiptAgeMs - 1,
       },
     },
     {
@@ -199,5 +200,29 @@ void test('a malformed stored histogram reads as empty and a percentile above th
   assert.deepEqual(
     [shaped.samples, shaped.p50Ms, shaped.p95Ms],
     [3, null, null],
+  );
+});
+
+void test('receipt amounts and fees above the ceiling are implausible; a recent skewed time is not', () => {
+  const entry = (record: object) =>
+    ({ receipt: { seller: { record } } }) as unknown as Parameters<
+      typeof plausibleReceipt
+    >[0];
+  const base = sellerRecord();
+  const over = String(COLLECTOR_LIMITS.maxReceiptAtomic + 1);
+  const sentAt = base.timing.receivedAt;
+  assert.equal(plausibleReceipt(entry(base), sentAt), true);
+  assert.equal(
+    plausibleReceipt(entry({ ...base, amountAtomic: over }), sentAt),
+    false,
+  );
+  assert.equal(
+    plausibleReceipt(entry({ ...base, feeAtomic: over }), sentAt),
+    false,
+  );
+  // A seller clock up to receiptClockSkewMs ahead of the uploader's is accepted.
+  assert.equal(
+    plausibleReceipt(entry(base), sentAt - COLLECTOR_LIMITS.receiptClockSkewMs),
+    true,
   );
 });

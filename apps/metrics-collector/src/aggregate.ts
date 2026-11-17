@@ -11,6 +11,7 @@ import {
   isNotNull,
   ne,
   sql,
+  type SQL,
 } from 'drizzle-orm';
 
 import { firstSeenUpserts } from './aggregate-first-seen';
@@ -61,11 +62,33 @@ export interface AggregationResult {
 }
 type BatchItem = Parameters<CollectorDatabase['batch']>[0][number];
 
-// Marks dirty every day touched since the previous scan, or aggregated with an older formula, and
-// moves the cursor, in one batch.
+type BatchItems = [BatchItem, ...BatchItem[]];
+// Days aggregated with another formula version, re-marked once after a formula change.
+function staleVersionMarks(
+  database: CollectorDatabase,
+  day: (value: ReturnType<typeof dayOf>) => { day: SQL.Aliased<string> },
+): BatchItem[] {
+  return [aggSellerDaily, aggObservedDaily].map((table) =>
+    database
+      .insert(aggDirtyDays)
+      .select(
+        database
+          .selectDistinct(day(sql<string>`${table.day}`))
+          .from(table)
+          .where(ne(table.formulaVersion, AGGREGATES.formulaVersion)),
+      )
+      .onConflictDoNothing(),
+  );
+}
+
+// Marks dirty every day touched since the previous scan (and, after a formula change, every day
+// aggregated with another version), and moves the cursor, in one batch.
 async function scan(database: CollectorDatabase, now: number) {
   const [state] = await database
-    .select({ scannedAt: aggState.scannedAt })
+    .select({
+      scannedAt: aggState.scannedAt,
+      formulaVersion: aggState.formulaVersion,
+    })
     .from(aggState)
     .where(eq(aggState.id, AGG_STATE_ID));
   const since = (state?.scannedAt ?? 0) - AGGREGATES.scanOverlapMs;
@@ -73,7 +96,14 @@ async function scan(database: CollectorDatabase, now: number) {
   const observationDay = dayOf(observations.at);
   const day = (value: ReturnType<typeof dayOf>) =>
     ordered(aggDirtyDays, { day: value });
-  await database.batch([
+  const changed =
+    state !== undefined && state.formulaVersion !== AGGREGATES.formulaVersion;
+  const cursor = { scannedAt: now, formulaVersion: AGGREGATES.formulaVersion };
+  const batch: BatchItems = [
+    database
+      .insert(aggState)
+      .values({ id: AGG_STATE_ID, ...cursor })
+      .onConflictDoUpdate({ target: aggState.id, set: cursor }),
     database
       .insert(aggDirtyDays)
       .select(
@@ -104,32 +134,9 @@ async function scan(database: CollectorDatabase, now: number) {
           .where(and(gte(conflicts.insertedAt, since), isNotNull(receiptDay))),
       )
       .onConflictDoNothing(),
-    // A formula change: every day aggregated with another version is recomputed.
-    database
-      .insert(aggDirtyDays)
-      .select(
-        database
-          .selectDistinct(day(sql<string>`${aggSellerDaily.day}`))
-          .from(aggSellerDaily)
-          .where(ne(aggSellerDaily.formulaVersion, AGGREGATES.formulaVersion)),
-      )
-      .onConflictDoNothing(),
-    database
-      .insert(aggDirtyDays)
-      .select(
-        database
-          .selectDistinct(day(sql<string>`${aggObservedDaily.day}`))
-          .from(aggObservedDaily)
-          .where(
-            ne(aggObservedDaily.formulaVersion, AGGREGATES.formulaVersion),
-          ),
-      )
-      .onConflictDoNothing(),
-    database
-      .insert(aggState)
-      .values({ id: AGG_STATE_ID, scannedAt: now })
-      .onConflictDoUpdate({ target: aggState.id, set: { scannedAt: now } }),
-  ]);
+    ...(changed ? staleVersionMarks(database, day) : []),
+  ];
+  await database.batch(batch);
 }
 
 function sellerRollups(

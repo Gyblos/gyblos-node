@@ -89,7 +89,15 @@ function network(orm: CollectorDatabase, range: DayRange) {
     .from(dem)
     .where(within(dem.day, range))
     .as('ranked');
-  const { rank: _rank, ...demand } = ranked._.selectedFields;
+  const demand = {
+    day: ranked.day,
+    modelId: ranked.modelId,
+    unserved: ranked.unserved,
+    refusedBeforeSelection: ranked.refusedBeforeSelection,
+    connectFailed: ranked.connectFailed,
+    formulaVersion: ranked.formulaVersion,
+    aggregatedAt: ranked.aggregatedAt,
+  };
   return orm.batch([
     orm
       .select({

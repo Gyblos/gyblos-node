@@ -75,8 +75,9 @@ void test('a formula version change recomputes every day aggregated with another
   const database = createCollectorD1();
   insertReceipt(database);
   await runAggregation(database, NOW);
+  // As after deploying a new formula: rows and the cursor carry the old version.
   database.raw.exec(
-    'UPDATE collector_agg_seller_daily SET formula_version = 0',
+    'UPDATE collector_agg_seller_daily SET formula_version = 0; UPDATE collector_agg_state SET formula_version = 0',
   );
   const later = NOW + AGGREGATES.scanOverlapMs * 4;
   assert.deepEqual((await runAggregation(database, later)).days, [DAY]);
@@ -89,7 +90,7 @@ void test('a formula version change recomputes every day aggregated with another
   );
 });
 
-void test('a run is two reads, one scan batch of 6 and 17 statements per day', async () => {
+void test('a run is two reads, one scan batch of 4 and 17 statements per day', async () => {
   const database = createCollectorD1();
   insertReceipt(database);
   database.log.length = 0;
@@ -97,7 +98,7 @@ void test('a run is two reads, one scan batch of 6 and 17 statements per day', a
   const sizes = new Map<number, number>();
   for (const entry of database.log)
     sizes.set(entry.batch, (sizes.get(entry.batch) ?? 0) + 1);
-  assert.deepEqual([...sizes.values()], [2, 6, 17]);
+  assert.deepEqual([...sizes.values()], [2, 4, 17]);
 });
 
 void test('hourly rows hold their hour and are replaced when the day is recomputed', async () => {
