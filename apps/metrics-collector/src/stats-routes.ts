@@ -17,6 +17,7 @@ import {
   sellerStats,
   type StatsEnvelope,
 } from './stats';
+import { chainStats } from './stats-chain';
 import type { StatsReader } from './stats-store';
 
 const NODE_ID = /^[0-9a-f]{64}$/;
@@ -51,6 +52,7 @@ export function statsRoutes(
     };
   app.get(COLLECTOR_ROUTES.STATS_NETWORK, handle(networkStats));
   app.get(COLLECTOR_ROUTES.STATS_MODELS, handle(modelStats));
+  app.get(COLLECTOR_ROUTES.STATS_CHAIN, handle(chainStats));
   app.get(
     COLLECTOR_ROUTES.STATS_SELLER,
     handle((stats, range, context) => {

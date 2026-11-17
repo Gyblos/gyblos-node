@@ -77,7 +77,7 @@ const fromTotals = (row: TotalsRow): Computed => ({
   minVersion: row.minFormulaVersion,
   maxVersion: row.maxFormulaVersion,
 });
-const fromRow = (row: {
+export const fromRow = (row: {
   aggregatedAt: number;
   formulaVersion: number;
 }): Computed => ({
@@ -86,7 +86,10 @@ const fromRow = (row: {
   maxVersion: row.formulaVersion,
 });
 
-function envelope(range: DayRange, rows: readonly Computed[]): StatsEnvelope {
+export function envelope(
+  range: DayRange,
+  rows: readonly Computed[],
+): StatsEnvelope {
   let aggregatedAt: number | null = null;
   const versions = new Set<number | null>();
   for (const row of rows) {
@@ -107,7 +110,7 @@ function envelope(range: DayRange, rows: readonly Computed[]): StatsEnvelope {
 }
 
 // Groups rows by a key once, so per-day assembly is linear in the rows.
-function groupBy<T>(rows: readonly T[], key: (row: T) => string) {
+export function groupBy<T>(rows: readonly T[], key: (row: T) => string) {
   const groups = new Map<string, T[]>();
   for (const row of rows)
     groups.set(key(row), [...(groups.get(key(row)) ?? []), row]);

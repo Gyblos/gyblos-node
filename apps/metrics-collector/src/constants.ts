@@ -48,6 +48,7 @@ export const COLLECTOR_ROUTES = {
   STATS_NETWORK: '/v1/stats/network',
   STATS_MODELS: '/v1/stats/models',
   STATS_SELLER: '/v1/stats/sellers/:nodeId',
+  STATS_CHAIN: '/v1/stats/chain',
 } as const;
 // What an accepted envelope carried.
 export const ENVELOPE_KINDS = {
@@ -183,6 +184,13 @@ export const CHAIN_INSTRUCTIONS = {
 } as const;
 export type ChainInstructionKind =
   (typeof CHAIN_INSTRUCTIONS)[keyof typeof CHAIN_INSTRUCTIONS];
+// Scopes of the chain aggregates: the whole program, and channels that claim Gyblos traffic.
+export const CHAIN_AGGREGATE_SCOPES = {
+  PROGRAM: 'program',
+  GYBLOS: 'gyblos',
+} as const;
+export type ChainAggregateScope =
+  (typeof CHAIN_AGGREGATE_SCOPES)[keyof typeof CHAIN_AGGREGATE_SCOPES];
 export const CHAIN_DISCRIMINATORS: ReadonlyMap<number, ChainInstructionKind> =
   new Map([
     [1, CHAIN_INSTRUCTIONS.OPEN],
