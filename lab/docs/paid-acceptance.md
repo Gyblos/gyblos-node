@@ -1,68 +1,89 @@
 # Simulated paid startup acceptance
 
-Run `pnpm acceptance:paid` with Node 24.22.1+ and the pinned pnpm version. This
-is a verification command, not an operational buyer or a payment demonstration.
-It accepts no arguments, real home, RPC, index, wallet, engine or network
-overrides. A failed or unsupported native run is not successful acceptance.
+`pnpm acceptance:paid` starts the real seller and paid buyer, settles requests
+against a simulated chain and checks every payment outcome, without a wallet,
+RPC or transaction. Run it after you change paid startup, the payment client or
+server, the seller ledger or the buyer journal. It is a verification command,
+not a payment demonstration: never present its output as real paid inference.
 
-The command allocates disposable private role homes and an
-environment-allowlisted child. It starts the actual seller and paid buyer, an
-in-process discovery index, a local synthetic 8004 registry and native encrypted
-Iroh over loopback with relays disabled. The seller receives a deterministic
-recounted engine through an explicit factory port; its default engine registry
-and pinned artifacts remain unchanged. The real upto client, server, offline
-signing/verifier, seller ledger and buyer journal run over a synthetic chain. No
-payment RPC or facilitator client is constructed, and no transaction is
-broadcast. This does not validate mainnet, USDC transfer, rent/SOL costs,
-production RPC finality, real tokenization or model performance.
+## Prerequisites
 
-Coverage includes complete and streamed answers, refusal before prompt
-transmission, discard of an unsent authorization, independent settlement-share
-checks, clean role restarts, persistent uncertainty, explicit receipt
-confirmation and recovery of a pending seller claim exactly once. Engine failure
-and cancellation do not repeat the prompt; the next request remains blocked when
-its prior payment is uncertain. A delivered answer can carry an `unverified`
-payment verdict; delivery is not proof that accounting has been verified.
-Confirmation uses the buyer's recorded expected charge and the independent
-simulated chain, never a journal reset or another inference call.
+- Node 24.22.1 or newer and the pnpm version pinned in `package.json`.
+- Native Iroh for your platform. A missing or unsupported native binding fails
+  the run; it is never a successful acceptance.
 
-The same verification exercises the buyer terminal entrypoint and buyer mode
-selection with synthetic input and output and test-injected adapters. A fake
-engine stops after emitting a fragment: the synthetic ledger charges 45 atomic
-units from a 10000-unit ceiling and returns 9955. A second interruption also
-simulates an unavailable settlement confirmation; the real reconciliation
-command reads a synthetic finalized history and resolves the record to
-`settled`. Neither scenario retries the prompt. These values are deterministic
-fixture results, not an on-chain payment or a live-engine run.
+## Run it
 
-The final JSON contains only fixed phase names, simulation flags and aggregate
-counters. No prompts, answers, identities, paths, authorizations or signatures
-are printed. Product outcome records stay private and content-free inside
-temporary homes. Local free usage receipts and their free-only collector are
-separate from paid settlement receipts; this command does not submit to that
-collector.
+```sh
+pnpm acceptance:paid
+```
 
-The harness lives in verification support (`tests/support/paid-acceptance-*`),
-where the independent payment SDK is permitted; product and lab modules never
-import it. The shared lab native binding advertises only the ALPNs requested by
-product startup. There is no boundary exception or alternate paid production
-path.
+The command takes no arguments: no home, RPC, index, wallet, engine or network
+override. Any argument prints `ACCEPTANCE_INVALID_OPTIONS` and exits with a
+nonzero code. `tests/lab/paid-startup-acceptance.test.ts` runs the same
+scenario inside `pnpm test:lab`.
 
-## Buyer experience and demo boundary
+On success the command prints one JSON line with fixed case names, flags and
+aggregate counters, similar to the following:
 
-`pnpm buyer:chat` starts its own buyer and offers interactive terminal chat;
-`pnpm buyer` remains a local OpenAI-compatible service launcher. Paid startup
-restricts the model, reasoning and network to its supported subset and devnet.
-The acceptance command prints evidence rather than chat content; it must not be
-presented as real paid inference. The acceptance invokes the terminal entrypoint
-with injected streams and adapters; it does not launch a separate interactive
-terminal process, run a real model or test an internet relay. The separate
-subprocess SIGINT regression runs on Unix; Windows uses the portable injected
-cancellation test and its native Ctrl-C behavior remains unverified by that
-subprocess test.
+```text
+{"ok":true,"nativeIroh":true,"simulatedChain":true,"realPayments":false,"cases":[…],"answers":…,"attempts":…,"deposits":…,"settlements":…}
+```
 
-Buyer bearer authentication is maintained separately. On versions that provision
-an API token the harness reads only its freshly created private token and sends
-it to the owned loopback endpoint. Passing this scenario is not an independent
-authentication audit. Real-engine, two-machine, live-registry and paid
-operational demos require their own authorized runs.
+On failure it prints `{"ok":false,"code":"<CODE>"}` with a static code from
+`ACCEPTANCE_CODES` (for example `ACCEPTANCE_FAILED` or
+`ACCEPTANCE_NATIVE_UNAVAILABLE`) and exits with a nonzero code. Output never holds
+prompts, answers, identities, paths, authorizations or signatures.
+
+## What runs
+
+Real:
+
+- the seller and paid buyer startup, in disposable private role homes, in a
+  child process with an allowlisted environment;
+- native encrypted Iroh over loopback, relays disabled, advertising only the
+  ALPNs product startup requests;
+- the `upto` client, server, offline signing and verification, seller ledger and
+  buyer journal;
+- the buyer terminal entrypoint and mode selection, driven with injected streams
+  and adapters.
+
+Simulated:
+
+- the chain: no payment RPC or facilitator client is built, and nothing is
+  broadcast;
+- the engine: a deterministic recounted engine passed through the seller's
+  engine factory port;
+- the discovery index (in process) and the 8004 agent registry (local,
+  synthetic).
+
+The harness lives in `tests/support/paid-acceptance-*`, where the payment SDK
+may be imported; product and lab code never import it.
+
+## Cases
+
+- Complete and streamed answers.
+- Refusal before the prompt is sent, and discard of an unsent authorization.
+- Independent checks of the settlement shares.
+- Clean restarts of both roles, and persistent uncertainty: a request stays
+  blocked while the previous payment is uncertain.
+- Explicit receipt confirmation, using the buyer's recorded expected charge and
+  the simulated chain, never a journal reset or another inference.
+- Recovery of a pending seller claim exactly once.
+- Engine failure and cancellation never repeat the prompt.
+- An interrupted answer: the fake engine stops after one fragment, and the
+  simulated ledger charges 45 atomic units from a 10,000-unit ceiling and
+  returns 9,955. A second interruption also hides the settlement confirmation;
+  the real reconciliation command reads a synthetic finalized history and
+  resolves the record to `settled`.
+
+A delivered answer can carry an `unverified` payment verdict: delivery is not
+proof that accounting was verified.
+
+## What it does not prove
+
+It does not validate mainnet or devnet, USDC transfers, rent or SOL costs, RPC
+finality, real tokenization, model performance, an internet relay or a separate
+interactive terminal process. The buyer's API-key check passes, but this is not
+an authentication audit. Native Ctrl-C on Windows is covered only by the
+injected cancellation test. See [limitations.md](../../docs/limitations.md).

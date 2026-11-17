@@ -1,50 +1,58 @@
 ---
 title: Use Gyblos from your code
-description: Advanced integration for developers who want to connect OpenAI or Anthropic clients to Gyblos.
+description: Point OpenAI, Anthropic or OpenRouter clients and coding agents at a local Gyblos buyer, from the desktop app or from a source checkout.
 ---
 
-This is an advanced developer path, not the normal buyer setup. If you only want to chat with Gyblos,
-use the [desktop app](/en/buyers/desktop-app) instead.
+Gyblos speaks the OpenAI and Anthropic APIs through a **local buyer**: a small server on your own
+computer. Programs written for those APIs use Gyblos sellers when you change their base URL. For each
+request, the local buyer gets a signed quote from a seller and streams the answer back over a direct,
+encrypted peer-to-peer connection.
 
-The buyer is a small server on your own computer, at `http://127.0.0.1:4031`. It speaks the OpenAI and
-Anthropic APIs, so programs written for those services can use a Gyblos seller by changing their base URL.
-For each request it gets a signed free quote from the seller and streams the answer back over a direct
-peer-to-peer connection.
+You can run the local buyer in two ways:
 
-The Responses route currently refuses `parallel_tool_calls: false`, non-default sampling, and non-neutral reasoning before contacting a seller. The signed protocol cannot carry those constraints yet; Codex versions that require them are not compatible until that support lands. Disable HTTP and stream retries in any configured client.
+- **The desktop app.** Its **Connections** screen gives you a Base URL and an API key with a spending
+  limit, and can set up coding agents. No source checkout is needed. See
+  [Use Gyblos from other tools](/en/buyers/desktop-app#api-keys).
+- **A source checkout.** This page shows how. It serves free offers, at `http://127.0.0.1:4031`.
 
-## What works today [#what-works-today]
+The request formats, options and errors below apply to both.
 
-| Feature                                                              | Beta status                                   |
-| -------------------------------------------------------------------- | --------------------------------------------- |
-| Whole conversations: system message, history, new message            | Yes, up to 1024 messages                      |
-| OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming              |
-| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming              |
-| `GET /v1/models`                                                     | Yes, every model your buyer serves            |
-| Free offers                                                          | Yes                                           |
-| Tools (function calling), both formats, whole answers and streaming  | Yes, see [Tools](#tools)                      |
-| Claude Code                                                          | Only with a seller on a larger model          |
-| Cursor agent mode                                                    | No: it calls from Cursor's cloud              |
-| Images, structured output, several answers                           | Not yet: refused with a clear 400 error       |
-| Paid offers                                                          | Pilot: ask in [Telegram](https://t.me/gyblos) |
+## What works [#what-works-today]
 
-A seller serves each buyer up to **30 answers per minute** by default. An answer is at most **4096
-tokens** unless you raise the buyer's limit (up to 32768); a longer request is served up to that limit and
-ends with finish reason `length`.
+| Feature                                                              | Status                                          |
+| -------------------------------------------------------------------- | ----------------------------------------------- |
+| Whole conversations: system message, history, new message            | Yes, up to 1024 messages                        |
+| OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming                |
+| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming                |
+| `GET /v1/models`                                                     | Yes, every model your buyer serves              |
+| Free offers                                                          | Yes                                             |
+| Priced offers (devnet USDC)                                          | Through a desktop API key with a spending limit |
+| Tools (function calling), both formats, whole answers and streaming  | Yes, on free offers; see [Tools](#tools)        |
+| Claude Code                                                          | Only with a seller on a larger model            |
+| Cursor agent mode                                                    | No: it calls from Cursor's cloud                |
+| Images, structured output, several answers per request               | No: refused with a 400 error                    |
 
-Your prompt reaches the seller that answers it, whose machine runs the model and can read it. Do not send
-passwords, keys or other secrets.
+By default, a seller serves each buyer up to **30 answers per minute**. An answer is at most **4096
+tokens** unless you raise the buyer's limit, up to 32768. A longer answer stops at the limit with finish
+reason `length`.
 
-## Before you start [#before-you-start]
+The Responses API refuses `parallel_tool_calls: false`, non-default sampling and non-neutral reasoning
+before it contacts a seller, because the signed request can't carry those constraints. Codex versions
+that require them don't work. In every client, turn off HTTP and stream retries.
 
-- Nothing about the sellers: by default the buyer uses any seller registered in the Gyblos index, for free
-  answers, and checks each one's identity on Solana devnet before sending anything. To use one seller you
-  trust (and to pay it), have its **NodeId** and **owner wallet** (the seller prints both with
-  `gyblos doctor`).
-- Git, [Node.js](https://nodejs.org) 24.22.1 or later, and pnpm 10 (`corepack enable` provides it).
+Your prompt reaches the seller that answers it. That seller's machine runs the model and can read your
+prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/reference/data-and-privacy).
 
-In the beta the buyer runs from the source repository; the installer and the npm package contain the
-seller only.
+## Prerequisites [#before-you-start]
+
+- Git.
+- [Node.js](https://nodejs.org) 24.22.1 or later.
+- The pnpm version pinned in the repository's `package.json`; `corepack enable` provides it.
+
+You don't need to choose a seller: by default the buyer uses any seller registered in the Gyblos index,
+for free answers, and checks each seller's identity on Solana devnet before it sends anything. To use
+only one seller you trust, get its **NodeId** and **owner wallet** (the seller prints both with
+`gyblos doctor`).
 
 ## Install and configure [#install-and-configure]
 
@@ -57,12 +65,13 @@ pnpm buyer:init
 
 `buyer:init` asks for a seller's NodeId: press Enter to use any registered seller, or paste one with its
 owner wallet. It shows the settings (model `qwen3-0.6b`, answers up to 4096 tokens, free quotes only) and
-saves them after you confirm. It sends nothing to the
-seller or the chain. `pnpm buyer:init --advanced` also sets the model, the answer limit and the endpoints.
+saves them after you confirm. It sends nothing to a seller or to the chain. `pnpm buyer:init --advanced`
+also sets the model, the answer limit and the endpoints. The buyer keeps its key and settings in
+`.local/gyblos/buyer` inside the checkout.
 
 ## Start the buyer [#start-the-buyer]
 
-Start the buyer. It needs no relay token: the Gyblos relays admit every client.
+Start the buyer. It needs no relay token:
 
 ```sh
 pnpm buyer:free
@@ -74,8 +83,31 @@ Leave it running. In another terminal, check that it answers:
 curl http://127.0.0.1:4031/v1/models
 ```
 
-The list names the models your buyer can use; use one of those names as `model` in your requests. For a quick
-conversation in the terminal instead, run `pnpm buyer:chat`, which starts its own buyer.
+The output is similar to the following:
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "qwen3-0.6b",
+      "object": "model",
+      "created": 0,
+      "owned_by": "gyblos",
+      "type": "model",
+      "display_name": "qwen3-0.6b",
+      "max_output_tokens": 4096
+    }
+  ],
+  "has_more": false,
+  "first_id": "qwen3-0.6b",
+  "last_id": "qwen3-0.6b"
+}
+```
+
+Use one of the listed `id` values as `model` in your requests. Press Ctrl+C in the buyer's terminal to
+stop it. For a quick conversation in the terminal instead, run `pnpm buyer:chat`, which starts its own
+buyer.
 
 ## Send a conversation [#send-a-conversation]
 
@@ -95,8 +127,8 @@ curl http://127.0.0.1:4031/v1/chat/completions \
 
 ### OpenAI SDK [#openai-sdk]
 
-Use base URL `http://127.0.0.1:4031/v1`. The free buyer does not check the API key, but the SDK needs a
-non-empty one.
+Use base URL `http://127.0.0.1:4031/v1`. The checkout buyer doesn't check the API key, but the SDK needs a
+non-empty one. With the desktop app, use its Base URL and API key instead.
 
 ```js
 import OpenAI from 'openai';
@@ -122,7 +154,7 @@ for await (const chunk of stream)
 
 ### Anthropic SDK [#anthropic-sdk]
 
-Use base URL `http://127.0.0.1:4031` (without `/v1`). `max_tokens` is required, as with Anthropic.
+Use base URL `http://127.0.0.1:4031`, without `/v1`. As with Anthropic, `max_tokens` is required.
 
 ```js
 import Anthropic from '@anthropic-ai/sdk';
@@ -198,17 +230,17 @@ console.log(second.choices[0].message.content);
 
 With the Anthropic SDK, send `tools` with `input_schema`, read the `tool_use` blocks and answer with
 `tool_result` blocks, as with Anthropic. The buyer asks only sellers that serve tools; if none does, it
-answers 503 and says so.
+answers 503 and says so. Tools work on free offers only.
 
-The default model, qwen3:0.6b, handles simple calls like this one. Agents that send many tools and long
+The default model, `qwen3:0.6b`, handles simple calls like this one. Agents that send many tools and long
 instructions, such as Claude Code, need a seller on a larger model through the OpenAI or Anthropic engine.
 
 ## Switch models [#switch-models]
 
-One buyer can serve several models by name. List them in `selection.json` under `models`; the list must
+One buyer can serve several models by name. List them under `models` in `selection.json`; the list must
 include the model in `request.selection`. A client switches by sending another name as `model` (`/model`
 in most agents). Each request carries the whole conversation, so the next model reads everything said
-before; only the previous seller's cache is lost, so the first answer may take a little longer.
+before. The first answer after a switch can take longer, because the new seller has nothing cached.
 
 ```json
 "models": [
@@ -217,34 +249,29 @@ before; only the previous seller's cache is lost, so the first answer may take a
 ]
 ```
 
-A name the buyer does not serve gets a 404 that lists the ones it does. Paid modes accept only the pinned
-paid model and its token limit in this list.
+A name the buyer doesn't serve gets a 404 that lists the names it does.
 
 ## If a seller drops [#if-a-seller-drops]
 
-On `buyer:free`, if the seller drops (its connection breaks) or stalls after it got the prompt, before
-any visible text reached your client, the request goes to another seller of the same model within the
-same request, and you see only the answer. That covers a complete (non-streaming) answer and a streamed
-tool call with no text before it; a streamed answer that already showed text is not restarted. The
-prompt goes to at most three sellers, within the 180-second limit. An error the seller sends back itself
-(busy, its daily limit, an engine failure) ends the request as before, so a seller cannot read prompts
-it then refuses without that showing. Because the prompt may reach a second seller,
-`"failover": "never"` in `selection.json` keeps each prompt on one seller; then only a prompt that was
-certainly never sent moves.
+With `buyer:free`, what happens when a seller fails depends on how far the answer got:
 
-Once text reached your client, a failure ends the request with an error: the answer is not restarted
-elsewhere. Disable client HTTP and stream retries: a broken connection may deliver no response headers
-at all.
+| When the seller fails                                                       | What happens                                                                                                |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Before any text reached your client                                         | The buyer sends the request to another seller of the same model, at most three in total, within 180 seconds |
+| After text reached your client                                              | The request ends with an error; the answer is not restarted elsewhere                                       |
+| The seller itself answers with an error (busy, daily limit, engine failure) | The request ends with that error                                                                            |
 
-A manual resend starts a new selection: the same seller or another one may win. Seller-attributable
-failures affect its weight. Preference for the seller that answered earlier is bounded and guarantees
-neither affinity nor a warm cache. These preferences apply here to free execution; paid modes retain
-their channel and seller constraints.
+Because a retry sends your prompt to a second seller, you can set `"failover": "never"` in
+`selection.json` to keep each prompt on one seller. Then only a request that certainly never reached a
+seller moves to another one.
+
+A broken connection may deliver no response headers at all, so turn off HTTP and stream retries in your
+client. Resending a request yourself starts a new seller selection.
 
 ## Connect a coding agent [#connect-a-coding-agent]
 
-One command writes the configuration for OpenCode, pi or Codex CLI with every model your buyer serves,
-changing only the `gyblos` provider and keeping a copy of the previous file. For Claude Code it prints the
+One command writes the configuration for OpenCode, pi or Codex CLI with every model your buyer serves. It
+changes only the `gyblos` provider and keeps a copy of the previous file. For Claude Code it prints the
 variables to set in your shell. Without `--write`, it only prints.
 
 ```bash
@@ -256,48 +283,50 @@ pnpm buyer:agent claude
 
 Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or
 `codex --profile gyblos`. Each request carries the whole conversation, so switching models keeps the
-context.
+context. The desktop app's **Connect agent** button writes the same configuration.
 
 ## Options and errors [#options-and-errors]
 
-Options that clients send by default and that do not change the answer are accepted and ignored, such as
-`temperature`, `top_p`, `user`, `metadata`, `stream_options` and, in the Anthropic format, `thinking`
-(thinking is always off). Options that would change it are refused unless they hold their neutral value:
-`response_format` (`text`), `n` (1) and `logprobs`. These sampling hints refer to Chat Completions and
-Anthropic; Responses refuses non-neutral sampling and reasoning.
+| Option                                                                                          | Behavior                                                                               |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `temperature`, `top_p`, `user`, `metadata`, `stream_options`; Anthropic `thinking` (always off) | Accepted and ignored                                                                   |
+| `response_format`, `n`, `logprobs`                                                              | Refused unless neutral: `text`, `1`, `false`                                           |
+| `stop` (up to 4 strings) and Anthropic `stop_sequences`                                         | Honored by your buyer                                                                  |
+| Images                                                                                          | Refused by Chat Completions and Anthropic; replaced by a text placeholder in Responses |
 
-`stop` (Chat Completions, a string or up to 4 strings) and `stop_sequences` (Anthropic) are honored by your
-buyer: the answer ends just before the first sequence, with finish reason `stop` (Anthropic:
-`stop_reason: "stop_sequence"` and the sequence in `stop_sequence`). A cut answer carries no tool calls.
-The seller does not receive the sequences, so it keeps generating until its own end: a stream shows nothing
-after the sequence but closes only when the seller finishes, and `usage` counts everything it generated.
-Chat Completions and Anthropic refuse images. Responses substitutes a text placeholder for an
-`input_image`; it does not send image content to the seller.
+The buyer applies stop sequences itself: the answer ends just before the first sequence, with finish
+reason `stop` (Anthropic: `stop_reason: "stop_sequence"`). A cut answer carries no tool calls. The seller
+doesn't receive the sequences and keeps generating, so a stream closes only when the seller finishes, and
+`usage` counts everything it generated.
 
-| Answer | Meaning                                                                                                                                                                     |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 400    | The request uses something not supported yet; the message and `param` name it.                                                                                              |
-| 503    | No seller is available right now. `Retry-After` suggests when a new attempt may succeed. The clients shown here have automatic retries disabled; retrying is your decision. |
-| 504    | The seller did not answer in time.                                                                                                                                          |
+| Answer | Meaning                                                                                     |
+| ------ | ------------------------------------------------------------------------------------------- |
+| 400    | The request uses something the buyer doesn't support; the message and `param` name it       |
+| 404    | The buyer doesn't serve that model; the message lists the ones it does                      |
+| 503    | No seller is available. `Retry-After` suggests when to try again; retrying is your decision |
+| 504    | The seller didn't answer in time                                                            |
 
-Errors use each API's own shape, so SDKs raise their usual exceptions.
+Errors use each API's own shape, so SDKs raise their usual exceptions. For startup errors, see
+[Troubleshooting](/en/help/troubleshooting#buyer-and-desktop).
 
 ## Clients made for OpenRouter [#clients-made-for-openrouter]
 
-OpenRouter speaks the same Chat Completions format, plus a few fields of its own. A client or agent set up
-for OpenRouter works by pointing its base URL at your buyer (`http://127.0.0.1:<port>/v1`) and using its
-token as the API key:
+OpenRouter uses the same Chat Completions format, plus a few fields of its own. A client or agent set up
+for OpenRouter works when you point its base URL at your buyer (`http://127.0.0.1:4031/v1` for the
+checkout buyer, or the desktop app's Base URL) and use any API key with the checkout buyer, or the
+desktop app's API key:
 
 - `provider`, `route`, `transforms`, `usage`, `debug`, `reasoning`, `verbosity`, `prediction` and the
-  extra sampling knobs `top_k`, `min_p`, `top_a` and `repetition_penalty` are accepted and ignored: they
-  choose among OpenRouter's providers or tune sampling, and do not change what a seller is asked.
-- `models` (a fallback list) is honored: the answer comes from the first name, `model` first, that your
-  buyer serves, and the reply's `model` says which. With none served, the 404 lists the names it serves.
+  sampling fields `top_k`, `min_p`, `top_a` and `repetition_penalty` are accepted and ignored. They choose
+  among OpenRouter's providers or tune sampling, and don't change what a seller is asked.
+- `models`, a fallback list of up to 8 names, is honored: the answer comes from the first name, `model`
+  first, that your buyer serves, and the reply's `model` says which. If it serves none, the 404 lists the
+  names it serves.
 - OpenRouter-style names find the same model: `qwen/qwen3-0.6b` and `qwen/qwen3-0.6b:free` answer as
-  `qwen3-0.6b`. The suffixes `:free`, `:nitro` and `:floor` only choose a provider there; a suffix that
-  changes the answer, such as `:online` (web search), is not accepted as the plain model.
+  `qwen3-0.6b`. The suffixes `:free`, `:nitro` and `:floor` only choose a provider on OpenRouter. A
+  suffix that changes the answer, such as `:online` (web search), doesn't match the plain model.
 - `plugins` (for example web search) and `web_search_options` are refused with a 400 rather than skipped,
-  so a client never shows an answer as searched when it was not.
+  so a client never shows an answer as searched when it wasn't.
 
-Later, `provider` (a price ceiling, cheapest or fastest, sellers to avoid) could steer seller selection per
-request, and `usage` could report what each answer cost; neither does yet.
+**Related:** [Desktop app](/en/buyers/desktop-app) · [Data and privacy](/en/reference/data-and-privacy) ·
+[Troubleshooting](/en/help/troubleshooting#buyer-and-desktop).

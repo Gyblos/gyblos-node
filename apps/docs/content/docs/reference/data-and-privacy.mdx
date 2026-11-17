@@ -1,0 +1,200 @@
+---
+title: Data and privacy
+description: What the seller node, the local buyer and the desktop app keep on your machine, what they send and to whom, and what never leaves your machine.
+---
+
+Gyblos services never receive your prompts, answers or keys. The seller that answers a request does
+read it, though. This page lists what each part of Gyblos sends, where it goes, and how to turn off
+what is optional.
+
+## At a glance [#at-a-glance]
+
+| What                                    | Goes to                                                     | When                                                           | Turn it off                                            |
+| --------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------ |
+| Your prompts and the answers            | The seller that serves the request, and its engine provider | Every request                                                  | No. A seller has to read a prompt to answer it         |
+| [Signed receipts](#receipts)            | The metrics collector, `collector.gyblos.com`               | Release builds, about once a minute                            | No                                                     |
+| [Telemetry observations](#observations) | The metrics collector                                       | Release builds, with the receipts                              | Yes: `GYBLOS_OBSERVATIONS=off`                         |
+| [Public seller records](#discovery)     | The discovery index, `discovery.gyblos.com`                 | While a seller is listed                                       | Yes: set `publish = false`                             |
+| [Registration](#discovery)              | The discovery index and Solana devnet                       | Once, when you run `gyblos seller register`                    | You choose whether to register                         |
+| [Update checks](#update-checks)         | The GitHub API                                              | Desktop app: at start and every 5 minutes. Seller: on `status` | Yes: `GYBLOS_UPDATE_CHECK=0`                           |
+| [Network metadata](#network)            | Relays, peers, the index, the collector and the Solana RPC  | Every connection                                               | Partly: [relay-only mode](/en/reference/configuration) |
+
+A development build from a source checkout uploads no receipts or observations unless you set
+`GYBLOS_COLLECTOR_URL`.
+
+## What never leaves your machine [#never-sent]
+
+- **Private keys.** The owner, node and payment keys of a seller, the buyer key and the desktop wallet
+  stay in their files. Nothing sends them anywhere.
+- **Credentials.** An engine API key goes only to its own provider. A relay token goes only to a relay
+  that requires one. Neither is uploaded to Gyblos.
+- **Prompts and answers, to Gyblos.** Receipts, observations, local telemetry files and diagnostic logs
+  carry no message text. The metrics collector refuses any upload with a field it does not expect, such
+  as a prompt.
+
+## Who can read your messages [#who-reads-messages]
+
+- **The seller.** The seller that serves your request runs the model, so it can read your prompt and the
+  answer. A free answer is not a private answer. Encryption protects messages on the way, not from the
+  seller.
+- **The seller's engine provider.** A seller that serves a model through an OpenAI- or
+  Anthropic-compatible API forwards your prompt to that provider.
+- **Not the relays or Gyblos services.** Relays carry only encrypted traffic, and the index and the
+  collector never receive message text.
+
+Do not send passwords, keys or other secrets to any model.
+
+The desktop app saves your conversations and drafts in its own folder on your computer. They are not
+synchronized anywhere, and the app does not encrypt them separately: protect them like any other file
+in your account.
+
+## Receipts [#receipts]
+
+For every free answer, and every answer in a payment session, the seller signs a receipt. A single
+priced request outside a session produces none. The buyer can add its own signed verdict on what it
+received. A receipt contains:
+
+- both NodeIds (seller and buyer) and the seller's owner address;
+- the model, its settings and the engine kind;
+- token counts, input and output sizes in bytes and characters, and timings;
+- the outcome and finish or failure code, the reasoning level and metering mode, the offer's prices,
+  and the amount and fee charged for this request;
+- a digest (a hash) of the request, never its text.
+
+Each upload also names the uploader's role, client kind (`seller-node`, `buyer-cli` or
+`buyer-desktop`), release version, operating system and processor architecture.
+
+**Who uploads.** Release builds of the Docker seller, the native seller and the desktop app upload
+receipts to `https://collector.gyblos.com/v1`. Receipts have no opt-out.
+
+**How.** The node sends up to 50 receipts every minute. A failed upload keeps them pending on your
+machine and retries later, waiting up to one hour between attempts. Uploading never delays or blocks
+an answer.
+
+**What is public.** The collector keeps the raw receipts private and publishes aggregates only: network,
+model and per-seller daily totals, keyed by NodeId. It uses your IP address for rate limiting and does
+not store it.
+
+**On your machine.** The seller keeps pending receipts until the collector accepts them, plus a short
+history of uploaded ones (at most 256, for up to seven days). `gyblos seller status` shows the queue.
+
+## Telemetry observations [#observations]
+
+Observations are content-free events that receipts cannot carry: a request that no seller could serve,
+a refusal before a seller was chosen, a failed connection, the latency the buyer experienced, whether
+the seller was reached directly or through a relay, and when each request started. Each event belongs
+to the node that sends it and carries no message text.
+
+Each event names the buyer's NodeId and, once one is chosen, the seller's NodeId, plus a request ID, the
+model, the timing and, when known, token counts, sizes and any amount charged. Observations therefore
+show which sellers a buyer tried and when, including attempts that produced no receipt.
+
+Release builds send observations with the receipts. They wait in memory, at most 5,000 events, so a
+restart loses the ones not yet sent.
+
+To turn observations off, set `GYBLOS_OBSERVATIONS=off` in the environment of the process:
+
+- **Docker seller:** add the line `GYBLOS_OBSERVATIONS=off` to `~/gyblos-seller/seller.env`, then
+  recreate the container:
+
+  ```sh
+  cd ~/gyblos-seller
+  docker compose up -d --force-recreate seller
+  ```
+
+- **Native seller:** add the same line to `seller.env` in the seller's home (`~/.gyblos` or
+  `%USERPROFILE%\.gyblos`), then run the installer again. It reinstalls the service with the current
+  `seller.env`.
+- **Desktop app:** quit the app, then start it from a terminal with the variable set. On macOS:
+
+  ```sh
+  GYBLOS_OBSERVATIONS=off /Applications/Gyblos.app/Contents/MacOS/gyblos-desktop
+  ```
+
+  On Linux, with the `.deb` installed:
+
+  ```sh
+  GYBLOS_OBSERVATIONS=off gyblos-desktop
+  ```
+
+  On Windows, in PowerShell, from the extracted `gyblos-desktop-win32-x64` folder:
+
+  ```powershell
+  $env:GYBLOS_OBSERVATIONS = 'off'
+  .\gyblos-desktop.exe
+  ```
+
+  The setting applies to that launch only.
+
+Receipts are still uploaded with observations off.
+
+`[telemetry] file = true` in `config.toml` is a separate, local option: it writes private telemetry
+files under the role's `telemetry/` folder and sends nothing. It is off by default.
+
+## Discovery index and registration [#discovery]
+
+A listed seller publishes signed public records to the discovery index: its NodeId, its owner address,
+each offered model (name, variant, quantization and context size) with its price, which is zero for a
+free offer, and its data-retention policy. While it runs it renews a presence record, and it publishes
+a withdrawal when it stops or you unpublish it. Anyone can read these records. They contain no IP
+address. Set `publish = false` to stop publishing (see [Register and publish](/en/sellers/register-publish)).
+
+`gyblos seller register` sends your invite code to the index. The index stores your NodeId, owner
+address and 8004 agent registry asset, a hash of the invite code (never the code), the time, and the
+two-letter country of the request. It does not store your IP address. The invite code was issued to a
+contact you gave Gyblos (an email address or Telegram handle). The index keeps that contact with the
+invite, so Gyblos operators can link it to your NodeId, owner address and country. The contact is never
+published. Registering also writes a public
+entry in the 8004 agent registry on Solana devnet.
+
+Buyers and the desktop app read the index to find sellers. The index uses IP addresses for rate
+limiting and stores none.
+
+## Solana devnet [#solana]
+
+Registration and payments are public devnet transactions: anyone can see the addresses and amounts on
+a Solana explorer. Buyers and the desktop app also read the 8004 agent registry through a Solana RPC
+(by default `https://api.devnet.solana.com`) to check each seller's identity. The RPC provider sees
+those requests and your IP address.
+
+## Update checks [#update-checks]
+
+- **Desktop app:** at startup and every five minutes, it asks the GitHub API for the latest desktop
+  release. It sends no identity or chat content and never downloads or installs anything.
+- **Seller:** on a release build, `gyblos seller status` asks the GitHub API for the latest release.
+  It sends nothing about the seller.
+
+Set `GYBLOS_UPDATE_CHECK=0` to turn either off: in the environment that starts the desktop app (as for
+observations above), or in the shell that runs `gyblos seller status`. For the Docker seller, add it to
+`seller.env`, because `docker compose exec` uses the container's environment.
+
+## Network metadata [#network]
+
+Sellers and buyers connect peer to peer. A direct connection shows each peer's IP address to the other.
+A relay carries encrypted traffic when a direct path fails, and sees both IP addresses. Relay-only mode
+(`transport.relay_only`) keeps a seller's address from buyers, but not from the relay. The discovery
+index, the metrics collector and the Solana RPC see the IP address you connect from.
+
+## Where data stays on your machine [#local-data]
+
+| Install                            | Location                                                                     | Contents                                                                                                                     |
+| ---------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Docker seller                      | `~/gyblos-seller` and the Docker volume `gyblos` (mounted at `/data`)        | `config.toml` and `seller.env` in the folder. Keys, registration state, receipts and payment records in the volume           |
+| Native seller                      | `~/.gyblos` (Windows: `%USERPROFILE%\.gyblos`)                               | `config.toml`, `seller.env`, `service.log` (macOS and Windows), and `seller/` with keys, registration, receipts and payments |
+| Local buyer from a source checkout | `.local/gyblos/buyer` in the checkout                                        | Buyer key, `selection.json`, receipts, payment records and diagnostic logs                                                   |
+| Desktop app                        | `gyblos-desktop` and `gyblos-wallet` in the system's application-data folder | Conversations, activity, the Chat budget and the local buyer; the wallet, protected by the system's key store                |
+
+The application-data folder is `~/Library/Application Support` on macOS, `%APPDATA%` on Windows and
+`~/.config` on Linux.
+
+<Callout type="warn" title="Deleting these folders deletes keys">
+  Removing a seller's home or volume, or the desktop's `gyblos-wallet` folder,
+  permanently deletes its keys. It cannot be undone: the NodeId, registration
+  and any funds controlled by those keys are lost. To stop instead, stop the
+  seller or quit the app. To keep a backup, see [Identity and
+  backups](/en/sellers/identity).
+</Callout>
+
+**Related:** [Identity and backups](/en/sellers/identity) ·
+[Configuration reference](/en/reference/configuration) · [Desktop app](/en/buyers/desktop-app) ·
+[Troubleshooting](/en/help/troubleshooting).

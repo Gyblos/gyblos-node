@@ -1,169 +1,285 @@
-# Free receipt construction and policy
+# Usage receipts
 
-`@gyblos/core/receipts` constructs content-free `receipt/v1` attestations. It
-imports protocol validation/signing only; no clock, randomness, filesystem,
-transport, engine, payment or startup service is involved. Callers inject their
-node signer. The existing receipt schema, signing domains and vectors are
-unchanged. These functions are not connected to runtime execution.
+A usage receipt is a content-free, signed record of one inference: which seller
+and buyer, which model, how many tokens and bytes, how long it took, how it
+ended and, when paid, the price and charge. The seller signs it and the buyer
+countersigns it. Receipts never contain prompts, answers, keys or endpoint
+addresses.
 
-## Seller
+Free requests and [payment sessions](payment-sessions.md) produce receipts.
+Per-request paid requests don't. The wire formats (`receipt/v1`, the receipt
+channel and the upload envelopes) are owned by the
+[protocol specification](../packages/protocol/SPEC.md).
 
-`buildFreeSellerReceipt(input)` takes `FreeSellerReceiptInput`: the seller
-record's fields except version, pricing and amounts. It fixes version 1, free
-pricing and both amounts to zero, rejects overrides/unknown fields and returns a
-detached protocol-validated record. `createFreeSellerReceipt(input, signer)`
-returns the signed seller-only envelope. The protocol self-verifies the signer
-against the seller NodeId. Such an envelope remains unconfirmed.
+## Lifecycle
 
-The caller must supply measurements from the authenticated execution, including
-its request digest, exact selection, actual usage, sizes, timing and terminal
-outcome. Admission estimates and unused reservations are not usage. Preserve
-`declared` versus `recounted` metering and nullable unknown reasoning tokens;
-never manufacture unavailable counts. The protocol requires known input/output
-token counts, so this API cannot attest an attempt for which they are unknown.
-Failed/cancelled partial observations are accepted only under the existing
-protocol invariants. This module cannot prove that a caller measured honestly.
+1. **Sign.** After an execution, the seller builds a receipt from its own
+   measurements and signs it with its node key. It stores this seller-only
+   receipt in its role's private receipt store.
+2. **Exchange.** The buyer fetches the seller's receipt over the receipt channel
+   (`gyblos/receipt/1`, methods `receipt.get` and `receipt.confirm`). It checks
+   the receipt against its own view of the execution, signs its observation and
+   sends the pair back. Both roles store the countersigned pair.
+3. **Upload.** In release builds, each role's uploader sends its pending
+   receipts in signed batches to the metrics collector at
+   `https://collector.gyblos.com/v1`.
+4. **Classify.** The metrics collector verifies both signatures and counts each
+   receipt as bilateral, disputed or seller-only, and free or paid. It never
+   publishes individual receipts.
 
-`receiptTextSizes(input, output)` returns only UTF-8 bytes and Unicode
-code-point counts. It retains no text. Use bounded execution text; this helper
-is not a wire parser. Do not reuse telemetry character counts: that port
-currently counts UTF-16 code units, whereas receipt/v1 specifies code points.
+Receipt work runs beside inference and payments and never changes them. A
+receipt failure never retries a prompt, blocks an answer or alters a payment.
+Control queries and receipt calls have their own admission and don't hold a
+generation slot.
 
-## Buyer
+## What leaves your machine
 
-`buildFreeBuyerReceipt({ seller, context, observed })` first snapshots and
-validates local context/observations, then verifies the seller signature. It
-rejects paid receipts and requires exact equality with
-`ReceiptExecutionContext`: request ID, execution request digest, seller/buyer
-NodeIds, owner, complete model selection, reasoning and streaming mode. Context
-must come from the buyer's independently verified execution, never from the
-received receipt. Owner–NodeId policy, authenticated transport and quote
-verification remain the caller's responsibility. Receipts are historical
-evidence and have no expiry check.
+Release builds upload receipts with no setting to turn it off. They also upload
+content-free telemetry observations, which `GYBLOS_OBSERVATIONS=off` turns off.
+`GYBLOS_COLLECTOR_URL` points the uploader at another collector; it must be
+`https`, or `http` on a loopback host. A build without a release version uploads
+only when `GYBLOS_COLLECTOR_URL` is set, so tests and development stay offline.
 
-The buyer digest references the canonical seller signing bytes, not the
-execution request digest. Known unequal input/output token counts and output
-bytes are disputed in protocol order. Unknown independent token counts stay
-null, even if the seller declared counts. Different timing observations are
-preserved but not disputed. `agreed` means no disagreement among available
-comparable measurements; it does not establish independent token verification or
-proof of execution.
+The
+[uploader section of metrics-collector.md](metrics-collector.md#uploader-nodes)
+owns the exact fields sent, pacing, retries and failure handling. The receipt
+privacy policy is in [public decisions](public-decisions.md).
 
-`createFreeBuyerReceipt(input, signer)` returns the verified seller attestation
-plus the buyer's separately signed observation. The buyer signer is checked
-against the bound buyer NodeId. Invalid signatures, context mismatches and
-malformed observations never reach the buyer signer. Protocol errors use
-existing static codes and never include arbitrary input. There is no fallback or
-retry here.
+## What a receipt proves
 
-## Deliberately separate work
+| Term                    | Meaning                                                                                                     |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Seller-only             | Signed by the seller only. The buyer disconnected or never confirmed. It is never treated as countersigned. |
+| Agreed (bilateral)      | Both node keys signed, and no comparable measurement differs.                                               |
+| Disputed                | The buyer's known input or output token count, or output bytes, differ from the seller's.                   |
+| `declared`, `recounted` | Whether the seller reports the engine's own token count or recounts it with the pinned tokenizer.           |
+| Paid fields             | Prices, network, asset, charge and fee for a payment-session request.                                       |
 
-A future separate exchange needs its own transport contract; this module neither
-registers a channel nor changes the free execution channels. No receipt
-exchange, execution-channel change, event emission, persistence,
-consent/configuration, collector or public aggregation is added. A disconnected
-buyer can leave a seller-only receipt; it must never be treated as
-countersigned. Receipt failures must be given explicit lifecycle semantics when
-wiring execution; this module does not decide whether they can affect an already
-delivered answer. Full receipts remain private; this API grants no permission to
-publish or export them. Paid execution and v1 payment contracts remain
-unchanged.
+A signature attests what its signer claims, not that the usage is true:
 
-## Private ingestion policy
+- "Agreed" means two node keys agreed. Node keys are free, so it doesn't show
+  that two independent parties exist.
+- A buyer's unknown token count stays `null`, even if the seller declared one.
+  Different timings are kept but not disputed.
+- A paid receipt doesn't prove settlement. A cumulative payment voucher is not a
+  receipt either.
+- Receipts are historical evidence and have no expiry.
 
-The separate
-[private free-receipt collector policy](private-receipt-collector.md) validates
-complete free pairs through an injected atomic storage port. It does not
-activate collection, a backend, an exporter or seller/buyer startup wiring.
+## Construction API
 
-An optional private file implementation is available through
-`@gyblos/telemetry-file/receipt-store`; its lifecycle, bounds and persistence
-limitations are documented with the collector policy. It is not wired into
-startup or external collection.
+`@gyblos/core/receipts` builds receipts. It is pure: no clock, randomness,
+filesystem, transport, engine or payment. Callers inject their node signer.
 
-The public collector policy (`@gyblos/core/public-receipts`) verifies a
-receipt/v1 or receipt/v2 from either party itself (node signatures and
-cross-binding), keeps a detached copy, and classifies it as bilateral, disputed
-or seller-only, free or paid, under the same key as the private collector. It
-refuses a buyer whose disputed fields do not match its own observations.
-Bilateral means two node keys agreed; it does not show that two independent
-parties exist. A buyer half completes a stored seller-only receipt. A different
-seller record under the same key (including a changed request digest) is a
-seller conflict, and a second, different buyer attestation is a buyer conflict:
-the first accepted version stays stored and keeps counting, so a seller cannot
-erase a buyer's dispute by signing again, and the conflict is evidence against
-the side that signed it. It is pure policy, not connected to any service; it
-stores nothing and never publishes individual receipts. The loopback paired-free
-collector above is unchanged and now shares the dispute, key and digest helpers
-with it.
+- `buildFreeSellerReceipt(input)` validates a seller record with free pricing
+  and zero amounts. `createFreeSellerReceipt(input, signer)` returns the signed
+  seller-only envelope; the signer must match the seller NodeId.
+- `buildFreeBuyerReceipt({ seller, context, observed })` verifies the seller's
+  signature and requires the seller record to match the buyer's own
+  `ReceiptExecutionContext` exactly: request ID, request digest, both NodeIds,
+  owner, model selection, reasoning and streaming mode. The context comes from
+  the buyer's verified execution, never from the received receipt.
+  `createFreeBuyerReceipt(input, signer)` adds the buyer's signed observation.
+- `buildPaidSellerReceipt`, `createPaidSellerReceipt`, `buildPaidBuyerReceipt`
+  and `createPaidBuyerReceipt` do the same with a validated payment block
+  (pricing, `amountAtomic`, `feeAtomic`).
+- `receiptTextSizes(input, output)` returns UTF-8 byte and Unicode code-point
+  counts and keeps no text.
 
-The signed batch format a node will use to hand its receipts and its own
-timestamps to a collector is the protocol contract "Receipt upload envelope v1"
-(`packages/protocol/SPEC.md`). It is a contract only: no uploader, schedule or
-endpoint uses it yet.
+Rules for callers:
 
-The additive `receipt-upload/v2` contract keeps the same rules and adds a
-buyer-declared reference to the exact paid quote. `buildReceiptUploadOfferV2`
-projects an independently accepted quote to six facts plus the SHA-256
-reference; it returns no endpoint addresses or owner signature. Capture that
-projection before discarding the quote. It is not proof of identity, settlement
-or truthful metadata. Upload/store/start times originate on the uploader's
-clock; copied offer times originate on the seller's clock and remain
-buyer-reported claims. Existing v1 uploads/vectors stay unchanged. The public
-collector and uploader must explicitly adopt the new contract; no runtime
-activation is included here.
+- Supply measurements from the authenticated execution: actual usage, sizes,
+  timing and outcome. Admission estimates and unused reservations are not usage.
+  Never invent a count you don't have.
+- The protocol requires known input and output token counts, so an attempt
+  without them can't be attested.
+- The buyer's digest covers the seller's signing bytes, not the request digest.
+- Invalid signatures, context mismatches and malformed observations never reach
+  the buyer's signer. Errors use static protocol codes and never echo input.
 
-`apps/metrics-collector` is the public collector Worker that uses v1
-(`POST /v1/receipts`), deployed at `collector.gyblos.com` with its own D1
-database. Its endpoints, order of checks, storage, query cost and operations are
-documented in [metrics-collector.md](metrics-collector.md).
+## Local store and upload cursor
 
-## Local upload cursor
+`@gyblos/node/receipts` is each role's private receipt store, in the role's
+`receipts/` directory. The seller daemon and the shared buyer (CLI and desktop
+app) open it at startup. `gyblos seller status` shows its health, capacity and
+failures.
 
-The shared role store at `@gyblos/node/receipts` keeps every saved receipt
-pending until an explicit uploader acknowledgement. `listPending(limit)` returns
-the oldest pending bodies in `(storedAt, canonical request key)` order, with a
-fingerprint of the complete signed envelope. `markUploaded(cursor, confirmedAt)`
-is compare-and-swap on that fingerprint. It preserves the first acknowledgement
-time, in integer UTC epoch milliseconds. A later buyer confirmation keeps the
-original `storedAt` and returns the changed envelope to pending; an old
-seller-only acknowledgement cannot acknowledge the pair. No uploader is enabled
-here.
+- A saved receipt stays pending until the uploader's acknowledgement.
+  `listPending(limit)` returns the oldest pending receipts with a fingerprint of
+  each signed envelope. `markUploaded(cursor, confirmedAt)` is a
+  compare-and-swap on that fingerprint.
+- A later buyer confirmation keeps the original `storedAt` and returns the pair
+  to pending, so an old seller-only acknowledgement can't acknowledge the pair.
+- Pending capacity is 16,384 receipts or 64 MiB, reserving 4 KiB per receipt so
+  a seller-only body can grow into its countersigned pair. At that limit new
+  writes fail with `RECEIPT_STORAGE_FULL` and existing receipts are kept; the
+  `rejectedWrites` counter counts failed write attempts.
+- Only uploaded receipts are pruned, by the 256-receipt, 1 MiB and seven-day
+  history limits.
+- The store is an append-only private journal, synced before each write succeeds
+  and compacted atomically within 128 MiB. A torn final line from a crash is
+  discarded on the next write.
 
-Pending capacity is 16,384 records / 64 MiB, reserving 4 KiB per record so an
-existing seller-only body can grow to its buyer-confirmed pair. Current golden
-fixtures measure 1,057–1,759 bytes for v1 envelopes and 1,390–2,007 for v2. The
-fixed protocol record caps plus signatures and local metadata fit that
-reservation; this change does not enable v2 emission or storage. The reserve
-covers roughly 11 days at one request per minute or 4.5 hours at one per second;
-it is a capacity estimate, not a guarantee of offline duration.
+## Collector policy
 
-A full pending budget never deletes an existing body. New writes fail with
-`RECEIPT_STORAGE_FULL`; a durable `rejectedWrites` counter counts failed write
-attempts, not distinct permanently lost requests (a later retry may succeed).
-The role's receipt health and `gyblos seller status` expose capacity and
-failures. Disk/permission failures still report unavailable storage; no software
-counter can be durably saved to a device that rejects writes. Receipt failure
-never retries inference or alters payments.
+`@gyblos/core/public-receipts` is the policy the metrics collector runs. It
+verifies a receipt from either party (node signatures and cross-binding), keeps
+a detached copy and classifies it. It refuses a buyer whose disputed fields
+don't match its own observations.
 
-Only uploaded history is eligible for the existing 256-record / 1 MiB /
-seven-day limits. Pending timestamps and data are not corrected when a clock
-moves. Original `storedAt` is immutable, including during migration and buyer
-confirmation.
+Each receipt is keyed by seller NodeId, buyer NodeId and request ID. The first
+accepted version stays stored and keeps counting:
 
-The existing state filename now contains a private version-2 local journal,
-independent of the signed receipt version. A canonical snapshot is followed by
-canonical newline-terminated mutations. Appends are synchronized before success;
-a crash-torn final line is ignored and removed under the exclusive update lock
-before the next append. Earlier complete records remain intact. Atomic staged
-compaction bounds the physical file at 128 MiB. The in-process index is rebuilt
-from the journal on reopen; normal writes do not rewrite all earlier bodies.
-Bounded, read-only cold replay finishes warming the cache even if its caller
-cancels; the cancelled call cannot mutate storage. This prevents a large queue
-from consuming the receipt worker's deadline again on every later write. The
-worker retains its slot until that replay settles; its deadline is unchanged.
-Private modes, no-follow/single-link checks, CAS and immutable first buyer
-confirmation remain enforced. Old version-1 snapshots migrate on the next write;
-all surviving entries start pending, even if old enough for the previous TTL. Do
-not downgrade a writer after migration: older binaries cannot read the new local
-journal. Data already discarded by an old binary cannot be recovered.
+- A buyer half completes a stored seller-only receipt.
+- A different seller record under the same key, including a changed request
+  digest, is a seller conflict. A second, different buyer attestation is a buyer
+  conflict. A seller can't erase a buyer's dispute by signing again, and the
+  conflict is evidence against the side that signed it.
+
+The collector side (endpoints, storage, aggregates) is documented in
+[metrics-collector.md](metrics-collector.md).
+
+## Upload envelopes
+
+Nodes upload with the signed "Receipt upload envelope v1" contract. The additive
+`receipt-upload/v2` contract adds a buyer-declared reference to the exact paid
+quote: `buildReceiptUploadOfferV2` projects an accepted quote to six facts plus
+a SHA-256 reference, without endpoint addresses or the owner signature. Neither
+the uploader nor the metrics collector uses v2. Its offer times come from the
+seller's clock and stay buyer-reported claims, not proof of identity, settlement
+or truthful metadata.
+
+## Local receipt receiver
+
+`apps/receipt-collector` is a standalone, loopback-only receiver for
+countersigned free receipt pairs, for research collection with explicit buyer
+consent. It is not the metrics collector, and buyers and sellers never upload to
+it on their own. It composes the core policy below with a private file store.
+
+### Receiver policy
+
+`createPrivateReceiptCollector(store).collect(body, signal?)` in
+`@gyblos/core/receipt-collector` takes one canonical JSON `{ seller, buyer }`
+pair and checks:
+
+- non-empty bytes, at most 4096 bytes and depth 16, strict UTF-8 and canonical
+  JSON (no duplicate keys, trailing data or other whitespace);
+- both node signatures, request and peer linkage, and the buyer's binding to the
+  seller receipt digest;
+- free pricing only, with a mandatory buyer attestation whose dispute fields
+  match its real discrepancies.
+
+Disputes are kept as disputes. The policy makes no RPC or index queries, checks
+no owner–NodeId registry binding and applies no freshness rule. Each instance
+admits at most four active calls with no queue; invalid submissions count too.
+Results are `STORED` or `DUPLICATE`, and errors use the static
+`RECEIPT_COLLECTOR_CODES`. Cancellation is checked before validation and before
+storage; a commit that already happened is not rolled back, so retry only the
+identical receipt, never the prompt.
+
+The injected `PrivateReceiptStore.insert(entry, signal?)` must atomically return
+`INSERTED`, `IDENTICAL`, `CONFLICT` (keeping the first pair) or `FULL` (without
+eviction). The key is `[sellerNodeId, buyerNodeId, requestId]` and excludes the
+request digest, so re-signing a request ID with a new digest conflicts instead
+of counting twice.
+
+### File stores
+
+Two private file backends in `@gyblos/telemetry-file` implement that port. Only
+the receiver opens them; normal node startup never does.
+
+| Entry               | Behavior                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `receipt-store`     | `createReceiptFileStore` creates a new snapshot; `openReceiptFileStore` requires an existing valid one.                           |
+| `retained-receipts` | Adds replay markers and records a `retentionMs` policy (at most seven days) that must match on reopen. Keeps bodies indefinitely. |
+
+Both stores:
+
+- hold at most 256 entries and a 1 MiB snapshot, return `FULL` at the limit and
+  never evict, prune or reset;
+- take one process lock for the store's lifetime, with at most four admitted
+  writes (extra calls fail `BUSY`);
+- re-verify every stored pair on open and refuse a corrupt snapshot or an
+  orphaned stage file;
+- write a full staged snapshot, sync it and rename it atomically, using 0700
+  directories and 0600 files.
+
+They are not encrypted, not rollback-resistant (a restored older snapshot goes
+undetected), validated on POSIX only, and not a multi-host or hostile-process
+defense. Ordinary macOS `fsync` doesn't guarantee power-loss durability.
+
+### Standalone local receiver
+
+The receiver binds only `127.0.0.1` and accepts exactly `POST /v1/receipts`.
+There are no read, health, delete or admin routes.
+
+- **Access.** Each grant has one buyer NodeId, one random 32-byte token (64
+  lowercase hex characters) and `consent: true`. Obtain the buyer's consent
+  before you add the grant; the flag records it but doesn't prove it. The
+  receiver checks `Authorization: Bearer TOKEN` before reading the body, then
+  requires the verified buyer attestation to match the grant. Changing grants
+  needs a restart.
+- **Requests.** `Content-Type: application/json`, no content encoding, at most
+  4096 bytes. Seller-only, invalid or conflicting pairs are refused. Replies
+  carry only `status: stored` or `status: duplicate`, or a static `COLLECTOR_*`
+  code. A foreign `Host` gets an empty 421, and browser `Origin` or
+  `Sec-Fetch-Site` requests are refused.
+- **Limits.** 16 connections, four active requests, one active request per
+  buyer, ten requests per buyer per minute, 120 per minute in total and 32
+  grants. Every response closes its connection. The deadline is five seconds
+  from complete headers.
+
+Loopback is not authentication: another process of the same OS user can read the
+configuration and reach the port.
+
+### Start the receiver
+
+1. Create a private configuration file (mode 0600, in a directory you control).
+   Use placeholders only in shared examples:
+
+   ```json
+   {
+     "version": 1,
+     "path": "/ABSOLUTE/PATH/receipts.json",
+     "create": true,
+     "retentionMs": 604800000,
+     "principals": [
+       {
+         "buyerNodeId": "BUYER_NODE_ID",
+         "token": "RANDOM_64_HEX_TOKEN",
+         "consent": true
+       }
+     ],
+     "port": 4100
+   }
+   ```
+
+   Replace `BUYER_NODE_ID` with the buyer's lowercase NodeId and
+   `RANDOM_64_HEX_TOKEN` with a fresh random token. Set `create` to `true` only
+   the first time, then to `false`. Never reuse a wallet or node key as a token,
+   and never put tokens in command-line arguments, fixtures or logs.
+
+2. Start the receiver with the file's absolute path:
+
+   ```sh
+   GYBLOS_COLLECTOR_CONFIG=/ABSOLUTE/PATH/collector.json pnpm --filter @gyblos/receipt-collector start
+   ```
+
+   The output is similar to the following:
+
+   ```text
+   {"ok":true,"loopback":true}
+   ```
+
+   A failure prints `{"ok":false,"code":"..."}` with a static code. The
+   entrypoint takes no arguments and loads no `.env` file.
+
+Programmatic hosts can call `startLocalCollector` with explicit options and own
+its `close()`. Close stops admission and waits up to five seconds for admitted
+work; it never breaks a lock.
+
+## Related
+
+- [Metrics collector](metrics-collector.md)
+- [Payment sessions](payment-sessions.md)
+- [Public decisions](public-decisions.md)
+- [Protocol specification](../packages/protocol/SPEC.md)

@@ -1,229 +1,230 @@
-# Desktop buyer and compatibility probe
+# Desktop app
 
-An experimental Electron buyer for macOS, Windows and Linux. Local packaging
-currently supports macOS Apple Silicon only. Chat, Connections, Models,
-Applications, Activity, Payments and Settings share the approved compact visual
-system, Instrument Sans and reusable controls.
+`apps/desktop` is the Gyblos desktop app: an Electron buyer for macOS, Windows
+and Linux. It chats with network sellers through a local buyer, manages
+[buyer API keys](buyer-api-keys.md) for coding agents, and keeps a protected
+local wallet. This page is for developers working on the app. The public
+[desktop app guide](https://docs.gyblos.com/en/buyers/desktop-app) covers
+download, first launch and everyday use, and
+[apps/desktop/DESIGN.md](../apps/desktop/DESIGN.md) owns the visual system.
 
-Native Chat supports two independent payment coordinators: an authenticated
-local x402 buyer and the opt-in [PayPal Sandbox session](paypal-sandbox.md).
-Switching payment method keeps the conversation and draft and never starts a
-payment. Historical simulated responses retain their original provenance. The
-web mockup's sample replies are not payment or live-inference evidence.
+The app is experimental and runs on Solana devnet. Its packages are unsigned.
 
-## x402 chat
+## Screens
 
-The desktop stages the buyer-owned utility executable and runs the same inert
-buyer composition as the CLI. It does not import another app into its renderer.
-Signed-quote selection decides whether a response is free or paid: a zero-price
-offer never creates a transaction, regardless of the budget. Paid execution
-retains its existing devnet, model, reasoning, identity, recount and journal
-checks. The current paid runtime supports the pinned Qwen3-0.6B configuration
-with reasoning off.
+| Screen       | What it does                                                                                         |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| Chat         | One transcript and draft; the composer picks model, thinking, tools and payment method               |
+| Connections  | Buyer API keys, their Base URL and limits, and agent setup ([buyer API keys](buyer-api-keys.md))     |
+| Models       | Searchable model list with a network check against the discovery index                               |
+| Applications | Web tools; unavailable services show as unavailable                                                  |
+| Activity     | Chat consumption, agent inference and confirmed payments                                             |
+| Payments     | The local buyer and Chat budget, the protected wallet and its backup, and the PayPal Sandbox summary |
+| Settings     | Appearance, the design-system preview and version information                                        |
 
-Before starting, prepare the buyer using the existing CLI setup, including its
-selection, identity configuration and public tokenizer for paid execution. Stop
-any other buyer using the same home. In Payments:
-
-1. Choose the **GYBLOS_HOME root**, containing buyer/selection.json.
-2. Optionally, only for a relay that still requires one, enter a relay token in
-   the password field or provide GYBLOS_RELAY_TOKEN in the app's launch
-   environment. The Gyblos relays need no token; leave the field empty.
-3. Start the local buyer. The app uses an ephemeral loopback port and keeps its
-   generated bearer credential in the trusted host.
-4. Authorize a Chat budget in the displayed asset. Each request reserves the
-   configured maximum before transmission; the remaining budget must cover that
-   maximum. No funds move merely by approving this local permission.
-5. Continue in Chat. Each independent message uses actual buyer execution.
-   Positive-price responses settle automatically through x402.
-6. Finish the session to close this desktop's permission. Confirmed payment
-   references remain in Payments and Activity.
-
-An alternative dialog connects an already running compatible local buyer with
-its URL and bearer key. Only literal 127.0.0.1 HTTP endpoints are accepted.
-Metadata and the desktop chat route require bearer authentication, reject any
-Origin, and bind each request to the buyer process's policy identifier. A
-restarted or reconfigured buyer cannot silently execute under an old approval.
-There is no automatic prompt retry.
-
-The paying account is the selected buyer role wallet, not necessarily the
-separate protected desktop wallet. Only the known devnet USDC mint is labelled
-USDC; other test assets display atomic units. This version does not query the
-protected desktop wallet's balance or fund it.
-
-The host saves a separate private Chat permission and reservation before each
-send. Unfinished or unverified payments block messages and closure, including
-after restart. Only explicit buyer proof that a request was never sent can
-release its unsent reservation; this never removes or retries a financial
-journal entry. Reconciliation remains the existing buyer workflow. Successful
-receipts are recorded only after the buyer's chain verification. Their
-abbreviated signatures open the fixed Solana devnet explorer through an
-owning-main-frame action; the renderer cannot supply arbitrary explorer URLs.
-
-The budget applies to this desktop Chat, not other clients or agents using the
-same buyer or wallet. Current x402 settlement is per inference. Finish does not
-submit a deferred aggregate payment or independently prove a refund.
-
-## Local history and previews
-
-Conversations and drafts are saved privately in the persistent desktop profile,
-including model/payment labels and opaque PayPal or x402 session links.
-Restoring never resumes inference, acknowledges a response or authorizes
-spending. Incomplete responses reopen as interrupted. Credentials and signed
-payment payloads are excluded. Storage is local, not cloud-synchronized or
-claimed to encrypt conversation content.
-
-PayPal's descriptive session history remains separate from its financial
-journal. x402 history contains verified references and amounts, or an explicit
-free result without a fabricated hash. Uncertain values are not displayed as
-confirmed spending or available balance. Local dates are observation times, not
-necessarily the chain's block time.
-
-The sample model catalog and unimplemented web tools remain previews. Exact-ID
-lookup reads bounded signed free announcements from the public index; an
-announcement alone is not registry identity, availability or inference proof.
-Real x402 Chat uses the selected buyer's model and policy, rather than silently
-applying a sample model selection.
-
-The renderer remains network-denied. The host owns the buyer connection,
-configuration chooser, credentials and allowlisted explorer action. The PayPal
-coordinator continues using its configured local Ollama model and test session.
-
-## Navigation and wallet settings
-
-The shared header shows the current route and the sidebar toggle. The sidebar
-owns its full-height divider; the header rule starts at that edge. Settings is
-above the appearance switch. Chat-only web tools are separate from inference
-applications in Connect; model artwork and compact selectors are shared.
-
-Payments owns the protected desktop wallet and backup actions. The sidebar
-provides system status without a permanent footer. Copy address uses a narrow
-host action: only the currently selected wallet's public address can be copied,
-from the owning main frame while its lifecycle is active. No arbitrary clipboard
-access, private key or signing capability is exposed.
-
-Add funds opens a local amount form. It rejects an unavailable wallet or missing
-verified backup, then always reports payment unavailable. It cannot authorize
-payment, change a balance, or enable funding. Automatic startup and the
-Settings-only recovery flow are described below.
-
-## Internal wallet library
-
-The Node-only `@gyblos/desktop/wallet-library` entry is composed by the host
-session; the renderer receives public summaries and fixed operation results. It
-requires an existing protected desktop wallet. It never creates a replacement
-for missing, partial or inaccessible custody.
-
-`summary()` returns only public addresses/statuses. `restore(bytes, password)`
-authenticates a portable backup and imports it into a separate address-named
-protected store, leaving the original record and active selection unchanged.
-Duplicates are refused. `select(address)` explicitly publishes an authenticated,
-OS-protected selection; reopening the library retains that address.
-`verifyBackup(address, bytes, password)` reuses the existing identity-bound
-verification receipt. Restoring alone does not mark a backup verified. Every
-summary retains `fundingEnabled: false`, including after verification.
-
-Library paths are owned by config. A private directory lock serializes
-instances; a remaining lock is reported busy, never stolen. Failed encrypted
-writes and incomplete destinations remain for inspection, never automatically
-replaced or deleted. Missing/corrupt selection metadata while the library
-directory remains present fails closed rather than selecting another identity.
-Deleting or rolling back the entire library is not detected; absence is treated
-as a legacy-only installation. Selection publication by atomic rename is the
-commit point; cancellation after publication cannot roll it back. Fresh service
-instances reload selection from disk; process-crash recovery, Windows directory
-fsync and sudden-power-loss recovery are not established. No payment state,
-transfer, balance query or raw secret-export API is added. Settings backup
-reuses the existing approved encrypted-file workflow, pinned to the selected
-address and serialized with restore/select.
-
-## Protected local wallet
-
-On first launch the small ASCII loader automatically prepares a protected wallet
-only when its dedicated root is absent or empty. It offers no creation choice,
-backup prompt or startup wallet modal. Existing state is read without
-initialization; a missing original inside a retained library never generates a
-replacement. Settings can restore an encrypted backup alongside the original,
-then explicitly select which wallet to use. The selected address and its
-verified-backup indicator are reloaded on the next launch. See
-[portable backup and recovery](desktop-backup.md) for the flow and its limits.
-
-The main process retains the original Ed25519 wallet under
-`app.getPath('appData')/gyblos-wallet/wallet-v1`. Imported identities have
-separate address-named stores in the config-owned wallet library, with only
-OS-encrypted private material on disk. Chat/Connect receive only the public
-address and status; private material stays in the host process. Funding remains
-unconditionally disabled, including after backup verification or restoration. Do
-not fund this experimental wallet: external transfers to an address cannot be
-blocked by the app. No balance is queried.
-
-| Platform | Protection and limits                                                                                                                                                                       |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS    | Electron asynchronous `safeStorage` backed by Keychain. Consistent code signing is needed before claiming continuity across distributed app updates.                                        |
-| Windows  | Asynchronous `safeStorage` backed by DPAPI. This protects against other users, not arbitrary processes in the same user account.                                                            |
-| Linux    | Electron 45 synchronous `safeStorage`, restricted to `gnome_libsecret` or KWallet backends. Missing, `basic_text`, unknown and unrecognized backends block creation; no plaintext fallback. |
-
-Linux deliberately uses the encryptor whose backend can be checked. Electron 45
-does not expose equivalent async-provider identification; migrating this adapter
-is required before upgrading to Electron 46, which removes synchronous methods.
-See
-[Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage).
-
-The persistent instance-lock profile is separate from disposable Chromium
-session data. Initialization is shared, and orderly quit waits for it; an
-unresponsive OS secret-store prompt may delay quit. Existing, interrupted,
-corrupt or inaccessible wallet data is never silently replaced. POSIX
-directories/files use owner-only permissions and file/directory flushes; Windows
-uses the OS user profile and DPAPI, without claiming equivalent
-sudden-power-loss durability. Repeated launches reuse the stored identity.
-Partial/corrupt local state is retained for inspection; importing a backup does
-not silently repair or replace that state.
-
-OS encryption protects stored data, not a compromised app or account. Plaintext
-is temporarily present in main-process memory; JavaScript strings cannot be
-reliably zeroed. This is not a Secure Enclave wallet or a portable recovery
-backup.
-
-Offline wallet tests use disposable keys and fake OS encryption on the three CI
-systems. They do not establish native Keychain, DPAPI or Linux keystore
-acceptance, cross-platform recovery or signed-update continuity. Those remain
-separate checks.
-
-The [portable backup flow](desktop-backup.md) supports saving, same-address
-verification and Settings-only restoration alongside the current wallet.
-Successful saved-file checks persist protected identity-bound metadata and can
-set the public backup indicator; funding remains unconditionally disabled.
-Current cross-platform automation and real OS secret-store acceptance must be
-verified separately.
+A notice appears in the title bar when a newer release exists
+([Network contact](#network-contact)).
 
 ## Run locally
 
-Use Node 24.22.1+ and the repository's pinned pnpm. After a frozen install:
+### Prerequisites
+
+- Node 24.22.1 or later and the pnpm version pinned in `package.json`.
+- A frozen install: `pnpm install --frozen-lockfile`.
+
+Start the app:
 
 ```sh
 pnpm desktop:start
 ```
 
-The app creates fresh temporary Chromium session data and retains renderer
-isolation and network denial. Real inference requires an explicitly configured
-and authorized buyer or PayPal session. The normal host also starts a resident
-utility process with the existing loopback-only Iroh binder and
-`@gyblos/node/lifecycle`. It uses an ephemeral identity, no relays/discovery,
-and no operational configuration or wallet. The sidebar reads fixed sanitized
-host states; readiness requires worker acknowledgement, errors permit a
-single-process retry, and quit waits for process exit. Startup and stop
-deadlines request termination; a forced exit is never a clean stop. There is no
-hard exit bound if the OS refuses process termination.
+This builds the app and opens it with fresh temporary Chromium session data. The
+renderer stays isolated and has no network access. The host also starts a
+resident utility process with the loopback-only Iroh binder and
+`@gyblos/node/lifecycle`. It uses an ephemeral identity, no relays or discovery,
+and no operational configuration or wallet; the sidebar's system status reads
+its fixed, sanitized states.
 
-The separate `--smoke` mode mounts the compatibility view and its one fixed IPC
-operation. A utility process imports the pinned Iroh binding and
-`@gyblos/node/lifecycle`, performs two synthetic loopback echo cycles, closes
-both endpoints after each cycle, reports a closed summary and exits after the
-parent acknowledges receipt. No CLI output is parsed to control the app.
+Real inference needs the local buyer ([Chat with x402](#chat-with-x402)) or a
+[PayPal Sandbox session](paypal-sandbox.md).
 
-The compatibility smoke has no relay/discovery preset, external engine, wallet,
-payment, gateway or remote access. No existing node data is read. Cancellation
-reports failure rather than claiming graceful endpoint cleanup.
+## Chat with x402
+
+Chat has two independent payment methods: a local x402 buyer and the opt-in
+[PayPal Sandbox session](paypal-sandbox.md). Switching method keeps the
+conversation and draft and never starts a payment.
+
+### The local buyer
+
+The app starts its own buyer when it launches. On first start it creates a
+dedicated buyer home in the app's profile directory with the shared buyer
+initializer (`@gyblos/node/buyer-init`) and a devnet USDC buyer role. A new
+configuration uses free models only. The buyer is the same buyer-owned
+executable the CLI runs (`apps/buyer/src/desktop-worker.ts`, staged as
+`buyer-service.cjs`); the renderer never imports another app.
+
+The buyer listens on an ephemeral loopback port, and its bearer credential stays
+in the host. If the start fails, use **Retry local buyer**.
+
+To use a buyer you configured yourself instead, choose **Connect a running
+buyer** and enter its **Local buyer URL** and **Private buyer connection key**.
+Only literal `127.0.0.1` HTTP endpoints are accepted. Stop any other buyer that
+uses the same home first.
+
+Relays: the Gyblos relays need no token. Set `GYBLOS_RELAY_TOKEN` in the app's
+launch environment only for an owned relay that requires one. `GYBLOS_RELAYS`,
+`GYBLOS_BUYER_RELAY_ONLY`, `GYBLOS_IROH_BIND` and `GYBLOS_IROH_EXTERNAL_ADDR`
+from that environment are passed to the managed buyer.
+
+### Pay for answers
+
+1. In **Payments**, authorize a Chat budget in the displayed asset. Approving it
+   moves no funds; it is a local permission.
+2. Write in **Chat**. Each message runs a real buyer execution. Each request
+   reserves the configured maximum before it is sent, so the remaining budget
+   must cover that maximum.
+3. Paid answers settle automatically through x402, one payment per answer. A
+   zero-price offer never creates a transaction.
+4. Finish the session to close this desktop's permission. Confirmed payment
+   references stay in **Payments** and **Activity**.
+
+The signed quote decides whether an answer is free or paid. Paid execution keeps
+the buyer's devnet, model, reasoning, identity, recount and journal checks; the
+paid runtime supports the pinned Qwen3 0.6B with reasoning off. Finishing does
+not submit a deferred aggregate payment or prove a refund.
+
+The paying account is the buyer role's wallet, not the protected desktop wallet.
+Only the known devnet USDC mint is labelled USDC; other assets show atomic
+units.
+
+### Safety rules
+
+- Metadata and the Chat route require bearer authentication, reject any
+  `Origin`, and bind each request to the buyer's policy identifier. A restarted
+  or reconfigured buyer cannot run under an old approval.
+- The host saves a private Chat permission and reservation before each send.
+  Unfinished or unverified payments block new messages and closing, including
+  after a restart. Only buyer proof that a request was never sent releases its
+  reservation.
+- There is no automatic prompt retry, and the app never removes or retries a
+  financial journal entry. Resolve uncertain payments with the buyer
+  [recovery](recovery.md) commands.
+- The budget covers desktop Chat only, not other clients or agents that use the
+  same buyer or wallet.
+- Receipts are recorded only after the buyer's chain verification. Their
+  abbreviated signatures open the fixed Solana devnet explorer through a
+  main-frame host action; the renderer cannot supply an explorer URL.
+
+## Local history
+
+Conversations and drafts are saved privately in the persistent desktop profile,
+with model and payment labels and opaque PayPal or x402 session links.
+Credentials and signed payment payloads are excluded. Storage is local, not
+synchronized, and conversation content is not encrypted.
+
+- Restoring history never resumes inference, acknowledges a response or
+  authorizes spending. An incomplete response reopens as interrupted.
+- x402 history holds verified references and amounts, or an explicit free result
+  with no hash. Uncertain values never appear as confirmed spending or available
+  balance.
+- PayPal's session history is separate from its financial journal.
+- Local dates are when this device observed a record, not the chain's block
+  time.
+
+The sample model catalog and unimplemented web tools are previews. Exact-ID
+lookup reads signed free announcements from the discovery index; an announcement
+alone is not registry identity, availability or proof of inference. x402 Chat
+uses the buyer's model and policy, never a sample model selection.
+
+## Network contact
+
+The renderer has no network access. The host process makes these contacts:
+
+| Destination                     | When                                                                                                     | How to turn it off                                                     |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `api.github.com` release list   | At start and at most every 5 minutes, to show the update notice. It never downloads or installs anything | `GYBLOS_UPDATE_CHECK=0`                                                |
+| Discovery index (`/v1/sellers`) | Model network checks and exact-ID lookups                                                                |                                                                        |
+| Gyblos relays and sellers       | While the local buyer runs                                                                               | Stop the buyer                                                         |
+| Metrics collector               | Packaged app only: the managed buyer uploads receipts and telemetry observations, as a release CLI does  | `GYBLOS_OBSERVATIONS=off` stops observations; receipts have no opt-out |
+| Solana devnet RPC               | The buyer's payment and identity checks                                                                  |                                                                        |
+| Solana devnet explorer          | Only when you open a payment reference                                                                   |                                                                        |
+| PayPal Sandbox                  | Only during a PayPal Sandbox session                                                                     |                                                                        |
+
+`GYBLOS_COLLECTOR_URL` from the launch environment overrides the collector
+address. See [receipts](receipts.md) and [telemetry](telemetry.md) for what is
+uploaded.
+
+## Protected local wallet
+
+On first launch the loader prepares a protected Ed25519 wallet, but only when
+its dedicated directory is absent or empty. It shows no creation choice or
+backup prompt. Existing state is read without initialization; a missing original
+inside a retained wallet library never generates a replacement.
+
+- The original wallet lives under
+  `app.getPath('appData')/gyblos-wallet/wallet-v1`. Restored wallets get
+  separate address-named stores in the wallet library, whose paths
+  `@gyblos/config` owns. Only OS-encrypted private material is on disk.
+- Chat and Connections receive only the public address and status. **Copy
+  address** copies only the selected wallet's public address, through a narrow
+  host action.
+- **Add funds** opens a local amount form that always reports payment
+  unavailable. It cannot authorize payment, change a balance or enable funding.
+- The app queries no balance for this wallet.
+
+> **Warning:** Funding is disabled in every state, including after backup
+> verification or restore. Don't send funds to this wallet's address: the app
+> cannot block an external transfer, and it has no supported way to spend or
+> recover those funds.
+
+Backup, verification and restore are described in
+[Desktop wallet backup and restore](desktop-backup.md).
+
+| Platform | Protection and limits                                                                                                                                                                          |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS    | Electron asynchronous `safeStorage` backed by Keychain. Continuity across distributed updates needs consistent code signing                                                                    |
+| Windows  | Asynchronous `safeStorage` backed by DPAPI. This protects against other users, not other processes in the same account                                                                         |
+| Linux    | Electron 45 synchronous `safeStorage`, restricted to the `gnome_libsecret` or KWallet backends. Missing, `basic_text` and unrecognized backends block creation; there is no plaintext fallback |
+
+Linux uses the synchronous encryptor because it can identify the backend;
+Electron 45 does not expose that for the asynchronous provider. Upgrading to
+Electron 46, which removes the synchronous methods, requires migrating this
+adapter. See
+[Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage).
+
+Durability:
+
+- Existing, interrupted, corrupt or inaccessible wallet data is never silently
+  replaced, and importing a backup does not repair it. It is kept for
+  inspection.
+- POSIX directories and files are owner-only and flushed. Windows relies on the
+  user profile and DPAPI, without equivalent power-loss guarantees.
+- Initialization is shared, and an orderly quit waits for it. An unresponsive OS
+  secret-store prompt can delay quitting.
+- Plaintext is briefly present in main-process memory, and JavaScript strings
+  cannot be reliably zeroed. This is not a Secure Enclave wallet.
+
+### Wallet library
+
+The Node-only `@gyblos/desktop/wallet-library` entry is composed by the host
+session. It requires an existing protected wallet and never creates a
+replacement for missing, partial or inaccessible custody.
+
+- `summary()` returns only public addresses and statuses, always with
+  `fundingEnabled: false`.
+- `restore(bytes, password)` imports a backup into a separate address-named
+  store and leaves the original and the active selection unchanged. Duplicates
+  are refused.
+- `select(address)` publishes an authenticated, OS-protected selection by atomic
+  rename; that rename is the commit point.
+- `verifyBackup(address, bytes, password)` reuses the identity-bound
+  verification record. Restoring alone does not mark a backup verified.
+
+A private directory lock serializes instances; a remaining lock reports busy and
+is never stolen. Failed writes and incomplete destinations stay for inspection.
+Missing or corrupt selection metadata, while the library directory exists, fails
+closed instead of selecting another wallet. Deleting or rolling back the whole
+library is not detected.
 
 ## Check and package
 
@@ -232,18 +233,17 @@ pnpm desktop:smoke
 pnpm desktop:package
 ```
 
-The smoke runs its compatibility renderer/preload/IPC/worker path in a hidden
-window and exits nonzero on failure, including a renderer that never calls the
-bridge. A successful result has two cycles, two round trips and `closed: true`.
-Timeouts cover startup and request worker termination at its deadline. An
-already-cancelled request creates no worker; cancellation before spawn retries
-termination at spawn. A created worker reports failure only after its exit
-event, including on timeout; this is not a hard completion bound if the
-operating system cannot terminate it. Native failures are intentionally reported
-without raw SDK errors, identities or socket addresses.
+`desktop:smoke` runs the compatibility view in a hidden window. A utility
+process loads the pinned Iroh binding and `@gyblos/node/lifecycle`, runs two
+synthetic loopback echo cycles, closes both endpoints after each, and reports. A
+pass has two cycles, two round trips and `closed: true`; any failure, including
+a renderer that never calls the bridge, exits nonzero. The smoke has no relays,
+discovery, engine, wallet, payment or remote access, and reads no node data.
+Native failures are reported without raw SDK errors, identities or socket
+addresses.
 
-Packaging creates an **unsigned** app for one target under
-`apps/desktop/dist/packages/` and its release archives, with `.sha256` files,
+`desktop:package` builds an **unsigned** app for one target under
+`apps/desktop/dist/packages/`, and its release archives with `.sha256` files
 under `apps/desktop/dist/release/`:
 
 | Target         | Archive                          | Built on   |
@@ -257,22 +257,34 @@ pnpm desktop:package                       # this machine's target
 pnpm desktop:package -- --target win32-x64
 ```
 
-It stages compiled assets and the target's pinned Iroh binding explicitly; it
-does not copy the repository or operational directories. A binding for another
-OS is installed by adding pnpm `supportedArchitectures` for it (the lockfile
-verifies it). No macOS x64 Iroh binding exists, so there is no Intel Mac
-package. The macOS app is sealed ad hoc, so Gatekeeper offers to open an app
-from an unidentified developer instead of reporting it damaged. The `.deb`
-installs to `/opt/Gyblos` and makes `chrome-sandbox` setuid root, which
-Electron's sandbox needs where unprivileged user namespaces are restricted
-(Ubuntu 24.04). The packaged executable accepts `--smoke` too, and needs neither
-a globally installed Node runtime nor workspace links at runtime.
+- Packaging stages compiled assets and the target's pinned Iroh binding; it
+  copies no repository or operational directories. To build for another OS, add
+  that platform to pnpm `supportedArchitectures` so its binding installs.
+- No macOS x64 Iroh binding exists, so there is no Intel Mac package.
+- The macOS app is sealed ad hoc, so Gatekeeper offers to open an app from an
+  unidentified developer instead of reporting it damaged.
+- The `.deb` installs to `/opt/Gyblos` and makes `chrome-sandbox` setuid root,
+  which Electron's sandbox needs where unprivileged user namespaces are
+  restricted (Ubuntu 24.04).
+- The packaged executable accepts `--smoke` and needs no installed Node or
+  workspace links.
 
-`.github/workflows/desktop-packages.yml` builds all three, starts each on its
-own OS with `--smoke` (the `.deb` installed with apt), and keeps them as
-artifacts; run it by hand to try a build. The release workflow calls it with the
-tag and attaches the archives to that GitHub release. The packages are not
-signed with a Developer ID or code-signing certificate and there is no automatic
-updater; Windows SmartScreen and macOS Gatekeeper ask once before the first
-start. Electron packaging is a separate platform-specific check from the normal
-root checks.
+`.github/workflows/desktop-packages.yml` builds all three targets, starts each
+on its own OS with `--smoke` (the `.deb` installed with apt), and keeps them as
+artifacts. It runs by hand, on pull requests that change `apps/desktop/scripts/`
+or the workflow, and from `release-seller-image.yml`, which passes the tag and
+attaches the archives to that GitHub release. The packages have no Developer ID
+or code-signing certificate and no automatic updater, so Windows SmartScreen and
+macOS Gatekeeper ask once before the first start.
+
+## Limits
+
+- Offline wallet tests use disposable keys and fake OS encryption. They do not
+  prove native Keychain, DPAPI or Linux secret-store behavior, cross-platform
+  recovery or signed-update continuity. The manual `desktop-platforms.yml`
+  workflow covers the backup exchange between systems.
+- Utility process start and stop have deadlines that request termination. A
+  forced exit is never a clean stop, and there is no hard bound if the OS
+  refuses to terminate a process.
+- Process-crash recovery, Windows directory fsync and power-loss recovery of the
+  wallet library are not established.

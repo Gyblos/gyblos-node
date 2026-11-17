@@ -1,19 +1,22 @@
 ---
-title: Quickstart
-description: Install your first free Docker seller, check it and continue to registration.
+title: Install a seller
+description: Install a free seller with the official installer, register it with your invite code and publish it.
 ---
 
-Use this guide after checking the [beta requirements](/en/getting-started/beta).
-Keep your invitation's invite code private. Downloading the images and model takes most
-of the installation time; the duration depends on your connection and machine.
+The installer sets up a free seller node that serves Qwen3 0.6B through Ollama, then walks you through
+registering and publishing it. Most of the time goes into downloading the images and the model.
 
-## Before you start
+## Prerequisites
 
-You need an invitation with its `gyb_` invite code (no relay token), Linux, macOS or Windows (see [Windows](#windows)),
-Docker with Compose v2.17 or later, at least 4 GB of memory and outbound internet access.
-Check the [full requirements](/en/getting-started/beta), including memory headroom, before installing.
+- An invitation with its `gyb_` invite code. Keep the code private. You need no relay token.
+- A machine that meets the [beta requirements](/en/getting-started/beta), including memory headroom.
+- One of these setups:
+  - **Docker seller:** Linux, macOS or Windows with Docker and Compose v2.17 or later.
+  - **Native seller:** a Mac with Apple Silicon or Linux (x64 or arm64, glibc) with your own
+    [Ollama](https://ollama.com/download).
+  - **Windows native seller:** Windows 10 or 11 (x64) with [Ollama for Windows](https://ollama.com/download/windows).
 
-## Install [#install-the-seller]
+## 1. Run the installer [#install-the-seller]
 
 Download the official installer, read it if you like, and run it:
 
@@ -22,119 +25,138 @@ curl -fsSL https://gyblos.com/install.sh -o install.sh
 sh install.sh
 ```
 
+With Docker running, the installer sets up a **Docker seller** in `~/gyblos-seller` (set `GYBLOS_DIR` to use
+another folder). It writes `compose.yaml`, `config.toml` and a private `seller.env`, starts its own Ollama,
+downloads `qwen3:0.6b`, creates the seller keys in a Docker volume, installs the tokenizer, runs
+`gyblos doctor` and starts the seller.
+
 The installer pins one signed release of the seller image by version and digest. With
-[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3 or later installed it prints
-`Verified the Gyblos release signature` before pulling; without cosign it says the check was skipped.
-To make the check mandatory, run `GYBLOS_REQUIRE_SIGNATURE=1 sh install.sh`: it stops unless the signature verifies.
-To verify the image yourself or set up each file by hand, see [Install without the script](/en/sellers/manual-install).
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3 or later installed, it prints
+`Verified the Gyblos release signature` before pulling. Without cosign, it says the check was skipped.
+To make the check mandatory, run `GYBLOS_REQUIRE_SIGNATURE=1 sh install.sh`; it then stops unless the
+signature verifies. To verify the image yourself or write each file by hand, see
+[Install without the script](/en/sellers/manual-install).
 
-The script asks for no relay token. It works in `~/gyblos-seller` unless you explicitly
-set another installation directory. It creates `compose.yaml`, `config.toml` and private `seller.env`,
-downloads Ollama and `qwen3:0.6b`, creates seller keys in a Docker volume, installs the tokenizer,
-runs `gyblos doctor` and starts the seller.
+### Native seller on macOS or Linux
 
-### Without Docker
+Without a usable Docker, the same installer sets up the **native seller**: it checks the download against
+the release's checksum and signature, keeps everything in `~/.gyblos` and runs the seller as a background
+service. It uses your own Ollama and never installs it. If Ollama is not running, it says how to start it;
+run the script again to continue.
 
-On a Mac with Apple Silicon or on Linux (x64 or arm64) without Docker, the same installer sets up the
-packaged seller: it checks the download against the release's checksum and signature, keeps everything
-in `~/.gyblos` and runs the seller as a background service. It uses your own
-[Ollama](https://ollama.com/download), which it never installs: if Ollama is not running it says how to
-start it, and running the script again continues. On a Mac, Docker cannot use the GPU, so this is the
-faster choice even with Docker installed: run `GYBLOS_MODE=native sh install.sh`. Afterwards, type
-`gyblos …` where this guide says `docker compose exec seller gyblos …`. Intel Macs use Docker.
+On a Mac with Apple Silicon, Docker cannot use the GPU, so the native seller is faster even when Docker is
+installed:
 
-### Windows
+```sh
+GYBLOS_MODE=native sh install.sh
+```
 
-On Windows 10 or 11 (x64), use `install.ps1` instead, in PowerShell:
+Intel Macs use Docker. On a native seller you type `gyblos …` where these guides show
+`docker compose exec seller gyblos …`.
+
+### Windows [#windows]
+
+On Windows 10 or 11 (x64), run `install.ps1` in PowerShell instead:
 
 ```powershell
 irm https://github.com/Gyblos/gyblos-node/releases/latest/download/install.ps1 -OutFile install.ps1
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-It does the same as on a Mac without Docker: it checks the download against the release's checksum,
-keeps the seller's files in `%USERPROFILE%\.gyblos` (readable only by your account), uses your own
-[Ollama for Windows](https://ollama.com/download/windows) and runs the seller in the background, without
-a window, while you are logged in. Open a new terminal afterwards to type `gyblos …`. Replace
-`sh install.sh` in this guide with `powershell -ExecutionPolicy Bypass -File install.ps1`.
+It works like the native seller: it checks the download against the release's checksum, keeps the seller's
+files in `%USERPROFILE%\.gyblos` (readable only by your account), uses your own Ollama and runs the seller in
+the background while you are logged in. Open a new terminal afterwards to type `gyblos …`. Wherever these
+guides say `sh install.sh`, run `powershell -ExecutionPolicy Bypass -File install.ps1`.
 
-### Public identity
+### Save the public identity
 
-When it prints `The seller is running`, continue with the status check. Save the public identity
-printed by doctor:
+When the seller starts, the installer prints `The seller is running` and the public identity from doctor.
+The output is similar to the following:
 
 ```text
-Seller identity (public; `gyblos seller register` enrolls it in discovery):
-  nodeId  4d789a89…
-  owner   7is91kWV…
-  fee payer  9Xh2pQrT…  (pays priced offers' transactions; needs devnet SOL only to charge)
+Seller identity (public; `docker compose exec seller gyblos seller register` enrolls it in discovery):
+  nodeId  NODE_ID
+  owner   OWNER_ADDRESS
+  fee payer  FEE_PAYER_ADDRESS  (pays priced offers' transactions; needs devnet SOL only to charge)
 ```
 
-These are abbreviated examples, not keys or values to copy into configuration. Discovery registration
-is separate from the on-chain enrollment that the index checks.
+These values are public and safe to share. Your seller starts **unlisted**: buyers cannot find it until you
+register and publish it. What each key does is in [Identity and backups](/en/sellers/identity#keys).
 
-### Installation issues
+## 2. Register and publish [#finish-onboarding]
 
-If installation stops, read the `FAIL` or `gyblos install:` line and use
-[troubleshooting](/en/help/troubleshooting). Correct the cause before rerunning the script.
-Rerunning preserves existing configuration, `seller.env` and identity; it does not reset those files.
+In a terminal, the installer continues straight into registration and publishing, and asks before each
+step:
 
-## Check status [#confirm-the-service-state]
+1. **Register.** Paste the invite code when asked. The prompt shows what you type, so do not share your
+   screen. Registration costs the owner about 0.01 devnet SOL once. Devnet SOL is free test money.
+2. **Fund the owner if asked.** If the owner has too little SOL, the command prints its address and how much
+   to send, then waits. Open [faucet.solana.com](https://faucet.solana.com), choose **devnet**, paste the
+   owner address and request about 0.02 SOL. The command continues on its own when the SOL arrives.
+3. **Confirm the registration.** Review the estimated cost and answer `y` to sign and submit it.
+4. **Publish.** Press Enter (or `y`) to list your offer in the discovery index.
 
-Run commands from the installation folder:
+When both steps succeed, the installer prints:
+
+```text
+Done: this seller is registered and published. Buyers can find it within about two minutes.
+```
+
+Press Ctrl+C at any step and run `sh install.sh` again later: it keeps what is done and continues. Without a
+terminal, or with `GYBLOS_GUIDED=0`, the installer only prints these steps for you to run yourself. While the
+seller runs, `gyblos seller status` names the next step. The details, including what to do if registration
+is interrupted, are in [Register and publish](/en/sellers/register-publish).
+
+## 3. Check the status [#confirm-the-service-state]
+
+For a Docker seller, run commands from the installation folder:
 
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller status
 ```
 
-| Result          | Meaning and next action                                                   |
-| --------------- | ------------------------------------------------------------------------- |
-| `RUNNING`       | The service is running. Continue to registration.                         |
-| `STARTING`      | Wait briefly, then check again.                                           |
-| `FAILING`       | Read the phase and error code; follow the matching troubleshooting entry. |
-| `STOPPED`       | Run `docker compose up -d --force-recreate seller`.                       |
-| `NOT_CONFIRMED` | Check `docker compose ps`; service health could not be confirmed.         |
+On a native seller, run `gyblos seller status`. Its `Result:` line is one of these:
 
-### Diagnostics
+| Result          | Meaning and next action                                                        |
+| --------------- | ------------------------------------------------------------------------------ |
+| `RUNNING`       | The seller is serving. You are done.                                           |
+| `STARTING`      | Wait briefly, then check again.                                                |
+| `FAILING`       | Read the phase and error code, then follow the matching troubleshooting entry. |
+| `STOPPED`       | Start it again ([Operate and update](/en/sellers/operate#stop-and-start)).     |
+| `NOT_CONFIRMED` | The service state could not be confirmed. Check `docker compose ps`.           |
 
-If the container is stopped or restarting, `exec` cannot work. Run the one-off diagnostic instead:
+To confirm that the discovery index lists your seller, add `--online` (`gyblos seller status --online`). It
+reports `listed in the index` once the listing is live. Without `--online`, status prints a `Next:` line
+while a registration or publishing step is still missing.
+
+## If the installation stops [#installation-issues]
+
+Read the `FAIL` or `gyblos install:` line and look it up in [troubleshooting](/en/help/troubleshooting). Fix
+the cause, then run the installer again. A rerun keeps your existing configuration, `seller.env` and keys.
+
+If a Docker container is stopped or restarting, `exec` cannot reach it. Run the one-off diagnostic instead:
 
 ```sh
 cd ~/gyblos-seller
 docker compose run --rm seller gyblos doctor
 ```
 
-Doctor success does not prove that a buyer request completed. After registration and publication,
-ask the team in the [Gyblos Telegram](https://t.me/gyblos) if you need help arranging a free external check.
-
-## Next steps [#finish-onboarding]
-
-Your node starts **unlisted**. Run in a terminal, the installer then finishes onboarding with you, asking
-before each step:
-
-1. **Register.** Paste the `gyb_` invite code from your invitation. Registering costs about 0.01 devnet
-   SOL once (devnet SOL is free test money). If the owner it names has too little, the command shows its
-   address and how much to send, and waits until it arrives:
-   1. Copy the owner address the command shows.
-   2. Open [faucet.solana.com](https://faucet.solana.com), choose **devnet**, paste the address and
-      request 0.5 SOL or less.
-   3. Go back to the terminal: it continues on its own and asks you to confirm the one-time registration
-      with `y`.
-2. **Publish.** Press Enter (or `y`) to list your offer in the discovery index.
-
-Press Ctrl+C at any step and run `sh install.sh` again later: it keeps what is done and continues. Without a
-terminal, or with `GYBLOS_GUIDED=0`, it only prints the three steps instead: send a little devnet SOL to the
-owner it names, run `docker compose exec seller gyblos seller register` with your invite code, then
-`sh install.sh publish`. While the seller runs, `gyblos seller status` shows the next one. Follow
-[Register and publish](/en/sellers/register-publish) for the details. If Solana enrollment is missing, interactive registration estimates its
-devnet SOL cost and asks before a new signed submission; review that guide before continuing. The default offer allows 200,000 input plus output tokens per UTC day,
-with 50,000 per buyer; see [Models and offers](/en/sellers/models-offers) before changing limits.
-
-<Callout type="error" title="Preserve your identity">
-  `docker compose down -v` deletes the persistent volumes and your seller keys.
-  Stop with `docker compose stop seller`. Read the identity guide before moving
-  or removing data.
+<Callout type="error" title="Keep your keys">
+  `docker compose down -v` deletes the Docker volumes, including your seller
+  keys, and cannot be undone. A used invite code cannot register new keys. To
+  stop the seller, run `docker compose stop seller` instead.
 </Callout>
 
-**Next:** [Register and publish](/en/sellers/register-publish).
+## What your seller sends
+
+Release builds send content-free signed receipts and telemetry observations to the Gyblos metrics
+collector, and `gyblos seller status` checks GitHub for a newer release. Receipts and observations never
+contain prompts or answers. To turn off observations, see
+[what your seller sends](/en/sellers/operate#data-your-seller-sends).
+
+## Next steps
+
+- [Change models and limits](/en/sellers/models-offers)
+- [Operate and update](/en/sellers/operate)
+- [Back up your keys](/en/sellers/identity#back-up-keys)

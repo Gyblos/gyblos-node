@@ -1,125 +1,144 @@
 ---
-title: Registration
-description: Distinguish running, registered and listed, then enable your seller in discovery.
+title: Register and publish
+description: Register your seller with your invite code, publish its offer in the discovery index and check the listing.
 ---
 
-You need a running seller, the invitation's unused code and the same persistent identity created during
-installation. [Install first](/en/sellers/beta-guide) if the node is not ready.
+A seller goes through three states: **running** (the seller node serves), **registered** (the discovery index
+accepted its identity) and **listed** (the index publishes its offer, so buyers can find it). The installer
+walks you through registering and publishing; use this page to run the steps yourself or to understand what
+they do.
 
-## Register [#register-the-identity-with-discovery]
+## Prerequisites
 
-Before running the command, verify the intended `discovery.url` in `config.toml` and any
-`GYBLOS_DISCOVERY_URL` override in the container environment. The default is
-`https://discovery.gyblos.com/v1`. Review a customized `seller.env` only in a private editor; do not print it.
-Enter an invite only when you trust the configured destination.
+- A running seller ([Install a seller](/en/sellers/beta-guide)), with the keys the installer created.
+- Your unused `gyb_` invite code.
+- About 0.02 devnet SOL on the owner address that `gyblos doctor` prints. Registration costs about 0.01 SOL
+  once; get it free from [the devnet faucet](https://faucet.solana.com). Use no mainnet funds or keys.
+
+## 1. Register [#register-the-identity-with-discovery]
+
+Run the command for your setup. For a Docker seller:
 
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller register
 ```
 
-The prompt **echoes what you type**: do not screen-share, record it or paste the code into a command.
-After accepting the invite, the command prints the index origin and immediately sends the invite and
-public NodeId. That printed line is informational; there is no confirmation pause.
+On a native seller, run `gyblos seller register`. The command asks for your code:
 
-`Registered: this seller may now publish.` means discovery accepted the registration.
-`Already registered` is also a success for the same invite and identity. Registration neither changes
-`config.toml` nor publishes the offer.
+```text
+Invite code (from your Gyblos invitation):
+```
 
-### Solana enrollment [#complete-solana-enrollment-if-requested]
+The prompt **shows what you type**: do not share your screen or record it, and never put the code in a
+command line. The command then prints the index it registers with and sends it the invite and your public
+NodeId.
 
-If discovery reports missing enrollment, the interactive command can register your existing owner wallet
-and NodeId on **Solana devnet**, then retry discovery automatically. The owner address printed by doctor
-needs sufficient **devnet SOL** first: about 0.01 SOL, so send it about 0.02 from
-[the devnet faucet](https://faucet.solana.com). If it has too little, the command names the owner and how
-much more SOL it needs; in a terminal it then waits, checking the balance every 15 seconds, and continues
-once the SOL arrives (Ctrl+C stops it; run it again later). The registration cost is separate from free inference; use no mainnet funds or
-mainnet keys.
+`Registered: this seller may now publish.` means the index accepted the registration.
+`Already registered` is also a success for the same invite and keys. Registering does not change
+`config.toml` and does not publish your offer.
 
-The command shows `Pre-simulation funding estimate:` before checking funding and simulation. It then
-shows `Estimated registration cost:` and asks `Sign and submit this registration? (yes/no):`.
-Only **`yes`** (or **`y`**) approves a new signed attempt. The estimate is not a fixed price: upgradeable programs
-can change actual costs. If the refreshed cost increases, the command stops so you can review again.
-Any other answer declines: `REGISTER_CANCELLED` means nothing was signed or sent, so run the command again.
-
-Without an interactive terminal, `DISCOVERY_IDENTITY_NOT_REGISTERED` means rerun interactively.
-`GYBLOS_INVITE` supplies the invite, not consent to a new on-chain submission. If your installed beta
-image does not offer this flow, send its image identifier and your public NodeId/owner to the team.
-
-<Callout type="warn" title="Preserve an uncertain registration attempt">
-  The seller saves private registration state. Rerunning checks that attempt and
-  may print `Resending the previously approved registration.` before resending
-  the same signed bytes without another approval prompt. An uncertain result is
-  not proof of failure or zero fees. Keep the volume, registration file and
-  lock. A proven expired blockhash plus finalized absent asset accounts can
-  permit a replacement with the same asset and fresh consent; expiry alone does
-  not prove the old attempt never landed or paid a fee. Partial or inconclusive
-  state needs Gyblos assistance. Never delete state or change home to force
-  another attempt.
+<Callout type="warn" title="Check where your invite goes">
+  The command sends your invite to `discovery.url` in `config.toml`, or to
+  `GYBLOS_DISCOVERY_URL` if `seller.env` sets it. The default is
+  `https://discovery.gyblos.com/v1`. If you changed either, make sure you trust
+  that destination before you register.
 </Callout>
 
-The wallet registered in 8004 is the owner. An existing paid role may have a different payout and show
-a warning; that does not change the owner. New paid roles use owner as payout ([get paid](/en/sellers/get-paid)).
+### Enrollment on Solana [#complete-solana-enrollment-if-requested]
 
-`DISCOVERY_INVITE_INVALID` means the code is wrong, used or expired. `DISCOVERY_RATE_LIMITED` means wait
-before retrying; `DISCOVERY_UNAVAILABLE` means the index could not complete the request. See
-[troubleshooting](/en/help/troubleshooting) for those errors and revoked identities.
+The index accepts only sellers enrolled in the **8004 agent registry** on Solana devnet, which records your
+owner and NodeId on chain. If yours is not enrolled yet, the interactive command enrolls it and then retries
+the index on its own:
 
-## Publication [#enable-publication]
+1. It prints `Pre-simulation funding estimate:` and checks the owner's balance. If the owner has too little
+   SOL, it names the owner address and how much to send, then waits and continues when the SOL arrives
+   (Ctrl+C stops waiting; run the command again later).
+2. It prints `Estimated registration cost:` and asks `Sign and submit this registration? (yes/no):`.
+3. Answer `yes` (or `y`) to sign and submit. Any other answer stops with `REGISTER_CANCELLED`: nothing was
+   signed or sent, so you can run the command again.
 
-With the installer, turn publishing on from the folder where you saved `install.sh`:
+The estimate is not a fixed price. If the refreshed cost goes up, the command stops so you can review it
+again. Without an interactive terminal, the command cannot ask for consent and stops with
+`DISCOVERY_IDENTITY_NOT_REGISTERED`; run it again in a terminal. `GYBLOS_INVITE` can supply the invite code,
+but never consent to an on-chain submission.
+
+### If registration is interrupted [#if-registration-is-interrupted]
+
+Run the same command again. The seller saves each approved registration attempt, checks it on a rerun and may print `Resending the previously approved registration.` before it sends the same signed transaction without asking again.
+
+<Callout type="error" title="Never reset a registration">
+  An uncertain result does not prove that nothing was paid. Deleting the
+  seller's data, its registration file or its lock, or changing its home, can
+  pay a second time or lose your identity, and cannot be undone. If the result
+  stays uncertain, ask in the [Gyblos Telegram](https://t.me/gyblos).
+</Callout>
+
+### Registration errors
+
+| Code                       | Meaning and next action                                                       |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| `DISCOVERY_INVITE_INVALID` | The code is wrong, already used or expired. Check it or ask for a new invite. |
+| `DISCOVERY_RATE_LIMITED`   | Too many attempts. Wait before trying again.                                  |
+| `DISCOVERY_UNAVAILABLE`    | The index could not complete the request. Try again later.                    |
+
+For revoked identities and other codes, see [troubleshooting](/en/help/troubleshooting).
+
+## 2. Publish [#enable-publication]
+
+Turn publishing on from the folder where you saved the installer:
 
 ```sh
 sh install.sh publish
 ```
 
-Publishing sends no blockchain transaction and costs nothing. It sets `publish = true` in `~/gyblos-seller/config.toml`, validates the file and recreates the seller; if
-validation fails or you interrupt it, it leaves the file as it was. If you installed elsewhere, prefix the same
-`GYBLOS_DIR=…` you installed with. An older `install.sh` does not know `publish`: download it again first. `gyblos seller status` also names this step while publishing
-is off.
+On Windows, run `powershell -ExecutionPolicy Bypass -File install.ps1 publish`. If you installed in another
+folder, prefix the same `GYBLOS_DIR=…` (Docker) or `GYBLOS_HOME=…` (native) that you installed with.
 
-To do it by hand, edit the existing `[discovery]` table in `~/gyblos-seller/config.toml`; do not add a
-duplicate table:
+Publishing sends no blockchain transaction and costs nothing. The installer sets `publish = true` in
+`config.toml`, validates the file and restarts the seller. If validation fails or you interrupt it, the file
+stays as it was. The index lists your seller within about two minutes, once it is registered.
+
+To publish a Docker seller by hand, edit the existing `[discovery]` table in `~/gyblos-seller/config.toml`.
+Do not add a second table:
 
 ```toml
 [discovery]
 publish = true
 ```
 
-Validate the mounted file, then recreate the seller to apply it:
+Then validate the file and apply it as described in
+[Operate and update](/en/sellers/operate#apply-configuration-or-environment-changes).
 
-```sh
-cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/config.toml && docker compose up -d --force-recreate seller
-```
+## 3. Check the listing [#confirm-the-listing]
 
-The first command must report `OK`. Validation checks file syntax and environment resolution; startup
-also checks whether the seller can serve the offer. If validation fails, correct the reported key before restarting.
-
-### Check the listing [#confirm-the-listing]
-
-After the seller starts, query discovery:
+Ask the index whether it lists your seller. For a Docker seller:
 
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller status --online
 ```
 
-| Observation                     | What it establishes                                 |
-| ------------------------------- | --------------------------------------------------- |
-| `RUNNING`                       | The seller service is running                       |
-| Registration succeeded          | This identity may publish to that index             |
-| `listed in the index`           | The lookup found this NodeId for the queried model  |
-| `not found in the index`        | The completed lookup did not find this NodeId       |
-| `not in the first 2000 sellers` | The lookup budget ended; absence is not established |
-| `index unreachable`             | The lookup failed; listing state is unknown         |
+On a native seller, run `gyblos seller status --online`. The discovery line reports one of these:
 
-An index listing is not an external inference test. Only ready offers are published. The index receives
-public identity, model and offer metadata; prompts are not part of this listing.
+| Observation                               | What it means                                     |
+| ----------------------------------------- | ------------------------------------------------- |
+| `listed in the index`                     | The index lists this NodeId for the model.        |
+| `not found in the index`                  | The lookup finished and did not find this NodeId. |
+| `not in the first N sellers of the index` | The lookup stopped early; the listing is unknown. |
+| `index unreachable`                       | The lookup failed; the listing is unknown.        |
 
-### Unlist [#unlist-without-losing-your-identity]
+The index receives your public identity, model and offer, never prompts. Only offers the seller can serve
+are published. A listing proves that buyers can find your seller, not that a request has completed.
 
-Run `sh install.sh unpublish`, or set `publish = false` in the same table and recreate the seller. Stopping the seller also withdraws its
-presence within two minutes. Do not delete keys to leave discovery. A listing can take time to expire.
+## Unlist [#unlist-without-losing-your-identity]
 
-**Next:** [Adjust models and offers](/en/sellers/models-offers) or [operate your seller](/en/sellers/operate).
+Run `sh install.sh unpublish`. It sets `publish = false` and restarts the seller, which keeps running; the
+index withdraws it within about two minutes. Stopping the seller also withdraws it within two minutes. Never
+delete keys to leave discovery: a used invite code cannot register new keys.
+
+## Next steps
+
+- [Change models and limits](/en/sellers/models-offers)
+- [Get paid](/en/sellers/get-paid)
+- [Operate and update](/en/sellers/operate)

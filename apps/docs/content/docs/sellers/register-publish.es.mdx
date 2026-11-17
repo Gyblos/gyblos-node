@@ -1,126 +1,147 @@
 ---
-title: Registro
-description: Distingue servicio, registro y publicación, y habilita tu vendedor en descubrimiento.
+title: Registra y publica
+description: Registra tu vendedor con tu código de invitación, publica su oferta en el índice de descubrimiento y comprueba el listado.
 ---
 
-Necesitas un vendedor en ejecución, el código sin usar de tu invitación y la misma identidad persistente
-creada al instalar. [Instala primero](/es/sellers/beta-guide) si el nodo aún no está listo.
+Un vendedor pasa por tres estados: **en marcha** (el nodo vendedor atiende), **registrado** (el índice de
+descubrimiento aceptó su identidad) y **listado** (el índice publica su oferta y los compradores pueden
+encontrarlo). El instalador te guía por el registro y la publicación; usa esta página para hacer los pasos tú
+mismo o para entender qué hacen.
 
-## Registra [#registra-la-identidad-en-descubrimiento]
+## Requisitos previos
 
-Antes de ejecutar el comando, verifica el `discovery.url` previsto en `config.toml` y cualquier
-`GYBLOS_DISCOVERY_URL` que prevalezca en el entorno del contenedor. El valor predeterminado es
-`https://discovery.gyblos.com/v1`. Revisa un `seller.env` personalizado solo en un editor privado; no lo muestres.
-Introduce la invitación solo si confías en el destino configurado.
+- Un vendedor en marcha ([Instala un vendedor](/es/sellers/beta-guide)), con las llaves que creó el instalador.
+- Tu código de invitación `gyb_` sin usar.
+- Unos 0,02 SOL de devnet en la dirección del dueño (`owner`) que muestra `gyblos doctor`. El registro cuesta
+  unos 0,01 SOL una sola vez; consíguelos gratis en [el faucet de devnet](https://faucet.solana.com). No uses
+  fondos ni llaves de mainnet.
+
+## 1. Registra [#registra-la-identidad-en-descubrimiento]
+
+Ejecuta el comando de tu instalación. En un vendedor Docker:
 
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller register
 ```
 
-La pregunta **muestra lo que escribes**: no compartas ni grabes la pantalla y no pegues el código en un comando.
-Tras aceptar la invitación, el comando muestra el origen del índice y envía inmediatamente la invitación
-y el NodeId público. Esa línea es informativa; no hay una pausa de confirmación.
+En un vendedor nativo, ejecuta `gyblos seller register`. El comando te pide el código:
 
-`Registered: this seller may now publish.` significa que descubrimiento aceptó el registro.
-`Already registered` también es correcto para la misma invitación e identidad. El registro no modifica
-`config.toml` ni publica la oferta.
+```text
+Invite code (from your Gyblos invitation):
+```
+
+El campo **muestra lo que escribes**: no compartas tu pantalla ni lo grabes, y nunca pongas el código en una
+línea de comandos. Después el comando indica el índice donde se registra y le envía la invitación y tu NodeId
+público.
+
+`Registered: this seller may now publish.` significa que el índice aceptó el registro.
+`Already registered` también es un éxito para la misma invitación y las mismas llaves. Registrarte no cambia
+`config.toml` ni publica tu oferta.
+
+<Callout type="warn" title="Comprueba adónde va tu invitación">
+  El comando envía tu invitación a `discovery.url` de `config.toml`, o a
+  `GYBLOS_DISCOVERY_URL` si `seller.env` la define. El valor predeterminado es
+  `https://discovery.gyblos.com/v1`. Si cambiaste alguno de los dos, asegúrate
+  de que confías en ese destino antes de registrarte.
+</Callout>
 
 ### Inscripción en Solana [#completa-la-inscripción-en-solana-si-se-solicita]
 
-Si descubrimiento indica que falta la inscripción, el comando interactivo puede registrar tu cartera
-owner existente y NodeId en **Solana devnet**, y repetir descubrimiento automáticamente. La dirección owner
-que muestra doctor necesita suficiente **SOL de devnet** antes de continuar: unos 0,01 SOL, así que envíale
-unos 0,02 desde [el faucet de devnet](https://faucet.solana.com). Si le falta, el comando indica la dirección
-owner y cuánto SOL más necesita; en una terminal espera, revisando el saldo cada 15 segundos, y continúa
-cuando llega el SOL (Ctrl+C lo detiene; ejecútalo de nuevo más tarde). El coste de registro es independiente de la inferencia gratuita; no uses
-fondos ni llaves de mainnet.
+El índice solo acepta vendedores inscritos en el **8004 agent registry** de Solana devnet, que guarda en cadena
+tu dueño y tu NodeId. Si el tuyo aún no está inscrito, el comando interactivo lo inscribe y vuelve a intentar
+el registro en el índice por su cuenta:
 
-El comando muestra `Pre-simulation funding estimate:` antes de comprobar fondos y simular. Después
-muestra `Estimated registration cost:` y pregunta `Sign and submit this registration? (yes/no):`.
-Solo **`yes`** (o **`y`**) aprueba un nuevo intento firmado. La estimación no es un precio fijo: los programas actualizables
-pueden cambiar el coste real. Si el coste actualizado aumenta, el comando se detiene para que lo revises de nuevo.
-Cualquier otra respuesta lo rechaza: `REGISTER_CANCELLED` indica que no se firmó ni envió nada; vuelve a ejecutar el comando.
+1. Muestra `Pre-simulation funding estimate:` y comprueba el saldo del dueño. Si al dueño le falta SOL, indica
+   su dirección y cuánto enviar, y espera hasta que llegue (Ctrl+C deja de esperar; vuelve a ejecutar el comando
+   más tarde).
+2. Muestra `Estimated registration cost:` y pregunta `Sign and submit this registration? (yes/no):`.
+3. Responde `yes` (o `y`) para firmar y enviar. Cualquier otra respuesta termina con `REGISTER_CANCELLED`: no se
+   firmó ni se envió nada, así que puedes volver a ejecutar el comando.
 
-Sin terminal interactiva, `DISCOVERY_IDENTITY_NOT_REGISTERED` indica repetir de forma interactiva.
-`GYBLOS_INVITE` proporciona la invitación, no consentimiento para un nuevo envío en cadena. Si tu imagen beta
-instalada no ofrece este flujo, envía al equipo el identificador de imagen y tu NodeId/owner públicos.
+La estimación no es un precio fijo. Si el coste actualizado sube, el comando se detiene para que lo revises de
+nuevo. Sin una terminal interactiva, el comando no puede pedir tu consentimiento y termina con
+`DISCOVERY_IDENTITY_NOT_REGISTERED`; vuelve a ejecutarlo en una terminal. `GYBLOS_INVITE` puede aportar el
+código de invitación, pero nunca el consentimiento para un envío en cadena.
 
-<Callout type="warn" title="Conserva un intento de registro incierto">
-  El vendedor guarda estado privado de registro. Repetir el comando comprueba
-  ese intento y puede mostrar `Resending the previously approved registration.`
-  antes de reenviar los mismos bytes firmados sin otra pregunta de aprobación.
-  Un resultado incierto no demuestra fallo ni comisión cero. Conserva el
-  volumen, archivo de registro y bloqueo. Un blockhash demostradamente vencido y
-  cuentas del asset ausentes a nivel finalized pueden permitir un reemplazo con
-  el mismo asset y consentimiento nuevo; el vencimiento por sí solo no demuestra
-  que el intento anterior nunca llegó ni pagó comisión. El estado parcial o
-  inconcluso necesita ayuda de Gyblos. Nunca borres estado ni cambies de
-  directorio de datos para forzar otro intento.
+### Si el registro se interrumpe [#si-el-registro-se-interrumpe]
+
+Vuelve a ejecutar el mismo comando. El vendedor guarda cada intento de registro aprobado, lo revisa al repetirlo y puede mostrar `Resending the previously approved registration.` antes de enviar la misma transacción firmada sin volver a preguntar.
+
+<Callout type="error" title="Nunca reinicies un registro">
+  Un resultado incierto no demuestra que no se pagó nada. Borrar los datos del
+  vendedor, su archivo de registro o su lock, o cambiar su carpeta, puede
+  hacerte pagar dos veces o perder tu identidad, y no se puede deshacer. Si el
+  resultado sigue siendo incierto, pregunta en el [Telegram de
+  Gyblos](https://t.me/gyblos).
 </Callout>
 
-La cartera inscrita en 8004 es owner. Un rol pagado existente puede tener otro payout y mostrar un aviso;
-eso no cambia owner. Los roles pagados nuevos usan owner como payout ([cobrar](/es/sellers/get-paid)).
+### Errores de registro
 
-`DISCOVERY_INVITE_INVALID` indica código incorrecto, usado o vencido. `DISCOVERY_RATE_LIMITED` requiere
-esperar antes de repetir; `DISCOVERY_UNAVAILABLE` indica que el índice no pudo completar la solicitud. Consulta
-[solución de problemas](/es/help/troubleshooting) para esos errores e identidades retiradas.
+| Código                     | Significado y siguiente paso                                                       |
+| -------------------------- | ---------------------------------------------------------------------------------- |
+| `DISCOVERY_INVITE_INVALID` | El código es incorrecto, ya se usó o venció. Revísalo o pide una invitación nueva. |
+| `DISCOVERY_RATE_LIMITED`   | Demasiados intentos. Espera antes de volver a intentarlo.                          |
+| `DISCOVERY_UNAVAILABLE`    | El índice no pudo completar la solicitud. Inténtalo más tarde.                     |
 
-## Publicación [#activa-la-publicación]
+Para identidades revocadas y otros códigos, consulta [solución de problemas](/es/help/troubleshooting).
 
-Con el instalador, activa la publicación desde la carpeta donde guardaste `install.sh`:
+## 2. Publica [#activa-la-publicación]
+
+Activa la publicación desde la carpeta donde guardaste el instalador:
 
 ```sh
 sh install.sh publish
 ```
 
-Publicar no envía ninguna transacción a la cadena y no cuesta nada. Pone `publish = true` en `~/gyblos-seller/config.toml`, valida el archivo y recrea el vendedor; si la
-validación falla o lo interrumpes, deja el archivo como estaba. Si instalaste en otra carpeta, antepone el mismo
-`GYBLOS_DIR=…` que usaste al instalar. Un `install.sh` anterior no conoce `publish`: descárgalo de nuevo antes. `gyblos seller status` también indica este paso mientras la
-publicación está desactivada.
+En Windows, ejecuta `powershell -ExecutionPolicy Bypass -File install.ps1 publish`. Si instalaste en otra
+carpeta, antepón el mismo `GYBLOS_DIR=…` (Docker) o `GYBLOS_HOME=…` (nativo) que usaste al instalar.
 
-Para hacerlo a mano, edita la tabla `[discovery]` existente en `~/gyblos-seller/config.toml`; no agregues una
-tabla duplicada:
+Publicar no envía ninguna transacción a la blockchain y no cuesta nada. El instalador pone `publish = true` en
+`config.toml`, valida el archivo y reinicia el vendedor. Si la validación falla o lo interrumpes, el archivo
+queda como estaba. El índice lista tu vendedor en unos dos minutos, una vez registrado.
+
+Para publicar a mano un vendedor Docker, edita la tabla `[discovery]` que ya existe en
+`~/gyblos-seller/config.toml`. No añadas una segunda tabla:
 
 ```toml
 [discovery]
 publish = true
 ```
 
-Valida el archivo montado y recrea el vendedor para aplicarlo:
+Después valida el archivo y aplícalo como se explica en
+[Opera y actualiza](/es/sellers/operate#aplica-cambios-de-configuración-o-entorno).
 
-```sh
-cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/config.toml && docker compose up -d --force-recreate seller
-```
+## 3. Comprueba el listado [#confirma-la-publicación]
 
-El primer comando debe mostrar `OK`. La validación revisa sintaxis y resolución del entorno; el inicio
-comprueba además si el vendedor puede servir la oferta. Si falla la validación, corrige la clave antes de reiniciar.
-
-### Comprueba la publicación [#confirma-la-publicación]
-
-Cuando el vendedor arranque, consulta descubrimiento:
+Pregunta al índice si lista tu vendedor. En un vendedor Docker:
 
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller status --online
 ```
 
-| Observación                     | Qué demuestra                                              |
-| ------------------------------- | ---------------------------------------------------------- |
-| `RUNNING`                       | El servicio vendedor está en ejecución                     |
-| Registro correcto               | Esta identidad puede publicar en ese índice                |
-| `listed in the index`           | La consulta encontró este NodeId para el modelo solicitado |
-| `not found in the index`        | La consulta completa no encontró este NodeId               |
-| `not in the first 2000 sellers` | Se agotó el límite de búsqueda; no demuestra ausencia      |
-| `index unreachable`             | Falló la consulta; el estado de publicación es desconocido |
+En un vendedor nativo, ejecuta `gyblos seller status --online`. La línea de descubrimiento indica una de estas:
 
-Estar publicado no equivale a probar inferencia externa. Solo se publican ofertas listas. El índice recibe
-identidad pública, modelo y metadatos de la oferta; los mensajes no forman parte de esa publicación.
+| Observación                               | Qué significa                                       |
+| ----------------------------------------- | --------------------------------------------------- |
+| `listed in the index`                     | El índice lista este NodeId para el modelo.         |
+| `not found in the index`                  | La búsqueda terminó y no encontró este NodeId.      |
+| `not in the first N sellers of the index` | La búsqueda paró antes; no se sabe si está listado. |
+| `index unreachable`                       | La búsqueda falló; no se sabe si está listado.      |
 
-### Retira la oferta [#retira-la-oferta-sin-perder-tu-identidad]
+El índice recibe tu identidad pública, tu modelo y tu oferta, nunca preguntas. Solo se publican las ofertas que
+el vendedor puede servir. Un listado demuestra que los compradores pueden encontrar tu vendedor, no que una
+solicitud se haya completado.
 
-Ejecuta `sh install.sh unpublish`, o pon `publish = false` en la misma tabla y recrea el vendedor. Detenerlo también retira su presencia en
-un plazo de dos minutos. No borres las llaves para salir de descubrimiento. La publicación puede tardar en vencer.
+## Retira la oferta [#retira-la-oferta-sin-perder-tu-identidad]
 
-**Siguiente:** [Ajusta modelos y ofertas](/es/sellers/models-offers) u [opera tu vendedor](/es/sellers/operate).
+Ejecuta `sh install.sh unpublish`. Pone `publish = false` y reinicia el vendedor, que sigue en marcha; el índice
+lo retira en unos dos minutos. Detener el vendedor también lo retira en dos minutos. Nunca borres las llaves
+para salir del descubrimiento: un código de invitación usado no puede registrar llaves nuevas.
+
+## Siguientes pasos
+
+- [Cambia modelos y límites](/es/sellers/models-offers)
+- [Cobra](/es/sellers/get-paid)
+- [Opera y actualiza](/es/sellers/operate)

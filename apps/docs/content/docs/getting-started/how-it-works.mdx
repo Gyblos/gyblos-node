@@ -1,0 +1,86 @@
+---
+title: How Gyblos works
+description: Sellers, buyers, the discovery index, relays, offers, devnet payments and receipts, and how one request moves through them.
+---
+
+Gyblos connects people who run AI models with people who want to use them, without a central server
+in the middle of each answer. This page explains the parts and how one request moves through them.
+For short definitions, see the [glossary](/en/getting-started/glossary).
+
+## Roles [#roles]
+
+A **seller** serves a model. The seller node is a process on the seller's machine. It runs the model
+through an engine, by default Ollama, and offers it to the network. You install it as a Docker seller
+or as a native seller; see [Requirements](/en/getting-started/beta).
+
+A **buyer** uses a model. Most buyers use the [desktop app](/en/buyers/desktop-app). Developers can run
+the local buyer instead: a small server on their own computer whose buyer endpoint speaks the OpenAI
+and Anthropic APIs ([use from code](/en/buyers/use-from-code)).
+
+## Identity and discovery [#identity-and-discovery]
+
+Every node has a **NodeId**, its public network identity. A seller also has an **owner** wallet. The
+seller registers its NodeId and owner in the **8004 agent registry** on Solana devnet, so buyers can
+check who they talk to.
+
+The **discovery index** at `discovery.gyblos.com` lists sellers and their offers. A seller moves through
+three states:
+
+1. **Running**: the seller node is up. Nobody can find it yet.
+2. **Registered**: an invite code admitted this identity to the index. It may now publish.
+3. **Listed**: the seller published its ready offers, and a lookup in the index finds it.
+
+`gyblos seller status --online` reports the service state, such as `RUNNING`, and whether a lookup finds
+the seller (`listed in the index`). See [Registration](/en/sellers/register-publish#confirm-the-listing)
+for what each result proves.
+
+## Connections and relays [#connections-and-relays]
+
+Buyer and seller talk peer to peer, end-to-end encrypted. Gyblos relays, such as `na1.relay.gyblos.com`,
+help the two sides reach each other and carry the traffic when a direct connection is not possible. The
+seller only makes outbound connections, so it opens no port on your router.
+
+## Offers and prices [#offers-and-prices]
+
+An **offer** names a model, its reasoning levels, the engine that serves it and its terms. Terms are
+either free, with daily token caps, or a price in USDC per million input and output tokens. Buyers pay
+the seller's price plus a 4% Gyblos fee.
+
+Before each request the seller sends a signed **quote**. A zero-price quote runs without any payment. A
+priced quote runs through a payment channel, as described below. The buyer's settings set a **ceiling**:
+it never authorizes more than that amount.
+
+## One request, step by step [#one-request]
+
+1. The buyer looks up sellers that offer the model in the discovery index.
+2. It checks the seller's NodeId and owner in the 8004 agent registry before sending anything.
+3. It connects to the seller through the relays and asks for a quote.
+4. For a free quote, the seller runs the model and streams the answer back.
+5. For a priced quote, the buyer signs a maximum for this request and deposits it in a **payment
+   channel** on Solana devnet. The seller answers, measures the tokens and settles the channel. The
+   seller's owner receives the price, Gyblos receives its fee and the rest returns to the buyer.
+6. For a free request or a payment session, both sides sign a **receipt**: a record of the model, token
+   counts and timing, without the prompt or the answer. A single priced request without a session
+   produces no receipt.
+
+During the beta every payment uses **devnet USDC**, which has no market value. A reusable **payment
+session**, where one deposit pays for many answers, runs only as a pilot. See
+[Get paid](/en/sellers/get-paid) for the seller side.
+
+## Receipts and network statistics [#receipts]
+
+Release builds upload signed receipts to the Gyblos **metrics collector**, `collector.gyblos.com`. It keeps
+raw rows private and publishes only aggregate network statistics. See
+[Data and privacy](/en/reference/data-and-privacy) for what each role sends.
+
+## What the network does not guarantee [#limits]
+
+- The seller's machine runs the model, so the seller can read your prompts. A remote engine provider
+  receives them too. Never send passwords, keys or other secrets.
+- Using a relay does not guarantee that your IP address stays hidden.
+- Signed records prove who signed them. They do not prove which model answered or that an answer is
+  correct.
+- A seller that is running, registered or listed has not yet proved that a buyer completed a request.
+
+**Next:** check the [requirements](/en/getting-started/beta), then start with the
+[desktop app](/en/buyers/desktop-app) or the [Install a seller](/en/sellers/beta-guide) guide.

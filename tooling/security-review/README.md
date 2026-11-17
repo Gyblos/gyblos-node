@@ -1,122 +1,159 @@
-# AI source review
+# AI security review
 
-The runner lives in `tooling/security-review`; product packages do not import
-it. It provides a manual baseline by app/package and cross-cutting flow, and an
-advisory incremental review for PRs targeting `develop` or `main`. Existing
-Security and Static analysis checks keep their existing roles.
+`tooling/security-review` runs an advisory, model-based review of repository
+source. It has two modes:
 
-## Execution
+- **Baseline**: a manual review of every app, package and cross-cutting flow.
+- **Pull request**: an incremental review of a PR into `develop` or `main`.
 
-Use Node 24.22.1+ and the repository pnpm version. Install the isolated Pi
-coding agent 1.5.0 runtime with
-`npm ci --prefix tooling/security-review/runtime --ignore-scripts`. The runtime
-lock includes integrity pins from the installed Pi release manifest for all
-registry packages. Set `PI_COMMAND` to the absolute runtime
-`node_modules/.bin/pi` path, or use an already installed Pi 1.5.0. No Pi
-dependency is added to the product. Select an explicit `openai/<model-id>`
-supported by that installation; the runner does not guess a model ID or use
-stored ChatGPT credentials.
+It is advisory. The required Security and Static analysis checks keep their
+roles
+([repository-maintenance.md](../../docs/repository-maintenance.md#workflows)).
+Product packages never import this tooling.
 
-```sh
-pnpm security-review plan baseline
-pnpm security-review plan pr --base-ref <base-sha>
-pnpm security-review run baseline --dry-run --output /tmp/gyblos-review-new-run
-pnpm security-review run baseline --model openai/<model-id> \
-  --max-calls 300 --concurrency 3 --output /tmp/gyblos-review-another-run
-```
+## Run it locally
 
-Each output directory must be empty and outside the checkout. Reusing an
-artifact filename is rejected. A live invocation reads `OPENAI_API_KEY` from the
-environment; never put a key in a command, config file or report.
+Prerequisites: Node 24.22.1+, the repository's pnpm version, and an OpenAI API
+key for live runs. No Pi dependency is added to the product.
 
-A run reads immutable Git blobs, includes the real before/after diff for PRs,
-divides large surfaces into bounded inputs, and runs independent Pi processes.
-Pi has `--no-tools`, no sessions, extensions, MCP, project context, skills,
-templates or themes. Each process gets a fresh configuration directory and an
-allowlisted environment. Source is sent as model input; it is never executed or
-exposed through filesystem tools. The runner does not inspect local role state,
-execute tests supplied by a PR, make payments, access live services or deploy.
+1. Install the isolated Pi coding agent 1.5.0 runtime. Its lock pins the
+   integrity of every registry package.
 
-## Review roles and evidence
+   ```sh
+   npm ci --prefix tooling/security-review/runtime --ignore-scripts
+   ```
 
-Every selected unit gets security, architecture/maintainability and behavior
-reviewers. Protocol/crypto, payments/economics, P2P/identity,
-concurrency/recovery, desktop/local, supply-chain and tests/evidence reviewers
-are selected deterministically from paths, including deleted files and consumers
-in cross-cutting flows. Repository rules, tests, deployment files and
-unclassified public files have visible coverage units.
+2. Point `PI_COMMAND` at the runtime binary, or at an existing Pi 1.5.0:
 
-Each candidate gets two fresh independent verification sessions. Disagreement
-stays pending. Security and quality candidates are separate categories. JSON
-keys, verdicts, evidence revisions, line bounds and claimed path coverage are
-validated in code. Source-only analysis cannot emit a reproduced `confirmed`
-vulnerability or severity. It emits `needs_validation` or `rejected`; runtime
-confirmation requires a separately authorized bounded synthetic regression,
-followed by review.
+   ```sh
+   export PI_COMMAND="$PWD/tooling/security-review/runtime/node_modules/.bin/pi"
+   ```
 
-`--max-calls` bounds process invocations including both verifier passes. At
-least two calls are reserved before hunter work. Skipped tasks,
-oversized/binary/non-regular sources, missing input, errors and pending
-verification remain visible and cannot produce a clean result. Pi/provider
-internal retries and token usage are not a hard dollar cap: configure provider
-project spending limits separately.
+3. For a live run, export `OPENAI_API_KEY` in your environment. Never put a key
+   in a command, config file or report.
+4. Plan the review. Planning calls no model.
 
-A Jev/Decisions router is not enabled in this version. Path rules are the
-authority; a future classifier may add specialists or prioritize work, never
-remove required reviews or decide that a vulnerability exists.
+   ```sh
+   pnpm security-review plan baseline
+   pnpm security-review plan pr --base-ref <base-sha>
+   ```
 
-## Reports and limits
+5. Run it. `--dry-run` builds the plan and writes artifacts without calling Pi.
 
-Outputs: `review-results.json`, `coverage-ledger.json`, `findings.json`,
-`REPORT.md`, `status.txt` and `labels.txt`. The report is explicitly a partial
-source-only review. No prior report suppresses current coverage. A clean result
-means no retained candidate within completed source tasks; it is not a security
-certification.
+   ```sh
+   pnpm security-review run baseline --dry-run --output /tmp/gyblos-review-new-run
+   pnpm security-review run baseline --model openai/<model-id> \
+     --max-calls 300 --concurrency 3 --output /tmp/gyblos-review-another-run
+   ```
 
-This baseline does not implement the full security-audit skill's sandboxed
-reproduction, iterative coverage-critic waves or prior-run reconciliation. That
-methodology remains applicable to the subsequent full audit. Sharded
-cross-cutting reviews can miss interactions between chunks. Deterministic
-checks, human review and the decided external audit before mainnet remain
-necessary.
+Each output directory must be empty and outside the checkout; reusing an
+artifact filename is rejected.
+
+### Options
+
+| Option               | Meaning                                                                        |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `--output <dir>`     | Where artifacts go (required for `run`).                                       |
+| `--base-ref <sha>`   | The base commit, for pull-request mode.                                        |
+| `--source-ref <sha>` | The commit to review. Defaults to `HEAD`.                                      |
+| `--root <dir>`       | Review this committed checkout instead of the current one.                     |
+| `--model <model>`    | An explicit `openai/<model-id>` that your Pi supports. Defaults to `PI_MODEL`. |
+| `--thinking <level>` | Pi thinking level. Defaults to `high`.                                         |
+| `--concurrency <n>`  | Maximum parallel Pi tasks. Defaults to 3.                                      |
+| `--max-calls <n>`    | Maximum Pi invocations, including both verification passes. Defaults to 300.   |
+| `--dry-run`          | Build the plan without calling Pi.                                             |
+
+The runner never guesses a model ID or uses stored ChatGPT credentials.
+
+## What a run does and never does
+
+A run reads immutable Git blobs, includes the real before and after diff for a
+PR, splits large surfaces into bounded inputs and runs independent Pi processes.
+Pi runs with `--no-tools` and without sessions, extensions, MCP, project
+context, skills, templates or themes. Each process gets a fresh configuration
+directory and an allowlisted environment. Source is sent as model input only; it
+is never executed or exposed through filesystem tools.
+
+The runner never inspects local role state, runs tests supplied by a PR, makes
+payments, accesses live services or deploys.
+
+## Reviewers and verification
+
+Every unit gets security, architecture and maintainability, and behavior
+reviewers. Specialists (protocol and crypto, payments and economics, P2P and
+identity, concurrency and recovery, desktop and local, supply chain, tests and
+evidence) are chosen deterministically from paths, including deleted files and
+consumers in cross-cutting flows. Repository rules, tests, deployment files and
+unclassified public files have visible coverage units. Path rules decide which
+reviews run; nothing may remove a required review.
+
+Each candidate finding gets two fresh, independent verification sessions, and a
+disagreement stays pending. Code validates JSON keys, verdicts, evidence
+revisions, line bounds and claimed path coverage. A source-only review never
+claims a reproduced vulnerability or a severity: a candidate ends as
+`needs_validation` or `rejected`. Confirming one at runtime needs a separately
+authorized, bounded synthetic regression, then review.
+
+`--max-calls` bounds process invocations; at least two calls are reserved before
+reviewer work starts. It is not a cost cap, because Pi and the provider retry
+internally: set a spending limit on your provider project.
+
+## Reading the results
+
+A run writes `review-results.json`, `coverage-ledger.json`, `findings.json`,
+`REPORT.md`, `status.txt` and `labels.txt`. `status.txt` holds one of:
+
+| Status             | Meaning                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `clean`            | No retained candidate within the completed source tasks.                                                        |
+| `needs-validation` | A candidate needs runtime validation, a task did not complete or a changed file was excluded; read `REPORT.md`. |
+| `error`            | A task or verification failed, or verifications do not match the candidates.                                    |
+| `not-run`          | No model was called, as in a `--dry-run`.                                                                       |
+
+Skipped tasks, oversized, binary or non-regular sources, missing input, errors
+and pending verification stay visible and can never produce `clean`. No earlier
+report suppresses current coverage.
+
+`clean` is not a security certification. The review is source-only and partial:
+sharded cross-cutting reviews can miss interactions between chunks, and it does
+not do sandboxed reproduction or iterative coverage passes. Deterministic
+checks, human review and an external audit remain necessary.
 
 ## GitHub Actions
 
-1. `AI review request` runs on PRs into `develop` or `main`, without model
-   credentials or code checkout.
-2. `AI security review` responds through `workflow_run`. GitHub loads its
-   workflow from the default branch. It validates the current
-   PR/head/base/repository and runs the trusted default-branch runner against
-   the immutable PR merge snapshot as data.
-3. A separate publisher validates the fixed status, rechecks that the PR head is
-   current and that the reviewed base/merge remain unchanged, applies a fixed
-   label, and posts a deterministic summary. It never executes or renders model
-   text. Stale heads and forks do not receive a review result. A metadata-only
-   `AI review state` workflow invalidates old labels on each revision; it uses
-   `pull_request_target` without checking out or executing source, installing
-   packages or receiving model credentials. Failed analysis publishes error;
-   cancelled analysis leaves the pending label rather than preserving clean.
-4. `AI security baseline` accepts a manual dispatch only on the repository's
-   default branch (`develop`), records the exact dispatch commit and requires an
-   explicit model and invocation budget.
+1. **AI review request** runs on PRs into `develop` or `main`. It records the
+   event, with no model credentials and no checkout.
+2. **AI security review** responds through `workflow_run`, so GitHub loads it
+   from the default branch. It checks that the PR, head, base and repository are
+   current and runs the trusted runner against the immutable PR merge snapshot
+   as data.
+3. Its publisher validates the fixed status, rechecks that the head, base and
+   merge commit are unchanged, applies one fixed label and posts a deterministic
+   summary. It never runs or renders model text. Stale heads and forks get no
+   result. Failed analysis publishes `error`; cancelled analysis leaves the
+   queued label.
+4. **AI review state** clears old labels and sets `ai-review:queued` on each new
+   revision. It uses `pull_request_target` only for this metadata change,
+   without checking out or running source, installing packages or receiving
+   model credentials.
+5. **AI security baseline** accepts a manual dispatch only on the default branch
+   (`develop`), records the dispatch commit and requires an explicit model and
+   invocation budget.
 
-Enable automatic reviews with repository variable `AI_REVIEW_ENABLED=true`, set
-`PI_REVIEW_MODEL=openai/<model-id>`, and add the `OPENAI_API_KEY` Actions
-secret. The first setup PR cannot activate a default-branch workflow before it
-is merged. Precreate these labels: `ai-review:queued`, `ai-review:clean`,
-`ai-review:needs-validation`, `ai-review:error`. There is no GitHub App or
-`@bot` mention handler in this version.
+The workflows run only when the repository variable `AI_REVIEW_ENABLED` is
+`true`. They read the model from the `PI_REVIEW_MODEL` variable
+(`openai/<model-id>`, passed to the runner as `PI_MODEL`) and the key from the
+`OPENAI_API_KEY` Actions secret. They use the labels `ai-review:queued`,
+`ai-review:clean`, `ai-review:needs-validation` and `ai-review:error`, and clear
+a leftover `ai-review:running` label.
 
-After installing or updating the trusted workflow, validate a new PR event into
-`develop` with a small real change. The request check alone only records the
-event: the separate `AI security review` run must execute Pi, upload its report
-and publish an `AI source review` comment for the current head/base/merge. A
-green request check does not prove model execution or publication. Updates to
-the trusted workflow take effect after they merge into the default branch;
-create or update another PR after that merge to exercise the installed workflow.
+A green request check only records the event. A review ran only when the
+separate **AI security review** run executed Pi, uploaded its report and posted
+an `AI source review` comment for the current head, base and merge commit.
+Changes to these workflows take effect after they merge into the default branch.
 
-Actions artifacts contain candidate details and follow repository
-visibility/access rules; they expire after seven days. Avoid using public
-artifacts for a privately disclosed vulnerability. No model credentials or raw
-transcripts are uploaded. Hosted runs and live model calls are separate
-operational steps; local tests use a synthetic Pi implementation.
+Actions artifacts hold candidate details, follow repository visibility and
+access rules and expire after seven days. Do not use them for a privately
+disclosed vulnerability; see [SECURITY.md](../../SECURITY.md). No model
+credentials or raw transcripts are uploaded. Local tests use a synthetic Pi
+implementation.

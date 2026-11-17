@@ -1,128 +1,134 @@
 # Offline payment-channel program acceptance
 
-The lab executes signed transactions from the installed, patched x402 SDK in
-LiteSVM against a bundled SBF build of the official payment-channels program.
-The mint, keys, SOL and token balances exist only inside each fresh VM. There is
-no RPC client, network listener, live wallet or deployment in this fixture.
+These lab suites run signed transactions from the installed, patched x402 SDK in
+LiteSVM against a bundled SBF build of the official payment-channel program.
+Mint, keys, SOL and token balances exist only inside each fresh VM: there is no
+RPC client, network listener, live wallet or deployment. Run them whenever you
+change payment-channel, withdrawal or payment-session code.
 
-Run the ordinary lab gate, or just these cases:
+## Run them
+
+LiteSVM is a pinned development dependency; its native package must exist for
+your host. No compiler, validator, Docker, funded wallet or real engine is
+needed.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm test:lab
+```
+
+To run only the core channel cases:
+
+```sh
 node --import tsx --test tests/lab/paid-native.test.ts
 ```
 
-Node and pnpm versions are pinned by the repository. LiteSVM is a pinned
-**development dependency**; its native package must be available for the host.
-Missing native support fails these tests rather than reporting acceptance. No
-compiler, validator, Docker, funded wallet or real engine is needed to run the
-bundled fixture.
+Missing native support fails these suites instead of reporting acceptance.
+
+The same fixture, loaded through `tests/support/paid-native-vm.ts`, also backs
+the other native suites in `tests/lab/`, including channel opening, withdrawal,
+abrupt exit (`channel-crash-native.test.ts`), payment sessions and session
+renewal. [tests/README.md](../../tests/README.md) lists them.
 
 ## Scope
 
-The cases execute SDK channel opening, a payer's signed close, metered claims,
-sealing and distribution. They check actual native-program account transitions
-and token balances, including the refund, seller share, Gyblos fee share and
-separate program-treasury rounding dust. Channel and token-account bytes are
-never seeded or rewritten to fabricate a transition; mint/ATA setup also uses
-signed transactions. Only VM funding and Clock are initialized by the harness.
+- **Lifecycle.** The cases run SDK channel opening, a payer's signed close,
+  metered claims, sealing and distribution. They check the program's real
+  account transitions and token balances: refund, seller share, Gyblos fee share
+  and the separate program-treasury rounding remainder. The harness only funds
+  the VM and sets its clock; channel and token-account bytes are never seeded or
+  rewritten, and mint and token-account setup also use signed transactions.
+- **Deadlines.** Voucher and closing-grace boundaries are tested just before,
+  exactly at and just after each deadline. The VM clock can advance after the
+  SDK's checks and simulation succeed, which separates the program rejecting a
+  late transaction from a local SDK refusal. A rejected claim leaves the escrow
+  intact (it is not a refund); a later seal and distribution prove the principal
+  is recovered.
+- **Replay and recovery.** Reusing a settlement sends nothing again. A separate
+  replay with a fresh blockhash and signature is rejected by channel state, not
+  by transaction-history deduplication. Confirmation-loss recovery runs a claim,
+  hides its confirmation, then reveals that same transaction after local expiry;
+  recovery must finish without a second payout.
+- **Signatures.** Executed transactions keep signature and blockhash checks and
+  the Ed25519 precompile. Only a cloned VM used for simulation honors the SDK's
+  simulation options for partially signed messages and placeholder blockhashes;
+  the VM that changes balances never does.
 
-Voucher and closing-grace boundaries are tested immediately before, exactly at
-and immediately after their deadlines. The VM inclusion clock can advance
-**after** successful SDK checks and simulation, independently from local time.
-This distinguishes native rejection of late inclusion from a local SDK refusal.
-A rejected claim leaves escrow intact: it is not a refund. A later native
-seal/distribution explicitly proves principal recovery.
+## Limits
 
-Reusing the same settlement must send nothing again. A separate replay uses a
-fresh blockhash and signature, so its rejection exercises native channel state
-rather than transaction-history deduplication. Confirmation-loss recovery
-executes a claim first, hides its confirmation, then exposes that same native
-transaction after local expiry; it must recover without another payout.
+The fixture is built with the program's `mainnet-beta` feature because it is
+the only build that needs no source change: its treasury constant matches the
+SDK's network label, the default localnet treasury is a placeholder, and the
+devnet feature needs configuration missing from the pinned source. The label
+only selects constants inside the isolated VM. It doesn't enable mainnet in the
+product, touch a public network or validate the deployed devnet binary. The
+short grace used to test grace equality exists only in this fixture; the
+product refuses it and uses a longer grace.
 
-Executed transactions retain signature and blockhash verification and the
-Ed25519 precompile. Only a **cloned VM for simulation** honors the SDK's RPC
-simulation options for partially signed messages and placeholder blockhashes.
-Those options never weaken the VM that actually changes balances.
-
-## Treasury compatibility and limits
-
-The unmodified pinned source's `mainnet-beta` feature contains the treasury
-constant that matches the SDK's corresponding network label. Its default
-localnet treasury is a placeholder; its devnet feature requires a source
-configuration that is absent from the pinned tree. This fixture chooses the
-source-clean build instead of changing treasury or transfer logic.
-
-**The label selects constants inside an isolated VM. It does not enable product
-mainnet, access a public network or validate the deployed devnet binary.** The
-product mainnet lock and payment configuration are unchanged. The short grace
-used to isolate native grace equality is an SDK/native-only fixture; the product
-correctly refuses that unsafe configuration and uses its longer grace.
-
-These tests cover SDK/native-program semantics. They do not run buyer/seller
-startup, Iroh, an inference engine or current devnet. Product service/transport
-composition has separate synthetic tests. A source build is not evidence of byte
-equivalence to a deployed program. The separate legacy paid path,
-reusable-channel recovery and fee-policy work are not changed here.
-
-Before financial production acceptance, separately verify the intended cluster's
-binary/configuration and run an explicitly approved current-code live rehearsal.
-No finite local reserve guarantees inclusion under arbitrary RPC delay,
-congestion or clock drift. This lab does not claim 100% safety.
+These suites don't run buyer or seller startup, Iroh, an inference engine or
+current devnet; synthetic product tests cover that composition. A source build
+is not proof of byte equivalence with a deployed program. Before production
+payments, verify the target cluster's binary and configuration and run an
+explicitly approved live rehearsal. No local reserve guarantees inclusion under
+arbitrary RPC delay, congestion or clock drift; see
+[limitations.md](../../docs/limitations.md).
 
 ## Fixture provenance and rebuild
 
-The [manifest](../tests/fixtures/payment-channels-native.json) records the exact
+The [manifest](../../tests/fixtures/payment-channels-native.json) records the
 source commit, clean-source condition, lockfile digest, features, architecture,
-builder/tool archive digests and final ELF digest/size. The upstream program's
-[MIT notice](../tests/fixtures/payment-channels-native-LICENSE.txt) is
-preserved. The separate
-[target dependency inventory](../tests/fixtures/payment-channels-native-dependencies.json)
-records crate versions, declared/selected licenses and lockfile checksums. The
-program source's MIT label does not cover all linked dependencies: Apache-2.0
-covers the listed Apache/dual-licensed components and Rust core, while the
-MIT-only five8 family has its preserved copyright/permission notice. Host
-proc-macros/dev crates are excluded; compilation is not a claim that all
-component code survives linkage. The program is not a modified processor or a
-mock; SPL distribution batching and all native guards remain enabled.
+builder and tool archive digests, and the final ELF digest and size. The
+upstream [MIT notice](../../tests/fixtures/payment-channels-native-LICENSE.txt)
+is preserved, and the
+[target dependency inventory](../../tests/fixtures/payment-channels-native-dependencies.json)
+records crate versions, declared and selected licenses and lockfile checksums.
+The program source's MIT label does not cover every linked dependency:
+Apache-2.0 covers the listed Apache or dual-licensed components and Rust core,
+and the MIT-only five8 family keeps its
+[own notice](../../tests/fixtures/payment-channels-native-five8-LICENSE.txt).
+Host proc-macro and dev crates are excluded. See also
+[third-party-notices.md](../../docs/third-party-notices.md). The program is
+neither modified nor a mock: SPL distribution batching and every native guard
+stay enabled.
 
-To rebuild, use a fresh source checkout at the manifest's commit and verify that
-its working tree and Cargo.lock are unchanged. Provision these official tools in
-a disposable directory, checking their archive hashes against the manifest:
+To rebuild the fixture:
 
-- [Agave v3.1.13](https://github.com/anza-xyz/agave/releases/tag/v3.1.13),
-  `solana-release-aarch64-apple-darwin.tar.bz2`.
-- [Platform tools v1.52](https://github.com/anza-xyz/platform-tools/releases/tag/v1.52),
-  `platform-tools-osx-aarch64.tar.bz2`.
+1. Check out the source at the manifest's commit. Confirm the working tree and
+   `Cargo.lock` are unchanged.
+2. In a disposable directory, download these official tools and check their
+   archive hashes against the manifest:
+   - [Agave v3.1.13](https://github.com/anza-xyz/agave/releases/tag/v3.1.13),
+     `solana-release-aarch64-apple-darwin.tar.bz2`;
+   - [Platform tools v1.52](https://github.com/anza-xyz/platform-tools/releases/tag/v1.52),
+     `platform-tools-osx-aarch64.tar.bz2`.
+3. Point the extracted SBF SDK's `dependencies/platform-tools` at the verified
+   platform tools. Put platform-tools `rust/bin` first in `PATH` and set
+   `RUSTC` to its `rustc`.
+4. Set a disposable `CARGO_TARGET_DIR`. Set `RUSTFLAGS` to remap `/Users` to
+   `/build/users` and the source checkout to `/source`, as the recorded build
+   did (the builder also remaps the working directory).
+5. Build only the program, without generating clients or IDL or running install
+   or deploy scripts:
 
-Point the extracted SBF SDK's `dependencies/platform-tools` at those verified
-platform tools. Use its `cargo-build-sbf` directly, with platform-tools
-`rust/bin` first in PATH and RUSTC pointing to that directory's rustc; use
-`--no-rustup-override` to avoid changing the host toolchain. Build only the
-program, without generating clients/IDL or running install/deploy scripts:
+   ```sh
+   cargo-build-sbf \
+     --manifest-path program/payment_channels/Cargo.toml \
+     --skip-tools-install --no-rustup-override --tools-version v1.52 \
+     --no-default-features --features mainnet-beta \
+     --arch v0 --sbf-out-dir /tmp/payment-channel-artifact \
+     -- --locked
+   ```
 
-```sh
-cargo-build-sbf \
-  --manifest-path program/payment_channels/Cargo.toml \
-  --skip-tools-install --no-rustup-override --tools-version v1.52 \
-  --no-default-features --features mainnet-beta \
-  --arch v0 --sbf-out-dir /tmp/payment-channel-artifact \
-  -- --locked
-```
+   Fetching dependencies may need crates.io; running the tests never does. The
+   builder may warn about unknown syscall names for some Pinocchio symbols.
 
-Use a disposable CARGO_TARGET_DIR. The recorded build remaps `/Users` to
-`/build/users` and the source checkout to `/source` with RUSTFLAGS; the builder
-also enables its default cwd remapping. Only public compiler-provider source
-paths may remain in precompiled standard-library strings, never operator paths.
-Dependency acquisition may need crates.io; running the tests never does.
+6. Verify the digest and size, the license and the source diff, then replace the
+   fixture and manifest.
+7. Run every native suite on the new ELF. A build or load alone is not enough,
+   and never disable native guards, signatures or batching to get a pass.
 
-This builder's post-processing syscall-name list predates some Pinocchio symbols
-and can warn about unknown names. A build or load alone is insufficient: the
-acceptance cases must execute and pass on the resulting ELF. Do not disable
-native guards, signatures or batching to obtain a pass.
-
-After a rebuild, verify the digest/size, license and source diff before
-replacing the fixture or manifest. Changing any input or digest requires review
-and a complete native run; never bless an arbitrary supplied binary by rehashing
-it. A matching same-host rebuild is not a cross-platform reproducibility claim.
+Only public compiler-provider source paths may remain in precompiled
+standard-library strings, never operator paths. Changing any input or digest
+needs review and a complete native run; never accept an arbitrary binary by
+rehashing it. A matching rebuild on the same host is not a cross-platform
+reproducibility claim.

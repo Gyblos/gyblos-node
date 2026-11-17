@@ -1,49 +1,76 @@
 ---
 title: Requisitos
-description: Comprueba la instalación admitida, la invitación y los requisitos del equipo antes de empezar.
+description: Qué admite la beta y qué necesitas para usar Gyblos como comprador o ejecutar un vendedor.
 ---
 
-Este manual sigue el instalador oficial, `https://gyblos.com/install.sh`, que fija una versión firmada
-de la imagen `ghcr.io/gyblos/seller` por versión y digest. Incluye `docker compose images seller` al pedir
-ayuda para que el equipo pueda identificar la imagen instalada.
+Revisa esta página antes de instalar nada. Resume qué admite la beta para cada rol y qué equipo, cuenta y
+fondos necesita cada uno.
 
-## Alcance [#qué-puedes-hacer-hoy]
+## Alcance de la beta [#qué-puedes-hacer-hoy]
 
-| Tarea                                | Alcance de este manual                                                                                    |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Instalar y operar un vendedor        | Docker con Ollama local y Qwen3 0.6B fijado, sin razonamiento                                             |
-| Ofrecer inferencia gratuita          | Límites diarios totales y por comprador; los contadores están en memoria                                  |
-| Registrarse y publicar               | Invitación e inscripción devnet; el registro interactivo puede crear la inscripción tras aprobar el coste |
-| Usar otros motores                   | Configuración avanzada; aceptar el archivo no demuestra la validación del modelo                          |
-| Configurar ofertas pagadas o mainnet | Fuera de este inicio; la configuración mainnet se rechaza                                                 |
+| Tarea                         | Durante la beta                                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Conversar con modelos         | App de escritorio, ofertas gratuitas. No necesitas billetera ni fondos.                                         |
+| Llamar a modelos desde código | Comprador local desde el repositorio, ofertas gratuitas. Pagar a un vendedor desde código es un piloto.         |
+| Ejecutar un vendedor          | Vendedor Docker, o vendedor nativo sin Docker. El instalador sirve Qwen3 0.6B en Ollama, sin razonamiento.      |
+| Ofrecer inferencia gratuita   | Límites diarios de tokens, en total y por comprador.                                                            |
+| Cobrar por la inferencia      | Ofertas con precio por solicitud en devnet, pagadas en USDC de devnet. Consulta [Cobrar](/es/sellers/get-paid). |
+| Registrarte y publicar        | Necesitas un código de invitación. Registrarte en el registro de agentes 8004 cuesta un poco de SOL de devnet.  |
+| Usar otros motores y modelos  | Configuración avanzada. Que el archivo pase la validación no demuestra que el modelo funcione bien.             |
+| Mainnet                       | Se rechaza. `network = "mainnet"` en `config.toml` falla la validación con `MAINNET_UNSUPPORTED`.               |
 
-Si falta la inscripción, la cartera owner necesita SOL de devnet para el registro. El comando estima
-el coste y pide aprobación; consulta [Registra y publica](/es/sellers/register-publish).
+El SOL y el USDC de devnet no tienen valor de mercado. La electricidad, el alojamiento e internet sí
+cuestan, y un motor remoto puede cobrarte aunque la oferta sea gratuita.
 
-La beta usa Solana **devnet**. La oferta gratuita predeterminada no mueve dinero real. La electricidad,
-el alojamiento e internet tienen un coste; un motor remoto también puede cobrarte aunque la oferta sea gratuita.
+## Usa Gyblos como comprador [#requisitos-del-comprador]
 
-## Antes de empezar [#antes-de-instalar]
+Para la [app de escritorio](/es/buyers/desktop-app):
 
-- Una invitación con un **código de invitación** de un solo uso que empieza con `gyb_`. No necesitas token de relay.
-- Un equipo que permanezca encendido: Linux x86-64 o ARM64, macOS o Windows x64.
-- Con Docker (Linux o macOS): Docker Engine con Compose, o Docker Desktop. Compose debe ser **v2.17 o posterior**.
-  Sin Docker (macOS Apple Silicon, Linux, Windows x64): tu propio [Ollama](https://ollama.com); mira la
-  [guía del vendedor](/es/sellers/beta-guide).
-- Al menos **4 GB de memoria** y varios GB de disco disponibles. El inicio exige **1,5 GiB de margen** por encima del proceso vendedor; Ollama también necesita memoria.
-- Acceso saliente a internet. El Compose suministrado no publica puertos de escucha y usa conexiones salientes a relays.
+- macOS en Apple Silicon (M1 o posterior), Windows 10 u 11 (x64) o Linux (x64). No hay versión para Mac
+  con Intel.
+- Acceso a internet hacia el índice de descubrimiento, Solana devnet y los relays de Gyblos.
 
-El acceso a Docker es privilegiado. En Linux utiliza una cuenta ya autorizada para ejecutarlo;
-no cambies los permisos del equipo solo para saltarte un error de instalación.
+Para [llamar a modelos desde tu código](/es/buyers/use-from-code) también necesitas Git, Node.js 24.22.1 o
+posterior y pnpm (`corepack enable` lo proporciona). El comprador local se ejecuta desde el repositorio.
 
-## Qué demuestran las pruebas [#qué-demuestra-una-comprobación-correcta]
+## Ejecuta un vendedor [#antes-de-instalar]
 
-`doctor` revisa requisitos de inicio y consulta las dependencias admitidas. No genera una respuesta.
-`RUNNING` confirma el estado del servicio; el registro da permiso para publicar; `listed in the index`
-confirma una consulta al índice. Ninguno demuestra por sí solo que un comprador externo completó inferencia.
+- Una invitación con un **código de invitación** de un solo uso que empieza con `gyb_`. No necesitas token
+  de relay.
+- Un equipo que permanezca encendido, con al menos **4 GB de memoria** y varios GB de disco libre.
+- Acceso saliente a internet. El vendedor no abre ningún puerto de escucha; se conecta hacia los relays.
+- Uno de estos tipos de instalación. El instalador usa Docker si tu cuenta puede ejecutarlo y, si no, el
+  vendedor nativo:
 
-El motor configurado procesa los mensajes. El vendedor local puede leerlos; un proveedor remoto también
-los recibe. Usar un relay no garantiza anonimato de IP. Los registros firmados no prueban de forma
-independiente qué modelo respondió ni si la respuesta es correcta.
+| Tipo de instalación | Plataformas                                        | Qué pones tú                                                         |
+| ------------------- | -------------------------------------------------- | -------------------------------------------------------------------- |
+| Vendedor Docker     | Linux (x86-64 o ARM64) o macOS                     | Docker Engine con Compose **v2.17 o posterior**, o Docker Desktop    |
+| Vendedor nativo     | macOS en Apple Silicon, Linux (x64 o arm64, glibc) | Tu propio [Ollama](https://ollama.com/download)                      |
+| Vendedor nativo     | Windows 10 u 11 (x64), con `install.ps1`           | Tu propio [Ollama para Windows](https://ollama.com/download/windows) |
 
-**Siguiente:** [Instala tu primer vendedor](/es/sellers/beta-guide).
+Los Mac con Intel y Linux con musl (Alpine) necesitan Docker. En un Mac con Apple Silicon el vendedor
+nativo es más rápido, porque Docker no puede usar la GPU. Consulta la guía [Instala un vendedor](/es/sellers/beta-guide)
+para cada camino.
+
+Con un motor local, el vendedor anuncia su oferta solo mientras quede libre al menos **1,5 GiB** de memoria
+además del propio vendedor. Por debajo de eso sigue en marcha, pero sin publicarse. El modelo también
+necesita memoria.
+
+En Linux, pertenecer al grupo `docker` da a una cuenta control de nivel root sobre el equipo. Cuando el
+instalador no puede usar Docker, te sugiere añadir tu cuenta a ese grupo. Hazlo solo si esa cuenta puede
+tener ese poder; si no, deja que el instalador configure el vendedor nativo.
+
+También necesitas un poco de **SOL de devnet** del [faucet de devnet](https://faucet.solana.com): unos
+0,02 SOL en la dirección del dueño (owner) para registrarte, y unos 0,05 SOL en el pagador de comisiones (fee payer) si cobras por la
+inferencia. El instalador muestra ambas direcciones. Nunca uses fondos ni claves de mainnet.
+
+## Datos que salen de tu equipo [#datos-que-salen-de-tu-equipo]
+
+Las versiones publicadas del vendedor y de la app de escritorio suben recibos firmados y sin contenido al
+recolector de métricas de Gyblos, `collector.gyblos.com`. Los recibos no se pueden desactivar. También
+suben observaciones de telemetría sin contenido, que `GYBLOS_OBSERVATIONS=off` desactiva. Ninguno incluye
+mensajes ni respuestas. Consulta [Datos y privacidad](/es/reference/data-and-privacy) para la lista
+completa.
+
+**Siguiente:** lee [Cómo funciona](/es/getting-started/how-it-works), o ve directo a la
+[app de escritorio](/es/buyers/desktop-app) o a la guía [Instala un vendedor](/es/sellers/beta-guide).
