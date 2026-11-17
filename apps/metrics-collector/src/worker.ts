@@ -6,11 +6,15 @@ import {
   type CollectorLimiters,
   type RateLimiter,
 } from './app';
+import { runChainIndex } from './chain/indexer';
+import { createChainRpc } from './chain/rpc';
 import {
   COLLECTOR_AGGREGATION_FAILED,
+  COLLECTOR_CHAIN_INDEX_FAILED,
   COLLECTOR_DB_BINDING,
   COLLECTOR_LIMITERS,
   COLLECTOR_ROUTES,
+  COLLECTOR_SOLANA_RPC_BINDING,
   COLLECTOR_STATUS,
 } from './constants';
 import { statsReader } from './stats-read';
@@ -111,6 +115,33 @@ export async function scheduledAggregation(bindings: unknown, now: number) {
   return result;
 }
 
+// The scheduled chain read, when a database and a Solana RPC URL are bound. A failure logs a static
+// code and leaves the cursor where it was; aggregation runs either way.
+export async function scheduledChainIndex(
+  bindings: unknown,
+  now: number,
+  fetcher: typeof fetch = fetch,
+) {
+  const database = binding(bindings, COLLECTOR_DB_BINDING);
+  const url = binding(bindings, COLLECTOR_SOLANA_RPC_BINDING);
+  if (!isDatabase(database) || typeof url !== 'string' || !url)
+    return undefined;
+  try {
+    return await runChainIndex(database, createChainRpc(url, fetcher), now);
+  } catch (error) {
+    // The error's class only: never the RPC URL, which may carry a provider key.
+    console.warn(
+      COLLECTOR_CHAIN_INDEX_FAILED,
+      error instanceof Error ? error.name : 'unknown',
+    );
+    return undefined;
+  }
+}
+async function scheduledRun(bindings: unknown, now: number) {
+  await scheduledChainIndex(bindings, now);
+  await scheduledAggregation(bindings, now);
+}
+
 const edgeCache = () =>
   (globalThis as { caches?: { default?: EdgeCache } }).caches?.default;
 let worker: ReturnType<typeof createWorker> | undefined;
@@ -127,6 +158,6 @@ export default {
     bindings: unknown,
     context: ExecutionContext,
   ) {
-    context.waitUntil(scheduledAggregation(bindings, controller.scheduledTime));
+    context.waitUntil(scheduledRun(bindings, controller.scheduledTime));
   },
 };

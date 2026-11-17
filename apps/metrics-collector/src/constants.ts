@@ -168,3 +168,104 @@ export const FIRST_SEEN_KINDS = {
 } as const;
 // The single row of collector_agg_state.
 export const AGG_STATE_ID = 1;
+
+// Chain index (#349): the x402 payment-channels program (@x402/svm 2.28 Codama client). Discriminators
+// are one u8 at data[0]; account positions are the program's instruction account order.
+export const CHAIN_INSTRUCTIONS = {
+  OPEN: 'open',
+  SETTLE: 'settle',
+  TOP_UP: 'top_up',
+  SETTLE_AND_SEAL: 'settle_and_seal',
+  REQUEST_CLOSE: 'request_close',
+  SEAL: 'seal',
+  DISTRIBUTE: 'distribute',
+  RECLAIM: 'reclaim',
+} as const;
+export type ChainInstructionKind =
+  (typeof CHAIN_INSTRUCTIONS)[keyof typeof CHAIN_INSTRUCTIONS];
+export const CHAIN_DISCRIMINATORS: ReadonlyMap<number, ChainInstructionKind> =
+  new Map([
+    [1, CHAIN_INSTRUCTIONS.OPEN],
+    [2, CHAIN_INSTRUCTIONS.SETTLE],
+    [3, CHAIN_INSTRUCTIONS.TOP_UP],
+    [4, CHAIN_INSTRUCTIONS.SETTLE_AND_SEAL],
+    [5, CHAIN_INSTRUCTIONS.REQUEST_CLOSE],
+    [6, CHAIN_INSTRUCTIONS.SEAL],
+    [7, CHAIN_INSTRUCTIONS.DISTRIBUTE],
+    [9, CHAIN_INSTRUCTIONS.RECLAIM],
+  ]);
+// Positions in each instruction's account list.
+export const CHAIN_ACCOUNTS = {
+  open: {
+    payer: 0,
+    payee: 2,
+    mint: 3,
+    authorizedSigner: 4,
+    channel: 5,
+    count: 14,
+  },
+  settle: { channel: 0 },
+  topUp: { payer: 0, channel: 1, mint: 4 },
+  settleAndSeal: { payee: 0, channel: 1 },
+  requestClose: { payer: 0, channel: 1 },
+  seal: { channel: 0 },
+  // Split recipients' token accounts follow the 11 fixed accounts.
+  distribute: { channel: 0, payer: 1, mint: 7, fixed: 11 },
+  reclaim: { channel: 0 },
+} as const;
+export const CHAIN_LAYOUT = {
+  discriminatorBytes: 1,
+  u16Bytes: 2,
+  u32Bytes: 4,
+  u64Bytes: 8,
+  pubkeyBytes: 32,
+  // A split recipient: 32-byte owner and u16 bps.
+  recipientBytes: 34,
+  // Ed25519 precompile: message offset (u16) at byte 10 of its 16-byte header, in its own data.
+  ed25519MessageOffsetAt: 10,
+  // Voucher message: 2 magic bytes, 32-byte channel id, u64 cumulative amount, i64 expiry.
+  voucherMagic: [86, 1],
+  voucherChannelAt: 2,
+  voucherCumulativeAt: 34,
+  voucherBytes: 50,
+  // The channel account: 256 bytes; status at 3, deposit, settled and payout watermark u64 at 12, 20, 28.
+  channelAccountBytes: 256,
+  channelStatusAt: 3,
+  channelDepositAt: 12,
+  channelSettledAt: 20,
+  channelPayoutAt: 28,
+} as const;
+// Channel account status byte, and the state after the account is reclaimed (gone).
+export const CHAIN_CHANNEL_STATUSES = [
+  'open',
+  'sealed',
+  'closing',
+  'distributed',
+] as const;
+export const CHAIN_CHANNEL_CLOSED = 'closed';
+export const CHAIN_PROGRAMS = {
+  ED25519: 'Ed25519SigVerify111111111111111111111111111',
+  MEMO: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
+} as const;
+// Open memos that mark a channel as Gyblos traffic (v1 upto terms, v2 payment sessions).
+export const GYBLOS_OPEN_MEMOS = [
+  'gyblos:',
+  'gyblos/payment-session/v1:',
+] as const;
+export const CHAIN_INDEX = {
+  // Signatures read per getSignaturesForAddress page (the RPC maximum).
+  signaturesPerPage: 1000,
+  // Transactions read per scheduled run, and per batched JSON-RPC request.
+  maxTransactionsPerRun: 200,
+  transactionsPerRequest: 25,
+  // Channel accounts read per getMultipleAccounts request (the RPC maximum).
+  accountsPerRequest: 100,
+  requestTimeoutMs: 15_000,
+  // Highest Solana transaction version asked for: devnet already carries version 1 transactions.
+  maxTransactionVersion: 1,
+  msPerSecond: 1000,
+} as const;
+// Binding of the Solana RPC URL (a secret: a dedicated provider, not the rate-limited public devnet).
+export const COLLECTOR_SOLANA_RPC_BINDING = 'COLLECTOR_SOLANA_RPC_URL';
+// Log code of a scheduled run whose chain read failed; followed by a static reason only.
+export const COLLECTOR_CHAIN_INDEX_FAILED = 'COLLECTOR_CHAIN_INDEX_FAILED';

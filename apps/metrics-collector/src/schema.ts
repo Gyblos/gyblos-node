@@ -185,3 +185,12 @@ export {
   aggState,
   firstSeen,
 } from './schema-aggregates';
+
+// Chain index tables (#349).
+export {
+  chainChannels,
+  chainCursor,
+  chainInstructions,
+  chainTokenDeltas,
+  chainTxs,
+} from './schema-chain';

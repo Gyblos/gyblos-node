@@ -16,12 +16,18 @@
     "./aggregate": "./src/aggregate.ts",
     "./stats-read": "./src/stats-read.ts",
     "./stats-shape": "./src/stats-shape.ts",
-    "./stats": "./src/stats.ts"
+    "./stats": "./src/stats.ts",
+    "./chain/base58": "./src/chain/base58.ts",
+    "./chain/channel-account": "./src/chain/channel-account.ts",
+    "./chain/decode": "./src/chain/decode.ts",
+    "./chain/indexer": "./src/chain/indexer.ts",
+    "./chain/rpc": "./src/chain/rpc.ts"
   },
   "dependencies": {
+    "@gyblos/config": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/protocol": "workspace:*",
-    "hono": "4.13.13",
-    "drizzle-orm": "0.45.2"
+    "drizzle-orm": "0.45.2",
+    "hono": "4.13.13"
   }
 }
