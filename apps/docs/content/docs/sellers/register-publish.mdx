@@ -114,6 +114,11 @@ docker compose exec seller gyblos seller status --online
 | `not in the first 2000 sellers` | The lookup budget ended; absence is not established |
 | `index unreachable`             | The lookup failed; listing state is unknown         |
 
+During the beta the index only accepts sellers whose identity redeemed an invitation. If the seller stays
+`not found in the index` two minutes after starting, check that `gyblos seller register` printed `Registered` or
+`Already registered` for this same identity, and run it again if it did not. If it did and the seller is still not
+listed, ask in the [Gyblos Telegram](https://t.me/gyblos) with your public NodeId; never post the invite code.
+
 An index listing is not an external inference test. Only ready offers are published. The index receives
 public identity, model and offer metadata; prompts are not part of this listing.
 
