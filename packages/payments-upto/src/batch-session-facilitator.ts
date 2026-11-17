@@ -7,6 +7,7 @@ import {
 } from '@x402/svm/batch-settlement/facilitator';
 
 import { UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
+import { PAYMENT_TRANSACTION_LIMITS } from '@gyblos/config/payment-fees';
 import { paymentSplits } from '@gyblos/protocol/payment-binding';
 import type { PaymentSessionTerms } from '@gyblos/protocol/payment-session';
 
@@ -33,6 +34,7 @@ export function batchFacilitatorFor(
         splits: paymentSplits(terms),
       });
     return new BatchSvmScheme(signer, {
+      ...PAYMENT_TRANSACTION_LIMITS,
       pendingSettlementStore: pending,
       channelStorage,
       maxIdleSecs: 0,

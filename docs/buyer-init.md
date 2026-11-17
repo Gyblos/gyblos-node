@@ -1,156 +1,150 @@
 # Guided buyer setup
 
-From a checkout with dependencies installed, run:
+`pnpm buyer:init` prepares a local buyer from a checkout: it creates the buyer
+identity and writes its `selection.json`. It makes no discovery or RPC request,
+starts no engine, downloads nothing and sends no payment transaction.
+
+Prerequisites: a checkout with dependencies installed
+(`pnpm install --frozen-lockfile`) and an interactive terminal.
+`pnpm buyer:init --help` works without one.
 
 ```sh
 pnpm buyer:init
 pnpm buyer:chat
 ```
 
-The Gyblos relays admit every client, so chat needs no relay token.
-`GYBLOS_RELAY_TOKEN` is optional: set it privately in that process's environment
-only for a relay that still requires one. Setup does not request, print or save
-it. Never put it in `selection.json`, a shared shell command or a terminal
-recording. A malformed token produces a static startup diagnostic naming the
-relay settings to check.
+Before it saves anything, setup prints a summary similar to the following:
 
-`buyer:init` needs an interactive terminal. `pnpm buyer:init --help` works
-without one. It prepares local configuration only: it makes no discovery or RPC
-request, starts no engine, downloads nothing and sends no payment transaction.
-
-## Short setup and advanced setup
-
-The default `pnpm buyer:init` asks only for a seller's NodeId (Enter for any
-registered seller), its owner wallet when a NodeId was given, and confirmation.
-With no seller it saves an open-network buyer: no configured sellers and
-`"discovery": { "open": true }`, so it uses any seller the index lists whose
-8004 identity matches, for free answers only (see
-[discovery.md](discovery.md#open-discovery)). It shows the exact model, variant,
-quantization, token limit and zero spending/price ceilings before saving. These
-are the existing bounded Qwen3-0.6B defaults, with reasoning off; short setup
-does not discover a model or check a seller's availability. For another model,
-limits, relay, discovery index or RPC, use the complete form:
-
-```sh
-pnpm buyer:init --advanced
+```text
+Model: qwen3-0.6b; reasoning: off.
+Variant: [none]; Quantization: Q4_K_M.
+Maximum output tokens: 4096.
+Budget ceiling: 0 USDC per request. Prices: 0 input / 0 output USDC per million tokens.
+Sellers: any seller registered in the index, free answers only.
+Free signed quotes cause no payment transactions, including with a positive ceiling.
+8004 identity verification remains enabled. Existing settings will be refused.
 ```
 
-Both modes use the same shared validation, private initializer and identity
-policy. Existing settings are refused before either mode asks a question.
+Answer `y` or `yes` to save. Then `pnpm buyer:chat` opens a terminal chat; see
+[Buyer](running-a-node.md#buyer) for the chat commands and the local buyer
+endpoints.
 
-To name a seller, have its public NodeId and owner wallet address from an
-independent, trusted source. A discovery listing is not identity proof; the open
-network relies on the 8004 registry check instead. The advanced form also asks
-for the exact model/variant/quantization and the output-token limit. Defaults
-match the bounded Qwen3-0.6B offer, with reasoning off and no reasoning
-downgrade. Custom model names are preserved exactly; availability is checked by
-the existing buyer when it requests a quote. In advanced mode a name starting
-with punctuation or containing whitespace prompts for explicit confirmation.
-Declining repeats only the model question; cancelling performs no
-initialization. This warning does not validate a name against a central catalog
-or rewrite it, and the shared plan builder still accepts valid custom names.
+## Short and advanced setup
 
-Press Enter to accept the value in brackets. An empty optional field is shown as
-`[none]`; Enter keeps it empty. A nullable field with a nonempty default also
-shows `- to clear`, which clears that field to null. Each answer is checked
-immediately using the same shared validation as the complete plan. An invalid
-answer names the field and gives a static hint; only that question repeats, with
-earlier valid answers retained. Cancelling during a correction performs no
-initialization.
+The default form asks only for a seller's NodeId and, when you give one, that
+seller's owner wallet. `pnpm buyer:init --advanced` asks for every field:
 
-Amounts are entered as **USDC**, with exact micro-USDC precision. Input and
-output price ceilings are **USDC per million tokens**. The saved file contains
-canonical atomic amounts; no floating-point conversion is used.
+| Field                                                     | Short setup                  | Default                           |
+| --------------------------------------------------------- | ---------------------------- | --------------------------------- |
+| Seller NodeId (Enter for any registered seller)           | asked                        | none: any seller in the index     |
+| Seller owner wallet                                       | asked when a NodeId is given | none                              |
+| Model ID                                                  | uses the default             | `qwen3-0.6b`                      |
+| Variant                                                   | uses the default             | none                              |
+| Quantization                                              | uses the default             | `Q4_K_M`                          |
+| Maximum output tokens (1 to 32768)                        | uses the default             | `4096`                            |
+| Maximum spend per request in USDC                         | uses the default             | `0`                               |
+| Maximum input and output price in USDC per million tokens | uses the default             | `0` and `0`                       |
+| Discovery index URL                                       | uses the default             | `https://discovery.gyblos.com/v1` |
+| Seller relay URL                                          | uses the default             | `https://na1.relay.gyblos.com/`   |
+| 8004 devnet RPC URL                                       | uses the default             | `https://api.devnet.solana.com`   |
 
-The default total ceiling and both price ceilings are zero. This admits free
-quotes only, and `buyer:chat` labels that automatic setup as `free quotes only`.
-Chat remembers confirmed turns in memory. `/new` starts a new conversation
-without resetting spending limits or payment channels; `/exit` leaves the chat.
-An interrupted answer ends the session without retry. History is not saved to
-disk and is not silently trimmed to fit; use `/new` when the whole conversation
-reaches the existing input/context limits. See
-[conversation and payment-session behavior](payment-sessions.md#terminal-conversation-history).
-A positive total ceiling still allows free quotes: the buyer chooses the
-execution path from the verified signed quote, not from a mode selected by this
-command. Positive-price execution additionally requires the existing devnet
-funding and pinned-tokenizer preparation; setup performs neither. The total
-ceiling bounds the payment, including the protocol fee.
+With no seller, setup saves an open-network buyer: no configured sellers and
+`"discovery": { "open": true }`. It then uses any seller the index lists whose
+8004 agent registry entry matches, for free answers only (see
+[discovery.md](discovery.md#open-discovery)). Short setup does not discover a
+model or check a seller's availability.
 
-Discovery and the 8004 identity RPC have separate prompts. The generated
-configuration always enables independent 8004 verification and never sets a
-manual-trust override. The index provides availability only. The relay must be
-one already allowed by the transport configuration. Credentials in a URL's
-username/password or query, fragments and remote plain HTTP are refused;
-loopback HTTP is permitted for local services. Keep provider credentials out of
-shared configuration and terminal captures.
+To name one seller, get its public NodeId and owner wallet from an independent,
+trusted source; the seller prints both with `gyblos doctor`. A discovery listing
+is not identity proof.
 
-`GYBLOS_RELAYS` configures the allowed relay origins; its default is the
-supplied relay. Choosing a different relay in the form does not add it to that
-allowlist. Configure the approved origins before running setup and use the same
-relay configuration for chat. Relay approval and independent 8004 verification
-remain enforced.
+## Answering the questions
 
-The generated setup requires discovery and the configured 8004 RPC to be
-available at runtime. The RPC shown by default is editable. An index-fetch
-failure stops selection; a matching retained live signed record may still
-establish listing eligibility when absent from the latest response. There is no
-automatic fallback that skips discovery or identity checks.
+- Press Enter to accept the value in brackets. An empty optional field shows as
+  `[none]`. A field with a default that can be empty also shows `- to clear`.
+- Each answer is checked at once. An invalid answer names the field and gives a
+  hint; only that question repeats.
+- Custom model names are kept exactly. A name that starts with punctuation or
+  contains whitespace asks for confirmation; the buyer checks availability when
+  it requests a quote.
+- Enter amounts in USDC with up to six decimals (micro-USDC). Price ceilings are
+  USDC per million tokens. The file stores exact atomic amounts.
 
-This first assistant configures one independently known seller on devnet. The
-existing runtime can still read its richer selection format. The paid role's RPC
-remains governed by its existing role setup and `GYBLOS_RPC_URL`; the 8004 RPC
-answer does not replace an existing role's RPC.
+## Spending ceiling
 
-## Confirmation and local files
+The default spending ceiling and both price ceilings are zero, so the buyer
+accepts free quotes only, and `buyer:chat` shows the mode
+`automatic (free quotes only)`.
 
-Before the first question, setup checks the selection destination without
-opening it or creating directories, locks or identity files. Existing settings
-stop the assistant immediately, with their path and reconfiguration guidance.
-This early check is advisory: the locked check and exclusive publication below
-still reject a destination created while the questions were being answered.
+The ceiling applies per request and includes the protocol fee. A positive
+ceiling does not force payment: the buyer still chooses free or paid execution
+from each verified signed quote. Paid execution also needs devnet SOL and devnet
+USDC in the buyer wallet and the pinned tokenizer (`pnpm node:tokenizer`); setup
+prepares neither. See [Paid endpoint](running-a-node.md#paid-v2-buyer-endpoint).
 
-The assistant displays the model and spending ceilings, then asks for `y` or
-`yes`. Cancelling before confirmation requests no initialization. Once
-confirmed, it creates or reuses the buyer identity through existing role setup
-and saves `$GYBLOS_HOME/buyer/selection.json` (the existing home default still
-applies). Existing identities, journals and other state are retained.
+## Endpoints and relays
 
-The buyer directory is private (0700), and settings are private (0600).
-Initialization holds a process lock and publishes a fully synced staged file
-exclusively. It refuses any existing destination, including a symlink, even if
-another writer creates it during setup. There is no overwrite/force option. The
-command does not reset payment uncertainty or discovery replay history.
+The discovery index provides availability only. The generated settings always
+enable independent 8004 verification against the configured RPC and never set a
+manual-trust override. At runtime the buyer needs both the index and that RPC;
+nothing skips discovery or identity checks when they are unavailable.
 
-If interrupted after confirmation, newly created identity files may remain. A
-retry reuses them; an already published selection file is refused rather than
-replaced. Inspect the outcome before retrying. Cancellation is checked before
-role preparation and publication; an atomic write already in progress may
-complete. Setup does not provide a backup or recovery phrase.
+URLs with a username, password, query or fragment, and remote plain HTTP, are
+refused; loopback HTTP is allowed for local services. Keep provider credentials
+out of shared configuration and terminal recordings.
 
-Static errors:
+The relay must already be allowed by `GYBLOS_RELAYS` (default: the Gyblos
+relay). Choosing another relay in the form does not add it to that list, so set
+`GYBLOS_RELAYS` before setup and use the same value for chat. The Gyblos relays
+admit every client, so chat needs no relay token. `GYBLOS_RELAY_TOKEN` is only
+for a relay that requires one: set it privately in the buyer's environment, and
+never put it in `selection.json`, a shared command or a recording. Setup does
+not ask for, print or save it. See [Relays](running-a-node.md#relays).
 
-- `BUYER_INIT_INVALID`: invalid form values, unsupported bounds or unsafe URL.
-  Shared validation also identifies the invalid field without copying its value
-  into the error. The terminal gives a field-specific hint and repeats the
-  question.
-- `BUYER_INIT_EXISTS`: selection settings already exist and are preserved. Edit
-  the existing `selection.json` to reconfigure; the assistant does not replace
-  it.
-- `BUYER_INIT_UNAVAILABLE`: unsafe local paths, concurrent initialization,
-  unavailable state, cancellation during setup or incompatible existing role. An
-  existing role with another mint requires a separate `GYBLOS_HOME`.
+The 8004 RPC you enter does not change the payment RPC. Paid execution uses the
+`rpcUrl` in the buyer's `role.json`, which role setup takes from
+`GYBLOS_RPC_URL` (default `https://api.devnet.solana.com`) when it first creates
+the role.
 
-A separate home creates a separate buyer identity; it does not migrate balances,
-payment history or replay state. Keep the old home for any outstanding recovery,
-reconciliation or withdrawal. Never delete keys or clear journals to make setup
-succeed. Changes to an existing selection file must retain private file modes
-and the runtime's full validation and trust requirements.
+## Local files
 
-The shared `@gyblos/node/buyer-init` entry exports the form defaults, pure plan
-builder, field validator, `buyerInitFields` mode policy,
-`buyerInitModelNeedsConfirmation` advisory, read-only preflight and private
-initializer. `BUYER_INIT_MODES` lives in `@gyblos/node/buyer-init-constants`.
-Hosts supply role preparation and local-home context; the CLI supplies terminal
-input/output. Other hosts can reuse these functions without importing the CLI.
-Runtime selection validation, quote verification and execution remain in their
-existing paths.
+Setup saves `selection.json` in the buyer home: `.local/gyblos/buyer/` from a
+checkout, or `$GYBLOS_HOME/buyer/` when `GYBLOS_HOME` is set. It creates or
+reuses the buyer identity with the devnet USDC mint; existing identities,
+journals and other state are kept. The
+[`selection.json` reference](running-a-node.md#optional-buyer-selection-and-discovery)
+lists every field.
+
+The buyer directory is private (0700) and the settings file is private (0600).
+Setup never overwrites settings: it refuses an existing `selection.json`,
+including a symlink, before the first question and again when it saves. There is
+no force option. To reconfigure, edit the existing file and keep its private
+mode.
+
+Cancelling before confirmation changes nothing. If setup is interrupted after
+confirmation, new identity files may remain; a rerun reuses them. Inspect the
+result before you rerun. Setup does not create a backup or recovery phrase, and
+it never resets payment uncertainty or discovery replay history.
+
+## Errors
+
+- `BUYER_INIT_INVALID`: an invalid form value, an unsupported bound or an unsafe
+  URL. The message names the field, never its value, and the terminal repeats
+  the question.
+- `BUYER_INIT_EXISTS`: settings already exist and are preserved. Edit
+  `selection.json` to reconfigure.
+- `BUYER_INIT_UNAVAILABLE`: unsafe local paths, another setup running, state
+  that cannot be read, cancellation during setup, or an existing role with
+  another mint. A different mint needs a separate `GYBLOS_HOME`.
+
+A separate `GYBLOS_HOME` creates a separate buyer identity. It does not move
+balances, payment history or replay state, so keep the old home for any pending
+recovery, reconciliation or withdrawal ([recovery.md](recovery.md)). Never
+delete keys or clear journals to make setup succeed.
+
+## For contributors
+
+The CLI is a thin host over `@gyblos/node/buyer-init`, which holds the form
+defaults, validation, plan builder and private initializer, so other hosts such
+as the desktop app reuse the same rules. Runtime selection, quote verification
+and execution stay in the buyer.

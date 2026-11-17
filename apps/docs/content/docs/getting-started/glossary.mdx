@@ -1,0 +1,71 @@
+---
+title: Glossary
+description: Short definitions of the terms used across the Gyblos documentation, with their Spanish equivalents.
+---
+
+These pages use one term per concept. The Spanish column gives the term the Spanish pages use. For how
+the parts fit together, see [How Gyblos works](/en/getting-started/how-it-works).
+
+## Roles and software [#roles-and-software]
+
+| Term           | Meaning                                                                                    | Spanish                |
+| -------------- | ------------------------------------------------------------------------------------------ | ---------------------- |
+| Seller         | The role that serves a model to the network.                                               | vendedor               |
+| Seller node    | The process that does the selling on the seller's machine.                                 | nodo vendedor          |
+| Docker seller  | A seller node installed as Docker containers, with its own Ollama.                         | vendedor Docker        |
+| Native seller  | A seller node installed without Docker, as a background service that uses your own Ollama. | vendedor nativo        |
+| Engine         | The software that runs the model, such as Ollama.                                          | motor                  |
+| Buyer          | The role that uses models from the network.                                                | comprador              |
+| Desktop app    | The Gyblos app for macOS, Windows and Linux. It runs a local buyer for you.                | app de escritorio      |
+| Local buyer    | The buyer process on your own computer.                                                    | comprador local        |
+| Buyer endpoint | The local buyer's HTTP API, compatible with OpenAI and Anthropic clients.                  | endpoint del comprador |
+
+## Identity and discovery [#identity-and-discovery]
+
+| Term                | Meaning                                                                                           | Spanish                           |
+| ------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------- |
+| NodeId              | A node's public network identity. Buyers connect to a seller by its NodeId.                       | NodeId                            |
+| Owner               | The seller's wallet that is registered in the 8004 agent registry and pays for registration.      | dueño (owner)                     |
+| Payout address      | The address that receives a seller's earnings. The installer sets it to the owner.                | dirección de cobro                |
+| Fee payer           | The seller's wallet that pays Solana fees and rent for payment transactions. It holds devnet SOL. | pagador de comisiones (fee payer) |
+| 8004 agent registry | The on-chain registry on Solana devnet where sellers record their NodeId and owner.               | registro de agentes 8004          |
+| Enrollment          | A seller's entry in the 8004 agent registry.                                                      | inscripción                       |
+| Discovery index     | The public list of registered sellers and their offers, at `discovery.gyblos.com`.                | índice de descubrimiento          |
+| Invite code         | A one-use code, starting with `gyb_`, that lets a seller register with the discovery index.       | código de invitación              |
+| Running             | The seller node is up. Nobody can find it yet.                                                    | en marcha                         |
+| Registered          | The discovery index accepted this identity. The seller may publish.                               | registrado                        |
+| Listed              | The seller published its offers, and a lookup in the discovery index finds it.                    | listado                           |
+| Relay               | A Gyblos server that helps buyer and seller connect and carries traffic when a direct link fails. | relay                             |
+
+## Offers and payments [#offers-and-payments]
+
+| Term                   | Meaning                                                                                       | Spanish                   |
+| ---------------------- | --------------------------------------------------------------------------------------------- | ------------------------- |
+| Offer                  | What a seller publishes: a model, its engine and its terms, either free or priced.            | oferta                    |
+| Quote                  | The seller's signed terms for one request. A zero-price quote needs no payment.               | cotización                |
+| Ceiling                | The most a buyer authorizes for a request. It is a protocol term.                             | tope                      |
+| Spending limit         | The total an API key from the desktop app may spend over its lifetime.                        | límite de gasto           |
+| Payment channel        | An on-chain account that holds a buyer's deposit until the seller settles it.                 | canal de pago             |
+| Payment session        | A reusable arrangement where one deposit pays for many answers. Pilot only.                   | sesión de pago            |
+| Receipt                | A signed record of one request: model, token counts and timing, never the prompt or answer.   | recibo                    |
+| Metrics collector      | The Gyblos service at `collector.gyblos.com` that receives receipts and publishes aggregates. | recolector de métricas    |
+| Local receipt receiver | An optional private receiver for receipts that runs on your own machine.                      | receptor local de recibos |
+| Wallet                 | A Solana key pair and its address.                                                            | billetera                 |
+| Devnet                 | Solana's public test network. Its tokens have no market value.                                | devnet                    |
+| Devnet SOL             | Test SOL that pays transaction fees on devnet. Get it from the devnet faucet.                 | SOL de devnet             |
+| Devnet USDC            | Test USDC that buyers pay sellers with during the beta.                                       | USDC de devnet            |
+| Mainnet                | Solana's network with real money. Gyblos refuses it during the beta.                          | mainnet                   |
+
+## Words that are never translated [#never-translated]
+
+The Spanish pages keep these exactly as written here:
+
+- Product and project names: Gyblos, Ollama, Docker, Solana, USDC, Qwen.
+- Identifiers: NodeId, the `gyb_` prefix and addresses.
+- Commands, flags, `config.toml` keys, environment variables and file paths, such as `gyblos doctor`,
+  `--online`, `daily_token_cap`, `GYBLOS_HOME` and `~/gyblos-seller`.
+- Error codes and status values, such as `MAINNET_UNSUPPORTED` and `RUNNING`.
+- Program output quoted from the terminal, such as `listed in the index`.
+- Labels in the desktop app, such as **Payments** and **Stop response**.
+
+The Spanish pages address the reader as **tú**.

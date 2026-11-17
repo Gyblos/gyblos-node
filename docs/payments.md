@@ -1,174 +1,119 @@
 # Payments
 
-The x402 integration uses the official SDK on Solana devnet: core, Express and
-fetch are pinned to 2.29.0, while SVM remains at 2.28.0 with the local patch.
-Amounts are in atomic units of a six-decimal token.
+Gyblos buyers pay sellers on Solana **devnet**, in Circle devnet USDC, through
+x402 payment channels. Devnet USDC has no market value, and the product refuses
+mainnet. A free offer needs no payment at all.
 
-## Two schemes
+This page is the contributor overview of the payment paths. To charge for an
+offer as a seller operator, follow
+[Get paid](https://docs.gyblos.com/en/sellers/get-paid) on the docs site. Lab
+checks (gates, the local v1 facilitator and the published evidence) are in
+[lab/README.md](../lab/README.md).
 
-| Scheme  | What the buyer pays                       | Facilitator                           | Used for              |
-| ------- | ----------------------------------------- | ------------------------------------- | --------------------- |
-| `upto`  | Reported usage, within a signed ceiling   | Local process in this repo            | Metered inference     |
-| `exact` | A fixed price; no refund of unused budget | x402.org (PayAI as configured backup) | A fixed test resource |
+## Payment paths
 
-**`upto`** works through a payment channel. The buyer signs a ceiling and
-deposits it; after the work the facilitator settles the channel, paying the
-seller its charge and returning the rest to the buyer. The buyer independently
-recounts tokens and flags overcharges, but this does **not** prevent a dishonest
-charge within the ceiling.
+The signed quote decides the path. Both prices `"0"` means free; any positive
+price means paid. The buyer's `request.maxAtomic` is a spending ceiling, not a
+mode switch (see [Buyer routing](payment-sessions.md#buyer-routing)).
 
-**`exact`** pays 10,000 atomic units (0.01 Circle devnet USDC) for a fixed
-resource. The public facilitator pays the transaction fee. Get devnet USDC from
-the [Circle faucet](https://faucet.circle.com); the accepted mint is
-`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`.
+| Path               | Who uses it                            | Channel                                      | Owner page                                 |
+| ------------------ | -------------------------------------- | -------------------------------------------- | ------------------------------------------ |
+| Free               | Any seller and buyer                   | None: no signer, deposit or settlement       | [running-a-node.md](running-a-node.md)     |
+| Per-request paid   | Any priced offer (the default)         | x402 `upto`: one channel per request         | This page and [recovery.md](recovery.md)   |
+| Payment session    | Allowlisted seller–buyer pairs (pilot) | x402 `batch-settlement`: one deposit, reused | [payment-sessions.md](payment-sessions.md) |
+| `exact`, v1 `upto` | Lab gates only                         | Fixed-price resource, legacy PoC facilitator | [lab/README.md](../lab/README.md)          |
 
-The `upto` gates and the node use a test token labelled `devnet-test-token`,
-**not USDC**, created by `pnpm gate:fund --test-mint`.
+Per-request paid serves text conversations without tools. Tools on a priced
+offer need a payment session.
 
-## Gates
+## Seller-sponsored channel transaction limits
 
-Gates are proof-of-concept checks in `lab/harness`; the `exact` scheme and the
-fixed-price test seller exist only there. Run them from the repository root
-after `pnpm gate:setup` and funding; network confirmation can take minutes.
+Paid-v2 channel openings, top-ups and SDK settlement signing share
+`PAYMENT_TRANSACTION_LIMITS` in `packages/config/src/payment-fees.ts`: at most
+400,000 compute units, 5,000 micro-lamports per compute unit and two required
+signatures. An explicit positive compute-unit limit is mandatory; duplicate,
+malformed or unsupported compute-budget instructions and lookup-table messages
+are refused before the seller signs. Omitting the price means zero priority fee.
+Both SDK signing APIs are guarded, including the message-signing path used for
+buyer-supplied opens and the transaction-signing path used for settlement.
 
-| Command               | What it proves                                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `pnpm gate:preflight` | Devnet, program, mint and balances are ready.                                                                |
-| `pnpm gate:challenge` | An unpaid request returns 402 without running the resource or paying.                                        |
-| `pnpm gate:run`       | Full `upto` payment: 10,000 deposited, 4,000 charged, 6,000 returned, buyer SOL unchanged.                   |
-| `pnpm gate:failures`  | An empty buyer and an expired authorization are both refused without a charge (about 62 s).                  |
-| `pnpm gate:exact`     | Fixed-price payment through x402.org: network, mint, amount, recipient and fee payer checked before signing. |
-| `pnpm gate:inference` | Six metered-inference cases with a real model; see [inference.md](inference.md).                             |
-| `pnpm gate:channel`   | One long-lived channel for several requests, with the protocol fee split on chain; see below.                |
+These are per-transaction instruction and signer-count bounds, not a total
+wallet, daily SOL, token-account creation or rent budget. The priority component
+is at most 2,000 lamports per guarded transaction; network base fees remain
+separate. Existing SDK-generated openings and settlements fit these limits. A
+recovery retains the original recorded attempt: a refusal never clears
+uncertainty or rebuilds a channel. The independent standalone SDK wrapper
+accepts optional host limits and keeps its unconfigured defaults. The legacy v1
+path and the protocol commission are unchanged.
 
-`gate:setup` creates isolated buyer, seller, authorizer, facilitator and
-test-mint keys in the lab home (`.local/lab/`, or `GYBLOS_LAB_HOME`) and never
-overwrites existing keys. Rerunning `gate:fund --test-mint` does not mint more
-tokens when the mint already exists.
+## How a per-request payment works
 
-To run the fixed-resource roles in separate terminals: `pnpm gate:facilitator`
-(port 4022), `pnpm gate:seller` (port 4021), then `pnpm gate:buyer`.
+1. The buyer verifies the seller's signed quote, then signs a channel open whose
+   deposit is the request's ceiling. It records the opening in its private
+   journal before it signs.
+2. The seller verifies the open against its own offer terms, never against the
+   buyer's request. Its fee payer submits the deposit and pays the transaction
+   fees and the channel rent.
+3. The seller runs the inference and meters the output with the model's pinned
+   tokenizer. It stops publishing text that the deposit can't pay for.
+4. The seller claims the metered charge with a voucher signed by its authorizer
+   key. The channel pays the seller's payout address and the Gyblos treasury,
+   and refunds the rest of the deposit to the buyer.
+5. The buyer recounts the tokens and checks the charge against finalized chain
+   history. A charge that differs from its own count is recorded as a dispute.
 
-Gate reports for `exact` and inference are written locally to
-`lab/evidence/gate-0004.json` and `gate-0005.json`. These paths are ignored by
-Git; those reports are not published.
+A recount **detects** an overcharge within the ceiling. It does not prevent,
+refund or penalize it.
 
-## Batch-settlement channel check
+An unclear outcome (a timeout, a lost reply, a missing history entry) never
+counts as "no payment". It blocks new payments until it is reconciled; see
+[recovery.md](recovery.md). The buyer resolves its paid channels with
+`pnpm buyer:reconcile:paid` and takes a stuck channel toward a refund with
+`pnpm buyer:withdraw:paid`.
 
-Today the node opens one `upto` channel per request, so every request pays its
-own transactions and rent. `pnpm gate:channel` checks the alternative with the
-SDK's `batch-settlement` scheme and the official payment-channels program
-(`CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX`): the buyer deposits 5,000 once,
-pays three requests (145, 210 and 95) with metered vouchers signed by the
-seller's operator key, the seller redeems them in one claim and distribution,
-and the buyer gets the rest back with a cooperative refund. The check fails
-unless the seller receives 96% of the 450 charged (rounded down), the treasury
-4% (rounded down), the program treasury the rounding remainder, the refund is
-4,550 and the buyer spends no SOL. It is not wired into the buyer or seller.
+## Protocol fee
 
-The protocol fee is committed when the channel opens, through `extra.splits`
-(seller first, then the treasury; 1–4 distinct recipients, basis points summing
-to 10,000). The buyer's client opens such a channel only if its `approveSplits`
-callback accepts the exact list. Without `extra.splits` the SDK keeps paying
-100% to `payTo`. This part comes from the local `@x402/svm` patch, proposed
-upstream in
-[x402-foundation/x402#4166](https://github.com/x402-foundation/x402/issues/4166).
-Here the fee comes out of the seller's charge, unlike `upto`, where it is added
-on top of the seller's price.
+The fee is 4% (`PROTOCOL_FEE` in `packages/config/src/network.ts`). It is added
+on top of the seller's net price, not taken out of it:
 
-Before this replaces `upto` in the node:
+- The buyer sees and pays the gross price per million tokens: the net price
+  times 1.04, rounded up to a whole atomic unit (`grossAtomicPerMtok` in
+  `packages/protocol/src/payment-binding.ts`).
+- Each charge is split on chain between the payout address and the treasury
+  (`paymentSplits`). The seller's basis points are rounded up, and the program
+  floors each payout. The rounding residual goes to the payment program's own
+  treasury, so the fee Gyblos collects is approximate, not exactly 4%.
+- Per-request channels and payment sessions use the same arithmetic.
 
-- The splits are fixed for the channel's life, and the facilitator checks every
-  voucher, top-up, claim and refund against the splits of the current terms.
-  Changing the fee or treasury while a channel is open makes it unusable until
-  the buyer withdraws; close channels before changing them.
-- The facilitator's channel storage must be durable and keep each channel's
-  splits; otherwise, after a restart, rent cleanup builds a 100% `payTo`
-  distribution that the program rejects.
-- Every recipient needs a token account for the mint before redemption.
+The devnet treasury is a public Gyblos test wallet (`DEVNET_GYBLOS_TREASURY`).
 
-By default the check needs a loopback validator (Agave 4.x; Solana 1.18 cannot
-run the program) that loads the program dumped from devnet:
+## Asset and network
 
-```sh
-solana program dump -u devnet CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX channels.so
-solana-test-validator --reset --bpf-program CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX channels.so
-pnpm gate:channel
-```
+- Product payments use Circle devnet USDC (`DEVNET_USDC` in
+  `packages/config/src/network.ts`). `install.sh` sets up the seller with that
+  mint, and `pnpm buyer:init` sets up the buyer with it. Amounts are atomic
+  units of a six-decimal token, so `1000000` is 1 USDC.
+- The lab gates use their own test token instead; see
+  [lab/README.md](../lab/README.md).
+- The x402 SDK versions and the local `@x402/svm` patch are pinned in
+  `package.json` and `pnpm-workspace.yaml`, which also explains the patch.
 
-It uses throwaway keys and a fresh test mint. `pnpm gate:channel --devnet` runs
-on the public devnet RPC; it sends real devnet transactions, so run it only when
-approved. It keeps its keys in `.local/lab/batch-channel-check/keys.json` (mode
-`0600`; a more open file is refused), and only the funder key needs devnet SOL;
-when it has none, the check prints the funder address and exits with code 2.
+## Where the code lives
 
-## Published evidence
+The [package table](architecture.md#packages) owns the details. In short:
 
-Only three curated, redacted reports are committed in `lab/evidence/`:
+- `packages/protocol`: payment ports (`PaymentClient`, `PaymentServer`), the
+  payment binding (terms digest, memo, gross price, splits) and the paid and
+  session wire contracts.
+- `packages/x402-upto-metered`: the standalone metered `upto` library; see its
+  [README](../packages/x402-upto-metered/README.md).
+- `packages/payments-upto`: the `PaymentServer` adapter over it, the durable
+  seller ledger in the seller's `payments/` directory, and payment sessions.
+- `packages/node`: composes paid execution when the seller has a payment server.
 
-| Report           | What it shows                                                                                       |
-| ---------------- | --------------------------------------------------------------------------------------------------- |
-| `gate-0006.json` | Docker lab: flat network and relay passed; Docker NAT-direct did not.                               |
-| `gate-0007.json` | Earlier native Mac–VPS attempts (historical).                                                       |
-| `gate-0008.json` | Three sequential paid inferences, Mac seller and VPS buyer, direct Iroh, bound to source `ba168c4`. |
+## Related
 
-They contain public signatures, amounts and route categories only: no keys,
-prompts, answers, IPs, RPC URLs or raw logs.
-
-## Local facilitator
-
-The v1 facilitator (run by the lab gates; `lab/facilitator` runs it standalone
-for lab checks) signs and pays for channel settlement with its own devnet key.
-It keeps channel state in memory; there is no durable channel storage. The paid
-v2 seller daemon runs the facilitator in process instead, with its fee payer key
-and the durable upto ledger in `seller/payments/`.
-
-It writes private diagnostics as JSONL to `.local/lab/facilitator-diagnostics/`:
-
-- Files are mode `0600`, the directory `0700`. Keep them out of Git.
-- Records hold only allowlisted fields: SDK version, attempt, operation, phase,
-  stage and bounded channel/amount/signature hints. No raw errors, prompts,
-  payloads or RPC URLs.
-- Size is bounded: 128 queued records, 4 KiB per record, 4 MiB per file, 3
-  rotations per process, 16 files (64 MiB). When full, the oldest file is
-  deleted, so copy anything you need to keep.
-- `GET /facilitator/diagnostics` on the loopback facilitator shows health and
-  counters.
-- Logging never blocks or changes a payment. A diagnostic record is not proof of
-  settlement, refund or delivery.
-
-## Loopback servers
-
-All HTTP servers here (facilitator, sellers, buyer proxy) bind to `127.0.0.1`
-and answer only when `Host` is `127.0.0.1`, `localhost` or `[::1]` with the
-exact port; anything else gets an empty 421. This blocks DNS-rebinding reads
-from a browser. It is not authentication against other local processes.
-
-For what happens when a payment outcome is unclear, see
-[recovery.md](recovery.md).
-
-### Incremental delivery on reusable sessions
-
-Block-capable sessions use one capped deposit for repeated inferences. During a
-response, the buyer verifies each certified prefix and durably signs its
-cumulative total before the next block can be sent. These signatures do not
-submit transactions. Settlement is still a final operation over the highest
-accepted native voucher, with the unused deposit returned to the buyer.
-
-The soft target is 64 output tokens, subject to a safe tokenizer boundary and
-the existing 128-token request cap. A first block also authorizes its input
-usage; it must fit the signed request ceiling and remaining deposit. This bounds
-the delivery/signature exposure to one outstanding block, not to a fixed dollar
-amount. A tokenizer without a certified boundary cannot authorize intermediate
-prefixes.
-
-After cancellation or a lost ACK, recovery resends only the exact stored
-financial approval. It closes an unfinished channel and independently verifies
-the charged/refunded amounts. It never sends the prompt again. An existing
-settlement is verified before attempting to recover an expired approval.
-
-These protections require the seller's worker to remain available for claims
-within the program's withdrawal grace. They do not insure long simultaneous
-outages or a restored stale local backup. Reputation and paid usage-receipt
-integration are separate; do not interpret a cumulative payment voucher as a
-dual-signed quality receipt.
+- [Payment sessions](payment-sessions.md)
+- [Recovery and reconciliation](recovery.md)
+- [Known limitations](limitations.md#payments-and-recovery)
+- [Get paid](https://docs.gyblos.com/en/sellers/get-paid) (seller operators)
