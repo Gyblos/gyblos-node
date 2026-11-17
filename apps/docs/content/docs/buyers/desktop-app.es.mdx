@@ -36,11 +36,11 @@ de abrirla. Es normal; después de la primera vez se abre sin preguntar.
 2. Abre Gyblos. macOS dice que no puede verificar al desarrollador; elige **OK**.
 3. Abre **Configuración del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Gyblos y elige
    **Abrir de todas formas**; confirma con tu contraseña.
-4. Después macOS pide permiso para que Gyblos use la llave "Gyblos Safe Storage" de tu llavero. Escribe
-   la contraseña de tu Mac y elige **Permitir siempre**. La app protege su wallet con esa llave. Mientras
-   la pregunta está abierta, la app no se puede cerrar y su wallet aparece como no disponible.
+4. El chat se abre sin pedir desbloquear una wallet. Gyblos crea su carpeta de datos automáticamente;
+   no tienes que elegir ni abrir una carpeta.
 
-Como la app de la beta no está firmada, macOS repite los pasos 2 a 4 después de cada actualización.
+El sistema puede repetir el aviso de instalación después de actualizar. El acceso a la wallet es
+una acción separada, explicada abajo; abrir la app no solicita «Gyblos Safe Storage».
 
 ### Windows [#windows]
 
@@ -58,6 +58,23 @@ sudo apt install ./gyblos-desktop-<version>-linux-x64.deb
 ```
 
 En otras distribuciones, descomprime el `.tar.gz` y ejecuta `./gyblos-desktop` dentro de la carpeta.
+
+## Cuando elijas usar la wallet protegida [#wallet-protegida]
+
+El chat gratuito no requiere desbloquear esta wallet. En **Payments → Wallet details**, elige
+**Set up or unlock wallet**. Gyblos explica lo que ocurrirá antes de consultar el almacenamiento
+seguro del sistema. Elige **Continue** para seguir o **Cancel** para conversar sin desbloquearla.
+
+En **macOS**, el llavero usa «Gyblos Safe Storage» para proteger la clave de cifrado de la wallet local. Escribe la
+contraseña de tu Mac solo en el diálogo de macOS, nunca en un formulario de Gyblos. En **Windows**, la
+protección normalmente funciona sin preguntas mediante tu cuenta de Windows. En **Linux**, GNOME
+Keyring o KWallet puede pedir desbloquearse; sin un almacén seguro compatible, la wallet permanece
+no disponible y no se guardan claves sin protección.
+
+Desbloquear no autoriza pagos ni habilita fondos. Esta wallet sigue separada de la identidad del
+comprador que usa el chat. Se conservan wallets y registros de recuperación existentes. Los selectores
+de respaldo aparecen solo al elegir guardar o restaurar un archivo. Si ya hay un diálogo del sistema
+abierto, cerrar la app puede esperar a que termine; respóndelo o cancélalo para finalizar con seguridad.
 
 ## Usarla [#usarla]
 

@@ -10,7 +10,7 @@ import {
 
 type WalletHandlerSession = Pick<
   ReturnType<typeof createDesktopWalletSession>,
-  'summary' | 'collection' | 'run' | 'backup' | 'copy'
+  'summary' | 'collection' | 'run' | 'backup' | 'copy' | 'activate'
 >;
 interface WalletSender {
   sender: unknown;
@@ -40,6 +40,11 @@ export function createWalletHandlers(
     );
   }
   return {
+    activate: async (event: WalletSender, args: readonly unknown[]) => {
+      if (!accepts(event, args, 0) || !session) return unavailableCollection();
+      const value = await session.activate();
+      return accepts(event, args, 0) ? value : unavailableCollection();
+    },
     summary: (event: WalletSender, args: readonly unknown[]) =>
       accepts(event, args, 0) && session
         ? session.summary()

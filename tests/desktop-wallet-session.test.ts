@@ -48,7 +48,13 @@ async function fixture(context: { after(fn: () => Promise<void>): void }) {
     select: async () => path,
   };
   const open = () =>
-    createDesktopWalletSession(root, protection, dialogs, controller.signal);
+    createDesktopWalletSession(
+      root,
+      protection,
+      dialogs,
+      controller.signal,
+      async () => true,
+    );
   return {
     home,
     root,
@@ -62,11 +68,11 @@ async function fixture(context: { after(fn: () => Promise<void>): void }) {
   };
 }
 for (const provider of Object.values(WALLET_PROVIDER)) {
-  void test(`startup automatically prepares once; Settings restore/select/backup survives reopen with injected ${provider}`, async (context) => {
+  void test(`explicit wallet access prepares once; Settings restore/select/backup survives reopen with injected ${provider}`, async (context) => {
     const f = await fixture(context);
     f.protection.provider = provider;
     const session = f.open();
-    const first = await session.ready;
+    const first = await session.activate();
     assert.equal(first.wallet.status, WALLET_STATUS.READY);
     assert.ok(first.wallet.address);
     const original = await readFile(
@@ -106,7 +112,7 @@ for (const provider of Object.values(WALLET_PROVIDER)) {
       }),
       BACKUP_RESULT.VERIFIED,
     );
-    view = await f.open().ready;
+    view = await f.open().activate();
     assert.equal(view.wallet.address, f.imported.address);
     assert.equal(view.wallet.backupVerified, true);
     assert.equal(
@@ -124,7 +130,7 @@ for (const provider of Object.values(WALLET_PROVIDER)) {
 void test('duplicate and wrong-password restoration preserve both wallets and selection', async (context) => {
   const f = await fixture(context);
   const session = f.open();
-  const initial = await session.ready;
+  const initial = await session.activate();
   assert.equal(
     await session.run({
       action: WALLET_SETTINGS_ACTION.RESTORE,
@@ -152,7 +158,7 @@ void test('duplicate and wrong-password restoration preserve both wallets and se
   );
   assert.equal((await session.collection()).wallets.length, 2);
 });
-void test('closing during automatic encryption waits for settlement and does not publish a ready UI', async (context) => {
+void test('closing during explicitly approved encryption waits for settlement and does not publish a ready UI', async (context) => {
   const f = await fixture(context);
   let release: () => void = () => {};
   let entered: () => void = () => {};
@@ -169,6 +175,7 @@ void test('closing during automatic encryption waits for settlement and does not
     return encrypt(text);
   };
   const session = f.open();
+  const activating = session.activate();
   await reached;
   f.controller.abort();
   let done = false;
@@ -179,7 +186,7 @@ void test('closing during automatic encryption waits for settlement and does not
   assert.equal(done, false);
   release();
   await settling;
-  assert.equal((await session.ready).wallet.status, WALLET_STATUS.UNAVAILABLE);
+  assert.equal((await activating).wallet.status, WALLET_STATUS.UNAVAILABLE);
   assert.equal(
     (await createWalletService(f.root, f.protection).summary()).status,
     WALLET_STATUS.READY,
@@ -194,7 +201,10 @@ void test('an already aborted startup does not create a root or consult encrypti
     return true;
   };
   const session = f.open();
-  assert.equal((await session.ready).wallet.status, WALLET_STATUS.UNAVAILABLE);
+  assert.equal(
+    (await session.activate()).wallet.status,
+    WALLET_STATUS.UNAVAILABLE,
+  );
   assert.equal(availability, 0);
   await assert.rejects(
     readFile(join(f.root, WALLET.DIRECTORY, WALLET.RECORD)),
@@ -207,7 +217,7 @@ void test('existing incomplete library never initializes a replacement original 
   await mkdir(desktopWalletLibraryPaths(f.root).directory, { mode: 0o700 });
   const session = f.open();
   assert.equal(
-    (await session.ready).wallet.status,
+    (await session.activate()).wallet.status,
     WALLET_STATUS.RECOVERY_REQUIRED,
   );
   await assert.rejects(
@@ -219,7 +229,10 @@ void test('blocked secure storage opens the app without creating an unprotected 
   const f = await fixture(context);
   f.protection.available = async () => false;
   const session = f.open();
-  assert.equal((await session.ready).wallet.status, WALLET_STATUS.UNAVAILABLE);
+  assert.equal(
+    (await session.activate()).wallet.status,
+    WALLET_STATUS.UNAVAILABLE,
+  );
   assert.equal(
     await session.run({
       action: WALLET_SETTINGS_ACTION.RESTORE,
@@ -235,7 +248,7 @@ void test('blocked secure storage opens the app without creating an unprotected 
 void test('operations are mutually exclusive and closing a native dialog retains original custody', async (context) => {
   const f = await fixture(context);
   const session = f.open();
-  const before = await session.ready;
+  const before = await session.activate();
   let entered: () => void = () => {};
   let release: (path: string | null) => void = () => {};
   const reached = new Promise<void>((resolve) => {
