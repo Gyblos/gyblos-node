@@ -3,7 +3,8 @@ title: Desktop app
 description: Download the Gyblos app for macOS, Windows or Linux, open it the first time, and chat with models on the network.
 ---
 
-The desktop buyer starts automatically in its own private app folder (`userData` as `GYBLOS_HOME`).
+If you want to use Gyblos as a buyer, start here. For most users, the desktop app is the only setup you need.
+It starts automatically in its own private app folder (`userData` as `GYBLOS_HOME`).
 It works without a relay token or choosing a folder. A fresh profile creates free-only settings
 with zero budget and price ceilings, and selects a registered seller through discovery and independent
 8004 verification. Existing settings and unfinished spending records are preserved.
@@ -35,11 +36,11 @@ it. This is expected; after the first time it opens normally.
 2. Open Gyblos. macOS says it cannot verify the developer; choose **Done**.
 3. Open **System Settings → Privacy & Security**, scroll to the message about Gyblos and choose
    **Open Anyway**, then confirm with your password.
-4. macOS then asks to let Gyblos use the key "Gyblos Safe Storage" in your keychain. Enter your Mac
-   password and choose **Always Allow**. The app keeps its wallet protected with this key. While the
-   question is open the app cannot quit and its wallet shows as unavailable.
+4. Chat opens without asking to unlock a wallet. Gyblos creates its data folder automatically;
+   you do not need to choose or open a folder.
 
-Because the beta app is not signed, macOS asks steps 2 to 4 again after each update.
+The system may repeat its installation warning after an update. Wallet access is a separate action,
+explained below; opening the app does not request “Gyblos Safe Storage”.
 
 ### Windows [#windows]
 
@@ -56,6 +57,22 @@ sudo apt install ./gyblos-desktop-<version>-linux-x64.deb
 ```
 
 On other distributions, unpack the `.tar.gz` and run `./gyblos-desktop` inside the folder.
+
+## When you choose to use the protected wallet [#protected-wallet]
+
+Free chat does not require unlocking this wallet. In **Payments → Wallet details**, choose
+**Set up or unlock wallet**. Gyblos explains what will happen before consulting the system's secure
+storage. Choose **Continue** to proceed or **Cancel** to keep chatting without unlocking it.
+
+On **macOS**, Keychain uses “Gyblos Safe Storage” to protect the encryption key for the local wallet. Enter your Mac
+password only in the macOS dialog, never into a Gyblos form. On **Windows**, protection is normally
+transparent through your Windows account. On **Linux**, GNOME Keyring or KWallet may ask to unlock;
+without a supported secure store the wallet stays unavailable, with no plaintext fallback.
+
+Unlocking does not authorize a payment or enable funding. The protected wallet remains separate
+from the buyer identity used by chat. Existing wallets and recovery records are preserved. Backup
+and restore file pickers appear only when you choose those actions. If a system dialog is already
+open, closing the app may wait for it; respond to or cancel that dialog to finish safely.
 
 ## Using it [#using-it]
 
@@ -76,7 +93,8 @@ still needs explicit authorization; startup never authorizes a positive budget o
 If startup fails, **Payments → Retry local buyer** retries startup only. A failed inference is never
 resent automatically. Connecting a separately running buyer remains an advanced option.
 
-The app shows an update notice when a newer desktop build for your system is published. **View update**
+The app checks for updates at startup and every five minutes while it stays open. It shows a notice
+when a newer desktop build for your system is published. **View update**
 opens that release on GitHub; nothing is downloaded or installed automatically. This bounded public
 version check sends no identity or chat content. Offline failures stay silent; operators can disable
 it with `GYBLOS_UPDATE_CHECK=0`.
@@ -84,7 +102,7 @@ it with `GYBLOS_UPDATE_CHECK=0`.
 The seller running the model can read your messages. Transport encryption does not hide them from
 that seller. Do not send passwords, keys or other secrets.
 
-To connect your own programs or coding agents, see [Use Gyblos from your code](/en/buyers/use-from-code).
+For advanced integrations, see [connect Gyblos from code](/en/buyers/use-from-code).
 
 Questions or problems? Write in the [Gyblos Telegram](https://t.me/gyblos). The group is public; do not post keys,
 passwords or conversations you want to keep private.

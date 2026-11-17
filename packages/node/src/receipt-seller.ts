@@ -23,8 +23,8 @@ import { createReceiptService } from '@gyblos/transport-iroh/receipt-service';
 import { RECEIPT_WORK } from './constants';
 import type { FreeMeter } from './free-meter';
 import { receiptSignal } from './receipt-file';
-import type { LocalReceiptStore } from './receipt-store';
-import { createReceiptWork } from './receipt-work';
+import type { ReceiptRuntimeStore } from './receipt-store';
+import { createReceiptWork, receiptHealth } from './receipt-work';
 
 export interface SellerReceiptPublisher {
   publish(record: FreeSellerReceiptInput): void;
@@ -40,7 +40,7 @@ export interface PaidSellerReceiptOptions {
 }
 export function createSellerReceiptRuntime(options: {
   nodeId: string;
-  store: LocalReceiptStore;
+  store: ReceiptRuntimeStore;
   signer: Signer;
 }) {
   const work = createReceiptWork(RECEIPT_WORK.sellerMs);
@@ -78,7 +78,7 @@ export function createSellerReceiptRuntime(options: {
           .catch(() => {});
       },
     },
-    health: work.health,
+    health: receiptHealth(work.health, options.store.currentUploadHealth),
     close: work.close,
     settled: work.settled,
   };

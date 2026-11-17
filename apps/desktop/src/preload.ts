@@ -138,6 +138,10 @@ contextBridge.exposeInMainWorld('desktopProbe', {
   run: async () => parseProbeResult(await ipcRenderer.invoke(DESKTOP.CHANNEL)),
 });
 contextBridge.exposeInMainWorld('desktopWallet', {
+  activate: async () =>
+    parseWalletCollection(
+      await ipcRenderer.invoke(WALLET_SETTINGS.ACTIVATE_CHANNEL),
+    ),
   collection: async () =>
     parseWalletCollection(
       await ipcRenderer.invoke(WALLET_SETTINGS.COLLECTION_CHANNEL),

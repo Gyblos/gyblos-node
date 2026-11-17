@@ -124,8 +124,8 @@ capacity. There is no automatic age-based retention. Keys remain until the
 operator deliberately replaces/destroys the entire store. This preserves
 idempotence across normal restarts but is not rollback-resistant storage: an
 older valid snapshot restored between lifetimes cannot be detected without an
-independent anchor. Time retention and tombstones must be decided before
-external collection or public counting is enabled.
+independent anchor. The bounded local backend does not implement the public
+collector's archive or upload path.
 
 Directories and files are owner-only, using the existing runtime's bounded,
 no-follow, single-link reads and owner checks. Stage and snapshot files use mode
@@ -216,28 +216,24 @@ sync/rename. Explicit create refuses an existing file; open refuses missing or
 corrupt history. The retained format records its policy and refuses a different
 retention duration on reopen.
 
-A positive retention duration is required (at most seven days); this is an
-operator choice, not a new network-wide retention decision or default.
-Expiration uses local ingestion time, never the receipt's claimed timestamp. The
-service sweeps once per second while running, and reopening purges expired
-bodies before listening. Ingress also checks expiration. Duplicate submissions
-never extend retention. After expiration, the full signed body becomes `null`; a
-private canonical key, fingerprint and received-at time remain as a replay
-marker. The stored clock floor prevents rollback from reviving erased bodies.
-Markers keep duplicate/conflict decisions and count against the 256-entry/ 1 MiB
-limits forever; a full store refuses new entries without eviction. There is no
-automatic marker pruning, rotation or reset. Deliberately destroying the whole
-store loses its replay history and is not an accounting-safe reset.
+The raw signed bodies are retained indefinitely. The required positive
+`retentionMs` (at most seven days) remains compatibility metadata for existing
+snapshots, including the validation of old replay tombstones; it no longer
+removes bodies. Sweeps verify ownership and advance the local clock floor.
+Original ingestion timestamps never change. Old tombstones are preserved as
+replay evidence; bodies already erased by an earlier version cannot be
+reconstructed.
 
-Retention is logical removal through atomic replacement, not secure erasure:
-filesystem journals/backups may retain old bytes. It cannot erase while the
-process is stopped, and failed I/O can delay removal; a full work queue skips
-that maintenance tick, while a genuine storage or integrity failure stops
-ingestion. No encryption at rest, power-loss/rollback resistance against old
-snapshots, Windows ACL acceptance or production capacity is claimed. Markers
-remain private metadata. Public accounting still requires separate retention,
-identity, fraud and aggregation policy; signatures attest observations rather
-than independently true usage.
+Bodies and historical markers both count against the 256-entry / 1 MiB limits. A
+full store returns `FULL` and preserves every existing entry; duplicates and
+conflicts keep their existing outcomes. There is no automatic eviction, rotation
+or reset. The simple `receipt-store` backend already follows this no-eviction
+rule and needs no upload cursor: these are explicit local collector backends,
+not the per-role source stores consumed by the future uploader.
+
+Private access, process ownership and staged replacement are unchanged. No
+external collection, encryption at rest, snapshot-rollback protection, Windows
+ACL acceptance or production capacity is established by these local tests.
 
 ### Explicit private startup
 
@@ -263,6 +259,7 @@ explicit options and own its `close()` lifecycle.
 
 The existing synthetic startup acceptance also hands its product-produced
 confirmed pairs to this HTTP loopback receiver, closes/reopens the receiver and
-checks expired bodies with persistent duplicate markers. This is local test
-traffic, not runtime upload integration. Programmatic composition may supply the
-explicit retained-storage port; the application owns its close lifecycle.
+checks that raw bodies and duplicate decisions survive expiry and restart. This
+is local test traffic, not runtime upload integration. Programmatic composition
+may supply the explicit retained-storage port; the application owns its close
+lifecycle.

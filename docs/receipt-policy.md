@@ -112,3 +112,58 @@ clock; copied offer times originate on the seller's clock and remain
 buyer-reported claims. Existing v1 uploads/vectors stay unchanged. The public
 collector and uploader must explicitly adopt the new contract; no runtime
 activation is included here.
+
+`apps/metrics-collector` is the public collector Worker that uses v1
+(`POST /v1/receipts`), deployed at `collector.gyblos.com` with its own D1
+database. Its endpoints, order of checks, storage, query cost and operations are
+documented in [metrics-collector.md](metrics-collector.md).
+
+## Local upload cursor
+
+The shared role store at `@gyblos/node/receipts` keeps every saved receipt
+pending until an explicit uploader acknowledgement. `listPending(limit)` returns
+the oldest pending bodies in `(storedAt, canonical request key)` order, with a
+fingerprint of the complete signed envelope. `markUploaded(cursor, confirmedAt)`
+is compare-and-swap on that fingerprint. It preserves the first acknowledgement
+time, in integer UTC epoch milliseconds. A later buyer confirmation keeps the
+original `storedAt` and returns the changed envelope to pending; an old
+seller-only acknowledgement cannot acknowledge the pair. No uploader is enabled
+here.
+
+Pending capacity is 16,384 records / 64 MiB, reserving 4 KiB per record so an
+existing seller-only body can grow to its buyer-confirmed pair. Current golden
+fixtures measure 1,057–1,759 bytes for v1 envelopes and 1,390–2,007 for v2. The
+fixed protocol record caps plus signatures and local metadata fit that
+reservation; this change does not enable v2 emission or storage. The reserve
+covers roughly 11 days at one request per minute or 4.5 hours at one per second;
+it is a capacity estimate, not a guarantee of offline duration.
+
+A full pending budget never deletes an existing body. New writes fail with
+`RECEIPT_STORAGE_FULL`; a durable `rejectedWrites` counter counts failed write
+attempts, not distinct permanently lost requests (a later retry may succeed).
+The role's receipt health and `gyblos seller status` expose capacity and
+failures. Disk/permission failures still report unavailable storage; no software
+counter can be durably saved to a device that rejects writes. Receipt failure
+never retries inference or alters payments.
+
+Only uploaded history is eligible for the existing 256-record / 1 MiB /
+seven-day limits. Pending timestamps and data are not corrected when a clock
+moves. Original `storedAt` is immutable, including during migration and buyer
+confirmation.
+
+The existing state filename now contains a private version-2 local journal,
+independent of the signed receipt version. A canonical snapshot is followed by
+canonical newline-terminated mutations. Appends are synchronized before success;
+a crash-torn final line is ignored and removed under the exclusive update lock
+before the next append. Earlier complete records remain intact. Atomic staged
+compaction bounds the physical file at 128 MiB. The in-process index is rebuilt
+from the journal on reopen; normal writes do not rewrite all earlier bodies.
+Bounded, read-only cold replay finishes warming the cache even if its caller
+cancels; the cancelled call cannot mutate storage. This prevents a large queue
+from consuming the receipt worker's deadline again on every later write. The
+worker retains its slot until that replay settles; its deadline is unchanged.
+Private modes, no-follow/single-link checks, CAS and immutable first buyer
+confirmation remain enforced. Old version-1 snapshots migrate on the next write;
+all surviving entries start pending, even if old enough for the previous TTL. Do
+not downgrade a writer after migration: older binaries cannot read the new local
+journal. Data already discarded by an old binary cannot be recovered.

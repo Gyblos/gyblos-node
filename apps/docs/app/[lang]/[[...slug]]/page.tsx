@@ -26,18 +26,30 @@ export default async function Page(props: PageProps) {
   if (!page) notFound();
 
   const MDX = page.data.body;
+  const isHomePage = !slug?.length;
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription className="mb-0">
-        {page.data.description}
-      </DocsDescription>
-      <PageActions
-        key={page.url}
-        markdownUrl={markdownUrl(page.url)}
-        spanish={lang === 'es'}
-      />
+    <DocsPage
+      toc={page.data.toc}
+      full={page.data.full}
+      className={isHomePage ? 'docs-home-page' : undefined}
+      breadcrumb={{ enabled: !isHomePage }}
+    >
+      <div className="docs-page-header">
+        <div className="docs-page-heading">
+          <div className="docs-page-title-row">
+            <DocsTitle>{page.data.title}</DocsTitle>
+            <PageActions
+              key={page.url}
+              markdownUrl={markdownUrl(page.url)}
+              spanish={lang === 'es'}
+            />
+          </div>
+          <DocsDescription className="mb-0">
+            {page.data.description}
+          </DocsDescription>
+        </div>
+      </div>
       <DocsBody>
         <MDX
           components={getMDXComponents({ a: createRelativeLink(source, page) })}

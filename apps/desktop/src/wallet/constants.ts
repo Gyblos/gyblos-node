@@ -2,6 +2,7 @@
 import { BACKUP } from './backup/constants';
 
 export const WALLET_STATUS = {
+  LOCKED: 'locked',
   LOADING: 'loading',
   READY: 'ready',
   UNAVAILABLE: 'unavailable',
@@ -131,6 +132,7 @@ export const WALLET_SETTINGS_RESULT = {
   RECOVERY_REQUIRED: 'recovery-required',
 } as const;
 export const WALLET_SETTINGS = {
+  ACTIVATE_CHANNEL: 'desktop:wallet-activate',
   CHANNEL: 'desktop:wallet-settings',
   COLLECTION_CHANNEL: 'desktop:wallet-collection',
 } as const;

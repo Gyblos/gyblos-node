@@ -91,7 +91,7 @@ void test('local collector rejects Host rebinding, extra paths and read routes',
   );
   assert.equal(JSON.parse(await readFile(f.path, 'utf8')).entries.length, 0);
 });
-void test('local collector applies buyer quotas and resets the window without restoring expired payloads', async (context) => {
+void test('local collector applies buyer quotas and resets the window while retaining raw payloads', async (context) => {
   const f = await managedReceiptFixture(context);
   let now = 1000;
   const server = f.manage(
@@ -113,9 +113,9 @@ void test('local collector applies buyer quotas and resets the window without re
   const result = await raw(server.url, receiptBytes(f.entry.receipt), {});
   assert.equal(result.status, 200);
   assert.deepEqual(JSON.parse(result.text), { status: 'duplicate' });
-  assert.equal(
+  assert.deepEqual(
     JSON.parse(await readFile(f.path, 'utf8')).entries[0].receipt,
-    null,
+    f.entry.receipt,
   );
 });
 void test('local collector cuts off a slow body and releases its buyer admission', async (context) => {

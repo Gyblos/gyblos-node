@@ -92,7 +92,11 @@
     "./buyer-routing": "./src/buyer-routing.ts",
     "./agent-setup-host": "./src/agent-setup-host.ts",
     "./agent-setup-constants": "./src/agent-setup-constants.ts",
-    "./seller-paid-summary": "./src/seller-paid-summary.ts"
+    "./seller-paid-summary": "./src/seller-paid-summary.ts",
+    "./receipt-uploader": "./src/receipt-uploader.ts",
+    "./receipt-uploader-startup": "./src/receipt-uploader-startup.ts",
+    "./observation-buffer": "./src/observation-buffer.ts",
+    "./diagnostics-startup": "./src/diagnostics-startup.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

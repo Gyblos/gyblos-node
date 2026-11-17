@@ -122,15 +122,21 @@ export async function receiptCollectorHttp(
     acceptanceAssert(
       Array.isArray(snapshot.entries) &&
         snapshot.entries.length === receipts.length &&
-        snapshot.entries.every(
-          (entry: unknown) =>
-            controlObject(entry, [
-              'key',
-              'fingerprint',
-              'receivedAt',
-              'receipt',
-            ]).receipt === null,
-        ),
+        snapshot.entries.every((entry: unknown) => {
+          const row = controlObject(entry, [
+            'key',
+            'fingerprint',
+            'receivedAt',
+            'receipt',
+          ]);
+          return (
+            row.receipt !== null &&
+            receipts.some(
+              (receipt) =>
+                canonicalJson(receipt) === canonicalJson(row.receipt),
+            )
+          );
+        }),
     );
   } finally {
     await second.close();

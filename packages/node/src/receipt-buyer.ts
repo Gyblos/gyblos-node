@@ -32,8 +32,8 @@ import {
 
 import { RECEIPT_WORK } from './constants';
 import { receiptSignal } from './receipt-file';
-import type { LocalReceiptStore } from './receipt-store';
-import { createReceiptWork } from './receipt-work';
+import type { ReceiptRuntimeStore } from './receipt-store';
+import { createReceiptWork, receiptHealth } from './receipt-work';
 
 export interface BuyerReceiptEvidence {
   context: ReceiptExecutionContext;
@@ -67,7 +67,7 @@ async function receiptQuery(
 async function buyerPair(
   found: ReceiptV1,
   evidence: BuyerReceiptEvidence,
-  store: LocalReceiptStore,
+  store: ReceiptRuntimeStore,
   signer: Signer,
   signal: AbortSignal,
 ) {
@@ -115,7 +115,7 @@ function matchesPaidBuyer(expected: BuyerReceiptV1, actual: BuyerReceiptV1) {
 }
 export function createBuyerReceiptRuntime(options: {
   endpoint: Endpoint;
-  store: LocalReceiptStore;
+  store: ReceiptRuntimeStore;
   signer: Signer;
   transport?: ReceiptClientOptions;
   // Receipts that may be exchanged at once: one per request the buyer runs side by side.
@@ -189,7 +189,7 @@ export function createBuyerReceiptRuntime(options: {
         }, external)
         .catch(() => {});
     },
-    health: work.health,
+    health: receiptHealth(work.health, options.store.currentUploadHealth),
     close: work.close,
     settled: work.settled,
   };

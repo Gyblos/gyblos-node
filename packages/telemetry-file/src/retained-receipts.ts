@@ -1,4 +1,4 @@
-// Expiring private receipt bodies with bounded durable replay tombstones; no uploader, service or default home.
+// Keeps raw collector bodies indefinitely and reads historical tombstones; no uploader or default home.
 import { RECEIPT_COLLECTOR_WRITES } from '@gyblos/core/constants';
 import type { PrivateReceiptStore } from '@gyblos/core/receipt-collector';
 
@@ -56,15 +56,8 @@ async function sweep(state: RetainedState, signal?: AbortSignal) {
   if (state.broken) return receiptFileFail(RECEIPT_FILE_CODES.UNAVAILABLE);
   await assertReceiptFile(state);
   const clock = Math.max(state.data.clock, retentionClock(state.now));
-  const entries = state.data.entries.map((row) =>
-    row.receipt && row.receivedAt + state.data.retentionMs <= clock
-      ? { ...row, receipt: null }
-      : row,
-  );
-  if (entries.some((row, index) => row !== state.data.entries[index])) {
-    if (!(await publish(state, { ...state.data, clock, entries }, signal)))
-      return receiptFileFail(RECEIPT_FILE_CODES.UNAVAILABLE);
-  } else state.data.clock = clock;
+  // retentionMs is retained only to read existing snapshots and validate old replay tombstones.
+  state.data.clock = clock;
 }
 function lifecycle(state: RetainedState): RetainedReceiptStore {
   let closing: Promise<void> | undefined;

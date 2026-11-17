@@ -1,6 +1,6 @@
 {
   "title": "Get started",
-  "pages": ["[Intro](/en)", "../sellers/beta-guide", "beta"],
+  "pages": ["[Overview](/en)", "beta"],
   "defaultOpen": true,
   "icon": "compass"
 }

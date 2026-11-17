@@ -1,6 +1,43 @@
 // Private diagnostic log states, error codes and the degraded-logging warning.
 export const UNKNOWN_ERROR_NAME = 'UnknownError';
 
+export const DIAGNOSTIC_LEVELS = {
+  DEBUG: 'debug',
+  INFO: 'info',
+  WARN: 'warn',
+  ERROR: 'error',
+} as const;
+export type DiagnosticLevel =
+  (typeof DIAGNOSTIC_LEVELS)[keyof typeof DIAGNOSTIC_LEVELS];
+export const DIAGNOSTIC_OUTCOMES = {
+  SUCCESS: 'success',
+  FAILURE: 'failure',
+  CANCELLED: 'cancelled',
+  TIMEOUT: 'timeout',
+  CLEANUP_FAILURE: 'cleanup_failure',
+} as const;
+export type DiagnosticOutcome =
+  (typeof DIAGNOSTIC_OUTCOMES)[keyof typeof DIAGNOSTIC_OUTCOMES];
+export const DIAGNOSTIC_CAUSES = {
+  UNKNOWN: 'unknown',
+  ASSERTION: 'assertion',
+  ABORT: 'abort',
+  TIMEOUT: 'timeout',
+  SYNTAX: 'syntax',
+} as const;
+export type DiagnosticCause =
+  (typeof DIAGNOSTIC_CAUSES)[keyof typeof DIAGNOSTIC_CAUSES];
+export const DIAGNOSTIC_FORMAT = {
+  schema: 1,
+  sourceVersion: 'source',
+  tokenCharacters: 80,
+  followMs: 250,
+  defaultRecords: 100,
+  maxRecords: 1000,
+  directoryEntryFactor: 4,
+} as const;
+export const DIAGNOSTIC_READ_ERROR = 'DIAGNOSTICS_UNAVAILABLE';
+
 export const PRIVATE_LOG_STATES = {
   READY: 'ready',
   DEGRADED: 'degraded',

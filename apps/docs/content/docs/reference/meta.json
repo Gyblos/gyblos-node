@@ -1,6 +1,10 @@
 {
   "title": "Reference",
-  "pages": ["cli", "configuration"],
+  "pages": [
+    "cli",
+    "configuration",
+    "[Advanced integration](/en/buyers/use-from-code)"
+  ],
   "defaultOpen": true,
   "icon": "book-open"
 }

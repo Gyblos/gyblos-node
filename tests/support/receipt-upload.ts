@@ -26,7 +26,9 @@ import {
 import { buyerRecord, receiptSigner, sellerRecord } from './receipt-fixture';
 import { paidBuyerRecord, paidReceiptFixture } from './receipt-v2';
 
-export const T0 = 1_800_000_000_000;
+// The collector's clock in upload tests: shortly after the fixtures' signed receivedAt
+// (1700000000000), inside the collector's receipt age window.
+export const T0 = 1_700_000_100_000;
 
 export async function freePair(
   seller = receiptSigner(),

@@ -1,0 +1,52 @@
+{
+  // Metrics collector Worker at collector.gyblos.com. Deploy with `npx wrangler@4.151.1 ...` from
+  // this directory, as for the discovery index; apply migrations with `d1 migrations apply --remote`.
+  // One upload is one read and one batch of at most about 30 D1 statements (docs/metrics-collector.md).
+  "name": "gyblos-collector",
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "d1_databases": [
+    {
+      "binding": "COLLECTOR_DB",
+      "database_name": "gyblos-collector",
+      "database_id": "f6c2dddf-5911-414c-82ff-1f402d7db193",
+      "migrations_dir": "migrations",
+    },
+  ],
+  // Rate limits (Cloudflare counts 10 or 60 second windows). namespace_id values must be unique in
+  // the account (the discovery index uses 42621004, 42621005 and 42621007).
+  "ratelimits": [
+    {
+      // Per client address (IPv6 by /64), before the body is read.
+      "name": "COLLECTOR_IP_LIMITER",
+      "namespace_id": "42621010",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      // Per uploader NodeId, after its envelope signature verifies.
+      "name": "COLLECTOR_NODE_LIMITER",
+      "namespace_id": "42621011",
+      "simple": { "limit": 12, "period": 60 },
+    },
+    {
+      // One shared write budget, spent only by verified uploads right before the write: a ceiling on
+      // storage growth from free node keys. Cloudflare counts per location and eventually, so it is
+      // approximate, not an exact worldwide cap.
+      "name": "COLLECTOR_GLOBAL_LIMITER",
+      "namespace_id": "42621012",
+      "simple": { "limit": 600, "period": 60 },
+    },
+    {
+      // Per client address for the public stats reads, apart from uploads.
+      "name": "COLLECTOR_READ_LIMITER",
+      "namespace_id": "42621013",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
+  "routes": [{ "pattern": "collector.gyblos.com", "custom_domain": true }],
+  // Recomputes the aggregates of days whose raw rows changed (docs/metrics-collector.md, Aggregates).
+  "triggers": { "crons": ["*/10 * * * *"] },
+}
