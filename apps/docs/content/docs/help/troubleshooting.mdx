@@ -185,11 +185,6 @@ make a check pass, don't run setup into another home, and never run `docker comp
 | An answer fails with HTTP 503, or no seller is available                               | No registered seller is online for that model right now. Wait and try again; check that you can reach the internet                                                |
 | An error says the seller was too slow (`engine_timeout`)                               | Send the message again; another seller usually answers. With a coding agent, you can also shorten or compact the conversation                                     |
 | `An unfinished payment needs review. New messages are blocked.`                        | Open **Payments** and review the payment. Don't delete app data to clear it; ask for help if it stays unresolved                                                  |
-| `FREE_BUYER_CONFIGURATION_REQUIRED` when `pnpm buyer:free` starts                      | Read the reason and hint after the code. A missing `selection.json` means you need to run `pnpm buyer:init` first                                                 |
-| The checkout buyer reports that port 4031 is in use                                    | Another buyer is running; stop it first                                                                                                                           |
-
-For more detail on the local buyer, run `gyblos logs --role buyer` (from a checkout,
-`pnpm gyblos logs --role buyer`); see the [CLI reference](/en/reference/cli#local-operational-logs).
 
 ## Ask for help safely [#ask-for-help-safely]
 

@@ -187,11 +187,6 @@ una llave para que una comprobación pase, no ejecutes setup en otro home y nunc
 | Una respuesta falla con HTTP 503, o no hay vendedor disponible                                 | Ahora no hay ningún vendedor registrado en línea para ese modelo. Espera y vuelve a intentarlo; comprueba que llegas a internet                                              |
 | Un error dice que el vendedor fue demasiado lento (`engine_timeout`)                           | Envía el mensaje de nuevo; normalmente responde otro vendedor. Con un agente de código, también puedes acortar o compactar la conversación                                   |
 | `An unfinished payment needs review. New messages are blocked.`                                | Abre **Payments** y revisa el pago. No borres datos de la app para desbloquearlo; pide ayuda si sigue sin resolverse                                                         |
-| `FREE_BUYER_CONFIGURATION_REQUIRED` al arrancar `pnpm buyer:free`                              | Lee el motivo y la pista que siguen al código. Si falta `selection.json`, ejecuta antes `pnpm buyer:init`                                                                    |
-| El comprador del código fuente dice que el puerto 4031 está en uso                             | Ya hay otro comprador en marcha; detenlo primero                                                                                                                             |
-
-Para ver más detalle del comprador local, ejecuta `gyblos logs --role buyer` (desde el código fuente,
-`pnpm gyblos logs --role buyer`); consulta la [referencia de la CLI](/es/reference/cli#logs-operativos-locales).
 
 ## Pide ayuda de forma segura [#pide-ayuda-de-forma-segura]
 

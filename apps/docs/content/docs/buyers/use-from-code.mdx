@@ -1,141 +1,75 @@
 ---
-title: Use Gyblos from your code
-description: Point OpenAI, Anthropic or OpenRouter clients and coding agents at a local Gyblos buyer, from the desktop app or from a source checkout.
+title: Connect your coding tools
+description: Create an API key in the Gyblos app and use Gyblos models from coding agents, the OpenAI and Anthropic SDKs and OpenRouter clients.
 ---
 
-Gyblos speaks the OpenAI and Anthropic APIs through a **local buyer**: a small server on your own
-computer. Programs written for those APIs use Gyblos sellers when you change their base URL. For each
-request, the local buyer gets a signed quote from a seller and streams the answer back over a direct,
-encrypted peer-to-peer connection.
-
-You can run the local buyer in two ways:
-
-- **The desktop app.** Its **Connections** screen gives you a Base URL and an API key with a spending
-  limit, and can set up coding agents. No source checkout is needed. See
-  [Use Gyblos from other tools](/en/buyers/desktop-app#api-keys).
-- **A source checkout.** This page shows how. It serves free offers, at `http://127.0.0.1:4031`.
-
-The request formats, options and errors below apply to both.
-
-## What works [#what-works-today]
-
-| Feature                                                              | Status                                          |
-| -------------------------------------------------------------------- | ----------------------------------------------- |
-| Whole conversations: system message, history, new message            | Yes, up to 1024 messages                        |
-| OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming                |
-| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming                |
-| `GET /v1/models`                                                     | Yes, every model your buyer serves              |
-| Free offers                                                          | Yes                                             |
-| Priced offers (devnet USDC)                                          | Through a desktop API key with a spending limit |
-| Tools (function calling), both formats, whole answers and streaming  | Yes, on free offers; see [Tools](#tools)        |
-| Claude Code                                                          | Only with a seller on a larger model            |
-| Cursor agent mode                                                    | No: it calls from Cursor's cloud                |
-| Images, structured output, several answers per request               | No: refused with a 400 error                    |
-
-By default, a seller serves each buyer up to **30 answers per minute**. An answer is at most **4096
-tokens** unless you raise the buyer's limit, up to 32768. A longer answer stops at the limit with finish
-reason `length`.
-
-The Responses API refuses `parallel_tool_calls: false`, non-default sampling and non-neutral reasoning
-before it contacts a seller, because the signed request can't carry those constraints. Codex versions
-that require them don't work. In every client, turn off HTTP and stream retries.
+The Gyblos [desktop app](/en/buyers/desktop-app) runs a small server on your computer that speaks the
+OpenAI and Anthropic APIs. Coding agents and programs written for those APIs use Gyblos models when you
+give them the app's **Base URL** and an **API key**. You don't install anything else.
 
 Your prompt reaches the seller that answers it. That seller's machine runs the model and can read your
 prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/reference/data-and-privacy).
 
 ## Prerequisites [#before-you-start]
 
-- Git.
-- [Node.js](https://nodejs.org) 24.22.1 or later.
-- The pnpm version pinned in the repository's `package.json`; `corepack enable` provides it.
+- The [Gyblos desktop app](/en/buyers/desktop-app), installed and open. Keep it open while your tools use
+  it.
+- For priced models: a budget authorized in the app's **Payments**. Free models need no wallet.
 
-You don't need to choose a seller: by default the buyer uses any seller registered in the Gyblos index,
-for free answers, and checks each seller's identity on Solana devnet before it sends anything. To use
-only one seller you trust, get its **NodeId** and **owner wallet** (the seller prints both with
-`gyblos doctor`).
+## Create an API key [#create-an-api-key]
 
-## Install and configure [#install-and-configure]
+1. In the app, open **Connections**. If it asks you to connect your buyer, choose **Go to Payments** and
+   start it there.
+2. Under **Create an API key**, enter a **Name** and a **Spend limit**, then choose **Create API key**.
+   The limit is the total this key may spend, in devnet USDC. It never resets and can't be raised later.
+   A limit of `0` allows free models only.
+3. Choose **Copy API key** and **Copy Base URL**.
 
-```sh
-git clone https://github.com/Gyblos/gyblos-node.git
-cd gyblos-node
-pnpm install --frozen-lockfile
-pnpm buyer:init
-```
+You can copy a key only in the app session that created it. A tool that already has the key keeps
+working after you restart the app. **Revoke key** stops new requests with that key; what it already spent
+stays recorded.
 
-`buyer:init` asks for a seller's NodeId: press Enter to use any registered seller, or paste one with its
-owner wallet. It shows the settings (model `qwen3-0.6b`, answers up to 4096 tokens, free quotes only) and
-saves them after you confirm. It sends nothing to a seller or to the chain. `pnpm buyer:init --advanced`
-also sets the model, the answer limit and the endpoints. The buyer keeps its key and settings in
-`.local/gyblos/buyer` inside the checkout.
+## Connect a coding agent [#connect-a-coding-agent]
 
-## Start the buyer [#start-the-buyer]
+The app sets up OpenCode, pi, Codex CLI and Claude Code for you, with every model it can use:
 
-Start the buyer. It needs no relay token:
-
-```sh
-pnpm buyer:free
-```
-
-Leave it running. In another terminal, check that it answers:
+1. In **Connections**, select an active key and choose **Connect agent**.
+2. Pick the **Agent** and review the configuration the app shows.
+3. Choose **Write configuration**. The app changes only the `gyblos` provider and keeps a copy of the
+   previous file. For Claude Code, copy the variables into your shell instead.
+4. The configuration reads the key from `GYBLOS_API_KEY`. Set it in the shell that starts the agent:
 
 ```sh
-curl http://127.0.0.1:4031/v1/models
+export GYBLOS_API_KEY=YOUR_API_KEY
 ```
 
-The output is similar to the following:
+Replace `YOUR_API_KEY` with the key you copied.
 
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "id": "qwen3-0.6b",
-      "object": "model",
-      "created": 0,
-      "owned_by": "gyblos",
-      "type": "model",
-      "display_name": "qwen3-0.6b",
-      "max_output_tokens": 4096
-    }
-  ],
-  "has_more": false,
-  "first_id": "qwen3-0.6b",
-  "last_id": "qwen3-0.6b"
-}
-```
+Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or
+`codex --profile gyblos`. Agents that send many tools and long instructions, such as Claude Code, need a
+seller that serves a larger model.
 
-Use one of the listed `id` values as `model` in your requests. Press Ctrl+C in the buyer's terminal to
-stop it. For a quick conversation in the terminal instead, run `pnpm buyer:chat`, which starts its own
-buyer.
+## Use the key in your own code [#use-the-key]
 
-## Send a conversation [#send-a-conversation]
+In the commands below, set `BASE_URL` to the Base URL you copied and `GYBLOS_API_KEY` to your key. First
+list the models you can use:
 
 ```sh
-curl http://127.0.0.1:4031/v1/chat/completions \
-  -H 'content-type: application/json' \
-  -d '{
-    "model": "qwen3-0.6b",
-    "messages": [
-      {"role": "system", "content": "Answer in one short sentence."},
-      {"role": "user", "content": "My name is Ana."},
-      {"role": "assistant", "content": "Nice to meet you, Ana!"},
-      {"role": "user", "content": "What is my name?"}
-    ]
-  }'
+curl "$BASE_URL/models" -H "Authorization: Bearer $GYBLOS_API_KEY"
 ```
+
+Use one of the listed `id` values as `model`. Listing models doesn't spend from the key's limit.
 
 ### OpenAI SDK [#openai-sdk]
 
-Use base URL `http://127.0.0.1:4031/v1`. The checkout buyer doesn't check the API key, but the SDK needs a
-non-empty one. With the desktop app, use its Base URL and API key instead.
+Use the Base URL as it is:
 
 ```js
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  baseURL: 'http://127.0.0.1:4031/v1',
-  apiKey: 'local',
+  baseURL: process.env.BASE_URL,
+  apiKey: process.env.GYBLOS_API_KEY,
   maxRetries: 0,
 });
 const stream = await client.chat.completions.create({
@@ -154,14 +88,14 @@ for await (const chunk of stream)
 
 ### Anthropic SDK [#anthropic-sdk]
 
-Use base URL `http://127.0.0.1:4031`, without `/v1`. As with Anthropic, `max_tokens` is required.
+Use the Base URL without its final `/v1`. As with Anthropic, `max_tokens` is required:
 
 ```js
 import Anthropic from '@anthropic-ai/sdk';
 
 const client = new Anthropic({
-  baseURL: 'http://127.0.0.1:4031',
-  apiKey: 'local',
+  baseURL: process.env.BASE_URL.replace(/\/v1$/, ''),
+  apiKey: process.env.GYBLOS_API_KEY,
   maxRetries: 0,
 });
 const message = await client.messages.create({
@@ -177,6 +111,27 @@ const message = await client.messages.create({
 console.log(message.content[0].text);
 ```
 
+## What works [#what-works-today]
+
+| Feature                                                              | Status                                   |
+| -------------------------------------------------------------------- | ---------------------------------------- |
+| Whole conversations: system message, history, new message            | Yes, up to 1024 messages                 |
+| OpenAI `POST /v1/chat/completions` and Anthropic `POST /v1/messages` | Yes, whole answers and streaming         |
+| OpenAI `POST /v1/responses` (Codex CLI)                              | Yes, whole answers and streaming         |
+| `GET /v1/models`                                                     | Yes, every model the app can use         |
+| Free offers                                                          | Yes                                      |
+| Priced offers (devnet USDC)                                          | Yes, within the key's spend limit        |
+| Tools (function calling), both formats, whole answers and streaming  | Yes, on free offers; see [Tools](#tools) |
+| Cursor agent mode                                                    | No: it calls from Cursor's cloud         |
+| Images, structured output, several answers per request               | No: refused with a 400 error             |
+
+By default, a seller serves each buyer up to **30 answers per minute**. An answer is at most **4096
+tokens**; a longer answer stops at the limit with finish reason `length`.
+
+The Responses API refuses `parallel_tool_calls: false`, non-default sampling and non-neutral reasoning
+before it contacts a seller, because the signed request can't carry those constraints. Codex versions
+that require them don't work. In every client, turn off HTTP and stream retries.
+
 ## Tools [#tools]
 
 Send `tools` as each API defines them. When the model wants a tool, the answer ends with
@@ -187,8 +142,8 @@ runs the tool and sends the result back in the next request, with the whole conv
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  baseURL: 'http://127.0.0.1:4031/v1',
-  apiKey: 'local',
+  baseURL: process.env.BASE_URL,
+  apiKey: process.env.GYBLOS_API_KEY,
   maxRetries: 0,
 });
 const tools = [
@@ -229,66 +184,32 @@ console.log(second.choices[0].message.content);
 ```
 
 With the Anthropic SDK, send `tools` with `input_schema`, read the `tool_use` blocks and answer with
-`tool_result` blocks, as with Anthropic. The buyer asks only sellers that serve tools; if none does, it
+`tool_result` blocks, as with Anthropic. Gyblos asks only sellers that serve tools; if none does, it
 answers 503 and says so. Tools work on free offers only.
-
-The default model, `qwen3:0.6b`, handles simple calls like this one. Agents that send many tools and long
-instructions, such as Claude Code, need a seller on a larger model through the OpenAI or Anthropic engine.
 
 ## Switch models [#switch-models]
 
-One buyer can serve several models by name. List them under `models` in `selection.json`; the list must
-include the model in `request.selection`. A client switches by sending another name as `model` (`/model`
-in most agents). Each request carries the whole conversation, so the next model reads everything said
-before. The first answer after a switch can take longer, because the new seller has nothing cached.
-
-```json
-"models": [
-  { "id": "qwen3-0.6b", "selection": { "modelId": "qwen3-0.6b", "variant": null, "quantization": "Q4_K_M" }, "maxTokens": 2000 },
-  { "id": "gpt-oss-20b", "aliases": ["gpt-oss"], "selection": { "modelId": "gpt-oss-20b", "variant": null, "quantization": null } }
-]
-```
-
-A name the buyer doesn't serve gets a 404 that lists the names it does.
+Send another name as `model` (`/model` in most agents). Each request carries the whole conversation, so
+the next model reads everything said before. The first answer after a switch can take longer, because
+the new seller has nothing cached. A name the app can't use gets a 404 that lists the names it can.
 
 ## If a seller drops [#if-a-seller-drops]
 
-With `buyer:free`, what happens when a seller fails depends on how far the answer got:
+What happens when a seller fails depends on how far the answer got:
 
-| When the seller fails                                                       | What happens                                                                                                |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Before any text reached your client                                         | The buyer sends the request to another seller of the same model, at most three in total, within 180 seconds |
-| After text reached your client                                              | The request ends with an error; the answer is not restarted elsewhere                                       |
-| The seller itself answers with an error (busy, daily limit, engine failure) | The request ends with that error                                                                            |
-
-Because a retry sends your prompt to a second seller, you can set `"failover": "never"` in
-`selection.json` to keep each prompt on one seller. Then only a request that certainly never reached a
-seller moves to another one.
+| When the seller fails                                                       | What happens                                                                                             |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Before any text reached your tool                                           | Gyblos sends the request to another seller of the same model, at most three in total, within 180 seconds |
+| After text reached your tool                                                | The request ends with an error; the answer is not restarted elsewhere                                    |
+| The seller itself answers with an error (busy, daily limit, engine failure) | The request ends with that error                                                                         |
 
 A broken connection may deliver no response headers at all, so turn off HTTP and stream retries in your
-client. Resending a request yourself starts a new seller selection.
+tool. Resending a request yourself starts a new seller selection.
 
 Some sellers run on slow hardware. If a seller can't read a long prompt, such as a coding agent's, in
 time, the request ends with `reason` `engine_timeout` and a message that the seller was too slow for a
 request this size. Send it again: the failure lowers that seller's weight, so another seller usually
 answers. You can also shorten the conversation; Codex and OpenCode can compact it.
-
-## Connect a coding agent [#connect-a-coding-agent]
-
-One command writes the configuration for OpenCode, pi or Codex CLI with every model your buyer serves. It
-changes only the `gyblos` provider and keeps a copy of the previous file. For Claude Code it prints the
-variables to set in your shell. Without `--write`, it only prints.
-
-```bash
-pnpm buyer:agent opencode --write
-pnpm buyer:agent pi --write
-pnpm buyer:agent codex --write
-pnpm buyer:agent claude
-```
-
-Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or
-`codex --profile gyblos`. Each request carries the whole conversation, so switching models keeps the
-context. The desktop app's **Connect agent** button writes the same configuration.
 
 ## Options and errors [#options-and-errors]
 
@@ -296,37 +217,38 @@ context. The desktop app's **Connect agent** button writes the same configuratio
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `temperature`, `top_p`, `user`, `metadata`, `stream_options`; Anthropic `thinking` (always off) | Accepted and ignored                                                                   |
 | `response_format`, `n`, `logprobs`                                                              | Refused unless neutral: `text`, `1`, `false`                                           |
-| `stop` (up to 4 strings) and Anthropic `stop_sequences`                                         | Honored by your buyer                                                                  |
+| `stop` (up to 4 strings) and Anthropic `stop_sequences`                                         | Honored on your computer                                                               |
 | Images                                                                                          | Refused by Chat Completions and Anthropic; replaced by a text placeholder in Responses |
 
-The buyer applies stop sequences itself: the answer ends just before the first sequence, with finish
-reason `stop` (Anthropic: `stop_reason: "stop_sequence"`). A cut answer carries no tool calls. The seller
-doesn't receive the sequences and keeps generating, so a stream closes only when the seller finishes, and
-`usage` counts everything it generated.
+Gyblos applies stop sequences on your computer: the answer ends just before the first sequence, with
+finish reason `stop` (Anthropic: `stop_reason: "stop_sequence"`). A cut answer carries no tool calls. The
+seller doesn't receive the sequences and keeps generating, so a stream closes only when the seller
+finishes, and `usage` counts everything it generated.
 
-| Answer | Meaning                                                                                     |
-| ------ | ------------------------------------------------------------------------------------------- |
-| 400    | The request uses something the buyer doesn't support; the message and `param` name it       |
-| 404    | The buyer doesn't serve that model; the message lists the ones it does                      |
-| 503    | No seller is available. `Retry-After` suggests when to try again; retrying is your decision |
-| 504    | The seller didn't answer in time                                                            |
+| Answer                        | Meaning                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------- |
+| 400                           | The request uses something Gyblos doesn't support; the message and `param` name it          |
+| 400 `BUYER_KEY_LIMIT_REACHED` | The key's remaining limit can't cover this request; nothing was sent. Create a new key      |
+| 403 `BUYER_KEY_REVOKED`       | The key was revoked; nothing was sent                                                       |
+| 404                           | The app can't use that model; the message lists the ones it can                             |
+| 503                           | No seller is available. `Retry-After` suggests when to try again; retrying is your decision |
+| 503 `BUYER_KEY_NEEDS_REVIEW`  | An earlier paid request on this key has an uncertain outcome. Review it in **Payments**     |
+| 504                           | The seller didn't answer in time                                                            |
 
-Errors use each API's own shape, so SDKs raise their usual exceptions. For startup errors, see
+Errors use each API's own shape, so SDKs raise their usual exceptions. For other problems, see
 [Troubleshooting](/en/help/troubleshooting#buyer-and-desktop).
 
 ## Clients made for OpenRouter [#clients-made-for-openrouter]
 
 OpenRouter uses the same Chat Completions format, plus a few fields of its own. A client or agent set up
-for OpenRouter works when you point its base URL at your buyer (`http://127.0.0.1:4031/v1` for the
-checkout buyer, or the desktop app's Base URL) and use any API key with the checkout buyer, or the
-desktop app's API key:
+for OpenRouter works when you set its base URL to the app's Base URL and its API key to your Gyblos key:
 
 - `provider`, `route`, `transforms`, `usage`, `debug`, `reasoning`, `verbosity`, `prediction` and the
   sampling fields `top_k`, `min_p`, `top_a` and `repetition_penalty` are accepted and ignored. They choose
   among OpenRouter's providers or tune sampling, and don't change what a seller is asked.
 - `models`, a fallback list of up to 8 names, is honored: the answer comes from the first name, `model`
-  first, that your buyer serves, and the reply's `model` says which. If it serves none, the 404 lists the
-  names it serves.
+  first, that the app can use, and the reply's `model` says which. If it can use none, the 404 lists the
+  names it can.
 - OpenRouter-style names find the same model: `qwen/qwen3-0.6b` and `qwen/qwen3-0.6b:free` answer as
   `qwen3-0.6b`. The suffixes `:free`, `:nitro` and `:floor` only choose a provider on OpenRouter. A
   suffix that changes the answer, such as `:online` (web search), doesn't match the plain model.
