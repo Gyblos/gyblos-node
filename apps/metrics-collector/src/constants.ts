@@ -20,6 +20,8 @@ export const COLLECTOR_ERRORS = {
   HTTPS_REQUIRED: 'HTTPS_REQUIRED',
   NOT_FOUND: 'NOT_FOUND',
   UNAVAILABLE: 'COLLECTOR_UNAVAILABLE',
+  // A stats query with a malformed day range or NodeId.
+  INVALID_QUERY: 'INVALID_QUERY',
 } as const;
 export type CollectorErrorCode =
   (typeof COLLECTOR_ERRORS)[keyof typeof COLLECTOR_ERRORS];
@@ -41,6 +43,9 @@ export const COLLECTOR_ROUTES = {
   RECEIPTS: '/v1/receipts',
   HEALTH: '/v1/health',
   OBSERVATIONS: '/v1/observations',
+  STATS_NETWORK: '/v1/stats/network',
+  STATS_MODELS: '/v1/stats/models',
+  STATS_SELLER: '/v1/stats/sellers/:nodeId',
 } as const;
 // What an accepted envelope carried.
 export const ENVELOPE_KINDS = {
@@ -62,6 +67,8 @@ export const COLLECTOR_HEADERS = {
 } as const;
 export const COLLECTOR_HEADER_VALUES = {
   NO_STORE: 'no-store',
+  // Public aggregates: shared caches may keep them for the aggregation interval.
+  PUBLIC_STATS: 'public, max-age=300',
   NOINDEX: 'noindex',
   NOSNIFF: 'nosniff',
   RETRY_AFTER_SECONDS: '60',
@@ -113,3 +120,34 @@ export const IPV6 = {
   prefixGroups: 4,
   hexRadix: 16,
 } as const;
+
+// Aggregates (#351). Changing a formula bumps formulaVersion; rows are then rebuilt from raw.
+export const AGGREGATES = {
+  formulaVersion: 1,
+  // Upper bounds of the latency histogram buckets, in ms; one more bucket holds everything above.
+  // Fixed so histograms can be summed across hours, days, sellers and models.
+  latencyBucketsMs: [
+    100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000, 60_000,
+  ],
+  // Raw rows changed up to this long before the previous scan are scanned again, so an upload
+  // committed while a scan ran is never missed. Recomputing a day twice is harmless.
+  scanOverlapMs: 900_000,
+  // Days recomputed per scheduled run; the rest stay dirty for the next run.
+  maxDaysPerRun: 31,
+  // Per-seller unique buyers are public only at this count or more.
+  minPublicBuyers: 5,
+  // Public day ranges.
+  maxRangeDays: 92,
+  defaultRangeDays: 30,
+  dayMs: 86_400_000,
+  hourMs: 3_600_000,
+} as const;
+export const FIRST_SEEN_KINDS = {
+  SELLER: 'seller',
+  // Free buyers are counted by NodeId, paid buyers by wallet; never merged.
+  BUYER_FREE: 'buyer-free',
+  BUYER_PAID: 'buyer-paid',
+  MODEL: 'model',
+} as const;
+// The single row of collector_agg_state.
+export const AGG_STATE_ID = 1;

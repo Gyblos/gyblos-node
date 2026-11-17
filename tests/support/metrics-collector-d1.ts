@@ -66,7 +66,14 @@ export function createCollectorD1(): SqliteD1 {
         };
         pending.set(wrapped, () => {
           log.push({ kind: 'batch', batch: batches, sql, params });
-          const result = raw.prepare(sql).run(...params);
+          const query = raw.prepare(sql);
+          // Like D1, a batched statement that returns rows (a SELECT) carries them in `results`.
+          if (query.columns().length)
+            return {
+              meta: { changes: 0 },
+              results: query.all(...params) as D1Row[],
+            };
+          const result = query.run(...params);
           return { meta: { changes: Number(result.changes) }, results: [] };
         });
         return wrapped;

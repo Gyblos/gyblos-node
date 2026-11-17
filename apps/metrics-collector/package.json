@@ -12,7 +12,11 @@
     "./worker": "./src/worker.ts",
     "./schema": "./src/schema.ts",
     "./storage-memory": "./src/storage-memory.ts",
-    "./ingest-observations": "./src/ingest-observations.ts"
+    "./ingest-observations": "./src/ingest-observations.ts",
+    "./aggregate": "./src/aggregate.ts",
+    "./stats-read": "./src/stats-read.ts",
+    "./stats-routes": "./src/stats-routes.ts",
+    "./stats-shape": "./src/stats-shape.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

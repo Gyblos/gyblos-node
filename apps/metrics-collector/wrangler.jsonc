@@ -41,4 +41,6 @@
     },
   ],
   "routes": [{ "pattern": "collector.gyblos.com", "custom_domain": true }],
+  // Recomputes the aggregates of days whose raw rows changed (docs/metrics-collector.md, Aggregates).
+  "triggers": { "crons": ["*/10 * * * *"] },
 }

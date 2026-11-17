@@ -22,6 +22,8 @@ import { CollectorError, statusOf } from './errors';
 import { ingestUpload, StaleUploadError } from './ingest';
 import { ingestObservations } from './ingest-observations';
 import { ipKey } from './ip-key';
+import type { StatsReader } from './stats-read';
+import { statsRoutes } from './stats-routes';
 import type { CollectorStorage } from './storage';
 
 // The subset of a Cloudflare rate-limit binding the collector uses.
@@ -36,6 +38,8 @@ export interface MetricsCollectorOptions {
   // Missing storage or any missing limiter fails closed with 503 COLLECTOR_UNAVAILABLE.
   storage?: CollectorStorage;
   limiters?: CollectorLimiters;
+  // Public aggregate reads; missing answers 503 COLLECTOR_UNAVAILABLE on the stats routes only.
+  stats?: StatsReader;
   now?: () => number;
   // Loopback hosts only: plain http is accepted. Storage and limiters are never relaxed.
   development?: boolean;
@@ -70,12 +74,17 @@ async function allowed(limiter: RateLimiter, key: string) {
   }
 }
 
+// Nothing is cacheable unless a route said so (only successful public stats do).
 function finishHeaders(context: Context) {
   const headers = context.res.headers;
-  headers.set(
-    COLLECTOR_HEADERS.CACHE_CONTROL,
-    COLLECTOR_HEADER_VALUES.NO_STORE,
-  );
+  if (
+    context.res.status !== COLLECTOR_STATUS.OK ||
+    !headers.has(COLLECTOR_HEADERS.CACHE_CONTROL)
+  )
+    headers.set(
+      COLLECTOR_HEADERS.CACHE_CONTROL,
+      COLLECTOR_HEADER_VALUES.NO_STORE,
+    );
   headers.set(COLLECTOR_HEADERS.ROBOTS, COLLECTOR_HEADER_VALUES.NOINDEX);
   headers.set(
     COLLECTOR_HEADERS.CONTENT_TYPE_OPTIONS,
@@ -162,6 +171,7 @@ export function createMetricsCollector(options: MetricsCollectorOptions) {
     ] as const;
   app.post(COLLECTOR_ROUTES.RECEIPTS, ...upload(ingestUpload));
   app.post(COLLECTOR_ROUTES.OBSERVATIONS, ...upload(ingestObservations));
+  statsRoutes(app, options.stats, now);
 
   app.notFound((context) => rejection(context, COLLECTOR_ERRORS.NOT_FOUND));
   // Unexpected failures answer one static code and log nothing about the request.

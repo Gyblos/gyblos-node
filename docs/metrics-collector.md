@@ -1,12 +1,13 @@
 # Metrics collector Worker
 
-`apps/metrics-collector` (`@gyblos/metrics-collector`) is the proposed public
-receipt collector: a Cloudflare Worker for `https://collector.gyblos.com`
-(`collector.gyblos.com`), built with Hono and D1. Sellers, the buyer CLI and the
-buyer desktop app will send their signed receipts to it (no uploader exists
-yet), plus their own timestamps, in the
-[receipt upload envelope](../packages/protocol/SPEC.md#receipt-upload-envelope-v1).
-It keeps the rows private. It has no public reads or aggregates yet.
+`apps/metrics-collector` (`@gyblos/metrics-collector`) is the public receipt
+collector: a Cloudflare Worker at `https://collector.gyblos.com`, built with
+Hono and D1. Release builds of sellers, the buyer CLI and the buyer desktop app
+send their signed receipts to it, plus their own timestamps, in the
+[receipt upload envelope](../packages/protocol/SPEC.md#receipt-upload-envelope-v1),
+and content-free observations. Raw rows stay private. A scheduled run turns them
+into [aggregates](#aggregates), and the [public stats API](#public-stats-api)
+serves aggregates only.
 
 It was first deployed on 2026-11-16 with its own D1 database `gyblos-collector`.
 Applying migrations and deploying are founder-approved manual steps (see
@@ -17,17 +18,21 @@ rules.
 
 ## Endpoints
 
-| Route                   | Purpose                                                               |
-| ----------------------- | --------------------------------------------------------------------- |
-| `POST /v1/receipts`     | Upload one signed envelope of 1 to 50 receipts.                       |
-| `POST /v1/observations` | Upload one signed envelope of 1 to 200 content-free telemetry events. |
-| `GET /v1/health`        | `{ "ok": true }` once storage and every limiter exist.                |
+| Route                           | Purpose                                                               |
+| ------------------------------- | --------------------------------------------------------------------- |
+| `POST /v1/receipts`             | Upload one signed envelope of 1 to 50 receipts.                       |
+| `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events. |
+| `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                |
+| `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).       |
+| `GET /v1/stats/models`          | Totals per model over a day range.                                    |
+| `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                            |
 
-Every response carries `Cache-Control: no-store`, `X-Robots-Tag: noindex` and
-`X-Content-Type-Options: nosniff`. There is no CORS: only nodes call it. The
-collector is HTTPS only: a non-`https` URL gets `400 HTTPS_REQUIRED` for every
-method and path, before storage or any limiter. Anything else is
-`404 NOT_FOUND`.
+Every response carries `Cache-Control: no-store`, except a successful stats
+answer, which is `public, max-age=300`. Every response also carries
+`X-Robots-Tag: noindex` and `X-Content-Type-Options: nosniff`. There is no CORS:
+only nodes call it. The collector is HTTPS only: a non-`https` URL gets
+`400 HTTPS_REQUIRED` for every method and path, before storage or any limiter.
+Anything else is `404 NOT_FOUND`.
 
 ### `POST /v1/receipts`
 
@@ -206,6 +211,117 @@ These events carry what receipts cannot:
 - the time each request started (`at` on the request's events, joined by
   `requestId`).
 
+## Aggregates
+
+A Cron Trigger runs every 10 minutes (`*/10 * * * *`, `scheduled` in
+`src/worker.ts`) and calls `runAggregation` (`src/aggregate.ts`). Migration
+`0002_metrics_aggregates.sql` holds the tables.
+
+**Which days.** One batch marks a UTC day dirty when a receipt changed
+(`updated_at`), an observation arrived (`inserted_at`) or a conflict was stored
+since the previous scan, minus a 15-minute overlap so an upload committed during
+a scan is never missed. The cursor is `collector_agg_state`. A run recomputes at
+most 31 dirty days, oldest first; the rest wait for the next run.
+
+**Source time.** Every item falls on the day of its own source time: a receipt
+on the day of the seller's signed `receivedAt`, an observation on the day of its
+own `at`. Never on the collector's arrival time. Late data marks its day dirty
+again and the day is recomputed with a new `aggregated_at`.
+
+**One day, one transaction.** Each table is a `DELETE` of the day plus one
+`INSERT … SELECT … GROUP BY` over that day's raw rows. The day leaves the dirty
+set in the same batch, so readers see the old day or the new one, never a mix.
+The number of statements per day is fixed (17) whatever the day's row count, and
+each binds only the day bounds and the run time. A run adds one scan batch (4
+statements) and two reads. Every row stores `formula_version`
+(`AGGREGATES.formulaVersion`) and `aggregated_at`; deleting the
+`collector_agg_*` rows and the cursor rebuilds everything from raw.
+
+| Table                               | One row per                      | Notes                                                             |
+| ----------------------------------- | -------------------------------- | ----------------------------------------------------------------- |
+| `collector_agg_seller_daily`        | Seller × model × day × free/paid | Variant and quantization are `''` when none.                      |
+| `collector_agg_seller_hourly`       | Seller × model × UTC hour        | Same columns; hour is epoch ms / 3600000.                         |
+| `collector_agg_seller_buyers_daily` | Seller × day × free/paid         | Unique buyers; private, public only at 5 or more.                 |
+| `collector_agg_network_daily`       | Day × free/paid                  | Adds conflicts, active sellers, buyers and models served.         |
+| `collector_agg_observed_daily`      | Day                              | Buyer-experienced latency and the seller's network route.         |
+| `collector_agg_demand_daily`        | Day × requested model            | Unserved demand from buyer observations.                          |
+| `collector_first_seen`              | Seller, buyer or model           | Earliest headline receipt; the basis for new users and retention. |
+
+**Formulas (version 1).**
+
+- **Requests:** the headline is `bilateral + seller-only`. `disputed` is counted
+  apart and adds nothing else; conflicts (evidence against one side) are only
+  counted, never added to any total.
+- **Outcomes and success rate:** completed, failed and cancelled over headline
+  receipts; success rate = completed / (completed + failed + cancelled). Every
+  receipt already reached a seller; refusals and unserved demand are not here.
+- **Tokens:** the seller-signed input, output and reasoning counts of headline
+  receipts. A receipt without a reasoning count adds to `reasoning_unknown`,
+  never to zero.
+- **Authorized usage:** the sum of paid `amountAtomic` and `feeAtomic`, in USDC
+  atomic units. It is what buyers signed for, not revenue: settled USDC comes
+  only from the chain (#349, not built yet).
+- **Buyers:** free buyers are distinct NodeIds; paid buyers are distinct wallets
+  (`payer`, or the NodeId when a paid receipt names none). Free and paid are
+  separate rows and are never added up.
+- **Active sellers and models served:** distinct sellers and distinct
+  `model/variant/quantization` with at least one completed headline receipt.
+- **Latency:** fixed-bucket histograms (upper bounds 100, 200, 500, 1000, 2000,
+  5000, 10000, 20000, 30000 and 60000 ms, plus one bucket above), so hours,
+  days, sellers and models can be summed; percentiles are never averaged. Seller
+  first-token latency covers headline receipts; seller total latency covers
+  completed ones. Buyer-experienced latency comes from the buyer's own
+  `first_token` and `completed` observations and is kept apart.
+- **Network route:** the seller's `completed` and `failed` observations by
+  `path.route`: direct, relay, or unknown (no path or `unknown`).
+- **Unserved demand:** from buyer observations, per requested model, in three
+  disjoint counts: `unserved`, refused before a seller was chosen (except
+  connect failures), and connect failures. A refusal by a chosen seller is not
+  demand that no seller served.
+- **First seen:** the earliest headline receipt time per seller, free buyer,
+  paid buyer and model. Recomputing an earlier day can only move it earlier.
+
+Observations are self-reported by their uploader; they never count against a
+seller without a confirming source.
+
+Not yet included: the daily signed snapshot with a Merkle root and inclusion
+proofs, chain metrics (transactions, settled USDC, fees; they need the indexer
+in #349), and online sellers from presence (they live in the discovery index).
+
+## Public stats API
+
+`GET` only, aggregates only: never a receipt, a buyer identity or a raw
+observation. Query parameters `from` and `to` are UTC days (`YYYY-MM-DD`),
+inclusive, at most 92 days apart; the default is the last 30 days up to today. A
+malformed, impossible, reversed or too long range, or a NodeId that is not 64
+lowercase hex characters, answers `400 INVALID_QUERY`. Without a database the
+stats routes answer `503 COLLECTOR_UNAVAILABLE`. The per-address limit applies.
+
+Every answer has `from`, `to`, `formulaVersion` and `aggregatedAt` (when the
+newest row in the answer was computed, or `null` when the range has no data).
+Totals come in a `free` and a `paid` section, each `null` when there is no data;
+they are never summed. Each section has:
+
+- `requests`: `headline`, `bilateral`, `sellerOnly`, `disputed`;
+- `outcomes`: `completed`, `failed`, `cancelled`, and `successRate` (`null`
+  without outcomes);
+- `tokens`: `input`, `output`, `reasoning`, `reasoningUnknown`;
+- `sellerLatency.firstToken` and `sellerLatency.total`: `samples`, `p50Ms`,
+  `p95Ms` (the upper bound of the bucket holding the percentile; `null` when
+  empty or above 60000 ms), `bucketsMs` and `counts`;
+- free only: `backedByPayment: false`;
+- paid only: `authorizedAtomic` and `feeAtomic`, as decimal strings.
+
+| Route                           | Answer                                                                                                                                                                                              |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `buyers`, `modelsServed`), `observed` (`buyerLatency`, `routes`) and `demand` (per requested model).      |
+| `GET /v1/stats/models`          | `models`: one entry per model, variant and quantization, with `free` and `paid` (plus `sellers`), most completed first.                                                                             |
+| `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld` (the buyer count is `null` and `withheld` true below 5); `models`: the seller's totals per model over the range. |
+
+Each stats request is one batch of reads over aggregate tables: three statements
+for the network and seller answers, one for models, whatever the range.
+Histograms are summed in SQL.
+
 ## Order of checks
 
 The cheapest checks run first, and nothing expensive happens before the request
@@ -263,25 +379,31 @@ is written.
 
 ## Code layout
 
-| Layer            | File                                         | Owns                                                             |
-| ---------------- | -------------------------------------------- | ---------------------------------------------------------------- |
-| Entry            | `src/worker.ts`                              | Cloudflare bindings to the app; fails closed; inert on import.   |
-| HTTP             | `src/app.ts`, `src/ip-key.ts`                | Routes, admission middleware, body cap, error mapping.           |
-| Use case         | `src/ingest.ts`                              | The order of checks and building one write.                      |
-| Policy           | `@gyblos/core/public-receipts`               | Receipt verification, classification and merge rules.            |
-| Storage port     | `src/storage.ts`                             | The `CollectorStorage` interface and the shared write rule.      |
-| Storage adapters | `src/storage-d1.ts`, `src/storage-memory.ts` | D1 (Drizzle, `src/schema.ts`, `src/d1-client.ts`) and in-memory. |
-| Values           | `src/constants.ts`, `src/errors.ts`          | Wire codes, statuses, limits, binding names, error mapping.      |
+| Layer            | File                                                                                                  | Owns                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Entry            | `src/worker.ts`                                                                                       | Cloudflare bindings to the app; fails closed; inert on import.   |
+| HTTP             | `src/app.ts`, `src/ip-key.ts`                                                                         | Routes, admission middleware, body cap, error mapping.           |
+| Use case         | `src/ingest.ts`                                                                                       | The order of checks and building one write.                      |
+| Policy           | `@gyblos/core/public-receipts`                                                                        | Receipt verification, classification and merge rules.            |
+| Storage port     | `src/storage.ts`                                                                                      | The `CollectorStorage` interface and the shared write rule.      |
+| Storage adapters | `src/storage-d1.ts`, `src/storage-memory.ts`                                                          | D1 (Drizzle, `src/schema.ts`, `src/d1-client.ts`) and in-memory. |
+| Values           | `src/constants.ts`, `src/errors.ts`                                                                   | Wire codes, statuses, limits, binding names, error mapping.      |
+| Aggregation      | `src/aggregate.ts`, `src/aggregate-sql.ts`, `src/aggregate-first-seen.ts`, `src/schema-aggregates.ts` | The scheduled run, its per-day SQL and the aggregate tables.     |
+| Public reads     | `src/stats-read.ts`, `src/stats-shape.ts`, `src/stats-routes.ts`                                      | Set-based reads, response shapes and the stats routes.           |
 
 ## Operations
 
-All of these steps need founder approval. None has been done.
+Every step needs founder approval. The database, rate limits, route and
+migration `0001` were set up and deployed on 2026-11-16.
 
-1. Create the D1 database `gyblos-collector` and put its id in `wrangler.jsonc`.
-2. Create the three rate-limit namespaces. The ids in `wrangler.jsonc` are
-   unverified placeholders and must be unused in the account.
-3. Apply `migrations/` to the remote database.
-4. Route `collector.gyblos.com` and deploy with `npx wrangler@4.151.1 deploy`.
+To ship a change, from `apps/metrics-collector`:
+
+1. Apply new migrations:
+   `npx wrangler@4.151.1 d1 migrations apply gyblos-collector --remote`.
+2. Deploy: `npx wrangler@4.151.1 deploy`. This also registers the Cron Trigger.
+
+After `0002`, the first scheduled run marks every day with data dirty and
+recomputes up to 31 days per run.
 
 One upload can run about 30 D1 statements in a batch. Watch the database size:
 the shared write budget is the only ceiling on growth from free node keys, and
