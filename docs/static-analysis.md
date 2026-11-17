@@ -1,20 +1,35 @@
 # Static analysis
 
-The `Static analysis / Semgrep CE` workflow runs on pull requests into `main`
-and pushes to `main`. It uses Semgrep Community Edition 1.183.0, pinned by the
-official multi-platform image digest in
-[the workflow](../.github/workflows/semgrep.yml). No Semgrep account, paid
-GitHub security product or subscription is required. Private-repository Actions
-usage still counts against the plan's included usage. This job reports its
-result as an ordinary Actions check, without hosted SARIF alerts or cloud
-analysis.
+The `Static analysis / Semgrep CE` check blocks dangerous JavaScript and
+TypeScript patterns, such as `eval`, shell execution, disabled TLS verification
+or unsafe Electron preferences. It is a required check on pull requests into and
+pushes to `develop` and `main`.
+
+It runs Semgrep Community Edition 1.183.0, pinned by image digest in
+[the workflow](../.github/workflows/semgrep.yml), against eight local rules. It
+needs no Semgrep account or paid product, and reports as an ordinary Actions
+check, without hosted SARIF alerts or cloud analysis.
+
+## When the check fails on your PR
+
+1. Open the failed job log. It lists each finding's rule ID, file and line, not
+   the matched source.
+2. Find the rule in the table below and replace the pattern with a safe
+   alternative. The safe cases in [probes.json](../tooling/semgrep/probes.json)
+   show what each rule accepts.
+3. If the job failed on accounting instead of a finding (an analysis error, a
+   tracked symlink, a file over the size limits, a path mismatch), fix the
+   input; the log names the reason.
+4. If you believe a rule is wrong, say so in the PR. A rule change is reviewed
+   as code, in its own change, with its positive and safe-alternative probes.
+
+Never add `nosemgrep`, a baseline or an allowlist: inline suppressions are
+disabled and the job has none.
 
 ## Rules and scope
 
 [The eight local rules](../tooling/semgrep/rules.json) are original Apache-2.0
-project content. JavaScript and TypeScript rules cover the projected JS/TS/TSX
-inputs, with all three extensions exercised by the probes. No upstream registry
-rule pack is copied or downloaded.
+project content. No upstream registry rule pack is copied or downloaded.
 
 | Rule                          | Checked pattern                                                             |
 | ----------------------------- | --------------------------------------------------------------------------- |
@@ -27,87 +42,89 @@ rule pack is copied or downloaded.
 | `gyblos.raw-html`             | `innerHTML` assignment and React raw-HTML props                             |
 | `gyblos.weak-hash`            | Named imports of lowercase `md5`/`sha1` hashing from Node crypto            |
 
-The source inventory comes from NUL-delimited `git ls-files`. Every tracked
-`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` and `.cjs` file is projected into a
-temporary source-only directory, including product, lab, tests and tooling.
-Dependencies, Git metadata, local state and ignore/config files are not copied.
-Tracked symlinks/hard links, unsupported file types, empty inventories and files
-beyond the reviewed limits fail instead of silently reducing coverage. The
-limits are 4 MiB per file, 64 MiB in total and 5,000 code files.
+The inventory comes from NUL-delimited `git ls-files`. Every tracked `.ts`,
+`.tsx`, `.js`, `.jsx`, `.mjs` and `.cjs` file (product, lab, tests and tooling)
+is projected into a temporary source-only directory. Dependencies, Git metadata,
+local state and ignore or config files are not copied.
 
-An explicit empty ignore file overrides the selected frontend's default ignores.
+The job fails on:
+
+- any finding, of any severity;
+- a malformed report, an analysis error or a skipped rule;
+- a mismatch between the paths Git lists and the paths Semgrep scanned;
+- tracked symlinks or hard links, unsupported file types or an empty inventory;
+- files beyond the limits: 4 MiB per file, 64 MiB in total and 5,000 code files.
+  The repository has about 2,100 tracked code files.
+
 Inline `nosemgrep` suppressions, Git ignore filtering and the scanner's default
-size filter are disabled. The minified-filename probe is included; any omission
-fails target accounting. Findings of any severity, malformed reports, analysis
-errors, skipped rules or a mismatch between Git's expected paths and Semgrep's
-scanned paths fail the job. There is no baseline or allowlist.
+size filter are disabled, and an explicit empty ignore file replaces the default
+ignores.
 
 ## Coverage verification
 
 Before scanning the repository, [the runner](../tooling/semgrep/check.py) checks
 [positive and safe-alternative probes](../tooling/semgrep/probes.json) against
-the real pinned engine. Every rule must have a positive case, and exact findings
-must match the expected rule IDs and paths. Probes include TSX, process-import
-aliases, `tests/`, minified filenames, a source larger than the default scanner
-limit and an inline suppression comment. Three malformed TS/TSX/JS sources with
-a relevant token only in a comment must report analysis errors, without relying
-on a security finding to fail. Six incomplete-report cases and a tracked symlink
-verify the accounting guards. These are scanner inputs as text; none of the
-sample code is executed.
+the pinned engine. Every rule has a positive case, and findings must match the
+expected rule IDs and paths exactly. Probes cover TSX, process-import aliases,
+`tests/`, minified filenames, a source larger than the default scanner limit and
+an inline suppression comment. Malformed TS, TSX and JS sources must report
+analysis errors, and incomplete-report cases and a tracked symlink exercise the
+accounting guards. Probes are scanner input as text; none is executed.
 
-The scanner has no network, login, repository token or Docker socket. Its input
-mounts are read-only and its only writable workspace is bounded temporary
-scratch. Metrics and version checks are disabled. CPU, memory, process,
-file-size and wall-clock limits are enforced. The helper executes repository
-tooling, not product code. Logs contain finding identifiers and locations, not
-matched source snippets. No paid Semgrep engine, registry fetch, autofix or
-analysis upload is used.
+The scanner runs with no network, login, repository token or Docker socket. Its
+inputs are mounted read-only and its only writable space is bounded temporary
+scratch. Metrics and version checks are off, and CPU, memory, process, file-size
+and wall-clock limits apply. The helper runs repository tooling, never product
+code.
 
-The pinned release explicitly selects its supported legacy frontend with normal
-semantic rule prefiltering. Target accounting is not proof that every AST was
-fully parsed. Three separate no-keyword malformed probes demonstrate that CE can
-process a path without syntax-validating it; they record a known limit, not
-successful syntax coverage. Typechecking and lint remain independent checks.
+## Known limits
 
-## Limits
+- This is a bounded pattern check, not CodeQL-equivalent coverage or a
+  vulnerability audit. It does not establish inter-file or interprocedural
+  dataflow safety. Computed or obfuscated APIs, untested import forms and
+  patterns outside the eight rules can be missed.
+- Target accounting does not prove every file was fully parsed. With normal
+  semantic prefiltering, Semgrep can skip parsing a file that has no relevant
+  token; three malformed probes without keywords record this limit. Typecheck
+  and lint stay independent checks.
+- Valid TypeScript such as `export type *` and import-type queries has parser
+  gaps in this version
+  ([upstream issue](https://github.com/semgrep/semgrep/issues/11871)). A
+  compatibility probe checks the known type-only star-export rejection, and a
+  relevant pattern in an unsupported form fails until it is resolved.
+- The check says nothing about signatures, payment arithmetic, authorization,
+  journal recovery, backup custody, native code, dependencies or secrets.
+  Reviews, protocol vectors, regression tests, Gitleaks and the dependency audit
+  cover those. Python, workflow files and other non-JS/TS source need normal
+  review.
 
-These rules are a bounded pattern-based security check, not CodeQL-equivalent
-coverage or a complete vulnerability audit. Valid TypeScript constructs such as
-`export type *` and import-type queries have parser gaps in this version. Normal
-semantic prefiltering can avoid parsing a file without relevant patterns; no
-reported parser errors are suppressed or filtered. Adding a relevant pattern to
-an unsupported source form must fail until the incompatibility is resolved. An
-additional compatibility probe checks the known type-only star-export rejection.
-See the
-[upstream parser issue](https://github.com/semgrep/semgrep/issues/11871). CE
-does not establish inter-file or general interprocedural dataflow safety.
-Computed/obfuscated APIs, untested import forms and patterns outside these eight
-rules can be missed. Recognized safe-looking syntax is not proof that runtime
-input is trusted.
+## Run it locally
 
-The job does not prove signatures, payment arithmetic, authorization, journal
-recovery, backup custody, native/Rust security, dependency safety or absence of
-secrets. Independent reviews, protocol vectors, regression tests, Gitleaks and
-dependency auditing retain their separate responsibilities. Source outside the
-listed JavaScript/TypeScript extensions, including this Python helper and
-workflow configuration, requires normal review and appropriate other checks.
+You do not need to: `pnpm check` and `pnpm desktop:build` are the ordinary
+contribution checks. To reproduce the scan, you need Docker with Linux
+containers, Git and GNU `timeout` (`gtimeout` from coreutils on macOS). Use a
+fresh disposable clone or worktree with no real ignored `.local` or `.env`
+state, then run from its root:
 
-## Local reproduction and updates
+```sh
+export GITHUB_WORKSPACE="$PWD"
+export RUNNER_TEMP="$(mktemp -d)"
+export SEMGREP_IMAGE="$(sed -n 's/^ *SEMGREP_IMAGE: //p' .github/workflows/semgrep.yml)"
+docker pull "$SEMGREP_IMAGE"
+```
 
-Ordinary contribution checks remain `pnpm check` and `pnpm desktop:build`. Local
-scanner reproduction is optional and needs Docker with Linux containers, Git and
-GNU `timeout`. Use a fresh disposable clone/worktree without real ignored
-`.local` or `.env` state. Set `GITHUB_WORKSPACE` to the absolute checkout path,
-`RUNNER_TEMP` to a new temporary directory and `SEMGREP_IMAGE` to the exact
-pinned value in the workflow. Run its `Fetch pinned scanner` and
-`Verify rule probes and scan every tracked JS/TS/TSX file` command blocks. The
-image is fetched before the scanner's offline container starts. No project
-installation, wallet, environment secret, engine or operational service is used.
+Then run the `Verify rule probes and scan every tracked JS/TS/TSX file` block
+from [the workflow](../.github/workflows/semgrep.yml) unchanged. No project
+install, wallet, secret, engine or service is used.
 
-Update the image version and digest together after reviewing the upstream
-release. Review rule/probe changes as code, run the full scan and compare exact
-file counts; never remove a positive probe or suppress a finding to make CI
-pass. A changed rule must retain its positive and nearby safe-alternative cases.
-See the [CE engine source](https://github.com/semgrep/semgrep),
-[CLI reference](https://docs.semgrep.dev/cli-reference) and
+## Updating the scanner or rules
+
+- Update the image version and digest together after reviewing the upstream
+  release, run the full scan and compare exact file counts.
+- Review rule and probe changes as code. A changed rule keeps its positive and
+  nearby safe-alternative cases; never remove a positive probe or suppress a
+  finding to make CI pass.
+
+References: [CE engine source](https://github.com/semgrep/semgrep),
+[CLI reference](https://docs.semgrep.dev/cli-reference),
 [ignore behavior](https://docs.semgrep.dev/ignoring-files-folders-code).

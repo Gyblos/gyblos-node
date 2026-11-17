@@ -5,10 +5,16 @@ Applications, Activity, Payments and Settings. A visual state never proves a
 payment, model or remote service is available. Render capabilities from the
 existing controllers and validated host bridges.
 
+This file owns the visual and interaction rules. What each screen does, the
+payment flows and the wallet are described in
+[docs/desktop.md](../../docs/desktop.md). Settings opens a live preview of the
+shared components (`src/ui/DesignSystem.tsx`); check changes there first.
+
 ## Shared sources
 
 - `src/theme.ts`: light/dark semantic colors. The primary accent is `#0a28f0`.
-- `src/mockup-base.css`: bundled Instrument Sans, monospace and element defaults.
+- `src/mockup-base.css`: bundled Instrument Sans, GeistMono for monospace text,
+  and element defaults.
 - `src/ui/geometry.css`: panel 16 px, control 10 px, option 8 px and badge radii.
 - `src/ui/ui.css`: shared primitives and spacing tokens.
 - `src/ui/buyer-design.css`: compact buyer composition, shell motion, shared
@@ -29,7 +35,7 @@ existing controllers and validated host bridges.
 | Section / metric text               | 18 / 22 px                             |
 | Control / icon                      | 32 / 16 px                             |
 | Header                              | 44 px                                  |
-| Navigation / collapsed rail         | 224 / 56 px                            |
+| Navigation / collapsed rail         | 224 / 56 px (compact desktop frame)    |
 | Context panel                       | 260 px, capped at 40% of its workspace |
 | Management / reading column maximum | 1120 / 760 px                          |
 | Page inset                          | 24 px; 16 px below 900 px              |
@@ -114,10 +120,14 @@ Models uses a searchable list with laboratory artwork, a filter menu and a
 network-check dialog. Artwork does not establish availability. Applications
 shows unavailable web services as such, without pretend connection actions.
 Settings holds Appearance, the visual-system preview and version information.
+An update notice sits in the title bar when a newer release exists; it opens
+the release page and never installs anything.
 
 Payments prioritizes the USDC wallet with its public address and funding
 availability, followed by a compact PayPal summary and a session-management
-dialog. Spending filters are independent from Chat's selected payment method.
+dialog. Wallet details holds backup and restore (`WalletBackup`,
+`WalletRestore`, `WalletSelector`); their dialogs show only fixed statuses and
+never a key, path or file content. Spending filters are independent from Chat's selected payment method.
 Preserve all existing checkout, capture and uncertain-payment guards. Visiting
 a route or opening a dialog never starts, approves or settles a payment.
 

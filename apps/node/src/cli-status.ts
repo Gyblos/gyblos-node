@@ -4,7 +4,7 @@
 // codes, public identifiers and URL origins; never a prompt, a buyer, a key, the home location or a value
 // from the environment.
 import { runMode } from '@gyblos/config';
-import { fetchSellers } from '@gyblos/discovery-http';
+import { DISCOVERY_ERROR_CODES, fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
 import { listReceipts, receiptUploadHealth } from '@gyblos/node/receipts';
 import { sellerPaidSummary } from '@gyblos/node/seller-paid-summary';
@@ -114,6 +114,14 @@ async function indexListing(
     : NOT_FOUND;
 }
 
+// Why the index refused this seller's last publication, for the codes an operator can act on.
+const PUBLISH_HINTS: Readonly<Record<string, string>> = {
+  [DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED]:
+    'the index does not accept this identity yet: run `gyblos seller register` with your invitation; during the beta, ask for one in the Gyblos Telegram',
+};
+const publishHint = (code: string) =>
+  Object.hasOwn(PUBLISH_HINTS, code) ? ` (${PUBLISH_HINTS[code]})` : '';
+
 async function discoveryLine(
   online: boolean,
   system: StatusSystem,
@@ -127,7 +135,10 @@ async function discoveryLine(
       listing: LISTING.UNKNOWN,
     };
   if (!discovery.publish) return { text: 'off', listing: LISTING.OFF };
-  const on = `on (${urlOrigin(discovery.url)})`;
+  const refused = status?.publicationError;
+  const on = `on (${urlOrigin(discovery.url)})${
+    refused ? `; publishing refused: ${refused}${publishHint(refused)}` : ''
+  }`;
   if (!online) return { text: on, listing: LISTING.UNCHECKED };
   const models = new Set(
     (status?.offers ?? [])

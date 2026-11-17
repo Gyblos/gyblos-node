@@ -142,7 +142,7 @@ CI on the base branch for the merge SHA; otherwise report it as not run.
 Contributors without vault access hand off the merged change and validation to
 an authorized maintainer. Maintainers and agents with authorized vault access
 follow the vault's own `AGENTS.md`; this is the usual shape for
-`../gyblos-brain/30 Repos/gyblos-payments.md` (GYB-DOC-007):
+`../gyblos-brain/30 Repos/gyblos-payments.md`:
 
 1. `git -C ../gyblos-brain status` first; leave unrelated edits alone.
 2. Update **Current state** at the top (main SHA, merged PRs, exact gate counts,

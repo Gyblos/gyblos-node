@@ -60,7 +60,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 | discovery index client                      | `packages/discovery-http`                                       | HTTP adapter; index defaults in `config`                   |
 | discovery index server (Worker)             | `apps/discovery-index`                                          | deployable app; verification via protocol only             |
 | `GYBLOS_HOME` / `GYBLOS_LAB_HOME` layout    | `packages/config/src/home.ts`                                   | single path owner                                          |
-| `config.toml` validator, precedence         | `packages/node/src/node-config*.ts`, `packages/node/schemas/`   | node composes adapter URL policies; GYB-DOC-026            |
+| `config.toml` validator, precedence         | `packages/node/src/node-config*.ts`, `packages/node/schemas/`   | node composes adapter URL policies                           |
 | `gyblos` CLI (`config validate`)            | `apps/node/src/bin.ts` → `entry.ts` → `cli.ts`                  | one entry; output never prints env values                  |
 | devnet wallet config, `gate:*`              | `lab/harness`                                                   | lab-only                                                   |
 

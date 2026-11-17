@@ -44,7 +44,12 @@ void test('a day that fails stays dirty and never blocks the other days', async 
       ? Promise.reject(new Error('D1 unavailable'))
       : batch(statements);
   const run = await runAggregation(database, NOW);
-  assert.deepEqual(run, { days: ['2026-11-15'], failed: [DAY], more: false });
+  assert.deepEqual(run, {
+    days: ['2026-11-15'],
+    failed: [DAY],
+    more: false,
+    chain: { days: [], failed: [], more: false, scanFailed: false },
+  });
   assert.deepEqual(
     rowsOf(database, 'SELECT day FROM collector_agg_dirty_days'),
     [{ day: DAY }],
@@ -63,7 +68,12 @@ void test('raw values past year 9999 or beyond 64-bit sums never stop aggregatio
       inputTokens: Number.MAX_SAFE_INTEGER,
     });
   const run = await runAggregation(database, NOW);
-  assert.deepEqual(run, { days: [DAY], failed: [], more: false });
+  assert.deepEqual(run, {
+    days: [DAY],
+    failed: [],
+    more: false,
+    chain: { days: [], failed: [], more: false, scanFailed: false },
+  });
   assert.equal(
     rowsOf(database, 'SELECT count(*) AS n FROM collector_agg_dirty_days')[0]!
       .n,
@@ -90,7 +100,7 @@ void test('a formula version change recomputes every day aggregated with another
   );
 });
 
-void test('a run is two reads, one scan batch of 4 and 17 statements per day', async () => {
+void test('a run is four reads, a receipt scan batch of 4, 17 statements per day and a chain scan batch of 4', async () => {
   const database = createCollectorD1();
   insertReceipt(database);
   database.log.length = 0;
@@ -98,7 +108,7 @@ void test('a run is two reads, one scan batch of 4 and 17 statements per day', a
   const sizes = new Map<number, number>();
   for (const entry of database.log)
     sizes.set(entry.batch, (sizes.get(entry.batch) ?? 0) + 1);
-  assert.deepEqual([...sizes.values()], [2, 4, 17]);
+  assert.deepEqual([...sizes.values()], [4, 4, 17, 4]);
 });
 
 void test('hourly rows hold their hour and are replaced when the day is recomputed', async () => {

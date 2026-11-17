@@ -188,6 +188,9 @@ export {
 
 // Chain index tables (#349).
 export {
+  aggChainDaily,
+  aggChainDirtyDays,
+  aggChainState,
   chainChannels,
   chainCursor,
   chainInstructions,

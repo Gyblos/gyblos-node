@@ -12,18 +12,34 @@ export const TIMEOUTS = {
   readinessRequest: 500,
 } as const;
 
-// A long answer needs longer than the base generation deadline: past the original 128-token answer, each
-// asked-for token adds time, up to just under the transport's request deadline (180 s).
+// An engine's deadline has two parts, together just under the transport's request deadline (180 s):
+// - reading the prompt: each counted input token adds time, so a long agent prompt is not cut while it is
+//   still being read (10 ms per token, a reading speed of 100 tokens per second or more);
+// - answering: past the original 128-token answer, each asked-for token adds time.
 const LONG_ANSWER = {
   baseTokens: 128,
   msPerToken: 25,
   ceilingMs: 170_000,
 } as const;
-export function generationDeadlineMs(baseMs: number, maxTokens: number) {
+export const PROMPT_READING = {
+  msPerInputToken: 10,
+} as const;
+export function generationDeadlineMs(
+  baseMs: number,
+  maxTokens: number,
+  inputTokens = 0,
+) {
   const extra = Math.max(0, maxTokens - LONG_ANSWER.baseTokens);
+  const reading =
+    Number.isSafeInteger(inputTokens) && inputTokens > 0
+      ? inputTokens * PROMPT_READING.msPerInputToken
+      : 0;
   return Math.max(
     baseMs,
-    Math.min(LONG_ANSWER.ceilingMs, baseMs + extra * LONG_ANSWER.msPerToken),
+    Math.min(
+      LONG_ANSWER.ceilingMs,
+      baseMs + reading + extra * LONG_ANSWER.msPerToken,
+    ),
   );
 }
 

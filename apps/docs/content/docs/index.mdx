@@ -1,33 +1,42 @@
 ---
-title: Docs
-description: 'Choose how you want to use Gyblos: run a seller or start from the app.'
+title: Gyblos documentation
+description: Gyblos is a peer-to-peer network for AI inference. Use models as a buyer or serve one as a seller.
 ---
+
+Gyblos is a peer-to-peer network for AI inference. **Sellers** run a model on their own machine and
+offer it to the network. **Buyers** chat with those models in the desktop app, or call them from their own
+programs through OpenAI- and Anthropic-compatible APIs.
+
+The beta runs on Solana **devnet**. Free offers need no wallet. Priced offers are paid in devnet USDC,
+which has no market value. Selling requires an invite code.
 
 ## Choose your path [#choose-your-path]
 
 <Cards>
-  <Card title="Run a seller" href="/en/sellers/beta-guide">
-    Install a free seller, check that it works, and publish it to the index.
+  <Card title="Chat with models" href="/en/buyers/desktop-app">
+    Download the desktop app for macOS, Windows or Linux and chat with models on
+    the network.
   </Card>
-  <Card title="Use Gyblos" href="/en/buyers/desktop-app">
-    Download the desktop app and chat with models available on the network.
+  <Card title="Connect your coding tools" href="/en/buyers/use-from-code">
+    Create an API key in the app and use Gyblos from coding agents and OpenAI or
+    Anthropic clients.
+  </Card>
+  <Card title="Run a seller" href="/en/sellers/beta-guide">
+    Install a seller, check that it works and publish it in the discovery index.
   </Card>
 </Cards>
 
-## Common tasks [#common-tasks]
+## Learn the basics [#learn-the-basics]
 
 <Cards>
-  <Card title="Register and publish" href="/en/sellers/register-publish">
-    Add your identity and make your seller discoverable.
+  <Card title="How it works" href="/en/getting-started/how-it-works">
+    How sellers, buyers, the discovery index, relays and payments fit together.
   </Card>
-  <Card title="Models and limits" href="/en/sellers/models-offers">
-    Choose the model and adjust free response limits.
+  <Card title="Requirements" href="/en/getting-started/beta">
+    What the beta supports and what you need for each role.
   </Card>
-  <Card title="Operate your seller" href="/en/sellers/operate">
-    Check health, apply changes, and update the service.
-  </Card>
-  <Card title="Identity and privacy" href="/en/sellers/identity">
-    Preserve your identity and learn what data is safe to share.
+  <Card title="Glossary" href="/en/getting-started/glossary">
+    Short definitions of the terms these pages use.
   </Card>
 </Cards>
 
@@ -35,12 +44,15 @@ description: 'Choose how you want to use Gyblos: run a seller or start from the 
 
 <Cards>
   <Card title="CLI" href="/en/reference/cli">
-    Look up commands, options, and exit codes.
+    Look up `gyblos` commands, options and exit codes.
   </Card>
   <Card title="Configuration" href="/en/reference/configuration">
-    Review TOML keys, defaults, and startup restrictions.
+    Look up `config.toml` keys, defaults and environment overrides.
+  </Card>
+  <Card title="Data and privacy" href="/en/reference/data-and-privacy">
+    What each role sends over the network and what stays on your machine.
   </Card>
   <Card title="Troubleshooting" href="/en/help/troubleshooting">
-    Find the next step when something will not start or appear.
+    Find the next step when a seller does not start or does not appear.
   </Card>
 </Cards>

@@ -1,281 +1,233 @@
 # Known limitations
 
 Gyblos Node is experimental, devnet-only and not audited. This page lists what
-it does **not** do or has not proven today. Use isolated generated devnet keys
-only; never import mainnet keys.
+it does **not** do or has not proven. Use isolated, generated devnet keys only;
+never import mainnet keys.
 
-## What has been proven, and what has not
+Each bullet states one limit and its effect. The linked page owns the details.
 
-- One real paid run: three sequential inferences, native Mac seller and VPS
-  buyer, required direct Iroh route, test token (not USDC). All six transactions
-  finalized and every answer was recounted. Report:
-  [gate-0008.json](../lab/evidence/gate-0008.json), bound to source `ba168c4`.
-- That historical run covers its recorded source revision. A separate controlled
-  devnet run exercised paid v2 selling and recovery; see the limits below.
-  Neither run establishes paid behavior on every later revision or the current
-  head.
-- Docker NAT-direct did not pass. A relay session with inbound UDP blocked did
-  complete paid calls (see [gate-0006.json](../lab/evidence/gate-0006.json)).
-  Hotspot/CGNAT and wider NAT coverage are untested, as is a direct-to-relay
-  switch during a session.
-- The PayAI backup facilitator has never been used for a payment.
+## Validation status
+
+- Paid execution has settled on devnet only in controlled runs. Those runs don't
+  establish paid behavior on every later revision, in production or at load. The
+  published lab evidence is listed in [lab/README.md](../lab/README.md).
+- Docker NAT-direct connections did not pass the lab check. A relay session with
+  inbound UDP blocked did complete paid calls. Hotspot/CGNAT, wider NAT coverage
+  and a direct-to-relay switch during a session are untested.
 - Mainnet, MPP, mobile apps, reputation, penalties and decentralized seller
   discovery are not implemented.
 
 ## Payments and recovery
 
-- The devnet protocol fee treasury is a public Gyblos test wallet
-  (`4Ui1dfvqbFx9CtjXNcKajHdr7aKT1nbYRiYjB1s7umNy`), distinct from the x402
-  program's own treasury. Mainnet has no treasury configured. A claim pays into
-  token accounts for the mint, and the program pays a share whose account is
-  missing to its own treasury for good; the paid seller creates the missing ones
-  (payout, fee treasury, fee payer and the channel's payer) before it starts and
-  before each claim ([Seller startup](configuration.md#seller-startup)). A buyer
-  who closed its emptied token account makes the seller pay, unrecovered, the
-  rent to recreate it for its refund: about 0.002 SOL, at most about once per
-  channel. Rent cleanup and a buyer's withdrawal distribute channels without
-  that check, so an owner who closes its own token account while the seller runs
-  loses those shares for good; the next claim or restart recreates the account.
-  A claim whose buyer's refund account is frozen is not sent and stays pending,
-  retried on recovery, with the same code as an unreachable RPC.
-- Paid v2 selling (x402 upto channels) is wired to devnet and has settled there
-  only in a controlled run; it is not validated beyond that.
-- A claim is recognized as landed only through the transactions this seller sent
-  for it. If a claim lands without its signature being recorded (the process
-  stops after sending it, or the RPC fails the send after it propagated), the
-  claim stays unavailable: the seller was paid, but its ledger never marks the
-  channel settled, and it must be reconciled by hand.
-- Rent cleanup only knows the channels this process handled. After a restart, a
-  channel from the previous run that no claim sealed keeps the fee payer's rent
-  until the payer closes it.
-- Setting up a paid v2 seller still needs `--buyer`, a v1 setup requirement that
-  v2 does not use.
-- A paid v2 claim not confirmed in time is retried in the background for about a
-  minute and a half (at most about three minutes when every attempt times out).
-  The retry queue lives in memory: claims still pending at shutdown are
-  re-driven only by the payment server's own recovery at the next start, and a
-  fresh claim past the SDK payload's expiry lapses. A broadcast transaction can
-  still confirm later; recovery keeps the same charge and checks its signature
-  instead of inferring that expiry means no payment happened.
+Behavior and recovery steps are in [payments.md](payments.md) and
+[recovery.md](recovery.md).
 
-- Paid v2 reserves the settlement wait before the adapter-validated claim
-  deadline and stops further publication at that cutoff, even if the engine does
-  not finish. A confirmation that consumed the service window starts no
-  generation; it attempts zero-charge settlement. Only completed deliveries
-  before the cutoff enter the frozen charge. An already-issued transport write
-  cannot be retracted, and an uncooperative engine cannot be forcibly stopped by
-  an AbortSignal; late completion cannot revise the terminal or its charge. If a
-  write is still pending when the charge freezes, transport closes and drains it
-  instead of sending an inconsistent terminal. The buyer must reconcile that
-  interrupted result; the prompt is never retried.
-- New v2 channels use a 300-second withdrawal grace, covering the default
-  120-second SDK payload lifetime plus its 60-second accepted expiry slack and
-  margin. Shorter unsafe custom channel settings are refused. Existing channel
-  records keep their original terms; no journal migration occurs. The metered
-  facilitator explicitly enables a claim-only SDK patch for `Closing` channels
-  before grace ends, retaining the existing identity, amount, mint and
-  distribution checks. Unconfigured SDK/deposit behavior remains Open-only. This
-  uses the native program's
-  [payee-signed settle-and-seal path](https://github.com/solana-foundation/payment-channels/blob/0c07d5751c8972abf6a219570a3f39a72f46f879/program/payment_channels/src/instructions/settle_and_seal.rs#L83).
-  The deadline comes from the SDK-validated payload expiry, not the quote's
-  expiry; the payload expiry is not itself part of the payer-signed open.
-- The withdrawal grace is part of the channel authorization, and `v0.1.0-beta.4`
-  and earlier use 60 seconds. For paid requests, run buyer and seller on the
-  same release, `v0.1.0-beta.5` or later; mixed versions are not validated. Do
-  not downgrade to `v0.1.0-beta.4` while paid channels are still pending: it
-  cannot claim a `Closing` channel. Free requests are unaffected.
-- Closing and expiry regressions use the real installed SDK with synthetic
-  accounts, RPC replies and transaction confirmation. They do not execute the
-  native program or establish deployed-binary equivalence. Collection still
-  requires inclusion before voucher/grace expiry, bounded clock drift and
-  available RPC/chain services; a reserved wait is not a confirmation guarantee.
-  Native-program simulation and an explicitly approved current-code devnet
-  adversarial run remain separate validation. These guards cover paid v2; the
-  legacy v1 PoC retains its historical 60-second grace and is not covered by
-  this service-lifetime protection.
+**Fees and accounts**
 
-- Paid v2 checkpoints the original SDK opening identity and blockhash lifetime
-  before the payer signs. A wallet refusal or storage failure after that
-  checkpoint conservatively blocks new payments until read-only reconciliation
-  resolves the same channel. It neither saves a signed payload for
-  retransmission. Private paths are unchanged; lock takeover is limited to a
-  readable dead owner on the same host/PID namespace.
-- Closure/refund sends keep the locally signed transaction signature after a
-  lost or mismatched RPC reply and report it unconfirmed. They do not resend
-  inside the call or report refund amounts as verified. The existing read-only
-  finalized reconciliation remains required; absence of an account is not proof
-  of refund. The buyer checkpoints control signatures, original blockhash
-  lifetimes and observation slots in journal v5 before broadcast. Reopening the
-  journal inspects the same signature without a replacement send until a
-  finalized result or strict finalized lifetime expiry is established against
-  context-bound channel state. Clearing a control attempt does not settle the
-  financial row; read-only reconciliation still verifies charges and refunds.
-  Journal v1–v4 remain readable; after a v5 write, older binaries refuse the
-  file. Do not downgrade with pending channels. Local acceptance also kills real
-  buyer children at opening/closure/refund checkpoints, keeps the native VM in
-  the parent and recovers through normal APIs without deleting locks. Ambiguous
-  owners and takeover guards remain refused. This is same-host process recovery,
-  not power-loss, cross-namespace or restored-backup protection. Restoring an
-  old journal can still lose later checkpoints.
-- Local native withdrawal acceptance drives the actual adapter through closing,
-  grace, seal and distribution. It checks token balances, recreation of the
-  payer's refund account, response loss, signed replay refusal, a rejected early
-  seal and an already-paid channel. The source-built SBF fixture and synthetic
-  mint do not establish deployed-program equivalence or a live product run.
-- Opening checkpoint regressions use the product payment client with synthetic
-  signers and finalized-history replies. A separate standalone-SDK test executes
-  the pinned native program in LiteSVM, loses confirmation and recovers the same
-  deposited channel without a second send or a service charge. That fixture's
-  compiled mainnet-beta treasury matches its offline SDK network label; product
-  mainnet remains disabled. It proves neither deployed-binary equivalence nor a
-  current-code devnet run.
+- The fee isn't collected at exactly 4%. Each payout is floored, and the
+  rounding residual goes to the payment program's treasury, not to Gyblos
+  ([Protocol fee](payments.md#protocol-fee)).
+- The fee treasury is a public Gyblos devnet test wallet. No mainnet treasury
+  exists, and the product refuses mainnet terms.
+- The program pays a share whose token account is missing to its own treasury,
+  for good. The seller creates the missing accounts (payout, fee treasury, fee
+  payer and the channel's payer) before it starts and before each claim
+  ([Seller startup](configuration.md#seller-startup)).
+- A buyer that closed its emptied token account makes the seller pay about 0.002
+  SOL rent to recreate it for the refund, at most about once per channel. This
+  rent isn't recovered.
+- Rent cleanup and a buyer's withdrawal distribute without that account check.
+  An owner that closes its own token account while the seller runs loses those
+  shares for good; the next claim or restart recreates the account.
+- A claim whose buyer refund account is frozen isn't sent. It stays pending and
+  is retried on recovery, with the same code as an unreachable RPC.
+- Rent cleanup knows only the channels the current process handled. After a
+  restart, an older channel that no claim sealed keeps the fee payer's rent
+  until its payer closes it.
 
-- A timeout, a 503 or a missing history entry does not prove that no payment
-  happened. Uncertain payments block new ones until reconciled; there is no
+**Claims and deadlines**
+
+- A claim counts as landed only through a transaction signature the seller
+  recorded. If a claim lands without its signature being recorded (the process
+  stops right after sending, or the RPC fails a send that still propagated), the
+  seller was paid but its ledger never marks the channel settled. Reconcile it
+  by hand.
+- An unconfirmed claim is retried in the background for about a minute and a
+  half (at most about three minutes when every attempt times out). The retry
+  queue lives in memory: after a shutdown, only the next start's recovery drives
+  pending claims again, and a claim past the SDK payload's expiry lapses. A
+  broadcast transaction can still confirm later; recovery checks its signature
+  instead of assuming no payment happened.
+- The seller reserves the settlement wait before the claim deadline and stops
+  publishing at that cutoff. A transport write already issued can't be taken
+  back, and an engine that ignores abort can't be stopped. The buyer must
+  reconcile such an interrupted result; the prompt is never retried.
+- New paid channels use a 300-second withdrawal grace, which is part of the
+  channel authorization. Run buyer and seller on the same release, and don't
+  downgrade while paid channels are pending.
+- Collection needs inclusion before voucher or grace expiry, bounded clock drift
+  and a working RPC. A reserved wait is not a confirmation guarantee.
+
+**Uncertain outcomes**
+
+- A timeout, a 503 or a missing history entry doesn't prove that no payment
+  happened. Uncertain payments block new ones until reconciled. There is no
   automatic retry or provider switch after settlement was attempted.
-- A buyer can be charged and still not receive the answer (for example after a
-  disconnect). That case must be reconciled as charged but undelivered.
-- `buyer:reconcile` clears only **zero-charge** outcomes.
-  Charged-but-undelivered recovery, missing-claim recovery and journal-derived
-  paid exports are not implemented; `--audit-only` can still verify a charged
-  payment.
-- The verifier supports only fresh, individually settled channels with the
-  expected account shapes. Anything else fails closed and needs manual
-  investigation. It does not recover channel rent.
-- The facilitator keeps channel state in memory. Durable channel storage,
-  unilateral channel closure and recovery of all channel rent are not validated.
-- Lock checks are cooperative and local: not a defense against a hostile process
-  of the same user, not a multi-host lock. An interrupted `recovery.lock` needs
+- A buyer can be charged and still not receive the answer, for example after a
+  disconnect. `pnpm buyer:reconcile:paid` records what the chain charged; it
+  doesn't refund a charge for an undelivered answer.
+- A lost reply to a closure or refund send keeps the signed transaction's
+  signature and reports it unconfirmed. Finalized reconciliation is still
+  required, and a missing account is not proof of a refund.
+- The legacy `pnpm buyer:reconcile` (for older per-request journals) clears only
+  zero-charge outcomes, and `--audit-only` verifies a charged payment. Its
+  verifier accepts only fresh, individually settled channels with the expected
+  account shapes; anything else needs manual investigation. It doesn't recover
+  channel rent.
+
+**Local state**
+
+- Recovery covers same-host process crashes. It doesn't cover power loss, other
+  PID namespaces or a restored older backup; restoring an old journal can lose
+  later checkpoints.
+- Lock checks are cooperative and local: no defense against a hostile process of
+  the same user, and no multi-host lock. An interrupted `recovery.lock` needs
   manual investigation.
-- Local persistence is not crash-proof. A full or read-only disk can lose a call
-  row; the earlier journal then still blocks new payments.
-- `exact` replay protection holds only within one seller process, not across
-  restarts or several sellers.
-- The fixed failure gate covers an empty buyer and an expired authorization
-  only; it is not a replay or seller-crash test.
+- A full or read-only disk can lose a call row; the earlier journal then still
+  blocks new payments.
 
-See [recovery.md](recovery.md) for how recovery works.
+**Test scope**
 
-## Private facilitator diagnostics
+- Closing and expiry regressions run the real installed SDK against synthetic
+  accounts and RPC replies. Native channel tests run the source-built program in
+  LiteSVM with a synthetic mint. Neither establishes equivalence with the
+  deployed program or a live run of the current code.
 
-- Diagnostics are a bounded ring buffer: restarts and rotations delete the
-  oldest files, and a busy buyer can force rotations. Archive files you need.
-- Records can be lost on a crash, forced exit or late SDK return; a missing
-  record does not prove an operation never ran. File opening has no deadline.
-- A crash during cleanup can leave one extra quarantine file outside the 64 MiB
-  bound; a deleted file still held open by a process keeps its disk space.
-- File checks protect cooperative POSIX storage on macOS/Linux only. Windows
-  permissions are unvalidated.
-- The older in-memory `/facilitator/events` and `/facilitator/verifications` are
-  not sanitized; do not publish them.
-- Loopback `Host` checks stop browser DNS rebinding, not other local processes.
-  Ollama is not covered by them.
+## Payment sessions
+
+[payment-sessions.md](payment-sessions.md) owns session behavior.
+
+- Sessions are an allowlisted pilot: a seller accepts at most 16 buyers through
+  `GYBLOS_SESSION_BUYER_NODE_IDS`. There is no public session admission.
+- Windows refuses financial sessions on both seller and buyer.
+- A seller holds at most `max_sessions` (16 or fewer) unfinished sessions, and
+  keeps closed-session proof for at most 64 buyers; past that it refuses new
+  buyers instead of evicting proof.
+- A buyer holds at most 16 seller channels. Each channel runs one request at a
+  time.
+- There is no automatic top-up, channel rotation or seller failover.
+- A seller offline through the whole forced-close grace can lose signed earnings
+  it never claimed.
+- There is no rollback defense for a restored journal, and no validation on a
+  live network or against the deployed program.
+
+## Receipts and data upload
+
+[receipts.md](receipts.md) owns the receipt lifecycle.
+
+- Release builds upload signed receipts to `https://collector.gyblos.com/v1`
+  with no setting to turn it off. Telemetry observations are uploaded too,
+  unless `GYBLOS_OBSERVATIONS=off`.
+- Per-request paid requests produce no usage receipts; free requests and payment
+  sessions do.
+- A receipt signature attests its signer's claim, not true usage. "Agreed" means
+  two node keys agreed; node keys are free, so it doesn't show two independent
+  parties.
+- At 16,384 pending receipts or 64 MiB, new receipts fail with
+  `RECEIPT_STORAGE_FULL` until uploads free space.
 
 ## Inference and verification
 
-- Free-inference usage receipts are signed, exchanged and privately stored.
-  Signatures attest to each party’s observation, not independently truthful
-  usage. Token recounts **detect** an overcharge within the ceiling after
-  settlement; they do not prevent, refund or penalize it.
-- Model pins check local artifacts only. The buyer cannot verify the remote
+- Token recounts **detect** an overcharge within the ceiling after settlement.
+  They don't prevent, refund or penalize it.
+- Model pins check local artifacts only. The buyer can't verify the remote
   seller's model or the correctness of an answer.
-- Paid v1 responses remain buffered, without first-word latency measurement.
-  Free v2 supports incremental SSE; its synthetic native-loopback acceptance
-  does not establish real-model or production streaming performance.
-- Only the pinned Qwen3 0.6B engine is validated end to end.
+- Only the pinned Qwen3 0.6B engine is validated end to end, and only
+  `qwen3:0.6b` can be priced, because a priced model needs a public tokenizer
+  the buyer can recount with.
+- Streaming acceptance runs synthetic engines over native loopback. It doesn't
+  establish real-model or production streaming performance.
 - The seller's 1.5 GiB memory reserve is an admission policy, not a guarantee.
   Later memory pressure or model eviction can still break a request. The model
   stays loaded for five minutes; offers expire after four.
-- On Linux the reserve is checked against the machine's available memory and the
-  tightest cgroup limit from the seller's own group up to the root. An engine in
-  a separately limited service or container is outside that path, so its own
-  limit is not checked.
-
-Details: [inference.md](inference.md).
+- On Linux the reserve is checked against available memory and the tightest
+  cgroup limit from the seller's own group up to the root. An engine in a
+  separately limited service or container is outside that path, so its own limit
+  isn't checked.
 
 ## Transport and privacy
 
 - Route labels are sampled observations, not proof of every packet's path.
-- A direct connection reveals each peer's IP address. Relay-only modes
-  (`GYBLOS_RELAY_ONLY`, `GYBLOS_BUYER_RELAY_ONLY`) have only been checked
-  offline; off-host privacy is unmeasured. The relay always sees both IPs.
-- Without `GYBLOS_BUYER_RELAY_ONLY=1`, requiring a relay route does not hide the
+- A direct connection reveals each peer's IP address. The relay always sees both
+  IPs. Relay-only modes (`GYBLOS_RELAY_ONLY`, `GYBLOS_BUYER_RELAY_ONLY`) are
+  checked offline only; off-host privacy is unmeasured.
+- Without `GYBLOS_BUYER_RELAY_ONLY=1`, requiring a relay route doesn't hide the
   buyer's address.
-- Relay-token handling is tested offline; a successful native bind and relay
-  handshake are not covered by the offline suite.
-- Only one relay (`na1`) exists. The default changes when `na2` is deployed.
+- Relay-token handling is tested offline. A native bind and relay handshake are
+  not covered by the offline suite.
+- One relay (`na1`) exists.
 - `@number0/iroh` 1.1.0 has no Intel Mac build and no DHT, pkarr or gossip API.
 
 ## Admission limits and abuse
 
-The seller limits work per Iroh identity, but identities are free to create.
+The seller limits work per Iroh identity, and identities are free to create. The
+defaults below are configurable within hard ceilings
+([Seller limits](configuration.md#seller-limits)).
 
-- Limits: one control and one data connection and one active request per NodeId
-  (so four identities can occupy all eight connection slots), two active
-  requests globally, eight pending handshakes (two per source address), and 30
-  requests per NodeId within a shared 256-request minute.
+- By default: eight connections in total, one control and one data connection
+  and one active request per NodeId, two active requests globally, eight pending
+  handshakes (two per source address), and 30 requests per NodeId within a
+  shared 256-request minute.
 - Free challenges and failed requests count. About nine identities sending 30
-  free requests each can deny new peers for the rest of the minute. No payment
-  is needed for that; there is no Sybil resistance or availability guarantee.
-- A disconnected peer has no guaranteed reservation; reconnecting may need to
-  wait for spare capacity or the next window.
-- Source budgets use full IP addresses (IPv6 not grouped by prefix) and relay
+  free requests each can deny new peers for the rest of the minute, with no
+  payment. There is no Sybil resistance or availability guarantee.
+- A disconnected peer has no reserved slot; reconnecting can wait for spare
+  capacity or the next window.
+- Source budgets use full IP addresses (IPv6 isn't grouped by prefix) and relay
   identities, which are cheap to replace. Peers behind one NAT share a source
   limit.
-- Stuck native handshakes or writes cannot be cancelled and can fill their
+- Stuck native handshakes or writes can't be cancelled and can fill their
   bounded pools.
 - These limits are tested with loopback Iroh only, not over relays or real
   networks.
 
+## Discovery
+
+[discovery.md](discovery.md) and
+[discovery-index.md](discovery-index.md#security-model-and-limits) own the
+details.
+
+- There is no DHT or decentralized discovery; buyers rely on an index and their
+  own record verification.
+- Unreachable withdrawal delivery relies on signed-record expiry.
+- Deleting or restoring the local public sequence state and automatic crash-lock
+  recovery are unsupported. Windows power-loss durability is unverified.
+- Readiness checks are skipped while inference runs. An engine that ignores
+  abort holds the single check slot and keeps availability closed until it
+  settles.
+
 ## Local files
 
-- Keys, journals and diagnostics live in the product home (`.local/gyblos/`, one
-  directory per role) and the lab home (`.local/lab/`). Models and the tokenizer
-  are in `.local/gyblos/artifacts/`. Never share role or lab directories.
+- Keys, journals and diagnostics live in the product home, one directory per
+  role: `~/.gyblos/` for an installed release, `.local/gyblos/` in a checkout,
+  or `GYBLOS_HOME`. Models and the tokenizer are in its `artifacts/` directory.
+  Never share role directories.
 - Legacy `.local/p2p`, `.local/devnet` and `.local/ollama/models` data is never
-  migrated automatically; startup refuses until it is moved by hand
-  ([running-a-node.md](running-a-node.md#local-home)). The check is local and
+  migrated automatically; startup refuses until you move it by hand
+  ([Local home](running-a-node.md#local-home)). The check is local and
   existence-based only.
-- `GYBLOS_GATE_CONFIG` moves only the lab config file. `gate:setup` writes the
-  keys next to it, but `gate:inference` accepts only keys in the lab home
-  (`GYBLOS_LAB_HOME`); journals and models never follow it.
 - `.env` is not loaded; set variables in the process environment.
-- P2P role funding remains manual. `buyer:trust` creates the trust file only
-  from explicit seller identities after checking the signed offer.
-- Local gate reports (`gate-0004.json`, `gate-0005.json`) are not signed
-  receipts and are not committed.
+- Funding the roles is manual.
 
 ## Test coverage
 
 The offline suite uses synthetic inputs, mocked RPC, native loopback Iroh and
-one saved public finalized payment pair. It does not establish a fresh chain
+one saved public finalized payment pair. It doesn't establish a fresh chain
 audit, public relay compatibility, exactly-once settlement or physical recovery
-of a signed offer. Unsigned modified payment variants in the fixture were never
-executed on-chain. See [tests/README.md](../tests/README.md).
+of a signed offer. Unsigned modified payment variants in the fixture never ran
+on chain. See [tests/README.md](../tests/README.md).
 
-HTTP discovery is opt-in and limited to independently configured owner–NodeId
-bindings. Opt-in read-only 8004 admission verifies expected bindings
-independently and persists scoped high-water/tombstone state, with explicit
-manual overrides. It does not enroll unknown sellers, provide DHT discovery or
-establish live-index production availability. Replay state and withdrawal
-barriers persist; a retained lock or unsafe/corrupt state fails closed. These
-discovery and admission checks do not establish paid execution. The seller
-separately composes paid v2 when supplied with a payment server; the legacy v1
-paid path remains in the lab gates only.
+## Prototypes
 
-Seller discovery publication is opt-in and locally tested. It uses one durable
-public-v2 sequence allocator shared with control Iroh; it does not establish a
-live public index, automatic 8004 identity, off-host reliability or production
-load capacity. Unreachable withdrawal delivery relies on signed-record expiry.
-Deleting/restoring local sequence state and automatic crash-lock recovery are
-unsupported; Windows power-loss durability is unverified. A separate background
-warmup/memory check can establish fresh v2 readiness; publication itself cannot.
-Checks are skipped while inference is active and cancelled when inference
-starts. An engine ignoring abort holds the single check slot and keeps
-availability closed until it settles; no queued retry can accumulate. Shutdown
-invalidates snapshots without waiting for an uncooperative engine. Timing is
-locally tested, not a production load/cancellation guarantee. The legacy paid
-offer retains its original expiry, and free execution has separate startup
-acceptance. Paid v2 uses a separate conditional execution path. Only the
-historical controlled devnet settlement described above has been observed;
-current-head and production settlement remain unverified.
+- The [PayPal Sandbox prototype](paypal-sandbox.md) uses simulated money only.
+  It is not exactly-once and not safe for live money.
