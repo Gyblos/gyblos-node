@@ -22,11 +22,13 @@ import {
 } from './d1-client';
 import type { DayRange } from './days';
 import {
+  aggChainDaily,
   aggDemandDaily,
   aggNetworkDaily,
   aggObservedDaily,
   aggSellerBuyersDaily,
   aggSellerDaily,
+  chainCursor,
 } from './schema';
 import {
   HISTOGRAM_KEYS,
@@ -207,6 +209,23 @@ function seller(orm: CollectorDatabase, nodeId: string, range: DayRange) {
   ]);
 }
 
+function chain(orm: CollectorDatabase, range: DayRange) {
+  return orm.batch([
+    orm
+      .select()
+      .from(aggChainDaily)
+      .where(within(aggChainDaily.day, range))
+      .orderBy(asc(aggChainDaily.day), asc(aggChainDaily.scope)),
+    orm
+      .select({
+        backfillDone: chainCursor.backfillDone,
+        updatedAt: chainCursor.updatedAt,
+      })
+      .from(chainCursor)
+      .limit(1),
+  ]);
+}
+
 export function statsReader(database: D1Database): StatsReader {
   const orm = createD1Orm(database);
   return {
@@ -218,6 +237,18 @@ export function statsReader(database: D1Database): StatsReader {
     async seller(nodeId, range) {
       const [days, sellerModels, buyers] = await seller(orm, nodeId, range);
       return { days, models: sellerModels, buyers };
+    },
+    async chain(range) {
+      const [days, [cursor]] = await chain(orm, range);
+      return {
+        days,
+        index: cursor
+          ? {
+              backfillDone: cursor.backfillDone === 1,
+              updatedAt: cursor.updatedAt,
+            }
+          : null,
+      };
     },
   };
 }

@@ -1,7 +1,8 @@
-// Owns the scheduled aggregation run. One scan batch marks dirty the days whose raw rows changed since
-// the previous scan (with an overlap) or whose aggregates use an older formula version; then each
-// dirty day, newest first, is recomputed in one transactional batch, so readers see the old day or the
-// new one, never a mix. A day that fails stays dirty and never blocks the others.
+// Owns the scheduled aggregation run. One scan batch marks dirty the days whose raw rows (receipts,
+// observations, conflicts) changed since the previous scan (with an overlap) or whose aggregates use
+// an older formula version; then each dirty day, newest first, is recomputed in
+// one transactional batch, so readers see the old day or the new one, never a mix. Chain days follow,
+// with their own scan and dirty set (aggregate-chain.ts). A day that fails stays dirty and never blocks the others.
 import {
   and,
   countDistinct,
@@ -14,6 +15,10 @@ import {
   type SQL,
 } from 'drizzle-orm';
 
+import {
+  runChainAggregation,
+  type ChainAggregationResult,
+} from './aggregate-chain';
 import { firstSeenUpserts } from './aggregate-first-seen';
 import {
   blank,
@@ -59,6 +64,8 @@ export interface AggregationResult {
   failed: string[];
   // Dirty days are left for the next run.
   more: boolean;
+  // The chain days, scanned and recomputed after and apart from the receipt days.
+  chain: ChainAggregationResult;
 }
 type BatchItem = Parameters<CollectorDatabase['batch']>[0][number];
 
@@ -301,7 +308,7 @@ export async function runAggregation(
     .from(aggDirtyDays)
     .orderBy(desc(aggDirtyDays.day))
     .limit(AGGREGATES.maxDaysPerRun + 1);
-  const result: AggregationResult = {
+  const result: Omit<AggregationResult, 'chain'> = {
     days: [],
     failed: [],
     more: dirty.length > AGGREGATES.maxDaysPerRun,
@@ -320,5 +327,5 @@ export async function runAggregation(
       result.failed.push(day);
     }
   }
-  return result;
+  return { ...result, chain: await runChainAggregation(orm, now) };
 }
