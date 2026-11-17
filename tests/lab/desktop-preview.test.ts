@@ -323,7 +323,7 @@ void test('preview brand hooks accept Windows CRLF source files', async () => {
   );
   assert.match(
     transformBrand(
-      theme.replaceAll('\n', '\r\n'),
+      theme.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n'),
       'C:/repo/apps/desktop/src/theme.ts',
       'C:/repo/apps/desktop',
     ) ?? '',
