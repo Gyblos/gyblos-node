@@ -25,7 +25,18 @@ its local buyer running while a client uses a key.
 
 The app can copy a new key only during the session that created it. A key's
 limit has no automatic reset and cannot be raised later; create a new key for
-more spending. A buyer holds at most 32 keys.
+more spending. A buyer holds at most 32 keys. A key whose limit is `0` shows
+**Free only**. The key field reveals the secret only while the user asks for it
+(**Show API key**); hiding it, selecting another key or revoking it clears the
+visible value. The secret never enters status replies, saved agent configuration
+or chat history, and after a restart the app cannot display it again.
+
+The app's own buyer listens on the fixed loopback port `4033`
+(`packages/config/src/hosts.ts`), so its Base URL survives restarts. If the port
+is taken, startup fails and **Payments → Retry local buyer** tries again; the
+app never picks another port. A separately running buyer that the user connects
+explicitly keeps its own Base URL. Configurations written by versions that used
+a changing port must be copied or written again once.
 
 Clients send the key as a bearer token to the Base URL:
 
@@ -69,6 +80,12 @@ What the generated configuration does:
   model beside it; the preview names those files.
 - Claude Code is configured through shell environment variables, so its
   configuration is copy-only.
+- Each model keeps the context size the authenticated buyer reports. Without
+  one, the configuration falls back to 8,192 context tokens and at most 4,096
+  output tokens, or the buyer's lower output limit
+  (`packages/node/src/agent-setup-constants.ts`). Codex profiles carry this
+  limit so compaction starts earlier. The fallback is not a verified seller
+  capacity: a seller can offer a smaller window and refuse the request.
 
 No extra inference server starts. Switching models uses the same buyer, key and
 limits.

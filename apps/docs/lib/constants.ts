@@ -44,3 +44,6 @@ export const SIDEBAR_ICON_IDS = {
 } as const;
 export type SidebarIconId =
   (typeof SIDEBAR_ICON_IDS)[keyof typeof SIDEBAR_ICON_IDS];
+
+// Script type that React treats as data, not code: it renders it on the client without the "script tag" warning.
+export const SCRIPT_DATA_TYPE = 'application/json';
