@@ -140,6 +140,14 @@ export const STARTUP_WINDOW = {
   SETUP_HEIGHT: 420,
 } as const;
 
+export const STARTUP_PROGRESS = {
+  STATUS_CHANNEL: 'desktop:startup-status',
+  CHANGED_CHANNEL: 'desktop:startup-progress',
+  STEPS: 2,
+  MIN: 0,
+  MAX: 100,
+} as const;
+
 export const LOCAL_NODE_STATE = {
   STARTING: 'starting',
   READY: 'ready',

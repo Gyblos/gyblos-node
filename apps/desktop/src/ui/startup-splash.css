@@ -6,23 +6,21 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: var(--bg);
+  background: var(--canvas);
   color: var(--ink);
   font-family: Geist, sans-serif;
 }
 .startup-splash-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 15px;
   font-weight: 500;
-}
-.startup-splash-brand span {
-  color: var(--accent);
-  font-family: GeistMono, monospace;
-  margin-right: 8px;
 }
 .startup-ascii {
   display: flex;
   margin: 24px 0 16px;
-  color: var(--accent);
+  color: var(--blue);
   font:
     24px/1 GeistMono,
     monospace;
@@ -46,7 +44,6 @@
 }
 .startup-ascii-row.is-filled {
   color: var(--accent);
-  animation: startup-battery-charge 2.8s steps(20, end) infinite;
 }
 
 .startup-splash p {
@@ -57,22 +54,6 @@
   margin-top: 8px;
   color: var(--muted);
   font-size: 11px;
-}
-@keyframes startup-battery-charge {
-  0%,
-  100% {
-    clip-path: inset(0 100% 0 0);
-  }
-  45%,
-  55% {
-    clip-path: inset(0 0 0 0);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .startup-ascii-row.is-filled {
-    animation: none;
-    clip-path: inset(0 45% 0 0);
-  }
 }
 /* Setup uses the same native surface, controls and fields as Wallet. */
 .desktop-frame.wallet-setup {

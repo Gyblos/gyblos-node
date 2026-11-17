@@ -12,6 +12,7 @@ import {
   DESKTOP,
   DESKTOP_ACTIVITY,
   DESKTOP_UPDATE,
+  STARTUP_PROGRESS,
 } from './constants';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
 import { parsePaymentReferences } from './payment-reference-model';
@@ -21,6 +22,7 @@ import {
 } from './paypal-agent-model';
 import { DESKTOP_PAYPAL, parsePaypalResult } from './paypal-model';
 import { parseProbeResult } from './probe-model';
+import { parseStartupProgress } from './startup-progress';
 import {
   parseUsdcApiSecret,
   parseUsdcApiState,
@@ -43,6 +45,22 @@ import {
 
 contextBridge.exposeInMainWorld('desktopWindow', {
   platform: windowPlatform(process.platform),
+});
+
+contextBridge.exposeInMainWorld('desktopStartup', {
+  status: async () =>
+    parseStartupProgress(
+      await ipcRenderer.invoke(STARTUP_PROGRESS.STATUS_CHANNEL),
+    ),
+  onProgress: (listener: (percentage: number) => void) => {
+    const receive = (_event: unknown, input: unknown) => {
+      const percentage = parseStartupProgress(input);
+      if (percentage !== null) listener(percentage);
+    };
+    ipcRenderer.on(STARTUP_PROGRESS.CHANGED_CHANNEL, receive);
+    return () =>
+      ipcRenderer.removeListener(STARTUP_PROGRESS.CHANGED_CHANNEL, receive);
+  },
 });
 
 contextBridge.exposeInMainWorld('desktopConversations', {
