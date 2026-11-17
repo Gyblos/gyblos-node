@@ -81,45 +81,13 @@ envíes contraseñas, llaves ni otros secretos. Consulta [Datos y privacidad](/e
 
 ## Usa Gyblos desde otras herramientas [#llaves-de-api]
 
-Para el comprador gestionado por la app, **Connections → Connect agent** usa el puerto local fijo `4033`: reiniciar Gyblos conserva
-la misma Base URL. Si está ocupado, detén el otro servicio local y reintenta el comprador;
-Gyblos no elige otro puerto de forma silenciosa. Las configuraciones generadas por versiones anteriores
-con un puerto variable deben copiarse o escribirse de nuevo una vez. Comprueba la Base URL en Connections.
-Un comprador externo conectado explícitamente conserva su propia Base URL.
+**Connections** da a tus agentes de código y programas acceso a Gyblos a través de la app, con una API key
+y un límite de gasto. Las herramientas usan las API OpenAI Chat Completions, OpenAI Responses y Anthropic
+Messages, y **Connect agent** configura OpenCode, pi, Codex CLI y Claude Code por ti. El Chat tiene su
+propio presupuesto y no usa el límite de una key.
 
-**Connections** da a tus propios programas y agentes de código acceso a Gyblos a través de la app, con una
-API key y un límite de gasto. Las herramientas pueden usar las API OpenAI Chat Completions, OpenAI Responses
-y Anthropic Messages.
-
-1. Abre **Connections**. Si te pide conectar tu comprador, elige **Go to Payments** y arranca ahí el
-   comprador local.
-2. En **Create an API key**, escribe un **Name** y un **Spend limit**, y elige **Create API key**. El límite
-   es el total que puede gastar esta llave, en USDC de devnet, sin reinicio automático. Un límite de `0`
-   permite solo modelos gratis.
-3. Elige **Copy Base URL** y **Copy API key**, y pega ambos en tu herramienta. Solo puedes copiar la llave en
-   la sesión de la app que la creó. Una herramienta que ya la tiene sigue funcionando después de reiniciar.
-4. Opcional: elige **Connect agent** para configurar OpenCode, pi, Codex CLI o Claude Code. La app muestra la
-   configuración y puede escribirla por ti, salvo para Claude Code, que copias en tu terminal. La
-   configuración lee la llave de la variable `GYBLOS_API_KEY`: defínela en la terminal que arranca el agente.
-
-En **Connections**, una key con presupuesto cero muestra **Free only**. El botón del ojo revela la
-key solo cuando lo pides y durante la sesión de la app que la creó. Ocúltala antes de compartir la
-pantalla. Al ocultarla, seleccionar otra key o revocarla, desaparece el valor visible. El secreto no
-entra en consultas periódicas de estado, configuraciones guardadas del agente ni historial de chat.
-Tras reiniciar, la key guardada en tu agente sigue funcionando, pero la app no puede recuperar su secreto.
-
-Mantén Gyblos abierto mientras tus herramientas lo usan. **Revoke key** detiene las solicitudes nuevas con
-esa llave; lo que ya gastó queda registrado. El Chat tiene su propio presupuesto y no usa el límite de una
-llave.
-
-**Connect agent** conserva el contexto explícito que comunique el comprador local autenticado. Si no
-lo comunica, la configuración usa un contexto conservador de 8.192 tokens y como máximo 4.096 de salida
-(o el límite menor del comprador). Los perfiles de Codex incluyen ese tope para compactar antes.
-Este valor no acredita la capacidad del vendedor: puede ofrecer una ventana menor y rechazar el pedido.
-Actualiza y vuelve a escribir la configuración si cambian los metadatos del modelo. El generador del
-CLI usa el mismo valor; un `--context` explícito debe corresponder a los límites verificados del modelo.
-
-Para ejemplos con SDK, opciones admitidas y errores, consulta [Conecta tus herramientas de código](/es/buyers/use-from-code).
+Para crear una key y conectar tus herramientas, consulta
+[Conecta tus herramientas de código](/es/buyers/use-from-code).
 
 ## Pagos [#pagos]
 

@@ -12,7 +12,7 @@ the public handbook instead:
 [CLI reference](https://docs.gyblos.com/en/reference/cli) and the
 [configuration reference](https://docs.gyblos.com/en/reference/configuration).
 To call Gyblos from your own code, see
-[Use Gyblos from your code](https://docs.gyblos.com/en/buyers/use-from-code).
+[Connect your coding tools](https://docs.gyblos.com/en/buyers/use-from-code).
 The site's source is `apps/docs/content/docs/`.
 
 On this page:
@@ -787,11 +787,13 @@ endpoints on `127.0.0.1:4031`:
 
 Both use the same `selection.json`. Client setup, formats, tools, coding agents
 and errors are in
-[Use Gyblos from your code](https://docs.gyblos.com/en/buyers/use-from-code).
+[Connect your coding tools](https://docs.gyblos.com/en/buyers/use-from-code).
 `pnpm buyer:agent <opencode|pi|codex|claude>` prints (or with `--write` updates)
 a coding agent's configuration for every model the buyer serves;
-`--context <tokens>` passes the sellers' context size and `--token-env <NAME>`
-names the variable holding the endpoint token.
+`--context <tokens>` passes the sellers' context size (it must match the
+verified model limits; without it the generator uses the same 8,192-token
+fallback as the desktop app) and `--token-env <NAME>` names the variable holding
+the endpoint token.
 
 The automatic buyer can also issue bounded API keys
 ([buyer-api-keys.md](buyer-api-keys.md)) and keep reusable payment sessions

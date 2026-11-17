@@ -22,12 +22,19 @@ prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/
    start it there.
 2. Under **Create an API key**, enter a **Name** and a **Spend limit**, then choose **Create API key**.
    The limit is the total this key may spend, in devnet USDC. It never resets and can't be raised later.
-   A limit of `0` allows free models only.
-3. Choose **Copy API key** and **Copy Base URL**.
+   A limit of `0` allows free models only, and the key shows **Free only**.
+3. Choose **Copy API key** and **Copy Base URL**. The eye button shows the key only while you ask for it;
+   hide it before you share your screen.
 
-You can copy a key only in the app session that created it. A tool that already has the key keeps
-working after you restart the app. **Revoke key** stops new requests with that key; what it already spent
+You can show or copy a key only in the app session that created it. After a restart, a tool that already
+has the key keeps working, but the app can't show the key again. The key never appears in saved agent
+configuration or in chat history. **Revoke key** stops new requests with that key; what it already spent
 stays recorded.
+
+The Base URL uses the fixed port `4033`, so it stays the same when you restart the app. If another
+program uses that port, stop it and choose **Payments → Retry local buyer**; Gyblos doesn't switch to
+another port. A tool set up with an older version of the app, when the port could change, needs its
+configuration copied or written again once.
 
 ## Connect a coding agent [#connect-a-coding-agent]
 
@@ -44,6 +51,11 @@ export GYBLOS_API_KEY=YOUR_API_KEY
 ```
 
 Replace `YOUR_API_KEY` with the key you copied.
+
+When the app can't learn a model's context size, the configuration uses 8,192 tokens of context and at
+most 4,096 output tokens (less if the buyer's answer limit is lower). Codex profiles include this limit, so
+Codex compacts the conversation earlier. A seller can still offer a smaller window and refuse a request.
+When the models change, choose **Write configuration** again.
 
 Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or
 `codex --profile gyblos`. Agents that send many tools and long instructions, such as Claude Code, need a
