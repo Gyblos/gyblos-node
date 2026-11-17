@@ -32,7 +32,7 @@ The brand source is [web-gyblos](https://github.com/Gyblos/web-gyblos):
 `web/public/brand-assets/` distribution. No private vault content is required to
 build this preview.
 
-`build.js` applies only the theme-token and terminal-mark substitutions in
+`build.ts` applies only the theme-token and terminal-mark substitutions in
 memory while bundling the preview. It refuses changed desktop hook shapes rather
 than silently skipping them. The desktop source, native application and seller
 are unchanged. `preview.css` adds only the supplied mark's presentation and a
@@ -57,6 +57,10 @@ brand provenance. `dist/desktop` preserves the unchanged renderer build for
 comparison; it has no synthetic host and is not a second review app. Old
 generated assets may remain after a rebuild; the manifest hashes only the assets
 referenced by HTML.
+
+Tests build into a unique temporary directory and remove only that directory.
+The build disables Vite configuration-file discovery and environment-file
+loading, and exposes no prefixed environment variables.
 
 No native service is started. The page blocks network connections through its
 Content Security Policy. No real configuration folder, credential, prompt,

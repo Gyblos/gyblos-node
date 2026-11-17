@@ -2,9 +2,16 @@
 import {
   parsePaypalAgentResult,
   PAYPAL_AGENT_ACTION,
+  PAYPAL_AGENT_CLIENT,
+  PAYPAL_AGENT_COPY,
   PAYPAL_AGENT_USAGE_STATE,
+  paypalAgentExample,
 } from '@gyblos/desktop/paypal-agent-model';
 import { parsePaypalResult, PAYPAL_ACTION } from '@gyblos/desktop/paypal-model';
+import {
+  AGENT_TOOLS,
+  type AgentTool,
+} from '@gyblos/node/agent-setup-constants';
 import { PAYPAL_SESSION_PHASE } from '@gyblos/node/constants';
 
 import { PREVIEW } from './constants';
@@ -14,6 +21,7 @@ export function createPaypalPreview(
   ready: boolean,
   answer: string,
   now: number,
+  examples: Record<AgentTool, string>,
 ) {
   const paypalId = 'a'.repeat(PREVIEW.paymentIdCharacters);
   let paypalPhase: (typeof PAYPAL_SESSION_PHASE)[keyof typeof PAYPAL_SESSION_PHASE] =
@@ -96,8 +104,34 @@ export function createPaypalPreview(
         error: null,
       });
     },
-    copy: async () => {
-      await navigator.clipboard.writeText('PREVIEW_ONLY_NOT_A_VALID_API_KEY');
+    copy: async (input: unknown) => {
+      const { target } = read(input);
+      const url = 'http://127.0.0.1:8000/v1';
+      const model = 'qwen3:0.6b';
+      const tool =
+        target === PAYPAL_AGENT_CLIENT.OPENCODE
+          ? AGENT_TOOLS.OPENCODE
+          : target === PAYPAL_AGENT_CLIENT.CODEX
+            ? AGENT_TOOLS.CODEX
+            : target === PAYPAL_AGENT_CLIENT.PI
+              ? AGENT_TOOLS.PI
+              : target === PAYPAL_AGENT_CLIENT.CLAUDE_CODE
+                ? AGENT_TOOLS.CLAUDE_CODE
+                : undefined;
+      const text =
+        target === PAYPAL_AGENT_COPY.KEY
+          ? 'PREVIEW_ONLY_NOT_A_VALID_API_KEY'
+          : target === PAYPAL_AGENT_COPY.URL
+            ? url
+            : target === PAYPAL_AGENT_COPY.MODEL
+              ? model
+              : target === PAYPAL_AGENT_COPY.EXAMPLE
+                ? paypalAgentExample({ url, model })
+                : tool
+                  ? examples[tool]
+                  : undefined;
+      if (!text) return false;
+      await navigator.clipboard.writeText(text);
       return true;
     },
   };
@@ -157,7 +191,14 @@ export function createPaypalPreview(
           id: `PREVIEWCAP${String(index + 1).padStart(PREVIEW.referencePadding, '0')}`,
         })),
     }),
-    copyReference: async () => true,
+    copyReference: async (input: unknown) => {
+      const reference = (await desktopActivity.references()).references.find(
+        (row) => row.sessionId === input,
+      );
+      if (!reference) return false;
+      await navigator.clipboard.writeText(reference.id);
+      return true;
+    },
   };
   return { desktopPaypal, desktopPaypalAgent, desktopActivity };
 }

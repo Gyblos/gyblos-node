@@ -35,12 +35,12 @@ import { AGENT_TOOLS } from '@gyblos/node/agent-setup-constants';
 import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
 import { PREVIEW } from './constants';
-import { requestObject as read } from './input';
+import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
 
 export function createPreviewHost(
   search: string,
-  agentExamples: Record<(typeof AGENT_TOOLS)[keyof typeof AGENT_TOOLS], string>,
+  agentExamples: AgentExamples,
 ) {
   const query = new URLSearchParams(search);
   const ready = query.get('connection-state') !== 'unconfigured';
@@ -67,6 +67,8 @@ export function createPreviewHost(
   const sessionId = '00000000-0000-4000-8000-000000000003';
   let connected = ready;
   let active = ready;
+  let authorized = ready;
+  let limitAtomic = ready ? '1000000' : '0';
   let generation = 0;
   let selectedHome = ready;
   let keys = [
@@ -204,9 +206,9 @@ export function createPreviewHost(
         ...emptyX402(),
         active,
         policy: connected ? policy : null,
-        sessionId: active ? sessionId : null,
-        limitAtomic: active ? '1000000' : '0',
-        records: active ? records : [],
+        sessionId: authorized ? sessionId : null,
+        limitAtomic,
+        records: authorized ? records : [],
       },
       policy: connected ? policy : null,
       homeSelected: selectedHome,
@@ -223,7 +225,12 @@ export function createPreviewHost(
         connected = true;
         selectedHome = true;
       }
-      if (request.action === X402_ACTION.AUTHORIZE) active = true;
+      if (request.action === X402_ACTION.AUTHORIZE) {
+        active = true;
+        authorized = true;
+        if (typeof request.limitAtomic === 'string')
+          limitAtomic = request.limitAtomic;
+      }
       if (request.action === X402_ACTION.FINISH) active = false;
       if (request.action === X402_ACTION.COPY_PAYER)
         await navigator.clipboard.writeText(payer);
@@ -312,7 +319,7 @@ export function createPreviewHost(
         const tool =
           Object.values(AGENT_TOOLS).find((tool) => tool === request.tool) ??
           AGENT_TOOLS.OPENCODE;
-        setup = { tool, text: agentExamples[tool], models: [model] };
+        setup = { tool, text: agentExamples.usdc[tool], models: [model] };
         if (request.action === USDC_API_ACTION.COPY_AGENT)
           await navigator.clipboard.writeText(setup.text);
         if (request.action === USDC_API_ACTION.WRITE_AGENT)
@@ -333,6 +340,6 @@ export function createPreviewHost(
     desktopCatalog,
     desktopX402,
     desktopUsdcApiKeys,
-    ...createPaypalPreview(ready, answer, now),
+    ...createPaypalPreview(ready, answer, now, agentExamples.paypal),
   };
 }
