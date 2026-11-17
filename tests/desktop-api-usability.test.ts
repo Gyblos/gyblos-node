@@ -50,6 +50,26 @@ void test('timeout and free allowance failures explain an action without reflect
     /allowance|later/i,
   );
 });
+
+void test('output limits and paid engine quotas are not mislabelled as long history or a free allowance', () => {
+  const limit = desktopBuyerFailure(
+    { code: FREE_EXECUTION_CODES.LIMIT },
+    policy,
+  );
+  assert.match(limit.message, /request or response/i);
+  const quota = desktopBuyerFailure(
+    {
+      code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+      reason: FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+    },
+    { ...policy, maxAtomic: '100' },
+  );
+  assert.match(quota.message, /quota/i);
+  assert.doesNotMatch(
+    quota.message,
+    /free allowance|conversation is too long/i,
+  );
+});
 void test('a zero-budget key is labelled free-only while revoked and uncertain state still take precedence', async (t) => {
   const fixture = await desktopAgentFixture();
   t.after(() => fixture.close());

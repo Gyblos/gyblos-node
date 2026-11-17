@@ -90,6 +90,7 @@
     "package": "tsx scripts/package.ts"
   },
   "dependencies": {
+    "@gyblos/core": "workspace:*",
     "@gyblos/node": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/protocol": "workspace:*",

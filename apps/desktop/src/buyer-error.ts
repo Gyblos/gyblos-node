@@ -33,13 +33,17 @@ function explanation(code: BuyerCode, reason: unknown, free: boolean) {
   )
     return 'The seller is not available right now. Wait or choose another model.';
   if (code === FREE_EXECUTION_CODES.LIMIT)
-    return 'The conversation is too long for this seller. Shorten it or start a new chat.';
+    return "The request or response exceeded this seller's limits. Shorten the message or choose another model.";
   if (
     code === FREE_EXECUTION_CODES.DAILY_CAP ||
-    code === FREE_EXECUTION_CODES.BUYER_CAP ||
-    reason === FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED
+    code === FREE_EXECUTION_CODES.BUYER_CAP
   )
     return 'The seller has reached its free allowance. Try another model or come back later.';
+  if (
+    code === FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE &&
+    reason === FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED
+  )
+    return "The seller's model provider has reached its quota. Try another model or come back later.";
   if (
     code === FREE_EXECUTION_CODES.TIMEOUT ||
     (code === FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE &&
