@@ -177,12 +177,12 @@ index, the metrics collector and the Solana RPC see the IP address you connect f
 
 ## Where data stays on your machine [#local-data]
 
-| Install                            | Location                                                                     | Contents                                                                                                                     |
-| ---------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Docker seller                      | `~/gyblos-seller` and the Docker volume `gyblos` (mounted at `/data`)        | `config.toml` and `seller.env` in the folder. Keys, registration state, receipts and payment records in the volume           |
-| Native seller                      | `~/.gyblos` (Windows: `%USERPROFILE%\.gyblos`)                               | `config.toml`, `seller.env`, `service.log` (macOS and Windows), and `seller/` with keys, registration, receipts and payments |
-| Local buyer from a source checkout | `.local/gyblos/buyer` in the checkout                                        | Buyer key, `selection.json`, receipts, payment records and diagnostic logs                                                   |
-| Desktop app                        | `gyblos-desktop` and `gyblos-wallet` in the system's application-data folder | Conversations, activity, the Chat budget and the local buyer; the wallet, protected by the system's key store                |
+| Install                            | Location                                                                     | Contents                                                                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Docker seller                      | `~/gyblos-seller` and the Docker volume `gyblos` (mounted at `/data`)        | `config.toml` and `seller.env` in the folder. Keys, registration state, receipts and payment records in the volume                |
+| Native seller                      | `~/.gyblos` (Windows: `%USERPROFILE%\.gyblos`)                               | `config.toml`, `seller.env`, `service.log` (macOS and Windows), and `seller/` with keys, registration, receipts and payments      |
+| Local buyer from a source checkout | `.local/gyblos/buyer` in the checkout                                        | Buyer key, `selection.json`, receipts, payment records and diagnostic logs                                                        |
+| Desktop app                        | `gyblos-desktop` and `gyblos-wallet` in the system's application-data folder | Conversations, activity, the Chat budget and the local buyer; the wallet, once you set it up, protected by the system's key store |
 
 The application-data folder is `~/Library/Application Support` on macOS, `%APPDATA%` on Windows and
 `~/.config` on Linux.

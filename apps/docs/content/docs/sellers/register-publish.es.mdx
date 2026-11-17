@@ -130,6 +130,12 @@ En un vendedor nativo, ejecuta `gyblos seller status --online`. La línea de des
 | `not in the first N sellers of the index` | La búsqueda paró antes; no se sabe si está listado. |
 | `index unreachable`                       | La búsqueda falló; no se sabe si está listado.      |
 
+Durante la beta, el índice solo lista vendedores cuya identidad canjeó una invitación. Si el vendedor sigue
+en `not found in the index` dos minutos después de arrancar, comprueba que `gyblos seller register` mostró
+`Registered` o `Already registered` para esta misma identidad, y ejecútalo de nuevo si no fue así. Si lo
+mostró y el vendedor sigue sin aparecer, pide ayuda en el [Telegram de Gyblos](https://t.me/gyblos) con tu
+NodeId público. Nunca publiques tu código de invitación.
+
 El índice recibe tu identidad pública, tu modelo y tu oferta, nunca preguntas. Solo se publican las ofertas que
 el vendedor puede servir. Un listado demuestra que los compradores pueden encontrar tu vendedor, no que una
 solicitud se haya completado.

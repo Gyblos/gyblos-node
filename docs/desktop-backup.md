@@ -9,6 +9,9 @@ installation and everyday use.
 
 In short:
 
+- The wallet starts locked. Every action on this page needs it unlocked first,
+  through **Set up or unlock wallet** and the native explanation that follows.
+  Normal startup and status reads never consult the OS secret store.
 - You choose where the backup file goes, through a native save dialog. The file
   is encrypted with your password before it is written.
 - **Verify saved file** proves the file and password recover the current wallet.
@@ -95,12 +98,14 @@ status. It never receives a key, a path, file contents or decrypted material.
 - The bridge accepts only bounded requests from the main window's current main
   frame. The startup window renders only the loader and cannot perform wallet
   actions.
-- Public reads are coalesced. Restore, select, backup and copy run one at a
-  time, so an overlapping status request cannot change the selected wallet.
-- Quitting cancels pending work and waits for automatic initialization, native
-  file dialogs and in-flight backup or restore work. A write that already
-  started may finish with its encrypted file retained, but it reports
-  cancellation, not success, and the main window does not appear afterward.
+- Public reads return only the session snapshot; they never decrypt or open a
+  native dialog. Explicit unlocking is coalesced. Restore, select, backup and
+  copy run one at a time, and a locked wallet refuses them without unlocking.
+- Quitting cancels pending work and waits only for work already started: an
+  approval, protected preparation, a native file dialog, or a backup or restore.
+  An unused wallet never delays it. A write that already started may finish with
+  its encrypted file retained, but it reports cancellation, not success, and the
+  main window does not appear afterward.
 - Passwords are never persisted or logged. Native confirmation is consent, not
   biometric authentication or malware protection.
 
@@ -114,8 +119,8 @@ the recovered key; `codec.open` still requires an expected address.
   file, a symlink or interrupted state. It never reads existing wallet keys,
   deletes a directory or replaces another wallet.
 - Authentication and a local protection round trip happen before it reserves the
-  destination exclusively. Automatic wallet creation and restoration share that
-  claim, so one wins and the other refuses.
+  destination exclusively. Wallet creation after approved access and restoration
+  share that claim, so one wins and the other refuses.
 - The recovered key is re-encrypted with the destination's OS protection,
   written by exclusive file creation, and reloaded through a read-only loader
   that cannot create a replacement identity.
@@ -137,8 +142,9 @@ and a domain-separated HMAC-SHA256 tag keyed by the current wallet key. It never
 holds the password, the file path, the backup or the private key. Equivalent
 PKCS8 encodings are accepted when they derive the current address.
 
-The app revalidates the record on restart, when the wallet opens and after each
-operation. Missing, malformed, oversized, altered, wrong-wallet,
+The app revalidates the record on the first approved access after a restart and
+after each wallet operation. Opening a page or polling status never touches the
+protected store. Missing, malformed, oversized, altered, wrong-wallet,
 unsupported-version or inaccessible metadata means unverified. Invalid metadata
 is kept until a successful check replaces it. POSIX storage must be private;
 Windows does not enforce equivalent permissions.

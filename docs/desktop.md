@@ -156,10 +156,31 @@ uploaded.
 
 ## Protected local wallet
 
-On first launch the loader prepares a protected Ed25519 wallet, but only when
-its dedicated directory is absent or empty. It shows no creation choice or
-backup prompt. Existing state is read without initialization; a missing original
-inside a retained wallet library never generates a replacement.
+The app creates its private data folder and starts the buyer without asking for
+a folder and without touching protected custody. The wallet starts **locked**:
+no address, backup-verification claim or balance is exposed. Passive status,
+opening **Payments** and quitting with an unused wallet never consult OS
+encryption.
+
+Custody starts only on request:
+
+1. In **Payments → Wallet details**, the user chooses **Set up or unlock
+   wallet**.
+2. A native explanation appears before any secure-storage availability check,
+   encryption or decryption. **Continue** permits access; **Cancel** keeps free
+   chat running with the wallet locked.
+3. The OS may then prompt. On macOS, any "Gyblos Safe Storage" password goes
+   only into the system dialog, never a Gyblos form. Windows normally uses the
+   account's DPAPI without a prompt. Linux may ask to unlock GNOME Keyring or
+   KWallet.
+
+Denied or unavailable access is not retried until another explicit action.
+Approved access creates an Ed25519 wallet only when its dedicated directory is
+absent or empty. Existing state is read without creating another identity; a
+missing original inside a retained wallet library never generates a replacement.
+The active address and backup-verification metadata are checked again on
+approved access in each new process and after each wallet operation, never by
+background polling.
 
 - The original wallet lives under
   `app.getPath('appData')/gyblos-wallet/wallet-v1`. Restored wallets get
@@ -199,8 +220,9 @@ Durability:
   inspection.
 - POSIX directories and files are owner-only and flushed. Windows relies on the
   user profile and DPAPI, without equivalent power-loss guarantees.
-- Initialization is shared, and an orderly quit waits for it. An unresponsive OS
-  secret-store prompt can delay quitting.
+- Explicit unlocking is shared, and an orderly quit waits only for wallet work
+  already started. After approval, an unresponsive OS secret-store prompt can
+  delay quitting; an unused wallet never does.
 - Plaintext is briefly present in main-process memory, and JavaScript strings
   cannot be reliably zeroed. This is not a Secure Enclave wallet.
 

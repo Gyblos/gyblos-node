@@ -154,11 +154,12 @@ clear state to force another attempt.
 
 If the seller is registered and `publish = true`, but `gyblos seller status --online` still doesn't show it as listed:
 
-| Code or output                  | Meaning and remedy                                                                       |
-| ------------------------------- | ---------------------------------------------------------------------------------------- |
-| `not in the first 2000 sellers` | The search stopped early; this doesn't prove the seller is missing                       |
-| `index unreachable`             | The listing state is unknown; fix connectivity first                                     |
-| `CLOCK_SKEWED`                  | Turn on automatic time synchronization; the index can reject records dated in the future |
+| Code or output                                   | Meaning and remedy                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `not found in the index` two minutes after start | During the beta, only sellers whose identity redeemed an invitation are listed. Check that `gyblos seller register` printed `Registered` or `Already registered` for this identity, or run it again. If it did, ask in the [Gyblos Telegram](https://t.me/gyblos) with your public NodeId, never the invite code |
+| `not in the first 2000 sellers`                  | The search stopped early; this doesn't prove the seller is missing                                                                                                                                                                                                                                               |
+| `index unreachable`                              | The listing state is unknown; fix connectivity first                                                                                                                                                                                                                                                             |
+| `CLOCK_SKEWED`                                   | Turn on automatic time synchronization; the index can reject records dated in the future                                                                                                                                                                                                                         |
 
 ## Requests are refused or there is no activity [#free-requests-refused-or-no-activity]
 
@@ -175,15 +176,17 @@ make a check pass, don't run setup into another home, and never run `docker comp
 
 ## Desktop app and local buyer [#buyer-and-desktop]
 
-| Symptom or exact output                                                                | Remedy                                                                                                                 |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| macOS says it can't verify the developer, or Windows shows "Windows protected your PC" | Expected for the unsigned beta app; follow the [first-run steps](/en/buyers/desktop-app#install)                       |
-| The wallet shows as unavailable                                                        | macOS: answer the keychain prompt for "Gyblos Safe Storage" with **Always Allow**. Linux: run GNOME Keyring or KWallet |
-| `Local buyer is unavailable`                                                           | Choose **Payments → Retry local buyer**. It retries startup only                                                       |
-| An answer fails with HTTP 503, or no seller is available                               | No registered seller is online for that model right now. Wait and try again; check that you can reach the internet     |
-| `An unfinished payment needs review. New messages are blocked.`                        | Open **Payments** and review the payment. Don't delete app data to clear it; ask for help if it stays unresolved       |
-| `FREE_BUYER_CONFIGURATION_REQUIRED` when `pnpm buyer:free` starts                      | Read the reason and hint after the code. A missing `selection.json` means you need to run `pnpm buyer:init` first      |
-| The checkout buyer reports that port 4031 is in use                                    | Another buyer is running; stop it first                                                                                |
+| Symptom or exact output                                                                | Remedy                                                                                                                                                            |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS says it can't verify the developer, or Windows shows "Windows protected your PC" | Expected for the unsigned beta app; follow the [first-run steps](/en/buyers/desktop-app#install)                                                                  |
+| The wallet shows **Locked**                                                            | Expected until you unlock it; free chat doesn't need it. To use it, see [Protected wallet](/en/buyers/desktop-app#protected-wallet)                               |
+| The wallet shows **Not available**                                                     | macOS: allow "Gyblos Safe Storage" in the Keychain dialog. Linux: run GNOME Keyring or KWallet and restart the app. Then choose **Set up or unlock wallet** again |
+| `Local buyer is unavailable`                                                           | Choose **Payments → Retry local buyer**. It retries startup only                                                                                                  |
+| An answer fails with HTTP 503, or no seller is available                               | No registered seller is online for that model right now. Wait and try again; check that you can reach the internet                                                |
+| An error says the seller was too slow (`engine_timeout`)                               | Send the message again; another seller usually answers. With a coding agent, you can also shorten or compact the conversation                                     |
+| `An unfinished payment needs review. New messages are blocked.`                        | Open **Payments** and review the payment. Don't delete app data to clear it; ask for help if it stays unresolved                                                  |
+| `FREE_BUYER_CONFIGURATION_REQUIRED` when `pnpm buyer:free` starts                      | Read the reason and hint after the code. A missing `selection.json` means you need to run `pnpm buyer:init` first                                                 |
+| The checkout buyer reports that port 4031 is in use                                    | Another buyer is running; stop it first                                                                                                                           |
 
 For more detail on the local buyer, run `gyblos logs --role buyer` (from a checkout,
 `pnpm gyblos logs --role buyer`); see the [CLI reference](/en/reference/cli#local-operational-logs).

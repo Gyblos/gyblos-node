@@ -38,12 +38,12 @@ abrirla. Después se abre con normalidad.
 2. Abre Gyblos. macOS dice que no puede verificar al desarrollador; elige **OK**.
 3. Abre **Configuración del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Gyblos, elige
    **Abrir de todas formas** y confirma con tu contraseña.
-4. macOS pide permiso para que Gyblos use la llave "Gyblos Safe Storage" de tu llavero. Escribe la
-   contraseña de tu Mac y elige **Permitir siempre**. La app protege su billetera con esta llave. Mientras
-   la pregunta está abierta, la app no puede cerrarse y su billetera aparece como no disponible.
+4. Se abre el Chat. La app crea su carpeta de datos sola; no eliges ni abres ninguna carpeta, y no te pide
+   desbloquear una billetera.
 
-Como la app de la beta no está firmada, macOS vuelve a preguntar los pasos 2 a 4 después de cada
-actualización.
+Después de una actualización, macOS puede volver a avisarte antes de abrir la app. Abrir la app nunca pide
+"Gyblos Safe Storage": el acceso a la billetera es un paso aparte, descrito en
+[Billetera protegida](#billetera-protegida).
 
 ### Windows [#windows]
 
@@ -61,9 +61,6 @@ sudo apt install ./gyblos-desktop-<version>-linux-x64.deb
 ```
 
 En otras distribuciones, descomprime el `.tar.gz` y ejecuta `./gyblos-desktop` dentro de la carpeta.
-
-La app protege su billetera con el almacén de secretos de tu escritorio: GNOME Keyring o KWallet. Sin
-uno de ellos, la billetera aparece como no disponible.
 
 ## Chat [#usarla]
 
@@ -107,8 +104,8 @@ Para ejecutar el comprador local sin la app, consulta [Usar Gyblos desde tu cód
 
 ## Pagos [#pagos]
 
-Las respuestas gratis no necesitan fondos ni transacciones. La identidad del comprador local es distinta de
-la billetera protegida de **Payments**.
+Las respuestas gratis no necesitan fondos, transacciones ni billetera. La identidad del comprador local es
+distinta de la billetera protegida de **Payments**.
 
 Una respuesta con precio necesita un presupuesto que autorizas en **Payments**; la app nunca lo autoriza
 sola. Si el resultado de una solicitud pagada es incierto, la app bloquea los mensajes nuevos hasta que lo
@@ -117,6 +114,25 @@ revises en **Payments**. Detener una respuesta no prueba que no hubo cobro.
 Si el comprador local no arranca, elige **Payments → Retry local buyer**. Eso solo reintenta el arranque: la
 app nunca reenvía sola un mensaje que falló. **Activity** guarda el historial de tus sesiones y sus
 referencias de pago.
+
+## Billetera protegida [#billetera-protegida]
+
+La billetera empieza bloqueada, y el chat gratis nunca la necesita. Para usarla:
+
+1. Abre **Payments → Wallet details** y elige **Set up or unlock wallet**.
+2. Gyblos te explica qué va a pasar antes de tocar el almacenamiento seguro de tu sistema. Elige
+   **Continue** para seguir, o **Cancel** para seguir chateando sin la billetera.
+3. Después tu sistema puede pedirte acceso:
+   - **macOS**: el llavero usa "Gyblos Safe Storage" para proteger la llave de cifrado de la billetera.
+     Escribe la contraseña de tu Mac solo en el diálogo de macOS, nunca en un formulario de Gyblos.
+   - **Windows**: la protección normalmente funciona con tu cuenta de Windows, sin preguntar.
+   - **Linux**: GNOME Keyring o KWallet puede pedirte desbloquearlo. Sin un almacén de secretos compatible,
+     la billetera queda no disponible; la app nunca guarda sus llaves sin protección.
+
+Desbloquearla no autoriza ningún pago ni habilita fondos. Las billeteras y los registros de recuperación que
+ya existen se conservan. La app solo te pide un archivo cuando eliges hacer una copia o restaurar la
+billetera. Si hay un diálogo del sistema abierto cuando cierras la app, puede esperar a que termine:
+respóndelo o cancélalo para terminar de cerrarla.
 
 ## Actualizaciones [#actualizaciones]
 
@@ -127,8 +143,8 @@ desactivarla, consulta [Datos y privacidad](/es/reference/data-and-privacy#búsq
 
 ## Dónde guarda tus datos la app [#datos]
 
-La app guarda tus conversaciones, tu actividad y su comprador local en una carpeta `gyblos-desktop`, y su
-billetera en una carpeta `gyblos-wallet`, ambas dentro de la carpeta de datos de aplicaciones del sistema:
+La app guarda tus conversaciones, tu actividad y su comprador local en una carpeta `gyblos-desktop`, y, cuando
+la configuras, su billetera en una carpeta `gyblos-wallet`, ambas dentro de la carpeta de datos de aplicaciones del sistema:
 
 | Sistema | Carpeta                         |
 | ------- | ------------------------------- |

@@ -63,6 +63,7 @@ export function WalletDetails({
   }, [refresh]);
   const { busy } = useDesktopWalletActions();
   const ready = wallet.status === WALLET_STATUS.READY;
+  const locked = wallet.status === WALLET_STATUS.LOCKED;
   return (
     <section className="wallet-details" aria-label="Wallet details">
       <div className="connection-location">
@@ -72,7 +73,9 @@ export function WalletDetails({
             ? wallet.backupVerified
               ? 'Backup verified'
               : 'Backup needed'
-            : 'Not available'}
+            : locked
+              ? 'Locked'
+              : 'Not available'}
         </Badge>
       </div>
       <div className="settings-restriction wallet-balance">
@@ -90,7 +93,9 @@ export function WalletDetails({
           <Plus size={16} aria-hidden="true" /> Add funds
         </Button>
       </div>
-      {ready ? (
+      {locked ? (
+        <WalletAccess />
+      ) : ready ? (
         <WalletFacts address={wallet.address} />
       ) : (
         <Note>
@@ -101,8 +106,29 @@ export function WalletDetails({
               : 'Protected wallet storage is unavailable. On Linux, enable GNOME Keyring or KWallet and restart. You can still use free models.'}
         </Note>
       )}
+      {wallet.status === WALLET_STATUS.UNAVAILABLE && <WalletAccess />}
       <WalletSelector />
       <WalletRecovery ready={ready} onBackup={onBackup} />
+    </section>
+  );
+}
+
+function WalletAccess() {
+  const { busy, activate } = useDesktopWalletActions();
+  return (
+    <section className="ui-section" aria-label="Unlock protected wallet">
+      <Note>
+        Free chat works without this wallet. Continue only when you want to use
+        its wallet or backup features. Gyblos will explain your device's secure
+        storage prompt before opening it. No payment is authorized here.
+      </Note>
+      <Button
+        variant={BUTTON_VARIANT.PRIMARY}
+        disabled={busy}
+        onClick={() => void activate()}
+      >
+        {busy ? 'Waiting for device approval…' : 'Set up or unlock wallet'}
+      </Button>
     </section>
   );
 }

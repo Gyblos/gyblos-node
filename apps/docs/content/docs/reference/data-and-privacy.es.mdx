@@ -181,12 +181,12 @@ desde la que te conectas.
 
 ## Dónde quedan los datos en tu equipo [#datos-locales]
 
-| Instalación                            | Ubicación                                                                             | Contenido                                                                                                                             |
-| -------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Vendedor Docker                        | `~/gyblos-seller` y el volumen Docker `gyblos` (montado en `/data`)                   | `config.toml` y `seller.env` en la carpeta. Llaves, estado del registro, recibos y registros de pago en el volumen                    |
-| Vendedor nativo                        | `~/.gyblos` (Windows: `%USERPROFILE%\.gyblos`)                                        | `config.toml`, `seller.env`, `service.log` (macOS y Windows) y `seller/` con llaves, registro, recibos y pagos                        |
-| Comprador local desde el código fuente | `.local/gyblos/buyer` dentro del repositorio                                          | Llave del comprador, `selection.json`, recibos, registros de pago y logs de diagnóstico                                               |
-| App de escritorio                      | `gyblos-desktop` y `gyblos-wallet` en la carpeta de datos de aplicaciones del sistema | Conversaciones, actividad, el presupuesto del Chat y el comprador local; la billetera, protegida por el almacén de llaves del sistema |
+| Instalación                            | Ubicación                                                                             | Contenido                                                                                                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vendedor Docker                        | `~/gyblos-seller` y el volumen Docker `gyblos` (montado en `/data`)                   | `config.toml` y `seller.env` en la carpeta. Llaves, estado del registro, recibos y registros de pago en el volumen                                          |
+| Vendedor nativo                        | `~/.gyblos` (Windows: `%USERPROFILE%\.gyblos`)                                        | `config.toml`, `seller.env`, `service.log` (macOS y Windows) y `seller/` con llaves, registro, recibos y pagos                                              |
+| Comprador local desde el código fuente | `.local/gyblos/buyer` dentro del repositorio                                          | Llave del comprador, `selection.json`, recibos, registros de pago y logs de diagnóstico                                                                     |
+| App de escritorio                      | `gyblos-desktop` y `gyblos-wallet` en la carpeta de datos de aplicaciones del sistema | Conversaciones, actividad, el presupuesto del Chat y el comprador local; la billetera, cuando la configuras, protegida por el almacén de llaves del sistema |
 
 La carpeta de datos de aplicaciones es `~/Library/Application Support` en macOS, `%APPDATA%` en Windows y
 `~/.config` en Linux.

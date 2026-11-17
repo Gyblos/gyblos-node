@@ -37,11 +37,11 @@ After that it opens normally.
 2. Open Gyblos. macOS says it cannot verify the developer; choose **Done**.
 3. Open **System Settings → Privacy & Security**, scroll to the message about Gyblos, choose
    **Open Anyway**, and confirm with your password.
-4. macOS asks to let Gyblos use the key "Gyblos Safe Storage" in your keychain. Enter your Mac password and
-   choose **Always Allow**. The app protects its wallet with this key. While the question is open, the app
-   can't quit and its wallet shows as unavailable.
+4. Chat opens. The app creates its data folder by itself; you don't choose or open a folder, and it
+   doesn't ask to unlock a wallet.
 
-Because the beta app is not signed, macOS asks steps 2 to 4 again after each update.
+After an update, macOS may warn you again before the app opens. Opening the app never asks for
+"Gyblos Safe Storage": wallet access is a separate step, described in [Protected wallet](#protected-wallet).
 
 ### Windows [#windows]
 
@@ -58,9 +58,6 @@ sudo apt install ./gyblos-desktop-<version>-linux-x64.deb
 ```
 
 On other distributions, unpack the `.tar.gz` and run `./gyblos-desktop` inside the folder.
-
-The app protects its wallet with your desktop's secret store: GNOME Keyring or KWallet. Without one, the
-wallet shows as unavailable.
 
 ## Chat [#using-it]
 
@@ -104,8 +101,8 @@ To run the local buyer without the app, see [Use Gyblos from your code](/en/buye
 
 ## Payments [#payments]
 
-Free answers need no funding or transaction. The local buyer's identity is separate from the protected
-wallet in **Payments**.
+Free answers need no funding or transaction, and no wallet. The local buyer's identity is separate from
+the protected wallet in **Payments**.
 
 A priced answer needs a budget that you authorize in **Payments**; the app never authorizes one on its
 own. If the outcome of a paid request is uncertain, the app blocks new messages until you review it in
@@ -114,6 +111,24 @@ own. If the outcome of a paid request is uncertain, the app blocks new messages 
 If the local buyer fails to start, choose **Payments → Retry local buyer**. That retries startup only: the
 app never resends a failed message on its own. **Activity** keeps a history of your sessions and their
 payment references.
+
+## Protected wallet [#protected-wallet]
+
+The wallet starts locked, and free chat never needs it. To use it:
+
+1. Open **Payments → Wallet details** and choose **Set up or unlock wallet**.
+2. Gyblos explains what happens next before it touches your system's secure storage. Choose **Continue**
+   to go on, or **Cancel** to keep chatting without the wallet.
+3. Your system may then ask for access:
+   - **macOS**: Keychain uses "Gyblos Safe Storage" to protect the wallet's encryption key. Enter your
+     Mac password only in the macOS dialog, never in a Gyblos form.
+   - **Windows**: protection normally works through your Windows account, without a prompt.
+   - **Linux**: GNOME Keyring or KWallet may ask to be unlocked. Without a supported secret store, the
+     wallet stays unavailable; the app never stores its keys unprotected.
+
+Unlocking doesn't authorize a payment or enable funding. Existing wallets and recovery records are kept.
+The app asks for a file only when you choose to back up or restore the wallet. If a system dialog is
+open when you quit, the app may wait for it: answer or cancel it to finish closing.
 
 ## Updates [#updates]
 
@@ -124,8 +139,8 @@ off, see [Data and privacy](/en/reference/data-and-privacy#update-checks).
 
 ## Where the app keeps your data [#data]
 
-The app keeps your conversations, activity and its local buyer in a `gyblos-desktop` folder, and its
-wallet in a `gyblos-wallet` folder, both in your system's application-data folder:
+The app keeps your conversations, activity and its local buyer in a `gyblos-desktop` folder, and, once
+you set it up, its wallet in a `gyblos-wallet` folder, both in your system's application-data folder:
 
 | System  | Folder                          |
 | ------- | ------------------------------- |

@@ -920,8 +920,13 @@ details matter when you change or debug the endpoint:
   `error.reason` is `quota_exhausted`, `rate_limited`, `engine_unavailable`,
   `engine_interrupted`, `engine_timeout` or `engine_invalid_response`. Before
   the first token this is a 503 JSON error; mid-stream it is the final SSE error
-  event, with `error.usage.completion_tokens`. The buyer does not retry it.
-  `FREE_EXECUTION_ENGINE_UNAVAILABLE` is the refusal before generation.
+  event, with `error.usage.completion_tokens`. The buyer does not retry it. For
+  `engine_timeout` the message says the seller was too slow: before any text,
+  too slow to read a request this size (send it again to try another seller, or
+  shorten the conversation); after text, too slow to finish. This holds in the
+  OpenAI, Anthropic and Responses formats, for a JSON error and for a stream's
+  last event. `FREE_EXECUTION_ENGINE_UNAVAILABLE` is the refusal before
+  generation.
 - **Diagnostics line.** When a seller drops out of a selection, the buyer prints
   one stderr line:
   `FREE_BUYER_SELLER_FAILED <first 8 hex of the NodeId> <phase> <code>`, with
@@ -1112,7 +1117,9 @@ protocol specification. Free execution serves a conversation (an optional system
 message, then alternating user and assistant turns that start and end with the
 user) with reasoning `off`, up to the offer's answer limit
 (`free.max_output_tokens`, 4096 by default, at most 32768) within the model's
-context. The engine's deadline grows with the requested answer, up to 170
+context. The engine's deadline has two parts: time to read the prompt, 10 ms per
+counted input token (a 7000-token agent prompt gets 70 seconds more), and time
+to answer, which grows with the requested answer. Together they stay under 170
 seconds.
 
 ### Token caps

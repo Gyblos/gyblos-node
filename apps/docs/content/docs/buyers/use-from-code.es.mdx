@@ -273,6 +273,12 @@ Una conexión rota puede no entregar ni siquiera las cabeceras de la respuesta, 
 reintentos HTTP y de stream en tu cliente. Si reenvías una solicitud tú mismo, empieza una nueva selección
 de vendedor.
 
+Algunos vendedores usan equipos lentos. Si un vendedor no alcanza a leer a tiempo un prompt largo, como el
+de un agente de código, la solicitud termina con `reason` `engine_timeout` y un mensaje que dice que el
+vendedor fue demasiado lento para una solicitud de ese tamaño. Envíala de nuevo: el fallo baja el peso de
+ese vendedor, así que normalmente responde otro. También puedes acortar la conversación; Codex y OpenCode
+pueden compactarla.
+
 ## Conecta un agente de código [#conectar-un-agente-de-codigo]
 
 Un comando escribe la configuración de OpenCode, pi o Codex CLI con todos los modelos que sirve tu

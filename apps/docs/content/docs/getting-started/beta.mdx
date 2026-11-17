@@ -29,13 +29,15 @@ For the [desktop app](/en/buyers/desktop-app):
 - macOS on Apple Silicon (M1 or newer), Windows 10 or 11 (x64), or Linux (x64). There is no build for
   Intel Macs.
 - Internet access to the discovery index, Solana devnet and the Gyblos relays.
+- No invitation: the app needs no invite code.
 
 To [call models from your code](/en/buyers/use-from-code) you also need Git, Node.js 24.22.1 or later
 and pnpm (`corepack enable` provides it). The local buyer runs from the source repository.
 
 ## Run a seller [#before-you-install]
 
-- An invitation with a one-use **invite code** that starts with `gyb_`. You do not need a relay token.
+- An invitation with a one-use **invite code** that starts with `gyb_`. You do not need a relay token. If you
+  don't have one, ask for it in the [Gyblos Telegram](https://t.me/gyblos).
 - A machine that stays on, with at least **4 GB of memory** and a few GB of free disk.
 - Outbound internet access. The seller opens no listening port; it connects out to the relays.
 - One of these install types. The installer uses Docker when your account can run it, and the native
