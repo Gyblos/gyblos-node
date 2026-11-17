@@ -235,7 +235,7 @@ html > body[data-scroll-locked] {
 
 /* The docs lockup draws the mark and the name at the same size and keeps its aspect ratio in both themes. */
 .docs-wordmark {
-  width: 130px;
+  width: 160px;
   height: auto;
   flex-shrink: 0;
 }
@@ -264,17 +264,27 @@ body {
   text-decoration-color: currentColor;
 }
 
+/* The brand blue marks where you are and what you can act on: link underlines, the active page and
+   section indicators, and card hover borders. Text itself stays neutral. */
+.prose a {
+  text-decoration-color: var(--brand-blue);
+}
+
 :is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true'] {
-  background: var(--color-fd-accent);
+  background: color-mix(in srgb, var(--brand-blue) 14%, transparent);
 }
 
 :is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true']::before,
 #nd-toc .bg-fd-primary,
 [data-toc-popover] .bg-fd-primary {
-  background: var(--color-fd-foreground);
+  background: var(--brand-blue);
 }
 
 #nd-toc .stroke-fd-primary,
 [data-toc-popover] .stroke-fd-primary {
-  stroke: var(--color-fd-foreground);
+  stroke: var(--brand-blue);
+}
+
+#nd-page a[data-card]:hover {
+  border-color: var(--brand-blue);
 }
