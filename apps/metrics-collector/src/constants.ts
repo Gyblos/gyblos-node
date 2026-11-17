@@ -138,7 +138,8 @@ export const IPV6 = {
 
 // Aggregates (#351). Changing a formula bumps formulaVersion; rows are then rebuilt from raw.
 export const AGGREGATES = {
-  formulaVersion: 1,
+  // 2: origin and failure breakdowns (recomputes every day once).
+  formulaVersion: 2,
   // Upper bounds of the latency histogram buckets, in ms; one more bucket holds everything above.
   // Fixed so histograms can be summed across hours, days, sellers and models.
   latencyBucketsMs: [
@@ -159,6 +160,11 @@ export const AGGREGATES = {
   defaultRangeDays: 30,
   dayMs: 86_400_000,
   hourMs: 3_600_000,
+} as const;
+// Breakdown labels: a receipt no buyer upload carried, and unserved demand, which has no reason.
+export const BREAKDOWNS = {
+  unknownClient: 'unknown',
+  noReason: 'none',
 } as const;
 export const FIRST_SEEN_KINDS = {
   SELLER: 'seller',

@@ -13,6 +13,7 @@ import {
 } from '@gyblos/config/network';
 import { runAggregation } from '@gyblos/metrics-collector/aggregate';
 import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
+import { AGGREGATES } from '@gyblos/metrics-collector/constants';
 
 import { fakeChainRpc } from './support/metrics-collector-chain';
 import {
@@ -60,7 +61,7 @@ void test('the real devnet lifecycle adds up in both scopes, in USDC only', asyn
     program_treasury_atomic: '145',
     refunded_atomic: '9855',
     paid_out_atomic: '0',
-    formula_version: 1,
+    formula_version: AGGREGATES.formulaVersion,
     aggregated_at: 2000,
   };
   assert.deepEqual(chainRows(database, 'program'), [

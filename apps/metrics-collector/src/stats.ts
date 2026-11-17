@@ -3,6 +3,12 @@
 // Aggregates only: never a receipt, a buyer identity or a raw observation.
 import { daysOf, type DayRange } from './days';
 import {
+  failureEntry,
+  originEntry,
+  type FailureEntry,
+  type OriginEntry,
+} from './stats-breakdowns';
+import {
   bySide,
   latency,
   nullable,
@@ -47,6 +53,9 @@ export interface NetworkDay extends Sides<NetworkSide, NetworkSide> {
     refusedBeforeSelection: number;
     connectFailed: number;
   }[];
+  // Requests by the buyer application that reported them; failures by side, application and reason.
+  origins: OriginEntry[];
+  failures: FailureEntry[];
 }
 export interface ModelEntry<F = object, P = object> extends Sides<F, P> {
   modelId: string;
@@ -121,7 +130,10 @@ export async function networkStats(
   reader: StatsReader,
   range: DayRange,
 ): Promise<NetworkStats> {
-  const { network, observed, demand } = await reader.network(range);
+  const { network, observed, demand, origins, failures } =
+    await reader.network(range);
+  const originsByDay = groupBy(origins, (row) => row.day);
+  const failuresByDay = groupBy(failures, (row) => row.day);
   const networkByDay = groupBy(network, (row) => row.day);
   const observedByDay = new Map(observed.map((row) => [row.day, row]));
   const demandByDay = groupBy(demand, (row) => row.day);
@@ -155,6 +167,8 @@ export async function networkStats(
         refusedBeforeSelection: row.refusedBeforeSelection,
         connectFailed: row.connectFailed,
       })),
+      origins: (originsByDay.get(day) ?? []).map(originEntry),
+      failures: (failuresByDay.get(day) ?? []).map(failureEntry),
     };
   });
   return {
@@ -162,6 +176,8 @@ export async function networkStats(
       ...network.map(fromTotals),
       ...observed.map(fromRow),
       ...demand.map(fromRow),
+      ...origins.map(fromRow),
+      ...failures.map(fromRow),
     ]),
     days,
   };
