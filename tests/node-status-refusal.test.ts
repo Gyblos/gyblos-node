@@ -181,3 +181,30 @@ void test('seller status refuses flags of other commands', () =>
       assert.match(result.stderr, /^Usage:/, args.join(' '));
     }
   }));
+
+void test('seller status: a publication the index refused shows its code and how to register, never a crafted value', () =>
+  withHome(async (home) => {
+    await writeFile(join(home.root, 'config.toml'), PUBLISH);
+    const write = (lastError: unknown) =>
+      writeFile(
+        join(home.seller, 'status.json'),
+        JSON.stringify({
+          status: 'ready',
+          nodeId: home.nodeId,
+          offers: [{ modelId: 'qwen3-0.6b', engine: 'ollama', listed: true }],
+          publication: { lastError },
+        }),
+      );
+    await write('DISCOVERY_PUBLISH_NOT_ALLOWED');
+    const refused = await status(home, system(home));
+    assert.match(
+      refused.stdout,
+      /discovery\s+on \(https:\/\/index\.test <path hidden>\); publishing refused: DISCOVERY_PUBLISH_NOT_ALLOWED \(.*seller register.*\)\n/,
+    );
+    await write(null);
+    const clear = await status(home, system(home));
+    assert.doesNotMatch(clear.stdout, /publishing refused/);
+    await write('x y\u001b[2J');
+    const crafted = await status(home, system(home));
+    assert.doesNotMatch(crafted.output, /\u001b|publishing refused/);
+  }));

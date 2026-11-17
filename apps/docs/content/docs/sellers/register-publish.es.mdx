@@ -115,7 +115,9 @@ docker compose exec seller gyblos seller status --online
 | `not in the first 2000 sellers` | Se agotó el límite de búsqueda; no demuestra ausencia      |
 | `index unreachable`             | Falló la consulta; el estado de publicación es desconocido |
 
-Durante la beta el índice solo acepta vendedores cuya identidad canjeó una invitación. Si el vendedor sigue en
+Durante la beta el índice solo acepta vendedores cuya identidad canjeó una invitación. Cuando el índice rechaza este
+vendedor, `gyblos seller status` muestra `publishing refused: DISCOVERY_PUBLISH_NOT_ALLOWED` en la línea de
+descubrimiento (desde beta.12; las versiones anteriores no muestran el motivo). Si el vendedor sigue en
 `not found in the index` dos minutos después de arrancar, comprueba que `gyblos seller register` mostró `Registered`
 o `Already registered` para esta misma identidad, y ejecútalo de nuevo si no fue así. Si lo mostró y el vendedor sigue
 sin aparecer, pide ayuda en el [Telegram de Gyblos](https://t.me/gyblos) con tu NodeId público; nunca publiques el

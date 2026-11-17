@@ -354,10 +354,13 @@ It prints the NodeId and owner, then:
   `not serving yet`;
 - `discovery`: `off`, `on` with the index origin, or `configuration invalid`
   when node:start would refuse the file (an explicit `GYBLOS_CONFIG` must
-  exist). With `--online` it pages the index for each served model, sending only
-  the model, and says `listed in the index`, `not found in the index`, that it
-  stopped after 2000 sellers, `index unreachable`, or that no offer was serving
-  to look up;
+  exist). While the index refuses or fails this seller's publication, `on` is
+  followed by `publishing refused:` and the static code the daemon keeps in
+  status.json (`DISCOVERY_PUBLISH_NOT_ALLOWED` adds how to register). With
+  `--online` it pages the index for each served model, sending only the model,
+  and says `listed in the index`, `not found in the index`, that it stopped
+  after 2000 sellers, `index unreachable`, or that no offer was serving to look
+  up;
 - counts from the seller's signed receipts for the last 24 hours and 7 days
   (completed, failed, cancelled, output tokens, and the approximate output
   tokens per second of completed sales: time after the first token when
