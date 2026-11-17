@@ -6,7 +6,8 @@ import {
   observeStartupProgress,
   type StartupProgressBridge,
 } from '../startup-progress';
-import { themeStyle } from '../theme';
+import { prefersLightTheme, themeStyle } from '../theme';
+import { SignalMark } from './Signal';
 
 declare global {
   interface Window {
@@ -21,9 +22,9 @@ export function StartupSplash() {
     if (bridge) return observeStartupProgress(bridge, setPercentage);
   }, []);
   return (
-    <main className="startup-splash" style={themeStyle(false)}>
+    <main className="startup-splash" style={themeStyle(prefersLightTheme())}>
       <div className="startup-splash-brand">
-        <span>[g]</span> Gyblos
+        <SignalMark /> Gyblos
       </div>
       <div
         className="startup-ascii"

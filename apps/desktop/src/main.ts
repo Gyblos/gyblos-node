@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
 
 import { registerNetworkCatalog } from './catalog/host';
 import { registerChatArchive } from './chat-archive-host';
@@ -36,7 +36,9 @@ function createProbeWindow(startup = false) {
     minHeight: startup ? STARTUP_WINDOW.HEIGHT : DESKTOP.MIN_HEIGHT,
     show: false,
     resizable: !startup,
-    backgroundColor: BRAND_COLORS.charcoal,
+    backgroundColor: nativeTheme.shouldUseDarkColors
+      ? BRAND_COLORS.panel
+      : BRAND_COLORS.panelLight,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,

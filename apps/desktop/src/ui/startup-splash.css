@@ -6,23 +6,25 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: var(--bg);
+  background: var(--canvas);
   color: var(--ink);
   font-family: Geist, sans-serif;
 }
 .startup-splash-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 15px;
   font-weight: 500;
 }
-.startup-splash-brand span {
-  color: var(--accent);
-  font-family: GeistMono, monospace;
-  margin-right: 8px;
+.startup-splash-brand .signal-mark {
+  width: 32px;
+  height: 32px;
 }
 .startup-ascii {
   display: flex;
   margin: 24px 0 16px;
-  color: var(--accent);
+  color: var(--blue);
   font:
     24px/1 GeistMono,
     monospace;
