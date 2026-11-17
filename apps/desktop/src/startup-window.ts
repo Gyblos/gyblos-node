@@ -12,6 +12,7 @@ export function startupHandoff(
   main: StartupWindow,
   loading: StartupWindow,
   signal?: AbortSignal,
+  _onProgress?: (percentage: number) => void,
 ) {
   let prepared = false;
   let painted = false;
