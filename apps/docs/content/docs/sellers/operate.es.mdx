@@ -1,12 +1,26 @@
 ---
-title: Operación
-description: Comprueba, modifica, detén y actualiza el vendedor de Docker conservando su identidad.
+title: Opera y actualiza
+description: Comprueba el estado, aplica cambios de configuración, detén, actualiza y lee los logs de tu vendedor sin perder su identidad.
 ---
 
-Usa estos comandos para el vendedor gratuito de Docker de tu invitación. Si elegiste otra carpeta,
-sustituye `~/gyblos-seller` de forma coherente. Conserva juntos el proyecto de Compose y sus volúmenes existentes.
+Todas las tareas de esta página conservan las llaves de tu vendedor. Ejecuta los comandos de Docker desde la
+carpeta de instalación, `~/gyblos-seller` salvo que hayas definido `GYBLOS_DIR`. Ejecuta los comandos del
+instalador desde la carpeta donde guardaste `install.sh`; en Windows, usa en su lugar
+`powershell -ExecutionPolicy Bypass -File install.ps1`.
 
-## Salud y actividad [#comprueba-salud-y-actividad]
+| Tarea             | Vendedor Docker                                   | Vendedor nativo (macOS, Linux, Windows)      |
+| ----------------- | ------------------------------------------------- | -------------------------------------------- |
+| Estado            | `docker compose exec seller gyblos seller status` | `gyblos seller status`                       |
+| Diagnóstico       | `docker compose run --rm seller gyblos doctor`    | `gyblos doctor`                              |
+| Detener           | `docker compose stop seller`                      | `gyblos seller service uninstall`            |
+| Volver a iniciar  | `docker compose up -d`                            | `sh install.sh`                              |
+| Aplicar un cambio | `docker compose up -d --force-recreate seller`    | `sh install.sh`                              |
+| Actualizar        | `sh install.sh update`                            | `sh install.sh update`                       |
+| Seguir los logs   | `docker compose logs -f seller`                   | Ver [logs](#inspecciona-los-logs-en-privado) |
+
+## Comprueba el estado y la actividad [#comprueba-salud-y-actividad]
+
+En un vendedor Docker:
 
 ```sh
 cd ~/gyblos-seller
@@ -14,81 +28,123 @@ docker compose ps
 docker compose exec seller gyblos seller status
 ```
 
-Espera `RUNNING`. El resumen de recibos muestra solicitudes completadas, fallidas y canceladas, y **tokens
-de salida** durante una ventana móvil de 24 horas de recibos conservados. No es la cuota gratuita restante,
-el total de entrada más salida, ganancias ni prueba de toda la actividad pasada. Las cuotas gratuitas usan el día UTC.
+Espera `Result: RUNNING`. Status también muestra:
 
-Usa `docker compose exec seller gyblos seller status --online` para comprobar descubrimiento por separado.
-Si el contenedor no permanece activo, ejecuta `docker compose run --rm seller gyblos doctor` y
-busca el código en [solución de problemas](/es/help/troubleshooting).
+- **Activity**, a partir de los recibos firmados del vendedor: solicitudes completadas, fallidas y canceladas y
+  tokens de salida de las últimas 24 horas y de los últimos 7 días, y la hora de la última solicitud. No es tu
+  cuota gratuita restante, que se reinicia cada día UTC.
+- **receipt queue**: los recibos que aún esperan subir al recolector de métricas.
+- **Paid requests**, si el vendedor atendió alguna: consulta [Cobra](/es/sellers/get-paid#mira-lo-que-ganaste).
+- **Update:**, como última línea, cuando hay una versión nueva.
+
+Añade `--online` para comprobar también el índice de descubrimiento. Si un contenedor de Docker no se mantiene
+en marcha, ejecuta `docker compose run --rm seller gyblos doctor` y busca su código en
+[solución de problemas](/es/help/troubleshooting).
 
 ## Detén e inicia [#detén-e-inicia]
+
+Para detener un vendedor Docker, ejecuta:
 
 ```sh
 cd ~/gyblos-seller
 docker compose stop seller
 ```
 
-La presencia se retira en un plazo de dos minutos. Ollama sigue activo. Para iniciar de nuevo los servicios:
+El índice retira el vendedor en dos minutos; Ollama sigue en marcha. Vuelve a iniciar los servicios con
+`docker compose up -d`.
 
-```sh
-docker compose up -d
-```
+En un vendedor nativo, `gyblos seller service uninstall` detiene el vendedor y quita su servicio en segundo
+plano; tus llaves y archivos se conservan. Vuelve a ejecutar el instalador para iniciarlo.
 
-`docker compose down` elimina contenedores y conserva los volúmenes con nombre. **Nunca añadas `-v` a
-una parada o reparación habitual**: elimina los volúmenes persistentes, incluidas llaves y modelo descargado.
+<Callout type="error" title="Nunca añadas -v al detener">
+  `docker compose down` quita los contenedores y conserva los volúmenes, pero
+  `docker compose down -v` borra los volúmenes con las llaves de tu vendedor y
+  el modelo, y no se puede deshacer. Un código de invitación usado no puede
+  registrar llaves nuevas. Para detener, usa `docker compose stop seller`.
+</Callout>
 
-## Aplica cambios [#aplica-cambios-de-configuración-o-entorno]
+## Aplica cambios de configuración o de entorno [#aplica-cambios-de-configuración-o-entorno]
 
-Edita `config.toml` en el equipo anfitrión. Valídalo como indica la
-[referencia de configuración](/es/reference/configuration) y recrea el vendedor:
+El vendedor solo lee `config.toml` y `seller.env` al iniciar. Editarlos no cambia nada por sí solo.
+
+En un vendedor Docker, valida el archivo dentro del contenedor y luego recrea el vendedor:
 
 ```sh
 cd ~/gyblos-seller
+docker compose run --rm seller gyblos config validate --config /config/config.toml
 docker compose up -d --force-recreate seller
 docker compose exec seller gyblos seller status
 ```
 
-También debes recrearlo después de cambiar `seller.env`; reiniciar el contenedor no carga los cambios
-del archivo de entorno de Compose. Nunca muestres ese archivo en logs, capturas o una terminal compartida.
+La validación muestra `OK` seguido de los ajustes efectivos. Si informa un problema, corrige esa clave antes de
+recrear. Un simple `docker compose restart` no carga un `seller.env` modificado; recrea siempre.
+
+En un vendedor nativo, valida con `gyblos config validate --config ~/.gyblos/config.toml` (Windows:
+`gyblos config validate --config "$env:USERPROFILE\.gyblos\config.toml"`) y vuelve a ejecutar el instalador.
+Conserva tus archivos y llaves, ejecuta doctor y reinicia el servicio con los nuevos ajustes.
+
+El arranque comprueba más cosas que la validación, por ejemplo si el motor puede servir la oferta. Si el
+vendedor no llega a `RUNNING`, busca el código que indica en [solución de problemas](/es/help/troubleshooting).
 
 ## Actualiza el vendedor [#actualiza-la-imagen-beta]
 
-Cada actualización es una nueva versión firmada en el instalador. Cuando hay una, `gyblos seller status`
-termina con una línea `Update:` que la nombra. Registra la imagen instalada y después ejecuta la
-actualización donde guardaste `install.sh` (con el mismo `GYBLOS_DIR`, si definiste uno):
+Cuando hay una versión nueva, `gyblos seller status` termina con una línea `Update:` que la nombra. Para
+actualizar, ejecuta desde donde guardaste el instalador (con el mismo `GYBLOS_DIR` o `GYBLOS_HOME`, si
+definiste uno):
 
 ```sh
-cd ~/gyblos-seller
-docker compose images seller
 sh install.sh update
 ```
 
-`update` descarga el instalador de la última versión con su checksum y su firma, comprueba el checksum y,
-si cosign está instalado, la firma de la versión (`GYBLOS_REQUIRE_SIGNATURE=1` la hace obligatoria),
-reemplaza tu `install.sh` por él y lo ejecuta. Si tu instalador ya fija la última versión, lo vuelve a ejecutar, lo que también completa una actualización que se detuvo a mitad. Un
-`install.sh` anterior a este comando no conoce `update`: descarga el actual con
+La actualización:
+
+- descarga el instalador del último release con su suma de verificación y su paquete de firma;
+- comprueba la suma y, si tienes cosign, la firma del release (`GYBLOS_REQUIRE_SIGNATURE=1` hace obligatoria la
+  comprobación de la firma);
+- reemplaza tu instalador por el nuevo y lo ejecuta. Si el tuyo ya fija el último release, lo vuelve a
+  ejecutar, lo que también completa una actualización que se quedó a medias;
+- conserva `config.toml`, `seller.env`, las llaves y tus otros cambios en `compose.yaml`. En un vendedor Docker
+  solo cambia la línea `image:` del vendedor de Gyblos, y no toca una imagen de otro repositorio.
+
+Si `update` no se reconoce, vuelve a descargar el instalador con
 `curl -fsSL https://gyblos.com/install.sh -o install.sh` y ejecuta `sh install.sh`.
-`GYBLOS_UPDATE_CHECK=0` en `seller.env` desactiva la comprobación de status, que solo pregunta a GitHub por
-la última versión.
 
-Conserva `config.toml`, `seller.env`, las llaves y tus demás cambios de Compose. Solo cambia la línea
-`image:` del vendedor de Gyblos en `compose.yaml` a la nueva versión, comprueba su firma si cosign está
-instalado y reinicia el vendedor. Una imagen de vendedor de otro repositorio de imágenes se considera tu propia
-compilación y no se cambia. No migra el TOML ni el archivo de entorno.
+Después de actualizar, comprueba el estado y añade `--online` si publicas. Si falla, conserva los volúmenes e
+informa de la imagen (`docker compose images seller`, o `gyblos --version` en un vendedor nativo) y del código
+de error. No reinicies una y otra vez para quitar un lock o saltarte un rechazo.
 
-Después consulta el estado y, si publicas, el estado con `--online`. Si falla, conserva los volúmenes e
-informa de la imagen y el código. No reinicies repetidamente para eliminar un bloqueo o saltarte un rechazo.
+## Lee los logs en privado [#inspecciona-los-logs-en-privado]
 
-## Logs privados [#inspecciona-los-logs-en-privado]
+| Tipo de instalación | Comando                                                    |
+| ------------------- | ---------------------------------------------------------- |
+| Vendedor Docker     | `docker compose logs -f seller`                            |
+| macOS nativo        | `tail -f ~/.gyblos/service.log`                            |
+| Linux nativo        | `journalctl --user -u gyblos-seller -f`                    |
+| Windows nativo      | `Get-Content -Wait "$env:USERPROFILE\.gyblos\service.log"` |
 
-```sh
-cd ~/gyblos-seller
-docker compose logs -f seller
-```
+Ctrl+C deja de seguir los logs, no detiene el vendedor. Los logs pueden contener datos privados: léelos tú y
+comparte solo el código de error, nunca logs completos, mensajes de compradores ni URLs de proveedores. Si
+Ollama se reinició y un vendedor Docker perdió la conexión con el motor, ejecuta `docker compose restart seller`
+y comprueba el estado.
 
-Ctrl+C deja de seguir los logs; no detiene el servicio. Revísalos en privado antes de extraer un código.
-No publiques logs completos, mensajes de compradores ni URLs de proveedores. Si Ollama se reinició y
-el vendedor perdió su conexión al motor, ejecuta `docker compose restart seller` y comprueba el estado.
+## Qué envía tu vendedor [#datos-que-envía-tu-vendedor]
 
-**Siguiente:** [Protege identidad y datos](/es/sellers/identity), o [resuelve un problema](/es/help/troubleshooting).
+Además de atender a los compradores, una versión publicada del vendedor contacta con estos servicios:
+
+| Destino                                           | Qué envía                                                                                                                 | Cómo desactivarlo         |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| Recolector de métricas (`collector.gyblos.com`)   | Recibos firmados: NodeIds, dueño, modelo, recuento de tokens, tiempos, resultado e importe, nunca preguntas ni respuestas | No se puede desactivar    |
+| Recolector de métricas (`collector.gyblos.com`)   | Observaciones de telemetría, sin contenido                                                                                | `GYBLOS_OBSERVATIONS=off` |
+| Índice de descubrimiento (`discovery.gyblos.com`) | Tu identidad pública, tu modelo y tu oferta, mientras publicas                                                            | `sh install.sh unpublish` |
+| GitHub                                            | Una consulta del último release, solo cuando ejecutas `gyblos seller status`                                              | `GYBLOS_UPDATE_CHECK=0`   |
+
+Para desactivar las observaciones, añade `GYBLOS_OBSERVATIONS=off` a `seller.env` en un editor privado y
+aplícalo como cualquier [cambio de entorno](#aplica-cambios-de-configuración-o-entorno). `GYBLOS_UPDATE_CHECK=0`
+debe estar donde ejecutas el comando de estado: en `seller.env` para un vendedor Docker, o en tu shell para un
+vendedor nativo. La lista completa, con los relays y Solana, está en
+[Datos y privacidad](/es/reference/data-and-privacy).
+
+## Siguientes pasos
+
+- [Identidad y copias de seguridad](/es/sellers/identity)
+- [Solución de problemas](/es/help/troubleshooting)

@@ -1,6 +1,6 @@
 {
   "version": "3.0.0",
-  "source": "Gyblos brand kit 3.0.0 (gyblos-brain/50 Brand)",
+  "source": "Gyblos brand kit 3.0.0",
   "files": [
     {
       "file": "app/brand/gyblos-brand-tokens.css",
@@ -34,6 +34,14 @@
     {
       "file": "public/brand/gyblos-wordmark-solid-light.svg",
       "sha256": "fb9cbb0e977b2e1184d02b6170c06970bb4e328edc75083dab9d43a3f1d52a94"
+    },
+    {
+      "file": "public/brand/gyblos-docs-lockup-dark.svg",
+      "sha256": "5732de7c0f75270fa40b71fbadf787962821f9d3ec23fa2670a1c793d5bc972e"
+    },
+    {
+      "file": "public/brand/gyblos-docs-lockup-light.svg",
+      "sha256": "2aa08e5c70f3ca1a492101b41c23cceb183eb54a4c0ef903c2159508250406e7"
     },
     {
       "file": "public/favicon.svg",

@@ -180,7 +180,12 @@ void test('docs export: all five sidebar groups have decorative icons and locali
 void test('docs export: the sidebar follows the public seller and buyer paths', async () => {
   for (const locale of ['en', 'es']) {
     const output = await read(`${locale}.html`);
-    assert.match(output, /<h1\b[^>]*>Docs<\/h1>/);
+    assert.match(
+      output,
+      locale === 'es'
+        ? /<h1\b[^>]*>Documentación de Gyblos<\/h1>/
+        : /<h1\b[^>]*>Gyblos documentation<\/h1>/,
+    );
     const sidebar = output.match(
       /<aside\b[^>]*id="nd-sidebar"[\s\S]*?<\/aside>/,
     )?.[0];
@@ -192,25 +197,30 @@ void test('docs export: the sidebar follows the public seller and buyer paths', 
     assert.deepEqual(destinations, [
       `/${locale}`, // Brand home link.
       `/${locale}`,
+      `/${locale}/getting-started/how-it-works`,
       `/${locale}/getting-started/beta`,
+      `/${locale}/getting-started/glossary`,
       `/${locale}/sellers/beta-guide`,
-      `/${locale}/sellers/manual-install`,
       `/${locale}/sellers/register-publish`,
       `/${locale}/sellers/models-offers`,
       `/${locale}/sellers/get-paid`,
       `/${locale}/sellers/operate`,
       `/${locale}/sellers/identity`,
+      `/${locale}/sellers/manual-install`,
       `/${locale}/buyers/desktop-app`,
+      `/${locale}/buyers/use-from-code`,
       `/${locale}/reference/cli`,
       `/${locale}/reference/configuration`,
-      `/${locale}/buyers/use-from-code`,
+      `/${locale}/reference/data-and-privacy`,
       `/${locale}/help/troubleshooting`,
     ]);
     assert.ok(
       links[1]?.[2]?.includes(locale === 'es' ? 'Resumen' : 'Overview'),
     );
     assert.ok(
-      links[3]?.[2]?.includes(locale === 'es' ? 'Inicio rápido' : 'Quickstart'),
+      links[5]?.[2]?.includes(
+        locale === 'es' ? 'Instala un vendedor' : 'Install a seller',
+      ),
     );
   }
 });

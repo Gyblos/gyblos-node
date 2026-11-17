@@ -1,34 +1,47 @@
 ---
-title: Docs
-description: 'Elige cómo quieres usar Gyblos: ejecuta un vendedor o empieza desde la app.'
+title: Documentación de Gyblos
+description: Gyblos es una red entre pares para inferencia de IA. Usa modelos como comprador u ofrece uno como vendedor.
 ---
+
+Gyblos es una red entre pares para inferencia de IA. Los **vendedores** ejecutan un modelo en su propio
+equipo y lo ofrecen a la red. Los **compradores** conversan con esos modelos en la app de escritorio, o los
+llaman desde sus propios programas con APIs compatibles con OpenAI y Anthropic.
+
+La beta funciona en Solana **devnet**. Las ofertas gratuitas no necesitan billetera. Las ofertas con precio
+se pagan en USDC de devnet, que no tiene valor de mercado. Para vender necesitas un código de invitación.
 
 ## Elige tu camino [#elige-tu-camino]
 
 <Cards>
-  <Card title="Ejecuta un vendedor" href="/es/sellers/beta-guide">
-    Instala un vendedor gratuito, comprueba que funciona y publícalo en el
-    índice.
+  <Card title="Conversa con modelos" href="/es/buyers/desktop-app">
+    Descarga la app de escritorio para macOS, Windows o Linux y conversa con
+    modelos de la red.
   </Card>
-  <Card title="Usa Gyblos" href="/es/buyers/desktop-app">
-    Descarga la app de escritorio y conversa con modelos disponibles en la red.
+  <Card
+    title="Conecta tus herramientas de código"
+    href="/es/buyers/use-from-code"
+  >
+    Crea una API key en la app y usa Gyblos desde agentes de código y clientes
+    de OpenAI o Anthropic.
+  </Card>
+  <Card title="Ejecuta un vendedor" href="/es/sellers/beta-guide">
+    Instala un vendedor, comprueba que funciona y publícalo en el índice de
+    descubrimiento.
   </Card>
 </Cards>
 
-## Tareas frecuentes [#tareas-frecuentes]
+## Aprende lo básico [#aprende-lo-basico]
 
 <Cards>
-  <Card title="Registra y publica" href="/es/sellers/register-publish">
-    Añade tu identidad y haz visible tu vendedor.
+  <Card title="Cómo funciona" href="/es/getting-started/how-it-works">
+    Cómo encajan vendedores, compradores, el índice de descubrimiento, los
+    relays y los pagos.
   </Card>
-  <Card title="Modelos y cuotas" href="/es/sellers/models-offers">
-    Elige el modelo y ajusta los límites de respuestas gratuitas.
+  <Card title="Requisitos" href="/es/getting-started/beta">
+    Qué admite la beta y qué necesitas para cada rol.
   </Card>
-  <Card title="Opera tu vendedor" href="/es/sellers/operate">
-    Comprueba el estado, aplica cambios y actualiza el servicio.
-  </Card>
-  <Card title="Identidad y privacidad" href="/es/sellers/identity">
-    Conserva tu identidad y aprende qué datos puedes compartir.
+  <Card title="Glosario" href="/es/getting-started/glossary">
+    Definiciones breves de los términos que usan estas páginas.
   </Card>
 </Cards>
 
@@ -36,12 +49,16 @@ description: 'Elige cómo quieres usar Gyblos: ejecuta un vendedor o empieza des
 
 <Cards>
   <Card title="CLI" href="/es/reference/cli">
-    Consulta comandos, opciones y códigos de salida.
+    Consulta los comandos de `gyblos`, sus opciones y códigos de salida.
   </Card>
   <Card title="Configuración" href="/es/reference/configuration">
-    Revisa las claves TOML, los valores predeterminados y las restricciones.
+    Consulta las claves de `config.toml`, sus valores predeterminados y las
+    variables de entorno.
+  </Card>
+  <Card title="Datos y privacidad" href="/es/reference/data-and-privacy">
+    Qué envía cada rol por la red y qué se queda en tu equipo.
   </Card>
   <Card title="Problemas" href="/es/help/troubleshooting">
-    Encuentra el siguiente paso cuando algo no arranca o no aparece.
+    Encuentra el siguiente paso cuando un vendedor no arranca o no aparece.
   </Card>
 </Cards>
