@@ -1,8 +1,9 @@
 // Owns the sums the Payments section shows over settlements read from Solana: totals, the share of
 // escrow used, earnings per seller wallet and volume per UTC day.
-import type { ChainSnapshot, Settlement } from './chain';
-import { UNITS } from './constants';
+import type { ChainSnapshot } from './chain';
+import { DISPLAY, SETTLEMENT_KINDS, UNITS } from './constants';
 import { percent } from './format';
+import type { Settlement } from './settlement';
 
 // Escrow released by a settlement: everything paid out of the channel in that transaction.
 const released = (settlement: Settlement) =>
@@ -60,12 +61,15 @@ function volumeByDay(settled: Settlement[]) {
     entry.paid += settlement.sellerAtomic + settlement.feeAtomic;
     byDay.set(key, entry);
   }
-  return [...byDay].sort((left, right) => (left[0] < right[0] ? -1 : 1));
+  // Oldest first, the most recent DISPLAY.chartDays days only.
+  return [...byDay]
+    .sort((left, right) => (left[0] < right[0] ? -1 : 1))
+    .slice(-DISPLAY.chartDays);
 }
 
 export function summarizePayments(chain: ChainSnapshot) {
   const settled = chain.settlements.filter(
-    (settlement) => settlement.kind === 'settlement',
+    (settlement) => settlement.kind === SETTLEMENT_KINDS.SETTLEMENT,
   );
   const sum = (amount: (settlement: Settlement) => bigint) =>
     settled.reduce((total, settlement) => total + amount(settlement), 0n);
@@ -75,6 +79,8 @@ export function summarizePayments(chain: ChainSnapshot) {
     settled,
     toSellers: sum((settlement) => settlement.sellerAtomic),
     fees: sum((settlement) => settlement.feeAtomic),
+    // The fee is a share of the gross charge (seller + fee), as the protocol splits it.
+    gross: sum((settlement) => settlement.sellerAtomic + settlement.feeAtomic),
     escrow: sum(released),
     spent: sum(used),
     buyers: new Set(

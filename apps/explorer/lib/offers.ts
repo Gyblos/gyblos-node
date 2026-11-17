@@ -26,9 +26,9 @@ export function summarizeOffers(snapshot: DiscoverySnapshot) {
     .filter((ratio): ratio is number => typeof ratio === 'number');
   const models = new Map<string, ModelOffers>();
   for (const offer of offers) {
-    const key = offer.quantization
-      ? `${offer.modelId} ${offer.quantization}`
-      : offer.modelId;
+    const key = [offer.modelId, offer.variant, offer.quantization]
+      .filter(Boolean)
+      .join(' ');
     const entry = models.get(key) ?? {
       sellers: 0,
       free: 0,

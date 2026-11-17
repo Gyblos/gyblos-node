@@ -37,6 +37,14 @@ export const SOLANA_RPC = {
   fillWaitMs: 8000,
 } as const;
 
+// How a settlement transaction is read: a Gyblos fee was paid, or the channel only refunded.
+export const SETTLEMENT_KINDS = {
+  SETTLEMENT: 'settlement',
+  REFUND: 'refund',
+} as const;
+export type SettlementKind =
+  (typeof SETTLEMENT_KINDS)[keyof typeof SETTLEMENT_KINDS];
+
 export const UNITS = {
   usdcDecimals: 6,
   msPerSecond: 1000,
@@ -44,6 +52,11 @@ export const UNITS = {
   // Fixed-point scale for ratios of bigint amounts.
   ratioScale: 1_000_000,
 } as const;
+
+// Upper bounds of the collector's latency histogram buckets (AGGREGATES.latencyBucketsMs).
+export const LATENCY_BUCKETS_MS = [
+  100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000, 60_000,
+] as const;
 
 export const DISPLAY = {
   // Digits of a short address on each side of the ellipsis.
@@ -53,7 +66,7 @@ export const DISPLAY = {
   signatureEdge: 6,
   // "YYYY-MM-DD HH:MM" from an ISO timestamp.
   minutePrecision: 16,
-  // Most recent settlements listed, and days in the volume chart.
+  // Most recent settlements listed, and the most recent days in the volume chart.
   recentSettlements: 25,
   chartDays: 10,
   // Uptime windows shown, in days.

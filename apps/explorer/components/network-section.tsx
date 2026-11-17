@@ -85,7 +85,7 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
       {sellers.flatMap((seller) =>
         seller.models.map((model) => (
           <tr
-            key={`${seller.nodeId}:${model.modelId}:${model.quantization}`}
+            key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
             className="border-t border-line"
           >
             <td className={`${td} font-mono`} title={`Node ${seller.nodeId}`}>
@@ -94,6 +94,7 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
             <td className={td}>
               <ModelName
                 modelId={model.modelId}
+                variant={model.variant}
                 quantization={model.quantization}
               />
             </td>

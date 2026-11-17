@@ -42,6 +42,9 @@ importers:
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:packages/engine-ollama
+      '@gyblos/explorer':
+        specifier: workspace:*
+        version: link:apps/explorer
       '@gyblos/engine-openai':
         specifier: workspace:*
         version: link:packages/engine-openai

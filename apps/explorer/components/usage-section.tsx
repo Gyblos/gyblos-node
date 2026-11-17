@@ -1,22 +1,23 @@
 // Owns the Usage section: what the metrics collector aggregated from signed receipts and observations
-// over the last 30 UTC days. Free and paid are never added up; buyer counts below the public minimum
-// show as "< 5".
+// over the last 30 UTC days. Every figure is a "free · paid" pair, never a sum: free volume is not
+// backed by payment. Buyer counts below the public minimum show as "< 5".
 import {
   getCollector,
-  mergedLatency,
   type ModelStat,
   type NetworkDay,
+  type NetworkSide,
 } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
-import { count, latencyMs, usdc, utc } from '../lib/format';
+import { count, usdc, utc } from '../lib/format';
 import {
-  headline,
-  medianFirstToken,
+  countText,
+  latencyText,
+  pair,
+  rateText,
   relayText,
-  sidesOf,
-  successText,
+  sideFigures,
   summarizeUsage,
-  tokensOut,
+  type SideFigures,
 } from '../lib/usage';
 import {
   ModelName,
@@ -28,19 +29,51 @@ import {
   Unavailable,
 } from './ui';
 
-function Buyers({ side }: { side: NetworkDay['free'] }) {
-  if (!side) return <>—</>;
-  return side.withheld ? (
-    <span className="text-dim">&lt; {DISPLAY.minPublicBuyers}</span>
-  ) : (
-    <>{count(side.buyers ?? 0)}</>
+const buyersText = (side: NetworkSide | null) =>
+  !side
+    ? '—'
+    : side.withheld
+      ? `< ${DISPLAY.minPublicBuyers}`
+      : count(side.buyers ?? 0);
+// One row's "free · paid" figure cells.
+function FigureCells({
+  free,
+  paid,
+  latency,
+}: {
+  free: SideFigures;
+  paid: SideFigures;
+  latency: 'firstToken' | 'total';
+}) {
+  return (
+    <>
+      <td className={numberCell}>
+        {pair(free.requests, paid.requests, countText)}
+      </td>
+      <td className={numberCell}>
+        {pair(free.successRate, paid.successRate, rateText)}
+      </td>
+      <td className={numberCell}>
+        {pair(free.outputTokens, paid.outputTokens, countText)}
+      </td>
+      <td className={numberCell}>
+        {pair(free[latency], paid[latency], latencyText)}
+      </td>
+    </>
   );
 }
+const figureHead = (latency: string) => [
+  { label: 'Requests free · paid', right: true },
+  { label: 'Success free · paid', right: true },
+  { label: 'Output tokens free · paid', right: true },
+  { label: `${latency} p50 free · paid`, right: true },
+];
 
 export async function UsageSection() {
   const snapshot = await getCollector();
   if (snapshot.error) return <Unavailable title="Usage" />;
   const usage = summarizeUsage(snapshot);
+  const { free, paid } = usage;
   return (
     <>
       <SectionTitle
@@ -51,17 +84,23 @@ export async function UsageSection() {
             : 'no data yet'
         }
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="Free requests" value={count(usage.free)} />
-        <Stat label="Paid requests" value={count(usage.paid)} />
-        <Stat label="Success rate" value={successText(usage.sections)} />
-        <Stat label="Output tokens" value={count(usage.outputTokens)} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Stat
-          label="First token p50"
-          value={latencyMs(medianFirstToken(usage.sections))}
+          label="Requests free · paid"
+          value={pair(free.requests, paid.requests, countText)}
         />
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Stat
+          label="Success free · paid"
+          value={pair(free.successRate, paid.successRate, rateText)}
+        />
+        <Stat
+          label="Output tokens free · paid"
+          value={pair(free.outputTokens, paid.outputTokens, countText)}
+        />
+        <Stat
+          label="First token p50 free · paid"
+          value={pair(free.firstToken, paid.firstToken, latencyText)}
+        />
         <Stat label="Authorized (paid)" value={usdc(usage.authorized)} money />
         <Stat label="Unserved demand" value={count(usage.unserved)} />
       </div>
@@ -80,11 +119,7 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
         minWidth={DISPLAY.dailyTable}
         head={[
           { label: 'Day (UTC)' },
-          { label: 'Free', right: true },
-          { label: 'Paid', right: true },
-          { label: 'Success', right: true },
-          { label: 'Output tokens', right: true },
-          { label: 'First token p50', right: true },
+          ...figureHead('First token'),
           { label: 'Buyers free · paid', right: true },
           { label: 'Relay', right: true },
         ]}
@@ -92,17 +127,13 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
         {[...days].reverse().map((day) => (
           <tr key={day.day} className="border-t border-line">
             <td className={`${td} font-mono`}>{day.day}</td>
-            <td className={numberCell}>{count(headline(day.free))}</td>
-            <td className={numberCell}>{count(headline(day.paid))}</td>
-            <td className={numberCell}>{successText(sidesOf(day))}</td>
+            <FigureCells
+              free={sideFigures([day.free])}
+              paid={sideFigures([day.paid])}
+              latency="firstToken"
+            />
             <td className={numberCell}>
-              {count(tokensOut(day.free) + tokensOut(day.paid))}
-            </td>
-            <td className={numberCell}>
-              {latencyMs(medianFirstToken(sidesOf(day)))}
-            </td>
-            <td className={numberCell}>
-              <Buyers side={day.free} /> · <Buyers side={day.paid} />
+              {buyersText(day.free)} · {buyersText(day.paid)}
             </td>
             <td className={numberCell}>{relayText(day)}</td>
           </tr>
@@ -117,14 +148,11 @@ function ModelsTable({ models }: { models: ModelStat[] }) {
     <>
       <SectionTitle title="Models served" />
       <Table
+        minWidth={DISPLAY.dailyTable}
         head={[
           { label: 'Model' },
-          { label: 'Free', right: true },
-          { label: 'Paid', right: true },
-          { label: 'Success', right: true },
-          { label: 'Output tokens', right: true },
-          { label: 'Sellers', right: true },
-          { label: 'Total p50', right: true },
+          ...figureHead('Total'),
+          { label: 'Sellers free · paid', right: true },
         ]}
       >
         {models.map((model) => (
@@ -135,29 +163,18 @@ function ModelsTable({ models }: { models: ModelStat[] }) {
             <td className={td}>
               <ModelName
                 modelId={model.modelId}
+                variant={model.variant}
                 quantization={model.quantization}
               />
             </td>
-            <td className={numberCell}>{count(headline(model.free))}</td>
-            <td className={numberCell}>{count(headline(model.paid))}</td>
+            <FigureCells
+              free={sideFigures([model.free])}
+              paid={sideFigures([model.paid])}
+              latency="total"
+            />
             <td className={numberCell}>
-              {successText([model.free, model.paid])}
-            </td>
-            <td className={numberCell}>
-              {count(tokensOut(model.free) + tokensOut(model.paid))}
-            </td>
-            <td className={numberCell}>
-              {Math.max(model.free?.sellers ?? 0, model.paid?.sellers ?? 0)}
-            </td>
-            <td className={numberCell}>
-              {latencyMs(
-                mergedLatency(
-                  [
-                    model.free?.sellerLatency.total,
-                    model.paid?.sellerLatency.total,
-                  ],
-                  DISPLAY.median,
-                ),
+              {pair(model.free?.sellers, model.paid?.sellers, (value) =>
+                value === undefined ? '—' : count(value),
               )}
             </td>
           </tr>

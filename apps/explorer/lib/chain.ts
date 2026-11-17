@@ -1,34 +1,19 @@
-// Owns the read-only Solana reads for Gyblos settlements on the shared payment-channels program.
-// Gyblos traffic is identified by the fee paid to the Gyblos treasury, so settlements with a zero fee
-// are not visible here; the chain indexer (gyblos-node #349) replaces this.
+// Owns the read-only Solana reads for Gyblos settlements on the shared payment-channels program: the
+// treasury's signature list (cached) and each finalized transaction (stored on disk once). Gyblos
+// traffic is identified by the fee paid to the Gyblos treasury (settlement.ts), so settlements with a
+// zero fee are not visible here; the chain indexer (gyblos-node #349) replaces this.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { cacheLife } from 'next/cache';
+import { connection } from 'next/server';
 
-import {
-  CHANNEL_PROGRAM,
-  GYBLOS_TREASURY,
-  PROGRAM_TREASURY,
-  SOLANA_RPC_URL,
-  TOKEN_PROGRAM,
-} from './config';
+import { GYBLOS_TREASURY, SOLANA_RPC_URL, TOKEN_PROGRAM } from './config';
 import { CACHE_LIFE, SOLANA_RPC } from './constants';
+import { classify, type Settlement } from './settlement';
+import { list, record, text } from './validate';
 
-export interface Settlement {
-  signature: string;
-  slot: number;
-  blockTime: number | null;
-  kind: 'settlement' | 'refund';
-  payer: string | null;
-  seller: string | null;
-  // Atomic units (6 decimals for the devnet test USDC mints).
-  sellerAtomic: bigint;
-  feeAtomic: bigint;
-  residualAtomic: bigint;
-  refundAtomic: bigint;
-  mint: string | null;
-}
+export type { Settlement } from './settlement';
 
 export interface ChainSnapshot {
   fetchedAt: number;
@@ -43,7 +28,7 @@ let rpcId = 0;
 const SPACING_MS = process.env.SOLANA_RPC_URL ? 0 : SOLANA_RPC.publicSpacingMs;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function rpc<T>(method: string, params: unknown[]): Promise<T> {
+async function rpc(method: string, params: unknown[]): Promise<unknown> {
   if (SPACING_MS) await sleep(SPACING_MS);
   for (let attempt = 0; attempt < SOLANA_RPC.maxAttempts; attempt += 1) {
     const response = await fetch(SOLANA_RPC_URL, {
@@ -64,130 +49,43 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T> {
       continue;
     }
     if (!response.ok) throw new Error(`rpc ${method}: HTTP ${response.status}`);
-    const body = (await response.json()) as {
-      result?: T;
-      error?: { message: string };
-    };
-    if (body.error) throw new Error(`rpc ${method}: ${body.error.message}`);
-    return body.result as T;
+    const body = record((await response.json()) as unknown, `rpc ${method}`);
+    if (body.error)
+      throw new Error(`rpc ${method}: ${JSON.stringify(body.error)}`);
+    return body.result;
   }
   throw new Error(`rpc ${method}: rate limited`);
 }
 
-interface TokenBalance {
-  accountIndex: number;
-  mint: string;
-  owner?: string;
-  uiTokenAmount: { amount: string; decimals: number };
-}
-interface ParsedTx {
-  slot: number;
-  blockTime: number | null;
-  meta: {
-    err: unknown;
-    preTokenBalances?: TokenBalance[];
-    postTokenBalances?: TokenBalance[];
-  } | null;
-  transaction: {
-    signatures: string[];
-    message: {
-      instructions: { programId: string; accounts?: string[] }[];
-    };
-  };
-}
-
-// Net token change per owner across the transaction, and the first mint seen.
-function balanceDeltas(meta: NonNullable<ParsedTx['meta']>) {
-  const deltas = new Map<string, bigint>();
-  let mint: string | null = null;
-  for (const balance of meta.preTokenBalances ?? []) {
-    if (!balance.owner) continue;
-    deltas.set(
-      balance.owner,
-      (deltas.get(balance.owner) ?? 0n) - BigInt(balance.uiTokenAmount.amount),
-    );
-  }
-  for (const balance of meta.postTokenBalances ?? []) {
-    if (!balance.owner) continue;
-    mint ??= balance.mint;
-    deltas.set(
-      balance.owner,
-      (deltas.get(balance.owner) ?? 0n) + BigInt(balance.uiTokenAmount.amount),
-    );
-  }
-  return { deltas, mint };
-}
-
-function classify(tx: ParsedTx): Settlement | null {
-  const signature = tx.transaction.signatures[0];
-  if (!tx.meta || tx.meta.err || !signature) return null;
-  const channelInstruction = tx.transaction.message.instructions.find(
-    (instruction) =>
-      instruction.programId === CHANNEL_PROGRAM &&
-      (instruction.accounts?.length ?? 0) > SOLANA_RPC.minChannelAccounts,
-  );
-  if (!channelInstruction) return null;
-  const payer =
-    channelInstruction.accounts?.[SOLANA_RPC.payerAccountIndex] ?? null;
-  const { deltas, mint } = balanceDeltas(tx.meta);
-
-  const feeAtomic = deltas.get(GYBLOS_TREASURY) ?? 0n;
-  const residualAtomic = deltas.get(PROGRAM_TREASURY) ?? 0n;
-  const payerDelta = payer ? (deltas.get(payer) ?? 0n) : 0n;
-  const refundAtomic = payerDelta > 0n ? payerDelta : 0n;
-
-  let seller: string | null = null;
-  let sellerAtomic = 0n;
-  for (const [owner, delta] of deltas) {
-    if (delta <= 0n) continue;
-    if (
-      owner === GYBLOS_TREASURY ||
-      owner === PROGRAM_TREASURY ||
-      owner === payer
-    )
-      continue;
-    sellerAtomic += delta;
-    seller ??= owner;
-  }
-
-  return {
-    signature,
-    slot: tx.slot,
-    blockTime: tx.blockTime,
-    kind: feeAtomic > 0n ? 'settlement' : 'refund',
-    payer,
-    seller,
-    sellerAtomic,
-    feeAtomic,
-    residualAtomic,
-    refundAtomic,
-    mint,
-  };
-}
-
 async function treasurySignatures(): Promise<string[]> {
-  const accounts = await rpc<{ value: { pubkey: string }[] }>(
-    'getTokenAccountsByOwner',
-    [GYBLOS_TREASURY, { programId: TOKEN_PROGRAM }, { encoding: 'jsonParsed' }],
+  const accounts = record(
+    await rpc('getTokenAccountsByOwner', [
+      GYBLOS_TREASURY,
+      { programId: TOKEN_PROGRAM },
+      { encoding: 'jsonParsed' },
+    ]),
+    'token accounts',
   );
   const seen = new Set<string>();
-  for (const { pubkey } of accounts.value) {
+  for (const account of list(accounts.value, 'token accounts.value')) {
+    const pubkey = text(record(account, 'account').pubkey, 'account.pubkey');
     let before: string | undefined;
     for (let page = 0; page < SOLANA_RPC.maxSignaturePages; page += 1) {
-      const listed = await rpc<{ signature: string; err: unknown }[]>(
-        'getSignaturesForAddress',
-        [
+      const listed = list(
+        await rpc('getSignaturesForAddress', [
           pubkey,
           {
             limit: SOLANA_RPC.signaturesPerPage,
             ...(before ? { before } : {}),
           },
-        ],
-      );
-      for (const entry of listed) if (!entry.err) seen.add(entry.signature);
+        ]),
+        'signatures',
+      ).map((entry) => record(entry, 'signature entry'));
+      for (const entry of listed)
+        if (!entry.err) seen.add(text(entry.signature, 'signature'));
       const last = listed.at(-1);
       if (listed.length < SOLANA_RPC.signaturesPerPage || !last) break;
-      before = last.signature;
+      before = text(last.signature, 'signature');
     }
   }
   return [...seen];
@@ -270,7 +168,7 @@ function fillMissing(signatures: string[]) {
     for (const signature of signatures) {
       if ((await readStored(signature)) !== undefined) continue;
       try {
-        const tx = await rpc<ParsedTx | null>('getTransaction', [
+        const tx = await rpc('getTransaction', [
           signature,
           {
             encoding: 'jsonParsed',
@@ -278,7 +176,7 @@ function fillMissing(signatures: string[]) {
             commitment: 'confirmed',
           },
         ]);
-        const settlement = tx ? classify(tx) : null;
+        const settlement = classify(tx);
         await writeStored(signature, settlement ? toStored(settlement) : null);
         await sleep(SOLANA_RPC.fillSpacingMs);
       } catch {
@@ -307,6 +205,8 @@ export async function getChain(): Promise<ChainSnapshot> {
   try {
     listed = await listSignatures();
   } catch (error) {
+    // A failed read is never prerendered: it is retried on the next request.
+    await connection();
     return {
       fetchedAt: 0,
       settlements: [],

@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./collector": "./lib/collector.ts",
+    "./latency": "./lib/latency.ts",
+    "./offers": "./lib/offers.ts",
+    "./payments": "./lib/payments.ts",
+    "./settlement": "./lib/settlement.ts",
+    "./usage": "./lib/usage.ts"
+  },
   "scripts": {
     "dev": "next dev --port 4190",
     "build": "next build",

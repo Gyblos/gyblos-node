@@ -2,7 +2,7 @@
 // unavailable states, and linked addresses. No data access.
 import type { ReactNode } from 'react';
 
-import { EXPLORER_ADDRESS } from '../lib/config';
+import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY } from '../lib/constants';
 import { short } from '../lib/format';
 
@@ -96,24 +96,28 @@ export function Table({
 export function Addr({ value }: { value: string | null }) {
   if (!value) return <>—</>;
   return (
-    <a className="hover:text-brand" href={EXPLORER_ADDRESS(value)}>
+    <a className="hover:text-brand" href={explorerAddressUrl(value)}>
       {short(value)}
     </a>
   );
 }
 
+// A model as published: id, then variant and quantization when present.
 export function ModelName({
   modelId,
+  variant,
   quantization,
 }: {
   modelId: string;
+  variant: string | null;
   quantization: string | null;
 }) {
+  const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
     <>
       {modelId}
-      {quantization ? (
-        <span className="ml-2 font-mono text-xs text-dim">{quantization}</span>
+      {detail ? (
+        <span className="ml-2 font-mono text-xs text-dim">{detail}</span>
       ) : null}
     </>
   );

@@ -1,7 +1,7 @@
 // Owns the Payments section: settlements of Gyblos traffic on Solana devnet, their totals, volume
 // per day, earnings per seller wallet and the most recent settlements.
 import { getChain, type Settlement } from '../lib/chain';
-import { EXPLORER_TX } from '../lib/config';
+import { explorerTxUrl } from '../lib/config';
 import { DISPLAY, UNITS } from '../lib/constants';
 import { short, usdc, utc } from '../lib/format';
 import {
@@ -46,7 +46,7 @@ export async function PaymentsSection() {
         <Stat label="Gyblos fees" value={usdc(payments.fees)} money />
         <Stat
           label="Effective fee"
-          value={ratioText(payments.fees, payments.toSellers)}
+          value={ratioText(payments.fees, payments.gross)}
         />
         <Stat
           label="Buyers · sellers paid"
@@ -60,11 +60,7 @@ export async function PaymentsSection() {
         <Stat
           label="Avg paid per settlement"
           value={
-            settled.length
-              ? usdc(
-                  (payments.toSellers + payments.fees) / BigInt(settled.length),
-                )
-              : '—'
+            settled.length ? usdc(payments.gross / BigInt(settled.length)) : '—'
           }
           money
         />
@@ -178,7 +174,7 @@ function SettlementsTable({ settled }: { settled: Settlement[] }) {
             <td className={`${td} font-mono`}>
               <a
                 className="hover:text-brand"
-                href={EXPLORER_TX(settlement.signature)}
+                href={explorerTxUrl(settlement.signature)}
               >
                 {short(
                   settlement.signature,

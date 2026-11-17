@@ -1,70 +1,81 @@
-// Owns the sums the Usage section shows over the collector's daily answers. Free and paid are kept
-// apart; percentiles come from summed histograms, never from averaged percentiles.
-import {
-  mergedLatency,
-  type CollectorSnapshot,
-  type NetworkDay,
-  type Totals,
-} from './collector';
+// Owns what the Usage section computes over the collector's daily answers. Free and paid are never
+// added up: every figure is computed per side and shown as a "free · paid" pair. Percentiles come from
+// summed histograms, never from averaged percentiles. Pure functions, no I/O.
+import type { CollectorSnapshot, NetworkDay, Totals } from './collector';
 import { DISPLAY } from './constants';
-import { percent } from './format';
+import { count, latencyMs, percent } from './format';
+import { mergedLatency } from './latency';
 
+type Section = Totals | null | undefined;
 export const finished = (totals: Totals) =>
   totals.outcomes.completed +
   totals.outcomes.failed +
   totals.outcomes.cancelled;
-export const headline = (totals: Totals | null | undefined) =>
-  totals?.requests.headline ?? 0;
-export const tokensOut = (totals: Totals | null | undefined) =>
-  totals?.tokens.output ?? 0;
-export const sidesOf = (day: NetworkDay) => [day.free, day.paid];
 
-// completed / (completed + failed + cancelled) over every given section.
-export function successText(parts: (Totals | null | undefined)[]): string {
-  const done = parts.reduce(
+// completed / (completed + failed + cancelled) over the given sections of one side.
+export function successRate(sections: Section[]): number | null {
+  const done = sections.reduce(
     (sum, totals) => sum + (totals?.outcomes.completed ?? 0),
     0,
   );
-  const all = parts.reduce(
+  const all = sections.reduce(
     (sum, totals) => sum + (totals ? finished(totals) : 0),
     0,
   );
-  return all ? percent(done / all) : '—';
+  return all ? done / all : null;
 }
-export const medianFirstToken = (parts: (Totals | null | undefined)[]) =>
-  mergedLatency(
-    parts.map((totals) => totals?.sellerLatency.firstToken),
-    DISPLAY.median,
-  );
-const demandOf = (day: NetworkDay) =>
-  day.demand.map((model) => ({
-    modelId: model.modelId,
-    requests:
-      model.unserved + model.refusedBeforeSelection + model.connectFailed,
-  }));
+
+// One side's figures over any number of daily or model sections.
+export function sideFigures(sections: Section[]) {
+  return {
+    requests: sections.reduce(
+      (sum, totals) => sum + (totals?.requests.headline ?? 0),
+      0,
+    ),
+    successRate: successRate(sections),
+    outputTokens: sections.reduce(
+      (sum, totals) => sum + (totals?.tokens.output ?? 0),
+      0,
+    ),
+    firstToken: mergedLatency(
+      sections.map((totals) => totals?.sellerLatency.firstToken),
+      DISPLAY.median,
+    ),
+    total: mergedLatency(
+      sections.map((totals) => totals?.sellerLatency.total),
+      DISPLAY.median,
+    ),
+  };
+}
+export type SideFigures = ReturnType<typeof sideFigures>;
+
+// "free · paid", each side formatted on its own.
+export const pair = <T>(free: T, paid: T, show: (value: T) => string) =>
+  `${show(free)} · ${show(paid)}`;
+export const rateText = (rate: number | null) =>
+  rate === null ? '—' : percent(rate);
+export const countText = count;
+export const latencyText = latencyMs;
 
 export function summarizeUsage(snapshot: CollectorSnapshot) {
   const active = snapshot.days.filter(
     (day) => day.free || day.paid || day.observed || day.demand.length,
   );
-  const sections = active.flatMap(sidesOf);
   const demand = new Map<string, number>();
   for (const day of active)
-    for (const model of demandOf(day))
+    for (const model of day.demand)
       demand.set(
         model.modelId,
         (demand.get(model.modelId) ?? 0) + model.requests,
       );
   return {
     active,
-    sections,
-    free: active.reduce((sum, day) => sum + headline(day.free), 0),
-    paid: active.reduce((sum, day) => sum + headline(day.paid), 0),
+    free: sideFigures(active.map((day) => day.free)),
+    paid: sideFigures(active.map((day) => day.paid)),
     authorized: active.reduce(
       (sum, day) => sum + BigInt(day.paid?.authorizedAtomic ?? '0'),
       0n,
     ),
-    outputTokens: sections.reduce((sum, totals) => sum + tokensOut(totals), 0),
     unserved: [...demand.values()].reduce((sum, value) => sum + value, 0),
     demand: [...demand].sort((left, right) => right[1] - left[1]),
   };

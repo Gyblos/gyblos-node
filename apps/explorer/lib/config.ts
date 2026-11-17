@@ -23,7 +23,7 @@ export const PROGRAM_TREASURY = '4zTeC5mVqWLruDexgU2mV66p9t5vCA9JyiZqdGDUspap';
 
 export const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 
-export const EXPLORER_TX = (signature: string) =>
+export const explorerTxUrl = (signature: string) =>
   `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
-export const EXPLORER_ADDRESS = (address: string) =>
+export const explorerAddressUrl = (address: string) =>
   `https://explorer.solana.com/address/${address}?cluster=devnet`;

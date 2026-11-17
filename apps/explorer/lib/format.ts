@@ -1,6 +1,9 @@
 // Owns display formatting: USDC amounts from atomic units, short addresses, UTC times, percentages,
 // latency bounds and counts. Pure functions, no I/O.
-import { DISPLAY, UNITS } from './constants';
+import { DISPLAY, LATENCY_BUCKETS_MS, UNITS } from './constants';
+import type { LatencyBound } from './latency';
+
+const LAST_BOUND_MS = LATENCY_BUCKETS_MS.at(-1) ?? 0;
 
 const LOCALE = 'en-US';
 const DECIMAL_BASE = 10n;
@@ -47,9 +50,10 @@ export function percent(ratio: number): string {
   return `${(ratio * UNITS.percent).toFixed(ratio === 1 ? 0 : DISPLAY.percentDigits)}%`;
 }
 
-// A latency bucket bound: "< 500 ms", "< 2 s"; null is an empty histogram.
-export function latencyMs(value: number | null): string {
+// A latency bucket bound: "< 500 ms", "< 2 s", "> 60 s" past the last bound; "—" without samples.
+export function latencyMs(value: LatencyBound): string {
   if (value === null) return '—';
+  if (value === 'above') return `> ${LAST_BOUND_MS / UNITS.msPerSecond} s`;
   return value < UNITS.msPerSecond
     ? `< ${value} ms`
     : `< ${value / UNITS.msPerSecond} s`;
