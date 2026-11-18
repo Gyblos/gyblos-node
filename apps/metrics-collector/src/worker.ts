@@ -1,6 +1,6 @@
 // Owns the Cloudflare Worker entry: maps the D1 binding and rate limiters to the app and fails closed.
 // Development relaxations are never enabled here; nothing runs on import.
-import { DEVNET_RPC_URL } from '@gyblos/config/network';
+import { DEVNET_GENESIS, DEVNET_RPC_URL } from '@gyblos/config/network';
 
 import { runAggregation } from './aggregate';
 import {
@@ -27,6 +27,7 @@ import {
   COLLECTOR_SOLANA_RPC_BINDINGS,
   COLLECTOR_STATUS,
 } from './constants';
+import { rpcProbe } from './rpc-probe';
 import { statsReader } from './stats-read';
 import { createD1Storage, type D1Database } from './storage-d1';
 
@@ -183,7 +184,7 @@ export async function scheduledChainIndex(
     return url
       ? [
           {
-            rpc: createChainRpc(url, fetcher),
+            rpc: createChainRpc(url, fetcher, DEVNET_GENESIS),
             limits: {
               budget: CHAIN_INDEX.paidCallsPerRun,
               minIntervalMs: CHAIN_INDEX.paidIntervalMs,
@@ -194,7 +195,7 @@ export async function scheduledChainIndex(
   });
   const rpc = chainEndpoints(
     {
-      rpc: createChainRpc(DEVNET_RPC_URL, fetcher),
+      rpc: createChainRpc(DEVNET_RPC_URL, fetcher, DEVNET_GENESIS),
       limits: {
         budget: CHAIN_INDEX.publicCallsPerRun,
         minIntervalMs: CHAIN_INDEX.publicIntervalMs,
@@ -232,7 +233,10 @@ const edgeCache = () =>
   (globalThis as { caches?: { default?: EdgeCache } }).caches?.default;
 let worker: ReturnType<typeof createWorker> | undefined;
 export default {
-  fetch(request: Request, bindings: unknown, context: ExecutionContext) {
+  async fetch(request: Request, bindings: unknown, context: ExecutionContext) {
+    // The operator's probe is answered before the cache and the public app (rpc-probe.ts).
+    const probe = await rpcProbe(request, bindings);
+    if (probe) return probe;
     worker ??= createWorker();
     const app = worker;
     return cachedFetch(request, edgeCache(), context, (incoming) =>
