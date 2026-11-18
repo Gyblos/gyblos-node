@@ -1,6 +1,7 @@
 // `gyblos seller status`: whether this home's seller is running, what it serves and how much it answered,
 // read from the background service, the daemon's status.json and its signed receipts. Read-only; with
-// --online it also looks the NodeId up in the discovery index, sending only the model. Prints counts,
+// --online it also looks the NodeId up in the discovery index, paging sellers by model only, then asks
+// for this NodeId's public uptime (the NodeId the daemon already publishes to that index). Prints counts,
 // codes, public identifiers and URL origins; never a prompt, a buyer, a key, the home location or a value
 // from the environment.
 import { runMode } from '@gyblos/config';
@@ -13,6 +14,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { urlOrigin } from './cli-format';
 import { codeHint } from './cli-hints';
 import { commandsFor, LISTING, nextStep, sellerCommand } from './cli-next';
+import { uptimeLine } from './cli-status-uptime';
 import { updateNotice } from './cli-update';
 import {
   EXIT,
@@ -50,7 +52,6 @@ const NOT_FOUND = 'not found in the index';
 
 const COLUMN = 13;
 const INDEX_LOOKUP = {
-  FOUND: 'found',
   ABSENT: 'absent',
   TRUNCATED: 'truncated',
 } as const;
@@ -81,8 +82,8 @@ async function lookUp(
       limit: STATUS.indexPageSize,
       cursor,
     });
-    if (result.sellers.some((entry) => entry.catalog.nodeId === nodeId))
-      return INDEX_LOOKUP.FOUND;
+    const entry = result.sellers.find((item) => item.catalog.nodeId === nodeId);
+    if (entry) return { found: entry.presence.issuedAt };
     if (!result.next) return INDEX_LOOKUP.ABSENT;
     cursor = result.next;
   }
@@ -96,22 +97,25 @@ async function indexListing(
   models: ReadonlySet<string>,
   nodeId: string,
 ) {
-  if (!models.size) return 'not looked up: no offer is serving yet';
+  if (!models.size) return { text: 'not looked up: no offer is serving yet' };
   let unreachable = false;
   let truncated = false;
   for (const model of models) {
     try {
       const found = await lookUp(system, baseUrl, model, nodeId);
-      if (found === INDEX_LOOKUP.FOUND) return LISTED;
+      if (typeof found === 'object')
+        return { text: LISTED, presenceAt: found.found };
       if (found === INDEX_LOOKUP.TRUNCATED) truncated = true;
     } catch {
       unreachable = true;
     }
   }
-  if (unreachable) return 'index unreachable';
-  return truncated
-    ? `not in the first ${STATUS.maxIndexPages * STATUS.indexPageSize} sellers of the index`
-    : NOT_FOUND;
+  if (unreachable) return { text: 'index unreachable' };
+  return {
+    text: truncated
+      ? `not in the first ${STATUS.maxIndexPages * STATUS.indexPageSize} sellers of the index`
+      : NOT_FOUND,
+  };
 }
 
 // Why the index refused this seller's last publication, for the codes an operator can act on.
@@ -147,13 +151,26 @@ async function discoveryLine(
   );
   const found = await indexListing(system, discovery.url, models, nodeId);
   return {
-    text: `${on}; ${found}`,
+    text: `${on}; ${found.text}`,
     listing:
-      found === LISTED
+      found.text === LISTED
         ? LISTING.LISTED
-        : found === NOT_FOUND
+        : found.text === NOT_FOUND
           ? LISTING.ABSENT
           : LISTING.UNKNOWN,
+    // Nothing serving, nothing looked up: the index is not asked about this NodeId either.
+    ...(models.size
+      ? {
+          uptime: await uptimeLine(
+            system,
+            discovery.url,
+            nodeId,
+            'presenceAt' in found && found.presenceAt !== undefined
+              ? { listed: true, at: found.presenceAt }
+              : { listed: false, absent: found.text === NOT_FOUND },
+          ),
+        }
+      : {}),
   };
 }
 
@@ -340,6 +357,8 @@ export async function statusCommand(
   output.stdout(
     line('discovery', commandsFor(runMode(output.env), listing.text)),
   );
+  if ('uptime' in listing && listing.uptime)
+    output.stdout(line('uptime', listing.uptime));
   output.stdout(await usageLines(homeEnvironment, identity.nodeId, now));
   const verdict = result(service, status);
   output.stdout(`Result: ${verdict}\n`);

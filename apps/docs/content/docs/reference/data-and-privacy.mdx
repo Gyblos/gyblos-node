@@ -148,8 +148,9 @@ invite, so Gyblos operators can link it to your NodeId, owner address and countr
 published. Registering also writes a public
 entry in the 8004 agent registry on Solana devnet.
 
-Buyers and the desktop app read the index to find sellers. The index uses IP addresses for rate
-limiting and stores none.
+Buyers and the desktop app read the index to find sellers. `gyblos seller status --online` also asks it
+for the seller's own uptime by NodeId, which the seller already publishes there. The index uses IP
+addresses for rate limiting and stores none.
 
 ## Solana devnet [#solana]
 

@@ -416,9 +416,14 @@ pnpm gyblos seller status --online
 
 `seller status` is read-only and uses the same `GYBLOS_HOME` and `config.toml`
 as `node:start`. `--online` also looks this NodeId up in the discovery index,
-sending only the served model names. While the index refuses or fails this
+paging it by the served model names. While the index refuses or fails this
 seller's publication, the discovery line adds `publishing refused:` and the
-static code the daemon keeps in `status.json`. The output is described in the
+static code the daemon keeps in `status.json`. While a model is served, an
+`uptime` line then asks the index for this NodeId's public uptime (the share of
+five-minute slots with an accepted presence over 24 hours, 7 and 30 days) and
+says `online, last presence … ago` or `offline since …`; this is the only
+request that carries the NodeId, which the daemon already publishes to the same
+index. The output is described in the
 [CLI reference](https://docs.gyblos.com/en/reference/cli#status-and-registration).
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon.
