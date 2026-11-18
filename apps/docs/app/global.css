@@ -233,9 +233,10 @@ html > body[data-scroll-locked] {
   color: var(--color-fd-muted-foreground);
 }
 
-/* The docs lockup draws the mark and the name at the same size and keeps its aspect ratio in both themes. */
+/* The docs lockup draws the mark and the name at the same size and keeps its aspect ratio in both themes. It sits
+   at the scale of the sidebar text, not of a page title. */
 .docs-wordmark {
-  width: 160px;
+  width: 104px;
   height: auto;
   flex-shrink: 0;
 }
@@ -285,6 +286,44 @@ body {
   stroke: var(--brand-blue);
 }
 
+#nd-page a[data-card] {
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
 #nd-page a[data-card]:hover {
   border-color: var(--brand-blue);
+}
+
+/* Three-card groups sit side by side, and stack on narrow screens. */
+.docs-cards-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 40rem) {
+  .docs-cards-three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Link underlines fade in color rather than snapping. */
+.prose a {
+  transition: text-decoration-color 150ms ease;
+}
+
+/* Inline code stays readable inside prose without breaking the line into heavy blocks. */
+#nd-page .prose :not(pre) > code {
+  font-weight: 400;
+  font-size: 0.875em;
+  padding: 0.1em 0.3em;
+  border: 0;
+  background: color-mix(in srgb, var(--color-fd-foreground) 6%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #nd-page a[data-card],
+  .prose a {
+    transition: none;
+  }
 }

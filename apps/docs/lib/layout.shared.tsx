@@ -89,15 +89,15 @@ export function baseOptions(locale: string): BaseLayoutProps {
           <img
             src="/brand/gyblos-docs-lockup-dark.svg"
             alt=""
-            width={160}
-            height={37}
+            width={104}
+            height={24}
             className="docs-wordmark hidden dark:block"
           />
           <img
             src="/brand/gyblos-docs-lockup-light.svg"
             alt=""
-            width={160}
-            height={37}
+            width={104}
+            height={24}
             className="docs-wordmark dark:hidden"
           />
           <span className="text-sm text-fd-muted-foreground">docs</span>

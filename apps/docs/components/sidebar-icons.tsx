@@ -25,6 +25,12 @@ function paths(name: string) {
       return (
         <path d="M12 5v16M12 5C9 2 5 2 2 4v15c3-2 7-2 10 2 3-4 7-4 10-2V4c-3-2-7-2-10 1Z" />
       );
+    case SIDEBAR_ICON_IDS.CHAT:
+      return (
+        <path d="M21 12a8 8 0 0 1-11.7 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12Z" />
+      );
+    case SIDEBAR_ICON_IDS.CODE:
+      return <path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" />;
     case SIDEBAR_ICON_IDS.LIFE_BUOY:
       return (
         <>

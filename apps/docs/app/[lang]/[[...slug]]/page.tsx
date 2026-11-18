@@ -28,7 +28,9 @@ export default async function Page(props: PageProps) {
   return (
     <DocsPage
       toc={page.data.toc}
-      full={page.data.full}
+      full={isHomePage || page.data.full}
+      tableOfContent={{ enabled: !isHomePage }}
+      tableOfContentPopover={{ enabled: !isHomePage }}
       className={isHomePage ? 'docs-home-page' : undefined}
       breadcrumb={{ enabled: false }}
     >

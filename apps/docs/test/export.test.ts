@@ -46,7 +46,7 @@ void test('docs export: every authored page has complete clean Markdown and copy
     assert.ok(markdown.startsWith('# '), markdownPath);
     assert.doesNotMatch(
       markdown,
-      /<\/?(?:Callout|Card|Cards|Steps|Step)\b|^---\s*\ntitle:/m,
+      /<\/?(?:Callout|Card|Cards|Steps|Step)\b|<svg\b|^---\s*\ntitle:/m,
     );
     assert.ok(markdown.includes(`https://docs.gyblos.com/${html}`));
     // Code fences and all quoted commands must survive the conversion unchanged.
