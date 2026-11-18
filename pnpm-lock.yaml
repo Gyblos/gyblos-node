@@ -190,6 +190,9 @@ importers:
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
+      '@gyblos/payments-upto':
+        specifier: workspace:*
+        version: link:../../packages/payments-upto
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
@@ -709,6 +712,9 @@ importers:
       '@solana/rpc-spec-types':
         specifier: 8.6.0
         version: 8.6.0(typescript@5.9.3)
+      '@x402/core':
+        specifier: 2.29.0
+        version: 2.29.0
       '@x402/svm':
         specifier: 2.28.0
         version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.22.2))(typescript@5.9.3)
