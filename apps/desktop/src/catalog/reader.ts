@@ -1,6 +1,7 @@
-// Reuses verified HTTP discovery, then projects only requested zero-price listings.
+// Reuses verified HTTP discovery, then projects the requested model's listings: free ones, and paid ones
+// priced in devnet USDC (the asset this app pays with), each group with its cheapest price.
 // Signatures identify announcements, not registry trust, provider readiness or availability.
-import { DISCOVERY_INDEX_URL } from '@gyblos/config';
+import { DEVNET, DEVNET_USDC, DISCOVERY_INDEX_URL } from '@gyblos/config';
 import {
   fetchSellers,
   type DiscoveredSeller,
@@ -9,6 +10,19 @@ import {
 
 import { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 import type { AnnouncedModel, NetworkCatalog } from './model';
+
+type Pricing = DiscoveredSeller['catalog']['models'][number]['pricing'];
+
+const isFree = (pricing: Pricing) =>
+  pricing.inputAtomicPerMtok === '0' && pricing.outputAtomicPerMtok === '0';
+
+// A paid listing is shown only when its price is in an asset this app can show and pay.
+const isShown = (pricing: Pricing) =>
+  isFree(pricing) ||
+  (pricing.network === DEVNET && pricing.asset === DEVNET_USDC);
+
+const cheaper = (left: string, right: string) =>
+  BigInt(left) <= BigInt(right) ? left : right;
 
 function project(
   sellers: DiscoveredSeller[],
@@ -27,8 +41,7 @@ function project(
       if (
         model.modelId !== modelId ||
         expiresAt <= checkedAt ||
-        model.pricing.inputAtomicPerMtok !== '0' ||
-        model.pricing.outputAtomicPerMtok !== '0'
+        !isShown(model.pricing)
       )
         continue;
       const key = JSON.stringify([
@@ -36,6 +49,7 @@ function project(
         model.variant,
         model.quantization,
         model.contextTokens,
+        isFree(model.pricing),
       ]);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -43,6 +57,14 @@ function project(
       if (held) {
         held.announcements += 1;
         held.expiresAt = Math.min(held.expiresAt, expiresAt);
+        held.inputAtomicPerMtok = cheaper(
+          held.inputAtomicPerMtok,
+          model.pricing.inputAtomicPerMtok,
+        );
+        held.outputAtomicPerMtok = cheaper(
+          held.outputAtomicPerMtok,
+          model.pricing.outputAtomicPerMtok,
+        );
       } else if (models.size < NETWORK_CATALOG.MAX_MODELS)
         models.set(key, {
           modelId: model.modelId,
@@ -51,13 +73,15 @@ function project(
           contextTokens: model.contextTokens,
           announcements: 1,
           expiresAt,
+          inputAtomicPerMtok: model.pricing.inputAtomicPerMtok,
+          outputAtomicPerMtok: model.pricing.outputAtomicPerMtok,
         });
       else truncated = true;
     }
   }
   return { models: [...models.values()], truncated };
 }
-export async function readFreeAnnouncements(
+export async function readAnnouncements(
   fetch: DiscoveryFetch,
   model: string,
   now: () => number,

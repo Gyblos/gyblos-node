@@ -84,7 +84,7 @@ function CatalogStatus({ snapshot }: { snapshot: NetworkCatalog }) {
           : snapshot.state === CATALOG_STATE.STALE
             ? 'Announcements expired. Refresh to check again.'
             : snapshot.state === CATALOG_STATE.EMPTY
-              ? 'No free announcements returned for this model.'
+              ? 'No announcements returned for this model.'
               : 'Signed announcements · availability not checked.';
   return (
     <p className="dropdown-note" role="status">
@@ -114,7 +114,13 @@ function AnnouncementList({
               key={model.id}
               selected={!!onSelect && selected === model.id}
               leading={<ModelImage name={model.name} artwork={model.image} />}
-              trailing={<Badge>Free</Badge>}
+              trailing={
+                <Badge>
+                  {model.free
+                    ? 'Free'
+                    : `$${model.input.toFixed(2)} / $${model.output.toFixed(2)}`}
+                </Badge>
+              }
               onActivate={onSelect ? () => onSelect(model) : undefined}
             >
               <RowCopy
@@ -179,7 +185,8 @@ export function NetworkCatalogPanel({
       <CatalogStatus snapshot={snapshot} />
       {snapshot.query && (
         <p className="dropdown-note">
-          Results for {snapshot.query} · free input and output
+          Results for {snapshot.query} · free and paid (USDC per 1M tokens, in /
+          out)
         </p>
       )}
       <AnnouncementList

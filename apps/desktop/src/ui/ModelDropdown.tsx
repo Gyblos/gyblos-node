@@ -17,7 +17,9 @@ function priceLabel(model: ModelOption) {
 
 function modelDetail(model: ModelOption) {
   if (model.source === MODEL_SOURCE.ANNOUNCED)
-    return `${model.family ?? 'Signed announcement'} · Announced · Chat preview`;
+    return model.free
+      ? `${model.family ?? 'Signed announcement'} · Announced · Chat preview`
+      : `${model.family ?? 'Signed announcement'} · Announced · ${priceLabel(model)}`;
   return model.free ? 'Preview model' : priceLabel(model);
 }
 

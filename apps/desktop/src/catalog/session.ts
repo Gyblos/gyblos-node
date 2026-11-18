@@ -8,7 +8,7 @@ import {
   validCatalogQuery,
   type NetworkCatalog,
 } from './model';
-import { readFreeAnnouncements } from './reader';
+import { readAnnouncements } from './reader';
 
 export function createCatalogSession(
   fetch: DiscoveryFetch,
@@ -61,7 +61,7 @@ export function createCatalogSession(
       snapshot = emptyCatalog(CATALOG_STATE.LOADING, model);
       const result = (async () => {
         try {
-          const loaded = await readFreeAnnouncements(
+          const loaded = await readAnnouncements(
             fetch,
             model,
             now,

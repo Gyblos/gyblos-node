@@ -12,6 +12,10 @@ export interface AnnouncedModel {
   contextTokens: number;
   announcements: number;
   expiresAt: number;
+  // The cheapest price among the group's listings, in atomic devnet USDC per million tokens; both are
+  // "0" for a free group, and a group is either free or paid.
+  inputAtomicPerMtok: string;
+  outputAtomicPerMtok: string;
 }
 export interface NetworkCatalog {
   state: CatalogState;
@@ -50,6 +54,14 @@ function integer(value: unknown, minimum = 0): value is number {
     typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum
   );
 }
+// A non-negative integer amount as canonical decimal text, as public catalogs carry prices.
+function atomic(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length <= PUBLIC_RECORD_LIMITS.maxAtomicDigits &&
+    /^(?:0|[1-9][0-9]*)$/.test(value)
+  );
+}
 function publicText(value: unknown): value is string | null {
   return (
     value === null ||
@@ -67,6 +79,8 @@ function parseModel(value: unknown): AnnouncedModel | null {
       'contextTokens',
       'announcements',
       'expiresAt',
+      'inputAtomicPerMtok',
+      'outputAtomicPerMtok',
     ]) ||
     !validCatalogQuery(value.modelId) ||
     !publicText(value.variant) ||
@@ -75,7 +89,9 @@ function parseModel(value: unknown): AnnouncedModel | null {
     value.contextTokens > PUBLIC_RECORD_LIMITS.maxContextTokens ||
     !integer(value.announcements, 1) ||
     value.announcements > NETWORK_CATALOG.MAX_ANNOUNCEMENTS ||
-    !integer(value.expiresAt)
+    !integer(value.expiresAt) ||
+    !atomic(value.inputAtomicPerMtok) ||
+    !atomic(value.outputAtomicPerMtok)
   )
     return null;
   return {
@@ -85,6 +101,8 @@ function parseModel(value: unknown): AnnouncedModel | null {
     contextTokens: value.contextTokens,
     announcements: value.announcements,
     expiresAt: value.expiresAt,
+    inputAtomicPerMtok: value.inputAtomicPerMtok,
+    outputAtomicPerMtok: value.outputAtomicPerMtok,
   };
 }
 export function parseNetworkCatalog(value: unknown): NetworkCatalog {
