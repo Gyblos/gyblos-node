@@ -1,0 +1,28 @@
+name: Profile product test workers
+on:
+  push:
+    branches: [codex/product-worker-profile-n18]
+permissions:
+  contents: read
+jobs:
+  phases:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Measure product shard with stock file isolation
+        run: |
+          mkdir -p "$RUNNER_TEMP/startup-measurements"
+          node --import tsx --import ./.github/product-startup-probe.mjs --test --test-shard=3/3 "tests/*.test.ts" "packages/*/test/**/*.test.ts"
+      - name: Worker timestamps
+        run: python -c "import os, pathlib; [print('WORKER '+f.read_text()) for f in (pathlib.Path(os.environ['RUNNER_TEMP'])/'startup-measurements').glob('*.json')]"
