@@ -19,7 +19,7 @@ import { breakdownRollups } from './aggregate-breakdowns';
 import {
   runChainAggregation,
   type ChainAggregationResult,
-} from './aggregate-chain';
+} from './aggregate-chain-run';
 import { firstSeenUpserts } from './aggregate-first-seen';
 import {
   blank,

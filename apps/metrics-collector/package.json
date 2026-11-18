@@ -21,6 +21,7 @@
     "./chain/base58": "./src/chain/base58.ts",
     "./chain/channel-account": "./src/chain/channel-account.ts",
     "./chain/decode": "./src/chain/decode.ts",
+    "./chain/endpoints": "./src/chain/endpoints.ts",
     "./chain/indexer": "./src/chain/indexer.ts",
     "./chain/rpc": "./src/chain/rpc.ts"
   },

@@ -271,19 +271,38 @@ export const GYBLOS_OPEN_MEMOS = [
 export const CHAIN_INDEX = {
   // Signatures read per getSignaturesForAddress page (the RPC maximum).
   signaturesPerPage: 1000,
-  // Transactions read per scheduled run, and per batched JSON-RPC request.
-  maxTransactionsPerRun: 200,
-  transactionsPerRequest: 25,
+  // Program list pages read backwards per run while history is behind.
+  maxListPagesPerRun: 5,
+  // Followed Gyblos channels polled per run (least recently polled first), each at most this often.
+  maxFollowedPerRun: 40,
+  followIntervalMs: 1_800_000,
+  // Transactions read per followed channel per poll; the rest wait for the next poll.
+  maxReadsPerChannelPoll: 20,
+  // How long a run holds the index; an overlapping run within it skips (the Cron wall limit is 15 min).
+  leaseMs: 900_000,
+  // History before this is never read (Gyblos devnet activity starts after it).
+  historyFloorMs: Date.UTC(2026, 10, 1),
+  // The free public devnet RPC: calls per run, and the pause between two calls (its limit is 40 calls
+  // per 10 s per method and per address).
+  publicCallsPerRun: 80,
+  publicIntervalMs: 500,
+  // The paid RPC, used only after the public one rate-limits a run: calls per run, at most.
+  paidCallsPerRun: 20,
+  paidIntervalMs: 0,
+  // JSON-RPC error codes an endpoint uses for its own rate limit.
+  rateLimitCodes: [429, -32429],
   // Channel accounts read per getMultipleAccounts request (the RPC maximum).
   accountsPerRequest: 100,
   requestTimeoutMs: 15_000,
-  // Largest RPC answer read (25 jsonParsed transactions are well under 1 MiB).
+  // Largest RPC answer read (a page of signatures or one jsonParsed transaction).
   maxResponseBytes: 8_388_608,
   // Highest Solana transaction version asked for: devnet already carries version 1 transactions.
   maxTransactionVersion: 1,
   msPerSecond: 1000,
 } as const;
-// Binding of the Solana RPC URL (a secret: a dedicated provider, not the rate-limited public devnet).
+// Binding of the optional paid Solana RPC URL (a secret), used only when the public RPC rate-limits.
 export const COLLECTOR_SOLANA_RPC_BINDING = 'COLLECTOR_SOLANA_RPC_URL';
 // Log code of a scheduled run whose chain read failed; followed by a static reason only.
 export const COLLECTOR_CHAIN_INDEX_FAILED = 'COLLECTOR_CHAIN_INDEX_FAILED';
+// Log code of every scheduled chain read: calls per endpoint, rate limits, work done and backlog.
+export const COLLECTOR_CHAIN_INDEX_RUN = 'COLLECTOR_CHAIN_INDEX_RUN';

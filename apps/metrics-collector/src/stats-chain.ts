@@ -1,6 +1,7 @@
 // Owns the public chain stats use case: GET /v1/stats/chain turns the daily chain rows into what the
-// payment-channels program did per day, for the whole program and for channels that claim Gyblos
-// traffic (a claim anyone can make). Settled USDC and fees come only from here, never from receipts.
+// payment-channels program did per day: for the whole program, only its transaction counts (from the
+// signature list; its traffic is not read); for channels that claim Gyblos traffic (a claim anyone can
+// make), the full detail. Settled USDC and fees come only from here, never from receipts.
 import { CHANNEL_PROGRAM, DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 
 import { CHAIN_AGGREGATE_SCOPES } from './constants';
@@ -36,11 +37,13 @@ export interface ChainSection {
 }
 export interface ChainDay {
   day: string;
-  // Null when the program had no activity that day.
-  program: (ChainSection & { failed: number; undecodable: number }) | null;
+  // The whole program, anyone's traffic: transactions listed (successful and failed) and failed ones.
+  // Null when the program had no activity that day (or history before the floor).
+  program: { transactions: number; failed: number } | null;
   // Channels that claim Gyblos traffic: a self-declared label anyone can set, not verified traffic.
+  // `undecodable`: read transactions with a program instruction the decoder could not read.
   // Null when no such channel had activity that day.
-  gyblosClaimed: ChainSection | null;
+  gyblosClaimed: (ChainSection & { undecodable: number }) | null;
 }
 export interface ChainStats extends StatsEnvelope {
   network: string;
@@ -100,13 +103,11 @@ export async function chainStats(
       return {
         day,
         program: program
-          ? {
-              ...section(program),
-              failed: program.failed,
-              undecodable: program.undecodable,
-            }
+          ? { transactions: program.transactions, failed: program.failed }
           : null,
-        gyblosClaimed: gyblos ? section(gyblos) : null,
+        gyblosClaimed: gyblos
+          ? { ...section(gyblos), undecodable: gyblos.undecodable }
+          : null,
       };
     }),
   };

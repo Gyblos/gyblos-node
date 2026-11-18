@@ -1,17 +1,26 @@
 // Owns the Cloudflare Worker entry: maps the D1 binding and rate limiters to the app and fails closed.
 // Development relaxations are never enabled here; nothing runs on import.
+import { DEVNET_RPC_URL } from '@gyblos/config/network';
+
 import { runAggregation } from './aggregate';
 import {
   createMetricsCollector,
   type CollectorLimiters,
   type RateLimiter,
 } from './app';
-import { ChainIndexError, runChainIndex } from './chain/indexer';
+import { chainEndpoints } from './chain/endpoints';
+import {
+  ChainIndexError,
+  runChainIndex,
+  type ChainIndexResult,
+} from './chain/indexer';
 import { ChainShapeError } from './chain/json';
 import { ChainRpcError, chainRpcUrl, createChainRpc } from './chain/rpc';
 import {
+  CHAIN_INDEX,
   COLLECTOR_AGGREGATION_FAILED,
   COLLECTOR_CHAIN_INDEX_FAILED,
+  COLLECTOR_CHAIN_INDEX_RUN,
   COLLECTOR_DB_BINDING,
   COLLECTOR_LIMITERS,
   COLLECTOR_ROUTES,
@@ -123,37 +132,81 @@ export async function scheduledAggregation(bindings: unknown, now: number) {
   return result;
 }
 
-// The scheduled chain read, when a database and a valid Solana RPC URL are bound. A failure logs a
+// The scheduled chain read, when a database is bound: on the free public devnet RPC, and on the paid
+// one (the secret, if set) only after the public one rate-limits the run. Every run logs its calls
+// per endpoint, so a slow free endpoint is visible before relying on the paid one. A failure logs a
 // static code with the phase and the error's class only (never the URL, which may carry a provider
 // key) and leaves the cursor at the last stored batch.
 const chainFailureReason = (cause: unknown) =>
   cause instanceof ChainRpcError || cause instanceof ChainShapeError
     ? cause.message
     : '';
+const usageLine = (result: ChainIndexResult) => {
+  const { primary, fallback, onFallback } = result.usage;
+  return [
+    `public=${primary.calls}`,
+    `publicLimited=${primary.rateLimited}`,
+    `paid=${fallback.calls}`,
+    `paidLimited=${fallback.rateLimited}`,
+    `onPaid=${onFallback}`,
+    `listed=${result.listed}`,
+    `read=${result.read}`,
+    `followed=${result.followed}`,
+    `flooded=${result.flooded}`,
+    `accounts=${result.channels}`,
+    `undecodable=${result.undecodable}`,
+    `backlog=${result.backlog}`,
+    `skipped=${result.skipped}`,
+  ].join(' ');
+};
 
 export async function scheduledChainIndex(
   bindings: unknown,
   now: number,
   fetcher: typeof fetch = fetch,
+  wait?: (milliseconds: number) => Promise<void>,
 ) {
   const database = binding(bindings, COLLECTOR_DB_BINDING);
+  if (!isDatabase(database)) return undefined;
   const configured = binding(bindings, COLLECTOR_SOLANA_RPC_BINDING);
-  const url = chainRpcUrl(configured);
+  const paidUrl = chainRpcUrl(configured);
   // A secret that is set but not usable (http, credentials, a key in the query) must be visible.
-  if (configured !== undefined && configured !== '' && !url)
+  if (configured !== undefined && configured !== '' && !paidUrl)
     console.warn(COLLECTOR_CHAIN_INDEX_FAILED, 'config', 'rejected rpc url');
-  if (!isDatabase(database) || !url) return undefined;
+  const rpc = chainEndpoints(
+    {
+      rpc: createChainRpc(DEVNET_RPC_URL, fetcher),
+      limits: {
+        budget: CHAIN_INDEX.publicCallsPerRun,
+        minIntervalMs: CHAIN_INDEX.publicIntervalMs,
+      },
+    },
+    paidUrl
+      ? {
+          rpc: createChainRpc(paidUrl, fetcher),
+          limits: {
+            budget: CHAIN_INDEX.paidCallsPerRun,
+            minIntervalMs: CHAIN_INDEX.paidIntervalMs,
+          },
+        }
+      : undefined,
+    wait ? { wait } : {},
+  );
   try {
-    return await runChainIndex(database, createChainRpc(url, fetcher), now);
+    const result = await runChainIndex(database, rpc, now);
+    console.log(COLLECTOR_CHAIN_INDEX_RUN, usageLine(result));
+    return result;
   } catch (error) {
     const phase = error instanceof ChainIndexError ? error.phase : 'start';
     const cause = error instanceof ChainIndexError ? error.cause : error;
+    const { primary, fallback } = rpc.usage();
     // Static reasons only (an HTTP status, an RPC error code, a shape location), never the URL.
     console.warn(
       COLLECTOR_CHAIN_INDEX_FAILED,
       phase,
       cause instanceof Error ? cause.name : 'unknown',
       chainFailureReason(cause),
+      `public=${primary.calls} publicLimited=${primary.rateLimited} paid=${fallback.calls} paidLimited=${fallback.rateLimited}`,
     );
     return undefined;
   }

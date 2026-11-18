@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { DEVNET_USDC } from '@gyblos/config/network';
 import { decodeTransaction } from '@gyblos/metrics-collector/chain/decode';
 
+import { withSignature } from './metrics-collector-chain';
 import type { SqliteD1 } from './metrics-collector-d1';
 
 export const LAB_MINT = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
@@ -22,7 +23,7 @@ export function lifecycle(mint: string) {
       'utf8',
     ).replaceAll(LAB_MINT, mint);
     const tx = JSON.parse(text) as unknown;
-    return { signature: decodeTransaction(tx).signature, tx };
+    return withSignature(decodeTransaction(tx).signature, tx);
   });
 }
 
@@ -92,7 +93,7 @@ export function channel(
       terms.payer ?? null,
       terms.payee ?? null,
       terms.mint ?? null,
-      terms.gyblos ?? 0,
+      terms.gyblos ?? 1,
     );
 }
 export function delta(

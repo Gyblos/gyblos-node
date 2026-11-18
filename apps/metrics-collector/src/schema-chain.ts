@@ -1,5 +1,5 @@
-// Owns the typed chain index tables (#349) and their daily aggregates, matching migrations/0003 and 0004
-// exactly (the schema test compares them). These declarations perform no I/O.
+// Owns the typed chain index tables (#349) and their daily aggregates, matching migrations/0003,
+// 0004 and 0006 exactly (the schema test compares them). These declarations perform no I/O.
 import {
   index,
   integer,
@@ -20,6 +20,9 @@ export const chainCursor = sqliteTable('collector_chain_cursor', {
   backfillFull: integer('backfill_full').notNull(),
   backfillDone: integer('backfill_done').notNull(),
   updatedAt: integer('updated_at').notNull(),
+  newestSlot: integer('newest_slot'),
+  gapUntilSlot: integer('gap_until_slot'),
+  leaseUntil: integer('lease_until'),
 });
 
 export const chainTxs = sqliteTable(
@@ -94,9 +97,25 @@ export const chainChannels = sqliteTable(
     lastSlot: integer('last_slot').notNull(),
     accountReadAt: integer('account_read_at'),
     updatedAt: integer('updated_at').notNull(),
+    following: integer('following').notNull().default(0),
+    followUntil: text('follow_until'),
+    followedAt: integer('followed_at'),
   },
-  (table) => [index('collector_chain_channels_by_payer').on(table.payer)],
+  (table) => [
+    index('collector_chain_channels_by_payer').on(table.payer),
+    index('collector_chain_channels_by_follow').on(
+      table.following,
+      table.followedAt,
+    ),
+  ],
 );
+
+export const chainProgramDaily = sqliteTable('collector_chain_program_daily', {
+  day: text('day').primaryKey(),
+  transactions: integer('transactions').notNull(),
+  failed: integer('failed').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
 
 export const aggChainState = sqliteTable('collector_agg_chain_state', {
   id: integer('id').primaryKey(),

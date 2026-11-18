@@ -1,7 +1,7 @@
 // Protects the chain aggregate runs (#349): a new settle re-marks only its own day while an older one
 // read later re-marks the days after it; a late open or Gyblos claim recomputes the channel's earlier
-// days; a failing chain day never holds back receipt aggregates; days indexed before migration 0004
-// are aggregated; and GET /v1/stats/chain answers every day of the range with the index state.
+// days; a failing chain day never holds back receipt aggregates; days indexed before the first chain
+// scan are aggregated; and GET /v1/stats/chain answers every day of the range with the index state.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -23,7 +23,7 @@ import {
   NOW,
   DAY as RECEIPT_DAY,
 } from './support/metrics-collector-aggregates';
-import { fakeChainRpc } from './support/metrics-collector-chain';
+import { endpoints, fakeChainRpc } from './support/metrics-collector-chain';
 import {
   chainRows,
   channel,
@@ -87,7 +87,7 @@ void test('a new settle marks only its own day; an older one read later marks th
     day(DAY1 + DAY_MS),
   ]);
   assert.deepEqual(
-    chainRows(database, 'program').map((row) => row.settled_atomic),
+    chainRows(database, 'gyblos').map((row) => row.settled_atomic),
     ['20', '30', '30', '10'],
   );
 });
@@ -116,13 +116,12 @@ void test('a late open or Gyblos claim recomputes the channel days already aggre
   const database = createCollectorD1();
   const later = DAY1 + 5 * DAY_MS;
   // History read newest first: the settle arrives before its channel's open.
-  channel(database, 'D', {});
+  channel(database, 'D', { gyblos: 0 });
   // Indexed well before the first run, so the next scan no longer sees it as new.
   tx(database, 's1', DAY1 + DAY_MS, later - 2 * AGGREGATES.scanOverlapMs);
   instruction(database, 's1', 0, 'settle', 'D', { cumulative: '30' });
   await runAggregation(database, later);
-  const before = chainRows(database, 'program')[0]!;
-  assert.deepEqual([before.settled_atomic, before.payers], ['0', 0]);
+  // Not a Gyblos channel yet: no Gyblos row.
   assert.deepEqual(chainRows(database, 'gyblos'), []);
 
   // Well past the scan overlap, the open (a day earlier, claiming Gyblos) is indexed: the settle's day
@@ -153,6 +152,7 @@ void test('a late open or Gyblos claim recomputes the channel days already aggre
 
 void test('days indexed before the first chain scan are all aggregated', async () => {
   const database = createCollectorD1();
+  channel(database, 'E', { mint: DEVNET_USDC });
   tx(database, 'old', DAY1, 1);
   instruction(database, 'old', 0, 'open', 'E', { amount: '5' });
   // The receipt scan cursor is already far past these rows; the chain scan has its own.
@@ -163,7 +163,7 @@ void test('days indexed before the first chain scan are all aggregated', async (
     .run(DAY1 + 10 * DAY_MS, AGGREGATES.formulaVersion);
   const result = await runAggregation(database, DAY1 + 10 * DAY_MS + 1);
   assert.deepEqual(result.chain.days, [day(DAY1)]);
-  assert.equal(chainRows(database, 'program').length, 1);
+  assert.equal(chainRows(database, 'gyblos').length, 1);
 });
 
 void test('a failing chain scan never stops the receipt aggregates', async () => {
@@ -207,13 +207,13 @@ void test('a top-up read later raises the cap of the channel earlier settles', a
   instruction(database, 't1', 0, 'settle', 'T', { cumulative: '150' });
   const first = DAY1 + 10 * DAY_MS;
   await runAggregation(database, first);
-  assert.equal(chainRows(database, 'program')[0]!.settled_atomic, '100');
+  assert.equal(chainRows(database, 'gyblos')[0]!.settled_atomic, '100');
   const later = first + 4 * AGGREGATES.scanOverlapMs;
   tx(database, 't2', DAY1 + DAY_MS, later, { slot: 3 });
   instruction(database, 't2', 0, 'top_up', 'T', { amount: '100' });
   const result = await runAggregation(database, later + 1);
   assert.deepEqual(result.chain.days, [day(DAY1 + DAY_MS), day(DAY1)]);
-  assert.equal(chainRows(database, 'program')[0]!.settled_atomic, '150');
+  assert.equal(chainRows(database, 'gyblos')[0]!.settled_atomic, '150');
 });
 
 void test('the chain scan cost follows new transactions, not a channel history', async () => {
@@ -246,9 +246,13 @@ void test('the chain scan cost follows new transactions, not a channel history',
   assert.ok(performance.now() - started < 3000);
 });
 
-void test('GET /v1/stats/chain answers every day with both scopes and the index state', async () => {
+void test('GET /v1/stats/chain answers every day with program counts, Gyblos detail and the index state', async () => {
   const database = createCollectorD1();
-  await runChainIndex(database, fakeChainRpc(lifecycle(DEVNET_USDC)).rpc, 1000);
+  await runChainIndex(
+    database,
+    endpoints(fakeChainRpc(lifecycle(DEVNET_USDC)).rpc),
+    1000,
+  );
   await runAggregation(database, 2000);
   const app = collector(database, Date.UTC(2026, 10, 3, 12));
   const response = await app.request(
@@ -288,7 +292,9 @@ void test('GET /v1/stats/chain answers every day with both scopes and the index 
     ],
   );
   const busy = body.days[1]!;
-  assert.deepEqual(busy.program!.instructions, {
+  // The program: counts only. Gyblos: the full detail.
+  assert.deepEqual(busy.program, { transactions: 3, failed: 0 });
+  assert.deepEqual(busy.gyblosClaimed!.instructions, {
     open: 1,
     settle: 0,
     topUp: 0,
@@ -298,8 +304,7 @@ void test('GET /v1/stats/chain answers every day with both scopes and the index 
     distribute: 1,
     reclaim: 1,
   });
-  assert.deepEqual([busy.program!.failed, busy.program!.undecodable], [0, 0]);
-  assert.equal('failed' in busy.gyblosClaimed!, false);
+  assert.equal(busy.gyblosClaimed!.undecodable, 0);
 
   // Before the index ever ran: no state, no days with data; a bad range is refused.
   const empty = collector(createCollectorD1(), Date.UTC(2026, 10, 3));
