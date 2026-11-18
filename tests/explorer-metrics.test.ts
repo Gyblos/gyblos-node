@@ -223,6 +223,7 @@ void test('offers of the same model with different variants are summarized apart
   });
   const summary = summarizeOffers({
     generatedAt: 0,
+    network: null,
     error: null,
     sellers: [
       {

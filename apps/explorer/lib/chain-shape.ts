@@ -109,7 +109,6 @@ export interface ChainSummary {
   feeShare: number | null;
   // Days with Gyblos activity, oldest first.
   days: (ChainDay & { gyblos: ChainSection })[];
-  maxDaySettled: bigint;
 }
 
 const empty = (): ChainSection => ({
@@ -135,13 +134,11 @@ export function summarizeChain(snapshot: ChainSnapshot): ChainSummary {
   const totals = empty();
   let programTransactions = 0;
   const days: ChainSummary['days'] = [];
-  let maxDaySettled = 0n;
   for (const day of snapshot.days) {
     programTransactions += day.program?.transactions ?? 0;
     const gyblos = day.gyblos;
     if (!gyblos) continue;
     days.push({ ...day, gyblos });
-    if (gyblos.settled > maxDaySettled) maxDaySettled = gyblos.settled;
     for (const key of [
       'transactions',
       'opens',
@@ -171,6 +168,15 @@ export function summarizeChain(snapshot: ChainSnapshot): ChainSummary {
         UNITS.ratioScale
       : null,
     days,
-    maxDaySettled,
   };
+}
+
+// One point per day of the range, oldest first: what Gyblos channels settled that day (0 without
+// activity), for the daily chart.
+export function dailySettled(snapshot: ChainSnapshot) {
+  return snapshot.days.map((day) => ({
+    day: day.day,
+    settled: day.gyblos?.settled ?? 0n,
+    settles: day.gyblos?.settles ?? 0,
+  }));
 }

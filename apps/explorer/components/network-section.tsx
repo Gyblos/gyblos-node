@@ -1,9 +1,16 @@
-// Owns the Network section: sellers online, models offered with their cheapest prices, and each
-// seller's offers and uptime, from the discovery index.
+// Owns the Network section: sellers online and offline, models offered with their cheapest prices, each
+// online seller's offers and uptime, and the registered sellers not online now, from the discovery index.
 import { DISPLAY } from '../lib/constants';
 import { getDiscovery, type Seller } from '../lib/discovery';
-import { count, percent, pricePerMtok, usdc, utc } from '../lib/format';
+import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
+import {
+  notOnline,
+  type NetworkNode,
+  type NetworkStatus,
+} from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
+import { Chip } from './board/chip';
+import { StatusDot } from './board/status-dot';
 import {
   Addr,
   ModelName,
@@ -30,7 +37,17 @@ export async function NetworkSection() {
     <>
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Sellers online" value={String(snapshot.sellers.length)} />
+        {snapshot.network ? (
+          <Stat
+            label="Sellers online · offline"
+            value={`${snapshot.network.counts.online} · ${snapshot.network.counts.offline}`}
+          />
+        ) : (
+          <Stat
+            label="Sellers online"
+            value={String(snapshot.sellers.length)}
+          />
+        )}
         <Stat label="Models" value={String(summary.models.size)} />
         <Stat
           label="Free · paid offers"
@@ -52,7 +69,9 @@ export async function NetworkSection() {
       >
         {[...summary.models].map(([name, model]) => (
           <tr key={name} className="border-t border-line">
-            <td className={td}>{name}</td>
+            <td className={td}>
+              <ModelName modelId={name} variant={null} quantization={null} />
+            </td>
             <td className={numberCell}>{model.sellers}</td>
             <td className={numberCell}>{model.free}</td>
             <td className={moneyCell}>{priceText(model.minInput)}</td>
@@ -64,6 +83,7 @@ export async function NetworkSection() {
 
       <SectionTitle title="Sellers" />
       <SellersTable sellers={snapshot.sellers} />
+      {snapshot.network ? <NotOnlineTable network={snapshot.network} /> : null}
     </>
   );
 }
@@ -74,6 +94,7 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
       minWidth={DISPLAY.wideTable}
       head={[
         { label: 'Seller' },
+        { label: 'Status' },
         { label: 'Model' },
         { label: 'Context', right: true },
         { label: 'Input / 1M', right: true },
@@ -90,6 +111,12 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
           >
             <td className={`${td} font-mono`} title={`Node ${seller.nodeId}`}>
               <Addr value={seller.owner} />
+            </td>
+            <td className={td}>
+              <Chip tone="brand">
+                <StatusDot />
+                Online
+              </Chip>
             </td>
             <td className={td}>
               <ModelName
@@ -116,5 +143,56 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
         )),
       )}
     </Table>
+  );
+}
+
+const STATE_LABELS: Record<Exclude<NetworkNode['state'], 'online'>, string> = {
+  offline: 'Offline',
+  unpublished: 'Not published',
+};
+
+// Registered or recently seen sellers without a live presence now. Offline ones were seen before;
+// unpublished ones were never seen or withdrew their catalog.
+function NotOnlineTable({ network }: { network: NetworkStatus }) {
+  const nodes = notOnline(network);
+  if (!nodes.length) return null;
+  const { offline, unpublished } = network.counts;
+  return (
+    <>
+      <SectionTitle
+        title="Not online"
+        meta={`${count(offline)} offline · ${count(unpublished)} not published`}
+      />
+      <Table
+        minWidth={DISPLAY.defaultTable}
+        head={[
+          { label: 'Node' },
+          { label: 'Status' },
+          { label: 'Last seen' },
+          { label: 'First seen' },
+        ]}
+      >
+        {nodes.map((node) => (
+          <tr key={node.nodeId} className="border-t border-line">
+            <td className={`${td} font-mono`} title={`Node ${node.nodeId}`}>
+              {short(node.nodeId)}
+            </td>
+            <td className={td}>
+              <Chip>
+                {node.state === 'online' ? 'Online' : STATE_LABELS[node.state]}
+              </Chip>
+            </td>
+            <td className={timeCell}>{utc(node.lastSeenAt)}</td>
+            <td className={timeCell}>{utc(node.firstSeenAt)}</td>
+          </tr>
+        ))}
+      </Table>
+      {network.truncated ? (
+        <p className="mt-2 text-xs text-dim">
+          The index reached one of its limits: this list and its counts may be
+          incomplete.
+        </p>
+      ) : null}
+    </>
   );
 }

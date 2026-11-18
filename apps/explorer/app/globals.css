@@ -1,20 +1,24 @@
 @import 'tailwindcss';
 
-/* Gyblos brand tokens (DESIGN.md): one blue, neutral surfaces. */
+/* Gyblos brand tokens (DESIGN.md): one blue, neutral surfaces; light values match the web's. The
+   signal tone is the brand blue on light surfaces and #6f86ff on dark ones, for status dots and focus
+   rings only, never text. */
 :root {
   --brand-blue: #0a28f0;
-  --bg: #ffffff;
-  --panel: #f5f5f5;
-  --raised: #ebebeb;
-  --line: #e0e0e0;
-  --ink: #111111;
-  --muted: #555555;
+  --signal: #0a28f0;
+  --bg: #fcfcfc;
+  --panel: #f4f5f6;
+  --raised: #eceef0;
+  --line: #e4e6e8;
+  --ink: #1c1c1c;
+  --muted: #5f6368;
   --dim: #6b6b6b;
   --money: #0f7a3d;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --signal: #6f86ff;
     --bg: #090909;
     --panel: #151515;
     --raised: #222222;
@@ -35,6 +39,7 @@
   --color-muted: var(--muted);
   --color-dim: var(--dim);
   --color-brand: var(--brand-blue);
+  --color-signal: var(--signal);
   --color-money: var(--money);
   --font-sans: var(--font-instrument), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;

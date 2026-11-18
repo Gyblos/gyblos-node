@@ -32,6 +32,7 @@ site's bundled font hashes are in
 | Material                                    | Terms                                                      | Notice and provenance                                                                                                                                                                                      |
 | ------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Model icons (desktop)                       | Lobe Icons, MIT                                            | [MIT](../apps/desktop/public/assets/models/lobe-icons-LICENSE.txt); [sources and hashes](../apps/desktop/public/assets/models/sources.json)                                                                |
+| Model icons (explorer)                      | Lobe Icons, MIT                                            | [MIT notice](../apps/explorer/public/models/LICENSE); monochrome icons of `@lobehub/icons-static-svg` 1.103.0                                                                                              |
 | Claude Code, Codex, Exa and Firecrawl icons | Lobe Icons, MIT                                            | The same Lobe Icons notice; [sources and hashes](../apps/desktop/public/assets/tools/sources.json)                                                                                                         |
 | OpenCode icon (desktop)                     | OpenCode, MIT                                              | [MIT notice](../apps/desktop/public/assets/tools/opencode-LICENSE.txt); source and hash in the tools manifest                                                                                              |
 | Pi icon (desktop)                           | Official Pi press kit, MIT; Earendil Inc. and contributors | [MIT notice](../apps/desktop/public/assets/tools/pi-LICENSE.txt); source and hash in the tools manifest                                                                                                    |
@@ -81,6 +82,9 @@ installer built from it.
   its entry in `pnpm-workspace.yaml`. Keep upstream attribution and identify the
   Gyblos modification when you distribute patched code. No upstream acceptance
   is implied.
+- **Explorer components** in `apps/explorer/components/board` are adapted from
+  BoardUI's free components (MIT); its notice is kept in
+  [LICENSE](../apps/explorer/components/board/LICENSE).
 - **The Contributor Covenant** text keeps its source and version attribution in
   `CODE_OF_CONDUCT.md`.
 

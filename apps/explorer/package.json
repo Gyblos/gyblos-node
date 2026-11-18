@@ -7,7 +7,10 @@
     "./chain-shape": "./lib/chain-shape.ts",
     "./collector-shape": "./lib/collector-shape.ts",
     "./latency": "./lib/latency.ts",
+    "./model-family": "./lib/model-family.ts",
+    "./network-status": "./lib/network-status.ts",
     "./offers": "./lib/offers.ts",
+    "./range": "./lib/range.ts",
     "./usage": "./lib/usage.ts"
   },
   "scripts": {
@@ -19,7 +22,9 @@
   "dependencies": {
     "next": "16.4.6",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-aria-components": "1.22.1",
+    "react-dom": "19.3.1",
+    "recharts": "3.10.1"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "1.20.17",

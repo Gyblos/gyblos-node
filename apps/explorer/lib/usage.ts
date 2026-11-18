@@ -87,3 +87,12 @@ export function relayText(day: NetworkDay): string {
   const routed = routes ? routes.direct + routes.relay + routes.unknown : 0;
   return routes && routed ? percent(routes.relay / routed) : '—';
 }
+
+// One point per day of the range, oldest first: each side's headline requests (0 without receipts).
+export function dailyRequests(days: NetworkDay[]) {
+  return days.map((day) => ({
+    day: day.day,
+    free: day.free?.requests.headline ?? 0,
+    paid: day.paid?.requests.headline ?? 0,
+  }));
+}
