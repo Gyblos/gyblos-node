@@ -24,7 +24,7 @@ import {
   COLLECTOR_DB_BINDING,
   COLLECTOR_LIMITERS,
   COLLECTOR_ROUTES,
-  COLLECTOR_SOLANA_RPC_BINDING,
+  COLLECTOR_SOLANA_RPC_BINDINGS,
   COLLECTOR_STATUS,
 } from './constants';
 import { statsReader } from './stats-read';
@@ -149,6 +149,7 @@ const usageLine = (result: ChainIndexResult) => {
     `paid=${fallback.calls}`,
     `paidLimited=${fallback.rateLimited}`,
     `onPaid=${onFallback}`,
+    `endpoint=${result.usage.endpoint}`,
     `listed=${result.listed}`,
     `read=${result.read}`,
     `followed=${result.followed}`,
@@ -168,11 +169,29 @@ export async function scheduledChainIndex(
 ) {
   const database = binding(bindings, COLLECTOR_DB_BINDING);
   if (!isDatabase(database)) return undefined;
-  const configured = binding(bindings, COLLECTOR_SOLANA_RPC_BINDING);
-  const paidUrl = chainRpcUrl(configured);
-  // A secret that is set but not usable (http, credentials, a key in the query) must be visible.
-  if (configured !== undefined && configured !== '' && !paidUrl)
-    console.warn(COLLECTOR_CHAIN_INDEX_FAILED, 'config', 'rejected rpc url');
+  const keyed = COLLECTOR_SOLANA_RPC_BINDINGS.flatMap((name) => {
+    const configured = binding(bindings, name);
+    const url = chainRpcUrl(configured);
+    // A secret that is set but not usable (http, credentials, a fragment) must be visible.
+    if (configured !== undefined && configured !== '' && !url)
+      console.warn(
+        COLLECTOR_CHAIN_INDEX_FAILED,
+        'config',
+        'rejected rpc url',
+        name,
+      );
+    return url
+      ? [
+          {
+            rpc: createChainRpc(url, fetcher),
+            limits: {
+              budget: CHAIN_INDEX.paidCallsPerRun,
+              minIntervalMs: CHAIN_INDEX.paidIntervalMs,
+            },
+          },
+        ]
+      : [];
+  });
   const rpc = chainEndpoints(
     {
       rpc: createChainRpc(DEVNET_RPC_URL, fetcher),
@@ -181,15 +200,7 @@ export async function scheduledChainIndex(
         minIntervalMs: CHAIN_INDEX.publicIntervalMs,
       },
     },
-    paidUrl
-      ? {
-          rpc: createChainRpc(paidUrl, fetcher),
-          limits: {
-            budget: CHAIN_INDEX.paidCallsPerRun,
-            minIntervalMs: CHAIN_INDEX.paidIntervalMs,
-          },
-        }
-      : undefined,
+    keyed,
     wait ? { wait } : {},
   );
   try {

@@ -433,19 +433,27 @@ only what concerns Gyblos and spends as few RPC calls as possible:
 - It runs on the free public devnet RPC (`DEVNET_RPC_URL`), one call at a time
   (no JSON-RPC batches, which are billed and limited per call anyway), at least
   500 ms apart, at most 80 calls per run.
-- The optional `COLLECTOR_SOLANA_RPC_URL` secret (a paid RPC: https, or http on
-  loopback, with no credentials, query or fragment) is used only after the
-  public RPC rate-limits a run (HTTP 429 or its limit code), for at most 20
-  calls in that run, and never otherwise.
-- Every run logs `COLLECTOR_CHAIN_INDEX_RUN` with the calls and rate limits per
-  endpoint, whether it moved to the paid one, what it counted, read and
-  followed, the accounts read, and whether work is left (`backlog`). Many
-  `publicLimited` or a lasting `backlog` are the signal to rely on the paid RPC
-  for a while.
-- Measured once on devnet from one machine (not from Cloudflare, whose shared
-  addresses the public RPC may limit more): reading history cost 10 to 18 calls
-  per run with no rate limit; once caught up, an idle run costs 1 call, plus one
-  per followed channel and one per hundred Gyblos accounts every 30 minutes.
+- Keyed RPCs are optional secrets, tried in order only when the endpoint before
+  fails the run: `COLLECTOR_SOLANA_RPC_URL` (for example Helius, free tier),
+  then `COLLECTOR_SOLANA_RPC_FALLBACK_URL` (for example Alchemy). Each is https
+  (or http on loopback) with no credentials or fragment; a query may carry the
+  provider key, since the URL is never logged. Each gets at most 20 calls per
+  run. The run moves on after a refusal (HTTP 403 or 429, or the RPC's limit
+  code), a server error (5xx) or a transport failure; an answer the index cannot
+  read, or a transaction the RPC lists but cannot return yet, stops the run
+  instead.
+- The public devnet RPC answers Cloudflare Workers with HTTP 403 (measured
+  2026-11-18), so in production each run spends one public call and moves to the
+  first key.
+- Every run logs `COLLECTOR_CHAIN_INDEX_RUN` with the calls and refusals of the
+  public endpoint and of the keys together, whether it moved on and to which
+  endpoint (`endpoint=0` public, `1` the first key, `2` the second), what it
+  counted, read and followed, the accounts read, and whether work is left
+  (`backlog`).
+- Measured once on devnet from one machine (not from Cloudflare): reading
+  history cost 10 to 18 calls per run with no rate limit; once caught up, an
+  idle run costs 1 call, plus one per followed channel and one per hundred
+  Gyblos accounts every 30 minutes.
 
 **What is read, and when.** Finalized data, newest first, in five phases:
 

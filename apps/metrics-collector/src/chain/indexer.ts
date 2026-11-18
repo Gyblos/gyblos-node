@@ -12,7 +12,7 @@ import {
   type D1Database,
 } from '../d1-client';
 import { chainCursor } from '../schema';
-import type { ChainEndpoints, EndpointUse } from './endpoints';
+import type { ChainEndpoints } from './endpoints';
 import { followChannels, refreshChannels } from './follow';
 import { CHAIN_CURSOR_ID, fillGap, readBackfill, readForward } from './list';
 import type { ChainRun } from './run';
@@ -51,7 +51,7 @@ export interface ChainIndexResult {
   undecodable: number;
   // Work left for later runs: a gap of new signatures, or history not yet read.
   backlog: boolean;
-  usage: { primary: EndpointUse; fallback: EndpointUse; onFallback: boolean };
+  usage: ReturnType<ChainEndpoints['usage']>;
   cursor: ChainCursorState;
 }
 

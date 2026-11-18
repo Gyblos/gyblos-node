@@ -1,10 +1,11 @@
 // Owns the Solana JSON-RPC reads the chain index makes, one call per request (a batch is billed and
 // rate-limited per call anyway): signatures of an address (finalized, newest first, with each one's
 // error, block time and memo), one transaction, and accounts with their owner. The URL must be https
-// (http only on loopback) with no credentials, query or fragment; redirects are refused, answers are
-// size-capped and matched by id. Any HTTP or RPC error, or a transaction the RPC cannot return, throws:
-// the run stops and nothing past it is marked as read. A rate limit throws an error marked as such,
-// which lets the run move to its fallback endpoint.
+// (http only on loopback) with no credentials or fragment; a query may carry a provider key (the URL is
+// never logged). Redirects are refused, answers are size-capped and matched by id. Any HTTP or RPC
+// error, or a transaction the RPC cannot return, throws: the run stops and nothing past it is marked as
+// read. A refusal of the caller (a rate limit, or a 403 such as the public devnet RPC answers Cloudflare
+// Workers) throws an error marked as such, which lets the run move to its fallback endpoint.
 import { CHAIN_INDEX, LOOPBACK_HOSTS } from '../constants';
 import { ChainShapeError, list, nullable, num, record, text } from './json';
 
@@ -12,12 +13,13 @@ const FINALIZED = 'finalized';
 const JSON_RPC = '2.0';
 const HTTPS = 'https:';
 const HTTP = 'http:';
-const TOO_MANY_REQUESTS = 429;
+// HTTP statuses that refuse this caller rather than the call: the next endpoint may serve it.
+const REFUSING_STATUSES: readonly number[] = [403, 429];
 
 export class ChainRpcError extends Error {
   constructor(
     readonly reason: string,
-    // The endpoint refused the call for its rate limit (HTTP 429 or the RPC's own limit code).
+    // The endpoint refused this caller (HTTP 403 or 429, or the RPC's own rate-limit code).
     readonly rateLimited = false,
   ) {
     super(`solana rpc: ${reason}`);
@@ -37,7 +39,7 @@ export function chainRpcUrl(value: unknown): string | undefined {
   const allowed =
     url.protocol === HTTPS ||
     (url.protocol === HTTP && LOOPBACK_HOSTS.has(url.hostname));
-  return allowed && !url.username && !url.password && !url.search && !url.hash
+  return allowed && !url.username && !url.password && !url.hash
     ? url.toString()
     : undefined;
 }
@@ -99,7 +101,7 @@ function caller(url: string, fetcher: typeof fetch) {
       await response.body?.cancel();
       throw new ChainRpcError(
         `HTTP ${response.status}`,
-        response.status === TOO_MANY_REQUESTS,
+        REFUSING_STATUSES.includes(response.status),
       );
     }
     const reply = record(await readCapped(response), 'rpc reply');
