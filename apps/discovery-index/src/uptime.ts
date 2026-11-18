@@ -1,7 +1,8 @@
 // Owns public seller uptime: which five-minute slots each NodeId held a signed presence the index
 // accepted, and GET /v1/uptime?node=<NodeId>, which reports the share of slots seen over the last day,
 // week and month. A window starts no earlier than the NodeId was first seen, so a new seller is not
-// counted down for time before it existed. Built only from records the index already verified.
+// counted down for time before it existed. Its sightings also feed GET /v1/network (network.ts). Built
+// only from records the index already verified.
 import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS, UPTIME } from './constants';
 import { indexFail } from './errors';
 
@@ -188,18 +189,21 @@ export function memoryUptime() {
       });
     },
     async sightings(sinceHour: number, limit: number) {
-      return [...first].slice(0, limit).map(([nodeId, firstAt]) => {
-        const recent = [...(nodes.get(nodeId)?.values() ?? [])].filter(
-          (row) => row.hour >= sinceHour,
-        );
-        return {
-          nodeId,
-          firstAt,
-          lastAt: recent.length
-            ? Math.max(...recent.map((row) => row.lastAt))
-            : null,
-        };
-      });
+      return [...first]
+        .sort(([left], [right]) => (left < right ? -1 : 1))
+        .slice(0, limit)
+        .map(([nodeId, firstAt]) => {
+          const recent = [...(nodes.get(nodeId)?.values() ?? [])].filter(
+            (row) => row.hour >= sinceHour,
+          );
+          return {
+            nodeId,
+            firstAt,
+            lastAt: recent.length
+              ? Math.max(...recent.map((row) => row.lastAt))
+              : null,
+          };
+        });
     },
     async seen(nodeId: string, sinceHour: number) {
       return [...(nodes.get(nodeId)?.values() ?? [])]

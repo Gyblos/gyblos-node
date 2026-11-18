@@ -24,7 +24,7 @@ import {
   recordCountsQuery,
 } from './storage-queries';
 import { admitNodeQuery, recordQueries } from './storage-writes';
-import { createD1Uptime } from './uptime-d1';
+import { createD1Uptime, integer, text } from './uptime-d1';
 
 export type {
   D1Database,
@@ -34,16 +34,6 @@ export type {
   D1Value,
 } from './d1-client';
 
-function integer(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value))
-    throw new TypeError('Unexpected discovery storage row.');
-  return value;
-}
-function text(value: unknown): string {
-  if (typeof value !== 'string')
-    throw new TypeError('Unexpected discovery storage row.');
-  return value;
-}
 function nodeState(row: D1Row): NodeState {
   return {
     lastSequence: integer(row.lastSequence),
@@ -127,30 +117,34 @@ export function createD1Storage(client: D1Database): DiscoveryStorage {
       }));
     },
     async catalogStatus(now, limit, maxModels) {
+      // One row past each cap tells whether the cap cut the answer.
       const [rows, listed] = await Promise.all([
-        catalogStatusQuery(database, now, limit),
-        onlineModelsQuery(database, now, maxModels),
+        catalogStatusQuery(database, now, limit + 1),
+        onlineModelsQuery(database, now, maxModels + 1),
       ]);
       const byNode = new Map<string, string[]>();
-      for (const row of listed) {
+      for (const row of listed.slice(0, maxModels)) {
         const nodeId = text(row.nodeId);
         byNode.set(nodeId, [...(byNode.get(nodeId) ?? []), text(row.modelId)]);
       }
-      return rows.map((row) => {
-        const nodeId = text(row.nodeId);
-        const withdrawn = integer(row.withdrawn) !== 0;
-        const online =
-          integer(row.alive) !== 0 &&
-          !withdrawn &&
-          integer(row.issuedAt) <= now + CONTROL_LIMITS.clockSkewMs &&
-          integer(row.expiresAt) > now;
-        return {
-          nodeId,
-          online,
-          withdrawn,
-          models: online ? (byNode.get(nodeId) ?? []) : [],
-        };
-      });
+      return {
+        complete: rows.length <= limit && listed.length <= maxModels,
+        rows: rows.slice(0, limit).map((row) => {
+          const nodeId = text(row.nodeId);
+          const withdrawn = integer(row.withdrawn) !== 0;
+          const online =
+            integer(row.alive) !== 0 &&
+            !withdrawn &&
+            integer(row.issuedAt) <= now + CONTROL_LIMITS.clockSkewMs &&
+            integer(row.expiresAt) > now;
+          return {
+            nodeId,
+            online,
+            withdrawn,
+            models: online ? (byNode.get(nodeId) ?? []) : [],
+          };
+        }),
+      };
     },
   };
 }

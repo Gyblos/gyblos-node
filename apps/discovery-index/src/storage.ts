@@ -90,12 +90,13 @@ export interface DiscoveryStorage extends UptimeStorage {
   models(now: number, limit: number): Promise<ModelRow[]>;
   // Unexpired stored records of all three kinds.
   count(now: number): Promise<number>;
-  // Every stored catalog's status, at most `limit` NodeIds and `maxModels` model rows.
+  // Stored catalogs' status by NodeId, at most `limit` NodeIds and `maxModels` model rows (by NodeId,
+  // then model id); `complete` is false when either cap cut the answer.
   catalogStatus(
     now: number,
     limit: number,
     maxModels: number,
-  ): Promise<CatalogStatusRow[]>;
+  ): Promise<{ rows: CatalogStatusRow[]; complete: boolean }>;
 }
 
 interface MemoryNode {
@@ -183,9 +184,12 @@ function catalogStatusMemory(
   now: number,
   limit: number,
   maxModels: number,
-): CatalogStatusRow[] {
-  let models = 0;
-  return [...tables.catalogs].slice(0, limit).map(([nodeId, catalog]) => {
+) {
+  const ids = [...tables.catalogs.keys()].sort();
+  let models = maxModels;
+  let complete = ids.length <= limit;
+  const rows = ids.slice(0, limit).map((nodeId): CatalogStatusRow => {
+    const catalog = tables.catalogs.get(nodeId)!;
     const alive = tables.presence.get(nodeId);
     const withdrawn = tables.withdrawn(nodeId, catalog.digest);
     const online =
@@ -194,12 +198,13 @@ function catalogStatusMemory(
       !withdrawn &&
       live(catalog, now) &&
       live(alive, now);
-    const listed = online
-      ? [...new Set(catalog.models)].slice(0, Math.max(0, maxModels - models))
-      : [];
-    models += listed.length;
-    return { nodeId, online, withdrawn, models: listed.sort() };
+    const all = online ? [...new Set(catalog.models)].sort() : [];
+    const listed = all.slice(0, Math.max(0, models));
+    if (listed.length < all.length) complete = false;
+    models -= listed.length;
+    return { nodeId, online, withdrawn, models: listed };
   });
+  return { rows, complete };
 }
 
 function listMemory(tables: MemoryTables, query: SellerQuery): SellerRow[] {

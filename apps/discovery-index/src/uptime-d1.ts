@@ -1,5 +1,5 @@
 // Owns ORM persistence of public uptime; never reads request metadata or opens network connections.
-import { and, asc, eq, exists, gte, lt, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, gte, lt } from 'drizzle-orm';
 
 import { DISCOVERY_INDEX_LIMITS } from './constants';
 import type { DiscoveryDatabase } from './d1-client';
@@ -9,18 +9,19 @@ import {
   maximum,
   mergedBits,
   minimum,
+  scalarSubquery,
   singleRow,
   valueField,
 } from './sqlite-expressions';
 import { hourOf, retainedHour, slotBit, type UptimeStorage } from './uptime';
 
-function integer(value: unknown) {
+// Storage rows are our own, but a corrupted row fails closed (503) instead of being trusted.
+export function integer(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value))
     throw new TypeError('Unexpected discovery storage row.');
   return value;
 }
-
-function text(value: unknown) {
+export function text(value: unknown): string {
   if (typeof value !== 'string')
     throw new TypeError('Unexpected discovery storage row.');
   return value;
@@ -108,21 +109,24 @@ export function createD1Uptime(database: DiscoveryDatabase): UptimeStorage {
       }));
     },
     async sightings(sinceHour, limit) {
-      // The latest sighting through the (node_id, hour) primary key, one NodeId at a time.
+      // The NodeId's newest hourly row through the (node_id, hour) primary key: one row per NodeId,
+      // never a scan of its history. Its last_at is the latest sighting.
       const latest = database
-        .select({ lastAt: max(uptimeSlots.lastAt) })
+        .select({ lastAt: uptimeSlots.lastAt })
         .from(uptimeSlots)
         .where(
           and(
             eq(uptimeSlots.nodeId, uptimeNodes.nodeId),
             gte(uptimeSlots.hour, sinceHour),
           ),
-        );
+        )
+        .orderBy(desc(uptimeSlots.hour))
+        .limit(1);
       const rows = await database
         .select({
           nodeId: uptimeNodes.nodeId,
           firstAt: uptimeNodes.firstAt,
-          lastAt: sql`(${latest})`.mapWith((value: unknown) => value),
+          lastAt: scalarSubquery(latest).as('lastAt'),
         })
         .from(uptimeNodes)
         .orderBy(asc(uptimeNodes.nodeId))

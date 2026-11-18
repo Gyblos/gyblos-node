@@ -1,6 +1,10 @@
 // Owns the Cloudflare D1 adapter of the enrollment storage contract (tables in migrations/0003).
 // Redeeming is one D1 batch, so an invite is spent and its NodeId admitted together or not at all.
-import { REDEEM_RESULTS, REGISTRATION_STATUS } from './constants';
+import {
+  REDEEM_RESULTS,
+  REGISTRATION_STATUS,
+  type RegistrationStatus,
+} from './constants';
 import { createD1Orm } from './d1-client';
 import {
   createInviteQuery,
@@ -84,10 +88,15 @@ export function createD1RegistrationStore(
       return (await status(nodeId)) === REGISTRATION_STATUS.ACTIVE;
     },
     async registered(limit) {
-      return (await registeredQuery(database, limit)).map((row) => ({
-        nodeId: nullableText(row.nodeId) ?? unexpected(),
-        active: row.status === REGISTRATION_STATUS.ACTIVE,
-      }));
+      const ids = async (status: RegistrationStatus) =>
+        (await registeredQuery(database, status, limit)).map(
+          (row) => nullableText(row.nodeId) ?? unexpected(),
+        );
+      const [active, revoked] = await Promise.all([
+        ids(REGISTRATION_STATUS.ACTIVE),
+        ids(REGISTRATION_STATUS.REVOKED),
+      ]);
+      return { active, revoked };
     },
   };
 }

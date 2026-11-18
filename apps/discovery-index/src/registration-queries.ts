@@ -23,10 +23,15 @@ export function registrationStatusQuery(
     .from(registrations)
     .where(eq(registrations.nodeId, nodeId));
 }
-export function registeredQuery(database: DiscoveryDatabase, limit: number) {
+export function registeredQuery(
+  database: DiscoveryDatabase,
+  status: RegistrationStatus,
+  limit: number,
+) {
   return database
-    .select({ nodeId: registrations.nodeId, status: registrations.status })
+    .select({ nodeId: registrations.nodeId })
     .from(registrations)
+    .where(eq(registrations.status, status))
     .orderBy(asc(registrations.nodeId))
     .limit(limit);
 }

@@ -106,8 +106,9 @@ The index checks the request in this order:
 1. Per-IP and publish rate limits, then content type, size and strict shape. A
    malformed request is `400 INVALID_REGISTRATION`.
 2. The invite code. An unknown, expired or spent code is `403 INVITE_INVALID`,
-   before the chain is read. Without a usable code, nothing reveals whether a
-   NodeId is registered.
+   before the chain is read. This route never says whether a NodeId is
+   registered; `GET /v1/network` lists the active ones publicly
+   ([Network](#network)).
 3. A retry with the code that already admitted this NodeId answers
    `200 {"ok":true,"status":"active"}`, or `403 NODE_REVOKED` once revoked,
    without reading the chain.
@@ -118,8 +119,8 @@ The index checks the request in this order:
 6. Success spends the code: `201 {"ok":true,"status":"active"}`.
 
 Steps 3 to 5 do not spend the code. A holder of a usable code can therefore
-learn the status of NodeIds bound on chain until the code is spent or expires,
-at one RPC read per request, limited per IP.
+learn whether a NodeId bound on chain is revoked until the code is spent or
+expires, at one RPC read per request, limited per IP.
 
 What the index stores (migration `0003_registrations.sql`):
 
@@ -332,24 +333,36 @@ is `400 INVALID_QUERY`):
 ```
 
 - **Who is listed.** Every active registration, and every NodeId the index
-  accepted a presence from within the last 30 days (allowlisted sellers too).
-  Registered NodeIds are already public on chain, where the 8004 registry binds
-  each one to its owner, so they are listed before they publish. Revoked NodeIds
-  are never listed. The allowlist itself is not exposed: an allowlisted NodeId
-  appears only once it publishes.
+  accepted a presence from within the last 30 days (allowlisted or, in open
+  mode, any publisher). Registered NodeIds are already public on chain, where
+  the 8004 registry binds each one to its owner, so they are listed before they
+  publish. A revoked NodeId is listed only while it is online, exactly as
+  `/v1/sellers` lists it. The allowlist itself is not exposed: an allowlisted
+  NodeId appears only once it publishes. Unpublishing does not remove a seller
+  from this list: a registered one stays listed, and any other until 30 days
+  after its last presence.
 - **`state`.** `online`: a live presence references its live, non-withdrawn
   catalog, exactly as `/v1/sellers` would list it. `unpublished`: never seen, or
-  its stored catalog is withdrawn (`unpublish`). `offline`: seen before, with no
-  live presence now.
+  its stored catalog is withdrawn (`unpublish`). The index keeps a withdrawn
+  catalog only until it expires (at most one catalog lifetime); after that a
+  seller seen before shows as `offline`. `offline`: seen before, with no live
+  presence now.
 - **Fields.** `firstSeenAt` and `lastSeenAt` are the [uptime](#uptime) sightings
   (`lastSeenAt` is `null` when none falls within the last 30 days). `models`
   lists the catalog's model ids while `online`, and is empty otherwise. No
   owner, contact, country or IP is returned.
 - **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
-  NodeId. `counts` always cover every listed seller; the `nodes` list stops
-  before the answer would exceed 1 MiB, and `truncated` says so.
-- Reads at most `maxNodes` rows from each source (registrations, sightings,
-  stored catalogs) and 20,000 model rows.
+  NodeId. `counts` cover every listed seller. The `nodes` list stops before the
+  answer would exceed 1 MiB.
+- **Bounds.** Each source (active and revoked registrations, sightings, stored
+  catalogs) is read up to `maxNodes` rows by NodeId, and online models up to
+  20,000 rows. `truncated` is `true` when the list stopped at the size limit or
+  a source filled its cap, so sellers, counts or models may be incomplete.
+- **Cost.** One cache miss reads each source once. A NodeId's last sighting is
+  its newest hourly uptime row, one primary-key lookup per tracked NodeId.
+- In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
+  publishing from new NodeIds, as with uptime; the caps bound them, but the
+  public counts are not Sybil resistant.
 
 ## Storage
 
@@ -385,6 +398,7 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 | `CASE`                   | No conditional builder; quota resets and uptime admission use it atomically.                                                    |
 | `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
 | Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
+| Scalar subquery          | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                 |
 
 Migrations, applied in order:
 

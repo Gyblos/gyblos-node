@@ -7,10 +7,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  DISCOVERY_INDEX_LIMITS,
+  NETWORK,
   PUBLISH_MODES,
   REGISTRATION_STATUS,
   UPTIME,
 } from '@gyblos/discovery-index/constants';
+import { networkPage } from '@gyblos/discovery-index/network';
+import type { RegistrationStore } from '@gyblos/discovery-index/registration-store';
+import {
+  createMemoryStorage,
+  type DiscoveryStorage,
+} from '@gyblos/discovery-index/storage';
 
 import {
   deny,
@@ -171,7 +179,7 @@ for (const kind of STORE_KINDS) {
     assert.deepEqual(onlineIds, [...onlineIds].sort());
   });
 
-  void test(`network (${kind}): revoked and long-gone unregistered sellers are left out`, async (context) => {
+  void test(`network (${kind}): revoked sellers are listed only while online; long-gone unregistered ones are left out`, async (context) => {
     const index = await setup(kind);
     if (!index) return context.skip('node:sqlite unavailable');
     const { clock } = index;
@@ -187,6 +195,14 @@ for (const kind of STORE_KINDS) {
     await index.online(oldListed);
     const firstSeen = clock.now;
     index.setStatus(revoked.nodeId, REGISTRATION_STATUS.REVOKED);
+    // Open publishing still admits it: while online it is listed, exactly as /v1/sellers lists it.
+    clock.now += UPTIME.slotMs;
+    await index.online(revoked);
+    const listed = await index.read();
+    assert.equal(
+      listed.nodes.find((node) => node.nodeId === revoked.nodeId)?.state,
+      'online',
+    );
     clock.now += 31 * UPTIME.dayMs;
     const body = await index.read();
     assert.deepEqual(body.counts, {
@@ -243,4 +259,36 @@ void test('network: CORS-readable and cached, strict query, read limit and no re
   const limited = await setup('memory', { limiter: deny });
   assert.ok(limited);
   await expectError(await limited.network(), 429, 'RATE_LIMITED');
+});
+
+void test('network: a source that fills its cap marks the answer truncated', async () => {
+  const empty = createMemoryStorage();
+  const sighting = (index: number) => ({
+    nodeId: index.toString(16).padStart(64, '0'),
+    firstAt: 1,
+    lastAt: 2,
+  });
+  const page = async (
+    storage: Partial<DiscoveryStorage>,
+    registrations?: RegistrationStore,
+  ) =>
+    JSON.parse(
+      await networkPage(
+        { ...empty, ...storage },
+        registrations,
+        10,
+        DISCOVERY_INDEX_LIMITS.maxResponseBytes,
+      ),
+    ) as { truncated: boolean; counts: { total: number } };
+  assert.equal((await page({})).truncated, false);
+  const full = await page({
+    sightings: async () =>
+      Array.from({ length: NETWORK.maxNodes }, (_, index) => sighting(index)),
+  });
+  assert.equal(full.truncated, true);
+  assert.equal(full.counts.total, NETWORK.maxNodes);
+  const cut = await page({
+    catalogStatus: async () => ({ rows: [], complete: false }),
+  });
+  assert.equal(cut.truncated, true);
 });
