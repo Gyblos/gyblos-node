@@ -13,15 +13,14 @@ export interface ArtifactOptions {
 function finalStatus(result: ReviewRunResult): ReviewStatus {
   if (result.status === REVIEW_VALUES.NOT_RUN) return REVIEW_VALUES.NOT_RUN;
   if (result.status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
-  const status = overallReviewStatus(result.tasks);
+  const status = overallReviewStatus(result.tasks, result.verifications);
   if (status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
   if (
     result.candidates.length !== result.verifications.length ||
     result.candidates.some(
       (candidate, index) =>
         result.verifications[index]?.fingerprint !== candidate.fingerprint,
-    ) ||
-    result.verifications.some((item) => item.decision === REVIEW_VALUES.ERROR)
+    )
   )
     return REVIEW_VALUES.ERROR;
   if (

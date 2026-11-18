@@ -360,10 +360,6 @@ export async function runReview(
   result.candidates = candidates.map((item) => item.candidate);
   result.tasks = [...executions.map((item) => item.result), ...deferred];
   result.verifications = verifications;
-  result.status = verifications.some(
-    (item) => item.decision === REVIEW_VALUES.ERROR,
-  )
-    ? REVIEW_VALUES.ERROR
-    : overallReviewStatus(result.tasks);
+  result.status = overallReviewStatus(result.tasks, verifications);
   return result;
 }
