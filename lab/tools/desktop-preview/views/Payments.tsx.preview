@@ -3,10 +3,9 @@ import { Gauge, PaypalLogo, Receipt, Wallet } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { ActivitySessionDetails } from './ActivitySessionDetails';
 
-
 import {
   managePaypal,
-  PAYMENT_METHOD,
+  paypalPaymentSummary,
   type PaymentMethod,
 } from '../paypal-model';
 import { usageChange } from '../../../../lab/tools/desktop-preview/usage';
@@ -47,18 +46,27 @@ export function Payments(props: Props) {
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const entry = props.activity.state?.sessions.find(item => item.id === receiptId);
   const openPaypal = () => managePaypal(props.onPaymentMethod, () => props.onManagePaypal(true));
+  const { status, statusFresh, busy } = props.session.state;
+  const paypal = paypalPaymentSummary(status, statusFresh, busy);
   return (
     <PagePanel>
-      <WalletOverview buyer={props.x402} onAddFunds={props.onAddFunds} onDetails={() => setWalletOpen(true)} />
+      <WalletOverview buyer={props.x402} onBudget={() => setBudgetOpen(true)} onAddFunds={props.onAddFunds} onDetails={() => setWalletOpen(true)} />
+      <section className="ui-paypal-summary" aria-label="PayPal">
+        <span className="ui-icon-tile" aria-hidden="true"><PaypalLogo size={22} /></span>
+        <div className="ui-paypal-summary-copy">
+          <h2>PayPal</h2>
+          <span className="ui-help-text">{statusFresh || busy ? paypal.label : 'Approve a spending limit for chat and tools.'}</span>
+        </div>
+        <Button disabled={busy} onClick={openPaypal}>
+          {statusFresh ? 'Manage session' : 'Select PayPal'}
+        </Button>
+      </section>
       <SpendingHistory
         activity={props.activity} buyer={props.x402} chat={props.chat}
-        onActivity={setReceiptId} actions={<FormActions align="start">
-          {props.x402 && <Button onClick={() => setBudgetOpen(true)}>USDC budget</Button>}
-          <Button onClick={openPaypal}><PaypalLogo size={15} />PayPal session</Button>
-        </FormActions>}
+        onActivity={setReceiptId}
         onChat={id => { props.chat.openChat(id); props.onChat(); }}
       />
-      {budgetOpen && props.x402 && <Modal title="USDC budget" close={() => setBudgetOpen(false)}>
+      {budgetOpen && props.x402 && <Modal title="Chat budget · USDC" close={() => setBudgetOpen(false)}>
         <X402Payments buyer={props.x402} />
       </Modal>}
       {entry && <ActivitySessionDetails entry={entry}
@@ -108,10 +116,12 @@ export function Payments(props: Props) {
 }
 function WalletOverview({
   buyer,
+  onBudget,
   onAddFunds,
   onDetails,
 }: {
   buyer?: X402View;
+  onBudget(): void;
   onAddFunds(): void;
   onDetails(): void;
 }) {
@@ -153,7 +163,8 @@ function WalletOverview({
         >
           Add funds
         </Button>
-        <Button onClick={() => onDetails()}>Wallet details</Button>
+        <Button onClick={onDetails}>Wallet details</Button>
+        {buyer && <Button onClick={onBudget}><Gauge size={16} />Manage chat budget</Button>}
       </FormActions>
     </section>
   );

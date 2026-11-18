@@ -135,3 +135,21 @@ void test('unobserved sources have neither a measured amount nor a measured chan
   assert.deepEqual(measuredMetric(false, 0, 0), { value: null, change: null });
   assert.deepEqual(measuredMetric(true, 0, 0), { value: 0, change: 0 });
 });
+
+void test('wallet and PayPal actions belong to their payment method in the preview', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const render = async (name: string) => {
+    const path = 'apps/desktop/src/ui/' + name + '.tsx';
+    return (
+      transformBrand(await readFile(path, 'utf8'), path, 'apps/desktop') ?? ''
+    );
+  };
+  const payments = await render('Payments');
+  assert.match(
+    payments,
+    /aria-label="USDC wallet"[\s\S]*?onClick=\{onBudget\}/,
+  );
+  assert.match(payments, /aria-label="PayPal"[\s\S]*?onClick=\{openPaypal\}/);
+  assert.doesNotMatch(await render('SpendingHistory'), /action=\{actions\}/);
+});

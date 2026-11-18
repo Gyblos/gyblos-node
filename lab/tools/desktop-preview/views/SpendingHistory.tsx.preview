@@ -1,6 +1,6 @@
 // Show source-level usage while preserving the original provider payment reference.
 import { ArrowUpRight, CurrencyCircleDollar, PaypalLogo } from '@phosphor-icons/react';
-import { useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { x402Amount, x402Asset, x402Explorer, type X402Record } from '../x402-model';
 import type { ActivityEntry } from '../activity-model';
 import type { ChatController } from './chat-controller';
@@ -21,9 +21,9 @@ type Row = {
   id: string; at: number; source: Source | null;
 } & ({ method: 'USDC'; record: X402Record } | { method: 'PayPal'; entry: ActivityEntry; cents: number; authorization: boolean });
 
-export function SpendingHistory({ activity, buyer, chat, actions, onActivity, onChat }: {
+export function SpendingHistory({ activity, buyer, chat, onActivity, onChat }: {
   activity: ActivityView; buyer?: X402View; chat: ChatController;
-  actions: ReactNode; onActivity(id: string): void; onChat(id: string): void;
+  onActivity(id: string): void; onChat(id: string): void;
 }) {
   const { sessions } = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
   const conversations = new Map(sessions.flatMap(session => session.messages.map(message => [message.id, session] as const)));
@@ -54,7 +54,7 @@ export function SpendingHistory({ activity, buyer, chat, actions, onActivity, on
     && (source === 'All sources' || row.source === source)).sort((a, b) => b.at - a.at);
   const current = Math.min(page, Math.max(1, Math.ceil(visible.length / size)));
   const references = activity.references.available ? activity.references.references : [];
-  return <Section title="Payment history" action={actions}>
+  return <Section title="Payment history">
     <div className="ui-toolbar preview-history-filters">
       <ChoiceMenu label="Usage source" value={source} options={['All sources', 'API', 'Chat']} onChange={v => {setSource(v); setPage(1);}} />
       <ChoiceMenu label="Payment method" value={method} options={Object.values(HISTORY_METHOD)} onChange={v => {setMethod(v); setPage(1);}} />
