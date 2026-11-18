@@ -90,7 +90,9 @@ function caller(url: string, fetcher: typeof fetch) {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ jsonrpc: JSON_RPC, id, method, params }),
-      redirect: 'error',
+      // Workers refuses `redirect: 'error'` (a TypeError); `manual` turns a redirect into a 3xx answer,
+      // refused below as not ok, so the RPC's answer is never taken from another URL.
+      redirect: 'manual',
       signal: AbortSignal.timeout(CHAIN_INDEX.requestTimeoutMs),
     });
     if (!response.ok) {
