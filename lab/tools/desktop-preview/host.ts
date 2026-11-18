@@ -83,34 +83,81 @@ export function createPreviewHost(
       revoked: false,
     },
   ];
+  const sampleKey = keys[0]!;
+  keys =
+    query.get('keys') === 'empty'
+      ? []
+      : [
+          sampleKey,
+          {
+            ...sampleKey,
+            id: '00000000-0000-4000-8000-000000000003',
+            name: 'Research',
+            limitAtomic: '50000',
+            spentAtomic: '0',
+            settledAtomic: '0',
+          },
+          {
+            ...sampleKey,
+            id: '00000000-0000-4000-8000-000000000004',
+            name: 'Old laptop',
+            limitAtomic: '20000',
+            spentAtomic: '4000',
+            settledAtomic: '4000',
+            revoked: true,
+          },
+        ];
   let setup: UsdcApiState['setup'];
   const clone = <T>(value: T) => structuredClone(value);
   const answer =
     'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage in Activity and payment details in Payments.';
 
   const conversations = new ChatController('preview-first-chat');
-  for (const title of [
+  const records: Array<{
+    id: string;
+    sessionId: string;
+    at: number;
+    chargeAtomic: string;
+    transaction: null;
+    free: boolean;
+    policy: typeof policy;
+  }> = [];
+  function recordFreeReply(id: string, at: number) {
+    records.push({
+      id,
+      sessionId,
+      at,
+      chargeAtomic: '0',
+      transaction: null,
+      free: true,
+      policy,
+    });
+  }
+  const tenChats = query.get('review') === 'ten-chats';
+  const titles = [
     'Product launch plan',
     'Explain vector search',
     'Research assistant',
-  ]) {
-    conversations.setDraft(title);
-    conversations.newChat(crypto.randomUUID());
-  }
-  const conversationId = conversations.getSnapshot().activeId;
-  conversations.startPaypal(
-    'How can I use Gyblos in my coding tools?',
-    chatModel,
-    'preview-reply',
-    sessionId,
-    PAYMENT_METHOD.USDC,
-  );
-  conversations.completePaypal(
-    conversationId,
-    'preview-reply',
-    answer,
-    chatModel,
-    {
+  ];
+  if (tenChats)
+    titles.push(
+      'Review API changes',
+      'Plan the onboarding flow',
+      'Compare model outputs',
+      'Summarize meeting notes',
+      'Explore search ranking',
+      'Outline a release checklist',
+    );
+  function exampleChat(title: string, receiptId: string) {
+    const conversationId = conversations.getSnapshot().activeId;
+    conversations.startPaypal(
+      title,
+      chatModel,
+      receiptId,
+      sessionId,
+      PAYMENT_METHOD.USDC,
+    );
+    conversations.completePaypal(conversationId, receiptId, answer, chatModel, {
       inputTokens: 86,
       outputTokens: 144,
       firstTokenMs: null,
@@ -121,8 +168,20 @@ export function createPreviewHost(
         unit: RESPONSE_COST_UNIT.USDC,
         kind: RESPONSE_COST_KIND.SETTLED,
       },
-    },
-  );
+    });
+    recordFreeReply(
+      receiptId,
+      tenChats
+        ? now - (9 - records.length) * PREVIEW.dayMs - PREVIEW.minuteMs
+        : now - PREVIEW.minuteMs,
+    );
+  }
+  for (const title of titles) {
+    if (tenChats) exampleChat(title, crypto.randomUUID());
+    else conversations.setDraft(title);
+    conversations.newChat(crypto.randomUUID());
+  }
+  exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
   let archive = projectChatArchive(conversations.getSnapshot());
 
   const desktopWindow = { platform: windowPlatform(PREVIEW.platform) };
@@ -163,9 +222,29 @@ export function createPreviewHost(
     manage: async () => WALLET_SETTINGS_RESULT.CANCELLED,
     backup: async () => BACKUP_RESULT.CANCELLED,
   };
+  const requestedNode = query.get('node-state');
+  let nodeState =
+    Object.values(LOCAL_NODE_STATE).find((value) => value === requestedNode) ??
+    LOCAL_NODE_STATE.READY;
+  let readyAt: number | null = null;
   const desktopNode = {
-    summary: async () => LOCAL_NODE_STATE.READY,
-    retry: async () => LOCAL_NODE_STATE.READY,
+    summary: async () => {
+      if (readyAt !== null && Date.now() >= readyAt) {
+        nodeState = LOCAL_NODE_STATE.READY;
+        readyAt = null;
+      }
+      return nodeState;
+    },
+    retry: async () => {
+      if (
+        nodeState === LOCAL_NODE_STATE.ERROR ||
+        nodeState === LOCAL_NODE_STATE.STOPPED
+      ) {
+        nodeState = LOCAL_NODE_STATE.STARTING;
+        readyAt = Date.now() + 3000;
+      }
+      return nodeState;
+    },
   };
   const catalog = (search = '') => ({
     state: CATALOG_STATE.READY,
@@ -183,23 +262,21 @@ export function createPreviewHost(
       },
     ],
   });
+  let catalogQuery = '';
+  const catalogResult = () => {
+    const result = catalog(catalogQuery);
+    return !catalogQuery || catalogQuery === model
+      ? result
+      : { ...result, state: CATALOG_STATE.EMPTY, models: [] };
+  };
   const desktopCatalog = {
-    summary: async () => catalog(),
-    lookup: async (value: unknown) =>
-      catalog(typeof value === 'string' ? value : ''),
+    summary: async () => catalogResult(),
+    lookup: async (value: unknown) => {
+      catalogQuery = typeof value === 'string' ? value.trim() : '';
+      return catalogResult();
+    },
   };
 
-  const records = [
-    {
-      id: 'preview-free-reply',
-      sessionId,
-      at: now - PREVIEW.minuteMs,
-      chargeAtomic: '0',
-      transaction: null,
-      free: true,
-      policy,
-    },
-  ];
   function buyerState() {
     return parseX402Result({
       summary: {
@@ -240,6 +317,11 @@ export function createPreviewHost(
         await new Promise((resolve) =>
           window.setTimeout(resolve, PREVIEW.replyDelayMs),
         );
+        if (
+          typeof request.id === 'string' &&
+          !records.some((record) => record.id === request.id)
+        )
+          recordFreeReply(request.id, Date.now());
         return {
           ...buyerState(),
           reply: {
@@ -339,6 +421,7 @@ export function createPreviewHost(
     desktopNode,
     desktopCatalog,
     desktopX402,
+    previewUsdcBaseline: buyerState().summary,
     desktopUsdcApiKeys,
     ...createPaypalPreview(ready, answer, now, agentExamples.paypal),
   };

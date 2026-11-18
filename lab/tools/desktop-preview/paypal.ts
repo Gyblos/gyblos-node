@@ -7,7 +7,11 @@ import {
   PAYPAL_AGENT_USAGE_STATE,
   paypalAgentExample,
 } from '@gyblos/desktop/paypal-agent-model';
-import { parsePaypalResult, PAYPAL_ACTION } from '@gyblos/desktop/paypal-model';
+import {
+  parsePaypalResult,
+  PAYPAL_ACTION,
+  paypalPaymentSummary,
+} from '@gyblos/desktop/paypal-model';
 import {
   AGENT_TOOLS,
   type AgentTool,
@@ -16,6 +20,7 @@ import { PAYPAL_SESSION_PHASE } from '@gyblos/node/constants';
 
 import { PREVIEW } from './constants';
 import { requestObject as read } from './input';
+import type { UsageSource } from './usage';
 
 export function createPaypalPreview(
   ready: boolean,
@@ -55,6 +60,7 @@ export function createPaypalPreview(
       if (request.action === PAYPAL_ACTION.CREATE) {
         paypalPhase = PAYPAL_SESSION_PHASE.CREATED;
         paypalUsed = 0;
+        currentUsage = [];
         if (typeof request.limitCents === 'number')
           paypalLimit = request.limitCents;
       }
@@ -74,6 +80,7 @@ export function createPaypalPreview(
       }
       if (request.action === PAYPAL_ACTION.ACKNOWLEDGE && pending) {
         paypalUsed += PREVIEW.replyCents;
+        currentUsage.push(...exampleRequests(paypalId, Date.now(), 'Chat', 1));
         pending = null;
       }
       return paypalState();
@@ -137,6 +144,8 @@ export function createPaypalPreview(
   };
   const history = Array.from({ length: 24 }, (_, index) => {
     const amount = index % PREVIEW.voidEvery === 0 ? 0 : PREVIEW.capturedCents;
+    const apiOnly = index % 3 === 1;
+    const agentCents = amount ? (apiOnly ? amount : PREVIEW.replyCents) : 0;
     return {
       id: (index + PREVIEW.referenceOffset)
         .toString(PREVIEW.referenceRadix)
@@ -146,10 +155,10 @@ export function createPaypalPreview(
         : PAYPAL_SESSION_PHASE.VOIDED,
       limitCents: 500,
       recordedCents: amount,
-      chatCount: amount ? 2 : 0,
-      agentCount: amount ? 1 : 0,
-      chatCents: amount ? PREVIEW.recordedCents : 0,
-      agentCents: amount ? PREVIEW.replyCents : 0,
+      chatCount: (amount - agentCents) / PREVIEW.replyCents,
+      agentCount: agentCents / PREVIEW.replyCents,
+      chatCents: amount - agentCents,
+      agentCents,
       unconfirmedCents: 0,
       capturedCents: amount || null,
       needsReview: false,
@@ -157,6 +166,44 @@ export function createPaypalPreview(
       updatedAt: now - (index + 1) * PREVIEW.dayMs + PREVIEW.minuteMs,
     };
   });
+  // Request-level example measurements are independent of prices and authorizations.
+  function exampleRequests(
+    sessionId: string,
+    at: number,
+    source: UsageSource,
+    count: number,
+  ) {
+    return Array.from({ length: count }, (_, index) => ({
+      sessionId,
+      at,
+      source,
+      tokens: source === 'Chat' ? 182 + index * 11 : 368 + index * 23,
+    }));
+  }
+  const pastUsage = history.flatMap((session) => [
+    ...exampleRequests(
+      session.id,
+      session.updatedAt,
+      'Chat',
+      session.chatCount,
+    ),
+    ...exampleRequests(
+      session.id,
+      session.updatedAt,
+      'API',
+      session.agentCount,
+    ),
+  ]);
+  let currentUsage = [
+    ...exampleRequests(
+      paypalId,
+      now,
+      'Chat',
+      Math.max(0, paypalUsed / PREVIEW.replyCents - 1),
+    ),
+    ...exampleRequests(paypalId, now, 'API', paypalUsed ? 1 : 0),
+  ];
+  const previewUsage = { requests: () => [...currentUsage, ...pastUsage] };
   const desktopActivity = {
     summary: async () => ({
       available: true,
@@ -167,10 +214,16 @@ export function createPaypalPreview(
           phase: paypalPhase,
           limitCents: paypalLimit,
           recordedCents: paypalUsed,
-          chatCount: Math.max(0, paypalUsed / PREVIEW.replyCents - 1),
-          agentCount: paypalUsed ? 1 : 0,
-          chatCents: Math.max(0, paypalUsed - PREVIEW.replyCents),
-          agentCents: Math.min(PREVIEW.replyCents, paypalUsed),
+          chatCount: currentUsage.filter((request) => request.source === 'Chat')
+            .length,
+          agentCount: currentUsage.filter((request) => request.source === 'API')
+            .length,
+          chatCents:
+            currentUsage.filter((request) => request.source === 'Chat').length *
+            PREVIEW.replyCents,
+          agentCents:
+            currentUsage.filter((request) => request.source === 'API').length *
+            PREVIEW.replyCents,
           unconfirmedCents: 0,
           capturedCents:
             paypalPhase === PAYPAL_SESSION_PHASE.COMPLETED ? paypalUsed : null,
@@ -200,5 +253,15 @@ export function createPaypalPreview(
       return true;
     },
   };
-  return { desktopPaypal, desktopPaypalAgent, desktopActivity };
+  return {
+    desktopPaypal,
+    desktopPaypalAgent,
+    desktopActivity,
+    previewUsage,
+    previewPaypalBaseline: paypalPaymentSummary(
+      paypalState().status,
+      true,
+      false,
+    ),
+  };
 }
