@@ -16,7 +16,10 @@ import {
   voucherOf,
 } from '@gyblos/metrics-collector/chain/decode';
 import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
-import { chainRpcUrl } from '@gyblos/metrics-collector/chain/rpc';
+import {
+  chainRpcUrl,
+  createChainRpc,
+} from '@gyblos/metrics-collector/chain/rpc';
 import { CHAIN_INDEX } from '@gyblos/metrics-collector/constants';
 
 import {
@@ -180,4 +183,23 @@ void test('only an https (or loopback http) RPC URL without credentials is used'
     42,
   ])
     assert.equal(chainRpcUrl(bad), undefined, String(bad));
+});
+
+void test('the RPC client never follows a redirect, in a form Workers accepts', async () => {
+  const seen: (RequestRedirect | undefined)[] = [];
+  const rpc = createChainRpc('https://rpc.example/', (_input, init) => {
+    seen.push(init?.redirect);
+    return Promise.resolve(
+      new Response(null, {
+        status: 301,
+        headers: { location: 'https://elsewhere.example/' },
+      }),
+    );
+  });
+  // Workers throws a TypeError on `redirect: 'error'`; `manual` keeps the 3xx, refused as not ok.
+  await assert.rejects(rpc.signatures('address', {}), {
+    name: 'ChainRpcError',
+    reason: 'HTTP 301',
+  });
+  assert.deepEqual(seen, ['manual']);
 });
