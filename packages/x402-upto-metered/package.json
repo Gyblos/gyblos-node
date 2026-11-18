@@ -18,6 +18,6 @@
   },
   "devDependencies": {
     "tsx": "4.21.0",
-    "@solana-program/token": "0.9.0"
+    "@solana-program/token": "0.18.0"
   }
 }
