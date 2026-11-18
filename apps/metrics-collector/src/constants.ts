@@ -300,6 +300,13 @@ export const CHAIN_INDEX = {
   maxTransactionVersion: 1,
   msPerSecond: 1000,
 } as const;
+// Keyed providers whose key serves every Solana cluster under a per-cluster host: a configured
+// mainnet host is read on its devnet host with the same key, since the index reads devnet. The
+// genesis check (chain/rpc.ts) still refuses any endpoint that does not answer for devnet.
+export const CHAIN_DEVNET_HOSTS: Readonly<Record<string, string>> = {
+  'mainnet.helius-rpc.com': 'devnet.helius-rpc.com',
+  'solana-mainnet.g.alchemy.com': 'solana-devnet.g.alchemy.com',
+};
 // Optional keyed Solana RPC URLs (secrets), tried in this order only when the public RPC (and then the
 // previous one) fails the run: for example Helius, then Alchemy.
 export const COLLECTOR_SOLANA_RPC_BINDINGS = [

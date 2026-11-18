@@ -7,7 +7,7 @@
 // read. A refusal of the caller (a rate limit, or a 403 such as the public devnet RPC answers Cloudflare
 // Workers) throws an error marked as such, which lets the run move to its fallback endpoint; so does an
 // endpoint whose genesis hash is not the indexed network's.
-import { CHAIN_INDEX, LOOPBACK_HOSTS } from '../constants';
+import { CHAIN_DEVNET_HOSTS, CHAIN_INDEX, LOOPBACK_HOSTS } from '../constants';
 import { ChainShapeError, list, nullable, num, record, text } from './json';
 
 const FINALIZED = 'finalized';
@@ -28,7 +28,8 @@ export class ChainRpcError extends Error {
   }
 }
 
-// The configured RPC URL, or undefined when it is not one the index may call.
+// The configured RPC URL, or undefined when it is not one the index may call. A known provider's
+// mainnet host is moved to its devnet host (CHAIN_DEVNET_HOSTS), keeping path and key.
 export function chainRpcUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   let url: URL;
@@ -37,6 +38,10 @@ export function chainRpcUrl(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
+  const devnetHost = Object.hasOwn(CHAIN_DEVNET_HOSTS, url.hostname)
+    ? CHAIN_DEVNET_HOSTS[url.hostname]
+    : undefined;
+  if (devnetHost) url.hostname = devnetHost;
   const allowed =
     url.protocol === HTTPS ||
     (url.protocol === HTTP && LOOPBACK_HOSTS.has(url.hostname));
