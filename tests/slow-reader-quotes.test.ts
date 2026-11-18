@@ -29,6 +29,7 @@ import {
   type Engine,
   type EngineInput,
 } from '@gyblos/protocol/engine';
+import type { ControlService } from '@gyblos/transport-iroh/control-server';
 
 import { selectionFixture } from './support/buyer-selection';
 import { controlFixture } from './support/control-fixture';
@@ -150,7 +151,7 @@ void test('the seller learns its reading speed from its engine, ignoring prompts
   assert.ok(speed > 100 && speed < 200, String(speed));
 });
 
-void test('a request that timed out before any token bounds the reading speed from above', async () => {
+void test('a request that timed out before any visible token caps the reading speed for a while', async () => {
   let clock = 0;
   let emit = false;
   const reading = readingSpeedEngine(
@@ -161,18 +162,60 @@ void test('a request that timed out before any token bounds the reading speed fr
     }),
     () => clock,
   );
-  // 7000 tokens not read in 100 s: under 70 tokens per second.
-  await assert.rejects(
-    reading.engine.generate({ prompt: 'x', maxTokens: 1, inputTokens: 7_000 }),
-    { code: ENGINE_ERROR_CODES.TIMEOUT },
-  );
-  assert.equal(reading.tokensPerSecond(), 70);
+  const timeout = (inputTokens: number, tools?: EngineInput['tools']) =>
+    assert.rejects(
+      reading.engine.generate({
+        prompt: 'x',
+        maxTokens: 1,
+        inputTokens,
+        ...(tools ? { tools } : {}),
+      }),
+      { code: ENGINE_ERROR_CODES.TIMEOUT },
+    );
+  // An engine that has never shown a visible fragment may be answering in silence: nothing is learned.
+  await timeout(7_000);
+  assert.equal(reading.tokensPerSecond(), undefined);
   // A timeout after the first token was answering, not reading: it says nothing about reading.
   emit = true;
-  await assert.rejects(
-    reading.engine.generate({ prompt: 'x', maxTokens: 1, inputTokens: 700 }),
-  );
+  await timeout(700);
+  assert.equal(reading.tokensPerSecond(), undefined);
+  // Now silence means reading: 7000 tokens not read in 100 s is under 70 tokens per second.
+  emit = false;
+  await timeout(7_000);
   assert.equal(reading.tokensPerSecond(), 70);
+  // A tool call is generated without visible text: a silent timeout with tools says nothing either.
+  await timeout(1_000, [{ name: 'shell', description: 'd', parameters: '{}' }]);
+  assert.equal(reading.tokensPerSecond(), 70);
+  // The cap does not last: a seller that never gets a large request to measure is not stuck refusing.
+  clock += PROMPT_READING.timeoutCapMs;
+  assert.equal(reading.tokensPerSecond(), undefined);
+});
+
+void test('a measurement replaces a timeout cap', async () => {
+  let clock = 0;
+  let mode: 'answered' | 'silent' | 'ok' = 'answered';
+  const reading = readingSpeedEngine(
+    fakeEngine(async (input) => {
+      clock += 100_000;
+      if (mode !== 'silent') await input.onFragment?.();
+      if (mode !== 'ok') throw new EngineError(ENGINE_ERROR_CODES.TIMEOUT);
+      return {
+        text: 'ok',
+        finishReason: ENGINE_DONE_REASONS.STOP,
+        usage: usage(1_000, 5e9),
+      };
+    }),
+    () => clock,
+  );
+  const ask = () =>
+    reading.engine.generate({ prompt: 'x', maxTokens: 1, inputTokens: 7_000 });
+  await assert.rejects(ask());
+  mode = 'silent';
+  await assert.rejects(ask());
+  assert.equal(reading.tokensPerSecond(), 70);
+  mode = 'ok';
+  await ask();
+  assert.equal(reading.tokensPerSecond(), 200);
 });
 
 void test('the buyer sends the input size, and a too-slow refusal moves on without cooling the seller', async (t) => {
@@ -241,4 +284,69 @@ void test('a free request asks selection with its estimated input size', async (
     }),
   );
   assert.equal(asked[0]?.inputTokens, estimatedInputTokens(input));
+});
+
+// A seller from before this change parses quotes with the exact keys it knew: an unknown key is invalid.
+function olderSeller(service: ControlService): ControlService {
+  return {
+    ...service,
+    respond(value, peer, signal) {
+      const query = value as { params?: Record<string, unknown> };
+      if (!query.params || !Object.hasOwn(query.params, 'inputTokens'))
+        return service.respond(value, peer, signal);
+      const { inputTokens, ...params } = query.params;
+      return service.respond(
+        { ...query, params: { ...params, unknownKey: inputTokens } },
+        peer,
+        signal,
+      );
+    },
+  };
+}
+
+void test('a seller from before the input size is still chosen by a new buyer and not cooled down', async (t) => {
+  const run = await selectionFixture(true, undefined, olderSeller);
+  t.after(() => run.wire.close());
+  const failures: SellerFailure[] = [];
+  const stats = new Map<string, LocalSellerStats>();
+  const result = await selectVerifiedBuyerQuote(
+    { ...run.config, request: { ...run.config.request, inputTokens: 7_000 } },
+    {
+      ...run.dependencies,
+      stats,
+      onSellerFailure: (failure) => failures.push(failure),
+    },
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(failures, []);
+  const nodeId = run.config.sellers[0]!.nodeId;
+  assert.equal(stats.get(nodeId)?.cooldownUntil ?? null, null);
+  assert.equal(stats.get(nodeId)?.failures ?? 0, 0);
+});
+
+void test('the seller that served the previous turn is not asked the size its prompt cache mostly covers', async (t) => {
+  const run = await selectionFixture(true, (context) => ({
+    ...context,
+    models: context.models.map((model) => ({
+      ...model,
+      readingTokensPerSecond: () => 20,
+    })),
+  }));
+  t.after(() => run.wire.close());
+  const sent: unknown[] = [];
+  const original = run.client.requestOffer.bind(run.client);
+  run.client.requestOffer = async (...args) => {
+    sent.push(args[0]);
+    return original(...args);
+  };
+  const result = await selectVerifiedBuyerQuote(
+    {
+      ...run.config,
+      previousSeller: run.config.sellers[0]!.nodeId,
+      request: { ...run.config.request, inputTokens: 7_000 },
+    },
+    run.dependencies,
+  );
+  assert.equal(result.ok, true);
+  assert.equal(Object.hasOwn(sent[0] as object, 'inputTokens'), false);
 });

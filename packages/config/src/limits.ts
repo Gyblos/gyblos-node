@@ -29,6 +29,9 @@ export const PROMPT_READING = {
   minSampleTokens: 256,
   // How much each new measurement moves the seller's estimate of its reading speed.
   sampleWeight: 0.3,
+  // A request that ran out of time before its first token caps the estimate this long, or until a
+  // measurement replaces it.
+  timeoutCapMs: 10 * 60_000,
 } as const;
 export function generationDeadlineMs(
   baseMs: number,

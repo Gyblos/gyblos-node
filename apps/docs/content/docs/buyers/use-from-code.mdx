@@ -225,8 +225,8 @@ without sending it the prompt. If no seller is fast enough, the error says so; s
 (Codex and OpenCode can compact it) or try again later.
 
 A seller that has not measured itself yet can still time out. Then the request ends with `reason`
-`engine_timeout` and a message that the seller was too slow for a request this size. Send it again: the
-seller now knows its speed and declines requests that size, so another seller answers.
+`engine_timeout` and a message that the seller was too slow for a request this size. Send it again. Each
+seller learns its speed from the answers it gives, so this becomes rarer as sellers measure themselves.
 
 ## Options and errors [#options-and-errors]
 

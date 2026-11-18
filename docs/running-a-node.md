@@ -1128,12 +1128,18 @@ seconds.
 
 Each offer learns how fast its engine reads a prompt, in input tokens per
 second, from the engine's own report of every answer (prompts under 256 tokens
-do not count). A request that ran out of time before its first token also lowers
-the estimate. Buyers send an estimate of each request's size in the quote
-request, and an offer that would not finish reading it with 15 seconds left
-before its deadline refuses the quote with `CONTROL_TOO_SLOW_TO_READ`; the buyer
-picks another seller before any prompt is sent. The estimate lives in memory:
-after a restart the offer accepts every size until it measures again.
+do not count). A request without tools that ran out of time before its first
+visible token also caps the estimate for 10 minutes or until the next
+measurement; only once the engine has shown it reports visible text, because a
+tool call is generated without any. Buyers send an estimate of each request's
+size in the quote request, and an offer that would not finish reading it with 15
+seconds left before its deadline refuses the quote with
+`CONTROL_TOO_SLOW_TO_READ`; the buyer picks another seller before any prompt is
+sent. The seller that answered the conversation's previous turn is not sent the
+size, since its prompt cache already holds most of it. A seller from before this
+field refuses the sized quote as invalid; the buyer asks it once more without
+the size and does not count the refusal against it. The estimate lives in
+memory: after a restart the offer accepts every size until it measures again.
 
 ### Token caps
 

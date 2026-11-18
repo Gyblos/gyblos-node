@@ -4,6 +4,7 @@ import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { createSellerControlService } from '@gyblos/node/control';
+import type { ControlService } from '@gyblos/transport-iroh/control-server';
 
 import { controlFixture } from './control-fixture';
 import { controlLoopback } from './control-loopback';
@@ -15,13 +16,17 @@ export async function selectionFixture(
     context: Awaited<ReturnType<typeof controlFixture>>['context'],
   ) => Awaited<ReturnType<typeof controlFixture>>['context'] = (context) =>
     context,
+  // Changes the seller's service, e.g. to answer like an older release.
+  wrap: (service: ControlService) => ControlService = (service) => service,
 ) {
   const source = await controlFixture(free);
-  const service = createSellerControlService({
-    context: adjust(source.context),
-    ownerSigner: source.ownerSigner,
-    nodeSigner: source.nodeSigner,
-  });
+  const service = wrap(
+    createSellerControlService({
+      context: adjust(source.context),
+      ownerSigner: source.ownerSigner,
+      nodeSigner: source.nodeSigner,
+    }),
+  );
   const wire = await controlLoopback(
     service,
     source.request.params.buyerNodeId,

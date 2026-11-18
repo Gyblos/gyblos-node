@@ -87,6 +87,31 @@ function releaseInBackground(
   dependencies.snapshots?.retire(nodeId, closing);
 }
 
+// A quote request with the input size. The seller that answered this conversation's last turn likely
+// holds most of it in its prompt cache, so the full size would overstate its reading: it is not sent.
+// A seller from before quotes carried the size refuses that key as invalid. It is asked once more
+// without it and quotes as it did then; only the retry's outcome counts for or against it.
+async function requestSized(
+  client: BuyerControlClient,
+  params: Parameters<BuyerControlClient['requestOffer']>[0],
+  {
+    config,
+    nodeId,
+    signal,
+  }: { config: BuyerSelectionConfig; nodeId: string; signal: AbortSignal },
+) {
+  const inputTokens =
+    nodeId === config.previousSeller ? undefined : config.request.inputTokens;
+  if (!inputTokens) return client.requestOffer(params, signal);
+  try {
+    return await client.requestOffer({ ...params, inputTokens }, signal);
+  } catch (error) {
+    if (signal.aborted || sellerFailureCode(error) !== CONTROL_CODES.INVALID)
+      throw error;
+    return client.requestOffer(params, signal);
+  }
+}
+
 export async function raceCandidates(
   candidates: readonly SellerCandidate[],
   race: RaceState,
@@ -218,8 +243,8 @@ async function requestCandidate(
       signal,
     );
     remembered = opened.remembered;
-    const client = opened.client;
-    const quote = await client.requestOffer(
+    const quote = await requestSized(
+      opened.client,
       {
         buyer: dependencies.buyer,
         selection: request.selection,
@@ -230,9 +255,8 @@ async function requestCandidate(
         network: request.network,
         asset: request.asset,
         ...(request.tools ? { tools: true as const } : {}),
-        ...(request.inputTokens ? { inputTokens: request.inputTokens } : {}),
       },
-      querySignal,
+      { config, nodeId: candidate.nodeId, signal: querySignal },
     );
     if (querySignal.aborted)
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);

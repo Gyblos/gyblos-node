@@ -521,7 +521,10 @@ Request fields (required unless marked optional; unknown fields at every level a
     a request it would not finish reading with 15 seconds left before its
     engine deadline, with `CONTROL_TOO_SLOW_TO_READ`. A seller that has not
     measured yet quotes it. The signed offer is unchanged. Sellers before this
-    field refuse such quote requests as invalid.
+    field refuse such quote requests with `INVALID_CONTROL_REQUEST`; a buyer
+    then repeats the quote request once without `inputTokens` and counts only
+    the second answer. A buyer omits the size for the seller that answered the
+    conversation's previous turn, whose prompt cache holds most of it.
 
 Success response:
 `{version: 4, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason, toolCalls?}}`.
