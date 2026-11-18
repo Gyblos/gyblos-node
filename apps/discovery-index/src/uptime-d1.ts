@@ -1,5 +1,5 @@
 // Owns ORM persistence of public uptime; never reads request metadata or opens network connections.
-import { and, asc, eq, exists, gte, lt } from 'drizzle-orm';
+import { and, asc, eq, exists, gte, lt, max, sql } from 'drizzle-orm';
 
 import { DISCOVERY_INDEX_LIMITS } from './constants';
 import type { DiscoveryDatabase } from './d1-client';
@@ -16,6 +16,12 @@ import { hourOf, retainedHour, slotBit, type UptimeStorage } from './uptime';
 
 function integer(value: unknown) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value))
+    throw new TypeError('Unexpected discovery storage row.');
+  return value;
+}
+
+function text(value: unknown) {
+  if (typeof value !== 'string')
     throw new TypeError('Unexpected discovery storage row.');
   return value;
 }
@@ -99,6 +105,32 @@ export function createD1Uptime(database: DiscoveryDatabase): UptimeStorage {
         slots: integer(row.slots),
         firstAt: integer(row.firstAt),
         lastAt: integer(row.lastAt),
+      }));
+    },
+    async sightings(sinceHour, limit) {
+      // The latest sighting through the (node_id, hour) primary key, one NodeId at a time.
+      const latest = database
+        .select({ lastAt: max(uptimeSlots.lastAt) })
+        .from(uptimeSlots)
+        .where(
+          and(
+            eq(uptimeSlots.nodeId, uptimeNodes.nodeId),
+            gte(uptimeSlots.hour, sinceHour),
+          ),
+        );
+      const rows = await database
+        .select({
+          nodeId: uptimeNodes.nodeId,
+          firstAt: uptimeNodes.firstAt,
+          lastAt: sql`(${latest})`.mapWith((value: unknown) => value),
+        })
+        .from(uptimeNodes)
+        .orderBy(asc(uptimeNodes.nodeId))
+        .limit(limit);
+      return rows.map((row) => ({
+        nodeId: text(row.nodeId),
+        firstAt: integer(row.firstAt),
+        lastAt: row.lastAt === null ? null : integer(row.lastAt),
       }));
     },
     async firstSeen(nodeId) {

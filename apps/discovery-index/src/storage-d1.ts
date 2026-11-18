@@ -15,9 +15,11 @@ import type {
   StoredEntry,
 } from './storage';
 import {
+  catalogStatusQuery,
   listingQuery,
   modelsQuery,
   nodeStateQuery,
+  onlineModelsQuery,
   pruneQueries,
   recordCountsQuery,
 } from './storage-queries';
@@ -123,6 +125,32 @@ export function createD1Storage(client: D1Database): DiscoveryStorage {
         modelId: text(row.modelId),
         sellers: integer(row.sellers),
       }));
+    },
+    async catalogStatus(now, limit, maxModels) {
+      const [rows, listed] = await Promise.all([
+        catalogStatusQuery(database, now, limit),
+        onlineModelsQuery(database, now, maxModels),
+      ]);
+      const byNode = new Map<string, string[]>();
+      for (const row of listed) {
+        const nodeId = text(row.nodeId);
+        byNode.set(nodeId, [...(byNode.get(nodeId) ?? []), text(row.modelId)]);
+      }
+      return rows.map((row) => {
+        const nodeId = text(row.nodeId);
+        const withdrawn = integer(row.withdrawn) !== 0;
+        const online =
+          integer(row.alive) !== 0 &&
+          !withdrawn &&
+          integer(row.issuedAt) <= now + CONTROL_LIMITS.clockSkewMs &&
+          integer(row.expiresAt) > now;
+        return {
+          nodeId,
+          online,
+          withdrawn,
+          models: online ? (byNode.get(nodeId) ?? []) : [],
+        };
+      });
     },
   };
 }

@@ -1,6 +1,6 @@
 // Builds enrollment reads and writes with the shared ORM schema. Invite spending and admission
 // remain one native D1 batch, and operator commands compile these same mutations.
-import { and, eq, gt, isNull, notExists } from 'drizzle-orm';
+import { and, asc, eq, gt, isNull, notExists } from 'drizzle-orm';
 
 import { REGISTRATION_STATUS, type RegistrationStatus } from './constants';
 import type { DiscoveryDatabase } from './d1-client';
@@ -22,6 +22,13 @@ export function registrationStatusQuery(
     .select({ status: registrations.status })
     .from(registrations)
     .where(eq(registrations.nodeId, nodeId));
+}
+export function registeredQuery(database: DiscoveryDatabase, limit: number) {
+  return database
+    .select({ nodeId: registrations.nodeId, status: registrations.status })
+    .from(registrations)
+    .orderBy(asc(registrations.nodeId))
+    .limit(limit);
 }
 export function setRegistrationStatusQuery(
   database: DiscoveryDatabase,

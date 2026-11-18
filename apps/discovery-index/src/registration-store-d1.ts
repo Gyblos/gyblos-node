@@ -6,6 +6,7 @@ import {
   createInviteQuery,
   inviteQuery,
   redemptionQueries,
+  registeredQuery,
   registrationStatusQuery,
 } from './registration-queries';
 import {
@@ -81,6 +82,12 @@ export function createD1RegistrationStore(
     },
     async active(nodeId) {
       return (await status(nodeId)) === REGISTRATION_STATUS.ACTIVE;
+    },
+    async registered(limit) {
+      return (await registeredQuery(database, limit)).map((row) => ({
+        nodeId: nullableText(row.nodeId) ?? unexpected(),
+        active: row.status === REGISTRATION_STATUS.ACTIVE,
+      }));
     },
   };
 }

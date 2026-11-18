@@ -152,6 +152,11 @@ la invitación, así que los operadores de Gyblos pueden vincularlo con tu NodeI
 (owner) y el país. El contacto nunca se publica. El registro también escribe una
 entrada pública en el registro de agentes 8004 en Solana devnet.
 
+La lista pública de la red del índice (`/v1/network`) muestra cada NodeId registrado, porque el registro
+8004 ya lo hace público, y si está online, offline o nunca ha publicado, con la primera y la última vez
+que el índice lo vio. No muestra la dirección del dueño, el contacto, el país ni la dirección IP. Un
+NodeId revocado no aparece.
+
 Los compradores y la app de escritorio leen el índice para encontrar vendedores. `gyblos seller status
 --online` además le pide el uptime del propio vendedor por su NodeId, que el vendedor ya publica ahí. El
 índice usa las direcciones IP para limitar la tasa de solicitudes y no guarda ninguna.

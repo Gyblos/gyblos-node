@@ -67,6 +67,16 @@ export interface ModelRow {
   sellers: number;
 }
 
+// A NodeId's stored catalog: whether a live presence references it now (and its models then), and
+// whether it was withdrawn. Read by GET /v1/network.
+export interface CatalogStatusRow {
+  nodeId: string;
+  online: boolean;
+  withdrawn: boolean;
+  // The catalog's model ids while online; empty otherwise.
+  models: string[];
+}
+
 export interface DiscoveryStorage extends UptimeStorage {
   state(nodeId: string): Promise<NodeState | null>;
   // Drops expired records; keeps high-water marks until their retainUntil. Uptime prunes itself.
@@ -80,6 +90,12 @@ export interface DiscoveryStorage extends UptimeStorage {
   models(now: number, limit: number): Promise<ModelRow[]>;
   // Unexpired stored records of all three kinds.
   count(now: number): Promise<number>;
+  // Every stored catalog's status, at most `limit` NodeIds and `maxModels` model rows.
+  catalogStatus(
+    now: number,
+    limit: number,
+    maxModels: number,
+  ): Promise<CatalogStatusRow[]>;
 }
 
 interface MemoryNode {
@@ -160,6 +176,30 @@ function modelsMemory(
           : 1,
     )
     .slice(0, limit);
+}
+
+function catalogStatusMemory(
+  tables: MemoryTables,
+  now: number,
+  limit: number,
+  maxModels: number,
+): CatalogStatusRow[] {
+  let models = 0;
+  return [...tables.catalogs].slice(0, limit).map(([nodeId, catalog]) => {
+    const alive = tables.presence.get(nodeId);
+    const withdrawn = tables.withdrawn(nodeId, catalog.digest);
+    const online =
+      !!alive &&
+      alive.digest === catalog.digest &&
+      !withdrawn &&
+      live(catalog, now) &&
+      live(alive, now);
+    const listed = online
+      ? [...new Set(catalog.models)].slice(0, Math.max(0, maxModels - models))
+      : [];
+    models += listed.length;
+    return { nodeId, online, withdrawn, models: listed.sort() };
+  });
 }
 
 function listMemory(tables: MemoryTables, query: SellerQuery): SellerRow[] {
@@ -243,6 +283,7 @@ export function createMemoryStorage(): DiscoveryStorage {
   const withdrawn = (nodeId: string, digest: string) =>
     withdrawals.get(nodeId)?.digest === digest;
   const uptime = memoryUptime();
+  const tables = { catalogs, presence, withdrawn };
   function apply(entry: StoredEntry) {
     const row: MemoryRecord = {
       sequence: entry.sequence,
@@ -297,10 +338,13 @@ export function createMemoryStorage(): DiscoveryStorage {
       return true;
     },
     async list(query) {
-      return listMemory({ catalogs, presence, withdrawn }, query);
+      return listMemory(tables, query);
     },
     async models(now, limit) {
-      return modelsMemory({ catalogs, presence, withdrawn }, now, limit);
+      return modelsMemory(tables, now, limit);
+    },
+    async catalogStatus(now, limit, maxModels) {
+      return catalogStatusMemory(tables, now, limit, maxModels);
     },
     async count(now) {
       return (

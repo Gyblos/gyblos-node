@@ -41,6 +41,8 @@ export interface RegistrationStore {
   redeem(redemption: Redemption): Promise<RedeemResult>;
   // Whether the NodeId may publish.
   active(nodeId: string): Promise<boolean>;
+  // Every registered NodeId (at most `limit`) and whether it is active, for GET /v1/network.
+  registered(limit: number): Promise<{ nodeId: string; active: boolean }[]>;
 }
 
 interface MemoryInvite extends InviteInput {
@@ -129,6 +131,14 @@ export function createMemoryRegistrationStore(): RegistrationStore & {
     },
     async active(nodeId) {
       return registrations.get(nodeId)?.status === REGISTRATION_STATUS.ACTIVE;
+    },
+    async registered(limit) {
+      return [...registrations]
+        .slice(0, limit)
+        .map(([nodeId, registration]) => ({
+          nodeId,
+          active: registration.status === REGISTRATION_STATUS.ACTIVE,
+        }));
     },
     setStatus(nodeId, status) {
       const registration = registrations.get(nodeId);

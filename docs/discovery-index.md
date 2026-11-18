@@ -24,6 +24,7 @@ Routes sit at the root of the index host. The client base URL is
 | `GET /v1/sellers`        | List live sellers of one model, paged by an opaque cursor.                                   |
 | `GET /v1/models`         | List models from live sellers, ordered by seller count; no query parameters.                 |
 | `GET /v1/uptime?node=`   | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).           |
+| `GET /v1/network`        | Every known seller, online, offline or unpublished, with counts ([Network](#network)).       |
 | `GET /v1/health`         | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes). |
 | `POST /v1/registrations` | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.    |
 
@@ -37,9 +38,9 @@ Common behavior:
 - **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
-  `/v1/models`, `/v1/uptime` and `/v1/health` carry
+  `/v1/models`, `/v1/uptime`, `/v1/network` and `/v1/health` carry
   `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
-  from `/v1/sellers`, `/v1/models` or `/v1/uptime` carries
+  from `/v1/sellers`, `/v1/models`, `/v1/uptime` or `/v1/network` carries
   `Cache-Control: public, max-age=10`; everything else carries
   `Cache-Control: no-store`.
 
@@ -194,12 +195,12 @@ signed a record; clients re-verify everything.
 
 Rate limits:
 
-| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                        |
-| ----------------------------------- | --------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                      |
-| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                        |
-| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models` or `/v1/uptime` cache miss, a stale health count |
-| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                              |
+| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                       |
+| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                     |
+| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                       |
+| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime` or `/v1/network` cache miss, a stale health count |
+| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                             |
 
 - A Cloudflare limiter that refuses or fails gives `429 RATE_LIMITED` with
   `Retry-After: 60`. That `429` is `no-store` and never cached.
@@ -215,12 +216,12 @@ Rate limits:
 
 ## Caching
 
-- **Public reads.** `/v1/sellers`, `/v1/models` and `/v1/uptime` keep `200`
-  answers in the Workers Cache API (`caches.default`, per Cloudflare location)
-  for 10 seconds, matching their `max-age`. Keys are normalized:
+- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime` and `/v1/network`
+  keep `200` answers in the Workers Cache API (`caches.default`, per Cloudflare
+  location) for 10 seconds, matching their `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
-  - models: the route alone;
+  - models and network: the route alone;
   - uptime: `?node=<NodeId>`, however the query was spelled.
 
   Invalid queries are rejected before the cache. Errors and publishes are never
@@ -292,6 +293,63 @@ about 1.4 MB per always-online NodeId per year. At 1,000 online sellers that is
 about 1.4 GB a year against the 10 GB D1 limit, and a full database fails every
 write, publishes included. Before the database nears the limit, roll old hours
 into daily rows or move history to its own database.
+
+## Network
+
+`GET /v1/network` lists every seller the index knows, so anyone can count the
+network's online, offline and unpublished sellers. It takes no parameters (any
+is `400 INVALID_QUERY`):
+
+```json
+{
+  "counts": { "total": 3, "online": 1, "offline": 1, "unpublished": 1 },
+  "nodes": [
+    {
+      "nodeId": "…",
+      "state": "online",
+      "firstSeenAt": 1762473600000,
+      "lastSeenAt": 1763078400000,
+      "models": ["qwen3-0.6b"]
+    },
+    {
+      "nodeId": "…",
+      "state": "offline",
+      "firstSeenAt": 1762473600000,
+      "lastSeenAt": 1762990000000,
+      "models": []
+    },
+    {
+      "nodeId": "…",
+      "state": "unpublished",
+      "firstSeenAt": null,
+      "lastSeenAt": null,
+      "models": []
+    }
+  ],
+  "truncated": false,
+  "generatedAt": 1763078400000
+}
+```
+
+- **Who is listed.** Every active registration, and every NodeId the index
+  accepted a presence from within the last 30 days (allowlisted sellers too).
+  Registered NodeIds are already public on chain, where the 8004 registry binds
+  each one to its owner, so they are listed before they publish. Revoked NodeIds
+  are never listed. The allowlist itself is not exposed: an allowlisted NodeId
+  appears only once it publishes.
+- **`state`.** `online`: a live presence references its live, non-withdrawn
+  catalog, exactly as `/v1/sellers` would list it. `unpublished`: never seen, or
+  its stored catalog is withdrawn (`unpublish`). `offline`: seen before, with no
+  live presence now.
+- **Fields.** `firstSeenAt` and `lastSeenAt` are the [uptime](#uptime) sightings
+  (`lastSeenAt` is `null` when none falls within the last 30 days). `models`
+  lists the catalog's model ids while `online`, and is empty otherwise. No
+  owner, contact, country or IP is returned.
+- **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
+  NodeId. `counts` always cover every listed seller; the `nodes` list stops
+  before the answer would exceed 1 MiB, and `truncated` says so.
+- Reads at most `maxNodes` rows from each source (registrations, sightings,
+  stored catalogs) and 20,000 model rows.
 
 ## Storage
 

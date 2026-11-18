@@ -148,6 +148,11 @@ invite, so Gyblos operators can link it to your NodeId, owner address and countr
 published. Registering also writes a public
 entry in the 8004 agent registry on Solana devnet.
 
+The index's public network list (`/v1/network`) shows every registered NodeId, since the 8004 registry
+already makes it public, and whether it is online, offline or has never published, with when the
+index first and last saw it. It shows no owner address, contact, country or IP address. A revoked
+NodeId is not listed.
+
 Buyers and the desktop app read the index to find sellers. `gyblos seller status --online` also asks it
 for the seller's own uptime by NodeId, which the seller already publishes there. The index uses IP
 addresses for rate limiting and stores none.
