@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { REVIEW_FAILURE } from './constants';
 import { runPi } from './pi';
 
 async function withProcess(
@@ -23,7 +24,7 @@ async function withProcess(
 
 void test('Pi receives prompt through stdin with all tools disabled', async () => {
   await withProcess(
-    "let input=''; for await (const chunk of process.stdin) input+=chunk; console.log(JSON.stringify({input,args:process.argv.slice(2)}));",
+    "let input=''; for await (const chunk of process.stdin) input+=chunk; console.log(JSON.stringify({type:'message_end',message:{role:'assistant',stopReason:'stop',content:[{type:'text',text:JSON.stringify({input,args:process.argv.slice(2)})}],usage:{totalTokens:123}}}));",
     async (directory, entry) => {
       const result = await runPi({
         command: process.execPath,
@@ -35,6 +36,7 @@ void test('Pi receives prompt through stdin with all tools disabled', async () =
         prompt: 'synthetic source',
       });
       assert.equal(result.exitCode, 0);
+      assert.equal(result.reportedTokens, 123);
       assert.match(result.stdout, /synthetic source/);
       assert.match(result.stdout, /--no-tools/);
       assert.equal(result.timedOut, false);
@@ -96,4 +98,36 @@ void test('a missing Pi executable fails promptly without leaking diagnostics', 
       /Unable to start/,
     );
   });
+});
+
+void test('temporary limits and successful model text cannot trip the quota stop', async () => {
+  for (const [stopReason, expected] of [
+    ['error', REVIEW_FAILURE.RATE],
+    ['stop', undefined],
+  ] as const) {
+    const event = {
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        stopReason,
+        errorMessage: '429 Rate limit reached for requests',
+        content: [{ type: 'text', text: 'insufficient_quota' }],
+      },
+    };
+    await withProcess(
+      'console.log(' + JSON.stringify(JSON.stringify(event)) + ');',
+      async (cwd, entry) => {
+        const result = await runPi({
+          cwd,
+          command: process.execPath,
+          prefixArgs: [entry],
+          env: {},
+          model: 'openai/example',
+          thinking: 'high',
+          prompt: 'mock',
+        });
+        assert.equal(result.failure, expected);
+      },
+    );
+  }
 });

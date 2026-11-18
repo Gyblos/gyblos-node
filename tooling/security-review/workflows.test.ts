@@ -21,7 +21,14 @@ async function publisher(): Promise<string> {
   assert.ok(code);
   return code.replace(/^\s*import .+;\n/gm, '');
 }
-function runPublisher(code: string, base = BASE, merge = MERGE): string[][] {
+function runPublisher(
+  code: string,
+  base = BASE,
+  merge = MERGE,
+  diagnostics = '1\nunknown\n',
+  status = 'clean',
+  failedStep = '',
+): string[][] {
   const writes: string[][] = [];
   const pr = {
     state: 'open',
@@ -39,7 +46,8 @@ function runPublisher(code: string, base = BASE, merge = MERGE): string[][] {
           REVIEW_HEAD: HEAD,
           REVIEW_BASE: BASE,
           REVIEW_MERGE: MERGE,
-          REVIEW_JOB_RESULT: 'success',
+          REVIEW_JOB_RESULT: failedStep ? 'failure' : 'success',
+          FAILED_STEP: failedStep,
         },
         exit: () => {
           throw stopped;
@@ -51,7 +59,8 @@ function runPublisher(code: string, base = BASE, merge = MERGE): string[][] {
           isSymbolicLink: () => false,
           size: 6,
         }),
-        readFileSync: () => 'clean\n',
+        readFileSync: (path: string) =>
+          path.endsWith('diagnostics.txt') ? diagnostics : status,
       },
       execFileSync: (_command: string, args: string[]) => {
         if (args.includes('POST') || args.includes('DELETE')) {
@@ -211,4 +220,29 @@ void test('delayed invalidation preserves a completed result for the same snapsh
     if (error !== stopped) throw error;
   }
   assert.equal(writes.length, 0);
+});
+
+void test('publisher reports validated causes and rejects arbitrary diagnostic text', async () => {
+  const code = await publisher();
+  for (const [diagnostic, phrase] of [
+    ['insufficient_quota', 'quota was exhausted'],
+    ['invalid_api_key', 'authentication failed'],
+    ['rate_limited', 'rate-limited'],
+    ['private-canary', 'failed to validate'],
+  ]) {
+    const writes = runPublisher(
+      code,
+      BASE,
+      MERGE,
+      '3\nunknown\n' + diagnostic,
+      'error',
+    );
+    const comment = writes.flat().join(' ');
+    assert.ok(comment.includes(phrase ?? ''));
+    assert.doesNotMatch(comment, /private-canary/);
+  }
+  assert.match(
+    runPublisher(code, BASE, MERGE, '', 'error', 'snapshot').flat().join(' '),
+    /snapshot parent verification failed/,
+  );
 });

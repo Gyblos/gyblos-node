@@ -157,6 +157,16 @@ export async function writeArtifacts(
       2,
     ),
     'REPORT.md': renderReport(result),
+    'diagnostics.txt':
+      [
+        result.execution?.callsStarted ?? 0,
+        result.execution?.reportedTokens ?? 'unknown',
+        ...new Set(
+          [...result.tasks, ...result.verifications].flatMap((item) =>
+            item.failure ? [item.failure] : [],
+          ),
+        ),
+      ].join('\n') + '\n',
     'status.txt': result.status + '\n',
     'labels.txt': labelsForStatus(result.status).join('\n') + '\n',
   };

@@ -5,9 +5,11 @@ import { join } from 'node:path';
 import {
   DEFAULT_MAX_CALLS,
   DEFAULT_REVIEW_CONCURRENCY,
+  REVIEW_FAILURE,
   REVIEW_RESULT_VERSION,
   REVIEW_VALUES,
   type PiThinkingLevel,
+  type ReviewFailure,
 } from './constants';
 import {
   parseReviewResponse,
@@ -15,7 +17,7 @@ import {
   validateCoverage,
   validateEvidence,
 } from './parsing';
-import { runPi, type RunPiOptions } from './pi';
+import { preparePiDirectory, runPi, type RunPiOptions } from './pi';
 import { createSourceBundle, partitionBundle } from './projection';
 import { attachSource, buildVerificationPrompt } from './prompts';
 import { overallReviewStatus } from './result';
@@ -82,14 +84,21 @@ function environment(directory: string): NodeJS.ProcessEnv {
       : { OPENAI_API_KEY: process.env.OPENAI_API_KEY }),
   };
 }
+class InvocationFailure extends Error {
+  constructor(
+    readonly code: ReviewFailure,
+    readonly skipped = false,
+  ) {
+    super(code);
+  }
+}
 async function ask(
   prompt: string,
   options: ReviewExecutionOptions,
 ): Promise<string> {
   const directory = await mkdtemp(join(options.output, 'session-'));
   try {
-    for (const name of ['tmp', 'config', 'cache', 'pi'])
-      await mkdir(join(directory, name));
+    await preparePiDirectory(directory);
     const invocation: RunPiOptions = {
       command: options.piCommand,
       cwd: directory,
@@ -99,29 +108,29 @@ async function ask(
       prompt: (options.policyContext ?? '') + '\n' + prompt,
     };
     const result = await (options.execute ?? runPi)(invocation);
-    if (
-      result.exitCode !== 0 ||
-      result.signal ||
-      result.truncated ||
-      result.timedOut
-    )
-      throw new Error(
-        'Pi invocation failed, timed out or exceeded its output limit.',
-      );
+    if (result.timedOut) throw new InvocationFailure(REVIEW_FAILURE.TIMEOUT);
+    if (result.truncated) throw new InvocationFailure(REVIEW_FAILURE.LIMIT);
+    if (result.failure) throw new InvocationFailure(result.failure);
+    if (result.exitCode !== 0 || result.signal)
+      throw new InvocationFailure(REVIEW_FAILURE.PI);
     return result.stdout;
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 }
-function failed(assignment: Assignment, reason: string): Execution {
+function failed(
+  assignment: Assignment,
+  failure: ReviewFailure,
+  skipped = false,
+): Execution {
   return {
     assignment,
     findings: [],
     result: {
       taskId: assignment.task.id,
-      status: REVIEW_VALUES.ERROR,
+      status: skipped ? REVIEW_VALUES.SKIPPED : REVIEW_VALUES.ERROR,
       findings: [],
-      error: reason,
+      failure,
       omissions: assignment.bundle.omissions,
     },
   };
@@ -131,19 +140,18 @@ async function review(
   options: ReviewExecutionOptions,
 ): Promise<Execution> {
   if (assignment.bundle.omissions.length)
-    return failed(
-      assignment,
-      'Source omitted; see coverage ledger. Narrow the input or review the excluded file manually.',
-    );
+    return failed(assignment, REVIEW_FAILURE.SOURCE);
+  let phase: ReviewFailure = REVIEW_FAILURE.PI;
   try {
-    const response = parseReviewResponse(
-      await ask(
-        attachSource(assignment.task.prompt, assignment.bundle),
-        options,
-      ),
+    const output = await ask(
+      attachSource(assignment.task.prompt, assignment.bundle),
+      options,
     );
+    phase = REVIEW_FAILURE.FORMAT;
+    const response = parseReviewResponse(output);
     if (response.reviewer !== assignment.task.reviewer)
       throw new Error('reviewer mismatch');
+    phase = REVIEW_FAILURE.COVERAGE;
     validateCoverage(response, assignment.bundle);
     return {
       assignment,
@@ -158,11 +166,10 @@ async function review(
         })),
       },
     };
-  } catch {
-    return failed(
-      assignment,
-      'Pi output failed invocation, schema, evidence or coverage validation.',
-    );
+  } catch (error) {
+    return error instanceof InvocationFailure
+      ? failed(assignment, error.code, error.skipped)
+      : failed(assignment, phase);
   }
 }
 function candidatesFrom(
@@ -229,12 +236,12 @@ async function verify(
       decision: record.decision,
       record,
     };
-  } catch {
+  } catch (error) {
     return {
       fingerprint: candidate.fingerprint,
       decision: REVIEW_VALUES.ERROR,
-      error:
-        'Independent verification failed schema, source or invocation checks.',
+      failure:
+        error instanceof InvocationFailure ? error.code : REVIEW_FAILURE.VERIFY,
     };
   }
 }
@@ -280,6 +287,38 @@ function validateOptions(options: ReviewExecutionOptions): {
     throw new Error('An explicit openai/<model-id> is required.');
   return { concurrency, maxCalls };
 }
+function providerAdmission(
+  options: ReviewExecutionOptions,
+  execution: ReviewRunResult['execution'],
+) {
+  const admission: { stopped?: ReviewFailure } = {};
+  const countedOptions: ReviewExecutionOptions = {
+    ...options,
+    execute: async (invocation) => {
+      if (admission.stopped)
+        throw new InvocationFailure(admission.stopped, true);
+      if (!execution || execution.callsStarted >= execution.maxCalls)
+        throw new Error('Invocation budget exhausted.');
+      execution.callsStarted += 1;
+      let response;
+      try {
+        response = await (options.execute ?? runPi)(invocation);
+      } catch {
+        throw new InvocationFailure(REVIEW_FAILURE.PI);
+      }
+      if (
+        response.failure === REVIEW_FAILURE.QUOTA ||
+        response.failure === REVIEW_FAILURE.KEY
+      )
+        admission.stopped ??= response.failure;
+      if (response.reportedTokens !== undefined)
+        execution.reportedTokens =
+          (execution.reportedTokens ?? 0) + response.reportedTokens;
+      return response;
+    },
+  };
+  return { admission, countedOptions };
+}
 export async function runReview(
   plan: ReviewPlan,
   options: ReviewExecutionOptions,
@@ -312,16 +351,10 @@ export async function runReview(
     },
   };
   if (options.dryRun) return result;
-  const execution = result.execution;
-  const countedOptions: ReviewExecutionOptions = {
-    ...options,
-    execute: async (invocation) => {
-      if (!execution || execution.callsStarted >= maxCalls)
-        throw new Error('Invocation budget exhausted.');
-      execution.callsStarted += 1;
-      return (options.execute ?? runPi)(invocation);
-    },
-  };
+  const { admission, countedOptions } = providerAdmission(
+    options,
+    result.execution,
+  );
   const assignments = await assignmentsFor(plan, options);
   summary.taskCount = assignments.length;
   // Reserve at least two independent verification calls before spending on hunters.
@@ -329,7 +362,10 @@ export async function runReview(
   const executions = await mapConcurrent(
     assignments.slice(0, allowance),
     concurrency,
-    (assignment) => review(assignment, countedOptions),
+    (assignment) =>
+      admission.stopped
+        ? Promise.resolve(failed(assignment, admission.stopped, true))
+        : review(assignment, countedOptions),
   );
   const deferred: TaskResult[] = assignments
     .slice(allowance)
@@ -337,17 +373,17 @@ export async function runReview(
       taskId: task.id,
       status: REVIEW_VALUES.SKIPPED,
       findings: [],
-      error: 'Invocation budget exhausted.',
+      failure: REVIEW_FAILURE.BUDGET,
     }));
   let remaining = maxCalls - Math.min(assignments.length, allowance);
   const verifications: VerificationResult[] = [];
   const candidates = candidatesFrom(executions);
   for (const { candidate, assignment } of candidates) {
-    if (remaining < 2) {
+    if (admission.stopped || remaining < 2) {
       verifications.push({
         fingerprint: candidate.fingerprint,
         decision: REVIEW_VALUES.ERROR,
-        error: 'Invocation budget cannot fund both independent verifiers.',
+        failure: admission.stopped ?? REVIEW_FAILURE.BUDGET,
       });
       continue;
     }
