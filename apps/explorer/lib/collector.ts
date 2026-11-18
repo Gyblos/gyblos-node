@@ -1,7 +1,5 @@
 // Owns the read of the metrics collector's public stats API: fetched, checked at the boundary
-// (collector-shape.ts) and cached for the collector's 10-minute cycle.
-import { cacheLife } from 'next/cache';
-import { connection } from 'next/server';
+// (collector-shape.ts) on each render; the collector caches its answers at the edge.
 
 import {
   aggregatedAt,
@@ -10,7 +8,6 @@ import {
   type CollectorSnapshot,
 } from './collector-shape';
 import { COLLECTOR_URL } from './config';
-import { CACHE_LIFE } from './constants';
 import { fetchJson } from './fetch-json';
 import { list, record } from './validate';
 
@@ -28,8 +25,6 @@ export async function getCollector(): Promise<CollectorSnapshot> {
   try {
     return await loadCollector();
   } catch (error) {
-    // A failed read is never prerendered: it is retried on the next request.
-    await connection();
     return {
       aggregatedAt: null,
       days: [],
@@ -39,10 +34,7 @@ export async function getCollector(): Promise<CollectorSnapshot> {
   }
 }
 
-// Throws on failure so an error is never stored in the cache.
 async function loadCollector(): Promise<CollectorSnapshot> {
-  'use cache';
-  cacheLife(CACHE_LIFE.collector);
   const [networkBody, modelsBody] = await Promise.all([
     fetchJson(`${COLLECTOR_URL}/stats/network`, 'collector network'),
     fetchJson(`${COLLECTOR_URL}/stats/models`, 'collector models'),

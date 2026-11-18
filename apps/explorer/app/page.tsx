@@ -8,6 +8,10 @@ import { Loading } from '../components/ui';
 import { UsageSection } from '../components/usage-section';
 import { NETWORK_LABEL } from '../lib/config';
 
+// Every request renders with fresh source answers; the sources cache at their own edge (the collector
+// for 5 minutes). Workers cannot share a pending fetch across requests, so no in-process cache is used.
+export const dynamic = 'force-dynamic';
+
 export default function Home() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">

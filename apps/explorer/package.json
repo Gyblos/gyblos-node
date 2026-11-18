@@ -4,16 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./chain-shape": "./lib/chain-shape.ts",
     "./collector-shape": "./lib/collector-shape.ts",
     "./latency": "./lib/latency.ts",
     "./offers": "./lib/offers.ts",
-    "./payments": "./lib/payments.ts",
-    "./settlement": "./lib/settlement.ts",
     "./usage": "./lib/usage.ts"
   },
   "scripts": {
     "dev": "next dev --port 4190",
     "build": "next build",
+    "build:cloudflare": "opennextjs-cloudflare build",
     "start": "next start --port 4190"
   },
   "dependencies": {
@@ -22,6 +22,7 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.16",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
