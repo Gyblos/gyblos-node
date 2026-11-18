@@ -78,7 +78,6 @@ export interface FreeBuyerDependencies {
     signal: AbortSignal,
     needs?: {
       tools?: boolean;
-      // The estimated input size, so sellers too slow to read it refuse at quote time.
       inputTokens?: number;
       model?: RoutedModel;
       conversation?: string;

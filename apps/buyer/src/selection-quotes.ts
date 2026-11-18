@@ -9,6 +9,7 @@ import {
   ERROR_DIAGNOSTICS,
   SELLER_FAILURE_PHASES,
 } from './constants';
+import { SellerRefusal } from './control';
 import { raceControlOffers } from './offer-race';
 import type {
   BuyerControlClient,
@@ -87,10 +88,12 @@ function releaseInBackground(
   dependencies.snapshots?.retire(nodeId, closing);
 }
 
-// A quote request with the input size. The seller that answered this conversation's last turn likely
-// holds most of it in its prompt cache, so the full size would overstate its reading: it is not sent.
+// A quote request with the input size. The seller that answered this conversation's last turn within
+// FREE_BUYER.warmCacheMs likely holds most of it in its prompt cache, so the full size would overstate
+// its reading: it is not sent.
 // A seller from before quotes carried the size refuses that key as invalid. It is asked once more
-// without it and quotes as it did then; only the retry's outcome counts for or against it.
+// without it and quotes as it did then; only the retry's outcome counts for or against it. Only the
+// seller's own refusal does: this buyer's checks of its answer are never retried.
 async function requestSized(
   client: BuyerControlClient,
   params: Parameters<BuyerControlClient['requestOffer']>[0],
@@ -101,12 +104,16 @@ async function requestSized(
   }: { config: BuyerSelectionConfig; nodeId: string; signal: AbortSignal },
 ) {
   const inputTokens =
-    nodeId === config.previousSeller ? undefined : config.request.inputTokens;
+    nodeId === config.warmSeller ? undefined : config.request.inputTokens;
   if (!inputTokens) return client.requestOffer(params, signal);
   try {
     return await client.requestOffer({ ...params, inputTokens }, signal);
   } catch (error) {
-    if (signal.aborted || sellerFailureCode(error) !== CONTROL_CODES.INVALID)
+    if (
+      signal.aborted ||
+      !(error instanceof SellerRefusal) ||
+      error.code !== CONTROL_CODES.INVALID
+    )
       throw error;
     return client.requestOffer(params, signal);
   }

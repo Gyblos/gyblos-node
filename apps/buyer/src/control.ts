@@ -15,13 +15,16 @@ import {
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 import { parseControlQuery } from '@gyblos/protocol/control-requests';
-import { matchControlResponse } from '@gyblos/protocol/control-response';
+import {
+  matchControlResponse,
+  parseControlResponse,
+} from '@gyblos/protocol/control-response';
 import type {
   ControlOfferParams,
   ControlQuery,
   SignedPublicV2,
 } from '@gyblos/protocol/control-types';
-import { controlFail } from '@gyblos/protocol/control-validation';
+import { ControlError, controlFail } from '@gyblos/protocol/control-validation';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import {
   catalogDigestV2,
@@ -39,6 +42,8 @@ export interface ControlSellerTrust {
   relayAllowed: (origin: string) => boolean;
   now?: () => number;
 }
+// A refusal the seller itself sent, as opposed to one this buyer raised while checking its answer.
+export class SellerRefusal extends ControlError {}
 function requestId() {
   return randomBytes(CONTROL_LIMITS.requestIdBytes).toString('hex');
 }
@@ -55,10 +60,11 @@ class BuyerControlClient {
       return controlFail(CONTROL_CODES.POLICY);
   }
   private async exchange(query: ControlQuery, signal?: AbortSignal) {
-    return matchControlResponse(
-      await this.transport.exchange(query, signal),
-      query,
-    );
+    const value = await this.transport.exchange(query, signal);
+    const response = parseControlResponse(value);
+    if (response.error && response.requestId === query.requestId)
+      throw new SellerRefusal(response.error.code);
+    return matchControlResponse(value, query);
   }
   async getCatalog(signal?: AbortSignal) {
     const result = await this.exchange(

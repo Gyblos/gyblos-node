@@ -4,16 +4,12 @@ import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
-import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
+import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
-import {
-  BUYER_SELECTION,
-  FREE_BUYER_CODES,
-  FREE_CHAT_DETAILS,
-} from './constants';
+import { BUYER_SELECTION, FREE_BUYER_CODES } from './constants';
 import { connectBuyerControl } from './control';
 import { FreeBuyerError } from './free-chat';
 import { freeRouteContext } from './free-context';
@@ -49,6 +45,7 @@ import {
 import type { prepareBuyerSelection } from './selection-runtime';
 import { mergeSelectionStats } from './selection-stats';
 import type { SellerFailureReporter } from './seller-failures';
+import { refusedDetail } from './slow-seller';
 
 export function freeBuyerDependencies(
   prepared: PreparedSelection,
@@ -204,7 +201,8 @@ export async function permitsWinner(
     )
   );
 }
-// With tools, quotes ask for them; when every seller refused them, the buyer says so plainly.
+// Quotes ask for the tools and the input size the request needs; when every seller asked refused for
+// those reasons alone, the buyer says so plainly (refusedDetail).
 async function selectFreeWinner(
   prepared: PreparedSelection,
   options: FreeSelectionOptions,
@@ -215,18 +213,21 @@ async function selectFreeWinner(
     inputTokens,
     model,
     previousSeller,
+    warmSeller,
   }: {
     tools?: boolean;
     inputTokens?: number;
     model?: RoutedModel;
     previousSeller?: string;
+    warmSeller?: string;
   } = {},
 ) {
-  const refused = new Set<string>();
+  // The last refusal of each seller asked.
+  const refused = new Map<string, string>();
   const watched: FreeSelectionOptions = {
     ...options,
     onSellerFailure: (failure) => {
-      refused.add(failure.code);
+      refused.set(failure.nodeId, failure.code);
       options.onSellerFailure?.(failure);
     },
   };
@@ -243,15 +244,14 @@ async function selectFreeWinner(
         ...(tools ? { tools: true as const } : {}),
         ...(inputTokens ? { inputTokens } : {}),
       },
-      { open: true, ...(previousSeller ? { previousSeller } : {}) },
+      {
+        open: true,
+        ...(previousSeller ? { previousSeller } : {}),
+        ...(warmSeller ? { warmSeller } : {}),
+      },
     );
   } catch (error) {
-    // Every seller refused the tools, or the size: the buyer says so plainly.
-    const detail = refused.has(CONTROL_CODES.TOOLS)
-      ? FREE_CHAT_DETAILS.noToolSeller
-      : refused.has(CONTROL_CODES.TOO_SLOW)
-        ? FREE_CHAT_DETAILS.noFastSeller
-        : undefined;
+    const detail = refusedDetail(refused);
     if (detail && error instanceof FreeSelectionFailure && !error.retryAt)
       throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE, null, detail);
     throw error;
@@ -351,6 +351,7 @@ async function selectSticky(
   const winner = await selectFreeWinner(prepared, options, skip, signal, {
     ...needs,
     previousSeller: key ? sticky.get(key) : undefined,
+    warmSeller: key ? sticky.warm(key) : undefined,
   });
   if (key) sticky.chose(key, winner.nodeId);
   return winner;

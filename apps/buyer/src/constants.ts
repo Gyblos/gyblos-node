@@ -195,6 +195,9 @@ export const FREE_BUYER = {
   retryAfterHeader: 'retry-after',
   // How long /v1/models waits for verified catalogs to report each model's context.
   modelContextMs: 4000,
+  // A seller that answered a conversation this recently likely still holds it in its prompt cache (Ollama
+  // keeps a model loaded 5 minutes by default), so the next turn does not send it the full input size.
+  warmCacheMs: 240_000,
   requestMs: 180000,
   // Times one request may go to another seller after its prompt was sent (failover "safe").
   maxResends: 2,

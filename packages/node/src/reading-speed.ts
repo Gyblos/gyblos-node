@@ -1,88 +1,40 @@
 // Learns how fast an offer's engine reads a prompt (input tokens per second), so its quotes can refuse a
-// request it would not finish reading in time. Every generation the engine reports how long it spent on
-// the input is a measurement; a prompt shorter than PROMPT_READING.minSampleTokens (mostly cached, or tiny)
-// is not. In memory only; a restarted seller measures again.
-//
-// A request that ran out of time before its first visible token also caps the estimate: those input tokens
-// were not read in that time. Only when silence means reading: the engine has shown it reports visible
-// fragments, and the request offered no tools (a tool call is generated without visible text). The cap
-// lasts PROMPT_READING.timeoutCapMs or until a new measurement, so one slow moment does not keep the seller
-// refusing large requests it never gets to measure.
-import { PROMPT_READING } from '@gyblos/config';
-import { ENGINE_ERROR_CODES } from '@gyblos/protocol/constants';
-import {
-  EngineError,
-  type Engine,
-  type EngineInput,
-} from '@gyblos/protocol/engine';
+// request it would not finish reading in time. Only the engine's own report counts: every answer that
+// says how long it spent on the input is a measurement. A prompt shorter than MIN_SAMPLE_TOKENS (mostly
+// cached, or tiny) is not, and neither is a failure: a timeout's elapsed time also holds queueing, model
+// loading and hidden reasoning, which are not reading. In memory only; a restarted seller measures again.
+import type { Engine, EngineInput } from '@gyblos/protocol/engine';
 
 const NANOSECONDS_PER_SECOND = 1e9;
-const MILLISECONDS_PER_SECOND = 1_000;
+// Prompts shorter than this do not measure a seller's reading speed.
+const MIN_SAMPLE_TOKENS = 256;
+// How much each new measurement moves the seller's estimate.
+const SAMPLE_WEIGHT = 0.3;
 
-export function readingSpeedEngine(
-  engine: Engine,
-  now: () => number = () => performance.now(),
-) {
-  let measured: number | undefined;
-  let cap: { speed: number; until: number } | undefined;
-  let reportsFragments = false;
-  const measure = (sample: number) => {
-    if (!Number.isFinite(sample) || sample <= 0) return;
-    cap = undefined;
-    measured =
-      measured === undefined
-        ? sample
-        : measured + (sample - measured) * PROMPT_READING.sampleWeight;
-  };
+export function readingSpeedEngine(engine: Engine) {
+  let speed: number | undefined;
   const generate = async (input: EngineInput) => {
-    let answering = false;
-    const started = now();
-    const onFragment = async () => {
-      answering = true;
-      reportsFragments = true;
-      await input.onFragment?.();
-    };
-    try {
-      const result = await engine.generate({ ...input, onFragment });
-      const { inputTokens, inputDurationNs } = result.usage;
-      if (inputTokens >= PROMPT_READING.minSampleTokens && inputDurationNs > 0)
-        measure(inputTokens / (inputDurationNs / NANOSECONDS_PER_SECOND));
-      return result;
-    } catch (error) {
-      const elapsedMs = now() - started;
-      if (
-        error instanceof EngineError &&
-        error.code === ENGINE_ERROR_CODES.TIMEOUT &&
-        reportsFragments &&
-        !answering &&
-        !input.tools?.length &&
-        input.inputTokens !== undefined &&
-        input.inputTokens >= PROMPT_READING.minSampleTokens &&
-        elapsedMs > 0
-      ) {
-        const bound = input.inputTokens / (elapsedMs / MILLISECONDS_PER_SECOND);
-        cap = {
-          speed: Math.min(bound, cap?.speed ?? bound),
-          until: now() + PROMPT_READING.timeoutCapMs,
-        };
-      }
-      throw error;
-    }
-  };
-  const tokensPerSecond = () => {
-    if (cap && now() >= cap.until) cap = undefined;
-    if (!cap) return measured;
-    return measured === undefined ? cap.speed : Math.min(measured, cap.speed);
+    const result = await engine.generate(input);
+    const { inputTokens, inputDurationNs } = result.usage;
+    const sample = inputTokens / (inputDurationNs / NANOSECONDS_PER_SECOND);
+    if (
+      inputTokens >= MIN_SAMPLE_TOKENS &&
+      inputDurationNs > 0 &&
+      Number.isFinite(sample)
+    )
+      speed =
+        speed === undefined ? sample : speed + (sample - speed) * SAMPLE_WEIGHT;
+    return result;
   };
   return {
     engine: {
       describe: () => engine.describe(),
       capabilities: () => engine.capabilities(),
       ...(engine.supportsTools
-        ? { supportsTools: () => engine.supportsTools!() }
+        ? { supportsTools: engine.supportsTools.bind(engine) }
         : {}),
       generate,
     } satisfies Engine,
-    tokensPerSecond,
+    tokensPerSecond: () => speed,
   };
 }

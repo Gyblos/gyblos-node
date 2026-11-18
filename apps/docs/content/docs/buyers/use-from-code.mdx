@@ -219,10 +219,11 @@ A broken connection may deliver no response headers at all, so turn off HTTP and
 tool. Resending a request yourself starts a new seller selection.
 
 Some sellers run on slow hardware. Each seller measures how fast it reads prompts, and your buyer tells
-sellers how big a request is (only its size, never the text) before choosing one. A seller that would
-not read a long prompt, such as a coding agent's, in time declines, and your buyer picks another seller
-without sending it the prompt. If no seller is fast enough, the error says so; shorten the conversation
-(Codex and OpenCode can compact it) or try again later.
+every seller it asks roughly how big a request is before choosing one: only the size, rounded up to a
+multiple of 1024 tokens, never the text. A seller that would not read a long prompt, such as a coding
+agent's, in time declines, and your buyer picks another seller without sending it the prompt. If every
+seller asked declined for that reason, the error says so; shorten the conversation (Codex and OpenCode
+can compact it) or try again later.
 
 A seller that has not measured itself yet can still time out. Then the request ends with `reason`
 `engine_timeout` and a message that the seller was too slow for a request this size. Send it again. Each

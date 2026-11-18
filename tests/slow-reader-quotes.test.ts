@@ -1,18 +1,24 @@
 // A seller too slow to read a request in time refuses it at quote time, before the buyer sends any prompt.
-// The seller learns its reading speed from its own engine; the buyer sends only an estimate of the input
-// size, and a refusal moves it to another seller without counting against the slow one.
+// The seller learns its reading speed from its own engine; the buyer sends only a rounded estimate of the
+// input size, and a refusal moves it to another seller without counting against the slow one.
 // Synthetic engines and loopback control only; no Ollama, network or payment.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { FREE_BUYER, FREE_CHAT_DETAILS } from '@gyblos/buyer/constants';
 import { executeBuyerFree } from '@gyblos/buyer/free-execution';
-import { estimatedInputTokens } from '@gyblos/buyer/input-size';
+import { stickySellers } from '@gyblos/buyer/free-selection';
+import {
+  estimatedInputTokens,
+  INPUT_SIZE_STEP,
+} from '@gyblos/buyer/input-size';
 import {
   selectVerifiedBuyerQuote,
   type VerifiedSelectionDependencies,
 } from '@gyblos/buyer/selection';
 import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
-import { PROMPT_READING, readsInTime } from '@gyblos/config';
+import { refusedDetail } from '@gyblos/buyer/slow-seller';
+import { readsInTime } from '@gyblos/config';
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { readingSpeedEngine } from '@gyblos/node/reading-speed';
 import {
@@ -24,6 +30,7 @@ import {
   controlRequestDigest,
   parseControlQuery,
 } from '@gyblos/protocol/control-requests';
+import { ControlError } from '@gyblos/protocol/control-validation';
 import {
   EngineError,
   type Engine,
@@ -47,7 +54,6 @@ void test('reading fits when the estimated reading time leaves room to answer wi
   assert.equal(readsInTime(7_000, 4096, 200), true);
   // The answer keeps its reserve: reading that ends just before the deadline does not fit.
   assert.equal(readsInTime(1_000, 128, 1_000 / 99), false);
-  assert.ok(PROMPT_READING.answerReserveMs > 0);
 });
 
 void test('a quote request may carry the input size; it must be a positive integer within a context', async () => {
@@ -141,7 +147,11 @@ void test('the seller learns its reading speed from its engine, ignoring prompts
   await reading.engine.generate({ prompt: 'x', maxTokens: 1 });
   assert.equal(reading.tokensPerSecond(), 100);
   // A short prompt (mostly cached, or tiny) says little about reading speed.
-  next = usage(PROMPT_READING.minSampleTokens - 1, 1);
+  next = usage(255, 1);
+  await reading.engine.generate({ prompt: 'x', maxTokens: 1 });
+  assert.equal(reading.tokensPerSecond(), 100);
+  // An engine that does not time the input (declared usage) measures nothing.
+  next = usage(5_000, 0);
   await reading.engine.generate({ prompt: 'x', maxTokens: 1 });
   assert.equal(reading.tokensPerSecond(), 100);
   // Later samples move the estimate toward them.
@@ -151,71 +161,17 @@ void test('the seller learns its reading speed from its engine, ignoring prompts
   assert.ok(speed > 100 && speed < 200, String(speed));
 });
 
-void test('a request that timed out before any visible token caps the reading speed for a while', async () => {
-  let clock = 0;
-  let emit = false;
+void test('a timeout teaches nothing: its time also holds queueing, model loading and hidden reasoning', async () => {
   const reading = readingSpeedEngine(
-    fakeEngine(async (input) => {
-      clock += 100_000;
-      if (emit) await input.onFragment?.();
+    fakeEngine(async () => {
       throw new EngineError(ENGINE_ERROR_CODES.TIMEOUT);
     }),
-    () => clock,
   );
-  const timeout = (inputTokens: number, tools?: EngineInput['tools']) =>
-    assert.rejects(
-      reading.engine.generate({
-        prompt: 'x',
-        maxTokens: 1,
-        inputTokens,
-        ...(tools ? { tools } : {}),
-      }),
-      { code: ENGINE_ERROR_CODES.TIMEOUT },
-    );
-  // An engine that has never shown a visible fragment may be answering in silence: nothing is learned.
-  await timeout(7_000);
-  assert.equal(reading.tokensPerSecond(), undefined);
-  // A timeout after the first token was answering, not reading: it says nothing about reading.
-  emit = true;
-  await timeout(700);
-  assert.equal(reading.tokensPerSecond(), undefined);
-  // Now silence means reading: 7000 tokens not read in 100 s is under 70 tokens per second.
-  emit = false;
-  await timeout(7_000);
-  assert.equal(reading.tokensPerSecond(), 70);
-  // A tool call is generated without visible text: a silent timeout with tools says nothing either.
-  await timeout(1_000, [{ name: 'shell', description: 'd', parameters: '{}' }]);
-  assert.equal(reading.tokensPerSecond(), 70);
-  // The cap does not last: a seller that never gets a large request to measure is not stuck refusing.
-  clock += PROMPT_READING.timeoutCapMs;
-  assert.equal(reading.tokensPerSecond(), undefined);
-});
-
-void test('a measurement replaces a timeout cap', async () => {
-  let clock = 0;
-  let mode: 'answered' | 'silent' | 'ok' = 'answered';
-  const reading = readingSpeedEngine(
-    fakeEngine(async (input) => {
-      clock += 100_000;
-      if (mode !== 'silent') await input.onFragment?.();
-      if (mode !== 'ok') throw new EngineError(ENGINE_ERROR_CODES.TIMEOUT);
-      return {
-        text: 'ok',
-        finishReason: ENGINE_DONE_REASONS.STOP,
-        usage: usage(1_000, 5e9),
-      };
-    }),
-    () => clock,
+  await assert.rejects(
+    reading.engine.generate({ prompt: 'x', maxTokens: 1, inputTokens: 7_000 }),
+    { code: ENGINE_ERROR_CODES.TIMEOUT },
   );
-  const ask = () =>
-    reading.engine.generate({ prompt: 'x', maxTokens: 1, inputTokens: 7_000 });
-  await assert.rejects(ask());
-  mode = 'silent';
-  await assert.rejects(ask());
-  assert.equal(reading.tokensPerSecond(), 70);
-  mode = 'ok';
-  await ask();
-  assert.equal(reading.tokensPerSecond(), 200);
+  assert.equal(reading.tokensPerSecond(), undefined);
 });
 
 void test('the buyer sends the input size, and a too-slow refusal moves on without cooling the seller', async (t) => {
@@ -236,7 +192,7 @@ void test('the buyer sends the input size, and a too-slow refusal moves on witho
   const failures: SellerFailure[] = [];
   const stats = new Map<string, LocalSellerStats>();
   const result = await selectVerifiedBuyerQuote(
-    { ...run.config, request: { ...run.config.request, inputTokens: 7_000 } },
+    { ...run.config, request: { ...run.config.request, inputTokens: 7_168 } },
     {
       ...run.dependencies,
       stats,
@@ -244,17 +200,21 @@ void test('the buyer sends the input size, and a too-slow refusal moves on witho
     },
   );
   assert.equal(result.ok, false);
-  assert.equal((sent[0] as { inputTokens?: number }).inputTokens, 7_000);
+  assert.equal((sent[0] as { inputTokens?: number }).inputTokens, 7_168);
   assert.equal(failures[0]?.code, CONTROL_CODES.TOO_SLOW);
   const nodeId = run.config.sellers[0]!.nodeId;
   assert.equal(stats.get(nodeId)?.cooldownUntil ?? null, null);
   assert.equal(stats.get(nodeId)?.failures ?? 0, 0);
 });
 
-void test('the buyer estimates the input size from the conversation and tools it will send', () => {
+void test('the buyer estimates the input size from the conversation and tools, rounded up to whole steps', () => {
   const messages = [{ role: 'user' as const, content: 'x'.repeat(4_000) }];
-  const estimate = estimatedInputTokens({ messages });
-  assert.ok(estimate >= 1_000 && estimate < 1_100, String(estimate));
+  // About 1000 tokens: one step.
+  assert.equal(estimatedInputTokens({ messages }), INPUT_SIZE_STEP);
+  assert.equal(
+    estimatedInputTokens({ messages: [{ role: 'user', content: 'hi' }] }),
+    INPUT_SIZE_STEP,
+  );
   const withTools = estimatedInputTokens({
     messages,
     tools: [
@@ -265,7 +225,7 @@ void test('the buyer estimates the input size from the conversation and tools it
       },
     ],
   });
-  assert.ok(withTools > estimate + 90, String(withTools));
+  assert.equal(withTools, 2 * INPUT_SIZE_STEP);
 });
 
 void test('a free request asks selection with its estimated input size', async () => {
@@ -304,13 +264,19 @@ function olderSeller(service: ControlService): ControlService {
   };
 }
 
-void test('a seller from before the input size is still chosen by a new buyer and not cooled down', async (t) => {
+void test('a seller from before the input size is asked again without it, chosen, and not cooled down', async (t) => {
   const run = await selectionFixture(true, undefined, olderSeller);
   t.after(() => run.wire.close());
+  const sent: { inputTokens?: number }[] = [];
+  const original = run.client.requestOffer.bind(run.client);
+  run.client.requestOffer = async (...args) => {
+    sent.push(args[0]);
+    return original(...args);
+  };
   const failures: SellerFailure[] = [];
   const stats = new Map<string, LocalSellerStats>();
   const result = await selectVerifiedBuyerQuote(
-    { ...run.config, request: { ...run.config.request, inputTokens: 7_000 } },
+    { ...run.config, request: { ...run.config.request, inputTokens: 7_168 } },
     {
       ...run.dependencies,
       stats,
@@ -318,13 +284,32 @@ void test('a seller from before the input size is still chosen by a new buyer an
     },
   );
   assert.equal(result.ok, true);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0]?.inputTokens, 7_168);
+  assert.equal(Object.hasOwn(sent[1]!, 'inputTokens'), false);
   assert.deepEqual(failures, []);
   const nodeId = run.config.sellers[0]!.nodeId;
   assert.equal(stats.get(nodeId)?.cooldownUntil ?? null, null);
   assert.equal(stats.get(nodeId)?.failures ?? 0, 0);
 });
 
-void test('the seller that served the previous turn is not asked the size its prompt cache mostly covers', async (t) => {
+void test("the buyer's own failure checking a quote is not retried without the size", async (t) => {
+  const run = await selectionFixture(true);
+  t.after(() => run.wire.close());
+  let calls = 0;
+  run.client.requestOffer = async () => {
+    calls++;
+    throw new ControlError(CONTROL_CODES.INVALID);
+  };
+  const result = await selectVerifiedBuyerQuote(
+    { ...run.config, request: { ...run.config.request, inputTokens: 7_168 } },
+    run.dependencies,
+  );
+  assert.equal(result.ok, false);
+  assert.equal(calls, 1);
+});
+
+void test('the seller that just served the conversation is not sent the size its prompt cache covers', async (t) => {
   const run = await selectionFixture(true, (context) => ({
     ...context,
     models: context.models.map((model) => ({
@@ -343,10 +328,47 @@ void test('the seller that served the previous turn is not asked the size its pr
     {
       ...run.config,
       previousSeller: run.config.sellers[0]!.nodeId,
-      request: { ...run.config.request, inputTokens: 7_000 },
+      warmSeller: run.config.sellers[0]!.nodeId,
+      request: { ...run.config.request, inputTokens: 7_168 },
     },
     run.dependencies,
   );
   assert.equal(result.ok, true);
   assert.equal(Object.hasOwn(sent[0] as object, 'inputTokens'), false);
+});
+
+void test('a conversation seller is warm only shortly after its last answer', () => {
+  let clock = 0;
+  const sticky = stickySellers(4, () => clock);
+  sticky.chose('chat', 'seller');
+  assert.equal(sticky.warm('chat'), undefined);
+  sticky.served('seller');
+  assert.equal(sticky.warm('chat'), 'seller');
+  clock += FREE_BUYER.warmCacheMs;
+  // Its cache may be gone: it is still preferred, but sent the size like any other seller.
+  assert.equal(sticky.warm('chat'), undefined);
+  assert.equal(sticky.get('chat'), 'seller');
+});
+
+void test('the plain reason is shown only when every seller asked refused for what the request needs', () => {
+  const refusals = (...codes: string[]) =>
+    new Map(codes.map((code, index) => [`seller-${index}`, code]));
+  const { TOOLS, TOO_SLOW, BUSY } = CONTROL_CODES;
+  assert.equal(refusedDetail(refusals()), undefined);
+  assert.equal(
+    refusedDetail(refusals(TOOLS, TOOLS)),
+    FREE_CHAT_DETAILS.noToolSeller,
+  );
+  assert.equal(
+    refusedDetail(refusals(TOO_SLOW, TOO_SLOW)),
+    FREE_CHAT_DETAILS.noFastSeller,
+  );
+  // The sellers with tools were all too slow: the size is what no seller can serve.
+  assert.equal(
+    refusedDetail(refusals(TOOLS, TOO_SLOW)),
+    FREE_CHAT_DETAILS.noFastSeller,
+  );
+  // Another seller was busy (or gone): neither reason explains the failure.
+  assert.equal(refusedDetail(refusals(TOO_SLOW, BUSY)), undefined);
+  assert.equal(refusedDetail(refusals(TOOLS, BUSY)), undefined);
 });

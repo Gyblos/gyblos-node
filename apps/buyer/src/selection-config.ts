@@ -90,6 +90,8 @@ export interface BuyerSelectionConfig {
   failover?: BuyerFailover;
   // Set per request, never read from selection.json: the seller that served this conversation before.
   previousSeller?: string;
+  // Set per request: that seller, while its prompt cache likely still holds the conversation.
+  warmSeller?: string;
 }
 function parseRequest(value: unknown): SellerRequest {
   const row = controlObject(value, [

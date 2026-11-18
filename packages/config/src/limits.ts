@@ -25,13 +25,6 @@ export const PROMPT_READING = {
   msPerInputToken: 10,
   // A seller refuses at quote time a request it would not finish reading with this long left to answer.
   answerReserveMs: 15_000,
-  // Prompts shorter than this (mostly cached, or tiny) do not measure a seller's reading speed.
-  minSampleTokens: 256,
-  // How much each new measurement moves the seller's estimate of its reading speed.
-  sampleWeight: 0.3,
-  // A request that ran out of time before its first token caps the estimate this long, or until a
-  // measurement replaces it.
-  timeoutCapMs: 10 * 60_000,
 } as const;
 export function generationDeadlineMs(
   baseMs: number,

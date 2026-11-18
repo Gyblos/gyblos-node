@@ -517,14 +517,17 @@ Request fields (required unless marked optional; unknown fields at every level a
     with `FREE_EXECUTION_UNSUPPORTED` before generation.
   - A buyer may send its estimate of the request's input tokens in its quote
     request (`params.inputTokens`, a positive integer; only the size, never the
-    text). A seller that has measured its engine's prompt reading speed refuses
+    text). Every candidate asked receives it, so the reference buyer rounds it up
+    to a multiple of 1024. A seller that has measured its engine's prompt
+    reading speed refuses
     a request it would not finish reading with 15 seconds left before its
     engine deadline, with `CONTROL_TOO_SLOW_TO_READ`. A seller that has not
     measured yet quotes it. The signed offer is unchanged. Sellers before this
-    field refuse such quote requests with `INVALID_CONTROL_REQUEST`; a buyer
-    then repeats the quote request once without `inputTokens` and counts only
-    the second answer. A buyer omits the size for the seller that answered the
-    conversation's previous turn, whose prompt cache holds most of it.
+    field refuse such quote requests with `INVALID_CONTROL_REQUEST`; when the
+    seller itself sent that error, a buyer repeats the quote request once
+    without `inputTokens` and counts only the second answer. A buyer omits the
+    size for the seller that answered the conversation's previous turn less than
+    4 minutes ago, whose prompt cache likely still holds most of it.
 
 Success response:
 `{version: 4, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason, toolCalls?}}`.

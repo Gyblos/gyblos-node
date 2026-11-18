@@ -164,7 +164,8 @@ export const CONTROL_CODES = {
   SIGNATURE: 'INVALID_CONTROL_SIGNATURE',
   EXPIRED: 'EXPIRED_CONTROL_RECORD',
   CANCELLED: 'CONTROL_CANCELLED',
-  TOOLS: 'CONTROL_TOOLS_UNSUPPORTED', // The offer's engine does not serve the asked tools.
+  // The buyer asked for tools and this offer's engine does not serve them.
+  TOOLS: 'CONTROL_TOOLS_UNSUPPORTED',
   TOO_SLOW: 'CONTROL_TOO_SLOW_TO_READ', // It would not read a request this size in time.
 } as const;
 export type ControlCode = (typeof CONTROL_CODES)[keyof typeof CONTROL_CODES];
