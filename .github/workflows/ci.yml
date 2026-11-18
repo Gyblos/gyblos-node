@@ -88,7 +88,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: pnpm lint
+      # The docs job already checks formatting across the repository on every run.
+      - run: pnpm lint:code
 
   # `pnpm test` split by file; the patterns match its script in package.json.
   test:
@@ -189,8 +190,26 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # This installer test serves its own release fixture and can start while Linux builds the package.
+  windows-installer:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --import tsx --test tests/windows-install.test.ts
+
   # The seller on Windows (#235): private files and keys protected by the folder ACL, setup, init and
-  # doctor, the packaged seller from its archive and from npm, its service and installer, and the
+  # doctor, the packaged seller from its archive and from npm, its service, and the
   # running daemon. Windows runners bill at twice Linux, so
   # only the Windows-specific tests run here.
   windows:
@@ -212,7 +231,7 @@ jobs:
         with:
           name: windows-package
           path: ${{ runner.temp }}/windows-package
-      - run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts tests/windows-service.test.ts tests/windows-task.test.ts tests/windows-install.test.ts
+      - run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts tests/windows-service.test.ts tests/windows-task.test.ts
         env:
           GYBLOS_WINDOWS_PACKAGE: ${{ runner.temp }}/windows-package
           GYBLOS_WINDOWS_VERSION: 0.0.0-ci.1
@@ -225,7 +244,18 @@ jobs:
   # docs-only change count as passed.
   check:
     if: always()
-    needs: [changes, docs, static, test, lab, build, windows-package, windows]
+    needs:
+      [
+        changes,
+        docs,
+        static,
+        test,
+        lab,
+        build,
+        windows-package,
+        windows-installer,
+        windows,
+      ]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

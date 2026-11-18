@@ -9,7 +9,8 @@
     "node": ">=24.22.1"
   },
   "scripts": {
-    "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm skills:check && pnpm boundaries",
+    "lint": "pnpm format:check && pnpm lint:code",
+    "lint:code": "eslint . && pnpm tooling:test && pnpm skills:check && pnpm boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json && tsc -p apps/docs/tsconfig.json && tsc -p apps/explorer/tsconfig.json",
