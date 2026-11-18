@@ -157,3 +157,17 @@ access rules and expire after seven days. Do not use them for a privately
 disclosed vulnerability; see [SECURITY.md](../../SECURITY.md). No model
 credentials or raw transcripts are uploaded. Local tests use a synthetic Pi
 implementation.
+
+The PR comment identifies failed workflow steps and summarizes review failures
+using fixed descriptions. Pi reports assistant completion, usage and errors
+through its JSON event stream. Only recognized error categories, process counts
+and available token totals enter the public diagnostic summary. Missing usage is
+shown as unknown. Reported tokens can be partial and are not a billing total.
+
+An explicit exhausted quota or rejected credential stops new Pi processes for
+the remainder of that run, including independent verifiers. Already started
+processes finish. Each new workflow run checks the provider independently. Pi
+session and provider retries are disabled in the isolated settings directory.
+Temporary rate limits, invalid response formats and incomplete coverage are
+reported separately. The detailed task and verifier records remain in the
+artifact.

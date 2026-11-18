@@ -1,14 +1,29 @@
 // Owns bounded Pi subprocess I/O. No tools, extensions, MCP, context discovery or target execution are enabled.
 import { spawn } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import {
   MAX_AGENT_OUTPUT_BYTES,
   PI_TASK_TIMEOUT_MS,
   PI_TERMINATE_GRACE_MS,
+  REVIEW_FAILURE,
   type PiThinkingLevel,
+  type ReviewFailure,
 } from './constants';
 import type { PiProcessResult } from './types';
 
+export async function preparePiDirectory(directory: string): Promise<void> {
+  for (const name of ['tmp', 'config', 'cache', 'pi'])
+    await mkdir(join(directory, name));
+  await writeFile(
+    join(directory, 'pi', 'settings.json'),
+    JSON.stringify({
+      retry: { enabled: false, provider: { maxRetries: 0 } },
+      enableInstallTelemetry: false,
+    }),
+  );
+}
 export function buildPiArguments(
   model: string,
   thinking: PiThinkingLevel,
@@ -16,6 +31,8 @@ export function buildPiArguments(
 ): string[] {
   return [
     '--print',
+    '--mode',
+    'json',
     '--no-session',
     '--no-skills',
     '--no-context-files',
@@ -40,6 +57,90 @@ export interface RunPiOptions {
   prompt: string;
   timeoutMs?: number;
 }
+// Only Pi's failed assistant envelope or failed process stderr can identify a provider error.
+function providerFailure(message: string): ReviewFailure {
+  if (
+    /\binsufficient_quota\b|\byou exceeded your current quota\b|\bbilling_hard_limit_reached\b/i.test(
+      message,
+    )
+  )
+    return REVIEW_FAILURE.QUOTA;
+  if (
+    /\binvalid_api_key\b|\bincorrect api key provided\b|^401\b/i.test(message)
+  )
+    return REVIEW_FAILURE.KEY;
+  if (/\brate_limit_exceeded\b|\brate limit reached\b|^429\b/i.test(message))
+    return REVIEW_FAILURE.RATE;
+  return REVIEW_FAILURE.PI;
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function assistantResult(
+  output: string,
+): Pick<PiProcessResult, 'stdout' | 'failure' | 'reportedTokens'> {
+  let result: Pick<PiProcessResult, 'stdout' | 'failure' | 'reportedTokens'> = {
+    stdout: '',
+    failure: REVIEW_FAILURE.PI,
+  };
+  for (const line of output.split('\n')) {
+    if (!line.trim()) continue;
+    const event: unknown = JSON.parse(line);
+    if (
+      !isRecord(event) ||
+      event.type !== 'message_end' ||
+      !isRecord(event.message) ||
+      event.message.role !== 'assistant'
+    )
+      continue;
+    const message = event.message;
+    const usage = message.usage;
+    const tokens = isRecord(usage) ? usage.totalTokens : undefined;
+    const reported =
+      typeof tokens === 'number' && Number.isSafeInteger(tokens) && tokens > 0
+        ? { reportedTokens: tokens }
+        : {};
+    if (message.stopReason === 'error' || message.stopReason === 'aborted')
+      return {
+        stdout: '',
+        failure: providerFailure(
+          typeof message.errorMessage === 'string' ? message.errorMessage : '',
+        ),
+        ...reported,
+      };
+    if (message.stopReason === 'length')
+      return { stdout: '', failure: REVIEW_FAILURE.LIMIT, ...reported };
+    if (message.stopReason !== 'stop' || !Array.isArray(message.content))
+      continue;
+    result = {
+      stdout: message.content
+        .filter(isRecord)
+        .filter(
+          (block) => block.type === 'text' && typeof block.text === 'string',
+        )
+        .map((block) => block.text)
+        .join('\n'),
+      ...reported,
+    };
+  }
+  return result;
+}
+function processOutput(
+  exitCode: number | null,
+  stdout: Buffer[],
+  stderr: Buffer[],
+): Pick<PiProcessResult, 'stdout' | 'failure' | 'reportedTokens'> {
+  if (exitCode !== 0)
+    return {
+      stdout: '',
+      failure: providerFailure(Buffer.concat(stderr).toString('utf8').trim()),
+    };
+  try {
+    return assistantResult(Buffer.concat(stdout).toString('utf8'));
+  } catch {
+    return { stdout: '', failure: REVIEW_FAILURE.PI };
+  }
+}
 export function runPi(options: RunPiOptions): Promise<PiProcessResult> {
   const child = spawn(
     options.command ?? 'pi',
@@ -54,6 +155,7 @@ export function runPi(options: RunPiOptions): Promise<PiProcessResult> {
     },
   );
   const chunks: Buffer[] = [];
+  const diagnostics: Buffer[] = [];
   let bytes = 0;
   let timedOut = false;
   let truncated = false;
@@ -69,20 +171,16 @@ export function runPi(options: RunPiOptions): Promise<PiProcessResult> {
     timedOut = true;
     terminate();
   }, options.timeoutMs ?? PI_TASK_TIMEOUT_MS);
-  child.stdout.on('data', (chunk: Buffer) => {
+  const collect = (target: Buffer[], chunk: Buffer) => {
     bytes += chunk.length;
-    if (bytes > MAX_AGENT_OUTPUT_BYTES) {
-      truncated = true;
-      terminate();
-    } else chunks.push(chunk);
-  });
-  child.stderr.on('data', (chunk: Buffer) => {
-    bytes += chunk.length;
-    if (bytes > MAX_AGENT_OUTPUT_BYTES) {
+    if (bytes <= MAX_AGENT_OUTPUT_BYTES) target.push(chunk);
+    else if (!truncated) {
       truncated = true;
       terminate();
     }
-  });
+  };
+  child.stdout.on('data', (chunk: Buffer) => collect(chunks, chunk));
+  child.stderr.on('data', (chunk: Buffer) => collect(diagnostics, chunk));
   // Prompts travel via stdin, avoiding OS argument limits and process-list disclosure.
   child.stdin.on('error', () => {
     /* close/error below supplies the result */
@@ -102,7 +200,9 @@ export function runPi(options: RunPiOptions): Promise<PiProcessResult> {
       resolve({
         exitCode,
         signal,
-        stdout: Buffer.concat(chunks).toString('utf8'),
+        ...(!timedOut && !truncated && !signal
+          ? processOutput(exitCode, chunks, diagnostics)
+          : { stdout: '' }),
         truncated,
         timedOut,
       });

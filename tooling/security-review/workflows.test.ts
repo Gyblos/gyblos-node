@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import vm from 'node:vm';
 
+import { REVIEW_FAILURE, REVIEW_PHASE } from './constants';
+
 const WORKFLOW = resolve('.github/workflows/ai-security-review.yml');
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
@@ -21,7 +23,14 @@ async function publisher(): Promise<string> {
   assert.ok(code);
   return code.replace(/^\s*import .+;\n/gm, '');
 }
-function runPublisher(code: string, base = BASE, merge = MERGE): string[][] {
+function runPublisher(
+  code: string,
+  base = BASE,
+  merge = MERGE,
+  diagnostics = '1\nunknown\n',
+  status = 'clean',
+  failedStep = '',
+): string[][] {
   const writes: string[][] = [];
   const pr = {
     state: 'open',
@@ -39,7 +48,8 @@ function runPublisher(code: string, base = BASE, merge = MERGE): string[][] {
           REVIEW_HEAD: HEAD,
           REVIEW_BASE: BASE,
           REVIEW_MERGE: MERGE,
-          REVIEW_JOB_RESULT: 'success',
+          REVIEW_JOB_RESULT: failedStep ? 'failure' : 'success',
+          FAILED_STEP: failedStep,
         },
         exit: () => {
           throw stopped;
@@ -51,7 +61,8 @@ function runPublisher(code: string, base = BASE, merge = MERGE): string[][] {
           isSymbolicLink: () => false,
           size: 6,
         }),
-        readFileSync: () => 'clean\n',
+        readFileSync: (path: string) =>
+          path.endsWith('diagnostics.txt') ? diagnostics : status,
       },
       execFileSync: (_command: string, args: string[]) => {
         if (args.includes('POST') || args.includes('DELETE')) {
@@ -211,4 +222,48 @@ void test('delayed invalidation preserves a completed result for the same snapsh
     if (error !== stopped) throw error;
   }
   assert.equal(writes.length, 0);
+});
+
+void test('publisher reports validated causes and rejects arbitrary diagnostic text', async () => {
+  const code = await publisher();
+  for (const [diagnostic, phrase] of [
+    [
+      'verify1 insufficient_quota',
+      'First independent verification: OpenAI rejected',
+    ],
+    [
+      'verify2 invalid_api_key',
+      'Second independent verification: OpenAI authentication failed',
+    ],
+    ['review rate_limited', 'Source review: OpenAI rate-limited'],
+    ['private-canary', 'failed to validate'],
+  ]) {
+    const writes = runPublisher(
+      code,
+      BASE,
+      MERGE,
+      '3\nunknown\n' + diagnostic,
+      'error',
+    );
+    const comment = writes.flat().join(' ');
+    assert.ok(comment.includes(phrase ?? ''));
+    assert.doesNotMatch(comment, /private-canary/);
+  }
+  assert.match(
+    runPublisher(code, BASE, MERGE, '', 'error', 'snapshot').flat().join(' '),
+    /snapshot parent verification failed/,
+  );
+});
+
+void test('publisher accepts every current diagnostic code and phase', async () => {
+  const code = await publisher();
+  for (const phase of Object.values(REVIEW_PHASE)) {
+    const diagnostics = [
+      '1',
+      '10',
+      ...Object.values(REVIEW_FAILURE).map((reason) => phase + ' ' + reason),
+    ].join('\n');
+    const writes = runPublisher(code, BASE, MERGE, diagnostics, 'error');
+    assert.match(writes.flat().join(' '), /Reported tokens: 10/);
+  }
 });

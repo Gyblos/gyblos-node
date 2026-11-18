@@ -97,3 +97,26 @@ export type PiThinkingLevel = (typeof PI_THINKING_LEVELS)[number];
 
 export const REVIEWABLE_FILE_PATTERN =
   /(^|\/)(?:\.git|\.local|\.pi|node_modules|dist|coverage|evidence|captures|measurements|private|internal)(?:\/|$)|(^|\/)(?:\.env(?:\.|$)|seller\.env$|AGENTS\.local\.md$)|\.(?:key|pem|log)$|\.private\.|-private\./i;
+
+export const REVIEW_FAILURE = {
+  QUOTA: 'insufficient_quota',
+  KEY: 'invalid_api_key',
+  RATE: 'rate_limited',
+  PI: 'pi_failed',
+  TIMEOUT: 'pi_timeout',
+  LIMIT: 'pi_output_limit',
+  SOURCE: 'source_omitted',
+  FORMAT: 'invalid_review_response',
+  COVERAGE: 'invalid_coverage',
+  VERIFY: 'invalid_verification',
+  BUDGET: 'invocation_budget',
+} as const;
+export type ReviewFailure =
+  (typeof REVIEW_FAILURE)[keyof typeof REVIEW_FAILURE];
+
+export const REVIEW_PHASE = {
+  REVIEW: 'review',
+  VERIFY_FIRST: 'verify1',
+  VERIFY_SECOND: 'verify2',
+  SCHEDULE: 'schedule',
+} as const;
