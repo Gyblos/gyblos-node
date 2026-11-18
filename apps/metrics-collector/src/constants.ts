@@ -306,6 +306,8 @@ export const COLLECTOR_SOLANA_RPC_BINDINGS = [
   'COLLECTOR_SOLANA_RPC_URL',
   'COLLECTOR_SOLANA_RPC_FALLBACK_URL',
 ] as const;
+// Operator token (secret) for the RPC probe; while unset the probe route does not exist.
+export const COLLECTOR_ADMIN_TOKEN_BINDING = 'COLLECTOR_ADMIN_TOKEN';
 // Log code of a scheduled run whose chain read failed; followed by a static reason only.
 export const COLLECTOR_CHAIN_INDEX_FAILED = 'COLLECTOR_CHAIN_INDEX_FAILED';
 // Log code of every scheduled chain read: calls per endpoint, rate limits, work done and backlog.
