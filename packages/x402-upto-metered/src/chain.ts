@@ -27,6 +27,7 @@ import type {
   UptoChain,
   UptoChainStore,
   UptoChannelRecord,
+  UptoFeeLimits,
   UptoTerms,
 } from './types';
 import type { UptoVerifier } from './verify';
@@ -72,8 +73,10 @@ export interface UptoSdkChainOptions {
 export function createUptoFacilitator(
   signer: FacilitatorSvmSigner,
   store: UptoChainStore,
+  limits?: UptoFeeLimits,
 ): UptoFacilitatorScheme {
   return new UptoFacilitatorScheme(signer, {
+    ...limits,
     pendingSettlementStore: durablePendingStore(store),
     // This metered adapter opts in; the unconfigured upstream SDK remains Open-only.
     allowClosingClaims: true,

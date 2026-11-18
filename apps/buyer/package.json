@@ -70,6 +70,7 @@
     "@gyblos/runtime": "workspace:*",
     "@gyblos/node": "workspace:*",
     "@gyblos/engine-ollama": "workspace:*",
+    "@gyblos/payments-upto": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",
     "@gyblos/protocol": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",

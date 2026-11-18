@@ -1,17 +1,21 @@
-// Main-frame owner actions; delegated secrets remain in host memory and copy without being revealed.
+// Main-frame owner actions; delegated secrets stay in host memory until an explicit copy or reveal.
 import {
   AGENT_SETUP_CODES,
   AGENT_TOOLS,
   AgentSetupError,
 } from '@gyblos/node/agent-setup';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
-import { parseBuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
+import {
+  keyObject,
+  parseBuyerApiKeyCommand,
+} from '@gyblos/protocol/buyer-api-keys';
 
 import { prepareAgentSetup, type AgentSetupFiles } from './agent-setup-host';
 import { paypalAgentExample } from './paypal-agent-example';
 import {
   emptyUsdcApi,
   USDC_API_ACTION,
+  type UsdcApiSecret,
   type UsdcApiState,
 } from './usdc-api-model';
 import type { X402Client } from './x402-client';
@@ -35,6 +39,41 @@ class UsdcApiHost {
   close() {
     this.closed = true;
     this.secrets.clear();
+  }
+  async reveal(
+    event: Sender,
+    args: readonly unknown[],
+  ): Promise<UsdcApiSecret> {
+    const input = keyObject(this.request(event, args), ['id', 'policyId']);
+    const policy = this.current();
+    if (
+      !policy ||
+      this.busy ||
+      input.policyId !== policy.policyId ||
+      typeof input.id !== 'string' ||
+      !BUYER_API.POLICY_PATTERN.test(input.id)
+    )
+      throw new Error('API key is unavailable');
+    this.busy = true;
+    try {
+      await this.refresh();
+      this.request(event, args); // Navigation or shutdown while refreshing revokes this read too.
+      if (
+        this.current()?.policyId !== input.policyId ||
+        this.state.snapshot?.blocked ||
+        !this.state.snapshot?.keys.some(
+          (key) => key.id === input.id && !key.revoked,
+        )
+      )
+        throw new Error('API key is unavailable');
+      const secret = this.secrets.get(input.id);
+      if (!secret) throw new Error('API key is unavailable');
+      return { id: input.id, policyId: policy.policyId, secret };
+    } catch {
+      throw new Error('API key is unavailable');
+    } finally {
+      this.busy = false;
+    }
   }
   private current() {
     const policy = this.client.policy();
@@ -109,7 +148,7 @@ class UsdcApiHost {
     else throw new Error('Unsupported key action');
     return structuredClone(this.state);
   }
-  async run(event: Sender, args: readonly unknown[]): Promise<UsdcApiState> {
+  private request(event: Sender, args: readonly unknown[]) {
     if (
       this.closed ||
       this.owner.destroyed() ||
@@ -121,7 +160,10 @@ class UsdcApiHost {
       Array.isArray(args[0])
     )
       throw new Error('Unsupported API key request');
-    const input = Object.fromEntries(Object.entries(args[0]));
+    return Object.fromEntries(Object.entries(args[0]));
+  }
+  async run(event: Sender, args: readonly unknown[]): Promise<UsdcApiState> {
+    const input = this.request(event, args);
     const policy = this.current();
     if (!policy) return emptyUsdcApi();
     if (this.busy)

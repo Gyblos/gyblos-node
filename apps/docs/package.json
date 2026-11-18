@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./assistant-links": "./lib/assistant-links.ts"
+    "./assistant-links": "./lib/assistant-links.ts",
+    "./theme-script": "./lib/theme-script.ts"
   },
   "scripts": {
     "dev": "next dev",

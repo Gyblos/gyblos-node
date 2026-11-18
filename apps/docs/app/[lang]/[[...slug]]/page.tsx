@@ -1,10 +1,5 @@
 // Renders one MDX page per language and path, with canonical and hreflang links.
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-} from 'fumadocs-ui/layouts/docs/page';
+import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -28,12 +23,16 @@ export default async function Page(props: PageProps) {
   const MDX = page.data.body;
   const isHomePage = !slug?.length;
 
+  // A page opens with its title and actions only: the sidebar already shows the section, and the
+  // description stays in the page metadata for search and link previews.
   return (
     <DocsPage
       toc={page.data.toc}
-      full={page.data.full}
+      full={isHomePage || page.data.full}
+      tableOfContent={{ enabled: !isHomePage }}
+      tableOfContentPopover={{ enabled: !isHomePage }}
       className={isHomePage ? 'docs-home-page' : undefined}
-      breadcrumb={{ enabled: !isHomePage }}
+      breadcrumb={{ enabled: false }}
     >
       <div className="docs-page-header">
         <div className="docs-page-heading">
@@ -45,9 +44,6 @@ export default async function Page(props: PageProps) {
               spanish={lang === 'es'}
             />
           </div>
-          <DocsDescription className="mb-0">
-            {page.data.description}
-          </DocsDescription>
         </div>
       </div>
       <DocsBody>

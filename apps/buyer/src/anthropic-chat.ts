@@ -42,6 +42,7 @@ import {
   type ChatResult,
   type ChatStreamFormat,
 } from './free-sse';
+import { slowSellerMessage } from './slow-seller';
 
 function system(value: unknown): string[] {
   if (value === undefined || value === null) return [];
@@ -216,7 +217,7 @@ export function anthropicStream(model: string): ChatStreamFormat {
         type: 'error',
         error: {
           type: HTTP_ERROR_KINDS.default,
-          message: code,
+          message: slowSellerMessage(stop) ?? code,
           code,
           ...(stop.reason ? { reason: stop.reason } : {}),
           ...(stop.delivered

@@ -28,6 +28,10 @@ export const BRAND_COLORS = {
 
 type ThemeStyle = CSSProperties & { [token: `--${string}`]: string };
 
+export function prefersLightTheme() {
+  return window.matchMedia('(prefers-color-scheme: light)').matches;
+}
+
 export function themeStyle(light: boolean): ThemeStyle {
   const colors = BRAND_COLORS;
   return {

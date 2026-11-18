@@ -6,6 +6,8 @@ import type {
   aggObservedDaily,
   ReceiptTotals,
 } from './schema-aggregates';
+import type { aggFailuresDaily, aggOriginDaily } from './schema-breakdowns';
+import type { aggChainDaily } from './schema-chain';
 
 // Summed receipt totals of grouped rows, with the newest computation time and the formula versions
 // they were computed with.
@@ -40,14 +42,26 @@ export interface SellerBuyersRow {
 }
 export type ObservedRow = typeof aggObservedDaily.$inferSelect;
 export type DemandRow = typeof aggDemandDaily.$inferSelect;
+export type ChainDayRow = typeof aggChainDaily.$inferSelect;
+export type OriginRow = typeof aggOriginDaily.$inferSelect;
+export type FailureRow = typeof aggFailuresDaily.$inferSelect;
+// How far the chain index has read: whether the program's history before the first run is complete,
+// and when the index last moved. Null before the first run.
+export interface ChainIndexState {
+  backfillDone: boolean;
+  updatedAt: number;
+}
 
 export interface StatsReader {
   // Network rows per day and paid flag; observed rows per day; demand rows, at most
   // AGGREGATES.maxPublicDemandPerDay per day, largest first.
+  // Origin rows per day, paid flag and client; failure rows per day, side, client, event and reason.
   network(range: DayRange): Promise<{
     network: NetworkRow[];
     observed: ObservedRow[];
     demand: DemandRow[];
+    origins: OriginRow[];
+    failures: FailureRow[];
   }>;
   // Rows per model and paid flag, at most AGGREGATES.maxPublicModels models, most completed first.
   models(range: DayRange): Promise<ModelRow[]>;
@@ -59,4 +73,8 @@ export interface StatsReader {
     models: SellerModelRow[];
     buyers: SellerBuyersRow[];
   }>;
+  // Chain rows per day and scope, and the index state.
+  chain(
+    range: DayRange,
+  ): Promise<{ days: ChainDayRow[]; index: ChainIndexState | null }>;
 }

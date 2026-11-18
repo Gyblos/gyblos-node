@@ -1,5 +1,7 @@
 // Coordinates the small startup window and main window without accessing secrets.
 // Closing either window cancels the handoff; readiness never starts networking.
+import { startupPercentage } from './startup-progress';
+
 export interface StartupWindow {
   isDestroyed(): boolean;
   show(): void;
@@ -12,6 +14,7 @@ export function startupHandoff(
   main: StartupWindow,
   loading: StartupWindow,
   signal?: AbortSignal,
+  onProgress?: (percentage: number) => void,
 ) {
   let prepared = false;
   let painted = false;
@@ -23,6 +26,10 @@ export function startupHandoff(
   };
   if (signal?.aborted) cancel();
   else signal?.addEventListener('abort', cancel, { once: true });
+  const report = () => {
+    if (!cancelled && !completed)
+      onProgress?.(startupPercentage(prepared, painted));
+  };
   const reveal = () => {
     if (!prepared || !painted || cancelled || completed || main.isDestroyed())
       return;
@@ -35,7 +42,9 @@ export function startupHandoff(
     if (!cancelled && !completed && !loading.isDestroyed()) loading.show();
   });
   main.once('ready-to-show', () => {
+    if (cancelled || completed) return;
     painted = true;
+    report();
     reveal();
   });
   loading.once('closed', () => {
@@ -47,9 +56,12 @@ export function startupHandoff(
     cancel();
     if (!loading.isDestroyed()) loading.destroy();
   });
+  report();
   return {
     prepared() {
+      if (prepared || cancelled || completed) return;
       prepared = true;
+      report();
       reveal();
     },
     cancelled: () => cancelled,

@@ -52,7 +52,7 @@ void test('every tool gets every model with its limits, on the local endpoint', 
     output: 2000,
   });
   assert.deepEqual(opencode.models['qwen3-0.6b']?.limit, {
-    context: 32768,
+    context: 8192,
     output: 100,
   });
   const pi = piProvider(ENDPOINT);
@@ -60,7 +60,7 @@ void test('every tool gets every model with its limits, on the local endpoint', 
   assert.deepEqual(
     pi.models.map((model) => [model.id, model.maxTokens, model.contextWindow]),
     [
-      ['qwen3-0.6b', 100, 32768],
+      ['qwen3-0.6b', 100, 8192],
       ['gpt-oss-20b', 2000, 131072],
     ],
   );
@@ -83,7 +83,7 @@ void test('every tool gets every model with its limits, on the local endpoint', 
   );
   assert.match(
     profileBody!,
-    /^# .*\nmodel_provider = "gyblos"\nmodel = "qwen3-0.6b"\nweb_search = "disabled"\n$/,
+    /^# .*\nmodel_provider = "gyblos"\nmodel = "qwen3-0.6b"\nweb_search = "disabled"\nmodel_context_window = 8192\nmodel_auto_compact_token_limit = 8092\n$/,
   );
   assert.match(profileDigest!, /^[0-9a-f]{64}\n$/);
   assert.match(profiles[2]!.text, /model = "gpt-oss-20b"/);
@@ -361,7 +361,7 @@ void test('profiles of models no longer served are removed, but never an edited 
 
 void test('a Codex profile carries the context size when it is known', () => {
   const [first, , second] = codexProfiles(ENDPOINT);
-  assert.doesNotMatch(first!.text, /model_context_window/);
+  assert.match(first!.text, /model_context_window = 8192\n/);
   assert.match(
     second!.text,
     /\nmodel_context_window = 131072\nmodel_auto_compact_token_limit = 129072\n/,

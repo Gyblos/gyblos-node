@@ -5,6 +5,7 @@ import type { I18nProviderProps } from 'fumadocs-ui/contexts/i18n';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { type ReactNode } from 'react';
 
+import { themeScriptProps } from '../lib/theme-script';
 import SearchDialog from './search';
 
 export function Provider({
@@ -15,7 +16,11 @@ export function Provider({
   children: ReactNode;
 }) {
   return (
-    <RootProvider i18n={i18n} search={{ SearchDialog }}>
+    <RootProvider
+      i18n={i18n}
+      search={{ SearchDialog }}
+      theme={{ scriptProps: themeScriptProps(typeof window !== 'undefined') }}
+    >
       {children}
     </RootProvider>
   );

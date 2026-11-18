@@ -97,6 +97,7 @@ export function insertEnvelope(
   database: SqliteD1,
   role: 'seller' | 'buyer',
   at: number,
+  clientKind = role === 'seller' ? 'seller-node' : 'buyer-desktop',
 ) {
   const id = hex(`envelope-${++sequence}`);
   database.raw
@@ -104,13 +105,14 @@ export function insertEnvelope(
       `INSERT INTO collector_envelopes (id, kind, uploader_node_id, role, client_kind, app_version,
         platform, arch, nonce, sent_at, received_at, skew_ms, item_count, signature, signed_json,
         inserted_at)
-       VALUES (?, 'observations', ?, ?, 'buyer-desktop', '0.1.0-beta.11', 'macos', 'arm64', ?, ?, ?,
+       VALUES (?, 'observations', ?, ?, ?, '0.1.0-beta.11', 'macos', 'arm64', ?, ?, ?,
         0, 1, 'sig', '{}', ?)`,
     )
     .run(
       id,
       hex(`uploader-${sequence}`),
       role,
+      clientKind,
       hex(`nonce-${sequence}`),
       at,
       at,
@@ -141,5 +143,27 @@ export function insertObservation(
       (record.model as string | undefined) ?? 'synthetic/model',
       JSON.stringify(record),
       insertedAt,
+    );
+}
+
+// One upload's report of a receipt, as the collector stores it per envelope.
+export function insertReport(
+  database: SqliteD1,
+  envelopeId: string,
+  receiptKey: string,
+  role: 'seller' | 'buyer',
+) {
+  database.raw
+    .prepare(
+      `INSERT INTO collector_reports (envelope_id, receipt_key, role, fingerprint, seller_digest,
+        buyer_digest, merge, stored_at, started_at, offer_json, inserted_at)
+       VALUES (?, ?, ?, ?, ?, NULL, 'new', NULL, NULL, NULL, 0)`,
+    )
+    .run(
+      envelopeId,
+      receiptKey,
+      role,
+      hex(`rf-${++sequence}`),
+      hex(`rs-${sequence}`),
     );
 }

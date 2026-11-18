@@ -14,7 +14,7 @@ import {
   shouldMonitorPaypal,
   type PaymentMethod,
 } from './paypal-model';
-import { themeStyle } from './theme';
+import { prefersLightTheme, themeStyle } from './theme';
 import { Activity } from './ui/Activity';
 import { AddFunds } from './ui/AddFunds';
 import { announcedModels } from './ui/announced-models';
@@ -136,7 +136,7 @@ export function DesktopApp() {
     window.addEventListener('resize', resize);
     return () => window.removeEventListener('resize', resize);
   }, []);
-  const [light, setLight] = useState(false);
+  const [light, setLight] = useState(prefersLightTheme);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
     PAYMENT_METHOD.USDC,
   );

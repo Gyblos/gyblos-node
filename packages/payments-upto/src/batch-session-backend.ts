@@ -30,6 +30,7 @@ import type {
 import { waitBatch } from './batch-session-wait';
 import { createBuyerObservationRpc } from './buyer-observation-transport';
 import { BATCH_OPENING_LIMITS } from './constants';
+import { assertFeeWire, limitedFeePayer } from './fee-payer';
 import { verifyPaymentNetwork } from './seller-network';
 
 interface Options {
@@ -121,6 +122,11 @@ async function firstProof(
   if (Buffer.byteLength(payload) > BATCH_OPENING_LIMITS.bytes)
     return sessionFail(SESSION_CODES.LIMIT);
   const opening = openingFor(JSON.parse(payload), terms);
+  try {
+    assertFeeWire(opening.deposit.transaction, terms.feePayer);
+  } catch {
+    return sessionFail(SESSION_CODES.UNVERIFIED);
+  }
   const requirements = await requirementsFor(terms);
   const unused = async () => sessionFail(SESSION_CODES.UNAVAILABLE);
   const verifier = await facilitator(
@@ -152,7 +158,9 @@ export function openBatchSellerBackend(
   privatePlatform();
   const signer =
     options.signer ??
-    toFacilitatorSvmSigner(options.feePayer, { defaultRpcUrl: options.rpcUrl });
+    toFacilitatorSvmSigner(limitedFeePayer(options.feePayer), {
+      defaultRpcUrl: options.rpcUrl,
+    });
   return {
     inspect: () => inspectBatchSession(options.paths),
     async renew(

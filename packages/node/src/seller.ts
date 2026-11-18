@@ -370,8 +370,16 @@ export async function startSeller(
       { relayOnly, limits: settings.limits },
     );
     disposers[endpointDisposeIndex] = () => bridge.close();
+    // The last publication error, kept in status.json so `gyblos seller status` can show why the index
+    // refused this seller. Written only when it changes.
+    let publicationError: string | null = null;
+    let publicationChanged = () => {};
     const publication = publicationConfig
       ? createSellerPublisher({
+          onError: (code) => {
+            publicationError = code;
+            publicationChanged();
+          },
           records: control.records,
           canPublish: () => {
             const observed = offers.readiness();
@@ -415,7 +423,13 @@ export async function startSeller(
         relayOnly,
         offers: offerStatus(settings, offers),
         offerTicket,
+        ...(publication
+          ? { publication: { lastError: publicationError } }
+          : {}),
       });
+    publicationChanged = () => {
+      writeReady().catch(() => {});
+    };
     const retry = retrySellerOffers(pending, {
       ...offerDependencies,
       add: async (live) => {

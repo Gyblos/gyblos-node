@@ -5,6 +5,7 @@ export const PORTS = {
   facilitator: 4022,
   buyerProxy: 4031,
   seller: 4032,
+  desktopBuyer: 4033,
 } as const;
 
 export const HOSTS = {

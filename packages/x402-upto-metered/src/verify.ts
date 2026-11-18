@@ -9,7 +9,7 @@ import { decodeUptoPayload } from './authorization';
 import { UPTO, UPTO_ERROR_CODES } from './constants';
 import { UptoError } from './errors';
 import { uptoRequirements } from './requirements';
-import type { UptoAuthorization, UptoTerms } from './types';
+import type { UptoAuthorization, UptoFeeLimits, UptoTerms } from './types';
 
 function offline(): never {
   throw new UptoError(UPTO_ERROR_CODES.INTERNAL);
@@ -40,8 +40,12 @@ export type UptoVerifier = (
 export function createUptoVerifier(
   feePayer: Address,
   slot: () => Promise<bigint>,
+  limits?: UptoFeeLimits,
 ): UptoVerifier {
-  const facilitator = new UptoFacilitatorScheme(verifyingSigner(feePayer));
+  const facilitator = new UptoFacilitatorScheme(
+    verifyingSigner(feePayer),
+    limits,
+  );
   return async (authorization, terms) => {
     try {
       const payload = decodeUptoPayload(authorization);

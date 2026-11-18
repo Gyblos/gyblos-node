@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./payment-fees": "./src/payment-fees.ts",
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
     "./home": "./src/home.ts",

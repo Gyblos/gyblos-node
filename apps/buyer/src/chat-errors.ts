@@ -24,6 +24,7 @@ import {
   type ChatPayment,
   type ChatStreamFormat,
 } from './free-sse';
+import { slowSellerMessage } from './slow-seller';
 
 // How an error is answered: its code and status, whether the prompt certainly never left this
 // process (only then may a client retry), and the stop and payment it carries.
@@ -140,9 +141,10 @@ export function replyError(
         code,
         status,
         neverSent: view.neverSent,
-        // A refused request explains itself; every other error keeps its code as the message.
+        // A refused request and a too-slow seller explain themselves; every other error keeps its code.
         message:
           view.detail ||
+          slowSellerMessage(stop) ||
           (retry !== undefined ? FREE_CHAT_DETAILS.coolingDown(retry) : code),
         param: view.param ?? null,
         // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.

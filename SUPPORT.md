@@ -1,29 +1,38 @@
 # Support
 
-Gyblos Node is experimental and supports Solana devnet only. Support is provided
-by maintainers on a best-effort basis, without a response or resolution deadline.
-There is no production support commitment or promise of compatibility between
-experimental revisions.
+## Where to get help
 
-Ask questions and get help from the team and other beta testers in the
-[Gyblos Telegram](https://t.me/gyblos). The group is public.
-
-Search existing [issues](https://github.com/Gyblos/gyblos-node/issues) before
-opening a bug report, usage question or feature proposal. Use the issue forms
-when applicable. Include your source revision, operating system, Node.js and
-pnpm versions, the command used, and a minimal synthetic reproduction.
-
-Do not post keys, tokens, prompts, responses, journals, payment authorizations,
-wallet backups, private endpoints or raw logs. A timeout does not prove that a
-payment failed: stop further paid calls and follow the documented reconciliation
-procedure. Maintainers will never ask for your private keys or wallet backup.
-
-- **Security vulnerabilities:** follow [SECURITY.md](SECURITY.md); do not open a
+- **Questions and help:** the public [Gyblos Telegram](https://t.me/gyblos),
+  with the team and other beta testers.
+- **Seller problems:** start with
+  [troubleshooting](https://docs.gyblos.com/en/help/troubleshooting). It lists
+  the [information you can share safely](https://docs.gyblos.com/en/help/troubleshooting#ask-for-help-safely),
+  such as `gyblos seller status` output or a `gyblos doctor` code.
+- **Bugs, usage questions and feature proposals:** search the existing
+  [issues](https://github.com/Gyblos/gyblos-node/issues) first, then open one
+  with the matching issue form. Include your source revision or release version,
+  operating system, Node.js and pnpm versions, the command you ran and a minimal
+  reproduction with synthetic data.
+- **Security vulnerabilities:** follow [SECURITY.md](SECURITY.md). Don't open a
   public issue with exploit details or sensitive data.
-- **Conduct reports:** contact the address in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-- **Contribution proposals:** follow [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Conduct reports:** contact the address in
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- **Contributions:** follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The initial maintainer is [@gilbertsahumada](https://github.com/gilbertsahumada).
-Issues are the project's general discussion channel; GitHub Discussions is not
-required. Maintainers may request a smaller reproduction, defer a proposal or
-decline work outside the current project direction.
+## What never to share
+
+Don't post keys, tokens, invite codes, `seller.env`, prompts, responses,
+receipts, journals, payment authorizations, wallet backups, private endpoints,
+environment dumps or raw logs. Maintainers never
+ask for your private keys or wallet backup.
+
+A timeout doesn't prove that a payment failed. Stop further paid calls and
+follow [recovery and reconciliation](docs/recovery.md).
+
+## What to expect
+
+Gyblos Node is experimental and supports Solana devnet only. Maintainers help on
+a best-effort basis, with no response or resolution deadline, no production
+support commitment and no promise of compatibility between experimental
+revisions. Maintainers may ask for a smaller reproduction, defer a proposal or
+decline work outside the project's direction.

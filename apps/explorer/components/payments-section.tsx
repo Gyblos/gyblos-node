@@ -1,113 +1,97 @@
-// Owns the Payments section: settlements of Gyblos traffic on Solana devnet, their totals, volume
-// per day, earnings per seller wallet and the most recent settlements.
-import { getChain, type Settlement } from '../lib/chain';
-import { explorerTxUrl } from '../lib/config';
-import { DISPLAY, UNITS } from '../lib/constants';
-import { short, usdc, utc } from '../lib/format';
+// Owns the Payments section: what Gyblos channels moved on Solana devnet, from the collector's chain
+// index (GET /v1/stats/chain): settled USDC, payouts to sellers, Gyblos fees, refunds, volume per day,
+// and the whole program's traffic for scale. Gyblos traffic is a label the channel's open declares.
+import { summarizeChain, type ChainSummary } from '../lib/chain-shape';
+import { getChainStats } from '../lib/chain-stats';
+import { DISPLAY } from '../lib/constants';
+import { count, percent, usdc, utc } from '../lib/format';
 import {
-  ratioText,
-  summarizePayments,
-  type DayVolume,
-  type SellerEarnings,
-} from '../lib/payments';
-import {
-  Addr,
   moneyCell,
   numberCell,
   SectionTitle,
   Stat,
   Table,
   td,
-  timeCell,
   Unavailable,
 } from './ui';
 
-const blockTimeText = (seconds: number | null) =>
-  utc(seconds ? seconds * UNITS.msPerSecond : null);
+function meta(backfillDone: boolean | null, aggregatedAt: number | null) {
+  if (backfillDone === null) return 'chain index starting';
+  if (!backfillDone) return 'reading chain history';
+  return `updated ${utc(aggregatedAt)}`;
+}
 
 export async function PaymentsSection() {
-  const chain = await getChain();
+  const chain = await getChainStats();
   if (chain.error) return <Unavailable title="Payments" />;
-  const payments = summarizePayments(chain);
-  const { settled } = payments;
+  const summary = summarizeChain(chain);
+  const { totals } = summary;
   return (
     <>
       <SectionTitle
-        title="Payments"
-        meta={
-          chain.pending
-            ? `${chain.pending} transactions still loading`
-            : `last ${blockTimeText(payments.lastBlockTime)}`
-        }
+        title="Payments · 30 days"
+        meta={meta(chain.backfillDone, chain.aggregatedAt)}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Settlements" value={String(settled.length)} />
-        <Stat label="Paid to sellers" value={usdc(payments.toSellers)} money />
-        <Stat label="Gyblos fees" value={usdc(payments.fees)} money />
+        <Stat label="Settled" value={usdc(totals.settled)} money />
+        <Stat label="Paid to sellers" value={usdc(totals.paidOut)} money />
+        <Stat label="Gyblos fees" value={usdc(totals.gyblosFees)} money />
         <Stat
           label="Effective fee"
-          value={ratioText(payments.fees, payments.gross)}
+          value={summary.feeShare === null ? '—' : percent(summary.feeShare)}
         />
+        <Stat label="Channels opened" value={count(totals.opens)} />
+        <Stat label="Deposited" value={usdc(totals.deposited)} money />
+        <Stat label="Refunded" value={usdc(totals.refunded)} money />
         <Stat
-          label="Buyers · sellers paid"
-          value={`${payments.buyers} · ${payments.earnings.length}`}
-        />
-        <Stat label="Escrow released" value={usdc(payments.escrow)} money />
-        <Stat
-          label="Escrow used"
-          value={ratioText(payments.spent, payments.escrow)}
-        />
-        <Stat
-          label="Avg paid per settlement"
-          value={
-            settled.length ? usdc(payments.gross / BigInt(settled.length)) : '—'
-          }
-          money
+          label="Gyblos · program txs"
+          value={`${count(totals.transactions)} · ${count(summary.programTransactions)}`}
         />
       </div>
-      <VolumeChart days={payments.days} max={payments.maxDayPaid} />
-      <EarningsTable earnings={payments.earnings} />
-      <SettlementsTable settled={settled} />
+      <VolumeChart summary={summary} />
+      <DailyTable summary={summary} />
+      <p className="mt-4 text-xs text-dim">
+        Gyblos channels are those whose open carries a Gyblos memo, a label
+        anyone can set. The program is shared: its other traffic is only
+        counted.
+      </p>
     </>
   );
 }
 
-function barHeight(paid: bigint, max: bigint) {
-  const tenths = max === 0n ? 0 : Number((paid * DISPLAY.barScale) / max);
+function barHeight(value: bigint, max: bigint) {
+  const tenths = max === 0n ? 0 : Number((value * DISPLAY.barScale) / max);
   return Math.max(tenths / DISPLAY.barScaleToPercent, DISPLAY.barMinPercent);
 }
 
-function VolumeChart({
-  days,
-  max,
-}: {
-  days: [string, DayVolume][];
-  max: bigint;
-}) {
+function VolumeChart({ summary }: { summary: ChainSummary }) {
+  const days = summary.days.slice(-DISPLAY.chartDays);
   if (!days.length) return null;
   return (
     <>
-      <SectionTitle title="Volume by day" />
+      <SectionTitle title="Settled by day" />
       <div className="rounded-xl border border-line bg-panel p-4">
         <div className="flex h-40 items-end gap-2">
-          {days.map(([day, volume]) => (
+          {days.map(({ day, gyblos }) => (
             <div
               key={day}
               className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
-              title={`${day}: ${volume.count} settlements, ${usdc(volume.paid)}`}
+              title={`${day}: ${usdc(gyblos.settled)} settled, ${gyblos.settles} settlements`}
             >
               <span className="font-mono text-[10px] text-dim">
-                {volume.count}
+                {gyblos.settles}
               </span>
               <div
                 className="w-full max-w-12 rounded-t bg-brand"
-                style={{ height: `${barHeight(volume.paid, max)}%` }}
+                style={{
+                  height: `${barHeight(gyblos.settled, summary.maxDaySettled)}%`,
+                }}
               />
             </div>
           ))}
         </div>
         <div className="mt-2 flex gap-2">
-          {days.map(([day]) => (
+          {days.map(({ day }) => (
             <span
               key={day}
               className="min-w-0 flex-1 truncate text-center font-mono text-[10px] text-dim"
@@ -121,78 +105,37 @@ function VolumeChart({
   );
 }
 
-function EarningsTable({ earnings }: { earnings: [string, SellerEarnings][] }) {
-  if (!earnings.length) return null;
+function DailyTable({ summary }: { summary: ChainSummary }) {
+  if (!summary.days.length) return null;
   return (
     <>
-      <SectionTitle title="Seller earnings" />
+      <SectionTitle title="Daily on chain" />
       <Table
+        minWidth={DISPLAY.dailyTable}
         head={[
-          { label: 'Seller' },
+          { label: 'Day (UTC)' },
+          { label: 'Opens', right: true },
           { label: 'Settlements', right: true },
-          { label: 'Earned', right: true },
+          { label: 'Settled', right: true },
+          { label: 'To sellers', right: true },
           { label: 'Fees', right: true },
-          { label: 'Last' },
+          { label: 'Refunded', right: true },
+          { label: 'Program txs', right: true },
         ]}
       >
-        {earnings.map(([wallet, entry]) => (
-          <tr key={wallet} className="border-t border-line">
-            <td className={`${td} font-mono`}>
-              <Addr value={wallet} />
-            </td>
-            <td className={numberCell}>{entry.count}</td>
-            <td className={moneyCell}>{usdc(entry.paid)}</td>
-            <td className={moneyCell}>{usdc(entry.fees)}</td>
-            <td className={timeCell}>{blockTimeText(entry.last)}</td>
-          </tr>
-        ))}
-      </Table>
-    </>
-  );
-}
-
-function SettlementsTable({ settled }: { settled: Settlement[] }) {
-  if (!settled.length) return null;
-  return (
-    <>
-      <SectionTitle title="Settlements" />
-      <Table
-        minWidth={DISPLAY.wideTable}
-        head={[
-          { label: 'Time' },
-          { label: 'Transaction' },
-          { label: 'Buyer' },
-          { label: 'Seller' },
-          { label: 'To seller', right: true },
-          { label: 'Fee', right: true },
-          { label: 'Refund', right: true },
-        ]}
-      >
-        {settled.slice(0, DISPLAY.recentSettlements).map((settlement) => (
-          <tr key={settlement.signature} className="border-t border-line">
-            <td className={timeCell}>{blockTimeText(settlement.blockTime)}</td>
-            <td className={`${td} font-mono`}>
-              <a
-                className="hover:text-brand"
-                href={explorerTxUrl(settlement.signature)}
-              >
-                {short(
-                  settlement.signature,
-                  DISPLAY.signatureEdge,
-                  DISPLAY.signatureEdge,
-                )}
-              </a>
-            </td>
-            <td className={`${td} font-mono`}>
-              <Addr value={settlement.payer} />
-            </td>
-            <td className={`${td} font-mono`}>
-              <Addr value={settlement.seller} />
-            </td>
-            <td className={moneyCell}>{usdc(settlement.sellerAtomic)}</td>
-            <td className={moneyCell}>{usdc(settlement.feeAtomic)}</td>
+        {[...summary.days].reverse().map(({ day, gyblos, program }) => (
+          <tr key={day} className="border-t border-line">
+            <td className={`${td} font-mono`}>{day}</td>
+            <td className={numberCell}>{count(gyblos.opens)}</td>
+            <td className={numberCell}>{count(gyblos.settles)}</td>
+            <td className={moneyCell}>{usdc(gyblos.settled)}</td>
+            <td className={moneyCell}>{usdc(gyblos.paidOut)}</td>
+            <td className={moneyCell}>{usdc(gyblos.gyblosFees)}</td>
             <td className={`${numberCell} text-muted`}>
-              {usdc(settlement.refundAtomic)}
+              {usdc(gyblos.refunded)}
+            </td>
+            <td className={`${numberCell} text-muted`}>
+              {program ? count(program.transactions) : '—'}
             </td>
           </tr>
         ))}

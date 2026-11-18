@@ -48,6 +48,7 @@ export const X402_ACTION = {
 
 export const USDC_API = {
   CHANNEL: 'desktop:usdc-api-keys',
+  REVEAL_CHANNEL: 'desktop:usdc-api-key-reveal',
   POLL_MS: 3000,
   DEFAULT_LIMIT: '0.01',
 } as const;

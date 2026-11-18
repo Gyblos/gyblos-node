@@ -1,4 +1,5 @@
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
+import { DesktopBuyerFailure } from './buyer-error';
 import type { X402Budget } from './x402-budget';
 import type { X402Client } from './x402-client';
 import {
@@ -12,7 +13,7 @@ import {
 
 type Owner = { contents: unknown; mainFrame(): unknown; destroyed(): boolean };
 type Sender = { sender: unknown; senderFrame: unknown };
-function actionError(action: unknown, blocked: boolean) {
+function actionError(action: unknown, blocked: boolean, error: unknown) {
   if (blocked)
     return 'Spending status needs review. Further messages are blocked.';
   if (action === X402_ACTION.CONNECT || action === X402_ACTION.START_BUYER)
@@ -20,7 +21,9 @@ function actionError(action: unknown, blocked: boolean) {
   if (action === X402_ACTION.AUTHORIZE)
     return 'Budget not authorized. It must cover the maximum cost of one response.';
   if (action === X402_ACTION.SEND)
-    return 'Response unavailable. The request was not retried.';
+    return error instanceof DesktopBuyerFailure
+      ? `${error.message} The request was not retried.`
+      : 'Response unavailable. The request was not retried.';
   return 'The action could not complete.';
 }
 async function referenceAction(
@@ -155,11 +158,11 @@ export function createX402Handlers(
       )
         throw new Error('Unsupported buyer request');
       return await summary();
-    } catch {
+    } catch (error) {
       const current = await summary();
       return {
         ...current,
-        error: actionError(input.action, current.summary.blocked),
+        error: actionError(input.action, current.summary.blocked, error),
       };
     }
   };

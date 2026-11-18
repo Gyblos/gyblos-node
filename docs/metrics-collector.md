@@ -1,38 +1,44 @@
 # Metrics collector Worker
 
-`apps/metrics-collector` (`@gyblos/metrics-collector`) is the public receipt
-collector: a Cloudflare Worker at `https://collector.gyblos.com`, built with
-Hono and D1. Release builds of sellers, the buyer CLI and the buyer desktop app
-send their signed receipts to it, plus their own timestamps, in the
-[receipt upload envelope](../packages/protocol/SPEC.md#receipt-upload-envelope-v1),
-and content-free observations. Raw rows stay private. A scheduled run turns them
-into [aggregates](#aggregates), and the [public stats API](#public-stats-api)
-serves aggregates only.
+`apps/metrics-collector` (`@gyblos/metrics-collector`) is the metrics collector:
+a Cloudflare Worker at `https://collector.gyblos.com`, built with Hono and D1.
 
-It was first deployed on 2026-11-16 with its own D1 database `gyblos-collector`.
-Applying migrations and deploying are founder-approved manual steps (see
-[Operations](#operations)). Every verification goes through `@gyblos/protocol`
+- **What it receives.** Release builds of the seller node, the buyer CLI and the
+  desktop app upload their signed receipts and content-free telemetry
+  observations, each in a signed
+  [upload envelope](../packages/protocol/SPEC.md#receipt-upload-envelope-v1).
+- **What stays private.** Raw receipts, observations and envelopes are never
+  served.
+- **What is public.** A scheduled run turns raw rows into
+  [aggregates](#aggregates), and the [public stats API](#public-stats-api)
+  serves aggregates only. A scheduled [chain index](#chain-index) reads the
+  payment-channel program, the only source of settled amounts.
+
+Every verification goes through `@gyblos/protocol`
 (`verifyReceiptUploadEnvelope`) and `@gyblos/core/public-receipts`
 (`classifyPublicReceipt`); the app keeps no copy of the signing or receipt
-rules.
+rules. The local receipt receiver for private testing is a different app
+(`apps/receipt-collector`); see [receipts.md](receipts.md).
 
 ## Endpoints
 
-| Route                           | Purpose                                                               |
-| ------------------------------- | --------------------------------------------------------------------- |
-| `POST /v1/receipts`             | Upload one signed envelope of 1 to 50 receipts.                       |
-| `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events. |
-| `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                |
-| `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).       |
-| `GET /v1/stats/models`          | Totals per model over a day range.                                    |
-| `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                            |
+| Route                           | Purpose                                                                |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| `POST /v1/receipts`             | Upload one signed envelope of 1 to 50 receipts.                        |
+| `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events.  |
+| `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                 |
+| `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).        |
+| `GET /v1/stats/models`          | Totals per model over a day range.                                     |
+| `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                             |
+| `GET /v1/stats/chain`           | Payment-channels program activity per UTC day ([chain](#chain-stats)). |
 
 Every response carries `Cache-Control: no-store`, except a successful stats
 answer, which is `public, max-age=300`. Every response also carries
 `X-Robots-Tag: noindex` and `X-Content-Type-Options: nosniff`. There is no CORS:
-only nodes call it. The collector is HTTPS only: a non-`https` URL gets
-`400 HTTPS_REQUIRED` for every method and path, before storage or any limiter.
-Anything else is `404 NOT_FOUND`.
+nodes upload, and the explorer (`apps/explorer`) reads the stats API from its
+server. The collector is HTTPS only: a non-`https` URL gets `400 HTTPS_REQUIRED`
+for every method and path, before storage or any limiter. Anything else is
+`404 NOT_FOUND`.
 
 ### `POST /v1/receipts`
 
@@ -81,7 +87,7 @@ Success, `200`:
 The response says only how many receipts were accepted, so an uploader cannot
 learn whether the other side has reported. Accepted does not mean counted:
 conflicts are kept as evidence and excluded from totals (see
-[receipt-policy.md](receipt-policy.md)).
+[receipts.md](receipts.md)).
 
 Errors are `{ "error": "<CODE>" }` with a static code; input is never echoed.
 
@@ -106,85 +112,15 @@ Errors are `{ "error": "<CODE>" }` with a static code; input is never echoed.
 the corrected `sentAt`. A node with a wrong clock still gets its data in, and
 the skew is stored.
 
-## Uploader (nodes)
-
-`@gyblos/node/receipt-uploader` sends a role's pending receipts from its private
-store, which never evicts a receipt before it is uploaded. The seller daemon and
-the shared buyer (CLI and desktop) start it next to their receipt runtime.
-
-**When it uploads:**
-
-- Every release build uploads to `https://collector.gyblos.com/v1`, with no user
-  setting to turn it off (founder decision 2026-11-16). This covers CLI builds
-  with `GYBLOS_VERSION` and the packaged desktop app, which passes its version
-  to the buyer it runs.
-- A build without a version uploads only when `GYBLOS_COLLECTOR_URL` is set, so
-  tests and development never use the network.
-- `GYBLOS_COLLECTOR_URL` must be `https`, or `http` on a loopback host, with no
-  credentials, query or fragment. Any other value turns uploading off.
-
-**What leaves the machine:**
-
-- Each signed receipt: both NodeIds, the seller's owner wallet, the model and
-  its settings, the engine kind, token counts, sizes, timings, outcome and price
-  fields.
-- Envelope metadata: the uploader's role, client kind (`seller-node`,
-  `buyer-cli`, `buyer-desktop`), release version, platform and architecture, and
-  the uploader's own store time.
-- The collector also sees the uploader's IP address on the connection. It uses
-  the address for rate limits and never stores it.
-- Prompts, responses, keys and endpoint addresses are never sent.
-
-**Behavior:**
-
-- **Pacing:** batches of up to 50 receipts, every minute, and immediately again
-  after a full batch.
-- **What counts as uploaded:** only a `200` carrying the collector's
-  `receivedAt` and `accepted` equal to the batch size marks receipts uploaded,
-  and the acknowledgement uses the node's own clock. Redirects are refused.
-- **Failures:**
-  - A network error, `5xx`, `429`, `413`, a non-stale `409`, or an unconfirmed
-    `200` backs off from one minute, doubling up to one hour. The receipts stay
-    pending.
-  - `STALE_UPLOAD` corrects the clock from `serverTime` and resends once.
-  - A batch refused as invalid is retried one receipt at a time. Receipts
-    refused on their own are skipped for the life of the process, up to 200. If
-    every receipt is refused, the envelope itself is the problem: the uploader
-    backs off and marks nothing.
-- **Effect on inference:** it never blocks or retries inference.
-- **Stopping:** `close()` aborts an upload in flight. Anything not yet
-  acknowledged stays pending.
-- **Observations are on by default and can be turned off** with
-  `GYBLOS_OBSERVATIONS=off` (founder decision 2026-11-16). Receipts have no
-  opt-out. The packaged desktop passes this setting to its buyer.
-- **Observations are self-reported.** A buyer can attach a refusal or failure to
-  any seller, and node keys are free. Totals must keep observations apart from
-  receipt-backed figures, and must never count them against a seller without a
-  confirming source. Re-sent events are stored once, keyed by uploader and the
-  exact record, and each event's `at` must fall within 30 days before `sentAt`.
-- **Observations:** the seller and buyer telemetry events go through an
-  in-memory buffer of at most 5000 events. The buffer exists only when this
-  process uploads, and does not depend on the local telemetry file opt-in. The
-  uploader sends up to 200 events after each receipt batch. A failed send puts
-  them back. A batch the collector refuses as invalid is dropped and counted, so
-  it cannot block later ones. A restart loses at most the buffered events.
-- **Not sent yet:**
-  - the buyer's accepted offer facts (`offer` is still `null`);
-  - paid v2 receipts, until nodes emit them.
-
-  The buyer's request start time arrives through observations.
-
-  The HTTP client lives in `@gyblos/node`. Moving it into an adapter package,
-  and the collector's route and error codes into the protocol, is follow-up
-  work.
-
 ### `POST /v1/observations`
 
 The same headers, body cap, admission, clock window, replay protection and
 errors as `POST /v1/receipts`. The body is a signed
 [observation upload envelope](../packages/protocol/src/observation-upload.ts):
 the same uploader fields, with `events` in place of `items`, under its own
-signing domain `gyblos/observation-upload/v1\n`.
+signing domain `gyblos/observation-upload/v1\n`. Re-sent events are stored once,
+keyed by uploader and the exact record, and each event's `at` must fall within
+the 30 days before `sentAt`.
 
 Each event must be exactly core's validated telemetry projection
 (`toTelemetryRecord`). The kinds are request received, first token, completed,
@@ -210,6 +146,76 @@ These events carry what receipts cannot:
 - the seller's route;
 - the time each request started (`at` on the request's events, joined by
   `requestId`).
+
+## Uploader (nodes)
+
+`@gyblos/node/receipt-uploader` sends a role's pending receipts and buffered
+observations. The seller daemon and the shared buyer (CLI and desktop app) start
+it next to their receipt runtime. The receipt store never evicts a receipt
+before it is uploaded.
+
+**When it uploads:**
+
+- Every release build uploads to `https://collector.gyblos.com/v1`. That covers
+  CLI builds with `GYBLOS_VERSION` and the packaged desktop app, which passes
+  its version to the buyer it runs.
+- Receipts have no opt-out.
+- Observations are on by default. Set `GYBLOS_OBSERVATIONS=off` to stop sending
+  them; the packaged desktop app passes this setting to its buyer.
+- A build without a version uploads only when `GYBLOS_COLLECTOR_URL` is set, so
+  tests and development never use the network.
+- `GYBLOS_COLLECTOR_URL` must be `https`, or `http` on a loopback host, with no
+  credentials, query or fragment. Any other value turns uploading off.
+
+**What leaves the machine:**
+
+- Each signed receipt: both NodeIds, the seller's owner wallet, the model and
+  its settings, the engine kind, token counts, sizes, timings, outcome and price
+  fields.
+- Each observation: the validated telemetry record described in
+  [telemetry.md](telemetry.md#events) (request id, NodeIds, model, timings,
+  token counts, outcome and route; never content).
+- Envelope metadata: the uploader's role, client kind (`seller-node`,
+  `buyer-cli`, `buyer-desktop`), release version, platform and architecture, and
+  the uploader's own store time.
+- The collector also sees the uploader's IP address on the connection. It uses
+  the address for rate limits and never stores it.
+- Prompts, responses, keys and endpoint addresses are never sent.
+
+**Receipts:**
+
+- Batches of up to 50 receipts, every minute, and at once again after a full
+  batch.
+- Only a `200` carrying the collector's `receivedAt` and `accepted` equal to the
+  batch size marks receipts uploaded. The acknowledgement uses the node's own
+  clock. Redirects are refused.
+- A network error, `5xx`, `429`, `413`, a non-stale `409`, or an unconfirmed
+  `200` backs off from one minute, doubling up to one hour. The receipts stay
+  pending.
+- `STALE_UPLOAD` corrects the clock from `serverTime` and resends once.
+- A batch refused as invalid is retried one receipt at a time. Receipts refused
+  on their own are skipped for the life of the process, up to 200. If every
+  receipt is refused, the envelope itself is the problem: the uploader backs off
+  and marks nothing.
+- The buyer's accepted offer facts are not sent (`offer` is `null`); the buyer's
+  request start time arrives through observations.
+
+**Observations:**
+
+- Seller and buyer telemetry events go through an in-memory buffer of at most
+  5,000 events. The buffer exists only when this process uploads, and doesn't
+  depend on the local telemetry file setting.
+- The uploader sends up to 200 events after each receipt batch. A failed send
+  puts them back. A batch the collector refuses as invalid is dropped and
+  counted, so it can't block later ones. A restart loses at most the buffered
+  events.
+- Observations are self-reported: a buyer can attach a refusal or failure to any
+  seller, and node keys are free. Aggregates keep observations apart from
+  receipt-backed figures and never count them against a seller without a
+  confirming source.
+
+**Effect on inference:** the uploader never blocks or retries inference.
+`close()` aborts an upload in flight; anything not acknowledged stays pending.
 
 ## Aggregates
 
@@ -240,11 +246,12 @@ rather than stopping it.
 `INSERT … SELECT … GROUP BY` over that day's raw rows. The day leaves the dirty
 set in the same batch, so readers see the old day or the new one, never a mix. A
 day whose batch fails stays dirty for the next run and never blocks the others.
-A run is two reads, one scan batch of 4 statements (6 once after a formula
-change) and 17 statements per day, whatever the day's row count; no statement
-binds more than a few values. Sums use SQLite `total()`, which cannot overflow:
-they are exact while a day's total stays below 2^53 (about 9 billion USDC in
-atomic units) and approximate above. A run whose days fail logs
+The receipt part of a run is two reads, one scan batch of 4 statements (7 once
+after a formula change) and 21 statements per day, whatever the day's row count
+(the chain part follows with its own reads and batches); no statement binds more
+than a few values. Sums use SQLite `total()`, which cannot overflow: they are
+exact while a day's total stays below 2^53 (about 9 billion USDC in atomic
+units) and approximate above. A run whose days fail logs
 `COLLECTOR_AGGREGATION_FAILED` with the day names only. Every aggregate row
 stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
 
@@ -272,8 +279,8 @@ stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
 - **Authorized usage:** the sum of `amountAtomic` and `feeAtomic` of paid
   receipts **both sides signed** (bilateral), in USDC atomic units. A
   seller-only paid receipt counts as a request but adds no amount: only the
-  seller signed it. It is not revenue: settled USDC comes only from the chain
-  (#349, not built yet).
+  seller signed it. It is not revenue: settled USDC comes only from the
+  [chain index](#chain-index).
 - **Buyers:** free buyers are distinct NodeIds; paid buyers are distinct wallets
   (`payer`, or the NodeId when a paid receipt names none). Free and paid are
   separate rows and are never added up.
@@ -301,11 +308,38 @@ two keys of the same person, so request, token, buyer, seller and model counts
 can be inflated with self-made keys (sybils). Observations are self-reported by
 their uploader and never count against a seller without a confirming source.
 Read every figure as what nodes reported and signed, not as proof of real use;
-only chain settlement (#349) proves payment.
+only chain settlement proves payment.
 
-Not yet included: the daily signed snapshot with a Merkle root and inclusion
-proofs, chain metrics (transactions, settled USDC, fees; they need the indexer
-in #349), and online sellers from presence (they live in the discovery index).
+**Breakdowns** (migration `0005_breakdowns.sql`):
+
+- `collector_agg_origin_daily`: headline requests per day, paid flag and the
+  application of the buyer that reported them (`buyer-desktop`, `buyer-cli`), by
+  outcome, with distinct buyers. The origin is the client of a buyer-role upload
+  that carried the receipt; `unknown` when only the seller reported it (a buyer
+  with uploads off, or one that never uploaded).
+- `collector_agg_failures_daily`: failed, refused and unserved observations per
+  day, by the side and application that reported them, event and reason, with
+  events and distinct buyers. The reason is a failure's stop reason (for example
+  `engine_timeout`), else its code (for example `FREE_EXECUTION_LIMIT_EXCEEDED`,
+  the context limit, or `FREE_EXECUTION_CANCELLED`); a refusal's kind; `none`
+  for unserved demand. Every value is a validated protocol enum.
+
+Read them with care:
+
+- A buyer and its seller each report a failure or refusal of the same request,
+  so `buyer` and `seller` rows are two views of the same requests: never add
+  them up.
+- A receipt carried by uploads from both applications of one buyer key counts
+  once, under the first client name in sort order (`buyer-cli`).
+- Seller-side `buyers` counts the buyer NodeIds the seller itself reported: a
+  claim, unlike buyer-side rows, where each buyer is a signing key.
+
+`AGGREGATES.formulaVersion` 2 added them, so every day is recomputed once.
+
+The aggregates do not include a signed daily snapshot (Merkle root and inclusion
+proofs) or online sellers from presence, which the
+[discovery index](discovery-index.md#uptime) reports. Chain figures are in
+[Chain aggregates](#chain-aggregates).
 
 ## Public stats API
 
@@ -338,21 +372,227 @@ section has:
 - paid only: `authorizedAtomic` and `feeAtomic` (bilateral receipts only), as
   decimal strings.
 
+A breakdown row (`origins`, `failures`) with fewer than 5 distinct buyers is
+withheld whole: its labels stay, and `buyers`, `requests`, `outcomes` and
+`events` are `null`. Withholding hides the row, not necessarily its value: the
+day's `free` and `paid` totals and `demand` are always published, so a single
+withheld row can follow from them by subtraction (for example free requests
+minus the visible origins).
+
 Unique buyer counts (`buyers`) come with `withheld`: below 5 (zero included) the
 count is `null` and `withheld` is `true`, per seller and for the network. Only
 the count is withheld: a seller's day and model totals (requests, tokens,
 authorized amounts) are published whatever its number of buyers, so on a day
 with one buyer they describe that one pseudonymous buyer's use of that seller.
 
-| Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `modelsServed`, `buyers`, `withheld`); `observed` (`buyerLatency.firstToken`, `buyerLatency.total`, `routes.direct`, `routes.relay`, `routes.unknown`), `null` without observations that day; and `demand`: up to 20 models per day, largest first, each `modelId`, `unserved`, `refusedBeforeSelection`, `connectFailed`. |
-| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`).                                                                                                                                                                                                                                                 |
-| `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                     |
+| Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `modelsServed`, `buyers`, `withheld`); `observed` (`buyerLatency.firstToken`, `buyerLatency.total`, `routes.direct`, `routes.relay`, `routes.unknown`), `null` without observations that day; and `demand`: up to 20 models per day, largest first, each `modelId`, `unserved`, `refusedBeforeSelection`, `connectFailed`; `origins`: each `client`, `paid`, `requests`, `outcomes` (`completed`, `failed`, `cancelled`), `buyers`, `withheld`; and `failures`: each `side`, `client`, `event`, `reason`, `events`, `buyers`, `withheld`, most events first. |
+| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
-Each stats request is one batch of reads over aggregate tables: three statements
-for the network and seller answers, one for models, whatever the range.
-Histograms are summed and lists are capped in SQL.
+Each stats request is one batch of reads over aggregate tables: five statements
+for the network answer, three for the seller answer, one for models, two for
+chain, whatever the range. Histograms are summed and lists are capped in SQL.
+
+### Chain stats
+
+`GET /v1/stats/chain` takes the same range and envelope, plus `network` (the
+CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`: whether the
+program's history is fully read (`backfillDone`) and when the index last moved
+(`updatedAt`), or `null` before its first run. Until `backfillDone`, older days
+may still be missing. `days` lists every day of the range with `program` and
+`gyblosClaimed`, each `null` without activity that day:
+
+- `program` (anyone's traffic, from the signature list only): `transactions`
+  (successful and failed) and `failed`;
+- `gyblosClaimed` (read in full): `transactions`, `channels`, `payers`,
+  `payees`, `undecodable`; `instructions`: `open`, `settle`, `topUp`,
+  `settleAndSeal`, `requestClose`, `seal`, `distribute`, `reclaim`; and `usdc`:
+  `depositedAtomic`, `settledAtomic`, `gyblosFeesAtomic`,
+  `programTreasuryAtomic`, `refundedAtomic`, `paidOutAtomic`, as decimal
+  strings.
+
+This is the only source of settled USDC and fees: a paid receipt's
+`authorizedAtomic` is usage both sides signed for, not payment. `gyblosClaimed`
+is a self-declared label ([chain index](#chain-index)); wallets are public on
+chain, so payer and payee counts are not withheld.
+
+## Chain index
+
+The scheduled run aggregates first, then reads the Solana payment-channel
+program (`CHANNEL_PROGRAM` in `@gyblos/config`; code in `src/chain/`), so a slow
+RPC never delays the stats. The chain is the only source of settled USDC and
+fees: nothing here comes from node reports. Without a database the read is
+skipped.
+
+**What it costs.** The program is shared and busy (hundreds of other projects'
+transactions a day, bursts of tens of thousands), so the index reads in full
+only what concerns Gyblos and spends as few RPC calls as possible:
+
+- It runs on the free public devnet RPC (`DEVNET_RPC_URL`), one call at a time
+  (no JSON-RPC batches, which are billed and limited per call anyway), at least
+  500 ms apart, at most 80 calls per run.
+- The optional `COLLECTOR_SOLANA_RPC_URL` secret (a paid RPC: https, or http on
+  loopback, with no credentials, query or fragment) is used only after the
+  public RPC rate-limits a run (HTTP 429 or its limit code), for at most 20
+  calls in that run, and never otherwise.
+- Every run logs `COLLECTOR_CHAIN_INDEX_RUN` with the calls and rate limits per
+  endpoint, whether it moved to the paid one, what it counted, read and
+  followed, the accounts read, and whether work is left (`backlog`). Many
+  `publicLimited` or a lasting `backlog` are the signal to rely on the paid RPC
+  for a while.
+- Measured once on devnet from one machine (not from Cloudflare, whose shared
+  addresses the public RPC may limit more): reading history cost 10 to 18 calls
+  per run with no rate limit; once caught up, an idle run costs 1 call, plus one
+  per followed channel and one per hundred Gyblos accounts every 30 minutes.
+
+**What is read, and when.** Finalized data, newest first, in five phases:
+
+- **Gap, forward, history:** the program's signature list
+  (`getSignaturesForAddress`, a thousand per call, each with its error, block
+  time and memo): new signatures an earlier run could not cover (strictly
+  between `gap_until` and `gap_before`), signatures newer than
+  `newest_signature`, and history before `backfill_before`, up to 5 pages per
+  phase and run, until `CHAIN_INDEX.historyFloorMs` (2026-11-01; earlier history
+  is never read). Every listed signature is only counted per UTC day
+  (`collector_chain_program_daily`: transactions and failed ones). A transaction
+  is read in full (`getTransaction`, jsonParsed, versions 0 and 1) only when it
+  succeeded and its memo opens a Gyblos channel.
+- **Follow:** each Gyblos channel opened that way is followed through its own
+  signature list, polled at most every 30 minutes, up to 40 channels per run:
+  half for channels never polled, half for the least recently polled, so a burst
+  of new opens (anyone can open one with a Gyblos memo) never starves the
+  channels already known. Its later successful transactions are read in full,
+  oldest first, at most 20 per poll (the rest wait for the next poll). A channel
+  stops being followed once its account is gone (reclaimed), or when one poll
+  returns a full page (a thousand transactions in 30 minutes only come from an
+  attack): its later transactions are then no longer read, but its account state
+  still is.
+- **Accounts:** the accounts of the channels touched, of any never read, and of
+  every Gyblos channel not closed whose state is older than 30 minutes
+  (`getMultipleAccounts`, a hundred per call).
+
+Each stored stretch is written in one transaction with the cursor that covers it
+(`collector_chain_cursor`, a channel's `follow_until`), so every signature is
+counted once and a failed run resumes where it stopped. The cursor also keeps
+the slots of `newest_signature` and `gap_until`: a page holding older signatures
+(a lagging node that ignored `until`) is refused rather than counted twice. A
+lease (`lease_until`, 15 minutes) makes a run that overlaps another skip
+(`skipped=true` in its log line). A failed list phase does not stop the follow
+and account phases; the first failure is logged after them. After a full page, a
+gap answered empty is closed only when the signature right before `gap_before`
+is `gap_until` (one more call); otherwise it is a lagging RPC, retried next run.
+A transaction the RPC lists but cannot return (`null`), an empty page for a
+range known to hold signatures, a spent call budget or any RPC error stops the
+run there. A failure logs `COLLECTOR_CHAIN_INDEX_FAILED` with the phase (`gap`,
+`forward`, `backfill`, `follow`, `accounts`, or `start`), the error class, a
+static reason (an HTTP status, an RPC error code, a shape location) and the
+calls per endpoint, never a URL, which may carry a provider key. A secret that
+is set but rejected logs `COLLECTOR_CHAIN_INDEX_FAILED config`.
+
+**How a transaction is read** (`src/chain/decode.ts`, @x402/svm 2.28): every
+top-level program instruction by its one-byte discriminator — open (1), settle
+(2), top_up (3), settle_and_seal (4), request_close (5), seal (6), distribute
+(7), reclaim (9) — with its channel and parties from the account list, open's
+salt, deposit, open slot and splits, top_up's amount, and distribute's splits. A
+settle's cumulative amount is the voucher of the Ed25519 instruction right
+before it, counted only when the voucher names the same channel (and, for
+settle_and_seal, when it says it carries one). The net token change per owner
+and mint is stored as it happened: what distribute actually paid (seller, Gyblos
+fee, refund, or a payout the program redirected to its treasury), and what open
+and top_up deposited. Amounts are exact decimal text.
+
+Anyone can send transactions to the program. A **failed** transaction is stored
+with no instructions or token changes. A program instruction of a successful
+transaction this decoder cannot read is counted in `undecodable`, never guessed
+and never fatal. Program calls made through another program (inner instructions)
+are not read; their token changes are.
+
+| Table                           | One row per                | Notes                                                                                                   |
+| ------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `collector_chain_txs`           | Transaction read in full   | Slot, block time (ms), failed, undecodable, first memo (untrusted text).                                |
+| `collector_chain_instructions`  | Program instruction        | Kind, channel, parties, amount, voucher cumulative, splits.                                             |
+| `collector_chain_token_deltas`  | Transaction × owner × mint | Net token change; the basis of settled USDC, fees and refunds.                                          |
+| `collector_chain_channels`      | Channel                    | Parties and terms from open; deposit, settled, payout, status from its account; whether it is followed. |
+| `collector_chain_cursor`        | Run state                  | Newest signature known, the open gap, where history stopped, done.                                      |
+| `collector_chain_program_daily` | UTC day                    | The whole program's listed transactions and failed ones (none read).                                    |
+
+**Channel state.** After storing, the run reads the account of every channel a
+successful instruction named (and any never read): status (open, sealed,
+closing, distributed), deposit, settled cumulative amount and payout watermark.
+A missing account was reclaimed (`closed`); an account the program does not own,
+or of another size, holds no channel (`unknown`). Both keep the last known
+amounts.
+
+**Gyblos traffic is a claim.** The program is shared. A channel is marked
+`gyblos` when its open memo is Gyblos terms (`gyblos:`) or a Gyblos payment
+session (`gyblos/payment-session/v1:`); only those channels are read in full. A
+channel opened without that memo is never read, even if a distribute later pays
+the Gyblos treasury (only a transaction read for a Gyblos channel can still mark
+another channel it names). Anyone can make either claim, with any mint: metrics
+built on it must filter by the USDC mint and say the label is self-declared.
+
+### Chain aggregates
+
+The same scheduled run recomputes chain days (`src/aggregate-chain.ts`,
+migration `0004_chain_aggregates.sql`, table `collector_agg_chain_daily`) after
+the receipt days, with their own scan cursor (`collector_agg_chain_state`),
+dirty set (`collector_agg_chain_dirty_days`) and batch per day. The chain step
+never throws: a failed chain scan (logged
+`COLLECTOR_AGGREGATION_FAILED chain scan`) or chain day (`chain <days>`) is
+retried next run and never holds back receipt or observation days or the chain
+index that runs after. A day is the UTC day of the block time. The chain scan
+marks dirty:
+
+- the days of transactions indexed since the previous scan (`indexed_at`);
+- every day of a channel that a newly indexed open or distribute names, so an
+  open read after its settles (history is read newest first) or a later Gyblos
+  claim recomputes the channel's earlier days;
+- the days of a channel's settles at or after a newly indexed settle, since an
+  older settle changes what later ones added, and every settle day of a channel
+  after a newly indexed top-up, since deposits cap what settles count. Every
+  mark is driven from the newly indexed transactions through indexes, so its
+  cost follows what is new, and a new settle never re-marks the channel's whole
+  history.
+
+Before the first chain scan every indexed day is marked, and a formula change
+re-marks every chain day aggregated with another version. Each dirty day gets
+one row per scope: `program` (the whole program: only `transactions` and
+`failed`, from its signature list counts; every other column is zero) and
+`gyblos` (channels claiming Gyblos traffic, read in full); a scope with no
+activity that day has no row.
+
+- **Counts** (`gyblos`): successful transactions with an instruction in scope;
+  top-level instructions by kind; distinct channels, payers and payees;
+  `undecodable`: read transactions with a program instruction the decoder could
+  not read (such a transaction is also in `transactions` when another of its
+  instructions was read).
+- **Amounts** count channels in the devnet USDC mint only, as decimal strings.
+  `deposited`: open deposits plus top-ups. `settled`: each settle's signed
+  cumulative, capped at the channel's deposits, above the highest one the
+  channel settled before it, in chain order (a channel address derives from its
+  open slot, so it is never reopened): alternating vouchers never add twice, and
+  a self-signed cumulative never settles money the channel never held.
+- **Payouts** are the positive USDC changes in distribute and reclaim
+  transactions, by who received them: `gyblosFees` (the Gyblos fee treasury),
+  `programTreasury` (the program's own treasury: rounding residual and
+  redirected payouts), `refunded` (the payer of a channel the transaction names)
+  and `paidOut` (a payee or distribute recipient). Owners the channels do not
+  name never count, and a transaction whose payouts exceed what left its
+  channels' vaults (a transfer bundled with the payout) counts none, so payouts
+  never exceed what the program released. Within that bound a payer can still
+  move its own refund to a payee it controls. Payouts are per transaction, so in
+  the `gyblos` scope a transaction counts only when every distribute and reclaim
+  in it is for a Gyblos channel.
+- **Bounds:** sums use SQLite `total()`, so no value, however large, makes a day
+  fail; they are exact below 2^53 atomic units (about 9 billion USDC) and
+  saturate above. Instructions run through another program (CPI) are not read,
+  so they are not counted.
+
+The explorer doesn't read these aggregates, there is no mainnet treasury, and
+nothing reconciles paid receipts against settled amounts: no node signs paid
+receipt v2.
 
 ## Order of checks
 
@@ -385,11 +625,18 @@ is signed:
 
 ## Storage
 
-D1 tables are declared once in `src/schema.ts` (Drizzle) and created by
-`migrations/0001_metrics_collector.sql`; a test keeps both identical. Raw rows
-are append-only. Envelopes are never pruned: a conflict's signed receipt is kept
-only in its envelope's `signed_json`. Nothing stores an IP, a request header, a
-prompt, a response or an endpoint address.
+D1 tables are declared once with Drizzle and created by the migrations; a test
+keeps both identical:
+
+| Schema file                | Migration                     | Tables                                                    |
+| -------------------------- | ----------------------------- | --------------------------------------------------------- |
+| `src/schema.ts`            | `0001_metrics_collector.sql`  | Raw envelopes, reports, receipts, conflicts, observations |
+| `src/schema-aggregates.ts` | `0002_metrics_aggregates.sql` | `collector_agg_*`, `collector_first_seen`                 |
+| `src/schema-chain.ts`      | `0003_chain_index.sql`        | `collector_chain_*`                                       |
+
+Raw rows are append-only. Envelopes are never pruned: a conflict's signed
+receipt is kept only in its envelope's `signed_json`. Nothing stores an IP, a
+request header, a prompt, a response or an endpoint address.
 
 | Table                      | One row per                      | Holds                                                                                                                                                                         |
 | -------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -411,48 +658,41 @@ transactional batch:
 - One set-based history insert.
 - One set-based first-report-time update.
 
-Nothing runs once per receipt beyond chunking. Multi-row statements are split
-under D1's limit of 100 bound parameters per statement. A test pins the cost: 6
-statements for one receipt, at most 30 for 50, and no statement over 100
-parameters. The batch is one transaction: a replayed nonce aborts it and nothing
-is written.
+Nothing runs once per receipt beyond chunking. Multi-row statements stay under
+D1's limit of 100 bound parameters per statement. A test pins the cost: 6
+statements for one receipt and at most 30 for 50. The batch is one transaction:
+a replayed nonce aborts it and nothing is written.
+
+The shared write budget is the only ceiling on growth from free node keys, and
+Cloudflare counts it per location, so it is approximate.
 
 ## Code layout
 
-| Layer            | File                                                                                                                           | Owns                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| Entry            | `src/worker.ts`                                                                                                                | Cloudflare bindings, the scheduled run and the stats edge cache; fails closed; inert on import. |
-| HTTP             | `src/app.ts`, `src/ip-key.ts`                                                                                                  | Routes, admission middleware, body cap, error mapping.                                          |
-| Use case         | `src/ingest.ts`                                                                                                                | The order of checks and building one write.                                                     |
-| Policy           | `@gyblos/core/public-receipts`                                                                                                 | Receipt verification, classification and merge rules.                                           |
-| Storage port     | `src/storage.ts`                                                                                                               | The `CollectorStorage` interface and the shared write rule.                                     |
-| Storage adapters | `src/storage-d1.ts`, `src/storage-memory.ts`                                                                                   | D1 (Drizzle, `src/schema.ts`, `src/d1-client.ts`) and in-memory.                                |
-| Values           | `src/constants.ts`, `src/errors.ts`                                                                                            | Wire codes, statuses, limits, binding names, error mapping.                                     |
-| Aggregation      | `src/aggregate.ts`, `src/aggregate-sql.ts`, `src/aggregate-first-seen.ts`, `src/sql-primitives.ts`, `src/schema-aggregates.ts` | The scheduled run, metric formulas, SQL building blocks and the aggregate tables.               |
-| Stats use case   | `src/stats.ts`, `src/stats-shape.ts`, `src/days.ts`                                                                            | Typed answers, free/paid sections, percentiles, UTC day ranges.                                 |
-| Stats port       | `src/stats-store.ts`, `src/stats-read.ts`                                                                                      | The `StatsReader` interface and its D1 adapter.                                                 |
-| Stats HTTP       | `src/stats-routes.ts`, `src/http.ts`                                                                                           | Query parsing, cacheable answers, shared rejection.                                             |
+| Layer       | Files                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entry       | `src/worker.ts`: bindings, the scheduled run and the stats edge cache; inert on import.                                                                                         |
+| HTTP        | `src/app.ts`, `src/ip-key.ts`, `src/http.ts`, `src/stats-routes.ts`                                                                                                             |
+| Use cases   | `src/ingest.ts`, `src/ingest-observations.ts`, `src/stats.ts`, `src/stats-chain.ts`                                                                                             |
+| Policy      | `@gyblos/core/public-receipts`: receipt verification, classification and merge rules.                                                                                           |
+| Storage     | `src/storage.ts` (port), `src/storage-d1*.ts` and `src/storage-memory.ts` (adapters)                                                                                            |
+| Aggregation | `src/aggregate*.ts`, `src/sql-primitives.ts`                                                                                                                                    |
+| Stats reads | `src/stats-store.ts` (port), `src/stats-read.ts` (D1)                                                                                                                           |
+| Chain index | `src/chain/`: the scheduled read (`indexer.ts`, `list.ts`, `follow.ts`), call budgets and fallback (`endpoints.ts`), the RPC client, decoding and writes; `src/schema-chain.ts` |
+| Values      | `src/constants.ts`, `src/errors.ts`                                                                                                                                             |
 
 ## Operations
 
-Every step needs founder approval. The database, the first three rate limits,
-the route and migration `0001` were set up and deployed on 2026-11-16.
+Deploying, applying remote migrations, setting secrets and rebuilding aggregates
+for this service is a maintainer procedure kept outside the repository. The
+resource names, bindings and Cron Trigger are in
+`apps/metrics-collector/wrangler.jsonc`. To check the deployed collector:
 
-To ship a change, from `apps/metrics-collector`:
+```sh
+curl -s https://collector.gyblos.com/v1/health
+```
 
-1. Apply new migrations:
-   `npx wrangler@4.151.1 d1 migrations apply gyblos-collector --remote`.
-2. Deploy: `npx wrangler@4.151.1 deploy`. This also registers the Cron Trigger
-   and the read limiter (`namespace_id` 42621013, which must be unused in the
-   account).
+The output is similar to the following:
 
-After `0002`, the first scheduled run marks every day with data dirty and
-recomputes up to 31 days per run, newest first.
-
-To rebuild every aggregate from raw (for example to verify a formula), delete
-the rows of every `collector_agg_*` table and of `collector_first_seen`; the
-next run marks every day with raw data dirty again.
-
-One upload can run about 30 D1 statements in a batch. Watch the database size:
-the shared write budget is the only ceiling on growth from free node keys, and
-Cloudflare counts it per location, so it is approximate.
+```text
+{"ok":true}
+```
