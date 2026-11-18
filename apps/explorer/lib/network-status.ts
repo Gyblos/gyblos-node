@@ -1,6 +1,7 @@
 // Owns the shape of the discovery index's network status (GET /v1/network): every registered or recently
 // seen seller and whether it is online now, offline (seen before, no live presence) or unpublished
-// (never seen, or its catalog withdrawn). Checked at the boundary; exact keys, nothing private. Pure, no I/O.
+// (never seen, or its catalog withdrawn while the index keeps it). `truncated` means a source hit its cap:
+// nodes, counts or models may be incomplete. Checked at the boundary; exact keys, nothing private. Pure, no I/O.
 import {
   flag,
   list,

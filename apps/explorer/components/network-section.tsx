@@ -189,7 +189,8 @@ function NotOnlineTable({ network }: { network: NetworkStatus }) {
       </Table>
       {network.truncated ? (
         <p className="mt-2 text-xs text-dim">
-          The index cut this list short; the counts cover every seller.
+          The index reached one of its limits: this list and its counts may be
+          incomplete.
         </p>
       ) : null}
     </>
