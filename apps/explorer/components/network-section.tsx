@@ -4,6 +4,8 @@ import { DISPLAY } from '../lib/constants';
 import { getDiscovery, type Seller } from '../lib/discovery';
 import { count, percent, pricePerMtok, usdc, utc } from '../lib/format';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
+import { Chip } from './board/chip';
+import { StatusDot } from './board/status-dot';
 import {
   Addr,
   ModelName,
@@ -52,7 +54,9 @@ export async function NetworkSection() {
       >
         {[...summary.models].map(([name, model]) => (
           <tr key={name} className="border-t border-line">
-            <td className={td}>{name}</td>
+            <td className={td}>
+              <ModelName modelId={name} variant={null} quantization={null} />
+            </td>
             <td className={numberCell}>{model.sellers}</td>
             <td className={numberCell}>{model.free}</td>
             <td className={moneyCell}>{priceText(model.minInput)}</td>
@@ -74,6 +78,7 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
       minWidth={DISPLAY.wideTable}
       head={[
         { label: 'Seller' },
+        { label: 'Status' },
         { label: 'Model' },
         { label: 'Context', right: true },
         { label: 'Input / 1M', right: true },
@@ -90,6 +95,12 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
           >
             <td className={`${td} font-mono`} title={`Node ${seller.nodeId}`}>
               <Addr value={seller.owner} />
+            </td>
+            <td className={td}>
+              <Chip tone="brand">
+                <StatusDot />
+                Online
+              </Chip>
             </td>
             <td className={td}>
               <ModelName

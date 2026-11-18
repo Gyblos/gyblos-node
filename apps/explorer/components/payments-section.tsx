@@ -1,10 +1,17 @@
 // Owns the Payments section: what Gyblos channels moved on Solana devnet, from the collector's chain
 // index (GET /v1/stats/chain): settled USDC, payouts to sellers, Gyblos fees, refunds, volume per day,
 // and the whole program's traffic for scale. Gyblos traffic is a label the channel's open declares.
-import { summarizeChain, type ChainSummary } from '../lib/chain-shape';
+import {
+  dailySettled,
+  summarizeChain,
+  type ChainSnapshot,
+  type ChainSummary,
+} from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, UNITS } from '../lib/constants';
 import { count, percent, usdc, utc } from '../lib/format';
+import type { RangeDays } from '../lib/range';
+import { BarChartCard } from './board/bar-chart-card';
 import {
   moneyCell,
   numberCell,
@@ -21,15 +28,15 @@ function meta(backfillDone: boolean | null, aggregatedAt: number | null) {
   return `updated ${utc(aggregatedAt)}`;
 }
 
-export async function PaymentsSection() {
-  const chain = await getChainStats();
+export async function PaymentsSection({ days }: { days: RangeDays }) {
+  const chain = await getChainStats(days);
   if (chain.error) return <Unavailable title="Payments" />;
   const summary = summarizeChain(chain);
   const { totals } = summary;
   return (
     <>
       <SectionTitle
-        title="Payments · 30 days"
+        title={`Payments · ${days} days`}
         meta={meta(chain.backfillDone, chain.aggregatedAt)}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -48,7 +55,7 @@ export async function PaymentsSection() {
           value={`${count(totals.transactions)} · ${count(summary.programTransactions)}`}
         />
       </div>
-      <VolumeChart summary={summary} />
+      <SettledChart chain={chain} total={usdc(totals.settled)} />
       <DailyTable summary={summary} />
       <p className="mt-4 text-xs text-dim">
         Gyblos channels are those whose open carries a Gyblos memo, a label
@@ -59,49 +66,29 @@ export async function PaymentsSection() {
   );
 }
 
-function barHeight(value: bigint, max: bigint) {
-  const tenths = max === 0n ? 0 : Number((value * DISPLAY.barScale) / max);
-  return Math.max(tenths / DISPLAY.barScaleToPercent, DISPLAY.barMinPercent);
-}
-
-function VolumeChart({ summary }: { summary: ChainSummary }) {
-  const days = summary.days.slice(-DISPLAY.chartDays);
-  if (!days.length) return null;
+// Settled USDC per day; the bar height is approximate, the labels exact.
+function SettledChart({
+  chain,
+  total,
+}: {
+  chain: ChainSnapshot;
+  total: string;
+}) {
+  const points = dailySettled(chain).map((day) => ({
+    day: day.day,
+    value: Number(day.settled) / UNITS.atomicPerUsdc,
+    label: `${usdc(day.settled)} · ${count(day.settles)} settlements`,
+  }));
+  if (!points.length) return null;
   return (
-    <>
-      <SectionTitle title="Settled by day" />
-      <div className="rounded-xl border border-line bg-panel p-4">
-        <div className="flex h-40 items-end gap-2">
-          {days.map(({ day, gyblos }) => (
-            <div
-              key={day}
-              className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
-              title={`${day}: ${usdc(gyblos.settled)} settled, ${gyblos.settles} settlements`}
-            >
-              <span className="font-mono text-[10px] text-dim">
-                {gyblos.settles}
-              </span>
-              <div
-                className="w-full max-w-12 rounded-t bg-brand"
-                style={{
-                  height: `${barHeight(gyblos.settled, summary.maxDaySettled)}%`,
-                }}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="mt-2 flex gap-2">
-          {days.map(({ day }) => (
-            <span
-              key={day}
-              className="min-w-0 flex-1 truncate text-center font-mono text-[10px] text-dim"
-            >
-              {day.slice(DISPLAY.monthDayStart)}
-            </span>
-          ))}
-        </div>
-      </div>
-    </>
+    <div className="mt-4">
+      <BarChartCard
+        title="Settled per day"
+        total={total}
+        points={points}
+        countAxis={false}
+      />
+    </div>
   );
 }
 

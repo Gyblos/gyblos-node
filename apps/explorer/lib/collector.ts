@@ -9,6 +9,7 @@ import {
 } from './collector-shape';
 import { COLLECTOR_URL } from './config';
 import { fetchJson } from './fetch-json';
+import { rangeQuery, type RangeDays } from './range';
 import { list, record } from './validate';
 
 export type {
@@ -20,10 +21,12 @@ export type {
   Totals,
 } from './collector-shape';
 
-// The last 30 UTC days of network totals and models, as aggregated by the collector.
-export async function getCollector(): Promise<CollectorSnapshot> {
+// The last `days` UTC days of network totals and models, as aggregated by the collector.
+export async function getCollector(
+  days: RangeDays,
+): Promise<CollectorSnapshot> {
   try {
-    return await loadCollector();
+    return await loadCollector(rangeQuery(days, Date.now()));
   } catch (error) {
     return {
       aggregatedAt: null,
@@ -34,10 +37,10 @@ export async function getCollector(): Promise<CollectorSnapshot> {
   }
 }
 
-async function loadCollector(): Promise<CollectorSnapshot> {
+async function loadCollector(query: string): Promise<CollectorSnapshot> {
   const [networkBody, modelsBody] = await Promise.all([
-    fetchJson(`${COLLECTOR_URL}/stats/network`, 'collector network'),
-    fetchJson(`${COLLECTOR_URL}/stats/models`, 'collector models'),
+    fetchJson(`${COLLECTOR_URL}/stats/network${query}`, 'collector network'),
+    fetchJson(`${COLLECTOR_URL}/stats/models${query}`, 'collector models'),
   ]);
   const network = record(networkBody, 'network');
   const models = record(modelsBody, 'models');

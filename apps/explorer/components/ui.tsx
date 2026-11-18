@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY } from '../lib/constants';
 import { short } from '../lib/format';
+import { ModelLogo } from './model-logo';
 
 export const th = 'px-4 py-3 font-medium';
 export const td = 'px-4 py-3';
@@ -74,7 +75,10 @@ export function Table({
 }) {
   return (
     <div className="mt-4 overflow-x-auto rounded-xl border border-line">
-      <table className="w-full text-left text-sm" style={{ minWidth }}>
+      <table
+        className="w-full text-left text-sm whitespace-nowrap"
+        style={{ minWidth }}
+      >
         <thead className="bg-panel text-muted">
           <tr>
             {head.map((column) => (
@@ -102,7 +106,7 @@ export function Addr({ value }: { value: string | null }) {
   );
 }
 
-// A model as published: id, then variant and quantization when present.
+// A model as published: its maker's mark, the id, then variant and quantization when present.
 export function ModelName({
   modelId,
   variant,
@@ -114,11 +118,14 @@ export function ModelName({
 }) {
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
-    <>
-      {modelId}
-      {detail ? (
-        <span className="ml-2 font-mono text-xs text-dim">{detail}</span>
-      ) : null}
-    </>
+    <span className="inline-flex items-center gap-2">
+      <ModelLogo modelId={modelId} />
+      <span>
+        {modelId}
+        {detail ? (
+          <span className="ml-2 font-mono text-xs text-dim">{detail}</span>
+        ) : null}
+      </span>
+    </span>
   );
 }

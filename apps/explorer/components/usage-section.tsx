@@ -9,8 +9,10 @@ import {
 } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
 import { count, usdc, utc } from '../lib/format';
+import type { RangeDays } from '../lib/range';
 import {
   countText,
+  dailyRequests,
   latencyText,
   pair,
   rateText,
@@ -19,6 +21,7 @@ import {
   summarizeUsage,
   type SideFigures,
 } from '../lib/usage';
+import { BarChartCard } from './board/bar-chart-card';
 import {
   ModelName,
   numberCell,
@@ -69,15 +72,15 @@ const figureHead = (latency: string) => [
   { label: `${latency} p50 free · paid`, right: true },
 ];
 
-export async function UsageSection() {
-  const snapshot = await getCollector();
+export async function UsageSection({ days }: { days: RangeDays }) {
+  const snapshot = await getCollector(days);
   if (snapshot.error) return <Unavailable title="Usage" />;
   const usage = summarizeUsage(snapshot);
   const { free, paid } = usage;
   return (
     <>
       <SectionTitle
-        title="Usage · 30 days"
+        title={`Usage · ${days} days`}
         meta={
           snapshot.aggregatedAt
             ? `updated ${utc(snapshot.aggregatedAt)}`
@@ -104,10 +107,38 @@ export async function UsageSection() {
         <Stat label="Authorized (paid)" value={usdc(usage.authorized)} money />
         <Stat label="Unserved demand" value={count(usage.unserved)} />
       </div>
+      <RequestCharts days={snapshot.days} />
       <DailyTable days={usage.active} />
       <ModelsTable models={snapshot.models} />
       <DemandTable demand={usage.demand} />
     </>
+  );
+}
+
+// Small multiples, never stacked: free and paid requests per day, each in its own chart.
+function RequestCharts({ days }: { days: NetworkDay[] }) {
+  const series = dailyRequests(days);
+  const chart = (side: 'free' | 'paid') =>
+    series.map((day) => ({
+      day: day.day,
+      value: day[side],
+      label: count(day[side]),
+    }));
+  const total = (side: 'free' | 'paid') =>
+    count(series.reduce((sum, day) => sum + day[side], 0));
+  return (
+    <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <BarChartCard
+        title="Free requests per day"
+        total={total('free')}
+        points={chart('free')}
+      />
+      <BarChartCard
+        title="Paid requests per day"
+        total={total('paid')}
+        points={chart('paid')}
+      />
+    </div>
   );
 }
 
