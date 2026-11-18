@@ -233,12 +233,14 @@ html > body[data-scroll-locked] {
   color: var(--color-fd-muted-foreground);
 }
 
-/* The docs lockup draws the mark and the name at the same size and keeps its aspect ratio in both themes. It sits
-   at the scale of the sidebar text, not of a page title. */
+/* The site name is plain text in the brand typeface (Instrument Sans Medium), with no mark, at the scale of the
+   sidebar text rather than a page title. */
 .docs-wordmark {
-  width: 104px;
-  height: auto;
-  flex-shrink: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-fd-foreground);
 }
 
 body {
