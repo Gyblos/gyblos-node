@@ -140,10 +140,23 @@ void test(
     });
     const host = await startFreeBuyerHttp(
       (input, signal) => executeBuyerFree(input, dependencies, signal),
-      { selection: request.selection, maxTokens: 10 },
+      {
+        selection: request.selection,
+        maxTokens: 10,
+        contextTokens: dependencies.contextTokens,
+      },
       { port: 0 },
     );
     try {
+      // The model list reports the context the seller's verified catalog lists, without a quote or engine.
+      const listed = await (
+        await within(fetch(host.url.replace(/chat\/completions$/, 'models')))
+      ).json();
+      const offered = source.catalog.models.find(
+        (model) => model.modelId === request.selection.modelId,
+      );
+      assert.ok(offered);
+      assert.equal(listed.data[0].context_length, offered.contextTokens);
       assert.equal(fixture.calls(), 0);
       const response = await within(
         fetch(host.url, {

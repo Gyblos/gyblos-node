@@ -76,6 +76,12 @@ export interface FreeBuyerDependencies {
     signal: AbortSignal,
     needs?: { tools?: boolean; model?: RoutedModel; conversation?: string },
   ): Promise<FreeWinner>;
+  // The context every eligible seller of a routed model accepts, from verified catalogs; undefined when
+  // none is known. Never quotes or sends a prompt.
+  contextTokens?(
+    model: RoutedModel,
+    signal: AbortSignal,
+  ): Promise<number | undefined>;
   execute(
     winner: FreeWinner,
     request: FreeExecutionRequest,

@@ -16,6 +16,7 @@ import {
 } from './constants';
 import { connectBuyerControl } from './control';
 import { FreeBuyerError } from './free-chat';
+import { freeRouteContext } from './free-context';
 import {
   createConversationKey,
   FreeSelectionFailure,
@@ -86,6 +87,8 @@ export function freeBuyerDependencies(
       admission.select(excluded, signal, (skip) =>
         selectSticky(prepared, remembered, sticky, skip, signal, needs),
       ),
+    contextTokens: (model, signal) =>
+      freeRouteContext(prepared, remembered, model, signal),
     async execute(winner, request, signal, onDelta, beforeExecute) {
       const seller = winner.seller ?? sellers.get(winner.nodeId);
       if (

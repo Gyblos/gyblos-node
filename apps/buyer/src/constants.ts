@@ -193,6 +193,8 @@ export const FREE_BUYER = {
   // Header the official OpenAI SDKs honor to skip their automatic retries.
   noRetryHeader: 'x-should-retry',
   retryAfterHeader: 'retry-after',
+  // How long /v1/models waits for verified catalogs to report each model's context.
+  modelContextMs: 4000,
   requestMs: 180000,
   // Times one request may go to another seller after its prompt was sent (failover "safe").
   maxResends: 2,

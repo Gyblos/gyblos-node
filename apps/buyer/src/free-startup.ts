@@ -185,6 +185,7 @@ function buyerHttp(
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
   diagnostics?: DiagnosticSink,
+  contextTokens?: FreeBuyerDependencies['contextTokens'],
 ) {
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
@@ -194,6 +195,7 @@ function buyerHttp(
         selection: request.selection,
         maxTokens: request.maxTokens,
         ...(models ? { models } : {}),
+        ...(contextTokens ? { contextTokens } : {}),
         // The selected execution policy, not its price, determines admission after capability validation.
         tools: true,
       },
@@ -335,6 +337,7 @@ async function startOwnedFreeBuyer(
       execution,
       role,
       diagnostics,
+      dependencies.contextTokens,
     );
     return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
