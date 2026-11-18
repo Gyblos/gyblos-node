@@ -15,7 +15,9 @@ Open `http://127.0.0.1:5196/?screen=connections&connection-state=ready`. The
 `activity`, `payments` and `settings`. Use `connection-state=unconfigured` for
 an unconfigured example. Subsequent navigation uses the normal desktop controls.
 Example changes last only until the page reloads. A copied API key is
-deliberately invalid, and Write configuration never writes a tool's settings.
+deliberately invalid. The eye button in Connections shows the unavailable-key
+state because the preview has no stored credential to reveal. Write
+configuration never writes a tool's settings.
 
 ## Brand proposal awaiting desktop approval
 
