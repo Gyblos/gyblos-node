@@ -58,6 +58,7 @@ import {
   type FreeChatStreamExecutor,
 } from './free-sse';
 import { httpDiagnostics, httpRequestLifecycle } from './http-diagnostics';
+import { listModels } from './model-list';
 import {
   endpointRoutes,
   requestedModel,
@@ -83,6 +84,11 @@ interface ChatSettings {
   tools?: boolean; // true only where every request runs on the free channel
   // The models served by name; absent, `selection` is the one model.
   models?: readonly ModelRoute[];
+  // The context every eligible seller of a route accepts, from verified catalogs; undefined if unknown.
+  contextTokens?: (
+    route: ModelRoute,
+    signal: AbortSignal,
+  ) => Promise<number | undefined>;
 }
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();
@@ -102,10 +108,6 @@ function admit(
   desktopApi?: ChatApi,
 ): ChatApi | undefined {
   const local = request.headers.origin === undefined;
-  if (request.method === 'GET' && isModelsRoute(request.url) && local) {
-    replyJson(response, modelList(endpointRoutes(settings)));
-    return undefined;
-  }
   const api = desktopApi ?? chatApi(request.url);
   const code =
     !api || request.method !== 'POST' || !local || !isJson(request)
@@ -119,6 +121,10 @@ function admit(
   replyError(response, new FreeBuyerError(code), undefined, api);
   return undefined;
 }
+const asksModels = (request: IncomingMessage) =>
+  request.method === 'GET' &&
+  isModelsRoute(request.url) &&
+  request.headers.origin === undefined;
 const asksTokenCount = (request: IncomingMessage) =>
   request.method === 'POST' &&
   isCountTokensRoute(request.url) &&
@@ -303,6 +309,7 @@ export function freeBuyerHandler(
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
       return;
     }
+    if (asksModels(request)) return listModels(response, settings);
     if (asksTokenCount(request))
       return countTokens(request, response, requestMs, diagnostic);
     const localApi = desktop.accepts(request, isJson(request))

@@ -41,6 +41,7 @@ interface SellerOptions {
   presence?: 'fresh' | 'stale' | 'none';
   catalogExpired?: boolean;
   withdrawn?: boolean;
+  contextTokens?: number;
 }
 export const nodeId = (index: number) => index.toString(16).padStart(64, '0');
 export function seller(
@@ -66,7 +67,7 @@ export function seller(
       {
         ...MODEL,
         modelId: options.modelId ?? MODEL.modelId,
-        contextTokens: 4096,
+        contextTokens: options.contextTokens ?? 4096,
         pricing: {
           network: NETWORK,
           asset: ASSET,

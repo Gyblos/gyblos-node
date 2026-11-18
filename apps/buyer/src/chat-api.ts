@@ -159,7 +159,11 @@ export function estimatedTokens(body: unknown) {
 const BYTES_PER_TOKEN = 4;
 
 // The one model this buyer asks for, in the OpenAI list shape that SDKs and agents read.
-export function modelList(routes: readonly ModelRoute[]) {
+export function modelList(
+  routes: readonly ModelRoute[],
+  // The context each route's sellers all accept, by route id, when the buyer knows it.
+  contexts: ReadonlyMap<string, number> = new Map(),
+) {
   return {
     object: 'list',
     data: routes.map((route) => ({
@@ -172,6 +176,11 @@ export function modelList(routes: readonly ModelRoute[]) {
       display_name: route.id,
       // The longest answer this endpoint asks a seller for on this model.
       max_output_tokens: route.maxTokens,
+      // The longest prompt plus answer every eligible seller accepts (OpenRouter's field name); agents
+      // size their prompts and compaction to it. Absent when no seller's catalog is known yet.
+      ...(contexts.has(route.id)
+        ? { context_length: contexts.get(route.id) }
+        : {}),
     })),
     has_more: false,
     first_id: routes[0]?.id ?? null,

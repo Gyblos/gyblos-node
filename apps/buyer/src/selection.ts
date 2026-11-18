@@ -190,6 +190,42 @@ async function selectOnce(
   }
 }
 
+// Every configured seller's verified catalog and presence for `config`, without asking any for a quote
+// (cached snapshots are reused); the clients opened are closed before returning.
+export async function verifiedSnapshots(
+  config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
+  signal: AbortSignal,
+) {
+  if (config.identity && !dependencies.verifyIdentity)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
+  const now = dependencies.now ?? Date.now;
+  const deadline = AbortSignal.any([
+    AbortSignal.timeout(dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs),
+    signal,
+  ]);
+  const clients = new Map<string, BuyerControlClient>();
+  const settling: Promise<unknown>[] = [];
+  try {
+    const snapshots = await refreshSnapshots(
+      config,
+      dependencies,
+      clients,
+      new Map(),
+      now,
+      deadline,
+      settling,
+      signal,
+    );
+    return snapshots.filter((item) => item !== undefined);
+  } finally {
+    await Promise.allSettled(
+      [...clients.values()].map((client) => client.close()),
+    );
+    if (signal.aborted) await Promise.allSettled(settling);
+  }
+}
+
 // The winner can still drop out after the race; it is reported like any other seller unless the
 // caller cancelled.
 function dropWinner(
