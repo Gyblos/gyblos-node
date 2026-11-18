@@ -135,18 +135,29 @@ export function limitedAfter(rpc: ChainRpc, allowed: number): ChainRpc {
   };
 }
 
-// The run's endpoints with no pause between calls: the public one, and an optional paid fallback.
+// An endpoint whose every call fails with an HTTP status (403 and 429 refuse the caller).
+export function failingWith(status: number): ChainRpc {
+  const fail = () =>
+    Promise.reject(
+      new ChainRpcError(`HTTP ${status}`, status === 403 || status === 429),
+    );
+  return { signatures: fail, transaction: fail, accounts: fail };
+}
+
+// The run's endpoints with no pause between calls: the public one, and keyed fallbacks in order.
 export function endpoints(
   rpc: ChainRpc,
   budget = 1000,
-  fallback?: { rpc: ChainRpc; budget: number },
+  fallback?:
+    { rpc: ChainRpc; budget: number } | { rpc: ChainRpc; budget: number }[],
 ): ChainEndpoints {
+  const fallbacks = fallback === undefined ? [] : [fallback].flat();
   return chainEndpoints(
     { rpc, limits: { budget, minIntervalMs: 0 } },
-    fallback && {
-      rpc: fallback.rpc,
-      limits: { budget: fallback.budget, minIntervalMs: 0 },
-    },
+    fallbacks.map((entry) => ({
+      rpc: entry.rpc,
+      limits: { budget: entry.budget, minIntervalMs: 0 },
+    })),
     { wait: () => Promise.resolve() },
   );
 }

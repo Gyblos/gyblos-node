@@ -300,8 +300,12 @@ export const CHAIN_INDEX = {
   maxTransactionVersion: 1,
   msPerSecond: 1000,
 } as const;
-// Binding of the optional paid Solana RPC URL (a secret), used only when the public RPC rate-limits.
-export const COLLECTOR_SOLANA_RPC_BINDING = 'COLLECTOR_SOLANA_RPC_URL';
+// Optional keyed Solana RPC URLs (secrets), tried in this order only when the public RPC (and then the
+// previous one) fails the run: for example Helius, then Alchemy.
+export const COLLECTOR_SOLANA_RPC_BINDINGS = [
+  'COLLECTOR_SOLANA_RPC_URL',
+  'COLLECTOR_SOLANA_RPC_FALLBACK_URL',
+] as const;
 // Log code of a scheduled run whose chain read failed; followed by a static reason only.
 export const COLLECTOR_CHAIN_INDEX_FAILED = 'COLLECTOR_CHAIN_INDEX_FAILED';
 // Log code of every scheduled chain read: calls per endpoint, rate limits, work done and backlog.

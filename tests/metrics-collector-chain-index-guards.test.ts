@@ -8,10 +8,12 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
+import { ChainRpcError } from '@gyblos/metrics-collector/chain/rpc';
 import { CHAIN_INDEX } from '@gyblos/metrics-collector/constants';
 
 import {
   endpoints,
+  failingWith,
   fakeChainRpc,
   PROGRAM,
   withSignature,
@@ -49,6 +51,42 @@ void test('a lagging node that returns older signatures is refused, never counte
     name: 'ChainIndexError',
   });
   assert.equal(counted(database), 5);
+});
+
+void test('a public RPC that refuses Workers (403) and a failing first key fall through to the next key', async () => {
+  const database = createCollectorD1();
+  const alchemy = fakeChainRpc(plain(3, 'p'));
+  const result = await runChainIndex(
+    database,
+    endpoints(failingWith(403), 80, [
+      { rpc: failingWith(503), budget: 20 },
+      { rpc: alchemy.rpc, budget: 20 },
+    ]),
+    1000,
+  );
+  assert.deepEqual(
+    [result.listed, result.usage.endpoint, result.usage.onFallback],
+    [3, 2, true],
+  );
+  assert.deepEqual(result.usage.primary, { calls: 1, rateLimited: 1 });
+  // The failing key's one call, then the working key's.
+  assert.equal(result.usage.fallback.calls, 1 + alchemy.calls.signatures);
+  // A failure that is not the endpoint's (a transaction it lists but cannot return yet) never moves
+  // the run: it stops there and is retried next run.
+  const lagging = {
+    ...alchemy.rpc,
+    signatures: () =>
+      Promise.reject(new ChainRpcError('transaction unavailable')),
+  };
+  const backup = fakeChainRpc(plain(3, 'p'));
+  await assert.rejects(
+    runChainIndex(
+      createCollectorD1(),
+      endpoints(lagging, 80, { rpc: backup.rpc, budget: 20 }),
+      1000,
+    ),
+  );
+  assert.equal(backup.calls.signatures, 0);
 });
 
 void test('an overlapping run skips while another holds the lease', async () => {

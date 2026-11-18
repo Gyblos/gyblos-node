@@ -175,10 +175,15 @@ void test('a channel account is read only when the program owns it', () => {
 void test('only an https (or loopback http) RPC URL without credentials is used', () => {
   assert.equal(chainRpcUrl('https://rpc.example/'), 'https://rpc.example/');
   assert.equal(chainRpcUrl('http://127.0.0.1:8899'), 'http://127.0.0.1:8899/');
+  // Providers such as Helius carry the key in the query; the URL is never logged.
+  assert.equal(
+    chainRpcUrl('https://devnet.helius-rpc.example/?api-key=k'),
+    'https://devnet.helius-rpc.example/?api-key=k',
+  );
   for (const bad of [
     'http://rpc.example',
     'https://u:p@rpc.example',
-    'https://rpc.example/?key=1',
+    'https://rpc.example/#key',
     'nope',
     42,
   ])

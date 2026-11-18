@@ -1,7 +1,11 @@
 // Owns how one scheduled chain read spends RPC calls: a primary endpoint (the free public devnet RPC)
-// with a minimum interval between calls and a call budget, and an optional fallback (a paid RPC) used
-// only after the primary rate-limits this run, with its own smaller budget. Calls are counted per
-// endpoint for the run's log, so a slow or limited free endpoint is visible before paying for more.
+// with a minimum interval between calls and a call budget, then keyed fallbacks in order (for example
+// Helius, then Alchemy), each with its own smaller budget. The run moves to the next endpoint only when
+// the current one fails it: a refusal (a rate limit, or a 403 such as the public RPC answers Cloudflare
+// Workers), a server error, or a transport failure (a timeout or a dropped connection). An answer the
+// index cannot read stops the run instead. Calls are counted per endpoint for the run's log, so a slow
+// or refused free endpoint is visible before relying on keyed ones.
+import { ChainShapeError } from './json';
 import { ChainRpcError, type ChainRpc } from './rpc';
 
 export interface EndpointLimits {
@@ -12,16 +16,34 @@ export interface EndpointLimits {
 }
 export interface EndpointUse {
   calls: number;
+  // Calls the endpoint refused or failed (the run then moved on).
   rateLimited: number;
 }
 export interface ChainEndpoints extends ChainRpc {
   // Calls left on the endpoint in use; the run stops reading when this reaches zero.
   remaining(): number;
-  usage(): { primary: EndpointUse; fallback: EndpointUse; onFallback: boolean };
+  usage(): {
+    primary: EndpointUse;
+    // All fallbacks together.
+    fallback: EndpointUse;
+    onFallback: boolean;
+    // Endpoint in use: 0 the public one, 1 the first fallback, and so on.
+    endpoint: number;
+  };
 }
 type Wait = (milliseconds: number) => Promise<void>;
 const sleep: Wait = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
+const SERVER_ERROR = /^HTTP 5\d\d$/;
+
+// The endpoint failed this run, so the next one may serve it: a refusal, a server error, or a failure
+// to get any answer. A spent budget, a lagging answer or an unreadable one do not move the run.
+function endpointFailed(error: unknown) {
+  if (error instanceof ChainShapeError) return false;
+  if (error instanceof ChainRpcError)
+    return error.rateLimited || SERVER_ERROR.test(error.reason);
+  return true;
+}
 
 function metered(
   rpc: ChainRpc,
@@ -41,48 +63,57 @@ function metered(
     try {
       return await call(rpc);
     } catch (error) {
-      if (error instanceof ChainRpcError && error.rateLimited)
-        use.rateLimited += 1;
+      if (endpointFailed(error)) use.rateLimited += 1;
       throw error;
     }
   }
   return { run, use, remaining: () => limits.budget - use.calls };
 }
 
+type Endpoint = { rpc: ChainRpc; limits: EndpointLimits };
+
 export function chainEndpoints(
-  primary: { rpc: ChainRpc; limits: EndpointLimits },
-  fallback: { rpc: ChainRpc; limits: EndpointLimits } | undefined,
+  primary: Endpoint,
+  fallbacks: readonly Endpoint[] | Endpoint | undefined,
   options: { wait?: Wait; now?: () => number } = {},
 ): ChainEndpoints {
   const wait = options.wait ?? sleep;
   const now = options.now ?? Date.now;
-  const first = metered(primary.rpc, primary.limits, wait, now);
-  const second = fallback
-    ? metered(fallback.rpc, fallback.limits, wait, now)
-    : undefined;
-  let onFallback = false;
+  const later = fallbacks === undefined ? [] : [fallbacks].flat();
+  const endpoints = [primary, ...later].map((entry) =>
+    metered(entry.rpc, entry.limits, wait, now),
+  );
+  let current = 0;
   async function call<T>(work: (rpc: ChainRpc) => Promise<T>): Promise<T> {
-    if (!onFallback)
+    for (;;) {
       try {
-        return await first.run(work);
+        return await endpoints[current]!.run(work);
       } catch (error) {
-        // Only a rate limit moves the run to the paid endpoint; any other failure stops it.
-        if (!(error instanceof ChainRpcError && error.rateLimited) || !second)
+        if (!endpointFailed(error) || current >= endpoints.length - 1)
           throw error;
-        onFallback = true;
+        current += 1;
       }
-    return second!.run(work);
+    }
   }
+  const sum = (uses: EndpointUse[]) =>
+    uses.reduce(
+      (total, use) => ({
+        calls: total.calls + use.calls,
+        rateLimited: total.rateLimited + use.rateLimited,
+      }),
+      { calls: 0, rateLimited: 0 },
+    );
   return {
     signatures: (address, range) =>
       call((rpc) => rpc.signatures(address, range)),
     transaction: (signature) => call((rpc) => rpc.transaction(signature)),
     accounts: (addresses) => call((rpc) => rpc.accounts(addresses)),
-    remaining: () => (onFallback ? second!.remaining() : first.remaining()),
+    remaining: () => endpoints[current]!.remaining(),
     usage: () => ({
-      primary: { ...first.use },
-      fallback: { ...(second?.use ?? { calls: 0, rateLimited: 0 }) },
-      onFallback,
+      primary: { ...endpoints[0]!.use },
+      fallback: sum(endpoints.slice(1).map((endpoint) => endpoint.use)),
+      onFallback: current > 0,
+      endpoint: current,
     }),
   };
 }
