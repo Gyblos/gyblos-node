@@ -6,7 +6,11 @@ export const DISCOVERY_URL =
 export const COLLECTOR_URL =
   process.env.GYBLOS_COLLECTOR_URL ?? 'https://collector.gyblos.com/v1';
 
-export const NETWORK_LABEL = 'Solana devnet';
+// Networks the explorer can show; only a live one has data. Mainnet launches 2026-12-09.
+export const NETWORKS = [
+  { id: 'devnet', label: 'Solana devnet', live: true },
+  { id: 'mainnet', label: 'Solana mainnet · soon', live: false },
+] as const;
 
 export const explorerAddressUrl = (address: string) =>
   `https://explorer.solana.com/address/${address}?cluster=devnet`;
