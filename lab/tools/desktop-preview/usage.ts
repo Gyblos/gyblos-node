@@ -1,4 +1,6 @@
 // Calendar periods follow the local timezone used by the preview's date labels.
+import { PREVIEW } from './constants';
+
 export const USAGE_PERIOD = {
   DAY: 'Today',
   WEEK: 'This week',
@@ -34,13 +36,19 @@ function startOfPeriod(period: UsagePeriod, now: number) {
       start.setMonth(0, 1);
       break;
     case USAGE_PERIOD.HALF:
-      start.setMonth(start.getMonth() < 6 ? 0 : 6, 1);
+      start.setMonth(
+        start.getMonth() < PREVIEW.halfYearMonths ? 0 : PREVIEW.halfYearMonths,
+        1,
+      );
       break;
     case USAGE_PERIOD.MONTH:
       start.setDate(1);
       break;
     case USAGE_PERIOD.WEEK:
-      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+      start.setDate(
+        start.getDate() -
+          ((start.getDay() + PREVIEW.weekDays - 1) % PREVIEW.weekDays),
+      );
       break;
   }
   return start.getTime();
@@ -67,7 +75,7 @@ function summarize(events: readonly UsageEvent[], start: number, now: number) {
   return {
     start,
     totals,
-    rows: [...rows.values()].sort((a, b) => b.at - a.at),
+    rows: [...rows.values()].sort((first, second) => second.at - first.at),
   };
 }
 
@@ -92,7 +100,7 @@ export function previousUsageTotals(
   const calendarDay = (date: Date) =>
     Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
   const elapsedDays =
-    (calendarDay(localNow) - calendarDay(localStart)) / 86_400_000;
+    (calendarDay(localNow) - calendarDay(localStart)) / PREVIEW.dayMs;
   const cutoff = new Date(previousStart);
   cutoff.setDate(cutoff.getDate() + elapsedDays);
   cutoff.setHours(
@@ -111,5 +119,16 @@ export function previousUsageTotals(
 export function usageChange(current: number | null, previous: number | null) {
   if (current === null || previous === null) return null;
   if (current === previous) return 0;
-  return previous > 0 ? ((current - previous) / previous) * 100 : null;
+  return previous > 0
+    ? ((current - previous) / previous) * PREVIEW.percentScale
+    : null;
+}
+
+export function measuredMetric(
+  available: boolean,
+  current: number | null,
+  previous: number | null,
+) {
+  const value = available ? current : null;
+  return { value, change: usageChange(value, previous) };
 }

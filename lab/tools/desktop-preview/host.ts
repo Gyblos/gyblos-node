@@ -35,6 +35,7 @@ import { AGENT_TOOLS } from '@gyblos/node/agent-setup-constants';
 import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
 import { PREVIEW } from './constants';
+import { exampleKeys } from './example-keys';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
 
@@ -45,7 +46,6 @@ export function createPreviewHost(
   const query = new URLSearchParams(search);
   const ready = query.get('connection-state') !== 'unconfigured';
   const example = '00000000-0000-4000-8000-000000000001';
-  const keyId = '00000000-0000-4000-8000-000000000002';
   const now = Date.now();
   const model = 'qwen3-0.6b';
   const chatModel = {
@@ -71,42 +71,7 @@ export function createPreviewHost(
   let limitAtomic = ready ? '1000000' : '0';
   let generation = 0;
   let selectedHome = ready;
-  let keys = [
-    {
-      id: keyId,
-      name: 'Coding tools',
-      limitAtomic: '10000',
-      spentAtomic: '2000',
-      settledAtomic: '2000',
-      approvedAtomic: '0',
-      reservedAtomic: '0',
-      revoked: false,
-    },
-  ];
-  const sampleKey = keys[0]!;
-  keys =
-    query.get('keys') === 'empty'
-      ? []
-      : [
-          sampleKey,
-          {
-            ...sampleKey,
-            id: '00000000-0000-4000-8000-000000000003',
-            name: 'Research',
-            limitAtomic: '50000',
-            spentAtomic: '0',
-            settledAtomic: '0',
-          },
-          {
-            ...sampleKey,
-            id: '00000000-0000-4000-8000-000000000004',
-            name: 'Old laptop',
-            limitAtomic: '20000',
-            spentAtomic: '4000',
-            settledAtomic: '4000',
-            revoked: true,
-          },
-        ];
+  let keys = exampleKeys(query.get('keys') === 'empty');
   let setup: UsdcApiState['setup'];
   const clone = <T>(value: T) => structuredClone(value);
   const answer =
@@ -172,7 +137,9 @@ export function createPreviewHost(
     recordFreeReply(
       receiptId,
       tenChats
-        ? now - (9 - records.length) * PREVIEW.dayMs - PREVIEW.minuteMs
+        ? now -
+            (titles.length - records.length) * PREVIEW.dayMs -
+            PREVIEW.minuteMs
         : now - PREVIEW.minuteMs,
     );
   }
@@ -241,7 +208,7 @@ export function createPreviewHost(
         nodeState === LOCAL_NODE_STATE.STOPPED
       ) {
         nodeState = LOCAL_NODE_STATE.STARTING;
-        readyAt = Date.now() + 3000;
+        readyAt = Date.now() + PREVIEW.nodeStartupMs;
       }
       return nodeState;
     },

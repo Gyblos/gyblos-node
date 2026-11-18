@@ -15,9 +15,7 @@ Open `http://127.0.0.1:5196/?screen=connections&connection-state=ready`. The
 `activity`, `payments` and `settings`. Use `connection-state=unconfigured` for
 an unconfigured example. Subsequent navigation uses the normal desktop controls.
 Example changes last only until the page reloads. A copied API key is
-deliberately invalid. The eye button in Connections shows the unavailable-key
-state because the preview has no stored credential to reveal. Write
-configuration never writes a tool's settings.
+deliberately invalid. Connection examples can be copied from the setup dialog.
 
 ## Brand proposal awaiting desktop approval
 
@@ -34,12 +32,11 @@ The brand source is [web-gyblos](https://github.com/Gyblos/web-gyblos):
 `web/public/brand-assets/` distribution. No private vault content is required to
 build this preview.
 
-`build.ts` applies only the theme-token, terminal-mark and composer-copy
-substitutions in memory while bundling the preview. It refuses changed desktop
-hook shapes rather than silently skipping them. The desktop source, native
-application and seller are unchanged. `preview.css` adds only the supplied
-mark's presentation and a browser illustration of native macOS controls; it
-introduces no separate component scale.
+`brand-build.ts` selects the browser-only implementations under `views/` and
+adapts renderer modules while bundling. The shared card is
+`views/StatCard.tsx.preview` and the Payments layout is
+`views/Payments.tsx.preview`. Their styles are in `preview.css`. The unmodified
+desktop renderer is also built as a comparison baseline.
 
 The free-network caption beside Send is omitted in this proposal. The model
 name, Free badge and actionable authorization/generation status copy remain
@@ -51,7 +48,7 @@ app. Publishing this preview or its PR is not desktop implementation approval.
 
 ## Validation and limits
 
-Run `node --import tsx --test tests/lab/desktop-preview.test.ts` for the
+Run `node --import tsx --test "tests/lab/desktop-preview*.test.ts"` for the
 fixture, brand, isolation and build checks. Run the repository checks before a
 PR. Review all seven screens at wide and narrow widths, both themes, keyboard
 focus, reduced motion, sidebar/context motion and relevant connection/payment

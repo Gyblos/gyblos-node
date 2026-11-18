@@ -144,7 +144,7 @@ export function createPaypalPreview(
   };
   const history = Array.from({ length: 24 }, (_, index) => {
     const amount = index % PREVIEW.voidEvery === 0 ? 0 : PREVIEW.capturedCents;
-    const apiOnly = index % 3 === 1;
+    const apiOnly = index % PREVIEW.apiOnlyEvery === 1;
     const agentCents = amount ? (apiOnly ? amount : PREVIEW.replyCents) : 0;
     return {
       id: (index + PREVIEW.referenceOffset)
@@ -177,7 +177,10 @@ export function createPaypalPreview(
       sessionId,
       at,
       source,
-      tokens: source === 'Chat' ? 182 + index * 11 : 368 + index * 23,
+      tokens:
+        source === 'Chat'
+          ? PREVIEW.chatBaseTokens + index * PREVIEW.chatTokenStep
+          : PREVIEW.apiBaseTokens + index * PREVIEW.apiTokenStep,
     }));
   }
   const pastUsage = history.flatMap((session) => [
