@@ -29,7 +29,7 @@
     "@gyblos/config": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/protocol": "workspace:*",
-    "drizzle-orm": "0.45.2",
-    "hono": "4.13.13"
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.18"
   }
 }
