@@ -109,7 +109,7 @@ refuses a file that validates, run doctor. Defaults and ranges are in the
 | `MAINNET_UNSUPPORTED`                                                                                     | Keep `network = "devnet"`; mainnet is not open                                                                                                                  |
 | `SELLER_PAYMENT_ROLE_MISSING`                                                                             | The payment keys are missing: run the installer again (it keeps the NodeId and owner), then fund the fee payer ([Get paid](/en/sellers/get-paid))               |
 | `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`, `PAYMENT_ACCOUNTS_MISSING`, `PAYMENT_ACCOUNTS_UNCHECKED`           | Send devnet SOL to the `fee payer` address that `gyblos doctor` prints, then retry; startup creates the token accounts. `UNCHECKED` means the RPC didn't answer |
-| `PAYMENT_ACCOUNTS_UNUSABLE`                                                                               | A payout or fee token account is frozen or isn't a token account. Don't start a priced offer; contact Gyblos                                                    |
+| `PAYMENT_ACCOUNTS_UNUSABLE`                                                                               | A payout or fee token account is frozen or isn't a token account. Don't start a priced offer; ask in the [Gyblos Telegram](https://t.me/gyblos)                 |
 | `SELLER_PAID_METERING_UNRECOUNTED`                                                                        | Only `qwen3:0.6b` can be priced. Make other models free                                                                                                         |
 
 ## The engine or relay is unavailable [#engine-or-relay-unavailable]
@@ -142,9 +142,9 @@ same index where you registered and that at least one offer is ready.
 | `REGISTER_IDENTITY_UNAVAILABLE`     | The registration didn't complete: read the hint about missing SOL, the simulation or an uncertain result before you retry         |
 | `REGISTER_CANCELLED`                | You answered something other than `yes` or `y`: nothing was signed or sent. Run `gyblos seller register` again                    |
 | `DISCOVERY_INVITE_INVALID`          | The code is wrong, used or expired. Ask for a new one in the [Gyblos Telegram](https://t.me/gyblos); don't post the old code      |
-| `DISCOVERY_NODE_REVOKED`            | Contact Gyblos. Don't create another identity to get around the removal                                                           |
+| `DISCOVERY_NODE_REVOKED`            | Ask in the [Gyblos Telegram](https://t.me/gyblos). Don't create another identity to get around the removal                        |
 | `DISCOVERY_RATE_LIMITED`            | Wait a minute before you retry                                                                                                    |
-| `DISCOVERY_UNAVAILABLE`             | Try later or contact Gyblos. Check the configured index before you submit an invite                                               |
+| `DISCOVERY_UNAVAILABLE`             | Try later or ask in the [Gyblos Telegram](https://t.me/gyblos). Check the configured index before you submit an invite            |
 
 A repeated `register` checks its saved state and may resend the transaction you already approved. Keep every
 file and lock. Read the [recovery limits](/en/sellers/register-publish) before you run it again, and never
