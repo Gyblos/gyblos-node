@@ -53,6 +53,8 @@ export function configureBlockEngine(
 export async function blockProduct(
   options: Pick<SellerBatchSessionOptions, 'telemetry' | 'receipts'> & {
     receipt?: (evidence: BuyerReceiptEvidence) => void | Promise<void>;
+    // false runs the same paid session without blocks (no stable-prefix meter, no block transport).
+    blocks?: boolean;
   } = {},
 ) {
   const f = await sessionRig({
@@ -71,12 +73,15 @@ export async function blockProduct(
     now: f.now,
     blockTargetTokens: 2,
   });
-  const wire = await batchLoopback(service, f.terms, true);
+  const blocks = options.blocks ?? true;
+  const wire = await batchLoopback(service, f.terms, blocks);
   const buyer = createBuyerBatchSession({
     ...wire,
     terms: f.terms,
     buyer: f.buyer,
-    meter: blockTestMeter,
+    meter: blocks
+      ? blockTestMeter
+      : { ...blockTestMeter, stablePrefix: undefined },
     now: f.now,
     unresolved: async () => false,
     verify: async () => {},
