@@ -69,6 +69,14 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 - Uncertain payments block further calls until reconciled; never retry or clear a journal or lock to make something pass.
 - Never commit private keys, salts, prompts/responses, raw logs, endpoint addresses, signed payment payloads, RPC credentials, role volumes or journals. `.local/`, env secrets, evidence and captures stay ignored; the curated `lab/evidence/` reports and the finalized public fixture are deliberate exceptions. Synthetic fixtures and ephemeral unfunded signers are fine. Review the staged diff before publishing.
 
+## Desktop visual changes
+
+- Work on desktop UI proposals in the isolated web mockup first. Use the current renderer and shared components, with synthetic data and the approved brand kit; keep proposal-only styles and artwork outside the shipped desktop renderer.
+- Open the web preview and visually review all seven screens at wide and narrow widths, including both themes, interactions and relevant states. Show the result to the founder and wait for explicit approval of that visual proposal before porting it to the desktop app.
+- A request to change, preview, save, push or open a PR for the mockup does not authorize desktop implementation. Approval to implement an earlier proposal does not carry over to later visual changes.
+- After explicit approval, port the accepted shared design to the desktop app and compare it against the approved web preview at the same viewport size. Do not consider a successful build a visual review. Record remaining differences and validation limits in the PR.
+- Keep the workflow and component rules aligned with `apps/desktop/DESIGN.md`. This root file remains the single public agent-instruction source; do not add a conflicting desktop-specific agent file.
+
 ## Workflow and merges
 
 - Small coherent commits; never rewrite pushed commits without authorization.
