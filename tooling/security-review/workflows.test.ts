@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import vm from 'node:vm';
 
+import { REVIEW_FAILURE, REVIEW_PHASE } from './constants';
+
 const WORKFLOW = resolve('.github/workflows/ai-security-review.yml');
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
@@ -225,9 +227,15 @@ void test('delayed invalidation preserves a completed result for the same snapsh
 void test('publisher reports validated causes and rejects arbitrary diagnostic text', async () => {
   const code = await publisher();
   for (const [diagnostic, phrase] of [
-    ['insufficient_quota', 'quota was exhausted'],
-    ['invalid_api_key', 'authentication failed'],
-    ['rate_limited', 'rate-limited'],
+    [
+      'verify1 insufficient_quota',
+      'First independent verification: OpenAI rejected',
+    ],
+    [
+      'verify2 invalid_api_key',
+      'Second independent verification: OpenAI authentication failed',
+    ],
+    ['review rate_limited', 'Source review: OpenAI rate-limited'],
     ['private-canary', 'failed to validate'],
   ]) {
     const writes = runPublisher(
@@ -245,4 +253,17 @@ void test('publisher reports validated causes and rejects arbitrary diagnostic t
     runPublisher(code, BASE, MERGE, '', 'error', 'snapshot').flat().join(' '),
     /snapshot parent verification failed/,
   );
+});
+
+void test('publisher accepts every current diagnostic code and phase', async () => {
+  const code = await publisher();
+  for (const phase of Object.values(REVIEW_PHASE)) {
+    const diagnostics = [
+      '1',
+      '10',
+      ...Object.values(REVIEW_FAILURE).map((reason) => phase + ' ' + reason),
+    ].join('\n');
+    const writes = runPublisher(code, BASE, MERGE, diagnostics, 'error');
+    assert.match(writes.flat().join(' '), /Reported tokens: 10/);
+  }
 });

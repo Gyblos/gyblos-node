@@ -1,6 +1,7 @@
 // Owns source-review contracts; model output is data and never execution evidence.
 import type {
   PiThinkingLevel,
+  REVIEW_PHASE,
   REVIEW_VALUES,
   ReviewerId,
   ReviewFailure,
@@ -80,6 +81,8 @@ export interface VerificationResponse {
 export interface VerificationResult {
   fingerprint: string;
   decision: VerificationDecision | Value<'ERROR'>;
+  failedPass?:
+    typeof REVIEW_PHASE.VERIFY_FIRST | typeof REVIEW_PHASE.VERIFY_SECOND;
   record?: VerificationResponse;
   error?: string;
   failure?: ReviewFailure;

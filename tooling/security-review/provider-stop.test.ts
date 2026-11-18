@@ -113,11 +113,17 @@ void test('quota during first verification prevents the second verifier', async 
         return success(hunter(bundle, reviewer, [FINDING]));
       },
     });
+    result.plan.changedFiles.push('private/excluded');
+    result.plan.excludedFiles.push('private/excluded');
     assert.equal(checks, 1);
     assert.equal(result.verifications[0]?.failure, REVIEW_FAILURE.QUOTA);
     assert.equal(
       (await writeArtifacts(result, { output })).status,
       REVIEW_VALUES.ERROR,
+    );
+    assert.match(
+      await readFile(join(output, 'diagnostics.txt'), 'utf8'),
+      /verify1 insufficient_quota/,
     );
   });
 });

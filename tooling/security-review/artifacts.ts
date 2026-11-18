@@ -2,7 +2,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { REVIEW_VALUES } from './constants';
+import { REVIEW_FAILURE, REVIEW_PHASE, REVIEW_VALUES } from './constants';
 import { parseVerificationResponse } from './parsing';
 import { labelsForStatus, overallReviewStatus } from './result';
 import type { ReviewRunResult, ReviewStatus } from './types';
@@ -13,12 +13,6 @@ export interface ArtifactOptions {
 function finalStatus(result: ReviewRunResult): ReviewStatus {
   if (result.status === REVIEW_VALUES.NOT_RUN) return REVIEW_VALUES.NOT_RUN;
   if (result.status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
-  if (
-    result.plan.changedFiles.some((path) =>
-      result.plan.excludedFiles.includes(path),
-    )
-  )
-    return REVIEW_VALUES.PENDING;
   const status = overallReviewStatus(result.tasks);
   if (status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
   if (
@@ -30,6 +24,12 @@ function finalStatus(result: ReviewRunResult): ReviewStatus {
     result.verifications.some((item) => item.decision === REVIEW_VALUES.ERROR)
   )
     return REVIEW_VALUES.ERROR;
+  if (
+    result.plan.changedFiles.some((path) =>
+      result.plan.excludedFiles.includes(path),
+    )
+  )
+    return REVIEW_VALUES.PENDING;
   if (
     status === REVIEW_VALUES.PENDING &&
     result.tasks.some((item) => item.status !== REVIEW_VALUES.COMPLETE)
@@ -107,6 +107,31 @@ function renderReport(result: ReviewRunResult): string {
   }
   return lines.join('\n') + '\n';
 }
+function diagnosticSummary(result: ReviewRunResult): string {
+  return (
+    [
+      result.execution?.callsStarted ?? 0,
+      result.execution?.reportedTokens ?? 'unknown',
+      ...new Set([
+        ...result.tasks.flatMap((item) => {
+          if (!item.failure) return [];
+          if (item.failure === REVIEW_FAILURE.BUDGET)
+            return [REVIEW_PHASE.SCHEDULE + ' ' + item.failure];
+          return item.status === REVIEW_VALUES.ERROR
+            ? [REVIEW_PHASE.REVIEW + ' ' + item.failure]
+            : [];
+        }),
+        ...result.verifications.flatMap((item) => {
+          if (item.failedPass && item.failure)
+            return [item.failedPass + ' ' + item.failure];
+          return item.failure === REVIEW_FAILURE.BUDGET
+            ? [REVIEW_PHASE.SCHEDULE + ' ' + item.failure]
+            : [];
+        }),
+      ]),
+    ].join('\n') + '\n'
+  );
+}
 export async function writeArtifacts(
   initial: ReviewRunResult,
   options: ArtifactOptions,
@@ -157,16 +182,7 @@ export async function writeArtifacts(
       2,
     ),
     'REPORT.md': renderReport(result),
-    'diagnostics.txt':
-      [
-        result.execution?.callsStarted ?? 0,
-        result.execution?.reportedTokens ?? 'unknown',
-        ...new Set(
-          [...result.tasks, ...result.verifications].flatMap((item) =>
-            item.failure ? [item.failure] : [],
-          ),
-        ),
-      ].join('\n') + '\n',
+    'diagnostics.txt': diagnosticSummary(result),
     'status.txt': result.status + '\n',
     'labels.txt': labelsForStatus(result.status).join('\n') + '\n',
   };

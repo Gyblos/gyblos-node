@@ -113,3 +113,10 @@ export const REVIEW_FAILURE = {
 } as const;
 export type ReviewFailure =
   (typeof REVIEW_FAILURE)[keyof typeof REVIEW_FAILURE];
+
+export const REVIEW_PHASE = {
+  REVIEW: 'review',
+  VERIFY_FIRST: 'verify1',
+  VERIFY_SECOND: 'verify2',
+  SCHEDULE: 'schedule',
+} as const;

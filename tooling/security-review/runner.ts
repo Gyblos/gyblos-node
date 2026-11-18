@@ -6,6 +6,7 @@ import {
   DEFAULT_MAX_CALLS,
   DEFAULT_REVIEW_CONCURRENCY,
   REVIEW_FAILURE,
+  REVIEW_PHASE,
   REVIEW_RESULT_VERSION,
   REVIEW_VALUES,
   type PiThinkingLevel,
@@ -20,6 +21,7 @@ import {
 import { preparePiDirectory, runPi, type RunPiOptions } from './pi';
 import { createSourceBundle, partitionBundle } from './projection';
 import { attachSource, buildVerificationPrompt } from './prompts';
+import { InvocationFailure, providerAdmission } from './provider-admission';
 import { overallReviewStatus } from './result';
 import type {
   AgentFinding,
@@ -83,14 +85,6 @@ function environment(directory: string): NodeJS.ProcessEnv {
       ? {}
       : { OPENAI_API_KEY: process.env.OPENAI_API_KEY }),
   };
-}
-class InvocationFailure extends Error {
-  constructor(
-    readonly code: ReviewFailure,
-    readonly skipped = false,
-  ) {
-    super(code);
-  }
 }
 async function ask(
   prompt: string,
@@ -193,6 +187,8 @@ async function verify(
   assignment: Assignment,
   options: ReviewExecutionOptions,
 ): Promise<VerificationResult> {
+  let pass: NonNullable<VerificationResult['failedPass']> =
+    REVIEW_PHASE.VERIFY_FIRST;
   try {
     const response = parseVerificationResponse(
       await ask(
@@ -207,6 +203,7 @@ async function verify(
       throw new Error('fingerprint mismatch');
     validateEvidence(response.evidence, assignment.bundle);
     // A second fresh verifier checks a rejection too, preventing a single refuter from hiding a lead.
+    pass = REVIEW_PHASE.VERIFY_SECOND;
     const final = parseVerificationResponse(
       await ask(
         attachSource(
@@ -240,6 +237,7 @@ async function verify(
     return {
       fingerprint: candidate.fingerprint,
       decision: REVIEW_VALUES.ERROR,
+      failedPass: pass,
       failure:
         error instanceof InvocationFailure ? error.code : REVIEW_FAILURE.VERIFY,
     };
@@ -287,38 +285,6 @@ function validateOptions(options: ReviewExecutionOptions): {
     throw new Error('An explicit openai/<model-id> is required.');
   return { concurrency, maxCalls };
 }
-function providerAdmission(
-  options: ReviewExecutionOptions,
-  execution: ReviewRunResult['execution'],
-) {
-  const admission: { stopped?: ReviewFailure } = {};
-  const countedOptions: ReviewExecutionOptions = {
-    ...options,
-    execute: async (invocation) => {
-      if (admission.stopped)
-        throw new InvocationFailure(admission.stopped, true);
-      if (!execution || execution.callsStarted >= execution.maxCalls)
-        throw new Error('Invocation budget exhausted.');
-      execution.callsStarted += 1;
-      let response;
-      try {
-        response = await (options.execute ?? runPi)(invocation);
-      } catch {
-        throw new InvocationFailure(REVIEW_FAILURE.PI);
-      }
-      if (
-        response.failure === REVIEW_FAILURE.QUOTA ||
-        response.failure === REVIEW_FAILURE.KEY
-      )
-        admission.stopped ??= response.failure;
-      if (response.reportedTokens !== undefined)
-        execution.reportedTokens =
-          (execution.reportedTokens ?? 0) + response.reportedTokens;
-      return response;
-    },
-  };
-  return { admission, countedOptions };
-}
 export async function runReview(
   plan: ReviewPlan,
   options: ReviewExecutionOptions,
@@ -351,10 +317,11 @@ export async function runReview(
     },
   };
   if (options.dryRun) return result;
-  const { admission, countedOptions } = providerAdmission(
-    options,
+  const { admission, execute } = providerAdmission(
+    options.execute ?? runPi,
     result.execution,
   );
+  const countedOptions = { ...options, execute };
   const assignments = await assignmentsFor(plan, options);
   summary.taskCount = assignments.length;
   // Reserve at least two independent verification calls before spending on hunters.
@@ -393,6 +360,10 @@ export async function runReview(
   result.candidates = candidates.map((item) => item.candidate);
   result.tasks = [...executions.map((item) => item.result), ...deferred];
   result.verifications = verifications;
-  result.status = overallReviewStatus(result.tasks);
+  result.status = verifications.some(
+    (item) => item.decision === REVIEW_VALUES.ERROR,
+  )
+    ? REVIEW_VALUES.ERROR
+    : overallReviewStatus(result.tasks);
   return result;
 }

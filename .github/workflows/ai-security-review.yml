@@ -194,6 +194,7 @@ jobs:
             invalid_verification: 'Independent verification failed response or evidence validation.',
             invocation_budget: 'Scheduling reached the invocation budget.',
           }));
+          const phases = new Map(Object.entries({review:'Source review', verify1:'First independent verification', verify2:'Second independent verification', schedule:'Scheduling'}));
           const stages = new Map(Object.entries({
             trusted: 'Trusted runner checkout failed.', source: 'PR snapshot checkout failed.',
             pnpm: 'pnpm setup failed.', snapshot: 'Merge snapshot parent verification failed.',
@@ -216,11 +217,14 @@ jobs:
             else try {
               const value = readSmall('status.txt', 32);
               if (!['clean','needs-validation','error','not-run'].includes(value)) throw new Error('Invalid status.');
-              const [calls,tokens,...codes] = readSmall('diagnostics.txt', 512).split('\n');
-              if (!/^\d{1,10}$/.test(calls) || !(tokens === 'unknown' || /^\d{1,16}$/.test(tokens)) ||
-                  codes.some(code => !reasons.has(code))) throw new Error('Invalid diagnostics.');
+              const [calls,tokens,...codes] = readSmall('diagnostics.txt', 2048).split('\n');
+              if (!/^\d{1,10}$/.test(calls) || !(tokens === 'unknown' || /^\d{1,16}$/.test(tokens))) throw new Error('Invalid diagnostics.');
+              detail = [...new Set(codes)].map(line => {
+                const [phase,code,...extra] = line.split(' ');
+                if (extra.length || !phases.has(phase) || !reasons.has(code)) throw new Error('Invalid diagnostic code.');
+                return phases.get(phase) + ': ' + reasons.get(code);
+              }).join(' ');
               status = value;
-              detail = [...new Set(codes)].map(code => reasons.get(code)).join(' ');
               if (status === 'not-run') detail += ' No source review tasks completed.';
               if (status === 'error' && !detail) detail = 'Final report validation failed.';
               detail += ' Pi processes started: ' + calls + '. Reported tokens: ' + tokens + '.';
