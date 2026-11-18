@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { bunFixtureLoader } from '../support/bun-loader-fixture';
 import { NATIVE_TEST_OPTIONS } from '../support/native-runtime';
 
 void test('identity acceptance CLI refuses operational overrides and never reflects raw failures', async () => {
@@ -132,13 +133,20 @@ void test('identity acceptance CLI reports unavailable native transport without 
   const result = spawnSync(
     process.execPath,
     [
-      '--import',
-      'data:text/javascript,' + encodeURIComponent(bootstrap),
+      ...(process.versions.bun
+        ? []
+        : [
+            '--import',
+            'data:text/javascript,' + encodeURIComponent(bootstrap),
+          ]),
       '--import',
       'tsx',
       '--input-type=module',
       '--eval',
-      "const {main}=await import('@gyblos/lab-harness/cli/identity-acceptance');process.exitCode=await main([]);",
+      (process.versions.bun
+        ? bunFixtureLoader([{ name: '@number0/iroh', module: replacement }])
+        : '') +
+        "const {main}=await import('@gyblos/lab-harness/cli/identity-acceptance');process.exitCode=await main([]);",
     ],
     {
       encoding: 'utf8',

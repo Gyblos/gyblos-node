@@ -7,11 +7,11 @@
 # cross-platform wallet and backup-exchange jobs live in desktop-platforms.yml and run
 # on demand.
 # No secrets, funded wallets, engines, devnet RPC or deployment.
-name: Windows installer paired benchmark
+name: Windows parallel and Bun lab benchmark
 
 on:
   push:
-    branches: ['codex/winpair-n18-parallel-*']
+    branches: ['codex/winpair-bun-full-n18-*']
 
 permissions:
   contents: read
@@ -131,8 +131,19 @@ jobs:
           # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
           node-version: 24.22.1
           cache: pnpm
+      - if: matrix.shard == 1
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
       - run: pnpm install --frozen-lockfile
-      - run: node --import tsx --test --test-shard=${{ matrix.shard }}/2 "tests/lab/**/*.test.ts"
+      - if: matrix.shard == 2
+        run: node --import tsx --test --test-shard=2/2 "tests/lab/**/*.test.ts"
+      - name: Run identical shard files on Bun
+        if: matrix.shard == 1
+        run: |
+          node --input-type=module -e "import {globSync} from 'node:fs'; console.log(JSON.stringify(globSync('tests/lab/**/*.test.ts').sort().filter((_, i) => i % 2 === 0)))" > "$RUNNER_TEMP/shard.json"
+          export WORKERS=$(node -p "Math.max(1,require('node:os').availableParallelism()-1)")
+          python .github/bench-lab-bun.py
 
   build:
     needs: changes

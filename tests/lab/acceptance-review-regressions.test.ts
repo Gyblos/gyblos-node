@@ -10,6 +10,7 @@ import { ACCEPTANCE_CODES } from '@gyblos/lab-harness/acceptance/constants';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 
 import { acceptanceReplay } from '../support/acceptance-replay';
+import { bunFixtureLoader } from '../support/bun-loader-fixture';
 import { NATIVE_TEST_OPTIONS } from '../support/native-runtime';
 
 const REGRESSION_TIMEOUT_MS = 15000;
@@ -23,7 +24,15 @@ function child(
   intercepted: readonly { name: string; module: string }[] = [],
 ) {
   const args: string[] = [];
-  if (intercepted.length) {
+  if (intercepted.length && process.versions.bun) {
+    source =
+      bunFixtureLoader(
+        intercepted.map((entry) => ({
+          ...entry,
+          actual: import.meta.resolve(entry.name),
+        })),
+      ) + source;
+  } else if (intercepted.length) {
     const wrappers = intercepted.map((entry) => ({
       name: entry.name,
       url: 'data:text/javascript,' + encodeURIComponent(entry.module),
