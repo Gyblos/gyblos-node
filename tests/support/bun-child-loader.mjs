@@ -2,10 +2,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { plugin, resolveSync } from 'bun';
-
 export function installFixtures(rules, parentUrl) {
-  plugin({
+  Bun.plugin({
     name: 'acceptance fixture modules',
     setup(build) {
       function intercept(path, load) {
@@ -37,7 +35,7 @@ export function installFixtures(rules, parentUrl) {
       for (const rule of rules) {
         const path = rule.actual
           ? fileURLToPath(rule.actual)
-          : resolveSync(rule.name, process.cwd());
+          : Bun.resolveSync(rule.name, process.cwd());
         // A separate module URL lets the wrapper delegate to the real implementation.
         const contents = rule.module.replaceAll(
           "'" + rule.name + "'",
