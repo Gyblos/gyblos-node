@@ -1,7 +1,7 @@
 // Offline probes exercise the pilot guards at each payment port without enabling mainnet in product.
 // The loader substitutes the network lock only in this isolated test process; every side effect fails.
 import assert from 'node:assert/strict';
-import { register } from 'node:module';
+import { registerHooks } from 'node:module';
 import test from 'node:test';
 
 import { generateKeyPairSigner, type TransactionSigner } from '@solana/kit';
@@ -22,15 +22,15 @@ const real = new URL(
   import.meta.url,
 ).href;
 const stub = `export { assertMainnetPilotDeposit } from ${JSON.stringify(real)}; export function assertPaymentNetworkEnabled() {}`;
-const loader = `let targets, stub;
-export function initialize(data) { ({targets, stub} = data); }
-export function resolve(specifier, context, next) {
-  if (specifier === './mainnet' && targets.includes(context.parentURL))
-    return {url:'data:text/javascript,' + encodeURIComponent(stub), shortCircuit:true};
-  return next(specifier, context);
-}`;
-register(`data:text/javascript,${encodeURIComponent(loader)}`, {
-  data: { targets, stub },
+registerHooks({
+  resolve(specifier, context, next) {
+    if (specifier === './mainnet' && targets.includes(context.parentURL ?? ''))
+      return {
+        url: 'data:text/javascript,' + encodeURIComponent(stub),
+        shortCircuit: true,
+      };
+    return next(specifier, context);
+  },
 });
 const { createUptoPaymentClient, createUptoPaymentServer } =
   await import('@gyblos/payments-upto');

@@ -91,7 +91,7 @@ function bootstrap(faults: CallFaults) {
     './proof': proof,
     '@gyblos/payments-x402/inference-buyer': inference,
   };
-  return `import {register} from 'node:module';
+  return `import {registerHooks} from 'node:module';
     import {readFile,mkdir} from 'node:fs/promises';
     import {homeLayout,ROLE_FILES} from '${config}';
     const root=homeLayout(process.env).roles.buyer;
@@ -99,7 +99,11 @@ function bootstrap(faults: CallFaults) {
     globalThis.attempts=0;globalThis.rpcRequests=0;
     globalThis.fetch=async()=>{globalThis.rpcRequests++;throw Error('NETWORK_FORBIDDEN')};
     await mkdir(root,{recursive:true});
-    register('data:text/javascript,'+encodeURIComponent(\`let entry,stubs;export function initialize(data){({entry,stubs}=data)} export function resolve(specifier,context,next){if(context.parentURL?.split('?')[0]===entry&&Object.hasOwn(stubs,specifier))return {url:'data:text/javascript,'+encodeURIComponent(stubs[specifier]),shortCircuit:true};return next(specifier,context)}\`),{data:{entry,stubs}});
+    registerHooks({resolve(specifier,context,next){
+      if(context.parentURL?.split('?')[0]===entry&&Object.hasOwn(stubs,specifier))
+        return {url:'data:text/javascript,'+encodeURIComponent(stubs[specifier]),shortCircuit:true};
+      return next(specifier,context);
+    }});
     process.argv[2]='0';const {main}=await import(entry);await main();
     const journal=JSON.parse(await readFile(root+'/'+ROLE_FILES.journal,'utf8'));
     const calls=JSON.parse(await readFile(root+'/'+ROLE_FILES.calls,'utf8'));
@@ -124,7 +128,12 @@ export async function callFault(faults: CallFaults = {}): Promise<CallProbe> {
         timeout: PROBE_TIMEOUT_MS,
         killSignal: 'SIGKILL',
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, GYBLOS_P2P_RUN_ID: 'synthetic-diagnostic' },
+        env: {
+          PATH: process.env.PATH,
+          GYBLOS_HOME: join(directory, 'product'),
+          GYBLOS_LAB_HOME: join(directory, 'lab'),
+          GYBLOS_P2P_RUN_ID: 'synthetic-diagnostic',
+        },
       },
     );
     let stdout = '';
