@@ -12,8 +12,15 @@ assert len(files) == len(set(files)) == 39
 
 def run(file):
     xml = root / (Path(file).name + '.xml')
+    preloads = {
+        'http-multiseller-acceptance.test.ts': './.github/bun-http-observer.mjs',
+        'receipt-observation.test.ts': './.github/bun-fs-observer.mjs',
+        'batch-opening-absence-restart.test.ts': './.github/bun-fs-observer.mjs',
+    }
+    observer = preloads.get(Path(file).name)
+    preload = ['--preload', observer] if observer else []
     try:
-        proc = subprocess.run(['bun', 'test', '--timeout=600000', '--reporter=junit',
+        proc = subprocess.run(['bun', 'test', *preload, '--timeout=600000', '--reporter=junit',
                                '--reporter-outfile', str(xml), './'+file],
                               capture_output=True, text=True, errors='replace', timeout=360)
         code = proc.returncode

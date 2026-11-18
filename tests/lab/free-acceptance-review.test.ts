@@ -14,6 +14,8 @@ import {
   MODEL_IDS,
 } from '@gyblos/protocol/constants';
 
+import { bunFixtureLoader } from '../support/bun-loader-fixture';
+
 function response(finishReason: string = ENGINE_DONE_REASONS.STOP, index = 0) {
   return {
     status: HTTP_STATUS.ok,
@@ -63,14 +65,26 @@ function initializationFailure(borrowed: boolean) {
       'data:text/javascript,' + encodeURIComponent(constructor),
     './native': 'data:text/javascript,' + encodeURIComponent(native),
   };
-  const source = `
+  const interception = process.versions.bun
+    ? bunFixtureLoader(
+        [
+          { name: '@gyblos/buyer/control', module: constructor },
+          { name: './native', module: native },
+        ],
+        target,
+      )
+    : `
     import {registerHooks} from 'node:module';
-    globalThis.probe={opened:0,closed:0,failed:false,endpoint:{async close(){globalThis.probe.closed++}}};
+
     const sources=${JSON.stringify(sources)};
     registerHooks({resolve(specifier,context,next){
       const url=context.parentURL===${JSON.stringify(target)}?sources[specifier]:undefined;
       return url?{url,shortCircuit:true}:next(specifier,context);
     }});
+  `;
+  const source = `
+    ${interception}
+    globalThis.probe={opened:0,closed:0,failed:false,endpoint:{async close(){globalThis.probe.closed++}}};
     const {acquireFreeQuote}=await import('@gyblos/lab-harness/acceptance/free-quotes');
     const run={host(){return {wire:{endpoint:{addr(){return {}}},nodeId:'synthetic'}}},identity:{owner:{address:'synthetic'}},clock:{now(){return 0}}};
     try{await acquireFreeQuote(run,${borrowed ? 'globalThis.probe.endpoint' : 'undefined'});}
