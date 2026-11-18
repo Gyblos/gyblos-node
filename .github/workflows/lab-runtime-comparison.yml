@@ -1,0 +1,41 @@
+name: PR lab runtime comparison
+on:
+  push:
+    branches: [codex/pr-lab-runtime-comparison-n18]
+permissions:
+  contents: read
+jobs:
+  lab:
+    name: lab (1) / ${{ matrix.runtime }} / ${{ matrix.rep }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [node, deno]
+        rep: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - if: matrix.runtime == 'deno'
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.9.8
+      - run: pnpm install --frozen-lockfile
+      - name: Run PR lab shard on Node
+        if: matrix.runtime == 'node'
+        run: node --import tsx --test --test-shard=1/2 "tests/lab/**/*.test.ts"
+      - name: Run identical shard files on Deno
+        if: matrix.runtime == 'deno'
+        run: |
+          mapfile -t files < <(node --input-type=module -e "import {globSync} from 'node:fs'; console.log(globSync('tests/lab/**/*.test.ts').sort().filter((_, i) => i % 2 === 0).join('\n'))")
+          test "${#files[@]}" -gt 0
+          echo "Selected ${#files[@]} lab modules"
+          export DENO_JOBS=$(node -p "Math.max(1, require('node:os').availableParallelism()-1)")
+          deno test --parallel --no-check --cached-only --no-config --no-lock --node-modules-dir=manual --unstable-sloppy-imports -A "${files[@]}"
