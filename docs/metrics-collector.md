@@ -404,13 +404,14 @@ program's history is fully read (`backfillDone`) and when the index last moved
 may still be missing. `days` lists every day of the range with `program` and
 `gyblosClaimed`, each `null` without activity that day:
 
-- `transactions`, `channels`, `payers`, `payees`;
-- `instructions`: `open`, `settle`, `topUp`, `settleAndSeal`, `requestClose`,
-  `seal`, `distribute`, `reclaim`;
-- `usdc`: `depositedAtomic`, `settledAtomic`, `gyblosFeesAtomic`,
+- `program` (anyone's traffic, from the signature list only): `transactions`
+  (successful and failed) and `failed`;
+- `gyblosClaimed` (read in full): `transactions`, `channels`, `payers`,
+  `payees`, `undecodable`; `instructions`: `open`, `settle`, `topUp`,
+  `settleAndSeal`, `requestClose`, `seal`, `distribute`, `reclaim`; and `usdc`:
+  `depositedAtomic`, `settledAtomic`, `gyblosFeesAtomic`,
   `programTreasuryAtomic`, `refundedAtomic`, `paidOutAtomic`, as decimal
-  strings;
-- `program` only: `failed` and `undecodable`.
+  strings.
 
 This is the only source of settled USDC and fees: a paid receipt's
 `authorizedAtomic` is usage both sides signed for, not payment. `gyblosClaimed`
@@ -422,36 +423,73 @@ chain, so payer and payee counts are not withheld.
 The scheduled run aggregates first, then reads the Solana payment-channel
 program (`CHANNEL_PROGRAM` in `@gyblos/config`; code in `src/chain/`), so a slow
 RPC never delays the stats. The chain is the only source of settled USDC and
-fees: nothing here comes from node reports. Without a database or a valid
-`COLLECTOR_SOLANA_RPC_URL` secret (https, or http on loopback, with no
-credentials, query or fragment) the read is skipped.
+fees: nothing here comes from node reports. Without a database the read is
+skipped.
 
-**What is read, and when.** Finalized transactions of the program, through
-`getSignaturesForAddress`, `getTransaction` (jsonParsed, transaction versions 0
-and 1) in batched JSON-RPC requests (redirects refused, answers capped at 8 MiB
-and matched by id), and `getMultipleAccounts`. A run reads at most 200
-transactions and one page of signatures per phase, newest first within each:
+**What it costs.** The program is shared and busy (hundreds of other projects'
+transactions a day, bursts of tens of thousands), so the index reads in full
+only what concerns Gyblos and spends as few RPC calls as possible:
 
-1. **Gap:** new signatures an earlier run could not fit, strictly between
-   `gap_until` and `gap_before`.
-2. **Forward:** signatures newer than `newest_signature`. When they do not all
-   fit, the newest are read and the rest becomes the gap.
-3. **History:** signatures before `backfill_before`, until the program's first
-   transaction. An empty program is not marked done.
+- It runs on the free public devnet RPC (`DEVNET_RPC_URL`), one call at a time
+  (no JSON-RPC batches, which are billed and limited per call anyway), at least
+  500 ms apart, at most 80 calls per run.
+- The optional `COLLECTOR_SOLANA_RPC_URL` secret (a paid RPC: https, or http on
+  loopback, with no credentials, query or fragment) is used only after the
+  public RPC rate-limits a run (HTTP 429 or its limit code), for at most 20
+  calls in that run, and never otherwise.
+- Every run logs `COLLECTOR_CHAIN_INDEX_RUN` with the calls and rate limits per
+  endpoint, whether it moved to the paid one, what it counted, read and
+  followed, the accounts read, and whether work is left (`backlog`). Many
+  `publicLimited` or a lasting `backlog` are the signal to rely on the paid RPC
+  for a while.
+- Measured once on devnet from one machine (not from Cloudflare, whose shared
+  addresses the public RPC may limit more): reading history cost 10 to 18 calls
+  per run with no rate limit; once caught up, an idle run costs 1 call, plus one
+  per followed channel and one per hundred Gyblos accounts every 30 minutes.
 
-Each batch of transactions is stored in one transaction together with the cursor
-that covers it (`collector_chain_cursor`), so every signature is stored exactly
-once and a failed run resumes where it stopped, reading the failed batch again.
-A transaction the RPC lists but cannot return (`null`), a missing batch reply,
-an empty page for a range known to hold signatures (a lagging RPC: only a full
-page that was stored completely may be followed by an empty one) or any RPC
-error stops the run before that batch; a signature the RPC keeps failing on
-stops the read there until it is resolved. A failure logs
-`COLLECTOR_CHAIN_INDEX_FAILED` with the phase (`gap`, `forward`, `backfill`,
-`accounts`, or `start` for a failure outside those phases), the error class and
-a static reason (an HTTP status, an RPC error code, a shape location), never the
-URL, which may carry a provider key. A secret that is set but rejected (http,
-credentials, a key in the query) logs `COLLECTOR_CHAIN_INDEX_FAILED config`.
+**What is read, and when.** Finalized data, newest first, in five phases:
+
+- **Gap, forward, history:** the program's signature list
+  (`getSignaturesForAddress`, a thousand per call, each with its error, block
+  time and memo): new signatures an earlier run could not cover (strictly
+  between `gap_until` and `gap_before`), signatures newer than
+  `newest_signature`, and history before `backfill_before`, up to 5 pages per
+  phase and run, until `CHAIN_INDEX.historyFloorMs` (2026-11-01; earlier history
+  is never read). Every listed signature is only counted per UTC day
+  (`collector_chain_program_daily`: transactions and failed ones). A transaction
+  is read in full (`getTransaction`, jsonParsed, versions 0 and 1) only when it
+  succeeded and its memo opens a Gyblos channel.
+- **Follow:** each Gyblos channel opened that way is followed through its own
+  signature list, polled at most every 30 minutes, up to 40 channels per run:
+  half for channels never polled, half for the least recently polled, so a burst
+  of new opens (anyone can open one with a Gyblos memo) never starves the
+  channels already known. Its later successful transactions are read in full,
+  oldest first, at most 20 per poll (the rest wait for the next poll). A channel
+  stops being followed once its account is gone (reclaimed), or when one poll
+  returns a full page (a thousand transactions in 30 minutes only come from an
+  attack): its later transactions are then no longer read, but its account state
+  still is.
+- **Accounts:** the accounts of the channels touched, of any never read, and of
+  every Gyblos channel not closed whose state is older than 30 minutes
+  (`getMultipleAccounts`, a hundred per call).
+
+Each stored stretch is written in one transaction with the cursor that covers it
+(`collector_chain_cursor`, a channel's `follow_until`), so every signature is
+counted once and a failed run resumes where it stopped. The cursor also keeps
+the slots of `newest_signature` and `gap_until`: a page holding older signatures
+(a lagging node that ignored `until`) is refused rather than counted twice. A
+lease (`lease_until`, 15 minutes) makes a run that overlaps another skip
+(`skipped=true` in its log line). A failed list phase does not stop the follow
+and account phases; the first failure is logged after them. After a full page, a
+gap answered empty is closed only when the signature right before `gap_before`
+is `gap_until` (one more call); otherwise it is a lagging RPC, retried next run.
+A transaction the RPC lists but cannot return (`null`), an empty page for a
+range known to hold signatures, a spent call budget or any RPC error stops the
+run there. A failure logs `COLLECTOR_CHAIN_INDEX_FAILED` with the phase (`gap`,
+`forward`, `backfill`, `follow`, `accounts`, or `start`), the error class, a
+static reason (an HTTP status, an RPC error code, a shape location) and the
+calls per endpoint, never a URL, which may carry a provider key. A secret that
+is set but rejected logs `COLLECTOR_CHAIN_INDEX_FAILED config`.
 
 **How a transaction is read** (`src/chain/decode.ts`, @x402/svm 2.28): every
 top-level program instruction by its one-byte discriminator — open (1), settle
@@ -471,13 +509,14 @@ transaction this decoder cannot read is counted in `undecodable`, never guessed
 and never fatal. Program calls made through another program (inner instructions)
 are not read; their token changes are.
 
-| Table                          | One row per                | Notes                                                                           |
-| ------------------------------ | -------------------------- | ------------------------------------------------------------------------------- |
-| `collector_chain_txs`          | Finalized transaction      | Slot, block time (ms), failed, undecodable, first memo (untrusted text).        |
-| `collector_chain_instructions` | Program instruction        | Kind, channel, parties, amount, voucher cumulative, splits.                     |
-| `collector_chain_token_deltas` | Transaction × owner × mint | Net token change; the basis of settled USDC, fees and refunds.                  |
-| `collector_chain_channels`     | Channel                    | Parties and terms from open; deposit, settled, payout, status from its account. |
-| `collector_chain_cursor`       | Run state                  | Newest signature known, the open gap, where history stopped, done.              |
+| Table                           | One row per                | Notes                                                                                                   |
+| ------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `collector_chain_txs`           | Transaction read in full   | Slot, block time (ms), failed, undecodable, first memo (untrusted text).                                |
+| `collector_chain_instructions`  | Program instruction        | Kind, channel, parties, amount, voucher cumulative, splits.                                             |
+| `collector_chain_token_deltas`  | Transaction × owner × mint | Net token change; the basis of settled USDC, fees and refunds.                                          |
+| `collector_chain_channels`      | Channel                    | Parties and terms from open; deposit, settled, payout, status from its account; whether it is followed. |
+| `collector_chain_cursor`        | Run state                  | Newest signature known, the open gap, where history stopped, done.                                      |
+| `collector_chain_program_daily` | UTC day                    | The whole program's listed transactions and failed ones (none read).                                    |
 
 **Channel state.** After storing, the run reads the account of every channel a
 successful instruction named (and any never read): status (open, sealed,
@@ -488,9 +527,11 @@ amounts.
 
 **Gyblos traffic is a claim.** The program is shared. A channel is marked
 `gyblos` when its open memo is Gyblos terms (`gyblos:`) or a Gyblos payment
-session (`gyblos/payment-session/v1:`), or when a distribute paid the Gyblos
-treasury. Anyone can make either claim, with any mint: metrics built on it must
-filter by the USDC mint and say the label is self-declared.
+session (`gyblos/payment-session/v1:`); only those channels are read in full. A
+channel opened without that memo is never read, even if a distribute later pays
+the Gyblos treasury (only a transaction read for a Gyblos channel can still mark
+another channel it names). Anyone can make either claim, with any mint: metrics
+built on it must filter by the USDC mint and say the label is self-declared.
 
 ### Chain aggregates
 
@@ -517,15 +558,16 @@ marks dirty:
 
 Before the first chain scan every indexed day is marked, and a formula change
 re-marks every chain day aggregated with another version. Each dirty day gets
-one row per scope: `program` (the whole program) and `gyblos` (channels claiming
-Gyblos traffic); a scope with no activity that day has no row.
+one row per scope: `program` (the whole program: only `transactions` and
+`failed`, from its signature list counts; every other column is zero) and
+`gyblos` (channels claiming Gyblos traffic, read in full); a scope with no
+activity that day has no row.
 
-- **Counts:** successful transactions with an instruction in scope; top-level
-  instructions by kind; distinct channels, payers and payees. Failed
-  transactions name no channel, so they count in the `program` scope only, as do
-  successful transactions with a program instruction the decoder could not read
-  (`undecodable`; such a transaction is also in `transactions` when another of
-  its instructions was read).
+- **Counts** (`gyblos`): successful transactions with an instruction in scope;
+  top-level instructions by kind; distinct channels, payers and payees;
+  `undecodable`: read transactions with a program instruction the decoder could
+  not read (such a transaction is also in `transactions` when another of its
+  instructions was read).
 - **Amounts** count channels in the devnet USDC mint only, as decimal strings.
   `deposited`: open deposits plus top-ups. `settled`: each settle's signed
   cumulative, capped at the channel's deposits, above the highest one the
@@ -626,17 +668,17 @@ Cloudflare counts it per location, so it is approximate.
 
 ## Code layout
 
-| Layer       | Files                                                                                   |
-| ----------- | --------------------------------------------------------------------------------------- |
-| Entry       | `src/worker.ts`: bindings, the scheduled run and the stats edge cache; inert on import. |
-| HTTP        | `src/app.ts`, `src/ip-key.ts`, `src/http.ts`, `src/stats-routes.ts`                     |
-| Use cases   | `src/ingest.ts`, `src/ingest-observations.ts`, `src/stats.ts`, `src/stats-chain.ts`     |
-| Policy      | `@gyblos/core/public-receipts`: receipt verification, classification and merge rules.   |
-| Storage     | `src/storage.ts` (port), `src/storage-d1*.ts` and `src/storage-memory.ts` (adapters)    |
-| Aggregation | `src/aggregate*.ts`, `src/sql-primitives.ts`                                            |
-| Stats reads | `src/stats-store.ts` (port), `src/stats-read.ts` (D1)                                   |
-| Chain index | `src/chain/`                                                                            |
-| Values      | `src/constants.ts`, `src/errors.ts`                                                     |
+| Layer       | Files                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entry       | `src/worker.ts`: bindings, the scheduled run and the stats edge cache; inert on import.                                                                                         |
+| HTTP        | `src/app.ts`, `src/ip-key.ts`, `src/http.ts`, `src/stats-routes.ts`                                                                                                             |
+| Use cases   | `src/ingest.ts`, `src/ingest-observations.ts`, `src/stats.ts`, `src/stats-chain.ts`                                                                                             |
+| Policy      | `@gyblos/core/public-receipts`: receipt verification, classification and merge rules.                                                                                           |
+| Storage     | `src/storage.ts` (port), `src/storage-d1*.ts` and `src/storage-memory.ts` (adapters)                                                                                            |
+| Aggregation | `src/aggregate*.ts`, `src/sql-primitives.ts`                                                                                                                                    |
+| Stats reads | `src/stats-store.ts` (port), `src/stats-read.ts` (D1)                                                                                                                           |
+| Chain index | `src/chain/`: the scheduled read (`indexer.ts`, `list.ts`, `follow.ts`), call budgets and fallback (`endpoints.ts`), the RPC client, decoding and writes; `src/schema-chain.ts` |
+| Values      | `src/constants.ts`, `src/errors.ts`                                                                                                                                             |
 
 ## Operations
 

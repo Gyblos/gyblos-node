@@ -1,7 +1,7 @@
-// Owns the chain aggregates (#349): their dirty marks, the per-day formulas and their own run. Each
-// dirty day gets one row per scope (whole program, channels claiming Gyblos traffic) recomputed from
-// the chain index, in a batch apart from the receipt aggregates. Amounts count devnet USDC only and
-// are stored as decimal text.
+// Owns the chain aggregate formulas (#349): each dirty day gets one row per scope, the whole program
+// (counts from its signature list) and channels claiming Gyblos traffic (read in full), recomputed
+// from the chain index in one batch. Amounts count devnet USDC only and are stored as decimal text.
+// The run that schedules it is aggregate-chain-run.ts.
 import { desc, eq, getTableColumns, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 
@@ -11,6 +11,21 @@ import {
   DEVNET_USDC,
 } from '@gyblos/config/network';
 
+import {
+  asInteger,
+  atomicTotal,
+  channelJoin,
+  col,
+  from,
+  inDay,
+  inScope,
+  K,
+  kinds,
+  PAYING,
+  SETTLING,
+  txJoin,
+  type BatchItem,
+} from './aggregate-chain-sql';
 import { versionFields } from './aggregate-sql';
 import {
   AGG_STATE_ID,
@@ -28,119 +43,11 @@ import {
   aggChainState,
   chainChannels,
   chainInstructions,
+  chainProgramDaily,
   chainTokenDeltas,
   chainTxs,
 } from './schema';
 import { dayOf, literal, number } from './sql-primitives';
-
-type BatchItem = Parameters<CollectorDatabase['batch']>[0][number];
-const K = CHAIN_INSTRUCTIONS;
-const SETTLING: ChainInstructionKind[] = [K.SETTLE, K.SETTLE_AND_SEAL];
-const PAYING: ChainInstructionKind[] = [K.DISTRIBUTE, K.RECLAIM];
-
-// `alias.column`, always qualified: these statements read the same tables under several aliases.
-const col = (alias: string, column: SQLiteColumn) =>
-  sql`${sql.identifier(alias)}.${sql.identifier(column.name)}`;
-const from = (table: SQLiteTable, alias: string) =>
-  sql`${table} as ${sql.identifier(alias)}`;
-const kinds = (values: readonly ChainInstructionKind[]) =>
-  sql`(${sql.join(values.map(literal), sql`, `)})`;
-const asInteger = (value: SQL) => sql`cast(${value} as integer)`;
-// A sum as decimal integer text; 0 over no rows. SQLite total() never fails on overflow (one huge
-// value can never make a day fail) and is exact below 2^53 atomic units (9e9 USDC).
-const atomicTotal = (value: SQL) =>
-  sql`cast(cast(total(${value}) as integer) as text)`;
-// The block time of transaction alias `alias` falls in the day.
-const inDay = (alias: string, bounds: DayBounds) =>
-  sql`${col(alias, chainTxs.blockTime)} >= ${number(bounds.start)} and ${col(alias, chainTxs.blockTime)} < ${number(bounds.end)}`;
-// Channel alias `alias` is in scope (left-joined: an unknown channel is never a Gyblos one).
-const inScope = (alias: string, scope: ChainAggregateScope) =>
-  scope === CHAIN_AGGREGATE_SCOPES.GYBLOS
-    ? sql`${col(alias, chainChannels.gyblos)} = 1`
-    : sql`1 = 1`;
-const txJoin = (instruction: string, tx: string) =>
-  sql`join ${from(chainTxs, tx)} on ${col(tx, chainTxs.signature)} = ${col(instruction, chainInstructions.signature)}`;
-const channelJoin = (instruction: string, channel: string, left = true) =>
-  sql`${sql.raw(left ? 'left join' : 'join')} ${from(chainChannels, channel)} on ${col(channel, chainChannels.channel)} = ${col(instruction, chainInstructions.channel)}`;
-
-// Marks dirty, in the chain's own dirty set: the days of transactions indexed since `since`; every day
-// of a channel a fresh open or distribute names (a late open brings the mint and parties, a distribute
-// can add the Gyblos claim); and the days of a channel's settles at or after a fresh settle (history is
-// read newest first, so an older settle can arrive after newer ones). A plain new settle or top-up never
-// re-marks the channel's whole history.
-function chainDirtyMarks(
-  database: CollectorDatabase,
-  since: number,
-): BatchItem[] {
-  const fresh = sql`${col('t', chainTxs.indexedAt)} >= ${since}`;
-  const day = (alias: string) => dayOf(col(alias, chainTxs.blockTime));
-  const mark = (query: SQL) =>
-    database.insert(aggChainDirtyDays).select(query).onConflictDoNothing();
-  return [
-    mark(
-      sql`select distinct ${day('t')} from ${from(chainTxs, 't')} where ${fresh} and ${day('t')} is not null`,
-    ),
-    mark(
-      sql`select distinct ${day('o')} from ${from(chainInstructions, 'h')} ${txJoin('h', 'o')}
-        where ${col('h', chainInstructions.channel)} in (
-          select ${col('i', chainInstructions.channel)} from ${from(chainInstructions, 'i')} ${txJoin('i', 't')}
-          where ${fresh} and ${col('i', chainInstructions.kind)} in ${kinds([K.OPEN, K.DISTRIBUTE])}
-        ) and ${day('o')} is not null`,
-    ),
-    // Driven from the fresh transactions (by indexed_at, then each one's instructions), so its cost
-    // follows what is new. A fresh settle re-marks the channel's settles from its slot on; a fresh
-    // top-up raises the deposit cap of every earlier settle, so it re-marks them all.
-    mark(
-      sql`select distinct ${day('o')} from (
-          select ${col('i', chainInstructions.channel)} as channel,
-            min(case when ${col('i', chainInstructions.kind)} = ${literal(K.TOP_UP)} then 0 else ${col('t', chainTxs.slot)} end) as slot
-          from ${from(chainTxs, 't')} cross join ${from(chainInstructions, 'i')} on ${col('i', chainInstructions.signature)} = ${col('t', chainTxs.signature)}
-          where ${fresh} and ${col('i', chainInstructions.kind)} in ${kinds([...SETTLING, K.TOP_UP])}
-          group by ${col('i', chainInstructions.channel)}
-        ) as ${sql.identifier('f')}
-        join ${from(chainInstructions, 'h')} on ${col('h', chainInstructions.channel)} = ${sql.identifier('f')}.${sql.identifier('channel')}
-        ${txJoin('h', 'o')}
-        where ${col('h', chainInstructions.kind)} in ${kinds(SETTLING)}
-          and ${col('o', chainTxs.slot)} >= ${sql.identifier('f')}.${sql.identifier('slot')}
-          and ${day('o')} is not null`,
-    ),
-  ];
-}
-
-// The chain's own scan, apart from the receipt scan: one batch that moves the chain cursor and marks
-// dirty days. Before the first chain scan every indexed day is marked; after a formula change, every
-// chain day aggregated with another version.
-async function chainScan(database: CollectorDatabase, now: number) {
-  const [state] = await database
-    .select({
-      scannedAt: aggChainState.scannedAt,
-      formulaVersion: aggChainState.formulaVersion,
-    })
-    .from(aggChainState)
-    .where(eq(aggChainState.id, AGG_STATE_ID));
-  const since = state ? state.scannedAt - AGGREGATES.scanOverlapMs : 0;
-  const cursor = { scannedAt: now, formulaVersion: AGGREGATES.formulaVersion };
-  const changed =
-    state !== undefined && state.formulaVersion !== AGGREGATES.formulaVersion;
-  await database.batch([
-    database
-      .insert(aggChainState)
-      .values({ id: AGG_STATE_ID, ...cursor })
-      .onConflictDoUpdate({ target: aggChainState.id, set: cursor }),
-    ...chainDirtyMarks(database, since),
-    ...(changed ? [chainStaleMarks(database)] : []),
-  ]);
-}
-
-// After a formula change, every chain day aggregated with another version.
-function chainStaleMarks(database: CollectorDatabase): BatchItem {
-  return database
-    .insert(aggChainDirtyDays)
-    .select(
-      sql`select distinct ${aggChainDaily.day} from ${aggChainDaily} where ${aggChainDaily.formulaVersion} <> ${number(AGGREGATES.formulaVersion)}`,
-    )
-    .onConflictDoNothing();
-}
 
 // Counts and deposits of the day's instructions in scope.
 function instructionTotals(bounds: DayBounds, scope: ChainAggregateScope) {
@@ -165,14 +72,12 @@ function instructionTotals(bounds: DayBounds, scope: ChainAggregateScope) {
     where ${inDay('t', bounds)} and ${inScope('c', scope)}) as ins`;
 }
 
-// Failed and undecodable transactions name no channel: counted in the program scope only.
-function transactionTotals(bounds: DayBounds, scope: ChainAggregateScope) {
-  if (scope !== CHAIN_AGGREGATE_SCOPES.PROGRAM)
-    return sql`(select 0 as failed, 0 as undecodable) as tx`;
-  const failed = col('t', chainTxs.failed);
-  return sql`(select
-      count(case when ${failed} = 1 then 1 end) as failed,
-      count(case when ${failed} = 0 and ${col('t', chainTxs.undecodable)} > 0 then 1 end) as undecodable
+// Read transactions (all of them Gyblos: opens with a Gyblos memo, then followed channels) with a
+// program instruction the decoder could not read. Failed program transactions are counted in the
+// program row, from the signature list.
+function transactionTotals(bounds: DayBounds) {
+  return sql`(select 0 as failed,
+      count(case when ${col('t', chainTxs.failed)} = 0 and ${col('t', chainTxs.undecodable)} > 0 then 1 end) as undecodable
     from ${from(chainTxs, 't')} where ${inDay('t', bounds)}) as tx`;
 }
 
@@ -322,8 +227,43 @@ function scopeRow(
   });
   // A day with no chain activity in scope gets no row.
   return sql`select ${fields}
-    from ${instructionTotals(bounds, scope)}, ${transactionTotals(bounds, scope)}, ${settledTotal(bounds, scope)}, ${payoutTotals(bounds, scope)}
+    from ${instructionTotals(bounds, scope)}, ${transactionTotals(bounds)}, ${settledTotal(bounds, scope)}, ${payoutTotals(bounds, scope)}
     where ${field('ins', 'transactions')} + ${field('tx', 'failed')} + ${field('tx', 'undecodable')} > 0`;
+}
+
+// The whole program's row: counts from its signature list, no transaction read. Every other column is
+// zero (the program's traffic is not read in full); a day the list never covered has no row.
+function programRow(bounds: DayBounds, now: number): SQL {
+  const zero = sql`0`;
+  const none = sql`'0'`;
+  const version = versionFields(now);
+  const fields = fieldList(aggChainDaily, {
+    day: sql`${bounds.day}`,
+    scope: literal(CHAIN_AGGREGATE_SCOPES.PROGRAM),
+    transactions: sql`${chainProgramDaily.transactions}`,
+    failed: sql`${chainProgramDaily.failed}`,
+    undecodable: zero,
+    opens: zero,
+    settles: zero,
+    topUps: zero,
+    settleAndSeals: zero,
+    requestCloses: zero,
+    seals: zero,
+    distributes: zero,
+    reclaims: zero,
+    channels: zero,
+    payers: zero,
+    payees: zero,
+    depositedAtomic: none,
+    settledAtomic: none,
+    gyblosFeesAtomic: none,
+    programTreasuryAtomic: none,
+    refundedAtomic: none,
+    paidOutAtomic: none,
+    formulaVersion: version.formulaVersion,
+    aggregatedAt: version.aggregatedAt,
+  });
+  return sql`select ${fields} from ${chainProgramDaily} where ${chainProgramDaily.day} = ${bounds.day}`;
 }
 
 // The day's chain rows, replaced for every scope; the day leaves the chain dirty set with them.
@@ -337,62 +277,9 @@ export function chainDayBatch(
       .delete(aggChainDirtyDays)
       .where(eq(aggChainDirtyDays.day, bounds.day)),
     database.delete(aggChainDaily).where(eq(aggChainDaily.day, bounds.day)),
-    ...Object.values(CHAIN_AGGREGATE_SCOPES).map((scope) =>
-      database.insert(aggChainDaily).select(scopeRow(bounds, scope, now)),
-    ),
+    database.insert(aggChainDaily).select(programRow(bounds, now)),
+    database
+      .insert(aggChainDaily)
+      .select(scopeRow(bounds, CHAIN_AGGREGATE_SCOPES.GYBLOS, now)),
   ];
-}
-
-export interface ChainAggregationResult {
-  // Chain days recomputed by this run, newest first.
-  days: string[];
-  // Days whose batch failed; they stay dirty for the next run.
-  failed: string[];
-  // Dirty days are left for the next run.
-  more: boolean;
-  // The chain scan or the dirty-day read failed: nothing was recomputed, marks are retried next run.
-  scanFailed: boolean;
-}
-
-// Scans, then recomputes up to AGGREGATES.maxDaysPerRun chain days, newest first, each in its own batch.
-// It never throws: chain data (anyone can write to the program) can never hold back receipt or
-// observation aggregates, nor the chain index that runs after it.
-export async function runChainAggregation(
-  database: CollectorDatabase,
-  now: number,
-): Promise<ChainAggregationResult> {
-  const result: ChainAggregationResult = {
-    days: [],
-    failed: [],
-    more: false,
-    scanFailed: false,
-  };
-  let dirty: { day: string }[];
-  try {
-    await chainScan(database, now);
-    dirty = await database
-      .select({ day: aggChainDirtyDays.day })
-      .from(aggChainDirtyDays)
-      .orderBy(desc(aggChainDirtyDays.day))
-      .limit(AGGREGATES.maxDaysPerRun + 1);
-  } catch {
-    return { ...result, scanFailed: true };
-  }
-  result.more = dirty.length > AGGREGATES.maxDaysPerRun;
-  for (const { day } of dirty.slice(0, AGGREGATES.maxDaysPerRun)) {
-    const bounds = dayBounds(day);
-    try {
-      if (!bounds)
-        await database
-          .delete(aggChainDirtyDays)
-          .where(eq(aggChainDirtyDays.day, day));
-      else {
-        await database.batch(chainDayBatch(database, bounds, now));
-        result.days.push(day);
-      }
-    } catch {
-      result.failed.push(day);
-    }
-  }
-  return result;
 }

@@ -197,6 +197,7 @@ export {
   chainChannels,
   chainCursor,
   chainInstructions,
+  chainProgramDaily,
   chainTokenDeltas,
   chainTxs,
 } from './schema-chain';
