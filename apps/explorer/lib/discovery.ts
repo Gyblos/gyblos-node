@@ -1,9 +1,10 @@
-// Owns the read of the discovery index: models offered now, sellers online and their uptime, fetched,
-// checked at the boundary on each render.
+// Owns the read of the discovery index: models offered now, sellers online and their uptime, and the
+// network status of every registered seller, fetched, checked at the boundary on each render.
 
 import { DISCOVERY_URL } from './config';
 import { DISCOVERY } from './constants';
 import { fetchJson } from './fetch-json';
+import { parseNetworkStatus, type NetworkStatus } from './network-status';
 import { list, nullable, num, record, text } from './validate';
 
 export interface OfferedModel {
@@ -26,6 +27,8 @@ export interface Seller {
 export interface DiscoverySnapshot {
   generatedAt: number;
   sellers: Seller[];
+  // Null when the index does not answer /network (an older index): only online sellers are known.
+  network: NetworkStatus | null;
   error: string | null;
 }
 
@@ -101,6 +104,7 @@ export async function getDiscovery(): Promise<DiscoverySnapshot> {
     return {
       generatedAt: 0,
       sellers: [],
+      network: null,
       error: error instanceof Error ? error.message : 'discovery unavailable',
     };
   }
@@ -113,6 +117,7 @@ async function loadDiscovery(): Promise<DiscoverySnapshot> {
     text(record(entry, 'models.model').id, 'model.id'),
   );
   const sellers = [...(await sellersOf(modelIds)).values()];
+  const network = read('/network').then(parseNetworkStatus, () => null);
   await Promise.all(
     sellers.map(async (seller) => {
       try {
@@ -127,6 +132,7 @@ async function loadDiscovery(): Promise<DiscoverySnapshot> {
   return {
     generatedAt: num(listed.generatedAt, 'models.generatedAt'),
     sellers,
+    network: await network,
     error: null,
   };
 }

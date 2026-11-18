@@ -8,6 +8,7 @@
     "./collector-shape": "./lib/collector-shape.ts",
     "./latency": "./lib/latency.ts",
     "./model-family": "./lib/model-family.ts",
+    "./network-status": "./lib/network-status.ts",
     "./offers": "./lib/offers.ts",
     "./range": "./lib/range.ts",
     "./usage": "./lib/usage.ts"
