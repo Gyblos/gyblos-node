@@ -41,6 +41,8 @@ export const SIDEBAR_ICON_IDS = {
   PLUG: 'plug',
   BOOK_OPEN: 'book-open',
   LIFE_BUOY: 'life-buoy',
+  CHAT: 'chat',
+  CODE: 'code',
 } as const;
 export type SidebarIconId =
   (typeof SIDEBAR_ICON_IDS)[keyof typeof SIDEBAR_ICON_IDS];
