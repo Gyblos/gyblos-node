@@ -300,12 +300,21 @@ export const CHAIN_INDEX = {
   maxTransactionVersion: 1,
   msPerSecond: 1000,
 } as const;
+// Keyed providers whose key serves every Solana cluster under a per-cluster host: a configured
+// mainnet host is read on its devnet host with the same key, since the index reads devnet. The
+// genesis check (chain/rpc.ts) still refuses any endpoint that does not answer for devnet.
+export const CHAIN_DEVNET_HOSTS: Readonly<Record<string, string>> = {
+  'mainnet.helius-rpc.com': 'devnet.helius-rpc.com',
+  'solana-mainnet.g.alchemy.com': 'solana-devnet.g.alchemy.com',
+};
 // Optional keyed Solana RPC URLs (secrets), tried in this order only when the public RPC (and then the
 // previous one) fails the run: for example Helius, then Alchemy.
 export const COLLECTOR_SOLANA_RPC_BINDINGS = [
   'COLLECTOR_SOLANA_RPC_URL',
   'COLLECTOR_SOLANA_RPC_FALLBACK_URL',
 ] as const;
+// Operator token (secret) for the RPC probe; while unset the probe route does not exist.
+export const COLLECTOR_ADMIN_TOKEN_BINDING = 'COLLECTOR_ADMIN_TOKEN';
 // Log code of a scheduled run whose chain read failed; followed by a static reason only.
 export const COLLECTOR_CHAIN_INDEX_FAILED = 'COLLECTOR_CHAIN_INDEX_FAILED';
 // Log code of every scheduled chain read: calls per endpoint, rate limits, work done and backlog.

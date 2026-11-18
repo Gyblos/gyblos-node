@@ -277,3 +277,23 @@ export function selectSellers(
     throw error;
   }
 }
+
+// The smallest context any seller that could serve `request` lists for its model, cooldown aside, so a
+// prompt sized to it fits whichever of them is chosen later; undefined when no seller qualifies.
+export function smallestContextTokens(
+  input: Pick<SellerSelectionInput, 'request' | 'sellers' | 'stats' | 'now'>,
+): number | undefined {
+  const levels = acceptableLevels(input.request);
+  let smallest: number | undefined;
+  for (const seller of input.sellers) {
+    const entry = eligible(input as SellerSelectionInput, seller, false);
+    if (
+      !entry ||
+      !levels.some((level) => entry.listing.reasoning.includes(level))
+    )
+      continue;
+    const context = entry.listing.contextTokens;
+    if (smallest === undefined || context < smallest) smallest = context;
+  }
+  return smallest;
+}

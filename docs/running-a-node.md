@@ -416,9 +416,14 @@ pnpm gyblos seller status --online
 
 `seller status` is read-only and uses the same `GYBLOS_HOME` and `config.toml`
 as `node:start`. `--online` also looks this NodeId up in the discovery index,
-sending only the served model names. While the index refuses or fails this
+paging it by the served model names. While the index refuses or fails this
 seller's publication, the discovery line adds `publishing refused:` and the
-static code the daemon keeps in `status.json`. The output is described in the
+static code the daemon keeps in `status.json`. While a model is served, an
+`uptime` line then asks the index for this NodeId's public uptime (the share of
+five-minute slots with an accepted presence over 24 hours, 7 and 30 days) and
+says `online, last presence … ago` or `offline since …`; this is the only
+request that carries the NodeId, which the daemon already publishes to the same
+index. The output is described in the
 [CLI reference](https://docs.gyblos.com/en/reference/cli#status-and-registration).
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon.
@@ -840,9 +845,12 @@ are refused. It contains:
 - `models` (optional): 1 to 32 `{ id, aliases?, selection, maxTokens? }` entries
   that the endpoint serves by name. A client sends `id` or an alias as `model`.
   The list must serve `request.selection.modelId` by name. `GET /v1/models`
-  lists them with `max_output_tokens`; an unknown name gets 404
-  `FREE_BUYER_MODEL_NOT_FOUND`. Paid modes refuse to start unless every listed
-  model meets the paid limits.
+  lists them with `max_output_tokens` and, on the free endpoint,
+  `context_length`: the smallest context any eligible seller of that model lists
+  in its verified catalog, so a prompt sized to it fits whichever seller is
+  chosen. It is left out when no seller's catalog can be read within 4 seconds.
+  An unknown name gets 404 `FREE_BUYER_MODEL_NOT_FOUND`. Paid modes refuse to
+  start unless every listed model meets the paid limits.
 - `session` and `routing` (optional): reusable payment sessions and busy-seller
   routing; see [payment-sessions.md](payment-sessions.md).
 
