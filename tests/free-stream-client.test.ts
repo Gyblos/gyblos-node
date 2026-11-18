@@ -90,8 +90,16 @@ async function fixture(
             offset += size;
             return [...value];
           },
-          async read() {
-            return [...all.subarray(offset)];
+          // Like a native stream: up to `size` bytes, consumed, and empty at the end.
+          async read(size: number) {
+            if (
+              options.truncate &&
+              offset >= frames[0]!.length + frames[1]!.length
+            )
+              return [];
+            const value = all.subarray(offset, offset + size);
+            offset += value.length;
+            return [...value];
           },
         },
       };
