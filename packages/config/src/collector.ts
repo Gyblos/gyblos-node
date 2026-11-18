@@ -12,6 +12,10 @@ export const RECEIPT_UPLOADER = {
   releaseEnvironment: 'GYBLOS_VERSION',
   tickMs: 60_000,
   requestMs: 15_000,
+  // On close, how long to keep sending what only this process holds (buffered observations, then
+  // pending receipts) before stopping. A one-shot CLI or a quitting app would otherwise lose the
+  // observations of its last requests, which wait for the next 60-second tick.
+  closeFlushMs: 3_000,
   retryMs: 60_000,
   maxRetryMs: 3_600_000,
   // Refused receipts skipped per process; with a full envelope (50) it stays within the store's

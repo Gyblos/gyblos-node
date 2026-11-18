@@ -17,6 +17,7 @@ import {
 } from '@gyblos/protocol/constants';
 
 import { requestAgentEndpoint } from './agent-endpoint';
+import { desktopBuyerFailure } from './buyer-error';
 import { RESPONSE_COST_KIND, RESPONSE_COST_UNIT } from './constants';
 import { observedResponse, reportedUsage } from './response-metrics';
 import { requestBuyerApiKeys } from './usdc-api-client';
@@ -349,7 +350,7 @@ export class X402Client {
         error.code !== PAID_BUYER_CODES.UNRESOLVED
       )
         await this.budget.cancelUnsent(id);
-      throw new Error('Buyer did not complete the request');
+      throw desktopBuyerFailure(error, policy);
     }
     const reply = parseBuyerReply(body, policy);
     const summary = await this.budget.complete(id, reply);

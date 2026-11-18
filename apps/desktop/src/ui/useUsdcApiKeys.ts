@@ -1,18 +1,61 @@
-// Refreshes owner-visible key metadata; credentials and buyer requests stay in the main process.
+// Refreshes owner-visible metadata; an explicit reveal reads one transient key without retaining it here.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   emptyUsdcApi,
+  parseUsdcApiSecret,
   parseUsdcApiState,
   USDC_API,
   USDC_API_ACTION,
+  type UsdcApiSecret,
   type UsdcApiState,
 } from '../usdc-api-model';
 
 declare global {
   interface Window {
-    desktopUsdcApiKeys?: { run(input: unknown): Promise<UsdcApiState> };
+    desktopUsdcApiKeys?: {
+      run(input: unknown): Promise<UsdcApiState>;
+      reveal?(input: unknown): Promise<UsdcApiSecret>;
+    };
   }
+}
+function useKeyReveal(
+  running: { current: boolean },
+  mounted: { current: boolean },
+  policyId: { current: string | null },
+  setBusy: (value: boolean) => void,
+) {
+  return useCallback(
+    async (id: string) => {
+      const policy = policyId.current;
+      if (
+        !mounted.current ||
+        running.current ||
+        !policy ||
+        !window.desktopUsdcApiKeys?.reveal
+      )
+        throw new Error('API key is unavailable');
+      running.current = true;
+      setBusy(true);
+      try {
+        const result = parseUsdcApiSecret(
+          await window.desktopUsdcApiKeys.reveal({ id, policyId: policy }),
+        );
+        if (
+          !mounted.current ||
+          policyId.current !== policy ||
+          result.policyId !== policy ||
+          result.id !== id
+        )
+          throw new Error('API key is unavailable');
+        return result.secret;
+      } finally {
+        running.current = false;
+        if (mounted.current) setBusy(false);
+      }
+    },
+    [running, mounted, policyId, setBusy],
+  );
 }
 export function useUsdcApiKeys() {
   const [state, setState] = useState(emptyUsdcApi);
@@ -63,5 +106,6 @@ export function useUsdcApiKeys() {
       window.clearInterval(interval);
     };
   }, [run]);
-  return { state, busy, run };
+  const reveal = useKeyReveal(running, mounted, policyId, setBusy);
+  return { state, busy, run, reveal };
 }

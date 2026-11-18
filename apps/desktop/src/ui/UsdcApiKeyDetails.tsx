@@ -6,13 +6,18 @@ import type {
   BuyerKeyScope,
 } from '@gyblos/protocol/buyer-api-keys';
 
-import { usdcApiAmount as amount, USDC_API_ACTION } from '../usdc-api-model';
+import {
+  usdcApiAmount as amount,
+  USDC_API_ACTION,
+  usdcApiKeyBadge,
+} from '../usdc-api-model';
 import { BuyerAgentSetup } from './BuyerAgentSetup';
 import { BUTTON_VARIANT } from './constants';
 import { CopyField, FormActions } from './Form';
 import { Facts, Pair } from './Management';
 import { Modal } from './Modal';
 import { Badge, Button } from './UI';
+import { UsdcApiKeyField } from './UsdcApiKeyField';
 import type { useUsdcApiKeys } from './useUsdcApiKeys';
 
 type Controller = ReturnType<typeof useUsdcApiKeys>;
@@ -145,26 +150,13 @@ export function UsdcApiKeyDetails({
     <section className="ui-section" aria-label="USDC API connection">
       <div className="ui-section-title">
         <h2>{key.name}</h2>
-        <Badge>
-          {key.revoked
-            ? 'Revoked'
-            : state.snapshot?.blocked
-              ? 'Needs review'
-              : key.spentAtomic === key.limitAtomic
-                ? 'Paid limit reached'
-                : 'Active'}
-        </Badge>
+        <Badge>{usdcApiKeyBadge(state, key)}</Badge>
       </div>
-      <CopyField
-        id="usdc-tool-key"
-        label="API key"
-        secret
-        value="Key saved in your tool"
-        actionLabel="Copy API key"
-        disabled={busy || !available}
-        onCopy={() => {
-          void run({ action: USDC_API_ACTION.COPY_KEY, id });
-        }}
+      <UsdcApiKeyField
+        key={id + state.policyId}
+        api={api}
+        id={id}
+        available={available}
       />
       {!state.copyable.includes(key.id) && !key.revoked && (
         <p className="ui-help-text">

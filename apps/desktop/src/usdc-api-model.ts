@@ -1,4 +1,5 @@
-// Validates renderer-visible delegated key status; neither operator nor tool secrets enter this contract.
+// Validates ordinary delegated-key metadata separately from an explicit one-key reveal.
+// Routine status replies never carry operator or delegated credentials.
 import { LOCALHOST, ROUTES } from '@gyblos/config';
 import { DEVNET_USDC } from '@gyblos/config/network';
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
@@ -113,6 +114,36 @@ export function parseUsdcApiState(input: unknown): UsdcApiState {
 export function usdcApiAmount(atomic: string, scope: BuyerKeyScope) {
   return `${x402Amount(atomic, scope)} ${scope.mint === DEVNET_USDC ? 'USDC' : 'atomic units'}`;
 }
+export function usdcApiKeyBadge(state: UsdcApiState, key: BuyerApiKeySummary) {
+  return key.revoked
+    ? 'Revoked'
+    : !state.snapshot || state.error || state.snapshot.blocked
+      ? 'Needs review'
+      : key.limitAtomic === '0'
+        ? 'Free only'
+        : key.spentAtomic === key.limitAtomic
+          ? 'Paid limit reached'
+          : 'Active';
+}
+
+export interface UsdcApiSecret {
+  id: string;
+  policyId: string;
+  secret: string;
+}
+export function parseUsdcApiSecret(value: unknown): UsdcApiSecret {
+  const row = keyObject(value, ['id', 'policyId', 'secret']);
+  if (
+    typeof row.id !== 'string' ||
+    !BUYER_API.POLICY_PATTERN.test(row.id) ||
+    typeof row.policyId !== 'string' ||
+    !BUYER_API.POLICY_PATTERN.test(row.policyId) ||
+    typeof row.secret !== 'string' ||
+    !BUYER_API_KEYS.TOKEN_PATTERN.test(row.secret)
+  )
+    throw new Error('API key is unavailable');
+  return { id: row.id, policyId: row.policyId, secret: row.secret };
+}
 export function usdcApiKeyListDetail(
   state: UsdcApiState,
   key: BuyerApiKeySummary,
@@ -120,5 +151,5 @@ export function usdcApiKeyListDetail(
   if (!state.snapshot || state.error || state.snapshot.blocked)
     return 'Status unavailable';
   const scope = state.snapshot.scope;
-  return `${usdcApiAmount(key.spentAtomic, scope)} / ${usdcApiAmount(key.limitAtomic, scope)} · ${key.revoked ? 'Revoked' : 'Active'}`;
+  return `${usdcApiAmount(key.spentAtomic, scope)} / ${usdcApiAmount(key.limitAtomic, scope)} · ${usdcApiKeyBadge(state, key)}`;
 }

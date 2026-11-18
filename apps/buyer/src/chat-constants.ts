@@ -292,6 +292,12 @@ export const RESPONSES_CODES = {
 } as const;
 
 export const FREE_CHAT_DETAILS = {
+  // A seller's engine ran out of time (engine_timeout): before any text, it could not read a prompt this
+  // size in time; after text, it could not finish. The failed seller loses weight, so a resend goes elsewhere.
+  sellerTooSlowToRead:
+    'This seller was too slow to read a request this size and stopped before answering (engine_timeout). Send it again to try another seller, or shorten the conversation.',
+  sellerTooSlowToFinish:
+    'This seller was too slow to finish the answer and stopped (engine_timeout). Send it again to try another seller, or ask for a shorter answer.',
   coolingDown: (seconds: number) =>
     `no seller is available: every seller failed recently; retry in ${seconds} s`,
   body: 'the body must be a JSON object with model and messages',

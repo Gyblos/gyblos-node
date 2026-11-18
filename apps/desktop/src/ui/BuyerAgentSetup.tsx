@@ -2,6 +2,7 @@
 // Only environment references and generated text cross this view, never API credentials.
 import { useEffect, useState } from 'react';
 
+import { PORTS } from '@gyblos/config';
 import {
   AGENT_TOOLS,
   type AgentTool,
@@ -134,6 +135,14 @@ function AgentSetupDialog({
       <p className="ui-help-text">
         Uses the models served by your local buyer. Your key's budget applies to
         every model and tool.
+      </p>
+      <p className="ui-help-text">
+        The app-managed buyer keeps port {PORTS.desktopBuyer} after restart.
+        Separately connected buyers keep their own Base URL. If another app is
+        using the app's port, close that app and restart the buyer.
+        Configurations made with an earlier changing port need to be copied or
+        written again once; compare their Base URL with the one shown in
+        Connections.
       </p>
       {state.error && (
         <p role="alert" className="chat-notice">

@@ -1,16 +1,30 @@
 // Owns the Cloudflare Worker entry: maps the D1 binding and rate limiters to the app and fails closed.
 // Development relaxations are never enabled here; nothing runs on import.
+import { DEVNET_RPC_URL } from '@gyblos/config/network';
+
 import { runAggregation } from './aggregate';
 import {
   createMetricsCollector,
   type CollectorLimiters,
   type RateLimiter,
 } from './app';
+import { chainEndpoints } from './chain/endpoints';
 import {
+  ChainIndexError,
+  runChainIndex,
+  type ChainIndexResult,
+} from './chain/indexer';
+import { ChainShapeError } from './chain/json';
+import { ChainRpcError, chainRpcUrl, createChainRpc } from './chain/rpc';
+import {
+  CHAIN_INDEX,
   COLLECTOR_AGGREGATION_FAILED,
+  COLLECTOR_CHAIN_INDEX_FAILED,
+  COLLECTOR_CHAIN_INDEX_RUN,
   COLLECTOR_DB_BINDING,
   COLLECTOR_LIMITERS,
   COLLECTOR_ROUTES,
+  COLLECTOR_SOLANA_RPC_BINDINGS,
   COLLECTOR_STATUS,
 } from './constants';
 import { statsReader } from './stats-read';
@@ -108,7 +122,110 @@ export async function scheduledAggregation(bindings: unknown, now: number) {
   // Day names only (no request data): a day that keeps failing must be visible in the Worker logs.
   if (result.failed.length)
     console.warn(COLLECTOR_AGGREGATION_FAILED, result.failed.join(','));
+  if (result.chain.scanFailed)
+    console.warn(COLLECTOR_AGGREGATION_FAILED, 'chain scan');
+  if (result.chain.failed.length)
+    console.warn(
+      COLLECTOR_AGGREGATION_FAILED,
+      `chain ${result.chain.failed.join(',')}`,
+    );
   return result;
+}
+
+// The scheduled chain read, when a database is bound: on the free public devnet RPC, and on the paid
+// one (the secret, if set) only after the public one rate-limits the run. Every run logs its calls
+// per endpoint, so a slow free endpoint is visible before relying on the paid one. A failure logs a
+// static code with the phase and the error's class only (never the URL, which may carry a provider
+// key) and leaves the cursor at the last stored batch.
+const chainFailureReason = (cause: unknown) =>
+  cause instanceof ChainRpcError || cause instanceof ChainShapeError
+    ? cause.message
+    : '';
+const usageLine = (result: ChainIndexResult) => {
+  const { primary, fallback, onFallback } = result.usage;
+  return [
+    `public=${primary.calls}`,
+    `publicLimited=${primary.rateLimited}`,
+    `paid=${fallback.calls}`,
+    `paidLimited=${fallback.rateLimited}`,
+    `onPaid=${onFallback}`,
+    `endpoint=${result.usage.endpoint}`,
+    `listed=${result.listed}`,
+    `read=${result.read}`,
+    `followed=${result.followed}`,
+    `flooded=${result.flooded}`,
+    `accounts=${result.channels}`,
+    `undecodable=${result.undecodable}`,
+    `backlog=${result.backlog}`,
+    `skipped=${result.skipped}`,
+  ].join(' ');
+};
+
+export async function scheduledChainIndex(
+  bindings: unknown,
+  now: number,
+  fetcher: typeof fetch = fetch,
+  wait?: (milliseconds: number) => Promise<void>,
+) {
+  const database = binding(bindings, COLLECTOR_DB_BINDING);
+  if (!isDatabase(database)) return undefined;
+  const keyed = COLLECTOR_SOLANA_RPC_BINDINGS.flatMap((name) => {
+    const configured = binding(bindings, name);
+    const url = chainRpcUrl(configured);
+    // A secret that is set but not usable (http, credentials, a fragment) must be visible.
+    if (configured !== undefined && configured !== '' && !url)
+      console.warn(
+        COLLECTOR_CHAIN_INDEX_FAILED,
+        'config',
+        'rejected rpc url',
+        name,
+      );
+    return url
+      ? [
+          {
+            rpc: createChainRpc(url, fetcher),
+            limits: {
+              budget: CHAIN_INDEX.paidCallsPerRun,
+              minIntervalMs: CHAIN_INDEX.paidIntervalMs,
+            },
+          },
+        ]
+      : [];
+  });
+  const rpc = chainEndpoints(
+    {
+      rpc: createChainRpc(DEVNET_RPC_URL, fetcher),
+      limits: {
+        budget: CHAIN_INDEX.publicCallsPerRun,
+        minIntervalMs: CHAIN_INDEX.publicIntervalMs,
+      },
+    },
+    keyed,
+    wait ? { wait } : {},
+  );
+  try {
+    const result = await runChainIndex(database, rpc, now);
+    console.log(COLLECTOR_CHAIN_INDEX_RUN, usageLine(result));
+    return result;
+  } catch (error) {
+    const phase = error instanceof ChainIndexError ? error.phase : 'start';
+    const cause = error instanceof ChainIndexError ? error.cause : error;
+    const { primary, fallback } = rpc.usage();
+    // Static reasons only (an HTTP status, an RPC error code, a shape location), never the URL.
+    console.warn(
+      COLLECTOR_CHAIN_INDEX_FAILED,
+      phase,
+      cause instanceof Error ? cause.name : 'unknown',
+      chainFailureReason(cause),
+      `public=${primary.calls} publicLimited=${primary.rateLimited} paid=${fallback.calls} paidLimited=${fallback.rateLimited}`,
+    );
+    return undefined;
+  }
+}
+// Aggregates first (cheap, bounded), then the chain read, so a slow RPC never delays the stats.
+async function scheduledRun(bindings: unknown, now: number) {
+  await scheduledAggregation(bindings, now);
+  await scheduledChainIndex(bindings, now);
 }
 
 const edgeCache = () =>
@@ -127,6 +244,6 @@ export default {
     bindings: unknown,
     context: ExecutionContext,
   ) {
-    context.waitUntil(scheduledAggregation(bindings, controller.scheduledTime));
+    context.waitUntil(scheduledRun(bindings, controller.scheduledTime));
   },
 };

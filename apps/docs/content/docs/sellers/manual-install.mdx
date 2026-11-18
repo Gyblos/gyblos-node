@@ -3,27 +3,32 @@ title: Install without the script
 description: Verify the signed seller image yourself and set up the same Docker seller by hand.
 ---
 
-The [installer](/en/sellers/beta-guide) does all of this for you. Use this page to check the image
-signature yourself, or to set up the same seller step by step and keep full control of each file.
+The [installer](/en/sellers/beta-guide) does all of this for you. Use this page to verify the image
+signature yourself, or to write each file of the Docker seller by hand. This page covers the Docker seller
+only; the native and Windows sellers install only through the installer.
 
-## Find the current release
+## Prerequisites
+
+- Docker with Compose v2.17 or later, on a machine that meets the [beta requirements](/en/getting-started/beta).
+- [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3 or later, to verify the image.
+
+## 1. Find the current release
 
 Each installer pins one release of the seller image by version and digest. `gyblos.com/install.sh` serves
-the installer attached to the latest [GitHub release](https://github.com/Gyblos/gyblos-node/releases/latest),
-which also lists the image. Read it from the installer:
+the installer attached to the latest [GitHub release](https://github.com/Gyblos/gyblos-node/releases/latest).
+Read the pinned image from it:
 
 ```sh
 curl -fsSL https://gyblos.com/install.sh | grep '^DEFAULT_IMAGE='
 ```
 
-It prints a line such as `DEFAULT_IMAGE=ghcr.io/gyblos/seller:0.1.0-beta.3@sha256:…`. Below,
-replace `VERSION@sha256:DIGEST` with the part after `ghcr.io/gyblos/seller:`.
+The output is similar to `DEFAULT_IMAGE=ghcr.io/gyblos/seller:0.1.0-beta.N@sha256:…`. In the steps below,
+replace `VERSION@sha256:DIGEST` with everything after `ghcr.io/gyblos/seller:`.
 
-## Verify the image signature
+## 2. Verify the image signature
 
-Every release is built and signed by the Gyblos release workflow on GitHub, with no long-lived key: the
-signature names that workflow at a version tag and is recorded in the public Sigstore log. Install
-[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) version 3 or later and verify the image:
+The Gyblos release workflow on GitHub builds and signs every release with no long-lived key. The signature
+names that workflow at a version tag and is recorded in the public Sigstore log. Verify the image:
 
 ```sh
 cosign verify ghcr.io/gyblos/seller:VERSION@sha256:DIGEST \
@@ -31,11 +36,16 @@ cosign verify ghcr.io/gyblos/seller:VERSION@sha256:DIGEST \
   --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 ```
 
-A verified image prints the signature details and exits without error. If verification fails, do not
-run that image; report the image line in the [Gyblos Telegram](https://t.me/gyblos). The installer runs the same
-check when cosign is installed and prints `Verified the Gyblos release signature`.
+A verified image prints the signature details and exits without error.
 
-## Set up the seller by hand
+<Callout type="error" title="Do not run an image that fails verification">
+  If `cosign verify` fails, stop here and do not start that image. Report the
+  image line in the [Gyblos Telegram](https://t.me/gyblos).
+</Callout>
+
+The installer runs the same check when cosign is installed and prints `Verified the Gyblos release signature`.
+
+## 3. Write the files
 
 Create a private folder:
 
@@ -123,16 +133,24 @@ engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
 free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 ```
 
-Create `~/gyblos-seller/seller.env` readable only by you (`chmod 600`); Compose requires the file, but it
-may stay empty. The Gyblos relays need no relay token. Only if an offer uses an `api_key_env` variable,
-write it in a private editor as `NAME=value`, one per line, with no spaces, quotes or shell characters such
-as `$` or `#`. Never print that file or paste it into a terminal command.
+These files are the ones the installer writes; their comments point to repository documents. Publishing
+starts off, so the seller is not listed by accident.
+
+Create an empty `~/gyblos-seller/seller.env` readable only by you. Compose requires the file, but it can
+stay empty: the Gyblos relays need no relay token.
 
 ```sh
 (umask 077; touch ~/gyblos-seller/seller.env)
 ```
 
-Then pull the images and the model, create the keys, install the tokenizer, check and start:
+Only if an offer uses an `api_key_env` variable, add it to `seller.env` in a private editor as `NAME=value`,
+one per line, with no spaces, quotes or shell characters such as `$` or `#`. Never print that file or paste
+it into a terminal command.
+
+## 4. Pull, prepare and start
+
+Run these commands from the folder. They pull the images, start Ollama, wait until it answers and pull the
+model:
 
 ```sh
 cd ~/gyblos-seller
@@ -140,13 +158,29 @@ docker compose pull
 docker compose up -d ollama
 until docker compose exec -T ollama ollama list >/dev/null 2>&1; do sleep 2; done
 docker compose exec -T ollama ollama pull qwen3:0.6b
+```
+
+If the wait line keeps waiting, stop it with Ctrl+C and read `docker compose logs ollama` privately.
+
+Then create the seller keys, install the tokenizer, and start the seller once doctor passes. The `--mint`
+value is the public devnet USDC mint; it is not a secret, so keep it as shown:
+
+```sh
 docker compose run --rm seller setup --role seller --mint 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 docker compose run --rm seller tokenizer
 docker compose run --rm seller gyblos doctor && docker compose up -d --force-recreate seller
 ```
 
-The wait line returns once Ollama answers; if it keeps waiting, stop it with Ctrl+C and read
-`docker compose logs ollama` privately. The last line starts the seller only when `gyblos doctor` reports
-no failures; otherwise fix the named cause and run that line again. Continue with the
-[status check](/en/sellers/beta-guide#confirm-the-service-state) and
-[registration](/en/sellers/register-publish).
+The last line starts the seller only when `gyblos doctor` reports no failures. Doctor prints the public
+identity (`Seller identity (public; …`) and ends with `Result: READY`. If it reports a failure, fix the named
+cause and run that line again.
+
+## 5. Verify
+
+Check that the seller runs:
+
+```sh
+docker compose exec seller gyblos seller status
+```
+
+It prints `Result: RUNNING`. Continue with [Register and publish](/en/sellers/register-publish).

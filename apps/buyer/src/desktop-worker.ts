@@ -5,7 +5,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { startBuyer } from './buyer-startup';
 import { runBuyerSidecar } from './desktop-service';
-import { prepareDesktopBuyer } from './desktop-startup';
+import { startDesktopBuyer } from './desktop-startup';
 import { endpointToken } from './paid-startup';
 
 export async function startBuyerWorker() {
@@ -16,14 +16,15 @@ export async function startBuyerWorker() {
   }
   await runBuyerSidecar(
     port,
-    async () => {
-      await prepareDesktopBuyer({
-        environment: process.env,
-        prepareRole: () =>
-          setupRole({ role: P2P_ROLES.BUYER, mint: DEVNET_USDC }),
-      });
-      return startBuyer({ port: 0 });
-    },
+    () =>
+      startDesktopBuyer(
+        {
+          environment: process.env,
+          prepareRole: () =>
+            setupRole({ role: P2P_ROLES.BUYER, mint: DEVNET_USDC }),
+        },
+        startBuyer,
+      ),
     endpointToken,
     (code) => process.exit(code),
   );

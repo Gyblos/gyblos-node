@@ -3,10 +3,14 @@
 import { Suspense } from 'react';
 
 import { NetworkSection } from '../components/network-section';
+import { NetworkSelect } from '../components/network-select';
 import { PaymentsSection } from '../components/payments-section';
 import { Loading } from '../components/ui';
 import { UsageSection } from '../components/usage-section';
-import { NETWORK_LABEL } from '../lib/config';
+
+// Every request renders with fresh source answers; the sources cache at their own edge (the collector
+// for 5 minutes). Workers cannot share a pending fetch across requests, so no in-process cache is used.
+export const dynamic = 'force-dynamic';
 
 export default function Home() {
   return (
@@ -16,9 +20,7 @@ export default function Home() {
           <span className="text-xl font-medium tracking-tight">gyblos</span>
           <span className="text-muted">Explorer</span>
         </div>
-        <span className="rounded-full border border-line px-3 py-1 font-mono text-xs text-muted">
-          {NETWORK_LABEL}
-        </span>
+        <NetworkSelect />
       </header>
       <Suspense fallback={<Loading />}>
         <NetworkSection />

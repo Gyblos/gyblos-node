@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { RECEIPT_UPLOADER } from '@gyblos/config';
 import { createMetricsCollector } from '@gyblos/metrics-collector/app';
 import { COLLECTOR_LIMITERS } from '@gyblos/metrics-collector/constants';
 import { createMemoryStorage } from '@gyblos/metrics-collector/storage-memory';
@@ -134,6 +135,64 @@ void test('a failed send puts observations back; a refused batch is dropped and 
   assert.notEqual(refusedBatch.outcome, OUTCOMES.RETRY);
   assert.equal(buffer.size(), 0);
   assert.equal(buffer.dropped(), 1);
+});
+
+void test('closing sends the buffered observations of the last requests first', async () => {
+  const buyer = receiptSigner();
+  const buffer = createObservationBuffer();
+  const { memory, app } = collector();
+  let posts = 0;
+  const up = uploader(buyer, buffer, async (input, init) => {
+    posts += 1;
+    return app.request(String(input), init);
+  });
+  // The first tick finds nothing; the request's events arrive before the next 60-second tick.
+  up.start();
+  buffer.sink.emit(unserved(buyer.nodeId));
+  buffer.sink.emit(refused(buyer.nodeId));
+  await up.close();
+  assert.deepEqual(
+    memory.observations.map((row) => row.type),
+    [TELEMETRY_EVENTS.UNSERVED, TELEMETRY_EVENTS.REFUSED],
+  );
+  assert.equal(buffer.size(), 0);
+  // Closed for good: no later start sends anything.
+  const sent = posts;
+  up.start();
+  await up.close();
+  assert.equal(posts, sent);
+});
+
+void test('closing sends every buffered batch, not only the first', async () => {
+  const buyer = receiptSigner();
+  const buffer = createObservationBuffer();
+  const { memory, app } = collector();
+  for (let index = 0; index < 250; index += 1)
+    buffer.sink.emit(unserved(buyer.nodeId, NOW - 1000 + index));
+  await uploader(buyer, buffer, async (input, init) =>
+    app.request(String(input), init),
+  ).close();
+  assert.equal(memory.observations.length, 250);
+  assert.equal(buffer.size(), 0);
+});
+
+void test('closing gives up within the flush deadline and keeps unsent observations', async () => {
+  const buyer = receiptSigner();
+  const buffer = createObservationBuffer();
+  buffer.sink.emit(unserved(buyer.nodeId));
+  // A collector that never answers until the request is aborted.
+  const hanging: typeof fetch = (_input, init) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () =>
+        reject(new Error('aborted')),
+      );
+    });
+  const started = Date.now();
+  await uploader(buyer, buffer, hanging).close();
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed >= RECEIPT_UPLOADER.closeFlushMs - 100);
+  assert.ok(elapsed < RECEIPT_UPLOADER.closeFlushMs + 2_000);
+  assert.equal(buffer.size(), 1);
 });
 
 void test('the buffer is bounded, skips receipts and keeps only validated records', () => {

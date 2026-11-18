@@ -1,0 +1,20 @@
+// Visual-fixture settings only; never operator configuration, credentials or payment permission.
+export const PREVIEW = {
+  platform: 'darwin',
+  dayMs: 86400000,
+  minuteMs: 60000,
+  halfHourMs: 1800000,
+  replyDelayMs: 450,
+  replyCents: 10,
+  paymentIdCharacters: 64,
+  recordedCents: 20,
+  sessionLimitCents: 500,
+  voidEvery: 4,
+  capturedCents: 30,
+  referenceOffset: 10,
+  referenceRadix: 16,
+  referencePadding: 7,
+  title: 'Gyblos · Design preview · Example data',
+  host: '127.0.0.1',
+  port: 5196,
+} as const;

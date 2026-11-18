@@ -1,0 +1,17 @@
+{
+  // The metrics explorer (apps/explorer) at explorer.gyblos.com: Next.js rendered on Cloudflare
+  // Workers through OpenNext. Deploying is a founder-approved manual step; Wrangler is not a workspace
+  // dependency: from this directory, `pnpm build:cloudflare` then `npx wrangler@4.151.1 deploy`.
+  "name": "gyblos-explorer",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  // The first deploy attaches explorer.gyblos.com (a gyblos.com zone record) to this Worker.
+  "routes": [{ "pattern": "explorer.gyblos.com", "custom_domain": true }],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+}

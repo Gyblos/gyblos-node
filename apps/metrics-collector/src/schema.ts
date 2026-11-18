@@ -185,3 +185,19 @@ export {
   aggState,
   firstSeen,
 } from './schema-aggregates';
+
+// Breakdowns of the network stats: origin of requests and failure reasons.
+export { aggFailuresDaily, aggOriginDaily } from './schema-breakdowns';
+
+// Chain index tables (#349).
+export {
+  aggChainDaily,
+  aggChainDirtyDays,
+  aggChainState,
+  chainChannels,
+  chainCursor,
+  chainInstructions,
+  chainProgramDaily,
+  chainTokenDeltas,
+  chainTxs,
+} from './schema-chain';

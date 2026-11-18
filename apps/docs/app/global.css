@@ -86,8 +86,9 @@ html > body[data-scroll-locked] {
   padding-bottom: 3rem;
 }
 
+/* Title and page actions share one row; the page's own 1rem gap separates them from the content. */
 .docs-page-header {
-  margin-bottom: 2.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .docs-page-heading {
@@ -97,25 +98,32 @@ html > body[data-scroll-locked] {
 .docs-page-title-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem 1.25rem;
 }
 
 .docs-page-actions {
   margin: 0;
+  margin-left: auto;
 }
 
 .docs-page-actions > div {
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .docs-home-page > .prose > h2:first-child {
   margin-top: 0;
 }
 
+/* On narrow screens the actions wrap under the title and start at the left edge. */
 @media (max-width: 48rem) {
-  .docs-page-header {
-    margin-bottom: 2rem;
+  .docs-page-actions {
+    margin-left: 0;
+  }
+
+  .docs-page-actions > div {
+    justify-content: flex-start;
   }
 }
 
@@ -225,11 +233,14 @@ html > body[data-scroll-locked] {
   color: var(--color-fd-muted-foreground);
 }
 
-/* The official outlined wordmark keeps its supplied aspect ratio in both themes. */
+/* The site name is plain text in the brand typeface (Instrument Sans Medium), with no mark, at the scale of the
+   sidebar text rather than a page title. */
 .docs-wordmark {
-  width: 160px;
-  height: auto;
-  flex-shrink: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-fd-foreground);
 }
 
 body {
@@ -256,17 +267,65 @@ body {
   text-decoration-color: currentColor;
 }
 
+/* The brand blue marks where you are and what you can act on: link underlines, the active page and
+   section indicators, and card hover borders. Text itself stays neutral. */
+.prose a {
+  text-decoration-color: var(--brand-blue);
+}
+
 :is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true'] {
-  background: var(--color-fd-accent);
+  background: color-mix(in srgb, var(--brand-blue) 14%, transparent);
 }
 
 :is(#nd-sidebar, #nd-sidebar-mobile) a[data-active='true']::before,
 #nd-toc .bg-fd-primary,
 [data-toc-popover] .bg-fd-primary {
-  background: var(--color-fd-foreground);
+  background: var(--brand-blue);
 }
 
 #nd-toc .stroke-fd-primary,
 [data-toc-popover] .stroke-fd-primary {
-  stroke: var(--color-fd-foreground);
+  stroke: var(--brand-blue);
+}
+
+#nd-page a[data-card] {
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+#nd-page a[data-card]:hover {
+  border-color: var(--brand-blue);
+}
+
+/* Three-card groups sit side by side, and stack on narrow screens. */
+.docs-cards-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 40rem) {
+  .docs-cards-three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Link underlines fade in color rather than snapping. */
+.prose a {
+  transition: text-decoration-color 150ms ease;
+}
+
+/* Inline code stays readable inside prose without breaking the line into heavy blocks. */
+#nd-page .prose :not(pre) > code {
+  font-weight: 400;
+  font-size: 0.875em;
+  padding: 0.1em 0.3em;
+  border: 0;
+  background: color-mix(in srgb, var(--color-fd-foreground) 6%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #nd-page a[data-card],
+  .prose a {
+    transition: none;
+  }
 }

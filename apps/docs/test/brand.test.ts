@@ -52,14 +52,20 @@ void test('docs brand: supplied artwork and font files match the kit checksums',
   }
 });
 
-void test('docs brand: both locales use official wordmarks and the new favicon', async () => {
+// The header names the site in text only: the name in the brand typeface, no mark or logo image.
+void test('docs brand: both locales use the text name and the new favicon', async () => {
   for (const locale of ['en', 'es']) {
     const html = await readFile(join(OUTPUT, `${locale}.html`), 'utf8');
-    for (const variant of ['dark', 'light'])
-      assert.ok(
-        html.includes(`/brand/gyblos-wordmark-solid-${variant}.svg`),
-        `${locale}: missing official ${variant} wordmark`,
-      );
+    assert.match(
+      html,
+      /class="docs-wordmark"[^>]*>gyblos</,
+      `${locale}: no text name`,
+    );
+    assert.doesNotMatch(
+      html,
+      /\/brand\/gyblos-(?:docs-lockup|wordmark)-/,
+      `${locale}: logo image in header`,
+    );
     assert.ok(html.includes('Gyblos'));
     assert.ok(html.includes('docs'));
     assert.doesNotMatch(html, /gyblos-mark-holographic|font-geist/);

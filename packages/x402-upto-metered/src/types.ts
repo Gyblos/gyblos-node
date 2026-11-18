@@ -5,6 +5,13 @@ import type { Network } from '@x402/core/types';
 
 import type { UptoChannelState, UptoDepositState } from './constants';
 
+// Host-owned ceilings forwarded to the SDK; the standalone package defines no Gyblos policy values.
+export interface UptoFeeLimits {
+  maxComputeUnits: number;
+  maxPriorityFeeMicroLamports: number;
+  maxRequiredSignatures: number;
+}
+
 // One recipient of each charge, in basis points; the first is always payTo.
 export interface UptoSplit {
   recipient: string;

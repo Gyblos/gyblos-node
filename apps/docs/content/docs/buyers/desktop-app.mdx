@@ -1,13 +1,16 @@
 ---
 title: Desktop app
-description: Download the Gyblos app for macOS, Windows or Linux, open it the first time, and chat with models on the network.
+description: Download the Gyblos app for macOS, Windows or Linux, chat with models that Gyblos sellers serve, and connect your own tools with an API key.
 ---
 
-If you want to use Gyblos as a buyer, start here. For most users, the desktop app is the only setup you need.
-It starts automatically in its own private app folder (`userData` as `GYBLOS_HOME`).
-It works without a relay token or choosing a folder. A fresh profile creates free-only settings
-with zero budget and price ceilings, and selects a registered seller through discovery and independent
-8004 verification. Existing settings and unfinished spending records are preserved.
+The Gyblos desktop app lets you chat with models that sellers on the Gyblos network serve. Answers from
+free offers cost nothing and need no wallet funding. For most buyers, the app is the only setup you need.
+
+The app sets itself up the first time it opens. It keeps its data in its own private folder (`userData`),
+works without a relay token, and starts with a zero spending budget, so it never pays for an answer unless
+you authorize it.
+
+The startup bar fills from left to right. It shows 0%, 50% or 100% according to whether local preparation and the first window render have finished.
 
 ## Download [#download]
 
@@ -21,26 +24,26 @@ Get the file for your system from the
 | Linux (Ubuntu, Debian; x64)        | `gyblos-desktop-<version>-linux-x64.deb`    |
 | Other Linux (x64)                  | `gyblos-desktop-<version>-linux-x64.tar.gz` |
 
-There is no build for Intel Macs yet. Each file has a `.sha256` next to it; to check a download, put both
-in one folder and run `shasum -a 256 -c <file>.sha256` (macOS, Linux) or compare the output of
+There is no build for Intel Macs. Each file has a `.sha256` file next to it. To check a download, put both
+in one folder and run `shasum -a 256 -c <file>.sha256` (macOS, Linux), or compare the output of
 `certutil -hashfile <file> SHA256` (Windows).
 
 ## Install and open the first time [#install]
 
-During the beta the app is **not signed** by Apple or Microsoft, so your system asks once before opening
-it. This is expected; after the first time it opens normally.
+During the beta, Apple and Microsoft have not signed the app, so your system asks once before it opens.
+After that it opens normally.
 
 ### macOS [#macos]
 
 1. Open the `.zip`, enter `Gyblos-darwin-arm64`, and drag **Gyblos.app** to **Applications**.
 2. Open Gyblos. macOS says it cannot verify the developer; choose **Done**.
-3. Open **System Settings → Privacy & Security**, scroll to the message about Gyblos and choose
-   **Open Anyway**, then confirm with your password.
-4. macOS then asks to let Gyblos use the key "Gyblos Safe Storage" in your keychain. Enter your Mac
-   password and choose **Always Allow**. The app keeps its wallet protected with this key. While the
-   question is open the app cannot quit and its wallet shows as unavailable.
+3. Open **System Settings → Privacy & Security**, scroll to the message about Gyblos, choose
+   **Open Anyway**, and confirm with your password.
+4. Chat opens. The app creates its data folder by itself; you don't choose or open a folder, and it
+   doesn't ask to unlock a wallet.
 
-Because the beta app is not signed, macOS asks steps 2 to 4 again after each update.
+After an update, macOS may warn you again before the app opens. Opening the app never asks for
+"Gyblos Safe Storage": wallet access is a separate step, described in [Protected wallet](#protected-wallet).
 
 ### Windows [#windows]
 
@@ -58,35 +61,94 @@ sudo apt install ./gyblos-desktop-<version>-linux-x64.deb
 
 On other distributions, unpack the `.tar.gz` and run `./gyblos-desktop` inside the folder.
 
-## Using it [#using-it]
+## Chat [#using-it]
 
-Open **Chat**, write a message and send it. The first start prepares `buyer/` privately under the app's
-own data folder, separate from the CLI or seller home. The default model is `qwen3-0.6b`; a verified,
-online seller offering that model for free must be available. Discovery, the identity RPC and the
-network must be reachable. An unavailable seller or network gives an error, not a simulated reply.
+1. Open **Chat**.
+2. Write a message and send it.
 
-The answer appears as text arrives. While a response is running, the send button becomes **Stop
-response**; you can also press **Esc**. Stopping keeps the partial text and does not resend the prompt.
-An interrupted answer is not marked complete. A paid request whose charge is still uncertain remains
-blocked for review in **Payments**; stopping does not prove that no charge occurred.
+The answer appears as the text arrives. The app finds a registered seller that offers the model for free,
+checks the seller's identity, and only then sends your message. The default model is `qwen3-0.6b`. The app
+needs to reach the discovery index, the Solana devnet RPC and the network; if no seller is available, you
+get an error, never a made-up reply.
 
-No wallet funding or transaction is required for these free answers. The local buyer identity is
-separate from the protected wallet shown in Settings. A positive-price configuration or connection
-still needs explicit authorization; startup never authorizes a positive budget or clears pending state.
+While an answer is running, the send button becomes **Stop response**; you can also press **Esc**.
+Stopping keeps the partial text and doesn't resend your message. An interrupted answer is not marked as
+complete.
 
-If startup fails, **Payments → Retry local buyer** retries startup only. A failed inference is never
-resent automatically. Connecting a separately running buyer remains an advanced option.
+The seller that runs the model can read your messages, and so can its engine provider, if it uses one.
+Don't send passwords, keys or other secrets. See [Data and privacy](/en/reference/data-and-privacy).
 
-The app checks for updates at startup and every five minutes while it stays open. It shows a notice
-when a newer desktop build for your system is published. **View update**
-opens that release on GitHub; nothing is downloaded or installed automatically. This bounded public
-version check sends no identity or chat content. Offline failures stay silent; operators can disable
-it with `GYBLOS_UPDATE_CHECK=0`.
+## Use Gyblos from other tools [#api-keys]
 
-The seller running the model can read your messages. Transport encryption does not hide them from
-that seller. Do not send passwords, keys or other secrets.
+**Connections** gives your coding agents and programs access to Gyblos through the app, with an API key
+and a spend limit. Tools use the OpenAI Chat Completions, OpenAI Responses and Anthropic Messages APIs,
+and **Connect agent** sets up OpenCode, pi, Codex CLI and Claude Code for you. Chat has its own budget
+and doesn't use a key's limit.
 
-For advanced integrations, see [connect Gyblos from code](/en/buyers/use-from-code).
+To create a key and connect your tools, see [Connect your coding tools](/en/buyers/use-from-code).
 
-Questions or problems? Write in the [Gyblos Telegram](https://t.me/gyblos). The group is public; do not post keys,
-passwords or conversations you want to keep private.
+## Payments [#payments]
+
+Free answers need no funding or transaction, and no wallet. The local buyer's identity is separate from
+the protected wallet in **Payments**.
+
+A priced answer needs a budget that you authorize in **Payments**; the app never authorizes one on its
+own. If the outcome of a paid request is uncertain, the app blocks new messages until you review it in
+**Payments**. Stopping a response doesn't prove that no charge occurred.
+
+If the local buyer fails to start, choose **Payments → Retry local buyer**. That retries startup only: the
+app never resends a failed message on its own. **Activity** keeps a history of your sessions and their
+payment references.
+
+## Protected wallet [#protected-wallet]
+
+The wallet starts locked, and free chat never needs it. To use it:
+
+1. Open **Payments → Wallet details** and choose **Set up or unlock wallet**.
+2. Gyblos explains what happens next before it touches your system's secure storage. Choose **Continue**
+   to go on, or **Cancel** to keep chatting without the wallet.
+3. Your system may then ask for access:
+   - **macOS**: Keychain uses "Gyblos Safe Storage" to protect the wallet's encryption key. Enter your
+     Mac password only in the macOS dialog, never in a Gyblos form.
+   - **Windows**: protection normally works through your Windows account, without a prompt.
+   - **Linux**: GNOME Keyring or KWallet may ask to be unlocked. Without a supported secret store, the
+     wallet stays unavailable; the app never stores its keys unprotected.
+
+Unlocking doesn't authorize a payment or enable funding. Existing wallets and recovery records are kept.
+The app asks for a file only when you choose to back up or restore the wallet. If a system dialog is
+open when you quit, the app may wait for it: answer or cancel it to finish closing.
+
+## Updates [#updates]
+
+The app checks for updates when it starts and every five minutes while it stays open. When a newer build
+for your system is published, it shows a notice. **View update** opens that release on GitHub; the app
+never downloads or installs anything by itself. The check sends no identity or chat content. To turn it
+off, see [Data and privacy](/en/reference/data-and-privacy#update-checks).
+
+## Where the app keeps your data [#data]
+
+The app keeps your conversations, activity and its local buyer in a `gyblos-desktop` folder, and, once
+you set it up, its wallet in a `gyblos-wallet` folder, both in your system's application-data folder:
+
+| System  | Folder                          |
+| ------- | ------------------------------- |
+| macOS   | `~/Library/Application Support` |
+| Windows | `%APPDATA%`                     |
+| Linux   | `~/.config`                     |
+
+Release builds also upload signed, content-free receipts and telemetry observations; see
+[Data and privacy](/en/reference/data-and-privacy).
+
+To uninstall, delete the app. The data folders stay until you delete them.
+
+<Callout type="warn" title="Deleting gyblos-wallet deletes your wallet">
+  Deleting the `gyblos-wallet` folder permanently deletes the wallet's keys and
+  any funds they hold. It cannot be undone. Back up the wallet from **Payments**
+  first, or keep the folder.
+</Callout>
+
+## Get help [#help]
+
+See [Troubleshooting](/en/help/troubleshooting#buyer-and-desktop), or write in the
+[Gyblos Telegram](https://t.me/gyblos). The group is public: don't post keys, passwords or conversations
+you want to keep private.
