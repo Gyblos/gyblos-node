@@ -1,10 +1,8 @@
 // Owns the read of the discovery index: models offered now, sellers online and their uptime, fetched,
-// checked at the boundary and cached for about a presence interval.
-import { cacheLife } from 'next/cache';
-import { connection } from 'next/server';
+// checked at the boundary on each render.
 
 import { DISCOVERY_URL } from './config';
-import { CACHE_LIFE, DISCOVERY } from './constants';
+import { DISCOVERY } from './constants';
 import { fetchJson } from './fetch-json';
 import { list, nullable, num, record, text } from './validate';
 
@@ -100,8 +98,6 @@ export async function getDiscovery(): Promise<DiscoverySnapshot> {
   try {
     return await loadDiscovery();
   } catch (error) {
-    // A failed read is never prerendered: it is retried on the next request.
-    await connection();
     return {
       generatedAt: 0,
       sellers: [],
@@ -110,11 +106,8 @@ export async function getDiscovery(): Promise<DiscoverySnapshot> {
   }
 }
 
-// Throws on failure so an error is never stored in the cache. A seller whose uptime cannot be read
-// shows none for this cache window.
+// Throws on failure. A seller whose uptime cannot be read shows none for this render.
 async function loadDiscovery(): Promise<DiscoverySnapshot> {
-  'use cache';
-  cacheLife(CACHE_LIFE.discovery);
   const listed = record(await read('/models'), 'models');
   const modelIds = list(listed.models, 'models.models').map((entry) =>
     text(record(entry, 'models.model').id, 'model.id'),

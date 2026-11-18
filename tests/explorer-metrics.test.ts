@@ -1,17 +1,16 @@
 // Protects the explorer's pure metric logic: histograms are merged, never averaged; free and paid stay
-// apart in every figure; collector answers are checked at the boundary; the effective fee is a share of
-// the gross charge; a Solana channel transaction reads as a settlement; model variants are kept apart.
+// apart in every figure; collector answers (receipts and chain) are checked at the boundary; chain
+// amounts stay exact and the effective fee is a share of the payouts; model variants are kept apart.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { parseChainStats, summarizeChain } from '@gyblos/explorer/chain-shape';
 import {
   parseNetworkDay,
   type CollectorSnapshot,
 } from '@gyblos/explorer/collector-shape';
 import { mergedLatency, type Latency } from '@gyblos/explorer/latency';
 import { summarizeOffers } from '@gyblos/explorer/offers';
-import { ratioText, summarizePayments } from '@gyblos/explorer/payments';
-import { classify, type Settlement } from '@gyblos/explorer/settlement';
 import { summarizeUsage } from '@gyblos/explorer/usage';
 
 const BUCKETS = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 30000, 60000];
@@ -129,71 +128,89 @@ void test('a collector day is checked at the boundary', () => {
   );
 });
 
-const CHANNEL = 'CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX';
-const GYBLOS = '4Ui1dfvqbFx9CtjXNcKajHdr7aKT1nbYRiYjB1s7umNy';
-function tx(instructions: unknown[], err: unknown = null) {
-  const balance = (owner: string, amount: string) => ({
-    accountIndex: 0,
-    mint: 'Mint',
-    owner,
-    uiTokenAmount: { amount, decimals: 6 },
+void test('chain stats are checked at the boundary, summed exactly, and the fee is a share of the payouts', () => {
+  const usdc = (settled: string, fees: string, paidOut: string) => ({
+    depositedAtomic: '10000',
+    settledAtomic: settled,
+    gyblosFeesAtomic: fees,
+    programTreasuryAtomic: '0',
+    refundedAtomic: '0',
+    paidOutAtomic: paidOut,
   });
-  return {
-    slot: 7,
-    blockTime: 1_794_800_000,
-    meta: {
-      err,
-      preTokenBalances: [
-        balance('Payer', '10000'),
-        balance('Seller', '0'),
-        balance(GYBLOS, '0'),
-      ],
-      postTokenBalances: [
-        balance('Payer', '0'),
-        balance('Seller', '9600'),
-        balance(GYBLOS, '400'),
-      ],
+  const section = (
+    settled: string,
+    fees: string,
+    paidOut: string,
+    channels: number,
+  ) => ({
+    transactions: 3,
+    channels,
+    payers: 1,
+    payees: 1,
+    undecodable: 0,
+    instructions: {
+      open: 1,
+      settle: 1,
+      topUp: 0,
+      settleAndSeal: 1,
+      requestClose: 0,
+      seal: 0,
+      distribute: 1,
+      reclaim: 0,
     },
-    transaction: { signatures: ['Sig'], message: { instructions } },
-  };
-}
-
-void test('a channel transaction reads as a settlement and the fee is a share of the gross charge', () => {
-  const settlement = classify(
-    tx([
-      { programId: CHANNEL, accounts: ['Channel', 'Payer', 'Payee', 'Vault'] },
-    ]),
-  );
-  assert.ok(settlement);
-  assert.deepEqual(
-    [
-      settlement.kind,
-      settlement.payer,
-      settlement.seller,
-      settlement.sellerAtomic,
-      settlement.feeAtomic,
-    ],
-    ['settlement', 'Payer', 'Seller', 9600n, 400n],
-  );
-  assert.equal(classify(tx([{ programId: 'Other', accounts: [] }])), null);
-  assert.equal(
-    classify(
-      tx([{ programId: CHANNEL, accounts: ['a', 'b', 'c', 'd'] }], 'failed'),
-    ),
-    null,
-  );
-  assert.throws(() => classify({ meta: {}, transaction: {} }), {
-    name: 'SourceShapeError',
+    usdc: usdc(settled, fees, paidOut),
   });
-
-  const payments = summarizePayments({
-    fetchedAt: 0,
-    pending: 0,
+  const snapshot = {
+    ...parseChainStats({
+      aggregatedAt: 5,
+      index: { backfillDone: true, updatedAt: 4 },
+      days: [
+        {
+          day: '2026-11-15',
+          program: { transactions: 200, failed: 1 },
+          gyblosClaimed: section('9007199254740993', '400', '9600', 2),
+        },
+        {
+          day: '2026-11-16',
+          program: { transactions: 300, failed: 0 },
+          gyblosClaimed: null,
+        },
+        {
+          day: '2026-11-17',
+          program: null,
+          gyblosClaimed: section('7', '0', '0', 1),
+        },
+      ],
+    }),
     error: null,
-    settlements: [settlement as Settlement],
-  });
-  // 400 of a 10000 gross charge is 4%, not 400 / 9600.
-  assert.equal(ratioText(payments.fees, payments.gross), '4.0%');
+  };
+  const summary = summarizeChain(snapshot);
+  // Exact beyond 2^53, never a float.
+  assert.equal(summary.totals.settled, 9007199254741000n);
+  assert.equal(summary.programTransactions, 500);
+  // Distinct counts are per day: the largest daily value, never a sum.
+  assert.equal(summary.totals.channels, 2);
+  // 400 of 10000 paid out in all is 4%.
+  assert.equal(summary.feeShare, 0.04);
+  assert.deepEqual(
+    summary.days.map((entry) => entry.day),
+    ['2026-11-15', '2026-11-17'],
+  );
+  assert.throws(
+    () =>
+      parseChainStats({
+        aggregatedAt: null,
+        index: null,
+        days: [
+          {
+            day: 'x',
+            program: null,
+            gyblosClaimed: { ...section('1.5', '0', '0', 1) },
+          },
+        ],
+      }),
+    { name: 'SourceShapeError' },
+  );
 });
 
 void test('offers of the same model with different variants are summarized apart', () => {
