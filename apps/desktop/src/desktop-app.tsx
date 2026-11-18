@@ -39,6 +39,7 @@ import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account';
 import { DesignSystem } from './ui/DesignSystem';
 import { FormField, FormInput } from './ui/Form';
 import { Modal } from './ui/Modal';
+import { usdPerMtok } from './ui/model-price';
 import type { CatalogModel as Model, View } from './ui/model-types';
 import { ModelImage } from './ui/ModelImage';
 import { Models } from './ui/Models';
@@ -577,11 +578,11 @@ export function DesktopApp() {
             <div className="paid-terms">
               <div>
                 <span>Input / 1M tokens</span>
-                <strong>${paidModel.input.toFixed(2)}</strong>
+                <strong>{usdPerMtok(paidModel.input)}</strong>
               </div>
               <div>
                 <span>Output / 1M tokens</span>
-                <strong>${paidModel.output.toFixed(2)}</strong>
+                <strong>{usdPerMtok(paidModel.output)}</strong>
               </div>
               <div>
                 <span>Your device daily limit</span>

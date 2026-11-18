@@ -12,8 +12,10 @@ export interface AnnouncedModel {
   contextTokens: number;
   announcements: number;
   expiresAt: number;
-  // The cheapest price among the group's listings, in atomic devnet USDC per million tokens; both are
-  // "0" for a free group, and a group is either free or paid.
+  // Whether the group's listings are free. A paid group may still charge zero on one side.
+  free: boolean;
+  // One listing's price, in atomic devnet USDC per million tokens: "0" and "0" for a free group, else
+  // the cheapest paid listing by input plus output.
   inputAtomicPerMtok: string;
   outputAtomicPerMtok: string;
 }
@@ -79,6 +81,7 @@ function parseModel(value: unknown): AnnouncedModel | null {
       'contextTokens',
       'announcements',
       'expiresAt',
+      'free',
       'inputAtomicPerMtok',
       'outputAtomicPerMtok',
     ]) ||
@@ -90,8 +93,12 @@ function parseModel(value: unknown): AnnouncedModel | null {
     !integer(value.announcements, 1) ||
     value.announcements > NETWORK_CATALOG.MAX_ANNOUNCEMENTS ||
     !integer(value.expiresAt) ||
+    typeof value.free !== 'boolean' ||
     !atomic(value.inputAtomicPerMtok) ||
-    !atomic(value.outputAtomicPerMtok)
+    !atomic(value.outputAtomicPerMtok) ||
+    // Free exactly when both prices are zero.
+    value.free !==
+      (value.inputAtomicPerMtok === '0' && value.outputAtomicPerMtok === '0')
   )
     return null;
   return {
@@ -101,6 +108,7 @@ function parseModel(value: unknown): AnnouncedModel | null {
     contextTokens: value.contextTokens,
     announcements: value.announcements,
     expiresAt: value.expiresAt,
+    free: value.free,
     inputAtomicPerMtok: value.inputAtomicPerMtok,
     outputAtomicPerMtok: value.outputAtomicPerMtok,
   };

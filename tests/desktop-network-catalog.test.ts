@@ -22,7 +22,9 @@ import {
   jsonResponse,
   sellersBody,
 } from './support/discovery-fixture';
+import { PUBLIC_TEST_OWNER } from './support/public-records';
 
+const OTHER_ASSET = PUBLIC_TEST_OWNER;
 async function entry(free = true, modelId = 'qwen3:0.6b') {
   const source = await discoverySeller({ modelId });
   const catalog = {
@@ -31,6 +33,8 @@ async function entry(free = true, modelId = 'qwen3:0.6b') {
       ...model,
       pricing: {
         ...model.pricing,
+        // A paid listing in an asset the app does not pay with (not devnet USDC).
+        asset: OTHER_ASSET,
         inputAtomicPerMtok: free ? '0' : '1',
         outputAtomicPerMtok: '0',
       },

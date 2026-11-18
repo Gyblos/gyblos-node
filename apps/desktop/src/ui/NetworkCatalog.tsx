@@ -11,6 +11,7 @@ import {
 } from '../catalog/model';
 import { announcedModels } from './announced-models';
 import { BUTTON_VARIANT } from './constants';
+import { priceRange } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import {
@@ -84,7 +85,7 @@ function CatalogStatus({ snapshot }: { snapshot: NetworkCatalog }) {
           : snapshot.state === CATALOG_STATE.STALE
             ? 'Announcements expired. Refresh to check again.'
             : snapshot.state === CATALOG_STATE.EMPTY
-              ? 'No announcements returned for this model.'
+              ? 'No free or devnet USDC announcements returned for this model.'
               : 'Signed announcements · availability not checked.';
   return (
     <p className="dropdown-note" role="status">
@@ -115,11 +116,7 @@ function AnnouncementList({
               selected={!!onSelect && selected === model.id}
               leading={<ModelImage name={model.name} artwork={model.image} />}
               trailing={
-                <Badge>
-                  {model.free
-                    ? 'Free'
-                    : `$${model.input.toFixed(2)} / $${model.output.toFixed(2)}`}
-                </Badge>
+                <Badge>{model.free ? 'Free' : priceRange(model)}</Badge>
               }
               onActivate={onSelect ? () => onSelect(model) : undefined}
             >
@@ -185,8 +182,8 @@ export function NetworkCatalogPanel({
       <CatalogStatus snapshot={snapshot} />
       {snapshot.query && (
         <p className="dropdown-note">
-          Results for {snapshot.query} · free and paid (USDC per 1M tokens, in /
-          out)
+          Results for {snapshot.query} · free, and paid in devnet USDC (in / out
+          per 1M tokens); other assets are not shown
         </p>
       )}
       <AnnouncementList

@@ -1,5 +1,6 @@
 // Reuses verified HTTP discovery, then projects the requested model's listings: free ones, and paid ones
-// priced in devnet USDC (the asset this app pays with), each group with its cheapest price.
+// priced in devnet USDC (the asset this app pays with). A paid group shows one real listing's price, the
+// cheapest by input plus output; prices from different sellers are never mixed.
 // Signatures identify announcements, not registry trust, provider readiness or availability.
 import { DEVNET, DEVNET_USDC, DISCOVERY_INDEX_URL } from '@gyblos/config';
 import {
@@ -21,8 +22,8 @@ const isShown = (pricing: Pricing) =>
   isFree(pricing) ||
   (pricing.network === DEVNET && pricing.asset === DEVNET_USDC);
 
-const cheaper = (left: string, right: string) =>
-  BigInt(left) <= BigInt(right) ? left : right;
+// One listing's reference cost: input plus output per million tokens.
+const cost = (input: string, output: string) => BigInt(input) + BigInt(output);
 
 function project(
   sellers: DiscoveredSeller[],
@@ -51,20 +52,20 @@ function project(
         model.contextTokens,
         isFree(model.pricing),
       ]);
+      const { inputAtomicPerMtok, outputAtomicPerMtok } = model.pricing;
       if (seen.has(key)) continue;
       seen.add(key);
       const held = models.get(key);
       if (held) {
         held.announcements += 1;
         held.expiresAt = Math.min(held.expiresAt, expiresAt);
-        held.inputAtomicPerMtok = cheaper(
-          held.inputAtomicPerMtok,
-          model.pricing.inputAtomicPerMtok,
-        );
-        held.outputAtomicPerMtok = cheaper(
-          held.outputAtomicPerMtok,
-          model.pricing.outputAtomicPerMtok,
-        );
+        if (
+          cost(inputAtomicPerMtok, outputAtomicPerMtok) <
+          cost(held.inputAtomicPerMtok, held.outputAtomicPerMtok)
+        ) {
+          held.inputAtomicPerMtok = inputAtomicPerMtok;
+          held.outputAtomicPerMtok = outputAtomicPerMtok;
+        }
       } else if (models.size < NETWORK_CATALOG.MAX_MODELS)
         models.set(key, {
           modelId: model.modelId,
@@ -73,8 +74,9 @@ function project(
           contextTokens: model.contextTokens,
           announcements: 1,
           expiresAt,
-          inputAtomicPerMtok: model.pricing.inputAtomicPerMtok,
-          outputAtomicPerMtok: model.pricing.outputAtomicPerMtok,
+          free: isFree(model.pricing),
+          inputAtomicPerMtok,
+          outputAtomicPerMtok,
         });
       else truncated = true;
     }

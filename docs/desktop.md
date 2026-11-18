@@ -133,10 +133,11 @@ synchronized, and conversation content is not encrypted.
 
 The sample model catalog and unimplemented web tools are previews. Exact-ID
 lookup reads signed announcements from the discovery index: free listings, and
-paid listings priced in devnet USDC, grouped apart with each group's cheapest
-price. An announcement alone is not registry identity, availability or proof of
-inference. x402 Chat uses the buyer's model and policy, never a sample model
-selection.
+paid listings priced in devnet USDC, grouped apart. A paid group shows one real
+listing's price, the cheapest by input plus output, never sides mixed from
+different sellers; listings in other assets are not shown. An announcement alone
+is not registry identity, availability or proof of inference. x402 Chat uses the
+buyer's model and policy, never a sample model selection.
 
 ## Network contact
 
