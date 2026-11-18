@@ -1,0 +1,11 @@
+import {sessionProductHost} from './tests/support/session-product-host';
+import {chatSession} from './apps/buyer/src/chat-cli';
+import assert from 'node:assert/strict';
+const host=await sessionProductHost('free');
+try {
+ let questions=0;
+ await chatSession({...host.buyer().chat,read:async()=>++questions===1?'synthetic':'/exit',write(){}});
+ assert.equal(host.engine.attempts(),1);
+ assert.ok(host.binding.dials()>0);
+ console.log('BENCH_OK');
+} finally {await host.close()}

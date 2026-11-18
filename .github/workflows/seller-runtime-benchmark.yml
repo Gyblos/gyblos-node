@@ -1,0 +1,37 @@
+name: Seller runtime benchmark
+on:
+  push:
+    branches: [codex/hosted-seller-runtime-bench-n18]
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    name: ${{ matrix.os }} / ${{ matrix.runtime }} / ${{ matrix.rep }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        runtime: [node, bun, deno]
+        rep: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.1
+          package-manager-cache: false
+      - if: matrix.runtime == 'bun'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+      - if: matrix.runtime == 'deno'
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.9.8
+      - run: pnpm install --frozen-lockfile
+      - name: Package seller and measure isolated startup and Iroh requests
+        run: python tooling/runtime-benchmark/measure.py ${{ matrix.runtime }}

@@ -1,0 +1,13 @@
+import {createNode} from './packages/node/src/index';
+import {receiptNativeBinding} from './lab/harness/src/acceptance/receipt-native';
+import {paidAcceptanceEngine} from './tests/support/paid-acceptance-engine';
+const e=paidAcceptanceEngine(); const binding=receiptNativeBinding({calls:e.attempts});
+globalThis.fetch=async()=>{throw Error('external fetch forbidden')};
+const seller=createNode({bind:binding.bind,createEngine:e.create});
+try{
+ await seller.start();
+ if(!binding.directAddresses().length)throw Error('no direct addresses');
+ console.log('BENCH_READY');
+ await new Promise(r=>setTimeout(r,800));
+ console.log('BENCH_RSS', process.memoryUsage().rss);
+}finally{await seller.stop();await binding.close()}

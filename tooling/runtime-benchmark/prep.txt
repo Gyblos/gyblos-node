@@ -1,0 +1,9 @@
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {homeLayout} from './packages/config/src/home';
+import {paidAcceptanceRoles,paidSellerConfiguration} from './tests/support/paid-acceptance-config';
+const layout=homeLayout(process.env);
+for(const path of [layout.roles.seller,layout.roles.buyer]) await mkdir(path,{recursive:true,mode:0o700});
+await paidAcceptanceRoles();
+await paidSellerConfiguration('free');
+const f=process.env.GYBLOS_CONFIG;
+await writeFile(f,(await readFile(f,'utf8')).replace('publish = true','publish = false'));
