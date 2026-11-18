@@ -225,11 +225,16 @@ Una conexión cortada puede no entregar ninguna cabecera de respuesta, así que 
 HTTP y de stream en tu herramienta. Si reenvías una solicitud tú mismo, empieza una nueva selección de
 vendedor.
 
-Algunos vendedores usan hardware lento. Si un vendedor no alcanza a leer un prompt largo, como el de un
-agente de código, la solicitud termina con `reason` `engine_timeout` y un mensaje que dice que el vendedor
-fue demasiado lento para una solicitud de ese tamaño. Envíala de nuevo: la falla baja el peso de ese
-vendedor, así que normalmente responde otro. También puedes acortar la conversación; Codex y OpenCode
-pueden compactarla.
+Algunos vendedores usan hardware lento. Cada vendedor mide qué tan rápido lee los prompts, y tu comprador
+les dice el tamaño de la solicitud (solo el tamaño, nunca el texto) antes de elegir. Un vendedor que no
+alcanzaría a leer a tiempo un prompt largo, como el de un agente de código, lo rechaza, y tu comprador
+elige otro vendedor sin enviarle el prompt. Si ningún vendedor es lo bastante rápido, el error lo dice;
+acorta la conversación (Codex y OpenCode pueden compactarla) o vuelve a intentar más tarde.
+
+Un vendedor que todavía no se ha medido puede quedarse sin tiempo. Entonces la solicitud termina con
+`reason` `engine_timeout` y un mensaje que dice que el vendedor fue demasiado lento para una solicitud de
+ese tamaño. Envíala de nuevo: ese vendedor ya conoce su velocidad y rechaza solicitudes de ese tamaño, así
+que responde otro.
 
 ## Opciones y errores [#opciones-y-errores]
 

@@ -34,6 +34,7 @@
     "./trust": "./src/trust.ts",
     "./control": "./src/control.ts",
     "./selection": "./src/selection.ts",
+    "./input-size": "./src/input-size.ts",
     "./selection-backoff": "./src/selection-backoff.ts",
     "./selection-snapshots": "./src/selection-snapshots.ts",
     "./selection-cache": "./src/selection-cache.ts",

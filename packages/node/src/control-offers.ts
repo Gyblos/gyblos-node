@@ -26,6 +26,8 @@ export interface ControlOffer {
   readiness: () => QuoteReadiness;
   // Whether the offer has tool-capable execution available.
   tools?: boolean;
+  // The engine's measured prompt reading speed (input tokens per second); undefined until measured.
+  readingTokensPerSecond?: () => number | undefined;
 }
 
 export interface ControlOffers {
@@ -57,6 +59,9 @@ export function quoteModel(offer: ControlOffer): QuoteModel {
     reasoning: [...offer.offer.reasoning],
     meteringMode: offer.meteringMode,
     tools: offer.tools === true,
+    ...(offer.readingTokensPerSecond
+      ? { readingTokensPerSecond: offer.readingTokensPerSecond }
+      : {}),
     // A free offer refuses a longer answer at quote time, not after the buyer sent its conversation.
     ...(offer.offer.kind === OFFER_PRICING_KINDS.FREE
       ? {

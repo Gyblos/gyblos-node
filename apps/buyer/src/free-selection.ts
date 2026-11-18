@@ -209,15 +209,21 @@ async function selectFreeWinner(
   signal: AbortSignal,
   {
     tools = false,
+    inputTokens,
     model,
     previousSeller,
-  }: { tools?: boolean; model?: RoutedModel; previousSeller?: string } = {},
+  }: {
+    tools?: boolean;
+    inputTokens?: number;
+    model?: RoutedModel;
+    previousSeller?: string;
+  } = {},
 ) {
-  let refusedTools = false;
+  const refused = new Set<string>();
   const watched: FreeSelectionOptions = {
     ...options,
     onSellerFailure: (failure) => {
-      if (failure.code === CONTROL_CODES.TOOLS) refusedTools = true;
+      refused.add(failure.code);
       options.onSellerFailure?.(failure);
     },
   };
@@ -232,16 +238,19 @@ async function selectFreeWinner(
         maxAtomic: '0',
         priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
         ...(tools ? { tools: true as const } : {}),
+        ...(inputTokens ? { inputTokens } : {}),
       },
       { open: true, ...(previousSeller ? { previousSeller } : {}) },
     );
   } catch (error) {
-    if (refusedTools && error instanceof FreeSelectionFailure && !error.retryAt)
-      throw new FreeBuyerError(
-        FREE_BUYER_CODES.UNAVAILABLE,
-        null,
-        FREE_CHAT_DETAILS.noToolSeller,
-      );
+    // Every seller refused the tools, or the size: the buyer says so plainly.
+    const detail = refused.has(CONTROL_CODES.TOOLS)
+      ? FREE_CHAT_DETAILS.noToolSeller
+      : refused.has(CONTROL_CODES.TOO_SLOW)
+        ? FREE_CHAT_DETAILS.noFastSeller
+        : undefined;
+    if (detail && error instanceof FreeSelectionFailure && !error.retryAt)
+      throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE, null, detail);
     throw error;
   }
 }

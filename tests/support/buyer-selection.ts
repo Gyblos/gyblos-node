@@ -8,10 +8,17 @@ import { createSellerControlService } from '@gyblos/node/control';
 import { controlFixture } from './control-fixture';
 import { controlLoopback } from './control-loopback';
 
-export async function selectionFixture(free = false) {
+export async function selectionFixture(
+  free = false,
+  // Changes the seller's quote context, e.g. its offers' measured reading speed.
+  adjust: (
+    context: Awaited<ReturnType<typeof controlFixture>>['context'],
+  ) => Awaited<ReturnType<typeof controlFixture>>['context'] = (context) =>
+    context,
+) {
   const source = await controlFixture(free);
   const service = createSellerControlService({
-    context: source.context,
+    context: adjust(source.context),
     ownerSigner: source.ownerSigner,
     nodeSigner: source.nodeSigner,
   });

@@ -55,7 +55,9 @@ function coolAfterQuote(
   },
 ) {
   const { dependencies } = context;
-  if (code === CONTROL_CODES.TOOLS) return null;
+  // Neither refusal is a fault: the seller serves other requests (without tools, or smaller ones).
+  if (code === CONTROL_CODES.TOOLS || code === CONTROL_CODES.TOO_SLOW)
+    return null;
   return recordQuote(
     dependencies.stats,
     nodeId,
@@ -228,6 +230,7 @@ async function requestCandidate(
         network: request.network,
         asset: request.asset,
         ...(request.tools ? { tools: true as const } : {}),
+        ...(request.inputTokens ? { inputTokens: request.inputTokens } : {}),
       },
       querySignal,
     );

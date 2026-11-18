@@ -38,6 +38,7 @@
     "./seller-offers": "./src/seller-offers.ts",
     "./seller-offer-set": "./src/seller-offer-set.ts",
     "./control-offers": "./src/control-offers.ts",
+    "./reading-speed": "./src/reading-speed.ts",
     "./free-offers": "./src/free-offers.ts",
     "./seller-settings": "./src/seller-settings.ts",
     "./clock-check": "./src/clock-check.ts",

@@ -45,6 +45,9 @@ export interface ControlOfferParams {
   catalogDigest: string;
   // Asked only by a buyer that will offer tools; a seller that cannot serve them refuses the quote.
   tools?: true;
+  // The buyer's estimate of the request's input tokens: an offer too slow to read it in time refuses the
+  // quote, before any prompt is sent. Only the size travels, never the text.
+  inputTokens?: number;
 }
 interface Query {
   version: typeof CONTROL_VERSION;

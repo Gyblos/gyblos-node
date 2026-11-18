@@ -1,4 +1,5 @@
 // Evaluates live quote policy over caller-owned snapshots; never generates inference, reserves slots or pays.
+import { readsInTime } from '@gyblos/config';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   CONTROL_AVAILABILITY,
@@ -49,6 +50,9 @@ export interface QuoteModel {
   maxOutputTokens?: number;
   // Whether this offer can execute tool-aware requests.
   tools?: boolean;
+  // How fast this offer's engine reads a prompt, in input tokens per second, as measured so far;
+  // undefined until measured.
+  readingTokensPerSecond?: () => number | undefined;
 }
 export interface QuoteReadiness {
   generation: number;
@@ -257,6 +261,15 @@ export async function createControlQuote(
     return controlFail(CONTROL_CODES.LEVEL);
   if (query.params.tools && !mapped.tools)
     return controlFail(CONTROL_CODES.TOOLS);
+  if (
+    query.params.inputTokens !== undefined &&
+    !readsInTime(
+      query.params.inputTokens,
+      query.params.maxTokens,
+      mapped.readingTokensPerSecond?.(),
+    )
+  )
+    return controlFail(CONTROL_CODES.TOO_SLOW);
   const state = readReadiness(context);
   checkReadiness(context, state, now);
   const offer = await buildQuote(query, context, state, catalog, now);
