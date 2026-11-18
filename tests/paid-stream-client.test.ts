@@ -110,8 +110,12 @@ async function fixture(options: Options = {}) {
             offset += size;
             return [...value];
           },
-          async read() {
-            return [...all.subarray(offset)];
+          // Like a native stream: up to `size` bytes, consumed, and empty at the end.
+          async read(size: number) {
+            if (options.truncate && offset >= deltasEnd) return [];
+            const value = all.subarray(offset, offset + size);
+            offset += value.length;
+            return [...value];
           },
         },
       };
