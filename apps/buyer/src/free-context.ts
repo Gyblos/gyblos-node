@@ -32,7 +32,9 @@ export async function freeRouteContext(
     prepared,
     routedPolicy(prepared.config, new Set(), request),
     { fetch: options.fetch ?? globalThis.fetch, now, signal, verifyIdentity },
-    undefined,
+    // Like a free selection: with open discovery, every seller the index lists counts, not only the
+    // configured ones (a desktop buyer configures none).
+    new Set(),
   );
   const sellers = await verifiedSnapshots(
     config,
