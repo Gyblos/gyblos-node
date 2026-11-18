@@ -1,0 +1,29 @@
+name: Profile Linux lab test phases
+on:
+  push:
+    branches: [codex/lab-test-profile-n18]
+permissions:
+  contents: read
+jobs:
+  phases:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: python .github/measure-lab-phases.py
+      - name: Measure real waits, restarts and child startup
+        run: |
+          node --import tsx --test --test-concurrency=1 --test-name-pattern='native paid startup reaches|native identity acceptance proves|SIGKILL at' tests/lab/paid-startup-acceptance.test.ts tests/lab/identity-acceptance.test.ts tests/lab/batch-recovery-crash.test.ts
+      - name: Export phase durations
+        if: always()
+        run: cat "$RUNNER_TEMP/lab-phases.jsonl"
