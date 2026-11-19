@@ -100,6 +100,65 @@ void test('a missing Pi executable fails promptly without leaking diagnostics', 
   });
 });
 
+void test('provider refusals are classified by status and code', async () => {
+  for (const [errorMessage, expected] of [
+    [
+      'OpenAI API error (404): {"code":"model_not_found"}',
+      REVIEW_FAILURE.MODEL,
+    ],
+    [
+      'OpenAI API error (404): The model `gpt-x` does not exist or you do not have access to it.',
+      REVIEW_FAILURE.MODEL,
+    ],
+    [
+      'OpenAI API error (400): {"code":"context_length_exceeded"}',
+      REVIEW_FAILURE.CONTEXT,
+    ],
+    [
+      'OpenAI API error (400): {"code":"unsupported_value","param":"reasoning.effort"}',
+      REVIEW_FAILURE.REQUEST,
+    ],
+    [
+      'OpenAI API error (503): {"type":"server_error"}',
+      REVIEW_FAILURE.PROVIDER,
+    ],
+    ['OpenAI API error (401): {"code":"invalid_api_key"}', REVIEW_FAILURE.KEY],
+    ['OpenAI API error (401): {"code":"invalid_project"}', REVIEW_FAILURE.KEY],
+    ['OpenAI API error (429): Too Many Requests', REVIEW_FAILURE.RATE],
+    [
+      'OpenAI API error (429): {"code":"insufficient_quota"}',
+      REVIEW_FAILURE.QUOTA,
+    ],
+    [
+      "OpenAI API error (404): Item with id 'rs_1' not found",
+      REVIEW_FAILURE.REQUEST,
+    ],
+    ['Settings file does not exist; continuing', REVIEW_FAILURE.PI],
+    ['socket hang up', REVIEW_FAILURE.PI],
+  ] as const) {
+    const event = {
+      type: 'message_end',
+      message: { role: 'assistant', stopReason: 'error', errorMessage },
+    };
+    await withProcess(
+      'console.log(' + JSON.stringify(JSON.stringify(event)) + ');',
+      async (cwd, entry) => {
+        const result = await runPi({
+          cwd,
+          command: process.execPath,
+          prefixArgs: [entry],
+          env: {},
+          model: 'openai/example',
+          thinking: 'high',
+          prompt: 'mock',
+        });
+        assert.equal(result.failure, expected, errorMessage);
+        assert.doesNotMatch(JSON.stringify(result), /rs_1|gpt-x|Settings/);
+      },
+    );
+  }
+});
+
 void test('temporary limits and successful model text cannot trip the quota stop', async () => {
   for (const [stopReason, expected] of [
     ['error', REVIEW_FAILURE.RATE],

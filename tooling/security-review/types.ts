@@ -69,6 +69,7 @@ export interface TaskResult {
   failure?: ReviewFailure;
   coverage?: string[];
   omissions?: SourceBundle['omissions'];
+  excluded?: SourceBundle['excluded'];
 }
 export interface VerificationResponse {
   decision: VerificationDecision;
@@ -105,6 +106,8 @@ export interface SourceBundle {
   files: SourceFile[];
   diff: string;
   omissions: { path: string; reason: string }[];
+  // Symlinks, submodules and binary blobs: listed for the task, contents never sent, never a reason to fail it.
+  excluded: { path: string; reason: string }[];
 }
 export interface ReviewRunResult {
   version: number;
