@@ -6,6 +6,7 @@ import type {
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
 import { PAID_VERDICTS, SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
+import { UnsentDepositMinimumError } from '@gyblos/node/session-policy';
 import { buyerAtomic } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_KEY_CHARGE,
@@ -61,9 +62,10 @@ export async function executeApiKeySession<T>(
   try {
     return await execute();
   } catch (error) {
-    // Only the pool's durable resolution of an unsent intent authorizes release.
+    // Both errors prove that this request never reached its seller.
     if (
-      error instanceof UnsentSellerBusyError &&
+      (error instanceof UnsentSellerBusyError ||
+        error instanceof UnsentDepositMinimumError) &&
       error.nodeId === nodeId &&
       operation?.reserved()
     )

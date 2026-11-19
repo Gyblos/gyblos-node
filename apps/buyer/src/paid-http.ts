@@ -12,6 +12,7 @@ import {
 } from '@gyblos/node/buyer-paid-execution';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
 import { PAID_VERDICTS } from '@gyblos/node/constants';
+import { UnsentDepositMinimumError } from '@gyblos/node/session-policy';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
@@ -97,6 +98,8 @@ const unavailable = (
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  if (error instanceof UnsentDepositMinimumError)
+    return unavailable(error.code, true);
   const keyError = buyerApiKeyErrorView(error);
   if (keyError) return keyError;
   if (

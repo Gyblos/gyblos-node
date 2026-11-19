@@ -9,6 +9,7 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 import {
+  PaymentSessionError,
   SESSION_CODES,
   sessionFail,
   type PaymentSessionTerms,
@@ -96,19 +97,24 @@ export function sessionTerms(
   return matchBatchTerms(terms, terms);
 }
 
+export class UnsentDepositMinimumError extends PaymentSessionError {
+  constructor(readonly nodeId: string) {
+    super(SESSION_CODES.LIMIT);
+  }
+}
+
 // Existing journals retain their original terms; only fresh generations require a minimum deposit.
 export function newSessionTerms(
   quote: SignedOfferV2,
   policy: BuyerSessionPolicy,
   now: number,
 ) {
-  const terms = sessionTerms(quote, policy, now);
   if (
-    BigInt(terms.depositAtomic) <
+    BigInt(policy.depositAtomic) <
     BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
   )
-    return sessionFail(SESSION_CODES.LIMIT);
-  return terms;
+    throw new UnsentDepositMinimumError(quote.offer.nodeId);
+  return sessionTerms(quote, policy, now);
 }
 
 function positiveTotal(value: unknown) {

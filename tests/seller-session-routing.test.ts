@@ -22,7 +22,7 @@ import { sessionRig } from './support/batch-session';
 import { within } from './support/test-deadline';
 
 void test('separate buyers retain one global foreground turn without allocating financial work on PREPARE', async (t) => {
-  const rig = await sessionRig();
+  const rig = await sessionRig({ depositAtomic: '10000' });
   t.after(rig.dispose);
   const other = await generateKeyPairSigner();
   const terms = {
@@ -98,7 +98,7 @@ void test('separate buyers retain one global foreground turn without allocating 
 });
 
 void test('a returning buyer can prepare, inspect and close its channel without enrollment', async (t) => {
-  const rig = await sessionRig();
+  const rig = await sessionRig({ depositAtomic: '10000' });
   t.after(rig.dispose);
   await rig.open();
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
@@ -176,7 +176,7 @@ void test('a returning buyer can prepare, inspect and close its channel without 
 });
 
 void test('the first lost OPEN acknowledgment retains its host until a proved automatic close releases it', async (t) => {
-  const rig = await sessionRig();
+  const rig = await sessionRig({ depositAtomic: '10000' });
   t.after(rig.dispose);
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const signal = new AbortController().signal;
