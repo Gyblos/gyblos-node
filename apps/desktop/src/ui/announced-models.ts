@@ -1,5 +1,7 @@
-// Maps sanitized announcements into shared preview controls; never authorizes inference.
+// Maps sanitized announcements into shared preview controls; never authorizes inference. A paid group
+// shows its cheapest price in USDC per million tokens; choosing it still asks before any spending.
 import { CATALOG_STATE, type NetworkCatalog } from '../catalog/model';
+import { DESKTOP_X402 } from '../x402/constants';
 import {
   ADDITIONAL_MODEL_ARTWORK,
   MODEL_CATEGORY,
@@ -42,12 +44,17 @@ export function announcedModels(
   return catalog.models
     .filter((item) => item.expiresAt > now)
     .map((item) => {
+      const input = Number(item.inputAtomicPerMtok) / DESKTOP_X402.AMOUNT_SCALE;
+      const output =
+        Number(item.outputAtomicPerMtok) / DESKTOP_X402.AMOUNT_SCALE;
+      const { free } = item;
       return {
         id: JSON.stringify([
           item.modelId,
           item.variant,
           item.quantization,
           item.contextTokens,
+          free,
         ]),
         name: item.modelId,
         family:
@@ -57,9 +64,9 @@ export function announcedModels(
         category: MODEL_CATEGORY.EVERYDAY,
         context: item.contextTokens.toLocaleString(),
         providers: item.announcements,
-        free: true,
-        input: 0,
-        output: 0,
+        free,
+        input,
+        output,
         source: MODEL_SOURCE.ANNOUNCED,
       };
     });

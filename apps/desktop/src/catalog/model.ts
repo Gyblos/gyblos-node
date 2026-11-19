@@ -12,6 +12,12 @@ export interface AnnouncedModel {
   contextTokens: number;
   announcements: number;
   expiresAt: number;
+  // Whether the group's listings are free. A paid group may still charge zero on one side.
+  free: boolean;
+  // One listing's price, in atomic devnet USDC per million tokens: "0" and "0" for a free group, else
+  // the cheapest paid listing by input plus output.
+  inputAtomicPerMtok: string;
+  outputAtomicPerMtok: string;
 }
 export interface NetworkCatalog {
   state: CatalogState;
@@ -50,6 +56,14 @@ function integer(value: unknown, minimum = 0): value is number {
     typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum
   );
 }
+// A non-negative integer amount as canonical decimal text, as public catalogs carry prices.
+function atomic(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length <= PUBLIC_RECORD_LIMITS.maxAtomicDigits &&
+    /^(?:0|[1-9][0-9]*)$/.test(value)
+  );
+}
 function publicText(value: unknown): value is string | null {
   return (
     value === null ||
@@ -67,6 +81,9 @@ function parseModel(value: unknown): AnnouncedModel | null {
       'contextTokens',
       'announcements',
       'expiresAt',
+      'free',
+      'inputAtomicPerMtok',
+      'outputAtomicPerMtok',
     ]) ||
     !validCatalogQuery(value.modelId) ||
     !publicText(value.variant) ||
@@ -75,7 +92,13 @@ function parseModel(value: unknown): AnnouncedModel | null {
     value.contextTokens > PUBLIC_RECORD_LIMITS.maxContextTokens ||
     !integer(value.announcements, 1) ||
     value.announcements > NETWORK_CATALOG.MAX_ANNOUNCEMENTS ||
-    !integer(value.expiresAt)
+    !integer(value.expiresAt) ||
+    typeof value.free !== 'boolean' ||
+    !atomic(value.inputAtomicPerMtok) ||
+    !atomic(value.outputAtomicPerMtok) ||
+    // Free exactly when both prices are zero.
+    value.free !==
+      (value.inputAtomicPerMtok === '0' && value.outputAtomicPerMtok === '0')
   )
     return null;
   return {
@@ -85,6 +108,9 @@ function parseModel(value: unknown): AnnouncedModel | null {
     contextTokens: value.contextTokens,
     announcements: value.announcements,
     expiresAt: value.expiresAt,
+    free: value.free,
+    inputAtomicPerMtok: value.inputAtomicPerMtok,
+    outputAtomicPerMtok: value.outputAtomicPerMtok,
   };
 }
 export function parseNetworkCatalog(value: unknown): NetworkCatalog {

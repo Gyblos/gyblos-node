@@ -63,6 +63,7 @@
     "./node-runtime": "./src/node-runtime.ts",
     "./network-catalog": "./src/catalog/model.ts",
     "./network-catalog-reader": "./src/catalog/reader.ts",
+    "./model-price": "./src/ui/model-price.ts",
     "./network-catalog-session": "./src/catalog/session.ts",
     "./network-catalog-handlers": "./src/catalog/handlers.ts",
     "./announced-models": "./src/ui/announced-models.ts",

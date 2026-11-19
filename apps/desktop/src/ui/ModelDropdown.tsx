@@ -3,6 +3,7 @@ import { Check } from '@phosphor-icons/react';
 
 import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
 import { Dropdown } from './Dropdown';
+import { priceRange, usdPerMtok } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
 import { Badge, MenuItem } from './UI';
@@ -12,12 +13,12 @@ export type { ModelOption } from './model-types';
 function priceLabel(model: ModelOption) {
   return model.free
     ? 'Free'
-    : `$${model.input.toFixed(2)} in · $${model.output.toFixed(2)} out / 1M tokens`;
+    : `${usdPerMtok(model.input)} in · ${usdPerMtok(model.output)} out / 1M tokens`;
 }
 
 function modelDetail(model: ModelOption) {
   if (model.source === MODEL_SOURCE.ANNOUNCED)
-    return `${model.family ?? 'Signed announcement'} · Announced · Chat preview`;
+    return `${model.family ?? 'Signed announcement'} · Announced · ${model.free ? '' : priceLabel(model) + ' · '}Chat preview`;
   return model.free ? 'Preview model' : priceLabel(model);
 }
 
@@ -56,7 +57,7 @@ export function ModelDropdown({
             <Badge>Free</Badge>
           ) : (
             <span className="model-trigger-price" title={priceLabel(model)}>
-              ${model.input.toFixed(2)} / ${model.output.toFixed(2)} /M
+              {priceRange(model)} /M
             </span>
           )}
         </>

@@ -5,6 +5,7 @@ import { matchesCatalog, type ModelFilter } from './catalog-state';
 import { MODEL_FILTER, MODELS } from './constants';
 import { ChoiceMenu } from './Management';
 import { Modal } from './Modal';
+import { priceRange } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { NetworkCatalogPanel, useNetworkCatalog } from './NetworkCatalog';
@@ -111,11 +112,7 @@ function ModelRow({
       onActivate={canSelect ? () => onSelect(model) : undefined}
       trailing={
         <div className="ui-price">
-          <strong>
-            {model.free
-              ? 'Free'
-              : '$' + model.input.toFixed(2) + ' / $' + model.output.toFixed(2)}
-          </strong>
+          <strong>{model.free ? 'Free' : priceRange(model)}</strong>
           <small>
             {model.free ? 'Community supported' : 'In / out per 1M tokens'}
           </small>
