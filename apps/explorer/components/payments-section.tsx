@@ -9,9 +9,10 @@ import {
 } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
 import { DISPLAY, UNITS } from '../lib/constants';
-import { count, percent, usdc, utc } from '../lib/format';
+import { count, usdc, usdcDecimal, utc } from '../lib/format';
 import type { RangeDays } from '../lib/range';
 import { BarChartCard } from './board/bar-chart-card';
+import { Flow } from './flow';
 import {
   moneyCell,
   numberCell,
@@ -21,6 +22,10 @@ import {
   td,
   Unavailable,
 } from './ui';
+
+const money = (atomic: bigint) => (
+  <Flow value={usdcDecimal(atomic)} kind="usdc" />
+);
 
 function meta(backfillDone: boolean | null, aggregatedAt: number | null) {
   if (backfillDone === null) return 'chain index starting';
@@ -40,22 +45,25 @@ export async function PaymentsSection({ days }: { days: RangeDays }) {
         meta={meta(chain.backfillDone, chain.aggregatedAt)}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Settled" value={usdc(totals.settled)} money />
-        <Stat label="Paid to sellers" value={usdc(totals.paidOut)} money />
-        <Stat label="Gyblos fees" value={usdc(totals.gyblosFees)} money />
+        <Stat label="Settled" value={money(totals.settled)} money />
+        <Stat label="Paid to sellers" value={money(totals.paidOut)} money />
+        <Stat label="Gyblos fees" value={money(totals.gyblosFees)} money />
         <Stat
           label="Effective fee"
-          value={summary.feeShare === null ? '—' : percent(summary.feeShare)}
+          value={<Flow value={summary.feeShare} kind="percent" />}
         />
-        <Stat label="Channels opened" value={count(totals.opens)} />
-        <Stat label="Deposited" value={usdc(totals.deposited)} money />
-        <Stat label="Refunded" value={usdc(totals.refunded)} money />
+        <Stat
+          label="Channels opened"
+          value={<Flow value={totals.opens} kind="count" />}
+        />
+        <Stat label="Deposited" value={money(totals.deposited)} money />
+        <Stat label="Refunded" value={money(totals.refunded)} money />
         <Stat
           label="Gyblos · program txs"
           value={`${count(totals.transactions)} · ${count(summary.programTransactions)}`}
         />
       </div>
-      <SettledChart chain={chain} total={usdc(totals.settled)} />
+      <SettledChart chain={chain} total={totals.settled} />
       <DailyTable summary={summary} />
       <p className="mt-4 text-xs text-dim">
         Gyblos channels are those whose open carries a Gyblos memo, a label
@@ -72,19 +80,21 @@ function SettledChart({
   total,
 }: {
   chain: ChainSnapshot;
-  total: string;
+  total: bigint;
 }) {
   const points = dailySettled(chain).map((day) => ({
     day: day.day,
     value: Number(day.settled) / UNITS.atomicPerUsdc,
-    label: `${usdc(day.settled)} · ${count(day.settles)} settlements`,
+    amount: usdcDecimal(day.settled),
+    detail: `${count(day.settles)} settlements`,
   }));
   if (!points.length) return null;
   return (
     <div className="mt-4">
       <BarChartCard
         title="Settled per day"
-        total={total}
+        kind="usdc"
+        total={usdcDecimal(total)}
         points={points}
         countAxis={false}
       />

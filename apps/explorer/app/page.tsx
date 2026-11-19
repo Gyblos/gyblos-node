@@ -1,5 +1,6 @@
 // Owns the explorer's single page: the network, usage and payments sections, each streamed on its own
-// so a slow source never blocks the others. The `range` search parameter picks the days shown.
+// so a slow source never blocks the others. The `range` search parameter picks the days shown; a range
+// switch keeps the sections mounted so their figures roll to the new values.
 import { Suspense } from 'react';
 
 import { NetworkSection } from '../components/network-section';
@@ -36,10 +37,10 @@ export default async function Home({
       <Suspense fallback={<Loading />}>
         <NetworkSection />
       </Suspense>
-      <Suspense key={`usage-${days}`} fallback={<Loading />}>
+      <Suspense fallback={<Loading />}>
         <UsageSection days={days} />
       </Suspense>
-      <Suspense key={`payments-${days}`} fallback={<Loading />}>
+      <Suspense fallback={<Loading />}>
         <PaymentsSection days={days} />
       </Suspense>
     </div>

@@ -8,7 +8,7 @@ import {
   type NetworkSide,
 } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
-import { count, usdc, utc } from '../lib/format';
+import { count, usdcDecimal, utc } from '../lib/format';
 import type { RangeDays } from '../lib/range';
 import {
   countText,
@@ -22,6 +22,7 @@ import {
   type SideFigures,
 } from '../lib/usage';
 import { BarChartCard } from './board/bar-chart-card';
+import { Flow, FlowPair } from './flow';
 import {
   ModelName,
   numberCell,
@@ -90,22 +91,43 @@ export async function UsageSection({ days }: { days: RangeDays }) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Stat
           label="Requests free · paid"
-          value={pair(free.requests, paid.requests, countText)}
+          value={
+            <FlowPair free={free.requests} paid={paid.requests} kind="count" />
+          }
         />
         <Stat
           label="Success free · paid"
-          value={pair(free.successRate, paid.successRate, rateText)}
+          value={
+            <FlowPair
+              free={free.successRate}
+              paid={paid.successRate}
+              kind="percent"
+            />
+          }
         />
         <Stat
           label="Output tokens free · paid"
-          value={pair(free.outputTokens, paid.outputTokens, countText)}
+          value={
+            <FlowPair
+              free={free.outputTokens}
+              paid={paid.outputTokens}
+              kind="count"
+            />
+          }
         />
         <Stat
           label="First token p50 free · paid"
           value={pair(free.firstToken, paid.firstToken, latencyText)}
         />
-        <Stat label="Authorized (paid)" value={usdc(usage.authorized)} money />
-        <Stat label="Unserved demand" value={count(usage.unserved)} />
+        <Stat
+          label="Authorized (paid)"
+          value={<Flow value={usdcDecimal(usage.authorized)} kind="usdc" />}
+          money
+        />
+        <Stat
+          label="Unserved demand"
+          value={<Flow value={usage.unserved} kind="count" />}
+        />
       </div>
       <RequestCharts days={snapshot.days} />
       <DailyTable days={usage.active} />
@@ -122,19 +144,21 @@ function RequestCharts({ days }: { days: NetworkDay[] }) {
     series.map((day) => ({
       day: day.day,
       value: day[side],
-      label: count(day[side]),
+      amount: day[side],
     }));
   const total = (side: 'free' | 'paid') =>
-    count(series.reduce((sum, day) => sum + day[side], 0));
+    series.reduce((sum, day) => sum + day[side], 0);
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       <BarChartCard
         title="Free requests per day"
+        kind="count"
         total={total('free')}
         points={chart('free')}
       />
       <BarChartCard
         title="Paid requests per day"
+        kind="count"
         total={total('paid')}
         points={chart('paid')}
       />
