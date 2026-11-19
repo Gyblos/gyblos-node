@@ -1,11 +1,11 @@
 'use client';
 
-// Owns animated figures: a number that rolls to its new value when it changes (a range switch, a chart
+// Animated figures: a number that rolls to its new value when it changes (a range switch, a chart
 // hover), with NumberFlow. It respects prefers-reduced-motion and renders the formatted value on the
 // server. A missing value reads "—"; a pair reads "free · paid" and its two sides move together.
 import NumberFlow, { NumberFlowGroup } from '@number-flow/react';
 
-import { FLOW_FORMATS } from '../lib/constants';
+import { FLOW_FORMATS } from './constants';
 
 export type FlowKind = keyof typeof FLOW_FORMATS;
 // A count or ratio as a number; a USDC amount as an exact decimal string.

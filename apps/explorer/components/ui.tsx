@@ -1,4 +1,4 @@
-// Owns the explorer's shared presentational pieces: stat tiles, section titles, tables, loading and
+// Owns the explorer's shared presentational pieces: section titles, tables, loading and
 // unavailable states, and linked addresses. No data access.
 import type { ReactNode } from 'react';
 
@@ -16,25 +16,6 @@ export const timeCell = `${td} font-mono text-xs text-muted`;
 export function Loading() {
   return (
     <div className="mt-10 h-40 animate-pulse rounded-xl border border-line bg-panel" />
-  );
-}
-
-export function Stat({
-  label,
-  value,
-  money,
-}: {
-  label: string;
-  value: ReactNode;
-  money?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-panel p-4">
-      <div className="text-sm text-muted">{label}</div>
-      <div className={`mt-1 font-mono text-2xl ${money ? 'text-money' : ''}`}>
-        {value}
-      </div>
-    </div>
   );
 }
 

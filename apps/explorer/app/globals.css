@@ -14,6 +14,8 @@
   --muted: #5f6368;
   --dim: #6b6b6b;
   --money: #0f7a3d;
+  --good: #0f7a3d;
+  --bad: #c0362c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,6 +29,8 @@
     --muted: #b8b8b8;
     --dim: #a0a0a0;
     --money: #4ade80;
+    --good: #4ade80;
+    --bad: #f87171;
   }
 }
 
@@ -41,6 +45,8 @@
   --color-brand: var(--brand-blue);
   --color-signal: var(--signal);
   --color-money: var(--money);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
   --font-sans: var(--font-instrument), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }

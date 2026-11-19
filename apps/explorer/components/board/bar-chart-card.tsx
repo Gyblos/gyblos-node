@@ -14,8 +14,10 @@ import {
   YAxis,
 } from 'recharts';
 
-import { CHART, DISPLAY } from '../../lib/constants';
-import { Flow, type FlowKind, type FlowValue } from '../flow';
+import { Flow, type FlowKind, type FlowValue } from './animated-number';
+import { CHART } from './constants';
+import type { Delta } from './delta';
+import { DeltaChip } from './delta-chip';
 
 const TICK = {
   fill: 'var(--dim)',
@@ -36,11 +38,14 @@ export function BarChartCard({
   kind,
   total,
   points,
+  change,
   countAxis = true,
 }: {
   title: string;
   kind: FlowKind;
   total: FlowValue;
+  // The total's change against the previous period; hidden while a day is hovered.
+  change?: Delta;
   points: BarPoint[];
   // A count axis (whole numbers); amounts hide it and read from the headline instead.
   countAxis?: boolean;
@@ -48,12 +53,13 @@ export function BarChartCard({
   const [active, setActive] = useState<BarPoint | null>(null);
   const dense = points.length > CHART.denseDays;
   return (
-    <div className="rounded-xl border border-line bg-panel p-4">
+    <div className="rounded-2xl bg-raised p-4">
       <div className="text-sm text-muted">{title}</div>
-      <div className="mt-1 flex items-baseline gap-2">
+      <div className="mt-1 flex items-center gap-2">
         <span className="font-mono text-2xl">
           <Flow value={active ? active.amount : total} kind={kind} />
         </span>
+        {change && !active ? <DeltaChip delta={change} /> : null}
         <span className="font-mono text-xs text-dim">
           {active
             ? [active.day, active.detail].filter(Boolean).join(' · ')
@@ -80,7 +86,7 @@ export function BarChartCard({
           >
             <XAxis
               dataKey="day"
-              tickFormatter={(day: string) => day.slice(DISPLAY.monthDayStart)}
+              tickFormatter={(day: string) => day.slice(CHART.monthDayStart)}
               interval={dense ? 'preserveStartEnd' : 0}
               tickLine={false}
               axisLine={{ stroke: 'var(--line)' }}

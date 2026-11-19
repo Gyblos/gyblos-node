@@ -54,6 +54,8 @@ export function summarizeOffers(snapshot: DiscoverySnapshot) {
   return {
     offers: offers.length,
     free: offers.filter(isFree).length,
+    // Models with at least one free offer now.
+    freeModels: [...models.values()].filter((model) => model.free > 0).length,
     averageDayUptime: day.length
       ? day.reduce((sum, ratio) => sum + ratio, 0) / day.length
       : null,

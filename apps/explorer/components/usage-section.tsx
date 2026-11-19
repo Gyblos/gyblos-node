@@ -2,6 +2,15 @@
 // over the last 30 UTC days. Every figure is a "free · paid" pair, never a sum: free volume is not
 // backed by payment. Buyer counts below the public minimum show as "< 5".
 import {
+  CircleCheck,
+  CircleOff,
+  Hash,
+  MessagesSquare,
+  Timer,
+  Wallet,
+} from 'lucide-react';
+
+import {
   getCollector,
   type ModelStat,
   type NetworkDay,
@@ -21,13 +30,14 @@ import {
   summarizeUsage,
   type SideFigures,
 } from '../lib/usage';
+import { Flow, FlowPair } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
-import { Flow, FlowPair } from './flow';
+import { delta, type Delta } from './board/delta';
+import { StatCard } from './board/stat-card';
 import {
   ModelName,
   numberCell,
   SectionTitle,
-  Stat,
   Table,
   td,
   Unavailable,
@@ -73,10 +83,34 @@ const figureHead = (latency: string) => [
   { label: `${latency} p50 free · paid`, right: true },
 ];
 
+// Each side's change against the span just before the range; none when that span cannot be read.
+function changes(
+  current: ReturnType<typeof summarizeUsage>,
+  previous: ReturnType<typeof summarizeUsage> | null,
+) {
+  if (!previous) return null;
+  return {
+    requests: [
+      delta(current.free.requests, previous.free.requests),
+      delta(current.paid.requests, previous.paid.requests),
+    ],
+    outputTokens: [
+      delta(current.free.outputTokens, previous.free.outputTokens),
+      delta(current.paid.outputTokens, previous.paid.outputTokens),
+    ],
+    authorized: [delta(current.authorized, previous.authorized)],
+    unserved: [delta(current.unserved, previous.unserved, 'down')],
+  };
+}
+
 export async function UsageSection({ days }: { days: RangeDays }) {
-  const snapshot = await getCollector(days);
+  const [snapshot, before] = await Promise.all([
+    getCollector(days),
+    getCollector(days, 1),
+  ]);
   if (snapshot.error) return <Unavailable title="Usage" />;
   const usage = summarizeUsage(snapshot);
+  const change = changes(usage, before.error ? null : summarizeUsage(before));
   const { free, paid } = usage;
   return (
     <>
@@ -84,18 +118,21 @@ export async function UsageSection({ days }: { days: RangeDays }) {
         title={`Usage · ${days} days`}
         meta={
           snapshot.aggregatedAt
-            ? `updated ${utc(snapshot.aggregatedAt)}`
+            ? `vs previous ${days} days · updated ${utc(snapshot.aggregatedAt)}`
             : 'no data yet'
         }
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <Stat
+        <StatCard
+          icon={MessagesSquare}
           label="Requests free · paid"
           value={
             <FlowPair free={free.requests} paid={paid.requests} kind="count" />
           }
+          deltas={change?.requests}
         />
-        <Stat
+        <StatCard
+          icon={CircleCheck}
           label="Success free · paid"
           value={
             <FlowPair
@@ -105,7 +142,8 @@ export async function UsageSection({ days }: { days: RangeDays }) {
             />
           }
         />
-        <Stat
+        <StatCard
+          icon={Hash}
           label="Output tokens free · paid"
           value={
             <FlowPair
@@ -114,22 +152,28 @@ export async function UsageSection({ days }: { days: RangeDays }) {
               kind="count"
             />
           }
+          deltas={change?.outputTokens}
         />
-        <Stat
+        <StatCard
+          icon={Timer}
           label="First token p50 free · paid"
           value={pair(free.firstToken, paid.firstToken, latencyText)}
         />
-        <Stat
+        <StatCard
+          icon={Wallet}
           label="Authorized (paid)"
           value={<Flow value={usdcDecimal(usage.authorized)} kind="usdc" />}
+          deltas={change?.authorized}
           money
         />
-        <Stat
+        <StatCard
+          icon={CircleOff}
           label="Unserved demand"
           value={<Flow value={usage.unserved} kind="count" />}
+          deltas={change?.unserved}
         />
       </div>
-      <RequestCharts days={snapshot.days} />
+      <RequestCharts days={snapshot.days} change={change?.requests ?? null} />
       <DailyTable days={usage.active} />
       <ModelsTable models={snapshot.models} />
       <DemandTable demand={usage.demand} />
@@ -138,7 +182,13 @@ export async function UsageSection({ days }: { days: RangeDays }) {
 }
 
 // Small multiples, never stacked: free and paid requests per day, each in its own chart.
-function RequestCharts({ days }: { days: NetworkDay[] }) {
+function RequestCharts({
+  days,
+  change,
+}: {
+  days: NetworkDay[];
+  change: Delta[] | null;
+}) {
   const series = dailyRequests(days);
   const chart = (side: 'free' | 'paid') =>
     series.map((day) => ({
@@ -153,12 +203,14 @@ function RequestCharts({ days }: { days: NetworkDay[] }) {
       <BarChartCard
         title="Free requests per day"
         kind="count"
+        change={change?.[0]}
         total={total('free')}
         points={chart('free')}
       />
       <BarChartCard
         title="Paid requests per day"
         kind="count"
+        change={change?.[1]}
         total={total('paid')}
         points={chart('paid')}
       />
