@@ -68,7 +68,21 @@ void test(
         await import('@gyblos/lab-harness/acceptance/free');
       const { FREE_ACCEPTANCE_CASES } =
         await import('@gyblos/lab-harness/acceptance/free-constants');
-      const result = await runFreeAcceptance();
+      const advances: number[] = [];
+      const reads = new Set<number>();
+      let elapsed = 0;
+      const result = await runFreeAcceptance({
+        admissionClock: {
+          now: () => {
+            reads.add(elapsed);
+            return elapsed;
+          },
+          advance: (milliseconds: number) => {
+            elapsed += milliseconds;
+            advances.push(milliseconds);
+          },
+        },
+      });
       assert.equal(result.ok, true);
       assert.equal(result.index, 'in-process-memory');
       assert.equal(result.nativeIroh, true);
@@ -79,6 +93,9 @@ void test(
       assert.equal(result.queryGenerations, 0);
       assert.equal(result.queryEngineAttempts, 0);
       assert.equal(foreignCalls, 0);
+      assert.deepEqual(advances, Array<number>(11).fill(2000));
+      for (let selection = 1; selection <= advances.length; selection++)
+        assert.ok(reads.has(selection * 2000));
       assert.ok(
         !/signature|nodeId|owner|prompt|address|https?:|\.local|\/tmp\//i.test(
           JSON.stringify(result),
