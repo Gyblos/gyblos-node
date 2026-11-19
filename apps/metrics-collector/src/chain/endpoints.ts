@@ -3,9 +3,8 @@
 // Helius, then Alchemy), each with its own smaller budget. The run moves to the next endpoint only when
 // the current one fails it: a refusal (a rate limit, or a 403 such as the public RPC answers Cloudflare
 // Workers), an endpoint of another network, a server error, or a transport failure (a timeout or a
-// dropped connection). An answer the
-// index cannot read stops the run instead. Calls are counted per endpoint for the run's log, so a slow
-// or refused free endpoint is visible before relying on keyed ones.
+// dropped connection). An answer the index cannot read stops the run instead. Calls are counted per
+// endpoint for the run's log, so a slow or refused free endpoint is visible before relying on keyed ones.
 import { ChainShapeError } from './json';
 import { ChainRpcError, type ChainRpc } from './rpc';
 
