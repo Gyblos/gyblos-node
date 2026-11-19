@@ -3,6 +3,10 @@ import { isSignature } from '@solana/kit';
 
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import {
+  sessionApproval,
+  type SessionApproval,
+} from '@gyblos/node/session-accounting';
+import {
   BUYER_API,
   buyerAtomic,
   parseBuyerApiPolicy,
@@ -19,6 +23,7 @@ export interface X402Record {
   at: number;
   chargeAtomic: string;
   transaction: string | null;
+  sessionApproval?: SessionApproval;
   free: boolean;
   policy: BuyerApiPolicy;
 }
@@ -83,7 +88,15 @@ export function parseX402Summary(input: unknown): X402Summary {
   const records: X402Record[] = value.records.map((input: unknown) => {
     if (!input || typeof input !== 'object') throw new Error('Invalid payment');
     const record = input as Record<string, unknown>;
+    const approval =
+      record.sessionApproval === undefined
+        ? undefined
+        : sessionApproval(record.sessionApproval);
     if (
+      (approval &&
+        (record.free ||
+          record.transaction !== null ||
+          record.chargeAtomic !== approval.approvedAtomic)) ||
       !x402Id(record.id) ||
       !x402Id(record.sessionId) ||
       typeof record.at !== 'number' ||
@@ -96,11 +109,12 @@ export function parseX402Summary(input: unknown): X402Summary {
           !x402Signature(record.transaction))) ||
       (record.free
         ? record.transaction !== null || record.chargeAtomic !== '0'
-        : record.transaction === null)
+        : !approval && record.transaction === null)
     )
       throw new Error('Invalid payment');
     return {
       id: record.id,
+      ...(approval && { sessionApproval: approval }),
       sessionId: record.sessionId,
       at: record.at,
       chargeAtomic: record.chargeAtomic,

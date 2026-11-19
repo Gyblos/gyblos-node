@@ -100,6 +100,44 @@ void test('x402 changed server policy fails closed without retrying the message'
   assert.equal(posts, 1);
   assert.equal((await ledger.summary()).blocked, true);
 });
+void test('desktop counts a recorded channel approval against the budget before settlement', async () => {
+  const ledger = budget();
+  const client = new X402Client(ledger, async (_url, options) => {
+    if (options?.method !== 'POST') return Response.json(policy);
+    return Response.json({
+      ...reply(),
+      [BUYER_API.PAYMENT_FIELD]: {
+        verdict: SESSION_VERDICTS.APPROVED,
+        maxAtomic: '100',
+        expectedAtomic: '30',
+        chargedAtomic: null,
+        refundedAtomic: null,
+        sellerAtomic: null,
+        feeAtomic: null,
+        recorded: true,
+        session: {
+          approvedAtomic: '30',
+          cumulativeAtomic: '45',
+          depositAtomic: '1000000',
+        },
+      },
+    });
+  });
+  try {
+    await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+    await client.authorize('200');
+    const result = await client.send('approved-request', 'Hello');
+    assert.equal(result.summary.spentAtomic, '30');
+    assert.equal(result.summary.blocked, false);
+    assert.equal(result.summary.records[0]?.transaction, null);
+    assert.equal(
+      result.summary.records[0]?.sessionApproval?.cumulativeAtomic,
+      '45',
+    );
+  } finally {
+    await client.close();
+  }
+});
 void test('a reusable-session approval remains unresolved rather than becoming a settled desktop payment', async () => {
   let posts = 0;
   const ledger = budget();

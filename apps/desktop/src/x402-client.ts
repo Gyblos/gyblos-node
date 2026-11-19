@@ -3,7 +3,12 @@
 import { LOCALHOST, ROUTES } from '@gyblos/config';
 import { DEVNET_USDC } from '@gyblos/config/network';
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
-import { PAID_BUYER_CODES, PAID_VERDICTS } from '@gyblos/node/constants';
+import {
+  PAID_BUYER_CODES,
+  PAID_VERDICTS,
+  SESSION_VERDICTS,
+} from '@gyblos/node/constants';
+import { sessionApproval } from '@gyblos/node/session-accounting';
 import {
   BUYER_API,
   buyerAtomic,
@@ -107,6 +112,35 @@ export function parseBuyerReply(input: unknown, policy: BuyerApiPolicy) {
       usage,
     };
   const paid = object(payment);
+  if (paid.verdict === SESSION_VERDICTS.APPROVED) {
+    if (
+      !paid.session ||
+      paid.recorded !== true ||
+      paid.chargedAtomic !== null ||
+      paid.refundedAtomic !== null ||
+      paid.feeAtomic !== null ||
+      paid.sellerAtomic !== null ||
+      paid.transaction !== undefined ||
+      !buyerAtomic(paid.maxAtomic) ||
+      BigInt(paid.maxAtomic) > BigInt(policy.maxAtomic) ||
+      value[BUYER_API.EXECUTION_FIELD] !== OFFER_PRICING_KINDS.PAID
+    )
+      throw new Error('Payment is not confirmed.');
+    const approval = sessionApproval(paid.session);
+    if (
+      approval.approvedAtomic !== paid.expectedAtomic ||
+      BigInt(approval.approvedAtomic) > BigInt(paid.maxAtomic)
+    )
+      throw new Error('Invalid channel approval');
+    return {
+      text: message.content,
+      chargeAtomic: approval.approvedAtomic,
+      transaction: null,
+      free: false,
+      usage,
+      sessionApproval: approval,
+    };
+  }
   if (
     paid.verdict !== PAID_VERDICTS.SETTLED ||
     typeof paid.transaction !== 'string' ||
@@ -363,7 +397,9 @@ export class X402Client {
           policy.mint === DEVNET_USDC
             ? RESPONSE_COST_UNIT.USDC
             : RESPONSE_COST_UNIT.ATOMIC,
-        kind: RESPONSE_COST_KIND.SETTLED,
+        kind: reply.sessionApproval
+          ? RESPONSE_COST_KIND.RECORDED
+          : RESPONSE_COST_KIND.SETTLED,
       },
       reply.usage,
     );
