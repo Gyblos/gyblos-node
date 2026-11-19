@@ -116,6 +116,8 @@ export async function startSeller(
     // Explicit composition port; omission keeps the normal engine registry and pinned artifacts.
     createEngine?: typeof createSellerEngine;
     bind?: typeof bindEndpoint;
+    // Elapsed time for control admission only. Defaults to the runtime monotonic clock.
+    controlMonotonic?: () => number;
     // Builds the payment server for paid offers from the seller's role; without it, paid offers
     // refuse startup with SELLER_PAID_EXECUTION_UNAVAILABLE.
     payments?: (
@@ -320,6 +322,7 @@ export async function startSeller(
     });
     if (uploader) disposers.push(uploader.close);
     const control = await prepareSellerControl({
+      monotonic: options.controlMonotonic,
       owner,
       sequence: publicSequence,
       catalogMs: publicationConfig

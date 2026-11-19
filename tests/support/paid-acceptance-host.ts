@@ -51,6 +51,7 @@ export async function paidAcceptanceHost(
   signal: AbortSignal,
   initialPricing: OfferPricingKind = OFFER_PRICING_KINDS.PAID,
 ) {
+  let admissionOffsetMs = 0;
   let pricing = initialPricing;
   let budget: string =
     pricing === OFFER_PRICING_KINDS.FREE ? '0' : PAID_ACCEPTANCE.maxAtomic;
@@ -144,6 +145,7 @@ export async function paidAcceptanceHost(
   const startSeller = async () => {
     await paidSellerConfiguration(pricing);
     seller = createNode({
+      controlMonotonic: () => performance.now() + admissionOffsetMs,
       bind,
       payments: payments.seller,
       createEngine: engine.create,
@@ -220,6 +222,9 @@ export async function paidAcceptanceHost(
       engine,
       roles,
       payments,
+      advanceControlRefill() {
+        admissionOffsetMs += ACCEPTANCE.controlRefillMs;
+      },
       paymentPreparations: () => paymentPreparations,
       tokenizerLoads: () => tokenizerLoads,
       binding,

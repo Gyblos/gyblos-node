@@ -7,11 +7,11 @@
 # cross-platform wallet and backup-exchange jobs live in desktop-platforms.yml and run
 # on demand.
 # No secrets, funded wallets, engines, devnet RPC or deployment.
-name: Windows parallel and Bun lab benchmark
+name: Paid acceptance clock CI benchmark
 
 on:
   push:
-    branches: ['codex/winpair-bun-full-n18-*']
+    branches: ['codex/paid-clock-ci-n18-*']
 
 permissions:
   contents: read
@@ -144,6 +144,52 @@ jobs:
           node --input-type=module -e "import {globSync} from 'node:fs'; console.log(JSON.stringify(globSync('tests/lab/**/*.test.ts').sort().filter((_, i) => i % 2 === 0)))" > "$RUNNER_TEMP/shard.json"
           export WORKERS=$(node -p "Math.max(1,require('node:os').availableParallelism()-1)")
           python .github/bench-lab-bun.py
+      - name: Record acceptance duration
+        if: matrix.shard == 1
+        run: |
+          python - <<'PYTHON'
+          import os, pathlib, xml.etree.ElementTree as ET
+          suite = pathlib.Path(os.environ['RUNNER_TEMP']) / 'paid-startup-acceptance.test.ts.xml'
+          matches = [c for c in ET.parse(suite).iter('testcase') if c.get('name') == 'native paid startup reaches verified settlement and preserves uncertainty across restart']
+          assert len(matches) == 1 and len(matches[0]) == 0
+          print('PAID_CASE_SECONDS', matches[0].attrib['time'])
+          PYTHON
+
+  clock-control:
+    # Independent reference; the PR check never waits for this measurement.
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 830b32837e24bc76f46ce95e969fa058e197fa0b
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+      - run: pnpm install --frozen-lockfile
+      - name: Run identical shard files on Bun
+        run: |
+          node --input-type=module -e "import {globSync} from 'node:fs'; console.log(JSON.stringify(globSync('tests/lab/**/*.test.ts').sort().filter((_, i) => i % 2 === 0)))" > "$RUNNER_TEMP/shard.json"
+          export WORKERS=$(node -p "Math.max(1,require('node:os').availableParallelism()-1)")
+          python .github/bench-lab-bun.py
+      - name: Record acceptance duration
+        run: |
+          python - <<'PYTHON'
+          import os, pathlib, xml.etree.ElementTree as ET
+          suite = pathlib.Path(os.environ['RUNNER_TEMP']) / 'paid-startup-acceptance.test.ts.xml'
+          matches = [c for c in ET.parse(suite).iter('testcase') if c.get('name') == 'native paid startup reaches verified settlement and preserves uncertainty across restart']
+          assert len(matches) == 1 and len(matches[0]) == 0
+          print('PAID_CASE_SECONDS', matches[0].attrib['time'])
+          PYTHON
 
   build:
     needs: changes
