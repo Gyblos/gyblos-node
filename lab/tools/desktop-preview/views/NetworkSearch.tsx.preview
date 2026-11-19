@@ -1,0 +1,165 @@
+export function NetworkCatalogPanel({
+  snapshot,
+  onLookup,
+  selected,
+  onSelect,
+}: {
+  snapshot: NetworkCatalog;
+  onLookup: (query: string) => void;
+  selected: string;
+  onSelect?: (model: CatalogModel) => void;
+}) {
+  const [query, setQuery] = useState(snapshot.query);
+  const models = announcedModels(snapshot, Date.now());
+  const [knownIds, setKnownIds] = useState<string[]>([]);
+  useEffect(() => {
+    const ids = announcedModels(snapshot, Date.now()).map(
+      (model) => model.name,
+    );
+    if (ids.length)
+      setKnownIds((previous) => [...new Set([...previous, ...ids])]);
+  }, [snapshot]);
+  const [editing, setEditing] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const matching = knownIds
+    .filter((id) => id.toLowerCase().includes(query.trim().toLowerCase()))
+    .slice(0, 6);
+  const expanded = editing && matching.length > 0;
+  const submit = (id: string) => {
+    setQuery(id);
+    setEditing(false);
+    setActiveIndex(-1);
+    onLookup(id);
+  };
+  const loading = snapshot.state === CATALOG_STATE.LOADING;
+  const valid = validCatalogQuery(query.trim()) && !loading;
+  const messages = {
+    [CATALOG_STATE.LOADING]: 'Searching…',
+    [CATALOG_STATE.IDLE]: 'Enter a model ID to search.',
+    [CATALOG_STATE.EMPTY]: `No free listings for “${snapshot.query}”.`,
+    [CATALOG_STATE.ERROR]: 'Search unavailable. Try again.',
+    [CATALOG_STATE.STALE]: 'Listings expired. Search again.',
+    [CATALOG_STATE.READY]: models.length ? '' : 'No current listings.',
+  };
+  return (
+    <div className="preview-network-search">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (valid) submit(query.trim());
+        }}
+      >
+        <label htmlFor="preview-network-model">Model ID</label>
+        <div className="preview-model-picker">
+          <SearchField
+            label="Model ID"
+            id="preview-network-model"
+            role="combobox"
+            value={query}
+            placeholder="Search by model ID"
+            autoComplete="off"
+            spellCheck={false}
+            aria-autocomplete="list"
+            aria-expanded={expanded}
+            aria-controls={expanded ? 'preview-model-options' : undefined}
+            aria-activedescendant={
+              expanded && activeIndex >= 0
+                ? 'preview-model-option-' + activeIndex
+                : undefined
+            }
+            onFocus={() => setEditing(true)}
+            onBlur={() => setEditing(false)}
+            onValueChange={(value) => {
+              setQuery(value);
+              setEditing(true);
+              setActiveIndex(-1);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && expanded) {
+                event.preventDefault();
+                event.stopPropagation();
+                setEditing(false);
+                setActiveIndex(-1);
+              }
+              if (
+                (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+                matching.length
+              ) {
+                event.preventDefault();
+                setEditing(true);
+                setActiveIndex((index) =>
+                  event.key === 'ArrowDown'
+                    ? (index + 1) % matching.length
+                    : index <= 0
+                      ? matching.length - 1
+                      : index - 1,
+                );
+              }
+              if (
+                event.key === 'Enter' &&
+                expanded &&
+                activeIndex >= 0 &&
+                !loading
+              ) {
+                event.preventDefault();
+                submit(matching[activeIndex]!);
+              }
+            }}
+          />
+          {expanded && (
+            <ul
+              role="listbox"
+              aria-label="Matching model IDs"
+              id="preview-model-options"
+            >
+              {matching.map((id, index) => (
+                <li
+                  key={id}
+                  id={'preview-model-option-' + index}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    if (!loading) submit(id);
+                  }}
+                >
+                  {id}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </form>
+      {snapshot.query && query.trim() === snapshot.query && !expanded && (
+        <section aria-live="polite" aria-label="Search results">
+          {models.length > 0 && (
+            <>
+              <h3>Results</h3>
+              <List label="Network models">
+                {models.map((model) => (
+                  <ListRow
+                    key={model.id}
+                    selected={!!onSelect && selected === model.id}
+                    onActivate={onSelect ? () => onSelect(model) : undefined}
+                    leading={
+                      <ModelImage name={model.name} artwork={model.image} />
+                    }
+                    trailing={<Badge>Free</Badge>}
+                  >
+                    <RowCopy
+                      title={model.name}
+                      detail={model.family + ' · ' + model.context + ' tokens'}
+                    />
+                  </ListRow>
+                ))}
+              </List>
+            </>
+          )}
+          {messages[snapshot.state] && <p>{messages[snapshot.state]}</p>}
+          {snapshot.truncated && <small>Showing the first page.</small>}
+        </section>
+      )}
+      <small>Sample listings · Live availability unverified</small>
+    </div>
+  );
+}

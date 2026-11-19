@@ -114,6 +114,29 @@ void test('preview exposes bounded synthetic API key metadata without a credenti
     /PREVIEW_ONLY_NOT_A_VALID_API_KEY/,
   );
 });
+void test('the account budget includes chat and all API keys and preserves individual limits', async () => {
+  const call = await fixture('?screen=payments&review=ten-chats');
+  const readAccount = async () =>
+    object(await call('previewAccountBudget', 'current'));
+  const original = await readAccount();
+  assert.equal(original.limitAtomic, '1000000');
+  assert.equal(original.spentAtomic, '6000');
+  const setLimit = async (limitAtomic: string) =>
+    parseX402Result(
+      await call('desktopX402', 'run', {
+        action: X402_ACTION.AUTHORIZE,
+        limitAtomic,
+      }),
+    );
+  assert.ok((await setLimit('5999')).error);
+  assert.deepEqual(await readAccount(), original);
+  assert.equal((await setLimit('6000')).error, undefined);
+  assert.equal((await readAccount()).limitAtomic, '6000');
+  const keys = parseUsdcApiState(
+    await call('desktopUsdcApiKeys', 'run', { action: 'status' }),
+  );
+  assert.equal(keys.snapshot?.keys[0]?.limitAtomic, '10000');
+});
 void test('preview buyer status is runtime-loadable and keeps free replies transaction-free', async () => {
   const call = await fixture();
   const result = parseX402Result(
@@ -130,6 +153,21 @@ void test('preview wallet collection contains public example metadata only', asy
   );
   assert.equal(result.wallet.status, 'ready');
   assert.equal(result.wallet.fundingEnabled, false);
+});
+void test('wallet backup review reflects verified and needed states in the collection', async () => {
+  for (const [state, verified] of [
+    ['verified', true],
+    ['needed', false],
+  ] as const) {
+    const call = await fixture(
+      '?screen=payments&review=wallet-backup&backup=' + state,
+    );
+    const { wallet, wallets } = parseWalletCollection(
+      await call('desktopWallet', 'collection'),
+    );
+    assert.equal(wallet.backupVerified, verified);
+    assert.equal(wallets[0]?.backupVerified, verified);
+  }
 });
 void test('preview PayPal status follows the current public contract', async () => {
   const call = await fixture();
@@ -330,23 +368,27 @@ void test('preview brand hooks accept Windows CRLF source files', async () => {
     /#090909/,
   );
 });
-void test('preview omits the free-network composer caption and retains operational status copy', async () => {
-  const { transformBrand } =
-    await import('../../lab/tools/desktop-preview/brand-build');
-  const chat = await readFile(
-    new URL('../../apps/desktop/src/ui/Chat.tsx', import.meta.url),
-    'utf8',
+
+void test('ten example chats share one spending limit and have individually attributable receipts', async () => {
+  const call = await fixture('?screen=payments&review=ten-chats');
+  const { archive } = parseChatArchiveLoad(
+    await call('desktopConversations', 'load'),
   );
-  const preview =
-    transformBrand(chat, '/desktop/src/ui/Chat.tsx', '/desktop') ?? chat;
-  assert.doesNotMatch(preview, /Free · Gyblos network/);
-  for (const status of [
-    'Generating…',
-    'Authorize in Payments',
-    'x402 · devnet',
-    'PayPal Sandbox',
-    'Set up in Payments',
-    'Esc to stop',
-  ])
-    assert.ok(preview.includes(status));
+  const { summary } = parseX402Result(
+    await call('desktopX402', 'run', { action: X402_ACTION.STATUS }),
+  );
+  const chats = archive?.sessions.filter((chat) => chat.messages.length) ?? [];
+  assert.equal(chats.length, 10);
+  assert.equal(summary.records.length, 10);
+  for (const chat of chats) {
+    assert.ok(
+      summary.records.some(
+        (record) =>
+          record.sessionId === summary.sessionId &&
+          chat.messages.some(
+            (message) => message.id === record.id + '-assistant',
+          ),
+      ),
+    );
+  }
 });

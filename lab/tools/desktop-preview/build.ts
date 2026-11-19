@@ -90,6 +90,7 @@ export async function buildPreview(output = resolve(directory, 'dist')) {
   });
   for (const name of [
     'preview.css',
+    'buttons.html',
     'gyblos-mark-solid-dark.svg',
     'gyblos-mark-solid-light.svg',
   ])

@@ -30,11 +30,15 @@ import {
   emptyX402,
   parseX402Result,
   X402_ACTION,
+  type X402Record,
 } from '@gyblos/desktop/x402-model';
 import { AGENT_TOOLS } from '@gyblos/node/agent-setup-constants';
+import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
+import { accountBudgetSnapshot, accountLimitError } from './account-budget';
 import { PREVIEW } from './constants';
+import { exampleKeys } from './example-keys';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
 
@@ -45,7 +49,6 @@ export function createPreviewHost(
   const query = new URLSearchParams(search);
   const ready = query.get('connection-state') !== 'unconfigured';
   const example = '00000000-0000-4000-8000-000000000001';
-  const keyId = '00000000-0000-4000-8000-000000000002';
   const now = Date.now();
   const model = 'qwen3-0.6b';
   const chatModel = {
@@ -56,8 +59,8 @@ export function createPreviewHost(
   };
   const payer = '11111111111111111111111111111111';
   const scope = { network: DEVNET, mint: DEVNET_USDC, payer };
-  const policy = {
-    version: 1,
+  const policy: BuyerApiPolicy = {
+    version: BUYER_API.VERSION,
     policyId: example,
     model,
     maxTokens: 256,
@@ -68,49 +71,53 @@ export function createPreviewHost(
   let connected = ready;
   let active = ready;
   let authorized = ready;
-  let limitAtomic = ready ? '1000000' : '0';
+  let limitAtomic = '1000000';
   let generation = 0;
   let selectedHome = ready;
-  let keys = [
-    {
-      id: keyId,
-      name: 'Coding tools',
-      limitAtomic: '10000',
-      spentAtomic: '2000',
-      settledAtomic: '2000',
-      approvedAtomic: '0',
-      reservedAtomic: '0',
-      revoked: false,
-    },
-  ];
+  let keys = exampleKeys(query.get('keys') === 'empty');
   let setup: UsdcApiState['setup'];
   const clone = <T>(value: T) => structuredClone(value);
   const answer =
     'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage in Activity and payment details in Payments.';
 
   const conversations = new ChatController('preview-first-chat');
-  for (const title of [
+  const records: X402Record[] = [];
+  function recordFreeReply(id: string, at: number) {
+    records.push({
+      id,
+      sessionId,
+      at,
+      chargeAtomic: '0',
+      transaction: null,
+      free: true,
+      policy,
+    });
+  }
+  const tenChats = query.get('review') === 'ten-chats';
+  const titles = [
     'Product launch plan',
     'Explain vector search',
     'Research assistant',
-  ]) {
-    conversations.setDraft(title);
-    conversations.newChat(crypto.randomUUID());
-  }
-  const conversationId = conversations.getSnapshot().activeId;
-  conversations.startPaypal(
-    'How can I use Gyblos in my coding tools?',
-    chatModel,
-    'preview-reply',
-    sessionId,
-    PAYMENT_METHOD.USDC,
-  );
-  conversations.completePaypal(
-    conversationId,
-    'preview-reply',
-    answer,
-    chatModel,
-    {
+  ];
+  if (tenChats)
+    titles.push(
+      'Review API changes',
+      'Plan the onboarding flow',
+      'Compare model outputs',
+      'Summarize meeting notes',
+      'Explore search ranking',
+      'Outline a release checklist',
+    );
+  function exampleChat(title: string, receiptId: string) {
+    const conversationId = conversations.getSnapshot().activeId;
+    conversations.startPaypal(
+      title,
+      chatModel,
+      receiptId,
+      sessionId,
+      PAYMENT_METHOD.USDC,
+    );
+    conversations.completePaypal(conversationId, receiptId, answer, chatModel, {
       inputTokens: 86,
       outputTokens: 144,
       firstTokenMs: null,
@@ -121,8 +128,22 @@ export function createPreviewHost(
         unit: RESPONSE_COST_UNIT.USDC,
         kind: RESPONSE_COST_KIND.SETTLED,
       },
-    },
-  );
+    });
+    recordFreeReply(
+      receiptId,
+      tenChats
+        ? now -
+            (titles.length - records.length) * PREVIEW.dayMs -
+            PREVIEW.minuteMs
+        : now - PREVIEW.minuteMs,
+    );
+  }
+  for (const title of titles) {
+    if (tenChats) exampleChat(title, crypto.randomUUID());
+    else conversations.setDraft(title);
+    conversations.newChat(crypto.randomUUID());
+  }
+  exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
   let archive = projectChatArchive(conversations.getSnapshot());
 
   const desktopWindow = { platform: windowPlatform(PREVIEW.platform) };
@@ -147,7 +168,7 @@ export function createPreviewHost(
   const wallet = parseWalletSummary({
     status: WALLET_STATUS.READY,
     address: payer,
-    backupVerified: true,
+    backupVerified: query.get('backup') !== 'needed',
     fundingEnabled: false,
   });
   const desktopWallet = {
@@ -163,9 +184,29 @@ export function createPreviewHost(
     manage: async () => WALLET_SETTINGS_RESULT.CANCELLED,
     backup: async () => BACKUP_RESULT.CANCELLED,
   };
+  const requestedNode = query.get('node-state');
+  let nodeState =
+    Object.values(LOCAL_NODE_STATE).find((value) => value === requestedNode) ??
+    LOCAL_NODE_STATE.READY;
+  let readyAt: number | null = null;
   const desktopNode = {
-    summary: async () => LOCAL_NODE_STATE.READY,
-    retry: async () => LOCAL_NODE_STATE.READY,
+    summary: async () => {
+      if (readyAt !== null && Date.now() >= readyAt) {
+        nodeState = LOCAL_NODE_STATE.READY;
+        readyAt = null;
+      }
+      return nodeState;
+    },
+    retry: async () => {
+      if (
+        nodeState === LOCAL_NODE_STATE.ERROR ||
+        nodeState === LOCAL_NODE_STATE.STOPPED
+      ) {
+        nodeState = LOCAL_NODE_STATE.STARTING;
+        readyAt = Date.now() + PREVIEW.nodeStartupMs;
+      }
+      return nodeState;
+    },
   };
   const catalog = (search = '') => ({
     state: CATALOG_STATE.READY,
@@ -183,23 +224,22 @@ export function createPreviewHost(
       },
     ],
   });
+  let catalogQuery = '';
+  const catalogResult = () => {
+    const result = catalog(catalogQuery);
+    return !catalogQuery || catalogQuery === model
+      ? result
+      : { ...result, state: CATALOG_STATE.EMPTY, models: [] };
+  };
   const desktopCatalog = {
-    summary: async () => catalog(),
-    lookup: async (value: unknown) =>
-      catalog(typeof value === 'string' ? value : ''),
+    summary: async () => catalogResult(),
+    lookup: async (value: unknown) => {
+      catalogQuery = typeof value === 'string' ? value.trim() : '';
+      return catalogResult();
+    },
   };
 
-  const records = [
-    {
-      id: 'preview-free-reply',
-      sessionId,
-      at: now - PREVIEW.minuteMs,
-      chargeAtomic: '0',
-      transaction: null,
-      free: true,
-      policy,
-    },
-  ];
+  const accountBudget = () => accountBudgetSnapshot(limitAtomic, keys, records);
   function buyerState() {
     return parseX402Result({
       summary: {
@@ -226,10 +266,16 @@ export function createPreviewHost(
         selectedHome = true;
       }
       if (request.action === X402_ACTION.AUTHORIZE) {
+        if (!connected || typeof request.limitAtomic !== 'string')
+          return { ...buyerState(), error: 'Account budget unavailable.' };
+        const error = accountLimitError(
+          request.limitAtomic,
+          accountBudget().spentAtomic,
+        );
+        if (error) return { ...buyerState(), error };
+        limitAtomic = request.limitAtomic;
         active = true;
         authorized = true;
-        if (typeof request.limitAtomic === 'string')
-          limitAtomic = request.limitAtomic;
       }
       if (request.action === X402_ACTION.FINISH) active = false;
       if (request.action === X402_ACTION.COPY_PAYER)
@@ -240,6 +286,11 @@ export function createPreviewHost(
         await new Promise((resolve) =>
           window.setTimeout(resolve, PREVIEW.replyDelayMs),
         );
+        if (
+          typeof request.id === 'string' &&
+          !records.some((record) => record.id === request.id)
+        )
+          recordFreeReply(request.id, Date.now());
         return {
           ...buyerState(),
           reply: {
@@ -339,6 +390,7 @@ export function createPreviewHost(
     desktopNode,
     desktopCatalog,
     desktopX402,
+    previewAccountBudget: { current: accountBudget, baseline: accountBudget() },
     desktopUsdcApiKeys,
     ...createPaypalPreview(ready, answer, now, agentExamples.paypal),
   };
