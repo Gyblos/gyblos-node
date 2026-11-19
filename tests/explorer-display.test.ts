@@ -11,7 +11,7 @@ import { tokensPerSecond, usdcDecimal } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { parseRange, rangeQuery } from '@gyblos/explorer/range';
-import { dailyRequests } from '@gyblos/explorer/usage';
+import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
 
 void test('the range is a preset or the 30-day default', () => {
   assert.equal(parseRange('7'), 7);
@@ -177,4 +177,14 @@ void test('engine speed reads as the lower bound of its bucket, the first bucket
   assert.equal(tokensPerSecond(1000), '≥ 1,000 tok/s');
   assert.equal(tokensPerSecond(0), '< 1 tok/s');
   assert.equal(tokensPerSecond(null), '—');
+});
+
+void test('the Usage note names the comparison only when the earlier span was read', () => {
+  const at = Date.UTC(2026, 10, 19, 20, 10);
+  assert.equal(
+    usageMeta(30, at, true),
+    'vs previous 30 days · updated 2026-11-19 20:10 UTC',
+  );
+  assert.equal(usageMeta(30, at, false), 'updated 2026-11-19 20:10 UTC');
+  assert.equal(usageMeta(30, null, true), 'no data yet');
 });
