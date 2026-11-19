@@ -22,6 +22,7 @@ export async function listModels(
 ) {
   const routes = endpointRoutes(settings);
   const contexts = new Map<string, number>();
+  // The buyer's reader already caches and bounds its reads; this deadline also covers any other reader.
   const { contextTokens } = settings;
   if (contextTokens) {
     const signal = AbortSignal.timeout(FREE_BUYER.modelContextMs);

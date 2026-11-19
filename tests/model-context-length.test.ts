@@ -69,7 +69,7 @@ void test('a paid buyer announces the context of its paid sellers, with open fre
     8192,
   );
   // With open discovery, a free seller the index lists can also serve; an open paid one cannot.
-  assert.deepEqual(
+  assert.equal(
     routeContextTokens({
       request: request(),
       sellers,
@@ -118,8 +118,7 @@ void test('a route context is computed once per period and shared by requests th
   assert.equal(calls, 3);
 });
 
-void test('a caller that gives up does not stop the shared read, and a failed read counts as unknown', async () => {
-  let clock = NOW;
+void test('a caller that gives up does not stop the shared read, and a read that found nothing is retried', async () => {
   let calls = 0;
   const context = cachedRouteContext(
     async () => {
@@ -127,14 +126,14 @@ void test('a caller that gives up does not stop the shared read, and a failed re
       if (calls === 1) throw new Error('sellers unreachable');
       return 16_384;
     },
-    { ttlMs: 30_000, timeoutMs: 4000, now: () => clock },
+    { ttlMs: 30_000, timeoutMs: 4000, now: () => NOW },
   );
   const route = { selection: MODEL, maxTokens: 100 };
   assert.equal(await context(route, new AbortController().signal), undefined);
-  clock += 30_000;
   const leaving = new AbortController();
   leaving.abort();
   assert.equal(await context(route, leaving.signal), undefined);
+  assert.equal(await context(route, new AbortController().signal), 16_384);
   assert.equal(await context(route, new AbortController().signal), 16_384);
   assert.equal(calls, 2);
 });

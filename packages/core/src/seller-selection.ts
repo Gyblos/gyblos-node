@@ -134,9 +134,9 @@ function findListing(catalog: PublicCatalogV2, selection: ModelSelection) {
       item.quantization === selection.quantization,
   );
 }
+type ListingInput = Pick<SellerSelectionInput, 'request' | 'stats' | 'now'>;
 // Every hard filter except price and the reasoning level, which decides tiers and the
 // unsupported-level code. The pinned path checks cooldown itself so it can report when the seller returns.
-type ListingInput = Pick<SellerSelectionInput, 'request' | 'stats' | 'now'>;
 function offersModel(
   input: ListingInput,
   seller: KnownSeller,

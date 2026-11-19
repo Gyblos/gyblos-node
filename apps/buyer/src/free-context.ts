@@ -100,7 +100,8 @@ export async function routeContext(
 
 // One read per route and period, shared by the requests that arrive meanwhile: listing models does not
 // reach every seller each time. The read has its own deadline, so a caller that leaves does not cut it
-// short for the others; a failed read counts as unknown until the period ends.
+// short for the others. A read that finds no context (sellers unreachable, discovery not ready yet) is
+// shared only while it runs: the next request reads again.
 export function cachedRouteContext(
   read: RouteContext,
   options: { ttlMs: number; timeoutMs: number; now: () => number },
@@ -114,12 +115,15 @@ export function cachedRouteContext(
     const at = options.now();
     let entry = entries.get(key);
     if (!entry || at - entry.at >= options.ttlMs) {
-      entry = {
-        at,
-        context: read(model, AbortSignal.timeout(options.timeoutMs)).catch(
-          () => undefined,
-        ),
-      };
+      const context = read(model, AbortSignal.timeout(options.timeoutMs))
+        .catch(() => undefined)
+        .then((found) => {
+          if (found === undefined && entries.get(key) === current)
+            entries.delete(key);
+          return found;
+        });
+      const current = { at, context };
+      entry = current;
       entries.set(key, entry);
     }
     if (signal.aborted) return Promise.resolve(undefined);
