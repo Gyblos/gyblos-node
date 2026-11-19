@@ -6,7 +6,10 @@ import {
   type ChatArchiveSave,
 } from '@gyblos/desktop/chat-archive-model';
 import { ChatController } from '@gyblos/desktop/chat-controller';
-import { CATALOG_STATE } from '@gyblos/desktop/network-catalog';
+import {
+  CATALOG_STATE,
+  type NetworkCatalog,
+} from '@gyblos/desktop/network-catalog';
 import { LOCAL_NODE_STATE } from '@gyblos/desktop/node-status';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import {
@@ -208,19 +211,34 @@ export function createPreviewHost(
       return nodeState;
     },
   };
-  const catalog = (search = '') => ({
+  const catalog = (search = ''): NetworkCatalog => ({
     state: CATALOG_STATE.READY,
     query: search,
     checkedAt: now,
     truncated: false,
+    // One free and one paid example group, so both catalog rows render.
     models: [
       {
         modelId: model,
         variant: null,
         quantization: 'Q4_K_M',
-        contextTokens: 2048,
+        contextTokens: 16384,
         announcements: 1,
         expiresAt: now + PREVIEW.dayMs,
+        free: true,
+        inputAtomicPerMtok: '0',
+        outputAtomicPerMtok: '0',
+      },
+      {
+        modelId: model,
+        variant: null,
+        quantization: 'Q4_K_M',
+        contextTokens: 32768,
+        announcements: 1,
+        expiresAt: now + PREVIEW.dayMs,
+        free: false,
+        inputAtomicPerMtok: '52000',
+        outputAtomicPerMtok: '208000',
       },
     ],
   });
