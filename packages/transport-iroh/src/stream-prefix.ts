@@ -1,6 +1,7 @@
 // The length prefix of the next streamed event. The seller may stay silent while it reads a long prompt
 // or prepares a tool call, so the wait for an event is bounded by the request budget; once an event
 // begins, a partial prefix must meet the ingress deadline. An early end keeps the exact-read failure.
+// It reads only the prefix: length limits, body reads and verification stay with each stream client.
 import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 
