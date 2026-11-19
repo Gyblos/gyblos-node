@@ -14,6 +14,7 @@ import {
 } from 'react-aria-components';
 
 import { cx } from './cx';
+import { SURFACE } from './styles';
 
 export interface SelectOption<Id extends string> {
   id: Id;
@@ -49,7 +50,13 @@ export function Select<Id extends string>({
     >
       {({ isOpen }) => (
         <>
-          <Button className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-bg px-2.5 py-1.5 font-mono text-xs text-ink outline-none transition-colors hover:border-dim focus-visible:ring-2 focus-visible:ring-signal">
+          <Button
+            className={cx(
+              'flex cursor-pointer items-center gap-2 px-3 font-mono text-xs text-ink',
+              SURFACE.control,
+              SURFACE.focus,
+            )}
+          >
             <SelectValue className="truncate" />
             <ChevronDown
               aria-hidden
@@ -62,7 +69,7 @@ export function Select<Id extends string>({
           <Popover
             offset={6}
             placement="bottom end"
-            className="min-w-(--trigger-width) rounded-xl border border-line bg-panel p-1.5 shadow-lg outline-none transition duration-150 ease-out data-[entering]:scale-95 data-[entering]:opacity-0 data-[exiting]:scale-95 data-[exiting]:opacity-0"
+            className="min-w-(--trigger-width) rounded-2xl border border-line bg-panel p-1.5 shadow-lg outline-none transition duration-150 ease-out data-[entering]:scale-95 data-[entering]:opacity-0 data-[exiting]:scale-95 data-[exiting]:opacity-0"
           >
             <ListBox className="flex flex-col gap-0.5 outline-none">
               {options.map((option) => (
@@ -79,19 +86,7 @@ export function Select<Id extends string>({
                   }
                 >
                   {({ isSelected }) => (
-                    <>
-                      <span className="flex items-center gap-2">
-                        {option.label}
-                        {option.hint ? (
-                          <span className="rounded-md bg-raised px-1.5 py-0.5 text-[10px] text-muted">
-                            {option.hint}
-                          </span>
-                        ) : null}
-                      </span>
-                      {isSelected ? (
-                        <Check aria-hidden className="size-3.5 text-signal" />
-                      ) : null}
-                    </>
+                    <OptionRow option={option} selected={isSelected} />
                   )}
                 </ListBoxItem>
               ))}
@@ -100,5 +95,27 @@ export function Select<Id extends string>({
         </>
       )}
     </AriaSelect>
+  );
+}
+
+function OptionRow<Id extends string>({
+  option,
+  selected,
+}: {
+  option: SelectOption<Id>;
+  selected: boolean;
+}) {
+  return (
+    <>
+      <span className="flex items-center gap-2">
+        {option.label}
+        {option.hint ? (
+          <span className="rounded-md bg-raised px-1.5 py-0.5 text-[10px] text-muted">
+            {option.hint}
+          </span>
+        ) : null}
+      </span>
+      {selected ? <Check aria-hidden className="size-3.5 text-signal" /> : null}
+    </>
   );
 }

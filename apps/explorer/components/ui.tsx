@@ -15,7 +15,7 @@ export const timeCell = `${td} font-mono text-xs text-muted`;
 
 export function Loading() {
   return (
-    <div className="mt-10 h-40 animate-pulse rounded-xl border border-line bg-panel" />
+    <div className="mt-10 h-40 animate-pulse rounded-2xl border border-line bg-panel" />
   );
 }
 
@@ -38,7 +38,7 @@ export function Unavailable({ title }: { title: string }) {
   return (
     <>
       <SectionTitle title={title} />
-      <div className="rounded-xl border border-line bg-panel p-4 text-sm text-muted">
+      <div className="rounded-2xl border border-line bg-panel p-5 text-sm text-muted">
         Source unavailable.
       </div>
     </>
@@ -55,12 +55,12 @@ export function Table({
   minWidth?: number;
 }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-xl border border-line">
+    <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-panel">
       <table
         className="w-full text-left text-sm whitespace-nowrap"
         style={{ minWidth }}
       >
-        <thead className="bg-panel text-muted">
+        <thead className="border-b border-line bg-raised/50 text-muted">
           <tr>
             {head.map((column) => (
               <th

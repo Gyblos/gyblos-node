@@ -1,7 +1,8 @@
 'use client';
 
 // A daily bar chart in a card, after BoardUI's chart cards (MIT, see ./LICENSE), drawn with Recharts and
-// held to the explorer's chart rules: one series in the brand blue, no gradients, the headline readable
+// held to the explorer's chart rules: one series in the brand blue (its signal tone on dark surfaces, where
+// #0a28f0 reaches only 1.95:1 against the card; data marks need 3:1), no gradients, the headline readable
 // without hover. Hovering a day rolls the headline to that day's figure (NumberFlow), as BoardUI's
 // cards swap it. `value` only sets the bar's height; `amount` is the exact figure shown.
 import { useState } from 'react';
@@ -16,8 +17,10 @@ import {
 
 import { Flow, type FlowKind, type FlowValue } from './animated-number';
 import { CHART } from './constants';
+import { cx } from './cx';
 import type { Delta } from './delta';
 import { DeltaChip } from './delta-chip';
+import { SURFACE } from './styles';
 
 const TICK = {
   fill: 'var(--dim)',
@@ -53,7 +56,7 @@ export function BarChartCard({
   const [active, setActive] = useState<BarPoint | null>(null);
   const dense = points.length > CHART.denseDays;
   return (
-    <div className="rounded-2xl bg-raised p-4">
+    <div className={cx('p-4 sm:p-5', SURFACE.card)}>
       <div className="text-sm text-muted">{title}</div>
       <div className="mt-1 flex items-center gap-2">
         <span className="font-mono text-2xl">
@@ -101,10 +104,10 @@ export function BarChartCard({
               axisLine={false}
               tick={TICK}
             />
-            <Tooltip cursor={{ fill: 'var(--raised)' }} content={() => null} />
+            <Tooltip cursor={{ fill: 'var(--line)' }} content={() => null} />
             <Bar
               dataKey="value"
-              fill="var(--brand-blue)"
+              fill="var(--chart)"
               radius={[CHART.barRadius, CHART.barRadius, 0, 0]}
               isAnimationActive={false}
             />

@@ -5,6 +5,9 @@
 // so arrow keys move focus and Space/Enter select; the selection can't be emptied.
 import { ToggleButton, ToggleButtonGroup } from 'react-aria-components';
 
+import { cx } from './cx';
+import { SURFACE } from './styles';
+
 export function SegmentedControl<Value extends string | number>({
   label,
   options,
@@ -26,13 +29,16 @@ export function SegmentedControl<Value extends string | number>({
         const next = options.find((option) => keys.has(option.value));
         if (next && next.value !== selected) onChange(next.value);
       }}
-      className="inline-flex items-center gap-0.5 rounded-lg bg-raised p-1"
+      className={cx('inline-flex items-stretch gap-0.5 p-0.5', SURFACE.control)}
     >
       {options.map((option) => (
         <ToggleButton
           key={option.value}
           id={option.value}
-          className="cursor-pointer rounded-md px-2.5 py-1 font-mono text-xs text-muted outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-signal data-[selected]:bg-bg data-[selected]:text-ink data-[selected]:shadow-sm"
+          className={cx(
+            'flex cursor-pointer items-center rounded-md px-3 font-mono text-xs text-muted transition-colors hover:text-ink data-[selected]:bg-raised data-[selected]:text-ink',
+            SURFACE.focus,
+          )}
         >
           {option.label}
         </ToggleButton>

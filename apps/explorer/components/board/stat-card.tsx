@@ -1,4 +1,4 @@
-// A headline figure, after BoardUI's stat cards (MIT, see ./LICENSE): a gray card, a dark icon tile, the
+// A headline figure, after BoardUI's stat cards (MIT, see ./LICENSE): a neutral card, a dark icon tile, the
 // label, the value and either its change against the previous period (a free · paid pair carries one
 // change per side, in the same order) or a share of a whole: a meter with a caption ("2 of 3 online").
 import type { LucideIcon } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Fragment, type ReactNode } from 'react';
 import { cx } from './cx';
 import type { Delta } from './delta';
 import { DeltaChip } from './delta-chip';
+import { SURFACE } from './styles';
 
 const PERCENT = 100;
 
@@ -27,8 +28,15 @@ export function StatCard({
   money?: boolean;
 }) {
   return (
-    <section className="flex min-w-0 flex-col gap-4 rounded-2xl bg-raised p-4">
-      <span className="flex size-9 items-center justify-center rounded-lg bg-bg">
+    <section
+      className={cx('flex min-w-0 flex-col gap-4 p-4 sm:p-5', SURFACE.card)}
+    >
+      <span
+        className={cx(
+          'flex size-9 items-center justify-center rounded-lg',
+          SURFACE.inset,
+        )}
+      >
         <Icon aria-hidden className="size-4.5 text-ink" />
       </span>
       <div className="flex flex-col gap-1">
@@ -73,7 +81,7 @@ function Share({
         aria-valuemin={0}
         aria-valuemax={whole}
         aria-valuenow={part}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-bg"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-raised"
       >
         <span
           className="block h-full rounded-full bg-signal"

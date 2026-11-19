@@ -21,7 +21,8 @@
           "color-signal": "var(--signal)",
           "color-money": "var(--money)",
           "color-good": "var(--good)",
-          "color-bad": "var(--bad)"
+          "color-bad": "var(--bad)",
+          "color-chart": "var(--chart)"
         },
         "light": {
           "brand-blue": "#0a28f0",
@@ -35,7 +36,8 @@
           "dim": "#6b6b6b",
           "money": "#0f7a3d",
           "good": "#0f7a3d",
-          "bad": "#c0362c"
+          "bad": "#c0362c",
+          "chart": "#0a28f0"
         },
         "dark": {
           "brand-blue": "#0a28f0",
@@ -49,7 +51,8 @@
           "dim": "#a0a0a0",
           "money": "#4ade80",
           "good": "#4ade80",
-          "bad": "#f87171"
+          "bad": "#f87171",
+          "chart": "#6f86ff"
         }
       }
     },
@@ -63,6 +66,11 @@
           "path": "components/board/cx.ts",
           "type": "registry:lib",
           "target": "components/board/cx.ts"
+        },
+        {
+          "path": "components/board/styles.ts",
+          "type": "registry:lib",
+          "target": "components/board/styles.ts"
         },
         {
           "path": "components/board/constants.ts",
@@ -155,7 +163,7 @@
           "target": "components/board/segmented-control.tsx"
         }
       ],
-      "registryDependencies": ["gyblos-theme"]
+      "registryDependencies": ["board-base"]
     },
     {
       "name": "select",
