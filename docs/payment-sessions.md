@@ -263,11 +263,13 @@ Selection errors:
 - `SELLER_PRICE_ABOVE_BUDGET`: a seller offers the model at an acceptable
   reasoning level, but every listing costs more than `request.maxAtomic` or
   `priceCeilings`. Raise those limits in `selection.json`. A `maxAtomic` of
-  `"0"` admits only free listings, and `pnpm buyer:free` always uses a zero
-  budget.
+  `"0"` admits only free listings. The free buyer (`pnpm buyer:free`) always
+  uses a zero budget, so it reports this case as `NO_SELLER_CANDIDATES` (no free
+  seller is available now), with `Retry-After` when a free seller is cooling
+  down.
 - `PINNED_SELLER_REJECTED`: the pinned seller failed a check, including price.
 - `NO_SELLER_CANDIDATES`: no eligible seller offers the model, whatever the
-  budget.
+  budget; or, for the free buyer, no free seller is available now.
 
 Free execution loads no payment signer, paid tokenizer or payment RPC and
 creates no journal, deposit or settlement. It still reads payment state: an

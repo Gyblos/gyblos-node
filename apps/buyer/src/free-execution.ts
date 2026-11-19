@@ -3,6 +3,7 @@
 // Selection and I/O are injected; this module never authorizes payments or records content.
 import { createHmac, randomBytes } from 'node:crypto';
 
+import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import type {
@@ -42,6 +43,18 @@ export class FreeSelectionFailure extends Error {
     super(decision.code);
     this.name = 'FreeSelectionFailure';
   }
+}
+// A free request asks for zero prices, so "price above budget" only says that no free seller is available
+// now (cooling down, busy or gone) while a paid one is: it is reported as no candidates, keeping when a
+// cooling seller may be tried again. Only free execution applies it; a paid budget refusal is untouched.
+export function freeSelectionError(error: unknown) {
+  return error instanceof FreeSelectionFailure &&
+    error.decision.code === SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET
+    ? new FreeSelectionFailure(
+        { ok: false, code: SELLER_SELECTION_CODES.NO_CANDIDATES },
+        error.retryAt,
+      )
+    : error;
 }
 export interface FreeWinner {
   nodeId: string;
@@ -132,7 +145,7 @@ export async function executeBuyerFree(
           // Local occupancy is not a network failure; retain request-local model telemetry.
           if (!signal.aborted && !busy && !resent)
             buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
-          throw error;
+          throw freeSelectionError(error);
         });
       try {
         signal.throwIfAborted();
