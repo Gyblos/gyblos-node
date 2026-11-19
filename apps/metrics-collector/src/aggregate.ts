@@ -30,8 +30,11 @@ import {
   demandFields,
   headlineReceipt,
   modelKey,
+  modelObservedEvents,
+  modelObservedFields,
   observationJoin,
   observedFields,
+  receiptOfObservation,
   receiptTotalsSelect,
   versionFields,
 } from './aggregate-sql';
@@ -45,6 +48,7 @@ import { dayBounds, type DayBounds } from './days';
 import {
   aggDemandDaily,
   aggDirtyDays,
+  aggModelObservedDaily,
   aggNetworkDaily,
   aggObservedDaily,
   aggOriginDaily,
@@ -77,7 +81,12 @@ function staleVersionMarks(
   database: CollectorDatabase,
   day: (value: ReturnType<typeof dayOf>) => { day: SQL.Aliased<string> },
 ): BatchItem[] {
-  return [aggSellerDaily, aggObservedDaily, aggOriginDaily].map((table) =>
+  return [
+    aggSellerDaily,
+    aggObservedDaily,
+    aggOriginDaily,
+    aggModelObservedDaily,
+  ].map((table) =>
     database
       .insert(aggDirtyDays)
       .select(
@@ -130,6 +139,19 @@ async function scan(database: CollectorDatabase, now: number) {
           .from(observations)
           .where(
             and(gte(observations.insertedAt, since), isNotNull(observationDay)),
+          ),
+      )
+      .onConflictDoNothing(),
+    // Per-model observations fall on their receipt's day, which may differ from the event's own.
+    database
+      .insert(aggDirtyDays)
+      .select(
+        database
+          .selectDistinct(day(receiptDay))
+          .from(observations)
+          .innerJoin(receipts, receiptOfObservation)
+          .where(
+            and(gte(observations.insertedAt, since), isNotNull(receiptDay)),
           ),
       )
       .onConflictDoNothing(),
@@ -283,6 +305,43 @@ function observationRollups(
   ];
 }
 
+// Per model and paid flag, on the day of the receipt each event belongs to.
+function modelObservedRollup(
+  database: CollectorDatabase,
+  bounds: DayBounds,
+  now: number,
+) {
+  const model = {
+    modelId: receipts.modelId,
+    variant: blank(receipts.variant),
+    quantization: blank(receipts.quantization),
+  };
+  return [
+    database
+      .delete(aggModelObservedDaily)
+      .where(eq(aggModelObservedDaily.day, bounds.day)),
+    database.insert(aggModelObservedDaily).select(
+      database
+        .select(
+          ordered(aggModelObservedDaily, {
+            day: sql<string>`${bounds.day}`,
+            ...model,
+            paid: receipts.paid,
+            ...modelObservedFields(),
+            ...versionFields(now),
+          }),
+        )
+        .from(receipts)
+        .innerJoin(observations, receiptOfObservation)
+        .innerJoin(envelopes, observationJoin)
+        .where(
+          and(inRange(receipts.sellerReceivedAt, bounds), modelObservedEvents),
+        )
+        .groupBy(...Object.values(model), receipts.paid),
+    ),
+  ];
+}
+
 // Every statement for one day, in one transactional batch; the day leaves the dirty set with it.
 export function dayBatch(
   database: CollectorDatabase,
@@ -294,6 +353,7 @@ export function dayBatch(
     ...sellerRollups(database, bounds, now),
     ...networkRollup(database, bounds, now),
     ...observationRollups(database, bounds, now),
+    ...modelObservedRollup(database, bounds, now),
     ...firstSeenUpserts(database, bounds),
     ...breakdownRollups(database, bounds, now),
   ];

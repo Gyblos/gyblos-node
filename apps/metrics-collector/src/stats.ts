@@ -13,12 +13,15 @@ import {
   latency,
   nullable,
   publicBuyers,
+  speed,
   type FreeSection,
   type Latency,
   type PaidSection,
   type PublicBuyers,
+  type Speed,
 } from './stats-shape';
 import type {
+  ModelObservedRow,
   ModelRow,
   SellerModelRow,
   StatsReader,
@@ -65,8 +68,18 @@ export interface ModelEntry<F = object, P = object> extends Sides<F, P> {
 export interface NetworkStats extends StatsEnvelope {
   days: NetworkDay[];
 }
+// What buyers saw and how fast the engine generated, on one side of one model; null without any
+// observation joined to a receipt of that side.
+export interface ModelObserved {
+  // Buyer-measured, streaming only: from the start of the attempt with the chosen seller (session
+  // setup included; discovery and quotes not) to the first streamed text.
+  buyerFirstToken: Latency;
+  // Output tokens per second of the engine's own generation time, as sellers report it.
+  engineSpeed: Speed;
+}
+type ModelSide = { sellers: number; observed: ModelObserved | null };
 export interface ModelStats extends StatsEnvelope {
-  models: ModelEntry<{ sellers: number }, { sellers: number }>[];
+  models: ModelEntry<ModelSide, ModelSide>[];
 }
 export interface SellerStats extends StatsEnvelope {
   nodeId: string;
@@ -203,10 +216,24 @@ export async function modelStats(
   reader: StatsReader,
   range: DayRange,
 ): Promise<ModelStats> {
-  const rows = await reader.models(range);
+  const { models: rows, observed } = await reader.models(range);
+  const key = (row: ModelRow | ModelObservedRow) =>
+    JSON.stringify([row.modelId, row.variant, row.quantization, row.paid]);
+  const seen = new Map(observed.map((row) => [key(row), row]));
   return {
     ...envelope(range, rows.map(fromTotals)),
-    models: modelEntries(rows, (row) => ({ sellers: row.sellers })),
+    models: modelEntries(rows, (row) => {
+      const found = seen.get(key(row));
+      return {
+        sellers: row.sellers,
+        observed: found
+          ? {
+              buyerFirstToken: latency(found.buyerFirstTokenHist),
+              engineSpeed: speed(found.engineTpsHist),
+            }
+          : null,
+      };
+    }),
   };
 }
 

@@ -25,6 +25,7 @@ import {
   aggChainDaily,
   aggDemandDaily,
   aggFailuresDaily,
+  aggModelObservedDaily,
   aggNetworkDaily,
   aggObservedDaily,
   aggOriginDaily,
@@ -179,6 +180,28 @@ const byModelCompleted = (daily: typeof aggSellerDaily) => [
 function models(orm: CollectorDatabase, range: DayRange) {
   const daily = aggSellerDaily;
   const inRange = within(daily.day, range);
+  const seen = aggModelObservedDaily;
+  return orm.batch([
+    modelTotals(orm, inRange),
+    orm
+      .select({
+        modelId: seen.modelId,
+        variant: seen.variant,
+        quantization: seen.quantization,
+        paid: seen.paid,
+        buyerFirstTokenHist: histogramSum(seen.buyerFirstTokenHist),
+        engineTpsHist: histogramSum(
+          seen.engineTpsHist,
+          AGGREGATES.tokensPerSecondBuckets,
+        ),
+      })
+      .from(seen)
+      .where(within(seen.day, range))
+      .groupBy(seen.modelId, seen.variant, seen.quantization, seen.paid),
+  ]);
+}
+function modelTotals(orm: CollectorDatabase, inRange: SQL | undefined) {
+  const daily = aggSellerDaily;
   return orm
     .select({
       ...totals(daily),
@@ -259,7 +282,10 @@ export function statsReader(database: D1Database): StatsReader {
       );
       return { network: networkRows, observed, demand, origins, failures };
     },
-    models: async (range) => models(orm, range),
+    async models(range) {
+      const [rows, observed] = await models(orm, range);
+      return { models: rows, observed };
+    },
     async seller(nodeId, range) {
       const [days, sellerModels, buyers] = await seller(orm, nodeId, range);
       return { days, models: sellerModels, buyers };

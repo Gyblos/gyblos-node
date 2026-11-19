@@ -255,15 +255,16 @@ units) and approximate above. A run whose days fail logs
 `COLLECTOR_AGGREGATION_FAILED` with the day names only. Every aggregate row
 stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
 
-| Table                               | One row per                             | Notes                                                         |
-| ----------------------------------- | --------------------------------------- | ------------------------------------------------------------- |
-| `collector_agg_seller_daily`        | Seller × model × day × free/paid        | Variant and quantization are `''` when none.                  |
-| `collector_agg_seller_hourly`       | Seller × model × UTC hour × free/paid   | Same columns; hour is epoch ms / 3600000.                     |
-| `collector_agg_seller_buyers_daily` | Seller × day × free/paid                | Unique buyers; public only at 5 or more.                      |
-| `collector_agg_network_daily`       | Day × free/paid                         | Adds conflicts, active sellers, buyers and models served.     |
-| `collector_agg_observed_daily`      | Day                                     | Buyer-experienced latency and the seller's network route.     |
-| `collector_agg_demand_daily`        | Day × requested model                   | Unserved demand from buyer observations.                      |
-| `collector_first_seen`              | Seller, free buyer, paid buyer or model | Earliest headline receipt; basis for new users and retention. |
+| Table                                | One row per                             | Notes                                                         |
+| ------------------------------------ | --------------------------------------- | ------------------------------------------------------------- |
+| `collector_agg_seller_daily`         | Seller × model × day × free/paid        | Variant and quantization are `''` when none.                  |
+| `collector_agg_seller_hourly`        | Seller × model × UTC hour × free/paid   | Same columns; hour is epoch ms / 3600000.                     |
+| `collector_agg_seller_buyers_daily`  | Seller × day × free/paid                | Unique buyers; public only at 5 or more.                      |
+| `collector_agg_network_daily`        | Day × free/paid                         | Adds conflicts, active sellers, buyers and models served.     |
+| `collector_agg_observed_daily`       | Day                                     | Buyer-experienced latency and the seller's network route.     |
+| `collector_agg_demand_daily`         | Day × requested model                   | Unserved demand from buyer observations.                      |
+| `collector_agg_model_observed_daily` | Model × day × free/paid                 | Buyer first token and engine speed, joined to receipts.       |
+| `collector_first_seen`               | Seller, free buyer, paid buyer or model | Earliest headline receipt; basis for new users and retention. |
 
 **Formulas (version 1).**
 
@@ -336,6 +337,28 @@ Read them with care:
 
 `AGGREGATES.formulaVersion` 2 added them, so every day is recomputed once.
 
+**Per-model observations** (migration `0007_model_observed.sql`):
+
+- `collector_agg_model_observed_daily`: per model, day and paid flag, the
+  buyer's first token and the engine's speed. Telemetry events do not say
+  whether a request was free or paid, so each event is joined to its headline
+  receipt (same request and seller); the receipt gives the paid flag, the model
+  and the day (the seller's `receivedAt`). An event without such a receipt is
+  not counted. A receipt day is recomputed when an observation of it arrives
+  later.
+- **Buyer first token:** buyer-role `first_token` events, emitted only while
+  streaming. The buyer's clock starts at the attempt with the chosen seller, so
+  it includes session setup with that seller but not discovery or quotes. Same
+  latency buckets as above.
+- **Engine speed:** seller-role `completed` events that carry the engine's own
+  `generationMs` and output tokens: output tokens per second of generation, so
+  network and queue time are left out. Buckets with upper bounds 1, 2, 5, 10,
+  20, 50, 100, 200, 500 and 1000 tokens per second, plus one bucket above.
+- Both are opt-in telemetry: samples come only from nodes that upload
+  observations, and `samples` says how many.
+
+`AGGREGATES.formulaVersion` 3 added them, so every day is recomputed once.
+
 The aggregates do not include a signed daily snapshot (Merkle root and inclusion
 proofs) or online sellers from presence, which the
 [discovery index](discovery-index.md#uptime) reports. Chain figures are in
@@ -388,7 +411,7 @@ with one buyer they describe that one pseudonymous buyer's use of that seller.
 | Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `modelsServed`, `buyers`, `withheld`); `observed` (`buyerLatency.firstToken`, `buyerLatency.total`, `routes.direct`, `routes.relay`, `routes.unknown`), `null` without observations that day; and `demand`: up to 20 models per day, largest first, each `modelId`, `unserved`, `refusedBeforeSelection`, `connectFailed`; `origins`: each `client`, `paid`, `requests`, `outcomes` (`completed`, `failed`, `cancelled`), `buyers`, `withheld`; and `failures`: each `side`, `client`, `event`, `reason`, `events`, `buyers`, `withheld`, most events first. |
-| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50TokensPerSecond`, `bucketsTokensPerSecond` and `counts`; `null` without any observation joined to a receipt of that side).                                                                                                                                                                                                                                                                   |
 | `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 Each stats request is one batch of reads over aggregate tables: five statements

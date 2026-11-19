@@ -115,6 +115,10 @@ export const receipts = sqliteTable(
     ),
     index('collector_receipts_by_updated').on(table.updatedAt),
     index('collector_receipts_by_received').on(table.sellerReceivedAt),
+    index('collector_receipts_by_request').on(
+      table.requestId,
+      table.sellerNodeId,
+    ),
   ],
 );
 
@@ -188,6 +192,9 @@ export {
 
 // Breakdowns of the network stats: origin of requests and failure reasons.
 export { aggFailuresDaily, aggOriginDaily } from './schema-breakdowns';
+
+// Per-model observations: buyer first token and engine speed, per paid flag.
+export { aggModelObservedDaily } from './schema-model-observed';
 
 // Chain index tables (#349).
 export {
