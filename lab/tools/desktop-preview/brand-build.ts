@@ -40,6 +40,23 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'utf8',
       );
   }
+  if (target === `${base}/src/ui/Modal.tsx`) {
+    const props = replaceOnce(
+      source,
+      '  compact = false,',
+      '  compact = false,\n  size,',
+    );
+    const typed = replaceOnce(
+      props,
+      '  compact?: boolean;',
+      "  compact?: boolean;\n  size?: 'lg';",
+    );
+    return replaceOnce(
+      typed,
+      '      ref={ref}',
+      '      data-size={size}\n      ref={ref}',
+    );
+  }
   if (target === `${base}/src/ui/UI.tsx`) {
     const start = source.indexOf('export function StatCard(');
     const end = source.indexOf('export function EmptyState(', start);

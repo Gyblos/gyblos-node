@@ -801,3 +801,25 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
     margin: 0;
   }
 }
+
+.desktop-frame .modal[data-size='lg'] {
+  box-sizing: border-box;
+  width: min(45rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: clamp(16px, 3vw, 24px);
+}
+.modal[data-size='lg'] .wallet-details {
+  gap: 16px;
+}
+.modal[data-size='lg'] .wallet-details .ui-copy small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .modal[data-size='lg'] .wallet-details .ui-row {
+    flex-wrap: wrap;
+  }
+  .modal[data-size='lg'] .wallet-details .ui-row-content {
+    flex-basis: 100%;
+  }
+}

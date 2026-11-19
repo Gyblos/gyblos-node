@@ -153,3 +153,15 @@ void test('wallet and PayPal actions belong to their payment method in the previ
   assert.match(payments, /aria-label="PayPal"[\s\S]*?onClick=\{openPaypal\}/);
   assert.doesNotMatch(await render('SpendingHistory'), /action=\{actions\}/);
 });
+
+void test('Wallet details opts into the large preview dialog', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const path = 'apps/desktop/src/ui/Payments.tsx';
+  const payments = transformBrand(
+    await readFile(path, 'utf8'),
+    path,
+    'apps/desktop',
+  );
+  assert.match(payments ?? '', /<Modal title="Wallet details" size="lg"/);
+});
