@@ -79,7 +79,8 @@ export async function NetworkSection() {
       <SellersTable sellers={snapshot.sellers} />
       {snapshot.truncated ? (
         <p className="mt-2 text-xs text-dim">
-          Only part of the index was read: this list may be incomplete.
+          The explorer read only part of the index: this list and the counts
+          above may be incomplete.
         </p>
       ) : null}
       {snapshot.network ? <NotOnlineTable network={snapshot.network} /> : null}

@@ -70,7 +70,7 @@ function uptime(value: unknown): Uptime {
 }
 
 // Every seller offering any listed model, from the paged /sellers answers, within DISCOVERY.maxSellerPages
-// pages in all; `truncated` when a page was left unread.
+// pages in all; `truncated` when the budget ran out with a page (or a model's first page) still to read.
 async function sellersOf(
   modelIds: string[],
 ): Promise<{ byNode: Map<string, Seller>; truncated: boolean }> {

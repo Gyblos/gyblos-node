@@ -13,8 +13,8 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-// A fake index with `models` models, each listing one page of one distinct seller.
-function fakeIndex(models: number, paths: string[]) {
+// A fake index with `models` models, each listing one page of `perPage` distinct sellers.
+function fakeIndex(models: number, paths: string[], perPage = 1) {
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = new URL(String(input));
     paths.push(url.pathname);
@@ -29,13 +29,11 @@ function fakeIndex(models: number, paths: string[]) {
     if (url.pathname.endsWith('/sellers')) {
       const model = url.searchParams.get('model') ?? '';
       return json({
-        sellers: [
-          {
-            catalog: {
-              record: { nodeId: `n-${model}`, owner: 'o', models: [] },
-            },
+        sellers: Array.from({ length: perPage }, (_, index) => ({
+          catalog: {
+            record: { nodeId: `n-${model}-${index}`, owner: 'o', models: [] },
           },
-        ],
+        })),
         next: null,
       });
     }
@@ -65,18 +63,33 @@ void test('a large index is read within the bounds and marked incomplete', async
     paths.filter((path) => path.endsWith('/sellers')).length,
     DISCOVERY.maxSellerPages,
   );
-  assert.ok(
-    paths.filter((path) => path.endsWith('/uptime')).length <=
-      DISCOVERY.maxUptimeReads,
+});
+
+void test('past the uptime bound, the other sellers show none and the list is marked incomplete', async () => {
+  const paths: string[] = [];
+  fakeIndex(1, paths, DISCOVERY.maxUptimeReads + 10);
+  const snapshot = await getDiscovery();
+  assert.equal(snapshot.truncated, true);
+  assert.equal(snapshot.sellers.length, DISCOVERY.maxUptimeReads + 10);
+  assert.equal(
+    paths.filter((path) => path.endsWith('/uptime')).length,
+    DISCOVERY.maxUptimeReads,
+  );
+  assert.equal(
+    snapshot.sellers.filter((seller) => seller.uptime === null).length,
+    10,
   );
 });
 
-void test('every source read carries a timeout', async () => {
-  let signal: AbortSignal | null | undefined;
-  globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
-    signal = init?.signal;
-    return Response.json({});
-  }) as typeof fetch;
-  await fetchJson('https://source.test/x', 'test');
-  assert.ok(signal instanceof AbortSignal);
+void test('a source that never answers is given up after the timeout', async () => {
+  // A fetch that answers only when its signal aborts, as a stalled connection would.
+  globalThis.fetch = ((_input: unknown, init?: RequestInit) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () =>
+        reject(init.signal?.reason),
+      );
+    })) as typeof fetch;
+  await assert.rejects(fetchJson('https://source.test/x', 'test', 20), {
+    name: 'TimeoutError',
+  });
 });
