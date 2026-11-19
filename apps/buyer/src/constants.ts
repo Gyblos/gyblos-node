@@ -199,6 +199,9 @@ export const FREE_BUYER = {
   // keeps a model loaded 5 minutes by default), so the next turn does not send it the full input size.
   warmCacheMs: 240_000,
   requestMs: 180000,
+  // How long a free request waits for a seller this buyer is already using to be handed back before it
+  // is busy (429). It counts against requestMs.
+  sellerWaitMs: 60_000,
   // Times one request may go to another seller after its prompt was sent (failover "safe").
   maxResends: 2,
   headerMs: 10000,

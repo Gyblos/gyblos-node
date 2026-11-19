@@ -957,9 +957,12 @@ details matter when you change or debug the endpoint:
   visible text is never restarted.
 - **Concurrency.** `buyer:free` runs up to two requests at once, each on a
   different seller, because a seller serves one request per buyer at a time.
-  When every candidate is busy with this buyer's other request, the answer is
-  429 (`FREE_BUYER_BUSY`) and that seller is not cooled down; a third request
-  gets 429 too.
+  When every candidate is busy with this buyer's other request, the new request
+  waits up to 60 seconds for one to be handed back (an agent often sends a title
+  and its main request together), then runs on it; the wait counts against the
+  180-second request deadline. Only if none comes back in time is the answer 429
+  (`FREE_BUYER_BUSY`); the seller is not cooled down. A third request at once
+  gets 429 at the door.
 - **Seller preference.** The buyer remembers which seller served a conversation
   (by a digest of its model, system text and first user message, for the last
   256 conversations, in memory only). That seller stays a candidate while
