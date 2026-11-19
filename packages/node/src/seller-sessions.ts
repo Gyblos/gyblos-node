@@ -224,9 +224,15 @@ export async function startSellerSessions(
     }
   };
   return {
-    ownsSession: () =>
-      state.current !== undefined &&
-      state.current.session.snapshot().state !== SESSION_STATES.CLOSED,
+    ownsSession: () => {
+      if (!state.current) return false;
+      try {
+        return state.current.session.snapshot().state !== SESSION_STATES.CLOSED;
+      } catch {
+        // An unreadable journal must retain its owner and its recovery timer.
+        return true;
+      }
+    },
     service: {
       exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
         run(peer, signal, () =>
