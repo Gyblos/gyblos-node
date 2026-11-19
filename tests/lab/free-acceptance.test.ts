@@ -56,7 +56,7 @@ void test('free acceptance refuses pre-cancellation without allocating a session
 void test(
   'native free acceptance proves publication to HTTP answer and typed refusal/failover cases',
   { skip: NATIVE_CAPABILITY.transportSkip },
-  async () => {
+  async (context) => {
     const previous = globalThis.fetch;
     let foreignCalls = 0;
     globalThis.fetch = async () => {
@@ -72,15 +72,21 @@ void test(
       const reads = new Set<number>();
       let elapsed = 0;
       const result = await runFreeAcceptance({
-        admissionClock: {
-          now: () => {
+        onAdmissionClock: (clock) => {
+          const now = clock.now;
+          const advance = clock.advance;
+          context.mock.method(clock, 'now', () => {
+            const real = performance.now();
+            const value = now();
+            assert.ok(value >= real + elapsed);
             reads.add(elapsed);
-            return elapsed;
-          },
-          advance: (milliseconds: number) => {
+            return value;
+          });
+          context.mock.method(clock, 'advance', (milliseconds: number) => {
+            advance(milliseconds);
             elapsed += milliseconds;
             advances.push(milliseconds);
-          },
+          });
         },
       });
       assert.equal(result.ok, true);

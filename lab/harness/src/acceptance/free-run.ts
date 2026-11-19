@@ -41,7 +41,7 @@ import type { AcceptanceSession } from './session';
 
 export interface FreeAcceptanceOptions {
   signal?: AbortSignal;
-  admissionClock?: AdmissionClock;
+  onAdmissionClock?: (clock: AdmissionClock) => void;
   onCase?: (value: FreeAcceptanceCase) => void;
 }
 export async function runFreeAcceptance(options: FreeAcceptanceOptions = {}) {
@@ -62,9 +62,9 @@ export async function runFreeAcceptance(options: FreeAcceptanceOptions = {}) {
     assertAcceptanceActive(signal);
   };
   try {
-    run = await createFreeSeller(signal, {
-      admissionClock: options.admissionClock ?? createAdmissionClock(),
-    });
+    const admissionClock = createAdmissionClock();
+    options.onAdmissionClock?.(admissionClock);
+    run = await createFreeSeller(signal, { admissionClock });
     const began = run.clock.now();
     acceptanceAssert(await run.host().publisher.tick());
     buyer = await createFreeBuyer(run);

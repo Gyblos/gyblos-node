@@ -22,13 +22,13 @@ export function createAcceptanceClock(
 }
 export type AcceptanceClock = ReturnType<typeof createAcceptanceClock>;
 
-// Per-run monotonic time for the free flow's admission buckets only.
+// Preserve real elapsed admission time between simulated refill intervals.
 export function createAdmissionClock() {
-  let elapsed = 0;
+  let offset = 0;
   return {
-    now: () => elapsed,
+    now: () => performance.now() + offset,
     advance(milliseconds: number) {
-      elapsed += milliseconds;
+      offset += milliseconds;
     },
   };
 }
