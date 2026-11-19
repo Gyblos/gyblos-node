@@ -187,4 +187,14 @@ function main() {
     );
   });
 }
-if (isMain(import.meta.url)) main();
+if (isMain(import.meta.url)) {
+  main();
+  if (process.env.CRASH_PROFILE === '1') process.send?.({
+    kind: 'benchmark-ready',
+    processOriginMs: Math.round(Date.now() - process.uptime() * 1000),
+    readyMs: Date.now(),
+    runtime: process.versions.bun ?? process.release.name,
+    executable: process.execPath.split('/').at(-1),
+    version: process.version,
+  });
+}

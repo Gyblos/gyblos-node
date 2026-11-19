@@ -37,11 +37,15 @@ export function crashChild<Input extends Pick<CrashInput, 'root'>>(
   ) => Promise<unknown>,
   entry = new URL('./channel-crash-child.ts', import.meta.url),
 ) {
-  const child = fork(entry, [], {
-    execArgv: ['--import', import.meta.resolve('tsx')],
+  const measured = entry.pathname.endsWith('/batch-recovery-child.ts');
+  const bundled = measured && process.env.CRASH_VARIANT === 'bundle';
+  const startMs = Date.now();
+  const child = fork(bundled ? new URL('../../node_modules/.cache/batch-recovery-child.mjs', import.meta.url) : entry, [], {
+    execArgv: bundled ? [] : ['--import', import.meta.resolve('tsx')],
     serialization: 'advanced',
     env: {
       PATH: process.env.PATH,
+      CRASH_PROFILE: process.env.CRASH_PROFILE,
       TMPDIR: process.env.TMPDIR,
       SystemRoot: process.env.SystemRoot,
       GYBLOS_HOME: input.root,
@@ -73,7 +77,19 @@ export function crashChild<Input extends Pick<CrashInput, 'root'>>(
     done.reject(new Error(CRASH_FAILURE));
     reached.reject(new Error(CRASH_FAILURE));
   });
+  let observation: Record<string, unknown> | undefined;
   child.on('message', (raw: unknown) => {
+    if (measured) {
+      const message = crashObject(raw);
+      if (message.kind === 'benchmark-ready') {
+        observation = { ...message, startMs };
+        return;
+      }
+      if (observation) {
+        console.log('CHILD_PHASE', JSON.stringify({ ...observation, firstIpcMs: Date.now() }));
+        observation = undefined;
+      }
+    }
     const run = async () => {
       const value = crashObject(raw);
       if (value.kind === CRASH_MESSAGES.DONE) {

@@ -1,0 +1,37 @@
+name: Batch recovery process benchmark
+on:
+  push:
+    branches: ['codex/child-start-focused-18', 'codex/child-start-shard-18']
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        pair: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+      - run: pnpm install --frozen-lockfile
+      - name: Compare baseline and bundle
+        env:
+          PAIR: ${{ matrix.pair }}
+          SCOPE: ${{ endsWith(github.ref_name, 'focused-18') && 'focused' || 'shard' }}
+        run: |
+          variants="source bundle"
+          if [[ "$PAIR" == 2 ]]; then variants="bundle source"; fi
+          for variant in $variants; do
+            python3 .github/bench-child.py "$variant" "$SCOPE"
+          done
