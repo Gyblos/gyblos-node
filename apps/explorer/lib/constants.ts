@@ -1,13 +1,19 @@
 // Owns the explorer's canonical values: units and display bounds. Public source URLs live in config.ts.
 
-// Bounds on one render's reads of the discovery index, whose answers are not cached (no-store): past
-// them the render shows what it read and says the list may be incomplete.
-// One read of the index costs at most 22 requests (1 /models, 10 /sellers, 1 /network, 10 /uptime), and
-// its answer is shared by every render in the data center for `shareSeconds`, so the load on the index
-// (120 requests a minute per address, shared by all explorer requests) does not grow with viewers.
+// Bounds on one read of the discovery index (the index itself answers no-store): past them the page
+// shows what was read and says the list may be incomplete. One read costs at most 22 requests
+// (1 /models, 10 /sellers, 1 /network, 10 /uptime) and is shared by the renders of a data center
+// (shared-read.ts), so a data center reads at most once per `leaseSeconds` (4 reads, 88 requests a
+// minute at worst), under the index's 120 a minute per address, shared by all explorer requests.
 export const DISCOVERY = {
-  // How long one read of the index serves every render (the live refresh runs once a minute).
-  shareSeconds: 30,
+  // How long one complete read serves every render (the live refresh runs once a minute).
+  freshSeconds: 30,
+  // How long a read with a secondary answer missing (/network or an uptime) serves every render.
+  partialFreshSeconds: 15,
+  // How long the last read stays servable while another render reads, or after a failed read.
+  keepSeconds: 600,
+  // How long one render holds the read, and the back-off after a failed read.
+  leaseSeconds: 15,
   // Pages of /sellers read in all, across every model.
   maxSellerPages: 10,
   // Sellers whose uptime is read; the rest show none.
