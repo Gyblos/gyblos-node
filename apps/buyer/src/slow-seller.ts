@@ -1,6 +1,8 @@
 // A readable message for a seller whose engine ran out of time, in every chat format and both for a JSON
 // error and a stream's error event; undefined leaves the code as the message. Text delivered first means
 // the seller read the prompt and could not finish; none means it could not read a request this size.
+// It also words why a free request found no seller.
+import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import {
   CONTROL_CODES,
   FREE_EXECUTION_STOP_REASONS,
@@ -8,6 +10,7 @@ import {
 import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 
 import { FREE_CHAT_DETAILS } from './chat-constants';
+import { FreeSelectionFailure } from './free-execution';
 
 export function slowSellerMessage(stop: FreeExecutionStop): string | undefined {
   if (stop.reason !== FREE_EXECUTION_STOP_REASONS.ENGINE_TIMEOUT)
@@ -34,4 +37,17 @@ export function refusedDetail(
   )
     return FREE_CHAT_DETAILS.noFastSeller;
   return undefined;
+}
+
+// A free request asks for zero prices, so "price above budget" only says that no free seller is available
+// now (cooling down, busy or gone) while a paid one is: the free buyer reports no candidates, keeping when
+// a cooling seller may be tried again. A paid buyer's budget refusal is not passed through here.
+export function freeSelectionError(error: unknown) {
+  return error instanceof FreeSelectionFailure &&
+    error.decision.code === SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET
+    ? new FreeSelectionFailure(
+        { ok: false, code: SELLER_SELECTION_CODES.NO_CANDIDATES },
+        error.retryAt,
+      )
+    : error;
 }
