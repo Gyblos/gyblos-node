@@ -34,7 +34,6 @@ export interface SellerUptime {
   generatedAt: number;
 }
 
-const NOT_FOUND = 404;
 const REPORT_KEYS = [
   'nodeId',
   'firstSeenAt',
@@ -103,7 +102,7 @@ export async function fetchUptime(
     ...(input.signal ? { signal: input.signal } : {}),
   };
   return withDeadline(request, async (response, aborted) => {
-    if (response.status === NOT_FOUND) {
+    if (response.status === HTTP_STATUS.NOT_FOUND) {
       response.body?.cancel().catch(() => {});
       return null;
     }
