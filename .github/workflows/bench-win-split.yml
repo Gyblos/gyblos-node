@@ -1,0 +1,196 @@
+name: Windows split benchmark split
+on:
+  push:
+    branches: ['codex/win-split19-split-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Whether a pull request touches more than the docs site; pushes to main always run everything.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 66071508838607dc7dda7bcbc6af4276d8a983ae
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo code=true >>"$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" HEAD | grep -qv '^apps/docs/'; then
+            echo code=true >>"$GITHUB_OUTPUT"
+          else
+            echo code=false >>"$GITHUB_OUTPUT"
+          fi
+
+  # Formatting, the docs site and the tests that read its pages; every run.
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 66071508838607dc7dda7bcbc6af4276d8a983ae
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --check .
+      - run: pnpm docs:build
+      - run: pnpm docs:test
+      - run: node --import tsx --test "tests/docs-*.test.ts"
+
+  static:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 66071508838607dc7dda7bcbc6af4276d8a983ae
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+
+  # `pnpm test` split by file; the patterns match its script in package.json.
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 66071508838607dc7dda7bcbc6af4276d8a983ae
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --import tsx --test --test-shard=${{ matrix.shard }}/3 "tests/*.test.ts" "packages/*/test/**/*.test.ts"
+
+  # `pnpm test:lab` split by file; the pattern matches its script in package.json.
+  lab:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 66071508838607dc7dda7bcbc6af4276d8a983ae
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --import tsx --test --test-shard=${{ matrix.shard }}/2 "tests/lab/**/*.test.ts"
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 66071508838607dc7dda7bcbc6af4276d8a983ae
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm desktop:build
+      # The release's path: pinned Node and iroh downloads, then the packaged seller runs.
+      - name: Build the packaged seller for linux-x64
+        run: |
+          pnpm build:native --version 0.0.0-ci.1 --target linux-x64 --out "$RUNNER_TEMP/native"
+          tar -xzf "$RUNNER_TEMP/native/gyblos-0.0.0-ci.1-linux-x64.tar.gz" -C "$RUNNER_TEMP"
+          test "$("$RUNNER_TEMP/gyblos-0.0.0-ci.1-linux-x64/bin/gyblos" --version)" = 0.0.0-ci.1
+
+  windows:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 66071508838607dc7dda7bcbc6af4276d8a983ae
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-service.test.ts
+      # The running seller on Windows: the real daemon over native loopback with a synthetic engine, its
+      # files, and the free transport. No network or devnet. The buyer-side lab acceptance joins once the
+      # buyer's own files work on Windows.
+      - run: node --import tsx --test tests/lab/seller-daemon-files.test.ts tests/free-execution-iroh.test.ts tests/iroh-transport.test.ts tests/node-startup-failure.test.ts
+
+  # One result for the whole run: fails when any part failed or was cancelled; parts skipped for a
+  # docs-only change count as passed.
+  check:
+    if: always()
+    needs: [changes, docs, static, test, lab, build, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            case "$result" in
+              success | skipped) ;;
+              *) echo "A CI part ended with: $result"; exit 1 ;;
+            esac
+          done
