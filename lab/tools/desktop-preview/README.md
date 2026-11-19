@@ -38,8 +38,8 @@ adapts renderer modules while bundling. The shared card is
 `views/Payments.tsx.preview`. Their styles are in `preview.css`. The unmodified
 desktop renderer is also built as a comparison baseline.
 
-Keep the environment in the title bar. Use “Wallet address” for the public address
-and “View transaction in explorer” for transaction links. Omit the fixed
+Keep the environment in the title bar. Use “Wallet address” for the public
+address and “View transaction in explorer” for transaction links. Omit the fixed
 network from wallet facts and other screen labels, including accessible names.
 
 The free-network caption beside Send is omitted in this proposal. The model
@@ -49,6 +49,10 @@ visible.
 Follow the root `AGENTS.md` and `apps/desktop/DESIGN.md`: show the mockup,
 obtain explicit approval, then port the accepted visual proposal to the desktop
 app. Publishing this preview or its PR is not desktop implementation approval.
+
+Payments shows one USDC account budget for Chat and API usage. Connections shows
+the individual limit of each API key. Revoking a key preserves its past spending
+in the account total.
 
 Open `?screen=payments&review=wallet-backup&backup=needed` to inspect the
 recovery warning, or use `backup=verified` to see the green check. Both use

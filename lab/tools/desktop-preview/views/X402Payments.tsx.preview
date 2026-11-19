@@ -1,109 +1,22 @@
-// Desktop chat permission and verified receipts, distinct from the protected desktop wallet.
+// Account-wide USDC spending in the browser preview.
 import { useState } from 'react';
 
 import { LOCALHOST, PORTS } from '@gyblos/config/hosts';
 import { ROUTES } from '@gyblos/config/paths';
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
-import {
-  effectiveX402Policy,
-  X402_ACTION,
-  x402Amount,
-  x402Asset,
-  x402BudgetInput,
-} from '../x402-model';
+import { X402_ACTION, x402Amount, x402BudgetInput } from '../x402-model';
 import { BUTTON_VARIANT } from './constants';
-import { CopyField, FormActions, FormField, FormInput } from './Form';
+import { FormActions, FormField, FormInput } from './Form';
 import { Modal } from './Modal';
 import { Button } from './UI';
 import type { X402View } from './useX402';
 
-export function X402Payments({
-  buyer,
-
-}: {
-  buyer: X402View;
-
-}) {
-  const { summary, policy } = buyer.state;
-  const activePolicy = effectiveX402Policy(summary, policy);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [copyError, setCopyError] = useState('');
-  const copy = (
-    action: typeof X402_ACTION.COPY_PAYER | typeof X402_ACTION.COPY_MINT,
-  ) => {
-    void buyer
-      .run({ action, policyId: activePolicy?.policyId })
-      .then((result) =>
-        setCopyError(result && !result.error ? '' : 'Copy unavailable'),
-      );
-  };
-  return (
-    <section className="preview-chat-session" aria-label="Chat spending limit">
-      <div className="ui-section">
-        <header className="preview-session-header">
-          <div>
-            <span>{activePolicy?.model}</span>
-
-          </div>
-          {activePolicy && <Button onClick={() => setDetailsOpen(true)}>Budget details</Button>}
-        </header>
-      {!policy && <X402Connection buyer={buyer} />}
-      {detailsOpen && activePolicy && (
-        <Modal title="Chat spending limit" close={() => { setDetailsOpen(false); setCopyError(''); }}>
-          <div className="ui-form">
-          {summary.active && <p className="ui-help-text">This limit is shared across chats on this device. Ending the session stops further spending.</p>}
-          <CopyField
-            id="x402-payer"
-            actionLabel="Copy paying wallet address"
-            label="Paying wallet"
-            value={activePolicy.payer}
-            onCopy={() => copy(X402_ACTION.COPY_PAYER)}
-          />
-          <CopyField
-            id="x402-mint"
-            actionLabel="Copy token mint"
-            label="Token mint"
-            value={activePolicy.mint}
-            onCopy={() => copy(X402_ACTION.COPY_MINT)}
-          />
-          {summary.active && <FormActions align="start">
-            <Button disabled={buyer.busy || summary.blocked} onClick={() => {
-              void buyer.run({ action: X402_ACTION.FINISH }).then(result => {
-                if (result && !result.error && !result.summary.active) setDetailsOpen(false);
-              });
-            }}>Finish session</Button>
-          </FormActions>}
-          {buyer.state.error && <p role="status">{buyer.state.error}</p>}
-          {copyError && <p role="status">{copyError}</p>}
-          </div>
-        </Modal>
-      )}
-      {summary.active && activePolicy ? (
-        <p className="ui-help-text">
-          {x402Amount(summary.spentAtomic, activePolicy)} of {x402Amount(summary.limitAtomic, activePolicy)} {x402Asset(activePolicy)} used
-        </p>
-      ) : (
-        policy && <X402Authorize buyer={buyer} policy={policy} />
-      )}
-      {summary.active &&
-        policy &&
-        summary.policy?.policyId !== policy.policyId && (
-          <p role="status">
-            The connected buyer changed. Finish the previous chat budget before
-            authorizing a new one.
-          </p>
-        )}
-      {(buyer.state.error || summary.blocked) && (
-        <p role="status">
-          {buyer.state.error ||
-            'An unfinished payment needs review. New messages are blocked.'}
-        </p>
-      )}
-      </div>
-
-    </section>
-  );
+export function X402Payments({ buyer, onSaved }: { buyer: X402View; onSaved(): void }) {
+  const { policy } = buyer.state;
+  return policy
+    ? <AccountBudgetForm buyer={buyer} policy={policy} onSaved={onSaved} />
+    : <X402Connection buyer={buyer} />;
 }
 
 function X402Connection({ buyer }: { buyer: X402View }) {
@@ -182,55 +95,34 @@ function X402ExternalConnection({ buyer }: { buyer: X402View }) {
   );
 }
 
-function X402Authorize({
-  buyer,
-  policy,
-}: {
+function AccountBudgetForm({ buyer, policy, onSaved }: {
   buyer: X402View;
   policy: BuyerApiPolicy;
+  onSaved(): void;
 }) {
-  const [amount, setAmount] = useState('');
+  const account = window.previewAccountBudget.current();
+  const [amount, setAmount] = useState(() => x402Amount(account.limitAtomic, policy));
   const [error, setError] = useState('');
   return (
-    <form
-      className="ui-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        try {
-          setError('');
-          const limitAtomic = x402BudgetInput(amount, policy);
-          void buyer.run({ action: X402_ACTION.AUTHORIZE, limitAtomic });
-        } catch (failure) {
-          setError(
-            failure instanceof Error ? failure.message : 'Enter a valid budget',
-          );
-        }
-      }}
-    >
-      <FormField
-        htmlFor="x402-budget"
-        label={'Chat budget · ' + x402Asset(policy)}
-      >
-        <FormInput
-          id="x402-budget"
-          inputMode="decimal"
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-        />
+    <form className="ui-form" onSubmit={async (event) => {
+      event.preventDefault();
+      try {
+        setError('');
+        const limitAtomic = x402BudgetInput(amount, policy);
+        const result = await buyer.run({ action: X402_ACTION.AUTHORIZE, limitAtomic });
+        if (result && !result.error) onSaved();
+        else setError(result?.error ?? 'Could not save the budget.');
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : 'Enter a valid amount.');
+      }
+    }}>
+      <FormField htmlFor="account-budget" label="Account limit · USDC">
+        <FormInput id="account-budget" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} />
       </FormField>
-      <p>
-        Maximum per response: {x402Amount(policy.maxAtomic, policy)}. This
-        permission applies to Chat on this device.
-      </p>
+      <p className="ui-help-text">Chat and API usage share this limit. Each API key also has its own limit in Connections.</p>
       {error && <p role="status">{error}</p>}
       <FormActions align="start">
-        <Button
-          type="submit"
-          disabled={buyer.busy || buyer.state.summary.blocked || !amount}
-          variant={BUTTON_VARIANT.PRIMARY}
-        >
-          Authorize budget
-        </Button>
+        <Button type="submit" disabled={buyer.busy || buyer.state.summary.blocked || !amount} variant={BUTTON_VARIANT.PRIMARY}>Save budget</Button>
       </FormActions>
     </form>
   );

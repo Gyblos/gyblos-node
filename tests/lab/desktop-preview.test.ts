@@ -114,6 +114,29 @@ void test('preview exposes bounded synthetic API key metadata without a credenti
     /PREVIEW_ONLY_NOT_A_VALID_API_KEY/,
   );
 });
+void test('the account budget includes chat and all API keys and preserves individual limits', async () => {
+  const call = await fixture('?screen=payments&review=ten-chats');
+  const readAccount = async () =>
+    object(await call('previewAccountBudget', 'current'));
+  const original = await readAccount();
+  assert.equal(original.limitAtomic, '1000000');
+  assert.equal(original.spentAtomic, '6000');
+  const setLimit = async (limitAtomic: string) =>
+    parseX402Result(
+      await call('desktopX402', 'run', {
+        action: X402_ACTION.AUTHORIZE,
+        limitAtomic,
+      }),
+    );
+  assert.ok((await setLimit('5999')).error);
+  assert.deepEqual(await readAccount(), original);
+  assert.equal((await setLimit('6000')).error, undefined);
+  assert.equal((await readAccount()).limitAtomic, '6000');
+  const keys = parseUsdcApiState(
+    await call('desktopUsdcApiKeys', 'run', { action: 'status' }),
+  );
+  assert.equal(keys.snapshot?.keys[0]?.limitAtomic, '10000');
+});
 void test('preview buyer status is runtime-loadable and keeps free replies transaction-free', async () => {
   const call = await fixture();
   const result = parseX402Result(

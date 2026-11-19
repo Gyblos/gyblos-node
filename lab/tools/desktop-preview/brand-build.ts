@@ -205,7 +205,12 @@ export function transformBrand(source: string, id: string, desktop: string) {
       );
   if (target === `${base}/src/ui/Chat.tsx`)
     return replaceOnce(
-      source.replace("'x402 · devnet'", "'x402'"),
+      source
+        .replace("'x402 · devnet'", "'x402'")
+        .replace(
+          'Review the chat budget in Payments',
+          'Review the account budget in Payments',
+        ),
       "'Free · Gyblos network'",
       "''",
     );

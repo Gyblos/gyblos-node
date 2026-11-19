@@ -9,7 +9,7 @@ import {
   type PaymentMethod,
 } from '../paypal-model';
 import { usageChange } from '../../../../lab/tools/desktop-preview/usage';
-import { x402Amount, x402Asset, type X402Summary } from '../x402-model';
+import { x402Amount, x402Asset } from '../x402-model';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
 import { CopyField, FormActions } from './Form';
@@ -24,7 +24,8 @@ import { WalletDetails } from './WalletDetails';
 import { useDesktopWallet } from './WalletState';
 import { X402Payments } from './X402Payments';
 
-declare global { interface Window { previewUsdcBaseline: X402Summary } }
+type AccountBudget = ReturnType<typeof import('../../../../lab/tools/desktop-preview/account-budget').accountBudgetSnapshot>;
+declare global { interface Window { previewAccountBudget: { current(): AccountBudget; baseline: AccountBudget } } }
 
 type Props = {
   chat: import('./chat-controller').ChatController;
@@ -68,8 +69,8 @@ export function Payments(props: Props) {
         onActivity={setReceiptId}
         onChat={id => { props.chat.openChat(id); props.onChat(); }}
       />
-      {budgetOpen && props.x402 && <Modal title="Chat budget · USDC" close={() => setBudgetOpen(false)}>
-        <X402Payments buyer={props.x402} />
+      {budgetOpen && props.x402 && <Modal title="Account budget" close={() => setBudgetOpen(false)}>
+        <X402Payments buyer={props.x402} onSaved={() => setBudgetOpen(false)} />
       </Modal>}
       {entry && <ActivitySessionDetails entry={entry}
         reference={props.activity.references.references.find(item => item.sessionId === entry.id)}
@@ -128,21 +129,16 @@ function WalletOverview({
   onDetails(): void;
 }) {
   const wallet = useDesktopWallet();
-  const summary = buyer?.state.summary;
-  const policy = summary?.available && summary.active ? summary.policy : null;
-  const amount = (atomic: string | undefined) => policy && atomic !== undefined
-    ? x402Amount(atomic, policy) + ' ' + x402Asset(policy)
-    : null;
-  const baseline = window.previewUsdcBaseline;
+  const account = window.previewAccountBudget.current();
+  const amount = (atomic: string) => x402Amount(atomic, account) + ' ' + x402Asset(account);
   const changeSinceOpen = (field: 'limitAtomic' | 'spentAtomic') =>
-    summary && policy && baseline.active && baseline.policy?.policyId === policy.policyId
-      ? usageChange(Number(summary[field]), Number(baseline[field]))
-      : null;
+    usageChange(Number(account[field]), Number(window.previewAccountBudget.baseline[field]));
   const ready = wallet.status === WALLET_STATUS.READY;
   return (
     <section className="ui-section" aria-label="USDC wallet">
       <div className="ui-section-title">
         <h2>USDC wallet</h2>
+        <FormActions align="start">
         <Badge>
           {ready
             ? wallet.backupVerified
@@ -150,11 +146,13 @@ function WalletOverview({
               : 'Backup needed'
             : wallet.status === WALLET_STATUS.LOCKED ? 'Locked' : 'Not available'}
         </Badge>
+        {buyer && <Button onClick={onBudget}><Gauge size={16} />Edit account budget</Button>}
+        </FormActions>
       </div>
       <StatGrid>
         <StatCard label="Available balance" value="Unavailable" icon={Wallet} />
-        <StatCard label="Chat budget" value={amount(summary?.limitAtomic)} change={changeSinceOpen('limitAtomic')} comparison="Since the preview opened" icon={Gauge} />
-        <StatCard label="Budget spent" value={amount(summary?.spentAtomic)} change={changeSinceOpen('spentAtomic')} comparison="Since the preview opened" icon={Receipt} />
+        <StatCard label="Account budget" value={amount(account.limitAtomic)} change={changeSinceOpen('limitAtomic')} comparison="Since the preview opened" icon={Gauge} />
+        <StatCard label="Account spending" value={amount(account.spentAtomic)} change={changeSinceOpen('spentAtomic')} comparison="Since the preview opened" icon={Receipt} />
       </StatGrid>
       <WalletAddress />
       <FormActions align="start">
@@ -166,7 +164,6 @@ function WalletOverview({
           Add funds
         </Button>
         <Button onClick={onDetails}>Wallet details</Button>
-        {buyer && <Button onClick={onBudget}><Gauge size={16} />Manage chat budget</Button>}
       </FormActions>
     </section>
   );

@@ -30,10 +30,13 @@ import {
   emptyX402,
   parseX402Result,
   X402_ACTION,
+  type X402Record,
 } from '@gyblos/desktop/x402-model';
 import { AGENT_TOOLS } from '@gyblos/node/agent-setup-constants';
+import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
+import { accountBudgetSnapshot, accountLimitError } from './account-budget';
 import { PREVIEW } from './constants';
 import { exampleKeys } from './example-keys';
 import { requestObject as read, type AgentExamples } from './input';
@@ -56,8 +59,8 @@ export function createPreviewHost(
   };
   const payer = '11111111111111111111111111111111';
   const scope = { network: DEVNET, mint: DEVNET_USDC, payer };
-  const policy = {
-    version: 1,
+  const policy: BuyerApiPolicy = {
+    version: BUYER_API.VERSION,
     policyId: example,
     model,
     maxTokens: 256,
@@ -68,7 +71,7 @@ export function createPreviewHost(
   let connected = ready;
   let active = ready;
   let authorized = ready;
-  let limitAtomic = ready ? '1000000' : '0';
+  let limitAtomic = '1000000';
   let generation = 0;
   let selectedHome = ready;
   let keys = exampleKeys(query.get('keys') === 'empty');
@@ -78,15 +81,7 @@ export function createPreviewHost(
     'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage in Activity and payment details in Payments.';
 
   const conversations = new ChatController('preview-first-chat');
-  const records: Array<{
-    id: string;
-    sessionId: string;
-    at: number;
-    chargeAtomic: string;
-    transaction: null;
-    free: boolean;
-    policy: typeof policy;
-  }> = [];
+  const records: X402Record[] = [];
   function recordFreeReply(id: string, at: number) {
     records.push({
       id,
@@ -244,6 +239,7 @@ export function createPreviewHost(
     },
   };
 
+  const accountBudget = () => accountBudgetSnapshot(limitAtomic, keys, records);
   function buyerState() {
     return parseX402Result({
       summary: {
@@ -270,10 +266,16 @@ export function createPreviewHost(
         selectedHome = true;
       }
       if (request.action === X402_ACTION.AUTHORIZE) {
+        if (!connected || typeof request.limitAtomic !== 'string')
+          return { ...buyerState(), error: 'Account budget unavailable.' };
+        const error = accountLimitError(
+          request.limitAtomic,
+          accountBudget().spentAtomic,
+        );
+        if (error) return { ...buyerState(), error };
+        limitAtomic = request.limitAtomic;
         active = true;
         authorized = true;
-        if (typeof request.limitAtomic === 'string')
-          limitAtomic = request.limitAtomic;
       }
       if (request.action === X402_ACTION.FINISH) active = false;
       if (request.action === X402_ACTION.COPY_PAYER)
@@ -388,7 +390,7 @@ export function createPreviewHost(
     desktopNode,
     desktopCatalog,
     desktopX402,
-    previewUsdcBaseline: buyerState().summary,
+    previewAccountBudget: { current: accountBudget, baseline: accountBudget() },
     desktopUsdcApiKeys,
     ...createPaypalPreview(ready, answer, now, agentExamples.paypal),
   };
