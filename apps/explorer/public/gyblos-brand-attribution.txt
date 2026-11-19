@@ -1,0 +1,8 @@
+Gyblos brand kit 3.0.0.
+Symbol: Geist Mono 600. Wordmark name: Instrument Sans Medium. ASCII/technical text: JetBrains Mono.
+Geist Mono: Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font.git).
+Instrument Sans: Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans).
+JetBrains Mono: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono).
+Unmodified font binaries are included under their SIL Open Font License 1.1 notices. Variable-font weight selection occurs in memory. Logos are outlined artwork, not modified font software.
+Geist Mono source: https://github.com/google/fonts/tree/main/ofl/geistmono
+Other font source projects are listed in the included OFL notices. Rendering/build tools are not bundled. This kit does not grant trademark rights.
