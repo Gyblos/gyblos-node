@@ -59,7 +59,7 @@ git mv LICENSE OLD-LICENSE
 git commit -qm license
 expect pull_request develop "$prior" true true
 
-for path in apps/desktop/resources/icon.png tests/support/desktop-packaging.ts tests/node-packaged.test.ts tools/windows/manifest.txt; do
+for path in .dockerignore compose.yaml NOTICE .gitattributes apps/desktop/resources/icon.png tests/support/desktop-packaging.ts tests/node-packaged.test.ts tools/windows/manifest.txt; do
   prior=$(git rev-parse HEAD)
   mkdir -p "$(dirname "$path")"
   touch "$path"
@@ -67,3 +67,9 @@ for path in apps/desktop/resources/icon.png tests/support/desktop-packaging.ts t
   git commit -qm "sensitive file $path"
   expect pull_request develop "$prior" true true
 done
+
+prior=$(git rev-parse HEAD)
+printf '%s\n' "process.platform === 'win32'" "const operation = 'install';" > tests/new-platform.test.ts
+git add .
+git commit -qm 'extend existing Windows scenario'
+expect pull_request develop "$prior" true true
