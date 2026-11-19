@@ -6,7 +6,10 @@ import {
   type ChatArchiveSave,
 } from '@gyblos/desktop/chat-archive-model';
 import { ChatController } from '@gyblos/desktop/chat-controller';
-import { CATALOG_STATE } from '@gyblos/desktop/network-catalog';
+import {
+  CATALOG_STATE,
+  type NetworkCatalog,
+} from '@gyblos/desktop/network-catalog';
 import { LOCAL_NODE_STATE } from '@gyblos/desktop/node-status';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import {
@@ -167,12 +170,12 @@ export function createPreviewHost(
     summary: async () => LOCAL_NODE_STATE.READY,
     retry: async () => LOCAL_NODE_STATE.READY,
   };
-  const catalog = (search = '') => ({
+  const catalog = (search = ''): NetworkCatalog => ({
     state: CATALOG_STATE.READY,
     query: search,
     checkedAt: now,
     truncated: false,
-    // One free and one paid seller, as the beta network lists this model.
+    // One free and one paid example group, so both catalog rows render.
     models: [
       {
         modelId: model,

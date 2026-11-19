@@ -9,6 +9,10 @@ import { runInNewContext } from 'node:vm';
 
 import { parseActivityResult } from '@gyblos/desktop/activity-model';
 import { parseChatArchiveLoad } from '@gyblos/desktop/chat-archive-model';
+import {
+  CATALOG_STATE,
+  parseNetworkCatalog,
+} from '@gyblos/desktop/network-catalog';
 import { parsePaymentReferences } from '@gyblos/desktop/payment-reference-model';
 import {
   parsePaypalAgentResult,
@@ -123,6 +127,28 @@ void test('preview buyer status is runtime-loadable and keeps free replies trans
   assert.equal(result.summary.records[0]?.transaction, null);
   assert.equal(result.summary.records[0]?.chargeAtomic, '0');
 });
+void test('preview network catalog passes the desktop contract with a free and a paid group', async () => {
+  const call = await fixture();
+  const catalog = parseNetworkCatalog(await call('desktopCatalog', 'summary'));
+  assert.equal(catalog.state, CATALOG_STATE.READY);
+  assert.deepEqual(
+    catalog.models.map((model) => [
+      model.free,
+      model.inputAtomicPerMtok,
+      model.outputAtomicPerMtok,
+    ]),
+    [
+      [true, '0', '0'],
+      [false, '52000', '208000'],
+    ],
+  );
+  assert.equal(
+    parseNetworkCatalog(await call('desktopCatalog', 'lookup', 'qwen3-0.6b'))
+      .state,
+    CATALOG_STATE.READY,
+  );
+});
+
 void test('preview wallet collection contains public example metadata only', async () => {
   const call = await fixture();
   const result = parseWalletCollection(
