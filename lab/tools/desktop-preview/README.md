@@ -38,6 +38,10 @@ adapts renderer modules while bundling. The shared card is
 `views/Payments.tsx.preview`. Their styles are in `preview.css`. The unmodified
 desktop renderer is also built as a comparison baseline.
 
+Keep the environment in the title bar. Use “Wallet address” for the public address
+and “View transaction in explorer” for transaction links. Omit the fixed
+network from wallet facts and other screen labels, including accessible names.
+
 The free-network caption beside Send is omitted in this proposal. The model
 name, Free badge and actionable authorization/generation status copy remain
 visible.

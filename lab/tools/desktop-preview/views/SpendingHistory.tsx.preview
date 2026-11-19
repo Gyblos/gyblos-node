@@ -78,7 +78,7 @@ export function SpendingHistory({ activity, buyer, chat, onActivity, onChat }: {
           <DataCell label="Amount">{amount}{row.method === 'PayPal' && row.authorization && <span className="activity-row-meta">Authorization</span>}</DataCell>
           <DataCell label="Status">{row.method === 'PayPal' ? sessionOutcome(row.entry) : row.record.free ? 'Free' : 'Confirmed'}</DataCell>
           <DataCell label="Payment ID">{record?.transaction
-            ? <a href={x402Explorer(record.transaction)} target="_blank" rel="noreferrer" aria-label="View transaction in Solana Explorer">{shortReference(record.transaction)}</a>
+            ? <a href={x402Explorer(record.transaction)} target="_blank" rel="noreferrer" aria-label="View transaction in explorer">{shortReference(record.transaction)}</a>
             : <PaymentReference reference={reference} />}</DataCell>
           <DataCell label="Details">{entry ? <IconButton label="View session details" onClick={() => onActivity(entry.id)}><ArrowUpRight size={14}/></IconButton>
             : conversation ? <IconButton title="Open chat" label={'Open chat: '+conversation.title} onClick={() => onChat(conversation.id)}><ArrowUpRight size={14}/></IconButton> : '—'}</DataCell>

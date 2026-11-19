@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 void test('Payments uses a single history table for both sources', async () => {
@@ -164,4 +164,17 @@ void test('Wallet details opts into the large preview dialog', async () => {
     'apps/desktop',
   );
   assert.match(payments ?? '', /<Modal title="Wallet details" size="lg"/);
+});
+
+void test('preview screens omit the chain name from labels and accessible copy', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const directory = 'apps/desktop/src/ui';
+  for (const file of await readdir(directory)) {
+    if (!file.endsWith('.tsx')) continue;
+    const path = directory + '/' + file;
+    const source = await readFile(path, 'utf8');
+    const view = transformBrand(source, path, 'apps/desktop') ?? source;
+    assert.equal(/(?<![@./])\bsolana\b(?![.:/])/i.test(view), false, file);
+  }
 });

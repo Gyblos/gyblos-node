@@ -40,6 +40,18 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'utf8',
       );
   }
+  if (target === `${base}/src/ui/WalletDetails.tsx`) {
+    const facts = replaceOnce(
+      source,
+      '<dt>Solana address</dt>',
+      '<dt>Wallet address</dt>',
+    );
+    return replaceOnce(
+      facts,
+      '      <div>\n        <dt>Network</dt>\n        <dd>Solana</dd>\n      </div>\n',
+      '',
+    );
+  }
   if (target === `${base}/src/ui/Modal.tsx`) {
     const props = replaceOnce(
       source,
@@ -167,10 +179,12 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'Supports OpenAI Chat Completions, Responses and Anthropic Messages through your local buyer.',
       );
   if (target === `${base}/src/x402-model.ts`)
-    return replaceOnce(source, "'USDC · devnet'", "'USDC'").replace(
-      "String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')\n  );",
-      "String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')\n  ).replace(/0+$/, '').replace(/\\.$/, '');",
-    );
+    return replaceOnce(source, "'USDC · devnet'", "'USDC'")
+      .replace('Only Solana devnet is supported', 'Unsupported payment network')
+      .replace(
+        "String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')\n  );",
+        "String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')\n  ).replace(/0+$/, '').replace(/\\.$/, '');",
+      );
   if (target === `${base}/src/ui/Chat.tsx`)
     return replaceOnce(
       source.replace("'x402 · devnet'", "'x402'"),
