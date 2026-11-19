@@ -109,7 +109,10 @@ void test('the probe reports each endpoint, refuses another network and hides UR
   assert.equal(keyed?.failed, 1);
   assert.equal(mainnet?.ok, false);
   assert.equal(mainnet?.error, 'solana rpc: wrong network');
-  assert.equal(mainnet?.refused, true);
+  // Another network is reported as such, never as a rate limit.
+  assert.equal(mainnet?.refused, false);
+  assert.equal(mainnet?.wrongNetwork, true);
+  assert.equal(open?.wrongNetwork, false);
 });
 
 void test('an unset fallback is reported as not configured', async () => {

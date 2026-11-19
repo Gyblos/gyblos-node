@@ -147,8 +147,10 @@ const usageLine = (result: ChainIndexResult) => {
   return [
     `public=${primary.calls}`,
     `publicLimited=${primary.rateLimited}`,
+    `publicWrongNetwork=${primary.wrongNetwork}`,
     `paid=${fallback.calls}`,
     `paidLimited=${fallback.rateLimited}`,
+    `paidWrongNetwork=${fallback.wrongNetwork}`,
     `onPaid=${onFallback}`,
     `endpoint=${result.usage.endpoint}`,
     `listed=${result.listed}`,
@@ -218,7 +220,7 @@ export async function scheduledChainIndex(
       phase,
       cause instanceof Error ? cause.name : 'unknown',
       chainFailureReason(cause),
-      `public=${primary.calls} publicLimited=${primary.rateLimited} paid=${fallback.calls} paidLimited=${fallback.rateLimited}`,
+      `public=${primary.calls} publicLimited=${primary.rateLimited} publicWrongNetwork=${primary.wrongNetwork} paid=${fallback.calls} paidLimited=${fallback.rateLimited} paidWrongNetwork=${fallback.wrongNetwork}`,
     );
     return undefined;
   }

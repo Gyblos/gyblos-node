@@ -2,7 +2,8 @@
 // with a minimum interval between calls and a call budget, then keyed fallbacks in order (for example
 // Helius, then Alchemy), each with its own smaller budget. The run moves to the next endpoint only when
 // the current one fails it: a refusal (a rate limit, or a 403 such as the public RPC answers Cloudflare
-// Workers), a server error, or a transport failure (a timeout or a dropped connection). An answer the
+// Workers), an endpoint of another network, a server error, or a transport failure (a timeout or a
+// dropped connection). An answer the
 // index cannot read stops the run instead. Calls are counted per endpoint for the run's log, so a slow
 // or refused free endpoint is visible before relying on keyed ones.
 import { ChainShapeError } from './json';
@@ -16,8 +17,10 @@ export interface EndpointLimits {
 }
 export interface EndpointUse {
   calls: number;
-  // Calls the endpoint refused or failed (the run then moved on).
+  // Calls the endpoint refused or failed (the run then moved on), wrong networks apart.
   rateLimited: number;
+  // Calls refused because the endpoint serves another network (the run then moved on).
+  wrongNetwork: number;
 }
 export interface ChainEndpoints extends ChainRpc {
   // Calls left on the endpoint in use; the run stops reading when this reaches zero.
@@ -41,7 +44,9 @@ const SERVER_ERROR = /^HTTP 5\d\d$/;
 function endpointFailed(error: unknown) {
   if (error instanceof ChainShapeError) return false;
   if (error instanceof ChainRpcError)
-    return error.rateLimited || SERVER_ERROR.test(error.reason);
+    return (
+      error.rateLimited || error.wrongNetwork || SERVER_ERROR.test(error.reason)
+    );
   return true;
 }
 
@@ -51,7 +56,7 @@ function metered(
   wait: Wait,
   now: () => number,
 ) {
-  const use: EndpointUse = { calls: 0, rateLimited: 0 };
+  const use: EndpointUse = { calls: 0, rateLimited: 0, wrongNetwork: 0 };
   let last = Number.NEGATIVE_INFINITY;
   async function run<T>(call: (rpc: ChainRpc) => Promise<T>): Promise<T> {
     if (use.calls >= limits.budget)
@@ -63,7 +68,9 @@ function metered(
     try {
       return await call(rpc);
     } catch (error) {
-      if (endpointFailed(error)) use.rateLimited += 1;
+      if (error instanceof ChainRpcError && error.wrongNetwork)
+        use.wrongNetwork += 1;
+      else if (endpointFailed(error)) use.rateLimited += 1;
       throw error;
     }
   }
@@ -100,8 +107,9 @@ export function chainEndpoints(
       (total, use) => ({
         calls: total.calls + use.calls,
         rateLimited: total.rateLimited + use.rateLimited,
+        wrongNetwork: total.wrongNetwork + use.wrongNetwork,
       }),
-      { calls: 0, rateLimited: 0 },
+      { calls: 0, rateLimited: 0, wrongNetwork: 0 },
     );
   return {
     signatures: (address, range) =>

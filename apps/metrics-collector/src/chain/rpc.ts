@@ -6,7 +6,7 @@
 // error, or a transaction the RPC cannot return, throws: the run stops and nothing past it is marked as
 // read. A refusal of the caller (a rate limit, or a 403 such as the public devnet RPC answers Cloudflare
 // Workers) throws an error marked as such, which lets the run move to its fallback endpoint; so does an
-// endpoint whose genesis hash is not the indexed network's.
+// endpoint whose genesis hash is not the indexed network's, marked apart as a wrong network.
 import { CHAIN_DEVNET_HOSTS, CHAIN_INDEX, LOOPBACK_HOSTS } from '../constants';
 import { ChainShapeError, list, nullable, num, record, text } from './json';
 
@@ -17,11 +17,16 @@ const HTTP = 'http:';
 // HTTP statuses that refuse this caller rather than the call: the next endpoint may serve it.
 const REFUSING_STATUSES: readonly number[] = [403, 429];
 
+// The reason of an endpoint that serves another network than the indexed one.
+export const WRONG_NETWORK = 'wrong network';
+
 export class ChainRpcError extends Error {
   constructor(
     readonly reason: string,
     // The endpoint refused this caller (HTTP 403 or 429, or the RPC's own rate-limit code).
     readonly rateLimited = false,
+    // The endpoint serves another network (its genesis hash differs): never a rate limit.
+    readonly wrongNetwork = false,
   ) {
     super(`solana rpc: ${reason}`);
     this.name = 'ChainRpcError';
@@ -144,8 +149,8 @@ export function createChainRpc(
   fetcher: typeof fetch = fetch,
   // The genesis hash of the network the index reads. When given, the endpoint's own genesis hash is
   // asked once before its first call, and an endpoint of another network (a mainnet URL configured
-  // for devnet) is refused like a rate limit, so the run moves to the next endpoint and never stores
-  // another network's signatures.
+  // for devnet) is refused, so the run moves to the next endpoint and never stores another network's
+  // signatures.
   expectedGenesis?: string,
 ): ChainRpc {
   const raw = caller(url, fetcher);
@@ -153,15 +158,13 @@ export function createChainRpc(
   const verify = async () => {
     const genesis = await raw('getGenesisHash', []);
     if (genesis !== expectedGenesis)
-      throw new ChainRpcError('wrong network', true);
+      throw new ChainRpcError(WRONG_NETWORK, false, true);
   };
   const call = async (method: string, params: unknown[]) => {
     if (expectedGenesis) {
       checked ??= verify().catch((error: unknown) => {
         // A failed check (a timeout, an HTTP error) is asked again on the next call.
-        if (!(
-          error instanceof ChainRpcError && error.reason === 'wrong network'
-        ))
+        if (!(error instanceof ChainRpcError && error.wrongNetwork))
           checked = undefined;
         throw error;
       });

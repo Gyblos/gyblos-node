@@ -2,13 +2,18 @@
 // `until` (refused, never counted twice), an overlapping run (skipped by the lease), a failing list
 // (channels are still followed and their accounts read), a channel spammed below the flood size (reads
 // capped per poll), a burst of new Gyblos opens (known channels still polled), and an index that ran
-// with the full-read design (its Gyblos channels are followed after migration 0006).
+// with the full-read design (its Gyblos channels are followed after migration 0006); an endpoint of
+// another network hands the run on and is counted apart from rate limits.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
-import { ChainRpcError } from '@gyblos/metrics-collector/chain/rpc';
+import {
+  ChainRpcError,
+  WRONG_NETWORK,
+  type ChainRpc,
+} from '@gyblos/metrics-collector/chain/rpc';
 import { CHAIN_INDEX } from '@gyblos/metrics-collector/constants';
 
 import {
@@ -68,7 +73,11 @@ void test('a public RPC that refuses Workers (403) and a failing first key fall 
     [result.listed, result.usage.endpoint, result.usage.onFallback],
     [3, 2, true],
   );
-  assert.deepEqual(result.usage.primary, { calls: 1, rateLimited: 1 });
+  assert.deepEqual(result.usage.primary, {
+    calls: 1,
+    rateLimited: 1,
+    wrongNetwork: 0,
+  });
   // The failing key's one call, then the working key's.
   assert.equal(result.usage.fallback.calls, 1 + alchemy.calls.signatures);
   // A failure that is not the endpoint's (a transaction it lists but cannot return yet) never moves
@@ -217,4 +226,25 @@ void test('Gyblos channels indexed before migration 0006 are followed, and the l
     ],
   );
   assert.deepEqual(rows(database, 'SELECT * FROM collector_chain_cursor'), []);
+});
+
+void test('an endpoint of another network hands the run on and is never counted as a rate limit', async () => {
+  const refuse = () =>
+    Promise.reject(new ChainRpcError(WRONG_NETWORK, false, true));
+  const mainnet: ChainRpc = {
+    signatures: refuse,
+    transaction: refuse,
+    accounts: refuse,
+  };
+  const healthy = fakeChainRpc([]);
+  const run = endpoints(mainnet, 1000, { rpc: healthy.rpc, budget: 20 });
+  assert.deepEqual(await run.signatures(PROGRAM, {}), []);
+  const usage = run.usage();
+  assert.deepEqual(usage.primary, {
+    calls: 1,
+    rateLimited: 0,
+    wrongNetwork: 1,
+  });
+  assert.equal(usage.onFallback, true);
+  assert.equal(usage.fallback.calls, 1);
 });
