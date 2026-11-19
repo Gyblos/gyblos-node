@@ -5,7 +5,7 @@ const INDEX = /^\d+$/;
 
 export function hoveredPoint<T>(
   points: readonly T[],
-  index: unknown,
+  index: number | string | null | undefined,
 ): T | null {
   const position =
     typeof index === 'number'
