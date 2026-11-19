@@ -845,12 +845,13 @@ are refused. It contains:
 - `models` (optional): 1 to 32 `{ id, aliases?, selection, maxTokens? }` entries
   that the endpoint serves by name. A client sends `id` or an alias as `model`.
   The list must serve `request.selection.modelId` by name. `GET /v1/models`
-  lists them with `max_output_tokens` and, on the free endpoint,
-  `context_length`: the smallest context any eligible seller of that model lists
-  in its verified catalog, so a prompt sized to it fits whichever seller is
-  chosen. It is left out when no seller's catalog can be read within 4 seconds.
-  An unknown name gets 404 `FREE_BUYER_MODEL_NOT_FOUND`. Paid modes refuse to
-  start unless every listed model meets the paid limits.
+  lists them with `max_output_tokens` and `context_length`: the smallest context
+  its sellers list in their verified catalogs (configured sellers at the buyer's
+  own prices; with open discovery, also the index's free sellers), so a prompt
+  sized to it fits whichever seller is chosen. One read that finds it serves 30
+  seconds; the field is left out when no seller's catalog can be read within 4
+  seconds. An unknown name gets 404 `FREE_BUYER_MODEL_NOT_FOUND`. Paid modes
+  refuse to start unless every listed model meets the paid limits.
 - `session` is required for a positive request ceiling. Guided setup includes a
   deposit of 1 USDC and a one-hour lifetime. Existing paid profiles can
   [add the session settings](payment-sessions.md#explicit-startup-policy).

@@ -51,6 +51,7 @@ import {
   type BuyerDesktopOptions,
 } from './desktop-api';
 import { FreeBuyerError } from './free-chat';
+import type { RouteContext } from './free-context';
 import {
   executeFreeSse,
   type ChatResult,
@@ -85,10 +86,7 @@ interface ChatSettings {
   // The models served by name; absent, `selection` is the one model.
   models?: readonly ModelRoute[];
   // The context every eligible seller of a route accepts, from verified catalogs; undefined if unknown.
-  contextTokens?: (
-    route: ModelRoute,
-    signal: AbortSignal,
-  ) => Promise<number | undefined>;
+  contextTokens?: RouteContext<ModelRoute>;
 }
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();

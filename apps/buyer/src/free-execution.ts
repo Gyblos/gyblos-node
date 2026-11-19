@@ -22,6 +22,7 @@ import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
 import { FreeBuyerError } from './free-chat';
+import type { RouteContext } from './free-context';
 import { buyerReceiptObservation } from './free-receipts';
 import {
   buyerExecutionTelemetry,
@@ -98,10 +99,7 @@ export interface FreeBuyerDependencies {
   ): Promise<FreeWinner>;
   // The context every eligible seller of a routed model accepts, from verified catalogs; undefined when
   // none is known. Never quotes or sends a prompt.
-  contextTokens?(
-    model: RoutedModel,
-    signal: AbortSignal,
-  ): Promise<number | undefined>;
+  contextTokens?: RouteContext;
   execute(
     winner: FreeWinner,
     request: FreeExecutionRequest,
