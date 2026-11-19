@@ -1,8 +1,17 @@
 // Owns the explorer's canonical values: units and display bounds. Public source URLs live in config.ts.
 
+// Bounds on one render's reads of the discovery index, whose answers are not cached (no-store): past
+// them the render shows what it read and says the list may be incomplete.
 export const DISCOVERY = {
-  // Pages of sellers read per model.
-  maxSellerPages: 10,
+  // Pages of /sellers read in all, across every model.
+  maxSellerPages: 20,
+  // Sellers whose uptime is read; the rest show none.
+  maxUptimeReads: 40,
+} as const;
+
+// Every read of a public source gives up after this long, so a slow source cannot hold a render.
+export const FETCH = {
+  timeoutMs: 8_000,
 } as const;
 
 export const UNITS = {

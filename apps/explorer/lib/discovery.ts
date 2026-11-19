@@ -31,6 +31,8 @@ export interface DiscoverySnapshot {
   sellers: Seller[];
   // Null when the index does not answer /network (an older index): only online sellers are known.
   network: NetworkStatus | null;
+  // True when this render stopped at one of DISCOVERY's read bounds: sellers or uptimes may be missing.
+  truncated: boolean;
   error: string | null;
 }
 
@@ -67,16 +69,18 @@ function uptime(value: unknown): Uptime {
   };
 }
 
-// Every seller offering any listed model, from the paged /sellers answers.
-async function sellersOf(modelIds: string[]): Promise<Map<string, Seller>> {
+// Every seller offering any listed model, from the paged /sellers answers, within DISCOVERY.maxSellerPages
+// pages in all; `truncated` when a page was left unread.
+async function sellersOf(
+  modelIds: string[],
+): Promise<{ byNode: Map<string, Seller>; truncated: boolean }> {
   const byNode = new Map<string, Seller>();
+  let pages = 0;
   for (const modelId of modelIds) {
     let cursor: string | null = null;
-    for (
-      let pages = 0;
-      pages < DISCOVERY.maxSellerPages && (pages === 0 || cursor);
-      pages += 1
-    ) {
+    do {
+      if (pages >= DISCOVERY.maxSellerPages) return { byNode, truncated: true };
+      pages += 1;
       const query = new URLSearchParams({ model: modelId });
       if (cursor) query.set('cursor', cursor);
       const page = record(await read(`/sellers?${query}`), 'sellers page');
@@ -93,9 +97,9 @@ async function sellersOf(modelIds: string[]): Promise<Map<string, Seller>> {
           });
       }
       cursor = nullable(page.next, (present) => text(present, 'next'));
-    }
+    } while (cursor);
   }
-  return byNode;
+  return { byNode, truncated: false };
 }
 
 // Live view of the discovery index: models offered now, sellers online and their uptime. Read once per
@@ -108,6 +112,7 @@ export const getDiscovery = cache(async (): Promise<DiscoverySnapshot> => {
       generatedAt: 0,
       sellers: [],
       network: null,
+      truncated: false,
       error: error instanceof Error ? error.message : 'discovery unavailable',
     };
   }
@@ -119,10 +124,11 @@ async function loadDiscovery(): Promise<DiscoverySnapshot> {
   const modelIds = list(listed.models, 'models.models').map((entry) =>
     text(record(entry, 'models.model').id, 'model.id'),
   );
-  const sellers = [...(await sellersOf(modelIds)).values()];
+  const found = await sellersOf(modelIds);
+  const sellers = [...found.byNode.values()];
   const network = read('/network').then(parseNetworkStatus, () => null);
   await Promise.all(
-    sellers.map(async (seller) => {
+    sellers.slice(0, DISCOVERY.maxUptimeReads).map(async (seller) => {
       try {
         seller.uptime = uptime(
           await read(`/uptime?node=${encodeURIComponent(seller.nodeId)}`),
@@ -136,6 +142,7 @@ async function loadDiscovery(): Promise<DiscoverySnapshot> {
     generatedAt: num(listed.generatedAt, 'models.generatedAt'),
     sellers,
     network: await network,
+    truncated: found.truncated || sellers.length > DISCOVERY.maxUptimeReads,
     error: null,
   };
 }

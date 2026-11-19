@@ -226,6 +226,7 @@ void test('offers of the same model with different variants are summarized apart
   const summary = summarizeOffers({
     generatedAt: 0,
     network: null,
+    truncated: false,
     error: null,
     sellers: [
       {
@@ -246,6 +247,7 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
   const offers = summarizeOffers({
     generatedAt: 0,
     network: null,
+    truncated: false,
     error: null,
     sellers: [
       {
