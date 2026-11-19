@@ -11,6 +11,7 @@ import {
   aclIsPrivate,
   parseAcls,
   pathsArePrivate,
+  paymentPathsArePrivate,
   readAcls,
   restrictDirectory,
   userSid,
@@ -141,6 +142,19 @@ void test('windows acl: private means owned by this account and opened by no one
     aclIsPrivate({ owner: WINDOWS_SIDS.administrators, rules }, SID),
     true,
   );
+});
+
+void test('payment ACL checks read current permissions and refuse an incomplete report', async () => {
+  const outputs = {
+    'whoami.exe': '"DESKTOP","' + SID + '"',
+    'powershell.exe': 'item 0\nowner ' + SID + '\nrule ' + SID + ' Allow',
+  };
+  const { fake } = tools(outputs);
+  assert.equal(await paymentPathsArePrivate(['C:\\payments'], fake), true);
+  outputs['powershell.exe'] += '\nrule S-1-1-0 Allow';
+  assert.equal(await paymentPathsArePrivate(['C:\\payments'], fake), false);
+  outputs['powershell.exe'] = 'item 0\nowner ' + SID + '\nrule S-1-1-0';
+  assert.equal(await paymentPathsArePrivate(['C:\\payments'], fake), false);
 });
 
 void test('mode bits decide privacy on POSIX only; the public sequence never judged the owner', () => {

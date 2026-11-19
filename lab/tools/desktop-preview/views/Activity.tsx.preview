@@ -1,0 +1,53 @@
+import { useSyncExternalStore } from 'react';
+import { Modal } from './Modal';
+import { activityDate } from './activity-presentation';
+import { conversationSummary } from './chat-history';
+import { ActivitySessions } from './ActivitySessions';
+import type { ChatController } from './chat-controller';
+import { Button, List, ListRow, PagePanel } from './UI';
+import type { ActivityView } from './useActivity';
+import type { X402View } from './useX402';
+
+type Props = {
+  x402?: X402View;
+  activity: ActivityView;
+  chat: ChatController;
+  onPayments(): void;
+  onOpenChat(id: string): void;
+  selectedSession: string | null;
+  onSelectSession(id: string | null): void;
+};
+export function Activity({
+  x402,
+  activity,
+  chat,
+  onOpenChat,
+  selectedSession,
+  onSelectSession,
+}: Props) {
+  const { sessions: conversations } = useSyncExternalStore(
+    chat.subscribe,
+    chat.getSnapshot,
+  );
+  const entries = activity.state?.available ? activity.state.sessions : [];
+  const selected = entries.find(entry => entry.id === selectedSession);
+  const linked = selected ? conversations.filter(chat =>
+    conversationSummary(chat).paymentSessionIds.includes(selected.id)) : [];
+  return (
+    <PagePanel>
+      <ActivitySessions conversations={conversations} activity={activity} x402={x402}
+        onOpenChat={onOpenChat} onSelect={onSelectSession} />
+      {selected && <Modal title="Session activity" close={() => onSelectSession(null)}>
+        <List label="Usage breakdown">
+          <ListRow trailing={selected.chatCount}>Chat replies</ListRow>
+          <ListRow trailing={selected.agentCount}>API requests</ListRow>
+          <ListRow trailing={activityDate(selected.updatedAt)}>Last activity</ListRow>
+        </List>
+        {linked.map(chat => <Button key={chat.id} onClick={() => {
+          onSelectSession(null);
+          onOpenChat(chat.id);
+        }}>{chat.title}</Button>)}
+      </Modal>}
+    </PagePanel>
+  );
+}

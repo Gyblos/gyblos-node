@@ -21,11 +21,10 @@ import {
 import {
   acquireProcessLock,
   checkPrivateDirectory,
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
   readPrivateFile,
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { batchOpeningAbsent } from './batch-opening-proof';
 import type { PoolRecord, PoolRow } from './batch-pool-types';
@@ -109,6 +108,7 @@ export async function readPool(
 ): Promise<PoolRecord> {
   if (!(await checkPrivateDirectory(paths.directory)))
     return { version: BATCH_POOL_VERSION, entries: [] };
+  await ensurePrivatePaymentPaths(paths);
   const raw = await withBatchState(paths, () =>
     readPrivateFile(paths.state, BATCH_SESSION_DEFAULTS.poolBytes),
   );
@@ -141,7 +141,6 @@ export async function readPool(
       ],
     };
   }
-  if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
   const record = parse(JSON.parse(raw));
   const known = record.entries.find((entry) => entry.legacy);
   if (
@@ -178,7 +177,7 @@ async function seed(paths: BatchPoolPaths, row: PoolRow, now: number) {
       return sessionFail(SESSION_CODES.UNVERIFIED);
     return;
   }
-  await ensurePrivateDirectory(pathsFor.directory);
+  await ensurePrivatePaymentPaths(pathsFor);
   await withBatchState(pathsFor, () =>
     writePrivateFile(
       pathsFor.state,
@@ -189,8 +188,7 @@ async function seed(paths: BatchPoolPaths, row: PoolRow, now: number) {
   );
 }
 export async function openPoolStore(paths: BatchPoolPaths, now: () => number) {
-  if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
-  await ensurePrivateDirectory(paths.directory);
+  await ensurePrivatePaymentPaths(paths);
   const lock = await acquireProcessLock(paths.lock);
   let current: PoolRecord;
   let poisoned = false;

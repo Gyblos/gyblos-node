@@ -1,0 +1,91 @@
+// Show source-level usage while preserving the original provider payment reference.
+import { ArrowUpRight, CurrencyCircleDollar, PaypalLogo } from '@phosphor-icons/react';
+import { useState, useSyncExternalStore } from 'react';
+import { x402Amount, x402Asset, x402Explorer, type X402Record } from '../x402-model';
+import type { ActivityEntry } from '../activity-model';
+import type { ChatController } from './chat-controller';
+import { sessionOutcome } from './activity-presentation';
+import { DataCell, TableRow } from './DataTable';
+import { HISTORY, HISTORY_METHOD, HISTORY_PERIOD, type HistoryMethod, type HistoryPeriod } from './history-constants';
+import { historyDate, paymentAmount, shortReference } from './history-presentation';
+import { ChoiceMenu, Section } from './Management';
+import { Pagination } from './Pagination';
+import { PaymentReference } from './PaymentReference';
+import { ScrollTable } from './ScrollTable';
+import { Badge, IconButton } from './UI';
+import type { ActivityView } from './useActivity';
+import type { X402View } from './useX402';
+
+type Source = 'Chat' | 'API';
+type Row = {
+  id: string; at: number; source: Source | null;
+} & ({ method: 'USDC'; record: X402Record } | { method: 'PayPal'; entry: ActivityEntry; cents: number; authorization: boolean });
+
+export function SpendingHistory({ activity, buyer, chat, onActivity, onChat }: {
+  activity: ActivityView; buyer?: X402View; chat: ChatController;
+  onActivity(id: string): void; onChat(id: string): void;
+}) {
+  const { sessions } = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
+  const conversations = new Map(sessions.flatMap(session => session.messages.map(message => [message.id, session] as const)));
+  const [method, setMethod] = useState<HistoryMethod>(HISTORY_METHOD.ALL);
+  const [source, setSource] = useState<'All sources' | Source>('All sources');
+  const [period, setPeriod] = useState<HistoryPeriod>(HISTORY_PERIOD.MONTH);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState<number>(HISTORY.PAGE_SIZES[0]);
+  const rows: Row[] = [];
+  for (const record of buyer?.state.summary.records ?? []) {
+    rows.push({ id: 'usdc-' + record.id, at: record.at, method: 'USDC', record, source: 'Chat' });
+  }
+  for (const entry of activity.state?.available ? activity.state.sessions : []) {
+    const base = { at: entry.updatedAt, method: HISTORY_METHOD.PAYPAL, entry, authorization: false };
+    if (entry.chatCount || entry.chatCents)
+      rows.push({ ...base, id: 'chat-' + entry.id, source: 'Chat', cents: entry.chatCents });
+    if (entry.agentCount || entry.agentCents)
+      rows.push({ ...base, id: 'api-' + entry.id, source: 'API', cents: entry.agentCents });
+    if (entry.unconfirmedCents)
+      rows.push({ ...base, id: 'unconfirmed-' + entry.id, source: null, cents: entry.unconfirmedCents });
+    if (!entry.recordedCents && !entry.chatCount && !entry.agentCount) {
+      const authorization = entry.capturedCents === null;
+      rows.push({ ...base, id: 'session-' + entry.id, source: null, authorization, cents: entry.capturedCents ?? entry.limitCents });
+    }
+  }
+  const after = period === HISTORY_PERIOD.ALL ? 0 : Date.now() - HISTORY.DAY_MS * (period === HISTORY_PERIOD.WEEK ? HISTORY.WEEK_DAYS : HISTORY.MONTH_DAYS);
+  const visible = rows.filter(row => row.at >= after && (method === HISTORY_METHOD.ALL || method === row.method)
+    && (source === 'All sources' || row.source === source)).sort((a, b) => b.at - a.at);
+  const current = Math.min(page, Math.max(1, Math.ceil(visible.length / size)));
+  const references = activity.references.available ? activity.references.references : [];
+  return <Section title="Payment history">
+    <div className="ui-toolbar preview-history-filters">
+      <ChoiceMenu label="Usage source" value={source} options={['All sources', 'API', 'Chat']} onChange={v => {setSource(v); setPage(1);}} />
+      <ChoiceMenu label="Payment method" value={method} options={Object.values(HISTORY_METHOD)} onChange={v => {setMethod(v); setPage(1);}} />
+      <ChoiceMenu label="Period" value={period} options={Object.values(HISTORY_PERIOD)} onChange={v => {setPeriod(v); setPage(1);}} />
+    </div>
+    {activity.state && !activity.state.available && method !== HISTORY_METHOD.USDC && <p role="status">PayPal history unavailable.</p>}
+    {buyer && !buyer.state.summary.available && method !== HISTORY_METHOD.PAYPAL && <p role="status">USDC history unavailable.</p>}
+    <ScrollTable caption="Payment history" regionLabel="Payment history table" headings={['Date', 'Source', 'Method', 'Amount', 'Status', 'Payment ID', 'Details']} resetKey={[source, method, period, current, size].join('|')}>
+      {visible.slice((current-1)*size, current*size).map(row => {
+        const record = row.method === 'USDC' ? row.record : undefined;
+        const entry = row.method === 'PayPal' ? row.entry : undefined;
+        const conversation = record && conversations.get(record.id + '-assistant');
+        const reference = entry && references.find(ref => ref.sessionId === entry.id);
+        const amount = row.method === 'USDC'
+          ? (row.record.free ? '' : '− ') + x402Amount(row.record.chargeAtomic, row.record.policy) + ' ' + x402Asset(row.record.policy)
+          : (row.entry.capturedCents !== null && row.cents > 0 ? '− ' : '') + paymentAmount(row.cents);
+        return <TableRow key={row.id}>
+          <th scope="row"><time dateTime={new Date(row.at).toISOString()}>{historyDate(row.at)}</time></th>
+          <DataCell label="Source">{row.source ? <Badge>{row.source}</Badge> : '—'}</DataCell>
+          <DataCell label="Method"><span role="img" aria-label={row.method} title={row.method}>{entry ? <PaypalLogo size={18} /> : <CurrencyCircleDollar size={18} />}</span></DataCell>
+          <DataCell label="Amount">{amount}{row.method === 'PayPal' && row.authorization && <span className="activity-row-meta">Authorization</span>}</DataCell>
+          <DataCell label="Status">{row.method === 'PayPal' ? sessionOutcome(row.entry) : row.record.free ? 'Free' : 'Confirmed'}</DataCell>
+          <DataCell label="Payment ID">{record?.transaction
+            ? <a href={x402Explorer(record.transaction)} target="_blank" rel="noreferrer" aria-label="View transaction in explorer">{shortReference(record.transaction)}</a>
+            : <PaymentReference reference={reference} />}</DataCell>
+          <DataCell label="Details">{entry ? <IconButton label="View session details" onClick={() => onActivity(entry.id)}><ArrowUpRight size={14}/></IconButton>
+            : conversation ? <IconButton title="Open chat" label={'Open chat: '+conversation.title} onClick={() => onChat(conversation.id)}><ArrowUpRight size={14}/></IconButton> : '—'}</DataCell>
+        </TableRow>;
+      })}
+      {!visible.length && <TableRow><td colSpan={7}>No matching records.</td></TableRow>}
+    </ScrollTable>
+    {visible.length >= HISTORY.PAGE_SIZES[0] && <Pagination label="Payment history pagination" total={visible.length} page={current} pageSize={size} onPage={setPage} onPageSize={v => {setSize(v); setPage(1);}} />}
+  </Section>;
+}

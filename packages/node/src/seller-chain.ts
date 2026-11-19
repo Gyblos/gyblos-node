@@ -18,17 +18,12 @@ import {
 } from '@gyblos/payments-upto';
 import { P2P_ROLES, PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
-import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { GENESIS_READ_MS, NODE_ERROR_CODES } from './constants';
 import { NodeError } from './errors';
 import { roleSigner, type RoleConfig } from './roles';
 import type { SellerPayments } from './seller-paid';
-import {
-  sellerChainSessions,
-  sellerSessionBuyerIds,
-} from './seller-session-chain';
+import { sellerChainSessions } from './seller-session-chain';
 
 // The chain the RPC serves; tests inject one so they never reach the network.
 export type GenesisReader = (rpcUrl: string) => Promise<string>;
@@ -49,10 +44,6 @@ export function sellerChainPayments(
   limits?: { maxSessions: number },
 ) => Promise<SellerPayments> {
   return async (role, limits) => {
-    const buyerNodeIds = sellerSessionBuyerIds(process.env);
-    if (buyerNodeIds.length) {
-      if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
-    }
     if (
       role.role !== P2P_ROLES.SELLER ||
       role.payTo === undefined ||
@@ -68,7 +59,6 @@ export function sellerChainPayments(
     const authorizer = await roleSigner(P2P_ROLES.SELLER, 'authorizer');
     const sessions = await sellerChainSessions({
       environment: process.env,
-      buyerNodeIds,
       rpcUrl: role.rpcUrl,
       feePayer,
       authorizer,

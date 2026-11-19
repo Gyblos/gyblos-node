@@ -29,7 +29,7 @@ import {
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   acquireProcessLock,
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
 } from '@gyblos/runtime/private-file';
 
 import { NODE_ERROR_CODES } from './constants';
@@ -53,7 +53,10 @@ export function buyerChainWithdraw(
     if (role.role !== P2P_ROLES.BUYER)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
     const paths = batchPoolPathsIn(process.env);
-    const lock = await ensurePrivateDirectory(paths.directory)
+    const lock = await ensurePrivatePaymentPaths({
+      directory: paths.directory,
+      lock: paths.runtimeLock,
+    })
       .then(() => acquireProcessLock(paths.runtimeLock))
       .catch(() => {
         throw new NodeError(NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE);

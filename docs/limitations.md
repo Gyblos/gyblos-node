@@ -107,12 +107,10 @@ Behavior and recovery steps are in [payments.md](payments.md) and
 
 [payment-sessions.md](payment-sessions.md) owns session behavior.
 
-- Sessions are an allowlisted pilot: a seller accepts at most 16 buyers through
-  `GYBLOS_SESSION_BUYER_NODE_IDS`. There is no public session admission.
-- Windows refuses financial sessions on both seller and buyer.
-- A seller holds at most `max_sessions` (16 or fewer) unfinished sessions, and
-  keeps closed-session proof for at most 64 buyers; past that it refuses new
-  buyers instead of evicting proof.
+- A priced seller accepts authenticated buyers up to its configured capacity of
+  1–16 unfinished sessions. Verified closed journals remain available after
+  leaving the active index.
+- Windows validates access to payment folders, locks and journals using ACLs.
 - A buyer holds at most 16 seller channels. Each channel runs one request at a
   time.
 - There is no automatic top-up, channel rotation or seller failover.
