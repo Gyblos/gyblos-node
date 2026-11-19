@@ -184,3 +184,39 @@ void test('preview screens omit the chain name from labels and accessible copy',
     assert.equal(/(?<![@./])\bsolana\b(?![.:/])/i.test(view), false, file);
   }
 });
+
+void test('preview omits the free-network composer caption and retains operational status copy', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const chat = await readFile(
+    new URL('../../apps/desktop/src/ui/Chat.tsx', import.meta.url),
+    'utf8',
+  );
+  const preview =
+    transformBrand(chat, '/desktop/src/ui/Chat.tsx', '/desktop') ?? chat;
+  assert.doesNotMatch(preview, /Free · Gyblos network/);
+  for (const status of [
+    'Generating…',
+    'Authorize in Payments',
+    "'x402'",
+    'PayPal Sandbox',
+    'Set up in Payments',
+    'Esc to stop',
+  ])
+    assert.ok(preview.includes(status));
+});
+
+void test('preview payment, session and key lists use the same table component', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  for (const view of ['SpendingHistory', 'ActivitySessions', 'UsdcApiKeys']) {
+    const file = 'apps/desktop/src/ui/' + view + '.tsx';
+    const source = await readFile(file, 'utf8');
+    const rendered = transformBrand(source, file, 'apps/desktop') ?? source;
+    assert.ok(
+      rendered.includes('<ScrollTable'),
+      view + ' must use the shared table',
+    );
+    assert.doesNotMatch(rendered, /<(?:DataTable|table)\b/);
+  }
+});
