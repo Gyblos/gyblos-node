@@ -4,7 +4,7 @@
 // absolute path, never through PATH.
 import { execFile } from 'node:child_process';
 import { lstat, mkdtemp, readdir, rename, rmdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -89,6 +89,7 @@ export async function restrictDirectory(
 export async function createWindowsPaymentDirectory(
   path: string,
   tools: AclTools = defaultTools,
+  stagingParent = dirname(path),
 ) {
   const exists = async () =>
     lstat(path).then(
@@ -99,7 +100,7 @@ export async function createWindowsPaymentDirectory(
       },
     );
   if (await exists()) return;
-  const temporary = await mkdtemp(path + '.creating-');
+  const temporary = await mkdtemp(join(stagingParent, '.payment-creating-'));
   let published = false;
   try {
     await restrictDirectory(temporary, tools);

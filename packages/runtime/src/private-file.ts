@@ -65,6 +65,7 @@ async function privateDirectory(
   path: string,
   create: boolean,
   payment = false,
+  stagingParent?: string,
 ): Promise<boolean> {
   return guarded(async () => {
     const absolute = resolve(path);
@@ -77,7 +78,11 @@ async function privateDirectory(
       try {
         if (create) {
           if (payment && WINDOWS && current === absolute)
-            await createWindowsPaymentDirectory(current);
+            await createWindowsPaymentDirectory(
+              current,
+              undefined,
+              stagingParent,
+            );
           else await mkdir(current, { mode: FILE_MODES.privateDirectory });
         }
       } catch (error) {
@@ -126,7 +131,8 @@ export async function ensurePrivatePaymentPaths(paths: {
       await privateDirectory(parent, true, true);
       if (!(await paymentPathsArePrivate([parent]))) fail();
     }
-    await privateDirectory(paths.directory, true, true);
+    // A crash may leave an empty staging folder. Keep it outside the enumerated buyer/seller IDs.
+    await privateDirectory(paths.directory, true, true, paths.paymentRoot);
   }
   // Restored directories and their existing journal and lock share one ACL read.
   const existing = [...ancestors, paths.directory];
