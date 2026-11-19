@@ -42,7 +42,9 @@ type Props = {
 };
 export function Payments(props: Props) {
   const [budgetOpen, setBudgetOpen] = useState(false);
-  const [walletOpen, setWalletOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(
+    () => new URLSearchParams(location.search).get('review') === 'wallet-backup',
+  );
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const entry = props.activity.state?.sessions.find(item => item.id === receiptId);
   const openPaypal = () => managePaypal(props.onPaymentMethod, () => props.onManagePaypal(true));

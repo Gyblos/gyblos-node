@@ -808,6 +808,12 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   max-height: calc(100dvh - 2rem);
   padding: clamp(16px, 3vw, 24px);
 }
+.wallet-details .backup-verified-icon {
+  color: var(--connected);
+}
+.wallet-details .backup-needed-icon {
+  color: var(--warm);
+}
 .modal[data-size='lg'] .wallet-details {
   gap: 16px;
 }
@@ -821,5 +827,11 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   }
   .modal[data-size='lg'] .wallet-details .ui-row-content {
     flex-basis: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal[data-size='lg'] .wallet-details .ui-row-leading + .ui-row-content {
+    flex: 1 1 60%;
   }
 }

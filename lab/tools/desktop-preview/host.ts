@@ -173,7 +173,7 @@ export function createPreviewHost(
   const wallet = parseWalletSummary({
     status: WALLET_STATUS.READY,
     address: payer,
-    backupVerified: true,
+    backupVerified: query.get('backup') !== 'needed',
     fundingEnabled: false,
   });
   const desktopWallet = {

@@ -41,8 +41,26 @@ export function transformBrand(source: string, id: string, desktop: string) {
       );
   }
   if (target === `${base}/src/ui/WalletDetails.tsx`) {
-    const facts = replaceOnce(
+    const recovery = replaceOnce(
       source,
+      '<List label="Wallet recovery">\n        <ListRow\n          leading={null}',
+      `<List label="Wallet recovery">
+        <ListRow
+          leading={ready && wallet.backupVerified
+            ? <CheckCircle size={20} weight="fill" className="backup-verified-icon" aria-hidden="true" />
+            : ready
+              ? <Warning size={20} weight="fill" className="backup-needed-icon" aria-hidden="true" />
+              : null}`,
+    );
+    const facts = replaceOnce(
+      replaceOnce(
+        recovery,
+        'import { Archive,',
+        'import { CheckCircle, Warning, Archive,',
+      ).replace(
+        'Create a recovery file and verify it.',
+        'No verified backup yet. Back up this wallet to recover it later.',
+      ),
       '<dt>Solana address</dt>',
       '<dt>Wallet address</dt>',
     );

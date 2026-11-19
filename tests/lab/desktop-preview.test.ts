@@ -131,6 +131,21 @@ void test('preview wallet collection contains public example metadata only', asy
   assert.equal(result.wallet.status, 'ready');
   assert.equal(result.wallet.fundingEnabled, false);
 });
+void test('wallet backup review reflects verified and needed states in the collection', async () => {
+  for (const [state, verified] of [
+    ['verified', true],
+    ['needed', false],
+  ] as const) {
+    const call = await fixture(
+      '?screen=payments&review=wallet-backup&backup=' + state,
+    );
+    const { wallet, wallets } = parseWalletCollection(
+      await call('desktopWallet', 'collection'),
+    );
+    assert.equal(wallet.backupVerified, verified);
+    assert.equal(wallets[0]?.backupVerified, verified);
+  }
+});
 void test('preview PayPal status follows the current public contract', async () => {
   const call = await fixture();
   const result = parsePaypalResult(

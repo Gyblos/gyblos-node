@@ -50,6 +50,10 @@ Follow the root `AGENTS.md` and `apps/desktop/DESIGN.md`: show the mockup,
 obtain explicit approval, then port the accepted visual proposal to the desktop
 app. Publishing this preview or its PR is not desktop implementation approval.
 
+Open `?screen=payments&review=wallet-backup&backup=needed` to inspect the
+recovery warning, or use `backup=verified` to see the green check. Both use
+synthetic wallet metadata.
+
 ## Validation and limits
 
 Run `node --import tsx --test "tests/lab/desktop-preview*.test.ts"` for the
