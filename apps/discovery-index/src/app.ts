@@ -28,6 +28,7 @@ import { IndexError, statusOf } from './errors';
 import { ipKey } from './ip-key';
 import { allowed, type ResolvedLimiters } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
+import { networkPage, parseNetworkQuery } from './network';
 import { acceptRecord, type PublishContext } from './publish';
 import { publishModeOf } from './publishers';
 import type { RegistrationStore } from './registration-store';
@@ -239,7 +240,7 @@ function inBackground(context: IndexContext, task: Promise<void>) {
   }
 }
 
-// The public reads with a body: sellers pages, the model list and seller uptime.
+// The public reads with a body: sellers pages, the model list, seller uptime and the network.
 function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
   app.get(
     INDEX_ROUTES.SELLERS,
@@ -277,6 +278,23 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
       return {
         key: `${origin}${INDEX_ROUTES.UPTIME}?node=${node}`,
         body: () => uptimePage(context.get('storage'), node, settings.now()),
+      };
+    }),
+  );
+  app.get(
+    INDEX_ROUTES.NETWORK,
+    cachedRead(settings, async (context) => {
+      parseNetworkQuery(context.req.url);
+      const { origin } = new URL(context.req.url);
+      return {
+        key: `${origin}${INDEX_ROUTES.NETWORK}`,
+        body: () =>
+          networkPage(
+            context.get('storage'),
+            settings.registrations,
+            settings.now(),
+            settings.maxResponseBytes,
+          ),
       };
     }),
   );

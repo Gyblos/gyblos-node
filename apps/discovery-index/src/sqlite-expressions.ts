@@ -1,6 +1,14 @@
 // Contains SQLite expressions that Drizzle 0.45 cannot build, plus typed projection bindings.
 // No complete query or external SQL text is accepted; every dynamic value stays parameterized.
-import { eq, isNull, or, sql, type GetColumnData, type SQL } from 'drizzle-orm';
+import {
+  eq,
+  isNull,
+  or,
+  sql,
+  type GetColumnData,
+  type SQL,
+  type SQLWrapper,
+} from 'drizzle-orm';
 import type { AnySQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 import type { DiscoveryListingIndex } from './constants';
@@ -63,3 +71,7 @@ export const publicationCount = (
   incoming: number,
 ) =>
   sql<number>`case when ${window} >= ${incoming} then ${count} + 1 else 1 end`;
+
+// Drizzle cannot place a correlated subquery in a SELECT list. The network read takes each NodeId's
+// newest uptime row this way: one primary-key lookup per NodeId instead of an aggregate over its history.
+export const scalarSubquery = (query: SQLWrapper) => sql<unknown>`(${query})`;

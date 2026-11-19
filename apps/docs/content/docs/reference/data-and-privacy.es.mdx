@@ -14,7 +14,7 @@ desactivar lo que es opcional.
 | Tus prompts y las respuestas                                | El vendedor que atiende la solicitud y su proveedor de motor | En cada solicitud                                                      | No se puede: un vendedor tiene que leer el prompt para responder |
 | [Recibos firmados](#recibos)                                | El recolector de métricas, `collector.gyblos.com`            | Versiones publicadas, más o menos una vez por minuto                   | No se puede                                                      |
 | [Observaciones de telemetría](#observaciones)               | El recolector de métricas                                    | Versiones publicadas, junto con los recibos                            | Sí: `GYBLOS_OBSERVATIONS=off`                                    |
-| [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado                                      | Sí: pon `publish = false`                                        |
+| [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red, más tiempo      | En parte: pon `publish = false`                                  |
 | [Registro](#descubrimiento)                                 | El índice de descubrimiento y Solana devnet                  | Una vez, cuando ejecutas `gyblos seller register`                      | Tú decides si te registras                                       |
 | [Búsqueda de actualizaciones](#búsqueda-de-actualizaciones) | La API de GitHub                                             | App de escritorio: al iniciar y cada 5 minutos. Vendedor: con `status` | Sí: `GYBLOS_UPDATE_CHECK=0`                                      |
 | [Metadatos de red](#red)                                    | Relays, pares, el índice, el recolector y el RPC de Solana   | En cada conexión                                                       | En parte: [modo solo relay](/es/reference/configuration)         |
@@ -151,6 +151,14 @@ a un contacto que diste a Gyblos (un correo o un usuario de Telegram). El índic
 la invitación, así que los operadores de Gyblos pueden vincularlo con tu NodeId, la dirección del dueño
 (owner) y el país. El contacto nunca se publica. El registro también escribe una
 entrada pública en el registro de agentes 8004 en Solana devnet.
+
+La lista pública de la red del índice (`/v1/network`) muestra cada NodeId registrado, porque el registro
+8004 ya lo hace público, y cualquier otro vendedor que el índice vio en los últimos 30 días. Para cada
+uno muestra si está online, offline o sin publicar (nunca publicó o se retiró), la primera y la última
+vez que el índice lo vio, y sus modelos mientras está online. Dejar de publicar no te saca de esta
+lista: un vendedor registrado sigue en ella, y cualquier otro hasta 30 días después de su última
+presencia. No muestra la dirección del dueño, el contacto, el país ni la dirección IP. Un NodeId
+revocado aparece solo mientras está online.
 
 Los compradores y la app de escritorio leen el índice para encontrar vendedores. `gyblos seller status
 --online` además le pide el uptime del propio vendedor por su NodeId, que el vendedor ya publica ahí. El
