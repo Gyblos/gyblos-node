@@ -130,7 +130,7 @@ export async function tickBatch(context: BatchSellerContext) {
     (await waitBatch(options.closing(state.channelId), options.operationMs)) ||
     (idle &&
       !generating &&
-      (requests.length === 0 ||
+      ((state.state === SESSION_STATES.OPEN && requests.length === 0) ||
         unsigned ||
         BigInt(state.cumulativeAtomic) >= threshold))
   )

@@ -73,6 +73,29 @@ void test('an unused channel refunds its full deposit after the idle period', as
   assert.equal(await rig.seller().tick(), undefined);
   assert.deepEqual(rig.calls, ['deposit', 'refund']);
 });
+void test('idle handling preserves an interrupted opening for recovery', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  const payload = await rig.buyer.open();
+  const observation = t.mock.method(
+    rig.sellerOptions,
+    'observeOpening',
+    async () => {
+      throw new Error('Simulated observation outage');
+    },
+  );
+  await rig.restart();
+  await assert.rejects(rig.seller().open(payload));
+  rig.time(rig.now() + 1001);
+  assert.equal(await rig.seller().tick(), undefined);
+  assert.equal(rig.seller().snapshot().state, SESSION_STATES.OPENING);
+  assert.deepEqual(rig.calls, []);
+  observation.mock.restore();
+  await rig.restart();
+  await rig.seller().open(payload);
+  assert.equal(rig.seller().snapshot().state, SESSION_STATES.OPEN);
+  assert.deepEqual(rig.calls, ['deposit']);
+});
 void test('soft minimum defers idle dust but expiry still refunds it', async (t) => {
   const rig = await sessionRig();
   t.after(rig.dispose);
