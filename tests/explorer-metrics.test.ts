@@ -10,8 +10,9 @@ import {
   type CollectorSnapshot,
 } from '@gyblos/explorer/collector-shape';
 import { mergedLatency, type Latency } from '@gyblos/explorer/latency';
+import { completion, modelRows } from '@gyblos/explorer/model-table';
 import { summarizeOffers } from '@gyblos/explorer/offers';
-import { summarizeUsage } from '@gyblos/explorer/usage';
+import { successRate, summarizeUsage } from '@gyblos/explorer/usage';
 
 const BUCKETS = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 30000, 60000];
 function latency(...samples: number[]): Latency {
@@ -234,5 +235,110 @@ void test('offers of the same model with different variants are summarized apart
       },
     ],
   });
-  assert.deepEqual([...summary.models.keys()], ['m Q4', 'm instruct Q4']);
+  assert.deepEqual(
+    [...summary.models.values()].map((model) => model.variant),
+    [null, 'instruct'],
+  );
+});
+
+void test('the models table joins offers now with receipts, keeps both kinds of rows and counts cancellations apart', () => {
+  const offers = summarizeOffers({
+    generatedAt: 0,
+    network: null,
+    error: null,
+    sellers: [
+      {
+        nodeId: 'n',
+        owner: 'o',
+        uptime: null,
+        models: [
+          {
+            modelId: 'new',
+            variant: null,
+            quantization: null,
+            contextTokens: 8,
+            pricing: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+          },
+          {
+            modelId: 'served',
+            variant: null,
+            quantization: 'Q4',
+            contextTokens: 8,
+            pricing: { inputAtomicPerMtok: '5', outputAtomicPerMtok: '9' },
+          },
+        ],
+      },
+    ],
+  });
+  const withCancel = (completed: number, failed: number, cancelled: number) => {
+    const base = side(completed + failed + cancelled, completed, failed, 0);
+    return {
+      ...base,
+      outcomes: { completed, failed, cancelled },
+      authorizedAtomic: null,
+    };
+  };
+  const rows = modelRows(offers.models, [
+    {
+      modelId: 'served',
+      variant: null,
+      quantization: 'Q4',
+      free: null,
+      paid: withCancel(18, 2, 3),
+    },
+    {
+      modelId: 'gone',
+      variant: null,
+      quantization: null,
+      free: withCancel(1, 0, 0),
+      paid: null,
+    },
+    {
+      modelId: 'served',
+      variant: 'instruct',
+      quantization: 'Q4',
+      free: withCancel(0, 0, 4),
+      paid: null,
+    },
+    {
+      modelId: 'empty',
+      variant: null,
+      quantization: null,
+      free: withCancel(0, 0, 0),
+      paid: null,
+    },
+  ]);
+  assert.deepEqual(
+    rows.map((row) => [row.modelId, row.variant]),
+    [
+      ['served', null],
+      ['new', null],
+      ['served', 'instruct'],
+      ['gone', null],
+    ],
+  );
+  const [served, fresh, cancelledOnly, gone] = rows;
+  assert.equal(served?.now?.minOutput, 9n);
+  assert.ok(served?.paid);
+  assert.deepEqual(completion(served.paid), { done: 18, of: 20, ratio: 0.9 });
+  assert.equal(cancelledOnly?.now, null);
+  assert.ok(cancelledOnly?.free);
+  assert.deepEqual(completion(cancelledOnly.free), {
+    done: 0,
+    of: 0,
+    ratio: null,
+  });
+  assert.equal(served?.paid?.cancelled, 3);
+  assert.equal(served?.paid?.firstToken, 200);
+  assert.equal(fresh?.free, null);
+  assert.equal(gone?.now, null);
+});
+
+void test('cancellations stay out of the success rate', () => {
+  const day = (cancelled: number) => ({
+    ...side(30, 18, 2, 0),
+    outcomes: { completed: 18, failed: 2, cancelled },
+    authorizedAtomic: null,
+  });
+  assert.equal(successRate([day(10)]), 0.9);
 });
