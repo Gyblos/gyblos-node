@@ -16,6 +16,8 @@ export const UNITS = {
 } as const;
 
 // Upper bounds of the collector's latency histogram buckets (AGGREGATES.latencyBucketsMs).
+// The collector's first engine speed bucket bound (tokens per second).
+export const FIRST_SPEED_BOUND = 1;
 export const LATENCY_BUCKETS_MS = [
   100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000, 60_000,
 ] as const;
@@ -34,7 +36,7 @@ export const DISPLAY = {
   // Minimum width of wide tables, in px.
   wideTable: 860,
   dailyTable: 820,
-  modelsTable: 1080,
+  modelsTable: 1320,
   narrowTable: 420,
   defaultTable: 640,
   // Median latency.

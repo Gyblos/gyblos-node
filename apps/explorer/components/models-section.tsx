@@ -1,10 +1,16 @@
 // Owns the Models section: one row per model as published, with what is offered now (sellers, lowest
-// paid prices, context) next to what was served over the range (completed requests, cancellations and
-// the seller-measured first token), free and paid apart.
+// paid prices, context) next to what was served over the range (completed requests, cancellations, the
+// first token as the seller and the buyer measured it, and the engine's speed), free and paid apart.
 import { getCollector } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery';
-import { count, latencyMs, percent, usdc } from '../lib/format';
+import {
+  count,
+  latencyMs,
+  percent,
+  tokensPerSecond,
+  usdc,
+} from '../lib/format';
 import {
   completion,
   modelRows,
@@ -72,12 +78,14 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
           { label: 'Completed free', right: true },
           { label: 'Completed paid', right: true },
           { label: 'Cancelled free · paid', right: true },
-          { label: 'First token p50 free · paid', right: true },
+          { label: 'Seller first token p50 free · paid', right: true },
+          { label: 'Buyer first token p50 free · paid', right: true },
+          { label: 'Engine speed p50 free · paid', right: true },
         ]}
       >
         {rows.length ? null : (
           <tr>
-            <td className={`${td} text-muted`} colSpan={8}>
+            <td className={`${td} text-muted`} colSpan={10}>
               No model offered now or served in the range.
             </td>
           </tr>
@@ -92,9 +100,14 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
       </Table>
       <p className="mt-2 text-xs text-dim">
         Completed is out of the requests that completed or failed; cancellations
-        are shown apart and are not failures. First token is measured by the
-        seller. The lowest paid input and output prices may come from different
-        sellers.
+        are shown apart and are not failures. Seller first token is measured by
+        the seller. Buyer first token is measured by the buyer on streaming
+        requests, from the attempt with the chosen seller (after quotes) to the
+        first token, including local payment, tokenizer startup and channel
+        setup. Engine speed is output tokens per second of generation, only from
+        engines that report their generation time, shown as the lower bound of
+        the median. In those two columns, — means no data. The lowest paid input
+        and output prices may come from different sellers.
       </p>
       {offersKnown ? null : (
         <p className="mt-1 text-xs text-dim">
@@ -150,6 +163,20 @@ function ModelRowView({
           row.free?.firstToken ?? null,
           row.paid?.firstToken ?? null,
           latencyMs,
+        )}
+      </td>
+      <td className={numberCell}>
+        {pair(
+          row.free?.buyerFirstToken ?? null,
+          row.paid?.buyerFirstToken ?? null,
+          latencyMs,
+        )}
+      </td>
+      <td className={numberCell}>
+        {pair(
+          row.free?.engineSpeed ?? null,
+          row.paid?.engineSpeed ?? null,
+          tokensPerSecond,
         )}
       </td>
     </tr>
