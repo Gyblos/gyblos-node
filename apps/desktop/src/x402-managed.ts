@@ -7,6 +7,7 @@ import {
 } from '@gyblos/config';
 import { BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 
+import { BuyerSessionRequired } from './buyer-error';
 import { DESKTOP_X402 } from './x402/constants';
 
 export function buyerEnvironment(
@@ -101,9 +102,9 @@ function supervise(
     resolveReady = resolve;
     rejectReady = reject;
   });
-  const fail = () => {
+  const fail = (error = new Error('Local buyer could not start')) => {
     if (exited) return;
-    rejectReady(new Error('Local buyer could not start'));
+    rejectReady(error);
     worker.kill();
   };
   let timer = setTimeout(fail, startMs);
@@ -125,6 +126,8 @@ function supervise(
       return;
     }
     const value = message as Record<string, unknown>;
+    if (value.kind === BUYER_SIDECAR.SESSION_REQUIRED)
+      return fail(new BuyerSessionRequired());
     if (
       value.kind !== BUYER_SIDECAR.READY ||
       typeof value.url !== 'string' ||

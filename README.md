@@ -32,10 +32,10 @@ app ─▶ local buyer ══ Iroh (direct or relay) ══▶ seller node ─�
 ```
 
 - The **seller node** serves each offer in its `config.toml`, free or paid.
-- The **local buyer** verifies the seller's signed quote, then runs a free
-  request, or pays for a priced one through a per-request payment channel (or a
-  payment session, when the buyer has one configured). Its **buyer endpoint** is
-  an OpenAI- and Anthropic-compatible HTTP API on your machine.
+- The **local buyer** verifies the seller's signed quote. Free quotes incur no
+  charge. A priced quote uses a reusable payment channel, with a deposit of 1
+  USDC and a one-hour lifetime by default. Its **buyer endpoint** is an OpenAI-
+  and Anthropic-compatible HTTP API on your machine.
 - The **desktop app** runs the same local buyer inside an Electron app.
 
 ## Data that leaves your machine

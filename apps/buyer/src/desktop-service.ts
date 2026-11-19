@@ -40,10 +40,18 @@ export async function runBuyerSidecar(
         });
     }
     await stopped;
-  } catch {
+  } catch (error) {
     code = 1;
     try {
-      port.postMessage({ kind: BUYER_SIDECAR.ERROR });
+      const sessionRequired =
+        error instanceof Error &&
+        'reason' in error &&
+        error.reason === BUYER_SIDECAR.SESSION_REQUIRED;
+      port.postMessage({
+        kind: sessionRequired
+          ? BUYER_SIDECAR.SESSION_REQUIRED
+          : BUYER_SIDECAR.ERROR,
+      });
     } catch {
       /* Parent already exited. */
     }

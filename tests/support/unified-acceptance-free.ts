@@ -108,7 +108,9 @@ async function freeTerminal(run: PaidAcceptanceHost, signal: AbortSignal) {
   if (outcome && !outcome.ok) throw outcome.error;
   assert.equal(questions, 2);
   assert.ok(text.includes('Mode: automatic'));
-  assert.ok(text.includes(`Maximum deposit: ${PAID_ACCEPTANCE.maxAtomic}`));
+  assert.ok(
+    text.includes(`Maximum per question: ${PAID_ACCEPTANCE.maxAtomic}`),
+  );
   assert.ok(text.includes(PAID_ACCEPTANCE.text));
   assert.equal(text.includes('Payment:'), false);
   noPayments(run);

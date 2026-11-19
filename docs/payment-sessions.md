@@ -5,10 +5,9 @@ The buyer approves each answer's usage with a cumulative signature, and the
 seller settles the channel once, when the session closes. Sessions use the x402
 `batch-settlement` scheme on the official payment-channels program, on devnet.
 
-Per-request payment stays the default for every priced offer
-([payments.md](payments.md)). This page also owns how the buyer chooses between
-free and paid execution and what it does when a seller is busy
-([Buyer routing](#buyer-routing)).
+Guided setup uses a payment session for priced offers. This page also owns how
+the buyer chooses between free and paid execution and what it does when a seller
+is busy ([Buyer routing](#buyer-routing)).
 
 | Question              | Per-request paid                   | Payment session                         |
 | --------------------- | ---------------------------------- | --------------------------------------- |
@@ -65,8 +64,13 @@ to make room for another buyer.
 
 ### Explicit startup policy
 
-Add a `session` object to the buyer's `buyer/selection.json`, next to its
-existing request, selection and identity fields:
+New desktop and guided buyer profiles include a 1 USDC channel deposit and a
+one-hour lifetime. The initial request ceiling remains zero. For an existing
+profile with a positive request ceiling, add the following `session` object to
+`buyer/selection.json`, alongside `request` and `sellers`. Keep the existing
+price limits and private journals. Startup refuses paid settings until this
+field is present. An older profile with a zero ceiling can still serve free
+requests.
 
 ```json
 {
@@ -244,10 +248,10 @@ buyer) share one buyer runtime. Before it chooses how to execute, the buyer
 verifies discovery, the owner–NodeId binding, public-record replay protection,
 selection and the signed quote. Then the quote decides:
 
-| Signed prices   | Required quote budget | Execution                                                    |
-| --------------- | --------------------- | ------------------------------------------------------------ |
-| Both `"0"`      | `maxAtomic: "0"`      | Free channel, with the seller's free caps and replay checks  |
-| Either positive | Positive `maxAtomic`  | Paid: a payment session if configured, otherwise per-request |
+| Signed prices   | Required quote budget | Execution                                                   |
+| --------------- | --------------------- | ----------------------------------------------------------- |
+| Both `"0"`      | `maxAtomic: "0"`      | Free channel, with the seller's free caps and replay checks |
+| Either positive | Positive `maxAtomic`  | Paid through the configured payment session                 |
 
 The configured `request.maxAtomic` is a spending ceiling, not a paid-mode
 switch: a positive ceiling also accepts a free offer. The chosen executor

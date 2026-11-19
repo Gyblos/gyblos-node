@@ -18,9 +18,11 @@ import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
 import { executeSelectedBuyerFree } from './free-execution';
+import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
+import { onBuyerSelectionFailure } from './free-telemetry';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
 import { classifyPaidError } from './paid-http';
@@ -29,6 +31,7 @@ import {
   endpointToken,
   type startPaidBuyer,
 } from './paid-startup';
+import { selectConfiguredThenOpen } from './quote-selection';
 import { makeManager, type SessionState } from './session-manager';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 
@@ -107,26 +110,34 @@ function sessionSelection(
     excluded: Set<string>,
     current: AbortSignal,
     route: Parameters<BuyerRoutePorts<ChatResult>['select']>[2],
-  ) =>
-    selectWinner(
-      prepared,
-      {
-        endpoint,
-        buyer,
-        relayOnly,
-        onSellerFailure: options.onSellerFailure,
-        ...(router ? { onPinnedBusy: pinnedBusy } : {}),
-      },
-      excluded,
-      current,
-      {
-        ...request,
-        maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
-        priceCeilings: route.priceCeilings,
-        ...(inferenceNeedsTools(input) ? { tools: true } : {}),
-      },
-      route,
-    );
+  ) => {
+    const policy = {
+      ...request,
+      maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
+      priceCeilings: route.priceCeilings,
+      ...(inferenceNeedsTools(input) ? { tools: true as const } : {}),
+    };
+    const select = (
+      candidate: typeof request,
+      selectionRoute?: SelectionRoute,
+    ) =>
+      selectWinner(
+        prepared,
+        {
+          endpoint,
+          buyer,
+          relayOnly,
+          onSellerFailure: options.onSellerFailure,
+          ...(router ? { onPinnedBusy: pinnedBusy } : {}),
+        },
+        excluded,
+        current,
+        candidate,
+        selectionRoute,
+      );
+    if (router || route.pinnedNodeId) return select(policy, route);
+    return selectConfiguredThenOpen(prepared.config, policy, current, select);
+  };
 }
 function sessionExecutor(
   context: Context,
@@ -136,9 +147,8 @@ function sessionExecutor(
   buyer: string,
   router?: ReturnType<typeof sessionRouter>,
 ): Awaited<ReturnType<BuyerExecutionFactory>>['execute'] {
-  const { prepared } = context;
   return async (input, signal, onDelta, model, permission) => {
-    const request = routedRequest(prepared.config.request, model);
+    const request = routedRequest(context.prepared.config.request, model);
     const ports: BuyerRoutePorts<ChatResult> = {
       select: sessionSelection(
         context,
@@ -191,10 +201,19 @@ function sessionExecutor(
             enter: context.dependencies.enter ?? (() => () => {}),
             unresolved: manager.unresolved,
             select: (excluded, current) =>
-              ports.select(excluded, current, {
-                pinnedNodeId: prepared.config.pinnedNodeId,
-                priceCeilings: prepared.config.request.priceCeilings,
-              }),
+              ports
+                .select(excluded, current, {
+                  pinnedNodeId: context.prepared.config.pinnedNodeId,
+                  priceCeilings: context.prepared.config.request.priceCeilings,
+                })
+                .catch(
+                  onBuyerSelectionFailure(
+                    current,
+                    context.dependencies,
+                    Boolean(onDelta),
+                    model?.selection,
+                  ),
+                ),
           },
           signal,
         );

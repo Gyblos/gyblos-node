@@ -40,12 +40,12 @@ void test('the automatic runtime forwards open zero-price selection to free exec
         '@gyblos/node/buyer-chain': "export async function buyerPaymentsUnresolved(){return false} export function buyerChainPayments(){globalThis.probe.payments++;throw Error('unexpected chain')}"
       };
       registerHooks({resolve(name,context,next){
-        const source=context.parentURL===${JSON.stringify(target)}?sources[name]:undefined;
+        const source=(context.parentURL===${JSON.stringify(target)} || context.parentURL===new URL('./session-startup.ts',${JSON.stringify(target)}).href)?sources[name]:undefined;
         return source?{url:'data:text/javascript,'+encodeURIComponent(source),shortCircuit:true}:next(name,context);
       }});
       const {quoteBuyerExecution}=await import('@gyblos/buyer/quote-startup');
       const runtime=await quoteBuyerExecution({})({
-        prepared:{config:${JSON.stringify(config)}},role:${JSON.stringify(role)},
+        prepared:{config:${JSON.stringify(config)},identity:{}},role:${JSON.stringify(role)},
         dependencies:{},endpoint:{},relayOnly:false,
       });
       try {

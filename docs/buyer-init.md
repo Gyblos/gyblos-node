@@ -20,6 +20,7 @@ Model: qwen3-0.6b; reasoning: off.
 Variant: [none]; Quantization: Q4_K_M.
 Maximum output tokens: 4096.
 Budget ceiling: 0 USDC per request. Prices: 0 input / 0 output USDC per million tokens.
+Channel deposit: 1 USDC. Channel lifetime: 60 minutes.
 Sellers: any seller registered in the index, free answers only.
 Free signed quotes cause no payment transactions, including with a positive ceiling.
 8004 identity verification remains enabled. Existing settings will be refused.
@@ -47,6 +48,11 @@ seller's owner wallet. `pnpm buyer:init --advanced` asks for every field:
 | Discovery index URL                                       | uses the default             | `https://discovery.gyblos.com/v1` |
 | Seller relay URL                                          | uses the default             | `https://na1.relay.gyblos.com/`   |
 | 8004 devnet RPC URL                                       | uses the default             | `https://api.devnet.solana.com`   |
+
+Guided setup and desktop setup both save a payment session with a 1 USDC deposit
+and a one-hour lifetime. The initial request ceiling is zero. Existing paid
+profiles must add the session settings before starting. See
+[updating an existing payment profile](payment-sessions.md#explicit-startup-policy).
 
 With no seller, setup saves an open-network buyer: no configured sellers and
 `"discovery": { "open": true }`. It then uses any seller the index lists whose

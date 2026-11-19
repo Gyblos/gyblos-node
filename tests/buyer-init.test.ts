@@ -172,3 +172,26 @@ void test('configuration refuses credentialed or unsafe URLs and unconfigured re
     'http://127.0.0.1:9',
   );
 });
+
+void test('guided setup writes the default channel policy even with a zero request ceiling', () => {
+  const config = buildBuyerInit(answers());
+  assert.deepEqual(config.session, {
+    depositAtomic: '1000000',
+    lifetimeMs: 3600000,
+  });
+  assert.equal(config.request.maxAtomic, '0');
+});
+
+void test('old paid settings require a session and old free settings remain readable', () => {
+  const config = buildBuyerInit(answers());
+  const { session: _session, ...legacy } = config;
+  assert.equal(parseBuyerSelectionConfig(legacy).request.maxAtomic, '0');
+  assert.throws(
+    () =>
+      parseBuyerSelectionConfig({
+        ...legacy,
+        request: { ...legacy.request, maxAtomic: '1' },
+      }),
+    /session/i,
+  );
+});

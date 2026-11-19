@@ -83,37 +83,41 @@ void test('free path without a routed model keeps the initial selection', async 
   assert.deepEqual(unserved(), initial);
 });
 
-void test('quote path: UNSERVED names the requested model', async (t) => {
-  const home = await mkdtemp(join(tmpdir(), 'gyblos-unserved-'));
-  const previous = process.env.GYBLOS_HOME;
-  let close = async () => {};
-  process.env.GYBLOS_HOME = home;
-  await mkdir(join(home, 'buyer'), { recursive: true, mode: 0o700 });
-  t.after(async () => {
-    await close();
-    if (previous === undefined) delete process.env.GYBLOS_HOME;
-    else process.env.GYBLOS_HOME = previous;
-    await rm(home, { recursive: true, force: true });
+for (const session of [
+  undefined,
+  { depositAtomic: '1000000', lifetimeMs: 3600000 },
+])
+  void test(`quote path: UNSERVED names the requested model (session: ${Boolean(session)})`, async (t) => {
+    const home = await mkdtemp(join(tmpdir(), 'gyblos-unserved-'));
+    const previous = process.env.GYBLOS_HOME;
+    let close = async () => {};
+    process.env.GYBLOS_HOME = home;
+    await mkdir(join(home, 'buyer'), { recursive: true, mode: 0o700 });
+    t.after(async () => {
+      await close();
+      if (previous === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previous;
+      await rm(home, { recursive: true, force: true });
+    });
+    const { source, telemetry, input, unserved } = await fixture();
+    const { buyer, buyerNodeId, catalogDigest, ...params } =
+      source.source.request.params;
+    void buyerNodeId;
+    void catalogDigest;
+    const context = {
+      prepared: {
+        config: { request: { ...params }, sellers: [], session },
+        stats: { rows: new Map(), async save() {} },
+      },
+      endpoint: {},
+      relayOnly: true,
+      role: { role: P2P_ROLES.BUYER, buyer },
+      dependencies: { telemetry },
+    } as unknown as Parameters<BuyerExecutionFactory>[0];
+    const runtime = await quoteBuyerExecution({})(context);
+    close = () => runtime.close();
+    await assert.rejects(
+      runtime.execute(input, AbortSignal.timeout(5000), undefined, ASKED),
+    );
+    assert.deepEqual(unserved(), ASKED.selection);
   });
-  const { source, telemetry, input, unserved } = await fixture();
-  const { buyer, buyerNodeId, catalogDigest, ...params } =
-    source.source.request.params;
-  void buyerNodeId;
-  void catalogDigest;
-  const context = {
-    prepared: {
-      config: { request: { ...params }, sellers: [] },
-      stats: { rows: new Map(), async save() {} },
-    },
-    endpoint: {},
-    relayOnly: true,
-    role: { role: P2P_ROLES.BUYER, buyer },
-    dependencies: { telemetry },
-  } as unknown as Parameters<BuyerExecutionFactory>[0];
-  const runtime = await quoteBuyerExecution({})(context);
-  close = () => runtime.close();
-  await assert.rejects(
-    runtime.execute(input, AbortSignal.timeout(5000), undefined, ASKED),
-  );
-  assert.deepEqual(unserved(), ASKED.selection);
-});

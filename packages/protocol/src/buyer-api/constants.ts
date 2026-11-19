@@ -17,6 +17,7 @@ export const BUYER_API = {
 export const BUYER_SIDECAR = {
   READY: 'buyer-ready',
   ERROR: 'buyer-error',
+  SESSION_REQUIRED: 'PAID_SELECTION_REQUIRES_SESSION',
   STOP: 'buyer-stop',
 } as const;
 
