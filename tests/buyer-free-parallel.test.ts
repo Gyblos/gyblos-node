@@ -50,13 +50,18 @@ function buyer(sellers: string[], limit = 2, waitMs = 0) {
   const started: (() => void)[] = [];
   let release = gate();
   let failBeforeSend = new Set<string>();
+  let refused = gate();
   const dependencies: FreeBuyerDependencies = {
     enter: () => admission.enter(),
     done: (chosen) => admission.done(chosen.nodeId),
     select: (excluded, signal) =>
       admission.select(excluded, signal, async (skip) => {
         const free = sellers.find((nodeId) => !skip.has(nodeId));
-        if (!free) throw noSeller();
+        if (!free) {
+          refused.open();
+          refused = gate();
+          throw noSeller();
+        }
         return winner(free);
       }),
     async execute(chosen) {
@@ -73,6 +78,8 @@ function buyer(sellers: string[], limit = 2, waitMs = 0) {
     ran,
     started: () => new Promise<void>((resolve) => started.push(resolve)),
     release: () => release.open(),
+    // Settles when a selection next finds every seller taken.
+    refusedOnce: () => refused.opened,
     reset: () => {
       release = gate();
     },
@@ -100,8 +107,10 @@ void test('with the only seller serving one request, the next waits its turn and
   const first = run(host.dependencies);
   await host.started();
   // An agent's title and main requests arrive together: the second waits instead of a 429.
+  const refused = host.refusedOnce();
   const second = run(host.dependencies);
   const secondStarted = host.started();
+  await refused;
   host.release();
   assert.deepEqual(await first, RESULT);
   await secondStarted;
@@ -109,28 +118,85 @@ void test('with the only seller serving one request, the next waits its turn and
   assert.deepEqual(host.ran, ['a', 'a']);
 });
 
-void test('a request waiting for a seller is busy once its wait runs out, and leaves when its client does', async () => {
+// A pick that only `a` can serve, and reports each time it found `a` taken by another request.
+function onlyA() {
+  let refused = gate();
+  const pick = async (skip: ReadonlySet<string>) => {
+    if (!skip.has('a')) return { nodeId: 'a' };
+    refused.open();
+    refused = gate();
+    throw noSeller();
+  };
+  return { pick, refusedOnce: () => refused.opened };
+}
+
+void test('a request parked for a seller runs as soon as it is handed back', async () => {
+  const admission = freeAdmission(2, 60_000);
+  const signal = new AbortController().signal;
+  await admission.select(new Set(), signal, async () => ({ nodeId: 'a' }));
+  const only = onlyA();
+  const refused = only.refusedOnce();
+  const parked = admission.select(new Set(), signal, only.pick);
+  // The request found `a` taken and is now waiting for it.
+  await refused;
+  admission.done('a');
+  assert.deepEqual(await parked, { nodeId: 'a' });
+});
+
+void test('a parked request is busy once its wait runs out', async () => {
   const admission = freeAdmission(2, 20);
   const signal = new AbortController().signal;
   await admission.select(new Set(), signal, async () => ({ nodeId: 'a' }));
-  const onlyA = async (skip: ReadonlySet<string>) => {
-    if (skip.has('a')) throw noSeller();
-    return { nodeId: 'a' };
-  };
-  await assert.rejects(admission.select(new Set(), signal, onlyA), {
+  await assert.rejects(admission.select(new Set(), signal, onlyA().pick), {
     code: FREE_BUYER_CODES.BUSY,
   });
-  const patient = freeAdmission(2, 60_000);
-  await patient.select(new Set(), signal, async () => ({ nodeId: 'a' }));
-  const leaving = new AbortController();
-  const waiting = patient.select(new Set(), leaving.signal, onlyA);
-  leaving.abort();
-  await assert.rejects(waiting, { name: 'AbortError' });
-  // Handing the seller back serves the next request in line at once.
-  patient.done('a');
-  assert.deepEqual(await patient.select(new Set(), signal, onlyA), {
+});
+
+void test('a parked request leaves as soon as its client does', async () => {
+  const admission = freeAdmission(2, 60_000);
+  await admission.select(new Set(), new AbortController().signal, async () => ({
     nodeId: 'a',
+  }));
+  const only = onlyA();
+  const refused = only.refusedOnce();
+  const leaving = new AbortController();
+  const parked = admission.select(new Set(), leaving.signal, only.pick);
+  await refused;
+  leaving.abort();
+  await assert.rejects(parked, { name: 'AbortError' });
+});
+
+void test('a seller handed back while a waiting request is still selecting is taken at once', async () => {
+  const admission = freeAdmission(2, 60_000);
+  const signal = new AbortController().signal;
+  await admission.select(new Set(), signal, async () => ({ nodeId: 'a' }));
+  let tries = 0;
+  const started = performance.now();
+  const winner = await admission.select(new Set(), signal, async (skip) => {
+    tries++;
+    if (!skip.has('a')) return { nodeId: 'a' };
+    // The other request finishes while this selection is still running.
+    admission.done('a');
+    throw noSeller();
   });
+  assert.deepEqual(winner, { nodeId: 'a' });
+  assert.equal(tries, 2);
+  assert.ok(performance.now() - started < 1000);
+});
+
+void test('a request does not wait for a seller it has already ruled out', async () => {
+  const admission = freeAdmission(2, 60_000);
+  const signal = new AbortController().signal;
+  await admission.select(new Set(), signal, async () => ({ nodeId: 'a' }));
+  const started = performance.now();
+  // This request already failed on `a`; another request holding `a` is no reason to wait.
+  await assert.rejects(
+    admission.select(new Set(['a']), signal, async () => {
+      throw noSeller();
+    }),
+    FreeSelectionFailure,
+  );
+  assert.ok(performance.now() - started < 1000);
 });
 
 void test('with no wait, the only seller serving one request makes the next busy and the seller is not blamed', async () => {

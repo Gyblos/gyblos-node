@@ -56,6 +56,8 @@ export function freeAdmission(
   let active = 0;
   const reserved = new Set<string>();
   const releases = new Set<() => void>();
+  // Counts hand-backs, so a release during a selection is not missed by the wait that follows it.
+  let handedBack = 0;
   const subscribe = (listener: () => void) => {
     releases.add(listener);
     return () => releases.delete(listener);
@@ -90,7 +92,9 @@ export function freeAdmission(
         .then(async () => {
           const until = performance.now() + waitMs;
           for (;;) {
-            const busy = reserved.size > 0;
+            // Only sellers this request has not ruled out are worth waiting for.
+            const busy = [...reserved].some((nodeId) => !excluded.has(nodeId));
+            const seen = handedBack;
             try {
               const winner = await pick(new Set([...excluded, ...reserved]));
               reserved.add(winner.nodeId);
@@ -98,6 +102,7 @@ export function freeAdmission(
             } catch (error) {
               if (!busy || !unserved(error)) throw error;
               // Every seller left serves another of this buyer's requests: wait for one to come back.
+              if (handedBack !== seen) continue;
               const left = until - performance.now();
               if (left <= 0 || !(await nextRelease(subscribe, left, signal)))
                 throw new FreeBuyerError(FREE_BUYER_CODES.BUSY);
@@ -110,6 +115,7 @@ export function freeAdmission(
     },
     done(nodeId: string) {
       if (!reserved.delete(nodeId)) return;
+      handedBack++;
       for (const release of [...releases]) release();
     },
   };
