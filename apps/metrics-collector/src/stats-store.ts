@@ -29,6 +29,15 @@ export type ModelRow = TotalsRow & {
   quantization: string;
   sellers: number;
 };
+// Per-model observations summed over the range, per paid flag.
+export interface ModelObservedRow {
+  modelId: string;
+  variant: string;
+  quantization: string;
+  paid: number;
+  buyerFirstTokenHist: string;
+  engineTpsHist: string;
+}
 export type SellerDayRow = TotalsRow & { day: string };
 export type SellerModelRow = TotalsRow & {
   modelId: string;
@@ -63,8 +72,11 @@ export interface StatsReader {
     origins: OriginRow[];
     failures: FailureRow[];
   }>;
-  // Rows per model and paid flag, at most AGGREGATES.maxPublicModels models, most completed first.
-  models(range: DayRange): Promise<ModelRow[]>;
+  // Rows per model and paid flag, at most AGGREGATES.maxPublicModels models, most completed first;
+  // observation rows per model and paid flag.
+  models(
+    range: DayRange,
+  ): Promise<{ models: ModelRow[]; observed: ModelObservedRow[] }>;
   seller(
     nodeId: string,
     range: DayRange,

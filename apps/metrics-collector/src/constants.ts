@@ -139,12 +139,16 @@ export const IPV6 = {
 // Aggregates (#351). Changing a formula bumps formulaVersion; rows are then rebuilt from raw.
 export const AGGREGATES = {
   // 2: origin and failure breakdowns (recomputes every day once).
-  formulaVersion: 2,
+  // 3: per-model observations (recomputes every day once).
+  formulaVersion: 3,
   // Upper bounds of the latency histogram buckets, in ms; one more bucket holds everything above.
   // Fixed so histograms can be summed across hours, days, sellers and models.
   latencyBucketsMs: [
     100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000, 60_000,
   ],
+  // Upper bounds of the engine speed histogram buckets, in output tokens per second of generation;
+  // one more bucket holds everything above.
+  tokensPerSecondBuckets: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000],
   // Raw rows changed up to this long before the previous scan are scanned again, so an upload
   // committed while a scan ran is never missed. Recomputing a day twice is harmless.
   scanOverlapMs: 900_000,
@@ -160,6 +164,7 @@ export const AGGREGATES = {
   defaultRangeDays: 30,
   dayMs: 86_400_000,
   hourMs: 3_600_000,
+  msPerSecond: 1_000,
 } as const;
 // Breakdown labels: a receipt no buyer upload carried, and unserved demand, which has no reason.
 export const BREAKDOWNS = {
