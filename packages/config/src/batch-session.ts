@@ -14,6 +14,7 @@ export const BATCH_SESSION_DEFAULTS = {
   // Soft checkpoint target measured with the pinned tokenizer; an indivisible prefix can be larger.
   blockTargetTokens: 64,
   stateBytes: 512 * 1024,
+  minDepositAtomic: '10000',
   maxDepositAtomic: '1000000',
   minLifetimeMs: 5 * 60 * 1000,
   maxLifetimeMs: 24 * 60 * 60 * 1000,

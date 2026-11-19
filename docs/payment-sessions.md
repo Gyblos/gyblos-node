@@ -82,12 +82,12 @@ requests.
 }
 ```
 
-| Field                  | Meaning                                                  | Allowed values                       |
-| ---------------------- | -------------------------------------------------------- | ------------------------------------ |
-| `depositAtomic`        | Deposit for each seller channel, in atomic units         | Positive, at most `1000000` (1 USDC) |
-| `totalDepositAtomic`   | Optional authority shared by several sellers             | Positive atomic decimal string       |
-| `lifetimeMs`           | How long the seller serves the session                   | 5 minutes to 24 hours                |
-| `withdrawDelaySeconds` | Grace for the seller to claim after a buyer-forced close | 900 to 3600; 900 when omitted        |
+| Field                  | Meaning                                                  | Allowed values                                      |
+| ---------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| `depositAtomic`        | Deposit for each seller channel, in atomic units         | New channels: `10000` to `1000000` (0.01 to 1 USDC) |
+| `totalDepositAtomic`   | Optional authority shared by several sellers             | Positive atomic decimal string                      |
+| `lifetimeMs`           | How long the seller serves the session                   | 5 minutes to 24 hours                               |
+| `withdrawDelaySeconds` | Grace for the seller to claim after a buyer-forced close | 900 to 3600; 900 when omitted                       |
 
 `request.maxAtomic` still limits each question, and a question can't exceed the
 session's remaining unreserved funds. The protocol fee and treasury always come
