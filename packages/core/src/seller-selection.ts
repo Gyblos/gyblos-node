@@ -136,8 +136,9 @@ function findListing(catalog: PublicCatalogV2, selection: ModelSelection) {
 }
 // Every hard filter except price and the reasoning level, which decides tiers and the
 // unsupported-level code. The pinned path checks cooldown itself so it can report when the seller returns.
+type ListingInput = Pick<SellerSelectionInput, 'request' | 'stats' | 'now'>;
 function offersModel(
-  input: SellerSelectionInput,
+  input: ListingInput,
   seller: KnownSeller,
   honorCooldown = true,
 ) {
@@ -150,7 +151,7 @@ function offersModel(
   return entry;
 }
 function eligible(
-  input: SellerSelectionInput,
+  input: ListingInput,
   seller: KnownSeller,
   honorCooldown = true,
 ) {
@@ -278,22 +279,25 @@ export function selectSellers(
   }
 }
 
-// The smallest context any seller that could serve `request` lists for its model, cooldown aside, so a
-// prompt sized to it fits whichever of them is chosen later; undefined when no seller qualifies.
-export function smallestContextTokens(
-  input: Pick<SellerSelectionInput, 'request' | 'sellers' | 'stats' | 'now'>,
-): number | undefined {
+// The context each seller that could serve `request` lists for its model, cooldown aside: a seller resting
+// after a failure may still be chosen later.
+export function listedContexts(
+  input: Pick<SellerSelectionInput, 'request' | 'sellers' | 'now'>,
+): number[] {
   const levels = acceptableLevels(input.request);
-  let smallest: number | undefined;
+  const contexts: number[] = [];
   for (const seller of input.sellers) {
-    const entry = eligible(input as SellerSelectionInput, seller, false);
+    const entry = eligible({ ...input, stats: new Map() }, seller, false);
     if (
-      !entry ||
-      !levels.some((level) => entry.listing.reasoning.includes(level))
+      entry &&
+      levels.some((level) => entry.listing.reasoning.includes(level))
     )
-      continue;
-    const context = entry.listing.contextTokens;
-    if (smallest === undefined || context < smallest) smallest = context;
+      contexts.push(entry.listing.contextTokens);
   }
-  return smallest;
+  return contexts;
+}
+// The context to announce: the smallest listed, so a prompt sized to it fits whichever seller is chosen.
+// Undefined when none is listed.
+export function announcedContext(contexts: readonly number[]) {
+  return contexts.length ? Math.min(...contexts) : undefined;
 }
