@@ -172,14 +172,29 @@ export function createPreviewHost(
     query: search,
     checkedAt: now,
     truncated: false,
+    // One free and one paid seller, as the beta network lists this model.
     models: [
       {
         modelId: model,
         variant: null,
         quantization: 'Q4_K_M',
-        contextTokens: 2048,
+        contextTokens: 16384,
         announcements: 1,
         expiresAt: now + PREVIEW.dayMs,
+        free: true,
+        inputAtomicPerMtok: '0',
+        outputAtomicPerMtok: '0',
+      },
+      {
+        modelId: model,
+        variant: null,
+        quantization: 'Q4_K_M',
+        contextTokens: 32768,
+        announcements: 1,
+        expiresAt: now + PREVIEW.dayMs,
+        free: false,
+        inputAtomicPerMtok: '52000',
+        outputAtomicPerMtok: '208000',
       },
     ],
   });
