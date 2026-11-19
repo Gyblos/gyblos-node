@@ -100,17 +100,20 @@ export async function createWindowsPaymentDirectory(
     );
   if (await exists()) return;
   const temporary = await mkdtemp(path + '.creating-');
+  let published = false;
   try {
     await restrictDirectory(temporary, tools);
     if ((await readdir(temporary)).length)
       throw new Error('Unexpected payment folder contents');
     // Windows refuses to replace an existing directory. The caller validates the winning path.
-    await rename(temporary, path);
-  } catch (error) {
-    await rmdir(temporary).catch(() => undefined);
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST' && (await exists()))
-      return;
-    throw error;
+    try {
+      await rename(temporary, path);
+      published = true;
+    } catch (error) {
+      if (!(await exists())) throw error;
+    }
+  } finally {
+    if (!published) await rmdir(temporary).catch(() => undefined);
   }
 }
 

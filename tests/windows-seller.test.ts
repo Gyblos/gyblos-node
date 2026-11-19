@@ -62,7 +62,10 @@ void test(
     assert.equal(failed.status, 1);
     assert.match(failed.stderr, /PRIVATE_FILE_UNAVAILABLE/);
     await assert.rejects(lstat(directory), { code: 'ENOENT' });
-    await ensurePrivatePaymentPaths(paths);
+    await Promise.all([
+      ensurePrivatePaymentPaths(paths),
+      ensurePrivatePaymentPaths(paths),
+    ]);
     assert.equal(await pathsArePrivate([directory]), ACL_VERDICTS.PRIVATE);
   },
 );
