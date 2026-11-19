@@ -49,7 +49,10 @@ void test('per-model observations join each event to its receipt for the paid fl
   });
   const buyer = insertEnvelope(database, 'buyer', at);
   const seller = insertEnvelope(database, 'seller', at);
-  const event = (requestId: string, fields: Record<string, unknown>) => ({
+  const event = (
+    requestId: string,
+    fields: Record<string, unknown> & { type: string },
+  ) => ({
     at,
     requestId,
     sellerNodeId: SELLER_A,

@@ -46,6 +46,14 @@ interface Side {
   buyers: number | null;
   withheld?: boolean;
   sellers?: number;
+  observed?: {
+    buyerFirstToken: { samples: number; p50Ms: number | null };
+    engineSpeed: {
+      samples: number;
+      p50MinTokensPerSecond: number | null;
+      bucketsTokensPerSecond: number[];
+    };
+  } | null;
 }
 interface Answer {
   error?: string;
@@ -308,7 +316,7 @@ void test('models carry buyer first token and engine speed per side, from joined
   );
   const [model] = body.models;
   assert.equal(model!.free.observed, null);
-  const observed = model!.paid.observed;
+  const observed = model!.paid.observed!;
   assert.equal(observed.buyerFirstToken.samples, 1);
   assert.equal(observed.buyerFirstToken.p50Ms, 1000);
   assert.equal(observed.engineSpeed.samples, 1);
