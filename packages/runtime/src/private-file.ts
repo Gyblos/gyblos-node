@@ -24,7 +24,10 @@ import { FILE_MODES } from '@gyblos/config';
 
 import { PRIVATE_FILE_CODES, PROCESS_LOCK } from './constants';
 import { hasPrivateMode, WINDOWS } from './private-mode';
-import { paymentPathsArePrivate, restrictDirectory } from './windows-acl';
+import {
+  createWindowsPaymentDirectory,
+  paymentPathsArePrivate,
+} from './windows-acl';
 
 export class PrivateFileError extends Error {
   readonly code = PRIVATE_FILE_CODES.UNAVAILABLE;
@@ -73,9 +76,9 @@ async function privateDirectory(
       current = join(current, part);
       try {
         if (create) {
-          await mkdir(current, { mode: FILE_MODES.privateDirectory });
           if (payment && WINDOWS && current === absolute)
-            await restrictDirectory(current);
+            await createWindowsPaymentDirectory(current);
+          else await mkdir(current, { mode: FILE_MODES.privateDirectory });
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
