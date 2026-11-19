@@ -13,8 +13,14 @@ export function parseRange(value: unknown): RangeDays {
 const utcDay = (ms: number) =>
   new Date(ms).toISOString().slice(0, RANGE.dayPrecision);
 
-// The collector's inclusive `from`/`to` days for the last `days` UTC days ending on `now`'s day.
-export function rangeQuery(days: RangeDays, now: number): string {
-  const from = utcDay(now - (days - 1) * UNITS.msPerDay);
-  return `?from=${from}&to=${utcDay(now)}`;
+// The collector's inclusive `from`/`to` days for the last `days` UTC days ending on `now`'s day, or,
+// `periodsBack` periods earlier, the span of the same length just before it (for a change).
+export function rangeQuery(
+  days: RangeDays,
+  now: number,
+  periodsBack = 0,
+): string {
+  const end = now - periodsBack * days * UNITS.msPerDay;
+  const from = utcDay(end - (days - 1) * UNITS.msPerDay);
+  return `?from=${from}&to=${utcDay(end)}`;
 }

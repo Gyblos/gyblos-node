@@ -54,6 +54,19 @@ export function summarizeOffers(snapshot: DiscoverySnapshot) {
   return {
     offers: offers.length,
     free: offers.filter(isFree).length,
+    // Models with at least one free offer now.
+    freeModels: [...models.values()].filter((model) => model.free > 0).length,
+    // The network's lowest paid prices per million tokens, each over every model; null without paid offers.
+    minInput: [...models.values()].reduce<bigint | null>(
+      (low, model) =>
+        model.minInput === null ? low : lowest(low, model.minInput),
+      null,
+    ),
+    minOutput: [...models.values()].reduce<bigint | null>(
+      (low, model) =>
+        model.minOutput === null ? low : lowest(low, model.minOutput),
+      null,
+    ),
     averageDayUptime: day.length
       ? day.reduce((sum, ratio) => sum + ratio, 0) / day.length
       : null,

@@ -42,8 +42,6 @@ export const DISPLAY = {
   percentDigits: 1,
   // Unique buyer counts below this are withheld by the collector.
   minPublicBuyers: 5,
-  // "MM-DD" from "YYYY-MM-DD".
-  monthDayStart: 5,
 } as const;
 
 // The date range control: preset spans of UTC days ending today. The collector answers at most 92 days
@@ -56,28 +54,11 @@ export const RANGE = {
   dayPrecision: 10,
 } as const;
 
-// Daily charts.
-export const CHART = {
-  height: 176,
-  // Above this many days the axis labels every other day.
-  denseDays: 14,
-  barRadius: 3,
-  axisWidth: 44,
-  tickFontSize: 10,
-  topMargin: 4,
-  // Room for the last day's axis label.
-  rightMargin: 16,
-  minTickGap: 8,
-} as const;
-
-// Animated figures (NumberFlow): each kind's Intl format. USDC keeps up to its 6 decimals.
-export const FLOW_FORMATS = {
-  count: {},
-  percent: { style: 'percent', maximumFractionDigits: 1 },
-  usdc: {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 6,
-  },
+// The open page refreshes its data in place: the discovery index changes within seconds, the
+// collector's aggregates every 10 minutes (its cron), so once a minute is fresh enough. Only a visible
+// tab refreshes; a tab coming back after longer than this refreshes at once.
+export const LIVE = {
+  refreshMs: 60 * 1000,
+  // How often the "updated … ago" label is redrawn.
+  labelMs: 5 * 1000,
 } as const;

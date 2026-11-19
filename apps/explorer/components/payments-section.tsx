@@ -2,6 +2,17 @@
 // index (GET /v1/stats/chain): settled USDC, payouts to sellers, Gyblos fees, refunds, volume per day,
 // and the whole program's traffic for scale. Gyblos traffic is a label the channel's open declares.
 import {
+  ArrowDownToLine,
+  ArrowUpRight,
+  Coins,
+  Landmark,
+  ListOrdered,
+  Percent,
+  Undo2,
+  Unlock,
+} from 'lucide-react';
+
+import {
   dailySettled,
   summarizeChain,
   type ChainSnapshot,
@@ -11,13 +22,14 @@ import { getChainStats } from '../lib/chain-stats';
 import { DISPLAY, UNITS } from '../lib/constants';
 import { count, usdc, usdcDecimal, utc } from '../lib/format';
 import type { RangeDays } from '../lib/range';
+import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
-import { Flow } from './flow';
+import { delta, type Delta } from './board/delta';
+import { StatCard } from './board/stat-card';
 import {
   moneyCell,
   numberCell,
   SectionTitle,
-  Stat,
   Table,
   td,
   Unavailable,
@@ -33,37 +45,46 @@ function meta(backfillDone: boolean | null, aggregatedAt: number | null) {
   return `updated ${utc(aggregatedAt)}`;
 }
 
+// Each figure's change against the span just before the range; none when it cannot be read or the
+// chain history is still being read (an incomplete earlier span would overstate every change).
+function changes(current: ChainSummary['totals'], before: ChainSnapshot) {
+  if (before.error || !before.backfillDone) return null;
+  const previous = summarizeChain(before).totals;
+  return {
+    settled: [delta(current.settled, previous.settled)],
+    paidOut: [delta(current.paidOut, previous.paidOut)],
+    gyblosFees: [delta(current.gyblosFees, previous.gyblosFees)],
+    opens: [delta(current.opens, previous.opens)],
+    deposited: [delta(current.deposited, previous.deposited)],
+    refunded: [delta(current.refunded, previous.refunded, 'none')],
+  };
+}
+
 export async function PaymentsSection({ days }: { days: RangeDays }) {
-  const chain = await getChainStats(days);
+  const [chain, before] = await Promise.all([
+    getChainStats(days),
+    getChainStats(days, 1),
+  ]);
   if (chain.error) return <Unavailable title="Payments" />;
   const summary = summarizeChain(chain);
   const { totals } = summary;
+  const change = changes(totals, before);
   return (
     <>
       <SectionTitle
         title={`Payments · ${days} days`}
-        meta={meta(chain.backfillDone, chain.aggregatedAt)}
+        meta={
+          change
+            ? `vs previous ${days} days · ${meta(chain.backfillDone, chain.aggregatedAt)}`
+            : meta(chain.backfillDone, chain.aggregatedAt)
+        }
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Settled" value={money(totals.settled)} money />
-        <Stat label="Paid to sellers" value={money(totals.paidOut)} money />
-        <Stat label="Gyblos fees" value={money(totals.gyblosFees)} money />
-        <Stat
-          label="Effective fee"
-          value={<Flow value={summary.feeShare} kind="percent" />}
-        />
-        <Stat
-          label="Channels opened"
-          value={<Flow value={totals.opens} kind="count" />}
-        />
-        <Stat label="Deposited" value={money(totals.deposited)} money />
-        <Stat label="Refunded" value={money(totals.refunded)} money />
-        <Stat
-          label="Gyblos · program txs"
-          value={`${count(totals.transactions)} · ${count(summary.programTransactions)}`}
-        />
-      </div>
-      <SettledChart chain={chain} total={totals.settled} />
+      <PaymentStats summary={summary} change={change} />
+      <SettledChart
+        chain={chain}
+        total={totals.settled}
+        change={change?.settled[0]}
+      />
       <DailyTable summary={summary} />
       <p className="mt-4 text-xs text-dim">
         Gyblos channels are those whose open carries a Gyblos memo, a label
@@ -74,13 +95,80 @@ export async function PaymentsSection({ days }: { days: RangeDays }) {
   );
 }
 
+function PaymentStats({
+  summary,
+  change,
+}: {
+  summary: ChainSummary;
+  change: ReturnType<typeof changes>;
+}) {
+  const { totals } = summary;
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatCard
+        icon={Coins}
+        label="Settled"
+        value={money(totals.settled)}
+        deltas={change?.settled}
+        money
+      />
+      <StatCard
+        icon={ArrowUpRight}
+        label="Paid to sellers"
+        value={money(totals.paidOut)}
+        deltas={change?.paidOut}
+        money
+      />
+      <StatCard
+        icon={Landmark}
+        label="Gyblos fees"
+        value={money(totals.gyblosFees)}
+        deltas={change?.gyblosFees}
+        money
+      />
+      <StatCard
+        icon={Percent}
+        label="Effective fee"
+        value={<Flow value={summary.feeShare} kind="percent" />}
+      />
+      <StatCard
+        icon={Unlock}
+        label="Channels opened"
+        value={<Flow value={totals.opens} kind="count" />}
+        deltas={change?.opens}
+      />
+      <StatCard
+        icon={ArrowDownToLine}
+        label="Deposited"
+        value={money(totals.deposited)}
+        deltas={change?.deposited}
+        money
+      />
+      <StatCard
+        icon={Undo2}
+        label="Refunded"
+        value={money(totals.refunded)}
+        deltas={change?.refunded}
+        money
+      />
+      <StatCard
+        icon={ListOrdered}
+        label="Gyblos · program txs"
+        value={`${count(totals.transactions)} · ${count(summary.programTransactions)}`}
+      />
+    </div>
+  );
+}
+
 // Settled USDC per day; the bar height is approximate, the labels exact.
 function SettledChart({
   chain,
   total,
+  change,
 }: {
   chain: ChainSnapshot;
   total: bigint;
+  change?: Delta;
 }) {
   const points = dailySettled(chain).map((day) => ({
     day: day.day,
@@ -96,6 +184,7 @@ function SettledChart({
         kind="usdc"
         total={usdcDecimal(total)}
         points={points}
+        change={change}
         countAxis={false}
       />
     </div>

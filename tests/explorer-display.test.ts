@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { delta } from '@gyblos/explorer/board-delta';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
 import { usdcDecimal } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
@@ -24,6 +25,45 @@ void test('a range maps to the collector days ending today, inclusive', () => {
   assert.equal(rangeQuery(7, now), '?from=2026-11-12&to=2026-11-18');
   assert.equal(rangeQuery(30, now), '?from=2026-10-20&to=2026-11-18');
   assert.equal(rangeQuery(90, now), '?from=2026-08-21&to=2026-11-18');
+});
+
+void test('the previous period is the span of the same length just before the range', () => {
+  const now = Date.parse('2026-11-18T13:45:00.000Z');
+  assert.equal(rangeQuery(7, now, 1), '?from=2026-11-05&to=2026-11-11');
+  assert.equal(rangeQuery(30, now, 1), '?from=2026-09-20&to=2026-10-19');
+});
+
+void test('a change says its direction and whether it is good news', () => {
+  assert.deepEqual(delta(110, 100), {
+    label: '+10%',
+    direction: 'up',
+    tone: 'good',
+  });
+  assert.deepEqual(delta(95, 100), {
+    label: '-5.0%',
+    direction: 'down',
+    tone: 'bad',
+  });
+  assert.deepEqual(delta(95, 100, 'down'), {
+    label: '-5.0%',
+    direction: 'down',
+    tone: 'good',
+  });
+  assert.deepEqual(delta(12n, 4n, 'none'), {
+    label: '+200%',
+    direction: 'up',
+    tone: 'neutral',
+  });
+  assert.deepEqual(delta(68, 0), {
+    label: 'New',
+    direction: 'up',
+    tone: 'good',
+  });
+  assert.deepEqual(delta(0, 0), {
+    label: '0%',
+    direction: 'flat',
+    tone: 'neutral',
+  });
 });
 
 void test('a model mark comes from the family in its id', () => {

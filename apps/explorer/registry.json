@@ -1,0 +1,212 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "gyblos",
+  "homepage": "https://explorer.gyblos.com",
+  "items": [
+    {
+      "name": "gyblos-theme",
+      "type": "registry:theme",
+      "title": "Gyblos theme",
+      "description": "The Gyblos tokens the board components read: one brand blue, its signal tone for indicators, neutral surfaces, and money, good and bad tones.",
+      "cssVars": {
+        "theme": {
+          "color-bg": "var(--bg)",
+          "color-panel": "var(--panel)",
+          "color-raised": "var(--raised)",
+          "color-line": "var(--line)",
+          "color-ink": "var(--ink)",
+          "color-muted": "var(--muted)",
+          "color-dim": "var(--dim)",
+          "color-brand": "var(--brand-blue)",
+          "color-signal": "var(--signal)",
+          "color-money": "var(--money)",
+          "color-good": "var(--good)",
+          "color-bad": "var(--bad)",
+          "color-chart": "var(--chart)"
+        },
+        "light": {
+          "brand-blue": "#0a28f0",
+          "signal": "#0a28f0",
+          "bg": "#fcfcfc",
+          "panel": "#f4f5f6",
+          "raised": "#eceef0",
+          "line": "#e4e6e8",
+          "ink": "#1c1c1c",
+          "muted": "#5f6368",
+          "dim": "#6b6b6b",
+          "money": "#0f7a3d",
+          "good": "#0f7a3d",
+          "bad": "#c0362c",
+          "chart": "#0a28f0"
+        },
+        "dark": {
+          "brand-blue": "#0a28f0",
+          "signal": "#2e6bff",
+          "bg": "#090909",
+          "panel": "#151515",
+          "raised": "#222222",
+          "line": "#303030",
+          "ink": "#f5f5f5",
+          "muted": "#b8b8b8",
+          "dim": "#a0a0a0",
+          "money": "#4ade80",
+          "good": "#4ade80",
+          "bad": "#f87171",
+          "chart": "#2e6bff"
+        }
+      }
+    },
+    {
+      "name": "board-base",
+      "type": "registry:lib",
+      "title": "Board base",
+      "description": "Shared class joining, canonical values and period changes for the Gyblos board components.",
+      "files": [
+        {
+          "path": "components/board/cx.ts",
+          "type": "registry:lib",
+          "target": "components/board/cx.ts"
+        },
+        {
+          "path": "components/board/styles.ts",
+          "type": "registry:lib",
+          "target": "components/board/styles.ts"
+        },
+        {
+          "path": "components/board/constants.ts",
+          "type": "registry:lib",
+          "target": "components/board/constants.ts"
+        },
+        {
+          "path": "components/board/delta.ts",
+          "type": "registry:lib",
+          "target": "components/board/delta.ts"
+        },
+        {
+          "path": "components/board/LICENSE",
+          "type": "registry:file",
+          "target": "components/board/LICENSE"
+        }
+      ],
+      "registryDependencies": ["gyblos-theme"]
+    },
+    {
+      "name": "animated-number",
+      "type": "registry:component",
+      "title": "Animated number",
+      "description": "A count, percent or exact USDC amount that rolls to its new value (NumberFlow), and a free \u00b7 paid pair.",
+      "dependencies": ["@number-flow/react@0.6.2"],
+      "registryDependencies": ["board-base"],
+      "files": [
+        {
+          "path": "components/board/animated-number.tsx",
+          "type": "registry:component",
+          "target": "components/board/animated-number.tsx"
+        }
+      ]
+    },
+    {
+      "name": "delta-chip",
+      "type": "registry:component",
+      "title": "Delta chip",
+      "description": "A figure's change against the previous period, with a direction glyph and good, bad or neutral tone.",
+      "dependencies": ["lucide-react@1.68.0"],
+      "registryDependencies": ["board-base"],
+      "files": [
+        {
+          "path": "components/board/delta-chip.tsx",
+          "type": "registry:component",
+          "target": "components/board/delta-chip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "stat-card",
+      "type": "registry:component",
+      "title": "Stat card",
+      "description": "A headline figure with an icon tile, label, value and one change per side.",
+      "dependencies": ["lucide-react@1.68.0"],
+      "registryDependencies": ["board-base", "delta-chip"],
+      "files": [
+        {
+          "path": "components/board/stat-card.tsx",
+          "type": "registry:component",
+          "target": "components/board/stat-card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "bar-chart-card",
+      "type": "registry:component",
+      "title": "Bar chart card",
+      "description": "A daily bar chart with an animated total, its change and a hover readout of each day.",
+      "dependencies": ["recharts@3.10.1"],
+      "registryDependencies": ["board-base", "animated-number", "delta-chip"],
+      "files": [
+        {
+          "path": "components/board/bar-chart-card.tsx",
+          "type": "registry:component",
+          "target": "components/board/bar-chart-card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "segmented-control",
+      "type": "registry:component",
+      "title": "Segmented control",
+      "description": "A keyboard-complete single-select segmented control (React Aria).",
+      "dependencies": ["react-aria-components@1.22.1"],
+      "files": [
+        {
+          "path": "components/board/segmented-control.tsx",
+          "type": "registry:component",
+          "target": "components/board/segmented-control.tsx"
+        }
+      ],
+      "registryDependencies": ["board-base"]
+    },
+    {
+      "name": "select",
+      "type": "registry:component",
+      "title": "Select",
+      "description": "A single-value select with a button trigger and a floating list; disabled options keep a hint.",
+      "dependencies": ["react-aria-components@1.22.1", "lucide-react@1.68.0"],
+      "registryDependencies": ["board-base"],
+      "files": [
+        {
+          "path": "components/board/select.tsx",
+          "type": "registry:component",
+          "target": "components/board/select.tsx"
+        }
+      ]
+    },
+    {
+      "name": "chip",
+      "type": "registry:component",
+      "title": "Chip",
+      "description": "A small neutral or brand-toned label chip.",
+      "registryDependencies": ["board-base"],
+      "files": [
+        {
+          "path": "components/board/chip.tsx",
+          "type": "registry:component",
+          "target": "components/board/chip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "status-dot",
+      "type": "registry:component",
+      "title": "Status dot",
+      "description": "A 12 px status indicator in the signal blue.",
+      "files": [
+        {
+          "path": "components/board/status-dot.tsx",
+          "type": "registry:component",
+          "target": "components/board/status-dot.tsx"
+        }
+      ],
+      "registryDependencies": ["gyblos-theme"]
+    }
+  ]
+}

@@ -21,12 +21,14 @@ export type {
   Totals,
 } from './collector-shape';
 
-// The last `days` UTC days of network totals and models, as aggregated by the collector.
+// The last `days` UTC days of network totals and models, as aggregated by the collector, or the
+// span just before them with `periodsBack` 1.
 export async function getCollector(
   days: RangeDays,
+  periodsBack = 0,
 ): Promise<CollectorSnapshot> {
   try {
-    return await loadCollector(rangeQuery(days, Date.now()));
+    return await loadCollector(rangeQuery(days, Date.now(), periodsBack));
   } catch (error) {
     return {
       aggregatedAt: null,

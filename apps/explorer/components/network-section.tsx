@@ -1,7 +1,13 @@
 // Owns the Network section: sellers online and offline, models offered with their cheapest prices, each
 // online seller's offers and uptime, and the registered sellers not online now, from the discovery index.
+import { Activity, Boxes, Server, Tag } from 'lucide-react';
+
 import { DISPLAY } from '../lib/constants';
-import { getDiscovery, type Seller } from '../lib/discovery';
+import {
+  getDiscovery,
+  type DiscoverySnapshot,
+  type Seller,
+} from '../lib/discovery';
 import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
 import {
   notOnline,
@@ -9,16 +15,16 @@ import {
   type NetworkStatus,
 } from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
+import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
+import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
-import { Flow, FlowPair } from './flow';
 import {
   Addr,
   ModelName,
   moneyCell,
   numberCell,
   SectionTitle,
-  Stat,
   Table,
   td,
   timeCell,
@@ -38,29 +44,34 @@ export async function NetworkSection() {
     <>
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {snapshot.network ? (
-          <Stat
-            label="Sellers online · offline"
-            value={
-              <FlowPair
-                free={snapshot.network.counts.online}
-                paid={snapshot.network.counts.offline}
-                kind="count"
-              />
-            }
-          />
-        ) : (
-          <Stat
-            label="Sellers online"
-            value={String(snapshot.sellers.length)}
-          />
-        )}
-        <Stat label="Models" value={String(summary.models.size)} />
-        <Stat
-          label="Free · paid offers"
-          value={`${summary.free} · ${summary.offers - summary.free}`}
+        <SellersOnline snapshot={snapshot} />
+        <StatCard
+          icon={Boxes}
+          label="Models"
+          value={<Flow value={summary.models.size} kind="count" />}
+          caption={`${count(summary.freeModels)} with a free seller`}
         />
-        <Stat label="Uptime 24 h" value={ratioText(summary.averageDayUptime)} />
+        <StatCard
+          icon={Tag}
+          label="Lowest output price / 1M"
+          value={priceText(summary.minOutput)}
+          caption={
+            summary.minInput === null
+              ? 'No paid offers now'
+              : `Input from ${usdc(summary.minInput)}`
+          }
+          money={summary.minOutput !== null}
+        />
+        <StatCard
+          icon={Activity}
+          label="Uptime 24 h"
+          value={ratioText(summary.averageDayUptime)}
+          caption={
+            summary.averageDayUptime === null
+              ? undefined
+              : 'Average of the online sellers'
+          }
+        />
       </div>
 
       <SectionTitle title="Models" />
@@ -92,6 +103,32 @@ export async function NetworkSection() {
       <SellersTable sellers={snapshot.sellers} />
       {snapshot.network ? <NotOnlineTable network={snapshot.network} /> : null}
     </>
+  );
+}
+
+// Online sellers out of every registered or recently seen one; without the index's network status,
+// only the online count is known.
+function SellersOnline({ snapshot }: { snapshot: DiscoverySnapshot }) {
+  const counts = snapshot.network?.counts;
+  return (
+    <StatCard
+      icon={Server}
+      label="Sellers online"
+      value={
+        <Flow value={counts?.online ?? snapshot.sellers.length} kind="count" />
+      }
+      caption={
+        counts
+          ? [
+              `${count(counts.online)} of ${count(counts.total)} registered`,
+              `${count(counts.offline)} offline`,
+              ...(counts.unpublished
+                ? [`${count(counts.unpublished)} not published`]
+                : []),
+            ].join(' · ')
+          : undefined
+      }
+    />
   );
 }
 
