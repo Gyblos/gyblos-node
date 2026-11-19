@@ -6,10 +6,7 @@ import {
   type ChatArchiveSave,
 } from '@gyblos/desktop/chat-archive-model';
 import { ChatController } from '@gyblos/desktop/chat-controller';
-import {
-  CATALOG_STATE,
-  type NetworkCatalog,
-} from '@gyblos/desktop/network-catalog';
+import { CATALOG_STATE } from '@gyblos/desktop/network-catalog';
 import { LOCAL_NODE_STATE } from '@gyblos/desktop/node-status';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import {
@@ -44,6 +41,7 @@ import { PREVIEW } from './constants';
 import { exampleKeys } from './example-keys';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
+import { previewCatalog } from './seller-listings';
 
 export function createPreviewHost(
   search: string,
@@ -67,7 +65,7 @@ export function createPreviewHost(
     policyId: example,
     model,
     maxTokens: 256,
-    maxAtomic: '0',
+    maxAtomic: query.get('seller-budget') === 'ready' ? '10000' : '0',
     ...scope,
   };
   const sessionId = '00000000-0000-4000-8000-000000000003';
@@ -211,40 +209,9 @@ export function createPreviewHost(
       return nodeState;
     },
   };
-  const catalog = (search = ''): NetworkCatalog => ({
-    state: CATALOG_STATE.READY,
-    query: search,
-    checkedAt: now,
-    truncated: false,
-    // One free and one paid example group, so both catalog rows render.
-    models: [
-      {
-        modelId: model,
-        variant: null,
-        quantization: 'Q4_K_M',
-        contextTokens: 16384,
-        announcements: 1,
-        expiresAt: now + PREVIEW.dayMs,
-        free: true,
-        inputAtomicPerMtok: '0',
-        outputAtomicPerMtok: '0',
-      },
-      {
-        modelId: model,
-        variant: null,
-        quantization: 'Q4_K_M',
-        contextTokens: 32768,
-        announcements: 1,
-        expiresAt: now + PREVIEW.dayMs,
-        free: false,
-        inputAtomicPerMtok: '52000',
-        outputAtomicPerMtok: '208000',
-      },
-    ],
-  });
   let catalogQuery = '';
   const catalogResult = () => {
-    const result = catalog(catalogQuery);
+    const result = previewCatalog(model, now, catalogQuery);
     return !catalogQuery || catalogQuery === model
       ? result
       : { ...result, state: CATALOG_STATE.EMPTY, models: [] };

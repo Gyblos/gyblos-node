@@ -4,6 +4,7 @@ import { bounded } from '@gyblos/node/buyer-operation';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
@@ -34,6 +35,10 @@ import {
 import { selectConfiguredThenOpen } from './quote-selection';
 import { makeManager, type SessionState } from './session-manager';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
+import {
+  prepareChosenSeller,
+  verifyChosenOffer,
+} from './session-seller-choice';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
@@ -104,6 +109,7 @@ function sessionSelection(
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   permission: Parameters<typeof reserveApiKey>[0],
   router: ReturnType<typeof sessionRouter> | undefined,
+  choice?: BuyerSellerChoice,
 ): BuyerRoutePorts<ChatResult>['select'] {
   const { prepared, endpoint, relayOnly } = context;
   return (
@@ -135,6 +141,21 @@ function sessionSelection(
         candidate,
         selectionRoute,
       );
+    if (choice) {
+      if (permission) return sessionFail(SESSION_CODES.BINDING);
+      const chosen = prepareChosenSeller(prepared, choice);
+      return selectWinner(
+        chosen.prepared,
+        { endpoint, buyer, relayOnly },
+        excluded,
+        current,
+        policy,
+        { pinnedNodeId: choice.nodeId },
+      ).then((winner) => {
+        verifyChosenOffer(choice, winner);
+        return { ...winner, seller: chosen.seller };
+      });
+    }
     if (router || route.pinnedNodeId) return select(policy, route);
     return selectConfiguredThenOpen(prepared.config, policy, current, select);
   };
@@ -148,7 +169,8 @@ function sessionExecutor(
   router?: ReturnType<typeof sessionRouter>,
 ): Awaited<ReturnType<BuyerExecutionFactory>>['execute'] {
   return async (input, signal, onDelta, model, permission) => {
-    const request = routedRequest(context.prepared.config.request, model);
+    const config = context.prepared.config;
+    const request = routedRequest(config.request, model);
     const ports: BuyerRoutePorts<ChatResult> = {
       select: sessionSelection(
         context,
@@ -158,6 +180,7 @@ function sessionExecutor(
         input,
         permission,
         router,
+        model?.sellerChoice,
       ),
       free: (winner, current, sending) =>
         executeApiKeyFree(permission, winner.quote, current, () =>
@@ -193,30 +216,31 @@ function sessionExecutor(
           },
         ),
     };
-    const routed = router
-      ? await router.execute(ports, signal, routeScope(request))
-      : await executeBuyerQuote(
-          {
-            ...ports,
-            enter: context.dependencies.enter ?? (() => () => {}),
-            unresolved: manager.unresolved,
-            select: (excluded, current) =>
-              ports
-                .select(excluded, current, {
-                  pinnedNodeId: context.prepared.config.pinnedNodeId,
-                  priceCeilings: context.prepared.config.request.priceCeilings,
-                })
-                .catch(
-                  onBuyerSelectionFailure(
-                    current,
-                    context.dependencies,
-                    Boolean(onDelta),
-                    model?.selection,
+    const routed =
+      router && !model?.sellerChoice
+        ? await router.execute(ports, signal, routeScope(request))
+        : await executeBuyerQuote(
+            {
+              ...ports,
+              enter: context.dependencies.enter ?? (() => () => {}),
+              unresolved: manager.unresolved,
+              select: (excluded, current) =>
+                ports
+                  .select(excluded, current, {
+                    pinnedNodeId: config.pinnedNodeId,
+                    priceCeilings: config.request.priceCeilings,
+                  })
+                  .catch(
+                    onBuyerSelectionFailure(
+                      current,
+                      context.dependencies,
+                      Boolean(onDelta),
+                      model?.selection,
+                    ),
                   ),
-                ),
-          },
-          signal,
-        );
+            },
+            signal,
+          );
     return { ...routed.result, execution: routed.kind };
   };
 }
@@ -241,6 +265,7 @@ export async function startSessionQuoteRuntime(
     return run();
   };
   return {
+    sellerChoice: true,
     token,
     requestMs: PAID_BUYER_HTTP_MS,
     classify: classifyPaidError,

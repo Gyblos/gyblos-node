@@ -75,6 +75,7 @@ import { useX402 } from './ui/useX402';
 import { WalletBackup } from './ui/WalletBackup';
 import { useDesktopWallet } from './ui/WalletState';
 import { WindowTitlebar } from './ui/WindowTitlebar';
+import { paidSellerLimitNotice } from './x402-model';
 
 const money = (value: number) => '$' + value.toFixed(2);
 export function DesktopApp() {
@@ -190,6 +191,7 @@ export function DesktopApp() {
   useEffect(() => {
     if (
       model.source === MODEL_SOURCE.ANNOUNCED &&
+      !model.offerId &&
       announcements.snapshot.state !== CATALOG_STATE.LOADING &&
       !networkModels.some((item) => item.id === model.id)
     )
@@ -205,6 +207,9 @@ export function DesktopApp() {
     (typeof UI_DIALOG)[keyof typeof UI_DIALOG] | null
   >(null);
   const [paidModel, setPaidModel] = useState<Model | null>(null);
+  const sellerLimit = paidModel?.offerId
+    ? paidSellerLimitNotice(x402.state.policy, x402.state.summary)
+    : undefined;
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
   const [chatController] = useState(() => new ChatController('first-chat'));
@@ -574,6 +579,7 @@ export function DesktopApp() {
             <div className="paid-model-summary">
               <ModelImage name={paidModel.name} artwork={paidModel.image} />
               <strong>{paidModel.name}</strong>
+              {paidModel.offerId && <span>{paidModel.family}</span>}
             </div>
             <div className="paid-terms">
               <div>
@@ -585,17 +591,24 @@ export function DesktopApp() {
                 <strong>{usdPerMtok(paidModel.output)}</strong>
               </div>
               <div>
-                <span>Your device daily limit</span>
-                <strong>{money(budget)}</strong>
+                <span>
+                  {paidModel.offerId
+                    ? 'Channel deposit · 1 hour'
+                    : 'Your device daily limit'}
+                </span>
+                <strong>{paidModel.offerId ? '1 USDC' : money(budget)}</strong>
               </div>
             </div>
-            <p className="modal-note">
-              Your model stays selected. Gyblos won’t silently switch from a
-              free to a paid offer.
+            <p className="modal-note" role="status">
+              {sellerLimit ||
+                (paidModel.offerId
+                  ? 'The first paid message opens a channel with this seller. Later messages use the same channel.'
+                  : 'Your model stays selected. Gyblos won’t silently switch from a free to a paid offer.')}
             </p>
             <Button
               variant={BUTTON_VARIANT.PRIMARY}
               className="wide"
+              disabled={!!sellerLimit}
               onClick={() => {
                 setModel(paidModel);
                 setPaidModel(null);

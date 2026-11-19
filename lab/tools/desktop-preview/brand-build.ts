@@ -154,27 +154,8 @@ export function transformBrand(source: string, id: string, desktop: string) {
       '    </button>',
       '      {retry && <span className="preview-node-retry">Retry</span>}\n    </button>',
     );
-  if (target === `${base}/src/ui/model-price.ts`)
-    return replaceOnce(
-      source,
-      'value.toFixed(CENTS)',
-      "value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6, useGrouping: false })",
-    );
-  if (target === `${base}/src/ui/announced-models.ts`) {
-    const fixtures = readFileSync(
-      new URL('./views/SellerListings.ts.preview', import.meta.url),
-      'utf8',
-    );
-    return (
-      replaceOnce(
-        source,
-        'export function announcedModels(',
-        'function groupedModels(',
-      ) + fixtures
-    );
-  }
   if (target === `${base}/src/ui/NetworkCatalog.tsx`) {
-    const start = source.indexOf('function CatalogStatus(');
+    const start = source.indexOf('export function NetworkCatalogPanel(');
     if (start < 0) throw new Error('Missing network catalog view hook');
     return (
       source.slice(0, start) +
@@ -186,32 +167,13 @@ export function transformBrand(source: string, id: string, desktop: string) {
   }
   if (target === `${base}/src/ui/Models.tsx`)
     return replaceOnce(
-      source
-        .replaceAll('Check network', 'Find network models')
-        .replace(
-          'onLookup={catalog.lookup}',
-          'onLookup={catalog.lookup} onSelect={canSelect ? (offer) => { setNetwork(false); onSelect(offer); } : undefined}',
-        ),
+      source,
       'const [network, setNetwork] = useState(false)',
       "const [network, setNetwork] = useState(() => new URLSearchParams(location.search).get('review') === 'network')",
     );
   if (target === `${base}/src/desktop-app.tsx`)
     return replaceOnce(
-      replaceOnce(source, '<Payments\n', '<Payments chat={chatController}\n')
-        .replace(
-          '<strong>{paidModel.name}</strong>',
-          '<strong>{paidModel.name}</strong><span>{paidModel.family}</span>',
-        )
-        .replace('Your device daily limit', 'Channel deposit · 1 hour')
-        .replace('<strong>{money(budget)}</strong>', '<strong>1 USDC</strong>')
-        .replace(
-          'Your model stays selected. Gyblos won’t silently switch from a',
-          'The first paid message opens a channel with this seller.',
-        )
-        .replace(
-          'free to a paid offer.',
-          'Later messages use the same channel.',
-        ),
+      replaceOnce(source, '<Payments\n', '<Payments chat={chatController}\n'),
       'const [light, setLight] = useState(prefersLightTheme)',
       "const [light, setLight] = useState(() => new URLSearchParams(location.search).get('theme') === 'light')",
     );

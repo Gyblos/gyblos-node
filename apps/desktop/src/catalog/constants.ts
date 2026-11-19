@@ -11,6 +11,8 @@ export const NETWORK_CATALOG = {
   STATUS_CHANNEL: 'desktop:catalog-status',
   LOOKUP_CHANNEL: 'desktop:catalog-lookup',
   PARTITION: 'desktop-announcements',
+  MAX_SUGGESTIONS: 6,
+  OFFER_LABEL_DIGITS: 4,
   MAX_MODELS: 64,
   MAX_ANNOUNCEMENTS: 50,
   REQUEST_MS: 5000,

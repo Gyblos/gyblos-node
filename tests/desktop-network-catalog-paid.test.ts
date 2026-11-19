@@ -168,3 +168,25 @@ void test('a paid price too small for two decimals keeps its digits instead of r
   assert.equal(usdPerMtok(0.000001), '$0.000001');
   assert.equal(priceRange({ input: 0.0001, output: 0.15 }), '$0.0001 / $0.15');
 });
+
+void test('the buyer validates the selected seller and rejects expired terms before quoting', async () => {
+  const { parseBuyerSellerChoice } = await import('@gyblos/protocol/buyer-api');
+  const example = await priced('5', '9');
+  const { nodeId, owner } = example.signed.catalog.record;
+  const choice = {
+    nodeId,
+    owner,
+    modelId: 'qwen3-0.6b',
+    variant: null,
+    quantization: null,
+    contextTokens: 2048,
+    inputAtomicPerMtok: '5',
+    outputAtomicPerMtok: '9',
+    expiresAt: DISCOVERY_NOW + 1,
+  };
+  assert.deepEqual(parseBuyerSellerChoice(choice, DISCOVERY_NOW), choice);
+  assert.throws(() => parseBuyerSellerChoice(choice, choice.expiresAt));
+  assert.throws(() =>
+    parseBuyerSellerChoice({ ...choice, relayUrl: 'invalid' }, DISCOVERY_NOW),
+  );
+});

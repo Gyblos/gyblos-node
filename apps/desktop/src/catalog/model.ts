@@ -7,6 +7,7 @@ export { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 export type CatalogState = (typeof CATALOG_STATE)[keyof typeof CATALOG_STATE];
 export interface AnnouncedModel {
   offerId?: string;
+  sellerFingerprint?: string;
   modelId: string;
   variant: string | null;
   quantization: string | null;
@@ -77,7 +78,7 @@ function parseModel(value: unknown): AnnouncedModel | null {
   if (
     !object(value, [
       ...(value && typeof value === 'object' && 'offerId' in value
-        ? ['offerId']
+        ? ['offerId', 'sellerFingerprint']
         : []),
       'modelId',
       'variant',
@@ -92,6 +93,8 @@ function parseModel(value: unknown): AnnouncedModel | null {
     (value.offerId !== undefined &&
       (value.free !== false ||
         typeof value.offerId !== 'string' ||
+        typeof value.sellerFingerprint !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(value.sellerFingerprint) ||
         !/^[a-f0-9]{64}$/.test(value.offerId))) ||
     !validCatalogQuery(value.modelId) ||
     !publicText(value.variant) ||
@@ -110,7 +113,11 @@ function parseModel(value: unknown): AnnouncedModel | null {
   )
     return null;
   return {
-    ...(typeof value.offerId === 'string' && { offerId: value.offerId }),
+    ...(typeof value.offerId === 'string' &&
+      typeof value.sellerFingerprint === 'string' && {
+        offerId: value.offerId,
+        sellerFingerprint: value.sellerFingerprint,
+      }),
     modelId: value.modelId,
     variant: value.variant,
     quantization: value.quantization,

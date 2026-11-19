@@ -1,6 +1,10 @@
 // Validates the public configuration of an authenticated local buyer, never keys or signed payloads.
 import { BUYER_API } from './buyer-api/constants';
 
+export {
+  parseBuyerSellerChoice,
+  type BuyerSellerChoice,
+} from './buyer-api/seller-choice';
 export { BUYER_API } from './buyer-api/constants';
 export { BUYER_SIDECAR } from './buyer-api/constants';
 export interface BuyerApiPolicy {

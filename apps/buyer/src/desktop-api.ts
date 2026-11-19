@@ -74,8 +74,10 @@ function metadataRequest(
     request.method === 'POST' &&
     (path === ROUTES.inference ||
       path === CHAT_ROUTES.messages ||
-      path === BUYER_API.CHAT_PATH) &&
-    (path === BUYER_API.CHAT_PATH ||
+      path === BUYER_API.CHAT_PATH ||
+      path === BUYER_API.CHANNEL_CHAT_PATH) &&
+    (path === BUYER_API.CHANNEL_CHAT_PATH ||
+      path === BUYER_API.CHAT_PATH ||
       request.headers['if-match'] !== undefined) &&
     (!policy || request.headers['if-match'] !== '"' + policy.policyId + '"')
   ) {
@@ -109,7 +111,8 @@ export function createDesktopApi(
         request.headers.origin === undefined &&
         json &&
         (path === ROUTES.inference ||
-          (path === BUYER_API.CHAT_PATH &&
+          ((path === BUYER_API.CHAT_PATH ||
+            path === BUYER_API.CHANNEL_CHAT_PATH) &&
             policy !== undefined &&
             authenticated))
       );

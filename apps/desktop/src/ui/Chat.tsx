@@ -30,7 +30,7 @@ import {
   paypalDollars,
   type PaymentMethod,
 } from '../paypal-model';
-import { X402_ACTION } from '../x402-model';
+import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
 import { activityDate, sessionOutcome } from './activity-presentation';
 import { modelArtwork } from './announced-models';
 import type { ChatController } from './chat-controller';
@@ -195,7 +195,12 @@ export function Chat({
     (session.paypalRun &&
       session.messages.at(-1)?.paymentMethod === PAYMENT_METHOD.USDC),
   );
+  const limitNotice =
+    usingX402 && x402 && model.offerId
+      ? paidSellerLimitNotice(x402.state.policy, x402.state.summary)
+      : undefined;
   const canSend =
+    !limitNotice &&
     !loadingHistory &&
     online &&
     !busy &&
@@ -220,7 +225,9 @@ export function Chat({
   const composerModel = usingPaypal
     ? sandboxModel
     : usingX402
-      ? buyerModel
+      ? model.offerId
+        ? model
+        : buyerModel
       : model;
   const thinking = usingX402
     ? null
@@ -394,15 +401,21 @@ export function Chat({
       const id = crypto.randomUUID();
       const conversation = chat.startPaypal(
         session.draft,
-        buyerModel,
+        composerModel,
         id,
         x402.state.summary.sessionId ?? undefined,
         PAYMENT_METHOD.USDC,
       );
       if (!conversation) return;
       void x402
-        .run({ action: X402_ACTION.SEND, id, prompt: session.draft }, (text) =>
-          chat.appendBuyer(conversation, id, text),
+        .run(
+          {
+            action: X402_ACTION.SEND,
+            id,
+            prompt: session.draft,
+            ...(model.offerId && { offerId: model.offerId }),
+          },
+          (text) => chat.appendBuyer(conversation, id, text),
         )
         .then((result) => {
           if (result?.reply)
@@ -410,7 +423,7 @@ export function Chat({
               conversation,
               id,
               result.reply.text,
-              buyerModel,
+              composerModel,
               result.reply.metrics,
             );
           else
@@ -643,12 +656,12 @@ export function Chat({
                   usingPaypal
                     ? [sandboxModel]
                     : usingX402
-                      ? [buyerModel]
+                      ? [buyerModel, ...models.filter((item) => item.offerId)]
                       : models
                 }
                 onSelect={onSelectModel}
                 onBrowse={onBrowseModels}
-                showBrowse={!usingPaypal && !usingX402}
+                showBrowse={!usingPaypal}
                 contextLabel={
                   usingPaypal ? 'Local model · PayPal Sandbox' : undefined
                 }
@@ -739,7 +752,8 @@ export function Chat({
             </div>
           )}
           <p className="composer-note" role="status">
-            {(!usingPaypal && notice) ||
+            {limitNotice ||
+              (!usingPaypal && notice) ||
               (busy && session.draft.trim()
                 ? run
                   ? 'Draft kept · stop or wait to send'

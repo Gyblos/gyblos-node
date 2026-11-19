@@ -60,6 +60,7 @@ export type BuyerExecutionFactory = (context: {
     model?: RoutedModel,
     permission?: BuyerApiKeyOperation,
   ): Promise<ChatResult>;
+  sellerChoice?: boolean;
   token?: string;
   apiKeys?: BuyerApiKeys;
   requestMs?: number;
@@ -200,6 +201,7 @@ function buyerHttp(
       (input, signal, _onDelta, model, permission) =>
         run(input, signal, undefined, model, permission),
       {
+        sellerChoice: execution?.sellerChoice,
         selection: request.selection,
         maxTokens: request.maxTokens,
         ...(models ? { models } : {}),

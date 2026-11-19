@@ -138,6 +138,7 @@ export class X402Budget {
   complete(
     id: string,
     result: { chargeAtomic: string; transaction: string | null; free: boolean },
+    selectedModel?: string,
   ) {
     return this.serial(async () => {
       const state = await this.load();
@@ -164,6 +165,7 @@ export class X402Budget {
             sessionId: current.sessionId,
             at: Date.now(),
             policy: current.policy,
+            ...(selectedModel && { selectedModel }),
             ...result,
           },
         ],

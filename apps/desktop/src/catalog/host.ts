@@ -47,4 +47,5 @@ export function registerNetworkCatalog(
   ipcMain.handle(NETWORK_CATALOG.LOOKUP_CHANNEL, (event, ...args: unknown[]) =>
     handlers.lookup(event, args),
   );
+  return catalog.resolve;
 }

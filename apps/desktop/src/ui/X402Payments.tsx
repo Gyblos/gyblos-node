@@ -308,9 +308,15 @@ export function X402History({ buyer }: { buyer: X402View }) {
             </DataCell>
             <DataCell label="Usage">
               <strong>
-                {record.free ? 'Free response' : 'Confirmed payment'}
+                {record.free
+                  ? 'Free response'
+                  : record.sessionApproval
+                    ? 'Channel approval'
+                    : 'Confirmed payment'}
               </strong>
-              <span className="ui-muted">{record.policy.model}</span>
+              <span className="ui-muted">
+                {record.selectedModel ?? record.policy.model}
+              </span>
             </DataCell>
             <DataCell label="Amount">
               <strong>

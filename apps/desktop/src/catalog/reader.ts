@@ -7,6 +7,7 @@ import {
   type DiscoveredSeller,
   type DiscoveryFetch,
 } from '@gyblos/discovery-http';
+import type { BuyerSellerChoice as CatalogSellerChoice } from '@gyblos/protocol/buyer-api';
 
 import { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 import type { AnnouncedModel, NetworkCatalog } from './model';
@@ -21,17 +22,7 @@ const isShown = (pricing: Pricing) =>
   isFree(pricing) ||
   (pricing.network === DEVNET && pricing.asset === DEVNET_USDC);
 
-export interface CatalogSellerChoice {
-  nodeId: string;
-  owner: string;
-  modelId: string;
-  variant: string | null;
-  quantization: string | null;
-  contextTokens: number;
-  inputAtomicPerMtok: string;
-  outputAtomicPerMtok: string;
-  expiresAt: number;
-}
+export type { BuyerSellerChoice as CatalogSellerChoice } from '@gyblos/protocol/buyer-api';
 
 function project(
   sellers: DiscoveredSeller[],
@@ -92,7 +83,12 @@ function project(
             expiresAt,
           });
         models.set(key, {
-          ...(offerId && { offerId }),
+          ...(offerId && {
+            offerId,
+            sellerFingerprint: createHash('sha256')
+              .update(seller.catalog.nodeId)
+              .digest('hex'),
+          }),
           modelId: model.modelId,
           variant: model.variant,
           quantization: model.quantization,

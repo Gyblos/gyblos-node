@@ -42,7 +42,7 @@ export function NetworkCatalogPanel({
     [CATALOG_STATE.READY]: models.length ? '' : 'No current listings.',
   };
   return (
-    <div className="preview-network-search">
+    <div className="network-search">
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -50,7 +50,7 @@ export function NetworkCatalogPanel({
         }}
       >
         <label htmlFor="preview-network-model">Model ID</label>
-        <div className="preview-model-picker">
+        <div className="network-model-picker">
           <SearchField
             label="Model ID"
             id="preview-network-model"

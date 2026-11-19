@@ -10,6 +10,27 @@ import {
 } from './model';
 import { readAnnouncements, type CatalogSellerChoice } from './reader';
 
+function expireListings(
+  snapshot: NetworkCatalog,
+  current: number,
+): NetworkCatalog {
+  if (
+    snapshot.checkedAt !== null &&
+    (current < snapshot.checkedAt ||
+      snapshot.models.some((model) => model.expiresAt <= current))
+  ) {
+    const models =
+      current < snapshot.checkedAt
+        ? []
+        : snapshot.models.filter((model) => model.expiresAt > current);
+    return {
+      ...snapshot,
+      models,
+      state: models.length ? CATALOG_STATE.READY : CATALOG_STATE.STALE,
+    };
+  }
+  return snapshot;
+}
 export function createCatalogSession(
   fetch: DiscoveryFetch,
   now: () => number,
@@ -25,22 +46,7 @@ export function createCatalogSession(
     result: Promise<NetworkCatalog>;
   } | null = null;
   function summary() {
-    const current = now();
-    if (
-      snapshot.checkedAt !== null &&
-      (current < snapshot.checkedAt ||
-        snapshot.models.some((model) => model.expiresAt <= current))
-    ) {
-      const models =
-        current < snapshot.checkedAt
-          ? []
-          : snapshot.models.filter((model) => model.expiresAt > current);
-      snapshot = {
-        ...snapshot,
-        models,
-        state: models.length ? CATALOG_STATE.READY : CATALOG_STATE.STALE,
-      };
-    }
+    snapshot = expireListings(snapshot, now());
     return parseNetworkCatalog(snapshot);
   }
   function close() {

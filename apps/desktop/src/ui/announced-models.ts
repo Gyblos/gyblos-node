@@ -1,6 +1,10 @@
 // Maps sanitized announcements into shared preview controls; never authorizes inference. A paid group
 // shows its cheapest price in USDC per million tokens; choosing it still asks before any spending.
-import { CATALOG_STATE, type NetworkCatalog } from '../catalog/model';
+import {
+  CATALOG_STATE,
+  NETWORK_CATALOG,
+  type NetworkCatalog,
+} from '../catalog/model';
 import { DESKTOP_X402 } from '../x402/constants';
 import {
   ADDITIONAL_MODEL_ARTWORK,
@@ -58,10 +62,25 @@ export function announcedModels(
             item.contextTokens,
             free,
           ]),
+        ...(item.offerId && { offerId: item.offerId }),
         name: item.modelId,
         family:
-          [item.variant, item.quantization].filter(Boolean).join(' · ') ||
-          'Signed announcement',
+          [
+            item.sellerFingerprint &&
+              'Seller ' +
+                item.sellerFingerprint.slice(
+                  0,
+                  NETWORK_CATALOG.OFFER_LABEL_DIGITS,
+                ) +
+                '…' +
+                item.sellerFingerprint.slice(
+                  -NETWORK_CATALOG.OFFER_LABEL_DIGITS,
+                ),
+            item.variant,
+            item.quantization,
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'Signed announcement',
         image: modelArtwork(item.modelId),
         category: MODEL_CATEGORY.EVERYDAY,
         context: item.contextTokens.toLocaleString(),
