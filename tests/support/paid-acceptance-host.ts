@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { address } from '@solana/kit';
 
 import { startBuyer as startProductBuyer } from '@gyblos/buyer/buyer-main';
+import { startPaidBuyer } from '@gyblos/buyer/paid-startup';
 import { rolePathIn } from '@gyblos/config';
 import { fetchSellers } from '@gyblos/discovery-http';
 import { ACCEPTANCE } from '@gyblos/lab-harness/acceptance/constants';
@@ -81,7 +82,8 @@ export async function paidAcceptanceHost(
   const localFetch = globalThis.fetch;
   let external = 0;
   let reads = 0;
-  let buyer: Awaited<ReturnType<typeof startProductBuyer>> | undefined;
+  let buyer: Awaited<ReturnType<typeof startPaidBuyer>> | undefined;
+  let freeBuyer: Awaited<ReturnType<typeof startProductBuyer>> | undefined;
   globalThis.fetch = async (input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
@@ -122,7 +124,12 @@ export async function paidAcceptanceHost(
     },
   });
   const startBuyer = async () => {
-    const host = await startProductBuyer(buyerOptions());
+    // Per-request acceptance exercises the explicit legacy paid entry until its removal.
+    freeBuyer =
+      pricing === OFFER_PRICING_KINDS.FREE
+        ? await startProductBuyer(buyerOptions())
+        : undefined;
+    const host = freeBuyer ?? (await startPaidBuyer(buyerOptions()));
     buyer = host;
     try {
       token = (
@@ -232,13 +239,20 @@ export async function paidAcceptanceHost(
       token: () => token,
       stopBuyer: closeBuyer,
       receipts: () => {
-        assert.ok(buyer);
-        return buyer.receipts();
+        assert.ok(freeBuyer);
+        return freeBuyer.receipts();
       },
       async startTerminal() {
         assert.equal(buyer, undefined);
         const host = await startBuyer();
-        return { ...host, close: closeBuyer };
+        return {
+          ...host,
+          receipts: () => {
+            assert.ok(freeBuyer);
+            return freeBuyer.receipts();
+          },
+          close: closeBuyer,
+        };
       },
       url: () => {
         assert.ok(buyer);

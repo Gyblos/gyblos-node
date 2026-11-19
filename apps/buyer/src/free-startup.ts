@@ -36,7 +36,10 @@ import { buyerReceipts } from './free-receipt-runtime';
 import { freeBuyerDependencies } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { RoutedModel } from './model-routes';
-import { loadBuyerSelectionConfig } from './selection-config';
+import {
+  BuyerSelectionError,
+  loadBuyerSelectionConfig,
+} from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
 import { withBuyerDiagnostics } from './startup-diagnostics';
@@ -96,7 +99,12 @@ export async function buyerRole() {
 async function selectionConfig() {
   try {
     return await loadBuyerSelectionConfig(process.env);
-  } catch {
+  } catch (error) {
+    if (
+      error instanceof BuyerSelectionError &&
+      error.code === BUYER_SELECTION_CODES.SESSION_REQUIRED
+    )
+      return refuse(FREE_BUYER_STARTUP.SESSION_REQUIRED);
     return refuse(FREE_BUYER_STARTUP.SELECTION_INVALID);
   }
 }

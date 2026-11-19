@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { DEVNET, DEVNET_USDC, FILE_MODES, rolePathIn } from '@gyblos/config';
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { ACCEPTANCE } from '@gyblos/lab-harness/acceptance/constants';
@@ -56,6 +57,7 @@ export async function paidBuyerConfiguration(
   await writeFile(
     rolePathIn(process.env, P2P_ROLES.BUYER, BUYER_SELECTION.configFile),
     JSON.stringify({
+      session: BUYER_SESSION_DEFAULT_POLICY,
       request: {
         selection: {
           modelId: MODEL_IDS.QWEN3_0_6B,

@@ -93,3 +93,19 @@ void test('buyer sidecar failure reports only a static error', async () => {
   assert.deepEqual(messages, [{ kind: BUYER_SIDECAR.ERROR }]);
   assert.equal(exit, 1);
 });
+
+void test('desktop buyer reports a missing paid session without forwarding exception text', async () => {
+  const messages: unknown[] = [];
+  const error = Object.assign(new Error('private fixture'), {
+    reason: BUYER_SIDECAR.SESSION_REQUIRED,
+  });
+  await runBuyerSidecar(
+    { on() {}, postMessage: (message) => messages.push(message) },
+    async () => {
+      throw error;
+    },
+    async () => assert.fail('No credential should be requested'),
+    (code) => assert.equal(code, 1),
+  );
+  assert.deepEqual(messages, [{ kind: BUYER_SIDECAR.SESSION_REQUIRED }]);
+});

@@ -48,6 +48,11 @@ seller's owner wallet. `pnpm buyer:init --advanced` asks for every field:
 | Seller relay URL                                          | uses the default             | `https://na1.relay.gyblos.com/`   |
 | 8004 devnet RPC URL                                       | uses the default             | `https://api.devnet.solana.com`   |
 
+Guided setup and desktop setup both save a payment session with a 1 USDC deposit
+and a one-hour lifetime. The initial request ceiling is zero. Existing paid
+profiles must add the session settings before starting. See
+[updating an existing payment profile](payment-sessions.md#explicit-startup-policy).
+
 With no seller, setup saves an open-network buyer: no configured sellers and
 `"discovery": { "open": true }`. It then uses any seller the index lists whose
 8004 agent registry entry matches, for free answers only (see

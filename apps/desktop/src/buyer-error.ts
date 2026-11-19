@@ -11,6 +11,14 @@ import {
   type FreeExecutionCode,
 } from '@gyblos/protocol/constants';
 
+export class BuyerSessionRequired extends Error {
+  constructor() {
+    super(
+      'Paid settings need a payment channel. Add session.depositAtomic and session.lifetimeMs to buyer/selection.json before starting the buyer.',
+    );
+  }
+}
+
 type BuyerCode = FreeExecutionCode | SellerSelectionCode;
 export class DesktopBuyerFailure extends Error {
   constructor(

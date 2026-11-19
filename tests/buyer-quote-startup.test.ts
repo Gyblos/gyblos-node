@@ -14,6 +14,7 @@ import {
 } from '@gyblos/buyer/constants';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { FILE_MODES, ROLE_FILES } from '@gyblos/config';
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
@@ -119,6 +120,7 @@ void test(
       ...request
     } = source.request.params;
     const config: BuyerSelectionConfig = {
+      session: { ...BUYER_SESSION_DEFAULT_POLICY, withdrawDelaySeconds: 900 },
       request: {
         ...request,
         // Above the former paid answer bound of 128: paid preparation must still start (devnet rehearsal).
@@ -146,7 +148,7 @@ void test(
     let host: Awaited<ReturnType<typeof startBuyer>> | undefined;
     let paymentPreparations = 0;
     let tokenizerLoads = 0;
-    let chainClosed = 0;
+    let financialCreations = 0;
     let releaseChain = () => {};
     let beganChain = () => {};
     let finishedChain = () => {};
@@ -212,24 +214,20 @@ void test(
           tokenizerLoads++;
           if (tokenizerLoads === 1)
             throw new Error('synthetic tokenizer unavailable');
-          return { input: () => 4, count: () => 2 };
+          return { input: () => 4, chat: () => 4, count: () => 2 };
         },
-        chain: async (_role, maxAtomic) => {
-          assert.equal(maxAtomic, '1000');
+        batch: async () => {
           paymentPreparations++;
           beganChain();
           await chainReleased;
+          finishedChain();
           return {
-            client: {
-              authorize: unexpected,
-              discard: unexpected,
-              checkReceipt: unexpected,
-              reconcile: async () => [],
+            create: async () => {
+              financialCreations++;
+              return unexpected();
             },
-            close: async () => {
-              chainClosed++;
-              finishedChain();
-            },
+            inspect: async () => undefined,
+            observe: async () => undefined,
           };
         },
       });
@@ -301,10 +299,10 @@ void test(
       // Shutdown must finish before a stalled payment opener returns.
       await within(host.close());
       host = undefined;
-      assert.equal(chainClosed, 0);
+      assert.equal(financialCreations, 0);
       releaseChain();
       await within(chainFinished);
-      assert.equal(chainClosed, 1);
+      assert.equal(financialCreations, 0);
       assert.equal(paymentPreparations, 1);
       assert.equal(tokenizerLoads, 2);
       assert.equal(fixture.calls(), 2);

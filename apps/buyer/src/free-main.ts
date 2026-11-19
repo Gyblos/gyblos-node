@@ -29,6 +29,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
   [FREE_BUYER_STARTUP.NOT_BUYER]:
     'the role.json in the buyer directory does not describe a buyer',
   [FREE_BUYER_STARTUP.SELECTION_MISSING]: `create selection.json in the buyer home (.local/gyblos/buyer by default); see ${BUYER_DOCS}`,
+  [FREE_BUYER_STARTUP.SESSION_REQUIRED]: `paid settings require a session in selection.json. Add depositAtomic and lifetimeMs as described in ${BUYER_DOCS}`,
   [FREE_BUYER_STARTUP.SELECTION_INVALID]: `selection.json is not valid; compare it with ${BUYER_DOCS}`,
   [FREE_BUYER_STARTUP.STATS_INVALID]:
     'selection-stats.json in the buyer home is unreadable or invalid',

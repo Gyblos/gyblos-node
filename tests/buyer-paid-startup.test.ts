@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { DEVNET, DEVNET_GENESIS, ROLE_KEY_FILES } from '@gyblos/config';
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import type { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
@@ -27,6 +28,7 @@ import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 const MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const REFUSED = 'refuse me';
 const SELECTION = {
+  session: BUYER_SESSION_DEFAULT_POLICY,
   request: {
     selection: { modelId: 'qwen3-0.6b', variant: null, quantization: 'Q4_K_M' },
     reasoning: 'off',

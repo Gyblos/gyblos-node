@@ -18,6 +18,7 @@ import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
 import { executeSelectedBuyerFree } from './free-execution';
+import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
@@ -29,6 +30,7 @@ import {
   endpointToken,
   type startPaidBuyer,
 } from './paid-startup';
+import { selectConfiguredThenOpen } from './quote-selection';
 import { makeManager, type SessionState } from './session-manager';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 
@@ -107,26 +109,34 @@ function sessionSelection(
     excluded: Set<string>,
     current: AbortSignal,
     route: Parameters<BuyerRoutePorts<ChatResult>['select']>[2],
-  ) =>
-    selectWinner(
-      prepared,
-      {
-        endpoint,
-        buyer,
-        relayOnly,
-        onSellerFailure: options.onSellerFailure,
-        ...(router ? { onPinnedBusy: pinnedBusy } : {}),
-      },
-      excluded,
-      current,
-      {
-        ...request,
-        maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
-        priceCeilings: route.priceCeilings,
-        ...(inferenceNeedsTools(input) ? { tools: true } : {}),
-      },
-      route,
-    );
+  ) => {
+    const policy = {
+      ...request,
+      maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
+      priceCeilings: route.priceCeilings,
+      ...(inferenceNeedsTools(input) ? { tools: true as const } : {}),
+    };
+    const select = (
+      candidate: typeof request,
+      selectionRoute?: SelectionRoute,
+    ) =>
+      selectWinner(
+        prepared,
+        {
+          endpoint,
+          buyer,
+          relayOnly,
+          onSellerFailure: options.onSellerFailure,
+          ...(router ? { onPinnedBusy: pinnedBusy } : {}),
+        },
+        excluded,
+        current,
+        candidate,
+        selectionRoute,
+      );
+    if (router || route.pinnedNodeId) return select(policy, route);
+    return selectConfiguredThenOpen(prepared.config, policy, current, select);
+  };
 }
 function sessionExecutor(
   context: Context,

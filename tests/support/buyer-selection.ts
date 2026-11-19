@@ -2,6 +2,10 @@
 import { createBuyerControlClient } from '@gyblos/buyer/control';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
+import {
+  BATCH_SESSION_DEFAULTS,
+  BUYER_SESSION_DEFAULT_POLICY,
+} from '@gyblos/config/batch-session';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { createSellerControlService } from '@gyblos/node/control';
 import type { ControlService } from '@gyblos/transport-iroh/control-server';
@@ -42,6 +46,10 @@ export async function selectionFixture(
     ...request
   } = source.request.params;
   const config: BuyerSelectionConfig = {
+    session: {
+      ...BUYER_SESSION_DEFAULT_POLICY,
+      withdrawDelaySeconds: BATCH_SESSION_DEFAULTS.withdrawDelaySeconds,
+    },
     request: {
       ...request,
       lowestReasoning: null,

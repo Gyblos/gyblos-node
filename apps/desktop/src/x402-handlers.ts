@@ -1,5 +1,5 @@
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
-import { DesktopBuyerFailure } from './buyer-error';
+import { BuyerSessionRequired, DesktopBuyerFailure } from './buyer-error';
 import type { X402Budget } from './x402-budget';
 import type { X402Client } from './x402-client';
 import {
@@ -16,6 +16,7 @@ type Sender = { sender: unknown; senderFrame: unknown };
 function actionError(action: unknown, blocked: boolean, error: unknown) {
   if (blocked)
     return 'Spending status needs review. Further messages are blocked.';
+  if (error instanceof BuyerSessionRequired) return error.message;
   if (action === X402_ACTION.CONNECT || action === X402_ACTION.START_BUYER)
     return 'Unable to start the local buyer. Check its configuration or try again.';
   if (action === X402_ACTION.AUTHORIZE)

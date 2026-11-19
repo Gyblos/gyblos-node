@@ -228,6 +228,8 @@ export function parseBuyerSelectionConfig(
       new Set(sellers.map((item) => item.nodeId)).size !== sellers.length
     )
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+    if (request.maxAtomic !== '0' && row.session === undefined)
+      throw new BuyerSelectionError(BUYER_SELECTION_CODES.SESSION_REQUIRED);
     return {
       request,
       ...(models ? { models } : {}),
@@ -258,7 +260,8 @@ export function parseBuyerSelectionConfig(
             ),
           }),
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof BuyerSelectionError) throw error;
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
   }
 }
@@ -304,6 +307,7 @@ export async function loadBuyerSelectionConfig(environment: HomeEnvironment) {
     return parseBuyerSelectionConfig(value);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if (error instanceof BuyerSelectionError) throw error;
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
   }
 }

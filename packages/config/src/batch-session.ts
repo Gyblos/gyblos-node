@@ -19,3 +19,9 @@ export const BATCH_SESSION_DEFAULTS = {
   maxLifetimeMs: 24 * 60 * 60 * 1000,
   maxWithdrawDelaySeconds: 3600,
 } as const;
+
+// Written by guided buyer setup. The separate request ceiling still controls spending.
+export const BUYER_SESSION_DEFAULT_POLICY = {
+  depositAtomic: BATCH_SESSION_DEFAULTS.maxDepositAtomic,
+  lifetimeMs: 3_600_000,
+} as const;
