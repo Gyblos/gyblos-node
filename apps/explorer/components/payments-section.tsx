@@ -201,7 +201,7 @@ function DailyTable({ summary }: { summary: ChainSummary }) {
           { label: 'To sellers', right: true },
           { label: 'Fees', right: true },
           { label: 'Refunded', right: true },
-          { label: 'Program txs', right: true },
+          { label: 'All program txs', right: true },
         ]}
       >
         {[...summary.days].reverse().map(({ day, gyblos, program }) => (
