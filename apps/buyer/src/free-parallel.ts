@@ -1,8 +1,9 @@
 // Admission for free requests running side by side. Each seller serves one request per buyer at a time, so
 // selections take turns: each skips the sellers already serving another of this buyer's requests and
-// reserves its winner until that request is done with it. With every candidate reserved the answer is
-// busy (429, retry shortly), never a failure that would cool a healthy seller down.
-import { FREE_BUYER_CODES } from './constants';
+// reserves its winner until that request is done with it. With every candidate reserved, a request waits
+// for one to be handed back (an agent sends its title and main requests together), and only after
+// `waitMs` is it busy (429, retry shortly), never a failure that would cool a healthy seller down.
+import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
 import { FreeBuyerError } from './free-chat';
 import { FreeSelectionFailure } from './free-execution';
 
@@ -27,9 +28,38 @@ function waitTurn(turn: Promise<void>, signal: AbortSignal) {
   });
 }
 
-export function freeAdmission(limit: number) {
+// Resolves true when `subscribe` fires, false after `ms`; rejects when the client leaves.
+function nextRelease(
+  subscribe: (listener: () => void) => () => void,
+  ms: number,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  return new Promise<boolean>((resolve, reject) => {
+    const finish = (settle: () => void) => {
+      clearTimeout(timer);
+      unsubscribe();
+      signal.removeEventListener('abort', abort);
+      settle();
+    };
+    const abort = () => finish(() => reject(signal.reason));
+    const timer = setTimeout(() => finish(() => resolve(false)), ms);
+    const unsubscribe = subscribe(() => finish(() => resolve(true)));
+    signal.addEventListener('abort', abort, { once: true });
+  });
+}
+
+export function freeAdmission(
+  limit: number,
+  waitMs: number = FREE_BUYER.sellerWaitMs,
+) {
   let active = 0;
   const reserved = new Set<string>();
+  const releases = new Set<() => void>();
+  const subscribe = (listener: () => void) => {
+    releases.add(listener);
+    return () => releases.delete(listener);
+  };
   let turn: Promise<void> = Promise.resolve();
   return {
     enter() {
@@ -58,15 +88,20 @@ export function freeAdmission(limit: number) {
       );
       return waitTurn(ahead, signal)
         .then(async () => {
-          const busy = reserved.size > 0;
-          try {
-            const winner = await pick(new Set([...excluded, ...reserved]));
-            reserved.add(winner.nodeId);
-            return winner;
-          } catch (error) {
-            if (busy && unserved(error))
-              throw new FreeBuyerError(FREE_BUYER_CODES.BUSY);
-            throw error;
+          const until = performance.now() + waitMs;
+          for (;;) {
+            const busy = reserved.size > 0;
+            try {
+              const winner = await pick(new Set([...excluded, ...reserved]));
+              reserved.add(winner.nodeId);
+              return winner;
+            } catch (error) {
+              if (!busy || !unserved(error)) throw error;
+              // Every seller left serves another of this buyer's requests: wait for one to come back.
+              const left = until - performance.now();
+              if (left <= 0 || !(await nextRelease(subscribe, left, signal)))
+                throw new FreeBuyerError(FREE_BUYER_CODES.BUSY);
+            }
           }
         })
         .finally(() => {
@@ -74,7 +109,8 @@ export function freeAdmission(limit: number) {
         });
     },
     done(nodeId: string) {
-      reserved.delete(nodeId);
+      if (!reserved.delete(nodeId)) return;
+      for (const release of [...releases]) release();
     },
   };
 }
