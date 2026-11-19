@@ -1,0 +1,34 @@
+name: Buyer tsx cache pairs
+on:
+  push:
+    branches: ['codex/buyer-tsx-cache-18']
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        repetition: [1, 2, 3]
+        mode: [control, shared]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run product shard three and read timings
+        env:
+          GYB_BENCH_SHARE_TSX: ${{ matrix.mode == 'shared' && '1' || '0' }}
+        run: |
+          status=0
+          node --require "$GITHUB_WORKSPACE/.github/preflight-worker.cjs" --import tsx --test --test-shard=3/3 "tests/*.test.ts" "packages/*/test/**/*.test.ts" > "$RUNNER_TEMP/results" 2>&1 || status=$?
+          python3 .github/tsx-cache-results.py "$RUNNER_TEMP/results"
+          exit "$status"
