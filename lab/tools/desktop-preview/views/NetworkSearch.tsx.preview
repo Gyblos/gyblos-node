@@ -36,7 +36,7 @@ export function NetworkCatalogPanel({
   const messages = {
     [CATALOG_STATE.LOADING]: 'Searching…',
     [CATALOG_STATE.IDLE]: 'Enter a model ID to search.',
-    [CATALOG_STATE.EMPTY]: `No free listings for “${snapshot.query}”.`,
+    [CATALOG_STATE.EMPTY]: `No listings for “${snapshot.query}”.`,
     [CATALOG_STATE.ERROR]: 'Search unavailable. Try again.',
     [CATALOG_STATE.STALE]: 'Listings expired. Search again.',
     [CATALOG_STATE.READY]: models.length ? '' : 'No current listings.',
@@ -134,7 +134,8 @@ export function NetworkCatalogPanel({
         <section aria-live="polite" aria-label="Search results">
           {models.length > 0 && (
             <>
-              <h3>Results</h3>
+              <h3>Choose a seller</h3>
+              <p>Prices in USDC per million tokens, input / output.</p>
               <List label="Network models">
                 {models.map((model) => (
                   <ListRow
@@ -144,7 +145,7 @@ export function NetworkCatalogPanel({
                     leading={
                       <ModelImage name={model.name} artwork={model.image} />
                     }
-                    trailing={<Badge>Free</Badge>}
+                    trailing={<Badge>{model.free ? 'Free' : priceRange(model)}</Badge>}
                   >
                     <RowCopy
                       title={model.name}
