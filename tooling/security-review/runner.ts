@@ -112,6 +112,11 @@ async function ask(
     await rm(directory, { recursive: true, force: true });
   }
 }
+function excludedOf(assignment: Assignment) {
+  return assignment.bundle.excluded.length
+    ? { excluded: assignment.bundle.excluded }
+    : {};
+}
 function failed(
   assignment: Assignment,
   failure: ReviewFailure,
@@ -126,6 +131,7 @@ function failed(
       findings: [],
       failure,
       omissions: assignment.bundle.omissions,
+      ...excludedOf(assignment),
     },
   };
 }
@@ -154,6 +160,7 @@ async function review(
         taskId: assignment.task.id,
         status: response.status,
         coverage: response.coverage.reviewed_paths,
+        ...excludedOf(assignment),
         findings: response.findings.map(({ fingerprint, title }) => ({
           fingerprint,
           title,

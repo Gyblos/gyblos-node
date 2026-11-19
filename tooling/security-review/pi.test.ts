@@ -100,6 +100,53 @@ void test('a missing Pi executable fails promptly without leaking diagnostics', 
   });
 });
 
+void test('provider refusals are named by class, never by their text', async () => {
+  for (const [errorMessage, expected] of [
+    [
+      'OpenAI API error (404): {"code":"model_not_found"}',
+      REVIEW_FAILURE.MODEL,
+    ],
+    [
+      'The model `gpt-x` does not exist or you do not have access to it.',
+      REVIEW_FAILURE.MODEL,
+    ],
+    [
+      'OpenAI API error (400): {"code":"context_length_exceeded"}',
+      REVIEW_FAILURE.CONTEXT,
+    ],
+    [
+      'OpenAI API error (400): {"code":"unsupported_value","param":"reasoning.effort"}',
+      REVIEW_FAILURE.REQUEST,
+    ],
+    [
+      'OpenAI API error (503): {"type":"server_error"}',
+      REVIEW_FAILURE.PROVIDER,
+    ],
+    ['OpenAI API error (401): {"code":"invalid_api_key"}', REVIEW_FAILURE.KEY],
+    ['socket hang up', REVIEW_FAILURE.PI],
+  ] as const) {
+    const event = {
+      type: 'message_end',
+      message: { role: 'assistant', stopReason: 'error', errorMessage },
+    };
+    await withProcess(
+      'console.log(' + JSON.stringify(JSON.stringify(event)) + ');',
+      async (cwd, entry) => {
+        const result = await runPi({
+          cwd,
+          command: process.execPath,
+          prefixArgs: [entry],
+          env: {},
+          model: 'openai/example',
+          thinking: 'high',
+          prompt: 'mock',
+        });
+        assert.equal(result.failure, expected, errorMessage);
+      },
+    );
+  }
+});
+
 void test('temporary limits and successful model text cannot trip the quota stop', async () => {
   for (const [stopReason, expected] of [
     ['error', REVIEW_FAILURE.RATE],

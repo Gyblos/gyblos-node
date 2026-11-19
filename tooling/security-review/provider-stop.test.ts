@@ -12,7 +12,11 @@ import { buildBaselinePlan } from './plan';
 import { runReview } from './runner';
 import { FILE, FINDING, fixture, hunter, success } from './test-fixture';
 
-for (const code of [REVIEW_FAILURE.QUOTA, REVIEW_FAILURE.KEY]) {
+for (const [code, message] of [
+  [REVIEW_FAILURE.QUOTA, REVIEW_FAILURE.QUOTA],
+  [REVIEW_FAILURE.KEY, REVIEW_FAILURE.KEY],
+  [REVIEW_FAILURE.MODEL, 'OpenAI API error (404): {"code":"model_not_found"}'],
+] as const) {
   void test('provider stop prevents new Pi calls for ' + code, async () => {
     await fixture(async (root, output) => {
       const script = join(output, 'synthetic.mjs');
@@ -20,7 +24,7 @@ for (const code of [REVIEW_FAILURE.QUOTA, REVIEW_FAILURE.KEY]) {
         script,
         'for await (const _ of process.stdin) {}\n' +
           "console.log(JSON.stringify({type:'message_end',message:{role:'assistant',stopReason:'error',errorMessage:" +
-          JSON.stringify(code + ' PRIVATE_CANARY') +
+          JSON.stringify(message + ' PRIVATE_CANARY') +
           '}}));',
       );
       const plan = buildBaselinePlan([FILE], await repositoryRef(root));

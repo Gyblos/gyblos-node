@@ -23,11 +23,14 @@ function finalStatus(result: ReviewRunResult): ReviewStatus {
     )
   )
     return REVIEW_VALUES.ERROR;
-  if (
-    result.plan.changedFiles.some((path) =>
-      result.plan.excludedFiles.includes(path),
-    )
-  )
+  // A changed file nobody could read (private path, symlink, submodule or binary) needs a maintainer.
+  const unread = new Set([
+    ...result.plan.excludedFiles,
+    ...result.tasks.flatMap((item) =>
+      (item.excluded ?? []).map((entry) => entry.path),
+    ),
+  ]);
+  if (result.plan.changedFiles.some((path) => unread.has(path)))
     return REVIEW_VALUES.PENDING;
   if (
     status === REVIEW_VALUES.PENDING &&

@@ -4,7 +4,7 @@ import {
   MAX_RESPONSE_ITEMS,
   REVIEW_VALUES,
 } from './constants';
-import { sourceDiff, trackedFile } from './git';
+import { sourceDiff, trackedFile, UnsupportedSourceError } from './git';
 import { reviewableFiles } from './inventory';
 import type { ReviewPlan, SourceBundle } from './types';
 
@@ -13,7 +13,12 @@ export async function createSourceBundle(
   plan: ReviewPlan,
   paths: string[],
 ): Promise<SourceBundle> {
-  const bundle: SourceBundle = { files: [], diff: '', omissions: [] };
+  const bundle: SourceBundle = {
+    files: [],
+    diff: '',
+    omissions: [],
+    excluded: [],
+  };
   const safePaths = reviewableFiles(paths);
   for (const path of paths) {
     if (!safePaths.includes(path))
@@ -34,12 +39,18 @@ export async function createSourceBundle(
       try {
         const text = await trackedFile(root, ref, path);
         if (text !== undefined) bundle.files.push({ path, revision, text });
-      } catch {
-        bundle.omissions.push({
-          path,
-          reason:
-            'Source blob is unreadable, non-regular, binary or over its limit.',
-        });
+      } catch (error) {
+        if (error instanceof UnsupportedSourceError) {
+          if (!bundle.excluded.some((entry) => entry.path === path))
+            bundle.excluded.push({
+              path,
+              reason: 'Symlink, submodule or binary blob; not text source.',
+            });
+        } else
+          bundle.omissions.push({
+            path,
+            reason: 'Source blob is unreadable or over its limit.',
+          });
       }
     }
   }
@@ -67,6 +78,7 @@ export function partitionBundle(bundle: SourceBundle): SourceBundle[] {
     files: [],
     diff: bundle.diff,
     omissions: bundle.omissions,
+    excluded: bundle.excluded,
   };
   for (const file of bundle.files) {
     const proposed = { ...current, files: [...current.files, file] };
@@ -77,7 +89,12 @@ export function partitionBundle(bundle: SourceBundle): SourceBundle[] {
       current.files.length
     ) {
       parts.push(current);
-      current = { files: [], diff: bundle.diff, omissions: bundle.omissions };
+      current = {
+        files: [],
+        diff: bundle.diff,
+        omissions: bundle.omissions,
+        excluded: bundle.excluded,
+      };
     }
     current.files.push(file);
     if (Buffer.byteLength(JSON.stringify(current), 'utf8') > MAX_BUNDLE_BYTES)

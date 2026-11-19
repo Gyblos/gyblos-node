@@ -57,6 +57,7 @@ export interface RunPiOptions {
   prompt: string;
   timeoutMs?: number;
 }
+const HTTP = { CLIENT_ERROR: 400, NOT_FOUND: 404, SERVER_ERROR: 500 } as const;
 // Only Pi's failed assistant envelope or failed process stderr can identify a provider error.
 function providerFailure(message: string): ReviewFailure {
   if (
@@ -71,6 +72,19 @@ function providerFailure(message: string): ReviewFailure {
     return REVIEW_FAILURE.KEY;
   if (/\brate_limit_exceeded\b|\brate limit reached\b|^429\b/i.test(message))
     return REVIEW_FAILURE.RATE;
+  // Pi words provider refusals as "OpenAI API error (<status>): <body>"; only the class is kept, never the text.
+  const status = /\bAPI error \((\d{3})\)|^(\d{3})\b/.exec(message);
+  const code = Number(status?.[1] ?? status?.[2]);
+  if (
+    /\bmodel_not_found\b|\bdoes not exist\b/i.test(message) ||
+    code === HTTP.NOT_FOUND
+  )
+    return REVIEW_FAILURE.MODEL;
+  if (/\bcontext_length_exceeded\b|\bmaximum context length\b/i.test(message))
+    return REVIEW_FAILURE.CONTEXT;
+  if (code >= HTTP.SERVER_ERROR || /\bserver_error\b/i.test(message))
+    return REVIEW_FAILURE.PROVIDER;
+  if (code >= HTTP.CLIENT_ERROR) return REVIEW_FAILURE.REQUEST;
   return REVIEW_FAILURE.PI;
 }
 function isRecord(value: unknown): value is Record<string, unknown> {

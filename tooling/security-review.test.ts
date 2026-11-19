@@ -1,6 +1,6 @@
 // Owns synthetic review integration tests. No real credentials, target processes or model calls are used.
 import assert from 'node:assert/strict';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -68,6 +68,7 @@ void test('strict response validation rejects empty evidence, verdict fabricatio
     files: [{ path: FILE, revision: REVIEW_VALUES.HEAD, text: 'code' }],
     diff: '',
     omissions: [],
+    excluded: [],
   };
   assert.throws(
     () =>
@@ -101,6 +102,7 @@ void test('coverage and evidence must match actual supplied files and line bound
     files: [{ path: FILE, revision: REVIEW_VALUES.HEAD, text: 'code' }],
     diff: '',
     omissions: [],
+    excluded: [],
   };
   assert.throws(
     () => validateEvidence([{ ...EVIDENCE, line: 2 }], bundle),
@@ -145,6 +147,43 @@ void test('Git inventory and bundles use the requested immutable revision and re
     assert.match(bundle.diff, /\+export const limit = 2/);
     assert.equal(bundle.files.length, 2);
     assert.match((await trackedFile(root, base, FILE)) ?? '', /limit = 1/);
+  });
+});
+void test('symlinks and binary blobs are excluded from a bundle, not omitted, so the task still runs', async () => {
+  await fixture(async (root) => {
+    const image = 'packages/core/src/logo.png';
+    const link = 'packages/core/src/link.ts';
+    await writeFile(join(root, image), Buffer.from([0x89, 0x50, 0x00, 0x01]));
+    await symlink('policy.ts', join(root, link));
+    await exec('git', ['add', '.'], { cwd: root });
+    await exec(
+      'git',
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        '-c',
+        'core.hooksPath=/dev/null',
+        'commit',
+        '-qm',
+        'assets',
+      ],
+      { cwd: root },
+    );
+    const head = await repositoryRef(root);
+    const paths = [FILE, image, link];
+    const plan = buildBaselinePlan(paths, head);
+    const bundle = await createSourceBundle(root, plan, paths);
+    assert.deepEqual(bundle.omissions, []);
+    assert.deepEqual(
+      bundle.excluded.map((entry) => entry.path).sort(),
+      [link, image].sort(),
+    );
+    assert.deepEqual(
+      bundle.files.map((file) => file.path),
+      [FILE],
+    );
   });
 });
 void test('dry run never invokes Pi and reports no audit completion', async () => {

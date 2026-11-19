@@ -267,3 +267,66 @@ void test('publisher accepts every current diagnostic code and phase', async () 
     assert.match(writes.flat().join(' '), /Reported tokens: 10/);
   }
 });
+
+void test('the request binder waits for a merge snapshot of the current base and head', async () => {
+  const workflow = await readFile(WORKFLOW, 'utf8');
+  const code = [
+    ...workflow.matchAll(
+      /node --input-type=module <<'NODE'\n([\s\S]*?)\n\s*NODE/g,
+    ),
+  ][0]?.[1]?.replace(/^\s*import .+;\n/gm, '');
+  assert.ok(code);
+  const STALE = 'd'.repeat(40);
+  const OLD_BASE = 'e'.repeat(40);
+  let reads = 0;
+  let output = '';
+  const pr = () => ({
+    state: 'open',
+    base: { ref: 'develop', sha: BASE },
+    merge_commit_sha: reads < 2 ? STALE : MERGE,
+    head: { sha: HEAD, repo: { full_name: 'Gyblos/gyblos-node' } },
+  });
+  let pauses = 0;
+  vm.runInNewContext(code, {
+    process: {
+      env: {
+        GITHUB_EVENT_PATH: 'event',
+        GITHUB_REPOSITORY: 'Gyblos/gyblos-node',
+        GITHUB_OUTPUT: 'out',
+      },
+      exit: () => {
+        throw new Error('unexpected exit');
+      },
+    },
+    Atomics: {
+      wait: () => {
+        pauses++;
+        return 'timed-out';
+      },
+    },
+    Int32Array,
+    SharedArrayBuffer,
+    fs: {
+      readFileSync: () =>
+        JSON.stringify({
+          workflow_run: { head_sha: HEAD, pull_requests: [{ number: 7 }] },
+        }),
+      appendFileSync: (_path: string, text: string) => {
+        output += text;
+      },
+    },
+    execFileSync: (_command: string, args: string[]) => {
+      const path = args[1] ?? '';
+      if (path.endsWith('/pulls/7')) {
+        reads++;
+        return JSON.stringify(pr());
+      }
+      const parents = path.endsWith(STALE) ? [OLD_BASE, HEAD] : [BASE, HEAD];
+      return JSON.stringify({ parents: parents.map((sha) => ({ sha })) });
+    },
+  });
+  assert.equal(reads, 2);
+  assert.equal(pauses, 1);
+  assert.match(output, new RegExp('merge=' + MERGE));
+  assert.match(output, new RegExp('base=' + BASE));
+});

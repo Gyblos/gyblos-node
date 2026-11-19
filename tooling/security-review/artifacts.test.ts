@@ -54,6 +54,30 @@ void test('excluded changed paths keep an otherwise completed PR pending', async
   });
 });
 
+void test('a changed binary a task excluded keeps the PR pending; an unchanged one does not', async () => {
+  for (const [changed, expected] of [
+    [['docs/logo.png'], REVIEW_VALUES.PENDING],
+    [['packages/core/src/policy.ts'], REVIEW_VALUES.CLEAN],
+  ] as const) {
+    await withOutput(async (output) => {
+      const initial = result();
+      initial.plan.changedFiles = [...changed];
+      initial.tasks = [
+        {
+          taskId: 'test',
+          status: REVIEW_VALUES.COMPLETE,
+          findings: [],
+          excluded: [{ path: 'docs/logo.png', reason: 'binary' }],
+        },
+      ];
+      assert.equal(
+        (await writeArtifacts(initial, { output })).status,
+        expected,
+      );
+    });
+  }
+});
+
 void test('artifact output refuses to replace an existing run', async () => {
   await withOutput(async (output) => {
     await writeArtifacts(result(), { output });
