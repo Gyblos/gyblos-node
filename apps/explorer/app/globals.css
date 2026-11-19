@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /* Gyblos brand tokens (DESIGN.md): one blue, neutral surfaces; light values match the web's. The
-   signal tone is the brand blue on light surfaces and #6f86ff on dark ones, for status dots and focus
+   signal tone is the brand blue on light surfaces and #2e6bff on dark ones, for status dots and focus
    rings only, never text. */
 :root {
   --brand-blue: #0a28f0;
@@ -22,7 +22,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --signal: #6f86ff;
+    --signal: #2e6bff;
     --chart: var(--signal);
     --bg: #090909;
     --panel: #151515;

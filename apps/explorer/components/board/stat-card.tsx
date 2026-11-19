@@ -1,5 +1,5 @@
-// A headline figure, after BoardUI's stat cards (MIT, see ./LICENSE): a neutral card, a dark icon tile, the
-// label, the value and either its change against the previous period (a free · paid pair carries one
+// A headline figure, after BoardUI's stat cards (MIT, see ./LICENSE): a neutral card, a lighter icon tile,
+// the label, the value with its change against the previous period (a free · paid pair carries one
 // change per side, in the same order) or a share of a whole: a meter with a caption ("2 of 3 online").
 import type { LucideIcon } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
@@ -29,7 +29,7 @@ export function StatCard({
 }) {
   return (
     <section
-      className={cx('flex min-w-0 flex-col gap-4 p-4 sm:p-5', SURFACE.card)}
+      className={cx('flex min-w-0 flex-col gap-5 p-4 sm:p-5', SURFACE.card)}
     >
       <span
         className={cx(
@@ -41,24 +41,26 @@ export function StatCard({
       </span>
       <div className="flex flex-col gap-1">
         <span className="text-sm text-muted">{label}</span>
-        <span
-          className={cx(
-            'font-mono text-2xl whitespace-nowrap',
-            money && 'text-money',
-          )}
-        >
-          {value}
-        </span>
-        {deltas?.length ? (
-          <span className="flex flex-wrap items-center gap-1 text-xs text-dim">
-            {deltas.map((change, index) => (
-              <Fragment key={index}>
-                {index ? <span aria-hidden>·</span> : null}
-                <DeltaChip delta={change} />
-              </Fragment>
-            ))}
+        <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span
+            className={cx(
+              'font-mono text-2xl whitespace-nowrap text-ink',
+              money && 'text-money',
+            )}
+          >
+            {value}
           </span>
-        ) : null}
+          {deltas?.length ? (
+            <span className="flex items-center gap-1 text-xs text-dim">
+              {deltas.map((change, index) => (
+                <Fragment key={index}>
+                  {index ? <span aria-hidden>·</span> : null}
+                  <DeltaChip delta={change} />
+                </Fragment>
+              ))}
+            </span>
+          ) : null}
+        </span>
         {share ? <Share {...share} /> : null}
       </div>
     </section>

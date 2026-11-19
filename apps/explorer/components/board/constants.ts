@@ -12,7 +12,7 @@ export const CHART = {
   topMargin: 4,
   // Room for the last day's axis label.
   rightMargin: 16,
-  minTickGap: 8,
+  minTickGap: 20,
   // "MM-DD" from "YYYY-MM-DD".
   monthDayStart: 5,
 } as const;

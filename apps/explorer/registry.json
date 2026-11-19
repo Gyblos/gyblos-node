@@ -41,7 +41,7 @@
         },
         "dark": {
           "brand-blue": "#0a28f0",
-          "signal": "#6f86ff",
+          "signal": "#2e6bff",
           "bg": "#090909",
           "panel": "#151515",
           "raised": "#222222",
@@ -52,7 +52,7 @@
           "money": "#4ade80",
           "good": "#4ade80",
           "bad": "#f87171",
-          "chart": "#6f86ff"
+          "chart": "#2e6bff"
         }
       }
     },
