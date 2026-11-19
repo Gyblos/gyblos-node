@@ -91,6 +91,12 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 - Work in your own detached worktree, never in a shared checkout or another agent's worktree.
 - Sub-agents never delete their worktree or branch; report the path to the parent. The main agent asks before removing a worktree it is in, and from the repository root removes only worktrees it launched.
 
+## Founder decisions
+
+- Windows, macOS and Linux get the same features. Close a platform gap (for example payment-folder permissions on Windows) instead of shipping less on one platform.
+- Payment sessions default to a 1 USDC deposit (`1000000` atomic) and a 1-hour lifetime (`3600000` ms).
+- Keep `telemetry-file`, `telemetry-otel` and PayPal unless the founder approves removing them.
+
 ## Public decisions and internal vault
 
 - Contributors can work from the public repository without access to the private vault. Start with [docs/public-decisions.md](docs/public-decisions.md); if a decision needed for a change is missing or unclear, ask maintainers rather than inventing a policy. Do not change confirmed decisions without approval.
