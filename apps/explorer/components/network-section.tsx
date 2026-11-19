@@ -66,14 +66,10 @@ export async function NetworkSection() {
           icon={Activity}
           label="Uptime 24 h"
           value={ratioText(summary.averageDayUptime)}
-          share={
+          caption={
             summary.averageDayUptime === null
               ? undefined
-              : {
-                  part: summary.averageDayUptime,
-                  whole: 1,
-                  caption: 'Average of the online sellers',
-                }
+              : 'Average of the online sellers'
           }
         />
       </div>
@@ -121,19 +117,15 @@ function SellersOnline({ snapshot }: { snapshot: DiscoverySnapshot }) {
       value={
         <Flow value={counts?.online ?? snapshot.sellers.length} kind="count" />
       }
-      share={
+      caption={
         counts
-          ? {
-              part: counts.online,
-              whole: counts.total,
-              caption: [
-                `${count(counts.online)} of ${count(counts.total)} registered`,
-                `${count(counts.offline)} offline`,
-                ...(counts.unpublished
-                  ? [`${count(counts.unpublished)} not published`]
-                  : []),
-              ].join(' · '),
-            }
+          ? [
+              `${count(counts.online)} of ${count(counts.total)} registered`,
+              `${count(counts.offline)} offline`,
+              ...(counts.unpublished
+                ? [`${count(counts.unpublished)} not published`]
+                : []),
+            ].join(' · ')
           : undefined
       }
     />
