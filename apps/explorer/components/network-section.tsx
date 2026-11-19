@@ -1,5 +1,6 @@
-// Owns the Network section: sellers online and offline, models offered with their cheapest prices, each
-// online seller's offers and uptime, and the registered sellers not online now, from the discovery index.
+// Owns the Network section: sellers online and offline, the models offered and their cheapest prices,
+// each online seller's offers and uptime, and the registered sellers not online now, from the discovery
+// index. The per-model table lives in the Models section.
 import { Activity, Boxes, Server, Tag } from 'lucide-react';
 
 import { DISPLAY } from '../lib/constants';
@@ -73,31 +74,6 @@ export async function NetworkSection() {
           }
         />
       </div>
-
-      <SectionTitle title="Models" />
-      <Table
-        head={[
-          { label: 'Model' },
-          { label: 'Sellers', right: true },
-          { label: 'Free', right: true },
-          { label: 'Lowest input / 1M', right: true },
-          { label: 'Lowest output / 1M', right: true },
-          { label: 'Max context', right: true },
-        ]}
-      >
-        {[...summary.models].map(([name, model]) => (
-          <tr key={name} className="border-t border-line">
-            <td className={td}>
-              <ModelName modelId={name} variant={null} quantization={null} />
-            </td>
-            <td className={numberCell}>{model.sellers}</td>
-            <td className={numberCell}>{model.free}</td>
-            <td className={moneyCell}>{priceText(model.minInput)}</td>
-            <td className={moneyCell}>{priceText(model.minOutput)}</td>
-            <td className={numberCell}>{count(model.context)}</td>
-          </tr>
-        ))}
-      </Table>
 
       <SectionTitle title="Sellers" />
       <SellersTable sellers={snapshot.sellers} />

@@ -47,13 +47,12 @@ export interface NetworkDay {
   } | null;
   demand: { modelId: string; requests: number }[];
 }
-export type ModelSide = Totals & { sellers: number };
 export interface ModelStat {
   modelId: string;
   variant: string | null;
   quantization: string | null;
-  free: ModelSide | null;
-  paid: ModelSide | null;
+  free: Totals | null;
+  paid: Totals | null;
 }
 export interface CollectorSnapshot {
   aggregatedAt: number | null;
@@ -160,13 +159,6 @@ export function parseNetworkDay(value: unknown): NetworkDay {
     }),
   };
 }
-function modelSide(value: unknown, where: string): ModelSide {
-  const source = record(value, where);
-  return {
-    ...totals(source, where),
-    sellers: num(source.sellers, `${where}.sellers`),
-  };
-}
 export function parseModel(value: unknown): ModelStat {
   const source = record(value, 'model');
   const optional = (field: unknown, where: string) =>
@@ -175,8 +167,12 @@ export function parseModel(value: unknown): ModelStat {
     modelId: text(source.modelId, 'model.modelId'),
     variant: optional(source.variant, 'model.variant'),
     quantization: optional(source.quantization, 'model.quantization'),
-    free: nullable(source.free, (present) => modelSide(present, 'model.free')),
-    paid: nullable(source.paid, (present) => modelSide(present, 'model.paid')),
+    free: nullable(source.free, (present) =>
+      totals(record(present, 'model.free'), 'model.free'),
+    ),
+    paid: nullable(source.paid, (present) =>
+      totals(record(present, 'model.paid'), 'model.paid'),
+    ),
   };
 }
 export const aggregatedAt = (source: JsonRecord) =>

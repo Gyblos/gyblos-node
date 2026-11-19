@@ -7,6 +7,7 @@ import {
   MAX_AGENT_OUTPUT_BYTES,
   PI_TASK_TIMEOUT_MS,
   PI_TERMINATE_GRACE_MS,
+  PROVIDER_HTTP_STATUS,
   REVIEW_FAILURE,
   type PiThinkingLevel,
   type ReviewFailure,
@@ -58,7 +59,10 @@ export interface RunPiOptions {
   timeoutMs?: number;
 }
 // Only Pi's failed assistant envelope or failed process stderr can identify a provider error.
+// Pi words refusals as "OpenAI API error (<status>): <body>"; only the class is kept, never the text.
 function providerFailure(message: string): ReviewFailure {
+  const status = /\bAPI error \((\d{3})\)|^(\d{3})\b/.exec(message);
+  const code = Number(status?.[1] ?? status?.[2]);
   if (
     /\binsufficient_quota\b|\byou exceeded your current quota\b|\bbilling_hard_limit_reached\b/i.test(
       message,
@@ -66,11 +70,29 @@ function providerFailure(message: string): ReviewFailure {
   )
     return REVIEW_FAILURE.QUOTA;
   if (
-    /\binvalid_api_key\b|\bincorrect api key provided\b|^401\b/i.test(message)
+    code === PROVIDER_HTTP_STATUS.UNAUTHORIZED ||
+    /\binvalid_api_key\b|\bincorrect api key provided\b/i.test(message)
   )
     return REVIEW_FAILURE.KEY;
-  if (/\brate_limit_exceeded\b|\brate limit reached\b|^429\b/i.test(message))
+  if (
+    code === PROVIDER_HTTP_STATUS.TOO_MANY_REQUESTS ||
+    /\brate_limit_exceeded\b|\brate limit reached\b/i.test(message)
+  )
     return REVIEW_FAILURE.RATE;
+  // Only a refusal about the model itself stops the run; any other 404 is one rejected request.
+  if (
+    /\bmodel_not_found\b/i.test(message) ||
+    (code === PROVIDER_HTTP_STATUS.NOT_FOUND && /\bmodel\b/i.test(message))
+  )
+    return REVIEW_FAILURE.MODEL;
+  if (/\bcontext_length_exceeded\b|\bmaximum context length\b/i.test(message))
+    return REVIEW_FAILURE.CONTEXT;
+  if (
+    code >= PROVIDER_HTTP_STATUS.SERVER_ERROR ||
+    /\bserver_error\b/i.test(message)
+  )
+    return REVIEW_FAILURE.PROVIDER;
+  if (code >= PROVIDER_HTTP_STATUS.CLIENT_ERROR) return REVIEW_FAILURE.REQUEST;
   return REVIEW_FAILURE.PI;
 }
 function isRecord(value: unknown): value is Record<string, unknown> {

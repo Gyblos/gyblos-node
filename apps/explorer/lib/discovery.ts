@@ -1,6 +1,8 @@
 // Owns the read of the discovery index: models offered now, sellers online and their uptime, and the
 // network status of every registered seller, fetched, checked at the boundary on each render.
 
+import { cache } from 'react';
+
 import { DISCOVERY_URL } from './config';
 import { DISCOVERY } from './constants';
 import { fetchJson } from './fetch-json';
@@ -96,8 +98,9 @@ async function sellersOf(modelIds: string[]): Promise<Map<string, Seller>> {
   return byNode;
 }
 
-// Live view of the discovery index: models offered now, sellers online and their uptime.
-export async function getDiscovery(): Promise<DiscoverySnapshot> {
+// Live view of the discovery index: models offered now, sellers online and their uptime. Read once per
+// render: the Network and Models sections share the answer.
+export const getDiscovery = cache(async (): Promise<DiscoverySnapshot> => {
   try {
     return await loadDiscovery();
   } catch (error) {
@@ -108,7 +111,7 @@ export async function getDiscovery(): Promise<DiscoverySnapshot> {
       error: error instanceof Error ? error.message : 'discovery unavailable',
     };
   }
-}
+});
 
 // Throws on failure. A seller whose uptime cannot be read shows none for this render.
 async function loadDiscovery(): Promise<DiscoverySnapshot> {

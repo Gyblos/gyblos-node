@@ -29,7 +29,8 @@ export function providerAdmission(
     }
     if (
       response.failure === REVIEW_FAILURE.QUOTA ||
-      response.failure === REVIEW_FAILURE.KEY
+      response.failure === REVIEW_FAILURE.KEY ||
+      response.failure === REVIEW_FAILURE.MODEL
     )
       admission.stopped ??= response.failure;
     if (response.reportedTokens !== undefined)
