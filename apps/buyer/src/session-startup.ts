@@ -22,7 +22,7 @@ import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
-import { buyerUnserved } from './free-telemetry';
+import { onBuyerSelectionFailure } from './free-telemetry';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
 import { classifyPaidError } from './paid-http';
@@ -147,9 +147,8 @@ function sessionExecutor(
   buyer: string,
   router?: ReturnType<typeof sessionRouter>,
 ): Awaited<ReturnType<BuyerExecutionFactory>>['execute'] {
-  const { prepared } = context;
   return async (input, signal, onDelta, model, permission) => {
-    const request = routedRequest(prepared.config.request, model);
+    const request = routedRequest(context.prepared.config.request, model);
     const ports: BuyerRoutePorts<ChatResult> = {
       select: sessionSelection(
         context,
@@ -204,18 +203,17 @@ function sessionExecutor(
             select: (excluded, current) =>
               ports
                 .select(excluded, current, {
-                  pinnedNodeId: prepared.config.pinnedNodeId,
-                  priceCeilings: prepared.config.request.priceCeilings,
+                  pinnedNodeId: context.prepared.config.pinnedNodeId,
+                  priceCeilings: context.prepared.config.request.priceCeilings,
                 })
-                .catch((error: unknown) => {
-                  if (!current.aborted)
-                    buyerUnserved(
-                      context.dependencies,
-                      Boolean(onDelta),
-                      model?.selection,
-                    );
-                  throw error;
-                }),
+                .catch(
+                  onBuyerSelectionFailure(
+                    current,
+                    context.dependencies,
+                    Boolean(onDelta),
+                    model?.selection,
+                  ),
+                ),
           },
           signal,
         );

@@ -28,7 +28,7 @@ import { executeSelectedBuyerFree } from './free-execution';
 import { selectWinner, type FreeSelectionOptions } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
-import { buyerUnserved } from './free-telemetry';
+import { onBuyerSelectionFailure } from './free-telemetry';
 import { routedRequest } from './model-routes';
 import { classifyPaidError, PaidOutcomeError, paidSummary } from './paid-http';
 import { paidRecords } from './paid-records';
@@ -271,15 +271,14 @@ function quoteExecutor(
                 permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
               ...(inferenceNeedsTools(input) ? { tools: true } : {}),
             },
-          ).catch((error) => {
-            if (!selectionSignal.aborted)
-              buyerUnserved(
-                context.dependencies,
-                Boolean(onDelta),
-                model?.selection,
-              );
-            throw error;
-          }),
+          ).catch(
+            onBuyerSelectionFailure(
+              selectionSignal,
+              context.dependencies,
+              Boolean(onDelta),
+              model?.selection,
+            ),
+          ),
         free: (winner, executionSignal) =>
           executeApiKeyFree(permission, winner.quote, executionSignal, () =>
             executeSelectedBuyerFree(
