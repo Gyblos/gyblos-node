@@ -282,7 +282,7 @@ Selection errors:
   down.
 - `PINNED_SELLER_REJECTED`: the pinned seller failed a check, including price.
 - `NO_SELLER_CANDIDATES`: no eligible seller offers the model, whatever the
-  budget.
+  budget; or, for the free buyer, no free seller is available now.
 
 Free execution loads no payment signer, paid tokenizer or payment RPC and
 creates no journal, deposit or settlement. It still reads payment state: an

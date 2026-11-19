@@ -1,30 +1,45 @@
 // A free request asks for zero prices, so when the only seller left is paid (the free one cooling down,
-// busy or gone) the buyer says no seller is available, with when to retry, never that its price is above
-// budget; any other failure passes through. Pure error mapping and the local HTTP answer.
+// busy or gone) free execution says no seller is available, with when to retry, never that its price is
+// above budget; any other failure passes through. Injected selection; the local HTTP answer.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { FreeSelectionFailure } from '@gyblos/buyer/free-execution';
+import {
+  executeBuyerFree,
+  freeSelectionError,
+  FreeSelectionFailure,
+  type FreeBuyerDependencies,
+} from '@gyblos/buyer/free-execution';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
-import { freeSelectionError } from '@gyblos/buyer/slow-seller';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 
 const SELECTION = { modelId: 'synthetic', variant: null, quantization: null };
+const INPUT = {
+  messages: [{ role: 'user' as const, content: 'hi' }],
+  maxTokens: 5,
+};
 const priceAboveBudget = (retryAt?: number) =>
   new FreeSelectionFailure(
     { ok: false, code: SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET },
     retryAt,
   );
+// Free execution whose selection found only a paid seller left.
+const onlyPaidLeft = (retryAt?: number): FreeBuyerDependencies => ({
+  select: async () => {
+    throw priceAboveBudget(retryAt);
+  },
+  execute: async () => assert.fail('nothing executes'),
+});
 
-void test('a free request with only a paid seller left reports no candidates, keeping the retry time', () => {
+void test('free execution reports no candidates when only a paid seller is left, keeping the retry time', async () => {
   const retryAt = Date.now() + 20_000;
-  const mapped = freeSelectionError(priceAboveBudget(retryAt));
-  assert.ok(mapped instanceof FreeSelectionFailure);
-  assert.deepEqual(mapped.decision, {
-    ok: false,
-    code: SELLER_SELECTION_CODES.NO_CANDIDATES,
-  });
-  assert.equal(mapped.retryAt, retryAt);
+  await assert.rejects(
+    executeBuyerFree(INPUT, onlyPaidLeft(retryAt)),
+    (error) =>
+      error instanceof FreeSelectionFailure &&
+      error.decision.code === SELLER_SELECTION_CODES.NO_CANDIDATES &&
+      error.retryAt === retryAt,
+  );
   const other = new FreeSelectionFailure({
     ok: false,
     code: SELLER_SELECTION_CODES.LEVEL_UNSUPPORTED,
@@ -36,9 +51,7 @@ void test('a free request with only a paid seller left reports no candidates, ke
 
 void test('the local endpoint answers a free request that found only a paid seller with when to retry', async () => {
   const server = await startFreeBuyerHttp(
-    async () => {
-      throw freeSelectionError(priceAboveBudget(Date.now() + 20_000));
-    },
+    (input) => executeBuyerFree(input, onlyPaidLeft(Date.now() + 20_000)),
     { selection: SELECTION, maxTokens: 10 },
     { port: 0 },
   );

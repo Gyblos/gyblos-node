@@ -45,7 +45,7 @@ import {
 import type { prepareBuyerSelection } from './selection-runtime';
 import { mergeSelectionStats } from './selection-stats';
 import type { SellerFailureReporter } from './seller-failures';
-import { freeSelectionError, refusedDetail } from './slow-seller';
+import { refusedDetail } from './slow-seller';
 
 export function freeBuyerDependencies(
   prepared: PreparedSelection,
@@ -254,7 +254,7 @@ async function selectFreeWinner(
     const detail = refusedDetail(refused);
     if (detail && error instanceof FreeSelectionFailure && !error.retryAt)
       throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE, null, detail);
-    throw freeSelectionError(error);
+    throw error;
   }
 }
 // One verified winner among the configured or discovered sellers not excluded, quoted for `request`.
