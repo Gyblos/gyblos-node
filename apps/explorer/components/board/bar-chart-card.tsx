@@ -2,8 +2,8 @@
 
 // A daily bar chart in a card, after BoardUI's chart cards (MIT, see ./LICENSE), drawn with Recharts and
 // held to the explorer's chart rules: one series in the brand blue, no gradients, the headline readable
-// without hover. Hovering a day swaps the headline for that day's figure, as BoardUI's cards do.
-// Values arrive preformatted from the server; `value` only sets the bar's height.
+// without hover. Hovering a day rolls the headline to that day's figure (NumberFlow), as BoardUI's
+// cards swap it. `value` only sets the bar's height; `amount` is the exact figure shown.
 import { useState } from 'react';
 import {
   Bar,
@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 
 import { CHART, DISPLAY } from '../../lib/constants';
+import { Flow, type FlowKind, type FlowValue } from '../flow';
 
 const TICK = {
   fill: 'var(--dim)',
@@ -25,17 +26,21 @@ const TICK = {
 export interface BarPoint {
   day: string;
   value: number;
-  label: string;
+  amount: FlowValue;
+  // Shown next to the day while hovered (e.g. "3 settlements").
+  detail?: string;
 }
 
 export function BarChartCard({
   title,
+  kind,
   total,
   points,
   countAxis = true,
 }: {
   title: string;
-  total: string;
+  kind: FlowKind;
+  total: FlowValue;
   points: BarPoint[];
   // A count axis (whole numbers); amounts hide it and read from the headline instead.
   countAxis?: boolean;
@@ -46,9 +51,13 @@ export function BarChartCard({
     <div className="rounded-xl border border-line bg-panel p-4">
       <div className="text-sm text-muted">{title}</div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-mono text-2xl">{active?.label ?? total}</span>
+        <span className="font-mono text-2xl">
+          <Flow value={active ? active.amount : total} kind={kind} />
+        </span>
         <span className="font-mono text-xs text-dim">
-          {active ? active.day : `${points.length} days`}
+          {active
+            ? [active.day, active.detail].filter(Boolean).join(' · ')
+            : `${points.length} days`}
         </span>
       </div>
       <div className="mt-3" style={{ height: CHART.height }}>

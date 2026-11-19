@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { dailySettled } from '@gyblos/explorer/chain-shape';
+import { usdcDecimal } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { parseRange, rangeQuery } from '@gyblos/explorer/range';
@@ -121,4 +122,12 @@ void test('an unknown state or a malformed status is refused', () => {
   );
   assert.throws(bad((copy) => ({ ...copy, truncated: 'no' })));
   assert.throws(bad(() => null));
+});
+
+void test('an animated USDC amount is the exact decimal of its atomic units', () => {
+  assert.equal(usdcDecimal(0n), '0');
+  assert.equal(usdcDecimal(32n), '0.000032');
+  assert.equal(usdcDecimal(1_500_000n), '1.5');
+  assert.equal(usdcDecimal(123_456_789_012_345_678n), '123456789012.345678');
+  assert.equal(usdcDecimal(-70n), '-0.00007');
 });

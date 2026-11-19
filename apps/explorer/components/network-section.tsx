@@ -11,6 +11,7 @@ import {
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
 import { Chip } from './board/chip';
 import { StatusDot } from './board/status-dot';
+import { Flow, FlowPair } from './flow';
 import {
   Addr,
   ModelName,
@@ -40,7 +41,13 @@ export async function NetworkSection() {
         {snapshot.network ? (
           <Stat
             label="Sellers online · offline"
-            value={`${snapshot.network.counts.online} · ${snapshot.network.counts.offline}`}
+            value={
+              <FlowPair
+                free={snapshot.network.counts.online}
+                paid={snapshot.network.counts.offline}
+                kind="count"
+              />
+            }
           />
         ) : (
           <Stat

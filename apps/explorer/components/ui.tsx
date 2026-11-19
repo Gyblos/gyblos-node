@@ -25,7 +25,7 @@ export function Stat({
   money,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   money?: boolean;
 }) {
   return (

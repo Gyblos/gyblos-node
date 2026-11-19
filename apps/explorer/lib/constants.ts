@@ -69,3 +69,15 @@ export const CHART = {
   rightMargin: 16,
   minTickGap: 8,
 } as const;
+
+// Animated figures (NumberFlow): each kind's Intl format. USDC keeps up to its 6 decimals.
+export const FLOW_FORMATS = {
+  count: {},
+  percent: { style: 'percent', maximumFractionDigits: 1 },
+  usdc: {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  },
+} as const;

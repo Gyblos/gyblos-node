@@ -6,6 +6,7 @@
   "exports": {
     "./chain-shape": "./lib/chain-shape.ts",
     "./collector-shape": "./lib/collector-shape.ts",
+    "./format": "./lib/format.ts",
     "./latency": "./lib/latency.ts",
     "./model-family": "./lib/model-family.ts",
     "./network-status": "./lib/network-status.ts",
@@ -20,6 +21,7 @@
     "start": "next start --port 4190"
   },
   "dependencies": {
+    "@number-flow/react": "0.6.2",
     "next": "16.4.6",
     "react": "19.3.1",
     "react-aria-components": "1.22.1",

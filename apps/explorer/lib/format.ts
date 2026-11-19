@@ -24,6 +24,18 @@ export function usdc(
   return `${negative ? '-' : ''}$${whole.toLocaleString(LOCALE)}${trimmed ? `.${trimmed}` : ''}`;
 }
 
+// An exact USDC decimal string ("0.000032") from atomic units, for animated figures.
+export function usdcDecimal(atomic: bigint): `${number}` {
+  const negative = atomic < 0n;
+  const magnitude = negative ? -atomic : atomic;
+  const base = DECIMAL_BASE ** BigInt(UNITS.usdcDecimals);
+  const fraction = (magnitude % base)
+    .toString()
+    .padStart(UNITS.usdcDecimals, '0')
+    .replace(/0+$/, '');
+  return `${negative ? '-' : ''}${magnitude / base}${fraction ? `.${fraction}` : ''}` as `${number}`;
+}
+
 // Price per million tokens, from atomic units per million tokens.
 export function pricePerMtok(atomic: string): string {
   const value = BigInt(atomic);
