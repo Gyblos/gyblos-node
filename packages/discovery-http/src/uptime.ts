@@ -1,5 +1,7 @@
 // Fetches one NodeId's public uptime from an untrusted index: the share of five-minute slots in which the
 // index accepted a signed presence from it. Reports what the index says; it proves nothing on its own.
+import { HTTP_STATUS as CONFIG_HTTP_STATUS } from '@gyblos/config';
+
 import {
   DISCOVERY_ERROR_CODES,
   DISCOVERY_LIMITS,
@@ -34,7 +36,6 @@ export interface SellerUptime {
   generatedAt: number;
 }
 
-const NOT_FOUND = 404;
 const REPORT_KEYS = [
   'nodeId',
   'firstSeenAt',
@@ -103,7 +104,7 @@ export async function fetchUptime(
     ...(input.signal ? { signal: input.signal } : {}),
   };
   return withDeadline(request, async (response, aborted) => {
-    if (response.status === NOT_FOUND) {
+    if (response.status === CONFIG_HTTP_STATUS.notFound) {
       response.body?.cancel().catch(() => {});
       return null;
     }
