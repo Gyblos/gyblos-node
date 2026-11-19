@@ -7,19 +7,18 @@ import { count, latencyMs, percent } from './format';
 import { mergedLatency } from './latency';
 
 type Section = Totals | null | undefined;
-export const finished = (totals: Totals) =>
-  totals.outcomes.completed +
-  totals.outcomes.failed +
-  totals.outcomes.cancelled;
+// Requests that ended in success or failure; cancellations are not failures and stay out.
+const decided = (totals: Totals) =>
+  totals.outcomes.completed + totals.outcomes.failed;
 
-// completed / (completed + failed + cancelled) over the given sections of one side.
+// completed / (completed + failed) over the given sections of one side, as in the Models table.
 export function successRate(sections: Section[]): number | null {
   const done = sections.reduce(
     (sum, totals) => sum + (totals?.outcomes.completed ?? 0),
     0,
   );
   const all = sections.reduce(
-    (sum, totals) => sum + (totals ? finished(totals) : 0),
+    (sum, totals) => sum + (totals ? decided(totals) : 0),
     0,
   );
   return all ? done / all : null;

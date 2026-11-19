@@ -1,9 +1,10 @@
-// Owns the explorer's single page: the network, usage and payments sections, each streamed on its own
+// Owns the explorer's single page: the network, models, usage and payments sections, each streamed on its own
 // so a slow source never blocks the others. The `range` search parameter picks the days shown; a range
 // switch keeps the sections mounted so their figures roll to the new values.
 import { Suspense } from 'react';
 
 import { LiveRefresh } from '../components/live-refresh';
+import { ModelsSection } from '../components/models-section';
 import { NetworkSection } from '../components/network-section';
 import { NetworkSelect } from '../components/network-select';
 import { PaymentsSection } from '../components/payments-section';
@@ -38,6 +39,9 @@ export default async function Home({
       </header>
       <Suspense fallback={<Loading />}>
         <NetworkSection />
+      </Suspense>
+      <Suspense fallback={<Loading />}>
+        <ModelsSection days={days} />
       </Suspense>
       <Suspense fallback={<Loading />}>
         <UsageSection days={days} />
