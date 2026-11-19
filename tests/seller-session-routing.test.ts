@@ -11,7 +11,6 @@ import {
   BATCH_METHODS,
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
   SESSION_CODES,
   type PaymentSessionTerms,
@@ -55,7 +54,6 @@ void test('separate buyers retain one global foreground turn without allocating 
     async dispose() {},
   };
   const host = await startSellerSessionHost({
-    buyerNodeIds: [rig.terms.buyerNodeId, terms.buyerNodeId],
     registry,
     description: rig.terms,
     owner: rig.terms.owner,
@@ -99,7 +97,7 @@ void test('separate buyers retain one global foreground turn without allocating 
   assert.deepEqual(rig.calls, []);
 });
 
-void test('removing pilot eligibility preserves the old buyer close and status but refuses new inference', async (t) => {
+void test('a returning buyer can prepare, inspect and close its channel without enrollment', async (t) => {
   const rig = await sessionRig();
   t.after(rig.dispose);
   await rig.open();
@@ -129,7 +127,6 @@ void test('removing pilot eligibility preserves the old buyer close and status b
     async dispose() {},
   };
   const host = await startSellerSessionHost({
-    buyerNodeIds: [],
     registry,
     description: rig.terms,
     owner: rig.terms.owner,
@@ -155,7 +152,7 @@ void test('removing pilot eligibility preserves the old buyer close and status b
       signal,
     ),
   );
-  await assert.rejects(
+  await assert.doesNotReject(
     host.service.exchange(
       parseBatchChannelRequest({
         version: BATCH_CHANNEL.version,
@@ -166,7 +163,6 @@ void test('removing pilot eligibility preserves the old buyer close and status b
       rig.terms.buyerNodeId,
       signal,
     ),
-    { code: PAID_EXECUTION_CODES.PEER },
   );
   await assert.doesNotReject(
     host.service.exchange(

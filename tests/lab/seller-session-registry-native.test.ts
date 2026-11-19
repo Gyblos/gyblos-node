@@ -11,180 +11,113 @@ import {
   SESSION_CODES,
   SESSION_STATES,
 } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { sellerRegistryRig } from '../support/seller-session-registry';
 
-const skip = WINDOWS
-  ? 'Reusable financial startup requires payment subtree ACL validation on Windows'
-  : false;
+void test('competing buyers cannot reserve the last slot twice; only proved closure releases it', async (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('External RPC forbidden'),
+  );
+  const rig = await sellerRegistryRig(1);
+  t.after(rig.dispose);
+  const registry = await rig.open();
+  t.after(registry.dispose);
+  const before = rig.vm.sends();
+  const candidates = rig.buyers.slice(0, 2);
+  const results = await Promise.allSettled(
+    candidates.map((row) =>
+      registry.backend(row.terms.buyerNodeId).create(row.terms, row.payload),
+    ),
+  );
+  const winners = results.flatMap((result, index) =>
+    result.status === 'fulfilled'
+      ? [{ session: result.value, row: candidates[index]! }]
+      : [],
+  );
+  assert.equal(winners.length, 1);
+  assert.equal(
+    results.filter(
+      (result) =>
+        result.status === 'rejected' &&
+        result.reason.code === SESSION_CODES.BUSY,
+    ).length,
+    1,
+  );
+  const winner = winners[0]!;
+  t.after(winner.session.dispose);
+  assert.equal(
+    rig.vm.sends(),
+    before,
+    'a reserved slot never submits the deposit',
+  );
+  const outside = rig.buyers[2]!;
+  assert.equal(await registry.permits(outside.terms.buyerNodeId), false);
+  const first = await winner.session.open(winner.row.payload);
+  await winner.session.open(winner.row.payload);
+  assert.equal(
+    rig.vm.sends(),
+    before + 1,
+    'duplicate OPEN keeps one exact deposit',
+  );
+  const closed = await winner.session.close();
+  assert.equal(closed.channelId, first.channelId);
+  assert.equal(closed.chargedAtomic, '0');
+  assert.equal(closed.refundedAtomic, '1000');
+  assert.equal(await registry.permits(outside.terms.buyerNodeId), true);
+  const next = await registry
+    .backend(outside.terms.buyerNodeId)
+    .create(outside.terms, outside.payload);
+  t.after(next.dispose);
+  assert.equal(
+    (await registry.list()).length,
+    1,
+    'only the unfinished buyer remains in the active index',
+  );
+  assert.equal(
+    (await registry.backend(winner.row.terms.buyerNodeId).inspect())?.snapshot
+      .channelId,
+    closed.channelId,
+  );
+  assert.equal(
+    await registry.permits(
+      candidates.find((row) => row !== winner.row)!.terms.buyerNodeId,
+    ),
+    false,
+  );
+});
 
-void test(
-  'competing buyers cannot reserve the last slot twice; only proved closure releases it',
-  { skip },
-  async (t) => {
-    t.mock.method(Date, 'now', () => 1_800_000_000_000);
-    t.mock.method(globalThis, 'fetch', async () =>
-      assert.fail('External RPC forbidden'),
-    );
-    const rig = await sellerRegistryRig(1);
-    t.after(rig.dispose);
-    const registry = await rig.open();
-    t.after(registry.dispose);
-    const before = rig.vm.sends();
-    const candidates = rig.buyers.slice(0, 2);
-    const results = await Promise.allSettled(
-      candidates.map((row) =>
-        registry.backend(row.terms.buyerNodeId).create(row.terms, row.payload),
-      ),
-    );
-    const winners = results.flatMap((result, index) =>
-      result.status === 'fulfilled'
-        ? [{ session: result.value, row: candidates[index]! }]
-        : [],
-    );
-    assert.equal(winners.length, 1);
-    assert.equal(
-      results.filter(
-        (result) =>
-          result.status === 'rejected' &&
-          result.reason.code === SESSION_CODES.BUSY,
-      ).length,
-      1,
-    );
-    const winner = winners[0]!;
-    t.after(winner.session.dispose);
-    assert.equal(
-      rig.vm.sends(),
-      before,
-      'a reserved slot never submits the deposit',
-    );
-    const outside = rig.buyers[2]!;
-    assert.equal(await registry.permits(outside.terms.buyerNodeId), false);
-    const first = await winner.session.open(winner.row.payload);
-    await winner.session.open(winner.row.payload);
-    assert.equal(
-      rig.vm.sends(),
-      before + 1,
-      'duplicate OPEN keeps one exact deposit',
-    );
-    const closed = await winner.session.close();
-    assert.equal(closed.channelId, first.channelId);
-    assert.equal(closed.chargedAtomic, '0');
-    assert.equal(closed.refundedAtomic, '1000');
-    assert.equal(await registry.permits(outside.terms.buyerNodeId), true);
-    const next = await registry
-      .backend(outside.terms.buyerNodeId)
-      .create(outside.terms, outside.payload);
-    t.after(next.dispose);
-    assert.equal(
-      (await registry.list()).length,
-      2,
-      'closed proof is retained while its capacity is reused',
-    );
-    assert.equal(
-      await registry.permits(
-        candidates.find((row) => row !== winner.row)!.terms.buyerNodeId,
-      ),
-      false,
-    );
-  },
-);
-
-void test(
-  'lost native opening acknowledgment keeps its slot and restores one original deposit',
-  { skip },
-  async (t) => {
-    t.mock.method(Date, 'now', () => 1_800_000_000_000);
-    t.mock.method(globalThis, 'fetch', async () =>
-      assert.fail('External RPC forbidden'),
-    );
-    const rig = await sellerRegistryRig(1);
-    t.after(rig.dispose);
-    let registry = await rig.open();
-    t.after(() => registry.dispose());
-    const row = rig.buyers[0]!;
-    let seller = await registry
-      .backend(row.terms.buyerNodeId)
-      .create(row.terms, row.payload);
-    t.after(() => seller.dispose());
-    rig.vm.loseConfirmation(true);
-    await assert.rejects(seller.open(row.payload));
-    const sent = rig.vm.sends();
-    assert.equal(await rig.vm.balance(row.terms.buyer), 99000n);
-    assert.equal(
-      await registry.permits(rig.buyers[1]!.terms.buyerNodeId),
-      false,
-    );
-    await seller.dispose();
-    await registry.dispose();
-    rig.vm.loseConfirmation(false);
-    registry = await rig.open();
-    seller = await registry.backend(row.terms.buyerNodeId).create(row.terms);
-    await seller.open(row.payload);
-    assert.equal(rig.vm.sends(), sent);
-    assert.equal(await rig.vm.balance(row.terms.buyer), 99000n);
-  },
-);
+void test('lost native opening acknowledgment keeps its slot and restores one original deposit', async (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('External RPC forbidden'),
+  );
+  const rig = await sellerRegistryRig(1);
+  t.after(rig.dispose);
+  let registry = await rig.open();
+  t.after(() => registry.dispose());
+  const row = rig.buyers[0]!;
+  let seller = await registry
+    .backend(row.terms.buyerNodeId)
+    .create(row.terms, row.payload);
+  t.after(() => seller.dispose());
+  rig.vm.loseConfirmation(true);
+  await assert.rejects(seller.open(row.payload));
+  const sent = rig.vm.sends();
+  assert.equal(await rig.vm.balance(row.terms.buyer), 99000n);
+  assert.equal(await registry.permits(rig.buyers[1]!.terms.buyerNodeId), false);
+  await seller.dispose();
+  await registry.dispose();
+  rig.vm.loseConfirmation(false);
+  registry = await rig.open();
+  seller = await registry.backend(row.terms.buyerNodeId).create(row.terms);
+  await seller.open(row.payload);
+  assert.equal(rig.vm.sends(), sent);
+  assert.equal(await rig.vm.balance(row.terms.buyer), 99000n);
+});
 
 for (const failAt of [1, 2]) {
-  void test(
-    `interrupted seller reservation publication ${failAt} restores without submitting a deposit`,
-    { skip },
-    async (t) => {
-      t.mock.method(Date, 'now', () => 1_800_000_000_000);
-      t.mock.method(globalThis, 'fetch', async () =>
-        assert.fail('External RPC forbidden'),
-      );
-      const rig = await sellerRegistryRig(1);
-      t.after(rig.dispose);
-      let registry = await rig.open();
-      t.after(() => registry.dispose());
-      const rename = filesystem.rename;
-      let publications = 0;
-      const patched = t.mock.method(
-        filesystem,
-        'rename',
-        (...args: Parameters<typeof filesystem.rename>) => {
-          if (args[1] === rig.paths.state && ++publications === failAt)
-            throw new Error('Synthetic index publication failure');
-          return rename(...args);
-        },
-      );
-      const restore = () => {
-        patched.mock.restore();
-        syncBuiltinESMExports();
-      };
-      t.after(restore);
-      syncBuiltinESMExports();
-      const row = rig.buyers[0]!;
-      const before = rig.vm.sends();
-      await assert.rejects(
-        registry.backend(row.terms.buyerNodeId).create(row.terms, row.payload),
-        { code: SESSION_CODES.UNAVAILABLE },
-      );
-      await assert.rejects(registry.permits(rig.buyers[1]!.terms.buyerNodeId), {
-        code: SESSION_CODES.UNAVAILABLE,
-      });
-      restore();
-      await registry.dispose();
-      registry = await rig.open();
-      assert.equal(rig.vm.sends(), before);
-      assert.equal((await registry.list()).length, failAt === 1 ? 0 : 1);
-      const seller = await registry
-        .backend(row.terms.buyerNodeId)
-        .create(row.terms, row.payload);
-      t.after(seller.dispose);
-      await seller.open(row.payload);
-      assert.equal(rig.vm.sends(), before + 1);
-    },
-  );
-}
-
-void test(
-  'missing indexed financial state and orphaned funded children never become free capacity',
-  { skip },
-  async (t) => {
+  void test(`interrupted seller reservation publication ${failAt} restores without submitting a deposit`, async (t) => {
     t.mock.method(Date, 'now', () => 1_800_000_000_000);
     t.mock.method(globalThis, 'fetch', async () =>
       assert.fail('External RPC forbidden'),
@@ -193,34 +126,78 @@ void test(
     t.after(rig.dispose);
     let registry = await rig.open();
     t.after(() => registry.dispose());
+    const rename = filesystem.rename;
+    let publications = 0;
+    const patched = t.mock.method(
+      filesystem,
+      'rename',
+      (...args: Parameters<typeof filesystem.rename>) => {
+        if (args[1] === rig.paths.state && ++publications === failAt)
+          throw new Error('Synthetic index publication failure');
+        return rename(...args);
+      },
+    );
+    const restore = () => {
+      patched.mock.restore();
+      syncBuiltinESMExports();
+    };
+    t.after(restore);
+    syncBuiltinESMExports();
     const row = rig.buyers[0]!;
+    const before = rig.vm.sends();
+    await assert.rejects(
+      registry.backend(row.terms.buyerNodeId).create(row.terms, row.payload),
+      { code: SESSION_CODES.UNAVAILABLE },
+    );
+    await assert.rejects(registry.permits(rig.buyers[1]!.terms.buyerNodeId), {
+      code: SESSION_CODES.UNAVAILABLE,
+    });
+    restore();
+    await registry.dispose();
+    registry = await rig.open();
+    assert.equal(rig.vm.sends(), before);
+    assert.equal((await registry.list()).length, failAt === 1 ? 0 : 1);
     const seller = await registry
       .backend(row.terms.buyerNodeId)
       .create(row.terms, row.payload);
+    t.after(seller.dispose);
     await seller.open(row.payload);
-    await seller.dispose();
-    const path = batchSellerBuyerPaths(rig.paths, row.terms.buyerNodeId).state;
-    const saved = await readFile(path, 'utf8');
-    const before = rig.vm.sends();
-    await unlink(path);
-    await assert.rejects(registry.permits(rig.buyers[1]!.terms.buyerNodeId), {
-      code: SESSION_CODES.UNVERIFIED,
-    });
-    await writeFile(path, saved, { mode: FILE_MODES.privateFile });
-    await registry.dispose();
-    await unlink(rig.paths.state);
-    await assert.rejects(rig.open(), { code: SESSION_CODES.UNVERIFIED });
-    assert.equal(rig.vm.sends(), before);
-  },
-);
+    assert.equal(rig.vm.sends(), before + 1);
+  });
+}
+
+void test('missing indexed financial state and orphaned funded children never become free capacity', async (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('External RPC forbidden'),
+  );
+  const rig = await sellerRegistryRig(1);
+  t.after(rig.dispose);
+  let registry = await rig.open();
+  t.after(() => registry.dispose());
+  const row = rig.buyers[0]!;
+  const seller = await registry
+    .backend(row.terms.buyerNodeId)
+    .create(row.terms, row.payload);
+  await seller.open(row.payload);
+  await seller.dispose();
+  const path = batchSellerBuyerPaths(rig.paths, row.terms.buyerNodeId).state;
+  const saved = await readFile(path, 'utf8');
+  const before = rig.vm.sends();
+  await unlink(path);
+  await assert.rejects(registry.permits(rig.buyers[1]!.terms.buyerNodeId), {
+    code: SESSION_CODES.UNVERIFIED,
+  });
+  await writeFile(path, saved, { mode: FILE_MODES.privateFile });
+  await registry.dispose();
+  await unlink(rig.paths.state);
+  await assert.rejects(rig.open(), { code: SESSION_CODES.UNVERIFIED });
+  assert.equal(rig.vm.sends(), before);
+});
 
 void test(
   'a seller persists two independent buyers and restores obligations after lowering max_sessions',
-  {
-    skip: WINDOWS
-      ? 'Reusable financial startup requires payment subtree ACL validation on Windows'
-      : false,
-  },
+  {},
   async (t) => {
     t.mock.method(Date, 'now', () => 1_800_000_000_000);
     t.mock.method(globalThis, 'fetch', async () =>
@@ -288,74 +265,60 @@ void test(
   },
 );
 
-void test(
-  'legacy seller obligations remain at their original path and consume capacity without a pin',
-  { skip },
-  async (t) => {
-    t.mock.method(Date, 'now', () => 1_800_000_000_000);
-    t.mock.method(globalThis, 'fetch', async () =>
-      assert.fail('External RPC forbidden'),
-    );
-    const rig = await sellerRegistryRig(1);
-    t.after(rig.dispose);
-    const row = rig.buyers[0]!;
-    const old = await openBatchSellerBackend({
-      ...rig.options,
-      paths: rig.paths.legacy,
-    }).create(row.terms, row.payload);
-    const opened = await old.open(row.payload);
-    await old.dispose();
-    const original = await readFile(rig.paths.legacy.state, 'utf8');
-    const registry = await rig.open();
-    t.after(registry.dispose);
-    assert.equal(
-      (await registry.list())[0]?.stored.snapshot.channelId,
-      opened.channelId,
-    );
-    assert.equal(
-      await registry.permits(rig.buyers[1]!.terms.buyerNodeId),
-      false,
-    );
-    const restored = await registry
-      .backend(row.terms.buyerNodeId)
-      .create(row.terms);
-    t.after(restored.dispose);
-    assert.equal(restored.snapshot().channelId, opened.channelId);
-    assert.equal(await readFile(rig.paths.legacy.state, 'utf8'), original);
-    await assert.rejects(
-      readFile(batchSellerBuyerPaths(rig.paths, row.terms.buyerNodeId).state),
-      { code: 'ENOENT' },
-    );
-    await restored.close();
-    assert.equal(
-      await registry.permits(rig.buyers[1]!.terms.buyerNodeId),
-      true,
-    );
-  },
-);
+void test('legacy seller obligations remain at their original path and consume capacity without a pin', async (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('External RPC forbidden'),
+  );
+  const rig = await sellerRegistryRig(1);
+  t.after(rig.dispose);
+  const row = rig.buyers[0]!;
+  const old = await openBatchSellerBackend({
+    ...rig.options,
+    paths: rig.paths.legacy,
+  }).create(row.terms, row.payload);
+  const opened = await old.open(row.payload);
+  await old.dispose();
+  const original = await readFile(rig.paths.legacy.state, 'utf8');
+  const registry = await rig.open();
+  t.after(registry.dispose);
+  assert.equal(
+    (await registry.list())[0]?.stored.snapshot.channelId,
+    opened.channelId,
+  );
+  assert.equal(await registry.permits(rig.buyers[1]!.terms.buyerNodeId), false);
+  const restored = await registry
+    .backend(row.terms.buyerNodeId)
+    .create(row.terms);
+  t.after(restored.dispose);
+  assert.equal(restored.snapshot().channelId, opened.channelId);
+  assert.equal(await readFile(rig.paths.legacy.state, 'utf8'), original);
+  await assert.rejects(
+    readFile(batchSellerBuyerPaths(rig.paths, row.terms.buyerNodeId).state),
+    { code: 'ENOENT' },
+  );
+  await restored.close();
+  assert.equal(await registry.permits(rig.buyers[1]!.terms.buyerNodeId), true);
+});
 
-void test(
-  'corrupt index input is a static typed refusal before any new financial construction',
-  { skip },
-  async (t) => {
-    t.mock.method(Date, 'now', () => 1_800_000_000_000);
-    t.mock.method(globalThis, 'fetch', async () =>
-      assert.fail('External RPC forbidden'),
-    );
-    const rig = await sellerRegistryRig(1);
-    t.after(rig.dispose);
-    const registry = await rig.open();
-    const row = rig.buyers[0]!;
-    const seller = await registry
-      .backend(row.terms.buyerNodeId)
-      .create(row.terms, row.payload);
-    await seller.dispose();
-    await registry.dispose();
-    const before = rig.vm.sends();
-    await writeFile(rig.paths.state, '{"unrecognized":true}', {
-      mode: FILE_MODES.privateFile,
-    });
-    await assert.rejects(rig.open(), { code: SESSION_CODES.UNAVAILABLE });
-    assert.equal(rig.vm.sends(), before);
-  },
-);
+void test('corrupt index input is a static typed refusal before any new financial construction', async (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('External RPC forbidden'),
+  );
+  const rig = await sellerRegistryRig(1);
+  t.after(rig.dispose);
+  const registry = await rig.open();
+  const row = rig.buyers[0]!;
+  const seller = await registry
+    .backend(row.terms.buyerNodeId)
+    .create(row.terms, row.payload);
+  await seller.dispose();
+  await registry.dispose();
+  const before = rig.vm.sends();
+  await writeFile(rig.paths.state, '{"unrecognized":true}', {
+    mode: FILE_MODES.privateFile,
+  });
+  await assert.rejects(rig.open(), { code: SESSION_CODES.UNAVAILABLE });
+  assert.equal(rig.vm.sends(), before);
+});

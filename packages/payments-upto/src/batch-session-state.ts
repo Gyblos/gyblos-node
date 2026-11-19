@@ -10,10 +10,9 @@ import {
   type SessionSnapshot,
 } from '@gyblos/protocol/payment-session';
 import {
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
   readPrivateFile,
 } from '@gyblos/runtime/private-file';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
@@ -24,6 +23,7 @@ import type { BatchPaths, BatchRecord } from './batch-session-types';
 export interface BatchStoredSession {
   terms: PaymentSessionTerms;
   snapshot: SessionSnapshot;
+  archivedProof?: true;
   pending: boolean;
   recoverable: boolean;
   notCreated?: true;
@@ -37,9 +37,8 @@ async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
       return undefined;
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   }
-  if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
   try {
-    await ensurePrivateDirectory(paths.directory);
+    await ensurePrivatePaymentPaths(paths);
     const text = await readPrivateFile(
       paths.state,
       BATCH_SESSION_DEFAULTS.stateBytes,
@@ -73,6 +72,21 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
   );
   const notCreated = batchOpeningAbsent(record) !== undefined;
   return {
+    ...(record.state === SESSION_STATES.CLOSED &&
+    record.settlement?.transaction &&
+    record.settlement.channelId === record.channelId &&
+    record.settlement.chargedAtomic === record.cumulativeAtomic &&
+    BigInt(record.settlement.chargedAtomic) +
+      BigInt(record.settlement.refundedAtomic) ===
+      BigInt(record.terms.depositAtomic) &&
+    !pending.some(
+      (request) =>
+        request.bill ||
+        record.blocks?.[request.requestId]?.pending ||
+        record.blocks?.[request.requestId]?.accepted,
+    )
+      ? { archivedProof: true as const }
+      : {}),
     ...(notCreated ? { notCreated: true as const } : {}),
     terms: record.terms,
     ...(record.history

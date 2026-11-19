@@ -11,7 +11,6 @@ import {
   sessionFail,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import {
   openSellerRegistryStore,
@@ -52,6 +51,7 @@ interface State {
 }
 async function rows(state: State): Promise<BatchSellerRegistryEntry[]> {
   const entries = [];
+  const archived = new Set<string>();
   for (const row of state.store.read().entries) {
     if (row.prepared !== null) return sessionFail(SESSION_CODES.UNAVAILABLE);
     const backend = openBatchSellerBackend({
@@ -61,8 +61,16 @@ async function rows(state: State): Promise<BatchSellerRegistryEntry[]> {
     const stored = await backend.inspect();
     if (!stored || stored.terms.buyerNodeId !== row.buyerNodeId)
       return sessionFail(SESSION_CODES.UNVERIFIED);
-    entries.push({ buyerNodeId: row.buyerNodeId, stored });
+    if (stored.archivedProof) archived.add(row.buyerNodeId);
+    else entries.push({ buyerNodeId: row.buyerNodeId, stored });
   }
+  // Archive in place: remove only the index reference, never move or rewrite financial evidence.
+  if (archived.size)
+    await state.store.update((record) => {
+      record.entries = record.entries.filter(
+        (row) => !archived.has(row.buyerNodeId),
+      );
+    });
   return entries;
 }
 async function permits(state: State, peer: string) {
@@ -99,10 +107,12 @@ async function create(
     if (found.prepared !== null) return sessionFail(SESSION_CODES.UNAVAILABLE);
     return base.create(terms, payload);
   }
+  const old = await base.inspect();
+  if (old?.archivedProof) return base.create(terms, payload);
+  if (!(await permits(state, peer))) return sessionFail(SESSION_CODES.BUSY);
   if (state.store.read().entries.length >= BATCH_SELLER_REGISTRY.maxBuyers)
     return sessionFail(SESSION_CODES.LIMIT);
-  if (!(await permits(state, peer))) return sessionFail(SESSION_CODES.BUSY);
-  if (await base.inspect()) return sessionFail(SESSION_CODES.UNVERIFIED);
+  if (old) return sessionFail(SESSION_CODES.UNVERIFIED);
   // The backend verifies the signed native opening before a new row is published; create never submits.
   const financial = await base.create(terms, payload);
   try {
@@ -126,7 +136,9 @@ function backend(state: State, peer: string): BatchSellerBackend {
     .entries.find((row) => row.buyerNodeId === buyerNodeId);
   const paths = found
     ? sellerRegistryPaths(state.options.paths, found)
-    : batchSellerBuyerPaths(state.options.paths, buyerNodeId);
+    : state.store.legacyPeer === buyerNodeId
+      ? state.options.paths.legacy
+      : batchSellerBuyerPaths(state.options.paths, buyerNodeId);
   const base = openBatchSellerBackend({ ...state.options, paths });
   return {
     inspect: () =>
@@ -135,7 +147,11 @@ function backend(state: State, peer: string): BatchSellerBackend {
         const known = state.store
           .read()
           .entries.some((row) => row.buyerNodeId === buyerNodeId);
-        if (stored && (!known || stored.terms.buyerNodeId !== buyerNodeId))
+        if (
+          stored &&
+          ((!known && !stored.archivedProof) ||
+            stored.terms.buyerNodeId !== buyerNodeId)
+        )
           return sessionFail(SESSION_CODES.UNVERIFIED);
         if (known && !stored) return sessionFail(SESSION_CODES.UNVERIFIED);
         return stored;
@@ -146,14 +162,27 @@ function backend(state: State, peer: string): BatchSellerBackend {
       run(state, async () => {
         if (terms.buyerNodeId !== buyerNodeId)
           return sessionFail(SESSION_CODES.BINDING);
+        if (!(await permits(state, buyerNodeId)))
+          return sessionFail(SESSION_CODES.BUSY);
         if (
           !state.store
             .read()
             .entries.some((row) => row.buyerNodeId === buyerNodeId)
-        )
-          return sessionFail(SESSION_CODES.UNVERIFIED);
-        if (!(await permits(state, buyerNodeId)))
-          return sessionFail(SESSION_CODES.BUSY);
+        ) {
+          if (!(await base.inspect())?.archivedProof)
+            return sessionFail(SESSION_CODES.UNVERIFIED);
+          if (
+            state.store.read().entries.length >= BATCH_SELLER_REGISTRY.maxBuyers
+          )
+            return sessionFail(SESSION_CODES.LIMIT);
+          await state.store.update((record) => {
+            record.entries.push({
+              buyerNodeId,
+              legacy: state.store.legacyPeer === buyerNodeId,
+              prepared: null,
+            });
+          });
+        }
         if (!base.renew) return sessionFail(SESSION_CODES.UNAVAILABLE);
         await base.renew(expected, terms, payload);
       }),
@@ -162,7 +191,6 @@ function backend(state: State, peer: string): BatchSellerBackend {
 export async function openBatchSellerRegistry(
   options: Options,
 ): Promise<BatchSellerRegistry> {
-  if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
   if (
     !Number.isSafeInteger(options.maxSessions) ||
     options.maxSessions < 1 ||

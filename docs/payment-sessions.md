@@ -5,10 +5,10 @@ The buyer approves each answer's usage with a cumulative signature, and the
 seller settles the channel once, when the session closes. Sessions use the x402
 `batch-settlement` scheme on the official payment-channels program, on devnet.
 
-Sessions are an allowlisted pilot. Per-request payment stays the default for
-every priced offer ([payments.md](payments.md)). This page also owns how the
-buyer chooses between free and paid execution and what it does when a seller is
-busy ([Buyer routing](#buyer-routing)).
+Per-request payment stays the default for every priced offer
+([payments.md](payments.md)). This page also owns how the buyer chooses between
+free and paid execution and what it does when a seller is busy
+([Buyer routing](#buyer-routing)).
 
 | Question              | Per-request paid                   | Payment session                         |
 | --------------------- | ---------------------------------- | --------------------------------------- |
@@ -16,20 +16,17 @@ busy ([Buyer routing](#buyer-routing)).
 | On-chain transactions | Open and settle on every request   | Open once, settle once; none per answer |
 | Conversation history  | One user turn in `pnpm buyer:chat` | Full text conversation                  |
 | Tools                 | Refused                            | Supported                               |
-| Who can use it        | Any buyer                          | Buyers the seller allowlists            |
-| Windows               | Supported                          | Refused                                 |
+| Who can use it        | Any buyer                          | Any authenticated buyer                 |
+| Windows               | Supported                          | Supported                               |
 
 ## Prerequisites
 
 - The seller and the buyer run the same Gyblos release. Older and newer peers
   are not mixed (see [Upgrading and downgrading](#upgrading-and-downgrading)).
-- Both run on macOS or Linux. On Windows the seller refuses an allowlist and the
-  buyer refuses a session policy, because the payment directory lacks equivalent
-  ACL validation.
+- Windows checks the payment directory and journal ACLs before reuse.
 - The seller serves a priced offer with a recountable model and a funded fee
   payer ([Get paid](https://docs.gyblos.com/en/sellers/get-paid)).
-- The buyer holds devnet USDC for the deposit, and the seller knows the buyer's
-  NodeId.
+- The buyer holds devnet USDC for the deposit.
 
 ## Seller setup
 
@@ -41,18 +38,7 @@ busy ([Buyer routing](#buyer-routing)).
    max_sessions = 16
    ```
 
-2. Allowlist the buyers. Set `GYBLOS_SESSION_BUYER_NODE_IDS` in the seller's
-   environment to a comma-separated list of lowercase buyer NodeIds, with no
-   spaces and at most 16 entries. The singular `GYBLOS_SESSION_BUYER_NODE_ID` is
-   a one-buyer alias. Setting both, or a duplicate NodeId, refuses startup.
-
-3. Start the seller normally. With an allowlist, it advertises the session
-   channels next to its per-request paid channel.
-
-Without an allowlist, the seller serves only free and per-request paid requests.
-It still restores any unfinished session for status, approval and closure.
-Removing a buyer from the allowlist never grants a new inference or discards a
-debt.
+2. Start the seller normally. A priced seller advertises session channels.
 
 <a id="seller-capacity-and-separate-buyer-sessions"></a>
 
@@ -69,10 +55,10 @@ Each buyer has its own private child journal under the seller's payment
 directory. An admission index reserves the slot before any deposit is submitted.
 A missing, corrupt or unindexed journal fails closed.
 
-The index also keeps proof for closed sessions, up to 64 distinct buyers. At
-that limit it refuses a new buyer instead of evicting proof. There is no
-automatic retention management. Never delete journals or locks to free capacity
-or bypass recovery.
+The active index holds up to 64 buyer records. A fully settled channel with no
+outstanding recovery leaves this index. Its private journal stays at its
+original path for later inspection and retries. Never remove a journal or lock
+to make room for another buyer.
 
 ## Buyer setup
 

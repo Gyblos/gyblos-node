@@ -1,4 +1,4 @@
-// Routes authenticated pilot buyers to separate financial hosts while preserving one global foreground turn.
+// Routes authenticated buyers to separate financial hosts while preserving one global foreground turn.
 import {
   batchSessionTerminal,
   type BatchSellerRegistry,
@@ -10,8 +10,6 @@ import {
   batchFail,
   type BatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
-import { controlHex } from '@gyblos/protocol/control-validation';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import {
@@ -22,15 +20,13 @@ import {
 
 export type SellerSessionComposition =
   | Pick<SellerSessionOptions, 'buyerNodeId' | 'backend'>
-  | { buyerNodeIds: readonly string[]; registry: BatchSellerRegistry };
+  | { registry: BatchSellerRegistry };
 type Common = Omit<SellerSessionOptions, 'buyerNodeId' | 'backend'>;
 type Options = Common & SellerSessionComposition;
 interface State {
   options: Common & {
-    buyerNodeIds: readonly string[];
     registry: BatchSellerRegistry;
   };
-  allowed: Set<string>;
   known: Set<string>;
   hosts: Map<string, SellerSessionHost>;
   active?: Promise<unknown>;
@@ -53,30 +49,14 @@ async function admission(
   request: BatchChannelRequest,
   peer: string,
 ) {
-  if (!state.allowed.has(peer)) {
-    if (
-      !state.known.has(peer) ||
-      request.method === BATCH_METHODS.PREPARE ||
-      request.method === BATCH_METHODS.EXECUTE
-    )
-      return batchFail(PAID_EXECUTION_CODES.PEER);
-    if (request.method === BATCH_METHODS.OPEN) {
-      const old = await state.options.registry.backend(peer).inspect();
-      if (
-        !old ||
-        canonicalJson(request.params.terms ?? old.terms) !==
-          canonicalJson(old.terms)
-      )
-        return batchFail(PAID_EXECUTION_CODES.PEER);
-    }
-  }
   if (
     request.method === BATCH_METHODS.PREPARE ||
     request.method === BATCH_METHODS.OPEN
   ) {
-    const old = state.known.has(peer)
-      ? await state.options.registry.backend(peer).inspect()
-      : undefined;
+    const old =
+      request.method === BATCH_METHODS.OPEN
+        ? await state.options.registry.backend(peer).inspect()
+        : undefined;
     const restores =
       request.method === BATCH_METHODS.OPEN &&
       old &&
@@ -88,13 +68,10 @@ async function admission(
 }
 async function run<T>(
   state: State,
-  peer: string,
   signal: AbortSignal,
   execute: () => Promise<T>,
 ) {
   if (state.closed) return batchFail(SESSION_CODES.UNAVAILABLE);
-  if (!state.allowed.has(peer) && !state.known.has(peer))
-    return batchFail(PAID_EXECUTION_CODES.PEER);
   if (state.active) return batchFail(SESSION_CODES.BUSY);
   signal.throwIfAborted();
   const operation = Promise.resolve().then(execute);
@@ -121,13 +98,12 @@ export async function startSellerSessionHost(
   const entries = await options.registry.list();
   const state: State = {
     options,
-    allowed: new Set(options.buyerNodeIds.map((peer) => controlHex(peer))),
     known: new Set(entries.map((entry) => entry.buyerNodeId)),
     hosts: new Map(),
     closed: false,
   };
   try {
-    // Recovery does not depend on continued pilot eligibility or the newly configured capacity.
+    // Recovery does not depend on the newly configured capacity.
     for (const entry of entries)
       if (!batchSessionTerminal(entry.stored))
         await host(state, entry.buyerNodeId);
@@ -138,23 +114,32 @@ export async function startSellerSessionHost(
   return {
     service: {
       exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
-        run(state, peer, signal, async () => {
+        run(state, signal, async () => {
           await admission(state, request, peer);
           signal.throwIfAborted();
           const current = await host(state, peer);
-          const reply = await current.service.exchange(
-            request,
-            peer,
-            signal,
-            onDelta,
-            blocks,
-            blockMode,
-          );
-          if (request.method === BATCH_METHODS.OPEN) state.known.add(peer);
-          return reply;
+          try {
+            const reply = await current.service.exchange(
+              request,
+              peer,
+              signal,
+              onDelta,
+              blocks,
+              blockMode,
+            );
+            if (request.method === BATCH_METHODS.OPEN) state.known.add(peer);
+            if (request.method === BATCH_METHODS.CLOSE)
+              state.known.delete(peer);
+            return reply;
+          } finally {
+            if (!state.known.has(peer)) {
+              state.hosts.delete(peer);
+              await current.close();
+            }
+          }
         }),
       resumeBlock: (approval, peer, signal) =>
-        run(state, peer, signal, async () => {
+        run(state, signal, async () => {
           if (!state.known.has(peer))
             return batchFail(SESSION_CODES.UNAVAILABLE);
           const current = await host(state, peer);

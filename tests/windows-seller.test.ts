@@ -10,6 +10,10 @@ import test from 'node:test';
 import { promisify } from 'node:util';
 
 import {
+  ensurePrivatePaymentPaths,
+  writePrivateFile,
+} from '@gyblos/runtime/private-file';
+import {
   ACL_VERDICTS,
   pathsArePrivate,
   readAcls,
@@ -54,6 +58,31 @@ void test(
       assert.equal(await pathsArePrivate([shared]), ACL_VERDICTS.EXPOSED);
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  },
+);
+
+void test(
+  'windows: buyer and seller payment stores reject exposed folders and restored journals',
+  { skip: !WINDOWS },
+  async (t) => {
+    const root = await mkdtemp(join(tmpdir(), 'gyblos-payment-acl-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    for (const role of ['buyer', 'seller']) {
+      const directory = join(root, role, 'payments');
+      const paths = {
+        directory,
+        state: join(directory, 'journal'),
+        lock: join(directory, 'lock'),
+      };
+      await ensurePrivatePaymentPaths(paths);
+      await writePrivateFile(paths.state, 'fixture', 100);
+      await ensurePrivatePaymentPaths(paths);
+      await run(ICACLS, [paths.state, '/grant', '*S-1-1-0:R']);
+      await assert.rejects(ensurePrivatePaymentPaths(paths));
+      await run(ICACLS, [paths.state, '/reset']);
+      await run(ICACLS, [directory, '/grant', '*S-1-1-0:(OI)(CI)R']);
+      await assert.rejects(ensurePrivatePaymentPaths(paths));
     }
   },
 );

@@ -20,7 +20,7 @@ mode switch (see [Buyer routing](payment-sessions.md#buyer-routing)).
 | ------------------ | -------------------------------------- | -------------------------------------------- | ------------------------------------------ |
 | Free               | Any seller and buyer                   | None: no signer, deposit or settlement       | [running-a-node.md](running-a-node.md)     |
 | Per-request paid   | Any priced offer (the default)         | x402 `upto`: one channel per request         | This page and [recovery.md](recovery.md)   |
-| Payment session    | Allowlisted seller–buyer pairs (pilot) | x402 `batch-settlement`: one deposit, reused | [payment-sessions.md](payment-sessions.md) |
+| Payment session    | Authenticated buyers of a priced offer | x402 `batch-settlement`: one deposit, reused | [payment-sessions.md](payment-sessions.md) |
 | `exact`, v1 `upto` | Lab gates only                         | Fixed-price resource, legacy PoC facilitator | [lab/README.md](../lab/README.md)          |
 
 Per-request paid serves text conversations without tools. Tools on a priced

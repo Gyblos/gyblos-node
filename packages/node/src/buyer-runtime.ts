@@ -2,7 +2,7 @@
 import { batchPoolPathsIn, type HomeEnvironment } from '@gyblos/config/home';
 import {
   acquireProcessLock,
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
 } from '@gyblos/runtime/private-file';
 
 import { NODE_ERROR_CODES } from './constants';
@@ -20,7 +20,10 @@ export async function withBuyerRuntime<Host extends BuyerRuntimeHost>(
   start: () => Promise<Host>,
 ): Promise<Host> {
   const paths = batchPoolPathsIn(environment);
-  const lock = await ensurePrivateDirectory(paths.directory)
+  const lock = await ensurePrivatePaymentPaths({
+    directory: paths.directory,
+    lock: paths.runtimeLock,
+  })
     .then(() => acquireProcessLock(paths.runtimeLock))
     .catch(() => {
       throw new NodeError(NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE);

@@ -1,6 +1,6 @@
 // One private index reserves buyer slots before deposit submission; each child's journal owns its terms.
 // Interrupted initial publication is repaired only from its exact pristine prepared state.
-import { readdir } from 'node:fs/promises';
+import { opendir } from 'node:fs/promises';
 
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import {
@@ -21,7 +21,7 @@ import {
 } from '@gyblos/protocol/payment-session';
 import {
   acquireProcessLock,
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
   readPrivateFile,
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
@@ -29,7 +29,11 @@ import {
 import { termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
-import { readBatchRecord } from './batch-session-state';
+import {
+  inspectBatchSession,
+  readBatchRecord,
+  storedBatchSession,
+} from './batch-session-state';
 import { BATCH_SELLER_REGISTRY } from './constants';
 
 export interface SellerRegistryRow {
@@ -75,26 +79,27 @@ export function sellerRegistryPaths(
 async function children(paths: BatchSellerPaths, entries: SellerRegistryRow[]) {
   let found;
   try {
-    found = await readdir(paths.children, { withFileTypes: true });
+    found = await opendir(paths.children);
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
       return;
     throw error;
   }
-  if (found.length > BATCH_SELLER_REGISTRY.maxBuyers)
-    return sessionFail(SESSION_CODES.LIMIT);
-  for (const entry of found) {
+  for await (const entry of found) {
     if (!entry.isDirectory()) return sessionFail(SESSION_CODES.UNVERIFIED);
     const own = batchSellerBuyerPaths(paths, entry.name);
-    await ensurePrivateDirectory(own.directory);
-    if (
-      !entries.some((row) => !row.legacy && row.buyerNodeId === entry.name) &&
-      (await readBatchRecord(own))
-    )
-      return sessionFail(SESSION_CODES.UNVERIFIED);
+    await ensurePrivatePaymentPaths(own);
+    if (!entries.some((row) => !row.legacy && row.buyerNodeId === entry.name)) {
+      const stored = await inspectBatchSession(own);
+      if (
+        stored &&
+        (!stored.archivedProof || stored.terms.buyerNodeId !== entry.name)
+      )
+        return sessionFail(SESSION_CODES.UNVERIFIED);
+    }
   }
 }
-async function load(paths: BatchSellerPaths): Promise<Record> {
+async function load(paths: BatchSellerPaths) {
   const raw = await withBatchState(paths, () =>
     readPrivateFile(paths.state, BATCH_SELLER_REGISTRY.stateBytes),
   );
@@ -116,24 +121,27 @@ async function load(paths: BatchSellerPaths): Promise<Record> {
       : parse(JSON.parse(raw));
   const imported = record.entries.find((row) => row.legacy);
   if (
-    (legacy && imported?.buyerNodeId !== legacy.terms.buyerNodeId) ||
+    (legacy &&
+      imported?.buyerNodeId !== legacy.terms.buyerNodeId &&
+      (imported || !storedBatchSession(legacy).archivedProof)) ||
     (imported && !legacy)
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);
   await children(paths, record.entries);
-  return record;
+  return { record, legacyPeer: legacy?.terms.buyerNodeId };
 }
 export async function openSellerRegistryStore(
   paths: BatchSellerPaths,
   now: () => number,
 ) {
-  await ensurePrivateDirectory(paths.directory);
+  await ensurePrivatePaymentPaths(paths);
   const lock = await acquireProcessLock(paths.lock);
   let record: Record;
+  let legacyPeer: string | undefined;
   let disposed = false;
   let poisoned = false;
   try {
-    record = await load(paths);
+    ({ record, legacyPeer } = await load(paths));
   } catch (error) {
     await lock.release();
     throw error;
@@ -183,6 +191,7 @@ export async function openSellerRegistryStore(
   }
   return {
     read,
+    legacyPeer,
     update,
     prepare,
     async dispose() {
@@ -200,7 +209,7 @@ async function seed(
   const terms = row.prepared;
   if (terms === null) return;
   const own = sellerRegistryPaths(paths, row);
-  await ensurePrivateDirectory(own.directory);
+  await ensurePrivatePaymentPaths(own);
   const existing = await readBatchRecord(own);
   if (
     existing &&

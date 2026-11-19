@@ -19,7 +19,6 @@ import {
   openBatchSellerBackend,
 } from '@gyblos/payments-upto/batch-session';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import {
   blockTestMeter,
@@ -33,11 +32,7 @@ import { sessionNativeRpc } from '../support/session-native-rpc';
 for (const blocks of [false, true]) {
   void test(
     `one pilot pair (${blocks ? 'v5' : 'v4'}) renews only after proved refunds and retains historical spending across restart`,
-    {
-      skip: WINDOWS
-        ? 'Reusable financial startup requires payment subtree ACL validation on Windows'
-        : false,
-    },
+    {},
     async (t) => {
       let now = 1_800_000_000_000;
       t.mock.method(Date, 'now', () => now);

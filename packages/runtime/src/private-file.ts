@@ -24,6 +24,7 @@ import { FILE_MODES } from '@gyblos/config';
 
 import { PRIVATE_FILE_CODES, PROCESS_LOCK } from './constants';
 import { hasPrivateMode, WINDOWS } from './private-mode';
+import { paymentPathsArePrivate, restrictDirectory } from './windows-acl';
 
 export class PrivateFileError extends Error {
   readonly code = PRIVATE_FILE_CODES.UNAVAILABLE;
@@ -60,6 +61,7 @@ const NEW_FILE =
 async function privateDirectory(
   path: string,
   create: boolean,
+  payment = false,
 ): Promise<boolean> {
   return guarded(async () => {
     const absolute = resolve(path);
@@ -70,7 +72,11 @@ async function privateDirectory(
       .filter(Boolean)) {
       current = join(current, part);
       try {
-        if (create) await mkdir(current, { mode: FILE_MODES.privateDirectory });
+        if (create) {
+          await mkdir(current, { mode: FILE_MODES.privateDirectory });
+          if (payment && WINDOWS && current === absolute)
+            await restrictDirectory(current);
+        }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       }
@@ -96,6 +102,32 @@ async function privateDirectory(
 }
 export async function ensurePrivateDirectory(path: string): Promise<void> {
   await privateDirectory(path, true);
+}
+// Only newly created payment folders are restricted. Existing exposed evidence is refused.
+export async function ensurePrivatePaymentPaths(paths: {
+  directory: string;
+  state?: string;
+  lock: string;
+}) {
+  await privateDirectory(paths.directory, true, true);
+  if (!WINDOWS) return;
+  const existing = [paths.directory];
+  for (const path of [paths.state, paths.lock]) {
+    if (!path) continue;
+    try {
+      const info = await lstat(path);
+      if (!info.isFile() || info.nlink !== 1) fail();
+      existing.push(path);
+    } catch (error) {
+      if (!(
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ))
+        fail();
+    }
+  }
+  if (!(await paymentPathsArePrivate(existing))) fail();
 }
 // Read-only validation; a missing directory is clear, unsafe existing components are refused.
 export function checkPrivateDirectory(path: string): Promise<boolean> {

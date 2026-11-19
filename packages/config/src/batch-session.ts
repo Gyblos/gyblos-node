@@ -1,6 +1,4 @@
 // Operator defaults for capped client-signed batch sessions; thresholds never change a buyer's price.
-export const SELLER_SESSION_BUYER_ENV = 'GYBLOS_SESSION_BUYER_NODE_ID';
-export const SELLER_SESSION_BUYERS_ENV = 'GYBLOS_SESSION_BUYER_NODE_IDS';
 export const BATCH_SESSION_DEFAULTS = {
   millisecondsPerSecond: 1000,
   withdrawDelaySeconds: 900,
