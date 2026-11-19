@@ -149,7 +149,7 @@ export async function UsageSection({ days }: { days: RangeDays }) {
         />
         <StatCard
           icon={Timer}
-          label="First token p50 free · paid"
+          label="Seller first token p50 free · paid"
           value={pair(free.firstToken, paid.firstToken, latencyText)}
         />
         <StatCard
@@ -218,7 +218,7 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
         minWidth={DISPLAY.dailyTable}
         head={[
           { label: 'Day (UTC)' },
-          ...figureHead('First token'),
+          ...figureHead('Seller first token'),
           { label: 'Buyers free · paid', right: true },
           { label: 'Relay', right: true },
         ]}

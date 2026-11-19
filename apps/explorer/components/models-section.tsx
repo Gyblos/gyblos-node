@@ -102,11 +102,12 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
         Completed is out of the requests that completed or failed; cancellations
         are shown apart and are not failures. Seller first token is measured by
         the seller. Buyer first token is measured by the buyer on streaming
-        requests, from the request to the first token, and includes payment and
-        channel setup. Engine speed is output tokens per second of generation,
-        only from engines that report their generation time, shown as the lower
-        bound of the median. — means no data. The lowest paid input and output
-        prices may come from different sellers.
+        requests, from the attempt with the chosen seller (after quotes) to the
+        first token, including local payment, tokenizer startup and channel
+        setup. Engine speed is output tokens per second of generation, only from
+        engines that report their generation time, shown as the lower bound of
+        the median. In those two columns, — means no data. The lowest paid input
+        and output prices may come from different sellers.
       </p>
       {offersKnown ? null : (
         <p className="mt-1 text-xs text-dim">

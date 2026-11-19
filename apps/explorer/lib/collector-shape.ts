@@ -48,12 +48,10 @@ export interface NetworkDay {
   demand: { modelId: string; requests: number }[];
 }
 // Output tokens per second of generation, from engines that report their generation time: the lower
-// bound of the bucket holding the median, null without samples.
+// bound of the bucket holding the median, null without samples. The explorer reads the median only.
 export interface Speed {
   samples: number;
   p50MinTokensPerSecond: number | null;
-  bucketsTokensPerSecond: number[];
-  counts: number[];
 }
 // Per-model observations joined to their receipts: the first token as the buyer saw it (streaming
 // requests only) and the engine's generation speed.
@@ -99,13 +97,6 @@ function speed(value: unknown, where: string): Speed {
     samples: num(source.samples, `${where}.samples`),
     p50MinTokensPerSecond: nullable(source.p50MinTokensPerSecond, (present) =>
       num(present, `${where}.p50MinTokensPerSecond`),
-    ),
-    bucketsTokensPerSecond: list(
-      source.bucketsTokensPerSecond,
-      `${where}.bucketsTokensPerSecond`,
-    ).map((edge) => num(edge, where)),
-    counts: list(source.counts, `${where}.counts`).map((value) =>
-      num(value, where),
     ),
   };
 }
@@ -198,13 +189,14 @@ function modelSide(value: unknown, where: string): ModelSide {
   return {
     ...totals(source, where),
     observed: nullable(source.observed, (present) => {
-      const observed = record(present, `${where}.observed`);
+      const at = `${where}.observed`;
+      const observed = record(present, at);
       return {
         buyerFirstToken: latency(
           observed.buyerFirstToken,
-          `${where}.buyerFirstToken`,
+          `${at}.buyerFirstToken`,
         ),
-        engineSpeed: speed(observed.engineSpeed, `${where}.engineSpeed`),
+        engineSpeed: speed(observed.engineSpeed, `${at}.engineSpeed`),
       };
     }),
   };

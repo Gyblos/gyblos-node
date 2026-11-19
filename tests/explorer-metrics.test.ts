@@ -280,12 +280,7 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
       observed: null,
     };
   };
-  const speed = {
-    samples: 3,
-    p50MinTokensPerSecond: 20,
-    bucketsTokensPerSecond: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000],
-    counts: [0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0],
-  };
+  const speed = { samples: 3, p50MinTokensPerSecond: 20 };
   const rows = modelRows(offers.models, [
     {
       modelId: 'served',
@@ -374,22 +369,19 @@ void test('a model side reads its observations, and their absence as no data', (
       authorizedAtomic: '7',
       observed: {
         buyerFirstToken: latency(1200),
-        engineSpeed: {
-          samples: 1,
-          p50MinTokensPerSecond: 50,
-          bucketsTokensPerSecond: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000],
-          counts: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-        },
+        engineSpeed: { samples: 1, p50MinTokensPerSecond: 50 },
       },
     },
   });
   assert.equal(model.free?.observed, null);
   assert.equal(model.paid?.observed?.buyerFirstToken.samples, 1);
   assert.equal(model.paid?.observed?.engineSpeed.p50MinTokensPerSecond, 50);
-  assert.throws(() =>
-    parseModel({
-      modelId: 'm',
-      free: { ...totals, observed: { buyerFirstToken: latency(1) } },
-    }),
+  assert.throws(
+    () =>
+      parseModel({
+        modelId: 'm',
+        free: { ...totals, observed: { buyerFirstToken: latency(1) } },
+      }),
+    /observed\.engineSpeed/,
   );
 });
