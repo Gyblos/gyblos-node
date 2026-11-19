@@ -1,0 +1,115 @@
+diff --git a/tests/buyer-key-preflight.test.ts b/tests/buyer-key-preflight.test.ts
+index 1865a19a1..0ce612ac0 100644
+--- a/tests/buyer-key-preflight.test.ts
++++ b/tests/buyer-key-preflight.test.ts
+@@ -6,6 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
+ import { tmpdir } from 'node:os';
+ import { join } from 'node:path';
+ import test from 'node:test';
++import { fileURLToPath } from 'node:url';
+ 
+ import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
+ import { SELLER_BADGES } from '@gyblos/core/constants';
+@@ -49,7 +50,10 @@ const cases = [
+ ];
+ for (const scenario of cases)
+   void test(`API-key preflight preserves delegated budget: ${scenario}`, async () => {
++    const stamp = () => Number(process.hrtime.bigint()) / 1e6;
++    const began = stamp();
+     const directory = await mkdtemp(join(tmpdir(), 'gyb-key-preflight-'));
++    const directoryReady = stamp();
+     try {
+       const source = await controlFixture();
+       source.request.params.maxAtomic = '100';
+@@ -74,14 +78,7 @@ for (const scenario of cases)
+           },
+         ],
+       };
+-      const child = spawnSync(
+-        process.execPath,
+-        [
+-          '--import',
+-          'tsx',
+-          '--input-type=module',
+-          '--eval',
+-          keyPreflightProgram({
++      const program = keyPreflightProgram({
+             config,
+             quote,
+             input: {
+@@ -90,7 +87,18 @@ for (const scenario of cases)
+             },
+             scenario,
+             target: import.meta.resolve('@gyblos/buyer/quote-startup'),
+-          }),
++          });
++      const spawning = stamp();
++      const child = spawnSync(
++        process.execPath,
++        [
++          '--require',
++          fileURLToPath(new URL('../.github/preflight-clock.cjs', import.meta.url)),
++          '--import',
++          'tsx',
++          '--input-type=module',
++          '--eval',
++          program,
+         ],
+         {
+           cwd: new URL('..', import.meta.url),
+@@ -105,8 +113,13 @@ for (const scenario of cases)
+           },
+         },
+       );
++      const returned = stamp();
+       assert.equal(child.status, 0, child.stderr);
++      const clock = child.stdout.split('\n').find(line => line.startsWith('PREFLIGHT_CLOCK '));
++      assert.ok(clock);
++      console.log('PREFLIGHT_CASE', JSON.stringify({scenario, began, directoryReady, spawning, ...JSON.parse(clock.slice('PREFLIGHT_CLOCK '.length)), returned}));
+     } finally {
+       await rm(directory, { recursive: true, force: true });
++      console.log('PREFLIGHT_END', JSON.stringify({scenario, end:stamp()}));
+     }
+   });
+diff --git a/tests/support/key-preflight.ts b/tests/support/key-preflight.ts
+index 51c438184..e50b544d1 100644
+--- a/tests/support/key-preflight.ts
++++ b/tests/support/key-preflight.ts
+@@ -25,6 +25,8 @@ import {SESSION_CODES} from '@gyblos/protocol/payment-session';
+ import {ENGINE_DONE_REASONS,REASONING_LEVELS} from '@gyblos/protocol/constants';
+ import {BATCH_SESSION_DEFAULTS} from '@gyblos/config/batch-session';
+ import {FREE_BUYER_STARTUP,PAID_BUYER_CODES} from '@gyblos/buyer/constants';
++const stamp = () => Number(process.hrtime.bigint()) / 1e6;
++const phases = {entry: Number(process.env.GYB_BENCH_ENTRY)/1e6, staticReady:stamp()};
+ const {config,quote,input,scenario,target}=${JSON.stringify(data)};
+ let now=quote.offer.issuedAt;
+ Date.now=()=>now;
+@@ -49,7 +51,9 @@ registerHooks({resolve(name,context,next){
+   const source=owner?sources[name]:undefined;
+   return source?{url:'data:text/javascript,'+encodeURIComponent(source),shortCircuit:true}:next(name,context);
+ }});
++phases.hooksReady=stamp();
+ const {quoteBuyerExecution}=await import('@gyblos/buyer/quote-startup');
++phases.dynamicReady=stamp();
+ const keys=await createBuyerApiKeys({
+   files:{read:async()=>undefined,write:async()=>{}},
+   scope:{network:quote.offer.network,mint:quote.offer.mint,payer:quote.offer.buyer}
+@@ -130,6 +134,7 @@ const runtime=await quoteBuyerExecution({meter,chain,
+ const call=(data=input,model,signal=new AbortController().signal)=>executeApiKey(keys,key.id,signal,
+   (current,operation)=>runtime.execute(data,current,undefined,model,operation));
+ try {
++  phases.ready=stamp();
+   if(scenario==='warm') {
+     await call();
+     assert.equal(probe.authorizations,1);
+@@ -178,7 +183,10 @@ try {
+     assert.equal(probe.free,1,'a later free request must still work');
+     assert.equal(probe.chains,before.chains);
+   }
++  phases.validated=stamp();
+   console.log(JSON.stringify(probe));
+ } finally {await runtime.close();await keys.close()}
++phases.closed=stamp();
++console.log('PREFLIGHT_CLOCK', JSON.stringify(phases));
+ `;
+ }

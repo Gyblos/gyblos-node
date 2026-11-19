@@ -1,0 +1,33 @@
+name: Buyer preflight timing
+on:
+  push:
+    branches: ['codex/buyer-key-phases-18']
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        repetition: [1, 2, 3]
+        mode: [control, profile]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - if: matrix.mode == 'profile'
+        run: git apply .github/preflight-timing.patch
+      - name: Run product shard three and read timings
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          node --import tsx --test --test-shard=3/3 "tests/*.test.ts" "packages/*/test/**/*.test.ts" > "$RUNNER_TEMP/results" 2>&1
+          python3 .github/preflight-results.py "$RUNNER_TEMP/results" "$MODE"
