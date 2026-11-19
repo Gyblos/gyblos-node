@@ -86,11 +86,6 @@ export async function PaymentsSection({ days }: { days: RangeDays }) {
         change={change?.settled[0]}
       />
       <DailyTable summary={summary} />
-      <p className="mt-4 text-xs text-dim">
-        Gyblos channels are those whose open carries a Gyblos memo, a label
-        anyone can set. The program is shared: its other traffic is only
-        counted.
-      </p>
     </>
   );
 }
