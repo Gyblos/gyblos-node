@@ -2,9 +2,12 @@
 
 // Bounds on one render's reads of the discovery index, whose answers are not cached (no-store): past
 // them the render shows what it read and says the list may be incomplete.
-// One render then costs at most 22 reads (1 /models, 10 /sellers, 1 /network, 10 /uptime), well under
-// the index's per-address limit (120 a minute), which every explorer request shares.
+// One read of the index costs at most 22 requests (1 /models, 10 /sellers, 1 /network, 10 /uptime), and
+// its answer is shared by every render in the data center for `shareSeconds`, so the load on the index
+// (120 requests a minute per address, shared by all explorer requests) does not grow with viewers.
 export const DISCOVERY = {
+  // How long one read of the index serves every render (the live refresh runs once a minute).
+  shareSeconds: 30,
   // Pages of /sellers read in all, across every model.
   maxSellerPages: 10,
   // Sellers whose uptime is read; the rest show none.

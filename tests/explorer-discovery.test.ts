@@ -1,6 +1,7 @@
-// Protects the explorer's reads of the discovery index, whose answers are not cached: one render reads
-// a bounded number of seller pages and uptimes, says when it stopped short, and every read has a
-// timeout so a slow source cannot hold a render.
+// Protects the explorer's reads of the discovery index, whose answers are not cached: one read is a
+// bounded number of seller pages and uptimes and says when it stopped short, every request has a
+// timeout so a slow source cannot hold a render, and a successful read is shared by the renders of a
+// data center (never a failed one).
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
@@ -11,7 +12,27 @@ import { fetchJson } from '@gyblos/explorer/fetch-json';
 const realFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = realFetch;
+  Reflect.deleteProperty(globalThis, 'caches');
 });
+
+// A data center's cache as the Workers Cache API offers it (caches.default), in memory.
+function fakeSharedCache() {
+  const stored = new Map<string, string>();
+  Object.assign(globalThis, {
+    caches: {
+      default: {
+        match: async (key: string) => {
+          const body = stored.get(key);
+          return body === undefined ? undefined : new Response(body);
+        },
+        put: async (key: string, response: Response) => {
+          stored.set(key, await response.text());
+        },
+      },
+    },
+  });
+  return stored;
+}
 
 // A fake index with `models` models, each listing one page of `perPage` distinct sellers.
 function fakeIndex(models: number, paths: string[], perPage = 1) {
@@ -92,4 +113,36 @@ void test('a source that never answers is given up after the timeout', async () 
   await assert.rejects(fetchJson('https://source.test/x', 'test', 20), {
     name: 'TimeoutError',
   });
+});
+
+void test('a successful read is shared by later renders, and a failed one is not', async () => {
+  const stored = fakeSharedCache();
+  const paths: string[] = [];
+  globalThis.fetch = (async () =>
+    new Response('{}', { status: 503 })) as typeof fetch;
+  assert.ok((await getDiscovery()).error);
+  assert.equal(stored.size, 0);
+
+  fakeIndex(2, paths);
+  const first = await getDiscovery();
+  const reads = paths.length;
+  const second = await getDiscovery();
+  assert.equal(first.error, null);
+  assert.deepEqual(second, first);
+  assert.equal(paths.length, reads);
+});
+
+void test('a failing shared cache never stops the read', async () => {
+  Object.assign(globalThis, {
+    caches: {
+      default: {
+        match: () => Promise.reject(new Error('cache down')),
+        put: () => Promise.reject(new Error('cache down')),
+      },
+    },
+  });
+  fakeIndex(1, []);
+  const snapshot = await getDiscovery();
+  assert.equal(snapshot.error, null);
+  assert.equal(snapshot.sellers.length, 1);
 });

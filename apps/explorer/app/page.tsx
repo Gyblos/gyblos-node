@@ -14,8 +14,9 @@ import { UsageSection } from '../components/usage-section';
 import { RANGE } from '../lib/constants';
 import { parseRange } from '../lib/range';
 
-// Every request renders with fresh source answers; the sources cache at their own edge (the collector
-// for 5 minutes). Workers cannot share a pending fetch across requests, so no in-process cache is used.
+// Every request renders; the collector caches its answers at its own edge (5 minutes), and the discovery
+// index's answer is shared through the data center's cache for DISCOVERY.shareSeconds. Workers cannot
+// share a pending fetch across requests, so no in-process cache is used.
 export const dynamic = 'force-dynamic';
 
 export default async function Home({

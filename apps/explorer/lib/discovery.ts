@@ -1,5 +1,6 @@
 // Owns the read of the discovery index: models offered now, sellers online and their uptime, and the
-// network status of every registered seller, fetched, checked at the boundary on each render.
+// network status of every registered seller, fetched and checked at the boundary, then shared by the
+// renders of one data center for DISCOVERY.shareSeconds.
 
 import { cache } from 'react';
 
@@ -7,6 +8,7 @@ import { DISCOVERY_URL } from './config';
 import { DISCOVERY } from './constants';
 import { fetchJson } from './fetch-json';
 import { parseNetworkStatus, type NetworkStatus } from './network-status';
+import { SITE } from './site';
 import { list, nullable, num, record, text } from './validate';
 
 export interface OfferedModel {
@@ -102,11 +104,36 @@ async function sellersOf(
   return { byNode, truncated: false };
 }
 
+// The data center's shared cache (the Workers Cache API), or null where there is none (local runs).
+// The key is a URL of the explorer's own origin that no route serves.
+const SHARED_KEY = `${SITE.origin}/_shared/discovery`;
+function sharedCache(): Cache | null {
+  const store = (globalThis as { caches?: { default?: Cache } }).caches;
+  return store?.default ?? null;
+}
+
 // Live view of the discovery index: models offered now, sellers online and their uptime. Read once per
-// render: the Network and Models sections share the answer.
+// render (the Network and Models sections share the answer), and a successful read is shared by every
+// render in the data center for DISCOVERY.shareSeconds; a failure is never shared.
+// The shared cache only saves reads: when it fails, the render reads the index itself.
 export const getDiscovery = cache(async (): Promise<DiscoverySnapshot> => {
+  const shared = sharedCache();
+  const hit = await shared
+    ?.match(SHARED_KEY)
+    .then((response) => response?.json() as Promise<DiscoverySnapshot>)
+    .catch(() => undefined);
+  if (hit) return hit;
   try {
-    return await loadDiscovery();
+    const snapshot = await loadDiscovery();
+    await shared
+      ?.put(
+        SHARED_KEY,
+        Response.json(snapshot, {
+          headers: { 'cache-control': `max-age=${DISCOVERY.shareSeconds}` },
+        }),
+      )
+      .catch(() => undefined);
+    return snapshot;
   } catch (error) {
     return {
       generatedAt: 0,
