@@ -12,18 +12,13 @@ import {
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { batchOfferFixture } from '../support/batch-iroh-offer';
 import { sellerRegistryRig } from '../support/seller-session-registry';
 
 void test(
   'expired pristine seller reservation refreshes under the same slot while attempted opening stays protected',
-  {
-    skip: WINDOWS
-      ? 'Reusable financial startup requires payment subtree ACL validation on Windows'
-      : false,
-  },
+  {},
   async (t) => {
     let now = 1_800_000_000_000;
     t.mock.method(Date, 'now', () => now);
@@ -65,7 +60,6 @@ void test(
     const payload = await fresh.open();
     const offers = await batchOfferFixture(terms, rig.vm.seller, rig.now);
     const host = await startSellerSessionHost({
-      buyerNodeIds: [terms.buyerNodeId],
       registry,
       description: terms,
       owner: terms.owner,

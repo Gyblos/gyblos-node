@@ -8,13 +8,13 @@ market value: the beta tests the payment path, not real income. Mainnet is not o
 
 ## What you can sell [#beta-scope]
 
-| How you sell                     | Who can buy                | Tools (agents) | Availability                           |
-| -------------------------------- | -------------------------- | -------------- | -------------------------------------- |
-| **Free**                         | Any buyer                  | Yes            | Every seller                           |
-| **Priced, paid per request**     | Any buyer                  | No, text only  | Every seller; this page                |
-| Priced, reusable channel (pilot) | One buyer paired by Gyblos | Yes            | Pilot only; Gyblos sets it up with you |
+| How you sell                 | Who can buy             | Tools (agents) | Availability                |
+| ---------------------------- | ----------------------- | -------------- | --------------------------- |
+| **Free**                     | Any buyer               | Yes            | Every seller                |
+| **Priced, paid per request** | Any buyer               | No, text only  | Every seller; this page     |
+| Priced, reusable channel     | Any authenticated buyer | Yes            | Sellers with a priced offer |
 
-Coding agents such as Codex or Claude Code use tools, so they buy from free offers or from the pilot. A priced
+Coding agents can use tools with free offers and reusable channels. A priced
 per-request offer serves plain text conversations. To tune a free offer for agents, see
 [answer and context length](/en/sellers/models-offers#answer-and-context-length).
 
@@ -95,12 +95,10 @@ can take a few minutes to appear.
 (including the Gyblos fee) and how many are still settling. These recent totals are not your lifetime
 earnings or your wallet balance. An unsafe or invalid payment ledger shows as unavailable.
 
-## Reusable channel pilot [#reusable-channel-pilot]
+## Reusable channels [#reusable-channel-pilot]
 
 A reusable channel lets one deposit pay for many answers, with tools. It settles when the buyer asks, the
-deposit runs out, the terms expire or the channel is idle. In the beta it runs only as a pilot with a buyer
-paired by Gyblos, and not on Windows. To join, ask in the [Gyblos Telegram](https://t.me/gyblos); Gyblos
-configures it with you.
+deposit runs out, the terms expire or the channel is idle. Buyers can open a channel on Windows, macOS and Linux.
 
 `max_sessions` in `config.toml` sets how many reusable sessions your seller keeps open at once, from 1 to 16
 (default 16). It counts open payment sessions, not connections:
@@ -113,7 +111,7 @@ max_sessions = 16
 ## Back to free [#back-to-free]
 
 An all-free seller does not run payment recovery or cleanup. Before you switch your last priced offer back to
-free, let pending payments settle and close any pilot channels. Keep your payment data and keys, and contact
+free, let pending payments settle and close any reusable channels. Keep your payment data and keys, and contact
 Gyblos if anything stays unresolved.
 
 Then replace `price = {...}` with `free = {...}` and apply the change.

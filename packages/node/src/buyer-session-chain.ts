@@ -6,12 +6,11 @@ import {
 } from '@gyblos/payments-upto/batch-session';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { roleSigner, type RoleConfig } from './roles';
 
 export async function buyerSessionChain(role: RoleConfig) {
-  if (WINDOWS || role.role !== P2P_ROLES.BUYER)
+  if (role.role !== P2P_ROLES.BUYER)
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   return openBatchBuyerBackend({
     rpcUrl: role.rpcUrl,
@@ -25,7 +24,7 @@ export async function buyerSessionPoolChain(
   role: RoleConfig,
   totalDepositAtomic: string,
 ) {
-  if (WINDOWS || role.role !== P2P_ROLES.BUYER)
+  if (role.role !== P2P_ROLES.BUYER)
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   return openBatchBuyerPool({
     paths: batchPoolPathsIn(process.env),

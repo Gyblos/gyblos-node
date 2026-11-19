@@ -11,7 +11,6 @@ import {
   BATCH_METHODS,
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
   SESSION_CODES,
   type PaymentSessionTerms,
@@ -55,7 +54,6 @@ void test('separate buyers retain one global foreground turn without allocating 
     async dispose() {},
   };
   const host = await startSellerSessionHost({
-    buyerNodeIds: [rig.terms.buyerNodeId, terms.buyerNodeId],
     registry,
     description: rig.terms,
     owner: rig.terms.owner,
@@ -99,7 +97,7 @@ void test('separate buyers retain one global foreground turn without allocating 
   assert.deepEqual(rig.calls, []);
 });
 
-void test('removing pilot eligibility preserves the old buyer close and status but refuses new inference', async (t) => {
+void test('a returning buyer can prepare, inspect and close its channel without enrollment', async (t) => {
   const rig = await sessionRig();
   t.after(rig.dispose);
   await rig.open();
@@ -129,7 +127,6 @@ void test('removing pilot eligibility preserves the old buyer close and status b
     async dispose() {},
   };
   const host = await startSellerSessionHost({
-    buyerNodeIds: [],
     registry,
     description: rig.terms,
     owner: rig.terms.owner,
@@ -155,7 +152,7 @@ void test('removing pilot eligibility preserves the old buyer close and status b
       signal,
     ),
   );
-  await assert.rejects(
+  await assert.doesNotReject(
     host.service.exchange(
       parseBatchChannelRequest({
         version: BATCH_CHANNEL.version,
@@ -166,7 +163,6 @@ void test('removing pilot eligibility preserves the old buyer close and status b
       rig.terms.buyerNodeId,
       signal,
     ),
-    { code: PAID_EXECUTION_CODES.PEER },
   );
   await assert.doesNotReject(
     host.service.exchange(
@@ -177,4 +173,72 @@ void test('removing pilot eligibility preserves the old buyer close and status b
   );
   assert.deepEqual(rig.calls, ['deposit', 'refund']);
   assert.equal(offers.generations(), 0);
+});
+
+void test('the first lost OPEN acknowledgment retains its host until a proved automatic close releases it', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
+  const signal = new AbortController().signal;
+  const seller = rig.seller();
+  const dispose = t.mock.method(seller, 'dispose');
+  const open = seller.open.bind(seller);
+  t.mock.method(seller, 'open', async (payload: string) => {
+    await open(payload);
+    throw new Error('synthetic lost acknowledgement');
+  });
+  let created = false;
+  const registry: BatchSellerRegistry = {
+    list: async () => [],
+    permits: async (_peer, retained) => {
+      retained?.([]);
+      return true;
+    },
+    backend: () => ({
+      inspect: async () => undefined,
+      create: async () => {
+        created = true;
+        return seller;
+      },
+    }),
+    async dispose() {},
+  };
+  const host = await startSellerSessionHost({
+    registry,
+    description: rig.terms,
+    owner: rig.terms.owner,
+    nodeId: rig.terms.sellerNodeId,
+    now: rig.now,
+    offers: () => [offers.live],
+  });
+  t.after(host.close);
+  const request = parseBatchChannelRequest({
+    version: BATCH_CHANNEL.version,
+    requestId: '16'.repeat(16),
+    method: BATCH_METHODS.OPEN,
+    params: {
+      terms: rig.terms,
+      quote: await offers.quote(1),
+      payload: await rig.buyer.open(),
+    },
+  });
+  await assert.rejects(
+    host.service.exchange(request, rig.terms.buyerNodeId, signal),
+  );
+  assert.equal(created, true);
+  assert.equal(dispose.mock.callCount(), 0);
+  await seller.close();
+  const terms = { ...rig.terms, buyerNodeId: '56'.repeat(32) };
+  const next = await batchOfferFixture(terms, rig.owner, rig.now);
+  await host.service.exchange(
+    parseBatchChannelRequest({
+      version: BATCH_CHANNEL.version,
+      requestId: '17'.repeat(16),
+      method: BATCH_METHODS.PREPARE,
+      params: { terms, quote: await next.quote(1) },
+    }),
+    terms.buyerNodeId,
+    signal,
+  );
+  assert.equal(dispose.mock.callCount(), 1);
 });

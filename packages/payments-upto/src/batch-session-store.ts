@@ -8,7 +8,7 @@ import {
 } from '@gyblos/protocol/payment-session';
 import {
   acquireProcessLock,
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
   readPrivateFile,
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
@@ -22,7 +22,7 @@ export async function openBatchStore(
   initial: BatchRecord,
   requireExisting = false,
 ) {
-  await ensurePrivateDirectory(options.paths.directory);
+  await ensurePrivatePaymentPaths(options.paths);
   const lock = await acquireProcessLock(options.paths.lock);
   let poisoned = false;
   let disposed = false;

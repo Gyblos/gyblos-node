@@ -345,6 +345,7 @@ export function batchPoolChannelPaths(paths: BatchPoolPaths, nodeId: string) {
   if (!/^[a-f0-9]+$/.test(nodeId)) throw new TypeError('Invalid session slot');
   const directory = join(paths.directory, BATCH_POOL_FILES.channels, nodeId);
   return {
+    paymentRoot: paths.directory,
     directory,
     state: join(directory, BATCH_SESSION_FILES.state),
     lock: join(directory, BATCH_SESSION_FILES.lock),
@@ -383,6 +384,7 @@ export function batchSellerBuyerPaths(
     throw new TypeError('Invalid session slot');
   const directory = join(paths.children, buyerNodeId);
   return {
+    paymentRoot: paths.directory,
     directory,
     state: join(directory, BATCH_SESSION_FILES.state),
     lock: join(directory, BATCH_SESSION_FILES.lock),

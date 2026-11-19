@@ -110,12 +110,15 @@ interface AclReport {
 // The ACLs by SID, for each path in GYBLOS_ACL_PATHS (one per line): `item <n>`, `owner <sid>`, then
 // `rule <sid> <Allow|Deny>` lines. Neither the language of Windows nor account names change the answer,
 // and only .NET calls are used, so no PowerShell module has to load. Paths travel in the environment.
-const ACL_SCRIPT = `$sid = [Security.Principal.SecurityIdentifier]
+const ACL_SCRIPT = `$ErrorActionPreference = 'Stop'
+$sid = [Security.Principal.SecurityIdentifier]
 $n = 0
 foreach ($p in ($env:GYBLOS_ACL_PATHS -split "\`n")) {
   if (-not $p) { continue }
   if ([System.IO.Directory]::Exists($p)) { $a = [System.IO.Directory]::GetAccessControl($p) }
   else { $a = [System.IO.File]::GetAccessControl($p) }
+  $raw = [Security.AccessControl.RawSecurityDescriptor]::new($a.GetSecurityDescriptorBinaryForm(), 0)
+  if ($null -eq $raw.DiscretionaryAcl) { throw 'Missing discretionary ACL' }
   'item ' + $n
   'owner ' + $a.GetOwner($sid).Value
   foreach ($r in $a.GetAccessRules($true, $true, $sid)) { 'rule ' + $r.IdentityReference.Value + ' ' + $r.AccessControlType }
@@ -130,8 +133,15 @@ export function parseAcls(output: string, count: number): AclReport[] {
     if (kind === 'item' && Number(value) === reports.length)
       reports.push({ owner: '', rules: [] });
     else if (kind === 'owner' && value && current) current.owner = value;
-    else if (kind === 'rule' && value && type && current)
+    else if (
+      kind === 'rule' &&
+      value &&
+      (type === ALLOW || type === 'Deny') &&
+      current
+    )
       current.rules.push({ sid: value, type });
+    else if (line.trim())
+      throw new Error('Could not read the Windows permissions.');
   }
   if (reports.length !== count || reports.some((report) => !report.owner))
     throw new Error('Could not read the Windows permissions.');
@@ -205,4 +215,20 @@ export async function pathsArePrivate(
     return ACL_VERDICTS.EXPOSED;
   if (cache) for (const path of unknown) privatePaths.add(path.toLowerCase());
   return ACL_VERDICTS.PRIVATE;
+}
+
+// A financial journal may be replaced between opens. Always read its current ACL.
+export async function paymentPathsArePrivate(
+  paths: readonly string[],
+  tools: AclTools = defaultTools,
+) {
+  try {
+    const [reports, sid] = await Promise.all([
+      readAcls(paths, tools),
+      accountSid(tools),
+    ]);
+    return reports.every((report) => aclIsPrivate(report, sid));
+  } catch {
+    return false;
+  }
 }

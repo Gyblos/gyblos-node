@@ -18,18 +18,13 @@ import {
   SESSION_CODES,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { nativeVm } from '../support/paid-native-vm';
 import { sessionNativeRpc } from '../support/session-native-rpc';
 
 void test(
   'startup backends prove original native opening, cumulative usage and actual finalized refund independently',
-  {
-    skip: WINDOWS
-      ? 'Reusable financial startup requires payment subtree ACL validation on Windows'
-      : false,
-  },
+  {},
   async (t) => {
     let now = 1800000000000;
     t.mock.method(Date, 'now', () => now);
