@@ -23,6 +23,8 @@ const LONG_ANSWER = {
 } as const;
 export const PROMPT_READING = {
   msPerInputToken: 10,
+  // A seller refuses at quote time a request it would not finish reading with this long left to answer.
+  answerReserveMs: 15_000,
 } as const;
 export function generationDeadlineMs(
   baseMs: number,
@@ -40,6 +42,27 @@ export function generationDeadlineMs(
       LONG_ANSWER.ceilingMs,
       baseMs + reading + extra * LONG_ANSWER.msPerToken,
     ),
+  );
+}
+
+// Whether a seller reading `tokensPerSecond` finishes reading `inputTokens` in time to answer within its
+// engine deadline. An unknown speed always fits: a seller only refuses what it has measured.
+export function readsInTime(
+  inputTokens: number,
+  maxTokens: number,
+  tokensPerSecond: number | undefined,
+  baseMs: number = TIMEOUTS.generation,
+) {
+  if (
+    tokensPerSecond === undefined ||
+    !Number.isFinite(tokensPerSecond) ||
+    tokensPerSecond <= 0
+  )
+    return true;
+  const readingMs = (inputTokens / tokensPerSecond) * 1_000;
+  return (
+    readingMs + PROMPT_READING.answerReserveMs <=
+    generationDeadlineMs(baseMs, maxTokens, inputTokens)
   );
 }
 

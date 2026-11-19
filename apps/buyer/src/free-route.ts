@@ -36,6 +36,7 @@ export function routedPolicy(
       ? { pinnedNodeId: route.pinnedNodeId }
       : {}),
     ...(route?.previousSeller ? { previousSeller: route.previousSeller } : {}),
+    ...(route?.warmSeller ? { warmSeller: route.warmSeller } : {}),
     request,
     sellers: policy.sellers.filter((seller) => !excluded.has(seller.nodeId)),
   };
@@ -44,6 +45,7 @@ export interface SelectionRoute {
   pinnedNodeId?: string;
   waitingFor?: string;
   previousSeller?: string;
+  warmSeller?: string;
   // Free execution only: sellers found only in the index may be used.
   open?: true;
 }

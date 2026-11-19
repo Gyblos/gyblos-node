@@ -55,7 +55,9 @@ Two optional settings decide how long a request can be:
   range is 1,024 to 32,768.
 
 Coding agents send prompts of thousands of tokens. To serve them, raise `context_tokens` and use a fast
-machine with Apple Silicon or a GPU; a CPU-only server can be too slow for them. For example:
+machine with Apple Silicon or a GPU; a CPU-only server can be too slow for them. Each offer measures how
+fast it reads prompts and declines, before receiving the prompt, requests it could not read in time, so a
+slow server still serves the shorter ones. For example:
 
 ```toml
 [[offers]]

@@ -28,6 +28,7 @@ import {
   completeBuyerTelemetry,
   failBuyerTelemetry,
 } from './free-telemetry';
+import { estimatedInputTokens } from './input-size';
 import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
 import type { StaticControlSeller } from './selection-config';
@@ -69,12 +70,18 @@ export interface FreeBuyerDependencies {
   enter?(): () => void;
   // Hands a selected seller back once this request is done with it (free requests side by side).
   done?(winner: FreeWinner): void;
-  // `needs.tools`: only a seller that serves tools may win; `needs.model`: the routed model to quote;
+  // `needs.tools`: only a seller that serves tools may win; `needs.inputTokens`: the estimated input size,
+  // which a seller too slow to read it refuses; `needs.model`: the routed model to quote;
   // `needs.conversation`: a digest of the conversation's opening, to go back to the seller that served it.
   select(
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
-    needs?: { tools?: boolean; model?: RoutedModel; conversation?: string },
+    needs?: {
+      tools?: boolean;
+      inputTokens?: number;
+      model?: RoutedModel;
+      conversation?: string;
+    },
   ): Promise<FreeWinner>;
   // The context every eligible seller of a routed model accepts, from verified catalogs; undefined when
   // none is known. Never quotes or sends a prompt.
@@ -112,6 +119,7 @@ export async function executeBuyerFree(
       const winner = await dependencies
         .select(excluded, signal, {
           tools: inferenceNeedsTools(input),
+          inputTokens: estimatedInputTokens(input),
           ...(model ? { model } : {}),
           conversation: dependencies.conversationKey?.(input, model),
         })

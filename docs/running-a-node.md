@@ -1134,6 +1134,21 @@ counted input token (a 7000-token agent prompt gets 70 seconds more), and time
 to answer, which grows with the requested answer. Together they stay under 170
 seconds.
 
+Each offer learns how fast its engine reads a prompt, in input tokens per
+second, only from the engine's own timing of the input in each completed answer
+(prompts under 256 tokens, and engines that do not time the input, do not
+count). A timeout teaches it nothing, since its time also holds queueing, model
+loading and hidden reasoning. Buyers send every seller they ask a rough estimate
+of each request's size in the quote request, rounded up to a multiple of 1024
+tokens, and an offer that would not finish reading it with 15 seconds left
+before its deadline refuses the quote with `CONTROL_TOO_SLOW_TO_READ`; the buyer
+picks another seller before any prompt is sent. The seller that answered the
+conversation's previous turn less than 4 minutes ago is not sent the size, since
+its prompt cache likely still holds most of it. A seller from before this field
+refuses the sized quote as invalid; the buyer asks it once more without the size
+and does not count the refusal against it. The estimate lives in memory: after a
+restart the offer accepts every size until it measures again.
+
 ### Token caps
 
 `daily_token_cap` applies across all buyers and `per_buyer_cap` per
