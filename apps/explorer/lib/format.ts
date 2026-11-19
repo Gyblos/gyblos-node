@@ -71,6 +71,11 @@ export function latencyMs(value: LatencyBound): string {
     : `< ${value / UNITS.msPerSecond} s`;
 }
 
+// Engine speed as the lower bound of the median's bucket: "≥ 20 tok/s"; "—" without samples.
+export function tokensPerSecond(value: number | null): string {
+  return value === null ? '—' : `≥ ${count(value)} tok/s`;
+}
+
 export function count(value: number): string {
   return value.toLocaleString(LOCALE);
 }

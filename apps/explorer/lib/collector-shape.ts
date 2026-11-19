@@ -47,12 +47,30 @@ export interface NetworkDay {
   } | null;
   demand: { modelId: string; requests: number }[];
 }
+// Output tokens per second of generation, from engines that report their generation time: the lower
+// bound of the bucket holding the median, null without samples.
+export interface Speed {
+  samples: number;
+  p50MinTokensPerSecond: number | null;
+  bucketsTokensPerSecond: number[];
+  counts: number[];
+}
+// Per-model observations joined to their receipts: the first token as the buyer saw it (streaming
+// requests only) and the engine's generation speed.
+export interface ModelObserved {
+  buyerFirstToken: Latency;
+  engineSpeed: Speed;
+}
+export type ModelSide = Totals & {
+  // null without any observation joined to a receipt on that side: no data, never zero.
+  observed: ModelObserved | null;
+};
 export interface ModelStat {
   modelId: string;
   variant: string | null;
   quantization: string | null;
-  free: Totals | null;
-  paid: Totals | null;
+  free: ModelSide | null;
+  paid: ModelSide | null;
 }
 export interface CollectorSnapshot {
   aggregatedAt: number | null;
@@ -70,6 +88,22 @@ function latency(value: unknown, where: string): Latency {
     bucketsMs: list(source.bucketsMs, `${where}.bucketsMs`).map((edge) =>
       num(edge, where),
     ),
+    counts: list(source.counts, `${where}.counts`).map((value) =>
+      num(value, where),
+    ),
+  };
+}
+function speed(value: unknown, where: string): Speed {
+  const source = record(value, where);
+  return {
+    samples: num(source.samples, `${where}.samples`),
+    p50MinTokensPerSecond: nullable(source.p50MinTokensPerSecond, (present) =>
+      num(present, `${where}.p50MinTokensPerSecond`),
+    ),
+    bucketsTokensPerSecond: list(
+      source.bucketsTokensPerSecond,
+      `${where}.bucketsTokensPerSecond`,
+    ).map((edge) => num(edge, where)),
     counts: list(source.counts, `${where}.counts`).map((value) =>
       num(value, where),
     ),
@@ -159,6 +193,22 @@ export function parseNetworkDay(value: unknown): NetworkDay {
     }),
   };
 }
+function modelSide(value: unknown, where: string): ModelSide {
+  const source = record(value, where);
+  return {
+    ...totals(source, where),
+    observed: nullable(source.observed, (present) => {
+      const observed = record(present, `${where}.observed`);
+      return {
+        buyerFirstToken: latency(
+          observed.buyerFirstToken,
+          `${where}.buyerFirstToken`,
+        ),
+        engineSpeed: speed(observed.engineSpeed, `${where}.engineSpeed`),
+      };
+    }),
+  };
+}
 export function parseModel(value: unknown): ModelStat {
   const source = record(value, 'model');
   const optional = (field: unknown, where: string) =>
@@ -167,12 +217,8 @@ export function parseModel(value: unknown): ModelStat {
     modelId: text(source.modelId, 'model.modelId'),
     variant: optional(source.variant, 'model.variant'),
     quantization: optional(source.quantization, 'model.quantization'),
-    free: nullable(source.free, (present) =>
-      totals(record(present, 'model.free'), 'model.free'),
-    ),
-    paid: nullable(source.paid, (present) =>
-      totals(record(present, 'model.paid'), 'model.paid'),
-    ),
+    free: nullable(source.free, (present) => modelSide(present, 'model.free')),
+    paid: nullable(source.paid, (present) => modelSide(present, 'model.paid')),
   };
 }
 export const aggregatedAt = (source: JsonRecord) =>

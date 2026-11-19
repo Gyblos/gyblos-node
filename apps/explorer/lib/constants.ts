@@ -34,7 +34,7 @@ export const DISPLAY = {
   // Minimum width of wide tables, in px.
   wideTable: 860,
   dailyTable: 820,
-  modelsTable: 1080,
+  modelsTable: 1320,
   narrowTable: 420,
   defaultTable: 640,
   // Median latency.

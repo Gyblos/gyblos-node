@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { parseChainStats, summarizeChain } from '@gyblos/explorer/chain-shape';
 import {
+  parseModel,
   parseNetworkDay,
   type CollectorSnapshot,
 } from '@gyblos/explorer/collector-shape';
@@ -276,7 +277,14 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
       ...base,
       outcomes: { completed, failed, cancelled },
       authorizedAtomic: null,
+      observed: null,
     };
+  };
+  const speed = {
+    samples: 3,
+    p50MinTokensPerSecond: 20,
+    bucketsTokensPerSecond: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000],
+    counts: [0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0],
   };
   const rows = modelRows(offers.models, [
     {
@@ -284,7 +292,10 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
       variant: null,
       quantization: 'Q4',
       free: null,
-      paid: withCancel(18, 2, 3),
+      paid: {
+        ...withCancel(18, 2, 3),
+        observed: { buyerFirstToken: latency(1500, 1800), engineSpeed: speed },
+      },
     },
     {
       modelId: 'gone',
@@ -330,6 +341,11 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
   });
   assert.equal(served?.paid?.cancelled, 3);
   assert.equal(served?.paid?.firstToken, 200);
+  assert.equal(served?.paid?.buyerFirstToken, 2000);
+  assert.equal(served?.paid?.engineSpeed, 20);
+  // No observation on that side: no data, never zero.
+  assert.equal(gone?.free?.buyerFirstToken, null);
+  assert.equal(gone?.free?.engineSpeed, null);
   assert.equal(fresh?.free, null);
   assert.equal(gone?.now, null);
 });
@@ -341,4 +357,39 @@ void test('cancellations stay out of the success rate', () => {
     authorizedAtomic: null,
   });
   assert.equal(successRate([day(10)]), 0.9);
+});
+
+void test('a model side reads its observations, and their absence as no data', () => {
+  const totals = {
+    ...side(2, 2, 0, 0),
+    authorizedAtomic: null,
+  };
+  const model = parseModel({
+    modelId: 'm',
+    variant: null,
+    quantization: null,
+    free: { ...totals, observed: null },
+    paid: {
+      ...totals,
+      authorizedAtomic: '7',
+      observed: {
+        buyerFirstToken: latency(1200),
+        engineSpeed: {
+          samples: 1,
+          p50MinTokensPerSecond: 50,
+          bucketsTokensPerSecond: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000],
+          counts: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        },
+      },
+    },
+  });
+  assert.equal(model.free?.observed, null);
+  assert.equal(model.paid?.observed?.buyerFirstToken.samples, 1);
+  assert.equal(model.paid?.observed?.engineSpeed.p50MinTokensPerSecond, 50);
+  assert.throws(() =>
+    parseModel({
+      modelId: 'm',
+      free: { ...totals, observed: { buyerFirstToken: latency(1) } },
+    }),
+  );
 });
