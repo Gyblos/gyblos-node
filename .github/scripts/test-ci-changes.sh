@@ -11,7 +11,7 @@ git config user.email "ci@example.invalid"
 git config commit.gpgsign false
 git config core.hooksPath /dev/null
 mkdir -p tests apps/docs
-touch tests/windows-install.test.ts
+touch tests/windows-install.test.ts LICENSE
 git add .
 git commit -qm base
 base=$(git rev-parse HEAD)
@@ -53,3 +53,17 @@ touch pnpm-lock.yaml
 git add .
 git commit -qm distribution
 expect pull_request develop "$prior" true true
+
+prior=$(git rev-parse HEAD)
+git mv LICENSE OLD-LICENSE
+git commit -qm license
+expect pull_request develop "$prior" true true
+
+for path in apps/desktop/resources/icon.png tests/support/desktop-packaging.ts tests/node-packaged.test.ts tools/windows/manifest.txt; do
+  prior=$(git rev-parse HEAD)
+  mkdir -p "$(dirname "$path")"
+  touch "$path"
+  git add .
+  git commit -qm "sensitive file $path"
+  expect pull_request develop "$prior" true true
+done

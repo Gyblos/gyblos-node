@@ -18,12 +18,13 @@ if [[ $EVENT == pull_request && $TARGET == develop ]] && git cat-file -e "$BASE^
     code=false
     windows_full=false
   elif ! changed -- \
-    '.github/**' 'scripts/**' 'install.*' 'Dockerfile' 'docker/**' 'patches/**' \
+    '.github/**' 'scripts/**' 'install.*' 'LICENSE' 'Dockerfile' 'docker/**' 'patches/**' \
     'package.json' '**/package.json' 'pnpm-*' '.npmrc' '.node-version' '.nvmrc' 'tsconfig*.json' \
     ':(icase,glob)**/*windows*' ':(icase,glob)**/*win32*' '*.ps1' '*.cmd' '*.bat' \
-    'apps/node/**' 'apps/desktop/scripts/**' 'apps/desktop/src/wallet/**' \
+    ':(icase,glob)**/*windows*/**' ':(icase,glob)**/*win32*/**' \
+    'apps/node/**' 'apps/desktop/**' \
     'packages/config/**' 'packages/runtime/**' 'packages/node/**' 'packages/transport-iroh/**' \
-    'tooling/native-*' 'tooling/npm-*' 'tests/native-*' 'tests/npm-*' 'tests/release-*' \
+    'tooling/native-*' 'tooling/npm-*' 'tests/native-*' 'tests/npm-*' 'tests/release-*' 'tests/*packag*' 'tests/*install*' \
     'tests/support/node-config-fixtures.ts' 'tests/lab/seller-daemon-files.test.ts' \
     'tests/free-execution-iroh.test.ts' 'tests/iroh-transport.test.ts' 'tests/node-startup-failure.test.ts' \
     && ! changed -G 'win32|windows-acl|SystemRoot|LOCALAPPDATA|schtasks|icacls' -- '*.ts' '*.js' '*.mjs' '*.cjs'; then
