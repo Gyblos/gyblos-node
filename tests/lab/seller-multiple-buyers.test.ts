@@ -25,7 +25,7 @@ void test(
     t.mock.method(globalThis, 'fetch', async () =>
       assert.fail('External RPC forbidden'),
     );
-    const rig = await sellerRegistryRig(2);
+    const rig = await sellerRegistryRig(2, { depositAtomic: '10000' });
     t.after(rig.dispose);
     const registry = await rig.open();
     t.after(registry.dispose);
@@ -57,7 +57,7 @@ void test(
         endpoint: wire.endpoint,
         destination: () => wire.destination,
         policy: {
-          depositAtomic: '1000',
+          depositAtomic: '10000',
           lifetimeMs: 3_600_000,
           withdrawDelaySeconds: 900,
         },

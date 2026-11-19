@@ -24,7 +24,7 @@ import {
   createBuyerSessionManager,
   type BuyerSessionOptions,
 } from './buyer-session';
-import { sessionTerms } from './session-policy';
+import { newSessionTerms } from './session-policy';
 
 type Options<Remote extends BatchDestination> = Omit<
   BuyerSessionOptions<Remote>,
@@ -157,7 +157,7 @@ async function execute<Remote extends BatchDestination>(
     );
     const terms =
       existing?.terms ??
-      sessionTerms(quote, state.options.policy, state.options.now());
+      newSessionTerms(quote, state.options.policy, state.options.now());
     await verifyBatchQuote(
       quote,
       terms,

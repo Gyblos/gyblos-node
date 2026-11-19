@@ -96,6 +96,21 @@ export function sessionTerms(
   return matchBatchTerms(terms, terms);
 }
 
+// Existing journals retain their original terms; only fresh generations require a minimum deposit.
+export function newSessionTerms(
+  quote: SignedOfferV2,
+  policy: BuyerSessionPolicy,
+  now: number,
+) {
+  const terms = sessionTerms(quote, policy, now);
+  if (
+    BigInt(terms.depositAtomic) <
+    BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
+  )
+    return sessionFail(SESSION_CODES.LIMIT);
+  return terms;
+}
+
 function positiveTotal(value: unknown) {
   const total = controlAtomic(value);
   if (total === '0') return sessionFail();

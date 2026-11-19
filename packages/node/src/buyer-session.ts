@@ -27,8 +27,8 @@ import { bounded } from './buyer-operation';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
+  newSessionTerms,
   parseBuyerSessionPolicy,
-  sessionTerms,
   type BuyerSessionPolicy,
 } from './session-policy';
 
@@ -68,7 +68,7 @@ async function openCurrent<Remote extends BatchDestination>(
   if (stored?.notCreated) return sessionFail(SESSION_CODES.CLOSED);
   const terms =
     stored?.terms ??
-    (quote ? sessionTerms(quote, options.policy, options.now()) : undefined);
+    (quote ? newSessionTerms(quote, options.policy, options.now()) : undefined);
   if (!terms) return sessionFail(SESSION_CODES.UNAVAILABLE);
   if (quote && !stored)
     await verifyBatchQuote(
@@ -185,7 +185,7 @@ async function renewable<Remote extends BatchDestination>(
         BigInt(opened.terms.depositAtomic))
   )
     return opened;
-  const proposed = sessionTerms(quote, options.policy, options.now());
+  const proposed = newSessionTerms(quote, options.policy, options.now());
   await verifyBatchQuote(
     quote,
     proposed,
@@ -203,7 +203,7 @@ async function renewable<Remote extends BatchDestination>(
     BigInt(stored.priorSpentAtomic ?? '0') -
     BigInt(settlement?.chargedAtomic ?? '0');
   if (remaining <= 0n) return sessionFail(SESSION_CODES.LIMIT);
-  const terms = sessionTerms(
+  const terms = newSessionTerms(
     quote,
     { ...options.policy, depositAtomic: String(remaining) },
     options.now(),

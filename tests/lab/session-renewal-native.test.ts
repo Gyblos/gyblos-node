@@ -120,7 +120,7 @@ for (const blocks of [false, true]) {
             ),
           verify: async () => {},
         });
-      let buyer = start();
+      let buyer = start('10000');
       t.after(() => buyer.close());
       const signal = () => new AbortController().signal;
       await buyer.execute(await offers.quote(1), offers.input, signal());
@@ -132,6 +132,20 @@ for (const blocks of [false, true]) {
       );
       const beforeRenew = vm.sends();
       now += 1_000;
+      const closedJournal = await readFile(buyerPaths.state, 'utf8');
+      await assert.rejects(
+        buyer.execute(await offers.quote(19), offers.input, signal()),
+        {
+          code: SESSION_CODES.LIMIT,
+        },
+      );
+      assert.ok(
+        (await readFile(buyerPaths.state, 'utf8')) === closedJournal,
+        'the previous settlement journal must remain unchanged',
+      );
+      assert.equal(vm.sends(), beforeRenew);
+      await buyer.close();
+      buyer = start();
       local.hideOriginal(true);
       await assert.rejects(
         buyer.execute(await offers.quote(20), offers.input, signal()),
@@ -199,7 +213,7 @@ for (const blocks of [false, true]) {
       assert.equal(raw.history.length, 2);
       assert.equal(
         raw.history[0].settlement.refundedAtomic,
-        String(20000 - charge),
+        String(10000 - charge),
       );
       const beforeRefusal = vm.sends();
       const oversized = await offers.quote(5, { maxAtomic: '19900' });
