@@ -6,6 +6,7 @@ import { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 export { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 export type CatalogState = (typeof CATALOG_STATE)[keyof typeof CATALOG_STATE];
 export interface AnnouncedModel {
+  offerId?: string;
   modelId: string;
   variant: string | null;
   quantization: string | null;
@@ -75,6 +76,9 @@ function publicText(value: unknown): value is string | null {
 function parseModel(value: unknown): AnnouncedModel | null {
   if (
     !object(value, [
+      ...(value && typeof value === 'object' && 'offerId' in value
+        ? ['offerId']
+        : []),
       'modelId',
       'variant',
       'quantization',
@@ -85,6 +89,10 @@ function parseModel(value: unknown): AnnouncedModel | null {
       'inputAtomicPerMtok',
       'outputAtomicPerMtok',
     ]) ||
+    (value.offerId !== undefined &&
+      (value.free !== false ||
+        typeof value.offerId !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(value.offerId))) ||
     !validCatalogQuery(value.modelId) ||
     !publicText(value.variant) ||
     !publicText(value.quantization) ||
@@ -102,6 +110,7 @@ function parseModel(value: unknown): AnnouncedModel | null {
   )
     return null;
   return {
+    ...(typeof value.offerId === 'string' && { offerId: value.offerId }),
     modelId: value.modelId,
     variant: value.variant,
     quantization: value.quantization,

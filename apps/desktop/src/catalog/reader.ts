@@ -1,7 +1,6 @@
-// Reuses verified HTTP discovery, then projects the requested model's listings: free ones, and paid ones
-// priced in devnet USDC (the asset this app pays with). A paid group shows one real listing's price, the
-// cheapest by input plus output; prices from different sellers are never mixed.
-// Signatures identify announcements, not registry trust, provider readiness or availability.
+// Projects verified listings. Paid offers retain a main-process binding to one seller and price pair.
+import { createHash } from 'node:crypto';
+
 import { DEVNET, DEVNET_USDC, DISCOVERY_INDEX_URL } from '@gyblos/config';
 import {
   fetchSellers,
@@ -22,13 +21,23 @@ const isShown = (pricing: Pricing) =>
   isFree(pricing) ||
   (pricing.network === DEVNET && pricing.asset === DEVNET_USDC);
 
-// One listing's reference cost: input plus output per million tokens.
-const cost = (input: string, output: string) => BigInt(input) + BigInt(output);
+export interface CatalogSellerChoice {
+  nodeId: string;
+  owner: string;
+  modelId: string;
+  variant: string | null;
+  quantization: string | null;
+  contextTokens: number;
+  inputAtomicPerMtok: string;
+  outputAtomicPerMtok: string;
+  expiresAt: number;
+}
 
 function project(
   sellers: DiscoveredSeller[],
   modelId: string,
   checkedAt: number,
+  choices?: Map<string, CatalogSellerChoice>,
 ) {
   const models = new Map<string, AnnouncedModel>();
   let truncated = false;
@@ -50,7 +59,14 @@ function project(
         model.variant,
         model.quantization,
         model.contextTokens,
-        isFree(model.pricing),
+        isFree(model.pricing)
+          ? null
+          : [
+              seller.catalog.nodeId,
+              seller.catalog.owner,
+              model.pricing.inputAtomicPerMtok,
+              model.pricing.outputAtomicPerMtok,
+            ],
       ]);
       const { inputAtomicPerMtok, outputAtomicPerMtok } = model.pricing;
       if (seen.has(key)) continue;
@@ -59,15 +75,24 @@ function project(
       if (held) {
         held.announcements += 1;
         held.expiresAt = Math.min(held.expiresAt, expiresAt);
-        if (
-          cost(inputAtomicPerMtok, outputAtomicPerMtok) <
-          cost(held.inputAtomicPerMtok, held.outputAtomicPerMtok)
-        ) {
-          held.inputAtomicPerMtok = inputAtomicPerMtok;
-          held.outputAtomicPerMtok = outputAtomicPerMtok;
-        }
-      } else if (models.size < NETWORK_CATALOG.MAX_MODELS)
+      } else if (models.size < NETWORK_CATALOG.MAX_MODELS) {
+        const offerId = isFree(model.pricing)
+          ? undefined
+          : createHash('sha256').update(key).digest('hex');
+        if (offerId)
+          choices?.set(offerId, {
+            nodeId: seller.catalog.nodeId,
+            owner: seller.catalog.owner,
+            modelId,
+            variant: model.variant,
+            quantization: model.quantization,
+            contextTokens: model.contextTokens,
+            inputAtomicPerMtok,
+            outputAtomicPerMtok,
+            expiresAt,
+          });
         models.set(key, {
+          ...(offerId && { offerId }),
           modelId: model.modelId,
           variant: model.variant,
           quantization: model.quantization,
@@ -78,7 +103,7 @@ function project(
           inputAtomicPerMtok,
           outputAtomicPerMtok,
         });
-      else truncated = true;
+      } else truncated = true;
     }
   }
   return { models: [...models.values()], truncated };
@@ -88,6 +113,7 @@ export async function readAnnouncements(
   model: string,
   now: () => number,
   signal: AbortSignal,
+  choices?: Map<string, CatalogSellerChoice>,
 ): Promise<NetworkCatalog> {
   const page = await fetchSellers({
     baseUrl: DISCOVERY_INDEX_URL,
@@ -99,7 +125,7 @@ export async function readAnnouncements(
     timeoutMs: NETWORK_CATALOG.REQUEST_MS,
   });
   const checkedAt = now();
-  const result = project(page.sellers, model, checkedAt);
+  const result = project(page.sellers, model, checkedAt, choices);
   return {
     state: result.models.length ? CATALOG_STATE.READY : CATALOG_STATE.EMPTY,
     query: model,

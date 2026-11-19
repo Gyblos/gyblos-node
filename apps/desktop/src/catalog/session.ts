@@ -8,7 +8,7 @@ import {
   validCatalogQuery,
   type NetworkCatalog,
 } from './model';
-import { readAnnouncements } from './reader';
+import { readAnnouncements, type CatalogSellerChoice } from './reader';
 
 export function createCatalogSession(
   fetch: DiscoveryFetch,
@@ -16,6 +16,7 @@ export function createCatalogSession(
   signal: AbortSignal,
 ) {
   let snapshot = emptyCatalog();
+  let choices = new Map<string, CatalogSellerChoice>();
   let closed = signal.aborted;
   let sequence = 0;
   let pending: {
@@ -51,6 +52,15 @@ export function createCatalogSession(
   if (!closed) signal.addEventListener('abort', close, { once: true });
   return {
     summary,
+    resolve(offerId: string) {
+      if (
+        closed ||
+        !summary().models.some((model) => model.offerId === offerId)
+      )
+        return undefined;
+      const choice = choices.get(offerId);
+      return choice ? { ...choice } : undefined;
+    },
     async lookup(model: string): Promise<NetworkCatalog> {
       if (closed || !validCatalogQuery(model))
         return emptyCatalog(CATALOG_STATE.ERROR);
@@ -61,13 +71,18 @@ export function createCatalogSession(
       snapshot = emptyCatalog(CATALOG_STATE.LOADING, model);
       const result = (async () => {
         try {
+          const offers = new Map<string, CatalogSellerChoice>();
           const loaded = await readAnnouncements(
             fetch,
             model,
             now,
             controller.signal,
+            offers,
           );
-          if (!closed && sequence === current) snapshot = loaded;
+          if (!closed && sequence === current) {
+            choices = offers;
+            snapshot = loaded;
+          }
         } catch {
           if (!closed && sequence === current)
             snapshot = emptyCatalog(CATALOG_STATE.ERROR, model);

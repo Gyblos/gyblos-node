@@ -49,13 +49,15 @@ export function announcedModels(
         Number(item.outputAtomicPerMtok) / DESKTOP_X402.AMOUNT_SCALE;
       const { free } = item;
       return {
-        id: JSON.stringify([
-          item.modelId,
-          item.variant,
-          item.quantization,
-          item.contextTokens,
-          free,
-        ]),
+        id:
+          item.offerId ??
+          JSON.stringify([
+            item.modelId,
+            item.variant,
+            item.quantization,
+            item.contextTokens,
+            free,
+          ]),
         name: item.modelId,
         family:
           [item.variant, item.quantization].filter(Boolean).join(' · ') ||

@@ -42,7 +42,7 @@ async function priced(input: string, output: string) {
   };
 }
 
-void test('desktop announcements show paid USDC listings apart from free ones, with the cheapest price', async () => {
+void test('desktop announcements show paid USDC listings apart from free ones, with each seller’s own prices', async () => {
   const { announcedModels } = await import('@gyblos/desktop/announced-models');
   const free = await priced('0', '0');
   const pricey = await priced('90000', '150000');
@@ -66,8 +66,8 @@ void test('desktop announcements show paid USDC listings apart from free ones, w
     ]),
     [
       [1, '0', '0'],
-      // One real listing's price: the cheapest by input plus output (240000 < 260000).
-      [2, '90000', '150000'],
+      [1, '90000', '150000'],
+      [1, '52000', '208000'],
     ],
   );
   assert.deepEqual(parseNetworkCatalog(snapshot), snapshot);
@@ -77,6 +77,7 @@ void test('desktop announcements show paid USDC listings apart from free ones, w
     [
       [true, 0, 0],
       [false, 0.09, 0.15],
+      [false, 0.052, 0.208],
     ],
   );
   assert.notEqual(models[0]?.id, models[1]?.id);
@@ -98,7 +99,7 @@ void test('desktop announcements show paid USDC listings apart from free ones, w
   );
 });
 
-void test('paid listings that charge zero on opposite sides stay one paid group, never shown as free', async () => {
+void test('paid listings that charge zero on opposite sides stay separate, never shown as free', async () => {
   const { announcedModels } = await import('@gyblos/desktop/announced-models');
   const free = await priced('0', '0');
   const outputOnly = await priced('0', '500000');
@@ -123,17 +124,41 @@ void test('paid listings that charge zero on opposite sides stay one paid group,
     [
       [true, 1, '0', '0'],
       // The first of two equally priced listings is kept whole; sides are never mixed into "0" and "0".
-      [false, 2, '0', '500000'],
+      [false, 1, '0', '500000'],
+      [false, 1, '500000', '0'],
     ],
   );
   const models = announcedModels(snapshot, DISCOVERY_NOW);
   assert.deepEqual(
     models.map((model) => model.free),
-    [true, false],
+    [true, false, false],
   );
-  assert.equal(new Set(models.map((model) => model.id)).size, 2);
+  assert.equal(new Set(models.map((model) => model.id)).size, 3);
 });
 
+void test('an offer handle resolves only to its live seller and terms in the main process', async () => {
+  const { createCatalogSession } =
+    await import('@gyblos/desktop/network-catalog-session');
+  const first = await priced('10', '20');
+  const second = await priced('10', '20');
+  let now = DISCOVERY_NOW;
+  const catalog = createCatalogSession(
+    async () => jsonResponse(200, sellersBody([first.signed, second.signed])),
+    () => now,
+    new AbortController().signal,
+  );
+  const snapshot = await catalog.lookup('qwen3:0.6b');
+  const [a, b] = snapshot.models;
+  assert.ok(a?.offerId && b?.offerId);
+  assert.notEqual(a.offerId, b.offerId);
+  assert.equal(
+    catalog.resolve(b.offerId)?.nodeId,
+    second.signed.catalog.record.nodeId,
+  );
+  assert.equal(catalog.resolve('missing'), undefined);
+  now = b.expiresAt;
+  assert.equal(catalog.resolve(b.offerId), undefined);
+});
 void test('a paid price too small for two decimals keeps its digits instead of reading $0.00', async () => {
   const { usdPerMtok, priceRange } =
     await import('@gyblos/desktop/model-price');
