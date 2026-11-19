@@ -53,3 +53,12 @@ export const RANGE = {
   // "YYYY-MM-DD" from an ISO timestamp.
   dayPrecision: 10,
 } as const;
+
+// The open page refreshes its data in place: the discovery index changes within seconds, the
+// collector's aggregates every 10 minutes (its cron), so once a minute is fresh enough. Only a visible
+// tab refreshes; a tab coming back after longer than this refreshes at once.
+export const LIVE = {
+  refreshMs: 60 * 1000,
+  // How often the "updated … ago" label is redrawn.
+  labelMs: 5 * 1000,
+} as const;

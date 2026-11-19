@@ -3,6 +3,7 @@
 // switch keeps the sections mounted so their figures roll to the new values.
 import { Suspense } from 'react';
 
+import { LiveRefresh } from '../components/live-refresh';
 import { NetworkSection } from '../components/network-section';
 import { NetworkSelect } from '../components/network-select';
 import { PaymentsSection } from '../components/payments-section';
@@ -30,6 +31,7 @@ export default async function Home({
           <span className="text-muted">Explorer</span>
         </div>
         <div className="flex items-center gap-2">
+          <LiveRefresh />
           <RangeControl days={days} />
           <NetworkSelect />
         </div>
