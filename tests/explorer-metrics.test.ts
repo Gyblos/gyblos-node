@@ -276,7 +276,6 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
       ...base,
       outcomes: { completed, failed, cancelled },
       authorizedAtomic: null,
-      sellers: 1,
     };
   };
   const rows = modelRows(offers.models, [
@@ -295,6 +294,13 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
       paid: null,
     },
     {
+      modelId: 'served',
+      variant: 'instruct',
+      quantization: 'Q4',
+      free: withCancel(0, 0, 4),
+      paid: null,
+    },
+    {
       modelId: 'empty',
       variant: null,
       quantization: null,
@@ -303,12 +309,25 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
     },
   ]);
   assert.deepEqual(
-    rows.map((row) => row.modelId),
-    ['served', 'new', 'gone'],
+    rows.map((row) => [row.modelId, row.variant]),
+    [
+      ['served', null],
+      ['new', null],
+      ['served', 'instruct'],
+      ['gone', null],
+    ],
   );
-  const [served, fresh, gone] = rows;
+  const [served, fresh, cancelledOnly, gone] = rows;
   assert.equal(served?.now?.minOutput, 9n);
-  assert.deepEqual(completion(served!.paid!), { done: 18, of: 20, ratio: 0.9 });
+  assert.ok(served?.paid);
+  assert.deepEqual(completion(served.paid), { done: 18, of: 20, ratio: 0.9 });
+  assert.equal(cancelledOnly?.now, null);
+  assert.ok(cancelledOnly?.free);
+  assert.deepEqual(completion(cancelledOnly.free), {
+    done: 0,
+    of: 0,
+    ratio: null,
+  });
   assert.equal(served?.paid?.cancelled, 3);
   assert.equal(served?.paid?.firstToken, 200);
   assert.equal(fresh?.free, null);

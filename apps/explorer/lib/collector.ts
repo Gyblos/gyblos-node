@@ -16,8 +16,6 @@ import { list, record } from './validate';
 
 export type {
   CollectorSnapshot,
-  ModelSide,
-  ModelStat,
   NetworkDay,
   NetworkSide,
   Totals,
@@ -26,8 +24,11 @@ export type {
 // The last `days` UTC days of network totals and models, as aggregated by the collector, or the
 // span just before them with `periodsBack` 1. Read once per render and span: the Models and Usage
 // sections share the answer.
-export const getCollector = cache(
-  async (days: RangeDays, periodsBack = 0): Promise<CollectorSnapshot> => {
+export const getCollector = (days: RangeDays, periodsBack = 0) =>
+  readCollector(days, periodsBack);
+// Memoized on both arguments always passed, so a default and an explicit 0 share one read.
+const readCollector = cache(
+  async (days: RangeDays, periodsBack: number): Promise<CollectorSnapshot> => {
     try {
       return await loadCollector(rangeQuery(days, Date.now(), periodsBack));
     } catch (error) {

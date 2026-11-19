@@ -24,21 +24,25 @@ import {
   Unavailable,
 } from './ui';
 
-// "18 of 20 · 90%"; "—" without receipts on that side.
+// "18 of 20 · 90%"; "—" without receipts on that side, or with cancellations only.
 function completedText(side: Served | null) {
   if (!side) return '—';
   const { done, of, ratio } = completion(side);
   return ratio === null
-    ? `0 of 0`
+    ? '—'
     : `${count(done)} of ${count(of)} · ${percent(ratio)}`;
 }
 
-// The lowest paid prices per million tokens, or "Free" when only free sellers offer it now.
-function priceText(now: ModelRow['now']) {
-  if (!now) return '—';
+// The lowest paid input and output prices per million tokens (money), or "Free" when only free
+// sellers offer it now.
+function price(now: ModelRow['now']): { text: string; money: boolean } {
+  if (!now) return { text: '—', money: false };
   if (now.minInput === null || now.minOutput === null)
-    return now.free ? 'Free' : '—';
-  return `${usdc(now.minInput)} · ${usdc(now.minOutput)}`;
+    return { text: now.free ? 'Free' : '—', money: false };
+  return {
+    text: `${usdc(now.minInput)} · ${usdc(now.minOutput)}`,
+    money: true,
+  };
 }
 
 export async function ModelsSection({ days }: { days: RangeDays }) {
@@ -47,8 +51,9 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
     getCollector(days),
   ]);
   if (discovery.error && collector.error) return <Unavailable title="Models" />;
+  const offersKnown = !discovery.error;
   const rows = modelRows(
-    discovery.error ? new Map() : summarizeOffers(discovery).models,
+    offersKnown ? summarizeOffers(discovery).models : new Map(),
     collector.error ? [] : collector.models,
   );
   return (
@@ -62,7 +67,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
         head={[
           { label: 'Model' },
           { label: 'Sellers now free · paid', right: true },
-          { label: 'Lowest input · output / 1M', right: true },
+          { label: 'Lowest paid input · output / 1M', right: true },
           { label: 'Max context', right: true },
           { label: 'Completed free', right: true },
           { label: 'Completed paid', right: true },
@@ -70,51 +75,83 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
           { label: 'First token p50 free · paid', right: true },
         ]}
       >
-        {rows.map((row) => (
-          <tr
-            key={`${row.modelId}:${row.variant}:${row.quantization}`}
-            className="border-t border-line"
-          >
-            <td className={td}>
-              <ModelName
-                modelId={row.modelId}
-                variant={row.variant}
-                quantization={row.quantization}
-              />
-            </td>
-            <td className={numberCell}>
-              {row.now
-                ? pair(row.now.free, row.now.sellers - row.now.free, count)
-                : 'Not offered'}
-            </td>
-            <td className={row.now?.minInput != null ? moneyCell : numberCell}>
-              {priceText(row.now)}
-            </td>
-            <td className={numberCell}>
-              {row.now ? count(row.now.context) : '—'}
-            </td>
-            <td className={numberCell}>{completedText(row.free)}</td>
-            <td className={numberCell}>{completedText(row.paid)}</td>
-            <td className={numberCell}>
-              {pair(row.free?.cancelled, row.paid?.cancelled, (value) =>
-                value === undefined ? '—' : count(value),
-              )}
-            </td>
-            <td className={numberCell}>
-              {pair(
-                row.free?.firstToken ?? null,
-                row.paid?.firstToken ?? null,
-                latencyMs,
-              )}
+        {rows.length ? null : (
+          <tr>
+            <td className={`${td} text-muted`} colSpan={8}>
+              No model offered now or served in the range.
             </td>
           </tr>
+        )}
+        {rows.map((row) => (
+          <ModelRowView
+            key={`${row.modelId}:${row.variant}:${row.quantization}`}
+            row={row}
+            offersKnown={offersKnown}
+          />
         ))}
       </Table>
       <p className="mt-2 text-xs text-dim">
-        Completed counts the requests that ended without failing; cancellations
+        Completed is out of the requests that completed or failed; cancellations
         are shown apart and are not failures. First token is measured by the
-        seller. Prices are the lowest paid offer now.
+        seller. The lowest paid input and output prices may come from different
+        sellers.
       </p>
+      {offersKnown ? null : (
+        <p className="mt-1 text-xs text-dim">
+          The discovery index did not answer: what is offered now is unknown.
+        </p>
+      )}
+      {collector.error ? (
+        <p className="mt-1 text-xs text-dim">
+          The metrics collector did not answer: what was served is unknown.
+        </p>
+      ) : null}
     </>
+  );
+}
+
+// One model: what is offered now, then what was served on each side. Without the discovery index's
+// answer, what is offered now reads unknown, never "not offered".
+function ModelRowView({
+  row,
+  offersKnown,
+}: {
+  row: ModelRow;
+  offersKnown: boolean;
+}) {
+  const shown = price(row.now);
+  return (
+    <tr className="border-t border-line">
+      <td className={td}>
+        <ModelName
+          modelId={row.modelId}
+          variant={row.variant}
+          quantization={row.quantization}
+        />
+      </td>
+      <td className={numberCell}>
+        {row.now
+          ? pair(row.now.free, row.now.sellers - row.now.free, count)
+          : offersKnown
+            ? 'Not offered now'
+            : '—'}
+      </td>
+      <td className={shown.money ? moneyCell : numberCell}>{shown.text}</td>
+      <td className={numberCell}>{row.now ? count(row.now.context) : '—'}</td>
+      <td className={numberCell}>{completedText(row.free)}</td>
+      <td className={numberCell}>{completedText(row.paid)}</td>
+      <td className={numberCell}>
+        {pair(row.free?.cancelled, row.paid?.cancelled, (value) =>
+          value === undefined ? '—' : count(value),
+        )}
+      </td>
+      <td className={numberCell}>
+        {pair(
+          row.free?.firstToken ?? null,
+          row.paid?.firstToken ?? null,
+          latencyMs,
+        )}
+      </td>
+    </tr>
   );
 }

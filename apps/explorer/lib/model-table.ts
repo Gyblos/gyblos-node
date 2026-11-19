@@ -2,7 +2,7 @@
 // the discovery index offers now with what the collector saw served over the range. A model offered now
 // keeps its row without receipts; a model no longer offered keeps its row while it has receipts. Free
 // and paid stay apart. Pure functions, no I/O.
-import type { ModelSide, ModelStat } from './collector-shape';
+import type { ModelStat, Totals } from './collector-shape';
 import { DISPLAY } from './constants';
 import { mergedLatency, type LatencyBound } from './latency';
 import { modelKey, type ModelOffers } from './offers';
@@ -25,7 +25,7 @@ export interface ModelRow {
   paid: Served | null;
 }
 
-function served(side: ModelSide | null): Served | null {
+function served(side: Totals | null): Served | null {
   if (!side) return null;
   const { completed, failed, cancelled } = side.outcomes;
   if (!completed && !failed && !cancelled) return null;

@@ -133,6 +133,7 @@ export async function UsageSection({ days }: { days: RangeDays }) {
               kind="percent"
             />
           }
+          caption="Cancellations are not counted as failures"
         />
         <StatCard
           icon={Hash}
