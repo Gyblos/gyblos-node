@@ -851,8 +851,10 @@ are refused. It contains:
   chosen. It is left out when no seller's catalog can be read within 4 seconds.
   An unknown name gets 404 `FREE_BUYER_MODEL_NOT_FOUND`. Paid modes refuse to
   start unless every listed model meets the paid limits.
-- `session` and `routing` (optional): reusable payment sessions and busy-seller
-  routing; see [payment-sessions.md](payment-sessions.md).
+- `session` is required for a positive request ceiling. Guided setup includes a
+  deposit of 1 USDC and a one-hour lifetime. Existing paid profiles can
+  [add the session settings](payment-sessions.md#explicit-startup-policy).
+- `routing` optionally configures busy-seller handling.
 
 How selection works: the buyer verifies catalog, presence and withdrawal
 signatures and bindings, picks candidates, then asks for signed quotes in
@@ -993,10 +995,10 @@ Paid execution is devnet only and needs:
   and `asset` the role's mint, with `maxAtomic` the most one request may deposit
   and `priceCeilings` the highest prices it accepts (protocol fee included).
 
-For a positive-price quote without a reusable session, the buyer signs one
-channel open for at most `maxAtomic`, streams the answer and checks the seller's
-settlement against its own count. This single-request path accepts only one user
-message and no tools; it refuses anything else before paying
+The explicit legacy per-request entry also requires a valid paid profile. It
+signs one channel open for at most `maxAtomic`, streams the answer and checks
+the seller's settlement against its own count. This single-request path accepts
+only one user message and no tools; it refuses anything else before paying
 (`PAID_BUYER_UNSUPPORTED_INPUT`). Conversations and tools on paid offers need a
 reusable session ([payment-sessions.md](payment-sessions.md)). A completed
 answer, and an error the seller answered after receiving the open, carries

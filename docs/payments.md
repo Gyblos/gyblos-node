@@ -19,9 +19,13 @@ mode switch (see [Buyer routing](payment-sessions.md#buyer-routing)).
 | Path               | Who uses it                            | Channel                                      | Owner page                                 |
 | ------------------ | -------------------------------------- | -------------------------------------------- | ------------------------------------------ |
 | Free               | Any seller and buyer                   | None: no signer, deposit or settlement       | [running-a-node.md](running-a-node.md)     |
-| Per-request paid   | Any priced offer (the default)         | x402 `upto`: one channel per request         | This page and [recovery.md](recovery.md)   |
+| Per-request paid   | Explicit legacy entry only             | x402 `upto`: one channel per request         | This page and [recovery.md](recovery.md)   |
 | Payment session    | Authenticated buyers of a priced offer | x402 `batch-settlement`: one deposit, reused | [payment-sessions.md](payment-sessions.md) |
 | `exact`, v1 `upto` | Lab gates only                         | Fixed-price resource, legacy PoC facilitator | [lab/README.md](../lab/README.md)          |
+
+The desktop and guided buyer use a payment session for priced quotes. Existing
+profiles with a positive ceiling require the
+[session settings](payment-sessions.md#explicit-startup-policy).
 
 Per-request paid serves text conversations without tools. Tools on a priced
 offer need a payment session.

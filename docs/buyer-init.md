@@ -20,6 +20,7 @@ Model: qwen3-0.6b; reasoning: off.
 Variant: [none]; Quantization: Q4_K_M.
 Maximum output tokens: 4096.
 Budget ceiling: 0 USDC per request. Prices: 0 input / 0 output USDC per million tokens.
+Channel deposit: 1 USDC. Channel lifetime: 60 minutes.
 Sellers: any seller registered in the index, free answers only.
 Free signed quotes cause no payment transactions, including with a positive ceiling.
 8004 identity verification remains enabled. Existing settings will be refused.

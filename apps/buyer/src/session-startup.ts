@@ -22,6 +22,7 @@ import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
+import { buyerUnserved } from './free-telemetry';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
 import { classifyPaidError } from './paid-http';
@@ -201,10 +202,20 @@ function sessionExecutor(
             enter: context.dependencies.enter ?? (() => () => {}),
             unresolved: manager.unresolved,
             select: (excluded, current) =>
-              ports.select(excluded, current, {
-                pinnedNodeId: prepared.config.pinnedNodeId,
-                priceCeilings: prepared.config.request.priceCeilings,
-              }),
+              ports
+                .select(excluded, current, {
+                  pinnedNodeId: prepared.config.pinnedNodeId,
+                  priceCeilings: prepared.config.request.priceCeilings,
+                })
+                .catch((error: unknown) => {
+                  if (!current.aborted)
+                    buyerUnserved(
+                      context.dependencies,
+                      Boolean(onDelta),
+                      model?.selection,
+                    );
+                  throw error;
+                }),
           },
           signal,
         );
