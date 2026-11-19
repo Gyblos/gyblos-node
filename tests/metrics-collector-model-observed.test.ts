@@ -19,6 +19,9 @@ import {
 } from './support/metrics-collector-aggregates';
 import { createCollectorD1 } from './support/metrics-collector-d1';
 
+// The fixtures' default receipt buyer.
+const BUYER = 'c3'.repeat(32);
+
 const rowsOf = (
   database: ReturnType<typeof createCollectorD1>,
   query: string,
@@ -50,17 +53,26 @@ void test('per-model observations join each event to its receipt for the paid fl
     at,
     requestId,
     sellerNodeId: SELLER_A,
+    buyerNodeId: BUYER,
     ...fields,
   });
   insertObservation(
     database,
     buyer,
-    event(request('a1'), { type: 'first_token', firstTokenMs: 1200 }),
+    event(request('a1'), {
+      type: 'first_token',
+      streaming: true,
+      firstTokenMs: 1200,
+    }),
   );
   insertObservation(
     database,
     buyer,
-    event(request('b2'), { type: 'first_token', firstTokenMs: 300 }),
+    event(request('b2'), {
+      type: 'first_token',
+      streaming: true,
+      firstTokenMs: 300,
+    }),
   );
   // 40 output tokens in 2 s of generation: 20 tokens per second, on the paid side.
   insertObservation(
@@ -72,8 +84,18 @@ void test('per-model observations join each event to its receipt for the paid fl
       generationMs: 2000,
     }),
   );
-  // Not counted: a seller's first token, a completion without a generation time, an event without a
+  // Not counted: a buyer first token of a non-streaming request (it is the total time), a seller's
+  // first token, a completion without a generation time, an event without a
   // receipt, and one whose receipt is disputed.
+  insertObservation(
+    database,
+    buyer,
+    event(request('a1'), {
+      type: 'first_token',
+      streaming: false,
+      firstTokenMs: 5,
+    }),
+  );
   insertObservation(
     database,
     seller,
@@ -87,12 +109,20 @@ void test('per-model observations join each event to its receipt for the paid fl
   insertObservation(
     database,
     buyer,
-    event(request('ff'), { type: 'first_token', firstTokenMs: 50 }),
+    event(request('ff'), {
+      type: 'first_token',
+      streaming: true,
+      firstTokenMs: 50,
+    }),
   );
   insertObservation(
     database,
     buyer,
-    event(request('c3'), { type: 'first_token', firstTokenMs: 50 }),
+    event(request('c3'), {
+      type: 'first_token',
+      streaming: true,
+      firstTokenMs: 50,
+    }),
   );
 
   await runAggregation(database, NOW);
@@ -137,9 +167,11 @@ void test('an observation arriving after its receipt recomputes the receipt day'
     buyer,
     {
       type: 'first_token',
+      streaming: true,
       at: late,
       requestId,
       sellerNodeId: SELLER_A,
+      buyerNodeId: BUYER,
       firstTokenMs: 700,
     },
     NOW + HOUR,
@@ -151,5 +183,36 @@ void test('an observation arriving after its receipt recomputes the receipt day'
       'SELECT day, buyer_first_token_hist FROM collector_agg_model_observed_daily',
     ),
     [{ day: DAY, buyer_first_token_hist: buckets(700) }],
+  );
+});
+
+void test('only the receipt buyer attaches first tokens, and a repeated event adds one sample', async () => {
+  const database = createCollectorD1();
+  const requestId = 'f6'.padEnd(32, '0');
+  insertReceipt(database, { requestId });
+  const at = DAY_START + 3 * HOUR;
+  const own = insertEnvelope(database, 'buyer', at);
+  const other = insertEnvelope(database, 'buyer', at);
+  const event = (buyerNodeId: string, firstTokenMs: number, offset = 0) => ({
+    type: 'first_token',
+    streaming: true,
+    at: at + offset,
+    requestId,
+    sellerNodeId: SELLER_A,
+    buyerNodeId,
+    firstTokenMs,
+  });
+  // The same event uploaded again with other times: still one sample, the lowest.
+  insertObservation(database, own, event(BUYER, 900));
+  insertObservation(database, own, event(BUYER, 600, 1));
+  // Another buyer naming the same request and seller is not this receipt's buyer.
+  insertObservation(database, other, event('99'.repeat(32), 50));
+  await runAggregation(database, NOW);
+  assert.deepEqual(
+    rowsOf(
+      database,
+      'SELECT buyer_first_token_hist FROM collector_agg_model_observed_daily',
+    ),
+    [{ buyer_first_token_hist: buckets(600) }],
   );
 });

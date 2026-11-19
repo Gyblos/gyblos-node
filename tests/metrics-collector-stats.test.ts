@@ -32,6 +32,9 @@ import {
   T0,
 } from './support/receipt-upload';
 
+// The fixtures' default receipt buyer.
+const BUYER = 'c3'.repeat(32);
+
 const ORIGIN = 'https://collector.test';
 // The parts of a stats answer these tests read; the API shape is asserted field by field.
 interface Side {
@@ -285,10 +288,11 @@ void test('models carry buyer first token and engine speed per side, from joined
   insertReceipt(database, { requestId, paid: true, payer: 'Wallet' });
   insertReceipt(database);
   const at = Date.parse(`${DAY}T03:00:00.000Z`);
-  const event = { at, requestId, sellerNodeId: SELLER_A };
+  const event = { at, requestId, sellerNodeId: SELLER_A, buyerNodeId: BUYER };
   insertObservation(database, insertEnvelope(database, 'buyer', at), {
     ...event,
     type: 'first_token',
+    streaming: true,
     firstTokenMs: 800,
   });
   insertObservation(database, insertEnvelope(database, 'seller', at), {
@@ -308,8 +312,8 @@ void test('models carry buyer first token and engine speed per side, from joined
   assert.equal(observed.buyerFirstToken.samples, 1);
   assert.equal(observed.buyerFirstToken.p50Ms, 1000);
   assert.equal(observed.engineSpeed.samples, 1);
-  // 90 tokens per second falls in the bucket up to 100.
-  assert.equal(observed.engineSpeed.p50TokensPerSecond, 100);
+  // 90 tokens per second falls in the bucket from 50 up to 100: published as at least 50.
+  assert.equal(observed.engineSpeed.p50MinTokensPerSecond, 50);
   assert.deepEqual(
     observed.engineSpeed.bucketsTokensPerSecond,
     AGGREGATES.tokensPerSecondBuckets,

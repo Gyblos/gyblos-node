@@ -3,7 +3,7 @@
 -- by the scheduled run like every aggregate.
 --
 -- Telemetry events do not say whether a request was free or paid, so each event is joined to its
--- headline receipt (same request and seller); the receipt gives the paid flag, the model and the day
+-- headline receipt (same request, seller and buyer); the receipt gives the paid flag, the model and the day
 -- (the seller's receivedAt, as in every receipt aggregate). An event without such a receipt is not
 -- counted. Histograms are JSON arrays of fixed buckets that can be summed across rows.
 
@@ -17,11 +17,12 @@ CREATE TABLE IF NOT EXISTS collector_agg_model_observed_daily (
   variant TEXT NOT NULL,
   quantization TEXT NOT NULL,
   paid INTEGER NOT NULL,
-  -- Buyer-role first_token events: time from the start of the attempt with the chosen seller (session
-  -- setup included; discovery and quotes not) to the first streamed text. AGGREGATES.latencyBucketsMs.
+  -- Buyer-role first_token events of streaming requests, one per receipt: time from the start of the
+  -- attempt with the chosen seller (local payment and tokenizer startup, session setup and channel
+  -- opening included; discovery and quotes not) to the first streamed text. AGGREGATES.latencyBucketsMs.
   buyer_first_token_hist TEXT NOT NULL,
-  -- Seller-role completed events that carry the engine's own generation time: output tokens per second
-  -- of generation. AGGREGATES.tokensPerSecondBuckets.
+  -- Seller-role completed events that carry the engine's own generation time, one per receipt: output
+  -- tokens per second of generation. AGGREGATES.tokensPerSecondBuckets.
   engine_tps_hist TEXT NOT NULL,
   formula_version INTEGER NOT NULL,
   aggregated_at INTEGER NOT NULL,

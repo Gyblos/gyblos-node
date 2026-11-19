@@ -152,8 +152,17 @@ function network(orm: CollectorDatabase, range: DayRange) {
 }
 
 // Only the AGGREGATES.maxPublicModels models with the most completed requests (free and paid
-// together) under `condition`; an uncorrelated subquery, so the cap counts models, not rows.
-function topModels(orm: CollectorDatabase, condition: SQL | undefined) {
+// together) under `condition`; an uncorrelated subquery, so the cap counts models, not rows. `of`
+// names the model columns of the table being filtered.
+function topModels(
+  orm: CollectorDatabase,
+  condition: SQL | undefined,
+  of: {
+    modelId: SQLiteColumn;
+    variant: SQLiteColumn;
+    quantization: SQLiteColumn;
+  } = aggSellerDaily,
+) {
   const daily = aggSellerDaily;
   const top = orm
     .select({
@@ -166,7 +175,7 @@ function topModels(orm: CollectorDatabase, condition: SQL | undefined) {
     .groupBy(...modelColumns(daily))
     .orderBy(desc(total(daily.completed)), ...modelColumns(daily).map(asc))
     .limit(AGGREGATES.maxPublicModels);
-  return sql`(${daily.modelId}, ${daily.variant}, ${daily.quantization}) in ${top}`;
+  return sql`(${of.modelId}, ${of.variant}, ${of.quantization}) in ${top}`;
 }
 // Most completed first, free and paid of one model together.
 const byModelCompleted = (daily: typeof aggSellerDaily) => [
@@ -177,9 +186,9 @@ const byModelCompleted = (daily: typeof aggSellerDaily) => [
   asc(daily.paid),
 ];
 
+// Totals per model and paid flag, and the same models' observations, both capped in SQL.
 function models(orm: CollectorDatabase, range: DayRange) {
-  const daily = aggSellerDaily;
-  const inRange = within(daily.day, range);
+  const inRange = within(aggSellerDaily.day, range);
   const seen = aggModelObservedDaily;
   return orm.batch([
     modelTotals(orm, inRange),
@@ -196,7 +205,7 @@ function models(orm: CollectorDatabase, range: DayRange) {
         ),
       })
       .from(seen)
-      .where(within(seen.day, range))
+      .where(and(within(seen.day, range), topModels(orm, inRange, seen)))
       .groupBy(seen.modelId, seen.variant, seen.quantization, seen.paid),
   ]);
 }

@@ -21,6 +21,7 @@ import {
   type ChainAggregationResult,
 } from './aggregate-chain-run';
 import { firstSeenUpserts } from './aggregate-first-seen';
+import { modelObservedRollup } from './aggregate-model-observed';
 import {
   blank,
   buyerIdentity,
@@ -31,9 +32,9 @@ import {
   headlineReceipt,
   modelKey,
   modelObservedEvents,
-  modelObservedFields,
   observationJoin,
   observedFields,
+  perReceiptObserved,
   receiptOfObservation,
   receiptTotalsSelect,
   versionFields,
@@ -301,43 +302,6 @@ function observationRollups(
         .innerJoin(envelopes, observationJoin)
         .where(and(where, demandEvents))
         .groupBy(observations.modelId),
-    ),
-  ];
-}
-
-// Per model and paid flag, on the day of the receipt each event belongs to.
-function modelObservedRollup(
-  database: CollectorDatabase,
-  bounds: DayBounds,
-  now: number,
-) {
-  const model = {
-    modelId: receipts.modelId,
-    variant: blank(receipts.variant),
-    quantization: blank(receipts.quantization),
-  };
-  return [
-    database
-      .delete(aggModelObservedDaily)
-      .where(eq(aggModelObservedDaily.day, bounds.day)),
-    database.insert(aggModelObservedDaily).select(
-      database
-        .select(
-          ordered(aggModelObservedDaily, {
-            day: sql<string>`${bounds.day}`,
-            ...model,
-            paid: receipts.paid,
-            ...modelObservedFields(),
-            ...versionFields(now),
-          }),
-        )
-        .from(receipts)
-        .innerJoin(observations, receiptOfObservation)
-        .innerJoin(envelopes, observationJoin)
-        .where(
-          and(inRange(receipts.sellerReceivedAt, bounds), modelObservedEvents),
-        )
-        .groupBy(...Object.values(model), receipts.paid),
     ),
   ];
 }

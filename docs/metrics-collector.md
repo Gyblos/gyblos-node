@@ -235,8 +235,9 @@ wait for the next run.
 
 **Source time.** Every item falls on the day of its own source time: a receipt
 on the day of the seller's signed `receivedAt`, an observation on the day of its
-own `at`. Never on the collector's arrival time. Late data marks its day dirty
-again and the day is recomputed with a new `aggregated_at`. Ingest bounds
+own `at` (except in the per-model observations, where it falls on its receipt's
+day). Never on the collector's arrival time. Late data marks its day dirty again
+and the day is recomputed with a new `aggregated_at`. Ingest bounds
 (`receivedAt` within the 30 days before the upload, see
 [Order of checks](#order-of-checks)) keep every day real and recent, so only the
 last 30 days can still change; a raw time past year 9999 is skipped by the scan
@@ -246,8 +247,8 @@ rather than stopping it.
 `INSERT … SELECT … GROUP BY` over that day's raw rows. The day leaves the dirty
 set in the same batch, so readers see the old day or the new one, never a mix. A
 day whose batch fails stays dirty for the next run and never blocks the others.
-The receipt part of a run is two reads, one scan batch of 4 statements (7 once
-after a formula change) and 21 statements per day, whatever the day's row count
+The receipt part of a run is two reads, one scan batch of 5 statements (9 once
+after a formula change) and 23 statements per day, whatever the day's row count
 (the chain part follows with its own reads and batches); no statement binds more
 than a few values. Sums use SQLite `total()`, which cannot overflow: they are
 exact while a day's total stays below 2^53 (about 9 billion USDC in atomic
@@ -342,20 +343,29 @@ Read them with care:
 - `collector_agg_model_observed_daily`: per model, day and paid flag, the
   buyer's first token and the engine's speed. Telemetry events do not say
   whether a request was free or paid, so each event is joined to its headline
-  receipt (same request and seller); the receipt gives the paid flag, the model
-  and the day (the seller's `receivedAt`). An event without such a receipt is
-  not counted. A receipt day is recomputed when an observation of it arrives
-  later.
-- **Buyer first token:** buyer-role `first_token` events, emitted only while
-  streaming. The buyer's clock starts at the attempt with the chosen seller, so
-  it includes session setup with that seller but not discovery or quotes. Same
-  latency buckets as above.
+  receipt (same request, seller and buyer); the receipt gives the paid flag, the
+  model and the day (the seller's `receivedAt`). An event without such a receipt
+  is not counted, so only a receipt's own buyer and seller add to it. Each
+  receipt adds at most one sample of each kind (the lowest, if an event was
+  uploaded more than once), so `samples` counts requests. A receipt day is
+  recomputed when an observation of it arrives later.
+- **Buyer first token:** buyer-role `first_token` events of streaming requests
+  (a non-streaming completion also reports one, at its total time, and is left
+  out). The buyer's clock starts at the attempt with the chosen seller: it
+  includes the buyer's local payment and tokenizer startup, payment-session
+  setup and channel opening, and the delivery of the first text, but not
+  discovery or quotes. It therefore differs from the seller's first token in the
+  receipt. Same latency buckets as above.
 - **Engine speed:** seller-role `completed` events that carry the engine's own
-  `generationMs` and output tokens: output tokens per second of generation, so
-  network and queue time are left out. Buckets with upper bounds 1, 2, 5, 10,
-  20, 50, 100, 200, 500 and 1000 tokens per second, plus one bucket above.
+  `generationMs` and output tokens: metered output tokens per second of
+  generation, so prompt processing, network and queue time are left out. Only
+  engines that report a generation time count (today Ollama's decode time).
+  Buckets with upper bounds 1, 2, 5, 10, 20, 50, 100, 200, 500 and 1000 tokens
+  per second, plus one bucket above. Higher is better, so the published median
+  is the **lower** bound of its bucket: never more than was measured.
 - Both are opt-in telemetry: samples come only from nodes that upload
-  observations, and `samples` says how many.
+  observations. With few samples a figure can describe very few buyers; it is
+  not withheld.
 
 `AGGREGATES.formulaVersion` 3 added them, so every day is recomputed once.
 
@@ -411,12 +421,13 @@ with one buyer they describe that one pseudonymous buyer's use of that seller.
 | Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `modelsServed`, `buyers`, `withheld`); `observed` (`buyerLatency.firstToken`, `buyerLatency.total`, `routes.direct`, `routes.relay`, `routes.unknown`), `null` without observations that day; and `demand`: up to 20 models per day, largest first, each `modelId`, `unserved`, `refusedBeforeSelection`, `connectFailed`; `origins`: each `client`, `paid`, `requests`, `outcomes` (`completed`, `failed`, `cancelled`), `buyers`, `withheld`; and `failures`: each `side`, `client`, `event`, `reason`, `events`, `buyers`, `withheld`, most events first. |
-| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50TokensPerSecond`, `bucketsTokensPerSecond` and `counts`; `null` without any observation joined to a receipt of that side).                                                                                                                                                                                                                                                                   |
+| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50MinTokensPerSecond` (the lower bound of the median's bucket; `null` only without samples), `bucketsTokensPerSecond` and `counts`; `observed` is `null` without any observation joined to a receipt of that side, and either metric is empty, with `samples` 0, when only the other has data).                                                                                                |
 | `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 Each stats request is one batch of reads over aggregate tables: five statements
-for the network answer, three for the seller answer, one for models, two for
-chain, whatever the range. Histograms are summed and lists are capped in SQL.
+for the network answer, three for the seller answer, two in one batch for
+models, two for chain, whatever the range. Histograms are summed and lists are
+capped in SQL.
 
 ### Chain stats
 
@@ -659,11 +670,12 @@ is signed:
 D1 tables are declared once with Drizzle and created by the migrations; a test
 keeps both identical:
 
-| Schema file                | Migration                     | Tables                                                    |
-| -------------------------- | ----------------------------- | --------------------------------------------------------- |
-| `src/schema.ts`            | `0001_metrics_collector.sql`  | Raw envelopes, reports, receipts, conflicts, observations |
-| `src/schema-aggregates.ts` | `0002_metrics_aggregates.sql` | `collector_agg_*`, `collector_first_seen`                 |
-| `src/schema-chain.ts`      | `0003_chain_index.sql`        | `collector_chain_*`                                       |
+| Schema file                    | Migration                     | Tables                                                    |
+| ------------------------------ | ----------------------------- | --------------------------------------------------------- |
+| `src/schema.ts`                | `0001_metrics_collector.sql`  | Raw envelopes, reports, receipts, conflicts, observations |
+| `src/schema-aggregates.ts`     | `0002_metrics_aggregates.sql` | `collector_agg_*`, `collector_first_seen`                 |
+| `src/schema-chain.ts`          | `0003_chain_index.sql`        | `collector_chain_*`                                       |
+| `src/schema-model-observed.ts` | `0007_model_observed.sql`     | `collector_agg_model_observed_daily`                      |
 
 Raw rows are append-only. Envelopes are never pruned: a conflict's signed
 receipt is kept only in its envelope's `signed_json`. Nothing stores an IP, a

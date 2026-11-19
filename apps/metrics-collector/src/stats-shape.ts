@@ -62,20 +62,35 @@ export function latency(text: string): Latency {
 }
 
 const SPEED_BUCKETS = AGGREGATES.tokensPerSecondBuckets;
-// The engine's output tokens per second of generation, from fixed buckets.
+// The engine's output tokens per second of generation, from fixed buckets. Higher is better, so the
+// median reads as the lower bound of its bucket: never more than was measured.
 export interface Speed {
   samples: number;
-  // Upper bound of the bucket holding the median; null when empty or above the last bound.
-  p50TokensPerSecond: number | null;
+  // Lower bound of the bucket holding the median (0 in the first bucket, the last bound above it);
+  // null only without samples.
+  p50MinTokensPerSecond: number | null;
   // Upper bounds in tokens per second; the last count is everything above the last bound.
   bucketsTokensPerSecond: readonly number[];
   counts: number[];
+}
+function lowerPercentile(
+  values: readonly number[],
+  share: number,
+): number | null {
+  const samples = values.reduce((sum, value) => sum + value, 0);
+  if (!samples) return null;
+  let seen = 0;
+  for (const [index, value] of values.entries()) {
+    seen += value;
+    if (seen >= samples * share) return index ? SPEED_BUCKETS[index - 1]! : 0;
+  }
+  return null;
 }
 export function speed(text: string): Speed {
   const values = counts(text, SPEED_BUCKETS);
   return {
     samples: values.reduce((sum, value) => sum + value, 0),
-    p50TokensPerSecond: percentile(values, PERCENTILES.p50, SPEED_BUCKETS),
+    p50MinTokensPerSecond: lowerPercentile(values, PERCENTILES.p50),
     bucketsTokensPerSecond: SPEED_BUCKETS,
     counts: values,
   };

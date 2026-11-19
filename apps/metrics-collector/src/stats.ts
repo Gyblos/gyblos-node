@@ -71,10 +71,13 @@ export interface NetworkStats extends StatsEnvelope {
 // What buyers saw and how fast the engine generated, on one side of one model; null without any
 // observation joined to a receipt of that side.
 export interface ModelObserved {
-  // Buyer-measured, streaming only: from the start of the attempt with the chosen seller (session
-  // setup included; discovery and quotes not) to the first streamed text.
+  // Buyer-measured, streaming requests only: from the start of the attempt with the chosen seller
+  // (the buyer's local payment and tokenizer startup, session setup and channel opening included;
+  // discovery and quotes not) to the first streamed text delivered.
   buyerFirstToken: Latency;
-  // Output tokens per second of the engine's own generation time, as sellers report it.
+  // Output tokens per second of the engine's own generation time, as sellers report it; only engines
+  // that report a generation time (prompt processing left out). Either metric is empty (no samples)
+  // when only the other has data.
   engineSpeed: Speed;
 }
 type ModelSide = { sellers: number; observed: ModelObserved | null };

@@ -131,23 +131,32 @@ export function demandFields() {
 export const demandEvents = sql`${byRole(P2P_ROLES.BUYER)} and ${observations.type} in (${literal(TELEMETRY_EVENTS.UNSERVED)}, ${literal(TELEMETRY_EVENTS.REFUSED)})`;
 
 // Per-model observations (migrations/0007): telemetry events joined to their headline receipt, which
-// gives the paid flag, the model and the day. Buyer first tokens, and the engine's own speed.
+// gives the paid flag, the model and the day. Buyer first tokens, and the engine's own speed. A receipt
+// is one request of one buyer to one seller; ingest binds a buyer event to its uploading buyer and a
+// seller event to its uploading seller, so only the receipt's own two sides can attach events to it.
 export const receiptOfObservation = and(
   eq(receipts.requestId, observations.requestId),
   eq(receipts.sellerNodeId, observations.sellerNodeId),
+  sql`${json('buyerNodeId')} = ${receipts.buyerNodeId}`,
 );
-const buyerFirstToken = sql`${byRole(P2P_ROLES.BUYER)} and ${ofType(TELEMETRY_EVENTS.FIRST_TOKEN)}`;
+// Streaming requests only: a non-streaming completion also reports a first token, at its total time.
+const buyerFirstToken = sql`${byRole(P2P_ROLES.BUYER)} and ${ofType(TELEMETRY_EVENTS.FIRST_TOKEN)} and ${json('streaming')} = 1`;
 // Only completions that carry a positive generation time and output tokens.
 const engineTimed = sql`${byRole(P2P_ROLES.SELLER)} and ${ofType(TELEMETRY_EVENTS.COMPLETED)} and ${json('generationMs')} > 0 and ${json('usage.outputTokens')} > 0`;
 export const modelObservedEvents = sql`${headlineReceipt} and ((${buyerFirstToken}) or (${engineTimed}))`;
-export function modelObservedFields() {
+// One sample of each kind per receipt, grouped by receipt: an uploader repeating an event (with other
+// times, so other event keys) still adds one sample; the lowest value is kept.
+export function perReceiptObserved() {
   return {
-    buyerFirstTokenHist: histogram(
-      sql`case when ${buyerFirstToken} then ${json('firstTokenMs')} end`,
+    firstTokenMs: sql<
+      number | null
+    >`min(case when ${buyerFirstToken} then ${json('firstTokenMs')} end)`.as(
+      'first_token_ms',
     ),
-    engineTpsHist: histogram(
-      sql`case when ${engineTimed} then cast(${json('usage.outputTokens')} as real) * ${number(AGGREGATES.msPerSecond)} / ${json('generationMs')} end`,
-      AGGREGATES.tokensPerSecondBuckets,
+    tokensPerSecond: sql<
+      number | null
+    >`min(case when ${engineTimed} then cast(${json('usage.outputTokens')} as real) * ${number(AGGREGATES.msPerSecond)} / ${json('generationMs')} end)`.as(
+      'tokens_per_second',
     ),
   };
 }
