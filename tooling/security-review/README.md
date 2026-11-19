@@ -127,8 +127,9 @@ checks, human review and an external audit remain necessary.
    event, with no model credentials and no checkout.
 2. **AI security review** responds through `workflow_run`, so GitHub loads it
    from the default branch. It checks that the PR, head, base and repository are
-   current and runs the trusted runner against the immutable PR merge snapshot
-   as data.
+   current, waits up to about a minute for GitHub to rebuild the merge commit
+   after the base moves, and runs the trusted runner against the immutable PR
+   merge snapshot as data.
 3. Its publisher validates the fixed status, rechecks that the head, base and
    merge commit are unchanged, applies one fixed label and posts a deterministic
    summary. It never runs or renders model text. Stale heads and forks get no
@@ -166,8 +167,8 @@ through its JSON event stream. Only recognized error categories, process counts
 and available token totals enter the public diagnostic summary. Missing usage is
 shown as unknown. Reported tokens can be partial and are not a billing total.
 
-An explicit exhausted quota, rejected credential or model the key cannot use
-stops new Pi processes for the remainder of that run, including independent
+An explicit exhausted quota, rejected credential (401) or model the key cannot
+use stops new Pi processes for the remainder of that run, including independent
 verifiers. Other provider refusals are named by class (context window, other
 HTTP 4xx, server error); their text never enters the summary. Already started
 processes finish. Each new workflow run checks the provider independently. Pi

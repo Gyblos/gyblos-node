@@ -98,6 +98,15 @@ export type PiThinkingLevel = (typeof PI_THINKING_LEVELS)[number];
 export const REVIEWABLE_FILE_PATTERN =
   /(^|\/)(?:\.git|\.local|\.pi|node_modules|dist|coverage|evidence|captures|measurements|private|internal)(?:\/|$)|(^|\/)(?:\.env(?:\.|$)|seller\.env$|AGENTS\.local\.md$)|\.(?:key|pem|log)$|\.private\.|-private\./i;
 
+// HTTP statuses Pi reports for OpenAI refusals; this tooling imports no workspace package.
+export const PROVIDER_HTTP_STATUS = {
+  CLIENT_ERROR: 400,
+  UNAUTHORIZED: 401,
+  NOT_FOUND: 404,
+  TOO_MANY_REQUESTS: 429,
+  SERVER_ERROR: 500,
+} as const;
+
 export const REVIEW_FAILURE = {
   QUOTA: 'insufficient_quota',
   KEY: 'invalid_api_key',

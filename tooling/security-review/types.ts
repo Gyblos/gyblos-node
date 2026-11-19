@@ -106,7 +106,7 @@ export interface SourceBundle {
   files: SourceFile[];
   diff: string;
   omissions: { path: string; reason: string }[];
-  // Symlinks, submodules and binary blobs: recorded, never sent and never a reason to fail the task.
+  // Symlinks, submodules and binary blobs: listed for the task, contents never sent, never a reason to fail it.
   excluded: { path: string; reason: string }[];
 }
 export interface ReviewRunResult {

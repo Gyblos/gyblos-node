@@ -47,13 +47,19 @@ jobs:
           let pr;
           for (let attempt = 0; attempt < 6; attempt++) {
             if (attempt) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10_000);
-            pr = api('repos/' + repo + '/pulls/' + reference.number);
-            if (!/^[0-9a-f]{40}$/.test(pr.merge_commit_sha ?? '')) continue;
-            const parents = api('repos/' + repo + '/commits/' + pr.merge_commit_sha).parents;
-            // Only a definite mismatch waits; the snapshot step below still verifies the checked-out commit.
-            if (!Array.isArray(parents) || (parents.length === 2 && parents[0]?.sha === pr.base.sha &&
-                parents[1]?.sha === pr.head.sha)) break;
+            try {
+              pr = api('repos/' + repo + '/pulls/' + reference.number);
+              if (pr.state !== 'open' || request.head_sha !== pr.head.sha) break;
+              if (!/^[0-9a-f]{40}$/.test(pr.merge_commit_sha ?? '')) continue;
+              const parents = api('repos/' + repo + '/commits/' + pr.merge_commit_sha).parents;
+              // Only a definite mismatch waits; the snapshot step below still verifies the checked-out commit.
+              if (!Array.isArray(parents) || (parents.length === 2 && parents[0]?.sha === pr.base.sha &&
+                  parents[1]?.sha === pr.head.sha)) break;
+            } catch {
+              // GitHub may not serve a test merge commit it is still building; try again.
+            }
           }
+          if (!pr) process.exit(0);
           if (pr.state !== 'open' || !['develop', 'main'].includes(pr.base.ref) ||
               pr.head.repo?.full_name !== repo || request.head_sha !== pr.head.sha) process.exit(0);
           if (!/^[0-9a-f]{40}$/.test(pr.merge_commit_sha) || !/^[0-9a-f]{40}$/.test(pr.base.sha)) process.exit(0);

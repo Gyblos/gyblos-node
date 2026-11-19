@@ -100,14 +100,14 @@ void test('a missing Pi executable fails promptly without leaking diagnostics', 
   });
 });
 
-void test('provider refusals are named by class, never by their text', async () => {
+void test('provider refusals are classified by status and code', async () => {
   for (const [errorMessage, expected] of [
     [
       'OpenAI API error (404): {"code":"model_not_found"}',
       REVIEW_FAILURE.MODEL,
     ],
     [
-      'The model `gpt-x` does not exist or you do not have access to it.',
+      'OpenAI API error (404): The model `gpt-x` does not exist or you do not have access to it.',
       REVIEW_FAILURE.MODEL,
     ],
     [
@@ -123,6 +123,17 @@ void test('provider refusals are named by class, never by their text', async () 
       REVIEW_FAILURE.PROVIDER,
     ],
     ['OpenAI API error (401): {"code":"invalid_api_key"}', REVIEW_FAILURE.KEY],
+    ['OpenAI API error (401): {"code":"invalid_project"}', REVIEW_FAILURE.KEY],
+    ['OpenAI API error (429): Too Many Requests', REVIEW_FAILURE.RATE],
+    [
+      'OpenAI API error (429): {"code":"insufficient_quota"}',
+      REVIEW_FAILURE.QUOTA,
+    ],
+    [
+      "OpenAI API error (404): Item with id 'rs_1' not found",
+      REVIEW_FAILURE.REQUEST,
+    ],
+    ['Settings file does not exist; continuing', REVIEW_FAILURE.PI],
     ['socket hang up', REVIEW_FAILURE.PI],
   ] as const) {
     const event = {
@@ -142,6 +153,7 @@ void test('provider refusals are named by class, never by their text', async () 
           prompt: 'mock',
         });
         assert.equal(result.failure, expected, errorMessage);
+        assert.doesNotMatch(JSON.stringify(result), /rs_1|gpt-x|Settings/);
       },
     );
   }

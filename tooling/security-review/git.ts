@@ -98,8 +98,24 @@ export async function trackedFile(
   const size = Number(header[3]);
   if (!['100644', '100755'].includes(mode ?? '') || header[1] !== 'blob')
     throw new UnsupportedSourceError('Only regular Git blobs may be reviewed.');
-  if (!Number.isSafeInteger(size) || size > MAX_PROJECTION_FILE_BYTES)
+  if (!Number.isSafeInteger(size) || size > MAX_PROJECTION_FILE_BYTES) {
+    // Git's own text test (first 8000 bytes) tells an oversized binary, excluded, from oversized source.
+    const text = await gitText(root, [
+      'grep',
+      '-I',
+      '--name-only',
+      '-e',
+      '',
+      ref,
+      '--',
+      ':(literal)' + file,
+    ]).catch(() => '');
+    if (!text)
+      throw new UnsupportedSourceError(
+        'Binary source is outside this text review.',
+      );
     throw new Error('Source file exceeds the byte limit.');
+  }
   const text = await gitText(
     root,
     ['cat-file', 'blob', header[2] ?? ''],

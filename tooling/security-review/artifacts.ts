@@ -10,6 +10,17 @@ import type { ReviewRunResult, ReviewStatus } from './types';
 export interface ArtifactOptions {
   output: string;
 }
+// Plan-level private paths and the symlinks, submodules and binaries each task set aside.
+function excludedPaths(result: ReviewRunResult): string[] {
+  return [
+    ...new Set([
+      ...result.plan.excludedFiles,
+      ...result.tasks.flatMap((item) =>
+        (item.excluded ?? []).map((entry) => entry.path),
+      ),
+    ]),
+  ].sort();
+}
 function finalStatus(result: ReviewRunResult): ReviewStatus {
   if (result.status === REVIEW_VALUES.NOT_RUN) return REVIEW_VALUES.NOT_RUN;
   if (result.status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
@@ -24,12 +35,7 @@ function finalStatus(result: ReviewRunResult): ReviewStatus {
   )
     return REVIEW_VALUES.ERROR;
   // A changed file nobody could read (private path, symlink, submodule or binary) needs a maintainer.
-  const unread = new Set([
-    ...result.plan.excludedFiles,
-    ...result.tasks.flatMap((item) =>
-      (item.excluded ?? []).map((entry) => entry.path),
-    ),
-  ]);
+  const unread = new Set(excludedPaths(result));
   if (result.plan.changedFiles.some((path) => unread.has(path)))
     return REVIEW_VALUES.PENDING;
   if (
@@ -66,7 +72,7 @@ function renderReport(result: ReviewRunResult): string {
     '',
     'This is a partial source-only AI review, not proof that the protocol is secure.',
     'No target code was executed. Runtime claims require bounded synthetic validation.',
-    'No prior run suppressed current coverage. Binary/private/oversized files are excluded or blocked.',
+    'No prior run suppressed current coverage. Private paths, symlinks, submodules and binaries are excluded; oversized files are blocked.',
     '',
     '## Coverage',
     '',
@@ -76,7 +82,7 @@ function renderReport(result: ReviewRunResult): string {
     '',
     '## Excluded paths',
     '',
-    ...result.plan.excludedFiles.map((path) => '- ' + escape(path)),
+    ...excludedPaths(result).map((path) => '- ' + escape(path)),
     '',
     '## Independently checked candidates',
     '',

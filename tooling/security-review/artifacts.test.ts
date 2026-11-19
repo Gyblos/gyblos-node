@@ -74,6 +74,10 @@ void test('a changed binary a task excluded keeps the PR pending; an unchanged o
         (await writeArtifacts(initial, { output })).status,
         expected,
       );
+      assert.match(
+        await readFile(join(output, 'REPORT.md'), 'utf8'),
+        /## Excluded paths\n\n- docs\/logo\.png/,
+      );
     });
   }
 });

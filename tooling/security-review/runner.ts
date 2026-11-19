@@ -112,11 +112,6 @@ async function ask(
     await rm(directory, { recursive: true, force: true });
   }
 }
-function excludedOf(assignment: Assignment) {
-  return assignment.bundle.excluded.length
-    ? { excluded: assignment.bundle.excluded }
-    : {};
-}
 function failed(
   assignment: Assignment,
   failure: ReviewFailure,
@@ -131,7 +126,7 @@ function failed(
       findings: [],
       failure,
       omissions: assignment.bundle.omissions,
-      ...excludedOf(assignment),
+      excluded: assignment.bundle.excluded,
     },
   };
 }
@@ -141,6 +136,19 @@ async function review(
 ): Promise<Execution> {
   if (assignment.bundle.omissions.length)
     return failed(assignment, REVIEW_FAILURE.SOURCE);
+  // Only symlinks or binaries: nothing a model can read, so no Pi call is spent on an empty input.
+  if (!assignment.bundle.files.length && assignment.bundle.excluded.length)
+    return {
+      assignment,
+      findings: [],
+      result: {
+        taskId: assignment.task.id,
+        status: REVIEW_VALUES.COMPLETE,
+        findings: [],
+        coverage: [],
+        excluded: assignment.bundle.excluded,
+      },
+    };
   let phase: ReviewFailure = REVIEW_FAILURE.PI;
   try {
     const output = await ask(
@@ -160,7 +168,7 @@ async function review(
         taskId: assignment.task.id,
         status: response.status,
         coverage: response.coverage.reviewed_paths,
-        ...excludedOf(assignment),
+        excluded: assignment.bundle.excluded,
         findings: response.findings.map(({ fingerprint, title }) => ({
           fingerprint,
           title,
