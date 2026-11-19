@@ -60,6 +60,19 @@ void test('restart restores the highest voucher and seller closes without the bu
   assert.equal((await rig.seller().tick())?.chargedAtomic, '145');
   assert.deepEqual(rig.calls, ['deposit', 'refund']);
 });
+void test('an unused channel refunds its full deposit after the idle period', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  assert.equal(await rig.seller().tick(), undefined);
+  rig.time(rig.now() + 1001);
+  const settlement = await rig.seller().tick();
+  assert.equal(settlement?.chargedAtomic, '0');
+  assert.equal(settlement.refundedAtomic, rig.terms.depositAtomic);
+  await rig.restart();
+  assert.equal(await rig.seller().tick(), undefined);
+  assert.deepEqual(rig.calls, ['deposit', 'refund']);
+});
 void test('soft minimum defers idle dust but expiry still refunds it', async (t) => {
   const rig = await sessionRig();
   t.after(rig.dispose);

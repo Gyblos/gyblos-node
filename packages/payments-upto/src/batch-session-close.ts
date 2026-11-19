@@ -104,12 +104,13 @@ export async function tickBatch(context: BatchSellerContext) {
   const idle =
     options.now() - state.lastActivity >=
     (options.idleMs ?? BATCH_SESSION_DEFAULTS.idleMs);
-  const unsigned = Object.values(state.requests).some(
+  const requests = Object.values(state.requests);
+  const unsigned = requests.some(
     (request) =>
       !request.accepted &&
       (request.bill !== null || !!state.blocks?.[request.requestId]),
   );
-  const generating = Object.values(state.requests).some(
+  const generating = requests.some(
     (request) =>
       !request.accepted &&
       (state.blocks?.[request.requestId]
@@ -123,13 +124,15 @@ export async function tickBatch(context: BatchSellerContext) {
     state.state === SESSION_STATES.CLOSING ||
     options.now() >= options.terms.expiresAt ||
     BigInt(state.cumulativeAtomic) >= BigInt(options.terms.depositAtomic) ||
-    (Object.keys(state.requests).length >= BATCH_SESSION_DEFAULTS.maxRequests &&
+    (requests.length >= BATCH_SESSION_DEFAULTS.maxRequests &&
       !generating &&
       !unsigned) ||
     (await waitBatch(options.closing(state.channelId), options.operationMs)) ||
     (idle &&
       !generating &&
-      (unsigned || BigInt(state.cumulativeAtomic) >= threshold))
+      (requests.length === 0 ||
+        unsigned ||
+        BigInt(state.cumulativeAtomic) >= threshold))
   )
     return closeBatch(context);
   return undefined;
