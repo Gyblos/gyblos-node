@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { delta } from '@gyblos/explorer/board-delta';
+import { hoveredPoint } from '@gyblos/explorer/board-hovered';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
 import { tokensPerSecond, usdcDecimal } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
@@ -177,4 +178,15 @@ void test('engine speed reads as the lower bound of its bucket, the first bucket
   assert.equal(tokensPerSecond(1000), '≥ 1,000 tok/s');
   assert.equal(tokensPerSecond(0), '< 1 tok/s');
   assert.equal(tokensPerSecond(null), '—');
+});
+
+void test('a chart hover picks a bar only at a real index, never the first day off the bars', () => {
+  const days = ['10-01', '10-02'];
+  assert.equal(hoveredPoint(days, 1), '10-02');
+  assert.equal(hoveredPoint(days, '0'), '10-01');
+  assert.equal(hoveredPoint(days, null), null);
+  assert.equal(hoveredPoint(days, undefined), null);
+  assert.equal(hoveredPoint(days, ''), null);
+  assert.equal(hoveredPoint(days, 5), null);
+  assert.equal(hoveredPoint(days, 1.5), null);
 });
