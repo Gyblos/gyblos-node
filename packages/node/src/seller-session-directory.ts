@@ -3,13 +3,7 @@ import {
   batchSessionTerminal,
   type BatchSellerRegistry,
 } from '@gyblos/payments-upto/batch-session';
-import { canonicalJson } from '@gyblos/protocol';
-import {
-  BATCH_METHODS,
-  batchError,
-  batchFail,
-  type BatchChannelRequest,
-} from '@gyblos/protocol/batch-channel';
+import { batchError, batchFail } from '@gyblos/protocol/batch-channel';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import {
@@ -27,7 +21,6 @@ interface State {
   options: Common & {
     registry: BatchSellerRegistry;
   };
-  known: Set<string>;
   hosts: Map<string, SellerSessionHost>;
   active?: Promise<unknown>;
   closed: boolean;
@@ -38,33 +31,28 @@ async function host(state: State, peer: string) {
     current = await startSellerSessions({
       ...state.options,
       buyerNodeId: peer,
+      admit: () => admit(state, peer),
       backend: state.options.registry.backend(peer),
     });
     state.hosts.set(peer, current);
   }
   return current;
 }
-async function admission(
-  state: State,
-  request: BatchChannelRequest,
-  peer: string,
-) {
-  if (
-    request.method === BATCH_METHODS.PREPARE ||
-    request.method === BATCH_METHODS.OPEN
-  ) {
-    const old =
-      request.method === BATCH_METHODS.OPEN
-        ? await state.options.registry.backend(peer).inspect()
-        : undefined;
-    const restores =
-      request.method === BATCH_METHODS.OPEN &&
-      old &&
-      canonicalJson(request.params.terms ?? old.terms) ===
-        canonicalJson(old.terms);
-    if (!restores && !(await state.options.registry.permits(peer)))
-      return batchFail(SESSION_CODES.BUSY);
+async function admit(state: State, peer: string) {
+  // The host calls this only after checking the signed quote. Timers can settle
+  // channels while a buyer is offline; release those handles before admitting more.
+  const retired = new Map<string, SellerSessionHost>();
+  const allowed = await state.options.registry.permits(peer, (entries) => {
+    const retained = new Set(entries.map((entry) => entry.buyerNodeId));
+    for (const [buyer, current] of state.hosts) {
+      if (buyer !== peer && !retained.has(buyer)) retired.set(buyer, current);
+    }
+  });
+  for (const [buyer, current] of retired) {
+    await current.close();
+    state.hosts.delete(buyer);
   }
+  if (!allowed) return batchFail(SESSION_CODES.BUSY);
 }
 async function run<T>(
   state: State,
@@ -98,7 +86,6 @@ export async function startSellerSessionHost(
   const entries = await options.registry.list();
   const state: State = {
     options,
-    known: new Set(entries.map((entry) => entry.buyerNodeId)),
     hosts: new Map(),
     closed: false,
   };
@@ -115,7 +102,6 @@ export async function startSellerSessionHost(
     service: {
       exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
         run(state, signal, async () => {
-          await admission(state, request, peer);
           signal.throwIfAborted();
           const current = await host(state, peer);
           try {
@@ -127,12 +113,10 @@ export async function startSellerSessionHost(
               blocks,
               blockMode,
             );
-            if (request.method === BATCH_METHODS.OPEN) state.known.add(peer);
-            if (request.method === BATCH_METHODS.CLOSE)
-              state.known.delete(peer);
             return reply;
           } finally {
-            if (!state.known.has(peer)) {
+            // An OPEN with a lost acknowledgement still owns its live recovery timer.
+            if (!current.ownsSession?.()) {
               state.hosts.delete(peer);
               await current.close();
             }
@@ -140,7 +124,10 @@ export async function startSellerSessionHost(
         }),
       resumeBlock: (approval, peer, signal) =>
         run(state, signal, async () => {
-          if (!state.known.has(peer))
+          if (
+            !state.hosts.has(peer) &&
+            !(await state.options.registry.backend(peer).inspect())?.recoverable
+          )
             return batchFail(SESSION_CODES.UNAVAILABLE);
           const current = await host(state, peer);
           if (!current.service.resumeBlock)

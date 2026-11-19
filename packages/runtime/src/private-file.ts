@@ -106,12 +106,22 @@ export async function ensurePrivateDirectory(path: string): Promise<void> {
 // Only newly created payment folders are restricted. Existing exposed evidence is refused.
 export async function ensurePrivatePaymentPaths(paths: {
   directory: string;
+  paymentRoot?: string;
   state?: string;
   lock: string;
 }) {
+  const existing: string[] = [];
+  if (WINDOWS && paths.paymentRoot) {
+    const container = dirname(paths.directory);
+    if (resolve(paths.paymentRoot) !== dirname(container)) fail();
+    for (const directory of [paths.paymentRoot, container]) {
+      await privateDirectory(directory, true, true);
+      if (!(await paymentPathsArePrivate([directory]))) fail();
+    }
+  }
   await privateDirectory(paths.directory, true, true);
   if (!WINDOWS) return;
-  const existing = [paths.directory];
+  existing.push(paths.directory);
   for (const path of [paths.state, paths.lock]) {
     if (!path) continue;
     try {

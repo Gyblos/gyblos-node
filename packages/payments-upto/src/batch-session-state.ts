@@ -71,22 +71,23 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     (request) => !request.accepted,
   );
   const notCreated = batchOpeningAbsent(record) !== undefined;
-  return {
-    ...(record.state === SESSION_STATES.CLOSED &&
-    record.settlement?.transaction &&
-    record.settlement.channelId === record.channelId &&
-    record.settlement.chargedAtomic === record.cumulativeAtomic &&
-    BigInt(record.settlement.chargedAtomic) +
-      BigInt(record.settlement.refundedAtomic) ===
-      BigInt(record.terms.depositAtomic) &&
-    !pending.some(
+  const recoverable =
+    !notCreated &&
+    pending.some(
       (request) =>
-        request.bill ||
-        record.blocks?.[request.requestId]?.pending ||
-        record.blocks?.[request.requestId]?.accepted,
-    )
-      ? { archivedProof: true as const }
-      : {}),
+        request.bill !== null ||
+        !!record.blocks?.[request.requestId]?.pending ||
+        !!record.blocks?.[request.requestId]?.accepted,
+    );
+  // parseRecord validated the settlement channel and deposit totals. Keep shortfalls
+  // and outstanding delivery recovery in the active registry.
+  const archivedProof =
+    record.state === SESSION_STATES.CLOSED &&
+    !!record.settlement?.transaction &&
+    record.settlement.chargedAtomic === record.cumulativeAtomic &&
+    !recoverable;
+  return {
+    ...(archivedProof ? { archivedProof: true as const } : {}),
     ...(notCreated ? { notCreated: true as const } : {}),
     terms: record.terms,
     ...(record.history
@@ -103,14 +104,7 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
       !notCreated &&
       record.state !== SESSION_STATES.CLOSED &&
       pending.length > 0,
-    recoverable:
-      !notCreated &&
-      pending.some(
-        (request) =>
-          request.bill !== null ||
-          !!record.blocks?.[request.requestId]?.pending ||
-          !!record.blocks?.[request.requestId]?.accepted,
-      ),
+    recoverable,
   };
 }
 

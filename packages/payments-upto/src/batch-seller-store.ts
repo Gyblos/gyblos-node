@@ -88,7 +88,6 @@ async function children(paths: BatchSellerPaths, entries: SellerRegistryRow[]) {
   for await (const entry of found) {
     if (!entry.isDirectory()) return sessionFail(SESSION_CODES.UNVERIFIED);
     const own = batchSellerBuyerPaths(paths, entry.name);
-    await ensurePrivatePaymentPaths(own);
     if (!entries.some((row) => !row.legacy && row.buyerNodeId === entry.name)) {
       const stored = await inspectBatchSession(own);
       if (

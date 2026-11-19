@@ -29,6 +29,7 @@ import type { LiveSellerOffer } from './seller-offer-set';
 import type { SellerSessionBackend } from './session-backend';
 
 export interface SellerSessionOptions {
+  admit?: () => Promise<void>;
   receipts?: import('./batch-seller').SellerBatchSessionOptions['receipts'];
   telemetry?: {
     sink: import('@gyblos/protocol/telemetry').TelemetrySink;
@@ -46,6 +47,7 @@ export interface SellerSessionOptions {
   now: () => number;
 }
 export interface SellerSessionHost {
+  ownsSession?: () => boolean;
   service: BatchChannelService;
   close(): Promise<void>;
 }
@@ -153,6 +155,8 @@ async function operation(
     const live = batchLiveOffer(offer, options.offers(), options.now());
     if (blockMode && !live.meter.stablePrefix)
       return batchFail(SESSION_CODES.UNAVAILABLE);
+    if (request.method === BATCH_METHODS.PREPARE || !state.current || replacing)
+      await options.admit?.();
     if (request.method === BATCH_METHODS.PREPARE) return { terms };
     if (replacing && state.current) {
       if (!options.backend.renew) return batchFail(SESSION_CODES.CLOSED);
@@ -220,6 +224,9 @@ export async function startSellerSessions(
     }
   };
   return {
+    ownsSession: () =>
+      state.current !== undefined &&
+      state.current.session.snapshot().state !== SESSION_STATES.CLOSED,
     service: {
       exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
         run(peer, signal, () =>

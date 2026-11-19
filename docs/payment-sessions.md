@@ -53,7 +53,8 @@ recovery, and refuses new sessions.
 
 Each buyer has its own private child journal under the seller's payment
 directory. An admission index reserves the slot before any deposit is submitted.
-A missing, corrupt or unindexed journal fails closed.
+A missing indexed journal, a corrupt record or an unindexed unfinished payment
+blocks admission.
 
 The active index holds up to 64 buyer records. A fully settled channel with no
 outstanding recovery leaves this index. Its private journal stays at its

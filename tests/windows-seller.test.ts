@@ -76,6 +76,16 @@ void test(
         lock: join(directory, 'lock'),
       };
       await ensurePrivatePaymentPaths(paths);
+      const container = join(directory, 'channels');
+      const slot = join(container, 'peer');
+      const child = {
+        paymentRoot: directory,
+        directory: slot,
+        lock: join(slot, 'lock'),
+      };
+      await ensurePrivatePaymentPaths(child);
+      await run(ICACLS, [container, '/grant', '*S-1-1-0:R']);
+      await assert.rejects(ensurePrivatePaymentPaths(child));
       await writePrivateFile(paths.state, 'fixture', 100);
       await ensurePrivatePaymentPaths(paths);
       await run(ICACLS, [paths.state, '/grant', '*S-1-1-0:R']);

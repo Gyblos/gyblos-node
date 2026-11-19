@@ -31,7 +31,10 @@ export interface BatchSellerRegistryEntry {
 }
 export interface BatchSellerRegistry {
   list(): Promise<BatchSellerRegistryEntry[]>;
-  permits(buyerNodeId: string): Promise<boolean>;
+  permits(
+    buyerNodeId: string,
+    retained?: (entries: readonly BatchSellerRegistryEntry[]) => void,
+  ): Promise<boolean>;
   backend(buyerNodeId: string): BatchSellerBackend;
   // Financial handles are owned and disposed by the host; this drains admission and releases its lock.
   dispose(): Promise<void>;
@@ -73,8 +76,13 @@ async function rows(state: State): Promise<BatchSellerRegistryEntry[]> {
     });
   return entries;
 }
-async function permits(state: State, peer: string) {
+async function permits(
+  state: State,
+  peer: string,
+  retained?: (entries: readonly BatchSellerRegistryEntry[]) => void,
+) {
   const entries = await rows(state);
+  retained?.(entries);
   if (
     entries.some(
       (row) => row.buyerNodeId === peer && !batchSessionTerminal(row.stored),
@@ -208,7 +216,8 @@ export async function openBatchSellerRegistry(
   let disposing: Promise<void> | undefined;
   return {
     list: () => run(state, () => rows(state)),
-    permits: (peer) => run(state, () => permits(state, controlHex(peer))),
+    permits: (peer, retained) =>
+      run(state, () => permits(state, controlHex(peer), retained)),
     backend: (peer) => backend(state, peer),
     dispose() {
       state.closing = true;

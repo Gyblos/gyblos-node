@@ -322,3 +322,49 @@ void test('corrupt index input is a static typed refusal before any new financia
   await assert.rejects(rig.open(), { code: SESSION_CODES.UNAVAILABLE });
   assert.equal(rig.vm.sends(), before);
 });
+
+void test('64 settled buyers retain their proofs after restart while an uncertain opening still consumes capacity', async (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('External RPC forbidden'),
+  );
+  const rig = await sellerRegistryRig(2, { buyerCount: 66 });
+  t.after(rig.dispose);
+  let registry = await rig.open();
+  t.after(() => registry.dispose());
+  for (const buyer of rig.buyers.slice(0, 64)) {
+    const seller = await registry
+      .backend(buyer.terms.buyerNodeId)
+      .create(buyer.terms, buyer.payload);
+    try {
+      await seller.open(buyer.payload);
+      await seller.close();
+    } finally {
+      await seller.dispose();
+    }
+  }
+  const uncertain = rig.buyers[64]!;
+  const seller = await registry
+    .backend(uncertain.terms.buyerNodeId)
+    .create(uncertain.terms, uncertain.payload);
+  rig.vm.loseConfirmation(true);
+  try {
+    await assert.rejects(seller.open(uncertain.payload));
+  } finally {
+    await seller.dispose();
+  }
+  await registry.dispose();
+  registry = await rig.open(1);
+  assert.deepEqual(
+    (await registry.list()).map((row) => row.buyerNodeId),
+    [uncertain.terms.buyerNodeId],
+  );
+  const first = rig.buyers[0]!;
+  const stored = await registry.backend(first.terms.buyerNodeId).inspect();
+  assert.equal(stored?.archivedProof, true);
+  assert.equal(
+    await registry.permits(rig.buyers[65]!.terms.buyerNodeId),
+    false,
+  );
+  assert.equal(await registry.permits(first.terms.buyerNodeId), false);
+});
