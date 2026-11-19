@@ -1,6 +1,6 @@
 // Owns the Network section: sellers online and offline, models offered with their cheapest prices, each
 // online seller's offers and uptime, and the registered sellers not online now, from the discovery index.
-import { Activity, Boxes, Gift, Server } from 'lucide-react';
+import { Activity, Boxes, Server, Tag } from 'lucide-react';
 
 import { DISPLAY } from '../lib/constants';
 import {
@@ -48,17 +48,19 @@ export async function NetworkSection() {
         <StatCard
           icon={Boxes}
           label="Models"
-          value={String(summary.models.size)}
+          value={<Flow value={summary.models.size} kind="count" />}
+          caption={`${count(summary.freeModels)} with a free seller`}
         />
         <StatCard
-          icon={Gift}
-          label="Free models"
-          value={<Flow value={summary.freeModels} kind="count" />}
-          share={{
-            part: summary.freeModels,
-            whole: summary.models.size,
-            caption: `${count(summary.freeModels)} of ${count(summary.models.size)} models have a free seller`,
-          }}
+          icon={Tag}
+          label="Lowest output price / 1M"
+          value={priceText(summary.minOutput)}
+          caption={
+            summary.minInput === null
+              ? 'No paid offers now'
+              : `Input from ${usdc(summary.minInput)}`
+          }
+          money={summary.minOutput !== null}
         />
         <StatCard
           icon={Activity}

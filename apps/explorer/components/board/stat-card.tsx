@@ -17,14 +17,18 @@ export function StatCard({
   value,
   deltas,
   share,
+  caption,
   money,
 }: {
   icon: LucideIcon;
   label: string;
   value: ReactNode;
   deltas?: Delta[];
-  // The value as a part of a whole, drawn as a meter with its caption.
+  // The value as a part of a whole, drawn as a meter with its caption; only where the ratio says
+  // something (a share of a meaningful whole), never for a one-of-one.
   share?: { part: number; whole: number; caption: ReactNode };
+  // A plain line of context under the value, without a meter.
+  caption?: ReactNode;
   money?: boolean;
 }) {
   return (
@@ -62,6 +66,7 @@ export function StatCard({
           ) : null}
         </span>
         {share ? <Share {...share} /> : null}
+        {caption ? <span className="text-xs text-muted">{caption}</span> : null}
       </div>
     </section>
   );
