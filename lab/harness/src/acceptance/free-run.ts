@@ -7,6 +7,7 @@ import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
 import { acceptQuote } from './buyer';
+import { createAdmissionClock, type AdmissionClock } from './clock';
 import {
   ACCEPTANCE,
   ACCEPTANCE_CLOCKS,
@@ -40,6 +41,7 @@ import type { AcceptanceSession } from './session';
 
 export interface FreeAcceptanceOptions {
   signal?: AbortSignal;
+  admissionClock?: AdmissionClock;
   onCase?: (value: FreeAcceptanceCase) => void;
 }
 export async function runFreeAcceptance(options: FreeAcceptanceOptions = {}) {
@@ -60,7 +62,9 @@ export async function runFreeAcceptance(options: FreeAcceptanceOptions = {}) {
     assertAcceptanceActive(signal);
   };
   try {
-    run = await createFreeSeller(signal);
+    run = await createFreeSeller(signal, {
+      admissionClock: options.admissionClock ?? createAdmissionClock(),
+    });
     const began = run.clock.now();
     acceptanceAssert(await run.host().publisher.tick());
     buyer = await createFreeBuyer(run);

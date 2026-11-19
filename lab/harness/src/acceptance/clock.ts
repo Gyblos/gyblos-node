@@ -21,3 +21,15 @@ export function createAcceptanceClock(
   };
 }
 export type AcceptanceClock = ReturnType<typeof createAcceptanceClock>;
+
+// Per-run monotonic time for the free flow's admission buckets only.
+export function createAdmissionClock() {
+  let elapsed = 0;
+  return {
+    now: () => elapsed,
+    advance(milliseconds: number) {
+      elapsed += milliseconds;
+    },
+  };
+}
+export type AdmissionClock = ReturnType<typeof createAdmissionClock>;
