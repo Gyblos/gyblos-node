@@ -1,13 +1,16 @@
 // Owns how one read of a public source is shared by the renders of a data center through the Workers
 // Cache API (caches.default), so the load on the source does not grow with viewers:
-// - a fresh entry serves every render without a read;
-// - past its freshness, one render takes a short lease and reads, while the others keep serving the
-//   last entry (kept for `keepSeconds`; the page shows its time);
-// - a failed read leaves the lease in place as a back-off, so nobody reads again before it ends;
-// - a partial read (some secondary answers missing) is shared for a shorter time.
-// Without an entry, a render reads unless the last read failed within the back-off. Two renders can
-// still both read when they start within the same instant (the Cache API has no atomic claim). The
-// cache only saves reads: when it fails, the render reads the source itself.
+// - a fresh entry serves every render without a read (freshness counts from the end of the read);
+// - past its freshness, one render takes a lease that outlasts its slowest possible read and reads,
+//   while the others keep serving the last entry (kept for `keepSeconds`);
+// - without an entry (a cold cache), the others wait a little for that read instead of reading too;
+// - a failed read turns the lease into a back-off, so nobody reads again before it ends, and the last
+//   entry is served marked as old (`staleFrom`);
+// - a partial read (some secondary answers missing) is fresh for a shorter time;
+// - a lease is released only by its owner, and an older read never replaces a newer entry.
+// The Cache API has no atomic claim: renders that look in the same instant, as an entry goes stale,
+// can each take the lease and read. The cache only saves reads: when it fails, the render reads the
+// source itself.
 
 export interface SharedStore {
   match(key: string): Promise<Response | undefined>;
@@ -20,20 +23,37 @@ export interface SharePolicy {
   freshSeconds: number;
   partialFreshSeconds: number;
   keepSeconds: number;
-  leaseSeconds: number;
+  // Longer than the slowest possible read.
+  readingLeaseSeconds: number;
+  failedBackoffSeconds: number;
+  // How long a render without an entry waits for another render's read, and how often it looks.
+  waitSeconds: number;
+  waitPollMs: number;
 }
 export interface Loaded<T> {
   value: T;
-  // False when a secondary answer was missing: shared for partialFreshSeconds only.
+  // False when a secondary answer was missing: fresh for partialFreshSeconds only.
   complete: boolean;
+}
+export interface Shared<T> {
+  value: T;
+  // When the source failed and an older read is served: when that read ended. Null otherwise.
+  staleFrom: number | null;
 }
 interface Entry<T> {
   value: T;
+  startedAt: number;
+  readAt: number;
   freshUntil: number;
 }
-type Lease = 'reading' | 'failed';
+interface Lease {
+  owner: string;
+  state: 'reading' | 'failed';
+}
 
 const MS_PER_SECOND = 1000;
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // The data center's cache, or null where there is none (local runs and tests).
 export function workersCache(): SharedStore | null {
@@ -63,45 +83,95 @@ async function set(
       }),
     );
   } catch {
-    // Not shared this time; the next render reads.
+    // Not shared this time; a later render reads.
   }
+}
+
+async function waitForEntry<T>(
+  store: SharedStore,
+  policy: SharePolicy,
+  clock: () => number,
+  wait: (ms: number) => Promise<void>,
+): Promise<Entry<T> | undefined> {
+  const deadline = clock() + policy.waitSeconds * MS_PER_SECOND;
+  while (clock() < deadline) {
+    await wait(policy.waitPollMs);
+    const entry = await get<Entry<T>>(store, policy.key);
+    if (entry) return entry;
+  }
+  return undefined;
 }
 
 export async function sharedRead<T>(
   store: SharedStore | null,
   policy: SharePolicy,
-  now: number,
+  clock: () => number,
   load: () => Promise<Loaded<T>>,
   failed: (error: unknown) => T,
-): Promise<T> {
+  wait: (ms: number) => Promise<void> = sleep,
+): Promise<Shared<T>> {
+  const fresh = (value: T): Shared<T> => ({ value, staleFrom: null });
   if (!store)
     return load().then(
-      (loaded) => loaded.value,
-      (error: unknown) => failed(error),
+      (loaded) => fresh(loaded.value),
+      (error: unknown) => fresh(failed(error)),
     );
   const leaseKey = `${policy.key}/lease`;
+  const startedAt = clock();
   const entry = await get<Entry<T>>(store, policy.key);
-  if (entry && now < entry.freshUntil) return entry.value;
+  if (entry && startedAt < entry.freshUntil) return fresh(entry.value);
   const lease = await get<Lease>(store, leaseKey);
-  if (entry && lease) return entry.value;
-  if (lease === 'failed') return failed(new Error('source backing off'));
-  await set(store, leaseKey, 'reading', policy.leaseSeconds);
+  if (lease?.state === 'failed')
+    return entry
+      ? { value: entry.value, staleFrom: entry.readAt }
+      : fresh(failed(new Error('source backing off')));
+  if (lease) {
+    if (entry) return fresh(entry.value);
+    const waited = await waitForEntry<T>(store, policy, clock, wait);
+    return fresh(
+      waited ? waited.value : failed(new Error('source read in progress')),
+    );
+  }
+  const owner = crypto.randomUUID();
+  await set(
+    store,
+    leaseKey,
+    { owner, state: 'reading' } satisfies Lease,
+    policy.readingLeaseSeconds,
+  );
   let loaded: Loaded<T>;
   try {
     loaded = await load();
   } catch (error) {
-    await set(store, leaseKey, 'failed', policy.leaseSeconds);
-    return entry ? entry.value : failed(error);
+    await set(
+      store,
+      leaseKey,
+      { owner, state: 'failed' } satisfies Lease,
+      policy.failedBackoffSeconds,
+    );
+    return entry
+      ? { value: entry.value, staleFrom: entry.readAt }
+      : fresh(failed(error));
   }
-  const fresh = loaded.complete
-    ? policy.freshSeconds
-    : policy.partialFreshSeconds;
-  await set(
-    store,
-    policy.key,
-    { value: loaded.value, freshUntil: now + fresh * MS_PER_SECOND },
-    policy.keepSeconds,
-  );
-  await store.delete(leaseKey).catch(() => false);
-  return loaded.value;
+  const readAt = clock();
+  const latest = await get<Entry<T>>(store, policy.key);
+  if (!latest || latest.startedAt <= startedAt) {
+    const seconds = loaded.complete
+      ? policy.freshSeconds
+      : policy.partialFreshSeconds;
+    await set(
+      store,
+      policy.key,
+      {
+        value: loaded.value,
+        startedAt,
+        readAt,
+        freshUntil: readAt + seconds * MS_PER_SECOND,
+      } satisfies Entry<T>,
+      policy.keepSeconds,
+    );
+  }
+  const held = await get<Lease>(store, leaseKey);
+  if (held?.owner === owner) await store.delete(leaseKey).catch(() => false);
+  return fresh(loaded.value);
 }

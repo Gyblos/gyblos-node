@@ -10,6 +10,7 @@ import {
   percent,
   tokensPerSecond,
   usdc,
+  utc,
 } from '../lib/format';
 import {
   completion,
@@ -98,6 +99,12 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
           />
         ))}
       </Table>
+      {discovery.staleFrom ? (
+        <p className="mt-1 text-xs text-dim">
+          The discovery index is not answering: what is offered is as of{' '}
+          {utc(discovery.staleFrom)}.
+        </p>
+      ) : null}
       {offersKnown ? null : (
         <p className="mt-1 text-xs text-dim">
           The discovery index did not answer: what is offered now is unknown.

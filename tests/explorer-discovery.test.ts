@@ -112,11 +112,11 @@ void test('a large index is read within the bounds and marked incomplete', async
   );
 });
 
-void test('past the uptime bound, the other sellers show none and the list is marked incomplete', async () => {
+void test('past the uptime bound, the other sellers show none and the list stays complete', async () => {
   const paths: string[] = [];
   fakeIndex(1, paths, DISCOVERY.maxUptimeReads + 10);
   const snapshot = await getDiscovery();
-  assert.equal(snapshot.truncated, true);
+  assert.equal(snapshot.truncated, false);
   assert.equal(snapshot.sellers.length, DISCOVERY.maxUptimeReads + 10);
   assert.equal(
     paths.filter((path) => path.endsWith('/uptime')).length,
@@ -141,46 +141,86 @@ void test('a source that never answers is given up after the timeout', async () 
   });
 });
 
-void test('a fresh read serves every render, and only one render reads when it ages', async () => {
+const KEY = 'https://explorer.gyblos.com/_shared/discovery';
+const noWait = () => Promise.resolve();
+
+// A fake index whose reads wait until `open()` is called, to hold a read in flight.
+function gatedIndex(paths: string[]) {
+  let open = () => {};
+  const gate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  fakeIndex(1, paths, 1, true);
+  const answer = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    await gate;
+    return answer(input);
+  }) as typeof fetch;
+  return () => open();
+}
+
+void test('a fresh read serves every render; freshness counts from the end of the read', async () => {
+  const clock = { now: 1_000_000 };
+  const { store, stored } = fakeStore(clock);
+  const paths: string[] = [];
+  fakeIndex(2, paths, 1, true);
+  const first = await readDiscovery(store, () => clock.now);
+  assert.equal(first.error, null);
+  assert.ok(first.network);
+  assert.equal(first.staleFrom, null);
+  assert.equal(countReads(paths), 1);
+  const entry = JSON.parse(stored.get(KEY)!.body) as { freshUntil: number };
+  assert.equal(entry.freshUntil, clock.now + 30 * SECOND);
+
+  clock.now += 25 * SECOND;
+  assert.deepEqual(await readDiscovery(store, () => clock.now), first);
+  assert.equal(countReads(paths), 1);
+  clock.now += 10 * SECOND;
+  await readDiscovery(store, () => clock.now);
+  assert.equal(countReads(paths), 2);
+});
+
+void test('while one render reads, the others serve the last read and do not read', async () => {
   const clock = { now: 1_000_000 };
   const { store } = fakeStore(clock);
   const paths: string[] = [];
-  fakeIndex(2, paths, 1, true);
-  const first = await readDiscovery(store, clock.now);
-  assert.equal(first.error, null);
-  assert.ok(first.network);
-  assert.equal(countReads(paths), 1);
-
-  // A complete read stays fresh for 30 s.
-  clock.now += 25 * SECOND;
-  assert.deepEqual(await readDiscovery(store, clock.now), first);
-  assert.equal(countReads(paths), 1);
-
-  // Past its freshness: one render reads, and a render arriving while it reads does not.
-  clock.now += 10 * SECOND;
-  const reading = readDiscovery(store, clock.now);
+  fakeIndex(1, paths, 1, true);
+  const first = await readDiscovery(store, () => clock.now);
+  clock.now += 31 * SECOND;
+  const open = gatedIndex(paths);
+  const reading = readDiscovery(store, () => clock.now);
+  // Let the reader take the lease and start its read, held at the gate.
   await new Promise((resolve) => setImmediate(resolve));
-  await readDiscovery(store, clock.now);
+  const other = await readDiscovery(store, () => clock.now);
+  assert.deepEqual(other, first);
+  open();
   await reading;
   assert.equal(countReads(paths), 2);
 });
 
-void test('while one render reads, the others serve the last read', async () => {
+void test('on a cold cache, a render waits for the read in flight instead of reading', async () => {
   const clock = { now: 1_000_000 };
   const { store } = fakeStore(clock);
   const paths: string[] = [];
-  fakeIndex(1, paths);
-  const first = await readDiscovery(store, clock.now);
-  clock.now += 31 * SECOND;
-  await store.put(
-    'https://explorer.gyblos.com/_shared/discovery/lease',
-    Response.json('reading', { headers: { 'cache-control': 'max-age=15' } }),
+  const open = gatedIndex(paths);
+  const reading = readDiscovery(store, () => clock.now);
+  await new Promise((resolve) => setImmediate(resolve));
+  // The waiting render polls; the read ends while it waits.
+  const waiting = readDiscovery(
+    store,
+    () => clock.now,
+    async () => {
+      open();
+      await reading;
+    },
   );
-  assert.deepEqual(await readDiscovery(store, clock.now), first);
+  const [first, second] = await Promise.all([reading, waiting]);
+  assert.equal(second.error, null);
+  assert.deepEqual(second, first);
   assert.equal(countReads(paths), 1);
 });
 
-void test('a failed read backs off: no render reads again until the back-off ends', async () => {
+void test('a failed read backs off, and then the last good read is shown as old', async () => {
   const clock = { now: 1_000_000 };
   const { store, stored } = fakeStore(clock);
   let calls = 0;
@@ -188,42 +228,72 @@ void test('a failed read backs off: no render reads again until the back-off end
     calls += 1;
     return new Response('{}', { status: 429 });
   }) as typeof fetch;
-  assert.ok((await readDiscovery(store, clock.now)).error);
-  assert.ok((await readDiscovery(store, clock.now + 5 * SECOND)).error);
+  assert.ok((await readDiscovery(store, () => clock.now)).error);
+  assert.ok((await readDiscovery(store, () => clock.now + 5 * SECOND)).error);
   assert.equal(calls, 1);
-  assert.equal(
-    stored.has('https://explorer.gyblos.com/_shared/discovery'),
-    false,
-  );
+  assert.equal(stored.has(KEY), false);
 
   const paths: string[] = [];
-  fakeIndex(1, paths);
+  fakeIndex(1, paths, 1, true);
   clock.now += 16 * SECOND;
-  assert.equal((await readDiscovery(store, clock.now)).error, null);
-  assert.equal(countReads(paths), 1);
-});
+  const good = await readDiscovery(store, () => clock.now);
+  assert.equal(good.error, null);
+  const readAt = clock.now;
 
-void test('after a good read, a failed one serves the last good read', async () => {
-  const clock = { now: 1_000_000 };
-  const { store } = fakeStore(clock);
-  fakeIndex(1, []);
-  const good = await readDiscovery(store, clock.now);
   globalThis.fetch = (async () =>
     new Response('{}', { status: 503 })) as typeof fetch;
   clock.now += 31 * SECOND;
-  assert.deepEqual(await readDiscovery(store, clock.now), good);
+  const old = await readDiscovery(store, () => clock.now);
+  assert.equal(old.staleFrom, readAt);
+  assert.deepEqual(old.sellers, good.sellers);
+  // During the back-off the old read is served, still marked, without a read.
+  const again = await readDiscovery(store, () => clock.now + 5 * SECOND);
+  assert.equal(again.staleFrom, readAt);
 });
 
-void test('a partial read is shared for a shorter time', async () => {
+void test('a lease is released only by its owner, and an older read never replaces a newer one', async () => {
+  const clock = { now: 1_000_000 };
+  const { store, stored } = fakeStore(clock);
+  const paths: string[] = [];
+  const open = gatedIndex(paths);
+  const older = readDiscovery(store, () => clock.now);
+  await new Promise((resolve) => setImmediate(resolve));
+  // Another render took the lease since (its own read), and wrote a newer entry.
+  await store.put(
+    `${KEY}/lease`,
+    Response.json(
+      { owner: 'someone-else', state: 'reading' },
+      { headers: { 'cache-control': 'max-age=100' } },
+    ),
+  );
+  await store.put(
+    KEY,
+    Response.json(
+      {
+        value: { marker: 'newer' },
+        startedAt: clock.now + 1,
+        readAt: clock.now + 2,
+        freshUntil: clock.now + 30 * SECOND,
+      },
+      { headers: { 'cache-control': 'max-age=600' } },
+    ),
+  );
+  open();
+  await older;
+  assert.ok(stored.has(`${KEY}/lease`));
+  assert.match(stored.get(KEY)!.body, /newer/);
+});
+
+void test('a partial read is fresh for a shorter time', async () => {
   const clock = { now: 1_000_000 };
   const { store } = fakeStore(clock);
   const paths: string[] = [];
   // No /network answer: the read is partial.
   fakeIndex(1, paths);
-  const partial = await readDiscovery(store, clock.now);
+  const partial = await readDiscovery(store, () => clock.now);
   assert.equal(partial.network, null);
   clock.now += 16 * SECOND;
-  await readDiscovery(store, clock.now);
+  await readDiscovery(store, () => clock.now);
   assert.equal(countReads(paths), 2);
 });
 
@@ -235,7 +305,7 @@ void test('without a shared cache, or with one that fails, every render still re
     put: () => Promise.reject(new Error('cache down')),
     delete: () => Promise.reject(new Error('cache down')),
   };
-  const snapshot = await readDiscovery(broken, 1_000_000);
+  const snapshot = await readDiscovery(broken, () => 1_000_000, noWait);
   assert.equal(snapshot.error, null);
   assert.equal(snapshot.sellers.length, 1);
 });

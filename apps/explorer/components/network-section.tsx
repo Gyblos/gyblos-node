@@ -44,6 +44,12 @@ export async function NetworkSection() {
   return (
     <>
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
+      {snapshot.staleFrom ? (
+        <p className="-mt-2 mb-3 text-xs text-dim">
+          The discovery index is not answering: showing its answer from{' '}
+          {utc(snapshot.staleFrom)}.
+        </p>
+      ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SellersOnline snapshot={snapshot} />
         <StatCard

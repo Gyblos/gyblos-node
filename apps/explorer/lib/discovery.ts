@@ -40,8 +40,10 @@ export interface DiscoverySnapshot {
   sellers: Seller[];
   // Null when the index does not answer /network (an older index): only online sellers are known.
   network: NetworkStatus | null;
-  // True when the read stopped at one of DISCOVERY's bounds: sellers or uptimes may be missing.
+  // True when the read stopped at DISCOVERY.maxSellerPages: sellers may be missing.
   truncated: boolean;
+  // Set when the index is not answering and an older read is shown: when that read ended.
+  staleFrom: number | null;
   error: string | null;
 }
 
@@ -116,13 +118,17 @@ const SHARE: SharePolicy = {
   freshSeconds: DISCOVERY.freshSeconds,
   partialFreshSeconds: DISCOVERY.partialFreshSeconds,
   keepSeconds: DISCOVERY.keepSeconds,
-  leaseSeconds: DISCOVERY.leaseSeconds,
+  readingLeaseSeconds: DISCOVERY.readingLeaseSeconds,
+  failedBackoffSeconds: DISCOVERY.failedBackoffSeconds,
+  waitSeconds: DISCOVERY.waitSeconds,
+  waitPollMs: DISCOVERY.waitPollMs,
 };
 const unavailable = (error: unknown): DiscoverySnapshot => ({
   generatedAt: 0,
   sellers: [],
   network: null,
   truncated: false,
+  staleFrom: null,
   error: error instanceof Error ? error.message : 'discovery unavailable',
 });
 
@@ -130,12 +136,25 @@ const unavailable = (error: unknown): DiscoverySnapshot => ({
 // render (the Network and Models sections share the answer) and shared by the renders of a data center
 // (shared-read.ts).
 export const getDiscovery = cache((): Promise<DiscoverySnapshot> =>
-  readDiscovery(workersCache(), Date.now()),
+  readDiscovery(workersCache(), Date.now),
 );
 
-// The shared read with an explicit cache and clock.
-export const readDiscovery = (store: SharedStore | null, now: number) =>
-  sharedRead(store, SHARE, now, loadDiscovery, unavailable);
+// The shared read with an explicit cache, clock and wait.
+export async function readDiscovery(
+  store: SharedStore | null,
+  clock: () => number,
+  wait?: (ms: number) => Promise<void>,
+): Promise<DiscoverySnapshot> {
+  const shared = await sharedRead(
+    store,
+    SHARE,
+    clock,
+    loadDiscovery,
+    unavailable,
+    wait,
+  );
+  return { ...shared.value, staleFrom: shared.staleFrom };
+}
 
 // Throws on failure. A seller whose uptime cannot be read shows none until the next read, and the read
 // is then partial, as it is without /network.
@@ -155,7 +174,6 @@ async function loadDiscovery(): Promise<Loaded<DiscoverySnapshot>> {
           await read(`/uptime?node=${encodeURIComponent(seller.nodeId)}`),
         );
       } catch {
-        seller.uptime = null;
         uptimeMissing = true;
       }
     }),
@@ -164,7 +182,8 @@ async function loadDiscovery(): Promise<Loaded<DiscoverySnapshot>> {
     generatedAt: num(listed.generatedAt, 'models.generatedAt'),
     sellers,
     network: await network,
-    truncated: found.truncated || sellers.length > DISCOVERY.maxUptimeReads,
+    truncated: found.truncated,
+    staleFrom: null,
     error: null,
   };
   return { value, complete: value.network !== null && !uptimeMissing };
