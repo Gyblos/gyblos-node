@@ -42,7 +42,7 @@ function useSellerConfirmation(
         policy?.maxAtomic === maxAtomic &&
         policy.depositAtomic &&
         policy.lifetimeMs
-          ? buyer.state
+          ? { policy, summary: buyer.state.summary, error: undefined }
           : await buyer.run({
               action: X402_ACTION.CONFIGURE_PAID,
               maxAtomic,
