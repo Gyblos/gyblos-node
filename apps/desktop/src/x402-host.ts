@@ -19,6 +19,7 @@ import {
   type ProcessLock,
 } from '@gyblos/runtime/private-file';
 
+import { registerFunding } from './funding/host';
 import { createUsdcApiHandlers } from './usdc-api-handlers';
 import { USDC_API } from './usdc-api-model';
 import { X402Budget } from './x402-budget';
@@ -65,6 +66,13 @@ function managedBuyer(
   );
   return { environment, managed };
 }
+function frameOwner(window: BrowserWindow) {
+  return {
+    contents: window.webContents,
+    mainFrame: () => window.webContents.mainFrame,
+    destroyed: () => window.isDestroyed(),
+  };
+}
 export function registerDesktopX402(
   window: BrowserWindow,
   profile: string,
@@ -95,14 +103,17 @@ export function registerDesktopX402(
     client,
     budget,
   );
+  const closeFunding = registerFunding(
+    window,
+    environment,
+    () => client.policy(),
+    resolveOffer,
+  );
+  const owner = frameOwner(window);
   const handle = createX402Handlers(
     client,
     budget,
-    {
-      contents: window.webContents,
-      mainFrame: () => window.webContents.mainFrame,
-      destroyed: () => window.isDestroyed(),
-    },
+    owner,
     (url) => shell.openExternal(url),
     managed,
     (value) => clipboard.writeText(value),
@@ -115,11 +126,7 @@ export function registerDesktopX402(
   );
   const apiKeys = createUsdcApiHandlers(
     client,
-    {
-      contents: window.webContents,
-      mainFrame: () => window.webContents.mainFrame,
-      destroyed: () => window.isDestroyed(),
-    },
+    owner,
     (text) => clipboard.writeText(text),
     { home: homedir(), environment },
   );
@@ -134,6 +141,7 @@ export function registerDesktopX402(
   );
   return {
     async close() {
+      closeFunding();
       apiKeys.close();
       ipcMain.removeHandler(USDC_API.CHANNEL);
       ipcMain.removeHandler(USDC_API.REVEAL_CHANNEL);
