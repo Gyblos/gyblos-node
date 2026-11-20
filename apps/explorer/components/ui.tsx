@@ -99,9 +99,12 @@ export function ModelName({
 }) {
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
-    <span className="inline-flex items-center gap-2">
+    <span
+      className="inline-flex max-w-full items-center gap-2 align-middle"
+      title={[modelId, detail].filter(Boolean).join(' ')}
+    >
       <ModelLogo modelId={modelId} />
-      <span>
+      <span className="truncate">
         {modelId}
         {detail ? (
           <span className="ml-2 font-mono text-xs text-dim">{detail}</span>

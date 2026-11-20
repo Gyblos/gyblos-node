@@ -253,7 +253,9 @@ function DemandTable({ demand }: { demand: [string, number][] }) {
       >
         {demand.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
-            <td className={td}>{model}</td>
+            <td className={td} title={model}>
+              {model}
+            </td>
             <td className={numberCell}>{count(requests)}</td>
           </tr>
         ))}
