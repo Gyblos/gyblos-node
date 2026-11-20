@@ -1,9 +1,15 @@
 # Code standards
 
 Detailed conventions behind the short rules in [AGENTS.md](../AGENTS.md). If the
-two disagree, AGENTS.md wins. Architecture and ownership are in
-[architecture.md](architecture.md); test policy is in
-[tests/README.md](../tests/README.md).
+two disagree, AGENTS.md wins. Lint enforces the rules in the table below;
+everything else on this page is checked in review.
+
+Related pages:
+
+- Architecture and ownership: [architecture.md](architecture.md).
+- Test policy: [tests/README.md](../tests/README.md).
+- Failure diagnostics at lifecycle, HTTP and child-process boundaries:
+  [diagnostics.md](diagnostics.md).
 
 ## What lint enforces
 
@@ -17,21 +23,21 @@ grow in a PR.
 | ----------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
 | One declaration per `const`/`let`         | error | All TypeScript.                                                                                             |
 | `@typescript-eslint/no-explicit-any`      | error | All TypeScript.                                                                                             |
-| No object-literal `as` assertion          | error | Product, lab and tooling; allowed in `tests/` for invalid inputs and partial SDK doubles.                   |
+| No object-literal `as` assertion          | error | Product, lab and tooling; allowed in `tests/` and `packages/*/test/` for invalid inputs and SDK doubles.    |
 | `@typescript-eslint/no-floating-promises` | error | All TypeScript.                                                                                             |
 | `gyblos/package-boundaries`               | error | `apps`, `packages`, `lab`: a relative import must not leave its package.                                    |
 | `gyblos/import-extensions`                | error | All TypeScript: relative code imports have no extension; `.json`/`.css` keep it.                            |
 | `gyblos/version-pins`                     | error | `packages/config/src/versions.ts` must match the dependency pins in manifests.                              |
 | `pnpm boundaries` (dependency-cruiser)    | error | Layer direction, adapter and app independence, standalone packages, no product import of lab/tests/tooling. |
 | Import order (prettier sort-imports)      | error | Checked by `prettier --check`; `pnpm format` fixes it.                                                      |
-| `max-lines-per-function` 80               | warn  | Off for `tests/` and `lab/`; blank lines and comments are not counted.                                      |
+| `max-lines-per-function` 80               | warn  | Off for `tests/`, `packages/*/test/` and `lab/`; blank lines and comments are not counted.                  |
 | `max-lines` 400                           | warn  | All TypeScript.                                                                                             |
-| `no-magic-numbers`                        | warn  | Off for `packages/config`, `constants.ts` files and tests; -1, 0, 1, 2 are allowed.                         |
+| `no-magic-numbers`                        | warn  | Off for `packages/config`, `constants.ts` files and tests; -1, 0, 1, 2 and their BigInt forms are allowed.  |
 | `gyblos/structure` (short-name denylist)  | warn  | `apps`, `packages`, `lab`: bindings such as `r`, `res`, `req`, `e`, `env`, `addr`, `sig`.                   |
 
-Everything else on this page is checked in review, not by lint: module headers,
-canonical values and derived types, error catalogs, boundary parsing, naming
-beyond the denylist and declaration placement.
+Review checks the rest: module headers, canonical values and derived types,
+error catalogs, boundary parsing, naming beyond the denylist and declaration
+placement.
 
 Never silence a rule, add a baseline or cast to make a check pass. Fix the code
 or, if the rule is wrong, change the rule in a separate tooling PR with a test.
@@ -39,7 +45,14 @@ or, if the rule is wrong, change the rule in a separate tooling PR with a test.
 ## Module shape
 
 - Start each TypeScript module with a 1-3 line header stating its responsibility
-  and the boundary it must not cross.
+  and the boundary it must not cross. For example, `packages/node/src/home.ts`
+  opens with:
+
+  ```ts
+  // Fail-closed guard for the local home: a missing home directory next to an existing legacy path stops
+  // setup and startup. Uses lstat existence checks only; never reads, lists, moves or migrates legacy data.
+  ```
+
 - Keep functions focused on one named step. Use descriptive names; `i` and `tx`
   are permitted.
 - New code is TypeScript, not MJS.
@@ -79,7 +92,7 @@ definition: named constants or an `as const` catalog in the owning package's
   separately in the evidence union and the catch handler.
 - Keep ownership: lab evidence diagnostics belong to `lab/harness`; payment port
   codes (`PAYMENT_ERROR_CODES`) belong to `protocol`, and x402 diagnostics to
-  `payments-x402`. Do not widen a closed contract to `string` or use casts or
+  `payments-upto`. Do not widen a closed contract to `string` or use casts or
   `any` to bypass it.
 - Search for an existing canonical value before adding one. Do not borrow a
   constant from an unrelated concept because its value matches (an HTTP status
@@ -97,9 +110,10 @@ definition: named constants or an `as const` catalog in the owning package's
 
 `packages/config` holds operator-changeable values (ports, limits, timeouts,
 relays, index URLs) and the local home layout. `config/src/home.ts` is the only
-module that builds local paths. Fixed operational values live in the owning
-module or its `constants.ts`; config is not a place for unrelated constants.
-Dependency versions come from manifests and the lockfile.
+module that builds local paths (`config/src/paths.ts` holds HTTP routes, not
+file paths). Fixed operational values live in the owning module or its
+`constants.ts`; config is not a place for unrelated constants. Dependency
+versions come from manifests and the lockfile.
 
 ## Errors and external boundaries
 
@@ -123,4 +137,15 @@ you touch a contract, and report remaining gaps accurately.
   separately reviewed behavior change. Do not silently tighten accepted input or
   change error precedence during a refactor.
 - Retained legacy fixed config values need not move during unrelated work.
-- Existing lint warnings are tracked debt; a PR must not add warnings.
+- Existing lint warnings are tracked debt; see
+  [What lint enforces](#what-lint-enforces).
+
+## Documentation
+
+- Every page of the public docs site (`apps/docs`) has an English and a Spanish
+  file, updated together with the same sections and identical code blocks. A
+  change to output that the seller guide quotes updates the guide in the same
+  PR. `tests/docs-content.test.ts` checks both.
+- State only what the current code does, and link to the single page that owns a
+  topic instead of copying it. The repository docs index is
+  [docs/README.md](README.md).

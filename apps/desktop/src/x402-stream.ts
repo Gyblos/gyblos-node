@@ -7,6 +7,7 @@ import {
   OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 
+import { desktopBuyerFailure } from './buyer-error';
 import { reportedUsage } from './response-metrics';
 import { DESKTOP_X402, DESKTOP_X402_STREAM } from './x402/constants';
 
@@ -47,6 +48,8 @@ function streamFrame(
   }
   if (state.terminal) throw new Error('Invalid buyer stream');
   const value = object(JSON.parse(data));
+  if (Object.hasOwn(value, 'error'))
+    throw desktopBuyerFailure(value.error, policy);
   if (
     value.object !== AGENT_CHAT.CHUNK ||
     value.model !== policy.model ||

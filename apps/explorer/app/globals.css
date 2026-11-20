@@ -1,0 +1,61 @@
+@import 'tailwindcss';
+
+/* Gyblos brand tokens (DESIGN.md): one blue, neutral surfaces; light values match the web's. The
+   signal tone is the brand blue on light surfaces and #2e6bff on dark ones, for status dots and focus
+   rings only, never text. */
+:root {
+  --brand-blue: #0a28f0;
+  --signal: #0a28f0;
+  /* Chart marks: the brand blue where it reads (7.0:1 light), the signal tone on dark cards. */
+  --chart: var(--brand-blue);
+  --bg: #fcfcfc;
+  --panel: #f4f5f6;
+  --raised: #eceef0;
+  --line: #e4e6e8;
+  --ink: #1c1c1c;
+  --muted: #5f6368;
+  --dim: #6b6b6b;
+  --money: #0f7a3d;
+  --good: #0f7a3d;
+  --bad: #c0362c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --signal: #2e6bff;
+    --chart: var(--signal);
+    --bg: #090909;
+    --panel: #151515;
+    --raised: #222222;
+    --line: #303030;
+    --ink: #f5f5f5;
+    --muted: #b8b8b8;
+    --dim: #a0a0a0;
+    --money: #4ade80;
+    --good: #4ade80;
+    --bad: #f87171;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-dim: var(--dim);
+  --color-brand: var(--brand-blue);
+  --color-signal: var(--signal);
+  --color-money: var(--money);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --font-sans: var(--font-instrument), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-instrument), system-ui, sans-serif;
+}

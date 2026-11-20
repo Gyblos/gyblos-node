@@ -124,7 +124,9 @@ function WalletOverview({
             ? wallet.backupVerified
               ? 'Backup verified'
               : 'Backup needed'
-            : 'Not available'}
+            : wallet.status === WALLET_STATUS.LOCKED
+              ? 'Locked'
+              : 'Not available'}
         </Badge>
       </div>
       <div className="ui-wallet-summary">

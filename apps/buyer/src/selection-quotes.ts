@@ -9,6 +9,7 @@ import {
   ERROR_DIAGNOSTICS,
   SELLER_FAILURE_PHASES,
 } from './constants';
+import { SellerRefusal } from './control';
 import { raceControlOffers } from './offer-race';
 import type {
   BuyerControlClient,
@@ -55,7 +56,9 @@ function coolAfterQuote(
   },
 ) {
   const { dependencies } = context;
-  if (code === CONTROL_CODES.TOOLS) return null;
+  // Neither refusal is a fault: the seller serves other requests (without tools, or smaller ones).
+  if (code === CONTROL_CODES.TOOLS || code === CONTROL_CODES.TOO_SLOW)
+    return null;
   return recordQuote(
     dependencies.stats,
     nodeId,
@@ -83,6 +86,37 @@ function releaseInBackground(
   const closing = client.close().catch(() => undefined);
   settling.push(closing);
   dependencies.snapshots?.retire(nodeId, closing);
+}
+
+// A quote request with the input size. The seller that answered this conversation's last turn within
+// FREE_BUYER.warmCacheMs likely holds most of it in its prompt cache, so the full size would overstate
+// its reading: it is not sent.
+// A seller from before quotes carried the size refuses that key as invalid. It is asked once more
+// without it and quotes as it did then; only the retry's outcome counts for or against it. Only the
+// seller's own refusal does: this buyer's checks of its answer are never retried.
+async function requestSized(
+  client: BuyerControlClient,
+  params: Parameters<BuyerControlClient['requestOffer']>[0],
+  {
+    config,
+    nodeId,
+    signal,
+  }: { config: BuyerSelectionConfig; nodeId: string; signal: AbortSignal },
+) {
+  const inputTokens =
+    nodeId === config.warmSeller ? undefined : config.request.inputTokens;
+  if (!inputTokens) return client.requestOffer(params, signal);
+  try {
+    return await client.requestOffer({ ...params, inputTokens }, signal);
+  } catch (error) {
+    if (
+      signal.aborted ||
+      !(error instanceof SellerRefusal) ||
+      error.code !== CONTROL_CODES.INVALID
+    )
+      throw error;
+    return client.requestOffer(params, signal);
+  }
 }
 
 export async function raceCandidates(
@@ -216,8 +250,8 @@ async function requestCandidate(
       signal,
     );
     remembered = opened.remembered;
-    const client = opened.client;
-    const quote = await client.requestOffer(
+    const quote = await requestSized(
+      opened.client,
       {
         buyer: dependencies.buyer,
         selection: request.selection,
@@ -229,7 +263,7 @@ async function requestCandidate(
         asset: request.asset,
         ...(request.tools ? { tools: true as const } : {}),
       },
-      querySignal,
+      { config, nodeId: candidate.nodeId, signal: querySignal },
     );
     if (querySignal.aborted)
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);

@@ -12,6 +12,7 @@ import {
   DESKTOP,
   DESKTOP_ACTIVITY,
   DESKTOP_UPDATE,
+  STARTUP_PROGRESS,
 } from './constants';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
 import { parsePaymentReferences } from './payment-reference-model';
@@ -21,7 +22,12 @@ import {
 } from './paypal-agent-model';
 import { DESKTOP_PAYPAL, parsePaypalResult } from './paypal-model';
 import { parseProbeResult } from './probe-model';
-import { parseUsdcApiState, USDC_API } from './usdc-api-model';
+import { parseStartupProgress } from './startup-progress';
+import {
+  parseUsdcApiSecret,
+  parseUsdcApiState,
+  USDC_API,
+} from './usdc-api-model';
 import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model';
 import { parseWalletSummary, WALLET } from './wallet/model';
 import {
@@ -41,6 +47,22 @@ contextBridge.exposeInMainWorld('desktopWindow', {
   platform: windowPlatform(process.platform),
 });
 
+contextBridge.exposeInMainWorld('desktopStartup', {
+  status: async () =>
+    parseStartupProgress(
+      await ipcRenderer.invoke(STARTUP_PROGRESS.STATUS_CHANNEL),
+    ),
+  onProgress: (listener: (percentage: number) => void) => {
+    const receive = (_event: unknown, input: unknown) => {
+      const percentage = parseStartupProgress(input);
+      if (percentage !== null) listener(percentage);
+    };
+    ipcRenderer.on(STARTUP_PROGRESS.CHANGED_CHANNEL, receive);
+    return () =>
+      ipcRenderer.removeListener(STARTUP_PROGRESS.CHANGED_CHANNEL, receive);
+  },
+});
+
 contextBridge.exposeInMainWorld('desktopConversations', {
   load: async () =>
     parseChatArchiveLoad(await ipcRenderer.invoke(CHAT_STORAGE.LOAD_CHANNEL)),
@@ -56,6 +78,10 @@ contextBridge.exposeInMainWorld('desktopConversations', {
 contextBridge.exposeInMainWorld('desktopUsdcApiKeys', {
   run: async (request: unknown) =>
     parseUsdcApiState(await ipcRenderer.invoke(USDC_API.CHANNEL, request)),
+  reveal: async (request: unknown) =>
+    parseUsdcApiSecret(
+      await ipcRenderer.invoke(USDC_API.REVEAL_CHANNEL, request),
+    ),
 });
 contextBridge.exposeInMainWorld('desktopX402', {
   run: async (request: unknown) =>
@@ -138,6 +164,10 @@ contextBridge.exposeInMainWorld('desktopProbe', {
   run: async () => parseProbeResult(await ipcRenderer.invoke(DESKTOP.CHANNEL)),
 });
 contextBridge.exposeInMainWorld('desktopWallet', {
+  activate: async () =>
+    parseWalletCollection(
+      await ipcRenderer.invoke(WALLET_SETTINGS.ACTIVATE_CHANNEL),
+    ),
   collection: async () =>
     parseWalletCollection(
       await ipcRenderer.invoke(WALLET_SETTINGS.COLLECTION_CHANNEL),

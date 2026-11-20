@@ -12,7 +12,9 @@ import { createAcceptanceSession, type AcceptanceSession } from './session';
 
 export async function createFreeSeller(
   signal: AbortSignal,
-  shared?: AcceptanceSession,
+  shared?: Partial<
+    Pick<AcceptanceSession, 'index' | 'clock' | 'admissionClock'>
+  >,
   limited = false,
 ) {
   const run = await createAcceptanceSession(
@@ -21,6 +23,7 @@ export async function createFreeSeller(
     {
       index: shared?.index,
       clock: shared?.clock,
+      admissionClock: shared?.admissionClock,
       offer: {
         kind: OFFER_PRICING_KINDS.FREE,
         modelId: MODEL_IDS.QWEN3_0_6B,

@@ -28,6 +28,13 @@ export interface SqliteD1 extends D1Database {
   }[];
 }
 
+// D1 refuses a statement with more bound parameters than this; node:sqlite would not.
+const D1_MAX_BOUND_PARAMETERS = 100;
+function checkParameters(params: D1Value[]) {
+  if (params.length > D1_MAX_BOUND_PARAMETERS)
+    throw new Error('too many SQL variables');
+}
+
 export function createCollectorD1(): SqliteD1 {
   const raw = new DatabaseSync(':memory:');
   for (const file of readdirSync(MIGRATIONS).sort())
@@ -38,7 +45,10 @@ export function createCollectorD1(): SqliteD1 {
     sql: string,
     params: D1Value[] = [],
   ): D1PreparedStatement => ({
-    bind: (...values) => statement(sql, values),
+    bind: (...values) => {
+      checkParameters(values);
+      return statement(sql, values);
+    },
     all: () => {
       log.push({ kind: 'direct', batch: 0, sql, params });
       return Promise.resolve({
@@ -65,8 +75,16 @@ export function createCollectorD1(): SqliteD1 {
           run: prepared.run,
         };
         pending.set(wrapped, () => {
+          checkParameters(params);
           log.push({ kind: 'batch', batch: batches, sql, params });
-          const result = raw.prepare(sql).run(...params);
+          const query = raw.prepare(sql);
+          // Like D1, a batched statement that returns rows (a SELECT) carries them in `results`.
+          if (query.columns().length)
+            return {
+              meta: { changes: 0 },
+              results: query.all(...params) as D1Row[],
+            };
+          const result = query.run(...params);
           return { meta: { changes: Number(result.changes) }, results: [] };
         });
         return wrapped;

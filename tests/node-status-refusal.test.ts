@@ -100,12 +100,14 @@ void test('seller status --online pages the index for the served model until it 
       await daemonReady(home);
       await writeFile(join(home.root, 'config.toml'), PUBLISH);
       const index = fakeFetch((call) =>
-        jsonResponse(
-          200,
-          call.url.includes('cursor=')
-            ? sellersBody([listed.entry])
-            : sellersBody([other.entry], 'page2'),
-        ),
+        call.url.includes('/uptime')
+          ? jsonResponse(404, { error: 'NOT_FOUND' })
+          : jsonResponse(
+              200,
+              call.url.includes('cursor=')
+                ? sellersBody([listed.entry])
+                : sellersBody([other.entry], 'page2'),
+            ),
       );
       const fake = system(home, {
         fetch: index.fetch,
@@ -118,13 +120,22 @@ void test('seller status --online pages the index for the served model until it 
         /discovery\s+on \(https:\/\/index\.test <path hidden>\)\n/,
       );
       const online = await status(home, fake, ['--online']);
-      assert.equal(index.calls.length, 2);
-      // Only the model goes to the index, never the NodeId.
-      for (const call of index.calls)
+      const pages = index.calls.filter((call) => call.url.includes('/sellers'));
+      assert.equal(pages.length, 2);
+      // Paging sellers sends only the model; the NodeId goes only to the uptime lookup.
+      for (const call of pages)
         assert.equal(call.url.includes(home.nodeId), false);
+      assert.deepEqual(
+        index.calls
+          .filter((call) => !call.url.includes('/sellers'))
+          .map((call) => call.url),
+        [`${DISCOVERY_BASE}/uptime?node=${home.nodeId}`],
+      );
+      assert.match(online.stdout, /uptime\s+never seen by the index/);
       assert.match(online.stdout, /; listed in the index/);
       const down = await status(home, system(home), ['--online']);
       assert.match(down.stdout, /; index unreachable/);
+      assert.match(down.stdout, /uptime\s+unavailable \(index unreachable\)/);
     },
     { nodeId: listed.catalog.nodeId },
   );
@@ -150,7 +161,10 @@ void test('seller status --online says when it found nothing, stopped paging or 
       system(home, { fetch: endless.fetch, now: () => DISCOVERY_NOW }),
       ['--online'],
     );
-    assert.equal(endless.calls.length, 10);
+    assert.equal(
+      endless.calls.filter((call) => call.url.includes('/sellers')).length,
+      10,
+    );
     assert.match(
       truncated.stdout,
       /; not in the first 2000 sellers of the index/,
@@ -181,3 +195,161 @@ void test('seller status refuses flags of other commands', () =>
       assert.match(result.stderr, /^Usage:/, args.join(' '));
     }
   }));
+
+void test('seller status: a publication the index refused shows its code and how to register, never a crafted value', () =>
+  withHome(async (home) => {
+    await writeFile(join(home.root, 'config.toml'), PUBLISH);
+    const write = (lastError: unknown) =>
+      writeFile(
+        join(home.seller, 'status.json'),
+        JSON.stringify({
+          status: 'ready',
+          nodeId: home.nodeId,
+          offers: [{ modelId: 'qwen3-0.6b', engine: 'ollama', listed: true }],
+          publication: { lastError },
+        }),
+      );
+    await write('DISCOVERY_PUBLISH_NOT_ALLOWED');
+    const refused = await status(home, system(home));
+    assert.match(
+      refused.stdout,
+      /discovery\s+on \(https:\/\/index\.test <path hidden>\); publishing refused: DISCOVERY_PUBLISH_NOT_ALLOWED \(.*seller register.*\)\n/,
+    );
+    await write(null);
+    const clear = await status(home, system(home));
+    assert.doesNotMatch(clear.stdout, /publishing refused/);
+    await write('x y\u001b[2J');
+    const crafted = await status(home, system(home));
+    assert.doesNotMatch(crafted.output, /\u001b|publishing refused/);
+  }));
+
+const uptimeBody = (
+  nodeId: string,
+  lastSeenAt: number | null,
+  ratios: [number, number, number],
+) => ({
+  nodeId,
+  firstSeenAt: DISCOVERY_NOW - 40 * 24 * 3_600_000,
+  lastSeenAt,
+  slotMs: 300_000,
+  windows: [1, 7, 30].map((days, index) => ({
+    days,
+    seen: Math.round(ratios[index]! * 288 * days),
+    slots: 288 * days,
+    ratio: ratios[index]!,
+  })),
+  generatedAt: DISCOVERY_NOW,
+});
+
+void test('seller status --online reports uptime: online with the last presence, or offline since the last one', async () => {
+  const listed = await discoverySeller({ modelId: 'qwen3-0.6b' });
+  const other = await discoverySeller({ modelId: 'qwen3-0.6b' });
+  await withHome(
+    async (home) => {
+      await daemonReady(home);
+      await writeFile(join(home.root, 'config.toml'), PUBLISH);
+      const online = fakeFetch((call) =>
+        call.url.includes('/uptime')
+          ? jsonResponse(
+              200,
+              uptimeBody(
+                home.nodeId,
+                DISCOVERY_NOW - 60_000,
+                [0.9965, 0.9988, 0.5],
+              ),
+            )
+          : jsonResponse(200, sellersBody([listed.entry])),
+      );
+      const up = await status(
+        home,
+        system(home, { fetch: online.fetch, now: () => DISCOVERY_NOW }),
+        ['--online'],
+      );
+      assert.match(
+        up.stdout,
+        /uptime\s+99\.7% last 24h, 99\.9% last 7 days, 50\.0% last 30 days; online, last presence \d+ (s|min) ago\n/,
+      );
+      const lastSeen = DISCOVERY_NOW - 3 * 3_600_000;
+      const gone = fakeFetch((call) =>
+        call.url.includes('/uptime')
+          ? jsonResponse(
+              200,
+              uptimeBody(home.nodeId, lastSeen, [0.8, 0.9, 0.9]),
+            )
+          : jsonResponse(200, sellersBody([other.entry])),
+      );
+      const down = await status(
+        home,
+        system(home, { fetch: gone.fetch, now: () => DISCOVERY_NOW }),
+        ['--online'],
+      );
+      assert.match(down.stdout, /; not found in the index/);
+      assert.match(
+        down.stdout,
+        new RegExp(
+          `uptime\\s+80\\.0% last 24h, 90\\.0% last 7 days, 90\\.0% last 30 days; offline since ${new Date(lastSeen).toISOString().replace(/\.\d+Z$/, 'Z')}`,
+        ),
+      );
+      // A report for another NodeId is not trusted.
+      const wrong = fakeFetch((call) =>
+        call.url.includes('/uptime')
+          ? jsonResponse(200, uptimeBody(other.catalog.nodeId, null, [1, 1, 1]))
+          : jsonResponse(200, sellersBody([listed.entry])),
+      );
+      const mismatch = await status(
+        home,
+        system(home, { fetch: wrong.fetch, now: () => DISCOVERY_NOW }),
+        ['--online'],
+      );
+      assert.match(
+        mismatch.stdout,
+        /uptime\s+unavailable \(index unreachable\)/,
+      );
+      // Without --online nothing is asked and no uptime line is printed.
+      const quiet = await status(
+        home,
+        system(home, { fetch: online.fetch, now: () => DISCOVERY_NOW }),
+      );
+      assert.doesNotMatch(quiet.stdout, /uptime/);
+    },
+    { nodeId: listed.catalog.nodeId },
+  );
+});
+
+void test('seller status --online says "offline" only when the index answered without this seller', async () => {
+  const listed = await discoverySeller({ modelId: 'qwen3-0.6b' });
+  const other = await discoverySeller({ modelId: 'qwen3-0.6b' });
+  await withHome(
+    async (home) => {
+      await daemonReady(home);
+      await writeFile(join(home.root, 'config.toml'), PUBLISH);
+      const lastSeen = DISCOVERY_NOW - 3_600_000;
+      const iso = new Date(lastSeen).toISOString().replace(/\.\d+Z$/, 'Z');
+      // Paging is cut short (the NodeId may be further on): the last presence, no verdict.
+      const endless = fakeFetch((call) =>
+        call.url.includes('/uptime')
+          ? jsonResponse(200, uptimeBody(home.nodeId, lastSeen, [1, 1, 1]))
+          : jsonResponse(200, sellersBody([other.entry], 'more')),
+      );
+      const cut = await status(
+        home,
+        system(home, { fetch: endless.fetch, now: () => DISCOVERY_NOW }),
+        ['--online'],
+      );
+      assert.match(cut.stdout, new RegExp(`; last presence ${iso}\\n`));
+      assert.doesNotMatch(cut.stdout, /offline/);
+      const never = fakeFetch((call) =>
+        call.url.includes('/uptime')
+          ? jsonResponse(200, uptimeBody(home.nodeId, null, [0, 0, 0]))
+          : jsonResponse(200, sellersBody([other.entry])),
+      );
+      const quiet = await status(
+        home,
+        system(home, { fetch: never.fetch, now: () => DISCOVERY_NOW }),
+        ['--online'],
+      );
+      assert.match(quiet.stdout, /; no presence in the last 30 days\n/);
+    },
+    { nodeId: listed.catalog.nodeId },
+  );
+});

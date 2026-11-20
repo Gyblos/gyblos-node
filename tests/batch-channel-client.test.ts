@@ -17,7 +17,7 @@ import {
 } from '@gyblos/transport-iroh/batch-client';
 
 import { batchDeferred } from './support/batch-deferred';
-import { paidSource } from './support/paid-fixture';
+import { batchQuote } from './support/batch-quote';
 
 const seller = '34'.repeat(32);
 const destination = {
@@ -156,11 +156,11 @@ void test('a cancelled late connection is closed without sending or publishing a
 });
 void test('batch client refuses a quote that expired while opening the stream before any write', async () => {
   const f = fixture();
-  const source = await paidSource();
+  const source = await batchQuote();
   let now = source.now();
   const open = f.connection.openBi.bind(f.connection);
   f.connection.openBi = async () => {
-    now = source.paid.quote.offer.expiresAt;
+    now = source.quote.offer.expiresAt;
     return open();
   };
   const client = createBatchChannelClient(f.endpoint, destination, seller, {
@@ -170,7 +170,7 @@ void test('batch client refuses a quote that expired while opening the stream be
     version: BATCH_CHANNEL.version,
     requestId: '12'.repeat(16),
     method: BATCH_METHODS.OPEN,
-    params: { payload: 'synthetic opaque opening', quote: source.paid.quote },
+    params: { payload: 'synthetic opaque opening', quote: source.quote },
   };
   await assert.rejects(
     client.exchange(opening),
@@ -186,11 +186,11 @@ void test('batch client refuses a quote that expired while opening the stream be
 
 void test('batch PREPARE refuses expiry during stream opening before any write', async () => {
   const f = fixture();
-  const source = await paidSource();
+  const source = await batchQuote();
   let now = source.now();
   const open = f.connection.openBi.bind(f.connection);
   f.connection.openBi = async () => {
-    now = source.paid.quote.offer.expiresAt;
+    now = source.quote.offer.expiresAt;
     return open();
   };
   const client = createBatchChannelClient(f.endpoint, destination, seller, {
@@ -201,7 +201,7 @@ void test('batch PREPARE refuses expiry during stream opening before any write',
       version: BATCH_CHANNEL.version,
       requestId: '12'.repeat(16),
       method: BATCH_METHODS.PREPARE,
-      params: { quote: source.paid.quote },
+      params: { quote: source.quote },
     }),
     (error) =>
       error instanceof BatchClientError &&

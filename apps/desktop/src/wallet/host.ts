@@ -1,4 +1,4 @@
-// Wires the Electron window to the tested automatic wallet session and fixed IPC handlers.
+// Wires explicit protected-wallet access to authenticated IPC and native approval.
 // File pickers belong to the host; renderer startup never chooses or exports a wallet.
 import {
   clipboard,
@@ -13,7 +13,7 @@ import { WALLET } from './constants';
 import { createWalletHandlers } from './handlers';
 import { walletProtection } from './protection';
 import { createDesktopWalletSession } from './session';
-import { unavailableCollection, WALLET_SETTINGS } from './settings-model';
+import { WALLET_SETTINGS } from './settings-model';
 
 function walletDialogs(window: BrowserWindow) {
   return {
@@ -47,6 +47,26 @@ function walletDialogs(window: BrowserWindow) {
     },
   };
 }
+async function approveWalletAccess(window: BrowserWindow, signal: AbortSignal) {
+  if (signal.aborted || window.isDestroyed()) return false;
+  const frame = window.webContents.mainFrame;
+  const result = await dialog.showMessageBox(window, {
+    type: 'info',
+    title: 'Protected wallet',
+    message: 'Set up or unlock your wallet on this device?',
+    detail:
+      'Gyblos stores this wallet encrypted on your device. Your operating system may ask to unlock its secure storage. On macOS, “Gyblos Safe Storage” uses your Mac password: enter it only in the system dialog, never in Gyblos. You can cancel and keep using free models. This does not authorize a payment.',
+    buttons: ['Cancel', 'Continue'],
+    defaultId: 0,
+    cancelId: 0,
+  });
+  return (
+    result.response === 1 &&
+    !signal.aborted &&
+    !window.isDestroyed() &&
+    window.webContents.mainFrame === frame
+  );
+}
 export function registerDesktopWallet(
   window: BrowserWindow,
   root: string,
@@ -60,6 +80,7 @@ export function registerDesktopWallet(
         walletProtection(process.platform, safeStorage),
         walletDialogs(window),
         signal,
+        () => approveWalletAccess(window, signal),
       );
   const handlers = createWalletHandlers(
     session,
@@ -72,6 +93,10 @@ export function registerDesktopWallet(
   );
   ipcMain.handle(WALLET.CHANNEL, (event, ...args: unknown[]) =>
     handlers.summary(event, args),
+  );
+  ipcMain.handle(
+    WALLET_SETTINGS.ACTIVATE_CHANNEL,
+    (event, ...args: unknown[]) => handlers.activate(event, args),
   );
   ipcMain.handle(
     WALLET_SETTINGS.COLLECTION_CHANNEL,
@@ -87,7 +112,6 @@ export function registerDesktopWallet(
     handlers.backup(event, args),
   );
   return {
-    ready: session?.ready ?? Promise.resolve(unavailableCollection()),
     settled: () => session?.settled() ?? Promise.resolve(),
   };
 }

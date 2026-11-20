@@ -67,7 +67,11 @@ export {
 export { createUptoWithdrawal, type UptoWithdrawRpc } from './withdrawal';
 // Read only, for the seller's preflight: which token accounts a claim would pay into are missing or
 // could never receive a payout.
-export { uptoRecipientTokenAccounts } from 'x402-upto-metered';
+export {
+  createUptoRecipientAccounts,
+  uptoRecipientTokenAccounts,
+  type UptoRecipientAccountsRpc,
+} from 'x402-upto-metered';
 export {
   withdrawUptoBuyer,
   type UptoBuyerWithdrawOptions,

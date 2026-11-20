@@ -16,7 +16,6 @@ import {
   FREE_EXECUTION_CODES,
 } from '@gyblos/protocol/constants';
 import { PAID_INPUT_BYTES } from '@gyblos/protocol/execution-wire';
-import { PAID_EXECUTION, PAID_STREAM } from '@gyblos/protocol/paid/constants';
 
 import { controlFixture } from './support/control-fixture';
 import { CONVERSATION } from './support/conversation';
@@ -174,11 +173,25 @@ void test('a free offer refuses at quote time an answer longer than its limit', 
 });
 
 void test('paid execution keeps its input bound and admits long answers under a bounded deadline', () => {
-  assert.equal(PAID_EXECUTION.requestBytes, 131072 + 8192);
-  assert.equal(PAID_STREAM.maxEvents, 32769);
   assert.equal(PAID_INPUT_BYTES, 65536);
   assert.equal(generationDeadlineMs(90_000, 128), 90_000);
   assert.equal(generationDeadlineMs(90_000, 1128), 115_000);
   assert.equal(generationDeadlineMs(90_000, 32768), 170_000);
   assert.equal(generationDeadlineMs(200, 8), 200);
+});
+
+void test('the generation deadline adds time to read the prompt, scaled by its input tokens, under the ceiling', () => {
+  // No counted input keeps the answer-only deadline.
+  assert.equal(generationDeadlineMs(90_000, 128, 0), 90_000);
+  // A ~7k-token agent prompt gets 70 s more to be read before its answer's own time.
+  assert.equal(generationDeadlineMs(90_000, 128, 7_000), 160_000);
+  assert.equal(generationDeadlineMs(90_000, 1128, 4_000), 155_000);
+  // Reading and answering together stay under the buyer's request deadline.
+  assert.equal(generationDeadlineMs(90_000, 4096, 16_000), 170_000);
+  assert.equal(generationDeadlineMs(90_000, 128, 1e9), 170_000);
+  // A short engine deadline (tests) grows the same way.
+  assert.equal(generationDeadlineMs(200, 8, 50), 700);
+  // A count that is not a non-negative integer adds nothing.
+  assert.equal(generationDeadlineMs(90_000, 128, -5), 90_000);
+  assert.equal(generationDeadlineMs(90_000, 128, Number.NaN), 90_000);
 });

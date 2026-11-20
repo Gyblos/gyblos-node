@@ -1,7 +1,8 @@
 // Owns public seller uptime: which five-minute slots each NodeId held a signed presence the index
 // accepted, and GET /v1/uptime?node=<NodeId>, which reports the share of slots seen over the last day,
 // week and month. A window starts no earlier than the NodeId was first seen, so a new seller is not
-// counted down for time before it existed. Built only from records the index already verified.
+// counted down for time before it existed. Its sightings also feed GET /v1/network (network.ts). Built
+// only from records the index already verified.
 import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS, UPTIME } from './constants';
 import { indexFail } from './errors';
 
@@ -18,6 +19,13 @@ export interface UptimeRow {
   lastAt: number;
 }
 
+// A NodeId the index has seen: its first sighting ever and its latest since a given hour (null if none).
+export interface Sighting {
+  nodeId: string;
+  firstAt: number;
+  lastAt: number | null;
+}
+
 export interface UptimeStorage {
   // Marks the slot holding `now` for the NodeId.
   markSeen(nodeId: string, now: number, maxNodes?: number): Promise<void>;
@@ -25,6 +33,8 @@ export interface UptimeStorage {
   seen(nodeId: string, sinceHour: number): Promise<UptimeRow[]>;
   // When the NodeId was first seen, kept after its rows are pruned; null when never seen.
   firstSeen(nodeId: string): Promise<number | null>;
+  // Every NodeId ever seen, at most `limit`, with its latest sighting from `sinceHour` on.
+  sightings(sinceHour: number, limit: number): Promise<Sighting[]>;
   // Drops rows older than the retention period (UPTIME.retentionDays).
   pruneUptime(now: number): Promise<void>;
 }
@@ -177,6 +187,23 @@ export function memoryUptime() {
         firstAt: Math.min(prior?.firstAt ?? now, now),
         lastAt: Math.max(prior?.lastAt ?? now, now),
       });
+    },
+    async sightings(sinceHour: number, limit: number) {
+      return [...first]
+        .sort(([left], [right]) => (left < right ? -1 : 1))
+        .slice(0, limit)
+        .map(([nodeId, firstAt]) => {
+          const recent = [...(nodes.get(nodeId)?.values() ?? [])].filter(
+            (row) => row.hour >= sinceHour,
+          );
+          return {
+            nodeId,
+            firstAt,
+            lastAt: recent.length
+              ? Math.max(...recent.map((row) => row.lastAt))
+              : null,
+          };
+        });
     },
     async seen(nodeId: string, sinceHour: number) {
       return [...(nodes.get(nodeId)?.values() ?? [])]

@@ -4,7 +4,9 @@
 import { EndpointTicket } from '@number0/iroh';
 
 import {
+  DEVNET,
   DIAGNOSTICS,
+  PROTOCOL_FEE,
   ROLE_FILES,
   SELLER_DISCOVERY,
   TRANSPORT_TIMEOUTS,
@@ -51,17 +53,13 @@ import {
   roleSigner,
   type RoleConfig,
 } from './roles';
+import type { SellerPayments } from './seller-chain';
 import { SellerOfferSet } from './seller-offer-set';
 import {
   liveSellerOffer,
   prepareSellerOffers,
   retrySellerOffers,
 } from './seller-offers';
-import {
-  openSellerPaid,
-  type SellerPaid,
-  type SellerPayments,
-} from './seller-paid';
 import { startSellerSessionHost } from './seller-session-directory';
 import { loadSellerSettings, type SellerSettings } from './seller-settings';
 import { previousFailure } from './seller-status';
@@ -193,27 +191,24 @@ export async function startSeller(
     for (const warmed of ready)
       offers.add(await liveSellerOffer(warmed, offerDependencies));
     const { payments } = options;
-    let paid: SellerPaid | undefined;
+    let paid: SellerPayments | undefined;
     if (sellsPaid && payments) {
       await stage('payments');
-      paid = await openSellerPaid(
-        () => payments(config, { maxSessions: settings.limits.maxSessions }),
-        {
-          owner: owner.address,
-          mint: config.mint,
-          nodeId: config.nodeId,
-          startedAt,
-          offers: () => offers.all(),
-          telemetry: telemetry.sink
-            ? {
-                sink: telemetry.sink,
-                engineKind: (index) =>
-                  settings.offers[index]!.engine.engine.kind,
-              }
-            : undefined,
-        },
-      );
+      paid = await payments(config, {
+        maxSessions: settings.limits.maxSessions,
+      });
       disposers.push(paid.close);
+      const terms = paid.description;
+      if (
+        terms.network !== DEVNET ||
+        terms.mint !== config.mint ||
+        terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
+        terms.treasury !== PROTOCOL_FEE.treasury ||
+        [terms.feePayer, terms.authorizer].includes(terms.payTo)
+      )
+        throw new NodeError(
+          NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID,
+        );
     }
     const sessions = paid?.sessions
       ? await startSellerSessionHost({
@@ -257,7 +252,6 @@ export async function startSeller(
         relayOnly,
         control: true,
         freeExecution: true,
-        paidExecution: paid !== undefined,
         batchSessions: sessions !== undefined,
         batchBlocks: sessions !== undefined,
         receipts: true,
@@ -364,14 +358,21 @@ export async function startSeller(
             settings.limits.maxFreeBuyers,
           ),
         }),
-        paid: paid?.service,
         batchSessions: sessions?.service,
       },
       { relayOnly, limits: settings.limits },
     );
     disposers[endpointDisposeIndex] = () => bridge.close();
+    // The last publication error, kept in status.json so `gyblos seller status` can show why the index
+    // refused this seller. Written only when it changes.
+    let publicationError: string | null = null;
+    let publicationChanged = () => {};
     const publication = publicationConfig
       ? createSellerPublisher({
+          onError: (code) => {
+            publicationError = code;
+            publicationChanged();
+          },
           records: control.records,
           canPublish: () => {
             const observed = offers.readiness();
@@ -415,7 +416,13 @@ export async function startSeller(
         relayOnly,
         offers: offerStatus(settings, offers),
         offerTicket,
+        ...(publication
+          ? { publication: { lastError: publicationError } }
+          : {}),
       });
+    publicationChanged = () => {
+      writeReady().catch(() => {});
+    };
     const retry = retrySellerOffers(pending, {
       ...offerDependencies,
       add: async (live) => {
@@ -432,7 +439,6 @@ export async function startSeller(
       publication: publication ? () => publication.health() : undefined,
       receipts: receipts.health,
       telemetry: telemetry.health,
-      payments: paid ? () => paid.health() : undefined,
     };
   } catch (error) {
     await close();

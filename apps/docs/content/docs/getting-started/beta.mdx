@@ -1,49 +1,74 @@
 ---
 title: Requirements
-description: Check the supported seller path, invitation and machine requirements before installing.
+description: What the beta supports and what you need to use Gyblos as a buyer or to run a seller.
 ---
 
-This handbook follows the official installer, `https://gyblos.com/install.sh`, which pins one signed
-release of the `ghcr.io/gyblos/seller` image by version and digest. Include `docker compose images seller`
-when asking for help so the team can identify your installed image.
+Check this page before you install anything. It lists what the beta supports for each role and the
+machine, account and funds each role needs.
 
-## Scope [#what-you-can-do-today]
+## Beta scope [#what-you-can-do-today]
 
-| Task                          | Scope of this handbook                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Install and operate a seller  | Docker with local Ollama and pinned Qwen3 0.6B, reasoning off                                                |
-| Offer free inference          | Daily total and per-buyer token caps; counters are in memory                                                 |
-| Register and publish          | Invitation and devnet enrollment; interactive registration can create missing enrollment after cost approval |
-| Use other engine plugins      | Advanced configuration; schema acceptance does not establish model validation                                |
-| Set up paid offers or mainnet | Outside this onboarding; mainnet configuration is refused                                                    |
+| Task                         | During the beta                                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Chat with models             | Desktop app, free offers. No wallet or funds needed.                                                      |
+| Connect coding tools         | An API key from the desktop app, with a spend limit. Free and priced offers.                              |
+| Run a seller                 | Docker seller, or native seller without Docker. The installer serves Qwen3 0.6B on Ollama, reasoning off. |
+| Offer free inference         | Daily total and per-buyer token caps.                                                                     |
+| Charge for inference         | Reusable payment channels on devnet, paid in devnet USDC. See [Get paid](/en/sellers/get-paid).           |
+| Register and publish         | Needs an invite code. Registering in the 8004 agent registry costs a little devnet SOL.                   |
+| Use other engines and models | Advanced configuration. A file that passes validation does not prove the model serves well.               |
+| Mainnet                      | Refused. `network = "mainnet"` in `config.toml` fails validation with `MAINNET_UNSUPPORTED`.              |
 
-If enrollment is missing, the seller owner wallet needs devnet SOL for registration. The command
-estimates its cost and asks for approval; see [Register and publish](/en/sellers/register-publish).
+Devnet SOL and devnet USDC have no market value. Your electricity, hosting and internet still cost
+money, and a remote engine may charge you even for a free offer.
 
-The beta uses Solana **devnet**. The default free offer moves no real money. Your electricity,
-hosting and internet still have a cost; a remote engine may also charge you even for a free offer.
+## Use Gyblos as a buyer [#buyer-requirements]
 
-## Before you start [#before-you-install]
+For the [desktop app](/en/buyers/desktop-app):
 
-- An invitation containing a one-use **invite code** starting with `gyb_`. No relay token is needed.
-- A machine that stays on: Linux x86-64 or ARM64, macOS, or Windows x64.
-- With Docker (Linux or macOS): Docker Engine with Compose, or Docker Desktop. Compose must be **v2.17 or later**.
-  Without Docker (macOS Apple Silicon, Linux, Windows x64): your own [Ollama](https://ollama.com); see the
-  [seller guide](/en/sellers/beta-guide).
-- At least **4 GB of memory** and a few GB of free disk. Seller startup requires **1.5 GiB of headroom** above the seller process; Ollama needs memory too.
-- Outbound internet access. The supplied Compose setup publishes no listening ports and uses outbound relay connections.
+- macOS on Apple Silicon (M1 or newer), Windows 10 or 11 (x64), or Linux (x64). There is no build for
+  Intel Macs.
+- Internet access to the discovery index, Solana devnet and the Gyblos relays.
+- No invitation: the app needs no invite code.
 
-Treat Docker access as privileged. On Linux use an account already authorized to run Docker;
-do not change host permissions merely to bypass an installation error.
+To [connect your coding tools](/en/buyers/use-from-code) you need nothing more: the app gives you the API
+key and Base URL.
 
-## What checks prove [#what-a-successful-check-means]
+## Run a seller [#before-you-install]
 
-`doctor` checks startup prerequisites and probes supported dependencies. It does not generate an answer.
-`RUNNING` confirms the service state; registration grants permission to publish; `listed in the index`
-confirms an index lookup. None of these alone proves that an external buyer completed inference.
+- An invitation with a one-use **invite code** that starts with `gyb_`. You do not need a relay token. If you
+  don't have one, ask for it in the [Gyblos Telegram](https://t.me/gyblos).
+- A machine that stays on, with at least **4 GB of memory** and a few GB of free disk.
+- Outbound internet access. The seller opens no listening port; it connects out to the relays.
+- One of these install types. The installer uses Docker when your account can run it, and the native
+  seller otherwise:
 
-Prompts are processed by the engine you configure. A local seller can read them; a remote provider also
-receives them. Relay use does not guarantee IP anonymity. Signed records do not independently prove
-which model answered or whether its answer is correct.
+| Install type  | Platforms                                           | You provide                                                        |
+| ------------- | --------------------------------------------------- | ------------------------------------------------------------------ |
+| Docker seller | Linux (x86-64 or ARM64) or macOS                    | Docker Engine with Compose **v2.17 or later**, or Docker Desktop   |
+| Native seller | macOS on Apple Silicon, Linux (x64 or arm64, glibc) | Your own [Ollama](https://ollama.com/download)                     |
+| Native seller | Windows 10 or 11 (x64), with `install.ps1`          | Your own [Ollama for Windows](https://ollama.com/download/windows) |
 
-**Next:** [Install your first seller](/en/sellers/beta-guide).
+Intel Macs and Linux with musl (Alpine) need Docker. On a Mac with Apple Silicon the native seller is
+faster, because Docker cannot use the GPU. See [Install a seller](/en/sellers/beta-guide) for each path.
+
+With a local engine, the seller advertises its offer only while at least **1.5 GiB** of memory stays free
+beyond the seller itself. Below that it keeps running but stays unlisted. The model needs memory too.
+
+On Linux, membership in the `docker` group gives an account root-level control of the machine. When the
+installer cannot use Docker it suggests adding your account to that group. Do that only if this account
+may hold that power; otherwise let the installer set up the native seller.
+
+You also need a little **devnet SOL** from the [devnet faucet](https://faucet.solana.com): about 0.02 SOL
+on the owner address to register, and about 0.05 SOL on the fee payer if you charge for inference. The
+installer prints both addresses. Never use mainnet funds or keys.
+
+## Data that leaves your machine [#data-that-leaves-your-machine]
+
+Release builds of the seller and the desktop app upload signed, content-free receipts to the Gyblos
+metrics collector, `collector.gyblos.com`. Receipts have no opt-out. They also upload content-free
+telemetry observations, which `GYBLOS_OBSERVATIONS=off` turns off. Neither contains prompts or answers.
+See [Data and privacy](/en/reference/data-and-privacy) for the full list.
+
+**Next:** read [How it works](/en/getting-started/how-it-works), or go straight to the
+[desktop app](/en/buyers/desktop-app) or the [Install a seller](/en/sellers/beta-guide) guide.

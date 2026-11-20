@@ -1,0 +1,90 @@
+---
+title: Cómo funciona Gyblos
+description: Vendedores, compradores, el índice de descubrimiento, los relays, las ofertas, los pagos en devnet y los recibos, y cómo pasa una solicitud por ellos.
+---
+
+Gyblos conecta a quienes ejecutan modelos de IA con quienes quieren usarlos, sin un servidor central en
+medio de cada respuesta. Esta página explica las piezas y el recorrido de una solicitud. Para
+definiciones breves, consulta el [glosario](/es/getting-started/glossary).
+
+## Roles [#roles]
+
+Un **vendedor** sirve un modelo. El nodo vendedor es un proceso en el equipo del vendedor. Ejecuta el
+modelo con un motor, Ollama por defecto, y lo ofrece a la red. Lo instalas como vendedor Docker o como
+vendedor nativo; consulta los [requisitos](/es/getting-started/beta).
+
+Un **comprador** usa un modelo. La mayoría usa la [app de escritorio](/es/buyers/desktop-app). La app
+ejecuta un comprador local: un pequeño servidor en tu equipo cuyo endpoint de comprador habla las API de
+OpenAI y Anthropic, así que tus herramientas de código pueden usar Gyblos con una API key
+([conecta tus herramientas de código](/es/buyers/use-from-code)).
+
+## Identidad y descubrimiento [#identidad-y-descubrimiento]
+
+Cada nodo tiene un **NodeId**, su identidad pública en la red. Un vendedor tiene además una billetera
+**dueño** (owner). El vendedor registra su NodeId y su dueño en el **registro de agentes 8004** de Solana devnet,
+para que los compradores puedan comprobar con quién hablan.
+
+El **índice de descubrimiento**, en `discovery.gyblos.com`, lista a los vendedores y sus ofertas. Un
+vendedor pasa por tres estados:
+
+1. **En marcha**: el nodo vendedor funciona. Todavía nadie puede encontrarlo.
+2. **Registrado**: un código de invitación admitió esta identidad en el índice. Ya puede publicar.
+3. **Listado**: el vendedor publicó sus ofertas listas y una consulta al índice lo encuentra.
+
+`gyblos seller status --online` informa del estado del servicio, por ejemplo `RUNNING`, y de si una
+consulta encuentra al vendedor (`listed in the index`). Consulta
+[Registro](/es/sellers/register-publish) para saber qué demuestra cada resultado.
+
+## Conexiones y relays [#conexiones-y-relays]
+
+Comprador y vendedor se comunican de igual a igual, con cifrado de extremo a extremo. Los relays de
+Gyblos, como `na1.relay.gyblos.com`, ayudan a que ambos lados se encuentren y transportan el tráfico
+cuando no es posible una conexión directa. El vendedor solo abre conexiones salientes, así que no abre
+ningún puerto en tu router.
+
+## Ofertas y precios [#ofertas-y-precios]
+
+Una **oferta** indica un modelo, sus niveles de razonamiento, el motor que lo sirve y sus condiciones.
+Las condiciones son gratuitas, con límites diarios de tokens, o un precio en USDC por millón de tokens de
+entrada y de salida. Los compradores pagan el precio del vendedor más una comisión de Gyblos del 4 %.
+
+Antes de cada solicitud el vendedor envía una **cotización** firmada. Una cotización a precio cero se
+ejecuta sin ningún pago. Una cotización con precio pasa por un canal de pago, como se explica abajo. La
+configuración del comprador fija un **tope** (ceiling): nunca autoriza más que esa cantidad.
+
+## Una solicitud, paso a paso [#una-solicitud]
+
+1. El comprador busca en el índice de descubrimiento los vendedores que ofrecen el modelo.
+2. Comprueba el NodeId y el dueño del vendedor en el registro de agentes 8004 antes de enviar nada.
+3. Se conecta al vendedor a través de los relays y pide una cotización.
+4. Con una cotización gratuita, el vendedor ejecuta el modelo y devuelve la respuesta a medida que se
+   genera.
+5. Con una cotización con precio, el comprador firma un máximo para esta solicitud y lo deposita en un
+   **canal de pago** en Solana devnet. El vendedor responde, mide los tokens y liquida el canal. El dueño
+   del vendedor recibe el precio, Gyblos recibe su comisión y el resto vuelve al comprador.
+6. En una solicitud gratuita o en una sesión de pago, ambos lados firman un **recibo**: un registro del
+   modelo, los tokens y los tiempos, sin el mensaje ni la respuesta. Una solicitud con precio suelta, sin
+   sesión, no genera recibo.
+
+Durante la beta todos los pagos usan **USDC de devnet**, que no tiene valor de mercado. Una **sesión de
+pago** reutilizable, en la que un depósito paga muchas respuestas, funciona con vendedores que publican ofertas con precio. Consulta
+[Cobrar](/es/sellers/get-paid) para el lado del vendedor.
+
+## Recibos y estadísticas de la red [#recibos]
+
+Las versiones publicadas suben los recibos firmados al **recolector de métricas** de Gyblos,
+`collector.gyblos.com`. Guarda en privado los datos individuales y solo publica estadísticas agregadas
+de la red. Consulta [Datos y privacidad](/es/reference/data-and-privacy) para saber qué envía cada rol.
+
+## Lo que la red no garantiza [#limites]
+
+- El equipo del vendedor ejecuta el modelo, así que el vendedor puede leer tus mensajes. Un proveedor de
+  motor remoto también los recibe. Nunca envíes contraseñas, claves ni otros secretos.
+- Usar un relay no garantiza que tu dirección IP quede oculta.
+- Los registros firmados demuestran quién los firmó. No demuestran qué modelo respondió ni que una
+  respuesta sea correcta.
+- Que un vendedor esté en marcha, registrado o listado no demuestra que un comprador haya completado una
+  solicitud.
+
+**Siguiente:** revisa los [requisitos](/es/getting-started/beta) y empieza con la
+[app de escritorio](/es/buyers/desktop-app) o con la guía [Instala un vendedor](/es/sellers/beta-guide).

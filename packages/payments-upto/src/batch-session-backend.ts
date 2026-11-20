@@ -10,7 +10,6 @@ import {
   type PaymentSessionTerms,
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { createBatchBuyer } from './batch-session-buyer';
 import { openingFor, requirementsFor, termsFor } from './batch-session-checks';
@@ -30,6 +29,7 @@ import type {
 import { waitBatch } from './batch-session-wait';
 import { createBuyerObservationRpc } from './buyer-observation-transport';
 import { BATCH_OPENING_LIMITS } from './constants';
+import { assertFeeWire, limitedFeePayer } from './fee-payer';
 import { verifyPaymentNetwork } from './seller-network';
 
 interface Options {
@@ -38,11 +38,7 @@ interface Options {
   now?: () => number;
   rpc?: BatchObserverOptions['rpc'];
 }
-function privatePlatform() {
-  if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
-}
 async function compatible(options: Options, terms: PaymentSessionTerms) {
-  privatePlatform();
   termsFor(terms);
   const existing = await inspectBatchSession(options.paths);
   if (existing && canonicalJson(existing.terms) !== canonicalJson(terms))
@@ -52,7 +48,6 @@ async function compatible(options: Options, terms: PaymentSessionTerms) {
 export function openBatchBuyerBackend(
   options: Options & { payer: KeyPairSigner },
 ): BatchBuyerBackend {
-  privatePlatform();
   const rpc = options.rpc ?? createBuyerObservationRpc(options.rpcUrl);
   let observer: ReturnType<typeof batchSessionObserver> | undefined;
   return {
@@ -121,6 +116,11 @@ async function firstProof(
   if (Buffer.byteLength(payload) > BATCH_OPENING_LIMITS.bytes)
     return sessionFail(SESSION_CODES.LIMIT);
   const opening = openingFor(JSON.parse(payload), terms);
+  try {
+    assertFeeWire(opening.deposit.transaction, terms.feePayer);
+  } catch {
+    return sessionFail(SESSION_CODES.UNVERIFIED);
+  }
   const requirements = await requirementsFor(terms);
   const unused = async () => sessionFail(SESSION_CODES.UNAVAILABLE);
   const verifier = await facilitator(
@@ -149,10 +149,11 @@ export function openBatchSellerBackend(
     signer?: FacilitatorSvmSigner;
   },
 ): BatchSellerBackend {
-  privatePlatform();
   const signer =
     options.signer ??
-    toFacilitatorSvmSigner(options.feePayer, { defaultRpcUrl: options.rpcUrl });
+    toFacilitatorSvmSigner(limitedFeePayer(options.feePayer), {
+      defaultRpcUrl: options.rpcUrl,
+    });
   return {
     inspect: () => inspectBatchSession(options.paths),
     async renew(

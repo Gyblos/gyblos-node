@@ -4,11 +4,10 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { address, generateKeyPairSigner, getAddressEncoder } from '@solana/kit';
+import { address, getAddressEncoder } from '@solana/kit';
 import ts from 'typescript';
 
 import applicationManifest from '@gyblos/core/package.json' with { type: 'json' };
-import { signInferenceOffer, verifyInferenceOffer } from '@gyblos/node/offers';
 import {
   canonicalJson,
   ENGINE_DONE_REASONS,
@@ -22,7 +21,6 @@ import {
   type EngineWireUsage,
 } from '@gyblos/protocol';
 import { OFFER_DOMAIN } from '@gyblos/protocol/constants';
-import type { InferenceOffer } from '@gyblos/protocol/offer';
 import protocolManifest from '@gyblos/protocol/package.json' with { type: 'json' };
 import vector from '@gyblos/protocol/vectors/signed-inference-offer-v1.json' with { type: 'json' };
 
@@ -84,19 +82,6 @@ void test('legacy offer golden vector preserves canonical bytes, Ed25519 signatu
     await verify(vector.domain, vector.offer, publicKey, signature),
     true,
   );
-  const actual = await verifyInferenceOffer(
-    { offer: vector.offer, signature: vector.signatureBase64 },
-    {
-      owner: vector.offer.owner,
-      nodeId: vector.offer.nodeId,
-      mint: vector.offer.mint,
-      payTo: vector.offer.payTo,
-      buyer: vector.offer.buyer,
-      maxAtomic: vector.offer.maxAtomic,
-    },
-    vector.offer.issuedAt,
-  );
-  assert.deepEqual(actual, vector.offer);
 });
 
 void test('SDK-independent signing uses the exact domain bytes and rejects a different domain or payload', async () => {
@@ -215,7 +200,7 @@ void test('engine completion reasons and separate domain/wire usage contracts ke
 
 void test('protocol has no SDK dependencies and application imports neither payment nor engine adapters', () => {
   assert.ok(!('dependencies' in protocolManifest));
-  for (const adapter of ['@gyblos/payments-x402', '@gyblos/engine-ollama'])
+  for (const adapter of ['@gyblos/payments-upto', '@gyblos/engine-ollama'])
     assert.ok(!(adapter in applicationManifest.dependencies));
   const root = new URL('../packages/core/src/', import.meta.url);
   for (const filename of readdirSync(root, {
@@ -235,7 +220,7 @@ void test('protocol has no SDK dependencies and application imports neither paym
         ts.isStringLiteral(node.moduleSpecifier)
       )
         assert.ok(
-          !/^@gyblos\/(?:payments-x402|engine-ollama)(?:\/|$)/.test(
+          !/^@gyblos\/(?:payments-upto|engine-ollama)(?:\/|$)/.test(
             node.moduleSpecifier.text,
           ),
           `${filename}: ${node.moduleSpecifier.text}`,
@@ -244,38 +229,4 @@ void test('protocol has no SDK dependencies and application imports neither paym
     }
     inspect(parsed);
   }
-});
-
-void test('application signing adapts the wallet once and preserves protocol bytes and signature', async () => {
-  const owner = await generateKeyPairSigner();
-  const offer: InferenceOffer = {
-    ...vector.offer,
-    owner: owner.address,
-    capabilities: { ...vector.offer.capabilities, modelIdentity: 'digest' },
-    meteringMode: 'recounted',
-  };
-  let calls = 0;
-  const result = await signInferenceOffer(offer, {
-    ...owner,
-    signMessages: async (messages, config) => {
-      calls++;
-      assert.equal(messages.length, 1);
-      assert.deepEqual(
-        Uint8Array.from(messages[0]!.content),
-        signingBytes(vector.domain, offer),
-      );
-      return owner.signMessages(messages, config);
-    },
-  });
-  assert.equal(calls, 1);
-  assert.equal(result.offer, offer);
-  assert.equal(
-    await verify(
-      vector.domain,
-      offer,
-      Uint8Array.from(getAddressEncoder().encode(owner.address)),
-      Uint8Array.from(Buffer.from(result.signature, 'base64')),
-    ),
-    true,
-  );
 });

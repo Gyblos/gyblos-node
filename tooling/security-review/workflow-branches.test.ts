@@ -68,7 +68,9 @@ function exerciseScript(
           ? JSON.stringify({
               workflow_run: { head_sha: HEAD, pull_requests: [{ number: 1 }] },
             })
-          : 'clean\n',
+          : path.endsWith('diagnostics.txt')
+            ? '1\nunknown\n'
+            : 'clean\n',
       appendFileSync: (_path: string, text: string) => {
         output += text;
       },

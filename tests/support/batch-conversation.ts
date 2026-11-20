@@ -36,6 +36,7 @@ export async function batchConversation(
   telemetry?: import('@gyblos/node/batch-seller').SellerBatchSessionOptions['telemetry'],
 ) {
   const rig = await sessionRig({
+    depositAtomic: '10000',
     buyerNodeId: '12'.repeat(32),
     sellerNodeId: '34'.repeat(32),
     treasury: PROTOCOL_FEE.treasury,

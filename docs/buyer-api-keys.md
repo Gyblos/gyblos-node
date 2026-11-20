@@ -1,103 +1,159 @@
-# Bounded buyer API keys
+# Buyer API keys
 
-The automatic USDC buyer supports delegated API keys created from the desktop
-app's **Connections** screen. Start or connect the local buyer in **Payments**,
-then give each key a name and a lifetime spending limit. The key and Base URL
-can be copied into a compatible client. Keep Gyblos and its buyer running while
-the client uses them.
+A buyer API key lets a client such as a coding agent use your local buyer with a
+lifetime spending limit. Two credentials are involved:
 
-The supported inference interfaces are OpenAI Chat Completions, Responses and
-Anthropic Messages, including text history and streaming. Tool requests still
-need a compatible seller and execution policy; unsupported options are rejected
-before sending the prompt. Model discovery is authenticated and does not consume
-the key budget.
+- The **operator token** is the local buyer's private credential. The desktop
+  app keeps it in its main process. Only the operator can create or revoke keys,
+  and it must never be given to a tool.
+- A **delegated key** (`gyb_...`) is what you give a client. The buyer enforces
+  its spending limit itself, independently of the app.
+
+You create and manage keys in the [desktop app](desktop.md). Keep the app and
+its local buyer running while a client uses a key.
+
+## Create a key
+
+1. In **Payments**, check that the local buyer is running. The app starts its
+   own buyer; use **Retry local buyer** or **Connect a running buyer** if it is
+   not.
+2. Open **Connections**.
+3. Under **Create an API key**, enter a **Name** and a **Spend limit** in the
+   displayed asset. A limit of `0` allows free models only.
+4. Choose **Create API key**.
+5. Copy the **API key** and the **Base URL** shown for the key.
+
+The app can copy a new key only during the session that created it. A key's
+limit has no automatic reset and cannot be raised later; create a new key for
+more spending. A buyer holds at most 32 keys. A key whose limit is `0` shows
+**Free only**. The key field reveals the secret only while the user asks for it
+(**Show API key**); hiding it, selecting another key or revoking it clears the
+visible value. The secret never enters status replies, saved agent configuration
+or chat history, and after a restart the app cannot display it again.
+
+The app's own buyer listens on the fixed loopback port `4033`
+(`packages/config/src/hosts.ts`), so its Base URL survives restarts. If the port
+is taken, startup fails and **Payments → Retry local buyer** tries again; the
+app never picks another port. A separately running buyer that the user connects
+explicitly keeps its own Base URL. Configurations written by versions that used
+a changing port must be copied or written again once.
+
+Clients send the key as a bearer token to the Base URL:
+
+```sh
+curl "$BASE_URL/models" -H "Authorization: Bearer $GYBLOS_API_KEY"
+```
+
+Replace `BASE_URL` with the Base URL shown in **Connections**, and set
+`GYBLOS_API_KEY` to the copied key.
+
+The supported interfaces are OpenAI Chat Completions, OpenAI Responses and
+Anthropic Messages, including text history and streaming. Tool requests need a
+compatible seller and execution policy. The buyer rejects unsupported options
+before it sends the prompt. Listing models needs the key but does not consume
+its limit.
 
 ## Connect a coding agent
 
-With an active key selected in **Connections**, choose **Connect agent**. The
-app reads `GET /v1/models` from that same local buyer and prepares OpenCode, pi,
-Codex CLI or Claude Code configuration with every model it serves and its output
-limit. This list is the buyer's configured routes, not every model advertised by
-the network. An empty, invalid or unavailable list stops setup; no model is
-invented.
+1. In **Connections**, select an active key.
+2. Choose **Connect agent**.
+3. Pick the **Agent**: OpenCode, pi, Codex CLI or Claude Code.
+4. Review the generated configuration, then choose **Write configuration**, or
+   copy it.
+5. Choose **Copy API key** and set `GYBLOS_API_KEY` in the shell that starts the
+   agent.
 
-Preview and copy use the same generators as `pnpm buyer:agent`. Codex uses the
-Responses interface, with HTTP and stream retries disabled. **Write
-configuration** uses the CLI's shared atomic writer, preserves other settings
-and keeps the first `.before-gyblos` backup. New files are private from
-creation. Existing symlinked configurations retain their link. Codex writes the
-provider in config.toml and separate managed profile files beside it, one per
-model; the preview and write confirmation name those files. Claude Code uses
-shell environment settings instead of a file, so its configuration is copy-only.
+The app reads `GET /v1/models` from the same local buyer and configures every
+model it serves, with its output limit. That list is the buyer's configured
+routes, not every model on the network. An empty, invalid or unavailable list
+stops setup; no model is invented.
 
-The generated configuration references `GYBLOS_API_KEY`; it never contains the
-credential's value. Use **Copy API key** and set that variable in the shell that
-starts the agent. The operator token and delegated secrets stay in the app's
-main process; the renderer receives only generated references and public status.
-No additional inference server is started. Model switching uses the same buyer
-and key, with their original spending and routing limits.
+What the generated configuration does:
 
-The separate PayPal Sandbox demo retains its local Ollama engine and payment
-lifecycle. It does not purchase inference from network sellers. Its key also
-copies through the native clipboard without being returned in renderer status.
+- It references `GYBLOS_API_KEY` and never contains the key itself.
+- Preview and copy use the same generators as `pnpm buyer:agent`. Codex uses the
+  Responses interface with HTTP and stream retries off.
+- **Write configuration** uses the CLI's atomic writer. It preserves other
+  settings, keeps the first `.before-gyblos` backup, creates new files as
+  private, and keeps an existing symlink as a link.
+- Codex gets its provider in `config.toml` plus one managed profile file per
+  model beside it; the preview names those files.
+- Claude Code is configured through shell environment variables, so its
+  configuration is copy-only.
+- Each model keeps the context size the authenticated buyer reports. Without
+  one, the configuration falls back to 8,192 context tokens and at most 4,096
+  output tokens, or the buyer's lower output limit
+  (`packages/node/src/agent-setup-constants.ts`). Codex profiles carry this
+  limit so compaction starts earlier. The fallback is not a verified seller
+  capacity: a seller can offer a smaller window and refuse the request.
+
+No extra inference server starts. Switching models uses the same buyer, key and
+limits.
+
+## Errors a client sees
+
+| Code                      | HTTP | Meaning                                                                 |
+| ------------------------- | ---- | ----------------------------------------------------------------------- |
+| `BUYER_KEY_LIMIT_REACHED` | 400  | The key's remaining limit cannot cover this request; nothing was sent   |
+| `BUYER_KEY_REVOKED`       | 403  | The key was revoked; nothing was sent                                   |
+| `BUYER_KEY_NEEDS_REVIEW`  | 503  | An earlier paid request on this key has an uncertain outcome; see below |
+
+A refusal for local validation, such as input that does not fit the model's
+context, leaves the key usable; it is not an uncertain payment.
 
 ## Authority and accounting
 
-The buyer's private operator credential is separate from delegated keys. It
-remains in the desktop host and must not be given to tools. Only that operator
-may create or revoke keys through `/v1/gyblos/api-keys`. Mutations require the
-currently displayed buyer policy in `If-Match`; delegated credentials cannot
-access management. Browser-origin requests cannot manage keys.
+Only the operator may create or revoke keys, through `/v1/gyblos/api-keys`. Each
+change must send the currently displayed buyer policy in `If-Match`. Delegated
+keys and browser-origin requests cannot reach key management.
 
-The buyer enforces each key's cap independently of the renderer. The cap is in
-atomic units, bound to the buyer wallet, network and asset. It has no automatic
-reset and cannot be edited upward. Revocation stops new work and preserves all
-recorded consumption and unresolved reservations. Zero permits free models only.
-A new key is a separate permission explicitly granted by the owner; it does not
-erase another key's liabilities.
+The limit is in atomic units, bound to the buyer wallet, network and asset.
+Revocation stops new work and keeps all recorded consumption and unresolved
+reservations. A new key is a separate permission; it does not erase another
+key's obligations.
 
-Before payment preparation, the buyer limits the signed quote's ceiling to the
-smaller of its configured request cap and the key's remaining allowance. It
-durably reserves the verified quote maximum before dispatch. Concurrent requests
-cannot reserve the same allowance. A known completion releases only the unused
-reservation and records its verified amount before delivering the response.
+Before preparing a payment, the buyer:
 
-For each paid request, the buyer validates the selected model, network, input
-and tokenizer before reserving a key's allowance or opening financial services.
-The input must fit the model context and the unsigned request's existing byte
-allowance, including JSON escapes and space for authorization. Reusable sessions
-also recheck quote freshness, buyer binding, deposit policy and worst-case input
-budget after loading the tokenizer. A local validation refusal leaves the key
-usable; it is not an uncertain payment. Other configured free models do not
-prevent a compatible paid request.
+1. Validates the selected model, network, input and tokenizer. The input must
+   fit the model context and the request's byte allowance, including JSON
+   escapes and space for authorization. Reusable sessions also recheck quote
+   freshness, buyer binding, deposit policy and worst-case input budget.
+2. Limits the signed quote's ceiling to the smaller of its configured request
+   cap and the key's remaining allowance.
+3. Durably reserves the verified quote maximum before dispatch, so concurrent
+   requests cannot reserve the same allowance.
+4. On a known completion, records the verified amount and releases only the
+   unused reservation, before it delivers the response.
 
-- Per-request settled executions consume the verified charge, including a
-  charged terminal failure or a failed delivery. A transaction is required to
-  classify a charge as settled.
-- Reusable sessions consume each verified request approval, once. The session's
-  cumulative approval and collateral deposit are not added as key usage.
-  Approved usage is shown separately from settled payments.
-- A verified free execution consumes zero. Proven-unsent failover can release
-  its reservation; an uncertain paid outcome cannot.
+What counts against a key:
 
-Existing buyer policy, price ceilings, wallet and payment-session safeguards
-still apply. A key does not allocate wallet funds or replace session collateral
-authority. Desktop Chat has its own budget; it does not consume a delegated tool
-key's permission.
+| Execution                | Consumes                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reusable session request | Each verified request approval, once. The session's cumulative approval and deposit are not key usage; the app shows approved usage apart from settled payments |
+| Free                     | Zero                                                                                                                                                            |
+| Failover proven unsent   | Zero; its reservation is released                                                                                                                               |
+| Uncertain paid outcome   | The reservation stays held                                                                                                                                      |
+
+Buyer policy, price ceilings, wallet and payment-session safeguards still apply.
+A key does not allocate wallet funds or replace session collateral. Other
+configured free models do not prevent a compatible paid request. Desktop Chat
+has its own budget and does not consume a delegated key.
 
 ## Persistence and interruption
 
-Only a digest of a delegated secret is saved, alongside content-free counters
-and unresolved request bindings, in an owner-only buyer permission ledger. The
-ledger has a single-process lock and durable writes. It is not a prompt,
-response or signed-payment store. App restarts retain the original key limits
-and usage; an already configured client keeps working with the same secret. The
-app can copy a new secret only during the app session that created it.
+The buyer saves only a digest of each delegated key, with content-free counters
+and unresolved request bindings, in an owner-only permission ledger. The ledger
+has a single-process lock and durable writes. It stores no prompts, responses or
+signed payments. After a restart, keys keep their limits and usage, and a
+configured client keeps working with the same key.
 
-An interrupted paid reservation, failed write or inconsistent state fails
-closed. Unknown reservations also block operator inference and creation of new
-keys. Revocation remains available and does not clear an obligation. This
-version does not automatically reconcile a delegated reservation from financial
-history: inspect the underlying payment state before implementing recovery.
-Never delete its ledger or lock to resume spending. A local file rollback is not
-a supported way to restore spending authority.
+An interrupted paid reservation, a failed write or an inconsistent state fails
+closed. Unknown reservations also block operator inference and the creation of
+new keys. Revocation stays available and does not clear an obligation. The buyer
+does not reconcile a delegated reservation from financial history; inspect the
+payment state with the [recovery](recovery.md) commands first.
+
+> **Warning:** Never delete the permission ledger or its lock to resume
+> spending, and never restore an older copy. Doing so erases recorded
+> obligations, and the buyer cannot tell that spending authority was rolled
+> back.

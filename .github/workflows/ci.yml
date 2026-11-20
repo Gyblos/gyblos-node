@@ -31,23 +31,19 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      windows_full: ${{ steps.diff.outputs.windows_full }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
+      - run: bash .github/scripts/test-ci-changes.sh
       - id: diff
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ "$EVENT" != pull_request ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            echo code=true >>"$GITHUB_OUTPUT"
-          elif git diff --name-only "$BASE" HEAD | grep -qv '^apps/docs/'; then
-            echo code=true >>"$GITHUB_OUTPUT"
-          else
-            echo code=false >>"$GITHUB_OUTPUT"
-          fi
+          TARGET: ${{ github.base_ref }}
+        run: bash .github/scripts/ci-changes.sh >> "$GITHUB_OUTPUT"
 
   # Formatting, the docs site and the tests that read its pages; every run.
   docs:
@@ -167,7 +163,7 @@ jobs:
   # the lockfile's iroh binding. The windows job installs and runs it.
   windows-package:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.windows_full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -195,7 +191,10 @@ jobs:
   # only the Windows-specific tests run here.
   windows:
     needs: [changes, windows-package]
-    if: needs.changes.outputs.code == 'true'
+    if: >-
+      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.code == 'true' &&
+      ((needs.changes.outputs.windows_full == 'true' && needs.windows-package.result == 'success') ||
+      (needs.changes.outputs.windows_full == 'false' && needs.windows-package.result == 'skipped'))
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
@@ -208,11 +207,17 @@ jobs:
           node-version: 24.22.1
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - name: Desktop seller selection and channel chat
+        run: node --import tsx --test tests/desktop-network-catalog-paid.test.ts tests/desktop-buyer-stream-loopback.test.ts
+      - if: needs.changes.outputs.windows_full == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: windows-package
           path: ${{ runner.temp }}/windows-package
-      - run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts tests/windows-service.test.ts tests/windows-task.test.ts tests/windows-install.test.ts
+      - if: needs.changes.outputs.windows_full == 'false'
+        run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-service.test.ts
+      - if: needs.changes.outputs.windows_full == 'true'
+        run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts tests/windows-service.test.ts tests/windows-task.test.ts tests/windows-install.test.ts
         env:
           GYBLOS_WINDOWS_PACKAGE: ${{ runner.temp }}/windows-package
           GYBLOS_WINDOWS_VERSION: 0.0.0-ci.1
@@ -230,8 +235,16 @@ jobs:
     timeout-minutes: 5
     steps:
       - env:
+          CODE: ${{ needs.changes.outputs.code }}
+          FULL: ${{ needs.changes.outputs.windows_full }}
+          WINDOWS: ${{ needs.windows.result }}
+          PACKAGE: ${{ needs.windows-package.result }}
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
+          case "$CODE/$FULL/$WINDOWS/$PACKAGE" in
+            true/true/success/success | true/false/success/skipped | false/false/skipped/skipped) ;;
+            *) echo "Unexpected Windows check results"; exit 1 ;;
+          esac
           for result in $RESULTS; do
             case "$result" in
               success | skipped) ;;

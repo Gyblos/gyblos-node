@@ -65,6 +65,9 @@ export function registerDesktopX402(
   window: BrowserWindow,
   profile: string,
   directory: string,
+  resolveOffer: ReturnType<
+    typeof import('./catalog/host').registerNetworkCatalog
+  >,
 ) {
   const paths = desktopX402Paths(profile);
   let ownership: Promise<ProcessLock> | null = null;
@@ -104,6 +107,7 @@ export function registerDesktopX402(
         DESKTOP_X402.PROGRESS_CHANNEL,
         progress,
       ),
+    resolveOffer,
   );
   const apiKeys = createUsdcApiHandlers(
     client,
@@ -118,6 +122,9 @@ export function registerDesktopX402(
   ipcMain.handle(USDC_API.CHANNEL, (event, ...args: unknown[]) =>
     apiKeys.run(event, args),
   );
+  ipcMain.handle(USDC_API.REVEAL_CHANNEL, (event, ...args: unknown[]) =>
+    apiKeys.reveal(event, args),
+  );
   ipcMain.handle(DESKTOP_X402.CHANNEL, (event, ...args: unknown[]) =>
     handle(event, args),
   );
@@ -125,6 +132,7 @@ export function registerDesktopX402(
     async close() {
       apiKeys.close();
       ipcMain.removeHandler(USDC_API.CHANNEL);
+      ipcMain.removeHandler(USDC_API.REVEAL_CHANNEL);
       await client.close();
       await managed.close();
       ipcMain.removeHandler(DESKTOP_X402.CHANNEL);

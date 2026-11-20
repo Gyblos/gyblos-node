@@ -113,6 +113,12 @@ export const receipts = sqliteTable(
       table.modelId,
       table.sellerReceivedAt,
     ),
+    index('collector_receipts_by_updated').on(table.updatedAt),
+    index('collector_receipts_by_received').on(table.sellerReceivedAt),
+    index('collector_receipts_by_request').on(
+      table.requestId,
+      table.sellerNodeId,
+    ),
   ],
 );
 
@@ -125,7 +131,10 @@ export const conflicts = sqliteTable(
     fingerprint: text('fingerprint').notNull(),
     insertedAt: integer('inserted_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.envelopeId, table.receiptKey] })],
+  (table) => [
+    primaryKey({ columns: [table.envelopeId, table.receiptKey] }),
+    index('collector_conflicts_by_inserted').on(table.insertedAt),
+  ],
 );
 
 export const statusHistory = sqliteTable(
@@ -163,5 +172,39 @@ export const observations = sqliteTable(
     ),
     index('collector_observations_by_type_time').on(table.type, table.at),
     index('collector_observations_by_request').on(table.requestId),
+    index('collector_observations_by_inserted').on(table.insertedAt),
+    index('collector_observations_by_at').on(table.at),
   ],
 );
+
+// Aggregate tables (#351), recomputed from the raw tables above.
+export {
+  aggDemandDaily,
+  aggDirtyDays,
+  aggNetworkDaily,
+  aggObservedDaily,
+  aggSellerBuyersDaily,
+  aggSellerDaily,
+  aggSellerHourly,
+  aggState,
+  firstSeen,
+} from './schema-aggregates';
+
+// Breakdowns of the network stats: origin of requests and failure reasons.
+export { aggFailuresDaily, aggOriginDaily } from './schema-breakdowns';
+
+// Per-model observations: buyer first token and engine speed, per paid flag.
+export { aggModelObservedDaily } from './schema-model-observed';
+
+// Chain index tables (#349).
+export {
+  aggChainDaily,
+  aggChainDirtyDays,
+  aggChainState,
+  chainChannels,
+  chainCursor,
+  chainInstructions,
+  chainProgramDaily,
+  chainTokenDeltas,
+  chainTxs,
+} from './schema-chain';

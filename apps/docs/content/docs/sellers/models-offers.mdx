@@ -1,17 +1,25 @@
 ---
-title: Models
-description: Change free token limits and understand which model and engine settings the seller can serve.
+title: Change models and limits
+description: Lower or raise your free token limits, set the answer and context length, and see which models and engines a seller can serve.
 ---
 
-The default installation serves pinned **Qwen3 0.6B through local Ollama**, with reasoning `off`.
-This is the model validated end to end for this onboarding. A catalog entry or valid TOML file does not
-mean that every model has been tested.
+The installer sets up one free offer: **Qwen3 0.6B through Ollama**, with reasoning `off`. It is the only
+model supported in the beta. You change the offer in the `[[offers]]` entry of `config.toml`:
+
+| Install type          | `config.toml` location              |
+| --------------------- | ----------------------------------- |
+| Docker seller         | `~/gyblos-seller/config.toml`       |
+| Native seller         | `~/.gyblos/config.toml`             |
+| Windows native seller | `%USERPROFILE%\.gyblos\config.toml` |
+
+The seller reads the file only at startup. After every edit, validate and apply it as described in
+[Operate and update](/en/sellers/operate#apply-configuration-or-environment-changes).
 
 ## Free limits [#lower-the-free-limits]
 
-Edit the existing `[[offers]]` entry in `~/gyblos-seller/config.toml`. The following complete example
-halves the total daily limit and lowers the per-buyer limit. It deliberately leaves publication off;
-if already listed, preserve your existing `[discovery]` setting when editing just the caps.
+The `free` line of the offer sets how many tokens the seller gives away. This example halves the daily total
+and lowers the per-buyer limit. Edit only that line and keep the rest of your file, including your
+`[discovery]` setting:
 
 ```toml
 version = 1
@@ -29,51 +37,64 @@ engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
 free = { daily_token_cap = 100000, per_buyer_cap = 2000 }
 ```
 
-Both caps are positive integers, with the per-buyer cap no higher than the daily total. They count
-**input plus output** per UTC day. Admission reserves input plus the requested maximum output, so a
-request can be refused before the nominal remaining balance reaches zero. Valid final usage releases
-the unused reservation.
+- `daily_token_cap` and `per_buyer_cap` are positive integers, and the per-buyer cap is no higher than the
+  daily total. The installer's defaults are 200,000 and 50,000.
+- Both count **input plus output** tokens per UTC day. Admission reserves the input plus the requested
+  maximum output, so a request can be refused before the balance reaches zero. The unused part of the
+  reservation returns when the answer ends.
+- The counters live in memory and reset when the seller restarts. Per-buyer limits are best effort: someone
+  can create another buyer identity.
 
-The counters are in memory and reset on restart. Per-buyer limits are best effort; they are not
-persistent billing or a guarantee against someone creating another buyer identity.
+## Answer and context length [#answer-and-context-length]
 
-### Apply changes [#validate-and-apply]
+Two optional settings decide how long a request can be:
 
-```sh
-cd ~/gyblos-seller
-docker compose run --rm seller gyblos config validate --config /config/config.toml
+- `free.max_output_tokens` on the `free` line sets the longest answer one request may ask for. The default is
+  4,096; the maximum is 32,768.
+- `context_tokens` on the `engine` line sets the model's context. For Ollama the default is 8,192, and the
+  range is 1,024 to 32,768.
+
+Coding agents send prompts of thousands of tokens. To serve them, raise `context_tokens` and use a fast
+machine with Apple Silicon or a GPU; a CPU-only server can be too slow for them. Each offer measures how
+fast it reads prompts and declines, before receiving the prompt, requests it could not read in time, so a
+slow server still serves the shorter ones. For example:
+
+```toml
+[[offers]]
+model = "qwen3:0.6b"
+reasoning = ["off"]
+engine = { kind = "ollama", url = "http://127.0.0.1:11434/", context_tokens = 32768 }
+free = { daily_token_cap = 200000, per_buyer_cap = 50000, max_output_tokens = 8192 }
 ```
 
-After `OK`, apply the edit:
-
-```sh
-docker compose up -d --force-recreate seller
-docker compose exec seller gyblos seller status
-```
-
-Check `RUNNING` and the offered model. Use `seller status --online` if publication is enabled.
-If it fails, use the reported code in [troubleshooting](/en/help/troubleshooting). Configuration is read
-at startup; editing the file alone does not change the running seller.
+All offer keys are in the [configuration reference](/en/reference/configuration#offer-fields).
 
 ## Models and engines [#changing-the-model-or-engine]
 
-Changing `model` does not download a model or start an engine. The installer downloads only
-`qwen3:0.6b`. Ollama startup currently accepts the pinned Qwen3 0.6B, a literal loopback root URL,
-no API-key variable and reasoning `off`. Keep its Docker URL at `http://127.0.0.1:11434/`.
-The two containers share a network namespace; a host service or another container has different addressing.
+Changing `model` does not download a model or start an engine; the installer downloads only `qwen3:0.6b`.
+An Ollama offer starts only with:
 
-OpenAI-compatible and Anthropic-compatible plugins also exist. They require explicit context size,
-reasoning `off` and a compatible model-list endpoint as well as generation. Anthropic also requires an
-API-key environment variable and an API root without `/v1`. These are advanced paths, outside the
-local installation tutorial. See the [configuration reference](/en/reference/configuration).
+- the model `qwen3:0.6b`;
+- a literal loopback URL such as `http://127.0.0.1:11434/`, with no API key;
+- reasoning `off`.
+
+Keep the Docker seller's URL at `http://127.0.0.1:11434/`: the seller shares a network namespace with its
+own Ollama container, so a host service or another container is not reachable at that address.
+
+OpenAI-compatible and Anthropic-compatible engines also exist for advanced setups outside this guide. Their
+requirements are in the [configuration reference](/en/reference/configuration#engine-compatibility-at-startup).
 
 <Callout type="warn" title="A free offer can still cost you money">
-  A hosted model provider can charge the seller for requests. Keep provider
-  credentials in environment variables, never in TOML. Do not enable a remote
-  provider until you understand its costs and data policy.
+  A hosted model provider can charge you for every request your seller serves,
+  and it receives the buyers' messages. Read its pricing and data policy before
+  you enable it. Keep provider credentials in `seller.env`, never in
+  `config.toml`.
 </Callout>
 
-The installer also prepares the payment keys. To charge for the Qwen3 offer on devnet, follow
-[get paid](/en/sellers/get-paid): set a `price` and fund the fee payer with devnet SOL.
+To charge for the Qwen3 offer on devnet instead of giving it away, see [Get paid](/en/sellers/get-paid).
 
-**Next:** [Operate and update](/en/sellers/operate).
+## Next steps
+
+- [Apply your change](/en/sellers/operate#apply-configuration-or-environment-changes)
+- [Get paid](/en/sellers/get-paid)
+- [Configuration reference](/en/reference/configuration)

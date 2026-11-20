@@ -2,13 +2,9 @@
 export const LOCALHOST = '127.0.0.1';
 
 export const PORTS = {
-  facilitator: 4022,
   buyerProxy: 4031,
   seller: 4032,
-} as const;
-
-export const HOSTS = {
-  facilitator: formatHostUrl(PORTS.facilitator),
+  desktopBuyer: 4033,
 } as const;
 
 export const IPV6_LOOPBACK = '[::1]';
@@ -23,10 +19,6 @@ export const LOOPBACK_HOST_NAMES = [
 ] as const;
 
 const EXPLORER_ORIGIN = 'https://explorer.solana.com';
-
-function formatHostUrl(port: number) {
-  return `http://${LOCALHOST}:${port}`;
-}
 
 export const explorerUrl = (signature: string) =>
   `${EXPLORER_ORIGIN}/tx/${signature}?cluster=devnet`;

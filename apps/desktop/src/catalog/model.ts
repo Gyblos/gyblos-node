@@ -6,12 +6,19 @@ import { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 export { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 export type CatalogState = (typeof CATALOG_STATE)[keyof typeof CATALOG_STATE];
 export interface AnnouncedModel {
+  offerId?: string;
+  sellerFingerprint?: string;
   modelId: string;
   variant: string | null;
   quantization: string | null;
   contextTokens: number;
   announcements: number;
   expiresAt: number;
+  // Free announcements are grouped. Each paid row identifies a single seller.
+  free: boolean;
+  // Advertised input and output prices in atomic devnet USDC per million tokens.
+  inputAtomicPerMtok: string;
+  outputAtomicPerMtok: string;
 }
 export interface NetworkCatalog {
   state: CatalogState;
@@ -50,6 +57,14 @@ function integer(value: unknown, minimum = 0): value is number {
     typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum
   );
 }
+// A non-negative integer amount as canonical decimal text, as public catalogs carry prices.
+function atomic(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length <= PUBLIC_RECORD_LIMITS.maxAtomicDigits &&
+    /^(?:0|[1-9][0-9]*)$/.test(value)
+  );
+}
 function publicText(value: unknown): value is string | null {
   return (
     value === null ||
@@ -61,13 +76,25 @@ function publicText(value: unknown): value is string | null {
 function parseModel(value: unknown): AnnouncedModel | null {
   if (
     !object(value, [
+      ...(value && typeof value === 'object' && 'offerId' in value
+        ? ['offerId', 'sellerFingerprint']
+        : []),
       'modelId',
       'variant',
       'quantization',
       'contextTokens',
       'announcements',
       'expiresAt',
+      'free',
+      'inputAtomicPerMtok',
+      'outputAtomicPerMtok',
     ]) ||
+    (value.offerId !== undefined &&
+      (value.free !== false ||
+        typeof value.offerId !== 'string' ||
+        typeof value.sellerFingerprint !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(value.sellerFingerprint) ||
+        !/^[a-f0-9]{64}$/.test(value.offerId))) ||
     !validCatalogQuery(value.modelId) ||
     !publicText(value.variant) ||
     !publicText(value.quantization) ||
@@ -75,16 +102,30 @@ function parseModel(value: unknown): AnnouncedModel | null {
     value.contextTokens > PUBLIC_RECORD_LIMITS.maxContextTokens ||
     !integer(value.announcements, 1) ||
     value.announcements > NETWORK_CATALOG.MAX_ANNOUNCEMENTS ||
-    !integer(value.expiresAt)
+    !integer(value.expiresAt) ||
+    typeof value.free !== 'boolean' ||
+    !atomic(value.inputAtomicPerMtok) ||
+    !atomic(value.outputAtomicPerMtok) ||
+    // Free exactly when both prices are zero.
+    value.free !==
+      (value.inputAtomicPerMtok === '0' && value.outputAtomicPerMtok === '0')
   )
     return null;
   return {
+    ...(typeof value.offerId === 'string' &&
+      typeof value.sellerFingerprint === 'string' && {
+        offerId: value.offerId,
+        sellerFingerprint: value.sellerFingerprint,
+      }),
     modelId: value.modelId,
     variant: value.variant,
     quantization: value.quantization,
     contextTokens: value.contextTokens,
     announcements: value.announcements,
     expiresAt: value.expiresAt,
+    free: value.free,
+    inputAtomicPerMtok: value.inputAtomicPerMtok,
+    outputAtomicPerMtok: value.outputAtomicPerMtok,
   };
 }
 export function parseNetworkCatalog(value: unknown): NetworkCatalog {

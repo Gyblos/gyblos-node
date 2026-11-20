@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
 
 import { registerNetworkCatalog } from './catalog/host';
 import { registerChatArchive } from './chat-archive-host';
@@ -16,6 +16,7 @@ import { probeInUtility } from './probe-host';
 import { failedProbe, type ProbeResult } from './probe-model';
 import { cleanupDesktopSession } from './session-cleanup';
 import { armSmokeWatchdog } from './smoke-watchdog';
+import { registerStartupProgress } from './startup-progress-host';
 import { settleDesktopStartup, startupHandoff } from './startup-window';
 import { BRAND_COLORS } from './theme';
 import { registerDesktopUpdate } from './update-host';
@@ -35,7 +36,9 @@ function createProbeWindow(startup = false) {
     minHeight: startup ? STARTUP_WINDOW.HEIGHT : DESKTOP.MIN_HEIGHT,
     show: false,
     resizable: !startup,
-    backgroundColor: BRAND_COLORS.charcoal,
+    backgroundColor: nativeTheme.shouldUseDarkColors
+      ? BRAND_COLORS.panel
+      : BRAND_COLORS.panelLight,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -69,8 +72,13 @@ async function loadDesktopWindows(
     await window.loadFile(file, { query: { probe: '1' } });
     return;
   }
-  const handoff = startupHandoff(window, loading, signal);
-  // Storage errors are displayed by the main wallet UI, never by the splash.
+  const handoff = startupHandoff(
+    window,
+    loading,
+    signal,
+    registerStartupProgress(loading, signal),
+  );
+  // Startup prepares local services; protected custody is activated from Wallet.
   const settled = preparation.then(
     () => handoff.prepared(),
     () => handoff.prepared(),
@@ -116,7 +124,7 @@ function installDesktopServices(
   const wallet = registerDesktopWallet(window, walletRoot, smoke, signal);
   services.wallet = wallet;
   if (!smoke) {
-    registerNetworkCatalog(window, signal);
+    const resolveOffer = registerNetworkCatalog(window, signal);
     registerDesktopUpdate(window, signal);
     services.paypal = registerDesktopPaypal(window);
     services.chats = registerChatArchive(window, app.getPath('userData'));
@@ -124,10 +132,11 @@ function installDesktopServices(
       window,
       app.getPath('userData'),
       __dirname,
+      resolveOffer,
     );
     services.node = registerDesktopNode(window, __dirname, signal);
   }
-  return wallet.ready;
+  return Promise.resolve();
 }
 
 function registerDesktopQuit(

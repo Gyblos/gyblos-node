@@ -47,7 +47,14 @@ void test('wizard confirms an explicit USDC ceiling and passes validated answers
         if (question.startsWith('Seller NodeId')) return sellerNodeId;
         if (question.startsWith('Seller owner')) return owner;
         if (question.startsWith('Maximum spend')) return '0.01';
-        if (question.startsWith('Save')) return 'yes';
+        if (question.startsWith('Save')) {
+          assert.match(output, /Budget ceiling: 0.01 USDC per request/);
+          assert.match(
+            output,
+            /Channel deposit: 1 USDC. Channel lifetime: 60 minutes/,
+          );
+          return 'yes';
+        }
         return '';
       },
       write: (text) => {

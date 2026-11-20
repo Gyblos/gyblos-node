@@ -3,8 +3,8 @@
 // with icacls; checks read the ACLs by SID with PowerShell before keys are used. Tools are called by
 // absolute path, never through PATH.
 import { execFile } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { lstat, mkdtemp, readdir, rename, rmdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -85,6 +85,39 @@ export async function restrictDirectory(
   ]);
 }
 
+// Only a directory created by this call may have its inherited permissions replaced.
+export async function createWindowsPaymentDirectory(
+  path: string,
+  tools: AclTools = defaultTools,
+  stagingParent = dirname(path),
+) {
+  const exists = async () =>
+    lstat(path).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return false;
+        throw error;
+      },
+    );
+  if (await exists()) return;
+  const temporary = await mkdtemp(join(stagingParent, '.payment-creating-'));
+  let published = false;
+  try {
+    await restrictDirectory(temporary, tools);
+    if ((await readdir(temporary)).length)
+      throw new Error('Unexpected payment folder contents');
+    // Windows refuses to replace an existing directory. The caller validates the winning path.
+    try {
+      await rename(temporary, path);
+      published = true;
+    } catch (error) {
+      if (!(await exists())) throw error;
+    }
+  } finally {
+    if (!published) await rmdir(temporary).catch(() => undefined);
+  }
+}
+
 // The folder restricted, and everything already inside reset to inherit from it: a key restored from a
 // backup or given its own permissions keeps neither.
 export async function restrictTree(
@@ -110,12 +143,15 @@ interface AclReport {
 // The ACLs by SID, for each path in GYBLOS_ACL_PATHS (one per line): `item <n>`, `owner <sid>`, then
 // `rule <sid> <Allow|Deny>` lines. Neither the language of Windows nor account names change the answer,
 // and only .NET calls are used, so no PowerShell module has to load. Paths travel in the environment.
-const ACL_SCRIPT = `$sid = [Security.Principal.SecurityIdentifier]
+const ACL_SCRIPT = `$ErrorActionPreference = 'Stop'
+$sid = [Security.Principal.SecurityIdentifier]
 $n = 0
 foreach ($p in ($env:GYBLOS_ACL_PATHS -split "\`n")) {
   if (-not $p) { continue }
   if ([System.IO.Directory]::Exists($p)) { $a = [System.IO.Directory]::GetAccessControl($p) }
   else { $a = [System.IO.File]::GetAccessControl($p) }
+  $raw = [Security.AccessControl.RawSecurityDescriptor]::new($a.GetSecurityDescriptorBinaryForm(), 0)
+  if ($null -eq $raw.DiscretionaryAcl) { throw 'Missing discretionary ACL' }
   'item ' + $n
   'owner ' + $a.GetOwner($sid).Value
   foreach ($r in $a.GetAccessRules($true, $true, $sid)) { 'rule ' + $r.IdentityReference.Value + ' ' + $r.AccessControlType }
@@ -130,8 +166,15 @@ export function parseAcls(output: string, count: number): AclReport[] {
     if (kind === 'item' && Number(value) === reports.length)
       reports.push({ owner: '', rules: [] });
     else if (kind === 'owner' && value && current) current.owner = value;
-    else if (kind === 'rule' && value && type && current)
+    else if (
+      kind === 'rule' &&
+      value &&
+      (type === ALLOW || type === 'Deny') &&
+      current
+    )
       current.rules.push({ sid: value, type });
+    else if (line.trim())
+      throw new Error('Could not read the Windows permissions.');
   }
   if (reports.length !== count || reports.some((report) => !report.owner))
     throw new Error('Could not read the Windows permissions.');
@@ -205,4 +248,20 @@ export async function pathsArePrivate(
     return ACL_VERDICTS.EXPOSED;
   if (cache) for (const path of unknown) privatePaths.add(path.toLowerCase());
   return ACL_VERDICTS.PRIVATE;
+}
+
+// A financial journal may be replaced between opens. Always read its current ACL.
+export async function paymentPathsArePrivate(
+  paths: readonly string[],
+  tools: AclTools = defaultTools,
+) {
+  try {
+    const [reports, sid] = await Promise.all([
+      readAcls(paths, tools),
+      accountSid(tools),
+    ]);
+    return reports.every((report) => aclIsPrivate(report, sid));
+  } catch {
+    return false;
+  }
 }

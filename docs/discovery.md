@@ -1,389 +1,424 @@
-# Discovery index
+# Discovery
 
-`packages/discovery-http` (`@gyblos/discovery-http`) is an adapter for an HTTP
-discovery index: a cache of node-signed public v2 records (catalog, presence)
-that buyers query by model. The buyer can opt into it through `selection.json`
-while preserving independently configured identity/endpoint bindings. The seller
-can explicitly opt into publication through the same verified record lifecycle
-used by its Iroh control service.
+A discovery index is an untrusted cache of node-signed public records. Sellers
+publish a signed catalog (the models they serve) and a short-lived presence
+(proof they are online). Buyers ask the index which sellers list a model, then
+verify every record themselves and contact each seller directly over Iroh.
 
-The default base URL is `DISCOVERY_INDEX_URL` in `@gyblos/config`
-(`https://discovery.gyblos.com/v1`). Buyers override it in `selection.json`;
-sellers use `GYBLOS_DISCOVERY_URL` when publication is enabled. Anyone can run
-an index; the reference implementation is `apps/discovery-index`
-([configuration and operations](discovery-index.md)).
+- The client is `packages/discovery-http` (`@gyblos/discovery-http`).
+- The default index is `https://discovery.gyblos.com/v1` (`DISCOVERY_INDEX_URL`
+  in `@gyblos/config`). Anyone can run another one.
+- The reference index is `apps/discovery-index`; its endpoints, limits and
+  storage are in [discovery-index.md](discovery-index.md).
+- The signed record formats, domains and signing bytes are in
+  [`packages/protocol/SPEC.md`](../packages/protocol/SPEC.md). This page owns
+  the trust model, the buyer and seller duties and the HTTP wire contract.
 
 ## Trust model
 
-The index is an **untrusted cache**. It never vouches for identity, never sees
-prompts, offers or payments, and a buyer must assume it can lie, omit sellers,
-replay old records or return garbage. The client therefore:
+The index never vouches for identity and never sees prompts, offers or payments.
+Assume it can lie, omit sellers, replay old records or return garbage. The
+client therefore:
 
-- re-verifies every entry locally with protocol `verifyPublicV2`: the catalog's
-  Ed25519 signature by its NodeId and the v2 domain, both lifetimes at the
-  caller's `now`, and the presence against that exact catalog (owner, NodeId,
-  sequence, lifetime and `catalogDigest`);
+- re-verifies every entry with protocol `verifyPublicV2`: the catalog's Ed25519
+  signature by its NodeId under the v2 domain, both lifetimes at the caller's
+  `now`, and the presence against that exact catalog (owner, NodeId, sequence,
+  lifetime and `catalogDigest`);
 - drops and counts (`dropped`) entries that fail, list another model, are at or
   below the caller's `lastSequence`, or lose to a higher-sequence entry for the
-  same NodeId, rather than failing the whole page;
-- bounds the response (read incrementally, about 1 MiB) before `JSON.parse`,
-  validates the page shape strictly, applies a deadline to the whole request and
-  refuses redirects;
+  same NodeId, instead of failing the whole page;
+- reads at most about 1 MiB before `JSON.parse`, validates the page shape
+  strictly, applies one deadline to the whole request and refuses redirects;
 - accepts only `https` base URLs (plain `http` only on loopback, for tests).
 
 A verified record proves only that the NodeId key signed it. The `owner` field
-is self-declared: buyers must still check the owner↔NodeId binding (see
-[identity.md](identity.md)) and assign the checkability badge before
-`selectSellers`.
+is self-declared: the buyer still checks the owner-to-NodeId binding in the 8004
+agent registry (see [identity.md](identity.md)) before it selects a seller.
 
-## API
+## Client API
 
-- `fetchSellers({ baseUrl, model, fetch, now, timeoutMs?, signal?, limit?, cursor?, lastSequence? })`
-  returns `{ sellers, dropped, next, generatedAt }`. Each seller is
-  `{ catalog, presence, withdrawal: null }` (`DiscoveredSeller`); the caller
-  adds `badge` and `openChannel` to form a `KnownSeller`. `limit` (default 50,
-  at most 200) is always sent. A NodeId repeated within a page keeps the entry
-  with the highest catalog sequence. `next` is the opaque cursor for the
-  following page.
-- `publishRecord({ baseUrl, record, fetch, timeoutMs? })` posts one signed
-  record (request body at most 34816 bytes) and resolves `{ ok: true }` on
-  `201`.
+All functions take an injected `fetch` and never use the global one. Each
+accepts an optional `timeoutMs` and `signal`.
 
-Both take an injected `fetch` and never use the global one. Failures throw
-`DiscoveryError` with a static code from `DISCOVERY_ERROR_CODES` and, when an
-HTTP response was received, its `status`; messages never echo input or response
-text. Index rejections map one-to-one (`INVALID_RECORD`, `INVALID_SIGNATURE`,
-`EXPIRED_RECORD`, `UNKNOWN_CATALOG`, `STALE_RECORD`/`409`), as do `413`, `429`
-and `503`; a `403` on publish is `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does
-not accept this NodeId as a publisher); anything else is
-`DISCOVERY_HTTP_STATUS`. A deadline is always `DISCOVERY_TIMEOUT`, including one
-that ends while reading a rejection body. An optional caller `signal` cancels
-headers and body reads with `DISCOVERY_CANCELLED`, even when an injected fetch
-ignores its signal.
+| Function                                                                       | What it does                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fetchSellers({ baseUrl, model, fetch, now, limit?, cursor?, lastSequence? })` | Returns `{ sellers, dropped, next, generatedAt }`. Each seller is `{ catalog, presence, withdrawal: null }` (`DiscoveredSeller`). `limit` (default 50, at most 200) is always sent. A NodeId repeated within a page keeps its highest catalog sequence. `next` is the opaque cursor. |
+| `publishRecord({ baseUrl, record, fetch })`                                    | Posts one signed record (body at most 34,816 bytes). Resolves `{ ok: true }` on `201`.                                                                                                                                                                                               |
+| `registerSeller({ baseUrl, invite, nodeId, fetch })`                           | Trades a one-use invite code for permission to publish (`POST /registrations`). Resolves `registered` (`201`) or `already-active` (`200`). The invite code never appears in an error.                                                                                                |
+| `validateDiscoveryBaseUrl(url)`                                                | Applies the client's URL policy to operator configuration: `https`, or `http` on loopback; no credentials, query string or fragment.                                                                                                                                                 |
+
+Failures throw `DiscoveryError` with a static code from `DISCOVERY_ERROR_CODES`
+and, when a response arrived, its `status`. Messages never echo input or
+response text.
+
+| Index answer                                                                      | Client code                                                                            |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `400` `INVALID_RECORD`, `INVALID_SIGNATURE`, `EXPIRED_RECORD`, `UNKNOWN_CATALOG`  | `DISCOVERY_` plus the same name                                                        |
+| `400` with an unreadable body or another code on publish                          | `DISCOVERY_RECORD_REJECTED`                                                            |
+| `400 HTTPS_REQUIRED`                                                              | `DISCOVERY_INSECURE_URL`                                                               |
+| `409` on publish or read                                                          | `DISCOVERY_STALE_RECORD`                                                               |
+| `403` on publish                                                                  | `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does not accept this NodeId as a publisher) |
+| `403` `INVITE_INVALID`, `IDENTITY_NOT_REGISTERED`, `NODE_REVOKED` on registration | `DISCOVERY_` plus the same name                                                        |
+| `400 INVALID_REGISTRATION`, or another `400`/`403` body on registration           | `DISCOVERY_REGISTRATION_REJECTED`                                                      |
+| `413`, `429`, `503`                                                               | `DISCOVERY_PAYLOAD_TOO_LARGE`, `DISCOVERY_RATE_LIMITED`, `DISCOVERY_UNAVAILABLE`       |
+| Any other status                                                                  | `DISCOVERY_HTTP_STATUS`                                                                |
+
+A deadline is always `DISCOVERY_TIMEOUT`, including one that ends while reading
+a rejection body. A caller `signal` cancels header and body reads with
+`DISCOVERY_CANCELLED`, even when the injected `fetch` ignores its signal.
 
 ## Buyer duties: replay and withdrawal
 
-`fetchSellers` verifies each page on its own; it keeps no state. A hostile index
-can replay an older record pair that has not expired yet, or hide a withdrawal
-and keep serving the withdrawn catalog with an earlier presence. The protocol
-(`packages/protocol/SPEC.md`, "Trust, references, replay and withdrawal")
-therefore makes the consumer responsible for replay state, and the buyer must
-merge index results against its own per-NodeId state **before** `selectSellers`:
+`fetchSellers` verifies each page on its own and keeps no state. A hostile index
+can replay an older record pair that has not expired, or hide a withdrawal and
+keep serving the withdrawn catalog. The protocol (SPEC.md, "Trust, references,
+replay and withdrawal") makes the consumer responsible for replay state. Before
+selecting a seller, the buyer merges index results against its own per-NodeId
+state:
 
 - Persist one high-water sequence per NodeId, shared by catalog, presence and
-  withdrawal, and keep withdrawal tombstones at least through the maximum
-  catalog lifetime. Do not reset it on restart.
+  withdrawal. Keep withdrawal tombstones at least through the maximum catalog
+  lifetime. Never reset them on restart.
 - Pass `lastSequence: (nodeId) => highWater.get(nodeId)`. Entries whose presence
-  sequence (an entry's highest, since it must exceed its catalog's) is at or
-  below the known value are dropped and counted. `sellers` is then only what is
-  newer than the buyer's state: an index re-serving the presence the buyer
-  already holds yields nothing new for that NodeId, so the buyer keeps its held
-  copy until it expires. Raise the high-water mark atomically when accepting an
-  entry.
-- Never let an index result revive a catalog the buyer holds a withdrawal for;
-  only a higher-sequence catalog reopens it. The index never serves withdrawals,
-  so `withdrawal` is always `null` here.
-- A cold buyer with no state cannot detect a replay. The exposure is bounded by
+  sequence is at or below the known value are dropped and counted, so `sellers`
+  holds only what is newer than the buyer's state. Raise the high-water mark
+  atomically when you accept an entry.
+- Never let an index result revive a catalog you hold a withdrawal for. Only a
+  higher-sequence catalog reopens it. The index never serves withdrawals, so
+  `withdrawal` is always `null`.
+- A cold buyer with no state can't detect a replay. The exposure is bounded by
   the presence lifetime (90 s), because every entry needs a live presence.
-
-Cap the number of pages a caller follows: `next` comes from the index and a
-malicious one can return a cursor forever.
+- Cap the number of pages you follow: `next` comes from the index, and a
+  malicious index can return a cursor forever.
 
 ## Buyer runtime integration
 
-Add optional `"discovery": {}` to the existing buyer `selection.json` to use the
-configured default index, or set `baseUrl` and `maxPages` inside that object.
-The `sellers` list remains an independent NodeId/endpoint allowlist with
-expected owners. Optional `identity` uses read-only 8004 verification and
-durable binding floors; only explicit per-seller `manualTrust: true` overrides
-it. Without identity configuration, existing owner–NodeId pairs retain manual
-trust. See [identity admission](identity.md#durable-buyer-identity-admission);
-unknown or mismatched index identities are discarded before storage or dialing.
-There is no automatic enrollment or inferred 8004 identity proof. Badges remain
-`declared-usage` and `openChannel` remains false.
+To use the default index, add `discovery` to the buyer's `selection.json`:
 
-The default traversal is three pages of at most 50 entries each, with a maximum
-of eight pages and an absolute 10-second discovery deadline. Cursor cycles or a
-non-final page at the configured cap fail with `BUYER_DISCOVERY_LIMIT`; no
-quotes are requested. Index errors stop preauthorization rather than silently
-switching to a different payment path. Equal signed entries and omitted entries
-can retain an already held candidate ID while its verified presence remains
-live.
+```json
+{
+  "discovery": {}
+}
+```
 
-`discovery-state-v2.json` under `homeLayout(...).roles.buyer` stores only owner,
-NodeId, shared high-water sequence, catalog/presence digests and expiries, and
-withdrawal/conflict sequence barriers. It caches no signed proof or offer: held
-metadata is only a bounded dialing hint. Every candidate must return fresh
-signed catalog/presence over authenticated Iroh; the buyer rechecks independent
-identity, exact references and replay state, and persists the observation before
-selection. The final quote also rechecks the latest durable catalog/withdrawal
-barrier.
+Inside `discovery` you can set `baseUrl` (same URL policy as the client) and
+`maxPages` (1 to 8, default 3). Each page holds at most 50 entries, and the
+whole discovery step has a 10-second deadline. A cursor cycle, or a non-final
+page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`, and no quotes are
+requested. An index error stops selection; it never switches the buyer to a
+different payment path. The rest of `selection.json` is described in
+[running-a-node.md](running-a-node.md#optional-buyer-selection-and-discovery).
 
-The HTTP adapter is asked to return equal sequences for digest comparison; the
-buyer applies its persistent replay policy after verification. Replayed entries
-never replace newer state. Equal-sequence conflicts block the NodeId; a catalog
-must advance beyond the barrier/high-water mark to reopen it. Withdrawals
-learned from configured signed records are verified against the exact catalog
-and retained through expiry, restarts and config omissions. A newer presence
-cannot revive a withdrawn catalog. The index does not serve withdrawals, so an
-unknown hidden withdrawal remains a discovery limitation, bounded by signed
-presence lifetime.
+The index only supplies candidate NodeIds. The `sellers` list in
+`selection.json` stays an independent NodeId/endpoint list with expected owners.
+With `identity` configured, the buyer checks each owner in the 8004 agent
+registry and keeps durable binding floors (see
+[identity.md](identity.md#durable-buyer-identity-admission)); only an explicit
+per-seller `manualTrust: true` overrides that check. Unknown or mismatched index
+identities are discarded before anything is stored or dialed. Every candidate
+must then return a fresh signed catalog and presence over authenticated Iroh.
+The buyer rechecks identity, exact references and replay state, and persists
+what it observed before selection. The final quote rechecks the latest durable
+catalog and withdrawal barrier.
 
-Replay metadata uses file mode 0600 and buyer-directory mode 0700, staged
-replace, file synchronization and POSIX directory synchronization. Updates
-serialize and reread disk state under a separate exclusive
-`discovery-state-v2.lock`; an existing lock, malformed state, unsafe permissions
-or failed persistence stops selection. The lock is never automatically broken
-after a crash. Tombstones/high-water marks are not pruned on config changes; at
-1,024 historical identities or 1 MiB state the buyer fails closed. Existing
-metadata needs deliberate operator repair rather than automatic reset. Windows
-power-loss durability is not established here.
+The buyer keeps its replay state in `discovery-state-v2.json` in the buyer home:
+owner, NodeId, shared high-water sequence, catalog and presence digests and
+expiries, and withdrawal and conflict sequence barriers. It caches no signed
+proof or offer. Equal-sequence conflicts block a NodeId until a higher catalog
+arrives. Withdrawals learned from configured signed records survive restarts and
+configuration changes.
 
-Discovery runs only in the unsigned preauthorization step. The existing proxy
-binds its decision to exact request ID/body; signed follow-ups never rediscover,
-select again or retry. Non-trusted winners stop after their signed quote.
-Execution still requires the independently trusted compatible v1 offer; no v2
-payment or free-v2 execution is enabled. See
-[running-a-node.md](running-a-node.md).
+The file uses mode 0600 in a 0700 buyer directory, staged replacement and file
+and directory synchronization. Updates run under an exclusive
+`discovery-state-v2.lock`. The buyer stops selection, and does not repair
+anything on its own, when:
+
+- the lock exists (the buyer never breaks it, even after a crash);
+- the state is malformed, has unsafe permissions, or cannot be persisted;
+- the state reaches 1,024 identities or 1 MiB (tombstones and high-water marks
+  are never pruned).
+
+Repair is a deliberate operator step: stop every buyer that uses this home
+before you remove a leftover lock. Never delete the state file to clear an
+error, because that also drops the replay protection it holds. Power-loss
+durability on Windows is not established.
 
 ### Open discovery
 
-With `"discovery": { "open": true }` (which requires `identity`), the dedicated
-`buyer:free` entry also uses sellers it never configured: for each catalog the
-index lists for the model, the catalog's owner must hold that NodeId in the 8004
-registry, checked before anything is remembered, exactly as for a configured
-seller. Such a seller is dialed by NodeId through the first configured relay
-(`GYBLOS_RELAYS`); the index supplies no address. Configured sellers come first
-and the candidate list stays within 16. Their stats live in memory only, so
-`selection-stats.json` keeps the configured sellers alone. With open discovery
-`sellers` may be empty. The usual replay and withdrawal checks still apply.
-These sellers serve free requests only, and never one the request already tried:
-`buyer:free` uses them directly, and the automatic buyer (`buyer:start`,
-`buyer:chat`, the desktop app) asks its configured sellers first at the
-request's own ceilings, then, when none can serve (or none is configured), the
-open network at zero price ceilings. Paid and session execution pay configured
-sellers only. Each selection makes at most 16 new identity lookups; an identity
-the registry refused is not looked up again for five minutes. The separate
-capacity limit is 64 **live unconfigured candidates**, counted under the
-discovery store lock from signed catalog/presence expiry and withdrawal/conflict
-state. Expiry, withdrawal or conflict frees a slot without deleting any replay
-floor. Registry denials occupy no live slot, and a temporary capacity refusal is
-not cached as a registry denial. The same candidate can be reconsidered as soon
-as capacity is available, including after restart.
+With `"discovery": { "open": true }`, which requires `identity`, free requests
+can also use sellers that `selection.json` does not list:
 
-Configured IDs are captured from the original startup configuration and do not
-consume this live-candidate budget. If an older file or changed configuration
-already has more than 64 live unconfigured rows, eligibility is
-deterministically limited by NodeId until rows expire; the history is retained.
-New activations wait while the live budget is full; already eligible renewals
-remain possible. Identity and discovery histories retain their existing
-independent limits of 1024 rows, with room reserved for missing configured IDs.
-Reaching a history limit refuses new identities without poisoning known ones;
-there is no automatic history deletion. Storage corruption and rollback still
-fail closed.
+```json
+{
+  "identity": { "rpcUrl": "SOLANA_DEVNET_RPC_URL" },
+  "discovery": { "open": true }
+}
+```
+
+Replace `SOLANA_DEVNET_RPC_URL` with an `https` devnet RPC URL without
+credentials or a query string; the other `identity` settings are in
+[identity.md](identity.md#durable-buyer-identity-admission).
+
+- For each catalog the index lists for the model, the catalog's owner must hold
+  that NodeId in the 8004 agent registry. The buyer checks this before it
+  remembers anything, exactly as for a configured seller.
+- The buyer dials such a seller by NodeId through the first configured relay
+  (`relays.urls` in `config.toml`, or `GYBLOS_RELAYS`). The index supplies no
+  address.
+- Configured sellers come first, and the candidate list stays within 16. With
+  open discovery, `sellers` may be empty.
+- `buyer:free` uses open sellers directly. The automatic buyer (`pnpm buyer`,
+  `buyer:chat`, the desktop app) asks its configured sellers first at the
+  request's own ceilings. When none can serve, or none is configured, it asks
+  the open network at zero price ceilings. A request never goes back to a seller
+  it already tried.
+- Paid requests and payment sessions use configured sellers only.
+- Stats for open sellers live in memory only; `selection-stats.json` keeps the
+  configured sellers alone.
+
+Open discovery has its own bounds:
+
+- Each selection makes at most 16 new identity lookups. An identity the registry
+  refused is not looked up again for five minutes.
+- At most 64 live unconfigured candidates are eligible at once, counted under
+  the discovery lock from signed expiry and withdrawal or conflict state.
+  Expiry, withdrawal or conflict frees a slot without deleting any replay floor.
+  Registry refusals take no slot.
+- Configured sellers never count toward the 64. If the state already holds more
+  than 64 live unconfigured rows, eligibility is limited by NodeId order until
+  rows expire.
+- Identity and discovery histories each keep at most 1,024 rows, with room for
+  configured sellers. A full history refuses new identities without affecting
+  known ones.
 
 ## Seller duties
 
-The seller publisher is opt-in. Set `GYBLOS_DISCOVERY_PUBLISH=1` when starting
-`node:start`; `GYBLOS_DISCOVERY_URL` optionally overrides the configured index.
-Without the opt-in, the node makes no discovery publication requests. The index
-operator must separately authorize its NodeId when publication is allowlisted;
-enabling the node publisher never changes that list. URL policy is the adapter's
-policy: HTTPS, or HTTP on loopback only; credentials, query strings and
-fragments are rejected.
+Publishing is opt-in. Without it, the seller node sends no request to any
+discovery index. `gyblos init` asks whether to list the seller in the public
+discovery index and writes the answer to `config.toml`:
 
-The publisher sends a signed catalog before its presence. It checks every ten
-seconds, rotates catalogs before expiry, and backs off failed publication by
-10/20/40/60 seconds (capped at 60 seconds). An uncertain acknowledgement forces
-a fresh, higher-sequence catalog on the next attempt, rather than replaying an
-old write. Requests have an absolute five-second deadline covering headers and
-body. Publication failures are reported as a static degraded health status
-(including `DISCOVERY_PUBLISH_NOT_ALLOWED` for an unapproved NodeId); they do
-not initiate inference, payment, or a different paid route.
+```toml
+[discovery]
+publish = true
+# url = "https://discovery.gyblos.com/v1"
+```
 
-Catalog renewal is bounded by the current model-readiness observation. The
-publisher and control queries never probe, warm or load the engine. A separate
-node lifecycle checks every ten seconds and starts a bounded private one-token
-warmup when the observation has two minutes left, or after expiry/failure. It
-checks memory headroom before and after, rejects new OOM events, and verifies
-the startup model name, digest and context. A successful check anchors a new
-four-minute observation to that warmup; it never extends the legacy paid offer.
+The `--discovery-publish` and `--discovery-url` flags and the
+`GYBLOS_DISCOVERY_PUBLISH` and `GYBLOS_DISCOVERY_URL` variables override the
+file; [configuration.md](configuration.md) has the precedence. The URL follows
+the client's URL policy.
 
-Busy inference skips a check. Starting inference cancels a pending check; late
-results cannot restore availability. A check has a ninety-second deadline and
-retains its single work slot until underlying work actually settles, even if the
-engine ignores cancellation. There is no overlapping or queued check backlog.
-During checks, failure, expiry or shutdown, local catalogs, presence and quotes
-fail closed immediately. The publisher retires on its next tick; remote expiry
-still bounds an undelivered withdrawal. Recovery requires a higher catalog tied
-to the new observation generation, even if failure/recovery occur between ticks.
-After inference becomes idle, the lifecycle refreshes the catalog independently
-of whether HTTP publication is enabled. These are cached availability
-observations, not capacity reservations or a guarantee of subsequent admission.
+Publishing alone does not list the seller on the reference index. The index
+accepts records only from NodeIds it admits: a seller registers its NodeId once
+with an invite code (`gyblos seller register`; see
+[running-a-node.md](running-a-node.md#seller-registration-beta-invite)). Until
+then, every publish fails with `DISCOVERY_PUBLISH_NOT_ALLOWED`.
 
-Shutdown disables local catalog/quote snapshots first, cancels in-flight
-publication and attempts one higher signed withdrawal while the reference
-catalog is still valid. A failed/unreachable withdrawal is not a guarantee of
-immediate remote removal: signed presence/catalog expiration remains the
-fallback. A signature already started cannot escape after local retirement.
-Cancelled control requests are checked before queued reservations and before
-signing. The shared presence-work queue is capped at the control query capacity
-(32); if a disk operation stalls, cancelled queued slots stay occupied until it
-settles, so later requests are refused instead of accumulating unbounded work.
-An already-started durable reservation cannot be interrupted; cancellation may
-burn that sequence without starting a signature.
+### Publisher
 
-`ROLE_FILES.publicSequence` under the seller home stores the public-v2 sequence
-high-water mark, bound to its NodeId. Catalogs, HTTP presence, Iroh presence and
-withdrawals all reserve from this one allocator **before signing**. State uses
-0600 files, a 0700 seller directory, an exclusive per-update lock, staged atomic
-replacement, file sync and POSIX directory sync. Reservations may be skipped
-when signing or delivery fails, but are never reused by the allocator. Existing
-state is reread on each reservation; malformed/wrong-node state, unsafe paths,
-lock contention, overflow, missing held state or observed rollback fail closed.
+The publisher sends a signed catalog before its presence and keeps both fresh.
+Publication failures appear as a static degraded health status. They never start
+inference or payment, and never change the paid route.
 
-Preserve this file across restarts and backup restores. The initial floor uses
-the startup clock for compatibility with earlier timestamp-based catalogs;
-subsequent persisted values remain monotonic even if that clock moves backward.
-A crash during an update may leave a lock: the node never automatically breaks
-it. Operator inspection/repair is required without resetting the high-water
-mark. Recovery: `pnpm gyblos doctor` reports `SEQUENCE_LOCK_PRESENT`; confirm no
-seller is running with this `GYBLOS_HOME` (the daemon, or a lab harness using
-it; for example `pgrep -fl 'gyblos|bin.ts start'`), then remove only
-`public-sequence-v2.lock` and any `public-sequence-v2.json.*.tmp` left beside it
-in the seller directory. Never edit or delete `public-sequence-v2.json`. Since
-the first signal after startup starts a stop that ignores further Ctrl-C until
-withdrawal and this write finish, a lock is expected only after a crash, a
-forced kill (`kill -9`), power loss, or a Ctrl-C during startup (startup signs
-its first catalog before the stop handler is installed). There is no hardware
-anti-rollback anchor: deleting/restoring all local state across process restarts
-is not supported recovery, and Windows power-loss durability is not established
-here.
+| Behavior                  | Value                                                                    |
+| ------------------------- | ------------------------------------------------------------------------ |
+| Publish check             | every 10 seconds                                                         |
+| Request deadline          | 5 seconds, covering headers and body                                     |
+| Backoff after a failure   | 10, 20, 40, then 60 seconds (capped)                                     |
+| Uncertain acknowledgement | the next attempt signs a fresh, higher-sequence catalog (never a replay) |
+| Catalog                   | rotated before it expires                                                |
 
-Control quotes remain v2-only observations, without reservations or execution.
-The paid v1 offer and HTTP bridge routes are unchanged. Automatic identity
-registration, public index deployment, off-host/load acceptance and v2 execution
-remain separate work.
+### Model readiness
+
+Catalog renewal depends on a model-readiness observation. The publisher and
+control queries never probe, warm or load the engine. A separate lifecycle:
+
+- checks every 10 seconds, and starts a bounded private one-token warmup when
+  the observation has two minutes left, or after it expired or failed;
+- checks memory headroom before and after, rejects new out-of-memory events, and
+  verifies the startup model name, digest and context;
+- anchors a new four-minute observation to each successful warmup;
+- skips a check while inference is busy, and cancels a pending check when
+  inference starts, so a late result can't restore availability;
+- gives each check a 90-second deadline and one work slot, held until the
+  underlying work settles, with no queued backlog.
+
+During a check, a failure, expiry or shutdown, local catalogs, presence and
+quotes fail closed at once. The publisher retires on its next tick. Recovery
+needs a higher catalog tied to the new observation. These observations say the
+model was ready recently; they don't reserve capacity or guarantee admission.
+
+### Shutdown and withdrawal
+
+On shutdown the seller disables local catalog and quote snapshots, cancels
+in-flight publication, and tries once to publish a higher signed withdrawal
+while the catalog is still valid. If the withdrawal fails, the index drops the
+seller when its signed presence and catalog expire.
+
+The shared presence-work queue holds at most 32 entries (the control query
+capacity). If a disk operation stalls, cancelled entries keep their slots until
+it settles, so later requests are refused instead of piling up.
+
+### Public sequence file
+
+Catalogs, HTTP presence, Iroh presence and withdrawals all reserve their
+sequence from one allocator before signing. The seller home stores its
+high-water mark in `public-sequence-v2.json`, bound to the NodeId, with mode
+0600 in a 0700 seller directory, an exclusive per-update lock and synchronized
+atomic replacement. A sequence is never reused, even when signing or delivery
+fails. Malformed or wrong-node state, unsafe paths, lock contention, overflow or
+an observed rollback stop publishing.
+
+Keep `public-sequence-v2.json` across restarts and backup restores. Deleting or
+rolling back local state is not a supported recovery, because there is no
+hardware anti-rollback anchor.
+
+A crash, a forced kill (`kill -9`), power loss, or Ctrl-C during startup can
+leave `public-sequence-v2.lock` behind. The seller never breaks it on its own,
+and `gyblos doctor` reports `SEQUENCE_LOCK_PRESENT`. To recover:
+
+1. Stop every seller that uses this `GYBLOS_HOME`, including a lab harness. For
+   example, check with `pgrep -fl 'gyblos|bin.ts start'`.
+2. In the seller directory, remove `public-sequence-v2.lock` and any
+   `public-sequence-v2.json.*.tmp` beside it.
+3. Run `gyblos doctor` again. `SEQUENCE_LOCK_PRESENT` no longer appears.
+
+Never edit or delete `public-sequence-v2.json` itself.
 
 ## Running an index (wire contract)
 
-Anyone can run an index (GYB-DOC-022). This section is the wire contract the
-client and the reference index (`apps/discovery-index`) both follow. It lives
-here rather than in `packages/protocol/SPEC.md` because SPEC.md fixes signed
-record formats, domains and signing bytes, which the index stores and serves
-unchanged; the HTTP service around those records is an adapter contract that can
-change without touching signatures or golden vectors.
+Anyone can run an index: multiple discovery sources are part of the design (see
+[public-decisions.md](public-decisions.md)). The client and the reference index
+both follow this contract. Record formats and signing bytes stay in SPEC.md; the
+HTTP service around them can change without touching signatures or golden
+vectors.
 
-An index is an **untrusted cache** of node-signed public v2 records. It checks
-records to keep junk out, but its acceptance proves only that the NodeId key
-signed them: it never vouches for owner identity, registration or availability,
-and clients must re-verify everything. It does not need, and should not store or
-log, IP addresses, prompts, offers or payments.
+An index checks records to keep junk out, but acceptance proves only that the
+NodeId key signed them. It never vouches for owner identity, registration or
+availability, and clients re-verify everything. An index has no reason to store
+or log IP addresses, prompts, offers or payments.
 
-The reference index base URL is `https://discovery.gyblos.com/v1`: the Worker
-serves `POST /v1/records`, `GET /v1/sellers`, `GET /v1/models` and
-`GET /v1/health` at the root of its own host. This client refuses redirects, so
-configure the exact base URL. All paths below are relative to the base URL.
-Error bodies are `{"error":"<CODE>"}` with a static code; an index never echoes
-request input.
+The reference base URL is `https://discovery.gyblos.com/v1`. All paths below are
+relative to the base URL. The client refuses redirects, so configure the exact
+base URL.
 
-An index is HTTPS only. Any request that does not arrive over `https`, whatever
-its method or path, gets `400 {"error":"HTTPS_REQUIRED"}` before any other
-check; it is never redirected, so a request body is never resent in the clear.
-(A reference index created for development also accepts plain `http` on a
-loopback host.) This client maps that code on a publish to
-`DISCOVERY_INSECURE_URL`; it already refuses non-loopback `http` base URLs
-before sending anything.
+Common rules:
+
+- **HTTPS only.** A request that doesn't arrive over `https`, whatever its
+  method or path, gets `400 {"error":"HTTPS_REQUIRED"}` before any other check.
+  It is never redirected, so a request body is never resent in the clear. An
+  index created for development also accepts `http` on a loopback host.
+- **Errors** are `{"error":"<CODE>"}` with a static code. An index never echoes
+  request input. Unknown paths answer `404 {"error":"NOT_FOUND"}`.
+- **Headers.** Every response carries `X-Robots-Tag: noindex` and
+  `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/sellers`, `/models`,
+  `/uptime` and `/health` carry `Access-Control-Allow-Origin: *` on every
+  status, errors included. A `200` from `/sellers`, `/models` or `/uptime`
+  carries `Cache-Control: public, max-age=10`; every other response carries
+  `Cache-Control: no-store`.
+- **No sessions or CAPTCHA.** Publishers authenticate by signature. Rate limits,
+  the size cap and one stored record per kind per NodeId bound abuse.
 
 ### `POST /records`
 
-- Request: `Content-Type: application/json` (optionally `; charset=utf-8`), body
-  exactly `{"record":<signed envelope>}` with no other fields, where the
-  envelope is `{"record":<public v2 record>,"signature":"<hex>"}`. At most 34816
-  bytes (a canonical record may be 32 KiB, plus the envelope).
-- Checks: strict shape (unknown fields rejected), canonical encoding and size,
-  the Ed25519 signature by `record.nodeId` under the v2 domain for its kind, and
-  lifetimes against the index clock, accepting a record issued up to 5 s ahead
-  of it and no expiry grace (`issuedAt <= now + 5 s`, `now < expiresAt`, within
-  600 s for catalog and withdrawal, 90 s for presence).
-- Sequence: one high-water mark per NodeId, shared across all three kinds. A
-  record whose `sequence` is at or below it is stale. The mark is retained past
-  record expiry (at least `expiresAt` plus the 600 s catalog lifetime) so stale
-  replays stay rejected.
-- References: a presence or withdrawal must reference the NodeId's current
-  stored catalog exactly as `referenceV2` in `packages/protocol` does (same
-  owner and NodeId, catalog sequence lower, catalog `issuedAt` no later, catalog
-  `expiresAt` no earlier, catalog still live, matching `catalogDigest`), and
-  that catalog must not be withdrawn.
-- Effects: a catalog replaces the NodeId's catalog and clears its presence; a
-  presence replaces the previous presence; a withdrawal tombstones the
-  referenced catalog and clears its presence. Only a later, higher-sequence
-  catalog reopens a withdrawn NodeId; a presence never revives it.
+- **Request:** `Content-Type: application/json` (optionally `; charset=utf-8`),
+  body exactly `{"record":<signed envelope>}`, where the envelope is
+  `{"record":<public v2 record>,"signature":"<hex>"}`. At most 34,816 bytes (a
+  canonical record may be 32 KiB, plus the envelope).
+- **Checks:** strict shape (unknown fields rejected), canonical encoding and
+  size, the Ed25519 signature by `record.nodeId` under the v2 domain for its
+  kind, and lifetimes against the index clock. A record may be issued up to 5 s
+  ahead of the index clock, with no expiry grace (`issuedAt <= now + 5 s`,
+  `now < expiresAt`), and lives at most 600 s (catalog and withdrawal) or 90 s
+  (presence).
+- **Sequence:** one high-water mark per NodeId, shared by all three kinds. A
+  record at or below it is stale. The mark outlives the record by at least the
+  600 s catalog lifetime, so stale replays stay rejected.
+- **References:** a presence or withdrawal must reference the NodeId's current,
+  live, non-withdrawn stored catalog exactly as `referenceV2` in
+  `packages/protocol` does.
+- **Effects:** a catalog replaces the NodeId's catalog and clears its presence.
+  A presence replaces the previous presence. A withdrawal tombstones the
+  referenced catalog and clears its presence. Only a higher-sequence catalog
+  reopens a withdrawn NodeId; a presence never revives it.
+- **Admission:** an index may accept records only from NodeIds it admits (an
+  allowlist or registration). It may refuse an unadmitted claimed `nodeId` with
+  `403` before verifying the signature.
 
-| Status | Body                    | Meaning                                                            |
-| ------ | ----------------------- | ------------------------------------------------------------------ |
-| `201`  | `{"ok":true}`           | Stored.                                                            |
-| `400`  | `INVALID_RECORD`        | Wrong content type, shape, encoding or size of the record.         |
-| `400`  | `INVALID_SIGNATURE`     | Signature does not verify.                                         |
-| `400`  | `EXPIRED_RECORD`        | Not yet valid, expired, or lifetime too long.                      |
-| `400`  | `UNKNOWN_CATALOG`       | Reference does not match a live, non-withdrawn stored catalog.     |
-| `403`  | `PUBLISH_NOT_ALLOWED`   | The index accepts records only from listed NodeIds (an allowlist). |
-| `409`  | `STALE_RECORD`          | Sequence at or below the NodeId's high-water mark.                 |
-| `400`  | `HTTPS_REQUIRED`        | The request did not use `https` (any route).                       |
-| `413`  | `PAYLOAD_TOO_LARGE`     | Body over 34816 bytes.                                             |
-| `429`  | `RATE_LIMITED`          | Per-IP, per-NodeId or capacity limit; `Retry-After` in seconds.    |
-| `503`  | `DISCOVERY_UNAVAILABLE` | Storage, limits or publishing not configured, or storage failure.  |
+| Status | Body                    | Meaning                                                         |
+| ------ | ----------------------- | --------------------------------------------------------------- |
+| `201`  | `{"ok":true}`           | Stored.                                                         |
+| `400`  | `INVALID_RECORD`        | Wrong content type, shape, encoding or size of the record.      |
+| `400`  | `INVALID_SIGNATURE`     | Signature does not verify.                                      |
+| `400`  | `EXPIRED_RECORD`        | Not valid yet, expired, or lifetime too long.                   |
+| `400`  | `UNKNOWN_CATALOG`       | Reference does not match a live, non-withdrawn stored catalog.  |
+| `400`  | `HTTPS_REQUIRED`        | The request did not use `https` (any route).                    |
+| `403`  | `PUBLISH_NOT_ALLOWED`   | The index does not admit this NodeId as a publisher.            |
+| `409`  | `STALE_RECORD`          | Sequence at or below the NodeId's high-water mark.              |
+| `413`  | `PAYLOAD_TOO_LARGE`     | Body over 34,816 bytes.                                         |
+| `429`  | `RATE_LIMITED`          | Per-IP, per-NodeId or capacity limit; `Retry-After` in seconds. |
+| `503`  | `DISCOVERY_UNAVAILABLE` | Storage, limits or publishing not configured, or a failure.     |
 
-There is no session or CAPTCHA: publishers authenticate by signature, and abuse
-is bounded by rate limits, the size cap and one stored record per kind per
-NodeId. An index may also restrict publishing to listed NodeIds (the reference
-index does during devnet); it may refuse an unlisted claimed `nodeId` with `403`
-before verifying the signature. Reads stay public.
+### `POST /registrations`
+
+An index that admits publishers by invite code exposes this route. The body is
+`{"invite":"gyb_<26 base32 characters>","nodeId":"<64 lowercase hex>"}`. The
+index reads the NodeId's 8004 agent registry binding itself; the request carries
+nothing else.
+
+| Status | Body                            | Meaning                                                                    |
+| ------ | ------------------------------- | -------------------------------------------------------------------------- |
+| `201`  | `{"ok":true,"status":"active"}` | Admitted; the invite code is spent.                                        |
+| `200`  | `{"ok":true,"status":"active"}` | Already admitted (a retry with the same invite code, or an active NodeId). |
+| `400`  | `INVALID_REGISTRATION`          | Wrong content type, size or shape.                                         |
+| `403`  | `INVITE_INVALID`                | Unknown, expired or spent invite code.                                     |
+| `403`  | `IDENTITY_NOT_REGISTERED`       | No 8004 agent registry binding for this NodeId.                            |
+| `403`  | `NODE_REVOKED`                  | The index operator revoked this NodeId.                                    |
+| `413`  | `PAYLOAD_TOO_LARGE`             | Body over the index's limit.                                               |
+| `429`  | `RATE_LIMITED`                  | Rate limit; `Retry-After` in seconds.                                      |
+| `503`  | `DISCOVERY_UNAVAILABLE`         | Registration not configured, registry unreachable, or a failure.           |
 
 ### `GET /sellers?model=<modelId>&limit=<n>&cursor=<c>`
 
-- `model` is required: a model identifier (at most 128 characters, the protocol
-  identifier charset). `limit` defaults to 50; the maximum is 200 and larger
-  values are clamped. `cursor` is the `next` value of a previous page. Missing
-  or malformed `model`, malformed `limit` or `cursor`, unknown parameters, or a
-  repeated parameter give `400 {"error":"INVALID_QUERY"}`.
-- `200` body:
-  `{"sellers":[{"catalog":<envelope>,"presence":<envelope>}...], "next":<cursor or null>,"generatedAt":<index time in ms>}`.
+- `model` is required: a model identifier of at most 128 characters in the
+  protocol identifier charset. `limit` defaults to 50; larger values than 200
+  are clamped. `cursor` is the `next` value of a previous page. A missing or
+  malformed `model`, a malformed `limit` or `cursor`, an unknown parameter, or a
+  repeated parameter gives `400 {"error":"INVALID_QUERY"}`.
+- The `200` body is
+  `{"sellers":[{"catalog":<envelope>,"presence":<envelope>}],"next":<cursor or null>,"generatedAt":<index time in ms>}`.
   Envelopes are returned byte-for-byte as published.
-- Inclusion: the NodeId's current catalog lists `model`, is live and not
+- A seller is included when its current catalog lists `model`, is live and not
   withdrawn, and its current presence is live and references that catalog. Order
   is deterministic (reference index: presence `issuedAt` descending, then
-  NodeId); ranking is the buyer's job.
-- Cursors are opaque: clients pass `next` back verbatim and must not parse or
-  build them. This client accepts 1 to 512 characters of `[A-Za-z0-9._~-]`.
-  `next` is `null` on the last page.
-- The response is at most 1 MiB; an index stops adding entries before that size
+  NodeId). Ranking is the buyer's job.
+- Cursors are opaque: pass `next` back verbatim, and never parse or build one.
+  The client accepts 1 to 512 characters of `[A-Za-z0-9._~-]`. `next` is `null`
+  on the last page.
+- The response is at most 1 MiB. The index stops adding entries before that size
   and returns `next`, so a page can hold fewer than `limit` entries.
-- Headers: `Content-Type: application/json; charset=UTF-8`,
-  `Cache-Control: public, max-age=10`, `Access-Control-Allow-Origin: *`. An
-  index may serve a `200` page from a cache for up to those 10 seconds, so
-  `generatedAt` can be that old; errors are never cached.
+- An index may serve a `200` page from a cache for up to 10 seconds, so
+  `generatedAt` can be that old. Errors are never cached.
 - Errors: `400 INVALID_QUERY`, `400 HTTPS_REQUIRED`, `429 RATE_LIMITED`,
   `503 DISCOVERY_UNAVAILABLE`.
 
 ### `GET /models`
 
-Takes no parameters (any query is a 400 `INVALID_QUERY`). Returns
+Takes no parameters; any query is `400 INVALID_QUERY`. Returns
 `{"models":[{"id":"<modelId>","sellers":<n>}],"generatedAt":<ms>}`: every model
-listed by catalogs that are live, not withdrawn and referenced by a live
-presence (the same liveness as `/sellers`), with how many such sellers list it,
-most sellers first and then by model ID, at most 500. It is a hint for offering
+listed by live sellers (the same liveness as `/sellers`), with its seller count,
+most sellers first and then by model ID, at most 500. It is a hint for showing
 the network's models by name; each seller is still found with `/sellers` and
-verified as usual. Cached and rate-limited like a sellers page
-(`public, max-age=10`) and CORS-readable.
+verified as usual.
 
 ### `GET /health`
 
-`200 {"ok":true,"records":<count of stored unexpired records>}` (the reference
-index adds `"publish"`, its publish mode; clients must not rely on it), or
-`503 {"error":"DISCOVERY_UNAVAILABLE"}`. Unknown paths answer
-`404 {"error":"NOT_FOUND"}`. Responses other than `/sellers` carry
-`Cache-Control: no-store`; all carry `X-Robots-Tag: noindex`. `GET` and `HEAD`
-on `/sellers` and `/health` carry `Access-Control-Allow-Origin: *` on every
-status, errors included. Limits, storage and operations of the reference index
-are in [discovery-index.md](discovery-index.md).
+Returns `200 {"ok":true,"records":<count of stored unexpired records>}` or
+`503 {"error":"DISCOVERY_UNAVAILABLE"}`. The reference index adds `"publish"`,
+its publish mode; clients must not rely on it.
+
+### Reference index extensions
+
+The reference index also serves `GET /uptime?node=<NodeId>`, a public uptime
+report built from the presences it accepted. It is not part of the contract a
+client relies on; see [discovery-index.md](discovery-index.md#uptime).

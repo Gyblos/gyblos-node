@@ -1,9 +1,14 @@
-// Receipt observations follow terminal verification, preserve cumulative rounding and never retry generation.
+// Receipt observations follow terminal verification, preserve cumulative rounding and never retry generation;
+// a paid session without blocks is attested by both halves too.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { type PaidSellerReceiptInput } from '@gyblos/core/receipts';
+import {
+  buildPaidSellerReceipt,
+  type PaidSellerReceiptInput,
+} from '@gyblos/core/receipts';
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
+import { batchSessionRequest } from '@gyblos/protocol/batch-channel';
 import { ENGINE_KINDS } from '@gyblos/protocol/constants';
 import {
   SESSION_BLOCKS,
@@ -196,4 +201,57 @@ void test('receipt-only digest work cannot hold an answer after its terminal aut
   } finally {
     release();
   }
+});
+
+void test('a paid session without blocks attests every request on both sides with the same digest', async (t) => {
+  const seller: PaidSellerReceiptInput[] = [];
+  const buyer: BuyerReceiptEvidence[] = [];
+  const f = await blockProduct({
+    blocks: false,
+    receipts: () => ({
+      engineKind: ENGINE_KINDS.OLLAMA,
+      publisher: {
+        publish: (input) => {
+          seller.push(input);
+        },
+      },
+    }),
+    receipt: (input) => {
+      buyer.push(input);
+    },
+  });
+  t.after(f.close);
+  f.offers.base.prices.inputAtomicPerMtok = '7000000';
+  f.offers.base.prices.outputAtomicPerMtok = '7000000';
+  for (let index = 1; index <= 2; index++) {
+    const quote = await f.offers.quote(index);
+    await f.buyer.execute(quote, f.offers.input, new AbortController().signal);
+    assert.equal(seller.length, index);
+    assert.equal(buyer.length, index);
+    const snapshot = f.f.buyer.snapshot();
+    assert.equal(snapshot.reservedAtomic, '0');
+    const pending = await batchSessionRequest({
+      channelId: snapshot.channelId!,
+      requestId: quote.offer.requestId,
+      quote,
+      input: {
+        ...f.offers.input,
+        selection: quote.offer.selection,
+        reasoning: quote.offer.reasoning,
+      },
+    });
+    assert.equal(
+      seller[index - 1]!.record.requestDigest,
+      pending.requestDigest,
+    );
+    assert.equal(
+      buyer[index - 1]!.context.requestDigest,
+      pending.requestDigest,
+    );
+    assert.deepEqual(buyer[index - 1]!.payment, seller[index - 1]!.payment);
+    assert.equal(seller[index - 1]!.payment.amountAtomic, '70');
+    // The seller half passes the same recount check its signer applies, so it is stored, not dropped.
+    assert.equal(buildPaidSellerReceipt(seller[index - 1]).amountAtomic, '70');
+  }
+  assert.equal(f.offers.generations(), 2);
 });

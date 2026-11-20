@@ -1,0 +1,129 @@
+// Account-wide USDC spending in the browser preview.
+import { useState } from 'react';
+
+import { LOCALHOST, PORTS } from '@gyblos/config/hosts';
+import { ROUTES } from '@gyblos/config/paths';
+import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+
+import { X402_ACTION, x402Amount, x402BudgetInput } from '../x402-model';
+import { BUTTON_VARIANT } from './constants';
+import { FormActions, FormField, FormInput } from './Form';
+import { Modal } from './Modal';
+import { Button } from './UI';
+import type { X402View } from './useX402';
+
+export function X402Payments({ buyer, onSaved }: { buyer: X402View; onSaved(): void }) {
+  const { policy } = buyer.state;
+  return policy
+    ? <AccountBudgetForm buyer={buyer} policy={policy} onSaved={onSaved} />
+    : <X402Connection buyer={buyer} />;
+}
+
+function X402Connection({ buyer }: { buyer: X402View }) {
+  const [external, setExternal] = useState(false);
+  return (
+    <div className="ui-form">
+      <p>
+        The app prepares its own buyer automatically. New configurations use
+        free models only.
+      </p>
+      <FormActions align="start">
+        <Button
+          disabled={buyer.busy}
+          onClick={() => {
+            void buyer.run({ action: X402_ACTION.START_BUYER });
+          }}
+        >
+          {buyer.busy ? 'Starting buyer…' : 'Retry local buyer'}
+        </Button>
+        <Button disabled={buyer.busy} onClick={() => setExternal(true)}>
+          Connect a running buyer
+        </Button>
+      </FormActions>
+      {external && (
+        <Modal title="Connect a running buyer" close={() => setExternal(false)}>
+          <X402ExternalConnection buyer={buyer} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+function X402ExternalConnection({ buyer }: { buyer: X402View }) {
+  const [url, setUrl] = useState(
+    'http://' + LOCALHOST + ':' + PORTS.buyerProxy + ROUTES.inference,
+  );
+  const [token, setToken] = useState('');
+  return (
+    <form
+      className="ui-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void buyer
+          .run({ action: X402_ACTION.CONNECT, url, token })
+          .then((result) => {
+            if (result?.policy) setToken('');
+          });
+      }}
+    >
+      <p>Connect the local Gyblos buyer to use your existing seller.</p>
+      <FormField htmlFor="x402-url" label="Local buyer URL">
+        <FormInput
+          id="x402-url"
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+        />
+      </FormField>
+      <FormField htmlFor="x402-key" label="Private buyer connection key">
+        <FormInput
+          id="x402-key"
+          type="password"
+          autoComplete="off"
+          value={token}
+          onChange={(event) => setToken(event.target.value)}
+        />
+      </FormField>
+      <FormActions align="start">
+        <Button
+          type="submit"
+          disabled={buyer.busy || !token}
+          variant={BUTTON_VARIANT.SECONDARY}
+        >
+          Connect buyer
+        </Button>
+      </FormActions>
+    </form>
+  );
+}
+
+function AccountBudgetForm({ buyer, policy, onSaved }: {
+  buyer: X402View;
+  policy: BuyerApiPolicy;
+  onSaved(): void;
+}) {
+  const account = window.previewAccountBudget.current();
+  const [amount, setAmount] = useState(() => buyer.state.summary.active ? x402Amount(account.limitAtomic, policy) : '');
+  const [error, setError] = useState('');
+  return (
+    <form className="ui-form" onSubmit={async (event) => {
+      event.preventDefault();
+      try {
+        setError('');
+        const limitAtomic = amount.trim() && x402BudgetInput(amount, policy);
+        const result = await buyer.run(limitAtomic ? { action: X402_ACTION.AUTHORIZE, limitAtomic } : { action: X402_ACTION.FINISH });
+        if (result && !result.error) onSaved();
+        else setError(result?.error ?? 'Could not save the budget.');
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : 'Enter a valid amount.');
+      }
+    }}>
+      <FormField htmlFor="account-budget" label="Optional chat limit · USDC">
+        <FormInput id="account-budget" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} />
+      </FormField>
+      <p className="ui-help-text">Leave blank for no total chat limit. The maximum per response still applies.</p>
+      {error && <p role="status">{error}</p>}
+      <FormActions align="start">
+        <Button type="submit" disabled={buyer.busy || buyer.state.summary.blocked} variant={BUTTON_VARIANT.PRIMARY}>Save budget</Button>
+      </FormActions>
+    </form>
+  );
+}

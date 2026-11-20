@@ -2,6 +2,7 @@
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
+import { FREE_BUYER } from './constants';
 import type { FreeWinner } from './free-execution';
 import type { PreparedSelection } from './free-selection';
 import {
@@ -11,19 +12,26 @@ import {
 
 // The seller each recent conversation went to, so its next turn can go back while that seller's prompt
 // cache may be warm. A choice is kept only once that seller has answered, and dropped when it fails. Keys
-// are digests, in memory only and bounded; the least recent is forgotten first.
-export function stickySellers(limit: number) {
-  const sellers = new Map<string, string>();
+// are digests, in memory only and bounded; the least recent is forgotten first. `warm` is the seller only
+// while its last answer is within FREE_BUYER.warmCacheMs.
+export function stickySellers(limit: number, now: () => number = Date.now) {
+  const sellers = new Map<string, { nodeId: string; at: number }>();
   // The conversation each selected seller is now serving, until it answers or fails.
   const serving = new Map<string, string>();
   const keep = (key: string, nodeId: string) => {
     sellers.delete(key);
-    sellers.set(key, nodeId);
+    sellers.set(key, { nodeId, at: now() });
     if (sellers.size > limit)
       sellers.delete(sellers.keys().next().value as string);
   };
   return {
-    get: (key: string) => sellers.get(key),
+    get: (key: string) => sellers.get(key)?.nodeId,
+    warm(key: string) {
+      const seller = sellers.get(key);
+      return seller && now() - seller.at < FREE_BUYER.warmCacheMs
+        ? seller.nodeId
+        : undefined;
+    },
     chose(key: string, nodeId: string) {
       serving.set(nodeId, key);
     },
@@ -35,7 +43,7 @@ export function stickySellers(limit: number) {
     forget(nodeId: string) {
       const key = serving.get(nodeId);
       serving.delete(nodeId);
-      if (key && sellers.get(key) === nodeId) sellers.delete(key);
+      if (key && sellers.get(key)?.nodeId === nodeId) sellers.delete(key);
     },
   };
 }

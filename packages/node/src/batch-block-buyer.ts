@@ -25,7 +25,7 @@ import type {
 import { isBlockBuyer } from './batch-block-ports';
 import type { BuyerBatchContext } from './batch-buyer-types';
 import {
-  sessionReceiptEvidence,
+  publishBuyerSessionReceipt,
   sessionReceiptPayment,
 } from './batch-receipts';
 import { bounded } from './buyer-operation';
@@ -136,22 +136,14 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
     buyer.snapshot().cumulativeAtomic !== result.bill.cumulativeAtomic
   )
     return batchFail(SESSION_CODES.BINDING);
-  if (options.receipt) {
-    try {
-      const evidence = sessionReceiptEvidence(
-        request,
-        pending.requestDigest,
-        result.value,
-        sessionReceiptPayment(request, terms, baseAtomic, result.bill),
-        first,
-        Math.floor(performance.now() - started),
-      );
-      void Promise.resolve(options.receipt(evidence, request.quote)).catch(
-        () => {},
-      );
-    } catch {
-      /* Receipt work never changes execution or the durable financial result. */
-    }
-  }
+  publishBuyerSessionReceipt(
+    options.receipt,
+    request,
+    pending.requestDigest,
+    result.value,
+    () => sessionReceiptPayment(request, terms, baseAtomic, result.bill),
+    first,
+    Math.floor(performance.now() - started),
+  );
   return result.value;
 }

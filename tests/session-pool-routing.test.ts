@@ -77,19 +77,19 @@ void test('shared manager routes A to B to A across restart with two deposits an
   assert.equal(offers[1]!.generations(), 1);
   assert.deepEqual(await buyer.settle(new AbortController().signal), {
     chargedAtomic: '120',
-    refundedAtomic: '1880',
+    refundedAtomic: '19880',
   });
   await buyer.close();
   const recovered = await options.pool();
   assert.deepEqual(await recovered.budget(), {
     committedAtomic: '120',
-    availableAtomic: '1880',
+    availableAtomic: '19880',
   });
   await recovered.dispose();
   const repeated = await options.pool();
   assert.deepEqual(await repeated.budget(), {
     committedAtomic: '120',
-    availableAtomic: '1880',
+    availableAtomic: '19880',
   });
   await repeated.dispose();
 });

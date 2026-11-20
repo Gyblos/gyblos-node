@@ -1,159 +1,68 @@
-# Reusable buyer-authorized payment sessions
+# Payment sessions
 
-## Seller capacity and separate buyer sessions
+A payment session lets a buyer deposit once and pay one seller for many answers.
+The buyer approves each answer's usage with a cumulative signature, and the
+seller settles the channel once, when the session closes. Sessions use the x402
+`batch-settlement` scheme on the official payment-channels program, on devnet.
 
-The seller reads financial session capacity from its `config.toml`:
+Guided setup uses a payment session for priced offers. This page also owns how
+the buyer chooses between free and paid execution and what it does when a seller
+is busy ([Buyer routing](#buyer-routing)).
 
-```toml
-[limits]
-max_sessions = 16
-```
+## Prerequisites
 
-The default is 16, with an initial supported range of 1–16. This counts durable
-nonterminal financial sessions, including disconnected buyers, opening attempts
-and uncertain or closing channels. It does not change connection quotas or the
-single global foreground execution turn. A completed answer or disconnected
-client does not release financial capacity. Only a proved closure/refund or a
-proved never-created opening does. Lowering the limit preserves existing
-obligations and their recovery while refusing additional reservations.
+- The seller and the buyer run the same Gyblos release. Older and newer peers
+  are not mixed (see [Upgrading and downgrading](#upgrading-and-downgrading)).
+- Windows checks the payment directory and journal ACLs before reuse.
+- The seller serves a priced offer with a recountable model and a funded fee
+  payer ([Get paid](https://docs.gyblos.com/en/sellers/get-paid)).
+- The buyer holds devnet USDC for the deposit.
 
-Capacity does not activate public reusable inference. For selected paired
-pilots, set `GYBLOS_SESSION_BUYER_NODE_IDS` to a comma-separated list of
-lowercase buyer NodeIds, without spaces. The old singular
-`GYBLOS_SESSION_BUYER_NODE_ID` remains a one-peer compatibility alias; setting
-both is refused. With neither set, ordinary free/per-request paid operation
-remains the default. Any old financial obligations still restore for status,
-approval and closure; removing pilot eligibility never grants a new inference or
-discards a debt.
+## Seller setup
 
-Each buyer has a separate private child journal. The admission index reserves a
-slot before a deposit can be submitted; an interrupted initial publication is
-repaired only from its exact pristine state. Legacy role journals remain at
-their original path and count toward capacity. Missing, corrupt or unindexed
-financial state fails closed. Renewal keeps terms and financial history solely
-in the existing atomic child journal. A stale unsubmitted preparation can
-refresh only after the financial adapter verifies its exact unsigned state;
-attempted openings retain their original recovery intent.
+1. Optionally set the session capacity in the seller's `config.toml`. The
+   default is 16 and the range is 1–16:
 
-Closed buyer proof remains private and retained. The pilot index is additionally
-bounded to 64 recorded buyers; it refuses a previously unseen buyer at that
-storage ceiling rather than evicting proof. This retention limit is separate
-from active `max_sessions`. General public reusable admission and automatic
-retention management are later work. Do not delete journals or locks to obtain
-capacity or bypass recovery.
+   ```toml
+   [limits]
+   max_sessions = 16
+   ```
 
-## Pilot renewal and spending authority
+2. Start the seller normally. A priced seller advertises session channels.
 
-The ordinary beta paid path charges per request. Reusable sessions remain an
-explicitly configured paired pilot, independently of free inference.
+<a id="seller-capacity-and-separate-buyer-sessions"></a>
 
-In the single-pair pilot, the buyer can prepare a new channel when the old one
-is closed, expired or cannot reserve the next quote. It first verifies the new
-quote, closes the original channel if necessary, and independently proves its
-final charge and refund. Missing or uncertain proof blocks renewal. No failed
-inference is replayed, and renewal never changes the seller or payment roles.
+### Capacity
 
-`depositAtomic` remains the finite spending authority for this single-pair
-manager across renewals: previous actual charges plus the next deposit cannot
-exceed it. A replacement deposit is reduced by those charges. There is no
-automatic wallet top-up. A new request whose ceiling exceeds the remaining
-authority is refused before opening another channel.
+`max_sessions` counts unfinished financial sessions: active, disconnected,
+opening, uncertain or closing. It does not change connection quotas or the
+single generation slot. A finished answer or a disconnected buyer does not free
+a slot. Only a proved closure with its refund, or a proved never-created
+opening, frees one. Lowering the limit keeps existing obligations and their
+recovery, and refuses new sessions.
 
-Closed generation proofs and the prepared replacement are published together in
-the same private atomic journal before a new opening is signed. Renewal
-introduces private journal version 3; older versions 1 and 2 remain readable and
-retain their original format until renewal. Older binaries cannot read a renewed
-journal. Keep both pilot peers on the same release; never delete a journal or
-lock to downgrade. History retains at most 16 closed generations and the
-existing 512 KiB file bound; exhaustion refuses further renewal without evicting
-proof. Pooled multi-seller renewal is separate: importing a renewed single-pair
-journal into a pool currently fails closed to preserve spending authority. No
-payment wire contract or native channel program changes.
+Each buyer has its own private child journal under the seller's payment
+directory. An admission index reserves the slot before any deposit is submitted.
+A missing indexed journal, a corrupt record or an unindexed unfinished payment
+blocks admission.
 
-The shared buyer and seller session services use the pinned Solana x402
-`batch-settlement` client-signature mode. Trusted hosts can compose them over
-the opt-in `gyblos/session/4` Iroh channel. The buyer CLI and seller daemon can
-activate this path explicitly. Without that policy, the existing per-request
-path remains available. No public gateway is enabled by this composition.
+The active index holds up to 64 buyer records. A fully settled channel with no
+outstanding recovery leaves this index. Its private journal stays at its
+original path for later inspection and retries. Never remove a journal or lock
+to make room for another buyer.
 
-## Conversation input and compatibility
+## Buyer setup
 
-Reusable sessions accept the shared text conversation shape: optional system
-first, then alternating user/assistant turns ending with the user's turn. The
-complete history is sent with each request and counted by the model's chat
-template on both peers. Earlier turns are input tokens again on later requests;
-channel reuse avoids a new deposit, not payment for input the engine processes.
-No server-side conversation history is stored. The existing 64 KiB content,
-1024-message and 128-output-token bounds, signed quote, context and budget all
-apply; unsupported input is rejected rather than trimmed.
+### Explicit startup policy
 
-The active session transport is v3. Old session-v1/v2 peers must be upgraded;
-failed v3 preparation signs no opening and does not trigger a fallback. The SDK
-channel and private financial journal do not migrate: saved approvals retain
-their original digest and recover without another inference. The per-request
-paid stream remains a separate, single-user path. Free wire contracts are
-unchanged. Reusable sessions opt into prompt cancellation of deadline-bounded
-generation, stopping publication even if an engine ignores abort. Legacy free
-and per-request paid paths retain their delivery-measurement timing. Execution
-replies carry ordered text fragments and one correlated complete terminal.
-Streaming API callers receive fragments as the engine produces them;
-complete-response callers drain and verify the same wire without publishing
-fragments. No final text is replayed after streaming. Every frame, the aggregate
-encoded response and the number of events are bounded. Waiting for the next
-engine event uses the original absolute request deadline; after its first byte,
-an incomplete prefix or body keeps the ingress deadline. The terminal's text
-must equal all observed fragments, and EOF is required before usage approval.
-Earlier v1/v2 vectors remain unchanged.
-
-Cancellation before a fully verified terminal creates no new usage approval. It
-stops publication, aborts generation on connection close and preserves the
-pending financial intent; the prompt is never replayed. The seller can collect
-only its highest already accepted cumulative signature, so the last unsigned
-response remains bounded seller exposure. Once independently verified usage
-enters durable approval, cancellation cannot revoke that intent: recover only
-the original bill/voucher, including a lost ACK. Passing time alone does not
-clear uncertainty. Tools remain separate from this shared streaming transport.
-
-## Terminal conversation history
-
-`pnpm buyer:chat` keeps confirmed user/assistant turns in memory and sends the
-whole conversation with the next question. It retains the assistant's exact text
-only after the local stream has a valid completion, its terminal marker and EOF.
-Partial text is provisional. A cut or uncertain result ends the chat; the prompt
-is never resent, including when more input was already queued.
-
-Control queries and receipt exchanges have their own bounded admission and do
-not hold generation slots. A receipt still finishing in the background therefore
-does not occupy the next question's inference capacity. Neither the completed
-answer nor a new question waits for optional local receipt persistence. Existing
-connection, query, inference and deadline limits still apply; a receipt failure
-never retries the prompt.
-
-Use `/new` to clear only the current conversation. It sends no request, closes
-no channel, resets no spending authority and clears no pending financial
-operation. `/settle` and `/exit` retain their existing meanings. Starting the
-process again begins with empty conversation history while financial recovery
-still uses its original private state. This feature adds no prompt/answer file
-or content logging.
-
-The existing terminal input limit of 64000 UTF-8 bytes now applies to the entire
-history plus the new question, within the common 1024-message limit. History is
-never silently shortened. If it no longer fits, the terminal rejects the next
-question before making a request and suggests `/new`. A completed answer may fit
-the existing output bound but make the next conversation too large; it is still
-displayed. Full-history tokenization, context and signed budget checks remain
-the shared buyer/seller policy, so previous turns cost input tokens again.
-
-Free offers and reusable paid sessions support this history. The legacy
-per-request paid path still accepts only a single user message: it refuses a
-multi-turn paid request rather than flattening it or falling back. Use `/new`
-for separate questions on that path, or configure the existing reusable-session
-policy for paid conversations. Selection and financial authorization are
-unchanged.
-
-## Explicit startup policy
-
-Add a `session` object to the buyer's existing `buyer/selection.json`:
+New desktop and guided buyer profiles include a 1 USDC channel deposit and a
+one-hour lifetime. The initial request ceiling remains zero. For an existing
+profile with a positive request ceiling, add the following `session` object to
+`buyer/selection.json`, alongside `request` and `sellers`. Keep the existing
+price limits and private journals. Startup refuses paid settings until this
+field is present. When configuring a session, set `depositAtomic` to at least
+10,000 atomic units (0.01 USDC). The buyer checks this at startup. An older
+profile with a zero ceiling can still serve free requests.
 
 ```json
 {
@@ -165,258 +74,218 @@ Add a `session` object to the buyer's existing `buyer/selection.json`:
 }
 ```
 
-This is an additional field in the existing document, not a replacement for its
-selection, identity and per-request budget fields. Deposit must be positive and
-at most 1000000 atomic units (1 USDC); lifetime is five minutes to 24 hours;
-withdrawal grace is 900 to 3600 seconds (900 if omitted). `maxAtomic` still
-limits each question. A request cannot exceed the session's remaining unreserved
-funds. The canonical protocol fee and treasury still come from `PROTOCOL_FEE`;
-the remote peer cannot change them.
+| Field                  | Meaning                                                  | Allowed values                                      |
+| ---------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| `depositAtomic`        | Deposit for each seller channel, in atomic units         | New channels: `10000` to `1000000` (0.01 to 1 USDC) |
+| `totalDepositAtomic`   | Optional authority shared by several sellers             | Positive atomic decimal string                      |
+| `lifetimeMs`           | How long the seller serves the session                   | 5 minutes to 24 hours                               |
+| `withdrawDelaySeconds` | Grace for the seller to claim after a buyer-forced close | 900 to 3600; 900 when omitted                       |
 
-The seller opts in by setting `GYBLOS_SESSION_BUYER_NODE_ID` to the one
-permitted buyer's lowercase NodeId before normal startup. Only a seller with a
-priced execution service exposes this ALPN. Without total authority there is one
-private session per role; the optional
-[shared-authority mode](#multiple-sellers-and-shared-authority) keeps one
-bounded slot per chosen seller, not per arbitrary remote buyer. Preparation is
-stateless; only a valid SDK opening proof can assign that slot. Restart restores
-its original terms, absolute expiry, pending operations and worker. Changing
-selection or limits does not replace that session. Remove neither its files nor
-its lock to unblock a request. A completed channel is retained; automatic
-rotation is not provided. Reusable financial startup is currently unavailable on
-Windows until the payment subtree has equivalent ACL validation. Existing paths
-retain their behavior.
+`request.maxAtomic` still limits each question, and a question can't exceed the
+session's remaining unreserved funds. The protocol fee and treasury always come
+from `PROTOCOL_FEE`; the seller can't change them.
 
-Start the buyer normally with `pnpm buyer:chat`. It distinguishes the session
-deposit, each question's ceiling and its independently verified **approved**
-cumulative usage. Approval is not a finalized on-chain charge. `/exit` closes
-the local connection; the seller worker continues. `/settle` requests final
-closure and prints amounts only after independent finalized evidence; if closure
-already happened it reads that evidence without requiring the seller to be
-online. A missing proof remains pending. A lost approval acknowledgment blocks
-new inference until the exact financial approval is recovered; recovery never
-sends the prompt again. A free signed quote uses the existing free path and
-constructs no financial backend, even with session policy present.
+Start the chat:
 
-## Ownership and trust
+```sh
+pnpm buyer:chat
+```
 
-`@gyblos/protocol/payment-session` defines the SDK-independent ports.
-`@gyblos/payments-upto/batch-session` owns SDK construction,
-synthetic-independent signers, bounded private journals, and the seller timer.
-`@gyblos/node/batch-session` composes admission, the existing execution
-lifecycle, independent buyer usage verification and post-delivery approval.
-`@gyblos/node/batch-buyer` connects an already chosen seller to independent
-quote verification, recounting and the session buyer. It plugs into the shared
-`executeBuyerQuote` paid port; zero-price offers still use its free port.
-`@gyblos/node/batch-seller` selects an exact warmed paid offer and runs its
-engine through the shared lifecycle. `serveSellerTransport` accepts this service
-as `batchSessions`; `bindEndpoint` advertises it only with
-`batchSessions: true`. `@gyblos/transport-iroh/batch-client` and `batch-server`
-own authenticated, bounded Iroh I/O and existing endpoint admission, without
-payment SDKs or engines.
+The header shows the session limits, similar to the following:
 
-Hosts provision one matching buyer/seller session and provide the existing
-independent identity/catalog/request/budget verification and finalized-chain
-observers. The buyer checks the unresolved-payment barrier before any opening.
-These are trusted ports, never callbacks supplied by discovery. This initial
-composition does not negotiate arbitrary deposits or create per-peer journals
-for unknown buyers. Before the buyer calls its opening/signing port, it uses
-`prepare` with its full independently authorized terms to check that the
-authenticated seller supports the session channel and agrees to those exact
-terms. Every field must match the buyer's independently authorized and persisted
-terms, including deposit, expiry, withdrawal delay, treasury and fee. A
-different term or unsupported peer fails before a new opening signature. The
-seller's preparation reply performs no financial operation or engine call.
-Policy, quote time and cancellation are checked again after the reply;
-preparation cannot replace a prior uncertain opening or approval. This is a
-compatibility/agreement check; it does not authorize public buyers or reserve
-the seller slot.
+```text
+Session deposit limit: 1000000 atomic units
+Maximum per question: 10000 atomic units
+Type /settle to close the channel, or /exit to leave settlement to the seller.
+```
 
-Each session fixes buyer wallet and NodeId, seller owner and NodeId, network,
-asset, payout, fee payer, receiver authorizer, fee distribution, deposit and
-host expiry. The buyer signs these terms in the opening memo. The SDK's on-chain
-voucher authorizer is the buyer, not the seller's receiver-authorizer key.
-Mainnet terms are refused by this first implementation. Hosts must independently
-verify RPC genesis before providing chain signers or observations. Native tests
-use synthetic keys and an isolated test-network label with the source-pinned
-program in LiteSVM.
+After each answer the chat prints the **approved** usage, for example
+`Approved this question: 42; cumulative: 42 of 1000000 atomic units; settlement pending.`
+An approval is a signed voucher, not a finalized on-chain charge.
 
-## Lifecycle
+- `/settle` asks the seller to close and prints the charge and refund only from
+  finalized chain evidence. If the channel is already closed, it reads that
+  evidence without the seller. Missing proof stays pending.
+- `/exit` closes the local connection. The seller's worker keeps the channel and
+  settles it later.
+- `/new` clears the conversation only. It sends nothing, closes no channel and
+  changes no spending authority.
 
-1. Persist the original opening hints and salt before any opening signature. On
-   a lost opening response, the trusted host must prove the finalized original
-   signed opening message and exact live channel bindings; mere account
-   existence is insufficient. The SDK then verifies the live buyer voucher
-   before recovery. Open one bounded deposit with a buyer-signed zero voucher
-   and no advance charge. The narrowly opt-in SDK helper patch preserves default
-   behavior.
-2. Verify the live funded channel with the SDK, then reserve a request's ceiling
-   before generating. Request identifiers/digests are single-use. Stage one
-   admits one unfinished request per session; reservations are individual
-   records, rather than an embedded single-request channel.
-3. Measure delivered usage through the common seller execution lifecycle. Save a
-   bill containing the request binding, actual charge and cumulative amount.
-4. Independently verify received usage and prices on the buyer. Persist the
-   approved bill before signing its cumulative voucher. The seller verifies that
-   signature with the SDK and persists it before acknowledging it.
-5. Only that acknowledgement permits the buyer's next request. A lost
-   acknowledgement retries the same financial approval, never the prompt.
-6. On closure, freeze admissions and the highest accepted voucher. The seller's
-   fee payer submits the SDK cooperative refund, or seals a buyer-forced Closing
-   channel within its grace period, and refunds unused escrow. The host must
-   independently confirm the resulting transaction and amounts before marking
-   the journal closed.
+A free signed quote still runs on the free path and builds no payment backend,
+even when a session policy is present.
 
-One finalization may require multiple transactions. There are no intermediate
-payment transactions for each inference. This service performs no automatic
-topup, channel rotation, seller failover or shared-balance operation.
+### Renewal and spending authority
 
-## Autonomous policy
+With one seller, the buyer can open a replacement channel when the old one is
+closed, expired or can't reserve the next quote. It first verifies the new quote
+and checks that the remaining authority can fund the minimum deposit before
+closing the old channel. It then verifies the final charge and refund. Missing
+or uncertain proof blocks renewal. Renewal never replays a failed inference or
+changes the seller or payment roles.
 
-Defaults live in `@gyblos/config/batch-session`: ten-minute inactivity, 10000
-atomic units (0.01 USDC) as a soft accumulated-charge threshold, and a fifteen
-second worker tick. The threshold is provisional, not measured profitability or
-a minimum charge. Below it, ordinary idle closure waits for host expiry.
-Explicit closure, deposit exhaustion, the request-record bound, host expiry,
-buyer-forced close, and an abandoned unsigned final response bypass the
-threshold. A host must observe buyer-forced closure every tick; a missing or
-failed observation does not become evidence that the channel remains open.
+`depositAtomic` is the total spending authority across renewals: earlier actual
+charges plus the next deposit can't exceed it, so a replacement deposit shrinks
+by those charges. There is no automatic top-up. A question whose ceiling exceeds
+the remaining authority is refused before any channel opens. The journal keeps
+at most 16 closed generations within its 512 KiB bound; at that limit renewal is
+refused.
 
-Batch SDK requires at least 900 seconds of withdrawal grace. Existing
-per-request `upto` parameters remain unchanged. Batch buyer vouchers use the
-SDK's non-expiring zero sentinel. Host expiry stops serving and triggers an
-actual close operation; it does not make funds return by the passage of time.
-Both parties being offline still prevents transaction submission. A seller
-offline beyond forced-close grace can lose earnings not yet submitted on chain.
+### Multiple sellers and shared authority
 
-The seller pays normal finalization gas and fronts rent from its fee payer.
-Buyer emergency recovery is separate; sponsored recovery is not newly promised.
-The existing canonical protocol fee and split arithmetic remain unchanged.
+Add `totalDepositAtomic` to the `session` policy to let the buyer keep channels
+with several sellers. `depositAtomic` stays the deposit for each new seller
+channel; `totalDepositAtomic` is the authority all of them share. For example, a
+deposit of `"100000"` and a total of `"200000"` can fund two sellers. Without
+`totalDepositAtomic` the buyer keeps one channel; it never infers a larger
+authority from the candidate list.
 
-## Failure and persistence boundaries
+- The normal selector picks the seller. Going A → B → A reuses A's original
+  channel and cumulative total, also after a buyer restart.
+- All channels share the buyer wallet, buyer NodeId, network and asset. A seller
+  whose owner, payment keys, network, asset or terms change can't replace its
+  old channel.
+- There are at most 16 channels, including retained closed ones. At most two
+  requests run at once, on different sellers; each channel runs one request at a
+  time.
+- Committed authority is each allocated deposit minus its verified refund. An
+  idle, expired, opening or uncertain channel still holds its full deposit.
+  Refunds are credited once and survive restarts.
+- Lowering the total below what is committed blocks new use; recovery and
+  closure under the original terms still work.
+- `/settle` tries every seller and reports an aggregate only when every proof
+  exists. One offline seller can't fake a total or stop the others from closing.
 
-Journals are private, size-bounded, atomically replaced and process-locked in
-the role's payments directory, with 0700 directories and 0600 files. They retain
-SDK pending operations and the highest voucher, without prompts, answers or
-keys. Before persisting a first remote opening, the adapter rejects unknown SDK
-fields, enforces an 8 KiB opening bound and the SDK Solana transaction-size
-bound, and verifies the buyer's initial SDK proof. Invalid data cannot pin or
-overflow the journal; legitimate lost-opening recovery retains its original
-checkpoint. An unavailable write poisons that handle; ambiguity is never cleared
-to proceed.
+An uncertain request on any channel blocks new free and paid requests across all
+sellers until recovery resolves it. A single-seller journal from before
+`totalDepositAtomic` was set is adopted in place and counted first; it is never
+moved or overwritten. A renewed single-seller journal can't join a multi-seller
+catalog; that import fails closed to protect spending authority.
 
-If the buyer disappears before approving the final response, the seller can
-collect only the previous signed total. Exposure is bounded to one request.
-Signature recovery reuses the already independently approved bill; it cannot
-restart generation. The seller may renew its own expired close authorization,
-keeping the buyer voucher, cumulative amount and SDK pending transaction records
-unchanged.
+## Conversations and streaming
 
-The optional Iroh composition authenticates the chosen peers, bounds frames and
-absolute deadlines, propagates cancellation and marks possible transmission
-before the first write. Native reads/writes retain their admission lease until
-settled after cancellation. An expired quote is refused again immediately before
-transmission. A transport error never retries the prompt. Explicit approval
-recovery resends only the already independently verified cumulative financial
-approval; its ACK must name the exact cumulative total and zero reservation.
-Remote status is metadata, and a remote close response becomes financial proof
-only after the buyer's own chain observation.
+### Terminal conversation history
 
-## Iroh execution scope
+`pnpm buyer:chat` keeps confirmed user and assistant turns in memory and sends
+the whole conversation with each question. It keeps an answer only after the
+stream ends with a valid terminal and EOF; partial text is provisional. A cut or
+uncertain result ends the chat, and the prompt is never resent. Nothing is
+written to disk, and a restart starts with an empty history.
 
-One bidirectional stream carries one canonical request/reply; the connection can
-serve sequential RPCs while the financial session survives disconnection. The
-operations are `prepare`, `open`, `execute`, `approve`, `snapshot` and `close`,
-defined in the [wire specification](../packages/protocol/SPEC.md). Both endpoint
-connection/rate admission and request quotas apply before the session's own
-single-active-call budget. The seller worker belongs to the financial service,
-not the connection; closing the buyer's connection does not stop autonomous
-settlement.
+Every earlier turn is input again, so you pay its input tokens again. The
+session avoids a new deposit, not that cost. The conversation must fit:
 
-This channel returns a complete response for one user message with reasoning
-off. The local chat receives one complete verified answer, exposed as one
-awaited SSE delta; this is not token streaming. Unsupported inputs are refused
-before the buyer signs an opening; there is no fallback to another seller or
-payment path after possible prompt transmission. The buyer recounts usage and
-charges at the signed quote's existing per-million rates before signing. A
-partial or missing terminal produces no new approval; the seller can collect
-only its earlier accepted total. Existing free/paid stream channels remain
-independently available; no streaming or full agent-API compatibility is newly
-claimed for this session RPC.
+- the terminal's 64,000-byte limit for the whole history plus the new question;
+- the session's 64 KiB content bound, 1024 messages and 128 output tokens;
+- the model's context and the signed quote's budget.
 
-Without shared total authority startup retains one pair. Explicit total
-authority enables separately owned seller sessions as described below.
-Concurrent requests inside one seller channel, automatic session rotation/topup,
-restored-journal rollback defense, abrupt host/power-loss acceptance and live
-network/deployed-program validation remain separate work.
+Input that doesn't fit is rejected before sending, never trimmed. The chat then
+suggests `/new`. Without a session, `pnpm buyer:chat` accepts one user turn per
+paid question.
 
-## Multiple sellers and shared authority
+Control queries and receipt exchanges have their own admission and don't hold a
+generation slot. Neither the answer nor the next question waits for receipt
+storage, and a receipt failure never retries the prompt.
 
-Add `totalDepositAtomic` to the existing buyer `session` policy to enable the
-private multi-seller catalog. `depositAtomic` remains the fixed amount per new
-seller channel; `totalDepositAtomic` is the authorization shared by all of them.
-For example, a per-channel deposit of `"100000"` and total authority of
-`"200000"` can fund two sellers. Omitting the total retains the existing
-single-channel mode; no larger authority is inferred from the candidate list.
-Both amounts use canonical atomic decimal strings. The per-channel pilot cap,
-finite lifetime and withdrawal grace remain unchanged.
+### Streaming
 
-The normal verified selector chooses a seller, and the shared buyer routes its
-signed quote to that seller's persistent slot. Returning A → B → A reuses A's
-original channel and cumulative total, including after restarting the buyer.
-Changing a seller's owner, payment identities, network, asset or channel terms
-cannot replace the old slot. All slots share the same buyer, buyer NodeId,
-network and asset. There are at most sixteen slots, including retained closed
-ones. With total authority, at most two requests may execute concurrently
-against different sellers, reusing the existing global limit; each seller
-channel remains single-request. Admissions and durable financial catalog
-mutations are serialized, not generation. This does not add automatic topup,
-channel rotation or new model/API formats.
+The seller streams ordered text fragments and ends with one terminal that
+carries the complete text. Streaming API callers receive fragments as the engine
+produces them. Complete-response callers read and verify the same stream without
+publishing fragments. The terminal's text must equal all fragments, and EOF is
+required before the buyer approves usage. Frames, total bytes and the number of
+events are bounded, and every wait uses the request's original deadline.
 
-Committed authority is the sum of each allocated deposit minus its independently
-verified refund. An idle, expired, opening or uncertain channel still occupies
-its full allocation. Actual charges remain consumed after settlement; refunds
-are credited once, survive restart and cannot reset prior spending. Lowering the
-configured total below commitments blocks new use, while recovery and closure
-under original terms remain available. `/settle` tries every retained seller and
-reports aggregate charge/refund amounts only when all required independent
-proofs exist. A failed/offline peer cannot fabricate a successful aggregate or
-prevent attempts to close the other slots.
+Cancelling before a verified terminal creates no new approval. It stops
+publication, aborts generation and keeps any pending financial intent. Once
+verified usage is durably approved, cancelling can't revoke it; recovery only
+resends that original approval.
 
-Every buyer service startup mode (free, per-request, single-session and pool)
-first holds the same buyer-home lifetime ownership guard. Startup failures,
-final inspection and shutdown release it. Raw signing/SDK ports remain trusted
-host primitives; external hosts must honor that ownership contract. The adapter
-additionally holds one buyer-wide catalog process lock and writes an allocation
-before financial construction or signing. It seeds a private child journal
-before marking that slot ready, so an interrupted pre-sign allocation can finish
-under the same immutable reservation. A missing ready journal fails closed. A
-durable request intent precedes execution: ambiguity blocks new free and paid
-routing across all sellers until original financial approval recovery or
-independent finality resolves it. A provably pristine pre-sign child may clear a
-failed intent without releasing its allocation. Prompt content is never
-replayed.
+### Block checkpoints
 
-The catalog and deterministic child paths live under the buyer's private
-payments home, using 0700 directories, 0600 files, bounded atomic writes and
-strict parsers. A pre-existing root single-channel journal is adopted in place
-and counted before another allocation; it is never moved or overwritten.
-Removing pool configuration cannot bypass non-finalized obligations. Updated
-applications must exclusively own this home; running an older binary against the
-same financial state is unsupported. This is not protection against restoring a
-complete older backup; that remains separate work.
+When both peers support block checkpoints and the model's tokenizer has
+certified safe boundaries, the session approves usage block by block during a
+response:
 
-Zero-price signed quotes still use transaction-free execution. A fresh free-only
-buyer with pool policy constructs no financial backend, loads no signing key and
-makes no financial RPC call. Identity/discovery checks retain their existing
-policy. Windows reusable financial activation remains unavailable.
+1. The seller sends a certified prefix of about 64 output tokens. A first block
+   also covers the input usage and must fit the signed request ceiling and the
+   remaining deposit.
+2. The buyer verifies the prefix and durably signs its cumulative total before
+   the seller sends the next block. These signatures submit no transaction.
+3. Settlement stays one final operation over the highest accepted voucher; the
+   unused deposit returns to the buyer.
 
-## Buyer routing when a selected seller is busy
+This bounds the unpaid exposure to one outstanding block, not to a fixed amount.
+A tokenizer without certified boundaries uses one approval for the whole result.
+A cumulative voucher is not a usage receipt; see [receipts.md](receipts.md) for
+receipts.
 
-The optional `routing` object in buyer `selection.json` is validated by the
-shared `@gyblos/core/buyer-routing` policy and consumed by the shared session
-runtime. Other hosts can reuse its parser and the node routing service; no
-Settings UI is included here. Configuration is loaded at buyer startup.
+### Tools
+
+With a payment session, the buyer endpoint supports tools on a priced offer, as
+it does on a free one. The shared inference package validates capabilities,
+keeps system, history and tool turns, and measures the result; the buyer
+verifies the whole result before signing. Tool definitions and results count
+toward the input bound, and tool-call output counts toward tokens even when the
+text is empty. The API client runs the tools, never the node, the chat or the
+desktop app.
+
+## Buyer routing
+
+### Free or paid by signed quote
+
+`pnpm buyer` (the buyer endpoint) and `pnpm buyer:chat` (which starts its own
+buyer) share one buyer runtime. Before it chooses how to execute, the buyer
+verifies discovery, the owner–NodeId binding, public-record replay protection,
+selection and the signed quote. Then the quote decides:
+
+| Signed prices   | Required quote budget | Execution                                                   |
+| --------------- | --------------------- | ----------------------------------------------------------- |
+| Both `"0"`      | `maxAtomic: "0"`      | Free channel, with the seller's free caps and replay checks |
+| Either positive | Positive `maxAtomic`  | Paid through the configured payment session                 |
+
+The configured `request.maxAtomic` is a spending ceiling, not a paid-mode
+switch: a positive ceiling also accepts a free offer. The chosen executor
+receives the same verified winner and signed quote and never selects again.
+Routing adds no free-first preference and no reasoning downgrade.
+
+A paid request also needs a recountable model on the seller
+(`SELLER_PAID_METERING_UNRECOUNTED` otherwise) and a devnet payment RPC
+(`BUYER_PAYMENT_NETWORK_MISMATCH` otherwise).
+
+Selection errors:
+
+- `SELLER_PRICE_ABOVE_BUDGET`: a seller offers the model at an acceptable
+  reasoning level, but every listing costs more than `request.maxAtomic` or
+  `priceCeilings`. Raise those limits in `selection.json`. A `maxAtomic` of
+  `"0"` admits only free listings. The free buyer (`pnpm buyer:free`) always
+  uses a zero budget, so it reports this case as `NO_SELLER_CANDIDATES` (no free
+  seller is available now), with `Retry-After` when a free seller is cooling
+  down.
+- `PINNED_SELLER_REJECTED`: the pinned seller failed a check, including price.
+- `NO_SELLER_CANDIDATES`: no eligible seller offers the model, whatever the
+  budget; or, for the free buyer, no free seller is available now.
+
+Free execution loads no payment signer, paid tokenizer or payment RPC and
+creates no journal, deposit or settlement. It still reads payment state: an
+unresolved payment, unsafe state or another process's payment lock blocks free
+calls too. The buyer never clears or takes over a lock to run a free call.
+
+The buyer endpoint requires its private bearer token on every request, because
+it can spend. Tools use separate [bounded API keys](buyer-api-keys.md). A
+completed JSON or SSE reply carries `gyblos_execution` (`free` or `paid`), and
+only a paid reply carries `gyblos_payment`. A paid completion without payment
+information is never reported as a free success.
+
+One deadline and one seller-exclusion set cover the whole request. An attempt
+proven unsent may move to another seller, even across free and paid. A possibly
+sent prompt, delivered text, remote failure or uncertain authorization is never
+retried. Routing never stores prompts or answers.
+
+### When the selected seller is busy
+
+The optional `routing` object in `selection.json` sets what happens when the
+chosen or pinned seller is busy. It doesn't change the initial ranking, and the
+buyer reads it at startup:
 
 ```json
 {
@@ -429,140 +298,180 @@ Settings UI is included here. Configuration is loaded at buyer startup.
 }
 ```
 
-`reroute` is the default. `reject` returns busy without another execution. A
-fixed seller is replaced only when `allowPinnedFallback` is explicitly true.
-These options govern a seller already chosen or pinned, not the initial ranking.
-The third option, `wait`, waits for that same seller with a bounded in-memory
-queue. Without shared total session authority, existing buyer modes retain their
-behavior.
+| Field                      | Default   | Meaning                                                             |
+| -------------------------- | --------- | ------------------------------------------------------------------- |
+| `onBusy`                   | `reroute` | `reroute` to another seller, `reject` with busy, or `wait` in queue |
+| `allowPinnedFallback`      | `false`   | Let `reroute` replace a pinned seller                               |
+| `allowHigherPriceFallback` | `false`   | Let a replacement cost more than the original quote                 |
+| `queueWaitMs`              | `30000`   | Longest `wait`, from 1 to the 180,000 ms request deadline           |
 
-Before rerouting, both replacement prices must be no higher than the original
-verified quote or fresh authenticated catalog, independently for input and
-output. An occupied local seller uses the quote held by its active request as
-the reference while that verified quote remains valid; querying its control
-channel would compete with its unchanged per-peer execution admission. An
-expired or missing active reference returns typed busy. This reference only
-bounds prices: the alternative still passes fresh identity, replay, selection
-and quote checks. User ceilings are intersected with those prices. Explicit
-higher-price permission still cannot widen the configured price, per-request or
-total budget. With the default price rule, a free quote cannot turn into a paid
-request. An unverifiable or expired reference cannot authorize fallback.
-Identity, replay, exact model, reasoning, network and asset checks remain
-mandatory for each alternative.
+Rerouting rules:
 
-Rerouting ends before the first possible prompt write: a failed or partial
-write, remote execution refusal or lost response never sends that prompt
-elsewhere. Only explicit busy before transmission and a safely unused financial
-intent can be treated as an unsent busy result. A busy response after a prompt
-was written remains terminal. No retries are added to execution.
+- A replacement's input and output prices must each be no higher than the
+  original verified quote, unless `allowHigherPriceFallback` is true. Even then,
+  it can't exceed the configured price ceilings or the per-request and total
+  budgets. With the default rule, a free request can't become a paid one.
+- A busy local seller's active quote is the price reference while it stays
+  valid. An expired or missing reference returns busy instead of rerouting.
+- Every alternative passes fresh identity, replay, model, reasoning, network,
+  asset and quote checks.
+- Rerouting ends before the first possible prompt write. A failed or partial
+  write, a remote refusal or a lost response never sends the prompt elsewhere. A
+  busy reply after the prompt was written is final.
 
-Live ownership is distinct from unknown financial state. An owned healthy A
-request does not trigger recovery or block B. If A becomes uncertain, new free
-and paid requests stop. B may finish under its original reservation if its
-prompt was already sent; otherwise B is cancelled before transmission. Restart
-never reconstructs live ownership from a pending journal: original recovery is
-required. Settlement/reconciliation refuse while requests are active. Shutdown
-closes admission and drains actual operations before releasing private journal
-ownership.
+A healthy request on seller A doesn't block seller B. If A becomes uncertain,
+new requests stop; B finishes if its prompt was already sent and is cancelled
+otherwise. Settlement and reconciliation refuse while requests are active.
 
-## Waiting for the selected seller
+### Waiting for the selected seller
 
-`routing.onBusy: "wait"` never reroutes. It admits at most one waiter per seller
-within the existing two-request total admission, including waiting HTTP calls.
-Two running calls therefore leave no third queue slot; one running A call can
-have one waiter. This does not increase HTTP, Iroh, engine or financial
-capacity. Waiting occupies neither an execution connection nor a new financial
-reservation. Existing channel deposits remain committed. Queue data, including
-its captured input, exists only in memory and is never restored or replayed
-after restart.
+`onBusy: "wait"` never reroutes:
 
-The default wait is 30000 milliseconds. `queueWaitMs` must be a positive integer
-no greater than the existing request deadline, and the original caller deadline
-may end the wait sooner. A waiter is removed on disconnect, cancellation,
-uncertainty, shutdown or expiry; timeout has a static typed local error. FIFO
-ownership is handed to the waiter before a newcomer can acquire that seller.
+- It admits at most one waiter per seller, within the buyer's two-request total.
+  Two running calls leave no queue slot; one running call on A can have one
+  waiter. Waiting adds no HTTP, Iroh, engine or financial capacity.
+- A waiter holds no connection and no new reservation. The queue, including its
+  input, lives only in memory and is never restored or replayed after a restart.
+- The wait ends on disconnect, cancellation, uncertainty, shutdown or
+  `queueWaitMs`, whichever comes first; the caller's own deadline can end it
+  sooner. Waiters are served first-in, first-out.
+- After admission the buyer gets a fresh quote from the same seller and repeats
+  identity, freshness, model, reasoning and budget checks. The original quote's
+  prices still bound it unless higher prices are allowed. No deposit or request
+  authorization starts while the request is queued.
+- If the seller stays busy, control-only polls share the original wait deadline.
+  A failure other than busy ends the call; it never changes sellers or retries a
+  prompt.
 
-After admission, the buyer obtains a new quote for the same seller and repeats
-identity, freshness, model/reasoning and budget checks. When a quote was already
-selected, its input and output prices also bound the renewed quote unless
-higher-price fallback was explicitly authorized. Waiting never silently turns a
-free choice into a paid one. Only a known busy cooldown is ignored for this
-explicit retry; hard filters still apply. No deposit or request authorization
-starts while the request is still queued. If the remote peer remains busy,
-bounded control-only polls share the original wait deadline. A non-busy failure
-ends the call; it never changes sellers or retries a prompt.
+## Lifecycle
 
-The trusted execution port receives a synchronous `sending` callback. Product
-free and session transports invoke it at the actual first possible prompt write,
-after checks. It ends the queue clock, preserving the original remaining
-response deadline without extending it. Preparation and quote renewal remain
-bounded by queue time. A failed/partial write is still a possible send and never
-retried. Usage approval and final settlement retain their existing independent
-checks.
+1. **Prepare.** The buyer sends its full terms to the seller, which confirms it
+   supports the session and agrees to every field (deposit, expiry, withdrawal
+   grace, treasury, fee). A mismatch fails before any opening signature. The
+   reply performs no financial operation.
+2. **Open.** The buyer persists the opening hints and salt, then signs one
+   capped deposit with a zero voucher; nothing is charged in advance. The buyer
+   signs the session terms into the opening memo: both wallets and NodeIds,
+   network, asset, payout, fee payer, authorizer, fee split, deposit and expiry.
+3. **Reserve.** For each request the seller verifies the funded channel and
+   reserves the request's ceiling. Request identifiers are single-use, and each
+   channel runs one request at a time.
+4. **Execute and bill.** The seller measures delivered usage through the common
+   execution lifecycle and saves a bill with the charge and the new cumulative
+   total.
+5. **Approve.** The buyer verifies the usage and prices, persists the approved
+   bill, then signs the cumulative voucher. The seller verifies and persists the
+   voucher before it acknowledges. Only that acknowledgement allows the next
+   request; a lost acknowledgement resends the same approval, never the prompt.
+6. **Close.** Admissions freeze at the highest accepted voucher. The seller's
+   fee payer submits the cooperative refund, or seals a buyer-forced closing
+   channel within its grace, and the unused deposit returns to the buyer. Both
+   sides confirm the resulting transaction and amounts independently before they
+   mark the journal closed.
 
-Settings controls belong to the separate host/UI integration. The canonical
-parser and behavior below apps are reusable; this implementation changes no
-desktop panel, seller CLI, fee calculation, wire bytes or journal format.
-
-### Tools on the common execution pipeline
-
-The normal buyer endpoint supports tools for both a zero-price quote and a
-positive-price quote backed by an explicitly configured reusable session. The
-same inference package validates capabilities, preserves system/history/tool
-turns, runs the engine and measures the result. A free choice constructs no
-financial services. A paid choice verifies the whole received result before
-signing its cumulative usage. Tools are run by the API client, never implicitly
-by the node, chat CLI or desktop host.
-
-Configure the session authorization above before using positive-price tools. The
-older individual settlement mode rejects tool requests before opening a payment:
-it cannot safely bill arguments held until a terminal without a buyer
-acknowledgement. It does not silently convert an individual authorization into a
-reusable deposit. Both peers need the active session v4 implementation; original
-saved financial approvals retain their exact bill and voucher through recovery,
-without replaying content.
-
-Tool definitions/results count toward the existing input bound; canonical tool
-output counts toward tokens even if the text is empty. Local telemetry covers
-both prices with the same content-free events and remains configurable. A
-voucher approval is shown as approved usage, not as a confirmed settlement.
+Closing can take several transactions; answers themselves need none.
 
 ## What closes a channel
 
-Passing time does not itself execute a blockchain transaction. Normal closure
-uses the highest buyer voucher already accepted by the seller; it does not ask
-for a new buyer spending signature. The seller's authorizer signs the close
-permission and the seller's fee payer funds its submission.
+Time passing never runs a transaction by itself. Normal closure uses the highest
+voucher the seller already accepted; it asks for no new buyer signature. The
+seller's authorizer signs the close and its fee payer pays for it.
 
-| Trigger                                                        | Actor and result                                                                                                                                                                                                    |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Buyer requests close/settle                                    | Authenticated buyer requests it; seller authorizes and submits finalization. Active executions keep maintenance exclusive.                                                                                          |
-| Terms expire                                                   | Online seller worker finalizes the latest accepted total. If both parties are offline, nothing submits until one recovers.                                                                                          |
-| Deposit is fully authorized                                    | Seller worker finalizes; unused deposit is zero. There is no automatic top-up.                                                                                                                                      |
-| Ten minutes without use and at least 10,000 atomic accrued     | Seller worker finalizes. The threshold is a soft economic default, not an additional charge.                                                                                                                        |
-| Interrupted/unsigned work becomes idle                         | Seller finalizes the preceding accepted total, even below the soft threshold. A block-aware runtime lease prevents treating a live generation as abandoned.                                                         |
-| Retained request limit reached with no active or unsigned work | Seller finalizes the existing total before the record can grow beyond its bound.                                                                                                                                    |
-| Buyer requests native forced close                             | Buyer signs and funds that control transaction. An online seller can claim during the configured grace, normally 900 seconds.                                                                                       |
-| Recovery after a crash                                         | Seller resumes its saved finalization; buyer can resend original financial messages, or complete native seal/distribution after grace when the seller is absent. Buyer-only recovery pays its own transaction fees. |
-| Opening expired and was independently proved never created     | No settlement or pretend refund: the unfunded commitment is released using the finalized absence proof.                                                                                                             |
+| Trigger                                                        | Actor and result                                                                                                                                                      |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Buyer requests close (`/settle`)                               | The seller authorizes and submits finalization. Active executions finish first.                                                                                       |
+| Terms expire                                                   | The online seller worker finalizes the latest accepted total. If both parties are offline, nothing is submitted until one returns.                                    |
+| Deposit is fully approved                                      | The seller worker finalizes; the refund is zero. There is no automatic top-up.                                                                                        |
+| Ten minutes idle without any requests                          | The seller closes the unused channel and verifies the full refund.                                                                                                    |
+| Ten minutes idle with at least 10,000 atomic units accrued     | The seller worker finalizes. The threshold is a soft default, not an extra charge.                                                                                    |
+| Interrupted or unsigned work becomes idle                      | The seller finalizes the previous accepted total, even below the threshold. A runtime lease stops a live generation from counting as abandoned.                       |
+| Retained request limit reached with no active or unsigned work | The seller finalizes before the record outgrows its bound.                                                                                                            |
+| Buyer forces a close on chain                                  | The buyer signs and pays that transaction. An online seller can still claim during the grace, 900 seconds by default.                                                 |
+| Recovery after a crash                                         | The seller resumes its saved finalization. The buyer can resend original messages, or seal and distribute after the grace if the seller is gone, paying its own fees. |
+| An opening expired and was proved never created                | No settlement and no refund: the unfunded reservation is released.                                                                                                    |
 
-For deposit D and independently observed gross charge C, the buyer receives D−C.
-Seller payout and Gyblos treasury receive the existing `settlementShares` for
-the channel's frozen fee terms. Native program rounding residuals remain
-separate from Gyblos revenue. This work does not change the canonical fee or the
-program's rounding. Finalization can require several native transactions; block
-approvals themselves require none.
+The defaults (10-minute idle, 10,000-unit threshold, 15-second worker tick) live
+in `BATCH_SESSION_DEFAULTS` in `packages/config/src/batch-session.ts`. The
+threshold is not a measured break-even point or a minimum charge. Explicit
+closure, an exhausted deposit, the request-record bound, expiry, a buyer-forced
+close and an abandoned unsigned response all bypass it. The seller pays normal
+finalization fees and fronts rent from its fee payer.
 
-Buyer/seller shutdown, an HTTP disconnect or switching A→B are not, by
-themselves, guaranteed financial close operations. Recovery and the online
-seller worker still matter. A seller absent throughout native forced-close grace
-can lose previously signed but unclaimed earnings; the accepted one-block risk
-bounds the delivery/approval window, not arbitrary settlement outages.
+For a deposit D and a verified gross charge C, the buyer receives D − C. The
+payout address and the Gyblos treasury share C with the fee split frozen at
+opening ([Protocol fee](payments.md#protocol-fee)).
 
-The block checkpoint ports are an additive integration foundation. Until the
-bidirectional transport/runtime activation is installed, existing inference
-still uses whole-result approval. Its new private block record is version 2;
-legacy pending version 1 records must resolve before upgrading. Do not downgrade
-software while a version 2 session is active. Only hashes, usage and financial
-metadata are stored; no conversation or response content is written to this
-record.
+Shutting down the buyer or seller, an HTTP disconnect or switching from seller A
+to B doesn't close a channel by itself. A seller that stays offline through the
+whole forced-close grace can lose signed earnings it never claimed.
+
+## Failure and persistence boundaries
+
+- Journals are private (0700 directories, 0600 files), size-bounded, atomically
+  replaced and process-locked in the role's payment directory. They hold the SDK
+  pending operations and the highest voucher, never prompts, answers or keys.
+- The seller rejects unknown SDK fields, oversized openings (8 KiB) and an
+  invalid initial buyer proof before it persists a remote opening.
+- A failed write poisons that journal handle; an ambiguous state is never
+  cleared to proceed.
+- If the buyer vanishes before approving the final response, the seller can
+  collect only the previous signed total: the exposure is one request, or one
+  block with block checkpoints.
+- A remote status is metadata. A remote close reply becomes proof only after the
+  buyer's own chain observation.
+- Every buyer startup mode (free, single session and multi-seller) first takes
+  the same buyer-home ownership guard. Only one application may own a buyer
+  home; running an older binary on the same financial state is unsupported.
+- These protections need the seller worker online within the withdrawal grace.
+  They don't cover long simultaneous outages or a restored old backup.
+
+Recovery steps, including `pnpm buyer:withdraw:paid` for session channels, are
+in [recovery.md](recovery.md#reusable-batch-recovery).
+
+## Upgrading and downgrading
+
+Keep both peers on the same release, and never delete a journal or lock to
+downgrade.
+
+- Beta.12 removed per-request payment. A beta.11 seller accepts no new channels
+  unless a buyer allowlist is set, so a paid seller must update before beta.12
+  buyers can pay it. Beta.12 neither settles a beta.11 seller's per-request
+  claims nor withdraws a beta.11 buyer's per-request funds: settle or withdraw
+  them with beta.11 before updating.
+
+- A renewed buyer journal uses private journal version 3. Versions 1 and 2 stay
+  readable and keep their format until renewal; older binaries can't read a
+  renewed journal.
+- Block checkpoints use a private record version 2. Resolve any pending version
+  1 record before upgrading, and don't downgrade while a version 2 session is
+  active. The record stores hashes, usage and financial metadata only.
+
+## Wire and code
+
+- Wire: the session channel is ALPN `gyblos/session/4`, and block checkpoints
+  use `gyblos/session/5`. One bidirectional stream carries one request and
+  reply; the operations are `prepare`, `open`, `execute`, `approve`, `snapshot`
+  and `close`. The [wire specification](../packages/protocol/SPEC.md) owns the
+  formats.
+- Admission: endpoint connection and rate limits and request quotas apply before
+  the session's own one-call budget. The seller's worker belongs to the
+  financial service, not the connection, so closing the buyer's connection
+  doesn't stop settlement.
+- Trust: hosts supply identity, catalog, request and budget verification and
+  finalized-chain observers as trusted ports, never as callbacks from discovery.
+  They verify the RPC genesis before providing chain signers. Mainnet terms are
+  refused.
+- Code:
+  [Reusable payment session composition](architecture.md#reusable-payment-session-composition)
+  lists the owning modules.
+
+Not provided: concurrent requests inside one channel, automatic rotation or
+top-up, rollback defense for a restored journal, and validation on a live
+network or the deployed program.
+
+## Related
+
+- [Payments](payments.md)
+- [Recovery and reconciliation](recovery.md)
+- [Known limitations](limitations.md)
+- [Bounded buyer API keys](buyer-api-keys.md)

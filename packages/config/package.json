@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./payment-fees": "./src/payment-fees.ts",
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
     "./home": "./src/home.ts",
@@ -12,7 +13,6 @@
     "./limits": "./src/limits.ts",
     "./paths": "./src/paths.ts",
     "./paypal": "./src/paypal.ts",
-    "./lock": "./src/lock.ts",
     "./batch-session": "./src/batch-session.ts",
     "./buyer-routing": "./src/buyer-routing.ts"
   },

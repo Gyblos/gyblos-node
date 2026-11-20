@@ -1,5 +1,4 @@
-// Builds verified selector inputs and races signed quotes; legacy trust authorization is an explicit wrapper.
-// Static operator identity trust stays independent of seller declarations; never executes payments.
+// Selects a seller from verified snapshots and signed quotes.
 import { randomInt } from 'node:crypto';
 
 import {
@@ -44,11 +43,6 @@ export type BuyerControlClient = Pick<
   Partial<Pick<ReturnType<typeof createBuyerControlClient>, 'useCatalog'>>;
 export type SelectionDecision =
   | { ok: true; winner: WinningQuote }
-  | {
-      ok: false;
-      code: typeof BUYER_SELECTION_CODES.QUOTE_ONLY;
-      winner: WinningQuote;
-    }
   | { ok: false; code: typeof BUYER_SELECTION_CODES.NO_OFFER }
   | Exclude<SellerSelectionResult, { ok: true }>;
 export interface VerifiedSelectionDependencies {
@@ -190,6 +184,42 @@ async function selectOnce(
   }
 }
 
+// Every configured seller's verified catalog and presence for `config`, without asking any for a quote
+// (cached snapshots are reused); the clients opened are closed before returning.
+export async function verifiedSnapshots(
+  config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
+  signal: AbortSignal,
+) {
+  if (config.identity && !dependencies.verifyIdentity)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
+  const now = dependencies.now ?? Date.now;
+  const deadline = AbortSignal.any([
+    AbortSignal.timeout(dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs),
+    signal,
+  ]);
+  const clients = new Map<string, BuyerControlClient>();
+  const settling: Promise<unknown>[] = [];
+  try {
+    const snapshots = await refreshSnapshots(
+      config,
+      dependencies,
+      clients,
+      new Map(),
+      now,
+      deadline,
+      settling,
+      signal,
+    );
+    return snapshots.filter((item) => item !== undefined);
+  } finally {
+    await Promise.allSettled(
+      [...clients.values()].map((client) => client.close()),
+    );
+    if (signal.aborted) await Promise.allSettled(settling);
+  }
+}
+
 // The winner can still drop out after the race; it is reported like any other seller unless the
 // caller cancelled.
 function dropWinner(
@@ -215,25 +245,4 @@ function offerCurrent(winner: WinningQuote, now: () => number) {
   } catch {
     return false;
   }
-}
-
-export interface SelectionDependencies extends VerifiedSelectionDependencies {
-  trusted: { owner: string; nodeId: string };
-}
-// Legacy authorization is applied only by the paid entry, after the shared verified selection.
-export async function selectBuyerQuote(
-  config: BuyerSelectionConfig,
-  dependencies: SelectionDependencies,
-  signal?: AbortSignal,
-): Promise<SelectionDecision> {
-  const result = await selectVerifiedBuyerQuote(config, dependencies, signal);
-  if (!result.ok) return result;
-  return result.winner.candidate.nodeId === dependencies.trusted.nodeId &&
-    result.winner.candidate.owner === dependencies.trusted.owner
-    ? result
-    : {
-        ok: false,
-        code: BUYER_SELECTION_CODES.QUOTE_ONLY,
-        winner: result.winner,
-      };
 }

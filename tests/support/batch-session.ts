@@ -21,8 +21,9 @@ import type {
 } from '@gyblos/protocol/payment-session';
 
 export async function sessionRig(nodes?: {
-  buyerNodeId: string;
-  sellerNodeId: string;
+  buyerNodeId?: string;
+  sellerNodeId?: string;
+  depositAtomic?: string;
   treasury?: string;
   transaction?: string;
   payer?: Awaited<ReturnType<typeof generateKeyPairSigner>>;
@@ -48,7 +49,7 @@ export async function sessionRig(nodes?: {
     authorizer: authorizer.address,
     treasury: nodes?.treasury ?? treasury.address,
     protocolFeeBps: PROTOCOL_FEE.bps,
-    depositAtomic: '1000',
+    depositAtomic: nodes?.depositAtomic ?? '1000',
     withdrawDelaySeconds: 900,
     expiresAt: now + 3_600_000,
   };

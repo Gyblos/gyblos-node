@@ -9,6 +9,7 @@ import {
 
 import { IROH_DEADLINES } from './constants';
 import type { ControlStream } from './control-io';
+import { readEventPrefix } from './stream-prefix';
 
 export async function readFreeStreamResponse(
   stream: ControlStream,
@@ -20,12 +21,7 @@ export async function readFreeStreamResponse(
   const verifier = await createFreeStreamVerifier(request);
   for (;;) {
     check();
-    const prefix = Uint8Array.from(
-      await stage(
-        stream.recv.readExact(CONTROL_LIMITS.prefixBytes),
-        IROH_DEADLINES.ingressMs,
-      ),
-    );
+    const prefix = await readEventPrefix(stream, check, stage);
     // The single-frame reader rejects an oversized prefix before any body allocation/read.
     const length = new DataView(prefix.buffer).getUint32(0);
     if (!length || length > FREE_STREAM.eventBytes) {

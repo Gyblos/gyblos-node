@@ -10,7 +10,7 @@ changes in `gyblos-node`. It is provider-neutral: the same sequence applies to
 Codex, Claude Code and human contributors. Read `AGENTS.md` first; its rules
 override this procedure.
 
-The public explanation is [docs/ai-assisted-contributing.md](../../../docs/ai-assisted-contributing.md).
+The public explanation is [CONTRIBUTING.md](../../../CONTRIBUTING.md#using-ai-tools).
 Use [gyblos-pr-workflow](../gyblos-pr-workflow/SKILL.md) for the detached
 worktree, branch, review and PR mechanics.
 Do not rely on a private prompt, provider-specific memory or an uncommitted

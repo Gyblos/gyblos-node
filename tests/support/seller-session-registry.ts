@@ -37,6 +37,8 @@ export async function sellerRegistryRig(
     sellerNodeId?: string;
     now?: () => number;
     prepareOpenings?: boolean;
+    buyerCount?: number;
+    depositAtomic?: string;
   } = {},
 ) {
   const now = options.now ?? (() => 1_800_000_000_000);
@@ -57,7 +59,7 @@ export async function sellerRegistryRig(
     authorizer: vm.authorizer,
   };
   const buyers: RegistryBuyer[] = [];
-  for (let index = 0; index < 3; index++) {
+  for (let index = 0; index < (options.buyerCount ?? 3); index++) {
     const payer = index === 0 ? vm.payer : await generateKeyPairSigner();
     if (index !== 0)
       await vm.send([
@@ -91,7 +93,7 @@ export async function sellerRegistryRig(
       authorizer: vm.authorizer.address,
       treasury: PROTOCOL_FEE.treasury,
       protocolFeeBps: PROTOCOL_FEE.bps,
-      depositAtomic: '1000',
+      depositAtomic: options.depositAtomic ?? '1000',
       withdrawDelaySeconds: 900,
       expiresAt: now() + 3_600_000,
     };

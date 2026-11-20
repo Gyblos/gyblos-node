@@ -1,12 +1,13 @@
 // Attributes only verified buyer outcomes to a delegated key; failed/unknown paid work keeps its reservation.
+import { UnsentChannelPeerError } from '@gyblos/node/batch-buyer';
 import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
-import { PAID_VERDICTS, SESSION_VERDICTS } from '@gyblos/node/constants';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
-import { buyerAtomic } from '@gyblos/protocol/buyer-api';
+import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import {
   BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
@@ -21,7 +22,6 @@ import type {
   FreeChatStreamExecutor,
 } from './free-sse';
 import type { RoutedModel } from './model-routes';
-import { PaidOutcomeError, paidSummary } from './paid-http';
 
 export async function reserveApiKey(
   operation: BuyerApiKeyOperation | undefined,
@@ -61,9 +61,11 @@ export async function executeApiKeySession<T>(
   try {
     return await execute();
   } catch (error) {
-    // Only the pool's durable resolution of an unsent intent authorizes release.
+    // Only locally proven unsent requests release their matching reservation.
     if (
-      error instanceof UnsentSellerBusyError &&
+      (error instanceof UnsentSellerBusyError ||
+        error instanceof UnsentChannelLimitError ||
+        error instanceof UnsentChannelPeerError) &&
       error.nodeId === nodeId &&
       operation?.reserved()
     )
@@ -78,13 +80,6 @@ function charge(payment: ChatPayment) {
       return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
     return { atomic: approved.approvedAtomic, kind: BUYER_KEY_CHARGE.APPROVED };
   }
-  if (
-    payment.verdict === PAID_VERDICTS.SETTLED &&
-    buyerAtomic(payment.chargedAtomic) &&
-    payment.chargedAtomic === payment.expectedAtomic &&
-    payment.transaction
-  )
-    return { atomic: payment.chargedAtomic, kind: BUYER_KEY_CHARGE.SETTLED };
   return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
 }
 async function complete(
@@ -106,10 +101,7 @@ export async function recordApiKeyPayment(
   payment: ChatPayment,
 ) {
   if (!operation || operation.completed()) return;
-  if (
-    payment.verdict === PAID_VERDICTS.SETTLED ||
-    payment.verdict === SESSION_VERDICTS.APPROVED
-  )
+  if (payment.verdict === SESSION_VERDICTS.APPROVED)
     await complete(operation, payment);
 }
 export async function executeApiKey(
@@ -130,10 +122,8 @@ export async function executeApiKey(
     if (!operation.completed()) await complete(operation, result.payment);
     return result;
   } catch (error) {
-    if (operation.reserved() && error instanceof PaidOutcomeError)
-      await complete(operation, paidSummary(error.outcome));
     // A verified free route cannot create a financial obligation. Paid errors remain under review.
-    else if (operation.reserved() && operation.maximum() === '0')
+    if (operation.reserved() && operation.maximum() === '0')
       await operation.complete('0', BUYER_KEY_CHARGE.SETTLED);
     throw error;
   } finally {

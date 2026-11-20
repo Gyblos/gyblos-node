@@ -2,7 +2,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { REVIEW_VALUES } from './constants';
+import { REVIEW_FAILURE, REVIEW_PHASE, REVIEW_VALUES } from './constants';
 import { parseVerificationResponse } from './parsing';
 import { labelsForStatus, overallReviewStatus } from './result';
 import type { ReviewRunResult, ReviewStatus } from './types';
@@ -10,26 +10,34 @@ import type { ReviewRunResult, ReviewStatus } from './types';
 export interface ArtifactOptions {
   output: string;
 }
+// Plan-level private paths and the symlinks, submodules and binaries each task set aside.
+function excludedPaths(result: ReviewRunResult): string[] {
+  return [
+    ...new Set([
+      ...result.plan.excludedFiles,
+      ...result.tasks.flatMap((item) =>
+        (item.excluded ?? []).map((entry) => entry.path),
+      ),
+    ]),
+  ].sort();
+}
 function finalStatus(result: ReviewRunResult): ReviewStatus {
   if (result.status === REVIEW_VALUES.NOT_RUN) return REVIEW_VALUES.NOT_RUN;
   if (result.status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
-  if (
-    result.plan.changedFiles.some((path) =>
-      result.plan.excludedFiles.includes(path),
-    )
-  )
-    return REVIEW_VALUES.PENDING;
-  const status = overallReviewStatus(result.tasks);
+  const status = overallReviewStatus(result.tasks, result.verifications);
   if (status === REVIEW_VALUES.ERROR) return REVIEW_VALUES.ERROR;
   if (
     result.candidates.length !== result.verifications.length ||
     result.candidates.some(
       (candidate, index) =>
         result.verifications[index]?.fingerprint !== candidate.fingerprint,
-    ) ||
-    result.verifications.some((item) => item.decision === REVIEW_VALUES.ERROR)
+    )
   )
     return REVIEW_VALUES.ERROR;
+  // A changed file nobody could read (private path, symlink, submodule or binary) needs a maintainer.
+  const unread = new Set(excludedPaths(result));
+  if (result.plan.changedFiles.some((path) => unread.has(path)))
+    return REVIEW_VALUES.PENDING;
   if (
     status === REVIEW_VALUES.PENDING &&
     result.tasks.some((item) => item.status !== REVIEW_VALUES.COMPLETE)
@@ -64,7 +72,7 @@ function renderReport(result: ReviewRunResult): string {
     '',
     'This is a partial source-only AI review, not proof that the protocol is secure.',
     'No target code was executed. Runtime claims require bounded synthetic validation.',
-    'No prior run suppressed current coverage. Binary/private/oversized files are excluded or blocked.',
+    'No prior run suppressed current coverage. Private paths, symlinks, submodules and binaries are excluded; oversized files are blocked.',
     '',
     '## Coverage',
     '',
@@ -74,7 +82,7 @@ function renderReport(result: ReviewRunResult): string {
     '',
     '## Excluded paths',
     '',
-    ...result.plan.excludedFiles.map((path) => '- ' + escape(path)),
+    ...excludedPaths(result).map((path) => '- ' + escape(path)),
     '',
     '## Independently checked candidates',
     '',
@@ -106,6 +114,31 @@ function renderReport(result: ReviewRunResult): string {
     );
   }
   return lines.join('\n') + '\n';
+}
+function diagnosticSummary(result: ReviewRunResult): string {
+  return (
+    [
+      result.execution?.callsStarted ?? 0,
+      result.execution?.reportedTokens ?? 'unknown',
+      ...new Set([
+        ...result.tasks.flatMap((item) => {
+          if (!item.failure) return [];
+          if (item.failure === REVIEW_FAILURE.BUDGET)
+            return [REVIEW_PHASE.SCHEDULE + ' ' + item.failure];
+          return item.status === REVIEW_VALUES.ERROR
+            ? [REVIEW_PHASE.REVIEW + ' ' + item.failure]
+            : [];
+        }),
+        ...result.verifications.flatMap((item) => {
+          if (item.failedPass && item.failure)
+            return [item.failedPass + ' ' + item.failure];
+          return item.failure === REVIEW_FAILURE.BUDGET
+            ? [REVIEW_PHASE.SCHEDULE + ' ' + item.failure]
+            : [];
+        }),
+      ]),
+    ].join('\n') + '\n'
+  );
 }
 export async function writeArtifacts(
   initial: ReviewRunResult,
@@ -157,6 +190,7 @@ export async function writeArtifacts(
       2,
     ),
     'REPORT.md': renderReport(result),
+    'diagnostics.txt': diagnosticSummary(result),
     'status.txt': result.status + '\n',
     'labels.txt': labelsForStatus(result.status).join('\n') + '\n',
   };

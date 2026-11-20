@@ -84,22 +84,8 @@ export function baseOptions(locale: string): BaseLayoutProps {
   return {
     nav: {
       title: (
-        <span className="docs-brand flex items-center gap-2 font-medium">
-          <span className="sr-only">Gyblos</span>
-          <img
-            src="/brand/gyblos-wordmark-solid-dark.svg"
-            alt=""
-            width={160}
-            height={43}
-            className="docs-wordmark hidden dark:block"
-          />
-          <img
-            src="/brand/gyblos-wordmark-solid-light.svg"
-            alt=""
-            width={160}
-            height={43}
-            className="docs-wordmark dark:hidden"
-          />
+        <span className="docs-brand flex items-baseline gap-2">
+          <span className="docs-wordmark">gyblos</span>
           <span className="text-sm text-fd-muted-foreground">docs</span>
         </span>
       ),

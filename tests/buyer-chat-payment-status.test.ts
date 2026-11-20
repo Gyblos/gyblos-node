@@ -6,12 +6,7 @@ import { chatSession, runOwnedChat } from '@gyblos/buyer/chat-cli';
 import { chatTurn } from '@gyblos/buyer/chat-cli-turn';
 import { PAID_VERDICTS } from '@gyblos/buyer/constants';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
-import { classifyPaidError, paidChat } from '@gyblos/buyer/paid-http';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
-
-import { setup } from './support/buyer-paid';
 
 const DIGEST = 'ab'.repeat(32);
 const DELTA = JSON.stringify({
@@ -287,41 +282,6 @@ void test('the local stream includes a digest only for an opt-in buyer', async (
   }
 });
 
-void test('a paid cut binds the streamed digest to its authorized attempt', async () => {
-  const buyer = await setup();
-  buyer.scripts.push(async (_request, emit) => {
-    await emit('synthetic');
-    throw new PaidClientError(PAID_EXECUTION_CODES.TIMEOUT, true);
-  });
-  const paid = paidChat(buyer.dependencies);
-  const host = await startFreeBuyerHttp(
-    paid.execute,
-    {
-      selection: { modelId: 'synthetic', variant: null, quantization: null },
-      maxTokens: 50,
-    },
-    { port: 0, stream: paid.stream, classify: classifyPaidError },
-  );
-  try {
-    const result = await chatTurn(
-      {
-        model: 'synthetic',
-        maxTokens: 50,
-        prompt: 'synthetic',
-        paid: true,
-        write: () => {},
-      },
-      (_url, init) => fetch(host.url, init),
-    );
-    assert.equal(result.status, 'uncertain');
-    assert.equal(result.requestDigest, buyer.calls.authorize[0]?.requestDigest);
-    assert.equal(buyer.calls.authorize.length, 1);
-    assert.equal(buyer.calls.executed.length, 1);
-  } finally {
-    await host.close();
-  }
-});
-
 void test('a pending seller claim is not presented as a confirmed charge', async () => {
   const output: string[] = [];
   await chatSession({
@@ -344,31 +304,4 @@ void test('a pending seller claim is not presented as a confirmed charge', async
   assert.match(text, /reported.*17/i);
   assert.match(text, /not confirmed/i);
   assert.doesNotMatch(text, /charged:\s*17/i);
-});
-
-void test('a cut with a verified settlement shows the confirmed charge and does not retry', async () => {
-  const output: string[] = [];
-  let turns = 0;
-  await chatSession({
-    model: 'synthetic',
-    maxTokens: 8,
-    maxAtomic: '100',
-    request: async () => new Response(),
-    read: async () => 'synthetic prompt',
-    write: (text) => output.push(text),
-    turn: async () => {
-      turns++;
-      return {
-        status: 'uncertain',
-        payment: {
-          verdict: PAID_VERDICTS.SETTLED,
-          charged: '7',
-          refunded: '93',
-        },
-      };
-    },
-  });
-  assert.equal(turns, 1);
-  assert.match(output.join(''), /charged:\s*7/);
-  assert.match(output.join(''), /No retry was made/);
 });

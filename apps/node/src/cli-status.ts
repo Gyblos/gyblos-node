@@ -1,18 +1,19 @@
 // `gyblos seller status`: whether this home's seller is running, what it serves and how much it answered,
 // read from the background service, the daemon's status.json and its signed receipts. Read-only; with
-// --online it also looks the NodeId up in the discovery index, sending only the model. Prints counts,
+// --online it also looks the NodeId up in the discovery index, paging sellers by model only, then asks
+// for this NodeId's public uptime (the NodeId the daemon already publishes to that index). Prints counts,
 // codes, public identifiers and URL origins; never a prompt, a buyer, a key, the home location or a value
 // from the environment.
 import { runMode } from '@gyblos/config';
-import { fetchSellers } from '@gyblos/discovery-http';
+import { DISCOVERY_ERROR_CODES, fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
 import { listReceipts, receiptUploadHealth } from '@gyblos/node/receipts';
-import { sellerPaidSummary } from '@gyblos/node/seller-paid-summary';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { urlOrigin } from './cli-format';
 import { codeHint } from './cli-hints';
 import { commandsFor, LISTING, nextStep, sellerCommand } from './cli-next';
+import { uptimeLine } from './cli-status-uptime';
 import { updateNotice } from './cli-update';
 import {
   EXIT,
@@ -29,7 +30,6 @@ import {
   type SellerOutput,
 } from './seller-home';
 import {
-  atomicUsdc,
   outputRate,
   receiptActivity,
   type ActivityWindow,
@@ -50,7 +50,6 @@ const NOT_FOUND = 'not found in the index';
 
 const COLUMN = 13;
 const INDEX_LOOKUP = {
-  FOUND: 'found',
   ABSENT: 'absent',
   TRUNCATED: 'truncated',
 } as const;
@@ -81,8 +80,8 @@ async function lookUp(
       limit: STATUS.indexPageSize,
       cursor,
     });
-    if (result.sellers.some((entry) => entry.catalog.nodeId === nodeId))
-      return INDEX_LOOKUP.FOUND;
+    const entry = result.sellers.find((item) => item.catalog.nodeId === nodeId);
+    if (entry) return { found: entry.presence.issuedAt };
     if (!result.next) return INDEX_LOOKUP.ABSENT;
     cursor = result.next;
   }
@@ -96,23 +95,34 @@ async function indexListing(
   models: ReadonlySet<string>,
   nodeId: string,
 ) {
-  if (!models.size) return 'not looked up: no offer is serving yet';
+  if (!models.size) return { text: 'not looked up: no offer is serving yet' };
   let unreachable = false;
   let truncated = false;
   for (const model of models) {
     try {
       const found = await lookUp(system, baseUrl, model, nodeId);
-      if (found === INDEX_LOOKUP.FOUND) return LISTED;
+      if (typeof found === 'object')
+        return { text: LISTED, presenceAt: found.found };
       if (found === INDEX_LOOKUP.TRUNCATED) truncated = true;
     } catch {
       unreachable = true;
     }
   }
-  if (unreachable) return 'index unreachable';
-  return truncated
-    ? `not in the first ${STATUS.maxIndexPages * STATUS.indexPageSize} sellers of the index`
-    : NOT_FOUND;
+  if (unreachable) return { text: 'index unreachable' };
+  return {
+    text: truncated
+      ? `not in the first ${STATUS.maxIndexPages * STATUS.indexPageSize} sellers of the index`
+      : NOT_FOUND,
+  };
 }
+
+// Why the index refused this seller's last publication, for the codes an operator can act on.
+const PUBLISH_HINTS: Readonly<Record<string, string>> = {
+  [DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED]:
+    'the index does not accept this identity yet: run `gyblos seller register` with your invitation; during the beta, ask for one in the Gyblos Telegram',
+};
+const publishHint = (code: string) =>
+  Object.hasOwn(PUBLISH_HINTS, code) ? ` (${PUBLISH_HINTS[code]})` : '';
 
 async function discoveryLine(
   online: boolean,
@@ -127,7 +137,10 @@ async function discoveryLine(
       listing: LISTING.UNKNOWN,
     };
   if (!discovery.publish) return { text: 'off', listing: LISTING.OFF };
-  const on = `on (${urlOrigin(discovery.url)})`;
+  const refused = status?.publicationError;
+  const on = `on (${urlOrigin(discovery.url)})${
+    refused ? `; publishing refused: ${refused}${publishHint(refused)}` : ''
+  }`;
   if (!online) return { text: on, listing: LISTING.UNCHECKED };
   const models = new Set(
     (status?.offers ?? [])
@@ -136,13 +149,26 @@ async function discoveryLine(
   );
   const found = await indexListing(system, discovery.url, models, nodeId);
   return {
-    text: `${on}; ${found}`,
+    text: `${on}; ${found.text}`,
     listing:
-      found === LISTED
+      found.text === LISTED
         ? LISTING.LISTED
-        : found === NOT_FOUND
+        : found.text === NOT_FOUND
           ? LISTING.ABSENT
           : LISTING.UNKNOWN,
+    // Nothing serving, nothing looked up: the index is not asked about this NodeId either.
+    ...(models.size
+      ? {
+          uptime: await uptimeLine(
+            system,
+            discovery.url,
+            nodeId,
+            'presenceAt' in found && found.presenceAt !== undefined
+              ? { listed: true, at: found.presenceAt }
+              : { listed: false, absent: found.text === NOT_FOUND },
+          ),
+        }
+      : {}),
   };
 }
 
@@ -188,32 +214,6 @@ async function activityLines(
   ].join('');
 }
 
-// Paid requests from the seller's payment ledger, which keeps finished requests for a day. Empty when this
-// seller never served one; lifetime earnings are the owner's USDC balance, shown on a block explorer.
-async function paidLines(homeEnvironment: HomeEnvironment, now: number) {
-  let summary;
-  try {
-    summary = await sellerPaidSummary(homeEnvironment, now - STATUS.dayMs, now);
-  } catch {
-    return `Paid requests:\n${line('ledger', 'unavailable (unsafe or invalid file)')}`;
-  }
-  if (!summary) return '';
-  return [
-    'Paid requests, from the payment ledger:\n',
-    line(
-      'last 24h',
-      `${summary.settled} settled, ${atomicUsdc(summary.chargedAtomic)} USDC charged (gross, including the Gyblos fee); ${summary.failed} not charged`,
-    ),
-    line('settling now', String(summary.pending)),
-    line(
-      'last settled',
-      summary.lastSettledAt === undefined ? 'none' : iso(summary.lastSettledAt),
-    ),
-    line('earnings', "the owner's USDC balance on a Solana explorer"),
-  ].join('');
-}
-
-// Free activity from signed receipts, then paid requests from the payment ledger.
 async function usageLines(
   homeEnvironment: HomeEnvironment,
   nodeId: string,
@@ -223,7 +223,6 @@ async function usageLines(
     `Activity, from signed receipts (pending protected; at most ${RECEIPT_STORAGE.maxEntries} uploaded kept):\n`,
     await receiptQueueLine(homeEnvironment, nodeId),
     await activityLines(homeEnvironment, nodeId, now),
-    await paidLines(homeEnvironment, now),
   ].join('');
 }
 
@@ -329,6 +328,8 @@ export async function statusCommand(
   output.stdout(
     line('discovery', commandsFor(runMode(output.env), listing.text)),
   );
+  if ('uptime' in listing && listing.uptime)
+    output.stdout(line('uptime', listing.uptime));
   output.stdout(await usageLines(homeEnvironment, identity.nodeId, now));
   const verdict = result(service, status);
   output.stdout(`Result: ${verdict}\n`);

@@ -115,3 +115,15 @@ export function buyerUnserved(
     /* Observational failures never replace the selection failure. */
   }
 }
+
+export function onBuyerSelectionFailure(
+  signal: AbortSignal,
+  dependencies: FreeBuyerDependencies,
+  streaming: boolean,
+  selection?: ModelSelection,
+) {
+  return (error: unknown): never => {
+    if (!signal.aborted) buyerUnserved(dependencies, streaming, selection);
+    throw error;
+  };
+}

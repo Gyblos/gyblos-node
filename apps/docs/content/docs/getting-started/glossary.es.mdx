@@ -1,0 +1,72 @@
+---
+title: Glosario
+description: Definiciones breves de los términos de la documentación de Gyblos, con su equivalente en inglés.
+---
+
+Estas páginas usan un solo término para cada concepto. La columna en inglés te ayuda a reconocerlo en la
+salida de los comandos y en las páginas en inglés. Para ver cómo encajan las piezas, consulta
+[Cómo funciona Gyblos](/es/getting-started/how-it-works).
+
+## Roles y software [#roles-y-software]
+
+| Término                | Significado                                                                                     | En inglés      |
+| ---------------------- | ----------------------------------------------------------------------------------------------- | -------------- |
+| Vendedor               | El rol que sirve un modelo a la red.                                                            | seller         |
+| Nodo vendedor          | El proceso que vende en el equipo del vendedor.                                                 | seller node    |
+| Vendedor Docker        | Un nodo vendedor instalado como contenedores de Docker, con su propio Ollama.                   | Docker seller  |
+| Vendedor nativo        | Un nodo vendedor instalado sin Docker, como servicio en segundo plano que usa tu propio Ollama. | native seller  |
+| Motor                  | El software que ejecuta el modelo, como Ollama.                                                 | engine         |
+| Comprador              | El rol que usa modelos de la red.                                                               | buyer          |
+| App de escritorio      | La app de Gyblos para macOS, Windows y Linux. Ejecuta un comprador local por ti.                | desktop app    |
+| Comprador local        | El proceso comprador en tu propio equipo.                                                       | local buyer    |
+| Endpoint del comprador | La API HTTP del comprador local, compatible con clientes de OpenAI y Anthropic.                 | buyer endpoint |
+
+## Identidad y descubrimiento [#identidad-y-descubrimiento]
+
+| Término                  | Significado                                                                                                       | En inglés           |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------- |
+| NodeId                   | La identidad pública de un nodo en la red. Los compradores se conectan a un vendedor por su NodeId.               | NodeId              |
+| Dueño (owner)            | La billetera del vendedor registrada en el registro de agentes 8004, que paga el registro.                        | owner               |
+| Dirección de cobro       | La dirección que recibe las ganancias del vendedor. El instalador la fija en el dueño.                            | payout address      |
+| Pagador de comisiones    | La billetera del vendedor que paga las comisiones y el alquiler de Solana de los pagos. Tiene SOL de devnet.      | fee payer           |
+| Registro de agentes 8004 | El registro en cadena de Solana devnet donde los vendedores anotan su NodeId y su dueño.                          | 8004 agent registry |
+| Inscripción              | La entrada de un vendedor en el registro de agentes 8004.                                                         | enrollment          |
+| Índice de descubrimiento | La lista pública de vendedores registrados y sus ofertas, en `discovery.gyblos.com`.                              | discovery index     |
+| Código de invitación     | Un código de un solo uso que empieza con `gyb_` y permite a un vendedor registrarse en el índice.                 | invite code         |
+| En marcha                | El nodo vendedor funciona. Todavía nadie puede encontrarlo.                                                       | running             |
+| Registrado               | El índice de descubrimiento aceptó esta identidad. El vendedor puede publicar.                                    | registered          |
+| Listado                  | El vendedor publicó sus ofertas y una consulta al índice lo encuentra.                                            | listed              |
+| Relay                    | Un servidor de Gyblos que ayuda a conectar comprador y vendedor y transporta el tráfico si no hay enlace directo. | relay               |
+
+## Ofertas y pagos [#ofertas-y-pagos]
+
+| Término                   | Significado                                                                                              | En inglés              |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------- |
+| Oferta                    | Lo que publica un vendedor: un modelo, su motor y sus condiciones, gratuitas o con precio.               | offer                  |
+| Cotización                | Las condiciones firmadas del vendedor para una solicitud. Una cotización a precio cero no requiere pago. | quote                  |
+| Tope                      | Lo máximo que un comprador autoriza para una solicitud. Es un término del protocolo.                     | ceiling                |
+| Límite de gasto           | El total que puede gastar en toda su vida una clave de API creada en la app de escritorio.               | spending limit         |
+| Canal de pago             | Una cuenta en cadena que guarda el depósito del comprador hasta que el vendedor lo liquida.              | payment channel        |
+| Sesión de pago            | Un acuerdo reutilizable en el que un depósito paga muchas respuestas.                                    | payment session        |
+| Recibo                    | Un registro firmado de una solicitud: modelo, tokens y tiempos, nunca el mensaje ni la respuesta.        | receipt                |
+| Recolector de métricas    | El servicio de Gyblos en `collector.gyblos.com` que recibe recibos y publica datos agregados.            | metrics collector      |
+| Receptor local de recibos | Un receptor privado y opcional de recibos que se ejecuta en tu propio equipo.                            | local receipt receiver |
+| Billetera                 | Un par de claves de Solana y su dirección.                                                               | wallet                 |
+| Devnet                    | La red pública de pruebas de Solana. Sus tokens no tienen valor de mercado.                              | devnet                 |
+| SOL de devnet             | SOL de prueba que paga las comisiones en devnet. Lo obtienes del faucet de devnet.                       | devnet SOL             |
+| USDC de devnet            | USDC de prueba con el que los compradores pagan a los vendedores durante la beta.                        | devnet USDC            |
+| Mainnet                   | La red de Solana con dinero real. Gyblos la rechaza durante la beta.                                     | mainnet                |
+
+## Palabras que nunca se traducen [#nunca-se-traducen]
+
+Las páginas en español las mantienen tal cual:
+
+- Nombres de productos y proyectos: Gyblos, Ollama, Docker, Solana, USDC, Qwen.
+- Identificadores: NodeId, el prefijo `gyb_` y las direcciones.
+- Comandos, opciones, claves de `config.toml`, variables de entorno y rutas, como `gyblos doctor`,
+  `--online`, `daily_token_cap`, `GYBLOS_HOME` y `~/gyblos-seller`.
+- Códigos de error y valores de estado, como `MAINNET_UNSUPPORTED` y `RUNNING`.
+- La salida de los programas citada de la terminal, como `listed in the index`.
+- Las etiquetas de la app de escritorio, como **Payments** y **Stop response**.
+
+Estas páginas tratan al lector de **tú**.

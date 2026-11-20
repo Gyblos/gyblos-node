@@ -80,7 +80,9 @@ export const REGISTRATION_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> =
 export const DISCOVERY_PATHS = {
   records: '/records',
   sellers: '/sellers',
+  models: '/models',
   registrations: '/registrations',
+  uptime: '/uptime',
 } as const;
 
 // A beta invite as `gyblos index:invite` prints it, and a NodeId (lowercase hex of its Ed25519 key);
@@ -142,6 +144,10 @@ export const DISCOVERY_LIMITS = {
   maxSellersResponseBytes: 1_100_000,
   maxPublishResponseBytes: 4_096,
   maxRegistrationResponseBytes: 4_096,
+  // One NodeId's uptime report: three windows and a few timestamps.
+  maxUptimeResponseBytes: 4_096,
+  // Uptime windows the index reports (1, 7 and 30 days today); more is malformed.
+  maxUptimeWindows: 8,
   // A canonical public v2 record may reach 32 KiB; 2 KiB more covers the envelope (same cap as the index).
   maxPublishBodyBytes: 34_816,
   defaultSellers: 50,

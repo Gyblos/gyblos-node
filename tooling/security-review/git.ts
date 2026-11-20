@@ -77,6 +77,8 @@ export async function changedFiles(
     .split('\0')
     .filter(Boolean);
 }
+// A tracked path that is not text source (a symlink, submodule or binary blob): excluded, not omitted.
+export class UnsupportedSourceError extends Error {}
 export async function trackedFile(
   root: string,
   ref: string,
@@ -95,16 +97,34 @@ export async function trackedFile(
   const mode = header[0];
   const size = Number(header[3]);
   if (!['100644', '100755'].includes(mode ?? '') || header[1] !== 'blob')
-    throw new Error('Only regular Git blobs may be reviewed.');
-  if (!Number.isSafeInteger(size) || size > MAX_PROJECTION_FILE_BYTES)
+    throw new UnsupportedSourceError('Only regular Git blobs may be reviewed.');
+  if (!Number.isSafeInteger(size) || size > MAX_PROJECTION_FILE_BYTES) {
+    // Git's own text test (first 8000 bytes) tells an oversized binary, excluded, from oversized source.
+    const text = await gitText(root, [
+      'grep',
+      '-I',
+      '--name-only',
+      '-e',
+      '',
+      ref,
+      '--',
+      ':(literal)' + file,
+    ]).catch(() => '');
+    if (!text)
+      throw new UnsupportedSourceError(
+        'Binary source is outside this text review.',
+      );
     throw new Error('Source file exceeds the byte limit.');
+  }
   const text = await gitText(
     root,
     ['cat-file', 'blob', header[2] ?? ''],
     MAX_PROJECTION_FILE_BYTES,
   );
   if (text.includes('\0'))
-    throw new Error('Binary source is outside this text review.');
+    throw new UnsupportedSourceError(
+      'Binary source is outside this text review.',
+    );
   return text;
 }
 export async function sourceDiff(

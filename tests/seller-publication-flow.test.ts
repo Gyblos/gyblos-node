@@ -7,7 +7,7 @@ import test from 'node:test';
 
 import { createBuyerControlClient } from '@gyblos/buyer/control';
 import { discoverBuyerSellers } from '@gyblos/buyer/discovery';
-import { selectBuyerQuote } from '@gyblos/buyer/selection';
+import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { fetchSellers, publishRecord } from '@gyblos/discovery-http';
@@ -91,9 +91,8 @@ async function discoverAndQuote(
       { fetch: globalThis.fetch, now: run.context.now },
     );
     assert.equal(config.sellers.length, 1);
-    const outcome = await selectBuyerQuote(config, {
+    const outcome = await selectVerifiedBuyerQuote(config, {
       buyer: run.request.params.buyer,
-      trusted: run.catalog,
       stats: new Map(),
       now: run.context.now,
       random: () => 0,

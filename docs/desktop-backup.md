@@ -1,151 +1,176 @@
-# Internal portable wallet backup format
+# Desktop wallet backup and restore
 
-The Node-only `@gyblos/desktop/wallet-backup` codec seals supplied Ed25519 PKCS8
-material and opens it only after authenticated decryption and comparison with a
-caller-supplied expected address through `open`; the separate internal `recover`
-operation derives the address after authentication. The codec itself has no
-filesystem operations. Wallet now offers an explicit, main-process-confirmed
-encrypted-file backup and same-address verification through native file dialogs.
-The renderer sends a password and receives a fixed status; it never receives a
-key, path, file contents or decrypted material. Funding remains disabled.
-Successful saved-file checks can now be remembered for the current address; this
-indicator is not a spending authorization. The loader automatically prepares a
-wallet for a new installation. Settings-only restoration adds a separate
-protected identity without replacing the current wallet or automatically
-selecting the import.
+The desktop app keeps a protected wallet on this machine (see
+[Desktop app](desktop.md#protected-local-wallet)). This page covers its portable
+encrypted backup: what you can do with it, the file format, and how the host
+keeps keys out of the renderer. It is contributor reference; the public
+[desktop app guide](https://docs.gyblos.com/en/buyers/desktop-app) covers
+installation and everyday use.
 
-Version 1 is compact UTF-8 JSON with exactly these fields: `format`, `version`,
-`kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Duplicate
-keys, alternate JSON spellings, unknown fields/profiles, invalid base64 and
-excessive sizes are rejected before deriving a key. Field order is immaterial.
-Canonical values and limits live in
+In short:
+
+- The wallet starts locked. Every action on this page needs it unlocked first,
+  through **Set up or unlock wallet** and the native explanation that follows.
+  Normal startup and status reads never consult the OS secret store.
+- You choose where the backup file goes, through a native save dialog. The file
+  is encrypted with your password before it is written.
+- **Verify saved file** proves the file and password recover the current wallet.
+  The app remembers that check for the current address.
+- **Restore backup** adds the backed-up wallet next to the current one; it never
+  replaces it. **Use wallet** switches the active address.
+- Funding stays disabled in every state (`fundingEnabled` is always `false`).
+  Backup status is not a spending authorization.
+
+> **Warning:** The password is the only way to open the file. If you lose the
+> file or the password, this recovery route is gone, and nobody can recover it
+> for you. Keep the file somewhere other than this machine.
+
+## Back up the wallet
+
+1. In **Payments**, open **Wallet details** and choose **Back up wallet**.
+2. Choose **Create backup**.
+3. Enter a **Backup password** of at least 12 characters and confirm it.
+4. Choose **Save encrypted file…** and approve the native confirmation.
+5. Choose a new filename in the save dialog.
+
+The app never replaces an existing file. If the write fails, an incomplete
+encrypted file may remain; choose another name when you retry. Saving alone does
+not mark the backup verified.
+
+## Verify the saved file
+
+1. In the same dialog, choose **Verify saved file**.
+2. Enter the backup password again.
+3. Choose **Choose file and verify…** and select the saved file.
+
+The app reads the file with a size bound, refuses directories and symlinks, and
+checks that authenticated decryption recovers the current address. It does not
+replace the installed wallet. A wrong password, an altered file, a different
+wallet and inaccessible storage each return a fixed failure status without
+details.
+
+## Restore a wallet
+
+1. In **Wallet details**, choose **Restore backup**.
+2. Enter the **Backup password**, choose **Choose file and restore…** and select
+   the encrypted file. The app adds the recovered wallet as a separate protected
+   store; the original wallet and the active selection stay unchanged.
+3. Choose **Use wallet** on the restored wallet to make it the active address.
+
+Restoring does not mark the restored wallet's backup verified. Back it up and
+verify it while it is the active wallet. Backup requests carry the displayed
+address, and a stale address is refused before any file dialog opens.
+
+## File format (version 1)
+
+The Node-only codec `@gyblos/desktop/wallet-backup` seals Ed25519 PKCS8 key
+material. It has no filesystem operations. `open` returns the key only after
+authenticated decryption and a match with a caller-supplied expected address;
+the internal `recover` operation derives the address after authentication
+instead.
+
+A file is compact UTF-8 JSON with exactly these fields: `format`, `version`,
+`kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Field order
+does not matter. Duplicate keys, alternate JSON spellings, unknown fields or
+profiles, invalid base64 and excessive sizes are refused before any key is
+derived. Canonical values and limits live in
 [`constants.ts`](../apps/desktop/src/wallet/backup/constants.ts).
 
-The fixed profile is scrypt N=131072, r=8, p=1 (128 MiB algorithm memory), with
-an explicit 192 MiB KDF memory ceiling and one operation per codec instance.
-Each seal uses a random 16-byte salt, random 12-byte AES-256-GCM nonce and
-16-byte tag. A fixed-order JSON array of format, version, KDF, cipher, key
-format, salt and nonce is authenticated as additional data. The encrypted
-payload is the original DER private material, not the machine-specific local
-ciphertext. No plaintext is returned before authentication completes.
+| Part            | Value                                                                                                       |
+| --------------- | ----------------------------------------------------------------------------------------------------------- |
+| Key derivation  | scrypt N=131072, r=8, p=1 (128 MiB), with a 192 MiB memory ceiling and one operation per codec instance     |
+| Cipher          | AES-256-GCM, random 16-byte salt, random 12-byte nonce, 16-byte tag                                         |
+| Associated data | A fixed-order JSON array of format, version, KDF, cipher, key format, salt and nonce                        |
+| Plaintext       | The original DER private key, not the machine-specific local ciphertext                                     |
+| Password        | Exact UTF-8 bytes, 12 to 1024 bytes, no normalization or trimming. The length bound is not a strength check |
 
-Passwords are exact UTF-8 bytes, 12–1024 bytes; no normalization or trimming.
-This length bound is not a password-strength guarantee. Cancellation refuses to
-publish a result but does not immediately interrupt an in-flight native scrypt
-operation. Buffers are cleared where possible; JavaScript strings cannot be
-reliably erased. Losing the file or password loses this recovery route.
-
-The profile follows the existing vault direction and uses
-[Node crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html) primitives;
-the scrypt cost matches one of
+No plaintext is returned before authentication completes. The primitives are
+[Node crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html), and the
+scrypt cost matches one of
 [OWASP's listed configurations](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt).
-This does not establish an independent cryptographic audit or production safety.
+The format has had no independent cryptographic audit.
 
-## Validation boundary
+## Host boundary
 
-The manual `Desktop platforms` workflow
-(`.github/workflows/desktop-platforms.yml`) produces fresh unfunded
-encrypted-key fixtures on macOS, Windows and Linux. Each system reads all three
-artifacts, reconstructs the same address and persists it into a fresh **injected
-synthetic store**, then reads it with a new wallet-service instance. Only
-encrypted disposable fixtures and public expected addresses are uploaded, with
-one-day retention and public synthetic test credentials. No existing keys, user
-passwords or operational state participate.
+The renderer sends an action, a password and an address, and receives a fixed
+status. It never receives a key, a path, file contents or decrypted material.
 
-The exchange harness demonstrates portable bytes and identity preservation, not
-real Keychain/DPAPI/Linux-store acceptance or operational restore. The desktop
-file flow below adds user-controlled save/reopen verification. `backupVerified`
-is true only after a saved-file check and validation of its protected
-identity-bound metadata. `fundingEnabled` remains false in every state; native
-custody acceptance and operational recovery remain separate work.
+- The bridge accepts only bounded requests from the main window's current main
+  frame. The startup window renders only the loader and cannot perform wallet
+  actions.
+- Public reads return only the session snapshot; they never decrypt or open a
+  native dialog. Explicit unlocking is coalesced. Restore, select, backup and
+  copy run one at a time, and a locked wallet refuses them without unlocking.
+- Quitting cancels pending work and waits only for work already started: an
+  approval, protected preparation, a native file dialog, or a backup or restore.
+  An unused wallet never delays it. A write that already started may finish with
+  its encrypted file retained, but it reports cancellation, not success, and the
+  main window does not appear afterward.
+- Passwords are never persisted or logged. Native confirmation is consent, not
+  biometric authentication or malware protection.
 
-## Desktop file flow
+## Restore into an absent destination
 
-Choose **Back up wallet** in Settings, then **Create backup**, enter and confirm
-at least 12 characters, approve the native confirmation and choose a new
-filename. Files are encrypted before writing and created exclusively: existing
-files are never replaced. A write failure may retain an incomplete encrypted
-file; choose another name on retry. Saving alone does not record verification or
-provide a funding capability.
+`@gyblos/desktop/wallet-restore` is the Node-only restorer the host calls for
+**Restore backup**. It authenticates the v1 format and derives the address from
+the recovered key; `codec.open` still requires an expected address.
 
-Choose **Verify saved file**, enter the password again and select the saved
-file. Reading is bounded and rejects directories and symlinks; authenticated
-decryption must recover the current address. This does not replace the installed
-wallet. Wrong passwords, altered files, another identity and inaccessible
-storage return sanitized failure status. Closing the app aborts before a write
-starts and waits for in-flight work. A write already started is allowed to
-finish with its encrypted file retained, but reports cancellation rather than
-success. Native derivation itself is not immediately interruptible. Passwords
-are not persisted or logged; JavaScript strings cannot be reliably erased.
-Native confirmation is consent, not biometric authentication or malware
-protection.
-
-## Internal restoration into an absent destination
-
-`@gyblos/desktop/wallet-restore` exposes a Node-only restorer. It accepts
-supplied backup bytes and a password, authenticates the unchanged v1 format and
-derives the address from the recovered Ed25519 key. The original `codec.open`
-still requires an expected address; the separate internal `recover` operation
-does not weaken that verification contract.
-
-Restoration refuses any existing wallet directory, including empty directories,
-files, symlinks and interrupted state. It never reads existing wallet keys,
-deletes a directory or replaces another wallet. Authentication and a local
-protection round trip occur before exclusive destination reservation. Automatic
-creation and restoration share that directory claim, so one can win and the
-other must refuse the existing destination.
-
-The recovered key is re-encrypted with the destination protection adapter,
-persisted by exclusive final-file creation, and reloaded through a read-only
-loader that cannot initialize a replacement identity. Success returns only the
-public address/status and both flags remain false; restoration does not copy the
-previous installation's remembered verification. Cancellation before the claim
-installs nothing; cancellation or failure after the claim returns
-`RECOVERY_REQUIRED` and preserves the encrypted record or directory marker for
-inspection. A completed record may exist after interrupted confirmation. There
-is no automatic rollback, stale-marker removal or retry that replaces that
-state. Filesystem errors are sanitized and the restorer limits itself to one
-operation at a time.
-
-The Electron host session calls this service from Settings after the user enters
-a password and selects an encrypted file. Restoration adds a separate protected
-store, preserves the original wallet, and leaves selection unchanged. The user
-explicitly chooses **Use wallet** to persist a different active address.
-Settings can create/verify a backup for that active address. Backup requests
-carry the displayed address; a stale address is rejected before opening a file
-dialog. Restoration alone does not mark the imported wallet's backup verified.
-
-The bridge accepts only bounded action/password/address requests from the main
-window's current main frame; paths, backup bytes and keys stay in the host. The
-startup window renders only the shared ASCII loader and is not authorized to
-perform wallet actions; the host rejects calls originating from its frame.
-Public reads are coalesced, and restore/select/backup/copy are serialized so an
-overlapping status request cannot invalidate or change the selected wallet. Quit
-cancels the handoff and waits for automatic initialization, native file dialogs
-and in-flight backup/restore work. An already-started encrypted write may
-finish; the main window must not appear afterward. The legacy first-run setup
-helper remains internally testable but is no longer registered with Electron.
+- It refuses any existing destination: a wallet directory, an empty directory, a
+  file, a symlink or interrupted state. It never reads existing wallet keys,
+  deletes a directory or replaces another wallet.
+- Authentication and a local protection round trip happen before it reserves the
+  destination exclusively. Wallet creation after approved access and restoration
+  share that claim, so one wins and the other refuses.
+- The recovered key is re-encrypted with the destination's OS protection,
+  written by exclusive file creation, and reloaded through a read-only loader
+  that cannot create a replacement identity.
+- Success returns only the public address and status, with both flags `false`.
+  The previous installation's remembered verification is not copied.
+- Cancellation before the claim installs nothing. Cancellation or failure after
+  it returns `RECOVERY_REQUIRED` and keeps the encrypted record or directory
+  marker for inspection. There is no automatic rollback, stale-marker removal or
+  retry that replaces that state.
+- Filesystem errors are sanitized, and the restorer runs one operation at a
+  time.
 
 ## Remembered verification
 
-After authenticated saved-file verification, the host rereads the current
-protected wallet and atomically stores a separate OS-encrypted metadata record.
-It contains only the address, verification schema version, backup format/version
-and a domain-separated HMAC-SHA256 tag bound to the current wallet key. No
-password, selected path, backup file or private key is stored in that record.
-Equivalent PKCS8 encodings are accepted when they derive the current address;
-metadata authentication still uses the installed wallet material. The existing
-portable backup and wallet record formats are unchanged.
+After an authenticated saved-file check, the host rereads the current protected
+wallet and atomically stores a separate OS-encrypted metadata record. It holds
+only the address, a verification schema version, the backup format and version,
+and a domain-separated HMAC-SHA256 tag keyed by the current wallet key. It never
+holds the password, the file path, the backup or the private key. Equivalent
+PKCS8 encodings are accepted when they derive the current address.
 
-Wallet revalidates this record on restart, when opened and after an operation.
-Missing, malformed, oversized, altered, wrong-identity, unsupported-version or
-inaccessible metadata means unverified; invalid metadata is retained until a
-successful check replaces only that metadata. POSIX storage must be private;
-Windows does not claim equivalent POSIX permission enforcement.
+The app revalidates the record on the first approved access after a restart and
+after each wallet operation. Opening a page or polling status never touches the
+protected store. Missing, malformed, oversized, altered, wrong-wallet,
+unsupported-version or inaccessible metadata means unverified. Invalid metadata
+is kept until a successful check replaces it. POSIX storage must be private;
+Windows does not enforce equivalent permissions.
 
-Saving a file or restoring a wallet does not create this record. A failed check
-does not erase an earlier valid verification. Cancellation before publication
-stores no new approval; an atomic rename already started on quit may finish and
-its valid record may remain. The app waits for that work. This records a past
-check, not continued possession of a usable backup, malware resistance or a
-payment capability. Funding remains unconditionally disabled.
+Saving a file or restoring a wallet does not create this record, and a failed
+check does not erase an earlier valid one. A rename already started at quit may
+finish, and its valid record may remain. The record shows that a check passed
+once; it does not prove that a usable backup still exists.
+
+## Validation
+
+The manual `Desktop platforms` workflow
+(`.github/workflows/desktop-platforms.yml`) creates fresh unfunded encrypted-key
+fixtures on macOS, Windows and Linux. Each system reads all three, reconstructs
+the same address, stores it in a fresh injected synthetic store, and reads it
+back with a new wallet service. Only encrypted disposable fixtures and public
+expected addresses are uploaded, with one-day retention. No real keys, user
+passwords or operational state take part.
+
+This proves the bytes are portable and the identity survives. It does not prove
+real Keychain, DPAPI or Linux secret-store behavior, or an operational restore.
+
+## Limits
+
+- Native scrypt cannot be interrupted. Cancellation refuses to publish a result,
+  but an in-flight derivation runs to completion.
+- Buffers are cleared where possible; JavaScript strings, including the
+  password, cannot be reliably erased.
+- OS encryption protects stored data, not a compromised app or user account.

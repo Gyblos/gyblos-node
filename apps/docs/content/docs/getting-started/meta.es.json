@@ -1,6 +1,6 @@
 {
-  "title": "Inicio",
-  "pages": ["[Intro](/es)", "../sellers/beta-guide", "beta"],
+  "title": "Empieza aquí",
+  "pages": ["[Resumen](/es)", "how-it-works", "beta", "glossary"],
   "defaultOpen": true,
   "icon": "compass"
 }

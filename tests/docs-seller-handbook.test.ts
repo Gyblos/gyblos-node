@@ -12,7 +12,9 @@ import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 const CONTENT = join(import.meta.dirname, '../apps/docs/content/docs');
 const JOURNEY = [
   'index',
+  'getting-started/how-it-works',
   'getting-started/beta',
+  'getting-started/glossary',
   'sellers/beta-guide',
   'sellers/manual-install',
   'sellers/register-publish',
@@ -24,6 +26,7 @@ const JOURNEY = [
   'buyers/use-from-code',
   'reference/cli',
   'reference/configuration',
+  'reference/data-and-privacy',
   'help/troubleshooting',
 ];
 

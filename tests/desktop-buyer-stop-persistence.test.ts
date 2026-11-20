@@ -39,12 +39,19 @@ void test('desktop Stop during final persistence rejects the late reply and reta
       ],
       [BUYER_API.EXECUTION_FIELD]: OFFER_PRICING_KINDS.PAID,
       [BUYER_API.PAYMENT_FIELD]: {
-        verdict: 'settled',
+        verdict: 'approved',
         maxAtomic: '100',
         expectedAtomic: '30',
-        chargedAtomic: '30',
-        refundedAtomic: '70',
-        transaction: '2'.repeat(88),
+        chargedAtomic: null,
+        refundedAtomic: null,
+        sellerAtomic: null,
+        feeAtomic: null,
+        recorded: true,
+        session: {
+          approvedAtomic: '30',
+          cumulativeAtomic: '30',
+          depositAtomic: '100',
+        },
       },
     });
   });
@@ -63,7 +70,7 @@ void test('desktop Stop during final persistence rejects the late reply and reta
     const summary = await new X402Budget(files).summary();
     assert.equal(summary.blocked, false);
     assert.equal(summary.spentAtomic, '30');
-    assert.equal(summary.records[0]?.transaction, '2'.repeat(88));
+    assert.equal(summary.records[0]?.transaction, null);
     assert.equal(posts, 1);
   } finally {
     release.resolve();

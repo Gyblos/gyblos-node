@@ -1,20 +1,28 @@
 # Contributing
 
-Read [AGENTS.md](AGENTS.md) for package ownership, rules, checks, privacy and
-the PR workflow, and [docs/code-standards.md](docs/code-standards.md) for
-detailed style. See [tests/README.md](tests/README.md) for regression design and
-native prerequisites. The [public decision index](docs/public-decisions.md)
-provides product and technical context without access to the private vault.
-Ask a maintainer when a decision needed for your contribution is missing or
-unclear.
+You can contribute without write access to this repository, without the private
+vault and without any AI tool. The short path:
+
+1. Pick an issue or propose a change.
+2. Fork the repository and create a worktree and branch from `develop`.
+3. Make a narrow change, with a failing test first for a behavior change.
+4. Run `pnpm check` and report the counts.
+5. Open a pull request into `develop`.
+
+[AGENTS.md](AGENTS.md) holds the repository rules: package ownership, checks,
+privacy and the PR workflow. [docs/code-standards.md](docs/code-standards.md)
+holds detailed style, and [tests/README.md](tests/README.md) the test policy.
+For product and technical context, read the
+[public decisions](docs/public-decisions.md). If a decision you need is missing
+or unclear, ask a maintainer instead of inventing a policy.
 
 ## Choose a contribution
 
-Search existing issues and pull requests before starting. Use issues for usage
-questions, bug reports and feature proposals; follow [SUPPORT.md](SUPPORT.md).
+Search existing issues and pull requests before you start. Use issues for usage
+questions, bug reports and feature proposals; see [SUPPORT.md](SUPPORT.md).
 Discuss changes to architecture, public contracts, payment behavior or product
-policy with a maintainer before implementation. Small documentation fixes and
-focused regressions are welcome without a prior proposal.
+policy with a maintainer before you implement them. Small documentation fixes
+and focused regressions are welcome without a prior proposal.
 
 Read the [code of conduct](CODE_OF_CONDUCT.md). Report vulnerabilities through
 the [private security channel](SECURITY.md), not in a public issue or PR. Never
@@ -22,9 +30,8 @@ include real credentials, prompts, responses, journals or payment payloads.
 
 ## Fork and prepare a branch
 
-External contributors do not need write access to this repository, the private
-vault or any AI tool. Fork `Gyblos/gyblos-node` on GitHub, then replace
-`YOUR-USER` and `describe-the-change` below:
+Fork `Gyblos/gyblos-node` on GitHub, then run these commands. Replace `YOUR-USER`
+with your GitHub user and `describe-the-change` with a short branch name:
 
 ```sh
 git clone https://github.com/YOUR-USER/gyblos-node.git
@@ -33,148 +40,160 @@ git remote add upstream https://github.com/Gyblos/gyblos-node.git
 git fetch upstream
 git worktree add --detach ../gyblos-contribution upstream/develop
 cd ../gyblos-contribution
-git switch -c codex/describe-the-change
+git switch -c feat/describe-the-change
 ```
 
-`origin` is your fork; `upstream` is the authoritative repository. The branch
-prefix is a convention and does not require Codex. Work in this task's worktree
-so unrelated changes remain separate. Configure your chosen public Git author
-identity before committing; GitHub provides a noreply address if you prefer not
-to expose a personal email. Commit authorship becomes public with the repository.
+`origin` is your fork; `upstream` is the authoritative repository. Use a prefix
+such as `feat/` or `fix/`. A separate worktree per task keeps unrelated changes
+apart.
+
+Set the public Git author identity you want before committing. GitHub provides
+a noreply address if you prefer not to expose a personal email; commit
+authorship is public.
 
 ## Set up Node.js and pnpm
 
-The project requires Node.js 24.22.1 or newer and the pnpm version pinned in
-[package.json](package.json). For development, use the latest available
-security-patched Node.js 24 release. Before installing dependencies, check the
-tools selected by the terminal you will use:
+The project needs Node.js 24.22.1 or newer and the pnpm version pinned in
+[package.json](package.json). Check the tools your terminal selects:
 
 ```sh
 node --version
-node -p "process.execPath"
 pnpm --version
 ```
 
-If Node is older than 24.22.1, select a supported version with your existing
-version manager, or install one if needed. For example, if you already use nvm:
-
-```sh
-nvm install 24
-nvm use 24
-```
-
-If the terminal still selects an older Node, check your shell's `PATH` and
-version-manager initialization, then open a new terminal (including an editor's
-integrated terminal) and repeat the checks. `process.execPath` shows the Node
-executable actually in use. If pnpm is missing or reports a different version,
-use the [pnpm installation guide](https://pnpm.io/installation) to install or
-select the version pinned in `package.json`, then check `pnpm --version` again
-before running `pnpm install --frozen-lockfile`.
-
-The discovery index's `node:sqlite` tests skip when that module is unavailable. See
-[native skips](tests/README.md#native-skips); a skipped case is not a pass.
-
-## One workflow for every contributor
-
-The repository uses the same workflow for humans, Codex, Claude Code and other
-development tools. See the full [AI-assisted contribution workflow](docs/ai-assisted-contributing.md).
-
-1. Start in your own detached worktree and task branch, read `AGENTS.md`, and
-   consult the [code map](.agents/skills/gyblos-code-map/SKILL.md).
-2. Define the goal, owning layer, non-goals and validation before editing.
-3. Inspect current code and tests; add a failing regression before a behavior
-   fix and keep structural work separate.
-4. Make a narrow change with one writer and small coherent commits.
-5. Run focused local checks, then the applicable repository gates.
-6. Review the diff and hand off exact validation, omissions, risks and next
-   action. CI or native checks that could not run remain explicitly unverified.
-
-The tool is interchangeable; the branch, repository files and handoff report
-are the shared context.
-
-## Repository skills
-
-The canonical repository skills live in `.agents/skills/` for Codex. Claude Code
-loads the same skills through relative symlinks in `.claude/skills/`. Do not edit
-the symlinked mirror directly. Run `pnpm skills:check` after changing a skill.
-
-The shared implementation procedure is
-`.agents/skills/gyblos-contributor-workflow/SKILL.md`; the code ownership map
-and PR procedure remain separate skills so they can be consulted independently.
-
-If the checkout cannot preserve symlinks and the mirror paths are absent, run
-`pnpm skills:materialize` to create an identical directory mirror. If Git has
-materialized the symlink entries as regular files, review them first and run
-`pnpm skills:materialize:replace`. The materialized mirror is accepted by the
-same check, but the canonical source remains `.agents/skills/`.
-
-## Verify and submit
-
-Dependency installation needs access to the package registry unless all pinned
-packages are cached. It is separate from the offline checks, which need no
-funded wallet, running engine or external service:
+If Node is older, select a newer Node 24 with your version manager (for example
+`nvm install 24 && nvm use 24`) and open a new terminal. If pnpm is missing or
+reports another version, follow the
+[pnpm installation guide](https://pnpm.io/installation). Then install the
+dependencies:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm test:lab
-pnpm tooling:test
-pnpm desktop:build
-git diff --check
-git diff
-git add -p
-git diff --cached
-git commit -m "Describe the concrete change"
-git push -u origin codex/describe-the-change
 ```
 
-CI also runs [Semgrep Community Edition](docs/static-analysis.md). Docker-based
-local reproduction is optional; the normal checks above do not need Docker, a
-Semgrep account, an AI tool or a vault.
+Installing needs access to the package registry unless every pinned package is
+cached. Nothing else needs network access.
 
-Use the product and lab counts separately, and explain every relevant skipped
-or unavailable check. Confirmed bugs require a failing regression before the
-fix and a passing run afterward. Never run `gate:*`, funding, devnet or deployment
-commands to validate a contribution.
+## Make the change
 
-`git add -p` lets you review tracked changes before staging. For new files, use
-`git add --` followed by each explicitly reviewed path; do not stage unrelated
-work. Inspect `git diff --cached` before committing.
+Every contributor follows the same loop: orient, define scope, inspect,
+implement, verify locally, review and hand off. The step-by-step procedure is
+the [contributor workflow skill](.agents/skills/gyblos-contributor-workflow/SKILL.md),
+and the [code map](.agents/skills/gyblos-code-map/SKILL.md) says where code
+belongs.
 
-Open a pull request from your fork's branch into `Gyblos/gyblos-node:develop` and
-complete the template. Use English for repository content, commits and PRs.
-Link the issue when one exists. Keep unrelated fixes and structural moves out
-of the PR. Review the staged content for sensitive material before pushing.
+- Add a failing test before a behavior fix, then the fix. Report both runs.
+- Keep structural moves and behavior changes in separate PRs.
+- Keep commits small and coherent.
+- For a docs site page (`apps/docs/content/docs`), update the English and the
+  Spanish file together. Preview with `pnpm docs:dev` and check the export with
+  `pnpm docs:test`.
+- Never run `gate:*`, funding, devnet or deployment commands to validate a
+  change.
 
-The initial maintainer is [@gilbertsahumada](https://github.com/gilbertsahumada).
-Maintainers arrange the three independent read-only reviews and decide whether
-to merge; contributors do not need to hire or coordinate reviewers. Respond to
-review with focused follow-up commits instead of rewriting pushed history.
-Approval and merge remain separate maintainer decisions, with merge commits as
-required by `AGENTS.md`. Support is best effort, with no guaranteed response time.
+## Verify
+
+1. Run the full checks:
+
+   ```sh
+   pnpm check
+   ```
+
+   `pnpm check` runs typecheck, lint (including the tooling tests, skill check
+   and import boundaries) and every product, standalone package and lab test.
+   It needs no funded wallet, engine, Docker, Semgrep account or AI tool. It
+   exits with status 0 when everything passes.
+
+2. If you changed the desktop app, also run `pnpm desktop:build`.
+
+3. Report the passed, failed, cancelled and skipped counts for product, lab and
+   tooling tests separately. Explain every skipped or unavailable check; a
+   skipped native case proves nothing on that host.
+
+## Submit
+
+1. Check the diff for whitespace errors and review it:
+
+   ```sh
+   git diff --check
+   git diff
+   ```
+
+2. Stage only what you reviewed. `git add -p` lets you pick tracked changes;
+   add each new file by its path with `git add -- PATH`. Then review what is
+   staged:
+
+   ```sh
+   git add -p
+   git diff --cached
+   ```
+
+3. Commit and push:
+
+   ```sh
+   git commit -m "Describe the concrete change"
+   git push -u origin feat/describe-the-change
+   ```
+
+4. Open a pull request from your fork's branch into `Gyblos/gyblos-node:develop`
+   and complete the template. Link the issue if there is one. Use English for
+   repository content, commits and PRs, and leave unrelated fixes out.
+
+Pull requests also run [Semgrep Community Edition](docs/static-analysis.md).
+
+## Review and merge
+
+Maintainers arrange three independent read-only reviews and decide whether to
+merge; you don't need to find reviewers. Answer review with focused follow-up
+commits instead of rewriting pushed history. Approval and merge are maintainer
+decisions, made with merge commits as `AGENTS.md` requires. Support is best
+effort, with no guaranteed response time.
+
+## Using AI tools
+
+AI-assisted contributions follow the same rules and loop as any other. The tool
+is interchangeable; the branch, the repository files and the handoff report are
+the shared context.
+
+- `AGENTS.md` is the only source of rules. Codex reads it directly, and
+  `CLAUDE.md` imports it for Claude Code. A provider-specific file may help a
+  tool load the repository, but it never adds or overrides rules. If a skill or
+  another document disagrees with `AGENTS.md`, follow `AGENTS.md`.
+- Skills are canonical in `.agents/skills/`. Claude Code loads them through the
+  mirror in `.claude/skills/`, which holds relative symlinks or, where a
+  checkout cannot keep symlinks, identical copies made by
+  `pnpm skills:materialize` (`pnpm skills:materialize:replace` replaces symlink
+  entries that Git checked out as plain files). Never edit the mirror; run
+  `pnpm skills:check` after changing a skill.
+- Hand off with the report template in the
+  [contributor workflow skill](.agents/skills/gyblos-contributor-workflow/SKILL.md#5-review-and-hand-off).
+  The next contributor must be able to continue from the branch, the files and
+  that report, without a private prompt, transcript or local log.
+- Never send keys, tokens, journals, role volumes, raw logs or private prompts
+  and responses to a model. Keep a real `.local/` out of the tool's reach.
+- A green check, an open PR or a model response is never approval to merge.
 
 ## License and rights
 
-Original project code is licensed under [Apache 2.0](LICENSE). Unless explicitly
-stated otherwise, contributions intentionally submitted for inclusion are offered
-under that license, as described in its contribution terms. No separate CLA or
-DCO sign-off is required. Submit only work you have the right to contribute,
-identify copied or adapted material, and preserve its license and attribution.
-Third-party components retain their own terms; see the
+Original project code is licensed under [Apache 2.0](LICENSE). Unless you state
+otherwise, a contribution you submit for inclusion is offered under that
+license, as described in its contribution terms. No separate CLA or DCO sign-off
+is required. Submit only work you have the right to contribute, identify copied
+or adapted material, and keep its license and attribution. Third-party
+components keep their own terms; see the
 [third-party notices](docs/third-party-notices.md). The code license grants no
 right to Gyblos or third-party trademarks beyond its stated terms.
 
-## Platform and distribution limits
+## Platform support
 
-| Capability                         | Declared scope                                                                      | Evidence limit                                                                                                |
-| ---------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Development checks                 | Node.js 24.22.1+ and pinned pnpm; automatic CI is Linux                             | A configured workflow is not a successful run; report the tested revision and platform.                       |
-| Native transport                   | macOS ARM64 and Linux x64/ARM64 bindings; IPv6 loopback required by native fixtures | Windows is unverified; no Intel Mac binding is supplied by the pinned SDK. Skips establish no native support. |
-| Desktop build and wallet contracts | Manual Linux/macOS/Windows workflow                                                 | The contracts use simulated OS encryption; they do not prove native keystore protection.                      |
-| Desktop packaging                  | Local macOS ARM64 preview only                                                      | No signed production installer or other-platform distribution is promised.                                    |
+| Area                       | Supported                                                         | Verified by CI                                                                                                          |
+| -------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Development checks         | Node.js 24.22.1+ and the pinned pnpm                              | Linux on every PR into `develop` or `main`, plus targeted Windows x64 tests of the seller and native transport.         |
+| Native transport (Iroh)    | macOS ARM64, Linux x64/ARM64, Windows x64; no Intel Mac binding   | Linux, and Windows for the transport and free execution tests.                                                          |
+| Desktop wallet and backups | macOS, Linux and Windows                                          | A manual workflow (`desktop-platforms.yml`); it uses simulated OS encryption, so it does not prove keystore protection. |
+| Desktop packages           | macOS arm64, Windows x64, Linux x64 (`.deb`, `.tar.gz`); unsigned | `desktop-packages.yml`, run by hand, on packaging changes and for each release.                                         |
 
-Opening the source does not publish packages or installers. Consult the
-[desktop guide](docs/desktop-probe.md) for current behavior and the
-[maintenance checklist](docs/repository-maintenance.md) for release prerequisites.
+For ordinary code PRs to `develop`, Windows tests run from source. Windows- or distribution-sensitive changes also build and test the release archive, npm package, scheduled task and PowerShell installer. All PRs to `main` and pushes to either protected branch run the full suite. The path and platform-change rules live in [the CI selector](.github/scripts/ci-changes.sh).
+
+A configured workflow is not a successful run: report the revision and
+platform you tested. For the desktop app, see [docs/desktop.md](docs/desktop.md).

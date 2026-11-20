@@ -1,40 +1,62 @@
 ---
-title: Docs
-description: Install and operate your node.
+title: Gyblos documentation
+description: Gyblos is a peer-to-peer network for AI inference. Use models as a buyer or serve one as a seller.
 ---
 
-**Beta · Devnet · Invitation required**
+Gyblos is a peer-to-peer network for AI inference. **Sellers** run a model on their own machine and
+offer it to the network. **Buyers** chat with those models in the desktop app, or call them from their own
+programs through OpenAI- and Anthropic-compatible APIs.
 
-<a className="docs-quickstart" href="/en/sellers/beta-guide">
-  Quickstart
-</a>
+The beta runs on Solana **devnet**. Free offers need no wallet. Priced offers are paid in devnet USDC,
+which has no market value. Selling requires an invite code.
 
-Install the free Docker seller and check its status. Review the [requirements](/en/getting-started/beta) before you start.
+## Choose your path [#choose-your-path]
 
-## Guides [#choose-your-next-task]
-
-<Cards>
-  <Card title="Registration" href="/en/sellers/register-publish">
-    Register your identity and publish your offer.
+<Cards className="docs-cards-three">
+  <Card title="Chat with models" href="/en/buyers/desktop-app" icon="chat">
+    Download the desktop app for macOS, Windows or Linux and chat with models on
+    the network.
   </Card>
-  <Card title="Use from your code" href="/en/buyers/use-from-code">
-    Chat with a seller from OpenAI or Anthropic clients.
+  <Card
+    title="Connect your coding tools"
+    href="/en/buyers/use-from-code"
+    icon="code"
+  >
+    Create an API key in the app and use Gyblos from coding agents and OpenAI or
+    Anthropic clients.
   </Card>
-  <Card title="CLI" href="/en/reference/cli">
-    Look up commands and flags.
-  </Card>
-  <Card title="Troubleshooting" href="/en/help/troubleshooting">
-    Find the symptom or error code.
+  <Card title="Run a seller" href="/en/sellers/beta-guide" icon="server">
+    Install a seller, check that it works and publish it in the discovery index.
   </Card>
 </Cards>
 
-## After installation [#after-installation]
+## Learn the basics [#learn-the-basics]
 
-- [Models and limits](/en/sellers/models-offers).
-- [Operation and updates](/en/sellers/operate).
-- [Identity and private data](/en/sellers/identity).
-- [Configuration](/en/reference/configuration).
+<Cards className="docs-cards-three">
+  <Card title="How it works" href="/en/getting-started/how-it-works">
+    How sellers, buyers, the discovery index, relays and payments fit together.
+  </Card>
+  <Card title="Requirements" href="/en/getting-started/beta">
+    What the beta supports and what you need for each role.
+  </Card>
+  <Card title="Glossary" href="/en/getting-started/glossary">
+    Short definitions of the terms these pages use.
+  </Card>
+</Cards>
 
-## Assistants [#read-with-your-assistant]
+## Reference and help [#reference-and-help]
 
-Use **Copy page**, **View Markdown** or **Open in**. Keep tokens, invite codes and keys out of messages and screenshots. For help, write in the [Gyblos Telegram](https://t.me/gyblos).
+<Cards>
+  <Card title="CLI" href="/en/reference/cli">
+    Look up `gyblos` commands, options and exit codes.
+  </Card>
+  <Card title="Configuration" href="/en/reference/configuration">
+    Look up `config.toml` keys, defaults and environment overrides.
+  </Card>
+  <Card title="Data and privacy" href="/en/reference/data-and-privacy">
+    What each role sends over the network and what stays on your machine.
+  </Card>
+  <Card title="Troubleshooting" href="/en/help/troubleshooting">
+    Find the next step when a seller does not start or does not appear.
+  </Card>
+</Cards>

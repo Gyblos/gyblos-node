@@ -56,7 +56,7 @@ void test('free acceptance refuses pre-cancellation without allocating a session
 void test(
   'native free acceptance proves publication to HTTP answer and typed refusal/failover cases',
   { skip: NATIVE_CAPABILITY.transportSkip },
-  async () => {
+  async (context) => {
     const previous = globalThis.fetch;
     let foreignCalls = 0;
     globalThis.fetch = async () => {
@@ -68,7 +68,27 @@ void test(
         await import('@gyblos/lab-harness/acceptance/free');
       const { FREE_ACCEPTANCE_CASES } =
         await import('@gyblos/lab-harness/acceptance/free-constants');
-      const result = await runFreeAcceptance();
+      const advances: number[] = [];
+      const reads = new Set<number>();
+      let elapsed = 0;
+      const result = await runFreeAcceptance({
+        onAdmissionClock: (clock) => {
+          const now = clock.now;
+          const advance = clock.advance;
+          context.mock.method(clock, 'now', () => {
+            const real = performance.now();
+            const value = now();
+            assert.ok(value >= real + elapsed);
+            reads.add(elapsed);
+            return value;
+          });
+          context.mock.method(clock, 'advance', (milliseconds: number) => {
+            advance(milliseconds);
+            elapsed += milliseconds;
+            advances.push(milliseconds);
+          });
+        },
+      });
       assert.equal(result.ok, true);
       assert.equal(result.index, 'in-process-memory');
       assert.equal(result.nativeIroh, true);
@@ -79,6 +99,9 @@ void test(
       assert.equal(result.queryGenerations, 0);
       assert.equal(result.queryEngineAttempts, 0);
       assert.equal(foreignCalls, 0);
+      assert.deepEqual(advances, Array<number>(11).fill(2000));
+      for (let selection = 1; selection <= advances.length; selection++)
+        assert.ok(reads.has(selection * 2000));
       assert.ok(
         !/signature|nodeId|owner|prompt|address|https?:|\.local|\/tmp\//i.test(
           JSON.stringify(result),

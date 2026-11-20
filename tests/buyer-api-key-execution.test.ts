@@ -9,7 +9,7 @@ import {
 } from '@gyblos/buyer/api-key-execution';
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
-import { PAID_VERDICTS, SESSION_VERDICTS } from '@gyblos/node/constants';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 import { controlFixture } from './support/control-fixture';
@@ -97,15 +97,19 @@ void test('settled charges are durable before a caller aborts, and missing settl
         assert.ok(operation);
         await operation.reserve(quote);
         const payment = {
-          verdict: PAID_VERDICTS.SETTLED,
+          verdict: SESSION_VERDICTS.APPROVED,
           maxAtomic: '100',
           expectedAtomic: '40',
-          chargedAtomic: '40',
-          sellerAtomic: '40',
-          feeAtomic: '0',
-          refundedAtomic: '60',
+          chargedAtomic: null,
+          sellerAtomic: null,
+          feeAtomic: null,
+          refundedAtomic: null,
           recorded: true,
-          transaction: '3'.repeat(88),
+          session: {
+            approvedAtomic: '40',
+            cumulativeAtomic: '40',
+            depositAtomic: '100',
+          },
         };
         await recordApiKeyPayment(operation, payment);
         controller.abort();
@@ -113,7 +117,7 @@ void test('settled charges are durable before a caller aborts, and missing settl
       },
     );
     assert.equal(reply.text, 'synthetic');
-    assert.equal((await f.keys.snapshot()).keys[0]?.settledAtomic, '40');
+    assert.equal((await f.keys.snapshot()).keys[0]?.approvedAtomic, '40');
     await assert.rejects(
       executeApiKey(
         f.keys,

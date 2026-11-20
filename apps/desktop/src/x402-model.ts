@@ -3,11 +3,16 @@ import { isSignature } from '@solana/kit';
 
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import {
+  sessionApproval,
+  type SessionApproval,
+} from '@gyblos/node/session-accounting';
+import {
   BUYER_API,
   buyerAtomic,
   parseBuyerApiPolicy,
   type BuyerApiPolicy,
 } from '@gyblos/protocol/buyer-api';
+import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import { parseResponseMetrics, type ResponseMetrics } from './response-metrics';
 import { DESKTOP_X402 } from './x402/constants';
@@ -19,6 +24,8 @@ export interface X402Record {
   at: number;
   chargeAtomic: string;
   transaction: string | null;
+  sessionApproval?: SessionApproval;
+  selectedModel?: string;
   free: boolean;
   policy: BuyerApiPolicy;
 }
@@ -44,6 +51,36 @@ export function emptyX402(): X402Summary {
     records: [],
   };
 }
+export function paidSellerLimitNotice(
+  policy: BuyerApiPolicy | null,
+  budget: X402Summary,
+  modelId: string,
+) {
+  if (budget.blocked)
+    return 'Review the unfinished payment in Payments before sending another message.';
+  if (!policy)
+    return 'Connect the local buyer in Payments to use a paid seller.';
+  if (policy.maxAtomic === '0')
+    return 'Raise the per-request maximum in buyer/selection.json (request.maxAtomic, in atomic USDC units) and restart the buyer to use a paid seller.';
+  if (
+    !policy.depositAtomic ||
+    !policy.lifetimeMs ||
+    policy.mint !== DEVNET_USDC
+  )
+    return 'Connect a buyer with a devnet USDC channel configured in Payments.';
+  if (modelId !== MODEL_IDS.QWEN3_0_6B)
+    return 'This model is unavailable for paid chat because its token counts cannot be verified.';
+  if (!budget.active) return undefined;
+  if (budget.policy?.policyId !== policy.policyId)
+    return 'Finish the previous chat budget in Payments before using this buyer.';
+  if (
+    BigInt(budget.limitAtomic) - BigInt(budget.spentAtomic) <
+    BigInt(policy.maxAtomic)
+  )
+    return 'Increase the budget in Payments. The remaining balance must cover the per-request maximum.';
+  return undefined;
+}
+export class PaidSellerLimitError extends Error {}
 export function x402Id(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -65,6 +102,52 @@ export function x402Explorer(transaction: string) {
 export function x402Signature(value: string) {
   return isSignature(value);
 }
+function parseRecord(input: unknown): X402Record {
+  if (!input || typeof input !== 'object') throw new Error('Invalid payment');
+  const record = input as Record<string, unknown>;
+  const approval =
+    record.sessionApproval === undefined
+      ? undefined
+      : sessionApproval(record.sessionApproval);
+  if (
+    (record.selectedModel !== undefined &&
+      (!approval ||
+        typeof record.selectedModel !== 'string' ||
+        !record.selectedModel.length ||
+        record.selectedModel.length > BUYER_API.MAX_MODEL_LENGTH)) ||
+    (approval &&
+      (record.free ||
+        record.transaction !== null ||
+        record.chargeAtomic !== approval.approvedAtomic)) ||
+    !x402Id(record.id) ||
+    !x402Id(record.sessionId) ||
+    typeof record.at !== 'number' ||
+    !Number.isSafeInteger(record.at) ||
+    record.at < 0 ||
+    !buyerAtomic(record.chargeAtomic) ||
+    typeof record.free !== 'boolean' ||
+    (record.transaction !== null &&
+      (typeof record.transaction !== 'string' ||
+        !x402Signature(record.transaction))) ||
+    (record.free
+      ? record.transaction !== null || record.chargeAtomic !== '0'
+      : !approval && record.transaction === null)
+  )
+    throw new Error('Invalid payment');
+  return {
+    id: record.id,
+    ...(approval && { sessionApproval: approval }),
+    ...(typeof record.selectedModel === 'string' && {
+      selectedModel: record.selectedModel,
+    }),
+    sessionId: record.sessionId,
+    at: record.at,
+    chargeAtomic: record.chargeAtomic,
+    transaction: record.transaction,
+    free: record.free,
+    policy: x402Policy(record.policy),
+  };
+}
 export function parseX402Summary(input: unknown): X402Summary {
   if (!input || typeof input !== 'object') throw new Error('Invalid session');
   const value = input as Record<string, unknown>;
@@ -80,35 +163,7 @@ export function parseX402Summary(input: unknown): X402Summary {
   )
     throw new Error('Invalid session');
   const policy = value.policy === null ? null : x402Policy(value.policy);
-  const records: X402Record[] = value.records.map((input: unknown) => {
-    if (!input || typeof input !== 'object') throw new Error('Invalid payment');
-    const record = input as Record<string, unknown>;
-    if (
-      !x402Id(record.id) ||
-      !x402Id(record.sessionId) ||
-      typeof record.at !== 'number' ||
-      !Number.isSafeInteger(record.at) ||
-      record.at < 0 ||
-      !buyerAtomic(record.chargeAtomic) ||
-      typeof record.free !== 'boolean' ||
-      (record.transaction !== null &&
-        (typeof record.transaction !== 'string' ||
-          !x402Signature(record.transaction))) ||
-      (record.free
-        ? record.transaction !== null || record.chargeAtomic !== '0'
-        : record.transaction === null)
-    )
-      throw new Error('Invalid payment');
-    return {
-      id: record.id,
-      sessionId: record.sessionId,
-      at: record.at,
-      chargeAtomic: record.chargeAtomic,
-      transaction: record.transaction,
-      free: record.free,
-      policy: x402Policy(record.policy),
-    };
-  });
+  const records: X402Record[] = value.records.map(parseRecord);
   if (
     BigInt(value.spentAtomic) > BigInt(value.limitAtomic) ||
     ((value.active || value.sessionId !== null) && !policy) ||

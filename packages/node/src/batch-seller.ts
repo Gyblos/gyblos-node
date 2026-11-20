@@ -101,9 +101,10 @@ async function executeObserved(
           blocks,
         )
       : undefined;
+    const pending = plan?.pending ?? (await batchSessionRequest(request));
     const result = await generateBatch(
       request,
-      plan?.pending ?? (await batchSessionRequest(request)),
+      pending,
       plan?.session ?? options.session,
       peer,
       live,
@@ -120,12 +121,14 @@ async function executeObserved(
       (duration) => observer?.generated(duration),
     );
     const completed = plan ? await plan.complete(result.value) : result;
-    if (plan && options.receipts) {
+    // Every paid session request is attested, with or without blocks: the bill is the same signed
+    // recount either way, and its digest is the one both halves of the receipt bind.
+    if (options.receipts) {
       try {
         publishSessionReceipt(
           options.receipts(live.index),
           request,
-          plan.pending.requestDigest,
+          pending.requestDigest,
           result.value,
           sessionReceiptPayment(request, options.terms, base, completed.bill),
           receivedAt,

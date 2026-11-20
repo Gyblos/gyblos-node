@@ -30,9 +30,9 @@ import {
   paypalDollars,
   type PaymentMethod,
 } from '../paypal-model';
-import { X402_ACTION } from '../x402-model';
+import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
 import { activityDate, sessionOutcome } from './activity-presentation';
-import { modelArtwork } from './announced-models';
+import { chatNetworkOptions, modelArtwork } from './announced-models';
 import type { ChatController } from './chat-controller';
 import { conversationSummary } from './chat-history';
 import { canSendPaypal, sendPaypalMessage } from './chat-paypal';
@@ -42,7 +42,12 @@ import { ChatAnswer } from './ChatAnswer';
 import { ChatComposer } from './ChatComposer';
 import { ToolsDropdown } from './ChatTools';
 import { ChatUserMessage } from './ChatUserMessage';
-import { BUTTON_VARIANT, CHAT_PREVIEW, CHAT_ROLE } from './constants';
+import {
+  BUTTON_VARIANT,
+  CHAT_PREVIEW,
+  CHAT_ROLE,
+  MODEL_SOURCE,
+} from './constants';
 import type { DemoAuthorizationStatus } from './demo-account';
 import { Modal } from './Modal';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
@@ -86,6 +91,8 @@ type Props = {
   onBrowseApplications: () => void;
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
+  confirmedPolicy?: string;
+  onDefaultModel?: () => void;
   onBrowseModels: () => void;
   onReviewPaypal: () => void;
   onAuthorize: () => DemoAuthorizationStatus;
@@ -143,6 +150,8 @@ export function Chat({
   onBrowseApplications,
   models,
   onSelectModel,
+  confirmedPolicy,
+  onDefaultModel,
   onBrowseModels,
   onReviewPaypal,
   onAuthorize,
@@ -169,10 +178,12 @@ export function Chat({
   const usingX402 = !usingPaypal && !!x402;
   const x402Ready =
     x402 &&
-    x402.state.summary.active &&
+    !!x402.state.policy &&
+    (x402.state.summary.active || !!model.offerId) &&
     !x402.state.summary.blocked &&
     !x402.busy &&
-    x402.state.summary.policy?.policyId === x402.state.policy?.policyId;
+    (!x402.state.summary.active ||
+      x402.state.summary.policy?.policyId === x402.state.policy.policyId);
   const notice = usingPaypal
     ? paypal.state.notice || session.notice
     : session.notice;
@@ -195,7 +206,37 @@ export function Chat({
     (session.paypalRun &&
       session.messages.at(-1)?.paymentMethod === PAYMENT_METHOD.USDC),
   );
+  const freeListingMismatch =
+    usingX402 &&
+    model.source === MODEL_SOURCE.ANNOUNCED &&
+    model.free &&
+    (x402?.state.policy?.maxAtomic !== '0' ||
+      x402?.state.policy?.model !== model.name);
+  const limitNotice =
+    usingX402 &&
+    x402?.state.policy &&
+    x402.state.policy.maxAtomic !== '0' &&
+    !model.offerId
+      ? 'Choose a seller in the model menu and confirm its prices before sending.'
+      : usingX402 &&
+          model.source === MODEL_SOURCE.ANNOUNCED &&
+          !models.some((item) => item.id === model.id)
+        ? 'This listing has expired. Select an available seller before sending.'
+        : usingX402 &&
+            model.offerId &&
+            x402?.state.policy?.policyId !== confirmedPolicy
+          ? 'Select the seller again to confirm the current channel terms.'
+          : freeListingMismatch
+            ? 'Select this model and set the maximum per response to zero in Payments to use free inference.'
+            : usingX402 && x402 && model.offerId
+              ? paidSellerLimitNotice(
+                  x402.state.policy,
+                  x402.state.summary,
+                  model.name,
+                )
+              : undefined;
   const canSend =
+    !limitNotice &&
     !loadingHistory &&
     online &&
     !busy &&
@@ -211,7 +252,10 @@ export function Chat({
   };
   const buyerModel: ModelOption = {
     id: x402?.state.policy?.model ?? model.id,
-    name: x402?.state.policy?.model ?? model.name,
+    name:
+      x402?.state.policy?.maxAtomic !== '0'
+        ? 'Choose a seller'
+        : (x402?.state.policy?.model ?? model.name),
     image: modelArtwork(x402?.state.policy?.model ?? model.id),
     free: x402?.state.policy?.maxAtomic === '0',
     input: 0,
@@ -220,7 +264,9 @@ export function Chat({
   const composerModel = usingPaypal
     ? sandboxModel
     : usingX402
-      ? buyerModel
+      ? model.source === MODEL_SOURCE.ANNOUNCED
+        ? model
+        : buyerModel
       : model;
   const thinking = usingX402
     ? null
@@ -394,15 +440,24 @@ export function Chat({
       const id = crypto.randomUUID();
       const conversation = chat.startPaypal(
         session.draft,
-        buyerModel,
+        composerModel,
         id,
         x402.state.summary.sessionId ?? undefined,
         PAYMENT_METHOD.USDC,
       );
       if (!conversation) return;
       void x402
-        .run({ action: X402_ACTION.SEND, id, prompt: session.draft }, (text) =>
-          chat.appendBuyer(conversation, id, text),
+        .run(
+          {
+            action: X402_ACTION.SEND,
+            id,
+            prompt: session.draft,
+            ...(model.offerId && {
+              offerId: model.offerId,
+              policyId: confirmedPolicy,
+            }),
+          },
+          (text) => chat.appendBuyer(conversation, id, text),
         )
         .then((result) => {
           if (result?.reply)
@@ -410,7 +465,7 @@ export function Chat({
               conversation,
               id,
               result.reply.text,
-              buyerModel,
+              composerModel,
               result.reply.metrics,
             );
           else
@@ -643,12 +698,16 @@ export function Chat({
                   usingPaypal
                     ? [sandboxModel]
                     : usingX402
-                      ? [buyerModel]
+                      ? chatNetworkOptions(models)
                       : models
                 }
-                onSelect={onSelectModel}
+                onSelect={(id) => {
+                  if (usingX402 && id === buyerModel.id) onDefaultModel?.();
+                  else onSelectModel(id);
+                }}
                 onBrowse={onBrowseModels}
-                showBrowse={!usingPaypal && !usingX402}
+                networkOnly={usingX402}
+                showBrowse={!usingPaypal}
                 contextLabel={
                   usingPaypal ? 'Local model · PayPal Sandbox' : undefined
                 }
@@ -739,7 +798,8 @@ export function Chat({
             </div>
           )}
           <p className="composer-note" role="status">
-            {(!usingPaypal && notice) ||
+            {limitNotice ||
+              (!usingPaypal && notice) ||
               (busy && session.draft.trim()
                 ? run
                   ? 'Draft kept · stop or wait to send'

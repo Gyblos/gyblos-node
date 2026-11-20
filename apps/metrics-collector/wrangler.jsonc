@@ -39,6 +39,14 @@
       "namespace_id": "42621012",
       "simple": { "limit": 600, "period": 60 },
     },
+    {
+      // Per client address for the public stats reads, apart from uploads.
+      "name": "COLLECTOR_READ_LIMITER",
+      "namespace_id": "42621013",
+      "simple": { "limit": 120, "period": 60 },
+    },
   ],
   "routes": [{ "pattern": "collector.gyblos.com", "custom_domain": true }],
+  // Recomputes the aggregates of days whose raw rows changed (docs/metrics-collector.md, Aggregates).
+  "triggers": { "crons": ["*/10 * * * *"] },
 }

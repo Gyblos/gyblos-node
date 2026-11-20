@@ -1,12 +1,22 @@
 ---
 title: Configuración
-description: Claves TOML, valores predeterminados, variables de entorno y restricciones de inicio.
+description: Cada clave de config.toml con su valor por defecto y su rango, las variables de entorno que las reemplazan y las reglas para secretos.
 ---
 
-Edita `~/gyblos-seller/config.toml` en el anfitrión. La imagen suministrada lo monta en modo de solo lectura
-en `/config/config.toml` y lo selecciona mediante `GYBLOS_CONFIG`. Se lee al arrancar; los cambios requieren recrear.
+El nodo vendedor lee un único `config.toml` al arrancar. Dónde está depende de cómo instalaste:
+
+| Instalación     | Archivo                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------ |
+| Vendedor Docker | `~/gyblos-seller/config.toml` en el host, montado en solo lectura en `/config/config.toml` |
+| Vendedor nativo | `~/.gyblos/config.toml` (Windows: `%USERPROFILE%\.gyblos\config.toml`)                     |
+| Código fuente   | `GYBLOS_CONFIG`, si no `./config.toml`                                                     |
+
+El vendedor lee el archivo solo al arrancar. Después de editarlo, revísalo y reinicia el vendedor como
+explica [Operación](/es/sellers/operate).
 
 ## Ejemplo [#configuración-completa-para-docker-gratuito]
+
+Este es el archivo que escribe el instalador: una oferta gratis, con la publicación desactivada.
 
 ```toml
 version = 1
@@ -24,166 +34,155 @@ engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
 free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 ```
 
-Es una oferta local gratuita sin publicar. Conserva tu elección de publicación al editar otro ajuste.
-Para cambiar cuotas, consulta [Modelos y ofertas](/es/sellers/models-offers).
+Conserva tu elección de publicación cuando edites otro ajuste. Para cambiar modelos y límites, consulta
+[Cambia modelos y límites](/es/sellers/models-offers).
 
-## Valida y aplica [#valida-antes-de-aplicar]
+## Revisa antes de aplicar [#valida-antes-de-aplicar]
 
 ```sh
 cd ~/gyblos-seller
 docker compose run --rm seller gyblos config validate --config /config/config.toml
 ```
 
-Espera `OK`; corrige cada código y ruta de clave antes de aplicar. Después:
+Espera `OK`. Si no, corrige cada código de problema en su ruta de clave. `config validate` revisa el esquema
+y el entorno. `gyblos doctor` además comprueba que el vendedor puede arrancar con este archivo y prueba su
+motor. Consulta la [referencia de la CLI](/es/reference/cli#valida-la-configuración-montada).
 
-```sh
-docker compose up -d --force-recreate seller
-docker compose exec seller gyblos seller status
-```
+## Reglas del archivo [#formato-y-valores-predeterminados]
 
-`config validate` revisa el esquema y el entorno; `doctor` revisa compatibilidad con el inicio del vendedor
-y consulta dependencias. Un archivo válido no demuestra que un modelo pueda servir. Si lo necesitas, ejecuta
-`docker compose run --rm seller gyblos doctor` antes de recrear.
+- `version = 1` y `[node] network = "devnet"` son obligatorios. Mainnet se rechaza con
+  `MAINNET_UNSUPPORTED`.
+- Las claves desconocidas fallan. El archivo puede medir como máximo 64 KiB.
+- Las cantidades son enteros TOML, no decimales ni números entre comillas.
 
-## Opciones [#formato-y-valores-predeterminados]
+## Ajustes [#ajustes]
 
-La versión **1** del esquema exige `version = 1` y `[node] network = "devnet"`. Las claves desconocidas fallan.
-El archivo tiene un límite de 64 KiB. Los conteos deben ser enteros TOML, no decimales ni números entre comillas.
-Mainnet se rechaza con `MAINNET_UNSUPPORTED`. El esquema admite más ajustes de los que consume este vendedor.
+| Clave                     | Tipo y valor por defecto                                                                                              |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `node.network`            | Obligatoria: `"devnet"`                                                                                               |
+| `discovery.publish`       | Booleano; por defecto `false`. `true` lista el vendedor en el índice de descubrimiento cuando está registrado         |
+| `discovery.url`           | URL base HTTPS, o HTTP de loopback; por defecto `https://discovery.gyblos.com/v1`                                     |
+| `relays.urls`             | De 1 a 8 orígenes HTTPS; por defecto `["https://na1.relay.gyblos.com/"]`; sin ruta, query, credenciales ni duplicados |
+| `relays.relay_token_env`  | Nombre de la variable con un token de relay; por defecto `"GYBLOS_RELAY_TOKEN"`. Solo para un relay que exija token   |
+| `transport.relay_only`    | Booleano; por defecto `false`. Llega a los compradores solo mediante un relay; no lo combines con `external_addr`     |
+| `transport.bind`          | `ip:port` literal opcional para escuchar; IPv6 entre corchetes; el puerto puede ser `0`                               |
+| `transport.external_addr` | `ip:port` opcional para anunciar; puerto de 1 a 65535                                                                 |
+| `telemetry.file`          | Booleano; por defecto `false`. Escribe archivos privados de telemetría sin contenido en este equipo; no envía nada    |
+| `diagnostics.enabled`     | Booleano; por defecto `true`. El log de diagnóstico del comprador local; el nodo vendedor no escribe uno              |
+| `diagnostics.level`       | `debug`, `info`, `warn` o `error`; por defecto `warn`                                                                 |
+| `buyer.relay_only`        | Booleano; por defecto `false`. Un ajuste del comprador; el vendedor lo ignora                                         |
 
-| Clave                     | Tipo, valor predeterminado y comportamiento del vendedor                                                                                  |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `node.network`            | Cadena obligatoria `"devnet"`                                                                                                             |
-| `node.data_dir`           | Ruta opcional en el esquema general; este vendedor rechaza el valor procedente del archivo; usa `GYBLOS_HOME` para rutas nativas          |
-| `node.rpc_url`            | URL opcional HTTPS o HTTP loopback en esquema; se rechaza desde archivo; el RPC pertenece al estado del rol aprovisionado                 |
-| `node.payout_wallet`      | Dirección Solana opcional en esquema; se rechaza desde archivo; fuera del inicio gratuito                                                 |
-| `discovery.publish`       | Booleano; predeterminado `false`                                                                                                          |
-| `discovery.url`           | Base HTTPS o HTTP loopback; predeterminada `https://discovery.gyblos.com/v1`                                                              |
-| `relays.urls`             | 1–8 orígenes HTTPS; predeterminado `["https://na1.relay.gyblos.com/"]`; sin rutas no raíz, query, credenciales ni duplicados normalizados |
-| `relays.relay_token_env`  | Nombre de variable opcional; predeterminado `"GYBLOS_RELAY_TOKEN"`, nunca el token; solo para un relay que aún exige token                |
-| `transport.relay_only`    | Booleano; predeterminado `false`; incompatible con dirección externa                                                                      |
-| `transport.bind`          | `ip:port` literal opcional; IPv6 entre corchetes; el puerto de escucha puede ser cero                                                     |
-| `transport.external_addr` | `ip:port` anunciado opcional; puerto 1–65535; incompatible con relay-only                                                                 |
-| `buyer.relay_only`        | Booleano, predeterminado `false`; el vendedor lo ignora                                                                                   |
-| `telemetry.file`          | Booleano, predeterminado `false`; activa telemetría privada en archivo local, sin recolección externa                                     |
+El esquema también acepta `node.data_dir`, `node.rpc_url` y `node.payout_wallet`, pero el vendedor se niega a
+arrancar si alguna está en el archivo (`SELLER_SETTING_UNSUPPORTED`). El home del vendedor sale de
+`GYBLOS_HOME`, su RPC de sus archivos de rol, y los pagos siempre van a su dueño.
 
-Conserva la ruta `/data` y la conexión al volumen de la imagen de Docker. El directorio nativo predeterminado
-es `.local/gyblos`, relativo al directorio de trabajo; cambiarlo selecciona otro estado de identidad.
-No cambies de ruta para reparar una identidad ausente.
+El home guarda las llaves y el estado del vendedor. Es `/data` en la imagen Docker, `~/.gyblos` en el
+vendedor nativo y `.local/gyblos` en el código fuente. Cambiarlo selecciona otra identidad: nunca lo cambies
+para reparar una identidad perdida.
+
+La subida al recolector de métricas no tiene clave en `config.toml`; consulta las
+[variables de entorno](#variables-que-prevalecen-sobre-el-archivo) y [Datos y privacidad](/es/reference/data-and-privacy).
 
 ### Capacidad [#capacidad-del-vendedor]
 
-Todas las claves de `[limits]` son enteros opcionales, mínimo 1, solo en archivo:
+Todas las claves de `[limits]` son enteros opcionales, de al menos 1, y solo se definen en el archivo:
 
-| Clave                        | Predeterminado | Máximo | Significado                                                                      |
-| ---------------------------- | -------------- | ------ | -------------------------------------------------------------------------------- |
-| `max_connections`            | 8              | 64     | Conexiones abiertas de compradores                                               |
-| `requests_per_minute`        | 30             | 120    | Solicitudes por NodeId comprador por minuto                                      |
-| `global_requests_per_minute` | 256            | 1024   | Solicitudes de todos los compradores por minuto                                  |
-| `max_free_buyers_per_day`    | 1024           | 65536  | Compradores distintos entre todas las ofertas gratuitas del vendedor por día UTC |
+| Clave                        | Por defecto | Máximo | Significado                                                      |
+| ---------------------------- | ----------- | ------ | ---------------------------------------------------------------- |
+| `max_connections`            | 8           | 64     | Conexiones abiertas de compradores                               |
+| `requests_per_minute`        | 30          | 120    | Respuestas por NodeId de comprador por minuto                    |
+| `global_requests_per_minute` | 256         | 1024   | Respuestas entre todos los compradores por minuto                |
+| `max_free_buyers_per_day`    | 1024        | 65536  | Compradores distintos entre todas las ofertas gratis por día UTC |
+| `max_sessions`               | 16          | 16     | Sesiones de pago reutilizables abiertas a la vez (no conexiones) |
 
-El producto efectivo `max_connections × requests_per_minute` no puede superar `global_requests_per_minute`,
-incluidos los valores predeterminados omitidos. Doctor muestra los límites efectivos de capacidad.
-Son independientes de las cuotas de tokens de las ofertas.
-
-Una solicitud es una respuesta que pide el comprador. La cotización, el catálogo y los recibos que la
-acompañan no cuentan, así que 30 por minuto son 30 respuestas por comprador.
+`max_connections × requests_per_minute` no puede superar `global_requests_per_minute`, contando los valores por
+defecto de las claves omitidas. Una solicitud es una respuesta: las llamadas de cotización, catálogo y recibo
+que la rodean no cuentan. Doctor imprime los límites efectivos. Son independientes de los límites de tokens
+de cada oferta.
 
 ### Ofertas [#campos-de-la-oferta]
 
-El vendedor necesita al menos una entrada `[[offers]]`; se admiten hasta 32. Cada modelo normalizado
-puede aparecer una vez, incluidos sus alias. Todas las entradas deben superar las comprobaciones del motor;
-al menos un motor debe quedar listo para iniciar y solo se publican las ofertas listas.
+El vendedor necesita de 1 a 32 entradas `[[offers]]`. Cada modelo puede aparecer una sola vez, alias
+incluidos. Cada oferta debe pasar las comprobaciones de su motor, al menos un motor debe estar listo para que
+el vendedor arranque, y solo se publican las ofertas listas.
 
-| Campo                    | Regla                                                                                                                                                                           |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`                  | ID o alias del catálogo como `qwen3:0.6b`; un ID desconocido exige `custom = true`                                                                                              |
-| `custom`                 | Booleano; no puede ser true para un modelo del catálogo                                                                                                                         |
-| `reasoning`              | Lista no vacía sin duplicados entre `off`, `low`, `medium`, `high`; el valor omitido sigue al catálogo, o `off` en personalizados/no verificados; aquí el motor exige `["off"]` |
-| `engine.kind`            | Obligatorio: `ollama`, `openai` o `anthropic`                                                                                                                                   |
-| `engine.url`             | Base obligatoria; HTTPS, o HTTP solo en loopback / `host.docker.internal` según esquema; restricciones de inicio abajo                                                          |
-| `engine.upstream_model`  | Nombre opcional del proveedor, hasta 256 caracteres; por defecto igual al modelo ofrecido                                                                                       |
-| `engine.api_key_env`     | Nombre de variable opcional; obligatorio para Anthropic; no puede empezar por `GYBLOS_` ni reutilizar la variable del token de relay                                            |
-| `engine.context_tokens`  | Entero 1024–2.000.000; obligatorio en OpenAI/Anthropic; opcional en Ollama, donde fija el contexto (8.192 por defecto, máximo 32.768)                                           |
-| `free.daily_token_cap`   | Obligatorio en oferta gratuita; entero 1–1.000.000.000.000; total de entrada más salida por día UTC                                                                             |
-| `free.per_buyer_cap`     | Mismo intervalo entero; no puede superar la cuota diaria total                                                                                                                  |
-| `free.max_output_tokens` | Opcional; la respuesta más larga que puede pedir un pedido, 4.096 por defecto; el contexto del modelo también la limita                                                         |
+| Campo                    | Regla                                                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                  | ID o alias del catálogo, como `qwen3:0.6b`; un ID fuera del catálogo necesita `custom = true`                                                        |
+| `custom`                 | Booleano; no puede ser `true` para un modelo del catálogo                                                                                            |
+| `reasoning`              | Niveles distintos entre `off`, `low`, `medium`, `high`; por defecto los del catálogo, o `off`. El vendedor solo sirve `["off"]`                      |
+| `engine.kind`            | Obligatorio: `ollama`, `openai` o `anthropic`                                                                                                        |
+| `engine.url`             | URL base obligatoria; HTTPS, o HTTP para loopback o `host.docker.internal`; consulta [Motores](#compatibilidad-de-motores-al-iniciar)                |
+| `engine.upstream_model`  | Nombre opcional del modelo en el proveedor, hasta 256 caracteres; por defecto `model`                                                                |
+| `engine.api_key_env`     | Nombre de la variable de la API key; obligatorio para Anthropic; no puede empezar por `GYBLOS_` ni reutilizar la variable del token de relay         |
+| `engine.context_tokens`  | Entero de 1024 a 2.000.000; obligatorio para OpenAI y Anthropic; con Ollama fija el contexto (por defecto 8.192, como máximo 32.768)                 |
+| `free.daily_token_cap`   | Obligatorio en una oferta gratis; entero de 1 a 1.000.000.000.000; tokens de entrada más salida por día UTC                                          |
+| `free.per_buyer_cap`     | El mismo rango; como máximo `daily_token_cap`                                                                                                        |
+| `free.max_output_tokens` | Opcional; la respuesta más larga que puede pedir una solicitud; por defecto 4.096, como máximo 32.768, y también limitada por el contexto del modelo |
 
-Se exige exactamente uno entre `free` y `price`. Los contadores gratuitos se restablecen al reiniciar; no persisten.
-El esquema general admite `price.input_per_mtok` y `price.output_per_mtok` como cadenas decimales en
-USDC por millón de tokens, con `price.currency = "USDC"`. Al menos una tarifa debe ser positiva; sin signos,
-exponentes ni ceros iniciales; hasta cuatro dígitos enteros y seis decimales tras quitar ceros finales.
-**Este tutorial aprovisiona un rol vendedor solo gratuito.** Las ofertas pagadas requieren preparar por separado
-el rol de pagos en devnet; aceptar `price` no aprovisiona esos roles ni demuestra preparación para pagos.
+Cada oferta tiene exactamente uno de `free` o `price`. Los contadores gratis se reinician cuando el vendedor
+se reinicia.
+
+Para cobrar por una oferta, cambia `free` por `price`: `price.input_per_mtok` y `price.output_per_mtok` son
+cadenas decimales en USDC de devnet por millón de tokens, con `price.currency = "USDC"`. Al menos una tarifa
+debe ser positiva. No escribas signo, exponente ni ceros a la izquierda, y usa como máximo cuatro dígitos
+enteros y seis decimales. Solo `qwen3:0.6b` puede tener precio. Lee [Cobrar](/es/sellers/get-paid) antes de
+ponerle precio a una oferta.
 
 ### Motores [#compatibilidad-de-motores-al-iniciar]
 
-- **Ollama:** Qwen3 0.6B fijado, razonamiento `off`, URL raíz de loopback literal, sin variable de API key. La URL de Docker es `http://127.0.0.1:11434/`. `localhost` o `host.docker.internal` pueden pasar el esquema y fallar en el motor.
-- **Compatible con OpenAI:** razonamiento `off`, contexto explícito, URL HTTPS o loopback literal, normalmente terminada en `/v1`. Desactiva razonamiento en el proveedor. Una variable de key nombrada debe existir y no estar vacía.
-- **Compatible con Anthropic:** razonamiento `off`, contexto y variable de API key no vacía. Usa la raíz sin `/v1`; el proveedor debe admitir consulta de modelos y Messages.
+- **Ollama:**
+  - el modelo fijado Qwen3 0.6B, reasoning `off` y ninguna variable de API key;
+  - una URL raíz de loopback literal. Los instaladores usan `http://127.0.0.1:11434/`;
+  - `localhost` o `host.docker.internal` pasan la revisión del esquema pero fallan al arrancar.
+- **Compatible con OpenAI:** reasoning `off`, un tamaño de contexto explícito y una URL HTTPS o de loopback
+  literal, normalmente terminada en `/v1`. Desactiva el razonamiento en el proveedor. Una API key con nombre
+  debe estar definida y no vacía.
+- **Compatible con Anthropic:** reasoning `off`, un tamaño de contexto y una API key no vacía. Usa la raíz de
+  la API sin `/v1`; el proveedor debe admitir la consulta de modelos y Messages.
 
-El uso de otros modelos es declarado por el proveedor, no recontado de forma independiente con el tokenizador
-fijado de Qwen. Los proveedores remotos pueden cobrar y recibir datos de compradores aunque tu oferta sea gratuita.
+Con modelos distintos del Qwen fijado, el vendedor informa el conteo de tokens del proveedor sin recontarlo.
+Un proveedor remoto puede cobrarte y recibe los prompts de los compradores, incluso con una oferta gratis.
 
-## Entorno [#variables-que-prevalecen-sobre-el-archivo]
+## Variables de entorno [#variables-que-prevalecen-sobre-el-archivo]
 
-Para los ajustes del vendedor, el entorno prevalece sobre el archivo y después se aplican los valores predeterminados.
-El resolutor general también tiene opciones programáticas, pero no son opciones generales de la CLI. Compose
-pasa el entorno del contenedor; definir una variable solo en tu terminal anfitriona no la envía automáticamente.
+En los ajustes del vendedor, una variable de entorno reemplaza al archivo, y el archivo reemplaza al valor
+por defecto. El vendedor Docker toma su entorno de `seller.env`; una variable definida solo en la terminal del
+host no llega al contenedor. El servicio nativo también lee solo su `seller.env`. Después de editar
+`seller.env`, reinicia el vendedor como explica [Operación](/es/sellers/operate).
 
-| Variable                    | Significado                                                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------------ |
-| `GYBLOS_CONFIG`             | Selecciona archivo de inicio/doctor/init; el validador necesita `--config`                       |
-| `GYBLOS_HOME`               | Selecciona identidad/datos; la imagen suministrada fija `/data`                                  |
-| `GYBLOS_RELAYS`             | Orígenes de relay separados por comas                                                            |
-| `GYBLOS_RELAY_TOKEN`        | Token de relay opcional, solo para un relay que aún lo exige; consérvalo en `seller.env` privado |
-| `GYBLOS_RELAY_ONLY`         | `1` activa, `0` desactiva; otros valores desactivan con aviso                                    |
-| `GYBLOS_IROH_BIND`          | Modifica la escucha; vacío se ignora                                                             |
-| `GYBLOS_IROH_EXTERNAL_ADDR` | Modifica la dirección anunciada; vacío se ignora                                                 |
-| `GYBLOS_DISCOVERY_PUBLISH`  | Solo `1` / `0`; cualquier otro valor es error                                                    |
-| `GYBLOS_DISCOVERY_URL`      | Modifica la base del índice; URL de entorno comprobada cuando se publica                         |
-| `GYBLOS_BUYER_RELAY_ONLY`   | Ajuste del comprador; no cambia el comportamiento vendedor                                       |
-| `GYBLOS_RPC_URL`            | La validación general la resuelve, pero el inicio vendedor la ignora; el rol define el RPC       |
-| `GYBLOS_INVITE`             | Entrada de `seller register`; no la pongas en TOML ni en el historial de terminal                |
+| Variable                    | Significado                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GYBLOS_CONFIG`             | El archivo que leen `start`, `doctor` y `seller init`; `config validate` usa `--config`           |
+| `GYBLOS_HOME`               | El home del vendedor (llaves y estado); fijo en `/data` en la imagen Docker                       |
+| `GYBLOS_RELAYS`             | Orígenes de relay separados por comas                                                             |
+| `GYBLOS_RELAY_TOKEN`        | Token de relay opcional, solo para un relay que lo exija; guárdalo en `seller.env`                |
+| `GYBLOS_RELAY_ONLY`         | `1` activa el modo solo relay, `0` lo desactiva; cualquier otro valor lo desactiva con un aviso   |
+| `GYBLOS_IROH_BIND`          | Reemplaza `transport.bind`; vacía se ignora                                                       |
+| `GYBLOS_IROH_EXTERNAL_ADDR` | Reemplaza `transport.external_addr`; vacía se ignora                                              |
+| `GYBLOS_DISCOVERY_PUBLISH`  | `1` o `0` estrictos para reemplazar `discovery.publish`; cualquier otro valor es un error         |
+| `GYBLOS_DISCOVERY_URL`      | Reemplaza `discovery.url`; se comprueba cuando la publicación está activa                         |
+| `GYBLOS_OBSERVATIONS`       | `off` deja de subir observaciones de telemetría; los recibos se siguen subiendo                   |
+| `GYBLOS_COLLECTOR_URL`      | Otro recolector de métricas (HTTPS, o HTTP en loopback); cualquier otro valor desactiva la subida |
+| `GYBLOS_UPDATE_CHECK`       | `0` impide que `gyblos seller status` busque una versión más nueva                                |
+| `GYBLOS_INVITE`             | El código de invitación para `gyblos seller register`; nunca lo pongas en TOML ni en el historial |
+| `GYBLOS_BUYER_RELAY_ONLY`   | Un ajuste del comprador; el vendedor lo ignora                                                    |
+| `GYBLOS_RPC_URL`            | La validación lo acepta pero el vendedor lo ignora; sus archivos de rol fijan el RPC              |
 
-Los valores vacíos de home, escucha y dirección externa se ignoran. `[limits]`, ofertas y telemetría no
-tienen modificación por entorno. Después de editar `seller.env`, recrea el contenedor para cargar el cambio.
+`[limits]`, las ofertas, `[telemetry]` y `[diagnostics]` no tienen variable de entorno.
 
-## Secretos y errores [#secretos-y-errores]
+## Secretos [#secretos-y-errores]
 
-Usa nombres `*_env` en TOML, nunca credenciales. Los nombres usan mayúsculas, dígitos y guiones bajos y
-no pueden empezar por dígito. Guarda credenciales solo en el archivo privado de entorno; no reutilices
-el token de relay como key de proveedor. Se rechazan campos de credenciales en línea y queries de URL con
-credenciales, pero una credencial en la ruta puede escapar a la detección. Revisa antes de compartir.
+- En TOML, escribe el nombre de una variable (claves `*_env`), nunca una credencial.
+- Los nombres de variable usan mayúsculas, dígitos y guiones bajos, y no empiezan por un dígito.
+- Guarda las credenciales solo en el `seller.env` privado. Nunca reutilices un token de relay como llave de
+  un proveedor.
+- Un TOML con una credencial escrita, o una URL con una credencial en su query, falla con `INLINE_SECRET`.
+  Una credencial escondida en la ruta de una URL puede pasar, así que revisa la salida antes de compartirla.
 
-Entre los códigos del archivo están `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`, `INLINE_SECRET`, `INVALID_CAP`,
-`INVALID_LIMIT`, `RELAY_ONLY_CONFLICT` y `REASONING_UNSUPPORTED`. Avisos como `ENV_SWITCH_NOT_STRICT` y
-`REASONING_UNVERIFIED` no hacen fallar la validación. El inicio puede rechazar además ajustes, motores o
-razonamiento no admitidos, o keys ausentes. Consulta [solución de problemas](/es/help/troubleshooting).
+Los avisos de validación como `ENV_SWITCH_NOT_STRICT` y `REASONING_UNVERIFIED` no hacen fallar la revisión.
+Para cada código de error y su solución, consulta
+[Solución de problemas](/es/help/troubleshooting#configuración-rechazada).
 
-**Relacionado:** [CLI](/es/reference/cli) · [Modelos y ofertas](/es/sellers/models-offers).
-
-## Diagnósticos operativos
-
-El buyer lee `[diagnostics]` de forma independiente de `[telemetry].file`:
-
-```toml
-[diagnostics]
-enabled = true
-level = "warn"
-```
-
-Estos son los valores por defecto. `enabled = false` desactiva el destino de
-diagnóstico local propio. Los niveles mínimos son `debug`, `info`, `warn` y
-`error`; debug sigue excluyendo contenido, credenciales, direcciones y mensajes
-crudos de excepciones. No hay override de entorno ni subida central de logs. Esta
-opción no cambia la política de recibos o telemetría. La configuración del seller
-acepta la sección, pero la instrumentación inicial cubre HTTP del buyer y workers
-de tools de lab, no todos los caminos del seller, transporte o pagos.
-
-Los logs del producto se guardan en `<GYBLOS_HOME>/<role>/diagnostics/`, separados
-de telemetría y recibos. Los archivos se crean al primer registro y tienen límites
-de tamaño, cola y rotación; una caída, cierre forzado o falta de almacenamiento
-puede perder evidencia. El host del buyer expone la salud del diagnóstico y los
-registros descartados. Usa el [comando de logs](/es/reference/cli#logs-operativos-locales)
-para leer los metadatos locales seguros.
+**Relacionado:** [Referencia de la CLI](/es/reference/cli) · [Cambia modelos y límites](/es/sellers/models-offers) ·
+[Datos y privacidad](/es/reference/data-and-privacy).

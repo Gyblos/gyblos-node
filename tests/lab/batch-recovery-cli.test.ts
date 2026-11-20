@@ -57,11 +57,7 @@ void test('buyer withdrawal CLI request-closes its actual batch home and refuses
   await rig.vm.signer.sendTransaction(signed, rig.vm.network);
   await rig.dispose();
   const local = sessionNativeRpc(rig.vm);
-  const withdraw = buyerChainWithdraw(
-    async () => DEVNET_GENESIS,
-    local.rpc,
-    local.rpc,
-  );
+  const withdraw = buyerChainWithdraw(async () => DEVNET_GENESIS, local.rpc);
   const printed: string[] = [];
   process.exitCode = undefined;
   const closing = await main(withdraw, (line) => printed.push(line));

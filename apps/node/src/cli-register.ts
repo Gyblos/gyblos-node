@@ -2,7 +2,7 @@
 // the index only the invite and this home's public NodeId; the index checks the NodeId's 8004 registration
 // on chain itself. The invite comes from GYBLOS_INVITE or a terminal question, never from the command line,
 // and is never printed; the index's origin is printed before anything is sent to it.
-import { runMode } from '@gyblos/config';
+import { HTTP_STATUS, runMode } from '@gyblos/config';
 import {
   DISCOVERY_ERROR_CODES,
   DiscoveryError,
@@ -37,7 +37,6 @@ import {
   type SellerOutput,
 } from './seller-home';
 
-const HTTP_NOT_FOUND = 404;
 const INVITE_SHAPE = 'gyb_ followed by 26 lowercase letters and digits 2-7';
 const RETRY_LATER = 'the index could not answer; try again in a few minutes';
 const NOT_OFFERED =
@@ -320,7 +319,7 @@ export async function registerCommand(
     if (!(error instanceof DiscoveryError)) throw error;
     const hint =
       error.code === DISCOVERY_ERROR_CODES.HTTP_STATUS &&
-      error.status === HTTP_NOT_FOUND
+      error.status === HTTP_STATUS.notFound
         ? NOT_OFFERED
         : HINTS.get(error.code);
     return fail(error.code, hint ?? RETRY_LATER);

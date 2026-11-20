@@ -3,30 +3,29 @@
 import { LOCALHOST, ROUTES } from '@gyblos/config';
 import { DEVNET_USDC } from '@gyblos/config/network';
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
-import { PAID_BUYER_CODES, PAID_VERDICTS } from '@gyblos/node/constants';
+import { PAID_BUYER_CODES } from '@gyblos/node/constants';
 import {
   BUYER_API,
-  buyerAtomic,
   type BuyerApiPolicy,
+  type BuyerSellerChoice,
 } from '@gyblos/protocol/buyer-api';
 import type { BuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
-import {
-  ENGINE_DONE_REASONS,
-  FREE_CHAT_ROLES,
-  OFFER_PRICING_KINDS,
-} from '@gyblos/protocol/constants';
+import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 
 import { requestAgentEndpoint } from './agent-endpoint';
+import { desktopBuyerFailure } from './buyer-error';
 import { RESPONSE_COST_KIND, RESPONSE_COST_UNIT } from './constants';
-import { observedResponse, reportedUsage } from './response-metrics';
+import { observedResponse } from './response-metrics';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
   DESKTOP_X402,
+  PaidSellerLimitError,
+  paidSellerLimitNotice,
   x402Amount,
   x402Policy,
-  x402Signature,
 } from './x402-model';
+import { buyerResponseObject as object, parseBuyerReply } from './x402-reply';
 import { readBuyerStream } from './x402-stream';
 
 export function buyerEndpoint(input: unknown) {
@@ -69,68 +68,7 @@ async function readJson(response: Response, allowError = false) {
   const value: unknown = JSON.parse(text);
   return value;
 }
-function object(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new Error('Invalid buyer response');
-  return value as Record<string, unknown>;
-}
-export function parseBuyerReply(input: unknown, policy: BuyerApiPolicy) {
-  const value = object(input);
-  if (
-    value.model !== policy.model ||
-    !Array.isArray(value.choices) ||
-    value.choices.length !== 1
-  )
-    throw new Error('Invalid buyer response');
-  const choice = object(value.choices[0]);
-  const message = object(choice.message);
-  if (
-    message.role !== FREE_CHAT_ROLES.ASSISTANT ||
-    typeof message.content !== 'string' ||
-    message.content.length > DESKTOP_X402.MAX_RESPONSE ||
-    (choice.finish_reason !== ENGINE_DONE_REASONS.STOP &&
-      choice.finish_reason !== ENGINE_DONE_REASONS.LENGTH)
-  )
-    throw new Error('Incomplete buyer response');
-  const payment = value[BUYER_API.PAYMENT_FIELD];
-  const usage = reportedUsage(value.usage, policy.maxTokens);
-  if (
-    value[BUYER_API.EXECUTION_FIELD] === OFFER_PRICING_KINDS.FREE &&
-    payment === undefined
-  )
-    return {
-      text: message.content,
-      chargeAtomic: '0',
-      transaction: null,
-      free: true,
-      usage,
-    };
-  const paid = object(payment);
-  if (
-    paid.verdict !== PAID_VERDICTS.SETTLED ||
-    typeof paid.transaction !== 'string' ||
-    !x402Signature(paid.transaction) ||
-    !buyerAtomic(paid.maxAtomic) ||
-    !buyerAtomic(paid.expectedAtomic) ||
-    !buyerAtomic(paid.chargedAtomic) ||
-    !buyerAtomic(paid.refundedAtomic) ||
-    paid.expectedAtomic !== paid.chargedAtomic ||
-    BigInt(paid.maxAtomic) > BigInt(policy.maxAtomic) ||
-    BigInt(paid.chargedAtomic) + BigInt(paid.refundedAtomic) !==
-      BigInt(paid.maxAtomic) ||
-    value[BUYER_API.EXECUTION_FIELD] === OFFER_PRICING_KINDS.FREE
-  )
-    throw new Error(
-      'Payment is not confirmed. Further messages are blocked until review.',
-    );
-  return {
-    text: message.content,
-    chargeAtomic: paid.chargedAtomic,
-    transaction: paid.transaction,
-    free: false,
-    usage,
-  };
-}
+export { parseBuyerReply } from './x402-reply';
 export class X402Client {
   private connection: {
     url: URL;
@@ -241,7 +179,12 @@ export class X402Client {
     this.controller.abort();
     return true;
   }
-  send(id: string, prompt: string, onDelta?: (text: string) => void) {
+  send(
+    id: string,
+    prompt: string,
+    onDelta?: (text: string) => void,
+    choice?: BuyerSellerChoice,
+  ) {
     if (this.busy || this.closed || !this.connection)
       return Promise.reject(new Error('Local buyer is unavailable'));
     if (!prompt.trim() || Buffer.byteLength(prompt) > DESKTOP_X402.MAX_PROMPT)
@@ -257,6 +200,7 @@ export class X402Client {
       prompt,
       controller.signal,
       onDelta,
+      choice,
     );
     this.pending = work;
     return work.finally(() => {
@@ -272,14 +216,38 @@ export class X402Client {
     prompt: string,
     external: AbortSignal,
     onDelta?: (text: string) => void,
+    choice?: BuyerSellerChoice,
   ) {
     const current = await this.budget.summary();
     external.throwIfAborted();
-    if (current.policy?.policyId !== connection.policy.policyId)
+    if (
+      (current.active || !choice) &&
+      current.policy?.policyId !== connection.policy.policyId
+    )
       throw new Error(
         'Buyer policy changed. Finish the previous budget before authorizing another.',
       );
-    const policy = await this.budget.reserve(id);
+    if (choice) {
+      if (choice.expiresAt <= Date.now())
+        throw new Error('Seller listing expired');
+      const notice = paidSellerLimitNotice(
+        connection.policy,
+        current,
+        choice.modelId,
+      );
+      if (notice) throw new PaidSellerLimitError(notice);
+    }
+    const reserved = await this.budget.reserve(
+      id,
+      choice ? connection.policy : undefined,
+    );
+    const policy = choice
+      ? {
+          ...reserved,
+          model: choice.modelId,
+          maxTokens: Math.min(choice.contextTokens, reserved.maxTokens),
+        }
+      : reserved;
     let sent = false;
     try {
       external.throwIfAborted();
@@ -291,6 +259,7 @@ export class X402Client {
         policy,
         external,
         onDelta,
+        choice,
       );
     } catch (error) {
       if (!sent) await this.budget.cancelUnsent(id);
@@ -309,6 +278,7 @@ export class X402Client {
     policy: BuyerApiPolicy,
     external: AbortSignal,
     onDelta?: (text: string) => void,
+    choice?: BuyerSellerChoice,
   ) {
     const started = performance.now();
     const signal = AbortSignal.any([
@@ -317,7 +287,10 @@ export class X402Client {
     ]);
     signal.throwIfAborted();
     const response = await this.request(
-      new URL(BUYER_API.CHAT_PATH, connection.url),
+      new URL(
+        choice ? BUYER_API.CHANNEL_CHAT_PATH : BUYER_API.CHAT_PATH,
+        connection.url,
+      ),
       {
         method: 'POST',
         redirect: 'error',
@@ -328,6 +301,7 @@ export class X402Client {
           'if-match': '"' + policy.policyId + '"',
         },
         body: JSON.stringify({
+          ...(choice && { [BUYER_API.SELLER_CHOICE_FIELD]: choice }),
           model: policy.model,
           messages: [{ role: FREE_CHAT_ROLES.USER, content: prompt }],
           max_tokens: policy.maxTokens,
@@ -349,10 +323,12 @@ export class X402Client {
         error.code !== PAID_BUYER_CODES.UNRESOLVED
       )
         await this.budget.cancelUnsent(id);
-      throw new Error('Buyer did not complete the request');
+      throw desktopBuyerFailure(error, policy);
     }
     const reply = parseBuyerReply(body, policy);
-    const summary = await this.budget.complete(id, reply);
+    if (choice && !reply.sessionApproval)
+      throw new Error('Missing channel approval');
+    const summary = await this.budget.complete(id, reply, choice?.modelId);
     signal.throwIfAborted();
     const metrics = observedResponse(
       responseMs,
@@ -362,7 +338,9 @@ export class X402Client {
           policy.mint === DEVNET_USDC
             ? RESPONSE_COST_UNIT.USDC
             : RESPONSE_COST_UNIT.ATOMIC,
-        kind: RESPONSE_COST_KIND.SETTLED,
+        kind: reply.sessionApproval
+          ? RESPONSE_COST_KIND.RECORDED
+          : RESPONSE_COST_KIND.SETTLED,
       },
       reply.usage,
     );

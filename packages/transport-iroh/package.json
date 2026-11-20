@@ -9,21 +9,17 @@
     "./constants": "./src/constants.ts",
     "./deadline": "./src/deadline.ts",
     "./endpoint": "./src/endpoint.ts",
-    "./iroh-client": "./src/iroh-client.ts",
     "./iroh-server": "./src/iroh-server.ts",
     "./limiter": "./src/limiter.ts",
     "./paths": "./src/paths.ts",
     "./relay-origins": "./src/relay-origins.ts",
     "./relays": "./src/relays.ts",
-    "./route-policy": "./src/route-policy.ts",
     "./wire": "./src/wire.ts",
     "./control-io": "./src/control-io.ts",
     "./control-server": "./src/control-server.ts",
     "./control-client": "./src/control-client.ts",
     "./free-server": "./src/free-server.ts",
     "./free-client": "./src/free-client.ts",
-    "./paid-server": "./src/paid-server.ts",
-    "./paid-client": "./src/paid-client.ts",
     "./receipt-client": "./src/receipt-client.ts",
     "./receipt-server": "./src/receipt-server.ts",
     "./receipt-service": "./src/receipt-service.ts",
@@ -33,7 +29,7 @@
   "dependencies": {
     "@gyblos/config": "workspace:*",
     "@gyblos/protocol": "workspace:*",
-    "@number0/iroh": "1.1.0",
+    "@number0/iroh": "1.2.0",
     "@gyblos/core": "workspace:*"
   }
 }
