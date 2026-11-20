@@ -6,7 +6,7 @@ import type {
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
-import { UnsentDepositMinimumError } from '@gyblos/node/session-policy';
+import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import {
   BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
@@ -63,7 +63,7 @@ export async function executeApiKeySession<T>(
     // Both errors prove that this request never reached its seller.
     if (
       (error instanceof UnsentSellerBusyError ||
-        error instanceof UnsentDepositMinimumError) &&
+        error instanceof UnsentChannelLimitError) &&
       error.nodeId === nodeId &&
       operation?.reserved()
     )

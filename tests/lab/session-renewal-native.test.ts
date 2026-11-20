@@ -207,6 +207,22 @@ for (const blocks of [false, true]) {
         second.snapshot.channelId,
       );
       assert.equal(vm.sends(), beforeRenew + 1);
+      const beforeExpensive = vm.sends();
+      const openJournal = await inspectBatchSession(buyerPaths);
+      await assert.rejects(
+        buyer.execute(
+          await offers.quote(22, { maxAtomic: String(20000 - charge) }),
+          offers.input,
+          signal(),
+        ),
+        { code: SESSION_CODES.LIMIT },
+      );
+      assert.equal(
+        vm.sends(),
+        beforeExpensive,
+        'a quote above the remaining authority must preserve the old channel',
+      );
+      assert.deepEqual(await inspectBatchSession(buyerPaths), openJournal);
       const beforeExpiry = vm.sends();
       now += 3_600_000;
       vm.time(Math.floor(now / 1_000));

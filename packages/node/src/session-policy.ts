@@ -97,7 +97,7 @@ export function sessionTerms(
   return matchBatchTerms(terms, terms);
 }
 
-export class UnsentDepositMinimumError extends PaymentSessionError {
+export class UnsentChannelLimitError extends PaymentSessionError {
   constructor(readonly nodeId: string) {
     super(SESSION_CODES.LIMIT);
   }
@@ -109,11 +109,12 @@ export function newSessionTerms(
   policy: BuyerSessionPolicy,
   now: number,
 ) {
+  const available = BigInt(policy.depositAtomic);
   if (
-    BigInt(policy.depositAtomic) <
-    BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
+    available < BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic) ||
+    available < BigInt(quote.offer.maxAtomic)
   )
-    throw new UnsentDepositMinimumError(quote.offer.nodeId);
+    throw new UnsentChannelLimitError(quote.offer.nodeId);
   return sessionTerms(quote, policy, now);
 }
 
