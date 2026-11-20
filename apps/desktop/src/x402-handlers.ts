@@ -1,10 +1,11 @@
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import { controlAtomic } from '@gyblos/protocol/control-validation';
 
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
 import { BuyerSessionRequired, DesktopBuyerFailure } from './buyer-error';
 import type { X402Budget } from './x402-budget';
-import type { X402Client } from './x402-client';
+import type { DesktopSellerChoice, X402Client } from './x402-client';
 import {
   effectiveX402Policy,
   PaidSellerLimitError,
@@ -71,7 +72,7 @@ function sendResponse(
   id: string,
   prompt: string,
   progress?: (value: X402Progress) => void,
-  choice?: BuyerSellerChoice,
+  choice?: DesktopSellerChoice,
 ) {
   return client.send(
     id,
@@ -106,6 +107,11 @@ function selectedOffer(
   input: Record<string, unknown>,
   resolveOffer?: (id: string) => BuyerSellerChoice | undefined,
 ) {
+  if (input.freeOnly === true) {
+    if (input.offerId || !policy || input.policyId !== policy.policyId)
+      throw new PaidSellerLimitError('Select the free model again.');
+    return OFFER_PRICING_KINDS.FREE;
+  }
   if (!input.offerId && policy && policy.maxAtomic !== '0')
     throw new PaidSellerLimitError(
       'Select a seller and confirm its prices before sending.',

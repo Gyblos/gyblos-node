@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
+import { routedRequest } from '@gyblos/buyer/model-routes';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { ChatController } from '@gyblos/desktop/chat-controller';
 import { MESSAGE_STATE } from '@gyblos/desktop/chat-state';
@@ -11,6 +12,7 @@ import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
 import { createX402Handlers } from '@gyblos/desktop/x402-handlers';
 import { X402_ACTION } from '@gyblos/desktop/x402-model';
+import { buildBuyerInit, buyerInitDefaults } from '@gyblos/node/buyer-init';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import {
@@ -263,6 +265,76 @@ void test('the desktop sends the selected seller to the authenticated channel ro
     assert.equal(result.model, seller.modelId);
     assert.equal(result.summary.spentAtomic, '30');
     assert.equal(calls, 1);
+  } finally {
+    await client.close();
+    await host.close();
+  }
+});
+
+void test('a free-only owner request clamps its quote policy while ordinary inference keeps the configured ceilings', async () => {
+  const settings = buildBuyerInit(buyerInitDefaults()).request;
+  const paid = {
+    ...settings,
+    maxAtomic: '100',
+    priceCeilings: { inputAtomicPerMtok: '123', outputAtomicPerMtok: '456' },
+  };
+  const caps: string[] = [];
+  const token = 'synthetic-local-buyer-token';
+  const host = await startFreeBuyerHttp(
+    async (_input, _signal, _delta, route) => {
+      const request = routedRequest(paid, route);
+      caps.push(
+        [
+          request.maxAtomic,
+          request.priceCeilings.inputAtomicPerMtok,
+          request.priceCeilings.outputAtomicPerMtok,
+        ].join('/'),
+      );
+      return {
+        text: 'free answer',
+        finishReason: ENGINE_DONE_REASONS.STOP,
+        usage: { inputTokens: 2, outputTokens: 1 },
+        execution: OFFER_PRICING_KINDS.FREE,
+      };
+    },
+    { selection: paid.selection, maxTokens: 10, sellerChoice: true },
+    {
+      port: 0,
+      token,
+      desktopPolicy: {
+        network: DEVNET,
+        mint: DEVNET_USDC,
+        payer: '11111111111111111111111111111111',
+        maxAtomic: paid.maxAtomic,
+      },
+    },
+  );
+  const ledger = new X402Budget({
+    read: async () => undefined,
+    write: async () => {},
+  });
+  const client = new X402Client(ledger);
+  try {
+    await client.connect(host.url, token);
+    await client.send(
+      'free-chat-turn',
+      'free please',
+      undefined,
+      OFFER_PRICING_KINDS.FREE,
+    );
+    const result = await fetch(host.url, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + token,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: paid.selection.modelId,
+        messages: [{ role: 'user', content: 'ordinary inference' }],
+      }),
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(caps, ['0/0/0', '100/123/456']);
   } finally {
     await client.close();
     await host.close();

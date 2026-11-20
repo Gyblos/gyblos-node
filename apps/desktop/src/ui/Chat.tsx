@@ -176,13 +176,18 @@ export function Chat({
   const [reasoning, setReasoning] = useState<ReasoningSelection | null>(null);
   const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
   const usingX402 = !usingPaypal && !!x402;
+  const freeOnly =
+    model.source === MODEL_SOURCE.ANNOUNCED &&
+    model.free &&
+    x402?.state.policy?.maxAtomic !== '0';
   const x402Ready =
     x402 &&
     !!x402.state.policy &&
-    (x402.state.summary.active || !!model.offerId) &&
+    (x402.state.summary.active || !!model.offerId || freeOnly) &&
     !x402.state.summary.blocked &&
     !x402.busy &&
-    (!x402.state.summary.active ||
+    (freeOnly ||
+      !x402.state.summary.active ||
       x402.state.summary.policy?.policyId === x402.state.policy.policyId);
   const notice = usingPaypal
     ? paypal.state.notice || session.notice
@@ -210,13 +215,13 @@ export function Chat({
     usingX402 &&
     model.source === MODEL_SOURCE.ANNOUNCED &&
     model.free &&
-    (x402?.state.policy?.maxAtomic !== '0' ||
-      x402?.state.policy?.model !== model.name);
+    x402?.state.policy?.model !== model.name;
   const limitNotice =
     usingX402 &&
     x402?.state.policy &&
     x402.state.policy.maxAtomic !== '0' &&
-    !model.offerId
+    !model.offerId &&
+    !freeOnly
       ? 'Choose a seller in the model menu and confirm its prices before sending.'
       : usingX402 &&
           model.source === MODEL_SOURCE.ANNOUNCED &&
@@ -227,7 +232,7 @@ export function Chat({
             x402?.state.policy?.policyId !== confirmedPolicy
           ? 'Select the seller again to confirm the current channel terms.'
           : freeListingMismatch
-            ? 'Select this model and set the maximum per response to zero in Payments to use free inference.'
+            ? 'Select the free model served by this buyer.'
             : usingX402 && x402 && model.offerId
               ? paidSellerLimitNotice(
                   x402.state.policy,
@@ -452,6 +457,10 @@ export function Chat({
             action: X402_ACTION.SEND,
             id,
             prompt: session.draft,
+            ...(freeOnly && {
+              freeOnly: true,
+              policyId: x402.state.policy?.policyId,
+            }),
             ...(model.offerId && {
               offerId: model.offerId,
               policyId: confirmedPolicy,

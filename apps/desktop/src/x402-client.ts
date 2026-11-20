@@ -10,7 +10,10 @@ import {
   type BuyerSellerChoice,
 } from '@gyblos/protocol/buyer-api';
 import type { BuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
-import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
+import {
+  FREE_CHAT_ROLES,
+  OFFER_PRICING_KINDS,
+} from '@gyblos/protocol/constants';
 
 import { requestAgentEndpoint } from './agent-endpoint';
 import { desktopBuyerFailure } from './buyer-error';
@@ -28,6 +31,8 @@ import {
 import { buyerResponseObject as object, parseBuyerReply } from './x402-reply';
 import { readBuyerStream } from './x402-stream';
 
+export type DesktopSellerChoice =
+  BuyerSellerChoice | typeof OFFER_PRICING_KINDS.FREE;
 export function buyerEndpoint(input: unknown) {
   if (typeof input !== 'string') throw new Error('Enter a local buyer URL');
   const url = new URL(input);
@@ -206,7 +211,7 @@ export class X402Client {
     id: string,
     prompt: string,
     onDelta?: (text: string) => void,
-    choice?: BuyerSellerChoice,
+    choice?: DesktopSellerChoice,
   ) {
     if (this.busy || this.closed || !this.connection)
       return Promise.reject(new Error('Local buyer is unavailable'));
@@ -239,10 +244,28 @@ export class X402Client {
     prompt: string,
     external: AbortSignal,
     onDelta?: (text: string) => void,
-    choice?: BuyerSellerChoice,
+    choice?: DesktopSellerChoice,
   ) {
     const current = await this.budget.summary();
     external.throwIfAborted();
+    if (choice === OFFER_PRICING_KINDS.FREE) {
+      if (
+        !current.available ||
+        current.blocked ||
+        current.records.some((item) => item.id === id) ||
+        current.records.length >= DESKTOP_X402.MAX_RECORDS
+      )
+        throw new Error('Chat history is unavailable or needs review.');
+      return this.executeReserved(
+        connection,
+        id,
+        prompt,
+        { ...connection.policy, maxAtomic: '0' },
+        external,
+        onDelta,
+        choice,
+      );
+    }
     if (
       (current.active || !choice) &&
       current.policy?.policyId !== connection.policy.policyId
@@ -301,7 +324,7 @@ export class X402Client {
     policy: BuyerApiPolicy,
     external: AbortSignal,
     onDelta?: (text: string) => void,
-    choice?: BuyerSellerChoice,
+    choice?: DesktopSellerChoice,
   ) {
     const started = performance.now();
     const signal = AbortSignal.any([
@@ -324,7 +347,9 @@ export class X402Client {
           'if-match': '"' + policy.policyId + '"',
         },
         body: JSON.stringify({
-          ...(choice && { [BUYER_API.SELLER_CHOICE_FIELD]: choice }),
+          ...(choice === OFFER_PRICING_KINDS.FREE
+            ? { [BUYER_API.FREE_ONLY_FIELD]: true }
+            : choice && { [BUYER_API.SELLER_CHOICE_FIELD]: choice }),
           model: policy.model,
           messages: [{ role: FREE_CHAT_ROLES.USER, content: prompt }],
           max_tokens: policy.maxTokens,
@@ -342,6 +367,7 @@ export class X402Client {
     if (!response.ok) {
       const error = object(object(body).error);
       if (
+        choice !== OFFER_PRICING_KINDS.FREE &&
         error[BUYER_API.NEVER_SENT_FIELD] === true &&
         error.code !== PAID_BUYER_CODES.UNRESOLVED
       )
@@ -349,9 +375,14 @@ export class X402Client {
       throw desktopBuyerFailure(error, policy);
     }
     const reply = parseBuyerReply(body, policy);
-    if (choice && !reply.sessionApproval)
+    if (choice === OFFER_PRICING_KINDS.FREE && !reply.free)
+      throw new Error('The seller did not return a free response.');
+    if (choice && choice !== OFFER_PRICING_KINDS.FREE && !reply.sessionApproval)
       throw new Error('Missing channel approval');
-    const summary = await this.budget.complete(id, reply, choice?.modelId);
+    const summary =
+      choice === OFFER_PRICING_KINDS.FREE
+        ? await this.budget.recordFree(id, policy)
+        : await this.budget.complete(id, reply, choice?.modelId);
     signal.throwIfAborted();
     const metrics = observedResponse(
       responseMs,

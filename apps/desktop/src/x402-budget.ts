@@ -148,6 +148,29 @@ export class X402Budget {
       return structuredClone(summary.policy);
     });
   }
+  // A free-only turn cannot create a financial obligation. Record its completed answer independently of any paid budget.
+  recordFree(id: string, policy: BuyerApiPolicy) {
+    return this.serial(async () => {
+      const state = await this.load();
+      if (state.pending || this.failed || policy.maxAtomic !== '0')
+        throw new Error('Chat history is unavailable or needs review.');
+      const record = {
+        id,
+        policy,
+        sessionId: randomUUID(),
+        at: Date.now(),
+        chargeAtomic: '0',
+        transaction: null,
+        free: true,
+      };
+      const summary = parseX402Summary({
+        ...state.summary,
+        records: [...state.summary.records, record],
+      });
+      await this.save({ ...state, summary });
+      return structuredClone(summary);
+    });
+  }
   complete(
     id: string,
     result: { chargeAtomic: string; transaction: string | null; free: boolean },

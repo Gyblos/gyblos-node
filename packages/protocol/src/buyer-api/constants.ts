@@ -2,6 +2,7 @@
 export const BUYER_API = {
   STATUS_PATH: '/v1/gyblos/status',
   CHANNEL_CHAT_PATH: '/v1/gyblos/channel-chat',
+  FREE_ONLY_FIELD: 'gyblos_free_only',
   SELLER_CHOICE_FIELD: 'gyblos_seller_choice',
   CHAT_PATH: '/v1/gyblos/chat',
   PAYMENT_FIELD: 'gyblos_payment',

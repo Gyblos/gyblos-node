@@ -120,7 +120,8 @@ function sessionSelection(
     const policy = {
       ...request,
       maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
-      priceCeilings: route.priceCeilings,
+      priceCeilings:
+        request.maxAtomic === '0' ? request.priceCeilings : route.priceCeilings,
       ...(inferenceNeedsTools(input) ? { tools: true as const } : {}),
     };
     const select = (
@@ -211,8 +212,9 @@ function sessionExecutor(
       ),
       free: freeSessionExecution(context, manager, input, permission, onDelta),
 
-      paid: (winner, current, sending) =>
-        observeBuyerExecution(
+      paid: (winner, current, sending) => {
+        if (model?.freeOnly) return sessionFail(SESSION_CODES.LIMIT);
+        return observeBuyerExecution(
           context.dependencies,
           winner,
           input,
@@ -231,7 +233,8 @@ function sessionExecutor(
               permission,
             );
           },
-        ),
+        );
+      },
     };
     const routed =
       router && !model?.sellerChoice
@@ -245,7 +248,7 @@ function sessionExecutor(
                 ports
                   .select(excluded, current, {
                     pinnedNodeId: config.pinnedNodeId,
-                    priceCeilings: config.request.priceCeilings,
+                    priceCeilings: request.priceCeilings,
                   })
                   .catch(
                     onBuyerSelectionFailure(
