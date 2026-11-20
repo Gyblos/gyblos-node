@@ -21,7 +21,6 @@ the matching service (`packages/transport-iroh/src/endpoint.ts`).
 | `gyblos/control/1`     | 1       | Active; carries v2 public records and offers                                                     | `control-v2.json`, `control-v2-mtok.json`                                                                                | [Control contracts](#control-contracts-and-iroh-runtime)                  |
 | `gyblos/free/4`        | 4       | Active                                                                                           | `free-execution-v4.json`                                                                                                 | [Free inference execution v4](#free-inference-execution-v4)               |
 | `gyblos/free-stream/4` | 4       | Active                                                                                           | `free-stream-v4.json`                                                                                                    | [Free streaming execution v4](#free-streaming-execution-v4)               |
-| `gyblos/paid-stream/2` | 2       | Active when the seller has a payment server                                                      | `paid-execution-v2.json` (`paid-execution-v1.json` is retired)                                                           | [Paid inference execution](#paid-inference-execution)                     |
 | `gyblos/session/4`     | 4       | Active when the seller has reusable sessions                                                     | `batch-channel-v4.json`, `batch-prepare-v4.json`, `batch-startup-v4.json`, `batch-stream-v4.json`, `batch-tools-v4.json` | [Active common tool-aware execution](#active-common-tool-aware-execution) |
 | `gyblos/session/5`     | 5       | Active alongside `gyblos/session/4` (response blocks)                                            | `session-blocks-v5.json`                                                                                                 | [Session block checkpoints](#reusable-session-block-checkpoints-v5)       |
 | `gyblos/receipt/1`     | 1       | Active                                                                                           | `receipt-channel-v1.json`                                                                                                | [Receipt exchange channel v1](#receipt-exchange-channel-v1)               |
@@ -49,7 +48,6 @@ Signed records and envelopes outside the Iroh channels:
 - [Public discovery records, version 1](#public-discovery-records-version-1)
 - [Control contracts and Iroh runtime](#control-contracts-and-iroh-runtime)
 - [Free inference execution v4](#free-inference-execution-v4)
-- [Paid inference execution](#paid-inference-execution)
 - [Usage receipts v1](#usage-receipts-v1)
 - [Receipt exchange channel v1](#receipt-exchange-channel-v1)
 - [Reusable buyer-authorized payment session port](#reusable-buyer-authorized-payment-session-port)
@@ -490,8 +488,7 @@ Request fields (required unless marked optional; unknown fields at every level a
   maximum or model context. The engine-specific input token count plus the
   requested output maximum must fit the quoted context before generation.
 - Optional tool calling uses the common grammar below. Active session v4 also
-  accepts it with its own unchanged bounds; legacy individual settlement refuses
-  it before payment (see [common execution](#active-common-tool-aware-execution)):
+  accepts it with its own bounds (see [common execution](#active-common-tool-aware-execution)):
   - `input.tools`: 1–128 `{name, description?, parameters}`. `name` matches
     `[A-Za-z0-9_-]{1,64}` and is unique; `description` is non-empty text up to
     8 KiB; `parameters` is JSON text (up to 64 KiB) holding one JSON object, the
@@ -669,12 +666,11 @@ independent one-shot Python oracle that first reproduced every v3 vector; the
 oracle is not committed. The v1 vectors,
 control v2 vectors and their domains remain unchanged.
 Each protocol change ships the contract first, then the seller, then the buyer.
-Free offers use their own handler and caps; paid offers use a separate paid
-stream when a payment server is configured. Acceptance covers publication → discovery → selection → free quote →
+Free offers use their own handler and caps; priced offers use reusable channels. Acceptance covers publication → discovery → selection → free quote →
 execution → answer using an in-process index and synthetic engine, including
 replay, expiry, wrong peer, exhausted caps, engine failure and no fallback once
 prompt transmission begins. Real engines, off-host or production runs require
-separate founder authorization. Free streaming and conditional paid-v2 wiring
+separate founder authorization. Free streaming and paid sessions
 are separate channels; see their runtime documentation for scope and limits.
 
 ### Seller runtime scope
@@ -1321,52 +1317,13 @@ result is not transmitted after cancellation. This changes no signing bytes.
 ## Active common tool-aware execution
 
 The active execution profiles are free `gyblos/free/4` and
-`gyblos/free-stream/4`, individual paid `gyblos/paid-stream/2` (request version
-2, domain `gyblos/paid-execution-request/v2\n`), and reusable paid
+`gyblos/free-stream/4`, and reusable paid
 `gyblos/session/4` (version 4, domains `gyblos/session-request/v4\n` and
 `gyblos/session-rpc/v4\n`). Earlier paid/session descriptions and golden
 vectors document retired wire profiles; they are not additional registered
 ALPNs. Free vectors, existing offers, cumulative SDK voucher signatures and
 financial journals are unchanged. Upgrade both peers together; no downgrade,
 reconstructed old request or automatic prompt replay is supported.
-
-Before constructing individual paid authorization, the canonical unsigned
-request envelope (`version`, `requestId`, `quote`, `input`) must fit its
-existing 128 KiB allowance, leaving 8 KiB for authorization within the unchanged
-136 KiB full frame. JSON escaping counts toward this allowance even when raw
-message bytes fit the 64 KiB input cap. Local preflight shares the request
-builder's parser and preserves the active v2 signing domain and wire limit.
-
-Individual paid execution in the coordinated beta release permits up to 32768
-output tokens, additionally bounded by the signed request, recounted input plus
-output within the model context, and the deposited spending ceiling. The stream
-allows 32768 deltas plus one terminal (32769 events). Its aggregate frame budget
-is 8817668 bytes: 32768 maximum 189-byte delta envelopes including their length
-prefixes, six encoded bytes per permitted output byte (262144 bytes of text),
-and a complete maximum terminal frame of 1051652 bytes. The terminal repeats the
-answer and includes charge/settlement metadata, so it reserves a whole frame,
-not only space for a small error. Individual delta, event, response and output
-bounds still apply; JSON escaping counts toward the serialized response limit.
-Readers reject lengths exceeding the per-event bound before allocating the body;
-the verifier checks the aggregate budget after canonical decoding. Admission,
-absolute deadlines and backpressure are unchanged. Both peers
-upgrade together; no compatibility implementation for older beta bounds is provided.
-
-If delivery reaches an event/byte limit after a deposit, the seller stops with
-`PAID_EXECUTION_SELLER_CANNOT_CONTINUE`, reason `engine_invalid_response`, and
-charges only the independently recounted acknowledged prefix. No acknowledged
-output means zero charge; the remaining deposit is refunded. A cancellation or
-deadline still takes precedence. Generic internal or final-validation failures
-do not become billable merely because a delta was seen. Settlement is attempted
-once under the existing recovery rules, and the prompt is never replayed.
-The seller tracks acknowledgments per bounded wire delta, including when one
-engine delta needs several frames: a failed later frame cannot erase earlier
-acknowledged output or make its unacknowledged tail billable.
-Each intermediate frame prefix must itself fit the recounted token allowance
-before writing: token counts can decrease when a suffix merges earlier tokens.
-An unaffordable intermediate prefix stops with `BUDGET_EXHAUSTED` before delivery,
-even when the whole engine delta would fit. Already acknowledged output remains
-billable within its verified allowance; no tokens or prices are guessed or clamped.
 
 `InferenceInput` and `InferenceResult` own the common conversation, tools,
 choice, output and usage shapes. `@gyblos/inference` owns capability validation,
@@ -1399,24 +1356,15 @@ remote provider tokenizes internally in that form. A paid tool request requires
 a tokenizer able to render tool output before financial construction. Declared
 provider usage remains suitable for conservative free caps only.
 
-Individual paid settlement has no buyer acknowledgement for held tool calls:
-it must reject tools and tool-result history with `UNSUPPORTED` before payment
-construction/admission, even after a text runtime was cached. It retains full
-text conversations and the common generator. Hosts must configure a reusable
-session for positive-price tools; they must not silently create a new deposit
-policy. Its v2 wire grammar is common, but this legacy economic policy does not
-admit those inputs. This prevents charging generated arguments before delivery.
-
 Telemetry is observational: failed sinks, clocks and generation callbacks do
 not change inference, caps or billing. Both peers record received, first usable
 output and one completed/failed/refused terminal. Tool-only first output is
 observed with its validated result. A session bill or approved voucher is not a
-confirmed payment; it emits no per-inference `CHARGED`. Existing confirmed
-individual settlement evidence retains that event. Channel totals are not
+confirmed payment; it emits no per-inference `CHARGED`. Channel totals are not
 attributed to the last request. Existing free signed usage receipts remain
 free-specific; this change does not fabricate paid usage receipts.
 
-New independent Node/OpenSSL vectors are `paid-execution-v2.json`,
+New independent Node/OpenSSL vectors are
 `batch-channel-v4.json`, `batch-prepare-v4.json`, `batch-startup-v4.json`,
 `batch-stream-v4.json` and `batch-tools-v4.json`. All historical vectors stay
 byte-identical and their retired versions are rejected by active parsers.
@@ -1595,8 +1543,7 @@ poisons pending verification; no late approval or ACK may escape afterward.
 A block-capable paid session uses the same inference lifecycle, engine, input
 validation and terminal tool checks as complete-response sessions. The economic
 adapter replaces the final-only approval with cumulative checkpoints; it never
-starts another generation. Free execution and single-request paid execution
-retain their existing transports. Reusable-session startup explicitly enables
+starts another generation. Free execution retains its own transport. Reusable-session startup explicitly enables
 the block ALPN. Buyer composition selects it before PREPARE only when both its
 financial port and recount tokenizer support checkpoints. A v5 seller refuses
 unsupported prefix certification before funding; neither side falls back after

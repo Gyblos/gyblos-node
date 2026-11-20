@@ -16,9 +16,14 @@ const terminal = JSON.stringify({
   choices: [{ delta: {}, finish_reason: 'stop' }],
   usage: { prompt_tokens: 2, completion_tokens: 3 },
   gyblos_payment: {
-    verdict: 'settled',
-    chargedAtomic: '5',
-    refundedAtomic: '7',
+    verdict: 'approved',
+    chargedAtomic: null,
+    refundedAtomic: null,
+    session: {
+      approvedAtomic: '5',
+      cumulativeAtomic: '5',
+      depositAtomic: '12',
+    },
   },
 });
 const delta = JSON.stringify({
@@ -61,7 +66,16 @@ void test('streams one answer and reports usage and paid settlement', async () =
     status: 'complete',
     text: 'Hello',
     usage: { input: 2, output: 3 },
-    payment: { verdict: 'settled', charged: '5', refunded: '7' },
+    payment: {
+      verdict: 'approved',
+      charged: null,
+      refunded: null,
+      session: {
+        approvedAtomic: '5',
+        cumulativeAtomic: '5',
+        depositAtomic: '12',
+      },
+    },
   });
 });
 
@@ -97,7 +111,7 @@ void test('rejects oversized prompts before making a request', async () => {
 
 void test('never reports a paid stream with unverified settlement as complete', async () => {
   const { options } = setup();
-  const unverified = terminal.replace('settled', 'unverified');
+  const unverified = terminal.replace('approved', 'unverified');
   const request: typeof fetch = async () =>
     stream(`data: ${delta}\n\ndata: ${unverified}\n\ndata: [DONE]\n\n`);
   assert.equal((await chatTurn(options, request)).status, 'uncertain');
@@ -118,9 +132,14 @@ void test('preserves typed remote error and settlement without revealing arbitra
       code: 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE',
       message: 'secret',
       gyblos_payment: {
-        verdict: 'settled',
-        chargedAtomic: '5',
-        refundedAtomic: '7',
+        verdict: 'approved',
+        chargedAtomic: null,
+        refundedAtomic: null,
+        session: {
+          approvedAtomic: '5',
+          cumulativeAtomic: '5',
+          depositAtomic: '12',
+        },
       },
     },
   };
@@ -130,9 +149,14 @@ void test('preserves typed remote error and settlement without revealing arbitra
   assert.equal(result.status, 'uncertain');
   assert.equal(result.code, 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE');
   assert.deepEqual(result.payment, {
-    verdict: 'settled',
-    charged: '5',
-    refunded: '7',
+    verdict: 'approved',
+    charged: null,
+    refunded: null,
+    session: {
+      approvedAtomic: '5',
+      cumulativeAtomic: '5',
+      depositAtomic: '12',
+    },
   });
   assert.equal(output.join('').includes('secret'), false);
 });
@@ -282,6 +306,11 @@ void test('owned buyer uses its actual startup budget and closes after the sessi
           model: 'actual-model',
           maxTokens: 8,
           maxAtomic: '500',
+          session: {
+            depositAtomic: '1000',
+            lifetimeMs: 3600000,
+            withdrawDelaySeconds: 300,
+          },
           request: async () =>
             stream(`data: ${delta}\n\ndata: ${terminal}\n\ndata: [DONE]\n\n`),
         },

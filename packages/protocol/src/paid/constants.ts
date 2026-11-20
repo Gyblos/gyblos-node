@@ -28,5 +28,3 @@ export const PAID_EXECUTION_CODES = {
 } as const;
 export type PaidExecutionCode =
   (typeof PAID_EXECUTION_CODES)[keyof typeof PAID_EXECUTION_CODES];
-
-// Refusals before any deposit: their terminals never carry a charge or payment.

@@ -4,9 +4,8 @@ import type {
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
-import { PAID_VERDICTS, SESSION_VERDICTS } from '@gyblos/node/constants';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
-import { buyerAtomic } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
@@ -77,13 +76,6 @@ function charge(payment: ChatPayment) {
       return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
     return { atomic: approved.approvedAtomic, kind: BUYER_KEY_CHARGE.APPROVED };
   }
-  if (
-    payment.verdict === PAID_VERDICTS.SETTLED &&
-    buyerAtomic(payment.chargedAtomic) &&
-    payment.chargedAtomic === payment.expectedAtomic &&
-    payment.transaction
-  )
-    return { atomic: payment.chargedAtomic, kind: BUYER_KEY_CHARGE.SETTLED };
   return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
 }
 async function complete(
@@ -105,10 +97,7 @@ export async function recordApiKeyPayment(
   payment: ChatPayment,
 ) {
   if (!operation || operation.completed()) return;
-  if (
-    payment.verdict === PAID_VERDICTS.SETTLED ||
-    payment.verdict === SESSION_VERDICTS.APPROVED
-  )
+  if (payment.verdict === SESSION_VERDICTS.APPROVED)
     await complete(operation, payment);
 }
 export async function executeApiKey(

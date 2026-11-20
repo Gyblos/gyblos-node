@@ -46,12 +46,19 @@ function reply() {
     ],
     [BUYER_API.EXECUTION_FIELD]: 'paid',
     [BUYER_API.PAYMENT_FIELD]: {
-      verdict: 'settled',
+      verdict: 'approved',
       maxAtomic: '100',
       expectedAtomic: '30',
-      chargedAtomic: '30',
-      refundedAtomic: '70',
-      transaction: '2'.repeat(88),
+      chargedAtomic: null,
+      refundedAtomic: null,
+      sellerAtomic: null,
+      feeAtomic: null,
+      recorded: true,
+      session: {
+        approvedAtomic: '30',
+        cumulativeAtomic: '30',
+        depositAtomic: '100',
+      },
     },
   };
 }
@@ -65,7 +72,7 @@ void test('x402 refuses non-loopback and credential-bearing endpoints before fet
   ])
     assert.throws(() => buyerEndpoint(url));
 });
-void test('x402 sends once with pinned policy and records only a verified hash', async () => {
+void test('x402 sends once with pinned policy and records only the channel approval', async () => {
   let posts = 0;
   const client = new X402Client(budget(), async (_url, options) => {
     assert.equal(options?.redirect, 'error');
@@ -81,7 +88,7 @@ void test('x402 sends once with pinned policy and records only a verified hash',
   await client.authorize('100');
   const result = await client.send('request-1', 'Hello');
   assert.equal(result.text, 'Hello from the model');
-  assert.equal(result.summary.records[0]?.transaction, '2'.repeat(88));
+  assert.equal(result.summary.records[0]?.transaction, null);
   assert.equal(result.summary.spentAtomic, '30');
   assert.equal(posts, 1);
 });
@@ -152,6 +159,7 @@ void test('a reusable-session approval remains unresolved rather than becoming a
         verdict: SESSION_VERDICTS.APPROVED,
         chargedAtomic: null,
         refundedAtomic: null,
+        session: undefined,
         transaction: undefined,
         recorded: true,
       },
@@ -181,7 +189,7 @@ void test('x402 malformed or unverified settlements never produce a confirmed pa
     assert.throws(() => parseBuyerReply(value, policy));
   }
   const mismatch = reply();
-  mismatch[BUYER_API.PAYMENT_FIELD].chargedAtomic = '101';
+  mismatch[BUYER_API.PAYMENT_FIELD].expectedAtomic = '101';
   assert.throws(() => parseBuyerReply(mismatch, policy));
   assert.throws(() =>
     parseBuyerReply(
@@ -199,7 +207,7 @@ void test('x402 explicit free result needs no invented hash; token-limited resul
   assert.equal(parseBuyerReply(value, policy).transaction, null);
   const limited = reply();
   limited.choices[0]!.finish_reason = 'length';
-  assert.equal(parseBuyerReply(limited, policy).transaction, '2'.repeat(88));
+  assert.equal(parseBuyerReply(limited, policy).transaction, null);
 });
 
 void test('x402 preserves valid reported token usage without treating it as payment evidence', () => {
@@ -215,7 +223,7 @@ void test('x402 preserves valid reported token usage without treating it as paym
   assert.throws(() => parseBuyerReply(value, policy));
 });
 
-void test('x402 treats malformed or absent telemetry as unknown after a valid settlement', () => {
+void test('x402 treats malformed or absent telemetry as unknown after a valid approval', () => {
   for (const usage of [
     undefined,
     { prompt_tokens: -1, completion_tokens: 10, total_tokens: 9 },
@@ -228,7 +236,7 @@ void test('x402 treats malformed or absent telemetry as unknown after a valid se
     assert.equal(result.chargeAtomic, '30');
   }
 });
-void test('response observations reach the renderer only after durable settlement and cannot trigger a retry', async () => {
+void test('response observations reach the renderer only after a durable channel approval and cannot trigger a retry', async () => {
   let posts = 0;
   const client = new X402Client(budget(), async (_url, options) => {
     if (options?.method !== 'POST') return Response.json(policy);
@@ -252,7 +260,7 @@ void test('response observations reach the renderer only after durable settlemen
   assert.deepEqual(parsed.reply?.metrics?.cost, {
     amount: '0.000030',
     unit: 'USDC',
-    kind: 'settled',
+    kind: 'recorded',
   });
   assert.equal(parsed.reply?.metrics?.firstTokenMs, null);
   assert.equal(parsed.reply?.metrics?.generationMs, null);
@@ -311,24 +319,6 @@ void test('x402 accepts a valid short Solana signature through reply, persistenc
   const signature = getBase58Decoder().decode(bytes);
   assert.equal(signature.length, 86);
   assert.ok(isSignature(signature));
-  const value = reply();
-  value[BUYER_API.PAYMENT_FIELD].transaction = signature;
-  const parsed = parseBuyerReply(value, policy);
-  let saved: string | undefined;
-  const files = {
-    read: async () => saved,
-    write: async (text: string) => {
-      saved = text;
-    },
-  };
-  const ledger = new X402Budget(files);
-  await ledger.authorize(policy, '100');
-  await ledger.reserve('short-signature');
-  await ledger.complete('short-signature', parsed);
-  assert.equal(
-    (await new X402Budget(files).summary()).records[0]?.transaction,
-    signature,
-  );
   assert.equal(
     x402Explorer(signature),
     'https://explorer.solana.com/tx/' + signature + '?cluster=devnet',

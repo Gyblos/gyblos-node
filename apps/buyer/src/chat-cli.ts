@@ -21,7 +21,6 @@ import {
   CHAT_INPUT_BYTES,
   CHAT_TURN_STATUSES,
   isFreeAtomic,
-  PAID_VERDICTS,
 } from './constants';
 import { startupMessage } from './free-main';
 
@@ -148,12 +147,8 @@ export async function chatSession(options: ChatSessionOptions) {
       ? 'paid (devnet)'
       : 'free';
   options.write(
-    `Model: ${options.model}\nMode: ${mode}\n${options.session ? `Session deposit limit: ${options.session.depositAtomic} atomic units\n${options.session.totalDepositAtomic ? `Total deposit authority: ${options.session.totalDepositAtomic} atomic units\n` : ''}Maximum per question: ${options.maxAtomic} atomic units\nType ${CHAT_COMMANDS.SETTLE} to close ${options.session.totalDepositAtomic ? 'all seller channels' : 'the channel'}, or ${CHAT_COMMANDS.EXIT} to leave settlement to the seller.\n` : `Maximum deposit: ${options.maxAtomic} atomic units per request\n`}Type ${CHAT_COMMANDS.NEW} for a new conversation; ${CHAT_COMMANDS.EXIT} to quit. History stays in memory only.\n`,
+    `Model: ${options.model}\nMode: ${mode}\n${options.session ? `Session deposit limit: ${options.session.depositAtomic} atomic units\n${options.session.totalDepositAtomic ? `Total deposit authority: ${options.session.totalDepositAtomic} atomic units\n` : ''}Maximum per question: ${options.maxAtomic} atomic units\nType ${CHAT_COMMANDS.SETTLE} to close ${options.session.totalDepositAtomic ? 'all seller channels' : 'the channel'}, or ${CHAT_COMMANDS.EXIT} to leave settlement to the seller.\n` : ''}Type ${CHAT_COMMANDS.NEW} for a new conversation; ${CHAT_COMMANDS.EXIT} to quit. History stays in memory only.\n`,
   );
-  if (paid && !options.session)
-    options.write(
-      'Paid offers without reusable sessions accept one user turn; use /new for a separate paid question.\n',
-    );
   while (!options.signal?.aborted) {
     const prompt = await options.read();
     if (prompt === undefined || prompt.trim() === CHAT_COMMANDS.EXIT) return;
@@ -206,9 +201,7 @@ export async function chatSession(options: ChatSessionOptions) {
       options.write(
         'The request may have been sent. No retry was made. Check the buyer and reconcile any uncertain payment before continuing.\n',
       );
-      return paid && result.payment?.verdict !== PAID_VERDICTS.SETTLED
-        ? result.requestDigest
-        : undefined;
+      return paid ? result.requestDigest : undefined;
     }
   }
 }
@@ -237,13 +230,11 @@ function reportTurn(result: ChatTurnResult, write: (text: string) => void) {
       `Tokens: ${result.usage.input} input, ${result.usage.output} output\n`,
     );
   if (result.payment) {
-    const { verdict, charged, refunded } = result.payment;
+    const { verdict, charged } = result.payment;
     write(
       verdict === SESSION_VERDICTS.APPROVED && result.payment.session
         ? `Approved this question: ${result.payment.session.approvedAtomic}; cumulative: ${result.payment.session.cumulativeAtomic} of ${result.payment.session.depositAtomic} atomic units; settlement pending.\n`
-        : verdict === PAID_VERDICTS.SETTLED
-          ? `Payment: ${verdict}; charged: ${charged ?? 'unknown'}; refunded: ${refunded ?? 'unknown'} atomic units\n`
-          : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
+        : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
     );
   }
 }

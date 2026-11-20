@@ -357,7 +357,7 @@ void test(
     const result = endpointProbe({
       GYBLOS_RELAY_TOKEN: TOKEN,
       PROBE_CONTROL: '1',
-      PROBE_SESSIONS: '1',
+      PROBE_BATCH_SESSIONS: '1',
       PROBE_HTTP: '0',
     });
     assert.equal(result.error, undefined);

@@ -16,6 +16,8 @@ import { loadRole, setupRole } from '@gyblos/node/roles';
 import { sellerChainPayments } from '@gyblos/node/seller-chain';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
+import { offline } from './support/upto-seller-rpc';
+
 async function withHome(run: (home: string) => Promise<void>) {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-seller-chain-'));
   const previous = process.env.GYBLOS_HOME;
@@ -31,7 +33,7 @@ async function withHome(run: (home: string) => Promise<void>) {
 
 const address = async () => (await generateKeyPairSigner()).address;
 
-void test('a seller set up with a payout gets a payment server for its own keys and fee', () =>
+void test('a new seller prepares channel payout accounts for its own keys and fee', () =>
   withHome(async () => {
     await setupRole({
       role: P2P_ROLES.SELLER,
@@ -39,10 +41,13 @@ void test('a seller set up with a payout gets a payment server for its own keys 
     });
     const role = await loadRole(P2P_ROLES.SELLER);
     assert.ok(role.role === P2P_ROLES.SELLER && role.facilitator);
-    const payments = await sellerChainPayments(async () => DEVNET_GENESIS)(
-      role,
-    );
+    const chain = offline({ missing: true });
+    const payments = await sellerChainPayments(
+      async () => DEVNET_GENESIS,
+      chain.rpc,
+    )(role);
     try {
+      assert.equal(chain.sent.length, 1);
       assert.deepEqual(payments.description, {
         network: DEVNET,
         mint: role.mint,
@@ -65,7 +70,7 @@ void test('a seller role without payment fields (earlier free setup) cannot sell
     const { authorizer, facilitator, payTo, ...role } = loaded;
     void [authorizer, facilitator, payTo];
     await assert.rejects(
-      sellerChainPayments(async () => DEVNET_GENESIS)(role),
+      sellerChainPayments(async () => DEVNET_GENESIS, offline().rpc)(role),
       (error) =>
         error instanceof NodeError &&
         error.code === NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING,
@@ -86,14 +91,53 @@ void test('a role whose RPC is not devnet, or cannot answer, never opens payment
       },
     ])
       await assert.rejects(
-        sellerChainPayments(genesis)(role),
+        sellerChainPayments(genesis, offline().rpc)(role),
         (error) =>
           error instanceof NodeError &&
           error.code === NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH,
       );
     // Nothing was opened: the payments directory holds no ledger lock.
-    const payments = await sellerChainPayments(async () => DEVNET_GENESIS)(
-      role,
-    );
+    const payments = await sellerChainPayments(
+      async () => DEVNET_GENESIS,
+      offline().rpc,
+    )(role);
     await payments.close();
+  }));
+
+void test('a seller whose payout, fee or fee payer token account cannot be created does not start', () =>
+  withHome(async () => {
+    await setupRole({
+      role: P2P_ROLES.SELLER,
+      mint: await address(),
+    });
+    const role = await loadRole(P2P_ROLES.SELLER);
+    await assert.rejects(
+      sellerChainPayments(
+        async () => DEVNET_GENESIS,
+        offline({ missing: true, refuse: true }).rpc,
+      )(role),
+      (error) =>
+        error instanceof NodeError &&
+        error.code === NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE,
+    );
+    // Nothing was left open: the payments directory holds no ledger lock.
+    await (
+      await sellerChainPayments(async () => DEVNET_GENESIS, offline().rpc)(role)
+    ).close();
+  }));
+
+void test('a changed seller fee payer is refused before preparing any payout account', () =>
+  withHome(async () => {
+    await setupRole({ role: P2P_ROLES.SELLER, mint: await address() });
+    const role = await loadRole(P2P_ROLES.SELLER);
+    assert.ok(role.role === P2P_ROLES.SELLER && role.facilitator);
+    const chain = offline({ missing: true });
+    await assert.rejects(
+      sellerChainPayments(
+        async () => DEVNET_GENESIS,
+        chain.rpc,
+      )({ ...role, facilitator: await address() }),
+      { code: NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID },
+    );
+    assert.equal(chain.sent.length, 0);
   }));

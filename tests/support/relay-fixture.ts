@@ -118,7 +118,6 @@ function probeScript() {
             relayOnly:process.env.PROBE_RELAY_ONLY==='1',
             control:process.env.PROBE_CONTROL==='1',
             freeExecution:process.env.PROBE_FREE_EXECUTION==='1',
-            batchSessions:process.env.PROBE_SESSIONS==='1',
             batchSessions:process.env.PROBE_BATCH_SESSIONS==='1',
             http:process.env.PROBE_HTTP!=='0',
             bindAddress:process.env.PROBE_BIND_ADDRESS});

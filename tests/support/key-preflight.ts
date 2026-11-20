@@ -18,12 +18,10 @@ import {mkdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createBuyerApiKeys} from '@gyblos/node/buyer-api-keys';
 import {executeApiKey} from '@gyblos/buyer/api-key-execution';
-import {canonicalJson} from '@gyblos/protocol';
 import {PAID_EXECUTION_CODES} from '@gyblos/protocol/paid/constants';
 import {SESSION_CODES} from '@gyblos/protocol/payment-session';
-import {ENGINE_DONE_REASONS,REASONING_LEVELS} from '@gyblos/protocol/constants';
 import {BATCH_SESSION_DEFAULTS} from '@gyblos/config/batch-session';
-import {FREE_BUYER_STARTUP,PAID_BUYER_CODES} from '@gyblos/buyer/constants';
+import {FREE_BUYER_STARTUP} from '@gyblos/buyer/constants';
 const {config,quote,input,scenario,target}=${JSON.stringify(data)};
 let now=quote.offer.issuedAt;
 Date.now=()=>now;
@@ -37,7 +35,7 @@ const sources={
     export function relayAllowed(){return true}\`,
   './free-execution': \`export class FreeSelectionFailure extends Error {}
     export async function executeSelectedBuyerFree(){globalThis.probe.free++;return {text:'synthetic',usage:{inputTokens:4,outputTokens:2},finishReason:'stop'}}\`,
-  '@gyblos/node/buyer-chain': 'export async function buyerPaymentsUnresolved(){return false} export function buyerChainPayments(){throw Error("unexpected default chain")}'
+  '@gyblos/node/buyer-chain': 'export async function buyerPaymentsUnresolved(){return false}'
 };
 registerHooks({resolve(name,context,next){
   const owner=[target,target.replace('quote-startup.ts','session-startup.ts'),target.replace('quote-startup.ts','session-manager.ts')].includes(context.parentURL);
@@ -68,12 +66,10 @@ const ready=()=>keys.snapshot();
 const meter=async()=>{
   probe.meters++;
   if(scenario.includes('expired')) now=quote.offer.expiresAt;
-  if(scenario==='meter-load') throw Error('synthetic tokenizer unavailable');
   const count=()=>{
-    if(scenario==='meter-input') throw Error('synthetic unsupported input');
     return scenario.includes('context')?quote.offer.model.contextTokens:4;
   };
-  return {input:count,count:()=>2,...(scenario==='history'?{}:{chat:count,output:()=>2})};
+  return {input:count,count:()=>2,chat:count,output:()=>2};
 };
 await mkdir(join(process.env.GYBLOS_HOME,'buyer'),{recursive:true,mode:0o700});
 const runtime=await quoteBuyerExecution({meter,
@@ -85,29 +81,20 @@ const call=(data=input,model,signal=new AbortController().signal)=>executeApiKey
 try {
     const before={...probe};
     const controller=new AbortController();
-    if(scenario==='aborted') controller.abort();
-    const route=undefined;
-    if(scenario==='model'||scenario==='warm'||scenario.includes('session-model')) quote.offer.selection=custom;
-    if(scenario==='reasoning') quote.offer.reasoning=REASONING_LEVELS.LOW;
-    const expected=scenario==='aborted'?{name:'AbortError'}
-      :scenario==='meter-load'?{message:'synthetic tokenizer unavailable'}
-      :['model','quote-model','warm','session-model','session-model-pool'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_MODEL}
-      :['reasoning','quote-reasoning','downgrade'].includes(scenario)?{reason:FREE_BUYER_STARTUP.REASONING}
-      :['network','mint','quote-mint'].includes(scenario)?{reason:FREE_BUYER_STARTUP.PAID_NETWORK}
-      :scenario==='tokens'?{reason:FREE_BUYER_STARTUP.MAX_TOKENS}
+    if(scenario.includes('session-model')) quote.offer.selection=custom;
+    const expected=scenario.includes('model')?{reason:FREE_BUYER_STARTUP.PAID_MODEL}
       :scenario.includes('expired')?{code:PAID_EXECUTION_CODES.EXPIRED}
       :scenario.includes('deposit')?{code:SESSION_CODES.LIMIT}
       :scenario.includes('budget')?{code:PAID_EXECUTION_CODES.BUDGET_EXHAUSTED}
-      :['quote-tokens','bytes','escaped-bytes'].includes(scenario)||scenario.includes('context')?{code:PAID_EXECUTION_CODES.LIMIT}
-      :{code:PAID_BUYER_CODES.UNSUPPORTED};
-    await assert.rejects(call(input,route,controller.signal),expected);
+      :{code:PAID_EXECUTION_CODES.LIMIT};
+    await assert.rejects(call(input,undefined,controller.signal),expected);
     const snapshot=await ready();
     assert.equal(snapshot.keys[0].reservedAtomic,'0','local rejection must not reserve API budget');
     assert.equal(snapshot.blocked,false,'local rejection must not block later requests');
     assert.equal(probe.chains,before.chains,'local rejection must precede financial construction');
     assert.equal(probe.authorizations,before.authorizations,'local rejection must precede signing');
     assert.equal(probe.executions,before.executions,'local rejection must not transmit a prompt');
-    if(['model','quote-model','reasoning','quote-reasoning','downgrade','network','mint','quote-mint','tokens','warm','session-model','session-model-pool','aborted'].includes(scenario))
+    if(scenario.includes('session-model'))
       assert.equal(probe.meters,before.meters,'static refusal must precede tokenizer loading');
     quote.offer.maxAtomic='0';
     quote.offer.prices={...quote.offer.prices,inputAtomicPerMtok:'0',outputAtomicPerMtok:'0'};

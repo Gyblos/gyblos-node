@@ -1109,7 +1109,7 @@ also look like loopback, so do not run one on a relay-only machine.
 
 A free offer in `config.toml` starts the control protocol plus the
 `gyblos/free/4` (complete response) and `gyblos/free-stream/4` (streaming)
-execution protocols. Paid offers use the separate paid stream described in the
+execution protocols. Paid offers use reusable payment channels described in the
 protocol specification. Free execution serves a conversation (an optional system
 message, then alternating user and assistant turns that start and end with the
 user) with reasoning `off`, up to the offer's answer limit
