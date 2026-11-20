@@ -6,14 +6,14 @@ export const FETCH = {
   timeoutMs: 8_000,
 } as const;
 
-// The discovery index is read in one place, by the Worker's scheduled run (scheduled.ts, on the cron in
-// wrangler.jsonc), into KV that every render reads (discovery-snapshot.ts): the index's load does not grow with
-// viewers. A run sends at most maxRequestsPerRun requests: under the Workers Free plan's 50 subrequests
-// per invocation (its KV read and write count too) and the index's 120 a minute per address. A whole
-// read of a large index spans several runs. On the Free plan a run also has 10 ms of CPU, which parsing
-// a few hundred sellers can exceed: an index that large needs the Workers Paid plan.
+// The discovery index is read in one place, by the Worker's scheduled run (scheduled.ts, on the cron
+// in wrangler.jsonc), into KV that every render reads (discovery-snapshot.ts): the index's load does
+// not grow with viewers. A run sends at most maxRequestsPerRun requests: under the Workers Free plan's
+// 50 subrequests per invocation (its KV read and write count too) and the index's 120 a minute per
+// address. A whole read of a large index spans several runs. On the Free plan a run also has 10 ms of
+// CPU, which parsing a few hundred sellers can exceed: an index that large needs the Workers Paid plan.
 export const DISCOVERY = {
-  // Bump the version whenever StoredDiscovery changes: renders then show nothing until the next whole read.
+  // Bump the version whenever StoredDiscovery changes: renders show nothing until the next whole read.
   storedKey: 'discovery/v1',
   // Sellers per /sellers page: the index's largest page (DISCOVERY_INDEX_LIMITS.maxSellers).
   sellersPerPage: 200,
