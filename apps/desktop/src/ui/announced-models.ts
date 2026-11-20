@@ -11,7 +11,7 @@ import {
   MODEL_SOURCE,
   MODELS,
 } from './constants';
-import type { CatalogModel, ModelArtwork } from './model-types';
+import type { CatalogModel, ModelArtwork, ModelOption } from './model-types';
 
 export function modelArtwork(modelId: string): ModelArtwork {
   const family = modelId.toLowerCase().split('/').at(-1) ?? '';
@@ -90,4 +90,8 @@ export function announcedModels(
         source: MODEL_SOURCE.ANNOUNCED,
       };
     });
+}
+
+export function chatNetworkOptions(models: readonly ModelOption[]) {
+  return models.filter((item) => item.source === MODEL_SOURCE.ANNOUNCED);
 }

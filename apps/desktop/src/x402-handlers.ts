@@ -99,10 +99,14 @@ function buyerAction(owner: Owner, event: Sender, args: readonly unknown[]) {
   return args[0] as Record<string, unknown>;
 }
 function selectedOffer(
-  policyId: string | undefined,
+  policy: ReturnType<X402Client['policy']>,
   input: Record<string, unknown>,
   resolveOffer?: (id: string) => BuyerSellerChoice | undefined,
 ) {
+  if (!input.offerId && policy && policy.maxAtomic !== '0')
+    throw new PaidSellerLimitError(
+      'Select a seller and confirm its prices before sending.',
+    );
   const selected =
     typeof input.offerId === 'string'
       ? resolveOffer?.(input.offerId)
@@ -111,7 +115,7 @@ function selectedOffer(
     throw new PaidSellerLimitError(
       'Refresh the model list and select the seller again. This listing has expired.',
     );
-  if (selected && (!input.policyId || input.policyId !== policyId))
+  if (selected && (!input.policyId || input.policyId !== policy?.policyId))
     throw new PaidSellerLimitError(
       'Select the seller again to confirm the current channel terms.',
     );
@@ -160,11 +164,7 @@ export function createX402Handlers(
         x402Id(input.id) &&
         typeof input.prompt === 'string'
       ) {
-        const selected = selectedOffer(
-          client.policy()?.policyId,
-          input,
-          resolveOffer,
-        );
+        const selected = selectedOffer(client.policy(), input, resolveOffer);
         const reply = await sendResponse(
           client,
           owner,

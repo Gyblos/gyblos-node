@@ -194,7 +194,8 @@ void test('the buyer validates the selected seller and rejects expired terms bef
 void test('opening chat discovers free and paid sellers of the same model without a lookup', async () => {
   const { createCatalogSession } =
     await import('@gyblos/desktop/network-catalog-session');
-  const { announcedModels } = await import('@gyblos/desktop/announced-models');
+  const { announcedModels, chatNetworkOptions } =
+    await import('@gyblos/desktop/announced-models');
   const free = await priced('0', '0');
   const paid = await priced('52000', '208000');
   const requests: string[] = [];
@@ -211,7 +212,9 @@ void test('opening chat discovers free and paid sellers of the same model withou
     () => DISCOVERY_NOW,
     new AbortController().signal,
   );
-  const listings = announcedModels(await session.browse(), DISCOVERY_NOW);
+  const listings = chatNetworkOptions(
+    announcedModels(await session.browse(), DISCOVERY_NOW),
+  );
   assert.deepEqual(
     listings.map((row) => [row.name, row.free, row.input, row.output]),
     [

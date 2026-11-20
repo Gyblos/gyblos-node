@@ -39,6 +39,17 @@ function expireListings(
 function freshUntil(now: number, until: number) {
   return now < until && now >= until - NETWORK_CATALOG.REFRESH_MS;
 }
+function readCatalog(
+  fetch: DiscoveryFetch,
+  model: string,
+  now: () => number,
+  signal: AbortSignal,
+  offers: Map<string, CatalogSellerChoice>,
+) {
+  return model
+    ? readAnnouncements(fetch, model, now, signal, offers)
+    : browseAnnouncements(fetch, now, signal, offers);
+}
 export function createCatalogSession(
   fetch: DiscoveryFetch,
   now: () => number,
@@ -64,14 +75,6 @@ export function createCatalogSession(
     snapshot = emptyCatalog(CATALOG_STATE.ERROR);
   }
   if (!closed) signal.addEventListener('abort', close, { once: true });
-  const read = (
-    model: string,
-    signal: AbortSignal,
-    offers: Map<string, CatalogSellerChoice>,
-  ) =>
-    model
-      ? readAnnouncements(fetch, model, now, signal, offers)
-      : browseAnnouncements(fetch, now, signal, offers);
   let nextRefresh = 0;
   async function load(model: string) {
     if (closed) return emptyCatalog(CATALOG_STATE.ERROR);
@@ -83,7 +86,13 @@ export function createCatalogSession(
     const result = (async () => {
       try {
         const offers = new Map<string, CatalogSellerChoice>();
-        const loaded = await read(model, controller.signal, offers);
+        const loaded = await readCatalog(
+          fetch,
+          model,
+          now,
+          controller.signal,
+          offers,
+        );
         if (!closed && sequence === current) {
           choices = offers;
           snapshot = loaded;

@@ -6,7 +6,6 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 
 import manifest from '../package.json';
-import { CATALOG_STATE } from './catalog/model';
 import { WINDOW_CHROME } from './constants';
 import {
   canSelectPreviewModel,
@@ -28,7 +27,6 @@ import { ChatPaymentSelector } from './ui/ChatPaymentSelector';
 import {
   BUTTON_VARIANT,
   MAIN_NAV,
-  MODEL_SOURCE,
   MODELS,
   NAVIGATION_WIDTH,
   ROUTE_ORDER,
@@ -185,20 +183,15 @@ export function DesktopApp() {
   const network = useLocalNode();
   const wallet = useDesktopWallet();
   const announcements = useNetworkCatalog();
-  const networkModels = announcedModels(announcements.snapshot, Date.now());
+  const now = Date.now();
+  const networkModels = announcedModels(announcements.snapshot, now);
+  const found = announcedModels(announcements.searchResult, now);
+  const ids = new Set(networkModels.map((item) => item.id));
+  networkModels.push(...found.filter((item) => !ids.has(item.id)));
   const chatModels = [MODELS[0], ...networkModels, ...MODELS.slice(1)];
   // Transport readiness and spending permission are independently enforced by each real coordinator.
   const online = true;
   const [model, setModel] = useState(MODELS[0]);
-  useEffect(() => {
-    if (
-      model.source === MODEL_SOURCE.ANNOUNCED &&
-      !model.offerId &&
-      announcements.snapshot.state !== CATALOG_STATE.LOADING &&
-      !networkModels.some((item) => item.id === model.id)
-    )
-      setModel(MODELS[0]);
-  }, [announcements.snapshot, model]);
   const [credits, setCredits] = useState(0);
   const [spent, setSpent] = useState(0);
   const [budget, setBudget] = useState<number>(DEMO_ACCOUNT.DEFAULT_BUDGET);

@@ -1,6 +1,7 @@
 // Static desktop explanations for validated buyer failures; remote text is never displayed.
 // Presentation does not change retry decisions, budget reservations or payment uncertainty.
 import {
+  BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
   type SellerSelectionCode,
 } from '@gyblos/core/constants';
@@ -21,6 +22,7 @@ export class BuyerSessionRequired extends Error {
 }
 
 type BuyerCode =
+  | typeof BUYER_ROUTING_CODES.BUSY
   | FreeExecutionCode
   | SellerSelectionCode
   | typeof SESSION_CODES.BINDING
@@ -36,6 +38,8 @@ export class DesktopBuyerFailure extends Error {
   }
 }
 function explanation(code: BuyerCode, reason: unknown, free: boolean) {
+  if (code === BUYER_ROUTING_CODES.BUSY)
+    return 'The selected seller or channel is busy. If your buyer uses one channel, settle the existing channel before switching sellers.';
   if (code === SESSION_CODES.BINDING)
     return 'The selected seller or terms changed. Refresh the listing before sending.';
   if (code === SESSION_CODES.UNVERIFIED)
@@ -88,6 +92,7 @@ export function desktopBuyerFailure(
       ? (value as Record<string, unknown>)
       : {};
   const code = [
+    BUYER_ROUTING_CODES.BUSY,
     SESSION_CODES.BINDING,
     SESSION_CODES.UNVERIFIED,
     SESSION_CODES.LIMIT,

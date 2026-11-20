@@ -160,6 +160,25 @@ function sessionSelection(
     return selectConfiguredThenOpen(prepared.config, policy, current, select);
   };
 }
+function freeSessionExecution(
+  context: Context,
+  manager: ReturnType<typeof makeManager>,
+  input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
+  permission: Parameters<typeof reserveApiKey>[0],
+  onDelta: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[2],
+): BuyerRoutePorts<ChatResult>['free'] {
+  return (winner, current, sending) =>
+    executeApiKeyFree(permission, winner.quote, current, () =>
+      executeSelectedBuyerFree(
+        input,
+        context.dependencies,
+        winner,
+        current,
+        onDelta,
+        freeExecutionGuard(manager, sending),
+      ),
+    );
+}
 function sessionExecutor(
   context: Context,
   options: Options,
@@ -182,17 +201,7 @@ function sessionExecutor(
         router,
         model?.sellerChoice,
       ),
-      free: (winner, current, sending) =>
-        executeApiKeyFree(permission, winner.quote, current, () =>
-          executeSelectedBuyerFree(
-            input,
-            context.dependencies,
-            winner,
-            current,
-            onDelta,
-            freeExecutionGuard(manager, sending),
-          ),
-        ),
+      free: freeSessionExecution(context, manager, input, permission, onDelta),
 
       paid: (winner, current, sending) =>
         observeBuyerExecution(
