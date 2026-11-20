@@ -47,6 +47,13 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 - Humans and AI-assisted contributors follow the same change loop: orient, define scope, inspect, implement, verify locally, review and hand off. The procedure is [`.agents/skills/gyblos-contributor-workflow/SKILL.md`](.agents/skills/gyblos-contributor-workflow/SKILL.md); its public onboarding explanation is [CONTRIBUTING.md](CONTRIBUTING.md#using-ai-tools).
 - Provider-specific files may help a tool load this repository, but they do not add rules or replace project context. A handoff must be reproducible from the branch, repository files and reported checks, without a private prompt or transcript.
 
+## Writing code
+
+- State your assumptions before coding. When a request has more than one reading, name them and ask instead of picking one silently; when a simpler approach exists, say so.
+- Write the least code that solves the request: no features, options, abstractions or error handling for cases nobody asked for or that cannot happen. If a reviewer would call it overcomplicated, simplify it.
+- Keep changes surgical: every changed line traces to the request. Match the surrounding style and do not reformat, rename or refactor neighboring code. Remove what your own change left unused; report other unused code and delete it in its own PR (see the next section).
+- Turn each task into a check that proves it is done, and give every step of a multi-step plan its own check.
+
 ## Hard rules
 
 - Boundaries and lint errors are enforcing; never suppress, baseline or cast around them. Lint warnings must not grow.
