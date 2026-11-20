@@ -180,6 +180,12 @@ export function makeManager(
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
     policy,
+    openingSupportsBlocks:
+      (policy.totalDepositAtomic !== undefined
+        ? options.pool
+        : options.batch) === undefined
+        ? true
+        : undefined,
     endpoint,
     now: Date.now,
     inspect: () =>
