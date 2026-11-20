@@ -1,5 +1,5 @@
-// Builds reads and expiry cleanup with the typed ORM schema. Listing sorts only index keys
-// before reading the selected signed envelopes; no query contains request metadata.
+// Builds reads and expiry cleanup with the typed ORM schema. Listing pages only index keys, in NodeId
+// order, before reading the selected signed envelopes; no query contains request metadata.
 import {
   and,
   asc,
@@ -10,10 +10,8 @@ import {
   exists,
   gt,
   inArray,
-  lt,
   lte,
   notExists,
-  or,
 } from 'drizzle-orm';
 
 import { CONTROL_LIMITS } from '@gyblos/protocol/constants';

@@ -279,11 +279,12 @@ eachStorage(
     for (let i = 0; i < 3; i++) {
       const seller = indexNode();
       const catalog = seller.catalog(1);
-      await publish(catalog);
+      assert.equal((await publish(catalog)).status, 201);
       // Presence times run against NodeId order: the order is NodeId's alone.
-      await publish(
-        await seller.presence(2, catalog, { issuedAt: T0 + 100 * i }),
-      );
+      const presence = await seller.presence(2, catalog, {
+        issuedAt: T0 + 100 * i,
+      });
+      assert.equal((await publish(presence)).status, 201);
       nodes.push({ seller, catalog });
     }
     nodes.sort((a, b) => (a.seller.nodeId < b.seller.nodeId ? -1 : 1));
@@ -297,13 +298,15 @@ eachStorage(
     // The last seller republishes its presence between pages; it is still on the next page.
     const last = nodes[2];
     assert.ok(last);
-    await publish(
-      await last.seller.presence(3, last.catalog, { issuedAt: T0 + 1000 }),
-    );
+    const republished = await last.seller.presence(3, last.catalog, {
+      issuedAt: T0 + 1000,
+    });
+    assert.equal((await publish(republished)).status, 201);
     const page2 = (
       await sellers('model=qwen3-0.6b&limit=2&cursor=' + page1.next)
     ).body;
     assert.deepEqual(nodeIds(page2), expected.slice(2));
+    assert.equal(page2.sellers[0].presence.record.sequence, 3);
     assert.equal(page2.next, null);
     assert.equal(
       (await sellers('model=qwen3-0.6b&limit=99999')).body.sellers.length,
