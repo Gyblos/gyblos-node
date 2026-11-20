@@ -69,7 +69,7 @@ export function Payments(props: Props) {
         onActivity={setReceiptId}
         onChat={id => { props.chat.openChat(id); props.onChat(); }}
       />
-      {budgetOpen && props.x402 && <Modal title="Account budget" close={() => setBudgetOpen(false)}>
+      {budgetOpen && props.x402 && <Modal title="Chat budget" close={() => setBudgetOpen(false)}>
         <X402Payments buyer={props.x402} onSaved={() => setBudgetOpen(false)} />
       </Modal>}
       {entry && <ActivitySessionDetails entry={entry}
@@ -146,13 +146,13 @@ function WalletOverview({
               : 'Backup needed'
             : wallet.status === WALLET_STATUS.LOCKED ? 'Locked' : 'Not available'}
         </Badge>
-        {buyer && <Button onClick={onBudget}><Gauge size={16} />Edit account budget</Button>}
+        {buyer && <Button onClick={onBudget}><Gauge size={16} />Edit chat budget</Button>}
         </FormActions>
       </div>
       <StatGrid>
         <StatCard label="Available balance" value="Unavailable" icon={Wallet} />
-        <StatCard label="Account budget" value={amount(account.limitAtomic)} change={changeSinceOpen('limitAtomic')} comparison="Since the preview opened" icon={Gauge} />
-        <StatCard label="Account spending" value={amount(account.spentAtomic)} change={changeSinceOpen('spentAtomic')} comparison="Since the preview opened" icon={Receipt} />
+        <StatCard label="Chat budget" value={buyer?.state.summary.active ? amount(account.limitAtomic) : 'No total limit'} change={changeSinceOpen('limitAtomic')} comparison="Since the preview opened" icon={Gauge} />
+        <StatCard label="Chat spending" value={amount(account.spentAtomic)} change={changeSinceOpen('spentAtomic')} comparison="Since the preview opened" icon={Receipt} />
       </StatGrid>
       <WalletAddress />
       <FormActions align="start">

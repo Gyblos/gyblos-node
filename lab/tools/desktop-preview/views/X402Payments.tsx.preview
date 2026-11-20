@@ -101,28 +101,28 @@ function AccountBudgetForm({ buyer, policy, onSaved }: {
   onSaved(): void;
 }) {
   const account = window.previewAccountBudget.current();
-  const [amount, setAmount] = useState(() => x402Amount(account.limitAtomic, policy));
+  const [amount, setAmount] = useState(() => buyer.state.summary.active ? x402Amount(account.limitAtomic, policy) : '');
   const [error, setError] = useState('');
   return (
     <form className="ui-form" onSubmit={async (event) => {
       event.preventDefault();
       try {
         setError('');
-        const limitAtomic = x402BudgetInput(amount, policy);
-        const result = await buyer.run({ action: X402_ACTION.AUTHORIZE, limitAtomic });
+        const limitAtomic = amount.trim() && x402BudgetInput(amount, policy);
+        const result = await buyer.run(limitAtomic ? { action: X402_ACTION.AUTHORIZE, limitAtomic } : { action: X402_ACTION.FINISH });
         if (result && !result.error) onSaved();
         else setError(result?.error ?? 'Could not save the budget.');
       } catch (failure) {
         setError(failure instanceof Error ? failure.message : 'Enter a valid amount.');
       }
     }}>
-      <FormField htmlFor="account-budget" label="Account limit · USDC">
+      <FormField htmlFor="account-budget" label="Optional chat limit · USDC">
         <FormInput id="account-budget" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} />
       </FormField>
-      <p className="ui-help-text">Chat and API usage share this limit. Each API key also has its own limit in Connections.</p>
+      <p className="ui-help-text">Leave blank for no total chat limit. The maximum per response still applies.</p>
       {error && <p role="status">{error}</p>}
       <FormActions align="start">
-        <Button type="submit" disabled={buyer.busy || buyer.state.summary.blocked || !amount} variant={BUTTON_VARIANT.PRIMARY}>Save budget</Button>
+        <Button type="submit" disabled={buyer.busy || buyer.state.summary.blocked} variant={BUTTON_VARIANT.PRIMARY}>Save budget</Button>
       </FormActions>
     </form>
   );

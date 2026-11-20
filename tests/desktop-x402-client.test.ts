@@ -100,6 +100,44 @@ void test('x402 changed server policy fails closed without retrying the message'
   assert.equal(posts, 1);
   assert.equal((await ledger.summary()).blocked, true);
 });
+void test('desktop counts a recorded channel approval against the budget before settlement', async () => {
+  const ledger = budget();
+  const client = new X402Client(ledger, async (_url, options) => {
+    if (options?.method !== 'POST') return Response.json(policy);
+    return Response.json({
+      ...reply(),
+      [BUYER_API.PAYMENT_FIELD]: {
+        verdict: SESSION_VERDICTS.APPROVED,
+        maxAtomic: '100',
+        expectedAtomic: '30',
+        chargedAtomic: null,
+        refundedAtomic: null,
+        sellerAtomic: null,
+        feeAtomic: null,
+        recorded: true,
+        session: {
+          approvedAtomic: '30',
+          cumulativeAtomic: '45',
+          depositAtomic: '1000000',
+        },
+      },
+    });
+  });
+  try {
+    await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+    await client.authorize('200');
+    const result = await client.send('approved-request', 'Hello');
+    assert.equal(result.summary.spentAtomic, '30');
+    assert.equal(result.summary.blocked, false);
+    assert.equal(result.summary.records[0]?.transaction, null);
+    assert.equal(
+      result.summary.records[0]?.sessionApproval?.cumulativeAtomic,
+      '45',
+    );
+  } finally {
+    await client.close();
+  }
+});
 void test('a reusable-session approval remains unresolved rather than becoming a settled desktop payment', async () => {
   let posts = 0;
   const ledger = budget();
@@ -297,4 +335,49 @@ void test('x402 accepts a valid short Solana signature through reply, persistenc
   );
   for (const invalid of ['0'.repeat(88), '2'.repeat(80), '2'.repeat(89)])
     assert.throws(() => x402Explorer(invalid));
+});
+
+void test('a paid seller cannot receive a request while either chat spending limit is insufficient', async () => {
+  const choice = {
+    owner: policy.payer,
+    nodeId: 'a'.repeat(64),
+    modelId: policy.model,
+    variant: null,
+    quantization: null,
+    contextTokens: 4096,
+    inputAtomicPerMtok: '100',
+    outputAtomicPerMtok: '200',
+    expiresAt: Date.now() + 10000,
+  };
+  for (const maxAtomic of ['0', '100']) {
+    let posts = 0;
+    const ledger = budget();
+    const client = new X402Client(ledger, async (_url, options) => {
+      if (options?.method !== 'POST')
+        return Response.json({
+          ...policy,
+          maxAtomic,
+          depositAtomic: '750000',
+          lifetimeMs: 900000,
+        });
+      posts++;
+      return Response.json(reply());
+    });
+    try {
+      await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+      await client.authorize('100');
+      if (maxAtomic !== '0') await client.send('first-message', 'test');
+      const previousPosts = posts;
+      await assert.rejects(
+        client.send('paid-seller', 'test', undefined, choice),
+        maxAtomic === '0'
+          ? /raise the per-request maximum/i
+          : /increase the budget in Payments/i,
+      );
+      assert.equal(posts, previousPosts);
+      assert.equal((await ledger.summary()).blocked, false);
+    } finally {
+      await client.close();
+    }
+  }
 });

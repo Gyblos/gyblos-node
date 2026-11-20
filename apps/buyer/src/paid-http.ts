@@ -26,6 +26,7 @@ import { buyerApiKeyErrorView } from './api-key-http';
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import type { ChatErrorView } from './free-http';
 import type { ChatPayment, ChatResult } from './free-sse';
+import { UnsentSellerChoiceError } from './seller-choice-error';
 
 // A paid request that ended in the seller's stop or refusal rather than a result.
 export class PaidOutcomeError extends Error {
@@ -97,6 +98,8 @@ const unavailable = (
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  if (error instanceof UnsentSellerChoiceError)
+    return unavailable(error.code, true);
   const keyError = buyerApiKeyErrorView(error);
   if (keyError) return keyError;
   if (

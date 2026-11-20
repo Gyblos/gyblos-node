@@ -50,9 +50,9 @@ Follow the root `AGENTS.md` and `apps/desktop/DESIGN.md`: show the mockup,
 obtain explicit approval, then port the accepted visual proposal to the desktop
 app. Publishing this preview or its PR is not desktop implementation approval.
 
-Payments shows one USDC account budget for Chat and API usage. Connections shows
-the individual limit of each API key. Revoking a key preserves its past spending
-in the account total.
+Payments shows an optional USDC budget for manual chat. Connections shows the
+individual limit of each API key. Revoking a key preserves its past spending in
+the account total.
 
 Open `?screen=payments&review=wallet-backup&backup=needed` to inspect the
 recovery warning, or use `backup=verified` to see the green check. Both use

@@ -124,7 +124,7 @@ function installDesktopServices(
   const wallet = registerDesktopWallet(window, walletRoot, smoke, signal);
   services.wallet = wallet;
   if (!smoke) {
-    registerNetworkCatalog(window, signal);
+    const resolveOffer = registerNetworkCatalog(window, signal);
     registerDesktopUpdate(window, signal);
     services.paypal = registerDesktopPaypal(window);
     services.chats = registerChatArchive(window, app.getPath('userData'));
@@ -132,6 +132,7 @@ function installDesktopServices(
       window,
       app.getPath('userData'),
       __dirname,
+      resolveOffer,
     );
     services.node = registerDesktopNode(window, __dirname, signal);
   }

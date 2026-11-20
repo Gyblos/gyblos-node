@@ -78,13 +78,14 @@ from that environment are passed to the managed buyer.
 
 ### Pay for answers
 
-1. In **Payments**, authorize a Chat budget in the displayed asset. Approving it
-   moves no funds; it is a local permission.
+1. Choose a paid seller in **Models** and confirm the rates, maximum per
+   response, channel deposit and duration. You can set an optional total Chat
+   budget in **Payments**.
 2. Write in **Chat**. Each message runs a real buyer execution. Each request
    reserves the configured maximum before it is sent, so the remaining budget
    must cover that maximum.
-3. Paid answers settle automatically through x402, one payment per answer. A
-   zero-price offer never creates a transaction.
+3. Channel approvals accumulate for batch settlement. A zero-price offer never
+   creates a transaction.
 4. Finish the session to close this desktop's permission. Confirmed payment
    references stay in **Payments** and **Activity**.
 
@@ -131,27 +132,33 @@ synchronized, and conversation content is not encrypted.
 - Local dates are when this device observed a record, not the chain's block
   time.
 
-The sample model catalog and unimplemented web tools are previews. Exact-ID
-lookup reads signed announcements from the discovery index: free listings, and
-paid listings priced in devnet USDC, grouped apart. A paid group shows one real
-listing's price, the cheapest by input plus output, never sides mixed from
-different sellers; listings in other assets are not shown. An announcement alone
-is not registry identity, availability or proof of inference. x402 Chat uses the
-buyer's model and policy, never a sample model selection.
+Chat automatically lists signed network offers and refreshes them while the app
+is open. Each paid listing identifies its seller and shows input and output
+prices in devnet USDC per million tokens. Choose a seller and confirm the
+displayed channel terms. The buyer verifies the seller and quote before sending
+the first paid message. An expired listing or a changed price requires a fresh
+selection.
+
+A zero per-request maximum blocks paid chat. Raise `request.maxAtomic` in the
+buyer profile and restart the buyer. If you set a chat budget in Payments, its
+remaining amount must cover that maximum. Choosing a seller does not change
+either limit. A recorded answer approval counts toward the budget while
+settlement is pending. The buyer supplies the deposit and duration shown in the
+confirmation.
 
 ## Network contact
 
 The renderer has no network access. The host process makes these contacts:
 
-| Destination                     | When                                                                                                     | How to turn it off                                                     |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `api.github.com` release list   | At start and at most every 5 minutes, to show the update notice. It never downloads or installs anything | `GYBLOS_UPDATE_CHECK=0`                                                |
-| Discovery index (`/v1/sellers`) | Model network checks and exact-ID lookups                                                                |                                                                        |
-| Gyblos relays and sellers       | While the local buyer runs                                                                               | Stop the buyer                                                         |
-| Metrics collector               | Packaged app only: the managed buyer uploads receipts and telemetry observations, as a release CLI does  | `GYBLOS_OBSERVATIONS=off` stops observations; receipts have no opt-out |
-| Solana devnet RPC               | The buyer's payment and identity checks                                                                  |                                                                        |
-| Solana devnet explorer          | Only when you open a payment reference                                                                   |                                                                        |
-| PayPal Sandbox                  | Only during a PayPal Sandbox session                                                                     |                                                                        |
+| Destination                                   | When                                                                                                     | How to turn it off                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `api.github.com` release list                 | At start and at most every 5 minutes, to show the update notice. It never downloads or installs anything | `GYBLOS_UPDATE_CHECK=0`                                                |
+| Discovery index (`/v1/models`, `/v1/sellers`) | Model network checks and exact-ID lookups                                                                |                                                                        |
+| Gyblos relays and sellers                     | While the local buyer runs                                                                               | Stop the buyer                                                         |
+| Metrics collector                             | Packaged app only: the managed buyer uploads receipts and telemetry observations, as a release CLI does  | `GYBLOS_OBSERVATIONS=off` stops observations; receipts have no opt-out |
+| Solana devnet RPC                             | The buyer's payment and identity checks                                                                  |                                                                        |
+| Solana devnet explorer                        | Only when you open a payment reference                                                                   |                                                                        |
+| PayPal Sandbox                                | Only during a PayPal Sandbox session                                                                     |                                                                        |
 
 `GYBLOS_COLLECTOR_URL` from the launch environment overrides the collector
 address. See [receipts](receipts.md) and [telemetry](telemetry.md) for what is

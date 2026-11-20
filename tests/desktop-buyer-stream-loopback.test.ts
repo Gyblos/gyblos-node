@@ -12,6 +12,8 @@ import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
 import { createX402Handlers } from '@gyblos/desktop/x402-handlers';
 import { X402_ACTION } from '@gyblos/desktop/x402-model';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import {
   ENGINE_DONE_REASONS,
   OFFER_PRICING_KINDS,
@@ -232,6 +234,105 @@ void test('desktop streaming preserves the existing confirmed paid producer with
     });
     assert.deepEqual(progress, ['Hi.']);
     assert.equal(buyer.calls.executed.length, 1);
+  } finally {
+    await client.close();
+    await host.close();
+  }
+});
+
+void test('the desktop sends the selected seller to the authenticated channel route and records its approval', async () => {
+  const ledger = new X402Budget({
+    read: async () => undefined,
+    write: async () => {},
+  });
+  const seller = {
+    owner: '11111111111111111111111111111111',
+    nodeId: 'a'.repeat(64),
+    modelId: 'qwen3-0.6b',
+    variant: null,
+    quantization: null,
+    contextTokens: 2048,
+    inputAtomicPerMtok: '30',
+    outputAtomicPerMtok: '90',
+    expiresAt: Date.now() + 60_000,
+  };
+  const token = 'synthetic-local-buyer-token';
+  const defaultModel = {
+    modelId: 'another-model',
+    variant: null,
+    quantization: null,
+  };
+  let calls = 0;
+  const host = await startFreeBuyerHttp(
+    async (_input, _signal, _delta, route) => {
+      assert.deepEqual(route?.sellerChoice, seller);
+      calls++;
+      return {
+        text: 'selected seller',
+        finishReason: ENGINE_DONE_REASONS.STOP,
+        usage: { inputTokens: 2, outputTokens: 1 },
+        execution: OFFER_PRICING_KINDS.PAID,
+        payment: {
+          verdict: SESSION_VERDICTS.APPROVED,
+          maxAtomic: '100',
+          expectedAtomic: '30',
+          chargedAtomic: null,
+          refundedAtomic: null,
+          sellerAtomic: null,
+          feeAtomic: null,
+          recorded: true,
+          session: {
+            approvedAtomic: '30',
+            cumulativeAtomic: '30',
+            depositAtomic: '750000',
+          },
+        },
+      };
+    },
+    { selection: defaultModel, maxTokens: 10, sellerChoice: true },
+    {
+      port: 0,
+      token,
+      desktopPolicy: {
+        network: DEVNET,
+        mint: DEVNET_USDC,
+        payer: seller.owner,
+        depositAtomic: '750000',
+        lifetimeMs: 900000,
+        maxAtomic: '100',
+      },
+    },
+  );
+  const client = new X402Client(ledger);
+  try {
+    await client.connect(host.url, token);
+    assert.equal((await ledger.summary()).active, false);
+    const unbound = await fetch(
+      new URL(BUYER_API.CHANNEL_CHAT_PATH + '?stream=1', host.url),
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + token,
+          'content-type': 'application/json',
+          'if-match': '"' + client.policy()!.policyId + '"',
+        },
+        body: JSON.stringify({
+          model: seller.modelId,
+          messages: [{ role: 'user', content: 'test' }],
+        }),
+      },
+    );
+    assert.equal(unbound.ok, false);
+    assert.equal(calls, 0);
+    const result = await client.send(
+      'chosen-seller',
+      'test',
+      undefined,
+      seller,
+    );
+    assert.equal(result.model, seller.modelId);
+    assert.equal(result.summary.spentAtomic, '30');
+    assert.equal(calls, 1);
   } finally {
     await client.close();
     await host.close();

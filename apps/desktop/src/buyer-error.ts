@@ -1,6 +1,7 @@
 // Static desktop explanations for validated buyer failures; remote text is never displayed.
 // Presentation does not change retry decisions, budget reservations or payment uncertainty.
 import {
+  BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
   type SellerSelectionCode,
 } from '@gyblos/core/constants';
@@ -10,6 +11,7 @@ import {
   FREE_EXECUTION_STOP_REASONS,
   type FreeExecutionCode,
 } from '@gyblos/protocol/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 export class BuyerSessionRequired extends Error {
   constructor() {
@@ -19,7 +21,13 @@ export class BuyerSessionRequired extends Error {
   }
 }
 
-type BuyerCode = FreeExecutionCode | SellerSelectionCode;
+type BuyerCode =
+  | typeof BUYER_ROUTING_CODES.BUSY
+  | FreeExecutionCode
+  | SellerSelectionCode
+  | typeof SESSION_CODES.BINDING
+  | typeof SESSION_CODES.UNVERIFIED
+  | typeof SESSION_CODES.LIMIT;
 export class DesktopBuyerFailure extends Error {
   constructor(
     readonly code: BuyerCode,
@@ -30,6 +38,14 @@ export class DesktopBuyerFailure extends Error {
   }
 }
 function explanation(code: BuyerCode, reason: unknown, free: boolean) {
+  if (code === BUYER_ROUTING_CODES.BUSY)
+    return 'The selected seller or channel is busy. If your buyer uses one channel, settle the existing channel before switching sellers.';
+  if (code === SESSION_CODES.BINDING)
+    return 'The selected seller or terms changed. Refresh the listing before sending.';
+  if (code === SESSION_CODES.UNVERIFIED)
+    return 'The local buyer could not verify this seller. Review the listing and buyer settings.';
+  if (code === SESSION_CODES.LIMIT)
+    return 'Review the per-request maximum and channel deposit limits in the buyer profile before sending.';
   if (code === SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET)
     return free
       ? 'No free seller is available right now. Wait or choose another model.'
@@ -76,6 +92,10 @@ export function desktopBuyerFailure(
       ? (value as Record<string, unknown>)
       : {};
   const code = [
+    BUYER_ROUTING_CODES.BUSY,
+    SESSION_CODES.BINDING,
+    SESSION_CODES.UNVERIFIED,
+    SESSION_CODES.LIMIT,
     ...Object.values(FREE_EXECUTION_CODES),
     ...Object.values(SELLER_SELECTION_CODES),
   ].find((code) => code === row.code);

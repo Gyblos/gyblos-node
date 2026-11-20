@@ -50,9 +50,11 @@ function trustedQuote(
   const { prepared } = context;
   return async (quote, signal) => {
     const selected = state.selections.get(quote.offer.requestId);
-    const seller = prepared.config.sellers.find(
-      (candidate) => candidate.nodeId === quote.offer.nodeId,
-    );
+    const seller =
+      selected?.seller ??
+      prepared.config.sellers.find(
+        (candidate) => candidate.nodeId === quote.offer.nodeId,
+      );
     if (
       !selected ||
       canonicalJson(selected.quote) !== canonicalJson(quote) ||
@@ -132,6 +134,42 @@ function sessionPreflight(
     await verifyBatchQuote(quote, terms, context.endpoint.id().toString(), now);
   };
 }
+function sessionDestination(
+  context: Context,
+  state: SessionState,
+  policy: NonNullable<Context['prepared']['config']['session']>,
+): BuyerSessionOptions<ReturnType<typeof sellerAddress>>['destination'] {
+  const { prepared, relayOnly } = context;
+  return (terms) => {
+    const seller = prepared.config.sellers.find(
+      (candidate) =>
+        candidate.nodeId === terms.sellerNodeId &&
+        candidate.owner === terms.owner,
+    );
+    const selected = [...state.selections.values()].find(
+      (winner) =>
+        winner.seller?.nodeId === terms.sellerNodeId &&
+        winner.seller.owner === terms.owner,
+    )?.seller;
+    if (
+      !seller &&
+      !selected &&
+      !prepared.identity &&
+      policy.totalDepositAtomic === undefined
+    )
+      return sessionFail(SESSION_CODES.BINDING);
+    return sellerAddress(
+      seller ??
+        selected ?? {
+          owner: terms.owner,
+          nodeId: terms.sellerNodeId,
+          relayUrl: null,
+          directAddresses: [],
+        },
+      relayOnly,
+    );
+  };
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -150,24 +188,7 @@ export function makeManager(
     backend: async () => {
       return (options.batch ?? buyerSessionChain)(role);
     },
-    destination: (terms) => {
-      const seller = prepared.config.sellers.find(
-        (candidate) =>
-          candidate.nodeId === terms.sellerNodeId &&
-          candidate.owner === terms.owner,
-      );
-      if (!seller && policy.totalDepositAtomic === undefined)
-        return sessionFail(SESSION_CODES.BINDING);
-      return sellerAddress(
-        seller ?? {
-          owner: terms.owner,
-          nodeId: terms.sellerNodeId,
-          relayUrl: null,
-          directAddresses: [],
-        },
-        relayOnly,
-      );
-    },
+    destination: sessionDestination(context, state, policy),
     meter: activeMeter(state),
     transport: {
       relayOnly,

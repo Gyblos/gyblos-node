@@ -1,6 +1,8 @@
 // Public local-buyer API names; these do not change the signed inference protocol.
 export const BUYER_API = {
   STATUS_PATH: '/v1/gyblos/status',
+  CHANNEL_CHAT_PATH: '/v1/gyblos/channel-chat',
+  SELLER_CHOICE_FIELD: 'gyblos_seller_choice',
   CHAT_PATH: '/v1/gyblos/chat',
   PAYMENT_FIELD: 'gyblos_payment',
   EXECUTION_FIELD: 'gyblos_execution',

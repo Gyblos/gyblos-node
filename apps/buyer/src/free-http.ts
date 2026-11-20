@@ -17,9 +17,8 @@ import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
-import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { FREE_EXECUTION } from '@gyblos/protocol/constants';
-import type { ModelSelection } from '@gyblos/protocol/control-types';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
@@ -37,12 +36,12 @@ import {
 } from './chat-api';
 import { readBody } from './chat-body';
 import { replyError, replyJson, type ChatErrorClassifier } from './chat-errors';
-import { stoppedResult, stoppingStream, withoutStop } from './chat-stop';
+import { routedInput, type ChatSettings } from './chat-route-input';
+import { stoppedResult, stoppingStream } from './chat-stop';
 import {
   CHAT_ROUTES,
   FREE_BUYER,
   FREE_BUYER_CODES,
-  OPENROUTER,
   PAID_BUYER,
 } from './constants';
 import {
@@ -51,7 +50,6 @@ import {
   type BuyerDesktopOptions,
 } from './desktop-api';
 import { FreeBuyerError } from './free-chat';
-import type { RouteContext } from './free-context';
 import {
   executeFreeSse,
   type ChatResult,
@@ -60,12 +58,7 @@ import {
 } from './free-sse';
 import { httpDiagnostics, httpRequestLifecycle } from './http-diagnostics';
 import { listModels } from './model-list';
-import {
-  endpointRoutes,
-  requestedModel,
-  type ModelRoute,
-  type RoutedModel,
-} from './model-routes';
+import { type RoutedModel } from './model-routes';
 import { bearerAuthorizer } from './paid-token';
 
 export type { ChatErrorClassifier, ChatErrorView } from './chat-errors';
@@ -79,15 +72,6 @@ type FreeChatExecutor = (
   model?: RoutedModel,
   permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
-interface ChatSettings {
-  selection: ModelSelection;
-  maxTokens: number;
-  tools?: boolean; // true only where every request runs on the free channel
-  // The models served by name; absent, `selection` is the one model.
-  models?: readonly ModelRoute[];
-  // The context every eligible seller of a route accepts, from verified catalogs; undefined if unknown.
-  contextTokens?: RouteContext<ModelRoute>;
-}
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();
   return type?.toLowerCase() === FREE_BUYER.contentType;
@@ -144,39 +128,6 @@ async function countTokens(
     replyError(response, error, undefined, chatApi(CHAT_ROUTES.messages));
   }
 }
-// The model a request names (or the first of its OpenRouter fallbacks that this endpoint serves), and its
-// input parsed against that model's route. The answer echoes the name that matched. The fallback list and
-// the buyer's own stop sequences are not part of what a seller receives.
-function routedInput(
-  api: ChatApi,
-  body: unknown,
-  settings: ChatSettings,
-  streaming: boolean,
-) {
-  const { route, name } = requestedModel(
-    endpointRoutes(settings),
-    body,
-    !!settings.models?.length,
-  );
-  const model = name ?? route.id;
-  let request = body;
-  if (body && typeof body === 'object' && !Array.isArray(body)) {
-    const { [OPENROUTER.fallbackField]: _fallbacks, ...rest } = body as Record<
-      string,
-      unknown
-    >;
-    request = name === undefined ? rest : { ...rest, model: name };
-  }
-  const input = api.parse(
-    request,
-    { ...route.selection, modelId: model },
-    route.maxTokens,
-    streaming,
-    settings.tools ?? false,
-  );
-  const { stream: _stream, ...rest } = input; // all but the stream flag
-  return { input, payload: withoutStop(rest), route, model };
-}
 // The executors with the request's stop sequences honored on what the client sees (see chat-stop.ts).
 function stopping(
   scoped: { execute: FreeChatExecutor; stream?: FreeChatStreamExecutor },
@@ -220,6 +171,7 @@ async function serveChat(
   api: ChatApi,
   requestMs: number,
   diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
+  selectedSellerAllowed: boolean,
   classify?: ChatErrorClassifier,
 ) {
   let format: ChatStreamFormat | undefined;
@@ -245,6 +197,7 @@ async function serveChat(
       await readBody(request, controller.signal),
       settings,
       scoped.stream !== undefined,
+      selectedSellerAllowed,
     );
     const run = stopping(scoped, input.stop);
     diagnostic.executing();
@@ -310,9 +263,18 @@ export function freeBuyerHandler(
     if (asksModels(request)) return listModels(response, settings);
     if (asksTokenCount(request))
       return countTokens(request, response, requestMs, diagnostic);
+    const channelRoute =
+      request.url?.split('?')[0] === BUYER_API.CHANNEL_CHAT_PATH;
     const localApi = desktop.accepts(request, isJson(request))
       ? defaultChatApi
       : undefined;
+    if (
+      channelRoute &&
+      !(caller.owner && authorize && settings.sellerChoice && localApi)
+    ) {
+      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
+      return;
+    }
     const api = admit(request, response, settings, active, localApi);
     if (!api) {
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
@@ -329,6 +291,13 @@ export function freeBuyerHandler(
         api,
         requestMs,
         diagnostic,
+        Boolean(
+          settings.sellerChoice &&
+          authorize &&
+          caller.owner &&
+          channelRoute &&
+          localApi,
+        ),
         classify,
       );
     } finally {
