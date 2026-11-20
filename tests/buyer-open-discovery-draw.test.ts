@@ -72,19 +72,40 @@ function openConfig(run: Run) {
   };
 }
 
-// Two pages of `sellers`, split in half; records each requested page's query.
-function twoPages(entries: unknown[], queries: URLSearchParams[]) {
-  const half = Math.ceil(entries.length / 2);
+// `pages` as the index's pages; every request and lookup is written to `log` in order.
+function pagedIndex(pages: unknown[][], log: string[]) {
   return async (input: string | URL | Request) => {
     const query = new URL(String(input)).searchParams;
-    queries.push(query);
-    return query.get('cursor')
-      ? discoveryResponse(entries.slice(half))
-      : discoveryResponse(entries.slice(0, half), 'page-2');
+    log.push(`page limit=${query.get('limit')}`);
+    const index = Number(query.get('cursor') ?? 0);
+    const next = index + 1 < pages.length ? String(index + 1) : null;
+    return discoveryResponse(pages[index]!, next);
   };
 }
 
-void test('identity lookups follow a random draw over every page, never the index order', async () => {
+async function discoverOpen(
+  run: Run,
+  state: Awaited<ReturnType<typeof discoveryHome>>['state'],
+  pages: unknown[][],
+  options: { random?: () => number; accept?: boolean } = {},
+) {
+  const log: string[] = [];
+  const checked: string[] = [];
+  const found = await discoverBuyerSellers(openConfig(run), state, {
+    fetch: pagedIndex(pages, log),
+    now: run.context.now,
+    openRelay: primaryRelayUrl(),
+    ...(options.random ? { random: options.random } : {}),
+    verifyIdentity: async (seller) => {
+      log.push('lookup');
+      checked.push(seller.nodeId);
+      return options.accept ?? true;
+    },
+  });
+  return { log, checked, found };
+}
+
+void test('every page is read at the index page size before any lookup, and lookups follow the draw', async () => {
   const home = await discoveryHome();
   const run = await discoveryRun();
   try {
@@ -92,39 +113,71 @@ void test('identity lookups follow a random draw over every page, never the inde
       Array.from({ length: 20 }, () => otherSeller(run)),
     );
     const listed = sellers.map((seller) => seller.nodeId);
-    const discover = async (random: () => number) => {
-      const checked: string[] = [];
-      const queries: URLSearchParams[] = [];
-      await discoverBuyerSellers(openConfig(run), home.state, {
-        fetch: twoPages(
-          sellers.map((seller) => seller.entry),
-          queries,
-        ),
-        now: run.context.now,
-        openRelay: primaryRelayUrl(),
-        random,
-        verifyIdentity: async (seller) => {
-          checked.push(seller.nodeId);
-          return true;
-        },
-      });
-      return { checked, queries };
-    };
-    // A draw that keeps every seller in place looks up the index's first ones.
-    const kept = await discover(() => 0.999_999);
-    assert.equal(kept.checked.length, BUYER_SELECTION.maxSellers);
-    assert.deepEqual(kept.checked, listed.slice(0, BUYER_SELECTION.maxSellers));
-    // Both pages were read, at the index's largest page, before any lookup.
-    assert.equal(kept.queries.length, 2);
-    assert.equal(
-      kept.queries[0]!.get('limit'),
-      String(BUYER_DISCOVERY.pageSize),
+    const pages = [sellers.slice(0, 10), sellers.slice(10)].map((page) =>
+      page.map((seller) => seller.entry),
     );
-    // Another draw reaches sellers the index order would never look up.
-    const moved = await discover(() => 0);
-    const late = new Set(listed.slice(BUYER_SELECTION.maxSellers));
-    assert.ok(moved.checked.some((nodeId) => late.has(nodeId)));
-    assert.equal(new Set(moved.checked).size, moved.checked.length);
+    // A draw that keeps every seller in place looks up the index's first ones.
+    const kept = await discoverOpen(run, home.state, pages, {
+      random: () => 0.999_999,
+    });
+    assert.deepEqual(kept.log.slice(0, 2), [
+      'page limit=200',
+      'page limit=200',
+    ]);
+    assert.ok(kept.log.slice(2).every((event) => event === 'lookup'));
+    assert.deepEqual(kept.checked, listed.slice(0, BUYER_SELECTION.maxSellers));
+    // A draw that moves every seller looks up ones the index order would never reach.
+    const moved = await discoverOpen(run, home.state, pages, {
+      random: () => 0,
+    });
+    assert.deepEqual(
+      moved.checked,
+      listed.slice(1, BUYER_SELECTION.maxSellers + 1),
+    );
+  } finally {
+    await run.wire.close();
+    await home.close();
+  }
+});
+
+void test('refused identities stop at the lookup bound, and a seller listed twice is drawn once', async () => {
+  const home = await discoveryHome();
+  const run = await discoveryRun();
+  try {
+    const sellers = await Promise.all(
+      Array.from({ length: 20 }, () => otherSeller(run)),
+    );
+    const refused = await discoverOpen(
+      run,
+      home.state,
+      [sellers.map((seller) => seller.entry)],
+      { accept: false },
+    );
+    assert.equal(refused.checked.length, BUYER_DISCOVERY.openLookups);
+    assert.deepEqual(refused.found.sellers, []);
+    // One draw per seller: a NodeId on two pages takes one place, so three sellers take two draws.
+    const [a, b, c] = await Promise.all([
+      otherSeller(run),
+      otherSeller(run),
+      otherSeller(run),
+    ]);
+    let draws = 0;
+    const twice = await discoverOpen(
+      run,
+      home.state,
+      [
+        [a!.entry, b!.entry],
+        [a!.entry, c!.entry],
+      ],
+      {
+        random: () => {
+          draws++;
+          return 0.5;
+        },
+      },
+    );
+    assert.equal(draws, 2);
+    assert.equal(new Set(twice.checked).size, 3);
   } finally {
     await run.wire.close();
     await home.close();
@@ -140,16 +193,9 @@ void test('a seller that could not serve the request is never looked up', async 
     );
     const cheap = await otherSeller(run);
     const dear = await otherSeller(run, String(ceiling + 1n));
-    const checked: string[] = [];
-    const found = await discoverBuyerSellers(openConfig(run), home.state, {
-      fetch: async () => discoveryResponse([dear.entry, cheap.entry]),
-      now: run.context.now,
-      openRelay: primaryRelayUrl(),
-      verifyIdentity: async (seller) => {
-        checked.push(seller.nodeId);
-        return true;
-      },
-    });
+    const { checked, found } = await discoverOpen(run, home.state, [
+      [dear.entry, cheap.entry],
+    ]);
     assert.deepEqual(checked, [cheap.nodeId]);
     assert.deepEqual(
       found.sellers.map((seller) => seller.nodeId),

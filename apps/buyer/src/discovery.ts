@@ -3,7 +3,10 @@
 import { randomInt } from 'node:crypto';
 
 import { SELLER_BADGES } from '@gyblos/core/constants';
-import { servesRequest } from '@gyblos/core/seller-selection';
+import {
+  servesRequest,
+  type SellerRequest,
+} from '@gyblos/core/seller-selection';
 import {
   fetchSellers,
   type DiscoveredSeller,
@@ -159,6 +162,7 @@ async function readAllPages(
       limit: BUYER_DISCOVERY.pageSize,
       cursor,
     });
+    signal.throwIfAborted();
     entries.push(...result.sellers);
     if (result.next === null) return entries;
     if (cursors.has(result.next) || page + 1 >= config.discovery.maxPages)
@@ -169,15 +173,27 @@ async function readAllPages(
   return entries;
 }
 
-// The sellers found only in the index that could serve this request (every hard filter, price included),
-// in a random order: which of them get the bounded identity lookups never depends on the index's order.
+// Whether `entry` is newer than `held`: catalog sequence, then presence sequence.
+const newer = (entry: DiscoveredSeller, held: DiscoveredSeller) =>
+  entry.catalog.sequence !== held.catalog.sequence
+    ? entry.catalog.sequence > held.catalog.sequence
+    : entry.presence.sequence > held.presence.sequence;
+
+// The sellers found only in the index that could serve this request (every hard filter), one
+// entry per NodeId, in a random order: which of them get the bounded identity lookups never depends on
+// the index's order or on how often it lists one.
 function drawOpen(
   entries: DiscoveredSeller[],
-  request: BuyerSelectionConfig['request'],
+  request: SellerRequest,
   now: number,
   random: () => number,
 ) {
-  const drawn = entries.filter((entry) =>
+  const unique = new Map<string, DiscoveredSeller>();
+  for (const entry of entries) {
+    const held = unique.get(entry.catalog.nodeId);
+    if (!held || newer(entry, held)) unique.set(entry.catalog.nodeId, entry);
+  }
+  const drawn = [...unique.values()].filter((entry) =>
     servesRequest(
       request,
       {
