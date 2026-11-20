@@ -41,8 +41,12 @@ void test(
     t.after(() => rm(root, { recursive: true, force: true }));
     const directory = join(root, 'payments');
     const paths = { directory, lock: join(directory, 'lock') };
-    const source =
-      "import { ensurePrivatePaymentPaths } from '@gyblos/runtime/private-file'; await ensurePrivatePaymentPaths(JSON.parse(process.argv[1]));";
+    // Start Node with the real Windows installation before making ACL tools unavailable.
+    const source = `
+      import { ensurePrivatePaymentPaths } from '@gyblos/runtime/private-file';
+      process.env.SystemRoot = process.argv[2];
+      await ensurePrivatePaymentPaths(JSON.parse(process.argv[1]));
+    `;
     const failed = spawnSync(
       process.execPath,
       [
@@ -52,10 +56,10 @@ void test(
         '-e',
         source,
         JSON.stringify(paths),
+        root,
       ],
       {
         cwd: REPOSITORY_ROOT,
-        env: { ...process.env, SystemRoot: root },
         encoding: 'utf8',
       },
     );
