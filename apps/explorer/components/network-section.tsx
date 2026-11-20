@@ -4,11 +4,8 @@
 import { Activity, Boxes, Server, Tag } from 'lucide-react';
 
 import { DISPLAY } from '../lib/constants';
-import {
-  getDiscovery,
-  type DiscoverySnapshot,
-  type Seller,
-} from '../lib/discovery';
+import type { DiscoverySnapshot, Seller } from '../lib/discovery';
+import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
 import {
   notOnline,
@@ -44,6 +41,16 @@ export async function NetworkSection() {
   return (
     <>
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
+      {snapshot.datedAt || snapshot.networkDatedAt ? (
+        <p className="-mt-2 mb-3 text-xs text-dim">
+          {snapshot.datedAt
+            ? `Sellers and models as of ${utc(snapshot.datedAt)}. `
+            : null}
+          {snapshot.networkDatedAt
+            ? `Online, offline and not published status as of ${utc(snapshot.networkDatedAt)}.`
+            : null}
+        </p>
+      ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SellersOnline snapshot={snapshot} />
         <StatCard
@@ -70,14 +77,21 @@ export async function NetworkSection() {
           caption={
             summary.averageDayUptime === null
               ? undefined
-              : 'Average of the online sellers'
+              : `Average over ${count(summary.sellersWithDayUptime)} of ${count(snapshot.sellers.length)} listed sellers`
           }
         />
       </div>
 
       <SectionTitle title="Sellers" />
       <SellersTable sellers={snapshot.sellers} />
-      {snapshot.network ? <NotOnlineTable network={snapshot.network} /> : null}
+      {snapshot.network ? (
+        <NotOnlineTable network={snapshot.network} />
+      ) : (
+        <p className="mt-2 text-xs text-dim">
+          The index&apos;s network status could not be read: offline and not
+          published sellers are unknown.
+        </p>
+      )}
     </>
   );
 }

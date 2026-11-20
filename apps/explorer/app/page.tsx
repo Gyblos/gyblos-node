@@ -14,8 +14,8 @@ import { UsageSection } from '../components/usage-section';
 import { RANGE } from '../lib/constants';
 import { parseRange } from '../lib/range';
 
-// Every request renders with fresh source answers; the sources cache at their own edge (the collector
-// for 5 minutes). Workers cannot share a pending fetch across requests, so no in-process cache is used.
+// Every request renders. The collector caches its answers at its own edge (5 minutes); the discovery
+// index is read into KV by the Worker's scheduled run, and renders read KV (lib/discovery-render.ts).
 export const dynamic = 'force-dynamic';
 
 export default async function Home({

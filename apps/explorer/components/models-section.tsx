@@ -3,13 +3,14 @@
 // first token as the seller and the buyer measured it, and the engine's speed), free and paid apart.
 import { getCollector } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
-import { getDiscovery } from '../lib/discovery';
+import { getDiscovery } from '../lib/discovery-render';
 import {
   count,
   latencyMs,
   percent,
   tokensPerSecond,
   usdc,
+  utc,
 } from '../lib/format';
 import {
   completion,
@@ -98,9 +99,14 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
           />
         ))}
       </Table>
+      {discovery.datedAt ? (
+        <p className="mt-1 text-xs text-dim">
+          Offers as of {utc(discovery.datedAt)}.
+        </p>
+      ) : null}
       {offersKnown ? null : (
         <p className="mt-1 text-xs text-dim">
-          The discovery index did not answer: what is offered now is unknown.
+          The discovery index could not be read: what is offered now is unknown.
         </p>
       )}
       {collector.error ? (

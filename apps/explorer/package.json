@@ -8,6 +8,10 @@
     "./board-hovered": "./components/board/hovered.ts",
     "./chain-shape": "./lib/chain-shape.ts",
     "./collector-shape": "./lib/collector-shape.ts",
+    "./constants": "./lib/constants.ts",
+    "./discovery": "./lib/discovery.ts",
+    "./discovery-snapshot": "./lib/discovery-snapshot.ts",
+    "./fetch-json": "./lib/fetch-json.ts",
     "./format": "./lib/format.ts",
     "./latency": "./lib/latency.ts",
     "./model-family": "./lib/model-family.ts",
@@ -21,7 +25,7 @@
     "dev": "node scripts/build-registry.mjs && next dev --port 4190",
     "build": "node scripts/build-registry.mjs && next build",
     "registry:build": "node scripts/build-registry.mjs",
-    "build:cloudflare": "opennextjs-cloudflare build",
+    "build:cloudflare": "opennextjs-cloudflare build && node scripts/write-worker-entry.mjs",
     "start": "next start --port 4190"
   },
   "dependencies": {

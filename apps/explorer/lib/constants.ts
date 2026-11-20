@@ -1,8 +1,47 @@
-// Owns the explorer's canonical values: units and display bounds. Public source URLs live in config.ts.
+// Owns the explorer's canonical values: source read bounds, the discovery schedule's budgets, units and
+// display bounds. Public source URLs live in config.ts.
 
+// Every read of a public source gives up after this long, so a slow source cannot hold a render.
+export const FETCH = {
+  timeoutMs: 8_000,
+} as const;
+
+// The discovery index is read in one place, by the Worker's scheduled run (scheduled.ts, on the cron
+// in wrangler.jsonc), into KV that every render reads (discovery-snapshot.ts): the index's load does
+// not grow with viewers. A run sends at most maxRequestsPerRun requests: under the Workers Free plan's
+// 50 subrequests per invocation (its KV read and write count too) and the index's 120 a minute per
+// address. A whole read of a large index spans several runs. On the Free plan a run also has 10 ms of
+// CPU, which parsing a few hundred sellers can exceed: an index that large needs the Workers Paid plan.
 export const DISCOVERY = {
-  // Pages of sellers read per model.
-  maxSellerPages: 10,
+  // Bump the version whenever StoredDiscovery changes: renders show nothing until the next whole read.
+  storedKey: 'discovery/v1',
+  // Sellers per /sellers page: the index's largest page (DISCOVERY_INDEX_LIMITS.maxSellers).
+  sellersPerPage: 200,
+  maxRequestsPerRun: 45,
+  // No request of a run begins after this long, so a run with requests at the fetch timeout still ends
+  // well before the next run (2 minutes later) and never overlaps it.
+  runDeadlineMs: 20 * 1000,
+  // Due uptimes a run tries before its catalog reading, none begun after reservedUptimesMs, so neither a
+  // slow catalog read nor a slow /uptime takes every run's requests and time.
+  reservedUptimes: 15,
+  reservedUptimesMs: 6 * 1000,
+  // Uptime reads in flight at once: a Worker opens 6 connections at a time, and a queued read's
+  // timeout would run while it waits.
+  uptimeConcurrency: 6,
+  // A seller's uptime is tried again this long after its last try (its windows span days).
+  uptimeRefreshMs: 10 * 60 * 1000,
+  // An uptime whose tries have failed for this long is no longer shown.
+  uptimeMaxAgeMs: 24 * 60 * 60 * 1000,
+  // A catalog read under way this long (a model that keeps failing or never fits in a run) begins again,
+  // and a shown catalog whose read began this long ago is dated on the page. A catalog needing more runs
+  // than fit in this time (about 800 seller pages) never completes, and the last one stays shown, dated.
+  restartAfterMs: 60 * 60 * 1000,
+  // When the catalog has not been read further for this long (two runs and a margin), the page says when
+  // the catalog it shows was read.
+  staleAfterMs: 5 * 60 * 1000,
+  // A render reuses the stored read its Worker instance read this recently instead of reading KV again;
+  // under `next dev`, how often a render runs the read itself.
+  reuseMs: 30 * 1000,
 } as const;
 
 export const UNITS = {

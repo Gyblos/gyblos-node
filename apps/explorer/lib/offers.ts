@@ -77,6 +77,8 @@ export function summarizeOffers(snapshot: DiscoverySnapshot) {
         model.minOutput === null ? low : lowest(low, model.minOutput),
       null,
     ),
+    // Listed sellers with a 24 h uptime read, over which averageDayUptime is taken.
+    sellersWithDayUptime: day.length,
     averageDayUptime: day.length
       ? day.reduce((sum, ratio) => sum + ratio, 0) / day.length
       : null,
