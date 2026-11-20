@@ -5,6 +5,7 @@ import { matchesCatalog, type ModelFilter } from './catalog-state';
 import { MODEL_FILTER, MODELS } from './constants';
 import { ChoiceMenu } from './Management';
 import { Modal } from './Modal';
+import { priceRange } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { NetworkCatalogPanel, useNetworkCatalog } from './NetworkCatalog';
@@ -32,6 +33,10 @@ export function Models({
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ModelFilter>(MODEL_FILTER.ALL);
   const [network, setNetwork] = useState(false);
+  function chooseOffer(offer: CatalogModel) {
+    setNetwork(false);
+    onSelect(offer);
+  }
   return (
     <PagePanel>
       <div className="ui-toolbar">
@@ -52,7 +57,7 @@ export function Models({
             if (next) setFilter(next);
           }}
         />
-        <Button onClick={() => setNetwork(true)}>Check network</Button>
+        <Button onClick={() => setNetwork(true)}>Find network models</Button>
         <Badge>Preview</Badge>
       </div>
       <List label="Model catalog">
@@ -78,11 +83,12 @@ export function Models({
         </p>
       )}
       {network && (
-        <Modal title="Check network" close={() => setNetwork(false)}>
+        <Modal title="Find network models" close={() => setNetwork(false)}>
           <div className="ui-section">
             <NetworkCatalogPanel
-              snapshot={catalog.snapshot}
+              snapshot={catalog.searchResult}
               onLookup={catalog.lookup}
+              onSelect={canSelect ? chooseOffer : undefined}
               selected={selected}
             />
           </div>
@@ -111,11 +117,7 @@ function ModelRow({
       onActivate={canSelect ? () => onSelect(model) : undefined}
       trailing={
         <div className="ui-price">
-          <strong>
-            {model.free
-              ? 'Free'
-              : '$' + model.input.toFixed(2) + ' / $' + model.output.toFixed(2)}
-          </strong>
+          <strong>{model.free ? 'Free' : priceRange(model)}</strong>
           <small>
             {model.free ? 'Community supported' : 'In / out per 1M tokens'}
           </small>

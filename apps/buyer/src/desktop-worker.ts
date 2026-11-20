@@ -6,7 +6,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { startBuyer } from './buyer-startup';
 import { runBuyerSidecar } from './desktop-service';
 import { startDesktopBuyer } from './desktop-startup';
-import { endpointToken } from './paid-startup';
+import { endpointToken } from './session-requirements';
 
 export async function startBuyerWorker() {
   const port = process.parentPort;

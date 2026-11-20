@@ -76,8 +76,8 @@ async function chainBinding(registry: RegistryReader, nodeId: string) {
   return lookup.binding;
 }
 
-// Throws IndexError with a static code; storage failures propagate (503). The invite is checked first,
-// so without an invite for that NodeId or a usable one nothing reveals whether a NodeId is registered.
+// Throws IndexError with a static code; storage failures propagate (503). The invite is checked first, so
+// this route says nothing about a NodeId without a usable invite (GET /v1/network lists active ones).
 export async function registerSeller(
   bytes: ArrayBuffer,
   context: RegistrationContext,

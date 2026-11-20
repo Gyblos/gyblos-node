@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { REVIEW_FAILURE } from './constants';
 import { runPi } from './pi';
 
 async function withProcess(
@@ -23,7 +24,7 @@ async function withProcess(
 
 void test('Pi receives prompt through stdin with all tools disabled', async () => {
   await withProcess(
-    "let input=''; for await (const chunk of process.stdin) input+=chunk; console.log(JSON.stringify({input,args:process.argv.slice(2)}));",
+    "let input=''; for await (const chunk of process.stdin) input+=chunk; console.log(JSON.stringify({type:'message_end',message:{role:'assistant',stopReason:'stop',content:[{type:'text',text:JSON.stringify({input,args:process.argv.slice(2)})}],usage:{totalTokens:123}}}));",
     async (directory, entry) => {
       const result = await runPi({
         command: process.execPath,
@@ -35,6 +36,7 @@ void test('Pi receives prompt through stdin with all tools disabled', async () =
         prompt: 'synthetic source',
       });
       assert.equal(result.exitCode, 0);
+      assert.equal(result.reportedTokens, 123);
       assert.match(result.stdout, /synthetic source/);
       assert.match(result.stdout, /--no-tools/);
       assert.equal(result.timedOut, false);
@@ -96,4 +98,95 @@ void test('a missing Pi executable fails promptly without leaking diagnostics', 
       /Unable to start/,
     );
   });
+});
+
+void test('provider refusals are classified by status and code', async () => {
+  for (const [errorMessage, expected] of [
+    [
+      'OpenAI API error (404): {"code":"model_not_found"}',
+      REVIEW_FAILURE.MODEL,
+    ],
+    [
+      'OpenAI API error (404): The model `gpt-x` does not exist or you do not have access to it.',
+      REVIEW_FAILURE.MODEL,
+    ],
+    [
+      'OpenAI API error (400): {"code":"context_length_exceeded"}',
+      REVIEW_FAILURE.CONTEXT,
+    ],
+    [
+      'OpenAI API error (400): {"code":"unsupported_value","param":"reasoning.effort"}',
+      REVIEW_FAILURE.REQUEST,
+    ],
+    [
+      'OpenAI API error (503): {"type":"server_error"}',
+      REVIEW_FAILURE.PROVIDER,
+    ],
+    ['OpenAI API error (401): {"code":"invalid_api_key"}', REVIEW_FAILURE.KEY],
+    ['OpenAI API error (401): {"code":"invalid_project"}', REVIEW_FAILURE.KEY],
+    ['OpenAI API error (429): Too Many Requests', REVIEW_FAILURE.RATE],
+    [
+      'OpenAI API error (429): {"code":"insufficient_quota"}',
+      REVIEW_FAILURE.QUOTA,
+    ],
+    [
+      "OpenAI API error (404): Item with id 'rs_1' not found",
+      REVIEW_FAILURE.REQUEST,
+    ],
+    ['Settings file does not exist; continuing', REVIEW_FAILURE.PI],
+    ['socket hang up', REVIEW_FAILURE.PI],
+  ] as const) {
+    const event = {
+      type: 'message_end',
+      message: { role: 'assistant', stopReason: 'error', errorMessage },
+    };
+    await withProcess(
+      'console.log(' + JSON.stringify(JSON.stringify(event)) + ');',
+      async (cwd, entry) => {
+        const result = await runPi({
+          cwd,
+          command: process.execPath,
+          prefixArgs: [entry],
+          env: {},
+          model: 'openai/example',
+          thinking: 'high',
+          prompt: 'mock',
+        });
+        assert.equal(result.failure, expected, errorMessage);
+        assert.doesNotMatch(JSON.stringify(result), /rs_1|gpt-x|Settings/);
+      },
+    );
+  }
+});
+
+void test('temporary limits and successful model text cannot trip the quota stop', async () => {
+  for (const [stopReason, expected] of [
+    ['error', REVIEW_FAILURE.RATE],
+    ['stop', undefined],
+  ] as const) {
+    const event = {
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        stopReason,
+        errorMessage: '429 Rate limit reached for requests',
+        content: [{ type: 'text', text: 'insufficient_quota' }],
+      },
+    };
+    await withProcess(
+      'console.log(' + JSON.stringify(JSON.stringify(event)) + ');',
+      async (cwd, entry) => {
+        const result = await runPi({
+          cwd,
+          command: process.execPath,
+          prefixArgs: [entry],
+          env: {},
+          model: 'openai/example',
+          thinking: 'high',
+          prompt: 'mock',
+        });
+        assert.equal(result.failure, expected);
+      },
+    );
+  }
 });

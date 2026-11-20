@@ -104,7 +104,9 @@ docker compose exec seller gyblos seller register
 
 `seller status` solo lee. `--online` además busca el NodeId del vendedor en el índice de descubrimiento.
 Mientras el índice rechace o falle la publicación de este vendedor, la línea de descubrimiento agrega
-`publishing refused:` y un código estático. El
+`publishing refused:` y un código estático. Mientras sirva algún modelo, una línea `uptime` muestra qué
+tan seguido el índice aceptó la presencia de este vendedor en las últimas 24 horas, 7 días y 30 días, y
+`online, last presence … ago` u `offline since …`; esa consulta envía al índice el NodeId, que es público. El
 resumen de actividad sale de los recibos firmados guardados en el equipo; no es un saldo de cuota. La línea
 `receipt queue` muestra los recibos que esperan subirse al recolector de métricas, los bytes reservados
 para ellos y las escrituras rechazadas. `FULL` significa que no se pueden guardar recibos nuevos hasta que

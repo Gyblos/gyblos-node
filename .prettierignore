@@ -18,3 +18,4 @@ apps/explorer/.next/
 apps/explorer/.open-next/
 apps/explorer/.wrangler/
 apps/explorer/next-env.d.ts
+apps/explorer/public/r/

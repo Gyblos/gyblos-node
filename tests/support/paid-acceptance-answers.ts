@@ -67,10 +67,7 @@ export function assertPaidJsonAnswer(body: string, verdict: PaidVerdict) {
     'usage',
     'system_fingerprint',
     PAID_BUYER.paymentField,
-    BUYER_EXECUTION_FIELD,
   ]);
-  if (row[BUYER_EXECUTION_FIELD] !== undefined)
-    assert.equal(row[BUYER_EXECUTION_FIELD], OFFER_PRICING_KINDS.PAID);
   assert.equal(row.object, FREE_BUYER.completionObject);
   assert.equal(row.model, MODEL_IDS.QWEN3_0_6B);
   const choices = controlArray(row.choices, 1);

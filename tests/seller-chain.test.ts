@@ -33,7 +33,7 @@ async function withHome(run: (home: string) => Promise<void>) {
 
 const address = async () => (await generateKeyPairSigner()).address;
 
-void test('a seller set up with a payout gets a payment server for its own keys and fee', () =>
+void test('a new seller prepares channel payout accounts for its own keys and fee', () =>
   withHome(async () => {
     await setupRole({
       role: P2P_ROLES.SELLER,
@@ -41,12 +41,14 @@ void test('a seller set up with a payout gets a payment server for its own keys 
     });
     const role = await loadRole(P2P_ROLES.SELLER);
     assert.ok(role.role === P2P_ROLES.SELLER && role.facilitator);
+    const chain = offline({ missing: true });
     const payments = await sellerChainPayments(
       async () => DEVNET_GENESIS,
-      offline().rpc,
+      chain.rpc,
     )(role);
     try {
-      assert.deepEqual(await payments.server.describe(), {
+      assert.equal(chain.sent.length, 1);
+      assert.deepEqual(payments.description, {
         network: DEVNET,
         mint: role.mint,
         payTo: role.owner,
@@ -122,4 +124,20 @@ void test('a seller whose payout, fee or fee payer token account cannot be creat
     await (
       await sellerChainPayments(async () => DEVNET_GENESIS, offline().rpc)(role)
     ).close();
+  }));
+
+void test('a changed seller fee payer is refused before preparing any payout account', () =>
+  withHome(async () => {
+    await setupRole({ role: P2P_ROLES.SELLER, mint: await address() });
+    const role = await loadRole(P2P_ROLES.SELLER);
+    assert.ok(role.role === P2P_ROLES.SELLER && role.facilitator);
+    const chain = offline({ missing: true });
+    await assert.rejects(
+      sellerChainPayments(
+        async () => DEVNET_GENESIS,
+        chain.rpc,
+      )({ ...role, facilitator: await address() }),
+      { code: NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID },
+    );
+    assert.equal(chain.sent.length, 0);
   }));

@@ -10,7 +10,6 @@ import {
   type PaymentSessionTerms,
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { createBatchBuyer } from './batch-session-buyer';
 import { openingFor, requirementsFor, termsFor } from './batch-session-checks';
@@ -39,11 +38,7 @@ interface Options {
   now?: () => number;
   rpc?: BatchObserverOptions['rpc'];
 }
-function privatePlatform() {
-  if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
-}
 async function compatible(options: Options, terms: PaymentSessionTerms) {
-  privatePlatform();
   termsFor(terms);
   const existing = await inspectBatchSession(options.paths);
   if (existing && canonicalJson(existing.terms) !== canonicalJson(terms))
@@ -53,7 +48,6 @@ async function compatible(options: Options, terms: PaymentSessionTerms) {
 export function openBatchBuyerBackend(
   options: Options & { payer: KeyPairSigner },
 ): BatchBuyerBackend {
-  privatePlatform();
   const rpc = options.rpc ?? createBuyerObservationRpc(options.rpcUrl);
   let observer: ReturnType<typeof batchSessionObserver> | undefined;
   return {
@@ -155,7 +149,6 @@ export function openBatchSellerBackend(
     signer?: FacilitatorSvmSigner;
   },
 ): BatchSellerBackend {
-  privatePlatform();
   const signer =
     options.signer ??
     toFacilitatorSvmSigner(limitedFeePayer(options.feePayer), {

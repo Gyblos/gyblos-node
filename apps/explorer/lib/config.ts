@@ -9,7 +9,7 @@ export const COLLECTOR_URL =
 // Networks the explorer can show; only a live one has data. Mainnet launches 2026-12-09.
 export const NETWORKS = [
   { id: 'devnet', label: 'Solana devnet', live: true },
-  { id: 'mainnet', label: 'Solana mainnet · soon', live: false },
+  { id: 'mainnet', label: 'Solana mainnet', live: false },
 ] as const;
 
 export const explorerAddressUrl = (address: string) =>

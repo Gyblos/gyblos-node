@@ -32,11 +32,10 @@ app ─▶ local buyer ══ Iroh (direct or relay) ══▶ seller node ─�
 ```
 
 - The **seller node** serves each offer in its `config.toml`, free or paid.
-- The **local buyer** verifies the seller's signed quote, then runs a free
-  request, or pays for a priced one through a per-request payment channel (or a
-  payment session, when the buyer has one configured and the seller allowlists
-  it). Its **buyer endpoint** is an OpenAI- and Anthropic-compatible HTTP API on
-  your machine.
+- The **local buyer** verifies the seller's signed quote. Free quotes incur no
+  charge. A priced quote uses a reusable payment channel, with a deposit of 1
+  USDC and a one-hour lifetime by default. Its **buyer endpoint** is an OpenAI-
+  and Anthropic-compatible HTTP API on your machine.
 - The **desktop app** runs the same local buyer inside an Electron app.
 
 ## Data that leaves your machine
@@ -86,7 +85,8 @@ cancelled and skipped counts.
   short, prepare keys and the tokenizer, start an engine, run
   `pnpm gyblos seller init` to write `config.toml`, check it with
   `pnpm gyblos doctor` and start it with `pnpm node:start`.
-- Buyer: run `pnpm buyer:init`, then `pnpm buyer:chat`. The defaults accept free
+- Buyer: buyers use the desktop app from the latest release. To develop the
+  buyer, run `pnpm buyer:init`, then `pnpm buyer:chat`. The defaults accept free
   quotes only, with zero spending and price ceilings. See
   [guided buyer setup](docs/buyer-init.md).
 - Desktop app: `pnpm desktop:start`. See [desktop app](docs/desktop.md).
@@ -105,7 +105,7 @@ cancelled and skipped counts.
 | `pnpm buyer`, `buyer:chat`                               | Start the local buyer endpoint; or chat with it in the terminal.                               |
 | `pnpm buyer:free`                                        | Start a buyer endpoint that runs free offers only.                                             |
 | `pnpm buyer:agent`                                       | Print or write the settings that connect a coding agent to the buyer endpoint.                 |
-| `pnpm buyer:reconcile:paid`, `buyer:withdraw:paid`       | Check open payment channels against devnet; move a stuck channel toward a refund.              |
+| `pnpm buyer:withdraw:paid`                               | Check open payment channels against devnet; move a stuck channel toward a refund.              |
 | `pnpm desktop:build`, `desktop:start`, `desktop:package` | Build, run or package the desktop app.                                                         |
 | `pnpm docs:dev`, `docs:test`                             | Preview the docs site; check its static export.                                                |
 | `pnpm check`                                             | Typecheck, lint and all tests; run before every PR.                                            |
@@ -113,10 +113,7 @@ cancelled and skipped counts.
 | `pnpm format`                                            | Format files and sort imports.                                                                 |
 
 Replace `MINT` with the devnet USDC mint
-`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`. The legacy paid v1 commands
-(`buyer:start`, `buyer:trust`, `buyer:call`, `buyer:reconcile`) and the `gate:*`
-commands work only with the lab; see
-[lab/README.md](lab/README.md#legacy-v1-buyer).
+`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`.
 
 Commands read settings from the environment and never load a `.env` file.
 [.env.example](.env.example) lists the environment variables, and

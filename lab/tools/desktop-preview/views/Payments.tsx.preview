@@ -1,0 +1,198 @@
+// Composes wallet metadata and the guarded shared PayPal session. Navigation never starts a payment.
+import { Gauge, PaypalLogo, Receipt, Wallet } from '@phosphor-icons/react';
+import { useState } from 'react';
+import { ActivitySessionDetails } from './ActivitySessionDetails';
+
+import {
+  managePaypal,
+  paypalPaymentSummary,
+  type PaymentMethod,
+} from '../paypal-model';
+import { usageChange } from '../../../../lab/tools/desktop-preview/usage';
+import { x402Amount, x402Asset } from '../x402-model';
+import { WALLET_STATUS } from '../wallet/model';
+import { BUTTON_VARIANT } from './constants';
+import { CopyField, FormActions } from './Form';
+import { Modal } from './Modal';
+import { PaypalSessionPanel } from './PaypalSessionPanel';
+import { SpendingHistory } from './SpendingHistory';
+import { Badge, Button, PagePanel, StatCard, StatGrid } from './UI';
+import type { ActivityView } from './useActivity';
+import type { PaypalSessionView } from './usePaypalSession';
+import type { X402View } from './useX402';
+import { WalletDetails } from './WalletDetails';
+import { useDesktopWallet } from './WalletState';
+import { X402Payments } from './X402Payments';
+
+type AccountBudget = ReturnType<typeof import('../../../../lab/tools/desktop-preview/account-budget').accountBudgetSnapshot>;
+declare global { interface Window { previewAccountBudget: { current(): AccountBudget; baseline: AccountBudget } } }
+
+type Props = {
+  chat: import('./chat-controller').ChatController;
+  x402?: X402View;
+  session: PaypalSessionView;
+  activity: ActivityView;
+  managePaypal: boolean;
+  onManagePaypal(open: boolean): void;
+  onChat(): void;
+  onConnections(): void;
+  onActivity(id?: string): void;
+  onBackup(): void;
+  onAddFunds(): void;
+  onPaymentMethod(method: PaymentMethod): boolean;
+};
+export function Payments(props: Props) {
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(
+    () => new URLSearchParams(location.search).get('review') === 'wallet-backup',
+  );
+  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const entry = props.activity.state?.sessions.find(item => item.id === receiptId);
+  const openPaypal = () => managePaypal(props.onPaymentMethod, () => props.onManagePaypal(true));
+  const { status, statusFresh, busy } = props.session.state;
+  const paypal = paypalPaymentSummary(status, statusFresh, busy);
+  return (
+    <PagePanel>
+      <WalletOverview buyer={props.x402} onBudget={() => setBudgetOpen(true)} onAddFunds={props.onAddFunds} onDetails={() => setWalletOpen(true)} />
+      <section className="ui-paypal-summary" aria-label="PayPal">
+        <span className="ui-icon-tile" aria-hidden="true"><PaypalLogo size={22} /></span>
+        <div className="ui-paypal-summary-copy">
+          <h2>PayPal</h2>
+          <span className="ui-help-text">{statusFresh || busy ? paypal.label : 'Approve a spending limit for chat and tools.'}</span>
+        </div>
+        <Button disabled={busy} onClick={openPaypal}>
+          {statusFresh ? 'Manage session' : 'Select PayPal'}
+        </Button>
+      </section>
+      <SpendingHistory
+        activity={props.activity} buyer={props.x402} chat={props.chat}
+        onActivity={setReceiptId}
+        onChat={id => { props.chat.openChat(id); props.onChat(); }}
+      />
+      {budgetOpen && props.x402 && <Modal title="Chat budget" close={() => setBudgetOpen(false)}>
+        <X402Payments buyer={props.x402} onSaved={() => setBudgetOpen(false)} />
+      </Modal>}
+      {entry && <ActivitySessionDetails entry={entry}
+        reference={props.activity.references.references.find(item => item.sessionId === entry.id)}
+        onCopyReference={() => props.activity.copyReference(entry.id)}
+        conversations={props.chat.getSnapshot().sessions} close={() => setReceiptId(null)}
+        onOpenChat={id => { props.chat.openChat(id); props.onChat(); }}
+        onPayments={openPaypal} canReview={false}
+      />}
+      {props.managePaypal && (
+        <Modal title="PayPal session" close={() => props.onManagePaypal(false)}>
+          <PaypalSessionPanel
+            session={props.session}
+            onChat={() => {
+              props.onManagePaypal(false);
+              props.onChat();
+            }}
+          />
+          <FormActions align="start">
+            <Button
+              onClick={() => {
+                props.onManagePaypal(false);
+                props.onConnections();
+              }}
+            >
+              Connect a tool
+            </Button>
+          </FormActions>
+        </Modal>
+      )}
+      {walletOpen && (
+        <Modal title="Wallet details" size="lg" close={() => setWalletOpen(false)}>
+          <WalletDetails
+            onBackup={() => {
+              setWalletOpen(false);
+              props.onBackup();
+            }}
+            onAddFunds={() => {
+              setWalletOpen(false);
+              props.onAddFunds();
+            }}
+          />
+        </Modal>
+      )}
+    </PagePanel>
+  );
+}
+function WalletOverview({
+  buyer,
+  onBudget,
+  onAddFunds,
+  onDetails,
+}: {
+  buyer?: X402View;
+  onBudget(): void;
+  onAddFunds(): void;
+  onDetails(): void;
+}) {
+  const wallet = useDesktopWallet();
+  const account = window.previewAccountBudget.current();
+  const amount = (atomic: string) => x402Amount(atomic, account) + ' ' + x402Asset(account);
+  const changeSinceOpen = (field: 'limitAtomic' | 'spentAtomic') =>
+    usageChange(Number(account[field]), Number(window.previewAccountBudget.baseline[field]));
+  const ready = wallet.status === WALLET_STATUS.READY;
+  return (
+    <section className="ui-section" aria-label="USDC wallet">
+      <div className="ui-section-title">
+        <h2>USDC wallet</h2>
+        <FormActions align="start">
+        <Badge>
+          {ready
+            ? wallet.backupVerified
+              ? 'Backup verified'
+              : 'Backup needed'
+            : wallet.status === WALLET_STATUS.LOCKED ? 'Locked' : 'Not available'}
+        </Badge>
+        {buyer && <Button onClick={onBudget}><Gauge size={16} />Edit chat budget</Button>}
+        </FormActions>
+      </div>
+      <StatGrid>
+        <StatCard label="Available balance" value="Unavailable" icon={Wallet} />
+        <StatCard label="Chat budget" value={buyer?.state.summary.active ? amount(account.limitAtomic) : 'No total limit'} change={changeSinceOpen('limitAtomic')} comparison="Since the preview opened" icon={Gauge} />
+        <StatCard label="Chat spending" value={amount(account.spentAtomic)} change={changeSinceOpen('spentAtomic')} comparison="Since the preview opened" icon={Receipt} />
+      </StatGrid>
+      <WalletAddress />
+      <FormActions align="start">
+        <Button
+          variant={BUTTON_VARIANT.PRIMARY}
+          disabled={!wallet.fundingEnabled}
+          onClick={onAddFunds}
+        >
+          Add funds
+        </Button>
+        <Button onClick={onDetails}>Wallet details</Button>
+      </FormActions>
+    </section>
+  );
+}
+function WalletAddress() {
+  const wallet = useDesktopWallet();
+  const [notice, setNotice] = useState('');
+  return (
+    <>
+      <CopyField
+        id="wallet-address"
+        label="Wallet address"
+        value={wallet.address ?? 'Not available'}
+        actionLabel="Copy address"
+        disabled={!wallet.address}
+        onCopy={() => {
+          if (wallet.address)
+            void window.desktopWallet
+              ?.copyAddress(wallet.address)
+              .then((ok) =>
+                setNotice(ok ? 'Address copied.' : 'Could not copy address.'),
+              )
+              .catch(() => setNotice('Could not copy address.'));
+        }}
+      />
+
+      <span className="sr-only" role="status">
+        {notice}
+      </span>
+    </>
+  );
+}

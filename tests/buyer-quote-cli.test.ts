@@ -10,9 +10,14 @@ const terminal = JSON.stringify({
   choices: [{ delta: {}, finish_reason: 'stop' }],
   usage: { prompt_tokens: 2, completion_tokens: 3 },
   gyblos_payment: {
-    verdict: 'settled',
-    chargedAtomic: '5',
-    refundedAtomic: '7',
+    verdict: 'approved',
+    chargedAtomic: null,
+    refundedAtomic: null,
+    session: {
+      approvedAtomic: '5',
+      cumulativeAtomic: '5',
+      depositAtomic: '12',
+    },
   },
 });
 const delta = JSON.stringify({

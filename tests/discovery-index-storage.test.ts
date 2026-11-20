@@ -395,3 +395,22 @@ void test('changing the allowlist cannot bypass capacity held by an earlier publ
   assert.ok(await storage.state(first.nodeId));
   assert.equal(await storage.state(second.nodeId), null);
 });
+
+void test('D1 network sightings read one uptime row per NodeId through the primary key', async (context) => {
+  const made = await recordingD1();
+  if (!made) return context.skip('node:sqlite unavailable');
+  const { db, read, storage } = made;
+  await storage.sightings(0, 10);
+  const statement = read.at(-1);
+  assert.ok(statement);
+  const detail = explainD1Statement(db, statement)
+    .map((row) => row.detail)
+    .join('\n');
+  // The newest hourly row by (node_id, hour), never an aggregate scan of a NodeId's history.
+  assert.match(
+    detail,
+    /SEARCH discovery_uptime USING PRIMARY KEY \(node_id=\? AND hour>\?\)/,
+  );
+  assert.doesNotMatch(detail, /SCAN discovery_uptime\b(?!_nodes)/);
+  assert.doesNotMatch(detail, /TEMP B-TREE/);
+});

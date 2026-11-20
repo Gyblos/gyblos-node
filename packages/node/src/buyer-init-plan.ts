@@ -8,6 +8,7 @@ import {
   IROH_RELAYS,
   LOOPBACK_HOST_NAMES,
 } from '@gyblos/config';
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import { SELLER_BADGES, SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import {
   selectSellers,
@@ -41,6 +42,7 @@ import { usdcToAtomic } from './node-config-price';
 
 export type BuyerInitAnswers = Record<BuyerInitField, string>;
 export interface BuyerInitPlan {
+  session: typeof BUYER_SESSION_DEFAULT_POLICY;
   request: SellerRequest;
   sellers: {
     owner: string;
@@ -201,6 +203,7 @@ export function buildBuyerInit(input: unknown): BuyerInitPlan {
     const baseUrl = read(BUYER_INIT_FIELDS.DISCOVERY_URL);
     return {
       request: policy,
+      session: { ...BUYER_SESSION_DEFAULT_POLICY },
       sellers: nodeId
         ? [{ owner, nodeId, relayUrl, directAddresses: [], manualTrust: false }]
         : [],

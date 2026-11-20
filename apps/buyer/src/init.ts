@@ -3,6 +3,7 @@ import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
 import { DEVNET_USDC, FREE_OUTPUT_TOKENS } from '@gyblos/config';
+import { MILLISECONDS_PER_MINUTE } from '@gyblos/config/constants';
 import {
   buildBuyerInit,
   buyerInitDefaults,
@@ -21,6 +22,7 @@ import {
   type BuyerInitField,
   type BuyerInitMode,
 } from '@gyblos/node/buyer-init-constants';
+import { atomicToUsdc } from '@gyblos/node/node-config';
 import { setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
@@ -188,7 +190,7 @@ export async function runBuyerInit(
   }
   const plan = buildBuyerInit(answers);
   terminal.write(
-    `\nModel: ${plan.request.selection.modelId}; reasoning: ${plan.request.reasoning}.\nVariant: ${answers.variant || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}; Quantization: ${answers.quantization || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}.\nMaximum output tokens: ${answers.maxTokens}.\nBudget ceiling: ${answers.maxUsdc} USDC per request. Prices: ${answers.inputUsdcPerMtok} input / ${answers.outputUsdcPerMtok} output USDC per million tokens.\nSellers: ${plan.sellers.length ? plan.sellers[0]!.nodeId : 'any seller registered in the index, free answers only'}.\nFree signed quotes cause no payment transactions, including with a positive ceiling.\n8004 identity verification remains enabled. Existing settings will be refused.\n`,
+    `\nModel: ${plan.request.selection.modelId}; reasoning: ${plan.request.reasoning}.\nVariant: ${answers.variant || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}; Quantization: ${answers.quantization || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}.\nMaximum output tokens: ${answers.maxTokens}.\nBudget ceiling: ${answers.maxUsdc} USDC per request. Prices: ${answers.inputUsdcPerMtok} input / ${answers.outputUsdcPerMtok} output USDC per million tokens.\nChannel deposit: ${atomicToUsdc(BigInt(plan.session.depositAtomic))} USDC. Channel lifetime: ${plan.session.lifetimeMs / MILLISECONDS_PER_MINUTE} minutes.\nSellers: ${plan.sellers.length ? plan.sellers[0]!.nodeId : 'any seller registered in the index, free answers only'}.\nFree signed quotes cause no payment transactions, including with a positive ceiling.\n8004 identity verification remains enabled. Existing settings will be refused.\n`,
   );
   const confirmation = await terminal.read(
     'Save these settings and prepare the local buyer identity? [y/N]: ',

@@ -24,6 +24,7 @@ Routes sit at the root of the index host. The client base URL is
 | `GET /v1/sellers`        | List live sellers of one model, paged by an opaque cursor.                                   |
 | `GET /v1/models`         | List models from live sellers, ordered by seller count; no query parameters.                 |
 | `GET /v1/uptime?node=`   | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).           |
+| `GET /v1/network`        | Every known seller, online, offline or unpublished, with counts ([Network](#network)).       |
 | `GET /v1/health`         | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes). |
 | `POST /v1/registrations` | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.    |
 
@@ -37,9 +38,9 @@ Common behavior:
 - **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
-  `/v1/models`, `/v1/uptime` and `/v1/health` carry
+  `/v1/models`, `/v1/uptime`, `/v1/network` and `/v1/health` carry
   `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
-  from `/v1/sellers`, `/v1/models` or `/v1/uptime` carries
+  from `/v1/sellers`, `/v1/models`, `/v1/uptime` or `/v1/network` carries
   `Cache-Control: public, max-age=10`; everything else carries
   `Cache-Control: no-store`.
 
@@ -105,8 +106,9 @@ The index checks the request in this order:
 1. Per-IP and publish rate limits, then content type, size and strict shape. A
    malformed request is `400 INVALID_REGISTRATION`.
 2. The invite code. An unknown, expired or spent code is `403 INVITE_INVALID`,
-   before the chain is read. Without a usable code, nothing reveals whether a
-   NodeId is registered.
+   before the chain is read. This route never says whether a NodeId is
+   registered; `GET /v1/network` lists the active ones publicly
+   ([Network](#network)).
 3. A retry with the code that already admitted this NodeId answers
    `200 {"ok":true,"status":"active"}`, or `403 NODE_REVOKED` once revoked,
    without reading the chain.
@@ -117,8 +119,8 @@ The index checks the request in this order:
 6. Success spends the code: `201 {"ok":true,"status":"active"}`.
 
 Steps 3 to 5 do not spend the code. A holder of a usable code can therefore
-learn the status of NodeIds bound on chain until the code is spent or expires,
-at one RPC read per request, limited per IP.
+learn whether a NodeId bound on chain is revoked until the code is spent or
+expires, at one RPC read per request, limited per IP.
 
 What the index stores (migration `0003_registrations.sql`):
 
@@ -194,12 +196,12 @@ signed a record; clients re-verify everything.
 
 Rate limits:
 
-| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                        |
-| ----------------------------------- | --------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                      |
-| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                        |
-| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models` or `/v1/uptime` cache miss, a stale health count |
-| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                              |
+| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                       |
+| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                     |
+| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                       |
+| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime` or `/v1/network` cache miss, a stale health count |
+| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                             |
 
 - A Cloudflare limiter that refuses or fails gives `429 RATE_LIMITED` with
   `Retry-After: 60`. That `429` is `no-store` and never cached.
@@ -215,12 +217,12 @@ Rate limits:
 
 ## Caching
 
-- **Public reads.** `/v1/sellers`, `/v1/models` and `/v1/uptime` keep `200`
-  answers in the Workers Cache API (`caches.default`, per Cloudflare location)
-  for 10 seconds, matching their `max-age`. Keys are normalized:
+- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime` and `/v1/network`
+  keep `200` answers in the Workers Cache API (`caches.default`, per Cloudflare
+  location) for 10 seconds, matching their `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
-  - models: the route alone;
+  - models and network: the route alone;
   - uptime: `?node=<NodeId>`, however the query was spelled.
 
   Invalid queries are rejected before the cache. Errors and publishes are never
@@ -293,6 +295,75 @@ about 1.4 GB a year against the 10 GB D1 limit, and a full database fails every
 write, publishes included. Before the database nears the limit, roll old hours
 into daily rows or move history to its own database.
 
+## Network
+
+`GET /v1/network` lists every seller the index knows, so anyone can count the
+network's online, offline and unpublished sellers. It takes no parameters (any
+is `400 INVALID_QUERY`):
+
+```json
+{
+  "counts": { "total": 3, "online": 1, "offline": 1, "unpublished": 1 },
+  "nodes": [
+    {
+      "nodeId": "…",
+      "state": "online",
+      "firstSeenAt": 1762473600000,
+      "lastSeenAt": 1763078400000,
+      "models": ["qwen3-0.6b"]
+    },
+    {
+      "nodeId": "…",
+      "state": "offline",
+      "firstSeenAt": 1762473600000,
+      "lastSeenAt": 1762990000000,
+      "models": []
+    },
+    {
+      "nodeId": "…",
+      "state": "unpublished",
+      "firstSeenAt": null,
+      "lastSeenAt": null,
+      "models": []
+    }
+  ],
+  "truncated": false,
+  "generatedAt": 1763078400000
+}
+```
+
+- **Who is listed.** Every active registration, and every NodeId the index
+  accepted a presence from within the last 30 days (allowlisted or, in open
+  mode, any publisher). Registered NodeIds are already public on chain, where
+  the 8004 registry binds each one to its owner, so they are listed before they
+  publish. A revoked NodeId is listed only while it is online, exactly as
+  `/v1/sellers` lists it. The allowlist itself is not exposed: an allowlisted
+  NodeId appears only once it publishes. Unpublishing does not remove a seller
+  from this list: a registered one stays listed, and any other until 30 days
+  after its last presence.
+- **`state`.** `online`: a live presence references its live, non-withdrawn
+  catalog, exactly as `/v1/sellers` would list it. `unpublished`: never seen, or
+  its stored catalog is withdrawn (`unpublish`). The index keeps a withdrawn
+  catalog only until it expires (at most one catalog lifetime); after that a
+  seller seen before shows as `offline`. `offline`: seen before, with no live
+  presence now.
+- **Fields.** `firstSeenAt` and `lastSeenAt` are the [uptime](#uptime) sightings
+  (`lastSeenAt` is `null` when none falls within the last 30 days). `models`
+  lists the catalog's model ids while `online`, and is empty otherwise. No
+  owner, contact, country or IP is returned.
+- **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
+  NodeId. `counts` cover every listed seller. The `nodes` list stops before the
+  answer would exceed 1 MiB.
+- **Bounds.** Each source (active and revoked registrations, sightings, stored
+  catalogs) is read up to `maxNodes` rows by NodeId, and online models up to
+  20,000 rows. `truncated` is `true` when the list stopped at the size limit or
+  a source filled its cap, so sellers, counts or models may be incomplete.
+- **Cost.** One cache miss reads each source once. A NodeId's last sighting is
+  its newest hourly uptime row, one primary-key lookup per tracked NodeId.
+- In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
+  publishing from new NodeIds, as with uptime; the caps bound them, but the
+  public counts are not Sybil resistant.
+
 ## Storage
 
 - `src/storage.ts` defines the storage contract and an in-memory adapter for
@@ -327,6 +398,7 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 | `CASE`                   | No conditional builder; quota resets and uptime admission use it atomically.                                                    |
 | `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
 | Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
+| Scalar subquery          | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                 |
 
 Migrations, applied in order:
 

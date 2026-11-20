@@ -126,8 +126,8 @@ void test('invalid history cannot construct the shared financial pool', async (t
   const pool = createBuyerSessionPool({
     ...f.wire,
     policy: {
-      depositAtomic: '1000',
-      totalDepositAtomic: '2000',
+      depositAtomic: '10000',
+      totalDepositAtomic: '20000',
       lifetimeMs: 3600000,
       withdrawDelaySeconds: 900,
     },
@@ -241,6 +241,6 @@ void test('a persisted v1 approval recovers over v2 with its original digest and
   assert.deepEqual(f.rig.calls, ['deposit']);
   const settled = await f.buyer().settle(new AbortController().signal);
   assert.equal(settled!.chargedAtomic, '5');
-  assert.equal(settled!.refundedAtomic, '995');
+  assert.equal(settled!.refundedAtomic, '9995');
   assert.equal(f.generated.length, 0);
 });

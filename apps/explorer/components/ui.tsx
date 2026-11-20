@@ -1,10 +1,11 @@
-// Owns the explorer's shared presentational pieces: stat tiles, section titles, tables, loading and
+// Owns the explorer's shared presentational pieces: section titles, tables, loading and
 // unavailable states, and linked addresses. No data access.
 import type { ReactNode } from 'react';
 
 import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY } from '../lib/constants';
 import { short } from '../lib/format';
+import { ModelLogo } from './model-logo';
 
 export const th = 'px-4 py-3 font-medium';
 export const td = 'px-4 py-3';
@@ -14,26 +15,7 @@ export const timeCell = `${td} font-mono text-xs text-muted`;
 
 export function Loading() {
   return (
-    <div className="mt-10 h-40 animate-pulse rounded-xl border border-line bg-panel" />
-  );
-}
-
-export function Stat({
-  label,
-  value,
-  money,
-}: {
-  label: string;
-  value: string;
-  money?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-panel p-4">
-      <div className="text-sm text-muted">{label}</div>
-      <div className={`mt-1 font-mono text-2xl ${money ? 'text-money' : ''}`}>
-        {value}
-      </div>
-    </div>
+    <div className="mt-10 h-40 animate-pulse rounded-2xl border border-line bg-panel" />
   );
 }
 
@@ -56,7 +38,7 @@ export function Unavailable({ title }: { title: string }) {
   return (
     <>
       <SectionTitle title={title} />
-      <div className="rounded-xl border border-line bg-panel p-4 text-sm text-muted">
+      <div className="rounded-2xl border border-line bg-panel p-5 text-sm text-muted">
         Source unavailable.
       </div>
     </>
@@ -73,9 +55,12 @@ export function Table({
   minWidth?: number;
 }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-xl border border-line">
-      <table className="w-full text-left text-sm" style={{ minWidth }}>
-        <thead className="bg-panel text-muted">
+    <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-panel">
+      <table
+        className="w-full text-left text-sm whitespace-nowrap"
+        style={{ minWidth }}
+      >
+        <thead className="border-b border-line bg-raised/50 text-muted">
           <tr>
             {head.map((column) => (
               <th
@@ -102,7 +87,7 @@ export function Addr({ value }: { value: string | null }) {
   );
 }
 
-// A model as published: id, then variant and quantization when present.
+// A model as published: its maker's mark, the id, then variant and quantization when present.
 export function ModelName({
   modelId,
   variant,
@@ -114,11 +99,14 @@ export function ModelName({
 }) {
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
-    <>
-      {modelId}
-      {detail ? (
-        <span className="ml-2 font-mono text-xs text-dim">{detail}</span>
-      ) : null}
-    </>
+    <span className="inline-flex items-center gap-2">
+      <ModelLogo modelId={modelId} />
+      <span>
+        {modelId}
+        {detail ? (
+          <span className="ml-2 font-mono text-xs text-dim">{detail}</span>
+        ) : null}
+      </span>
+    </span>
   );
 }

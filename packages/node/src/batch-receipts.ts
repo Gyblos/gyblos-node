@@ -19,6 +19,7 @@ import type {
 import { ReceiptChannelError } from '@gyblos/protocol/receipt-channel';
 import { conversationText, recordedFinishReason } from '@gyblos/protocol/tools';
 
+import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import type { BuyerReceiptEvidence } from './receipt-buyer';
 import type { PaidSellerReceiptOptions } from './receipt-seller';
 
@@ -116,4 +117,31 @@ export function publishSessionReceipt(
     },
     payment,
   });
+}
+
+// Hands the buyer's evidence of one completed paid request to its receipt worker. Receipt work never
+// changes execution or the durable financial result; a failure is counted by the worker's health.
+export function publishBuyerSessionReceipt(
+  receipt: BuyerBatchSessionOptions<never>['receipt'],
+  request: BatchExecutionRequest,
+  requestDigest: string,
+  result: ExecutionResult,
+  payment: () => PaidReceiptPayment,
+  first: number | null,
+  total: number,
+) {
+  if (!receipt) return;
+  try {
+    const evidence = sessionReceiptEvidence(
+      request,
+      requestDigest,
+      result,
+      payment(),
+      first,
+      total,
+    );
+    void Promise.resolve(receipt(evidence, request.quote)).catch(() => {});
+  } catch {
+    /* Receipt work never changes execution or the durable financial result. */
+  }
 }

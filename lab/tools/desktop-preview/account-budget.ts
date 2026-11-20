@@ -1,0 +1,25 @@
+// Optional spending limit for manual chat in the preview.
+import { DEVNET_USDC } from '@gyblos/config/network';
+import { buyerAtomic } from '@gyblos/protocol/buyer-api';
+
+export function accountBudgetSnapshot(
+  limitAtomic: string,
+  replies: ReadonlyArray<{ chargeAtomic: string }>,
+) {
+  const chatSpend = replies.reduce(
+    (sum, reply) => sum + BigInt(reply.chargeAtomic),
+    0n,
+  );
+  return {
+    mint: DEVNET_USDC,
+    limitAtomic,
+    spentAtomic: String(chatSpend),
+  };
+}
+
+export function accountLimitError(limit: string, spent: string) {
+  if (!buyerAtomic(limit)) return 'Enter a valid chat budget.';
+  if (BigInt(limit) < BigInt(spent))
+    return 'The budget must cover USDC already spent.';
+  return null;
+}

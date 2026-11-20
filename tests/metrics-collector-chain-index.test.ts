@@ -150,7 +150,11 @@ void test('a rate-limited free endpoint hands the run to the paid one, used for 
     }),
     1000,
   );
-  assert.deepEqual(result.usage.primary, { calls: 3, rateLimited: 1 });
+  assert.deepEqual(result.usage.primary, {
+    calls: 3,
+    rateLimited: 1,
+    wrongNetwork: 0,
+  });
   assert.equal(result.usage.onFallback, true);
   assert.equal(result.usage.fallback.calls, 4);
   assert.equal(readCount(database), 3);

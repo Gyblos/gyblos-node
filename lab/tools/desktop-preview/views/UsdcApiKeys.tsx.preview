@@ -1,0 +1,466 @@
+import { Info, LinkSimple, Plus } from '@phosphor-icons/react';
+// Buyer-owned USDC key management uses shared forms and financial facts; no wallet keys enter the view.
+import { useState } from 'react';
+
+import { DEVNET_USDC } from '@gyblos/config/network';
+import {
+  AGENT_TOOLS,
+  type AgentTool,
+} from '@gyblos/node/agent-setup-constants';
+import {
+  BUYER_API_KEYS,
+  type BuyerKeyScope,
+} from '@gyblos/protocol/buyer-api-keys';
+
+import {
+  usdcApiAmount as amount,
+  USDC_API,
+  USDC_API_ACTION,
+} from '../usdc-api-model';
+import { DESKTOP_X402, x402Asset, x402BudgetInput } from '../x402-model';
+import { BUTTON_VARIANT } from './constants';
+import { DataCell, TableRow } from './DataTable';
+import { CopyField, FormActions, FormField, FormInput } from './Form';
+import { StatePanel } from './Management';
+import { Modal } from './Modal';
+import { ScrollTable } from './ScrollTable';
+import { Badge, Button, IconButton } from './UI';
+import { RevokeConfirmation } from './UsdcApiKeyDetails';
+import { useUsdcApiKeys } from './useUsdcApiKeys';
+import { WorkspaceLayout } from './WorkspaceLayout';
+
+type Controller = ReturnType<typeof useUsdcApiKeys>;
+function keyLimit(value: string, scope: BuyerKeyScope) {
+  try {
+    return x402BudgetInput(value, scope);
+  } catch {
+    return null;
+  }
+}
+function NewKey({
+  create,
+  disabled,
+  scope,
+}: {
+  scope: BuyerKeyScope;
+  create: (name: string, limit: string) => void;
+  disabled: boolean;
+}) {
+  const [name, setName] = useState('');
+  const [limit, setLimit] = useState<string>(
+    scope.mint === DEVNET_USDC ? USDC_API.DEFAULT_LIMIT : '0',
+  );
+  const atomic = keyLimit(limit, scope);
+  const valid =
+    atomic !== null && !!name.trim() && name.length <= BUYER_API_KEYS.MAX_NAME;
+  return (
+    <section className="ui-section" aria-label="Create USDC API key">
+      <div className="ui-form ui-form--limited">
+        <FormField label="Name" htmlFor="usdc-key-name">
+          <FormInput
+            id="usdc-key-name"
+            value={name}
+            maxLength={BUYER_API_KEYS.MAX_NAME}
+            disabled={disabled}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </FormField>
+        <FormField
+          label={`Spend limit · ${x402Asset(scope)}`}
+          htmlFor="usdc-key-limit"
+        >
+          <FormInput
+            id="usdc-key-limit"
+            type="number"
+            min="0"
+            step={
+              scope.mint === DEVNET_USDC ? 1 / DESKTOP_X402.AMOUNT_SCALE : 1
+            }
+            value={limit}
+            disabled={disabled}
+            aria-invalid={atomic === null}
+            onChange={(event) => setLimit(event.target.value)}
+          />
+        </FormField>
+        <p className="ui-help-text">
+          Total for this key. Shared across tools, saved on this computer, with
+          no automatic reset. A zero limit allows free models only.
+        </p>
+        <FormActions align="start">
+          <Button
+            variant={BUTTON_VARIANT.PRIMARY}
+            disabled={disabled || !valid}
+            onClick={() => {
+              if (valid && atomic !== null) create(name.trim(), atomic);
+            }}
+          >
+            Create API key
+          </Button>
+        </FormActions>
+      </div>
+    </section>
+  );
+}
+function UsdcKeyContext({
+  onPayments,
+  scope,
+}: {
+  onPayments: () => void;
+  scope: BuyerKeyScope | undefined;
+}) {
+  return (
+    <>
+      <section className="ui-context-section">
+        <h3>Payment method</h3>
+        <strong>{scope ? x402Asset(scope) : 'USDC'}</strong>
+        <p className="ui-help-text">
+          Key usage is separate from Chat. Existing buyer and session limits
+          still apply.
+        </p>
+        <Button onClick={onPayments}>View payments</Button>
+      </section>
+      <section className="ui-context-section">
+        <h3>Access</h3>
+        <p className="ui-help-text">
+          This computer · Keep Gyblos open. The key permission and consumption
+          survive a restart.
+        </p>
+      </section>
+    </>
+  );
+}
+const toolNames = {
+  [AGENT_TOOLS.OPENCODE]: 'OpenCode',
+  [AGENT_TOOLS.CODEX]: 'Codex',
+  [AGENT_TOOLS.CLAUDE_CODE]: 'Claude Code',
+  [AGENT_TOOLS.PI]: 'Pi',
+  other: 'Other tools',
+};
+type KeyView = 'list' | 'choose' | 'guide' | 'detail' | 'revoke' | 'new';
+export function UsdcApiKeys({
+  onPayments,
+  contextOpen,
+  onCloseContext,
+}: {
+  onPayments: () => void;
+  contextOpen: boolean;
+  onCloseContext: () => void;
+}) {
+  const { state, run, busy } = useUsdcApiKeys();
+  const snapshot = state.snapshot;
+  const [view, setView] = useState<KeyView>('list');
+  const [id, setId] = useState('');
+  const [tool, setTool] = useState<AgentTool | 'other'>(AGENT_TOOLS.OPENCODE);
+  const key = snapshot?.keys.find((item) => item.id === id);
+  const locked = busy || !!state.error || !!snapshot?.blocked;
+  const go = (next: KeyView, keyId: string) => {
+    setId(keyId);
+    setView(next);
+  };
+  const choose = (keyId: string) => {
+    setTool(AGENT_TOOLS.OPENCODE);
+    go('choose', keyId);
+  };
+  const close = () => setView('list');
+  const copyKey = key && (
+    <CopyField
+      label="API key"
+      id="preview-tool-secret"
+      secret
+      value="Preview key"
+      actionLabel="Copy API key"
+      disabled={locked || key.revoked || !state.copyable.includes(id)}
+      onCopy={() => void run({ action: USDC_API_ACTION.COPY_KEY, id })}
+    />
+  );
+  const urlField = (
+    <CopyField
+      label="Base URL"
+      id="preview-base-url"
+      value={state.url ?? ''}
+      actionLabel="Copy Base URL"
+      disabled={!state.url || busy}
+      onCopy={() => void run({ action: USDC_API_ACTION.COPY_URL })}
+    />
+  );
+  const newDisabled =
+    locked || (snapshot?.keys.length ?? 0) >= BUYER_API_KEYS.MAX_KEYS;
+  const newButton = snapshot?.keys.length ? (
+    <IconButton
+      label="New API key"
+      disabled={newDisabled}
+      onClick={() => setView('new')}
+    >
+      <Plus size={18} />
+    </IconButton>
+  ) : (
+    <Button
+      variant={BUTTON_VARIANT.PRIMARY}
+      disabled={newDisabled}
+      onClick={() => setView('new')}
+    >
+      <Plus size={16} />
+      Create your first API key
+    </Button>
+  );
+  return (
+    <WorkspaceLayout
+      context={
+        <UsdcKeyContext onPayments={onPayments} scope={snapshot?.scope} />
+      }
+      contextOpen={contextOpen}
+      onCloseContext={onCloseContext}
+    >
+      <div className="ui-connection-page">
+        {!snapshot ? (
+          <StatePanel
+            title="Connect your USDC buyer"
+            description="Start the local buyer to create API keys."
+            action={<Button onClick={onPayments}>Go to Payments</Button>}
+          />
+        ) : (
+          <>
+            {snapshot.blocked && (
+              <StatePanel
+                title="Spending needs review"
+                description="Resolve the pending operation to use your keys."
+                action={<Button onClick={onPayments}>Review payments</Button>}
+              />
+            )}
+            {urlField}
+            <section className="ui-section">
+              <div className="ui-section-title">
+                <h2>API keys</h2>
+                {newButton}
+              </div>
+              {snapshot.keys.length > 0 && (
+                  <ScrollTable
+                    regionLabel="API key list"
+                    resetKey="keys"
+                    caption="API keys"
+                    headings={['Name', 'State', 'Used / limit', 'Actions']}
+                  >
+                    {snapshot.keys.map((item) => (
+                      <TableRow role="row" key={item.id}>
+                        <DataCell label="Name">
+                          <div className="preview-table-identity">
+                            <strong>{item.name}</strong>
+                          </div>
+                        </DataCell>
+                        <DataCell label="State">
+                          <Badge>{item.revoked ? 'Revoked' : 'Active'}</Badge>
+                        </DataCell>
+                        <DataCell label="Used / limit">
+                          {
+                            amount(item.spentAtomic, snapshot.scope).split(
+                              ' ',
+                            )[0]
+                          }{' '}
+                          / {amount(item.limitAtomic, snapshot.scope)}
+                        </DataCell>
+                        <DataCell label="Actions">
+                          <div className="ui-inline-actions">
+                            {!item.revoked && (
+                              <Button
+                                variant={BUTTON_VARIANT.SECONDARY}
+                                title={'Connect a tool with ' + item.name}
+                                disabled={locked}
+                                onClick={() => choose(item.id)}
+                              >
+                                <LinkSimple size={16} aria-hidden="true" />
+                              </Button>
+                            )}
+                            <Button
+                              variant={BUTTON_VARIANT.SECONDARY}
+                                title={'Details for ' + item.name}
+                              onClick={() => go('detail', item.id)}
+                            >
+                              <Info size={16} aria-hidden="true" />
+                            </Button>
+                          </div>
+                        </DataCell>
+                      </TableRow>
+                    ))}
+                  </ScrollTable>
+              )}
+            </section>
+            {view === 'new' && (
+              <Modal title="Create an API key" close={close}>
+                <NewKey
+                  scope={snapshot.scope}
+                  disabled={locked}
+                  create={(name, limitAtomic) => {
+                    void run({
+                      action: USDC_API_ACTION.CREATE,
+                      name,
+                      limitAtomic,
+                    }).then((result) => {
+                      const created = result?.snapshot?.keys.find(
+                        (k) => !snapshot.keys.some((old) => old.id === k.id),
+                      );
+                      if (created && !result?.error) go('detail', created.id);
+                    });
+                  }}
+                />
+              </Modal>
+            )}
+            {key && view === 'detail' && (
+              <Modal title={key.name} close={close}>
+                <div className="ui-section">
+                  <p>
+                    {amount(key.spentAtomic, snapshot.scope)} used of{' '}
+                    {amount(key.limitAtomic, snapshot.scope)}
+                  </p>
+                  {key.revoked ? (
+                    <p>Revoked</p>
+                  ) : (
+                    <>
+                      {copyKey}
+                      <FormActions align="start">
+                        <Button
+                          variant={BUTTON_VARIANT.PRIMARY}
+                          disabled={locked}
+                          onClick={() => choose(id)}
+                        >
+                          Connect a tool
+                        </Button>
+                        <Button
+                          disabled={busy}
+                          className="preview-destructive"
+                          onClick={() => setView('revoke')}
+                        >
+                          Revoke key
+                        </Button>
+                      </FormActions>
+                    </>
+                  )}
+                </div>
+              </Modal>
+            )}
+            {key && view === 'revoke' && (
+              <RevokeConfirmation id={id} run={run} close={close} />
+            )}
+            {key && !key.revoked && view === 'choose' && (
+              <Modal title="Connect a tool" close={close}>
+                <div className="ui-section">
+                  <fieldset className="preview-tool-choices">
+                    <legend>Choose a tool</legend>
+                    {Object.entries(toolNames).map(([value, label]) => (
+                      <label key={value}>
+                        <input
+                          type="radio"
+                          name="preview-client"
+                          value={value}
+                          checked={tool === value}
+                          onChange={() =>
+                            setTool(
+                              Object.values(AGENT_TOOLS).find(
+                                (t) => t === value,
+                              ) ?? 'other',
+                            )
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </fieldset>
+                  <FormField label="API key" htmlFor="preview-selected-key">
+                    <select
+                      id="preview-selected-key"
+                      className="ui-input"
+                      value={id}
+                      onChange={(event) => setId(event.target.value)}
+                    >
+                      {snapshot.keys
+                        .filter((k) => !k.revoked)
+                        .map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {k.name}
+                          </option>
+                        ))}
+                    </select>
+                  </FormField>
+                  <p className="ui-help-text">
+                    {amount(key.spentAtomic, snapshot.scope)} used of{' '}
+                    {amount(key.limitAtomic, snapshot.scope)}
+                  </p>
+                  <FormActions align="start">
+                    <Button
+                      variant={BUTTON_VARIANT.PRIMARY}
+                      disabled={locked}
+                      onClick={() => {
+                        if (tool === 'other') setView('guide');
+                        else
+                          void run({
+                            action: USDC_API_ACTION.PREVIEW_AGENT,
+                            id,
+                            tool,
+                          }).then((result) => {
+                            if (result?.setup?.tool === tool && !result.error)
+                              setView('guide');
+                          });
+                      }}
+                    >
+                      {tool === 'other'
+                        ? 'Show API details'
+                        : 'Set up ' + toolNames[tool]}
+                    </Button>
+                    <Button
+                      onClick={() => setView('new')}
+                      disabled={
+                        locked ||
+                        snapshot.keys.length >= BUYER_API_KEYS.MAX_KEYS
+                      }
+                    >
+                      New API key
+                    </Button>
+                  </FormActions>
+                </div>
+              </Modal>
+            )}
+            {key && !key.revoked && view === 'guide' && (
+              <Modal
+                title={
+                  tool === 'other' ? 'API details' : 'Set up ' + toolNames[tool]
+                }
+                close={close}
+              >
+                <div className="ui-section">
+                  <strong>{key.name}</strong>
+                  {copyKey}
+                  {tool === 'other' ? (
+                    urlField
+                  ) : (
+                    <>
+                      <p className="ui-help-text">
+                        Set GYBLOS_API_KEY to the copied key in your tool’s
+                        environment.
+                      </p>
+                      <pre className="ui-code-block">{state.setup?.text}</pre>
+                      <Button
+                        disabled={locked}
+                        onClick={() =>
+                          void run({
+                            action: USDC_API_ACTION.COPY_AGENT,
+                            id,
+                            tool,
+                          })
+                        }
+                      >
+                        Copy configuration
+                      </Button>
+                    </>
+                  )}
+                  <Button onClick={() => setView('choose')}>
+                    Back to tools
+                  </Button>
+                </div>
+              </Modal>
+            )}
+          </>
+        )}
+        {state.error && <p role="alert">{state.error}</p>}
+      </div>
+    </WorkspaceLayout>
+  );
+}

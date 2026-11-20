@@ -3,13 +3,24 @@
   // Workers through OpenNext. Deploying is a founder-approved manual step; Wrangler is not a workspace
   // dependency: from this directory, `pnpm build:cloudflare` then `npx wrangler@4.151.1 deploy`.
   "name": "gyblos-explorer",
-  "main": ".open-next/worker.js",
+  // Written by `pnpm build:cloudflare` (scripts/write-worker-entry.mjs): OpenNext's handler and the
+  // scheduled discovery read (scheduled.ts).
+  "main": ".open-next/explorer-worker.js",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": false,
   "preview_urls": false,
+  // No stored request logs (visitors' addresses); the scheduled run's problem codes show in
+  // `wrangler tail`.
+  "observability": { "enabled": false },
   // The first deploy attaches explorer.gyblos.com (a gyblos.com zone record) to this Worker.
   "routes": [{ "pattern": "explorer.gyblos.com", "custom_domain": true }],
+  // The discovery index is read every 2 minutes into this KV snapshot (lib/discovery-snapshot.ts):
+  // 720 writes a day, within the KV free tier's 1000 a day for the whole account (its only namespace).
+  "triggers": { "crons": ["*/2 * * * *"] },
+  "kv_namespaces": [
+    { "binding": "DISCOVERY", "id": "d6ac23a19e2e442386d67872433eb1a5" },
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",

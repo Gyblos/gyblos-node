@@ -16,6 +16,12 @@ export {
 } from './publish';
 export { registerSeller, type RegisterSellerInput } from './register';
 export {
+  fetchUptime,
+  type FetchUptimeInput,
+  type SellerUptime,
+} from './uptime';
+export {
+  fetchModels,
   fetchSellers,
   type DiscoveredSeller,
   type FetchSellersInput,

@@ -1,0 +1,100 @@
+// Flat appearance and product information use the shared compact design primitives.
+import { Info } from '@phosphor-icons/react';
+import { useState } from 'react';
+
+import { Appearance } from './Appearance';
+import { BUTTON_VARIANT } from './constants';
+import { FormField, FormInput } from './Form';
+import { Section } from './Management';
+import { Modal } from './Modal';
+import { Button, IconButton, PagePanel } from './UI';
+
+export function Settings({
+  light,
+  onLightChange,
+  version,
+}: {
+  light: boolean;
+  onLightChange(light: boolean): void;
+  version: string;
+}) {
+  const [designOpen, setDesignOpen] = useState(
+    () => new URLSearchParams(location.search).get('review') === 'buttons',
+  );
+  const [aboutOpen, setAboutOpen] = useState(false);
+  return (
+    <PagePanel>
+      <Section title="Appearance">
+        <Appearance label="Theme" light={light} onLightChange={onLightChange} />
+      </Section>
+      <section className="preview-settings-rows">
+        <div>
+          <span>Design system</span>
+          <Button onClick={() => setDesignOpen(true)}>View controls</Button>
+        </div>
+        <div>
+          <span>About Gyblos</span>
+          <Button onClick={() => setAboutOpen(true)}>View details</Button>
+        </div>
+      </section>
+      {aboutOpen && (
+        <Modal title="About Gyblos" close={() => setAboutOpen(false)}>
+          <div className="ui-section">
+            <p>Gyblos desktop</p>
+            <p className="ui-help-text">Version {version}</p>
+            <p className="ui-help-text">Local desktop application</p>
+          </div>
+        </Modal>
+      )}
+      {designOpen && (
+        <Modal title="Design system" close={() => setDesignOpen(false)}>
+          <div className="ui-section">
+            <Section title="Buttons">
+              <div className="preview-settings-rows">
+                <div>
+                  <span>Standard action</span>
+                  <Button>Copy</Button>
+                </div>
+                <div>
+                  <span>Primary action</span>
+                  <Button variant={BUTTON_VARIANT.PRIMARY}>
+                    Connect a tool
+                  </Button>
+                </div>
+                <div>
+                  <span>Integrated icon</span>
+                  <IconButton label="Information example">
+                    <Info size={16} />
+                  </IconButton>
+                </div>
+                <div>
+                  <span>Disabled</span>
+                  <Button disabled>Create key</Button>
+                </div>
+              </div>
+            </Section>
+            <Section title="Typography">
+              <p className="ui-help-text">
+                Instrument Sans · 14 px interface · 18 px sections
+              </p>
+            </Section>
+            <Section title="Colors">
+              <div className="ui-swatch-list">
+                <span className="ui-swatch ui-swatch--background">
+                  Background
+                </span>
+                <span className="ui-swatch ui-swatch--panel">Surface</span>
+                <span className="ui-swatch ui-swatch--accent">#0A28F0</span>
+              </div>
+            </Section>
+            <Section title="Spacing">
+              <p className="ui-help-text">
+                4, 8, 12, 16, 24 and 32 px. Controls use a 10 px radius.
+              </p>
+            </Section>
+          </div>
+        </Modal>
+      )}
+    </PagePanel>
+  );
+}

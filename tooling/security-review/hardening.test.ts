@@ -89,6 +89,7 @@ void test('tiny-file shards cannot exceed the coverage response path limit', () 
     })),
     diff: '',
     omissions: [],
+    excluded: [],
   };
   const parts = partitionBundle(source);
   assert.ok(parts.length > 1);
@@ -162,6 +163,7 @@ void test('large source input is partitioned without silently dropping files', (
     })),
     diff: '',
     omissions: [],
+    excluded: [],
   };
   const parts = partitionBundle(bundle);
   assert.ok(parts.length > 1);

@@ -3,6 +3,10 @@
 import { lstat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import {
+  BATCH_SESSION_DEFAULTS,
+  BUYER_DEPOSIT_MINIMUM_HINT,
+} from '@gyblos/config/batch-session';
 import { homeLayout, type HomeEnvironment } from '@gyblos/config/home';
 import {
   parseBuyerRoutingPolicy,
@@ -58,7 +62,11 @@ export class BuyerSelectionError extends Error {
   constructor(
     readonly code: (typeof BUYER_SELECTION_CODES)[keyof typeof BUYER_SELECTION_CODES],
   ) {
-    super(code);
+    super(
+      code === BUYER_SELECTION_CODES.DEPOSIT_MINIMUM
+        ? BUYER_DEPOSIT_MINIMUM_HINT
+        : code,
+    );
     this.name = 'BuyerSelectionError';
   }
 }
@@ -90,6 +98,8 @@ export interface BuyerSelectionConfig {
   failover?: BuyerFailover;
   // Set per request, never read from selection.json: the seller that served this conversation before.
   previousSeller?: string;
+  // Set per request: that seller, while its prompt cache likely still holds the conversation.
+  warmSeller?: string;
 }
 function parseRequest(value: unknown): SellerRequest {
   const row = controlObject(value, [
@@ -182,6 +192,18 @@ function parseStaticSeller(value: unknown): StaticControlSeller {
   }
   return result;
 }
+function configuredSession(value: unknown) {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'depositAtomic' in value &&
+    BigInt(controlAtomic(value.depositAtomic)) <
+      BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
+  )
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.DEPOSIT_MINIMUM);
+  return parseBuyerSessionPolicy(value);
+}
+
 export function parseBuyerSelectionConfig(
   value: unknown,
 ): BuyerSelectionConfig {
@@ -226,6 +248,8 @@ export function parseBuyerSelectionConfig(
       new Set(sellers.map((item) => item.nodeId)).size !== sellers.length
     )
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+    if (request.maxAtomic !== '0' && row.session === undefined)
+      throw new BuyerSelectionError(BUYER_SELECTION_CODES.SESSION_REQUIRED);
     return {
       request,
       ...(models ? { models } : {}),
@@ -234,7 +258,7 @@ export function parseBuyerSelectionConfig(
         : { routing: parseBuyerRoutingPolicy(row.routing) }),
       ...(row.session === undefined
         ? {}
-        : { session: parseBuyerSessionPolicy(row.session) }),
+        : { session: configuredSession(row.session) }),
       sellers,
       ...(row.identity === undefined
         ? {}
@@ -256,7 +280,8 @@ export function parseBuyerSelectionConfig(
             ),
           }),
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof BuyerSelectionError) throw error;
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
   }
 }
@@ -302,6 +327,7 @@ export async function loadBuyerSelectionConfig(environment: HomeEnvironment) {
     return parseBuyerSelectionConfig(value);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if (error instanceof BuyerSelectionError) throw error;
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
   }
 }

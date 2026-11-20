@@ -61,8 +61,13 @@ export function parseControlQuery(value: unknown): ControlQuery {
     !!input.params &&
     typeof input.params === 'object' &&
     Object.hasOwn(input.params, 'tools');
+  const sized =
+    !!input.params &&
+    typeof input.params === 'object' &&
+    Object.hasOwn(input.params, 'inputTokens');
   const params = controlObject(input.params, [
     ...(tools ? ['tools'] : []),
+    ...(sized ? ['inputTokens'] : []),
     'buyer',
     'buyerNodeId',
     'selection',
@@ -94,6 +99,15 @@ export function parseControlQuery(value: unknown): ControlQuery {
       asset: controlAddress(params.asset),
       catalogDigest: controlHex(params.catalogDigest),
       ...(tools ? { tools: params.tools === true ? true : controlFail() } : {}),
+      ...(sized
+        ? {
+            inputTokens: controlInteger(
+              params.inputTokens,
+              1,
+              PUBLIC_RECORD_LIMITS.maxContextTokens,
+            ),
+          }
+        : {}),
     },
   };
 }

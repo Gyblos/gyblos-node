@@ -11,6 +11,7 @@ import {
   batchFail,
   batchVoucher,
 } from './batch-channel-validation';
+import { batchInputBoundary } from './batch-input';
 import { BATCH_CHANNEL, BATCH_METHODS } from './batch/constants';
 import { canonicalJson } from './canonical';
 import type { SignedOfferV2 } from './control-types';
@@ -21,7 +22,6 @@ import {
 } from './control-validation';
 import { parseExecutionInput } from './execution-wire';
 import { parseOfferSignatureV2, parseOfferV2 } from './offer-v2';
-import { paidExecutionBoundary } from './paid-execution-validation';
 import { PAID_EXECUTION_CODES } from './paid/constants';
 import {
   PAYMENT_SESSION,
@@ -57,7 +57,7 @@ function conversationInput(
   quote: SignedOfferV2,
 ) {
   try {
-    const input = paidExecutionBoundary(() =>
+    const input = batchInputBoundary(() =>
       parseExecutionInput(
         value,
         requestId,

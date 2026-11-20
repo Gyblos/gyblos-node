@@ -22,11 +22,18 @@ import {
   validateOfferV2Time,
 } from '@gyblos/protocol/offer-v2';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import {
+  SESSION_CODES,
+  type SessionBill,
+} from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import { runBuyerBlocks } from './batch-block-buyer';
 import type { BuyerBatchContext } from './batch-buyer-types';
+import {
+  publishBuyerSessionReceipt,
+  sessionReceiptPayment,
+} from './batch-receipts';
 import { executeBatchBuyer } from './batch-session';
 import { bounded } from './buyer-operation';
 
@@ -110,9 +117,11 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     current.throwIfAborted();
   };
   await verify(signal);
-  const prepared = await rpc(BATCH_METHODS.PREPARE, { quote, terms }, signal);
-  if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
-  matchBatchTerms(prepared.terms, terms);
+  if (!options.preparation?.consume(quote, terms, context.blockMode)) {
+    const prepared = await rpc(BATCH_METHODS.PREPARE, { quote, terms }, signal);
+    if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
+    matchBatchTerms(prepared.terms, terms);
+  }
   await verify(signal);
   signal.throwIfAborted();
   await bounded(
@@ -135,26 +144,73 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     signal.throwIfAborted();
     return runBuyerBlocks(context, request, signal, onDelta);
   }
-  return executeBatchBuyer(
+  return runBuyerSession(context, request, {
+    verify,
+    open,
+    verifyUsage: async (result) =>
+      verifiedCharge(context, quote, input, result),
+    signal,
+    onDelta,
+  });
+}
+
+// One paid session request without blocks: execute, verify, approve, then attest it like a block
+// request (same evidence, same digest as the seller's half).
+async function runBuyerSession<Remote extends BatchDestination>(
+  context: BuyerBatchContext<Remote>,
+  request: import('@gyblos/protocol/batch-channel').BatchExecutionRequest,
+  steps: {
+    verify: (signal: AbortSignal) => Promise<void>;
+    open: (
+      payload: string,
+    ) => Promise<import('@gyblos/protocol/payment-session').SessionSnapshot>;
+    verifyUsage: (result: FreeExecutionResult) => Promise<string>;
+    signal: AbortSignal;
+    onDelta?: (text: string) => Promise<void>;
+  },
+) {
+  const { options, terms, rpc, approve } = context;
+  const { signal, onDelta } = steps;
+  const pending = await batchSessionRequest(request);
+  const started = performance.now();
+  let first: number | null = null;
+  let billed: SessionBill | undefined;
+  const baseAtomic = options.buyer.snapshot().cumulativeAtomic;
+  const generated = await executeBatchBuyer(
     {
       buyer: options.buyer,
-      verify,
-      open,
+      verify: steps.verify,
+      open: steps.open,
       execute: async () => {
         const result = await rpc(
           BATCH_METHODS.EXECUTE,
           request,
           signal,
-          onDelta,
+          async (text) => {
+            if (text) first ??= Math.floor(performance.now() - started);
+            await onDelta?.(text);
+          },
         );
         if (!('bill' in result)) return batchFail();
+        billed = result.bill;
         return result;
       },
-      verifyUsage: async (result) =>
-        verifiedCharge(context, quote, input, result),
+      verifyUsage: steps.verifyUsage,
       accept: approve,
     },
-    await batchSessionRequest(request),
+    pending,
     signal,
   );
+  const bill = billed;
+  if (bill)
+    publishBuyerSessionReceipt(
+      options.receipt,
+      request,
+      pending.requestDigest,
+      generated,
+      () => sessionReceiptPayment(request, terms, baseAtomic, bill),
+      first,
+      Math.floor(performance.now() - started),
+    );
+  return generated;
 }

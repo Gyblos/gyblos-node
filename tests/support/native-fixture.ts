@@ -12,10 +12,10 @@ import {
   HTTP_OVER_IROH,
   TRANSPORT_ROUTES,
 } from '@gyblos/transport-iroh/constants';
-import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 import { decodeResponse, encodeRequest } from '@gyblos/transport-iroh/wire';
 
+import { createIrohTransport } from './native-http-client';
 import { NATIVE_CAPABILITY } from './native-runtime';
 import { within } from './test-deadline';
 

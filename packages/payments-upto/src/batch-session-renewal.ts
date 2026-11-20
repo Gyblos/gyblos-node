@@ -13,7 +13,7 @@ import {
 } from '@gyblos/protocol/payment-session';
 import {
   acquireProcessLock,
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
@@ -42,7 +42,7 @@ export async function renewBatchSession(
   options: BatchRenewalOptions,
 ): Promise<void> {
   const terms = termsFor(options.terms);
-  await ensurePrivateDirectory(options.paths.directory);
+  await ensurePrivatePaymentPaths(options.paths);
   const lock = await acquireProcessLock(options.paths.lock);
   try {
     const previous = await readBatchRecord(options.paths);

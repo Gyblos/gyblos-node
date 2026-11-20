@@ -1,19 +1,43 @@
 // Owns the Payments section: what Gyblos channels moved on Solana devnet, from the collector's chain
 // index (GET /v1/stats/chain): settled USDC, payouts to sellers, Gyblos fees, refunds, volume per day,
 // and the whole program's traffic for scale. Gyblos traffic is a label the channel's open declares.
-import { summarizeChain, type ChainSummary } from '../lib/chain-shape';
+import {
+  ArrowDownToLine,
+  ArrowUpRight,
+  Coins,
+  Landmark,
+  ListOrdered,
+  Percent,
+  Undo2,
+  Unlock,
+} from 'lucide-react';
+
+import {
+  dailySettled,
+  summarizeChain,
+  type ChainSnapshot,
+  type ChainSummary,
+} from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
-import { DISPLAY } from '../lib/constants';
-import { count, percent, usdc, utc } from '../lib/format';
+import { DISPLAY, UNITS } from '../lib/constants';
+import { count, usdc, usdcDecimal, utc } from '../lib/format';
+import type { RangeDays } from '../lib/range';
+import { Flow } from './board/animated-number';
+import { BarChartCard } from './board/bar-chart-card';
+import { delta, type Delta } from './board/delta';
+import { StatCard } from './board/stat-card';
 import {
   moneyCell,
   numberCell,
   SectionTitle,
-  Stat,
   Table,
   td,
   Unavailable,
 } from './ui';
+
+const money = (atomic: bigint) => (
+  <Flow value={usdcDecimal(atomic)} kind="usdc" />
+);
 
 function meta(backfillDone: boolean | null, aggregatedAt: number | null) {
   if (backfillDone === null) return 'chain index starting';
@@ -21,87 +45,144 @@ function meta(backfillDone: boolean | null, aggregatedAt: number | null) {
   return `updated ${utc(aggregatedAt)}`;
 }
 
-export async function PaymentsSection() {
-  const chain = await getChainStats();
+// Each figure's change against the span just before the range; none when it cannot be read or the
+// chain history is still being read (an incomplete earlier span would overstate every change).
+function changes(current: ChainSummary['totals'], before: ChainSnapshot) {
+  if (before.error || !before.backfillDone) return null;
+  const previous = summarizeChain(before).totals;
+  return {
+    settled: [delta(current.settled, previous.settled)],
+    paidOut: [delta(current.paidOut, previous.paidOut)],
+    gyblosFees: [delta(current.gyblosFees, previous.gyblosFees)],
+    opens: [delta(current.opens, previous.opens)],
+    deposited: [delta(current.deposited, previous.deposited)],
+    refunded: [delta(current.refunded, previous.refunded, 'none')],
+  };
+}
+
+export async function PaymentsSection({ days }: { days: RangeDays }) {
+  const [chain, before] = await Promise.all([
+    getChainStats(days),
+    getChainStats(days, 1),
+  ]);
   if (chain.error) return <Unavailable title="Payments" />;
   const summary = summarizeChain(chain);
   const { totals } = summary;
+  const change = changes(totals, before);
   return (
     <>
       <SectionTitle
-        title="Payments · 30 days"
-        meta={meta(chain.backfillDone, chain.aggregatedAt)}
+        title={`Payments · ${days} days`}
+        meta={
+          change
+            ? `vs previous ${days} days · ${meta(chain.backfillDone, chain.aggregatedAt)}`
+            : meta(chain.backfillDone, chain.aggregatedAt)
+        }
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Settled" value={usdc(totals.settled)} money />
-        <Stat label="Paid to sellers" value={usdc(totals.paidOut)} money />
-        <Stat label="Gyblos fees" value={usdc(totals.gyblosFees)} money />
-        <Stat
-          label="Effective fee"
-          value={summary.feeShare === null ? '—' : percent(summary.feeShare)}
-        />
-        <Stat label="Channels opened" value={count(totals.opens)} />
-        <Stat label="Deposited" value={usdc(totals.deposited)} money />
-        <Stat label="Refunded" value={usdc(totals.refunded)} money />
-        <Stat
-          label="Gyblos · program txs"
-          value={`${count(totals.transactions)} · ${count(summary.programTransactions)}`}
-        />
-      </div>
-      <VolumeChart summary={summary} />
+      <PaymentStats summary={summary} change={change} />
+      <SettledChart
+        chain={chain}
+        total={totals.settled}
+        change={change?.settled[0]}
+      />
       <DailyTable summary={summary} />
-      <p className="mt-4 text-xs text-dim">
-        Gyblos channels are those whose open carries a Gyblos memo, a label
-        anyone can set. The program is shared: its other traffic is only
-        counted.
-      </p>
     </>
   );
 }
 
-function barHeight(value: bigint, max: bigint) {
-  const tenths = max === 0n ? 0 : Number((value * DISPLAY.barScale) / max);
-  return Math.max(tenths / DISPLAY.barScaleToPercent, DISPLAY.barMinPercent);
+function PaymentStats({
+  summary,
+  change,
+}: {
+  summary: ChainSummary;
+  change: ReturnType<typeof changes>;
+}) {
+  const { totals } = summary;
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatCard
+        icon={Coins}
+        label="Settled"
+        value={money(totals.settled)}
+        deltas={change?.settled}
+        money
+      />
+      <StatCard
+        icon={ArrowUpRight}
+        label="Paid to sellers"
+        value={money(totals.paidOut)}
+        deltas={change?.paidOut}
+        money
+      />
+      <StatCard
+        icon={Landmark}
+        label="Gyblos fees"
+        value={money(totals.gyblosFees)}
+        deltas={change?.gyblosFees}
+        money
+      />
+      <StatCard
+        icon={Percent}
+        label="Effective fee"
+        value={<Flow value={summary.feeShare} kind="percent" />}
+      />
+      <StatCard
+        icon={Unlock}
+        label="Channels opened"
+        value={<Flow value={totals.opens} kind="count" />}
+        deltas={change?.opens}
+      />
+      <StatCard
+        icon={ArrowDownToLine}
+        label="Deposited"
+        value={money(totals.deposited)}
+        deltas={change?.deposited}
+        money
+      />
+      <StatCard
+        icon={Undo2}
+        label="Refunded"
+        value={money(totals.refunded)}
+        deltas={change?.refunded}
+        money
+      />
+      <StatCard
+        icon={ListOrdered}
+        label="Gyblos · program txs"
+        value={`${count(totals.transactions)} · ${count(summary.programTransactions)}`}
+      />
+    </div>
+  );
 }
 
-function VolumeChart({ summary }: { summary: ChainSummary }) {
-  const days = summary.days.slice(-DISPLAY.chartDays);
-  if (!days.length) return null;
+// Settled USDC per day; the bar height is approximate, the labels exact.
+function SettledChart({
+  chain,
+  total,
+  change,
+}: {
+  chain: ChainSnapshot;
+  total: bigint;
+  change?: Delta;
+}) {
+  const points = dailySettled(chain).map((day) => ({
+    day: day.day,
+    value: Number(day.settled) / UNITS.atomicPerUsdc,
+    amount: usdcDecimal(day.settled),
+    detail: `${count(day.settles)} settlements`,
+  }));
+  if (!points.length) return null;
   return (
-    <>
-      <SectionTitle title="Settled by day" />
-      <div className="rounded-xl border border-line bg-panel p-4">
-        <div className="flex h-40 items-end gap-2">
-          {days.map(({ day, gyblos }) => (
-            <div
-              key={day}
-              className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
-              title={`${day}: ${usdc(gyblos.settled)} settled, ${gyblos.settles} settlements`}
-            >
-              <span className="font-mono text-[10px] text-dim">
-                {gyblos.settles}
-              </span>
-              <div
-                className="w-full max-w-12 rounded-t bg-brand"
-                style={{
-                  height: `${barHeight(gyblos.settled, summary.maxDaySettled)}%`,
-                }}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="mt-2 flex gap-2">
-          {days.map(({ day }) => (
-            <span
-              key={day}
-              className="min-w-0 flex-1 truncate text-center font-mono text-[10px] text-dim"
-            >
-              {day.slice(DISPLAY.monthDayStart)}
-            </span>
-          ))}
-        </div>
-      </div>
-    </>
+    <div className="mt-4">
+      <BarChartCard
+        title="Settled per day"
+        kind="usdc"
+        total={usdcDecimal(total)}
+        points={points}
+        change={change}
+        countAxis={false}
+      />
+    </div>
   );
 }
 
@@ -120,7 +201,7 @@ function DailyTable({ summary }: { summary: ChainSummary }) {
           { label: 'To sellers', right: true },
           { label: 'Fees', right: true },
           { label: 'Refunded', right: true },
-          { label: 'Program txs', right: true },
+          { label: 'All program txs', right: true },
         ]}
       >
         {[...summary.days].reverse().map(({ day, gyblos, program }) => (

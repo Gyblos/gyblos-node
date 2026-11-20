@@ -6,17 +6,17 @@ import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
-import { setup } from './support/buyer-paid';
+import { batchQuote } from './support/batch-quote';
 
 async function fixture() {
-  const buyer = await setup();
-  const paid = buyer.winners[0]!;
+  const { quote } = await batchQuote();
+  const paid = { nodeId: 'a'.repeat(64), quote };
   const free = {
-    ...buyer.winners[1]!,
+    nodeId: 'b'.repeat(64),
     quote: {
-      ...buyer.winners[1]!.quote,
+      ...quote,
       offer: {
-        ...buyer.winners[1]!.quote.offer,
+        ...quote.offer,
         prices: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
         maxAtomic: '0',
       },

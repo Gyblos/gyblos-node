@@ -1,6 +1,8 @@
 // Public local-buyer API names; these do not change the signed inference protocol.
 export const BUYER_API = {
   STATUS_PATH: '/v1/gyblos/status',
+  CHANNEL_CHAT_PATH: '/v1/gyblos/channel-chat',
+  SELLER_CHOICE_FIELD: 'gyblos_seller_choice',
   CHAT_PATH: '/v1/gyblos/chat',
   PAYMENT_FIELD: 'gyblos_payment',
   EXECUTION_FIELD: 'gyblos_execution',
@@ -17,8 +19,20 @@ export const BUYER_API = {
 export const BUYER_SIDECAR = {
   READY: 'buyer-ready',
   ERROR: 'buyer-error',
+  DEPOSIT_MINIMUM: 'BUYER_SESSION_DEPOSIT_BELOW_MINIMUM',
+  SESSION_REQUIRED: 'PAID_SELECTION_REQUIRES_SESSION',
   STOP: 'buyer-stop',
 } as const;
+
+export function isBuyerSessionConfigFailure(
+  kind: unknown,
+): kind is
+  typeof BUYER_SIDECAR.SESSION_REQUIRED | typeof BUYER_SIDECAR.DEPOSIT_MINIMUM {
+  return (
+    kind === BUYER_SIDECAR.SESSION_REQUIRED ||
+    kind === BUYER_SIDECAR.DEPOSIT_MINIMUM
+  );
+}
 
 // Delegated credentials are distinct from the buyer's private operator credential.
 export const BUYER_API_KEYS = {

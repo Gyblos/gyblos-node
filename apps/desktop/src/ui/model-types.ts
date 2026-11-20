@@ -4,6 +4,7 @@ import type { CatalogModelId } from '@gyblos/protocol/constants';
 export type ModelArtwork = { src: string; monochrome?: boolean };
 export type ChatModel = {
   id: string;
+  offerId?: string;
   catalogId?: CatalogModelId;
   name: string;
   image: ModelArtwork;

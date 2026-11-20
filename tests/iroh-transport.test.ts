@@ -14,10 +14,10 @@ import {
   TRANSPORT_LIMITS,
 } from '@gyblos/config';
 import { NODE_KEY_BYTES } from '@gyblos/node/constants';
-import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { endpoint, fixture, fixtureRequest } from './support/native-fixture';
+import { createIrohTransport } from './support/native-http-client';
 import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime';
 
 async function exercise(relayOnly: boolean, wrongIdentity: boolean) {

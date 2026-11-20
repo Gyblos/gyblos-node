@@ -167,7 +167,7 @@ credentials or a query string; the other `identity` settings are in
   address.
 - Configured sellers come first, and the candidate list stays within 16. With
   open discovery, `sellers` may be empty.
-- `buyer:free` uses open sellers directly. The automatic buyer (`buyer:start`,
+- `buyer:free` uses open sellers directly. The automatic buyer (`pnpm buyer`,
   `buyer:chat`, the desktop app) asks its configured sellers first at the
   request's own ceilings. When none can serve, or none is configured, it asks
   the open network at zero price ceilings. A request never goes back to a seller

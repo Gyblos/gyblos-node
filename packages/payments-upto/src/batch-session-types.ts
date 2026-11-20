@@ -61,6 +61,7 @@ export interface BatchRequestBlocks {
 }
 
 export interface BatchPaths {
+  paymentRoot?: string;
   directory: string;
   state: string;
   lock: string;

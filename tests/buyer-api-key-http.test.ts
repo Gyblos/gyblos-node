@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
-import { PAID_VERDICTS } from '@gyblos/node/constants';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
@@ -46,15 +46,19 @@ async function fixture() {
         usage: { inputTokens: 1, outputTokens: 1 },
         finishReason: ENGINE_DONE_REASONS.STOP,
         payment: {
-          verdict: PAID_VERDICTS.SETTLED,
+          verdict: SESSION_VERDICTS.APPROVED,
           maxAtomic: '60',
           expectedAtomic: charged,
-          chargedAtomic: charged,
-          sellerAtomic: charged,
-          feeAtomic: '0',
-          refundedAtomic: String(60 - Number(charged)),
-          recorded: false,
-          transaction: '3'.repeat(88),
+          chargedAtomic: null,
+          sellerAtomic: null,
+          feeAtomic: null,
+          refundedAtomic: null,
+          recorded: true,
+          session: {
+            approvedAtomic: charged,
+            cumulativeAtomic: charged,
+            depositAtomic: '100',
+          },
         },
       };
     },

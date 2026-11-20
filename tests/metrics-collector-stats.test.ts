@@ -32,6 +32,9 @@ import {
   T0,
 } from './support/receipt-upload';
 
+// The fixtures' default receipt buyer.
+const BUYER = 'c3'.repeat(32);
+
 const ORIGIN = 'https://collector.test';
 // The parts of a stats answer these tests read; the API shape is asserted field by field.
 interface Side {
@@ -43,6 +46,14 @@ interface Side {
   buyers: number | null;
   withheld?: boolean;
   sellers?: number;
+  observed?: {
+    buyerFirstToken: { samples: number; p50Ms: number | null };
+    engineSpeed: {
+      samples: number;
+      p50MinTokensPerSecond: number | null;
+      bucketsTokensPerSecond: number[];
+    };
+  } | null;
 }
 interface Answer {
   error?: string;
@@ -139,6 +150,8 @@ void test('models keep free and paid apart; sellers withhold buyers below the mi
   assert.equal(model!.free.outcomes.completed, AGGREGATES.minPublicBuyers + 1);
   assert.equal(model!.free.sellers, 2);
   assert.equal(model!.paid.authorizedAtomic, '7');
+  // No observation joined to a receipt: no data, never zero.
+  assert.equal(model!.free.observed, null);
 
   const shown = await get(
     app,
@@ -200,7 +213,8 @@ void test('the default range is the last days up to today, each endpoint one bat
   assert.equal(database.log.length, 3);
   database.log.length = 0;
   await get(app, '/v1/stats/models');
-  assert.equal(database.log.length, 1);
+  assert.equal(database.log.length, 2);
+  assert.equal(new Set(database.log.map((entry) => entry.batch)).size, 1);
 });
 
 void test('the network withholds unique buyers below the minimum and shows them at it', async () => {
@@ -274,4 +288,42 @@ void test('answers cap models and per-day demand, largest first', async () => {
   const demand = network.body.days[0]!.demand;
   assert.equal(demand.length, AGGREGATES.maxPublicDemandPerDay);
   assert.equal(demand[0]!.modelId, 'want/top');
+});
+
+void test('models carry buyer first token and engine speed per side, from joined observations', async () => {
+  const database = createCollectorD1();
+  const requestId = 'e5'.padEnd(32, '0');
+  insertReceipt(database, { requestId, paid: true, payer: 'Wallet' });
+  insertReceipt(database);
+  const at = Date.parse(`${DAY}T03:00:00.000Z`);
+  const event = { at, requestId, sellerNodeId: SELLER_A, buyerNodeId: BUYER };
+  insertObservation(database, insertEnvelope(database, 'buyer', at), {
+    ...event,
+    type: 'first_token',
+    streaming: true,
+    firstTokenMs: 800,
+  });
+  insertObservation(database, insertEnvelope(database, 'seller', at), {
+    ...event,
+    type: 'completed',
+    usage: { outputTokens: 90 },
+    generationMs: 1000,
+  });
+  await runAggregation(database, NOW);
+  const { body } = await get(
+    collector(database, NOW),
+    `/v1/stats/models?from=${DAY}&to=${DAY}`,
+  );
+  const [model] = body.models;
+  assert.equal(model!.free.observed, null);
+  const observed = model!.paid.observed!;
+  assert.equal(observed.buyerFirstToken.samples, 1);
+  assert.equal(observed.buyerFirstToken.p50Ms, 1000);
+  assert.equal(observed.engineSpeed.samples, 1);
+  // 90 tokens per second falls in the bucket from 50 up to 100: published as at least 50.
+  assert.equal(observed.engineSpeed.p50MinTokensPerSecond, 50);
+  assert.deepEqual(
+    observed.engineSpeed.bucketsTokensPerSecond,
+    AGGREGATES.tokensPerSecondBuckets,
+  );
 });

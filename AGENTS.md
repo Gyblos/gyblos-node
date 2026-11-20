@@ -10,15 +10,16 @@
 
 Dependency direction is protocol → core → inference/adapters → node → apps; config and runtime are shared support above protocol. Package table: [docs/architecture.md](docs/architecture.md).
 
-- `packages/protocol`: wire contracts, canonical JSON, signing domains and golden vectors (`vectors/`). It owns v1 signed offers and v2 public records, control, offers and paid execution (`paid-execution`, `paid-stream`). Paid v2 is conditionally composed by the seller with a payment server; see [limitations](docs/limitations.md) for validation scope. It also owns plugin ports (`Engine`, `PaymentClient` and `PaymentServer`), payment binding and shared catalogs. No SDKs.
+- `packages/protocol`: wire contracts, canonical JSON, signing domains and golden vectors (`vectors/`). It owns v1 signed offers and v2 public records, control, offers and reusable payment channels. The seller composes payment sessions for priced offers; see [limitations](docs/limitations.md) for validation scope. It also owns plugin ports (`Engine`, `PaymentClient` and `PaymentServer`), payment binding and shared catalogs. No SDKs.
 - `packages/core`: pure policy (metering, offer trust `offers`, `control-admission`, `control-quotes`, `seller-selection*`). No SDKs, filesystem, or clock/random of its own.
 - Adapters (plugins) are the packages matching `payments-*`, `identity`, `engine-*`, `transport-*`, `discovery-*`, `telemetry-*` (`tooling/boundaries/config.ts`). Each implements a port and is chosen by composition in `node`; they never import each other, `node` or apps. Inference knows no wallets; payment code knows no engines.
 - Standalone packages (`STANDALONE_NAMES` in `tooling/boundaries/config.ts`) are meant to leave the monorepo under their own license: they import no workspace package, app, lab or test code, keep their tests in `packages/<name>/test/`, and only `payments-*` adapters (plus tests and tooling) may import them.
 - `packages/inference`: shared SDK-free inference orchestration over protocol ports and core policy. It imports no concrete adapters, node or apps; core and adapters do not import it. Node supplies the engine, economic policy and observation ports.
-- `packages/node`: local-node library for both roles; composes adapters, including seller control, free channels and conditional paid-v2 execution when a payment server is supplied.
-- `apps/node` (seller daemon and the `gyblos` CLI), `apps/buyer`, `apps/desktop` (the desktop app: Electron, the provisional desktop host), `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval), `apps/metrics-collector` (the metrics collector: the public receipt Cloudflare Worker at collector.gyblos.com, with scheduled aggregates and a public stats API; migrations and deploys need founder approval), `apps/docs` (the public docs site, docs.gyblos.com: a Fumadocs static export; publishing needs founder approval), `apps/explorer` (the public metrics explorer: a server-rendered Next.js app over the discovery index, the metrics collector's stats API and Solana; not deployed, and hosting it needs founder approval) and `apps/receipt-collector` (the local receipt receiver: a standalone loopback-only process) are independent executables; apps never import each other. Every docs page has an English and a Spanish file, updated together; a change to output the seller guide quotes updates the guide in the same PR (`tests/docs-content.test.ts`).
+- `packages/node`: local-node library for both roles; composes adapters, including seller control, free channels and reusable payment channels for priced offers.
+- `apps/node` (seller daemon and the `gyblos` CLI), `apps/buyer`, `apps/desktop` (the desktop app: Electron, the provisional desktop host), `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval), `apps/metrics-collector` (the metrics collector: the public receipt Cloudflare Worker at collector.gyblos.com, with scheduled aggregates and a public stats API; migrations and deploys need founder approval), `apps/docs` (the public docs site, docs.gyblos.com: a Fumadocs static export; publishing needs founder approval), `apps/explorer` (the public metrics explorer at explorer.gyblos.com: a server-rendered Next.js app over the discovery index, the metrics collector's stats API and Solana; deploys need founder approval. Its reusable components live in `components/board` and are published as a shadcn registry, `registry.json` built into `/r/<name>.json`, so other Gyblos apps install them with `npx shadcn add https://explorer.gyblos.com/r/<name>.json`) and `apps/receipt-collector` (the local receipt receiver: a standalone loopback-only process) are independent executables; apps never import each other. Every docs page has an English and a Spanish file, updated together; a change to output the seller guide quotes updates the guide in the same PR (`tests/docs-content.test.ts`).
+- Buyers use the desktop app, and the API keys it issues to connect their coding tools. Public buyer-facing text (the docs site, the landing in `web-gyblos`, desktop copy) never tells a buyer to clone this repository, install Node or pnpm, or run `pnpm buyer` / `buyer:*` scripts. Running the buyer from a checkout is contributor material and belongs only in `docs/`.
 - `packages/config`: operator values; `config/src/home.ts` is the only owner of local paths. `packages/runtime`: platform helpers.
-- `lab/`: validation outside product (`harness`, `facilitator`, `tools`; `evidence` is historical). "Gate" is a lab word only: no product code, route, variable, message or product script uses it.
+- `lab/`: validation outside product (`harness`, `tools`; `evidence` is historical). "Gate" is a lab word only: no product code, route, variable, message or product script uses it.
 - Product never imports `lab/`, `tests/` or `tooling/`. Import other workspaces by name through explicit `exports`; relative imports stay inside one package.
 - Dependency patches are a last resort: each lives in `patches/` (pnpm `patchedDependencies`), changes nothing unless explicitly used, is justified next to its entry in `pnpm-workspace.yaml` with its upstream status, and is removed when the dependency supports the change.
 - No import-time initialization: handlers, timers and state start in lifecycle/entry functions (`tests/entrypoint-inertness.test.ts`).
@@ -46,11 +47,20 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 - Humans and AI-assisted contributors follow the same change loop: orient, define scope, inspect, implement, verify locally, review and hand off. The procedure is [`.agents/skills/gyblos-contributor-workflow/SKILL.md`](.agents/skills/gyblos-contributor-workflow/SKILL.md); its public onboarding explanation is [CONTRIBUTING.md](CONTRIBUTING.md#using-ai-tools).
 - Provider-specific files may help a tool load this repository, but they do not add rules or replace project context. A handoff must be reproducible from the branch, repository files and reported checks, without a private prompt or transcript.
 
+## Writing code
+
+- State your assumptions before coding. When readings of a request lead to different behavior or scope, ask the founder or a maintainer; otherwise state your choice and continue. When a simpler approach exists, say so.
+- Write the least code that solves the request: no features, options or abstractions nobody asked for. Validation at trust boundaries, error handling for external input, the diagnostics Safety and privacy requires and security controls are always in scope (see Hard rules and Safety and privacy).
+- Keep changes surgical: every changed line traces to the request; match the surrounding style and do not reformat, rename or refactor neighboring code. A replacement removes the old path in the same PR (Hard rules: delete code no product path uses). Report, without fixing, unrelated unused code and any security or correctness defect you notice; fix one only when it blocks the request.
+- Define the check that proves a task is done before you start; for a behavior change that check is the failing test required under Tests.
+
 ## Hard rules
 
 - Boundaries and lint errors are enforcing; never suppress, baseline or cast around them. Lint warnings must not grow.
 - One canonical definition per owned discrete value (`as const` in the owning `constants.ts`, type derived from it); for example use `INFERENCE_EVIDENCE_CODES.ASSERTION_FAILED`, never a second `'ASSERTION_FAILED'` literal. Details: [docs/code-standards.md](docs/code-standards.md).
 - No `any`, no widening closed types to `string`, no object-literal `as`, no floating promises, one declaration per `const`/`let`. Parse external input as `unknown` and validate at the boundary.
+- Delete code no product path uses: when a replacement is ready, remove the old path with its tests, scripts, docs and workspace entries instead of keeping it "for compatibility". Reachability from product entry points (seller daemon and `gyblos` CLI, buyer commands, desktop, Workers) decides; a test, lab gate or doc that is its only user does not keep it alive. This applies to every app and package.
+- Paid inference uses payment channels (payment sessions) only. Never add a new per-request payment path.
 - Keep behavior changes and structural moves in separate PRs; no scope expansion during structural work. Refactors preserve wire values, test names and counts, journals and private paths. Move files with `git mv` and check ignore rules for the destination.
 
 ## Tests
@@ -80,7 +90,8 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 ## Workflow and merges
 
 - Small coherent commits; never rewrite pushed commits without authorization.
-- Every substantive PR gets three independent read-only reviews (structure, behavior equivalence, security), each in its own worktree; one writer fixes confirmed findings and re-runs the gates.
+- Review each substantive PR with a team of three independent read-only agents covering structure, behavior equivalence and security. Each reviewer works in a separate detached worktree at the PR head and reports findings with evidence.
+- One writer verifies each finding. For every confirmed bug, first add a regression test and observe it fail for the reported reason, then fix the bug and run the test again. Resolve confirmed findings before handoff and record the reasoning for any dismissed finding. Re-run the required checks, have the team verify the final head, and include the red and green results and reviewer verdicts in the PR.
 - PRs are merged with merge commits, never squash.
 - Branches: work lands in `develop`; open every PR against `develop`. `main` receives only release PRs from `develop`, and release tags are cut from `main`. Both branches are protected: changes arrive only through PRs, with merge commits.
 - Opening a PR or green CI never authorizes a merge; merge only on explicit founder approval for that PR. CI, Security and Static analysis run on PRs into `develop` or `main` and on pushes to them. A stacked child PR intentionally has no hosted run: it still requires exact-head local gates, three independent reviews and separate founder approval before merging into its base. Merge stacks top-down; the final PR into `develop` requires successful current checks on the combined head. A missing or filtered check is never a passing check. Head updates and the final push to `develop` can run checks again. Default CI uses Linux plus targeted Windows checks; the broader wallet and backup-exchange platform jobs are manual (`desktop-platforms.yml`), so run them before desktop distribution or after wallet/backup/restore changes. A local-only task does not authorize triggering or rerunning remote workflows; report them as not run and leave the PR open.
@@ -90,6 +101,12 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 
 - Work in your own detached worktree, never in a shared checkout or another agent's worktree.
 - Sub-agents never delete their worktree or branch; report the path to the parent. The main agent asks before removing a worktree it is in, and from the repository root removes only worktrees it launched.
+
+## Founder decisions
+
+- Windows, macOS and Linux get the same features. Close a platform gap (for example payment-folder permissions on Windows) instead of shipping less on one platform.
+- Payment sessions default to a 1 USDC deposit (`1000000` atomic) and a 1-hour lifetime (`3600000` ms).
+- Keep `telemetry-file`, `telemetry-otel` and PayPal unless the founder approves removing them.
 
 ## Public decisions and internal vault
 

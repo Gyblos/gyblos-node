@@ -24,7 +24,7 @@ import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
-import type { AcceptanceClock } from './clock';
+import type { AcceptanceClock, AdmissionClock } from './clock';
 import type { AcceptanceEngine } from './engine';
 import { assertAcceptanceActive } from './errors';
 import type { AcceptanceIndex } from './index';
@@ -45,6 +45,7 @@ export interface AcceptanceHostOptions {
   wire: AcceptanceWire;
   identity: AcceptanceIdentity;
   clock: AcceptanceClock;
+  admissionClock?: AdmissionClock;
   engine: AcceptanceEngine;
   workspace: AcceptanceWorkspace;
   index: AcceptanceIndex;
@@ -123,6 +124,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       relayOnly: false,
       sequence,
       now: clock.now,
+      monotonic: options.admissionClock?.now,
       // The v1 PoC terms carry no protocol fee.
       protocolFeeBps: 0,
     });

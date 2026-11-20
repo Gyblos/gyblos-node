@@ -1,25 +1,11 @@
 // Owns synthetic review integration tests. No real credentials, target processes or model calls are used.
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import {
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { readdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import test from 'node:test';
-import { promisify } from 'node:util';
 
 import { writeArtifacts } from './security-review/artifacts';
-import {
-  REVIEW_VALUES,
-  REVIEWER_IDS,
-  type ReviewerId,
-} from './security-review/constants';
+import { REVIEW_VALUES, REVIEWER_IDS } from './security-review/constants';
 import {
   changedFiles,
   repositoryRef,
@@ -38,90 +24,17 @@ import {
 } from './security-review/plan';
 import { createSourceBundle } from './security-review/projection';
 import { runReview } from './security-review/runner';
-import type {
-  AgentEvidence,
-  AgentFinding,
-  PiProcessResult,
-  SourceBundle,
-} from './security-review/types';
+import {
+  EVIDENCE,
+  exec,
+  FILE,
+  FINDING,
+  fixture,
+  hunter,
+  success,
+} from './security-review/test-fixture';
+import type { SourceBundle } from './security-review/types';
 
-const exec = promisify(execFile);
-const FILE = 'packages/core/src/policy.ts';
-const EVIDENCE: AgentEvidence = {
-  file: FILE,
-  revision: REVIEW_VALUES.HEAD,
-  line: 1,
-  scope: 'policy',
-  description: 'Source rule.',
-};
-const FINDING: AgentFinding = {
-  fingerprint: 'policy:boundary',
-  category: REVIEW_VALUES.SECURITY,
-  title: 'Candidate',
-  description: 'Source hypothesis.',
-  evidence: [EVIDENCE],
-  lower_trust_principal: 'untrusted peer',
-  affected_resource: 'policy',
-  observed_result: 'Source inference.',
-  suggested_fix: 'Add the invariant at admission.',
-};
-function hunter(
-  bundle: SourceBundle,
-  reviewer: ReviewerId = REVIEWER_IDS.SECURITY,
-  findings: AgentFinding[] = [],
-) {
-  return {
-    status: REVIEW_VALUES.COMPLETE,
-    reviewer,
-    coverage: {
-      reviewed_paths: [...new Set(bundle.files.map((file) => file.path))],
-      notes: 'Source checked.',
-    },
-    findings,
-  };
-}
-function success(value: unknown): PiProcessResult {
-  return {
-    exitCode: 0,
-    signal: null,
-    truncated: false,
-    timedOut: false,
-    stdout: JSON.stringify(value),
-  };
-}
-async function fixture(
-  run: (root: string, output: string) => Promise<void>,
-): Promise<void> {
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-review-fixture-'));
-  const root = join(directory, 'source');
-  const output = join(directory, 'results');
-  await mkdir(root);
-  await mkdir(output);
-  await mkdir(dirname(join(root, FILE)), { recursive: true });
-  await writeFile(join(root, FILE), 'export const limit = 1;\n');
-  await exec('git', ['init', '-q'], { cwd: root });
-  await exec('git', ['add', '.'], { cwd: root });
-  await exec(
-    'git',
-    [
-      '-c',
-      'user.name=Fixture',
-      '-c',
-      'user.email=fixture@example.invalid',
-      '-c',
-      'core.hooksPath=/dev/null',
-      'commit',
-      '-qm',
-      'fixture',
-    ],
-    { cwd: root },
-  );
-  try {
-    await run(root, output);
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-}
 void test('baseline and payment PR select independent base and specialist reviews', () => {
   const paths = [
     FILE,
@@ -155,6 +68,7 @@ void test('strict response validation rejects empty evidence, verdict fabricatio
     files: [{ path: FILE, revision: REVIEW_VALUES.HEAD, text: 'code' }],
     diff: '',
     omissions: [],
+    excluded: [],
   };
   assert.throws(
     () =>
@@ -188,6 +102,7 @@ void test('coverage and evidence must match actual supplied files and line bound
     files: [{ path: FILE, revision: REVIEW_VALUES.HEAD, text: 'code' }],
     diff: '',
     omissions: [],
+    excluded: [],
   };
   assert.throws(
     () => validateEvidence([{ ...EVIDENCE, line: 2 }], bundle),
@@ -232,6 +147,89 @@ void test('Git inventory and bundles use the requested immutable revision and re
     assert.match(bundle.diff, /\+export const limit = 2/);
     assert.equal(bundle.files.length, 2);
     assert.match((await trackedFile(root, base, FILE)) ?? '', /limit = 1/);
+  });
+});
+void test('symlinks and binary blobs are excluded from a bundle, not omitted, so the task still runs', async () => {
+  await fixture(async (root) => {
+    const image = 'packages/core/src/logo.png';
+    const link = 'packages/core/src/link.ts';
+    // Over the 1 MiB text limit: still a binary, so excluded rather than a failing omission.
+    await writeFile(
+      join(root, image),
+      Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x00]),
+        Buffer.alloc(1_100_000, 1),
+      ]),
+    );
+    await symlink('policy.ts', join(root, link));
+    await exec('git', ['add', '.'], { cwd: root });
+    await exec(
+      'git',
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        '-c',
+        'core.hooksPath=/dev/null',
+        'commit',
+        '-qm',
+        'assets',
+      ],
+      { cwd: root },
+    );
+    const head = await repositoryRef(root);
+    const paths = [FILE, image, link];
+    const plan = buildBaselinePlan(paths, head);
+    const bundle = await createSourceBundle(root, plan, paths);
+    assert.deepEqual(bundle.omissions, []);
+    assert.deepEqual(
+      bundle.excluded.map((entry) => entry.path).sort(),
+      [link, image].sort(),
+    );
+    assert.deepEqual(
+      bundle.files.map((file) => file.path),
+      [FILE],
+    );
+  });
+});
+void test('a task with only binaries completes without calling Pi', async () => {
+  await fixture(async (root, output) => {
+    const image = 'packages/core/src/logo.png';
+    await writeFile(join(root, image), Buffer.from([0x89, 0x50, 0x00, 0x01]));
+    await exec('git', ['add', '.'], { cwd: root });
+    await exec(
+      'git',
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        '-c',
+        'core.hooksPath=/dev/null',
+        'commit',
+        '-qm',
+        'logo',
+      ],
+      { cwd: root },
+    );
+    const plan = buildBaselinePlan([image], await repositoryRef(root));
+    const result = await runReview(plan, {
+      root,
+      output,
+      model: 'openai/example',
+      thinking: 'high',
+      dryRun: false,
+      execute: async () => {
+        throw new Error('must not call');
+      },
+    });
+    assert.equal(result.execution?.callsStarted, 0);
+    assert.ok(result.tasks.every((t) => t.status === REVIEW_VALUES.COMPLETE));
+    assert.deepEqual(
+      result.tasks[0]?.excluded?.map((entry) => entry.path),
+      [image],
+    );
   });
 });
 void test('dry run never invokes Pi and reports no audit completion', async () => {

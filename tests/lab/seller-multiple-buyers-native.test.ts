@@ -15,7 +15,6 @@ import {
   SESSION_BLOCK_KINDS,
   SESSION_BLOCKS,
 } from '@gyblos/protocol/session-blocks';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import {
   blockTestMeter,
@@ -29,9 +28,7 @@ import { sellerRegistryRig } from '../support/seller-session-registry';
 void test(
   'native Iroh restores two buyer journals after seller restart and settles each original channel independently',
   {
-    skip: WINDOWS
-      ? 'Reusable financial startup requires payment subtree ACL validation on Windows'
-      : NATIVE_CAPABILITY.transportSkip,
+    skip: NATIVE_CAPABILITY.transportSkip,
   },
   async (t) => {
     t.mock.method(Date, 'now', () => 1_800_000_000_000);
@@ -49,6 +46,7 @@ void test(
       for (const client of endpoints) await client.close();
     });
     const rig = await sellerRegistryRig(2, {
+      depositAtomic: '10000',
       sellerNodeId: sellerEndpoint.id().toString(),
       buyerNodeIds: endpoints.map((peer) => peer.id().toString()),
       prepareOpenings: false,
@@ -64,7 +62,6 @@ void test(
     t.after(() => registry.dispose());
     const start = async () => {
       const host = await startSellerSessionHost({
-        buyerNodeIds: buyers.map((row) => row.terms.buyerNodeId),
         registry,
         description: buyers[0]!.terms,
         owner: buyers[0]!.terms.owner,
@@ -98,7 +95,7 @@ void test(
           endpoint: endpoints[index]!,
           destination: () => sellerEndpoint.addr(),
           policy: {
-            depositAtomic: '1000',
+            depositAtomic: '10000',
             lifetimeMs: 3_600_000,
             withdrawDelaySeconds: 900,
           },

@@ -11,7 +11,7 @@ import {
   validCatalogQuery,
 } from '@gyblos/desktop/network-catalog';
 import { createCatalogHandlers } from '@gyblos/desktop/network-catalog-handlers';
-import { readFreeAnnouncements } from '@gyblos/desktop/network-catalog-reader';
+import { readAnnouncements } from '@gyblos/desktop/network-catalog-reader';
 import { createCatalogSession } from '@gyblos/desktop/network-catalog-session';
 import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
@@ -22,7 +22,9 @@ import {
   jsonResponse,
   sellersBody,
 } from './support/discovery-fixture';
+import { PUBLIC_TEST_OWNER } from './support/public-records';
 
+const OTHER_ASSET = PUBLIC_TEST_OWNER;
 async function entry(free = true, modelId = 'qwen3:0.6b') {
   const source = await discoverySeller({ modelId });
   const catalog = {
@@ -31,6 +33,8 @@ async function entry(free = true, modelId = 'qwen3:0.6b') {
       ...model,
       pricing: {
         ...model.pricing,
+        // A paid listing in an asset the app does not pay with (not devnet USDC).
+        asset: OTHER_ASSET,
         inputAtomicPerMtok: free ? '0' : '1',
         outputAtomicPerMtok: '0',
       },
@@ -45,11 +49,11 @@ async function entry(free = true, modelId = 'qwen3:0.6b') {
     },
   };
 }
-void test('desktop announcements verify signatures, filter paid listings and never forward provider identities', async () => {
+void test('desktop announcements verify signatures, leave out paid listings in other assets and never forward provider identities', async () => {
   const free = await entry();
   const paid = await entry(false);
   const calls: { url: string; init: RequestInit }[] = [];
-  const result = await readFreeAnnouncements(
+  const result = await readAnnouncements(
     async (url, init) => {
       calls.push({ url, init });
       return jsonResponse(
@@ -88,7 +92,7 @@ void test('desktop announcements verify signatures, filter paid listings and nev
 void test('desktop announcements reject expired entries and mark a bounded first page without following its cursor', async () => {
   const free = await entry();
   let calls = 0;
-  const result = await readFreeAnnouncements(
+  const result = await readAnnouncements(
     async () => {
       calls += 1;
       return jsonResponse(200, sellersBody([free.signed], 'next-page'));
@@ -104,7 +108,7 @@ void test('desktop announcements reject expired entries and mark a bounded first
 void test('desktop announcement groups preserve context, variants and distinct node counts', async () => {
   const first = await entry();
   const second = await entry();
-  const result = await readFreeAnnouncements(
+  const result = await readAnnouncements(
     async () =>
       jsonResponse(
         200,
@@ -269,13 +273,16 @@ void test('desktop catalog IPC rejects foreign windows, stale frames, extra argu
     'org/model',
   ]);
   assert.equal(calls, 1);
-  assert.equal(handlers.summary(event, ['extra']).state, CATALOG_STATE.ERROR);
+  assert.equal(
+    (await handlers.summary(event, ['extra'])).state,
+    CATALOG_STATE.ERROR,
+  );
 });
 
 void test('announced model presentation reuses zero-price controls with explicit source and local-only artwork', async () => {
   const { announcedModels } = await import('@gyblos/desktop/announced-models');
   const free = await entry();
-  const snapshot = await readFreeAnnouncements(
+  const snapshot = await readAnnouncements(
     async () => jsonResponse(200, sellersBody([free.signed])),
     'qwen3:0.6b',
     () => DISCOVERY_NOW,
@@ -297,7 +304,7 @@ void test('announced model presentation reuses zero-price controls with explicit
 void test('model artwork does not attribute an unrelated name to a known lab', async () => {
   const { announcedModels } = await import('@gyblos/desktop/announced-models');
   const free = await entry(true, 'unrelated-qwen-copy');
-  const snapshot = await readFreeAnnouncements(
+  const snapshot = await readAnnouncements(
     async () => jsonResponse(200, sellersBody([free.signed])),
     'unrelated-qwen-copy',
     () => DISCOVERY_NOW,
@@ -307,7 +314,7 @@ void test('model artwork does not attribute an unrelated name to a known lab', a
   assert.equal(models[0]?.image.src, './assets/brand/gyblos-icon.png');
 });
 
-void test('desktop catalog bounds distinct variants and excludes paid output even when input is zero', async () => {
+void test('desktop catalog bounds distinct variants and leaves out a paid output in another asset even when input is zero', async () => {
   const first = await entry();
   const second = await entry();
   const variants = async (source: typeof first, offset: number) => {
@@ -332,7 +339,7 @@ void test('desktop catalog bounds distinct variants and excludes paid output eve
     await variants(first, 0),
     await variants(second, NETWORK_CATALOG.MAX_MODELS),
   ];
-  const result = await readFreeAnnouncements(
+  const result = await readAnnouncements(
     async () => jsonResponse(200, sellersBody(announcements)),
     'qwen3:0.6b',
     () => DISCOVERY_NOW,
@@ -347,7 +354,7 @@ void test('desktop catalog bounds distinct variants and excludes paid output eve
       pricing: { ...model.pricing, outputAtomicPerMtok: '1' },
     })),
   };
-  const excluded = await readFreeAnnouncements(
+  const excluded = await readAnnouncements(
     async () =>
       jsonResponse(
         200,
