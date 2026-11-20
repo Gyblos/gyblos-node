@@ -3,6 +3,8 @@
 import { Hono, type Context, type Next } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 
+import { ipKey } from '@gyblos/runtime/ip-key';
+
 import {
   COLLECTOR_ERRORS,
   COLLECTOR_HEADER_VALUES,
@@ -22,7 +24,6 @@ import { CollectorError, statusOf } from './errors';
 import { rejection } from './http';
 import { ingestUpload, StaleUploadError } from './ingest';
 import { ingestObservations } from './ingest-observations';
-import { ipKey } from './ip-key';
 import { statsRoutes } from './stats-routes';
 import type { StatsReader } from './stats-store';
 import type { CollectorStorage } from './storage';

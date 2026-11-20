@@ -10,7 +10,6 @@ import {
   NODE_PUBLISH_QUOTA,
   PUBLISH_MODES,
 } from '@gyblos/discovery-index/constants';
-import { ipKey } from '@gyblos/discovery-index/ip-key';
 import type { DiscoveryPublishers } from '@gyblos/discovery-index/publishers';
 import {
   createMemoryStorage,
@@ -18,6 +17,7 @@ import {
 } from '@gyblos/discovery-index/storage';
 import { createD1Storage } from '@gyblos/discovery-index/storage-d1';
 import { createWorker } from '@gyblos/discovery-index/worker';
+import { ipKey } from '@gyblos/runtime/ip-key';
 
 import {
   createSqliteD1,
