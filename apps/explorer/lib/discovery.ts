@@ -23,7 +23,7 @@ import { fetchJson } from './fetch-json';
 import { parseNetworkStatus, type NetworkStatus } from './network-status';
 import { list, nullable, num, record, text } from './validate';
 
-export type { OfferedModel, Seller, Uptime } from './discovery-shape';
+export type { OfferedModel, Seller } from './discovery-shape';
 
 export interface DiscoverySnapshot {
   generatedAt: number;
@@ -48,11 +48,9 @@ interface Catalog {
   sellers: Listed[];
 }
 // A catalog read under way: the models listed when it began, how many of them are read, and their
-// sellers, by node. `again` when it replaced a read that never ended: its progress does not date the
-// shown catalog as current (StoredDiscovery.progressAt).
+// sellers, by node.
 interface Pending {
   startedAt: number;
-  again: boolean;
   generatedAt: number;
   network: NetworkStatus | null;
   networkReadAt: number | null;
@@ -113,7 +111,8 @@ class Run {
   }
 }
 
-// Begins a catalog read: /models, then /network (the last catalog's when it fails or is malformed).
+// Begins a catalog read: /models, then /network (the last catalog's when it fails, is malformed, or the
+// run has ended).
 // Throws when /models fails or is malformed.
 async function begin(
   run: Run,
@@ -124,16 +123,18 @@ async function begin(
   const modelIds = list(listed.models, 'models.models').map((entry) =>
     text(record(entry, 'models.model').id, 'model.id'),
   );
-  const network = await run
-    .read('/network')
-    .then(parseNetworkStatus)
-    .catch(() => {
-      run.problems.add('network');
-      return null;
-    });
+  const network =
+    run.left > 0
+      ? await run
+          .read('/network')
+          .then(parseNetworkStatus)
+          .catch(() => {
+            run.problems.add('network');
+            return null;
+          })
+      : null;
   return {
     startedAt: now,
-    again: false,
     generatedAt: num(listed.generatedAt, 'models.generatedAt'),
     network: network ?? last?.network ?? null,
     networkReadAt: network ? now : (last?.networkReadAt ?? null),
@@ -175,7 +176,9 @@ async function carryOn(run: Run, pending: Pending) {
   while (pending.model < pending.modelIds.length && run.left > 0) {
     let sellers: Listed[] | null;
     try {
-      sellers = await sellersOf(run, pending.modelIds[pending.model] ?? '');
+      const modelId = pending.modelIds[pending.model];
+      if (modelId === undefined) break;
+      sellers = await sellersOf(run, modelId);
     } catch {
       run.problems.add('sellers');
       break;
@@ -217,19 +220,21 @@ async function withConcurrency<T>(
   await Promise.all(Array.from({ length: limit }, worker));
 }
 
-// Tries the uptimes of `nodeIds` within the run, DISCOVERY.uptimeConcurrency at a time; a failed try keeps
-// the last uptime and waits its turn like a read one.
+// Tries the uptimes of `nodeIds` within the run, none begun at or after `until`,
+// DISCOVERY.uptimeConcurrency at a time; a failed try keeps the last uptime and waits its turn like a
+// read one.
 async function tryUptimes(
   run: Run,
   stored: StoredDiscovery,
   nodeIds: string[],
   now: () => number,
+  until = Infinity,
 ) {
   await withConcurrency(
     nodeIds.slice(0, run.left),
     DISCOVERY.uptimeConcurrency,
     async (nodeId) => {
-      if (run.left <= 0) return;
+      if (run.left <= 0 || now() >= until) return;
       const last = stored.uptimes[nodeId]?.uptime ?? null;
       try {
         const fresh = uptime(
@@ -245,9 +250,11 @@ async function tryUptimes(
 }
 
 // One run over the previous stored read: first the uptimes most due, up to
-// DISCOVERY.uptimeReservedPerRun; then the catalog read (begun when none is under way, or again when the
-// one under way began DISCOVERY.restartAfterMs ago), replacing the shown catalog once whole; then more
-// due uptimes with what is left. Never throws: `problems` says what went wrong.
+// DISCOVERY.uptimeReservedPerRun and within DISCOVERY.reservedUptimesMs; then the catalog read (begun
+// when none is under way, or again when the one under way began DISCOVERY.restartAfterMs ago), replacing
+// the shown catalog once whole; then more due uptimes with what is left. A read begun
+// DISCOVERY.restartAfterMs or more after the shown catalog's (one that never ended came before it) does
+// not date the shown catalog as current. Never throws: `problems` says what went wrong.
 export async function readIndex(
   previous: StoredDiscovery | null,
   now: () => number,
@@ -264,28 +271,27 @@ export async function readIndex(
     stored,
     dueUptimes(stored, now()).slice(0, DISCOVERY.uptimeReservedPerRun),
     now,
+    now() + DISCOVERY.reservedUptimesMs,
   );
 
-  let again = false;
   if (
     stored.pending &&
     now() - stored.pending.startedAt >= DISCOVERY.restartAfterMs
   ) {
     run.problems.add('catalog-restarted');
-    again = true;
     stored.pending = null;
   }
   try {
     if (!stored.pending && run.left > 0)
-      stored.pending = { ...(await begin(run, now(), stored.catalog)), again };
+      stored.pending = await begin(run, now(), stored.catalog);
   } catch {
     run.problems.add('models');
   }
-  if (
-    stored.pending &&
-    (await carryOn(run, stored.pending)) &&
-    !stored.pending.again
-  )
+  const current =
+    !stored.catalog ||
+    (stored.pending?.startedAt ?? 0) - stored.catalog.readAt <
+      DISCOVERY.restartAfterMs;
+  if (stored.pending && (await carryOn(run, stored.pending)) && current)
     stored.progressAt = now();
   if (
     stored.pending &&

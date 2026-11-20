@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
-import { DISCOVERY } from '@gyblos/explorer/constants';
+import { DISCOVERY, FETCH } from '@gyblos/explorer/constants';
 import { readIndex, type StoredDiscovery } from '@gyblos/explorer/discovery';
 import { snapshotOf } from '@gyblos/explorer/discovery-snapshot';
 
@@ -202,6 +202,24 @@ void test('no uptime try begins after the run’s deadline either', async () => 
   ({ stored } = await readIndex(stored, () => now));
   assert.ok(began.length > 0);
   assert.ok(began.every((at) => at < DISCOVERY.runDeadlineMs));
+});
+
+void test('slow uptimes leave the run time for its catalog reading', async () => {
+  const sellers = nodes('n', 30);
+  fakeIndex({ models: { a: sellers } });
+  let { stored } = await readIndex(null, () => 0);
+  let now = DISCOVERY.uptimeRefreshMs;
+  const { requests } = fakeIndex({ models: { a: [...sellers, 'new'] } });
+  const answer = globalThis.fetch;
+  // Every /uptime takes the fetch timeout; other answers are instant.
+  globalThis.fetch = ((input: string | URL | Request) => {
+    if (String(input).includes('/uptime')) now += FETCH.timeoutMs / 6;
+    return answer(input);
+  }) as typeof fetch;
+  ({ stored } = await readIndex(stored, () => now));
+  assert.ok(count(requests, '/sellers') > 0);
+  assert.equal(stored.pending, null);
+  assert.ok(shownNodes(stored, now).includes('new'));
 });
 
 void test('a catalog read over several runs is not dated while it advances, and is once it stops', async () => {

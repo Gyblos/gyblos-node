@@ -7,7 +7,7 @@ export const FETCH = {
 } as const;
 
 // The discovery index is read in one place, by the Worker's scheduled run (scheduled.ts, on the cron in
-// wrangler.jsonc), into KV that every render reads (discovery.ts): the index's load does not grow with
+// wrangler.jsonc), into KV that every render reads (discovery-snapshot.ts): the index's load does not grow with
 // viewers. A run sends at most maxRequestsPerRun requests: under the Workers Free plan's 50 subrequests
 // per invocation (its KV read and write count too) and the index's 120 a minute per address. A whole
 // read of a large index spans several runs. On the Free plan a run also has 10 ms of CPU, which parsing
@@ -21,9 +21,10 @@ export const DISCOVERY = {
   // No request of a run begins after this long, so a run with requests at the fetch timeout still ends
   // well before the next run (2 minutes later) and never overlaps it.
   runDeadlineMs: 20 * 1000,
-  // Due uptimes a run tries before its catalog reading, so a long or slow catalog read never takes every
-  // run's requests and time.
+  // Due uptimes a run tries before its catalog reading, none begun after reservedUptimesMs, so neither a
+  // slow catalog read nor a slow /uptime takes every run's requests and time.
   uptimeReservedPerRun: 15,
+  reservedUptimesMs: 6 * 1000,
   // Uptime reads in flight at once: a Worker opens 6 connections at a time, and a queued read's
   // timeout would run while it waits.
   uptimeConcurrency: 6,
