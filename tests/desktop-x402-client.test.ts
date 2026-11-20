@@ -379,10 +379,8 @@ void test('an explicit free chat under a paid policy cannot spend or change API 
   const client = new X402Client(ledger, async (url, options) => {
     if (options?.method !== 'POST') return Response.json(policy);
     assert.equal(new URL(String(url)).pathname, BUYER_API.CHANNEL_CHAT_PATH);
-    assert.equal(
-      JSON.parse(String(options.body))[BUYER_API.FREE_ONLY_FIELD],
-      true,
-    );
+    const request = JSON.parse(String(options.body));
+    assert.equal(request[BUYER_API.FREE_ONLY_FIELD], true);
     posts++;
     if (claimPaid) return Response.json(reply());
     const { [BUYER_API.PAYMENT_FIELD]: _payment, ...free } = reply();
