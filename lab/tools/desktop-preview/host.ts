@@ -40,6 +40,7 @@ import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 import { accountBudgetSnapshot, accountLimitError } from './account-budget';
 import { PREVIEW } from './constants';
 import { exampleKeys } from './example-keys';
+import { previewFunding } from './funding';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
 import { previewCatalog } from './seller-listings';
@@ -380,24 +381,7 @@ export function createPreviewHost(
   };
 
   return {
-    desktopFunding: {
-      balance: async () =>
-        query.get('network') && query.get('network') !== 'devnet'
-          ? null
-          : {
-              network: DEVNET,
-              payer,
-              balanceAtomic: query.get('funding') === 'ready' ? '2000000' : '0',
-              faucetAvailable: true,
-              channelRemainingAtomic: null,
-            },
-      copyAddress: async (current: string) => {
-        if (current !== payer) return false;
-        await navigator.clipboard.writeText(payer);
-        return true;
-      },
-      openFaucet: async () => false,
-    },
+    desktopFunding: previewFunding(query, payer),
     desktopWindow,
     desktopConversations,
     desktopWallet,
