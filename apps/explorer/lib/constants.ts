@@ -5,32 +5,23 @@ export const FETCH = {
   timeoutMs: 8_000,
 } as const;
 
-const MAX_SELLER_PAGES = 10;
-// Bounds on one read of the discovery index (the index itself answers no-store): past them the page
-// shows what was read. One read costs at most 22 requests (1 /models, 10 /sellers, 1 /network,
-// 10 /uptime) and is shared by the renders of a data center (shared-read.ts): reads follow one another,
-// each fresh for at least 15 s, so a data center reads at most 4 times (88 requests) a minute, under
-// the index's 120 a minute per address that all explorer requests share; renders that look in the same
-// instant as the entry goes stale are the exception.
+// The discovery index is read in one place, by the Worker's scheduled run (worker.ts, every 2 minutes),
+// into a KV snapshot that every render reads (discovery.ts): the index's load does not grow with
+// viewers. A run stays within maxRequestsPerRun requests, well under the index's 120 a minute per
+// address: /models, every /sellers page, /network, then the uptimes most in need of a read.
 export const DISCOVERY = {
-  // Pages of /sellers read in all, across every model.
-  maxSellerPages: MAX_SELLER_PAGES,
-  // Sellers whose uptime is read; the rest show none.
-  maxUptimeReads: 10,
-  // How long one complete read serves every render (the live refresh runs once a minute).
-  freshSeconds: 30,
-  // How long a read with a secondary answer missing (/network or an uptime) serves every render.
-  partialFreshSeconds: 15,
-  // How long the last read stays servable while another render reads, or after a failed read.
-  keepSeconds: 600,
-  // Longer than the slowest read: /models, every /sellers page one after another, then /network and
-  // the uptimes together, each at the fetch timeout, plus a margin.
-  readingLeaseSeconds: ((MAX_SELLER_PAGES + 2) * FETCH.timeoutMs) / 1000 + 8,
-  // No render reads again this long after a failed read.
-  failedBackoffSeconds: 15,
-  // How long a render without any read to serve waits for another render's read.
-  waitSeconds: 10,
-  waitPollMs: 250,
+  // Sellers per /sellers page: the index's largest page (DISCOVERY_INDEX_LIMITS.maxSellers).
+  sellersPerPage: 200,
+  // Pages read per model before the run gives up: the index tracks at most 10 000 nodes
+  // (DISCOVERY_INDEX_LIMITS.maxNodes), 50 pages, so more means a broken cursor.
+  maxSellerPages: 50,
+  maxRequestsPerRun: 60,
+  // A seller's uptime is read again once its last read is this old (its windows span days).
+  uptimeRefreshMs: 10 * 60 * 1000,
+  // A snapshot older than this (two missed runs and a margin) is shown as old: the index is not answering.
+  staleAfterMs: 5 * 60 * 1000,
+  // A render reuses the snapshot its Worker instance read this recently instead of reading KV again.
+  reuseMs: 30 * 1000,
 } as const;
 
 export const UNITS = {

@@ -15,8 +15,7 @@ import { RANGE } from '../lib/constants';
 import { parseRange } from '../lib/range';
 
 // Every request renders; the collector caches its answers at its own edge (5 minutes), and the discovery
-// index's answer is shared by the renders of a data center (lib/shared-read.ts). Workers cannot
-// share a pending fetch across requests, so no in-process cache is used.
+// index is read by the Worker's scheduled run into a KV snapshot that renders read (lib/discovery.ts).
 export const dynamic = 'force-dynamic';
 
 export default async function Home({

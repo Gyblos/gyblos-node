@@ -3,7 +3,7 @@
 // first token as the seller and the buyer measured it, and the engine's speed), free and paid apart.
 import { getCollector } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
-import { getDiscovery } from '../lib/discovery';
+import { getDiscovery } from '../lib/discovery-render';
 import {
   count,
   latencyMs,
@@ -95,7 +95,9 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
           <ModelRowView
             key={`${row.modelId}:${row.variant}:${row.quantization}`}
             row={row}
-            offersKnown={offersKnown}
+            offersKnown={
+              offersKnown && !discovery.unreadModels.includes(row.modelId)
+            }
           />
         ))}
       </Table>
@@ -120,7 +122,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
 }
 
 // One model: what is offered now, then what was served on each side. Without the discovery index's
-// answer, what is offered now reads unknown, never "not offered".
+// answer, or before the model's sellers are read, what is offered now reads unknown, never "not offered".
 function ModelRowView({
   row,
   offersKnown,
@@ -128,7 +130,8 @@ function ModelRowView({
   row: ModelRow;
   offersKnown: boolean;
 }) {
-  const shown = price(row.now);
+  const now = offersKnown ? row.now : null;
+  const shown = price(now);
   return (
     <tr className="border-t border-line">
       <td className={td}>
@@ -139,14 +142,14 @@ function ModelRowView({
         />
       </td>
       <td className={numberCell}>
-        {row.now
-          ? pair(row.now.free, row.now.sellers - row.now.free, count)
+        {now
+          ? pair(now.free, now.sellers - now.free, count)
           : offersKnown
             ? 'Not offered now'
             : '—'}
       </td>
       <td className={shown.money ? moneyCell : numberCell}>{shown.text}</td>
-      <td className={numberCell}>{row.now ? count(row.now.context) : '—'}</td>
+      <td className={numberCell}>{now ? count(now.context) : '—'}</td>
       <td className={numberCell}>{completedText(row.free)}</td>
       <td className={numberCell}>{completedText(row.paid)}</td>
       <td className={numberCell}>

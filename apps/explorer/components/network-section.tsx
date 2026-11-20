@@ -4,11 +4,8 @@
 import { Activity, Boxes, Server, Tag } from 'lucide-react';
 
 import { DISPLAY } from '../lib/constants';
-import {
-  getDiscovery,
-  type DiscoverySnapshot,
-  type Seller,
-} from '../lib/discovery';
+import type { DiscoverySnapshot, Seller } from '../lib/discovery';
+import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
 import {
   notOnline,
@@ -76,17 +73,18 @@ export async function NetworkSection() {
           caption={
             summary.averageDayUptime === null
               ? undefined
-              : 'Average of the online sellers'
+              : `Average of ${count(summary.dayUptimes)} of ${count(snapshot.sellers.length)} online sellers`
           }
         />
       </div>
 
       <SectionTitle title="Sellers" />
       <SellersTable sellers={snapshot.sellers} />
-      {snapshot.truncated ? (
+      {snapshot.unreadModels.length ? (
         <p className="mt-2 text-xs text-dim">
-          The explorer read only part of the index: this list and the counts
-          above may be incomplete.
+          The explorer has not read the sellers of{' '}
+          {count(snapshot.unreadModels.length)} listed models yet: this list may
+          be incomplete.
         </p>
       ) : null}
       {snapshot.network ? <NotOnlineTable network={snapshot.network} /> : null}
