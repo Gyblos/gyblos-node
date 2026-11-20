@@ -183,10 +183,6 @@ setup on every run for this reason.
 | `receipts/`                                         | both   | Signed free-inference receipts ([Receipts](#private-free-inference-receipts)).                                         |
 | `diagnostics/`                                      | both   | Local operational logs, read with `pnpm gyblos logs` ([diagnostics.md](diagnostics.md)).                               |
 
-The lab's v1 files (`trust.json`, `offer.json`, `authorization.json`,
-`calls.json`) are described in
-[lab/README.md](../lab/README.md#legacy-v1-buyer).
-
 ## Seller
 
 Prerequisites:

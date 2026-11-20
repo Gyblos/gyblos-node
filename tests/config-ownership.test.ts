@@ -3,10 +3,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  MAX_CHANNEL_SIGNATURES,
-  MINIMUM_REQUESTS,
-} from '@gyblos/buyer/constants';
 import * as config from '@gyblos/config';
 import {
   FILE_MODES,
@@ -18,7 +14,6 @@ import {
 } from '@gyblos/config';
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import { NODE_KEY_BYTES } from '@gyblos/node/constants';
-import { LOCK_METADATA_BYTES } from '@gyblos/payments-x402/constants';
 import {
   HTTP_OVER_IROH,
   IROH_DEADLINES,
@@ -68,9 +63,6 @@ void test('operator-tunable transport limits, timeouts and ports keep their valu
 
 void test('offer, payment-evidence, lock and key values keep their owners and values', () => {
   assert.equal(OFFER_LIFETIME_MS, 240000);
-  assert.equal(MINIMUM_REQUESTS, 3);
-  assert.equal(MAX_CHANNEL_SIGNATURES, 10);
-  assert.equal(LOCK_METADATA_BYTES, 4096);
   assert.equal(NODE_KEY_BYTES, 32);
   assert.equal(FILE_MODES.permissionMask, 0o777);
   assert.equal('P2P' in config, false);

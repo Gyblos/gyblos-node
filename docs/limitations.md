@@ -35,11 +35,6 @@ For seller fees and channel closure, see
 - A lost reply to a closure or refund send keeps the signed transaction's
   signature and reports it unconfirmed. Finalized reconciliation is still
   required, and a missing account is not proof of a refund.
-- The legacy `pnpm buyer:reconcile` (for older per-request journals) clears only
-  zero-charge outcomes, and `--audit-only` verifies a charged payment. Its
-  verifier accepts only fresh, individually settled channels with the expected
-  account shapes; anything else needs manual investigation. It doesn't recover
-  channel rent.
 
 **Local state**
 

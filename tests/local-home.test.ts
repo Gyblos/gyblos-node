@@ -248,32 +248,6 @@ void test(
 );
 
 void test(
-  'buyer call and reconcile refuse legacy role data before taking a lock',
-  { skip: NATIVE_CAPABILITY.bindingSkip },
-  async () => {
-    const { main: paidCall } = await import('@gyblos/buyer/call');
-    const { main: reconcile } = await import('@gyblos/buyer/reconcile');
-    const previous = process.env.GYBLOS_HOME;
-    await inTemporaryCwd(async (directory) => {
-      process.env.GYBLOS_HOME = join(directory, 'home');
-      await mkdir(LEGACY_LOCAL_PATHS.roles, { recursive: true });
-      await assert.rejects(paidCall(), {
-        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
-      });
-      await assert.rejects(reconcile([]), {
-        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
-      });
-      await assert.rejects(lstat(homeLayout(process.env).root), {
-        code: 'ENOENT',
-      });
-    }).finally(() => {
-      if (previous === undefined) delete process.env.GYBLOS_HOME;
-      else process.env.GYBLOS_HOME = previous;
-    });
-  },
-);
-
-void test(
   'seller start refuses legacy role data before its first status write',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {

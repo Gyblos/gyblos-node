@@ -7,7 +7,6 @@ import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
 import { discoverBuyerSellers } from '@gyblos/buyer/discovery';
 import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import { parseBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
-import { createProxySelection } from '@gyblos/buyer/selection-proxy';
 
 import {
   discoveryHome,
@@ -112,51 +111,6 @@ void test('identity changed during quoting cannot return an admitted winner', as
     await run.wire.close();
   }
 });
-void test('cached v1 decision rechecks identity once before forwarding authorization and never retries after denial', async () => {
-  const run = await discoveryRun();
-  try {
-    let quotes = 0;
-    let checks = 0;
-    const selected = await selectVerifiedBuyerQuote(
-      run.config,
-      run.dependencies,
-    );
-    assert.ok(selected.ok);
-    const guard = createProxySelection(
-      async () => {
-        quotes++;
-        return selected;
-      },
-      run.config.request.maxTokens,
-      run.context.now,
-      async () => {
-        checks++;
-        return false;
-      },
-    );
-    const body = Buffer.from(
-      JSON.stringify({
-        requestId: 'identity-test',
-        maxTokens: run.config.request.maxTokens,
-      }),
-    );
-    const signal = new AbortController().signal;
-    assert.deepEqual(await guard.admit(body, false, signal), { ok: true });
-    assert.deepEqual(await guard.admit(body, true, signal), {
-      ok: false,
-      code: BUYER_SELECTION_CODES.RECONCILE,
-    });
-    assert.deepEqual(await guard.admit(body, true, signal), {
-      ok: false,
-      code: BUYER_SELECTION_CODES.RECONCILE,
-    });
-    assert.equal(quotes, 1);
-    assert.equal(checks, 1);
-  } finally {
-    await run.wire.close();
-  }
-});
-
 void test('a quote expiring during the final identity lookup cannot return an accepted winner', async () => {
   const run = await discoveryRun();
   try {

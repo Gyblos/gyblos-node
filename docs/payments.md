@@ -7,8 +7,7 @@ mainnet. A free offer needs no payment at all.
 This page is the contributor overview of the payment paths. To charge for an
 offer as a seller operator, follow
 [Get paid](https://docs.gyblos.com/en/sellers/get-paid) on the docs site. Lab
-checks (gates, the local v1 facilitator and the published evidence) are in
-[lab/README.md](../lab/README.md).
+channel checks and historical evidence are in [lab/README.md](../lab/README.md).
 
 ## Payment paths
 
@@ -16,11 +15,10 @@ The signed quote decides the path. Both prices `"0"` means free; any positive
 price means paid. The buyer's `request.maxAtomic` is a spending ceiling, not a
 mode switch (see [Buyer routing](payment-sessions.md#buyer-routing)).
 
-| Path               | Who uses it                            | Channel                                      | Owner page                                 |
-| ------------------ | -------------------------------------- | -------------------------------------------- | ------------------------------------------ |
-| Free               | Any seller and buyer                   | None: no signer, deposit or settlement       | [running-a-node.md](running-a-node.md)     |
-| Payment session    | Authenticated buyers of a priced offer | x402 `batch-settlement`: one deposit, reused | [payment-sessions.md](payment-sessions.md) |
-| `exact`, v1 `upto` | Lab gates only                         | Fixed-price resource, legacy PoC facilitator | [lab/README.md](../lab/README.md)          |
+| Path            | Who uses it                            | Channel                                      | Owner page                                 |
+| --------------- | -------------------------------------- | -------------------------------------------- | ------------------------------------------ |
+| Free            | Any seller and buyer                   | None: no signer, deposit or settlement       | [running-a-node.md](running-a-node.md)     |
+| Payment session | Authenticated buyers of a priced offer | x402 `batch-settlement`: one deposit, reused | [payment-sessions.md](payment-sessions.md) |
 
 The desktop and guided buyer use a payment session for priced quotes. Existing
 profiles with a positive ceiling require the

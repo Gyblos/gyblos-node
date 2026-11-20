@@ -7,16 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
-import { generateKeyPairSigner } from '@solana/kit';
-
-import { HOME_ENVIRONMENT, homeLayout, ROLE_FILES } from '@gyblos/config';
-import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
-import type { OfferTrust } from '@gyblos/core/offers';
-import { signInferenceOffer } from '@gyblos/node/offers';
-import type { RoleConfig } from '@gyblos/node/roles';
-import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
-
-import { recoveryFixture } from './recovery-fixture';
+import { HOME_ENVIRONMENT, homeLayout } from '@gyblos/config';
 
 const PROBE_TIMEOUT_MS = 15_000;
 const OUTPUT_LIMIT_BYTES = 65_536;
@@ -25,8 +16,6 @@ export const RELAY_TOKEN_SENTINEL = 'PRIVATE_RELAY_TOKEN_SENTINEL';
 
 export const PROBE_ACTIONS = {
   ENDPOINT: 'endpoint',
-  START_BUYER: 'start-buyer',
-  ADMISSION: 'admission',
   NATIVE_BIND: 'native-bind',
 } as const;
 
@@ -48,7 +37,6 @@ export interface EndpointProbe {
 
 function probeScript() {
   const entry = import.meta.resolve('@gyblos/transport-iroh/endpoint');
-  const buyer = import.meta.resolve('@gyblos/buyer/buyer');
   const sdk = import.meta.resolve('@number0/iroh');
   // Relay entries report only whether the environment token was attached.
   const replacement = `
@@ -87,10 +75,8 @@ function probeScript() {
         }
       };
     }};`;
-  const chain = `export async function assertProgram(){globalThis.probe.events.push('program');}`;
   const fakes = {
     [entry]: { '@number0/iroh': replacement },
-    [buyer]: { '@gyblos/payments-x402/chain': chain },
   };
   return `
     import {registerHooks} from 'node:module';
@@ -106,14 +92,7 @@ function probeScript() {
       return next(specifier,context);
     }});
     try {
-      if(action===${JSON.stringify(PROBE_ACTIONS.START_BUYER)}){
-        const {startBuyer}=await import(${JSON.stringify(buyer)});
-        await startBuyer();
-      } else {
-        const {assertConfiguredRelay,bindEndpoint}=await import(${JSON.stringify(entry)});
-        if(action===${JSON.stringify(PROBE_ACTIONS.ADMISSION)})
-          assertConfiguredRelay(process.env.PROBE_RELAY_URL);
-        else {
+      const {bindEndpoint}=await import(${JSON.stringify(entry)});
           const endpoint=await bindEndpoint([...Array(32).keys()],{
             relayOnly:process.env.PROBE_RELAY_ONLY==='1',
             control:process.env.PROBE_CONTROL==='1',
@@ -122,8 +101,6 @@ function probeScript() {
             http:process.env.PROBE_HTTP!=='0',
             bindAddress:process.env.PROBE_BIND_ADDRESS});
           await endpoint.close();
-        }
-      }
     } catch(error) {
       globalThis.probe.error={code:error.code,message:String(error.message)};
     }
@@ -192,65 +169,5 @@ export function endpointProbe(
     return probe;
   } finally {
     if (cwd === undefined) rmSync(directory, { recursive: true, force: true });
-  }
-}
-
-export interface RelayOfferOptions {
-  sellerNodeId?: string;
-  directAddresses?: string[];
-  buyer?: { secret: number[]; nodeId: string };
-}
-
-export async function withRelayOffer(
-  relayUrl: string | null,
-  run: (directory: string) => Promise<void>,
-  options: RelayOfferOptions = {},
-) {
-  const fixture = await recoveryFixture();
-  const owner = await generateKeyPairSigner();
-  const previousDirectory = process.cwd();
-  const previousHome = process.env.GYBLOS_HOME;
-  const previousLabHome = process.env.GYBLOS_LAB_HOME;
-  try {
-    process.env.GYBLOS_HOME = fixture.productHome;
-    process.env.GYBLOS_LAB_HOME = fixture.labHome;
-    const signed = await fixture.read<SignedInferenceOffer>(ROLE_FILES.offer);
-    const trust = await fixture.read<OfferTrust>(ROLE_FILES.trust);
-    const nodeId = options.sellerNodeId ?? signed.offer.nodeId;
-    const now = Date.now();
-    const offer = {
-      ...signed.offer,
-      owner: owner.address,
-      nodeId,
-      endpoint: { relayUrl, directAddresses: options.directAddresses ?? [] },
-      issuedAt: now,
-      expiresAt: now + OFFER_LIFETIME_MS,
-    };
-    await fixture.write(
-      ROLE_FILES.offer,
-      await signInferenceOffer(offer, owner),
-    );
-    await fixture.write(ROLE_FILES.trust, {
-      ...trust,
-      owner: owner.address,
-      nodeId,
-    });
-    if (options.buyer) {
-      const role = await fixture.read<RoleConfig>(ROLE_FILES.roleConfig);
-      await fixture.write(ROLE_FILES.nodeKey, options.buyer.secret);
-      await fixture.write(ROLE_FILES.roleConfig, {
-        ...role,
-        nodeId: options.buyer.nodeId,
-      });
-    }
-    process.chdir(fixture.directory);
-    await run(fixture.directory);
-  } finally {
-    process.chdir(previousDirectory);
-    if (previousHome === undefined) delete process.env.GYBLOS_HOME;
-    else process.env.GYBLOS_HOME = previousHome;
-    if (previousLabHome === undefined) delete process.env.GYBLOS_LAB_HOME;
-    else process.env.GYBLOS_LAB_HOME = previousLabHome;
-    await fixture.close();
   }
 }

@@ -3,10 +3,8 @@
 import { ROLE_FILES, TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { BUYER_SELECTION_FILE } from '@gyblos/node/buyer-init-constants';
 import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
-import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { BUYER_API, BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
-import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
 export const CHAT_COMMANDS = {
   NEW: '/new',
@@ -20,52 +18,10 @@ export const CHAT_TURN_STATUSES = {
 } as const;
 export const CHAT_INPUT_BYTES = 64_000;
 
-export const CALL_OUTCOMES = {
-  CONFIRMED: JOURNAL_STATES.CONFIRMED,
-  UNCERTAIN: JOURNAL_STATES.UNCERTAIN,
-  REJECTED: JOURNAL_STATES.REJECTED,
-  ROUTE_DISCREPANCY,
-  CONFIRMED_ERROR: 'confirmed-payment-error',
-} as const;
-
-export const RECONCILED_ZERO_CHARGE = 'finalized-zero-charge' as const;
-
-export const P2P_JOURNAL_STATES = {
-  AUTHORIZED: 'authorized',
-  CONFIRMED: JOURNAL_STATES.CONFIRMED,
-  UNCERTAIN: JOURNAL_STATES.UNCERTAIN,
-} as const;
-
-export const CALL_PHASES = {
-  REQUEST: 'request',
-  RESPONSE: 'response',
-  PROOF: 'payment-proof',
-  SETTLEMENT: 'settlement-receipt',
-  OBSERVATION: 'inference-observation',
-  MEASUREMENT: 'measurement',
-  METRICS: 'route-metrics',
-  PERSISTENCE: 'call-record',
-} as const;
-
-export type P2pJournalState =
-  (typeof P2P_JOURNAL_STATES)[keyof typeof P2P_JOURNAL_STATES];
-
-export type CallOutcome = (typeof CALL_OUTCOMES)[keyof typeof CALL_OUTCOMES];
-
-export type CallPhase = (typeof CALL_PHASES)[keyof typeof CALL_PHASES];
-
-export const BUYER_PROXY_ERROR_CODES = {
-  MALFORMED_JSON: 'MALFORMED_JSON',
-} as const;
-
 export const BUYER_SELECTION_CODES = {
-  QUOTE_ONLY: 'SELECTED_SELLER_NOT_TRUSTED',
-  V1_INCOMPATIBLE: 'QUOTE_REQUIRES_UNSUPPORTED_V2_EXECUTION',
   NO_OFFER: 'NO_ACCEPTABLE_CONTROL_OFFER',
   INVALID: 'INVALID_BUYER_SELECTION_CONFIG',
   SESSION_REQUIRED: BUYER_SIDECAR.SESSION_REQUIRED,
-  AUTHORIZATION_REQUIRED: 'TRUSTED_SELECTION_REQUIRED',
-  RECONCILE: 'AUTHORIZATION_OUTCOME_REQUIRES_RECONCILIATION',
   LIMIT: 'BUYER_SELECTION_LIMIT',
   DISCOVERY_STATE: 'BUYER_DISCOVERY_STATE_UNAVAILABLE',
   DISCOVERY_LIMIT: 'BUYER_DISCOVERY_LIMIT',
@@ -151,32 +107,12 @@ export const BUYER_DISCOVERY = {
   openRefusalMs: 300_000,
 } as const;
 
-export type BuyerProxyErrorCode =
-  (typeof BUYER_PROXY_ERROR_CODES)[keyof typeof BUYER_PROXY_ERROR_CODES];
-
-export const MEASUREMENT_SCHEMA_VERSION = 1;
-
-// Synthetic call cases selectable by index on the buyer:call command line.
-export const MINIMUM_REQUESTS = 3;
-
-// Bound on the channel history read when locating a deposit for a proof.
-export const MAX_CHANNEL_SIGNATURES = 10;
-
 export const ERROR_DIAGNOSTICS = {
   ASSERTION: 'ASSERTION_FAILED',
   UNKNOWN: 'EXECUTION_INTERRUPTED_OR_UNKNOWN',
   ABORTED: 'REQUEST_ABORTED',
   TIMEOUT: 'REQUEST_TIMEOUT',
   RESPONSE_INVALID: 'RESPONSE_INVALID',
-} as const;
-
-export const INFERENCE_CASES = {
-  HONEST_1: 'honest-1',
-  HONEST_2: 'honest-2',
-  HONEST_3: 'honest-3',
-  OVERCHARGE: 'overcharge',
-  UNDERCHARGE: 'undercharge',
-  ENGINE_INTERRUPTED: 'engine-interrupted',
 } as const;
 
 export type ErrorDiagnosticCode =
@@ -226,17 +162,6 @@ export type FreeBuyerCode =
 // Shared paid-buyer refusals remain available through the buyer's existing entry.
 export { PAID_BUYER_CODES, type PaidBuyerCode } from '@gyblos/node/constants';
 // Paid reconciliation's exit codes: 0 when nothing blocks payments.
-export const PAID_RECONCILE_EXIT = { FAILED: 1, OPEN: 2 } as const;
-// Why paid reconciliation stopped, with what to fix; printed alone, never with paths or URLs.
-export const PAID_RECONCILE_CODES = {
-  NETWORK:
-    'PAID_RECONCILE_NETWORK_MISMATCH: role.json rpcUrl must serve devnet',
-  ROLE: 'PAID_RECONCILE_ROLE_INVALID: run `pnpm node:setup --role buyer` first',
-  INCOMPLETE:
-    'PAID_RECONCILE_INCOMPLETE: stop the paid buyer, check the RPC and the buyer home, then run again',
-} as const;
-// `pnpm buyer:withdraw:paid`: 2 while another run is needed (a claim window or grace period to wait
-// out, or a transaction not yet confirmed); 1 when it failed or refused to sign for a channel.
 export const PAID_WITHDRAW_EXIT = { FAILED: 1, AGAIN: 2 } as const;
 // Why paid withdrawal stopped, with what to fix; printed alone, never with paths or URLs.
 export const PAID_WITHDRAW_CODES = {

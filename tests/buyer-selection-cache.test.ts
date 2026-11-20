@@ -6,7 +6,7 @@ import test from 'node:test';
 
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { createBuyerControlClient } from '@gyblos/buyer/control';
-import { selectBuyerQuote } from '@gyblos/buyer/selection';
+import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import { createSnapshotCache } from '@gyblos/buyer/selection-cache';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { controlFail } from '@gyblos/protocol/control-validation';
@@ -51,7 +51,7 @@ async function rig(t: test.TestContext) {
   // Quote failures cool a seller down; these requests are about the cache, not the cooldown.
   const select = async () => {
     dependencies.stats.clear();
-    return selectBuyerQuote(run.config, dependencies);
+    return selectVerifiedBuyerQuote(run.config, dependencies);
   };
   return {
     run,
@@ -91,7 +91,7 @@ void test('a remembered seller whose identity is refused is not used', async (t)
   const host = await rig(t);
   assert.equal((await host.select()).ok, true);
   const before = host.run.wire.queries;
-  const result = await selectBuyerQuote(
+  const result = await selectVerifiedBuyerQuote(
     { ...host.run.config, identity: { rpcUrl: 'http://127.0.0.1:1/' } },
     { ...host.dependencies, verifyIdentity: async () => false },
   );
@@ -131,7 +131,10 @@ void test('a seller that replaced its catalog is asked again in the same request
   assert.equal((await host.select()).ok, true);
   host.staleOnce();
   const before = host.run.wire.queries;
-  const result = await selectBuyerQuote(host.run.config, host.dependencies);
+  const result = await selectVerifiedBuyerQuote(
+    host.run.config,
+    host.dependencies,
+  );
   assert.equal(result.ok, true);
   // The refused quote was not sent (the synthetic refusal is local), then catalog, presence and quote.
   assert.equal(host.run.wire.queries - before, 3);
