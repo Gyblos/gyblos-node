@@ -1,6 +1,7 @@
 // Minimal D1-compatible database over node:sqlite for metrics collector tests only. It applies the real
 // migrations and runs a batch in one transaction, like D1.
 import { readdirSync, readFileSync } from 'node:fs';
+
 import { DatabaseSync } from 'node:sqlite';
 
 import type {
