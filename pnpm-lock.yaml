@@ -179,9 +179,6 @@ importers:
       '@gyblos/discovery-http':
         specifier: workspace:*
         version: link:../../packages/discovery-http
-      '@gyblos/engine-ollama':
-        specifier: workspace:*
-        version: link:../../packages/engine-ollama
       '@gyblos/inference':
         specifier: workspace:*
         version: link:../../packages/inference
@@ -203,9 +200,6 @@ importers:
       '@number0/iroh':
         specifier: 1.2.0
         version: 1.2.0
-      '@solana/kit':
-        specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.23.0)
 
   apps/desktop:
     dependencies:
@@ -455,9 +449,6 @@ importers:
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
-      '@gyblos/node-app':
-        specifier: workspace:*
-        version: link:../../apps/node
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -656,18 +647,6 @@ importers:
       '@solana/kit':
         specifier: 5.1.0
         version: 5.1.0(typescript@5.9.3)(ws@8.23.0)
-      '@x402/core':
-        specifier: 2.29.0
-        version: 2.29.0
-      '@x402/express':
-        specifier: 2.29.0
-        version: 2.29.0(express@4.22.3)(typescript@5.9.3)
-      '@x402/svm':
-        specifier: 2.28.0
-        version: 2.28.0(patch_hash=91371c4d0e50a73d104a61dcf23a89824a9b0c4e27771dea3bfa12e2a963c3eb)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.23.0))(typescript@5.9.3)
-      express:
-        specifier: 4.22.3
-        version: 4.22.3
       smol-toml:
         specifier: 1.9.1
         version: 1.9.1

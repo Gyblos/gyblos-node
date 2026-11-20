@@ -71,7 +71,6 @@ void test('home layout defaults to one cwd-relative product home and a separate 
   assert.deepEqual(labLayout(DEFAULT_ENV), {
     root: '.local/lab',
     measurements: '.local/lab/measurements.jsonl',
-    facilitatorDiagnostics: '.local/lab/facilitator-diagnostics',
     diagnostics: '.local/lab/diagnostics',
     identityKeys: '.local/lab/identity/keys',
     identityValidator: '.local/lab/identity-validator',

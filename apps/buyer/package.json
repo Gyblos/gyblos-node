@@ -54,12 +54,10 @@
     "@gyblos/config": "workspace:*",
     "@gyblos/runtime": "workspace:*",
     "@gyblos/node": "workspace:*",
-    "@gyblos/engine-ollama": "workspace:*",
     "@gyblos/payments-upto": "workspace:*",
     "@gyblos/protocol": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
     "@number0/iroh": "1.2.0",
-    "@solana/kit": "5.1.0",
     "@gyblos/discovery-http": "workspace:*"
   }
 }

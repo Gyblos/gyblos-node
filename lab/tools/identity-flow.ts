@@ -187,8 +187,11 @@ export function printable(value: unknown): string {
   );
 }
 
-export async function assertDevnet(url: string): Promise<void> {
-  if ((await readGenesis(url)) !== DEVNET_GENESIS)
+export async function assertDevnet(
+  url: string,
+  genesis = readGenesis,
+): Promise<void> {
+  if ((await genesis(url)) !== DEVNET_GENESIS)
     throw new ProtocolError(
       PROTOCOL_ERROR_CODES.WRONG_CLUSTER,
       'Only Solana devnet is allowed.',

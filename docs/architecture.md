@@ -230,7 +230,7 @@ environment. No other module builds `.local/...` paths.
 $GYBLOS_HOME (default .local/gyblos from a checkout, ~/.gyblos for the packaged
               release, /data in the Docker image)
   seller.env, service.log   the seller service's private environment and log
-  buyer/     role.json, node.key, selection.json, trust.json, api-keys.json,
+  buyer/     role.json, node.key, selection.json, api-keys.json,
              journals, locks, status, telemetry/, diagnostics/, receipts/,
              payments/, measurements
   seller/    role.json, node.key, owner key (a paid seller also has payment
@@ -238,7 +238,7 @@ $GYBLOS_HOME (default .local/gyblos from a checkout, ~/.gyblos for the packaged
              sequence
   artifacts/ tokenizer/ (public, hash-pinned, shared), ollama-models/ (lab cache)
 $GYBLOS_LAB_HOME (default .local/lab)
-  lab config, keys, journals, measurements, facilitator-diagnostics/, identity/
+  identity/ and temporary lab data
 ```
 
 Payment adapters receive journal and lock paths from their callers, which take
@@ -248,7 +248,6 @@ exists and the new home is missing; see
 [running-a-node.md](running-a-node.md#local-home).
 
 Named values follow their readers. HTTP-over-Iroh framing limits and stream
-deadlines are `transport-iroh` constants, the offer lifetime is a core trust
-rule, call and proof bounds belong to the buyer app, and only operator-tunable
-capacity, rate, timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
+deadlines are `transport-iroh` constants. Operator-tunable capacity, rate,
+timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
 `TRANSPORT_TIMEOUTS`, `PORTS`).
