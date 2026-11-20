@@ -173,6 +173,11 @@ export const CONTROL_DOMAINS = {
   REQUEST: 'gyblos/control-request/v1\n',
   OFFER: 'gyblos/signed-inference-offer/v2\n',
 } as const;
+export const SELLER_VERSION = {
+  header: 'Gyblos-Seller-Version',
+  domain: 'gyblos/seller-version/v1\n',
+  maxCharacters: 64,
+} as const;
 export const PUBLIC_V2_DOMAINS = {
   [PUBLIC_RECORD_KINDS.CATALOG]: 'gyblos/catalog/v2\n',
   [PUBLIC_RECORD_KINDS.PRESENCE]: 'gyblos/presence/v2\n',

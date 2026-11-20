@@ -10,6 +10,7 @@ import {
   type RunMode,
 } from '@gyblos/config';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
+import { SELLER_RELEASE_PATTERN } from '@gyblos/protocol/seller-version';
 
 export const UPDATE = {
   latestUrl: 'https://api.github.com/repos/Gyblos/gyblos-node/releases/latest',
@@ -19,13 +20,10 @@ export const UPDATE = {
   switchEnv: 'GYBLOS_UPDATE_CHECK',
 } as const;
 
-// The same grammar as scripts/semver-newer.mjs (semver.org §2 and §9), without build metadata.
-const VERSION =
-  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
 const NUMERIC = /^\d+$/;
 
 function parse(text: string) {
-  const match = VERSION.exec(text);
+  const match = SELLER_RELEASE_PATTERN.exec(text);
   if (!match) return undefined;
   return {
     core: [match[1], match[2], match[3]].map((part) => BigInt(part!)),

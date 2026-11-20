@@ -84,6 +84,8 @@ export const presence = sqliteTable(
     expiresAt: integer('expires_at').notNull(),
     digest: text('catalog_digest').notNull(),
     json: text('signed_json').notNull(),
+    releaseVersion: text('release_version'),
+    versionSequence: integer('version_sequence'),
   },
   (table) => [
     index('discovery_presence_by_expiry').on(table.expiresAt),

@@ -38,6 +38,7 @@ export interface StoredEntry {
   // Distinct model ids of a catalog; empty for other kinds.
   models: string[];
   signature: string;
+  version?: string | null;
   retainUntil: number;
   json: string;
 }
@@ -78,6 +79,11 @@ export interface CatalogStatusRow {
 }
 
 export interface DiscoveryStorage extends UptimeStorage {
+  activeVersions(
+    now: number,
+    limit: number,
+    nodeId?: string,
+  ): Promise<{ nodeId: string; version: string | null }[]>;
   state(nodeId: string): Promise<NodeState | null>;
   // Drops expired records; keeps high-water marks until their retainUntil. Uptime prunes itself.
   prune(now: number): Promise<void>;
@@ -107,6 +113,7 @@ interface MemoryNode {
 }
 
 interface MemoryRecord {
+  version?: string | null;
   sequence: number;
   issuedAt: number;
   expiresAt: number;
@@ -148,6 +155,38 @@ interface MemoryTables {
   withdrawn: (nodeId: string, digest: string) => boolean;
 }
 
+function activePresence(
+  tables: MemoryTables,
+  nodeId: string,
+  catalog: MemoryRecord,
+  now: number,
+) {
+  const alive = tables.presence.get(nodeId);
+  return alive &&
+    alive.digest === catalog.digest &&
+    !tables.withdrawn(nodeId, catalog.digest) &&
+    live(alive, now) &&
+    live(catalog, now)
+    ? alive
+    : undefined;
+}
+function versionsMemory(
+  tables: MemoryTables,
+  now: number,
+  limit: number,
+  selected?: string,
+) {
+  const rows = [];
+  for (const nodeId of selected
+    ? [selected]
+    : [...tables.presence.keys()].sort()) {
+    const catalog = tables.catalogs.get(nodeId);
+    const alive = catalog && activePresence(tables, nodeId, catalog, now);
+    if (alive) rows.push({ nodeId, version: alive.version ?? null });
+    if (rows.length === limit) break;
+  }
+  return rows;
+}
 function modelsMemory(
   tables: MemoryTables,
   now: number,
@@ -155,15 +194,7 @@ function modelsMemory(
 ): ModelRow[] {
   const counts = new Map<string, number>();
   for (const [nodeId, catalog] of tables.catalogs) {
-    const alive = tables.presence.get(nodeId);
-    if (
-      !alive ||
-      alive.digest !== catalog.digest ||
-      tables.withdrawn(nodeId, catalog.digest) ||
-      !live(catalog, now) ||
-      !live(alive, now)
-    )
-      continue;
+    if (!activePresence(tables, nodeId, catalog, now)) continue;
     for (const model of new Set(catalog.models))
       counts.set(model, (counts.get(model) ?? 0) + 1);
   }
@@ -297,6 +328,7 @@ export function createMemoryStorage(): DiscoveryStorage {
       digest: entry.digest,
       models: entry.models,
       json: entry.json,
+      version: entry.version,
     };
     if (entry.kind === PUBLIC_RECORD_KINDS.PRESENCE)
       return presence.set(entry.nodeId, row);
@@ -342,12 +374,10 @@ export function createMemoryStorage(): DiscoveryStorage {
       apply(entry);
       return true;
     },
-    async list(query) {
-      return listMemory(tables, query);
-    },
-    async models(now, limit) {
-      return modelsMemory(tables, now, limit);
-    },
+    list: async (query) => listMemory(tables, query),
+    activeVersions: async (now, limit, nodeId) =>
+      versionsMemory(tables, now, limit, nodeId),
+    models: async (now, limit) => modelsMemory(tables, now, limit),
     async catalogStatus(now, limit, maxModels) {
       return catalogStatusMemory(tables, now, limit, maxModels);
     },

@@ -12,7 +12,6 @@ import {
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
-import { publishRecord } from '@gyblos/discovery-http';
 import {
   CONTROL_CODES,
   OFFER_PRICING_KINDS,
@@ -40,7 +39,7 @@ import { NodeError } from './errors';
 import { createSellerFreeOffers } from './free-offers';
 import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
-import { createSellerPublisher } from './publisher';
+import { createSellerPublisher, publishSellerRecord } from './publisher';
 import {
   startRoleUploader,
   uploadObservationBuffer,
@@ -383,13 +382,17 @@ export async function startSeller(
             );
           },
           publish: async (record, signal) => {
-            await publishRecord({
-              baseUrl: publicationConfig.baseUrl,
-              record,
-              signal,
-              fetch: globalThis.fetch,
-              timeoutMs: SELLER_DISCOVERY.requestMs,
-            });
+            await publishSellerRecord(
+              {
+                baseUrl: publicationConfig.baseUrl,
+                record,
+                signal,
+                fetch: globalThis.fetch,
+                timeoutMs: SELLER_DISCOVERY.requestMs,
+              },
+              process.env,
+              nodeSigner,
+            );
           },
         })
       : undefined;
