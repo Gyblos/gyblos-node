@@ -21,9 +21,11 @@ export function unavailableActivity(): ActivityResult {
 }
 export function showActivityEmptyState(
   state: ActivityResult | null,
-  _hasX402Records: boolean,
+  hasX402Records: boolean,
 ): boolean {
-  return state?.available === true && state.sessions.length === 0;
+  return (
+    state?.available === true && state.sessions.length === 0 && !hasX402Records
+  );
 }
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)

@@ -1,7 +1,7 @@
 // Reads consumption and payments without initiating financial work or showing stale totals.
 import { useState, useSyncExternalStore } from 'react';
 
-import type { ActivityEntry } from '../activity-model';
+import { showActivityEmptyState, type ActivityEntry } from '../activity-model';
 import type { PaypalPaymentReference } from '../payment-reference-model';
 import { ActivitySessionDetails } from './ActivitySessionDetails';
 import { ActivitySessions } from './ActivitySessions';
@@ -106,9 +106,9 @@ export function Activity({
       {available && <HistorySummary entries={visible} method={method} />}
       <ActivityResults
         activity={activity}
-        hasX402Records={Boolean(x402?.state.summary.records.length)}
         available={available}
         entries={entries}
+        hasX402Records={Boolean(x402?.state.summary.records.length)}
         visible={visible}
         references={references}
         method={method}
@@ -141,9 +141,9 @@ export function Activity({
 
 function ActivityResults({
   activity,
-  hasX402Records,
   available,
   entries,
+  hasX402Records,
   visible,
   references,
   method,
@@ -156,9 +156,9 @@ function ActivityResults({
   onPayments,
 }: {
   activity: ActivityView;
-  hasX402Records: boolean;
   available: boolean;
   entries: ActivityEntry[];
+  hasX402Records: boolean;
   visible: ActivityEntry[];
   references: PaypalPaymentReference[];
   method: HistoryMethod;
@@ -171,7 +171,11 @@ function ActivityResults({
   onPayments(): void;
 }) {
   if (!available) return <ActivityUnavailable activity={activity} />;
-  if (!entries.length && hasX402Records) return null;
+  if (
+    !entries.length &&
+    !showActivityEmptyState(activity.state, hasX402Records)
+  )
+    return null;
   return visible.length ? (
     <>
       <ActivitySessions
