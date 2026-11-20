@@ -57,13 +57,16 @@ function clientRole(kind: ReceiptUploadClientKind): P2PRole {
     ? P2P_ROLES.SELLER
     : P2P_ROLES.BUYER;
 }
+const APP_VERSION = new RegExp(
+  `^[0-9A-Za-z.+-]{1,${RECEIPT_UPLOAD.maxAppVersionCharacters}}$`,
+);
+
+export function isReceiptUploadAppVersion(value: string): boolean {
+  return APP_VERSION.test(value);
+}
+
 function appVersion(value: unknown) {
-  if (
-    typeof value !== 'string' ||
-    !value ||
-    value.length > RECEIPT_UPLOAD.maxAppVersionCharacters ||
-    !/^[0-9A-Za-z.+-]+$/.test(value)
-  )
+  if (typeof value !== 'string' || !isReceiptUploadAppVersion(value))
     return controlFail();
   return value;
 }

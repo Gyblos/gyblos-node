@@ -23,6 +23,7 @@ import { sign, type Signer } from './signing';
 
 export type * from './receipt-upload-types';
 export { parseReceiptUpload };
+export { isReceiptUploadAppVersion } from './receipt-upload-parser';
 export {
   RECEIPT_UPLOAD,
   RECEIPT_UPLOAD_ARCHES,

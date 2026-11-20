@@ -9,6 +9,7 @@ import {
   BUYER_SIDECAR,
   isBuyerSessionConfigFailure,
 } from '@gyblos/protocol/buyer-api';
+import { isReceiptUploadAppVersion } from '@gyblos/protocol/receipt-upload';
 
 import { BuyerSessionRequired } from './buyer-error';
 import { DESKTOP_X402 } from './x402/constants';
@@ -210,7 +211,7 @@ function uploadEnvironment(
   releaseVersion: string | undefined,
 ): NodeJS.ProcessEnv {
   const result: NodeJS.ProcessEnv = {};
-  if (releaseVersion && DESKTOP_RELEASE_VERSION.test(releaseVersion))
+  if (releaseVersion && isReceiptUploadAppVersion(releaseVersion))
     result[RECEIPT_UPLOADER.releaseEnvironment] = releaseVersion;
   const url = environment[RECEIPT_UPLOADER.urlEnvironment];
   if (
@@ -227,4 +228,3 @@ function uploadEnvironment(
       RECEIPT_UPLOADER.observationsOff;
   return result;
 }
-const DESKTOP_RELEASE_VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
