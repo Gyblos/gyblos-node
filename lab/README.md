@@ -17,8 +17,6 @@ pull requests have required checks, not gates.
 
 - [Lab acceptance runs](docs/node-discovery-acceptance.md): discovery, free
   inference, streaming, identity and receipts, all synthetic and offline.
-- [Simulated paid startup acceptance](docs/paid-acceptance.md):
-  `pnpm acceptance:paid`, the paid seller and buyer against a simulated chain.
 - [Offline payment-channel program acceptance](docs/paid-native-acceptance.md):
   LiteSVM suites against the bundled program, and how to rebuild it.
 - [Lab inference gate](docs/inference-gate.md): `pnpm gate:inference`, metered

@@ -29,7 +29,7 @@ import type {
 } from '@gyblos/protocol/payment-session';
 
 import { runBatchSellerExecution } from './batch-session';
-import { createPaidStreamOutput } from './paid-stream-output';
+import { createBatchStreamOutput } from './batch-stream-output';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export function batchLiveOffer(
@@ -135,9 +135,9 @@ function batchGeneration(
   onDelta: ((text: string, check: () => void) => Promise<void>) | undefined,
   onGenerated: ((duration: number) => void) | undefined,
 ) {
-  const output = createPaidStreamOutput(
+  const output = createBatchStreamOutput(
     live.meter,
-    { inputTokens, allowance: input.maxTokens },
+    input.maxTokens,
     window.signal,
     onDelta ? (text) => onDelta(text, window.check) : async () => {},
     window.check,

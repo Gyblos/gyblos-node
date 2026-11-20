@@ -17,15 +17,7 @@ import {
   record,
   unavailable,
 } from './support/payment-upto-file';
-import {
-  daemonReady,
-  HOUR,
-  installUnit,
-  NOW,
-  status,
-  system,
-  withHome,
-} from './support/status-fixture';
+import { HOUR, NOW, withHome } from './support/status-fixture';
 
 function settled(): UptoChannelRecord {
   return {
@@ -149,27 +141,6 @@ void test('a live seller ledger is read without acquiring its lock or changing i
         assert.equal(current.stat.ino, previous.stat.ino);
       }
       await writer.channels.put(record('NextSyntheticChannel'));
-    } finally {
-      await writer.close();
-    }
-  }));
-
-void test('the public status command does not turn incomplete settlement evidence into zero sales', () =>
-  withHome(async (home) => {
-    const writer = await ledger(home.home);
-    try {
-      await writer.channels.put(
-        record('SyntheticChannel', UPTO_CHANNEL_STATES.SETTLED),
-      );
-      await daemonReady(home);
-      await installUnit(home);
-      const result = await status(home, system(home));
-      assert.equal(result.code, 0, result.output);
-      assert.match(result.stdout, /ledger\s+unavailable/);
-      assert.doesNotMatch(
-        result.stdout,
-        /0 settled|SyntheticChannel|SyntheticTransaction/,
-      );
     } finally {
       await writer.close();
     }

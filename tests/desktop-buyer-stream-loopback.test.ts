@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
-import { classifyPaidError, paidChat } from '@gyblos/buyer/paid-http';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { ChatController } from '@gyblos/desktop/chat-controller';
 import { MESSAGE_STATE } from '@gyblos/desktop/chat-state';
@@ -19,7 +18,6 @@ import {
   OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 
-import { header, setup as paidSetup, settlement } from './support/buyer-paid';
 import { latch, tick } from './support/desktop-stream';
 
 void test('desktop HTTP streaming shows a partial, stops the original execution and can send a new free turn', async () => {
@@ -172,74 +170,6 @@ void test('desktop HTTP streaming shows a partial, stops the original execution 
     await host.close();
   }
 });
-void test('desktop streaming preserves the existing confirmed paid producer without an execution marker', async () => {
-  const buyer = await paidSetup();
-  const transaction = '2'.repeat(88);
-  const progress: string[] = [];
-  buyer.scripts.push(async (request, onDelta) => {
-    await onDelta('Hi.');
-    return {
-      ...(await header(request)),
-      result: {
-        text: 'Hi.',
-        usage: { inputTokens: 4, outputTokens: 3 },
-        finishReason: ENGINE_DONE_REASONS.STOP,
-      },
-      charge: { inputTokens: 4, outputTokens: 3, chargedAtomic: '1' },
-      payment: { settlement: { ...settlement(request, '1'), transaction } },
-    };
-  });
-  let saved: string | undefined;
-  const budget = new X402Budget({
-    read: async () => saved,
-    write: async (text) => {
-      saved = text;
-    },
-  });
-  const chat = paidChat(buyer.dependencies);
-  const quote = buyer.winners[0]!.quote.offer;
-  const host = await startFreeBuyerHttp(
-    chat.execute,
-    {
-      selection: { modelId: 'synthetic', variant: null, quantization: null },
-      maxTokens: 10,
-    },
-    {
-      port: 0,
-      token: 'synthetic-local-buyer-token',
-      stream: chat.stream,
-      classify: classifyPaidError,
-      desktopPolicy: {
-        network: quote.network,
-        mint: quote.mint,
-        payer: quote.buyer,
-        maxAtomic: quote.maxAtomic,
-      },
-    },
-  );
-  const client = new X402Client(budget);
-  try {
-    await client.connect(host.url, 'synthetic-local-buyer-token');
-    await client.authorize(quote.maxAtomic);
-    await assert.doesNotReject(async () => {
-      const result = await client.send(
-        'paid-stream-one',
-        'Synthetic question',
-        (text) => progress.push(text),
-      );
-      assert.equal(result.text, 'Hi.');
-      assert.equal(result.summary.records[0]?.transaction, transaction);
-      assert.equal(result.summary.spentAtomic, '1');
-      assert.equal(result.summary.blocked, false);
-    });
-    assert.deepEqual(progress, ['Hi.']);
-    assert.equal(buyer.calls.executed.length, 1);
-  } finally {
-    await client.close();
-    await host.close();
-  }
-});
-
 void test('the desktop sends the selected seller to the authenticated channel route and records its approval', async () => {
   const ledger = new X402Budget({
     read: async () => undefined,

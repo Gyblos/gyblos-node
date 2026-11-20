@@ -12,7 +12,7 @@ import {
   PROTOCOL_FEE,
 } from '@gyblos/config';
 import { roleSigner, type RoleConfig } from '@gyblos/node/roles';
-import type { SellerPayments } from '@gyblos/node/seller-paid';
+import type { SellerPayments } from '@gyblos/node/seller-chain';
 import type {
   BuyerSessionBackend,
   SellerSessionBackend,
@@ -226,18 +226,14 @@ export async function httpMultiSellerPayments(
     },
   };
   return {
-    server: {
-      describe: async () => ({
-        network: DEVNET,
-        mint: role.mint,
-        payTo: role.payTo!,
-        feePayer: role.facilitator!,
-        authorizer: role.authorizer!,
-        protocolFeeBps: PROTOCOL_FEE.bps,
-        treasury: PROTOCOL_FEE.treasury,
-      }),
-      admit: async () => assert.fail('legacy payment path forbidden'),
-      settle: async () => assert.fail('legacy settlement forbidden'),
+    description: {
+      network: DEVNET,
+      mint: role.mint,
+      payTo: role.payTo!,
+      feePayer: role.facilitator!,
+      authorizer: role.authorizer!,
+      protocolFeeBps: PROTOCOL_FEE.bps,
+      treasury: PROTOCOL_FEE.treasury,
     },
     sessions: { buyerNodeId, backend },
     close: async () => {},

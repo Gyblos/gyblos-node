@@ -10,7 +10,7 @@ import {
   PROTOCOL_FEE,
 } from '@gyblos/config';
 import { roleSigner } from '@gyblos/node/roles';
-import type { SellerPayments } from '@gyblos/node/seller-paid';
+import type { SellerPayments } from '@gyblos/node/seller-chain';
 import type {
   BuyerSessionBackend,
   SellerSessionBackend,
@@ -158,18 +158,14 @@ export async function sessionProductPayments(
         backend: async (child) => buyerAt(child),
       }),
     seller: async (): Promise<SellerPayments> => ({
-      server: {
-        describe: async () => ({
-          network: DEVNET,
-          mint: roles.seller.mint,
-          payTo: roles.seller.payTo!,
-          feePayer: roles.seller.facilitator!,
-          authorizer: roles.seller.authorizer!,
-          protocolFeeBps: PROTOCOL_FEE.bps,
-          treasury: PROTOCOL_FEE.treasury,
-        }),
-        admit: async () => assert.fail('legacy payment path must not run'),
-        settle: async () => assert.fail('legacy settlement must not run'),
+      description: {
+        network: DEVNET,
+        mint: roles.seller.mint,
+        payTo: roles.seller.payTo!,
+        feePayer: roles.seller.facilitator!,
+        authorizer: roles.seller.authorizer!,
+        protocolFeeBps: PROTOCOL_FEE.bps,
+        treasury: PROTOCOL_FEE.treasury,
       },
       sessions: { buyerNodeId: roles.buyer.nodeId, backend: seller },
       close: async () => {},

@@ -16,6 +16,7 @@ import {
 } from '@gyblos/protocol/batch-stream';
 import {
   ENGINE_DONE_REASONS,
+  FREE_CHAT_ROLES,
   FREE_EXECUTION,
 } from '@gyblos/protocol/constants';
 import {
@@ -30,7 +31,7 @@ import { serveBatchChannelStream } from '@gyblos/transport-iroh/batch-server';
 import type { ControlStream } from '@gyblos/transport-iroh/control-io';
 
 import { batchDeferred } from './support/batch-deferred';
-import { paidSource } from './support/paid-fixture';
+import { batchQuote } from './support/batch-quote';
 
 const request: BatchChannelRequest = {
   version: BATCH_CHANNEL.version,
@@ -312,11 +313,14 @@ void test('batch framing rejects ambiguous JSON, trailing bytes and incomplete b
 });
 
 void test('a legal response whose JSON escapes exceed the frame produces a static LIMIT frame', async () => {
-  const source = await paidSource();
+  const source = await batchQuote();
   const execution = buildBatchExecutionRequest(
     request.params.channelId,
-    source.paid.quote,
-    source.paid.input,
+    source.quote,
+    {
+      messages: [{ role: FREE_CHAT_ROLES.USER, content: 'Hello' }],
+      maxTokens: source.quote.offer.maxTokens,
+    },
   );
   const call: BatchChannelRequest = {
     version: BATCH_CHANNEL.version,

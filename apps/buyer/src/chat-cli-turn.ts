@@ -95,7 +95,11 @@ function paymentResult(payment: Record<string, unknown>) {
       session: sessionApproval(payment.session),
     };
   }
-  if (payment.session !== undefined) throw new Error('payment');
+  if (
+    payment.session !== undefined ||
+    payment.verdict === PAID_VERDICTS.SETTLED
+  )
+    throw new Error('payment');
   if (
     !Object.values(PAID_VERDICTS).some((value) => value === payment.verdict) ||
     !amount(payment.chargedAtomic) ||
@@ -169,10 +173,7 @@ function completeResult(
   } else if (options.paid && !payment) throw new Error('payment');
   if (payment) {
     terminal.payment = paymentResult(payment);
-    if (
-      payment.verdict !== PAID_VERDICTS.SETTLED &&
-      payment.verdict !== SESSION_VERDICTS.APPROVED
-    )
+    if (payment.verdict !== SESSION_VERDICTS.APPROVED)
       terminal.status = CHAT_TURN_STATUSES.UNCERTAIN;
   }
   return terminal;

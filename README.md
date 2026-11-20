@@ -104,7 +104,7 @@ cancelled and skipped counts.
 | `pnpm buyer`, `buyer:chat`                               | Start the local buyer endpoint; or chat with it in the terminal.                               |
 | `pnpm buyer:free`                                        | Start a buyer endpoint that runs free offers only.                                             |
 | `pnpm buyer:agent`                                       | Print or write the settings that connect a coding agent to the buyer endpoint.                 |
-| `pnpm buyer:reconcile:paid`, `buyer:withdraw:paid`       | Check open payment channels against devnet; move a stuck channel toward a refund.              |
+| `pnpm buyer:withdraw:paid`                               | Check open payment channels against devnet; move a stuck channel toward a refund.              |
 | `pnpm desktop:build`, `desktop:start`, `desktop:package` | Build, run or package the desktop app.                                                         |
 | `pnpm docs:dev`, `docs:test`                             | Preview the docs site; check its static export.                                                |
 | `pnpm check`                                             | Typecheck, lint and all tests; run before every PR.                                            |

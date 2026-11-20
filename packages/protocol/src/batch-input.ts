@@ -1,47 +1,21 @@
-// Shares static paid-execution boundary errors; free-execution and control failures raised by
-// shared parsers become the paid code of the same meaning, never free codes on the paid wire.
+// Preserve channel inference error codes when shared wire parsers reject input.
+import { batchFail } from './batch-channel-validation';
 import {
   CONTROL_CODES,
   FREE_EXECUTION_CODES,
   type ControlCode,
   type FreeExecutionCode,
-  type FreeExecutionStopReason,
 } from './constants';
 import { ControlError } from './control-validation';
-import type {
-  FreeExecutionDelivered,
-  FreeExecutionStop,
-} from './free-execution-types';
-import {
-  FreeExecutionError,
-  freeExecutionStop,
-} from './free-execution-validation';
+import { FreeExecutionError } from './free-execution-validation';
 import { INFERENCE_CODES, InferenceError } from './inference';
 import { PAID_EXECUTION_CODES, type PaidExecutionCode } from './paid/constants';
 
-export class PaidExecutionError extends Error {
-  // Declared only: absent fields stay absent rather than own undefined properties.
-  declare readonly reason?: FreeExecutionStopReason;
-  declare readonly delivered?: FreeExecutionDelivered;
-  constructor(
-    readonly code: PaidExecutionCode,
-    readonly remote = false,
-    stop: FreeExecutionStop = {},
-  ) {
-    super(code);
-    this.name = 'PaidExecutionError';
-    Object.assign(this, freeExecutionStop(stop));
-  }
-}
-
-export function paidExecutionFail(
+function inputFail(
   code: PaidExecutionCode = PAID_EXECUTION_CODES.INVALID,
 ): never {
-  throw new PaidExecutionError(code);
+  return batchFail(code);
 }
-
-// Shared parsers raise free and control codes; each maps to the paid code of the same meaning.
-// Free-only admission codes cannot arise on the paid path and map to INVALID.
 const FROM_FREE = {
   [FREE_EXECUTION_CODES.INVALID]: PAID_EXECUTION_CODES.INVALID,
   [FREE_EXECUTION_CODES.VERSION]: PAID_EXECUTION_CODES.VERSION,
@@ -71,10 +45,9 @@ const FROM_CONTROL: Partial<Record<ControlCode, PaidExecutionCode>> = {
   [CONTROL_CODES.POLICY]: PAID_EXECUTION_CODES.BINDING,
 };
 
-export function rethrowPaidExecution(error: unknown): never {
-  if (error instanceof PaidExecutionError) throw error;
+function rethrowInput(error: unknown): never {
   if (error instanceof InferenceError)
-    return paidExecutionFail(
+    return inputFail(
       error.code === INFERENCE_CODES.LIMIT
         ? PAID_EXECUTION_CODES.LIMIT
         : error.code === INFERENCE_CODES.UNSUPPORTED
@@ -82,16 +55,15 @@ export function rethrowPaidExecution(error: unknown): never {
           : PAID_EXECUTION_CODES.INTERNAL,
     );
   if (error instanceof FreeExecutionError)
-    return paidExecutionFail(FROM_FREE[error.code]);
-  if (error instanceof ControlError)
-    return paidExecutionFail(FROM_CONTROL[error.code]);
-  return paidExecutionFail();
+    return inputFail(FROM_FREE[error.code]);
+  if (error instanceof ControlError) return inputFail(FROM_CONTROL[error.code]);
+  return inputFail();
 }
 
-export function paidExecutionBoundary<T>(parse: () => T): T {
+export function batchInputBoundary<T>(parse: () => T): T {
   try {
     return parse();
   } catch (error) {
-    return rethrowPaidExecution(error);
+    return rethrowInput(error);
   }
 }

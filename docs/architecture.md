@@ -138,9 +138,6 @@ generate within the permit, measure delivered output, finish once and release
 the generation slot.
 
 - `policy-free.ts` applies replay protection, concurrency and token caps.
-- `policy-x402.ts` wraps the per-request `PaymentServer` with the allowance and
-  charge calculations in core. It keeps admission order, the claim-time reserve,
-  zero charge when nothing is delivered and settlement retry.
 - Reusable payment sessions apply their own policy around the same lifecycle
   ([below](#reusable-payment-session-composition)).
 
@@ -184,26 +181,6 @@ by weighted sampling:
 The buyer app composes it: `apps/buyer/src/selection*.ts` builds the inputs and
 persists stats, and `offer-race.ts` asks the candidates for live offers. The
 operator view is in [payment-sessions.md](payment-sessions.md#buyer-routing).
-
-### Trusted host dependencies
-
-`@gyblos/node/buyer-paid-execution` runs one paid request in process. Hosts
-supply selection, payment, metering, transport and record dependencies, and the
-orchestration trusts them to do these checks:
-
-- **Selection** verifies the owner–NodeId binding, the authenticated catalog,
-  the signed quote, request binding, freshness, exact selection and the buyer's
-  ceilings.
-- **Payment** enforces its own terms and durable journal.
-- **Transport** authenticates the selected peer, verifies the response and
-  reports an open as unsent only when it could not have left the buyer. Only
-  that result permits discard and failover.
-- **Unresolved payments** block earlier signed, unsettled opens, including ones
-  whose transmission is uncertain or whose discard failed, and fail closed when
-  state is unavailable.
-
-The outcome includes a signed authorization payload. Hosts must never expose it
-to UI, IPC or logs; they provide a safe projection instead.
 
 ## Reusable payment session composition
 

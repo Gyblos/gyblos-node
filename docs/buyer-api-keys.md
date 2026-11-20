@@ -127,13 +127,12 @@ Before preparing a payment, the buyer:
 
 What counts against a key:
 
-| Execution                 | Consumes                                                                                                                                                        |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Per-request paid, settled | The verified charge, including a charged terminal failure or failed delivery. A transaction is required to count a charge as settled                            |
-| Reusable session request  | Each verified request approval, once. The session's cumulative approval and deposit are not key usage; the app shows approved usage apart from settled payments |
-| Free                      | Zero                                                                                                                                                            |
-| Failover proven unsent    | Zero; its reservation is released                                                                                                                               |
-| Uncertain paid outcome    | The reservation stays held                                                                                                                                      |
+| Execution                | Consumes                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reusable session request | Each verified request approval, once. The session's cumulative approval and deposit are not key usage; the app shows approved usage apart from settled payments |
+| Free                     | Zero                                                                                                                                                            |
+| Failover proven unsent   | Zero; its reservation is released                                                                                                                               |
+| Uncertain paid outcome   | The reservation stays held                                                                                                                                      |
 
 Buyer policy, price ceilings, wallet and payment-session safeguards still apply.
 A key does not allocate wallet funds or replace session collateral. Other

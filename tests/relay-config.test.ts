@@ -8,12 +8,12 @@ import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
   FREE_STREAM,
 } from '@gyblos/protocol/constants';
-import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
 import {
   RELAY_CONFIGURATION_CODES,
   RELAY_TOKEN_LENGTH,
@@ -351,17 +351,17 @@ void test(
 );
 
 void test(
-  'a paid endpoint advertises the paid stream ALPN only when asked',
+  'a paid endpoint advertises the session ALPN only when asked',
   OPTIONS,
   () => {
     const result = endpointProbe({
       GYBLOS_RELAY_TOKEN: TOKEN,
       PROBE_CONTROL: '1',
-      PROBE_PAID_EXECUTION: '1',
+      PROBE_BATCH_SESSIONS: '1',
       PROBE_HTTP: '0',
     });
     assert.equal(result.error, undefined);
-    assert.deepEqual(result.alpns, [CONTROL_ALPN, PAID_STREAM.alpn]);
+    assert.deepEqual(result.alpns, [CONTROL_ALPN, BATCH_CHANNEL.alpn]);
   },
 );
 

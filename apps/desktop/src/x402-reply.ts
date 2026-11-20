@@ -1,5 +1,5 @@
 // Parse free, settled and channel-approved responses from the authenticated buyer.
-import { PAID_VERDICTS, SESSION_VERDICTS } from '@gyblos/node/constants';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
 import {
   BUYER_API,
@@ -13,7 +13,7 @@ import {
 } from '@gyblos/protocol/constants';
 
 import { reportedUsage } from './response-metrics';
-import { DESKTOP_X402, x402Signature } from './x402-model';
+import { DESKTOP_X402 } from './x402-model';
 
 export function buyerResponseObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -63,30 +63,9 @@ export function parseBuyerReply(input: unknown, policy: BuyerApiPolicy) {
       sessionApproval: approval,
     };
   }
-  if (
-    paid.verdict !== PAID_VERDICTS.SETTLED ||
-    typeof paid.transaction !== 'string' ||
-    !x402Signature(paid.transaction) ||
-    !buyerAtomic(paid.maxAtomic) ||
-    !buyerAtomic(paid.expectedAtomic) ||
-    !buyerAtomic(paid.chargedAtomic) ||
-    !buyerAtomic(paid.refundedAtomic) ||
-    paid.expectedAtomic !== paid.chargedAtomic ||
-    BigInt(paid.maxAtomic) > BigInt(policy.maxAtomic) ||
-    BigInt(paid.chargedAtomic) + BigInt(paid.refundedAtomic) !==
-      BigInt(paid.maxAtomic) ||
-    value[BUYER_API.EXECUTION_FIELD] === OFFER_PRICING_KINDS.FREE
-  )
-    throw new Error(
-      'Payment is not confirmed. Further messages are blocked until review.',
-    );
-  return {
-    text: message.content,
-    chargeAtomic: paid.chargedAtomic,
-    transaction: paid.transaction,
-    free: false,
-    usage,
-  };
+  throw new Error(
+    'Payment is not confirmed. Further messages are blocked until review.',
+  );
 }
 
 function approvedSession(

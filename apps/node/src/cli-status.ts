@@ -8,7 +8,6 @@ import { runMode } from '@gyblos/config';
 import { DISCOVERY_ERROR_CODES, fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
 import { listReceipts, receiptUploadHealth } from '@gyblos/node/receipts';
-import { sellerPaidSummary } from '@gyblos/node/seller-paid-summary';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { urlOrigin } from './cli-format';
@@ -31,7 +30,6 @@ import {
   type SellerOutput,
 } from './seller-home';
 import {
-  atomicUsdc,
   outputRate,
   receiptActivity,
   type ActivityWindow,
@@ -216,32 +214,6 @@ async function activityLines(
   ].join('');
 }
 
-// Paid requests from the seller's payment ledger, which keeps finished requests for a day. Empty when this
-// seller never served one; lifetime earnings are the owner's USDC balance, shown on a block explorer.
-async function paidLines(homeEnvironment: HomeEnvironment, now: number) {
-  let summary;
-  try {
-    summary = await sellerPaidSummary(homeEnvironment, now - STATUS.dayMs, now);
-  } catch {
-    return `Paid requests:\n${line('ledger', 'unavailable (unsafe or invalid file)')}`;
-  }
-  if (!summary) return '';
-  return [
-    'Paid requests, from the payment ledger:\n',
-    line(
-      'last 24h',
-      `${summary.settled} settled, ${atomicUsdc(summary.chargedAtomic)} USDC charged (gross, including the Gyblos fee); ${summary.failed} not charged`,
-    ),
-    line('settling now', String(summary.pending)),
-    line(
-      'last settled',
-      summary.lastSettledAt === undefined ? 'none' : iso(summary.lastSettledAt),
-    ),
-    line('earnings', "the owner's USDC balance on a Solana explorer"),
-  ].join('');
-}
-
-// Free activity from signed receipts, then paid requests from the payment ledger.
 async function usageLines(
   homeEnvironment: HomeEnvironment,
   nodeId: string,
@@ -251,7 +223,6 @@ async function usageLines(
     `Activity, from signed receipts (pending protected; at most ${RECEIPT_STORAGE.maxEntries} uploaded kept):\n`,
     await receiptQueueLine(homeEnvironment, nodeId),
     await activityLines(homeEnvironment, nodeId, now),
-    await paidLines(homeEnvironment, now),
   ].join('');
 }
 
