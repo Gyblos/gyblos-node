@@ -23,6 +23,7 @@ import type {
 } from '@gyblos/protocol/payment-session';
 
 import type { paidAcceptanceRoles } from './paid-acceptance-config';
+import { singleBuyerRegistry } from './single-buyer-registry';
 
 export async function sessionProductPayments(
   roles: Awaited<ReturnType<typeof paidAcceptanceRoles>>,
@@ -167,7 +168,7 @@ export async function sessionProductPayments(
         protocolFeeBps: PROTOCOL_FEE.bps,
         treasury: PROTOCOL_FEE.treasury,
       },
-      sessions: { buyerNodeId: roles.buyer.nodeId, backend: seller },
+      sessions: { registry: singleBuyerRegistry(roles.buyer.nodeId, seller) },
       close: async () => {},
     }),
     calls,
