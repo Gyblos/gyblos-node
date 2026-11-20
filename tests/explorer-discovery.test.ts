@@ -1,5 +1,5 @@
 // Protects the explorer's scheduled read of the discovery index (which answers no-store): a run stays
-// within a fixed number of requests, whatever the number of viewers; a catalog with more models than fit
+// within a fixed number of requests and time; a catalog with more models than fit
 // in one run is carried on by the next ones and shown only once whole, each model read within one run, so
 // the page never shows part of the index as all of it; a failed page or uptime keeps the last good read
 // and is tried again later without starving the rest; what went wrong is reported as fixed codes.
@@ -7,11 +7,8 @@ import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
 import { DISCOVERY } from '@gyblos/explorer/constants';
-import {
-  readIndex,
-  snapshotOf,
-  type StoredDiscovery,
-} from '@gyblos/explorer/discovery';
+import { readIndex, type StoredDiscovery } from '@gyblos/explorer/discovery';
+import { snapshotOf } from '@gyblos/explorer/discovery-snapshot';
 
 import {
   count,
@@ -174,17 +171,55 @@ void test('a malformed seller entry is skipped and reported; the rest of its pag
 });
 
 void test('no request begins after the run’s deadline', async () => {
+  fakeIndex({ models: manyModels(DISCOVERY.maxRequestsPerRun) });
+  // Every request takes a tenth of the deadline; record when each one begins.
   let now = 0;
-  const { requests } = fakeIndex({
-    models: manyModels(DISCOVERY.maxRequestsPerRun),
-  });
-  // Every request takes a tenth of the deadline.
-  const clock = () => {
-    now += DISCOVERY.runDeadlineMs / 20;
-    return now;
-  };
-  await readIndex(null, clock);
-  assert.ok(requests.length < DISCOVERY.maxRequestsPerRun);
+  const began: number[] = [];
+  const answer = globalThis.fetch;
+  globalThis.fetch = ((input: string | URL | Request) => {
+    began.push(now);
+    now += DISCOVERY.runDeadlineMs / 10;
+    return answer(input);
+  }) as typeof fetch;
+  await readIndex(null, () => now);
+  assert.ok(began.length > 0);
+  assert.ok(began.every((at) => at < DISCOVERY.runDeadlineMs));
+});
+
+void test('no uptime try begins after the run’s deadline either', async () => {
+  const sellers = nodes('n', 60);
+  fakeIndex({ models: { a: sellers } });
+  let { stored } = await readIndex(null, () => 0);
+  let now = DISCOVERY.uptimeRefreshMs;
+  const began: number[] = [];
+  fakeIndex({ models: { a: sellers } });
+  const answer = globalThis.fetch;
+  globalThis.fetch = ((input: string | URL | Request) => {
+    began.push(now - DISCOVERY.uptimeRefreshMs);
+    now += DISCOVERY.runDeadlineMs / 10;
+    return answer(input);
+  }) as typeof fetch;
+  ({ stored } = await readIndex(stored, () => now));
+  assert.ok(began.length > 0);
+  assert.ok(began.every((at) => at < DISCOVERY.runDeadlineMs));
+});
+
+void test('a catalog read over several runs is not dated while it advances, and is once it stops', async () => {
+  fakeIndex({ models: { a: ['n1'] } });
+  let { stored } = await readIndex(null, () => 0);
+  const models = { a: ['n1'], ...manyModels(4 * DISCOVERY.maxRequestsPerRun) };
+  let now = 0;
+  for (let run = 0; run < 4; run += 1) {
+    now += 2 * MINUTE;
+    fakeIndex({ models });
+    ({ stored } = await readIndex(stored, () => now));
+    assert.equal(snapshotOf(stored, now).readAt, null);
+  }
+  assert.ok(stored.pending);
+  fakeIndex({ models, down: true });
+  ({ stored } = await readIndex(stored, () => now + 2 * MINUTE));
+  const late = now + DISCOVERY.staleAfterMs + MINUTE;
+  assert.equal(snapshotOf(stored, late).readAt, stored.catalog?.readAt);
 });
 
 void test('uptimes are tried in turns, never-tried first, a few at a time, and again only once old', async () => {
@@ -242,16 +277,20 @@ void test('a failed uptime keeps the last one and waits its turn; an uptime goes
   assert.equal(stored.uptimes.n2, undefined);
 });
 
-void test('a failed or malformed /network answer keeps the last one; an index without it has none', async () => {
+void test('a failed or malformed /network answer keeps the last one, dated; an index without it has none', async () => {
   fakeIndex({ models: { a: ['n1'] } });
   let { stored } = await readIndex(null, () => 0);
   const last = snapshotOf(stored, 0).network;
   assert.ok(last);
+  assert.equal(snapshotOf(stored, 0).networkReadAt, null);
   fakeIndex({ models: { a: ['n1'] }, offline: 'malformed' });
   let problems;
   ({ stored, problems } = await readIndex(stored, () => 2 * MINUTE));
   assert.deepEqual(problems, ['network']);
-  assert.deepEqual(snapshotOf(stored, 2 * MINUTE).network, last);
+  const kept = snapshotOf(stored, 2 * MINUTE);
+  assert.deepEqual(kept.network, last);
+  assert.equal(kept.networkReadAt, 0);
+  assert.equal(snapshotOf(stored, 2 * MINUTE).readAt, null);
 
   fakeIndex({ models: { a: ['n1'] }, offline: null });
   const fresh = await readIndex(null, () => 0);

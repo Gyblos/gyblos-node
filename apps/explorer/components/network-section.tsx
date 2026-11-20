@@ -46,6 +46,12 @@ export async function NetworkSection() {
           Discovery index last read at {utc(snapshot.readAt)}.
         </p>
       ) : null}
+      {snapshot.networkReadAt ? (
+        <p className="-mt-2 mb-3 text-xs text-dim">
+          Registered and offline counts last read at{' '}
+          {utc(snapshot.networkReadAt)}.
+        </p>
+      ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SellersOnline snapshot={snapshot} />
         <StatCard

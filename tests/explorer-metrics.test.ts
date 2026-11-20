@@ -227,6 +227,7 @@ void test('offers of the same model with different variants are summarized apart
     generatedAt: 0,
     network: null,
     readAt: null,
+    networkReadAt: null,
     error: null,
     sellers: [
       {
@@ -248,6 +249,7 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
     generatedAt: 0,
     network: null,
     readAt: null,
+    networkReadAt: null,
     error: null,
     sellers: [
       {

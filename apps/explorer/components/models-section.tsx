@@ -106,8 +106,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
       ) : null}
       {offersKnown ? null : (
         <p className="mt-1 text-xs text-dim">
-          The explorer has no read of the discovery index: what is offered now
-          is unknown.
+          The discovery index could not be read: what is offered now is unknown.
         </p>
       )}
       {collector.error ? (

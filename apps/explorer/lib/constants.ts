@@ -21,7 +21,8 @@ export const DISCOVERY = {
   // No request of a run begins after this long, so a run with requests at the fetch timeout still ends
   // well before the next run (2 minutes later) and never overlaps it.
   runDeadlineMs: 20 * 1000,
-  // Requests of a run kept for uptimes that are due, so a large catalog read never takes every run.
+  // Due uptimes a run tries before its catalog reading, so a long or slow catalog read never takes every
+  // run's requests and time.
   uptimeReservedPerRun: 15,
   // Uptime reads in flight at once: a Worker opens 6 connections at a time, and a queued read's
   // timeout would run while it waits.
@@ -30,7 +31,8 @@ export const DISCOVERY = {
   uptimeRefreshMs: 10 * 60 * 1000,
   // A catalog read under way this long (a model that keeps failing or never fits in a run) begins again.
   restartAfterMs: 60 * 60 * 1000,
-  // Past this age (two runs and a margin), the page says when the catalog it shows was read.
+  // When the catalog has not been read further for this long (two runs and a margin), the page says when
+  // the catalog it shows was read.
   staleAfterMs: 5 * 60 * 1000,
   // A render reuses the stored read its Worker instance read this recently instead of reading KV again.
   reuseMs: 30 * 1000,

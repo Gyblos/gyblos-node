@@ -9,6 +9,7 @@
     "./collector-shape": "./lib/collector-shape.ts",
     "./constants": "./lib/constants.ts",
     "./discovery": "./lib/discovery.ts",
+    "./discovery-snapshot": "./lib/discovery-snapshot.ts",
     "./fetch-json": "./lib/fetch-json.ts",
     "./format": "./lib/format.ts",
     "./latency": "./lib/latency.ts",

@@ -1,7 +1,7 @@
 // Owns the explorer Worker's scheduled run (on the cron in wrangler.jsonc): it reads the discovery
 // index into the DISCOVERY KV snapshot the page shows (lib/discovery.ts). The Worker's entry, written by
 // scripts/write-worker-entry.mjs after the OpenNext build, serves the page with OpenNext and runs this.
-import { refreshDiscovery, type DiscoveryKv } from './lib/discovery';
+import { refreshDiscovery, type DiscoveryKv } from './lib/discovery-snapshot';
 
 interface Bindings {
   DISCOVERY: DiscoveryKv;

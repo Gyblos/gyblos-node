@@ -7,15 +7,17 @@ import { cache } from 'react';
 
 import { DISCOVERY } from './constants';
 import {
-  loadSnapshot,
   readIndex,
-  snapshotOf,
   unavailable,
-  type DiscoveryKv,
   type DiscoverySnapshot,
   type RunProblem,
   type StoredDiscovery,
 } from './discovery';
+import {
+  loadSnapshot,
+  snapshotOf,
+  type DiscoveryKv,
+} from './discovery-snapshot';
 
 declare global {
   interface CloudflareEnv {

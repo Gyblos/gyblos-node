@@ -1,6 +1,6 @@
 // A fake discovery index and KV namespace for the explorer's discovery tests (tests/explorer-discovery*.test.ts):
 // the index answers over a shape the test sets, recording every request and the uptime reads in flight.
-import type { DiscoveryKv } from '@gyblos/explorer/discovery';
+import type { DiscoveryKv } from '@gyblos/explorer/discovery-snapshot';
 
 export interface IndexShape {
   // Sellers per model, by model id.

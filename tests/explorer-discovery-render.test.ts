@@ -10,7 +10,7 @@ import {
   loadSnapshot,
   refreshDiscovery,
   type DiscoveryKv,
-} from '@gyblos/explorer/discovery';
+} from '@gyblos/explorer/discovery-snapshot';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
 import { summarizeOffers } from '@gyblos/explorer/offers';
 
@@ -128,6 +128,7 @@ void test('the average 24 h uptime is over the sellers with an uptime read, and 
     generatedAt: 0,
     network: null,
     readAt: null,
+    networkReadAt: null,
     error: null,
     sellers: [seller('a', 1), seller('b', 0.5), seller('c', null)],
   });
