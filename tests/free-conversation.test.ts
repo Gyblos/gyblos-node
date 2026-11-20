@@ -16,7 +16,6 @@ import {
   FREE_EXECUTION_CODES,
 } from '@gyblos/protocol/constants';
 import { PAID_INPUT_BYTES } from '@gyblos/protocol/execution-wire';
-import { PAID_EXECUTION, PAID_STREAM } from '@gyblos/protocol/paid/constants';
 
 import { controlFixture } from './support/control-fixture';
 import { CONVERSATION } from './support/conversation';
@@ -174,8 +173,6 @@ void test('a free offer refuses at quote time an answer longer than its limit', 
 });
 
 void test('paid execution keeps its input bound and admits long answers under a bounded deadline', () => {
-  assert.equal(PAID_EXECUTION.requestBytes, 131072 + 8192);
-  assert.equal(PAID_STREAM.maxEvents, 32769);
   assert.equal(PAID_INPUT_BYTES, 65536);
   assert.equal(generationDeadlineMs(90_000, 128), 90_000);
   assert.equal(generationDeadlineMs(90_000, 1128), 115_000);

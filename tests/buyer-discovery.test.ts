@@ -8,9 +8,8 @@ import test from 'node:test';
 import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
 import { discoverBuyerSellers } from '@gyblos/buyer/discovery';
 import { buyerDiscoveryState } from '@gyblos/buyer/discovery-storage';
-import { selectBuyerQuote } from '@gyblos/buyer/selection';
+import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import { parseBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
-import { createProxySelection } from '@gyblos/buyer/selection-proxy';
 import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
 import {
@@ -49,7 +48,7 @@ void test('loopback HTTP discovery selects only independently trusted identities
       { fetch: globalThis.fetch, now: run.context.now },
     );
     let connects = 0;
-    const result = await selectBuyerQuote(config, {
+    const result = await selectVerifiedBuyerQuote(config, {
       ...run.dependencies,
       connect: async (seller) => {
         connects++;
@@ -222,62 +221,6 @@ void test('pagination loops and page caps fail closed without control queries', 
     await home.close();
   }
 });
-void test('discovery runs only before authorization; a non-trusted winner cannot acquire a v1 decision', async () => {
-  const home = await discoveryHome();
-  const run = await discoveryRun();
-  try {
-    let fetches = 0;
-    const route = async (signal: AbortSignal) => {
-      const config = await discoverBuyerSellers(run.config, home.state, {
-        fetch: async () => {
-          fetches++;
-          return discoveryResponse([run.entry]);
-        },
-        now: run.context.now,
-        signal,
-      });
-      return selectBuyerQuote(
-        config,
-        {
-          ...run.dependencies,
-          observeVerified: (seller) => home.state.observe(seller),
-        },
-        signal,
-      );
-    };
-    const guard = createProxySelection(route, 100, run.context.now);
-    const body = Buffer.from(
-      JSON.stringify({ requestId: 'synthetic', maxTokens: 100 }),
-    );
-    assert.deepEqual(
-      await guard.admit(body, false, new AbortController().signal),
-      { ok: true },
-    );
-    assert.deepEqual(
-      await guard.admit(body, true, new AbortController().signal),
-      { ok: true },
-    );
-    assert.equal(
-      (await guard.admit(body, true, new AbortController().signal)).ok,
-      false,
-    );
-    assert.equal(fetches, 1);
-    const config = await discoverBuyerSellers(run.config, home.state, {
-      fetch: async () => discoveryResponse([run.entry]),
-      now: run.context.now,
-    });
-    const result = await selectBuyerQuote(config, {
-      ...run.dependencies,
-      trusted: { owner: run.catalog.owner, nodeId: '0'.repeat(64) },
-      observeVerified: (seller) => home.state.observe(seller),
-    });
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.equal(result.code, BUYER_SELECTION_CODES.QUOTE_ONLY);
-  } finally {
-    await run.wire.close();
-    await home.close();
-  }
-});
 void test('discovery config is opt-in, bounded and preserves static-only compatibility', async () => {
   const run = await discoveryRun();
   try {
@@ -363,7 +306,7 @@ void test('fresh Iroh records older than the accepted HTTP snapshot cannot reach
       fetch: async () => discoveryResponse([{ catalog, presence }]),
       now: run.context.now,
     });
-    const result = await selectBuyerQuote(config, {
+    const result = await selectVerifiedBuyerQuote(config, {
       ...run.dependencies,
       observeVerified: (seller) => home.state.observe(seller),
     });
@@ -377,7 +320,7 @@ void test('fresh Iroh records older than the accepted HTTP snapshot cannot reach
 void test('failed replay persistence prevents even a signed fresh candidate from reaching quote selection', async () => {
   const run = await discoveryRun();
   try {
-    const result = selectBuyerQuote(run.config, {
+    const result = selectVerifiedBuyerQuote(run.config, {
       ...run.dependencies,
       observeVerified: async () => {
         const { BuyerSelectionError } =

@@ -18,7 +18,7 @@ function priceLabel(model: ModelOption) {
 
 function modelDetail(model: ModelOption) {
   if (model.source === MODEL_SOURCE.ANNOUNCED)
-    return `${model.family ?? 'Signed announcement'} · Announced · ${model.free ? '' : priceLabel(model) + ' · '}Chat preview`;
+    return `${model.family ?? 'Signed announcement'} · ${model.free ? 'Free' : priceLabel(model)}`;
   return model.free ? 'Preview model' : priceLabel(model);
 }
 
@@ -30,6 +30,7 @@ export function ModelDropdown({
   toolbar = false,
   label,
   showBrowse = true,
+  networkOnly = false,
   contextLabel,
 }: {
   model: ModelOption;
@@ -39,9 +40,15 @@ export function ModelDropdown({
   toolbar?: boolean;
   label?: string;
   showBrowse?: boolean;
+  networkOnly?: boolean;
   contextLabel?: string;
 }) {
-  const ordered = [model, ...models.filter((item) => item.id !== model.id)];
+  const network =
+    networkOnly ||
+    models.some((item) => item.source === MODEL_SOURCE.ANNOUNCED);
+  const ordered = network
+    ? models
+    : [model, ...models.filter((item) => item.id !== model.id)];
   return (
     <Dropdown
       searchLabel="Search models"
@@ -53,7 +60,8 @@ export function ModelDropdown({
           {model.name}
           {contextLabel ? (
             <Badge>Local</Badge>
-          ) : model.free ? (
+          ) : network &&
+            !models.some((item) => item.id === model.id) ? null : model.free ? (
             <Badge>Free</Badge>
           ) : (
             <span className="model-trigger-price" title={priceLabel(model)}>
@@ -69,9 +77,10 @@ export function ModelDropdown({
             .toLowerCase()
             .includes(query.trim().toLowerCase()),
         );
-        const options = query.trim()
-          ? filtered
-          : filtered.slice(0, MENU_GEOMETRY.QUICK_MODELS);
+        const options =
+          network || query.trim()
+            ? filtered
+            : filtered.slice(0, MENU_GEOMETRY.QUICK_MODELS);
         return (
           <>
             {options.map((item) => (

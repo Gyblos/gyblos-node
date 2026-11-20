@@ -22,7 +22,10 @@ import { createAcceptanceWorkspace } from './workspace';
 export async function createAcceptanceSession(
   mode: AcceptanceMode,
   signal: AbortSignal,
-  extras: Pick<AcceptanceHostOptions, 'offer' | 'tokenizer'> & {
+  extras: Pick<
+    AcceptanceHostOptions,
+    'offer' | 'tokenizer' | 'admissionClock'
+  > & {
     index?: AcceptanceIndex;
     clock?: AcceptanceClock;
   } = {},
@@ -52,6 +55,7 @@ export async function createAcceptanceSession(
       identity,
       engine,
       clock,
+      admissionClock: extras.admissionClock,
       index,
       workspace,
       signal,

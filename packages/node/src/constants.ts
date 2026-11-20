@@ -417,7 +417,7 @@ export const BUYER_PAID_TIMEOUTS = {
 } as const;
 // The paid buyer's own refusals, before any payment.
 export const PAID_BUYER_CODES = {
-  // An earlier channel is not resolved yet; `pnpm buyer:reconcile:paid` resolves it.
+  // An earlier channel still needs recovery.
   UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
   UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
   // Paid sellers serve a single user message; anything else is refused before paying.

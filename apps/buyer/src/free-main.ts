@@ -42,7 +42,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
     'request.reasoning must be "off" and lowestReasoning null',
   [FREE_BUYER_STARTUP.NODE_KEY]:
     'node.key is missing, unreadable or does not match role.json',
-  [FREE_BUYER_STARTUP.PORT_IN_USE]: `port ${PORTS.buyerProxy} is in use; stop buyer:start or the other process first`,
+  [FREE_BUYER_STARTUP.PORT_IN_USE]: `port ${PORTS.buyerProxy} is in use; stop the process using it first`,
   [FREE_BUYER_STARTUP.PAID_NETWORK]:
     'paid mode is devnet only: role.json rpcUrl must serve devnet, and request.network and asset must match the role',
   [FREE_BUYER_STARTUP.PAID_MODEL]:

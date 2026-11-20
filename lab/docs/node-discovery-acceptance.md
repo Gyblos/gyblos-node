@@ -66,8 +66,8 @@ registration or payment flow, and its result always reports
 `paymentsEnabled: false`. Cases:
 
 - Publication feeds buyer discovery and selection, then a verified,
-  buyer-bound quote over Iroh. An unrelated trusted identity forces the
-  selector's quote-only result.
+  buyer-bound quote over Iroh. The check verifies that quoting never starts an
+  engine generation.
 - Three readiness renewal cycles produce newer observations and catalogs and
   fresh quotes.
 - Injected busy and engine-check failures block control queries and remove the

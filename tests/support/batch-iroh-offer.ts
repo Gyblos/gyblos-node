@@ -14,14 +14,14 @@ import type { EngineInput, EngineResult } from '@gyblos/protocol/engine';
 import { signOfferV2 } from '@gyblos/protocol/offer-v2';
 import type { PaymentSessionTerms } from '@gyblos/protocol/payment-session';
 
-import { paidSource } from './paid-fixture';
+import { batchQuote } from './batch-quote';
 
 export async function batchOfferFixture(
   terms: PaymentSessionTerms,
   owner: MessagePartialSigner,
   now: () => number,
 ) {
-  const source = await paidSource();
+  const source = await batchQuote();
   let generations = 0;
   let busy = false;
   let down = false;
@@ -32,7 +32,7 @@ export async function batchOfferFixture(
     count: (text: string) => text.length,
   };
   const base: InferenceOfferV2 = {
-    ...source.paid.quote.offer,
+    ...source.quote.offer,
     owner: terms.owner,
     nodeId: terms.sellerNodeId,
     buyer: terms.buyer,
@@ -50,7 +50,7 @@ export async function batchOfferFixture(
     endpoint: { relayUrl: null, directAddresses: [] },
     relayOnly: false,
     availability: {
-      ...source.paid.quote.offer.availability,
+      ...source.quote.offer.availability,
       observedAt: now(),
     },
   };

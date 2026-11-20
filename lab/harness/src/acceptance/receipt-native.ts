@@ -10,7 +10,6 @@ import {
   GYBLOS_ALPN,
   RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
-import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
 import { SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
 import type { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
@@ -21,7 +20,6 @@ import type { ReceiptProvider } from './receipt-provider';
 type AcceptanceAlpn =
   | typeof BATCH_CHANNEL.alpn
   | typeof SESSION_BLOCKS.alpn
-  | typeof PAID_STREAM.alpn
   | typeof CONTROL_ALPN
   | typeof FREE_EXECUTION.alpn
   | typeof FREE_STREAM.alpn
@@ -47,7 +45,6 @@ export function receiptNativeBinding(provider: Pick<ReceiptProvider, 'calls'>) {
       if (options.control) alpns.push(CONTROL_ALPN);
       if (options.freeExecution)
         alpns.push(FREE_EXECUTION.alpn, FREE_STREAM.alpn);
-      if (options.paidExecution) alpns.push(PAID_STREAM.alpn);
       if (options.batchSessions) alpns.push(BATCH_CHANNEL.alpn);
       if (options.batchSessions && options.batchBlocks)
         alpns.push(SESSION_BLOCKS.alpn);
@@ -63,7 +60,7 @@ export function receiptNativeBinding(provider: Pick<ReceiptProvider, 'calls'>) {
       endpoint.connect = async (...args) => {
         if (Buffer.from(args[1]).toString() === CONTROL_ALPN) controlDials++;
         if (
-          [FREE_EXECUTION.alpn, FREE_STREAM.alpn, PAID_STREAM.alpn].some(
+          [FREE_EXECUTION.alpn, FREE_STREAM.alpn].some(
             (value) => value === Buffer.from(args[1]).toString(),
           )
         ) {

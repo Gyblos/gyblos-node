@@ -11,7 +11,6 @@ import test from 'node:test';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { parseNodeConfig, type NodeConfig } from '@gyblos/node/node-config';
-import { sellerPublicationConfig } from '@gyblos/node/publisher-config';
 import { listedPrices } from '@gyblos/node/seller-offer';
 import {
   loadSellerSettings,
@@ -109,7 +108,7 @@ void test('environment-only settings match the previous direct readers', () => {
   };
   const settings = sellerSettings(freeFile(), environment);
   assert.equal(settings.relayOnly, true);
-  assert.deepEqual(settings.publication, sellerPublicationConfig(environment));
+  assert.ok(settings.publication?.baseUrl);
   assert.equal(
     settings.relayEnvironment.GYBLOS_RELAY_TOKEN,
     environment.GYBLOS_RELAY_TOKEN,

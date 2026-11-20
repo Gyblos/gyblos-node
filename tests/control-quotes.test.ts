@@ -8,7 +8,6 @@ import {
   acceptControlQuote,
   createControlQuote,
 } from '@gyblos/core/control-quotes';
-import { validateInferenceOffer } from '@gyblos/core/offers';
 import {
   CONTROL_CODES,
   CONTROL_LIMITS,
@@ -67,21 +66,6 @@ void test('control quotes bind the complete request and round-trip without reser
   });
 
   assert.notEqual(first.offer.model.name, first.offer.selection.modelId);
-  assert.throws(() =>
-    validateInferenceOffer(
-      first,
-      {
-        owner: first.offer.owner,
-        nodeId: first.offer.nodeId,
-        mint: first.offer.mint,
-        payTo: first.offer.payTo,
-        buyer: first.offer.buyer,
-        maxAtomic: first.offer.maxAtomic,
-      },
-      first.offer.issuedAt,
-      () => {},
-    ),
-  );
 });
 
 void test('control supports free and mixed-zero model pricing without authorizing payment', async () => {
