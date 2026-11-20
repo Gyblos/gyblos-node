@@ -41,6 +41,7 @@ export const X402_ACTION = {
   STOP: 'stop',
   FINISH: 'finish',
   EXPLORER: 'explorer',
+  CONFIGURE_PAID: 'configure-paid',
   START_BUYER: 'start-buyer',
   COPY_PAYER: 'copy-payer',
   COPY_MINT: 'copy-mint',

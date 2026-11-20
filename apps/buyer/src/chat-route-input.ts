@@ -33,6 +33,18 @@ export function routedInput(
   streaming: boolean,
   selectedSellerAllowed: boolean,
 ) {
+  let freeOnly = false;
+  if (body && typeof body === 'object' && BUYER_API.FREE_ONLY_FIELD in body) {
+    freeOnly = true;
+    if (
+      !selectedSellerAllowed ||
+      body[BUYER_API.FREE_ONLY_FIELD] !== true ||
+      BUYER_API.SELLER_CHOICE_FIELD in body
+    )
+      throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
+    const { [BUYER_API.FREE_ONLY_FIELD]: _free, ...rest } = body;
+    body = rest;
+  }
   if (
     body &&
     typeof body === 'object' &&
@@ -53,7 +65,8 @@ export function routedInput(
     const { stream: _stream, ...payload } = input;
     return { input, payload: withoutStop(payload), route, model: modelId };
   }
-  if (selectedSellerAllowed) throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
+  if (selectedSellerAllowed && !freeOnly)
+    throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
   const { route, name } = requestedModel(
     endpointRoutes(settings),
     body,
@@ -76,5 +89,10 @@ export function routedInput(
     settings.tools ?? false,
   );
   const { stream: _stream, ...rest } = input; // all but the stream flag
-  return { input, payload: withoutStop(rest), route, model };
+  return {
+    input,
+    payload: withoutStop(rest),
+    route: freeOnly ? { ...route, freeOnly: true } : route,
+    model,
+  };
 }

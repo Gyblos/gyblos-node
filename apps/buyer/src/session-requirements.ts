@@ -65,6 +65,7 @@ export async function endpointToken() {
 }
 
 export interface BuyerStartupOptions {
+  desktopChosenPrices?: boolean;
   telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;
   pool?: (
     role: RoleConfig,

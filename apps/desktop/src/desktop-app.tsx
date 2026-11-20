@@ -3,8 +3,6 @@
 import { Check, CheckCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
-import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
-
 import manifest from '../package.json';
 import { WINDOW_CHROME } from './constants';
 import {
@@ -60,6 +58,7 @@ import {
 import { useNetworkCatalog } from './ui/NetworkCatalog';
 import { useLocalNode } from './ui/NetworkStatus';
 import { PageBody } from './ui/PageBody';
+import { PaidSellerDialog } from './ui/PaidSellerDialog';
 import { Payments } from './ui/Payments';
 import { PaypalAgentConnection } from './ui/PaypalAgentConnection';
 import { Settings } from './ui/Settings';
@@ -75,7 +74,6 @@ import { useX402 } from './ui/useX402';
 import { WalletBackup } from './ui/WalletBackup';
 import { useDesktopWallet } from './ui/WalletState';
 import { WindowTitlebar } from './ui/WindowTitlebar';
-import { paidSellerLimitNotice, x402Amount, x402Asset } from './x402-model';
 
 const money = (value: number) => '$' + value.toFixed(2);
 export function DesktopApp() {
@@ -203,13 +201,6 @@ export function DesktopApp() {
   >(null);
   const [confirmedPolicy, setConfirmedPolicy] = useState<string>();
   const [paidModel, setPaidModel] = useState<Model | null>(null);
-  const sellerLimit = paidModel?.offerId
-    ? paidSellerLimitNotice(
-        x402.state.policy,
-        x402.state.summary,
-        paidModel.name,
-      )
-    : undefined;
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
   const [chatController] = useState(() => new ChatController('first-chat'));
@@ -580,80 +571,57 @@ export function DesktopApp() {
         )}
       </MotionPresence>
       <MotionPresence>
-        {paidModel && (
-          <Modal title="Use a paid model?" close={() => setPaidModel(null)}>
-            <div className="paid-model-summary">
-              <ModelImage name={paidModel.name} artwork={paidModel.image} />
-              <strong>{paidModel.name}</strong>
-              {paidModel.offerId && <span>{paidModel.family}</span>}
-            </div>
-            <div className="paid-terms">
-              <div>
-                <span>Input / 1M tokens</span>
-                <strong>{usdPerMtok(paidModel.input)}</strong>
+        {paidModel?.offerId ? (
+          <PaidSellerDialog
+            key={paidModel.id}
+            model={paidModel}
+            buyer={x402}
+            close={() => setPaidModel(null)}
+            confirm={(policyId) => {
+              setConfirmedPolicy(policyId);
+              setModel(paidModel);
+              setPaidModel(null);
+              setToast('Model selected');
+            }}
+          />
+        ) : (
+          paidModel && (
+            <Modal title="Use a paid model?" close={() => setPaidModel(null)}>
+              <div className="paid-model-summary">
+                <ModelImage name={paidModel.name} artwork={paidModel.image} />
+                <strong>{paidModel.name}</strong>
               </div>
-              <div>
-                <span>Output / 1M tokens</span>
-                <strong>{usdPerMtok(paidModel.output)}</strong>
-              </div>
-              {paidModel.offerId && x402.state.policy && (
+              <div className="paid-terms">
                 <div>
-                  <span>Maximum per response</span>
-                  <strong>
-                    {x402Amount(x402.state.policy.maxAtomic, x402.state.policy)}{' '}
-                    {x402Asset(x402.state.policy)}
-                  </strong>
+                  <span>Input / 1M tokens</span>
+                  <strong>{usdPerMtok(paidModel.input)}</strong>
                 </div>
-              )}
-              <div>
-                <span>
-                  {paidModel.offerId
-                    ? 'Channel deposit'
-                    : 'Your device daily limit'}
-                </span>
-                <strong>
-                  {paidModel.offerId
-                    ? x402.state.policy?.depositAtomic
-                      ? x402Amount(
-                          x402.state.policy.depositAtomic,
-                          x402.state.policy,
-                        ) + ' USDC'
-                      : 'Unavailable'
-                    : money(budget)}
-                </strong>
-              </div>
-              {paidModel.offerId && x402.state.policy?.lifetimeMs && (
                 <div>
-                  <span>Channel duration</span>
-                  <strong>
-                    {x402.state.policy.lifetimeMs /
-                      BATCH_SESSION_DEFAULTS.millisecondsPerSecond}{' '}
-                    seconds
-                  </strong>
+                  <span>Output / 1M tokens</span>
+                  <strong>{usdPerMtok(paidModel.output)}</strong>
                 </div>
-              )}
-            </div>
-            <p className="modal-note" role="status">
-              {sellerLimit ||
-                (paidModel.offerId
-                  ? 'The first paid message opens a channel with this seller. Later messages use the same channel.'
-                  : 'Your model stays selected. Gyblos won’t silently switch from a free to a paid offer.')}
-            </p>
-            <Button
-              variant={BUTTON_VARIANT.PRIMARY}
-              className="wide"
-              disabled={!!sellerLimit}
-              onClick={() => {
-                setConfirmedPolicy(x402.state.policy?.policyId);
-                setModel(paidModel);
-                setPaidModel(null);
-                setToast('Model selected');
-              }}
-            >
-              Use this model
-              <Check size={16} />
-            </Button>
-          </Modal>
+                <div>
+                  <span>Your device daily limit</span>
+                  <strong>{money(budget)}</strong>
+                </div>
+              </div>
+              <p className="modal-note">
+                Your model stays selected. Gyblos won’t silently switch from a
+                free to a paid offer.
+              </p>
+              <Button
+                variant={BUTTON_VARIANT.PRIMARY}
+                className="wide"
+                onClick={() => {
+                  setModel(paidModel);
+                  setPaidModel(null);
+                  setToast('Model selected');
+                }}
+              >
+                Use this model <Check size={16} />
+              </Button>
+            </Modal>
+          )
         )}
       </MotionPresence>
       <MotionPresence>

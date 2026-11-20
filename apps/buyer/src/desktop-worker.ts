@@ -23,7 +23,8 @@ export async function startBuyerWorker() {
           prepareRole: () =>
             setupRole({ role: P2P_ROLES.BUYER, mint: DEVNET_USDC }),
         },
-        startBuyer,
+        (options) => startBuyer({ ...options, desktopChosenPrices: true }),
+        process.argv[2],
       ),
     endpointToken,
     (code) => process.exit(code),

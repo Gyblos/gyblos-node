@@ -1,4 +1,5 @@
 // Browser-only example data for the unchanged desktop renderer. No network, keys or filesystem APIs.
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import { modelArtwork } from '@gyblos/desktop/announced-models';
 import {
@@ -65,8 +66,7 @@ export function createPreviewHost(
     policyId: example,
     model,
     maxTokens: 256,
-    depositAtomic: '1000000',
-    lifetimeMs: PREVIEW.halfHourMs * 2,
+    ...BUYER_SESSION_DEFAULT_POLICY,
     maxAtomic: query.get('seller-budget') === 'ready' ? '10000' : '0',
     ...scope,
   };
@@ -251,6 +251,15 @@ export function createPreviewHost(
       ) {
         connected = true;
         selectedHome = true;
+      }
+      if (
+        request.action === X402_ACTION.CONFIGURE_PAID &&
+        typeof request.maxAtomic === 'string'
+      ) {
+        policy.maxAtomic = request.maxAtomic;
+        policy.policyId = crypto.randomUUID();
+        active = false;
+        connected = true;
       }
       if (request.action === X402_ACTION.AUTHORIZE) {
         if (!connected || typeof request.limitAtomic !== 'string')

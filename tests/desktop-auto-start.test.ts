@@ -113,8 +113,16 @@ function runtime(maxAtomic = '0') {
   const checked = { ...policy(), maxAtomic };
   const client = new X402Client(budget, async () => Response.json(checked));
   const service = {
-    start: async () => {
+    start: async (maximum?: string) => {
       starts++;
+      if (maximum !== undefined) {
+        Object.assign(checked, {
+          maxAtomic: maximum,
+          depositAtomic: '1000000',
+          lifetimeMs: 3600000,
+          policyId: '00000000-0000-4000-8000-000000000002',
+        });
+      }
       return {
         url: 'http://127.0.0.1:8090/v1/chat/completions',
         token: 'synthetic-private-token',
@@ -278,4 +286,34 @@ void test('a new app process rebinds a clean free permission but preserves a pai
   await paid.buyer.start();
   assert.deepEqual(await paid.budget.summary(), before);
   await paid.buyer.close();
+});
+
+void test('desktop updates the owned buyer and retires only its empty automatic chat budget', async () => {
+  const r = runtime();
+  await r.buyer.start();
+  const first = r.client.policy()!;
+  await r.buyer.configure('10000', first.policyId);
+  const upgraded = r.client.policy()!;
+  assert.equal(upgraded.maxAtomic, '10000');
+  assert.notEqual(upgraded.policyId, first.policyId);
+  assert.equal((await r.budget.summary()).active, false);
+  assert.equal(r.starts(), 2);
+  await assert.rejects(r.buyer.configure('20000', first.policyId));
+  assert.deepEqual(r.client.policy(), upgraded);
+  await r.budget.authorize(upgraded, '20000');
+  await assert.rejects(r.buyer.configure('20000', upgraded.policyId));
+  assert.equal((await r.budget.summary()).limitAtomic, '20000');
+  assert.equal(r.starts(), 2);
+  await r.buyer.close();
+});
+void test('an externally connected buyer cannot rewrite the desktop profile', async () => {
+  const r = runtime();
+  await r.buyer.start();
+  await r.client.connect(
+    'http://127.0.0.1:8100/v1/chat/completions',
+    'another-private-token',
+  );
+  await assert.rejects(r.buyer.configure('100', r.client.policy()!.policyId));
+  assert.equal(r.starts(), 1);
+  await r.buyer.close();
 });

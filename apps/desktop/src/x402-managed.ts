@@ -172,16 +172,17 @@ export class ManagedBuyer {
     private readonly fork: (
       home: string,
       relayToken: string | undefined,
+      maxAtomic?: string,
     ) => BuyerWorker,
     private readonly onExit: () => void,
     private readonly startMs: number = DESKTOP_X402.START_MS,
     private readonly stopMs: number = DESKTOP_X402.STOP_MS,
   ) {}
-  async start(home: string, relayToken?: string) {
+  async start(home: string, relayToken?: string, maxAtomic?: string) {
     if (this.closed || this.running)
       throw new Error('A buyer is already running');
     const operation = supervise(
-      this.fork(home, relayToken),
+      this.fork(home, relayToken, maxAtomic),
       () => {
         this.running = null;
         this.onExit();

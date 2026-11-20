@@ -1,9 +1,11 @@
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
+import { controlAtomic } from '@gyblos/protocol/control-validation';
 
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
 import { BuyerSessionRequired, DesktopBuyerFailure } from './buyer-error';
 import type { X402Budget } from './x402-budget';
-import type { X402Client } from './x402-client';
+import type { DesktopSellerChoice, X402Client } from './x402-client';
 import {
   effectiveX402Policy,
   PaidSellerLimitError,
@@ -60,6 +62,8 @@ async function referenceAction(
 }
 export interface ManagedBuyerPorts {
   start(): Promise<void>;
+  configure?(maxAtomic: string, policyId?: string): Promise<void>;
+  changing?(): boolean;
 }
 function sendResponse(
   client: X402Client,
@@ -68,7 +72,7 @@ function sendResponse(
   id: string,
   prompt: string,
   progress?: (value: X402Progress) => void,
-  choice?: BuyerSellerChoice,
+  choice?: DesktopSellerChoice,
 ) {
   return client.send(
     id,
@@ -103,6 +107,11 @@ function selectedOffer(
   input: Record<string, unknown>,
   resolveOffer?: (id: string) => BuyerSellerChoice | undefined,
 ) {
+  if (input.freeOnly === true) {
+    if (input.offerId || !policy || input.policyId !== policy.policyId)
+      throw new PaidSellerLimitError('Select the free model again.');
+    return OFFER_PRICING_KINDS.FREE;
+  }
   if (!input.offerId && policy && policy.maxAtomic !== '0')
     throw new PaidSellerLimitError(
       'Select a seller and confirm its prices before sending.',
@@ -120,6 +129,23 @@ function selectedOffer(
       'Select the seller again to confirm the current channel terms.',
     );
   return selected;
+}
+function configureAction(
+  managed: ManagedBuyerPorts | undefined,
+  input: Record<string, unknown>,
+): Promise<boolean> | false {
+  if (managed?.changing?.() && input.action !== X402_ACTION.STATUS)
+    throw new PaidSellerLimitError(
+      'Wait for the buyer settings to finish updating.',
+    );
+  if (input.action !== X402_ACTION.CONFIGURE_PAID || !managed?.configure)
+    return false;
+  if (input.policyId !== undefined && typeof input.policyId !== 'string')
+    throw new Error('Invalid buyer policy');
+  const maxAtomic = controlAtomic(input.maxAtomic);
+  if (maxAtomic === '0')
+    throw new PaidSellerLimitError('Enter a positive maximum per response.');
+  return managed.configure(maxAtomic, input.policyId).then(() => true);
 }
 export function createX402Handlers(
   client: X402Client,
@@ -143,6 +169,7 @@ export function createX402Handlers(
   ): Promise<X402Result> => {
     const input = buyerAction(owner, event, args);
     try {
+      if (await configureAction(managed, input)) return await summary();
       if (
         (input.action === X402_ACTION.START_BUYER ||
           input.action === X402_ACTION.STATUS) &&
