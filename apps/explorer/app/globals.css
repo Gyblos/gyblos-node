@@ -64,6 +64,10 @@ body {
   background: var(--panel);
 }
 
+.explorer-table-scroll {
+  scroll-timeline: --table-scroll inline;
+}
+
 .explorer-table thead {
   background: color-mix(in srgb, var(--raised) 50%, var(--panel));
 }
@@ -85,7 +89,22 @@ body {
   width: 1px;
   content: '';
   pointer-events: none;
+  opacity: 0;
   box-shadow:
     1px 0 var(--line),
     6px 0 8px -8px var(--muted);
+}
+
+@supports (animation-timeline: scroll()) {
+  .explorer-table tr > :first-child:not([colspan])::after {
+    animation: table-divider linear both;
+    animation-timeline: --table-scroll;
+    animation-range: 0px 1px;
+  }
+}
+
+@keyframes table-divider {
+  to {
+    opacity: 1;
+  }
 }

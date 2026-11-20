@@ -55,7 +55,7 @@ export function Table({
   minWidth?: number;
 }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-panel">
+    <div className="explorer-table-scroll mt-4 overflow-x-auto rounded-2xl border border-line bg-panel">
       <table
         className="explorer-table w-full text-left text-sm whitespace-nowrap"
         style={{ minWidth }}
