@@ -17,6 +17,7 @@ import {
   type BatchDestination,
 } from '@gyblos/transport-iroh/batch-client';
 
+import { UnsentChannelPeerError } from './batch-buyer-execution';
 import { bounded } from './buyer-operation';
 import { createPoolAdmissions, type PoolLease } from './buyer-pool-admission';
 import { UnsentSellerBusyError } from './buyer-routing';
@@ -265,21 +266,26 @@ async function run<Remote extends BatchDestination>(
         if (lease.registered) {
           if (
             !lease.sent &&
-            error instanceof BatchClientError &&
-            error.remote &&
-            (error.code === SESSION_CODES.BUSY ||
-              error.code === PAID_EXECUTION_CODES.BUSY) &&
+            (error instanceof UnsentChannelPeerError ||
+              (error instanceof BatchClientError &&
+                error.remote &&
+                (error.code === SESSION_CODES.BUSY ||
+                  error.code === PAID_EXECUTION_CODES.BUSY))) &&
             (await state.admission.serial(async () =>
               (await catalog(state)).resolve(id, lease.requestId),
             ))
-          )
+          ) {
+            if (error instanceof UnsentChannelPeerError) throw error;
             throw new UnsentSellerBusyError(id);
+          }
           state.admission.uncertain();
           await state.admission
             .serial(async () => {
               await (await catalog(state)).resolve(id);
             })
             .catch(() => undefined);
+          if (error instanceof UnsentChannelPeerError)
+            return sessionFail(SESSION_CODES.UNVERIFIED);
         }
         throw error;
       } finally {
