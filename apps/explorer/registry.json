@@ -149,6 +149,11 @@
           "target": "components/board/bar-chart-card.tsx"
         },
         {
+          "path": "components/board/bar-axis.ts",
+          "type": "registry:lib",
+          "target": "components/board/bar-axis.ts"
+        },
+        {
           "path": "components/board/hovered.ts",
           "type": "registry:lib",
           "target": "components/board/hovered.ts"

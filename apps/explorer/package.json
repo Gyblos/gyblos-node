@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./board-bar-axis": "./components/board/bar-axis.ts",
     "./board-delta": "./components/board/delta.ts",
     "./board-hovered": "./components/board/hovered.ts",
     "./chain-shape": "./lib/chain-shape.ts",
