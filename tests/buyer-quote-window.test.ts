@@ -9,7 +9,7 @@ import {
   BUYER_SELECTION_CODES,
 } from '@gyblos/buyer/constants';
 import { raceControlOffers } from '@gyblos/buyer/offer-race';
-import { selectBuyerQuote } from '@gyblos/buyer/selection';
+import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import { parseBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import type { SellerCandidate } from '@gyblos/core/seller-selection';
@@ -90,7 +90,7 @@ void test('the configured quote window decides whether a slow seller can answer'
       return requestOffer(...args);
     };
     const select = (quoteWindowMs: number) =>
-      selectBuyerQuote(
+      selectVerifiedBuyerQuote(
         { ...run.config, quoteWindowMs },
         {
           ...dependencies,
@@ -128,7 +128,7 @@ void test('a seller that never answers before the window closes is cooled down',
       );
     const stats = new Map<string, LocalSellerStats>();
     assert.deepEqual(
-      await selectBuyerQuote(
+      await selectVerifiedBuyerQuote(
         { ...run.config, quoteWindowMs: BUYER_SELECTION.minWindowMs },
         { ...dependencies, stats, connect: async () => run.client },
       ),

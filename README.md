@@ -112,10 +112,7 @@ cancelled and skipped counts.
 | `pnpm format`                                            | Format files and sort imports.                                                                 |
 
 Replace `MINT` with the devnet USDC mint
-`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`. The legacy paid v1 commands
-(`buyer:start`, `buyer:trust`, `buyer:call`, `buyer:reconcile`) and the `gate:*`
-commands work only with the lab; see
-[lab/README.md](lab/README.md#legacy-v1-buyer).
+`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`.
 
 Commands read settings from the environment and never load a `.env` file.
 [.env.example](.env.example) lists the environment variables, and

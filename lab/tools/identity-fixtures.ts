@@ -15,8 +15,9 @@ import {
   ACCOUNT_OFFSETS,
   PROGRAMS,
 } from '@gyblos/identity/constants';
-import { assertDevnet } from '@gyblos/payments-x402/chain';
 import { isMain } from '@gyblos/runtime';
+
+import { assertDevnet } from './identity-flow';
 
 const FIXTURE = new URL(
   '../../tests/fixtures/identity-devnet-accounts.json',

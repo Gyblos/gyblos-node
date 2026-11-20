@@ -1,15 +1,22 @@
-// Buyer-side Iroh transport: connects to the expected NodeId, sends one bounded HTTP exchange per stream
+// Synthetic HTTP peer for exercising the server transport: connects to the expected NodeId, sends one bounded HTTP exchange per stream
 // and reports the observed route. After an uncertain failure it refuses to reconnect.
 import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
 import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
-
-import { HTTP_OVER_IROH, IROH_DEADLINES, TRANSPORT_ROUTES } from './constants';
-import { withDeadline } from './deadline';
-import { selectedRoute } from './paths';
-import type { HttpRequest, Transport, TransportRoute } from './types';
-import { decodeResponse, encodeRequest } from './wire';
+import type {
+  HttpRequest,
+  Transport,
+  TransportRoute,
+} from '@gyblos/transport-iroh';
+import {
+  HTTP_OVER_IROH,
+  IROH_DEADLINES,
+  TRANSPORT_ROUTES,
+} from '@gyblos/transport-iroh/constants';
+import { withDeadline } from '@gyblos/transport-iroh/deadline';
+import { selectedRoute } from '@gyblos/transport-iroh/paths';
+import { decodeResponse, encodeRequest } from '@gyblos/transport-iroh/wire';
 
 export function createIrohTransport(
   endpoint: Endpoint,

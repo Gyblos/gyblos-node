@@ -10,10 +10,14 @@ import {
 
 import { DEVNET_RPC_URL } from '@gyblos/config';
 import { detachedSignerFromKeyPair } from '@gyblos/identity';
-import { assertDevnet } from '@gyblos/payments-x402/chain';
 import { isMain } from '@gyblos/runtime';
 
-import { confirm, printable, runSponsoredFlow } from './identity-flow';
+import {
+  assertDevnet,
+  confirm,
+  printable,
+  runSponsoredFlow,
+} from './identity-flow';
 import { loadOrCreateKey } from './identity-keys';
 
 const AIRDROP_LAMPORTS = 1_000_000_000n;
