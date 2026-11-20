@@ -59,3 +59,33 @@ body {
   color: var(--ink);
   font-family: var(--font-instrument), system-ui, sans-serif;
 }
+
+.explorer-table {
+  background: var(--panel);
+}
+
+.explorer-table thead {
+  background: color-mix(in srgb, var(--raised) 50%, var(--panel));
+}
+
+.explorer-table :is(tbody, tr) {
+  background: inherit;
+}
+
+.explorer-table tr > :first-child:not([colspan]) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+}
+
+.explorer-table tr > :first-child:not([colspan])::after {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 1px;
+  content: '';
+  pointer-events: none;
+  box-shadow:
+    1px 0 var(--line),
+    6px 0 8px -8px var(--muted);
+}

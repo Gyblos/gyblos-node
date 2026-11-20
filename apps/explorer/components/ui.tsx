@@ -57,10 +57,10 @@ export function Table({
   return (
     <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-panel">
       <table
-        className="w-full text-left text-sm whitespace-nowrap"
+        className="explorer-table w-full text-left text-sm whitespace-nowrap"
         style={{ minWidth }}
       >
-        <thead className="border-b border-line bg-raised/50 text-muted">
+        <thead className="border-b border-line text-muted">
           <tr>
             {head.map((column) => (
               <th
