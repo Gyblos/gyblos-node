@@ -28,6 +28,7 @@
     "./control-requests": "./src/control-requests.ts",
     "./control-framing": "./src/control-framing.ts",
     "./control-response": "./src/control-response.ts",
+    "./vectors/seller-version-v1.json": "./vectors/seller-version-v1.json",
     "./seller-version": "./src/seller-version.ts",
     "./public-v2": "./src/public-v2.ts",
     "./offer-v2": "./src/offer-v2.ts",
