@@ -85,7 +85,8 @@ cancelled and skipped counts.
   short, prepare keys and the tokenizer, start an engine, run
   `pnpm gyblos seller init` to write `config.toml`, check it with
   `pnpm gyblos doctor` and start it with `pnpm node:start`.
-- Buyer: run `pnpm buyer:init`, then `pnpm buyer:chat`. The defaults accept free
+- Buyer: buyers use the desktop app from the latest release. To develop the
+  buyer, run `pnpm buyer:init`, then `pnpm buyer:chat`. The defaults accept free
   quotes only, with zero spending and price ceilings. See
   [guided buyer setup](docs/buyer-init.md).
 - Desktop app: `pnpm desktop:start`. See [desktop app](docs/desktop.md).

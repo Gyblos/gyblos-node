@@ -430,6 +430,12 @@ in [recovery.md](recovery.md#reusable-batch-recovery).
 Keep both peers on the same release, and never delete a journal or lock to
 downgrade.
 
+- Beta.12 removed per-request payment. A beta.11 seller accepts no new channels
+  unless a buyer allowlist is set, so a paid seller must update before beta.12
+  buyers can pay it. Beta.12 neither settles a beta.11 seller's per-request
+  claims nor withdraws a beta.11 buyer's per-request funds: settle or withdraw
+  them with beta.11 before updating.
+
 - A renewed buyer journal uses private journal version 3. Versions 1 and 2 stay
   readable and keep their format until renewal; older binaries can't read a
   renewed journal.
