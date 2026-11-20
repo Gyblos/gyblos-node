@@ -329,6 +329,9 @@ void test('registrations: no registry or no store answers 503, and the allowlist
     active: async (): Promise<boolean> => {
       throw new Error('no table');
     },
+    registered: async () => {
+      throw new Error('no table');
+    },
   };
   const harness = (await enrollmentHarness('memory', {
     registrations: broken,

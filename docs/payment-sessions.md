@@ -5,31 +5,18 @@ The buyer approves each answer's usage with a cumulative signature, and the
 seller settles the channel once, when the session closes. Sessions use the x402
 `batch-settlement` scheme on the official payment-channels program, on devnet.
 
-Sessions are an allowlisted pilot. Per-request payment stays the default for
-every priced offer ([payments.md](payments.md)). This page also owns how the
-buyer chooses between free and paid execution and what it does when a seller is
-busy ([Buyer routing](#buyer-routing)).
-
-| Question              | Per-request paid                   | Payment session                         |
-| --------------------- | ---------------------------------- | --------------------------------------- |
-| Deposits              | One per request                    | One per seller channel, reused          |
-| On-chain transactions | Open and settle on every request   | Open once, settle once; none per answer |
-| Conversation history  | One user turn in `pnpm buyer:chat` | Full text conversation                  |
-| Tools                 | Refused                            | Supported                               |
-| Who can use it        | Any buyer                          | Buyers the seller allowlists            |
-| Windows               | Supported                          | Refused                                 |
+Guided setup uses a payment session for priced offers. This page also owns how
+the buyer chooses between free and paid execution and what it does when a seller
+is busy ([Buyer routing](#buyer-routing)).
 
 ## Prerequisites
 
 - The seller and the buyer run the same Gyblos release. Older and newer peers
   are not mixed (see [Upgrading and downgrading](#upgrading-and-downgrading)).
-- Both run on macOS or Linux. On Windows the seller refuses an allowlist and the
-  buyer refuses a session policy, because the payment directory lacks equivalent
-  ACL validation.
+- Windows checks the payment directory and journal ACLs before reuse.
 - The seller serves a priced offer with a recountable model and a funded fee
   payer ([Get paid](https://docs.gyblos.com/en/sellers/get-paid)).
-- The buyer holds devnet USDC for the deposit, and the seller knows the buyer's
-  NodeId.
+- The buyer holds devnet USDC for the deposit.
 
 ## Seller setup
 
@@ -41,18 +28,7 @@ busy ([Buyer routing](#buyer-routing)).
    max_sessions = 16
    ```
 
-2. Allowlist the buyers. Set `GYBLOS_SESSION_BUYER_NODE_IDS` in the seller's
-   environment to a comma-separated list of lowercase buyer NodeIds, with no
-   spaces and at most 16 entries. The singular `GYBLOS_SESSION_BUYER_NODE_ID` is
-   a one-buyer alias. Setting both, or a duplicate NodeId, refuses startup.
-
-3. Start the seller normally. With an allowlist, it advertises the session
-   channels next to its per-request paid channel.
-
-Without an allowlist, the seller serves only free and per-request paid requests.
-It still restores any unfinished session for status, approval and closure.
-Removing a buyer from the allowlist never grants a new inference or discards a
-debt.
+2. Start the seller normally. A priced seller advertises session channels.
 
 <a id="seller-capacity-and-separate-buyer-sessions"></a>
 
@@ -67,19 +43,26 @@ recovery, and refuses new sessions.
 
 Each buyer has its own private child journal under the seller's payment
 directory. An admission index reserves the slot before any deposit is submitted.
-A missing, corrupt or unindexed journal fails closed.
+A missing indexed journal, a corrupt record or an unindexed unfinished payment
+blocks admission.
 
-The index also keeps proof for closed sessions, up to 64 distinct buyers. At
-that limit it refuses a new buyer instead of evicting proof. There is no
-automatic retention management. Never delete journals or locks to free capacity
-or bypass recovery.
+The active index holds up to 64 buyer records. A fully settled channel with no
+outstanding recovery leaves this index. Its private journal stays at its
+original path for later inspection and retries. Never remove a journal or lock
+to make room for another buyer.
 
 ## Buyer setup
 
 ### Explicit startup policy
 
-Add a `session` object to the buyer's `buyer/selection.json`, next to its
-existing request, selection and identity fields:
+New desktop and guided buyer profiles include a 1 USDC channel deposit and a
+one-hour lifetime. The initial request ceiling remains zero. For an existing
+profile with a positive request ceiling, add the following `session` object to
+`buyer/selection.json`, alongside `request` and `sellers`. Keep the existing
+price limits and private journals. Startup refuses paid settings until this
+field is present. When configuring a session, set `depositAtomic` to at least
+10,000 atomic units (0.01 USDC). The buyer checks this at startup. An older
+profile with a zero ceiling can still serve free requests.
 
 ```json
 {
@@ -91,12 +74,12 @@ existing request, selection and identity fields:
 }
 ```
 
-| Field                  | Meaning                                                  | Allowed values                       |
-| ---------------------- | -------------------------------------------------------- | ------------------------------------ |
-| `depositAtomic`        | Deposit for each seller channel, in atomic units         | Positive, at most `1000000` (1 USDC) |
-| `totalDepositAtomic`   | Optional authority shared by several sellers             | Positive atomic decimal string       |
-| `lifetimeMs`           | How long the seller serves the session                   | 5 minutes to 24 hours                |
-| `withdrawDelaySeconds` | Grace for the seller to claim after a buyer-forced close | 900 to 3600; 900 when omitted        |
+| Field                  | Meaning                                                  | Allowed values                                      |
+| ---------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| `depositAtomic`        | Deposit for each seller channel, in atomic units         | New channels: `10000` to `1000000` (0.01 to 1 USDC) |
+| `totalDepositAtomic`   | Optional authority shared by several sellers             | Positive atomic decimal string                      |
+| `lifetimeMs`           | How long the seller serves the session                   | 5 minutes to 24 hours                               |
+| `withdrawDelaySeconds` | Grace for the seller to claim after a buyer-forced close | 900 to 3600; 900 when omitted                       |
 
 `request.maxAtomic` still limits each question, and a question can't exceed the
 session's remaining unreserved funds. The protocol fee and treasury always come
@@ -134,10 +117,11 @@ even when a session policy is present.
 ### Renewal and spending authority
 
 With one seller, the buyer can open a replacement channel when the old one is
-closed, expired or can't reserve the next quote. It first verifies the new
-quote, closes the old channel if needed and proves its final charge and refund.
-Missing or uncertain proof blocks renewal. Renewal never replays a failed
-inference or changes the seller or payment roles.
+closed, expired or can't reserve the next quote. It first verifies the new quote
+and checks that the remaining authority can fund the minimum deposit before
+closing the old channel. It then verifies the final charge and refund. Missing
+or uncertain proof blocks renewal. Renewal never replays a failed inference or
+changes the seller or payment roles.
 
 `depositAtomic` is the total spending authority across renewals: earlier actual
 charges plus the next deposit can't exceed it, so a replacement deposit shrinks
@@ -245,9 +229,6 @@ toward the input bound, and tool-call output counts toward tokens even when the
 text is empty. The API client runs the tools, never the node, the chat or the
 desktop app.
 
-Per-request paid refuses tool requests before opening a payment: it can't safely
-bill arguments held until the terminal without a buyer acknowledgement.
-
 ## Buyer routing
 
 ### Free or paid by signed quote
@@ -257,10 +238,10 @@ buyer) share one buyer runtime. Before it chooses how to execute, the buyer
 verifies discovery, the owner–NodeId binding, public-record replay protection,
 selection and the signed quote. Then the quote decides:
 
-| Signed prices   | Required quote budget | Execution                                                    |
-| --------------- | --------------------- | ------------------------------------------------------------ |
-| Both `"0"`      | `maxAtomic: "0"`      | Free channel, with the seller's free caps and replay checks  |
-| Either positive | Positive `maxAtomic`  | Paid: a payment session if configured, otherwise per-request |
+| Signed prices   | Required quote budget | Execution                                                   |
+| --------------- | --------------------- | ----------------------------------------------------------- |
+| Both `"0"`      | `maxAtomic: "0"`      | Free channel, with the seller's free caps and replay checks |
+| Either positive | Positive `maxAtomic`  | Paid through the configured payment session                 |
 
 The configured `request.maxAtomic` is a spending ceiling, not a paid-mode
 switch: a positive ceiling also accepts a free offer. The chosen executor
@@ -276,11 +257,13 @@ Selection errors:
 - `SELLER_PRICE_ABOVE_BUDGET`: a seller offers the model at an acceptable
   reasoning level, but every listing costs more than `request.maxAtomic` or
   `priceCeilings`. Raise those limits in `selection.json`. A `maxAtomic` of
-  `"0"` admits only free listings, and `pnpm buyer:free` always uses a zero
-  budget.
+  `"0"` admits only free listings. The free buyer (`pnpm buyer:free`) always
+  uses a zero budget, so it reports this case as `NO_SELLER_CANDIDATES` (no free
+  seller is available now), with `Retry-After` when a free seller is cooling
+  down.
 - `PINNED_SELLER_REJECTED`: the pinned seller failed a check, including price.
 - `NO_SELLER_CANDIDATES`: no eligible seller offers the model, whatever the
-  budget.
+  budget; or, for the free buyer, no free seller is available now.
 
 Free execution loads no payment signer, paid tokenizer or payment RPC and
 creates no journal, deposit or settlement. It still reads payment state: an
@@ -399,6 +382,7 @@ seller's authorizer signs the close and its fee payer pays for it.
 | Buyer requests close (`/settle`)                               | The seller authorizes and submits finalization. Active executions finish first.                                                                                       |
 | Terms expire                                                   | The online seller worker finalizes the latest accepted total. If both parties are offline, nothing is submitted until one returns.                                    |
 | Deposit is fully approved                                      | The seller worker finalizes; the refund is zero. There is no automatic top-up.                                                                                        |
+| Ten minutes idle without any requests                          | The seller closes the unused channel and verifies the full refund.                                                                                                    |
 | Ten minutes idle with at least 10,000 atomic units accrued     | The seller worker finalizes. The threshold is a soft default, not an extra charge.                                                                                    |
 | Interrupted or unsigned work becomes idle                      | The seller finalizes the previous accepted total, even below the threshold. A runtime lease stops a live generation from counting as abandoned.                       |
 | Retained request limit reached with no active or unsigned work | The seller finalizes before the record outgrows its bound.                                                                                                            |
@@ -435,10 +419,9 @@ whole forced-close grace can lose signed earnings it never claimed.
   block with block checkpoints.
 - A remote status is metadata. A remote close reply becomes proof only after the
   buyer's own chain observation.
-- Every buyer startup mode (free, per-request, single session and multi-seller)
-  first takes the same buyer-home ownership guard. Only one application may own
-  a buyer home; running an older binary on the same financial state is
-  unsupported.
+- Every buyer startup mode (free, single session and multi-seller) first takes
+  the same buyer-home ownership guard. Only one application may own a buyer
+  home; running an older binary on the same financial state is unsupported.
 - These protections need the seller worker online within the withdrawal grace.
   They don't cover long simultaneous outages or a restored old backup.
 
@@ -449,6 +432,12 @@ in [recovery.md](recovery.md#reusable-batch-recovery).
 
 Keep both peers on the same release, and never delete a journal or lock to
 downgrade.
+
+- Beta.12 removed per-request payment. A beta.11 seller accepts no new channels
+  unless a buyer allowlist is set, so a paid seller must update before beta.12
+  buyers can pay it. Beta.12 neither settles a beta.11 seller's per-request
+  claims nor withdraws a beta.11 buyer's per-request funds: settle or withdraw
+  them with beta.11 before updating.
 
 - A renewed buyer journal uses private journal version 3. Versions 1 and 2 stay
   readable and keep their format until renewal; older binaries can't read a

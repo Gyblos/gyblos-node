@@ -22,19 +22,17 @@ prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/
    start it there.
 2. Under **Create an API key**, enter a **Name** and a **Spend limit**, then choose **Create API key**.
    The limit is the total this key may spend, in devnet USDC. It never resets and can't be raised later.
-   A limit of `0` allows free models only, and the key shows **Free only**.
-3. Choose **Copy API key** and **Copy Base URL**. The eye button shows the key only while you ask for it;
-   hide it before you share your screen.
+   A limit of `0` allows free models only.
+3. Choose **Copy API key** and **Copy Base URL**. The app keeps the key hidden on screen; paste it
+   straight into your tool.
 
-You can show or copy a key only in the app session that created it. After a restart, a tool that already
-has the key keeps working, but the app can't show the key again. The key never appears in saved agent
+You can copy a key only in the app session that created it. After a restart, a tool that already has the
+key keeps working, but the app can't copy the key again. The key never appears in saved agent
 configuration or in chat history. **Revoke key** stops new requests with that key; what it already spent
 stays recorded.
 
-The Base URL uses the fixed port `4033`, so it stays the same when you restart the app. If another
-program uses that port, stop it and choose **Payments → Retry local buyer**; Gyblos doesn't switch to
-another port. A tool set up with an older version of the app, when the port could change, needs its
-configuration copied or written again once.
+The Base URL can change when you restart the app. After a restart, choose **Copy Base URL** again and, if
+it changed, update your tool or choose **Write configuration** again.
 
 ## Connect a coding agent [#connect-a-coding-agent]
 
@@ -52,9 +50,8 @@ export GYBLOS_API_KEY=YOUR_API_KEY
 
 Replace `YOUR_API_KEY` with the key you copied.
 
-When the app can't learn a model's context size, the configuration uses 8,192 tokens of context and at
-most 4,096 output tokens (less if the buyer's answer limit is lower). Codex profiles include this limit, so
-Codex compacts the conversation earlier. A seller can still offer a smaller window and refuse a request.
+When the app can't learn a model's context size, the configuration uses 32,768 tokens of context, and the
+output limit is the buyer's answer limit. A seller can still offer a smaller window and refuse a request.
 When the models change, choose **Write configuration** again.
 
 Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or
@@ -218,10 +215,16 @@ What happens when a seller fails depends on how far the answer got:
 A broken connection may deliver no response headers at all, so turn off HTTP and stream retries in your
 tool. Resending a request yourself starts a new seller selection.
 
-Some sellers run on slow hardware. If a seller can't read a long prompt, such as a coding agent's, in
-time, the request ends with `reason` `engine_timeout` and a message that the seller was too slow for a
-request this size. Send it again: the failure lowers that seller's weight, so another seller usually
-answers. You can also shorten the conversation; Codex and OpenCode can compact it.
+Some sellers run on slow hardware. Each seller measures how fast it reads prompts, and your buyer tells
+every seller it asks roughly how big a request is before choosing one: only the size, rounded up to a
+multiple of 1024 tokens, never the text. A seller that would not read a long prompt, such as a coding
+agent's, in time declines, and your buyer picks another seller without sending it the prompt. If every
+seller asked declined for that reason, the error says so; shorten the conversation (Codex and OpenCode
+can compact it) or try again later.
+
+A seller that has not measured itself yet can still time out. Then the request ends with `reason`
+`engine_timeout` and a message that the seller was too slow for a request this size. Send it again. Each
+seller learns its speed from the answers it gives, so this becomes rarer as sellers measure themselves.
 
 ## Options and errors [#options-and-errors]
 

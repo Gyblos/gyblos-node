@@ -5,8 +5,9 @@
 // never logged). Redirects are refused, answers are size-capped and matched by id. Any HTTP or RPC
 // error, or a transaction the RPC cannot return, throws: the run stops and nothing past it is marked as
 // read. A refusal of the caller (a rate limit, or a 403 such as the public devnet RPC answers Cloudflare
-// Workers) throws an error marked as such, which lets the run move to its fallback endpoint.
-import { CHAIN_INDEX, LOOPBACK_HOSTS } from '../constants';
+// Workers) throws an error marked as such, which lets the run move to its fallback endpoint; so does an
+// endpoint whose genesis hash is not the indexed network's, marked apart as a wrong network.
+import { CHAIN_DEVNET_HOSTS, CHAIN_INDEX, LOOPBACK_HOSTS } from '../constants';
 import { ChainShapeError, list, nullable, num, record, text } from './json';
 
 const FINALIZED = 'finalized';
@@ -16,18 +17,24 @@ const HTTP = 'http:';
 // HTTP statuses that refuse this caller rather than the call: the next endpoint may serve it.
 const REFUSING_STATUSES: readonly number[] = [403, 429];
 
+// The reason of an endpoint that serves another network than the indexed one.
+export const WRONG_NETWORK = 'wrong network';
+
 export class ChainRpcError extends Error {
   constructor(
     readonly reason: string,
     // The endpoint refused this caller (HTTP 403 or 429, or the RPC's own rate-limit code).
     readonly rateLimited = false,
+    // The endpoint serves another network (its genesis hash differs): never a rate limit.
+    readonly wrongNetwork = false,
   ) {
     super(`solana rpc: ${reason}`);
     this.name = 'ChainRpcError';
   }
 }
 
-// The configured RPC URL, or undefined when it is not one the index may call.
+// The configured RPC URL, or undefined when it is not one the index may call. A known provider's
+// mainnet host is moved to its devnet host (CHAIN_DEVNET_HOSTS), keeping path and key.
 export function chainRpcUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   let url: URL;
@@ -36,6 +43,10 @@ export function chainRpcUrl(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
+  const devnetHost = Object.hasOwn(CHAIN_DEVNET_HOSTS, url.hostname)
+    ? CHAIN_DEVNET_HOSTS[url.hostname]
+    : undefined;
+  if (devnetHost) url.hostname = devnetHost;
   const allowed =
     url.protocol === HTTPS ||
     (url.protocol === HTTP && LOOPBACK_HOSTS.has(url.hostname));
@@ -136,8 +147,31 @@ function signatureOf(entry: unknown): ChainSignature {
 export function createChainRpc(
   url: string,
   fetcher: typeof fetch = fetch,
+  // The genesis hash of the network the index reads. When given, the endpoint's own genesis hash is
+  // asked once before its first call, and an endpoint of another network (a mainnet URL configured
+  // for devnet) is refused, so the run moves to the next endpoint and never stores another network's
+  // signatures.
+  expectedGenesis?: string,
 ): ChainRpc {
-  const call = caller(url, fetcher);
+  const raw = caller(url, fetcher);
+  let checked: Promise<void> | undefined;
+  const verify = async () => {
+    const genesis = await raw('getGenesisHash', []);
+    if (genesis !== expectedGenesis)
+      throw new ChainRpcError(WRONG_NETWORK, false, true);
+  };
+  const call = async (method: string, params: unknown[]) => {
+    if (expectedGenesis) {
+      checked ??= verify().catch((error: unknown) => {
+        // A failed check (a timeout, an HTTP error) is asked again on the next call.
+        if (!(error instanceof ChainRpcError && error.wrongNetwork))
+          checked = undefined;
+        throw error;
+      });
+      await checked;
+    }
+    return raw(method, params);
+  };
   return {
     async signatures(address, { until, before }) {
       const result = await call('getSignaturesForAddress', [

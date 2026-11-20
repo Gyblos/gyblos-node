@@ -21,6 +21,7 @@ import {
 } from './engine-readiness';
 import { createSellerEngine } from './engine-registry';
 import { DECLARED_METER, recountedMeter, type FreeMeter } from './free-meter';
+import { readingSpeedEngine } from './reading-speed';
 import type { LiveSellerOffer } from './seller-offer-set';
 import type { SellerOfferSettings, SellerSettings } from './seller-settings';
 
@@ -108,6 +109,8 @@ export async function liveSellerOffer(
         }),
     },
   );
+  // Every generation teaches the offer how fast it reads, so its quotes refuse what it cannot read in time.
+  const reading = readingSpeedEngine(observation.engine);
   const live: LiveSellerOffer = {
     index: settings.engine.index,
     selection: prepared.selection,
@@ -117,7 +120,8 @@ export async function liveSellerOffer(
     tools: prepared.engine.supportsTools?.() ?? false,
     meteringMode: prepared.metering.mode,
     readiness: observation.readiness,
-    engine: observation.engine,
+    readingTokensPerSecond: reading.tokensPerSecond,
+    engine: reading.engine,
     meter: await offerMeter(prepared.metering),
     observation,
   };

@@ -178,7 +178,13 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
 });
 
 void test('payment uncertainty overrides friendly seller guidance without clearing its reservation', async () => {
-  const paid = { ...policy, maxAtomic: '100' };
+  const paid = {
+    ...policy,
+    model: 'qwen3-0.6b',
+    depositAtomic: '25000',
+    lifetimeMs: 900000,
+    maxAtomic: '100',
+  };
   const budget = new X402Budget({
     read: async () => undefined,
     write: async () => {},
@@ -199,6 +205,23 @@ void test('payment uncertainty overrides friendly seller guidance without cleari
     budget,
     { contents, mainFrame: () => mainFrame, destroyed: () => false },
     async () => {},
+    undefined,
+    undefined,
+    undefined,
+    (id) =>
+      id === 'confirmed'
+        ? {
+            nodeId: 'a'.repeat(64),
+            owner: paid.payer,
+            modelId: paid.model,
+            variant: null,
+            quantization: null,
+            contextTokens: 2048,
+            inputAtomicPerMtok: '30',
+            outputAtomicPerMtok: '90',
+            expiresAt: Date.now() + 60000,
+          }
+        : undefined,
   );
   try {
     await client.connect(
@@ -206,8 +229,26 @@ void test('payment uncertainty overrides friendly seller guidance without cleari
       'synthetic-operator-token',
     );
     await client.authorize('100');
+    const unconfirmed = await handler(
+      { sender: contents, senderFrame: mainFrame },
+      [
+        {
+          action: X402_ACTION.SEND,
+          id: 'before-confirmation',
+          prompt: 'synthetic',
+        },
+      ],
+    );
+    assert.match(unconfirmed.error ?? '', /select a seller/i);
+    assert.equal(posts, 0);
     const result = await handler({ sender: contents, senderFrame: mainFrame }, [
-      { action: X402_ACTION.SEND, id: 'synthetic-paid', prompt: 'synthetic' },
+      {
+        action: X402_ACTION.SEND,
+        id: 'synthetic-paid',
+        offerId: 'confirmed',
+        policyId: paid.policyId,
+        prompt: 'synthetic',
+      },
     ]);
     assert.match(result.error ?? '', /Spending status needs review/);
     assert.equal(result.summary.blocked, true);

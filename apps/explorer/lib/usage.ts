@@ -3,23 +3,22 @@
 // summed histograms, never from averaged percentiles. Pure functions, no I/O.
 import type { CollectorSnapshot, NetworkDay, Totals } from './collector-shape';
 import { DISPLAY } from './constants';
-import { count, latencyMs, percent } from './format';
+import { count, latencyMs, percent, utc } from './format';
 import { mergedLatency } from './latency';
 
 type Section = Totals | null | undefined;
-export const finished = (totals: Totals) =>
-  totals.outcomes.completed +
-  totals.outcomes.failed +
-  totals.outcomes.cancelled;
+// Requests that ended in success or failure; cancellations are not failures and stay out.
+const decided = (totals: Totals) =>
+  totals.outcomes.completed + totals.outcomes.failed;
 
-// completed / (completed + failed + cancelled) over the given sections of one side.
+// completed / (completed + failed) over the given sections of one side, as in the Models table.
 export function successRate(sections: Section[]): number | null {
   const done = sections.reduce(
     (sum, totals) => sum + (totals?.outcomes.completed ?? 0),
     0,
   );
   const all = sections.reduce(
-    (sum, totals) => sum + (totals ? finished(totals) : 0),
+    (sum, totals) => sum + (totals ? decided(totals) : 0),
     0,
   );
   return all ? done / all : null;
@@ -86,4 +85,24 @@ export function relayText(day: NetworkDay): string {
   const routes = day.observed?.routes;
   const routed = routes ? routes.direct + routes.relay + routes.unknown : 0;
   return routes && routed ? percent(routes.relay / routed) : '—';
+}
+
+// One point per day of the range, oldest first: each side's headline requests (0 without receipts).
+export function dailyRequests(days: NetworkDay[]) {
+  return days.map((day) => ({
+    day: day.day,
+    free: day.free?.requests.headline ?? 0,
+    paid: day.paid?.requests.headline ?? 0,
+  }));
+}
+
+// The Usage title's note: the comparison is named only when the span before the range could be read.
+export function usageMeta(
+  days: number,
+  aggregatedAt: number | null,
+  compared: boolean,
+): string {
+  if (!aggregatedAt) return 'no data yet';
+  const updated = `updated ${utc(aggregatedAt)}`;
+  return compared ? `vs previous ${days} days · ${updated}` : updated;
 }

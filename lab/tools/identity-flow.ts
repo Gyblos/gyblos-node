@@ -13,7 +13,11 @@ import {
   type TransactionSigner,
 } from '@solana/kit';
 
-import { COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
+import {
+  COMMITMENT,
+  DEVNET_GENESIS,
+  SVM_TRANSACTION_VERSION,
+} from '@gyblos/config';
 import {
   buildSponsoredRegistration,
   decideSponsorship,
@@ -29,6 +33,9 @@ import {
   type SponsorDecision,
   type SponsorPolicyConfig,
 } from '@gyblos/identity';
+import { readGenesis } from '@gyblos/node/seller-chain';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 const CONFIRM_POLL_MS = 500;
 const CONFIRM_ATTEMPTS = 120;
@@ -178,4 +185,15 @@ export function printable(value: unknown): string {
       typeof item === 'bigint' ? item.toString() : item,
     JSON_INDENT,
   );
+}
+
+export async function assertDevnet(
+  url: string,
+  genesis = readGenesis,
+): Promise<void> {
+  if ((await genesis(url)) !== DEVNET_GENESIS)
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.WRONG_CLUSTER,
+      'Only Solana devnet is allowed.',
+    );
 }

@@ -1,8 +1,13 @@
 // Owns conservative status and fixed labels; coverage gaps cannot yield a clean review.
 import { REVIEW_LABELS, REVIEW_VALUES, type ReviewLabel } from './constants';
-import type { ReviewStatus, TaskResult } from './types';
+import type { ReviewStatus, TaskResult, VerificationResult } from './types';
 
-export function overallReviewStatus(results: TaskResult[]): ReviewStatus {
+export function overallReviewStatus(
+  results: TaskResult[],
+  verifications: VerificationResult[] = [],
+): ReviewStatus {
+  if (verifications.some((item) => item.decision === REVIEW_VALUES.ERROR))
+    return REVIEW_VALUES.ERROR;
   if (!results.length) return REVIEW_VALUES.NOT_RUN;
   if (results.some((result) => result.status === REVIEW_VALUES.ERROR))
     return REVIEW_VALUES.ERROR;

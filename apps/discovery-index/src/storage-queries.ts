@@ -179,6 +179,59 @@ export function modelsQuery(
     .orderBy(desc(sellers), asc(models.modelId))
     .limit(limit);
 }
+// A live presence that references the catalog's digest.
+function livePresence(database: DiscoveryDatabase, now: number) {
+  return database
+    .select({ nodeId: presence.nodeId })
+    .from(presence)
+    .where(
+      and(
+        eq(presence.nodeId, catalogs.nodeId),
+        eq(presence.digest, catalogs.digest),
+        lte(presence.issuedAt, now + CONTROL_LIMITS.clockSkewMs),
+        gt(presence.expiresAt, now),
+      ),
+    );
+}
+// Every stored catalog with what GET /v1/network needs to tell online from withdrawn.
+export function catalogStatusQuery(
+  database: DiscoveryDatabase,
+  now: number,
+  limit: number,
+) {
+  return database
+    .select({
+      nodeId: catalogs.nodeId,
+      issuedAt: catalogs.issuedAt,
+      expiresAt: catalogs.expiresAt,
+      alive: exists(livePresence(database, now)).as('alive'),
+      withdrawn: exists(withdrawnCatalog(database)).as('withdrawn'),
+    })
+    .from(catalogs)
+    .orderBy(asc(catalogs.nodeId))
+    .limit(limit);
+}
+// The models of the catalogs online now (live, not withdrawn, with a live presence), by NodeId.
+export function onlineModelsQuery(
+  database: DiscoveryDatabase,
+  now: number,
+  limit: number,
+) {
+  return database
+    .select({ nodeId: models.nodeId, modelId: models.modelId })
+    .from(models)
+    .innerJoin(catalogs, eq(catalogs.nodeId, models.nodeId))
+    .where(
+      and(
+        lte(catalogs.issuedAt, now + CONTROL_LIMITS.clockSkewMs),
+        gt(catalogs.expiresAt, now),
+        exists(livePresence(database, now)),
+        notExists(withdrawnCatalog(database)),
+      ),
+    )
+    .orderBy(asc(models.nodeId), asc(models.modelId))
+    .limit(limit);
+}
 export function pruneQueries(database: DiscoveryDatabase, now: number) {
   return [
     database.delete(presence).where(lte(presence.expiresAt, now)),

@@ -1,12 +1,17 @@
-// Maps sanitized announcements into shared preview controls; never authorizes inference.
-import { CATALOG_STATE, type NetworkCatalog } from '../catalog/model';
+// Each paid listing shows that seller’s price per million tokens. Selection requires confirmation.
+import {
+  CATALOG_STATE,
+  NETWORK_CATALOG,
+  type NetworkCatalog,
+} from '../catalog/model';
+import { DESKTOP_X402 } from '../x402/constants';
 import {
   ADDITIONAL_MODEL_ARTWORK,
   MODEL_CATEGORY,
   MODEL_SOURCE,
   MODELS,
 } from './constants';
-import type { CatalogModel, ModelArtwork } from './model-types';
+import type { CatalogModel, ModelArtwork, ModelOption } from './model-types';
 
 export function modelArtwork(modelId: string): ModelArtwork {
   const family = modelId.toLowerCase().split('/').at(-1) ?? '';
@@ -42,25 +47,51 @@ export function announcedModels(
   return catalog.models
     .filter((item) => item.expiresAt > now)
     .map((item) => {
+      const input = Number(item.inputAtomicPerMtok) / DESKTOP_X402.AMOUNT_SCALE;
+      const output =
+        Number(item.outputAtomicPerMtok) / DESKTOP_X402.AMOUNT_SCALE;
+      const { free } = item;
       return {
-        id: JSON.stringify([
-          item.modelId,
-          item.variant,
-          item.quantization,
-          item.contextTokens,
-        ]),
+        id:
+          item.offerId ??
+          JSON.stringify([
+            item.modelId,
+            item.variant,
+            item.quantization,
+            item.contextTokens,
+            free,
+          ]),
+        ...(item.offerId && { offerId: item.offerId }),
         name: item.modelId,
         family:
-          [item.variant, item.quantization].filter(Boolean).join(' · ') ||
-          'Signed announcement',
+          [
+            item.sellerFingerprint &&
+              'Seller ' +
+                item.sellerFingerprint.slice(
+                  0,
+                  NETWORK_CATALOG.OFFER_LABEL_DIGITS,
+                ) +
+                '…' +
+                item.sellerFingerprint.slice(
+                  -NETWORK_CATALOG.OFFER_LABEL_DIGITS,
+                ),
+            item.variant,
+            item.quantization,
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'Signed announcement',
         image: modelArtwork(item.modelId),
         category: MODEL_CATEGORY.EVERYDAY,
         context: item.contextTokens.toLocaleString(),
         providers: item.announcements,
-        free: true,
-        input: 0,
-        output: 0,
+        free,
+        input,
+        output,
         source: MODEL_SOURCE.ANNOUNCED,
       };
     });
+}
+
+export function chatNetworkOptions(models: readonly ModelOption[]) {
+  return models.filter((item) => item.source === MODEL_SOURCE.ANNOUNCED);
 }

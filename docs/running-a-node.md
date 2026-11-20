@@ -183,10 +183,6 @@ setup on every run for this reason.
 | `receipts/`                                         | both   | Signed free-inference receipts ([Receipts](#private-free-inference-receipts)).                                         |
 | `diagnostics/`                                      | both   | Local operational logs, read with `pnpm gyblos logs` ([diagnostics.md](diagnostics.md)).                               |
 
-The lab's v1 files (`trust.json`, `offer.json`, `authorization.json`,
-`calls.json`) are described in
-[lab/README.md](../lab/README.md#legacy-v1-buyer).
-
 ## Seller
 
 Prerequisites:
@@ -416,9 +412,14 @@ pnpm gyblos seller status --online
 
 `seller status` is read-only and uses the same `GYBLOS_HOME` and `config.toml`
 as `node:start`. `--online` also looks this NodeId up in the discovery index,
-sending only the served model names. While the index refuses or fails this
+paging it by the served model names. While the index refuses or fails this
 seller's publication, the discovery line adds `publishing refused:` and the
-static code the daemon keeps in `status.json`. The output is described in the
+static code the daemon keeps in `status.json`. While a model is served, an
+`uptime` line then asks the index for this NodeId's public uptime (the share of
+five-minute slots with an accepted presence over 24 hours, 7 and 30 days) and
+says `online, last presence … ago` or `offline since …`; this is the only
+request that carries the NodeId, which the daemon already publishes to the same
+index. The output is described in the
 [CLI reference](https://docs.gyblos.com/en/reference/cli#status-and-registration).
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon.
@@ -840,14 +841,17 @@ are refused. It contains:
 - `models` (optional): 1 to 32 `{ id, aliases?, selection, maxTokens? }` entries
   that the endpoint serves by name. A client sends `id` or an alias as `model`.
   The list must serve `request.selection.modelId` by name. `GET /v1/models`
-  lists them with `max_output_tokens` and, on the free endpoint,
-  `context_length`: the smallest context any eligible seller of that model lists
-  in its verified catalog, so a prompt sized to it fits whichever seller is
-  chosen. It is left out when no seller's catalog can be read within 4 seconds.
-  An unknown name gets 404 `FREE_BUYER_MODEL_NOT_FOUND`. Paid modes refuse to
-  start unless every listed model meets the paid limits.
-- `session` and `routing` (optional): reusable payment sessions and busy-seller
-  routing; see [payment-sessions.md](payment-sessions.md).
+  lists them with `max_output_tokens` and `context_length`: the smallest context
+  its sellers list in their verified catalogs (configured sellers at the buyer's
+  own prices; with open discovery, also the index's free sellers), so a prompt
+  sized to it fits whichever seller is chosen. One read that finds it serves 30
+  seconds; the field is left out when no seller's catalog can be read within 4
+  seconds. An unknown name gets 404 `FREE_BUYER_MODEL_NOT_FOUND`. Paid modes
+  refuse to start unless every listed model meets the paid limits.
+- `session` is required for a positive request ceiling. Guided setup includes a
+  deposit of 1 USDC and a one-hour lifetime. Existing paid profiles can
+  [add the session settings](payment-sessions.md#explicit-startup-policy).
+- `routing` optionally configures busy-seller handling.
 
 How selection works: the buyer verifies catalog, presence and withdrawal
 signatures and bindings, picks candidates, then asks for signed quotes in
@@ -952,9 +956,12 @@ details matter when you change or debug the endpoint:
   visible text is never restarted.
 - **Concurrency.** `buyer:free` runs up to two requests at once, each on a
   different seller, because a seller serves one request per buyer at a time.
-  When every candidate is busy with this buyer's other request, the answer is
-  429 (`FREE_BUYER_BUSY`) and that seller is not cooled down; a third request
-  gets 429 too.
+  When every candidate is busy with this buyer's other request, the new request
+  waits up to 60 seconds for one to be handed back (an agent often sends a title
+  and its main request together), then runs on it; the wait counts against the
+  180-second request deadline. Only if none comes back in time is the answer 429
+  (`FREE_BUYER_BUSY`); the seller is not cooled down. A third request at once
+  gets 429 at the door.
 - **Seller preference.** The buyer remembers which seller served a conversation
   (by a digest of its model, system text and first user message, for the last
   256 conversations, in memory only). That seller stays a candidate while
@@ -985,34 +992,13 @@ Paid execution is devnet only and needs:
 - the pinned public tokenizer (`pnpm node:tokenizer`), because the buyer
   recounts every answer itself;
 - `request.selection.modelId` `qwen3-0.6b`, reasoning `off`, `network` devnet
-  and `asset` the role's mint, with `maxAtomic` the most one request may deposit
-  and `priceCeilings` the highest prices it accepts (protocol fee included).
+  and `asset` the role's mint, with `maxAtomic` the maximum charge for one
+  response and `priceCeilings` the highest prices it accepts (protocol fee
+  included).
 
-For a positive-price quote without a reusable session, the buyer signs one
-channel open for at most `maxAtomic`, streams the answer and checks the seller's
-settlement against its own count. This single-request path accepts only one user
-message and no tools; it refuses anything else before paying
-(`PAID_BUYER_UNSUPPORTED_INPUT`). Conversations and tools on paid offers need a
-reusable session ([payment-sessions.md](payment-sessions.md)). A completed
-answer, and an error the seller answered after receiving the open, carries
-`gyblos_payment`: the verdict, the ceiling, the buyer's expected charge, the
-seller's charge, payout, fee and refund in atomic units, and whether a record
-was kept.
-
-One paid request runs at a time (`PAID_BUYER_BUSY`), and one buyer process holds
-the payment journal (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`). The buyer never fails
-over once a seller received the signed open, since that seller could still land
-it.
-
-Any channel not settled on the buyer's own count (a refusal, a stop, a pending
-or lapsed claim, a dispute or an unconfirmed settlement) blocks new automatic
-requests, including free ones (`PAID_BUYER_UNRESOLVED_PAYMENT`), until it is
-reconciled. The buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can. Stop the buyer and follow
-[recovery.md](recovery.md#single-request-paid-v2-recovery):
-`pnpm buyer:reconcile:paid` reads the chain and never signs;
-`pnpm buyer:withdraw:paid` signs and pays fees to withdraw an unclaimed channel.
-Never reset or delete a journal or lock to bypass the block.
+If a channel needs recovery, stop the buyer and follow the
+[channel recovery guide](recovery.md#reusable-batch-recovery). Never reset or
+delete a journal or lock to bypass the block.
 
 #### Endpoint token
 
@@ -1119,7 +1105,7 @@ also look like loopback, so do not run one on a relay-only machine.
 
 A free offer in `config.toml` starts the control protocol plus the
 `gyblos/free/4` (complete response) and `gyblos/free-stream/4` (streaming)
-execution protocols. Paid offers use the separate paid stream described in the
+execution protocols. Paid offers use reusable payment channels described in the
 protocol specification. Free execution serves a conversation (an optional system
 message, then alternating user and assistant turns that start and end with the
 user) with reasoning `off`, up to the offer's answer limit
@@ -1128,6 +1114,21 @@ context. The engine's deadline has two parts: time to read the prompt, 10 ms per
 counted input token (a 7000-token agent prompt gets 70 seconds more), and time
 to answer, which grows with the requested answer. Together they stay under 170
 seconds.
+
+Each offer learns how fast its engine reads a prompt, in input tokens per
+second, only from the engine's own timing of the input in each completed answer
+(prompts under 256 tokens, and engines that do not time the input, do not
+count). A timeout teaches it nothing, since its time also holds queueing, model
+loading and hidden reasoning. Buyers send every seller they ask a rough estimate
+of each request's size in the quote request, rounded up to a multiple of 1024
+tokens, and an offer that would not finish reading it with 15 seconds left
+before its deadline refuses the quote with `CONTROL_TOO_SLOW_TO_READ`; the buyer
+picks another seller before any prompt is sent. The seller that answered the
+conversation's previous turn less than 4 minutes ago is not sent the size, since
+its prompt cache likely still holds most of it. A seller from before this field
+refuses the sized quote as invalid; the buyer asks it once more without the size
+and does not count the refusal against it. The estimate lives in memory: after a
+restart the offer accepts every size until it measures again.
 
 ### Token caps
 

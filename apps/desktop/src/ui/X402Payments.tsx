@@ -198,7 +198,7 @@ function X402Authorize({
     >
       <FormField
         htmlFor="x402-budget"
-        label={'Chat budget · ' + x402Asset(policy)}
+        label={'Optional chat budget · ' + x402Asset(policy)}
       >
         <FormInput
           id="x402-budget"
@@ -208,8 +208,8 @@ function X402Authorize({
         />
       </FormField>
       <p>
-        Maximum per response: {x402Amount(policy.maxAtomic, policy)}. This
-        permission applies to Chat on this device.
+        Maximum per response: {x402Amount(policy.maxAtomic, policy)}. You can
+        confirm a paid seller without setting a total chat budget.
       </p>
       {error && <p role="status">{error}</p>}
       <FormActions align="start">
@@ -308,9 +308,15 @@ export function X402History({ buyer }: { buyer: X402View }) {
             </DataCell>
             <DataCell label="Usage">
               <strong>
-                {record.free ? 'Free response' : 'Confirmed payment'}
+                {record.free
+                  ? 'Free response'
+                  : record.sessionApproval
+                    ? 'Channel approval'
+                    : 'Confirmed payment'}
               </strong>
-              <span className="ui-muted">{record.policy.model}</span>
+              <span className="ui-muted">
+                {record.selectedModel ?? record.policy.model}
+              </span>
             </DataCell>
             <DataCell label="Amount">
               <strong>

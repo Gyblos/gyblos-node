@@ -10,10 +10,9 @@ import {
   type SessionSnapshot,
 } from '@gyblos/protocol/payment-session';
 import {
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
   readPrivateFile,
 } from '@gyblos/runtime/private-file';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
@@ -24,6 +23,7 @@ import type { BatchPaths, BatchRecord } from './batch-session-types';
 export interface BatchStoredSession {
   terms: PaymentSessionTerms;
   snapshot: SessionSnapshot;
+  archivedProof?: true;
   pending: boolean;
   recoverable: boolean;
   notCreated?: true;
@@ -37,9 +37,8 @@ async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
       return undefined;
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   }
-  if (WINDOWS) return sessionFail(SESSION_CODES.UNAVAILABLE);
   try {
-    await ensurePrivateDirectory(paths.directory);
+    await ensurePrivatePaymentPaths(paths);
     const text = await readPrivateFile(
       paths.state,
       BATCH_SESSION_DEFAULTS.stateBytes,
@@ -72,7 +71,23 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     (request) => !request.accepted,
   );
   const notCreated = batchOpeningAbsent(record) !== undefined;
+  const recoverable =
+    !notCreated &&
+    pending.some(
+      (request) =>
+        request.bill !== null ||
+        !!record.blocks?.[request.requestId]?.pending ||
+        !!record.blocks?.[request.requestId]?.accepted,
+    );
+  // parseRecord validated the settlement channel and deposit totals. Keep shortfalls
+  // and outstanding delivery recovery in the active registry.
+  const archivedProof =
+    record.state === SESSION_STATES.CLOSED &&
+    !!record.settlement?.transaction &&
+    record.settlement.chargedAtomic === record.cumulativeAtomic &&
+    !recoverable;
   return {
+    ...(archivedProof ? { archivedProof: true as const } : {}),
     ...(notCreated ? { notCreated: true as const } : {}),
     terms: record.terms,
     ...(record.history
@@ -89,14 +104,7 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
       !notCreated &&
       record.state !== SESSION_STATES.CLOSED &&
       pending.length > 0,
-    recoverable:
-      !notCreated &&
-      pending.some(
-        (request) =>
-          request.bill !== null ||
-          !!record.blocks?.[request.requestId]?.pending ||
-          !!record.blocks?.[request.requestId]?.accepted,
-      ),
+    recoverable,
   };
 }
 

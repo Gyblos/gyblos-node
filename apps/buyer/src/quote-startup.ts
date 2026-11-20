@@ -1,50 +1,31 @@
-// Composes automatic routing from verified quotes; payment preparation is lazy and never needed by free execution.
-import { PROTOCOL_FEE } from '@gyblos/config';
-import {
-  buyerChainPayments,
-  buyerPaymentsUnresolved,
-} from '@gyblos/node/buyer-chain';
+// Routes session-enabled buyers and preserves free inference for older free-only profiles.
+import { buyerPaymentsUnresolved } from '@gyblos/node/buyer-chain';
 import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
-import {
-  checkBuyerPaidInput,
-  executeSelectedBuyerPaid,
-} from '@gyblos/node/buyer-paid-execution';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
-import { rolePath } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 
-import {
-  executeApiKeyFree,
-  recordApiKeyPayment,
-  reserveApiKey,
-} from './api-key-execution';
+import { executeApiKeyFree } from './api-key-execution';
 import { withBuyerApiKeys } from './api-key-runtime';
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER, PAID_BUYER_CODES, PAID_BUYER_HTTP_MS } from './constants';
-import { observeBuyerExecution } from './execution-observation';
 import { executeSelectedBuyerFree } from './free-execution';
 import { selectWinner, type FreeSelectionOptions } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
-import { buyerUnserved } from './free-telemetry';
+import { onBuyerSelectionFailure } from './free-telemetry';
 import { routedRequest } from './model-routes';
-import { classifyPaidError, PaidOutcomeError, paidSummary } from './paid-http';
-import { paidRecords } from './paid-records';
-import { paidBuyerDependencies } from './paid-selection';
-import {
-  checkPaidSellerRequest,
-  endpointToken,
-  payments,
-  tokenizer,
-  type startPaidBuyer,
-} from './paid-startup';
 import { selectConfiguredThenOpen } from './quote-selection';
 import type { BuyerSelectionConfig } from './selection-config';
+import { classifyPaidError } from './session-errors';
+import {
+  endpointToken,
+  type BuyerStartupOptions,
+} from './session-requirements';
 import { startSessionQuoteRuntime } from './session-startup';
 
-type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
+type Options = BuyerStartupOptions;
 type Context = Parameters<BuyerExecutionFactory>[0];
 type Runtime = Awaited<ReturnType<BuyerExecutionFactory>>;
 
@@ -54,7 +35,6 @@ function admission(enter: Context['dependencies']['enter']) {
   let idle = Promise.resolve();
   let finish = () => {};
   return {
-    closed: () => closed,
     enter() {
       if (closed) throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
       if (active) throw new PaidBuyerError(PAID_BUYER_CODES.BUSY);
@@ -80,144 +60,6 @@ function drain(state: ReturnType<typeof admission>) {
     () => true,
     () => false,
   );
-}
-async function preparePaid(
-  context: Context,
-  options: Options,
-  state: ReturnType<typeof admission>,
-  buyer: string,
-  signal: AbortSignal,
-  meter: Awaited<ReturnType<typeof tokenizer>>,
-) {
-  const { prepared, role, endpoint, relayOnly } = context;
-  signal.throwIfAborted();
-  if (state.closed()) throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-  const chain = await payments(
-    options.chain ?? buyerChainPayments(),
-    role,
-    prepared.config.request.maxAtomic,
-  );
-  try {
-    signal.throwIfAborted();
-    if (state.closed()) throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-    const paid = paidBuyerDependencies(prepared, {
-      endpoint,
-      buyer,
-      relayOnly,
-      onSellerFailure: options.onSellerFailure,
-      payment: chain.client,
-      fee: PROTOCOL_FEE,
-      meter,
-      record: paidRecords(rolePath(P2P_ROLES.BUYER, PAID_BUYER.recordsFile))
-        .record,
-    });
-    return { chain, paid };
-  } catch (error) {
-    await chain.close();
-    throw error;
-  }
-}
-function lazyPaid(
-  context: Context,
-  options: Options,
-  state: ReturnType<typeof admission>,
-  buyer: string,
-) {
-  let pending: ReturnType<typeof preparePaid> | undefined;
-  let opened: Awaited<ReturnType<typeof preparePaid>> | undefined;
-  let loading: ReturnType<typeof tokenizer> | undefined;
-
-  return {
-    meter(signal: AbortSignal) {
-      signal.throwIfAborted();
-      loading ??= (options.meter ?? tokenizer)().catch((error: unknown) => {
-        loading = undefined;
-        throw error;
-      });
-      return bounded(loading, signal);
-    },
-    get(signal: AbortSignal, meter: Awaited<ReturnType<typeof tokenizer>>) {
-      signal.throwIfAborted();
-      if (state.closed())
-        throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-      pending ??= preparePaid(context, options, state, buyer, signal, meter)
-        .then(async (runtime) => {
-          if (state.closed() || signal.aborted) {
-            await runtime.chain.close();
-            signal.throwIfAborted();
-            throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-          }
-          opened = runtime;
-          return runtime;
-        })
-        .catch((error: unknown) => {
-          pending = undefined;
-          throw error;
-        });
-      return bounded(pending, signal);
-    },
-    unresolved: () =>
-      pending
-        ? pending.then((runtime) => runtime.paid.unresolved())
-        : buyerPaymentsUnresolved(),
-    async inspect(digest: string, signal?: AbortSignal) {
-      const drained = await drain(state);
-      return drained ? opened?.chain.observe?.(digest, signal) : undefined;
-    },
-    drain: () => drain(state),
-    // Endpoint closure precedes journal closure; an unfinished prepare owns its late cleanup.
-    close: async () => {
-      await opened?.chain.close();
-    },
-  };
-}
-function paidQuoteExecutor(
-  context: Context,
-  paid: ReturnType<typeof lazyPaid>,
-  input: Parameters<Runtime['execute']>[0],
-  onDelta: Parameters<Runtime['execute']>[2],
-  permission: Parameters<typeof reserveApiKey>[0],
-  request: BuyerSelectionConfig['request'],
-) {
-  return async (
-    winner: Parameters<typeof executeSelectedBuyerFree>[2],
-    executionSignal: AbortSignal,
-  ) =>
-    observeBuyerExecution(
-      context.dependencies,
-      winner,
-      input,
-      executionSignal,
-      onDelta,
-      async (emit) => {
-        if (inferenceNeedsTools(input))
-          throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
-        checkPaidSellerRequest(request, context.role, winner.quote);
-        const meter = await paid.meter(executionSignal);
-        checkBuyerPaidInput(input, meter, winner.quote);
-        await reserveApiKey(permission, winner.quote, executionSignal);
-        const runtime = await paid.get(executionSignal, meter);
-        const outcome = await executeSelectedBuyerPaid(
-          input,
-          runtime.paid,
-          winner,
-          executionSignal,
-          emit,
-        );
-        if (!outcome) {
-          if (
-            permission &&
-            !(await bounded(paid.unresolved(), executionSignal))
-          )
-            await permission.releaseUnsent();
-          return undefined;
-        }
-        await recordApiKeyPayment(permission, paidSummary(outcome));
-        const { result, error } = outcome.terminal;
-        if (!result) throw new PaidOutcomeError(error.code, outcome);
-        return { ...result, payment: paidSummary(outcome) };
-      },
-    );
 }
 async function selectQuoted(
   context: Context,
@@ -245,7 +87,6 @@ function quoteExecutor(
   context: Context,
   options: Options,
   state: ReturnType<typeof admission>,
-  paid: ReturnType<typeof lazyPaid>,
   buyer: string,
 ): Runtime['execute'] {
   return async (input, signal, onDelta, model, permission) => {
@@ -253,7 +94,7 @@ function quoteExecutor(
     const routed = await executeBuyerQuote<ChatResult>(
       {
         enter: state.enter,
-        unresolved: paid.unresolved,
+        unresolved: () => buyerPaymentsUnresolved(),
         select: (excluded, selectionSignal) =>
           selectQuoted(
             context,
@@ -271,15 +112,14 @@ function quoteExecutor(
                 permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
               ...(inferenceNeedsTools(input) ? { tools: true } : {}),
             },
-          ).catch((error) => {
-            if (!selectionSignal.aborted)
-              buyerUnserved(
-                context.dependencies,
-                Boolean(onDelta),
-                model?.selection,
-              );
-            throw error;
-          }),
+          ).catch(
+            onBuyerSelectionFailure(
+              selectionSignal,
+              context.dependencies,
+              Boolean(onDelta),
+              model?.selection,
+            ),
+          ),
         free: (winner, executionSignal) =>
           executeApiKeyFree(permission, winner.quote, executionSignal, () =>
             executeSelectedBuyerFree(
@@ -290,14 +130,9 @@ function quoteExecutor(
               onDelta,
             ),
           ),
-        paid: paidQuoteExecutor(
-          context,
-          paid,
-          input,
-          onDelta,
-          permission,
-          request,
-        ),
+        paid: async () => {
+          throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+        },
       },
       signal,
     );
@@ -315,10 +150,10 @@ async function startQuoteRuntime(
   const buyer = context.role.buyer;
   const token = await endpointToken();
   const state = admission(context.dependencies.enter);
-  const paid = lazyPaid(context, options, state, buyer);
+
   const { request } = context.prepared.config;
   return {
-    execute: quoteExecutor(context, options, state, paid, buyer),
+    execute: quoteExecutor(context, options, state, buyer),
     token,
     requestMs: PAID_BUYER_HTTP_MS,
     classify: classifyPaidError,
@@ -332,9 +167,10 @@ async function startQuoteRuntime(
       ),
       automatic: true,
     }),
-    inspect: paid.inspect,
-    drain: paid.drain,
-    close: paid.close,
+    drain: () => drain(state),
+    close: async () => {
+      await drain(state);
+    },
   };
 }
 export function quoteBuyerExecution(options: Options): BuyerExecutionFactory {

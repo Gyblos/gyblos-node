@@ -4,12 +4,21 @@ import { DISPLAY } from './constants';
 import type { DiscoverySnapshot, OfferedModel, Seller } from './discovery';
 
 export interface ModelOffers {
+  modelId: string;
+  variant: string | null;
+  quantization: string | null;
   sellers: number;
   free: number;
   minInput: bigint | null;
   minOutput: bigint | null;
   context: number;
 }
+// A model's identity as published: the same id with another variant or quantization is another model.
+export const modelKey = (model: {
+  modelId: string;
+  variant: string | null;
+  quantization: string | null;
+}) => JSON.stringify([model.modelId, model.variant, model.quantization]);
 const isFree = (model: OfferedModel) =>
   model.pricing.inputAtomicPerMtok === '0' &&
   model.pricing.outputAtomicPerMtok === '0';
@@ -26,10 +35,11 @@ export function summarizeOffers(snapshot: DiscoverySnapshot) {
     .filter((ratio): ratio is number => typeof ratio === 'number');
   const models = new Map<string, ModelOffers>();
   for (const offer of offers) {
-    const key = [offer.modelId, offer.variant, offer.quantization]
-      .filter(Boolean)
-      .join(' ');
+    const key = modelKey(offer);
     const entry = models.get(key) ?? {
+      modelId: offer.modelId,
+      variant: offer.variant,
+      quantization: offer.quantization,
       sellers: 0,
       free: 0,
       minInput: null,
@@ -54,6 +64,21 @@ export function summarizeOffers(snapshot: DiscoverySnapshot) {
   return {
     offers: offers.length,
     free: offers.filter(isFree).length,
+    // Models with at least one free offer now.
+    freeModels: [...models.values()].filter((model) => model.free > 0).length,
+    // The network's lowest paid prices per million tokens, each over every model; null without paid offers.
+    minInput: [...models.values()].reduce<bigint | null>(
+      (low, model) =>
+        model.minInput === null ? low : lowest(low, model.minInput),
+      null,
+    ),
+    minOutput: [...models.values()].reduce<bigint | null>(
+      (low, model) =>
+        model.minOutput === null ? low : lowest(low, model.minOutput),
+      null,
+    ),
+    // Listed sellers with a 24 h uptime read, over which averageDayUptime is taken.
+    sellersWithDayUptime: day.length,
     averageDayUptime: day.length
       ? day.reduce((sum, ratio) => sum + ratio, 0) / day.length
       : null,

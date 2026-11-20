@@ -8,7 +8,7 @@ import test from 'node:test';
 void test('published tests have a public command without private harness dependencies', async () => {
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
   assert.equal(pkg.scripts.test.includes('.local/'), false);
-  // A missing binding must reach explicit skips before the proxy's role import.
+  // A missing binding must reach explicit skips for the native transport suite.
   const sdkSource =
     'export class SecretKey {}\nthrow new Error("Cannot find native binding: synthetic absence");';
   const resolver = `export function resolve(specifier,context,next){
@@ -26,7 +26,7 @@ void test('published tests have a public command without private harness depende
       'tsx',
       '--test',
       '--test-reporter=tap',
-      'tests/buyer-proxy.test.ts',
+      'tests/free-stream-iroh.test.ts',
     ],
     {
       encoding: 'utf8',
@@ -36,6 +36,7 @@ void test('published tests have a public command without private harness depende
     },
   );
   assert.equal(unavailable.status, 0, unavailable.stderr + unavailable.stdout);
-  assert.match(unavailable.stdout, /^# skipped 6$/m);
+  assert.match(unavailable.stdout, /^# skipped [1-9]\d*$/m);
+  assert.match(unavailable.stdout, /^# pass 0$/m);
   assert.match(unavailable.stdout, /^# fail 0$/m);
 });

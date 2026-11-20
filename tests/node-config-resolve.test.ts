@@ -9,7 +9,6 @@ import {
   resolveNodeConfig,
   type ResolvedNodeConfig,
 } from '@gyblos/node/node-config-resolve';
-import { sellerPublicationConfig } from '@gyblos/node/publisher-config';
 
 import { BASE, FAKE_SECRET, offer } from './support/node-config-fixtures';
 
@@ -77,7 +76,7 @@ void test('environment-only resolution reproduces each current reader', () => {
   assert.equal(settings.discoveryPublish, true);
   assert.deepEqual(
     { baseUrl: settings.discoveryUrl },
-    sellerPublicationConfig(environment),
+    { baseUrl: environment.GYBLOS_DISCOVERY_URL },
   );
   assert.deepEqual(
     origins
@@ -108,7 +107,6 @@ void test('today edge semantics: empty home and empty Iroh addresses fall back; 
   assert.equal(settings.irohBind, undefined);
   assert.equal(settings.irohExternalAddress, undefined);
   assert.equal(settings.discoveryPublish, false);
-  assert.equal(sellerPublicationConfig(environment), undefined);
 });
 
 void test('a switch other than 1 is off, as today, and raises a warning naming only the variable', () => {
@@ -140,16 +138,12 @@ void test('invalid environment values become issues that name the variable, neve
     { code: 'INVALID_VALUE', path: 'env.GYBLOS_DISCOVERY_PUBLISH' },
   ]);
   assert.equal(JSON.stringify(result).includes(FAKE_SECRET), false);
-  assert.throws(() =>
-    sellerPublicationConfig({ GYBLOS_DISCOVERY_PUBLISH: 'yes' }),
-  );
 });
 
 void test('an invalid discovery URL matters only when publishing, as today', () => {
   const quiet = { GYBLOS_DISCOVERY_URL: 'http://index.example.com/v1' };
   assert.equal(resolveNodeConfig({ env: quiet }).ok, true);
   const publishing = { ...quiet, GYBLOS_DISCOVERY_PUBLISH: '1' };
-  assert.throws(() => sellerPublicationConfig(publishing));
   const result = resolveNodeConfig({ env: publishing });
   assert.deepEqual(result.ok ? [] : result.issues, [
     { code: 'INSECURE_URL', path: 'env.GYBLOS_DISCOVERY_URL' },

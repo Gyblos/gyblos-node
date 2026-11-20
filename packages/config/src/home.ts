@@ -72,7 +72,6 @@ export const ROLE_FILES = {
   sellerRegistrationLock: 'registration-8004-v1.lock',
   publicSequence: 'public-sequence-v2.json',
   publicSequenceLock: 'public-sequence-v2.lock',
-  facilitatorDiagnostics: 'facilitator-diagnostics',
 } as const;
 
 // Solana key files inside a role directory: buyer for the buyer role, the other three for the seller.
@@ -164,7 +163,6 @@ export function labLayout(environment: HomeEnvironment) {
     root,
     diagnostics: join(root, ROLE_FILES.diagnostics),
     measurements: join(root, ROLE_FILES.measurements),
-    facilitatorDiagnostics: join(root, ROLE_FILES.facilitatorDiagnostics),
     identityKeys: join(root, LAB_DIRECTORIES.identityKeys),
     identityValidator: join(root, LAB_DIRECTORIES.identityValidator),
     batchChannelKeys: join(
@@ -345,6 +343,7 @@ export function batchPoolChannelPaths(paths: BatchPoolPaths, nodeId: string) {
   if (!/^[a-f0-9]+$/.test(nodeId)) throw new TypeError('Invalid session slot');
   const directory = join(paths.directory, BATCH_POOL_FILES.channels, nodeId);
   return {
+    paymentRoot: paths.directory,
     directory,
     state: join(directory, BATCH_SESSION_FILES.state),
     lock: join(directory, BATCH_SESSION_FILES.lock),
@@ -383,6 +382,7 @@ export function batchSellerBuyerPaths(
     throw new TypeError('Invalid session slot');
   const directory = join(paths.children, buyerNodeId);
   return {
+    paymentRoot: paths.directory,
     directory,
     state: join(directory, BATCH_SESSION_FILES.state),
     lock: join(directory, BATCH_SESSION_FILES.lock),

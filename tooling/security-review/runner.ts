@@ -5,9 +5,12 @@ import { join } from 'node:path';
 import {
   DEFAULT_MAX_CALLS,
   DEFAULT_REVIEW_CONCURRENCY,
+  REVIEW_FAILURE,
+  REVIEW_PHASE,
   REVIEW_RESULT_VERSION,
   REVIEW_VALUES,
   type PiThinkingLevel,
+  type ReviewFailure,
 } from './constants';
 import {
   parseReviewResponse,
@@ -15,9 +18,10 @@ import {
   validateCoverage,
   validateEvidence,
 } from './parsing';
-import { runPi, type RunPiOptions } from './pi';
+import { preparePiDirectory, runPi, type RunPiOptions } from './pi';
 import { createSourceBundle, partitionBundle } from './projection';
 import { attachSource, buildVerificationPrompt } from './prompts';
+import { InvocationFailure, providerAdmission } from './provider-admission';
 import { overallReviewStatus } from './result';
 import type {
   AgentFinding,
@@ -88,8 +92,7 @@ async function ask(
 ): Promise<string> {
   const directory = await mkdtemp(join(options.output, 'session-'));
   try {
-    for (const name of ['tmp', 'config', 'cache', 'pi'])
-      await mkdir(join(directory, name));
+    await preparePiDirectory(directory);
     const invocation: RunPiOptions = {
       command: options.piCommand,
       cwd: directory,
@@ -99,30 +102,31 @@ async function ask(
       prompt: (options.policyContext ?? '') + '\n' + prompt,
     };
     const result = await (options.execute ?? runPi)(invocation);
-    if (
-      result.exitCode !== 0 ||
-      result.signal ||
-      result.truncated ||
-      result.timedOut
-    )
-      throw new Error(
-        'Pi invocation failed, timed out or exceeded its output limit.',
-      );
+    if (result.timedOut) throw new InvocationFailure(REVIEW_FAILURE.TIMEOUT);
+    if (result.truncated) throw new InvocationFailure(REVIEW_FAILURE.LIMIT);
+    if (result.failure) throw new InvocationFailure(result.failure);
+    if (result.exitCode !== 0 || result.signal)
+      throw new InvocationFailure(REVIEW_FAILURE.PI);
     return result.stdout;
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 }
-function failed(assignment: Assignment, reason: string): Execution {
+function failed(
+  assignment: Assignment,
+  failure: ReviewFailure,
+  skipped = false,
+): Execution {
   return {
     assignment,
     findings: [],
     result: {
       taskId: assignment.task.id,
-      status: REVIEW_VALUES.ERROR,
+      status: skipped ? REVIEW_VALUES.SKIPPED : REVIEW_VALUES.ERROR,
       findings: [],
-      error: reason,
+      failure,
       omissions: assignment.bundle.omissions,
+      excluded: assignment.bundle.excluded,
     },
   };
 }
@@ -131,19 +135,31 @@ async function review(
   options: ReviewExecutionOptions,
 ): Promise<Execution> {
   if (assignment.bundle.omissions.length)
-    return failed(
+    return failed(assignment, REVIEW_FAILURE.SOURCE);
+  // Only symlinks or binaries: nothing a model can read, so no Pi call is spent on an empty input.
+  if (!assignment.bundle.files.length && assignment.bundle.excluded.length)
+    return {
       assignment,
-      'Source omitted; see coverage ledger. Narrow the input or review the excluded file manually.',
-    );
+      findings: [],
+      result: {
+        taskId: assignment.task.id,
+        status: REVIEW_VALUES.COMPLETE,
+        findings: [],
+        coverage: [],
+        excluded: assignment.bundle.excluded,
+      },
+    };
+  let phase: ReviewFailure = REVIEW_FAILURE.PI;
   try {
-    const response = parseReviewResponse(
-      await ask(
-        attachSource(assignment.task.prompt, assignment.bundle),
-        options,
-      ),
+    const output = await ask(
+      attachSource(assignment.task.prompt, assignment.bundle),
+      options,
     );
+    phase = REVIEW_FAILURE.FORMAT;
+    const response = parseReviewResponse(output);
     if (response.reviewer !== assignment.task.reviewer)
       throw new Error('reviewer mismatch');
+    phase = REVIEW_FAILURE.COVERAGE;
     validateCoverage(response, assignment.bundle);
     return {
       assignment,
@@ -152,17 +168,17 @@ async function review(
         taskId: assignment.task.id,
         status: response.status,
         coverage: response.coverage.reviewed_paths,
+        excluded: assignment.bundle.excluded,
         findings: response.findings.map(({ fingerprint, title }) => ({
           fingerprint,
           title,
         })),
       },
     };
-  } catch {
-    return failed(
-      assignment,
-      'Pi output failed invocation, schema, evidence or coverage validation.',
-    );
+  } catch (error) {
+    return error instanceof InvocationFailure
+      ? failed(assignment, error.code, error.skipped)
+      : failed(assignment, phase);
   }
 }
 function candidatesFrom(
@@ -186,6 +202,8 @@ async function verify(
   assignment: Assignment,
   options: ReviewExecutionOptions,
 ): Promise<VerificationResult> {
+  let pass: NonNullable<VerificationResult['failedPass']> =
+    REVIEW_PHASE.VERIFY_FIRST;
   try {
     const response = parseVerificationResponse(
       await ask(
@@ -200,6 +218,7 @@ async function verify(
       throw new Error('fingerprint mismatch');
     validateEvidence(response.evidence, assignment.bundle);
     // A second fresh verifier checks a rejection too, preventing a single refuter from hiding a lead.
+    pass = REVIEW_PHASE.VERIFY_SECOND;
     const final = parseVerificationResponse(
       await ask(
         attachSource(
@@ -229,12 +248,13 @@ async function verify(
       decision: record.decision,
       record,
     };
-  } catch {
+  } catch (error) {
     return {
       fingerprint: candidate.fingerprint,
       decision: REVIEW_VALUES.ERROR,
-      error:
-        'Independent verification failed schema, source or invocation checks.',
+      failedPass: pass,
+      failure:
+        error instanceof InvocationFailure ? error.code : REVIEW_FAILURE.VERIFY,
     };
   }
 }
@@ -312,16 +332,11 @@ export async function runReview(
     },
   };
   if (options.dryRun) return result;
-  const execution = result.execution;
-  const countedOptions: ReviewExecutionOptions = {
-    ...options,
-    execute: async (invocation) => {
-      if (!execution || execution.callsStarted >= maxCalls)
-        throw new Error('Invocation budget exhausted.');
-      execution.callsStarted += 1;
-      return (options.execute ?? runPi)(invocation);
-    },
-  };
+  const { admission, execute } = providerAdmission(
+    options.execute ?? runPi,
+    result.execution,
+  );
+  const countedOptions = { ...options, execute };
   const assignments = await assignmentsFor(plan, options);
   summary.taskCount = assignments.length;
   // Reserve at least two independent verification calls before spending on hunters.
@@ -329,7 +344,10 @@ export async function runReview(
   const executions = await mapConcurrent(
     assignments.slice(0, allowance),
     concurrency,
-    (assignment) => review(assignment, countedOptions),
+    (assignment) =>
+      admission.stopped
+        ? Promise.resolve(failed(assignment, admission.stopped, true))
+        : review(assignment, countedOptions),
   );
   const deferred: TaskResult[] = assignments
     .slice(allowance)
@@ -337,17 +355,17 @@ export async function runReview(
       taskId: task.id,
       status: REVIEW_VALUES.SKIPPED,
       findings: [],
-      error: 'Invocation budget exhausted.',
+      failure: REVIEW_FAILURE.BUDGET,
     }));
   let remaining = maxCalls - Math.min(assignments.length, allowance);
   const verifications: VerificationResult[] = [];
   const candidates = candidatesFrom(executions);
   for (const { candidate, assignment } of candidates) {
-    if (remaining < 2) {
+    if (admission.stopped || remaining < 2) {
       verifications.push({
         fingerprint: candidate.fingerprint,
         decision: REVIEW_VALUES.ERROR,
-        error: 'Invocation budget cannot fund both independent verifiers.',
+        failure: admission.stopped ?? REVIEW_FAILURE.BUDGET,
       });
       continue;
     }
@@ -357,6 +375,6 @@ export async function runReview(
   result.candidates = candidates.map((item) => item.candidate);
   result.tasks = [...executions.map((item) => item.result), ...deferred];
   result.verifications = verifications;
-  result.status = overallReviewStatus(result.tasks);
+  result.status = overallReviewStatus(result.tasks, verifications);
   return result;
 }

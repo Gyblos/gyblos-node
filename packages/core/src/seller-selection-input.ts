@@ -45,6 +45,8 @@ export interface SellerRequest {
   retention: readonly DataRetention[];
   // Set for a request that needs tools, irrespective of its signed price.
   tools?: true;
+  // The estimated input tokens, sent in quotes: an offer too slow to read them in time refuses.
+  inputTokens?: number;
 }
 export interface KnownSeller {
   catalog: PublicCatalogV2;

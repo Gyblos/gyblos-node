@@ -2,9 +2,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { startBuyer } from '@gyblos/buyer/buyer-main';
 import { chatSession } from '@gyblos/buyer/chat-cli';
 import { startFreeBuyer } from '@gyblos/buyer/free-startup';
-import { startPaidBuyer } from '@gyblos/buyer/paid-startup';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
@@ -102,16 +102,16 @@ void test(
 );
 
 void test(
-  'product pool owner blocks both dedicated paid and free startup before either factory and permits restart after close',
+  'product pool owner blocks both channel and free startup before either factory and permits restart after close',
   { skip: NATIVE_CAPABILITY.transportSkip },
   async (t) => {
     const host = await sessionProductHost(OFFER_PRICING_KINDS.PAID, '200000');
     t.after(host.close);
     await assert.rejects(
-      startPaidBuyer({
+      startBuyer({
         port: 0,
         meter: async () => assert.fail('must not load financial meter'),
-        chain: async () => assert.fail('must not construct financial backend'),
+        batch: async () => assert.fail('must not construct financial backend'),
       }),
       { code: NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE },
     );

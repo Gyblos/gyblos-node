@@ -5,12 +5,17 @@
 import { parseChainStats, type ChainSnapshot } from './chain-shape';
 import { COLLECTOR_URL } from './config';
 import { fetchJson } from './fetch-json';
+import { rangeQuery, type RangeDays } from './range';
 
 export type { ChainSnapshot } from './chain-shape';
 
-export async function getChainStats(): Promise<ChainSnapshot> {
+// `periodsBack` 1 reads the span of the same length just before the range, for a change.
+export async function getChainStats(
+  days: RangeDays,
+  periodsBack = 0,
+): Promise<ChainSnapshot> {
   try {
-    return { ...(await loadChainStats()), error: null };
+    return { ...(await loadChainStats(days, periodsBack)), error: null };
   } catch (error) {
     return {
       aggregatedAt: null,
@@ -21,8 +26,11 @@ export async function getChainStats(): Promise<ChainSnapshot> {
   }
 }
 
-async function loadChainStats() {
+async function loadChainStats(days: RangeDays, periodsBack: number) {
   return parseChainStats(
-    await fetchJson(`${COLLECTOR_URL}/stats/chain`, 'collector chain'),
+    await fetchJson(
+      `${COLLECTOR_URL}/stats/chain${rangeQuery(days, Date.now(), periodsBack)}`,
+      'collector chain',
+    ),
   );
 }

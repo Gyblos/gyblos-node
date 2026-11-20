@@ -3,8 +3,9 @@
 import { Check, CheckCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
+
 import manifest from '../package.json';
-import { CATALOG_STATE } from './catalog/model';
 import { WINDOW_CHROME } from './constants';
 import {
   canSelectPreviewModel,
@@ -26,7 +27,6 @@ import { ChatPaymentSelector } from './ui/ChatPaymentSelector';
 import {
   BUTTON_VARIANT,
   MAIN_NAV,
-  MODEL_SOURCE,
   MODELS,
   NAVIGATION_WIDTH,
   ROUTE_ORDER,
@@ -39,6 +39,7 @@ import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account';
 import { DesignSystem } from './ui/DesignSystem';
 import { FormField, FormInput } from './ui/Form';
 import { Modal } from './ui/Modal';
+import { usdPerMtok } from './ui/model-price';
 import type { CatalogModel as Model, View } from './ui/model-types';
 import { ModelImage } from './ui/ModelImage';
 import { Models } from './ui/Models';
@@ -74,6 +75,7 @@ import { useX402 } from './ui/useX402';
 import { WalletBackup } from './ui/WalletBackup';
 import { useDesktopWallet } from './ui/WalletState';
 import { WindowTitlebar } from './ui/WindowTitlebar';
+import { paidSellerLimitNotice, x402Amount, x402Asset } from './x402-model';
 
 const money = (value: number) => '$' + value.toFixed(2);
 export function DesktopApp() {
@@ -181,19 +183,15 @@ export function DesktopApp() {
   const network = useLocalNode();
   const wallet = useDesktopWallet();
   const announcements = useNetworkCatalog();
-  const networkModels = announcedModels(announcements.snapshot, Date.now());
+  const now = Date.now();
+  const networkModels = announcedModels(announcements.snapshot, now);
+  const found = announcedModels(announcements.searchResult, now);
+  const ids = new Set(networkModels.map((item) => item.id));
+  networkModels.push(...found.filter((item) => !ids.has(item.id)));
   const chatModels = [MODELS[0], ...networkModels, ...MODELS.slice(1)];
   // Transport readiness and spending permission are independently enforced by each real coordinator.
   const online = true;
   const [model, setModel] = useState(MODELS[0]);
-  useEffect(() => {
-    if (
-      model.source === MODEL_SOURCE.ANNOUNCED &&
-      announcements.snapshot.state !== CATALOG_STATE.LOADING &&
-      !networkModels.some((item) => item.id === model.id)
-    )
-      setModel(MODELS[0]);
-  }, [announcements.snapshot, model]);
   const [credits, setCredits] = useState(0);
   const [spent, setSpent] = useState(0);
   const [budget, setBudget] = useState<number>(DEMO_ACCOUNT.DEFAULT_BUDGET);
@@ -203,7 +201,15 @@ export function DesktopApp() {
   const [modal, setModal] = useState<
     (typeof UI_DIALOG)[keyof typeof UI_DIALOG] | null
   >(null);
+  const [confirmedPolicy, setConfirmedPolicy] = useState<string>();
   const [paidModel, setPaidModel] = useState<Model | null>(null);
+  const sellerLimit = paidModel?.offerId
+    ? paidSellerLimitNotice(
+        x402.state.policy,
+        x402.state.summary,
+        paidModel.name,
+      )
+    : undefined;
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
   const [chatController] = useState(() => new ChatController('first-chat'));
@@ -267,7 +273,11 @@ export function DesktopApp() {
   }, [toast]);
   function choose(next: Model) {
     if (paymentMethod === PAYMENT_METHOD.PAYPAL) return;
-    if (next.id === model.id) return;
+    if (
+      next.id === model.id &&
+      (!next.offerId || confirmedPolicy === x402.state.policy?.policyId)
+    )
+      return;
     if (!next.free) {
       setPaidModel(next);
       return;
@@ -411,6 +421,8 @@ export function DesktopApp() {
               connectedTools={connectedTools}
               onBrowseApplications={() => navigate(UI_VIEW.TOOLS)}
               models={chatModels}
+              confirmedPolicy={confirmedPolicy}
+              onDefaultModel={() => setModel(MODELS[0])}
               onSelectModel={(id) => {
                 const next = chatModels.find((item) => item.id === id);
                 if (next) choose(next);
@@ -573,29 +585,66 @@ export function DesktopApp() {
             <div className="paid-model-summary">
               <ModelImage name={paidModel.name} artwork={paidModel.image} />
               <strong>{paidModel.name}</strong>
+              {paidModel.offerId && <span>{paidModel.family}</span>}
             </div>
             <div className="paid-terms">
               <div>
                 <span>Input / 1M tokens</span>
-                <strong>${paidModel.input.toFixed(2)}</strong>
+                <strong>{usdPerMtok(paidModel.input)}</strong>
               </div>
               <div>
                 <span>Output / 1M tokens</span>
-                <strong>${paidModel.output.toFixed(2)}</strong>
+                <strong>{usdPerMtok(paidModel.output)}</strong>
               </div>
+              {paidModel.offerId && x402.state.policy && (
+                <div>
+                  <span>Maximum per response</span>
+                  <strong>
+                    {x402Amount(x402.state.policy.maxAtomic, x402.state.policy)}{' '}
+                    {x402Asset(x402.state.policy)}
+                  </strong>
+                </div>
+              )}
               <div>
-                <span>Your device daily limit</span>
-                <strong>{money(budget)}</strong>
+                <span>
+                  {paidModel.offerId
+                    ? 'Channel deposit'
+                    : 'Your device daily limit'}
+                </span>
+                <strong>
+                  {paidModel.offerId
+                    ? x402.state.policy?.depositAtomic
+                      ? x402Amount(
+                          x402.state.policy.depositAtomic,
+                          x402.state.policy,
+                        ) + ' USDC'
+                      : 'Unavailable'
+                    : money(budget)}
+                </strong>
               </div>
+              {paidModel.offerId && x402.state.policy?.lifetimeMs && (
+                <div>
+                  <span>Channel duration</span>
+                  <strong>
+                    {x402.state.policy.lifetimeMs /
+                      BATCH_SESSION_DEFAULTS.millisecondsPerSecond}{' '}
+                    seconds
+                  </strong>
+                </div>
+              )}
             </div>
-            <p className="modal-note">
-              Your model stays selected. Gyblos won’t silently switch from a
-              free to a paid offer.
+            <p className="modal-note" role="status">
+              {sellerLimit ||
+                (paidModel.offerId
+                  ? 'The first paid message opens a channel with this seller. Later messages use the same channel.'
+                  : 'Your model stays selected. Gyblos won’t silently switch from a free to a paid offer.')}
             </p>
             <Button
               variant={BUTTON_VARIANT.PRIMARY}
               className="wide"
+              disabled={!!sellerLimit}
               onClick={() => {
+                setConfirmedPolicy(x402.state.policy?.policyId);
                 setModel(paidModel);
                 setPaidModel(null);
                 setToast('Model selected');

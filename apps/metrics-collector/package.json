@@ -18,6 +18,7 @@
     "./stats-shape": "./src/stats-shape.ts",
     "./stats": "./src/stats.ts",
     "./stats-chain": "./src/stats-chain.ts",
+    "./rpc-probe": "./src/rpc-probe.ts",
     "./chain/base58": "./src/chain/base58.ts",
     "./chain/channel-account": "./src/chain/channel-account.ts",
     "./chain/decode": "./src/chain/decode.ts",
@@ -29,7 +30,7 @@
     "@gyblos/config": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/protocol": "workspace:*",
-    "drizzle-orm": "0.45.2",
-    "hono": "4.13.13"
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.18"
   }
 }

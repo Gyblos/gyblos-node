@@ -24,6 +24,7 @@ import {
   type ChatResult,
   type ChatStreamFormat,
 } from './free-sse';
+import { BYTES_PER_TOKEN } from './input-size';
 import type { ModelRoute } from './model-routes';
 import { parseResponsesChat } from './responses-chat';
 import {
@@ -156,7 +157,6 @@ export function estimatedTokens(body: unknown) {
     input_tokens: Math.ceil(Buffer.byteLength(text) / BYTES_PER_TOKEN),
   };
 }
-const BYTES_PER_TOKEN = 4;
 
 // The one model this buyer asks for, in the OpenAI list shape that SDKs and agents read.
 export function modelList(

@@ -174,6 +174,15 @@ void test('a channel account is read only when the program owns it', () => {
 
 void test('only an https (or loopback http) RPC URL without credentials is used', () => {
   assert.equal(chainRpcUrl('https://rpc.example/'), 'https://rpc.example/');
+  // A known provider's mainnet host is read on its devnet host with the same path and key.
+  assert.equal(
+    chainRpcUrl('https://mainnet.helius-rpc.com/?api-key=k1'),
+    'https://devnet.helius-rpc.com/?api-key=k1',
+  );
+  assert.equal(
+    chainRpcUrl('https://solana-mainnet.g.alchemy.com/v2/k2'),
+    'https://solana-devnet.g.alchemy.com/v2/k2',
+  );
   assert.equal(chainRpcUrl('http://127.0.0.1:8899'), 'http://127.0.0.1:8899/');
   // Providers such as Helius carry the key in the query; the URL is never logged.
   assert.equal(

@@ -12,25 +12,23 @@ import {
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { batchOfferFixture } from '../support/batch-iroh-offer';
 import { sellerRegistryRig } from '../support/seller-session-registry';
 
 void test(
   'expired pristine seller reservation refreshes under the same slot while attempted opening stays protected',
-  {
-    skip: WINDOWS
-      ? 'Reusable financial startup requires payment subtree ACL validation on Windows'
-      : false,
-  },
+  {},
   async (t) => {
     let now = 1_800_000_000_000;
     t.mock.method(Date, 'now', () => now);
     t.mock.method(globalThis, 'fetch', async () =>
       assert.fail('External RPC forbidden'),
     );
-    const rig = await sellerRegistryRig(1, { now: () => now });
+    const rig = await sellerRegistryRig(1, {
+      now: () => now,
+      depositAtomic: '10000',
+    });
     t.after(rig.dispose);
     let registry = await rig.open();
     t.after(() => registry.dispose());
@@ -65,7 +63,6 @@ void test(
     const payload = await fresh.open();
     const offers = await batchOfferFixture(terms, rig.vm.seller, rig.now);
     const host = await startSellerSessionHost({
-      buyerNodeIds: [terms.buyerNodeId],
       registry,
       description: terms,
       owner: terms.owner,
@@ -101,6 +98,7 @@ void test(
       await registry.permits(rig.buyers[1]!.terms.buyerNodeId),
       false,
     );
+    const initialBalance = await rig.vm.balance(terms.buyer);
     rig.vm.loseConfirmation(true);
     await assert.rejects(
       host.service.exchange(
@@ -109,7 +107,10 @@ void test(
         signal,
       ),
     );
-    assert.equal(await rig.vm.balance(terms.buyer), 99000n);
+    assert.equal(
+      await rig.vm.balance(terms.buyer),
+      initialBalance - BigInt(terms.depositAtomic),
+    );
     await assert.rejects(
       host.service.exchange(
         request(BATCH_METHODS.PREPARE, {

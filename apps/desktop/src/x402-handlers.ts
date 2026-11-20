@@ -1,9 +1,12 @@
+import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
+
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
-import { DesktopBuyerFailure } from './buyer-error';
+import { BuyerSessionRequired, DesktopBuyerFailure } from './buyer-error';
 import type { X402Budget } from './x402-budget';
 import type { X402Client } from './x402-client';
 import {
   effectiveX402Policy,
+  PaidSellerLimitError,
   X402_ACTION,
   x402Explorer,
   x402Id,
@@ -16,6 +19,8 @@ type Sender = { sender: unknown; senderFrame: unknown };
 function actionError(action: unknown, blocked: boolean, error: unknown) {
   if (blocked)
     return 'Spending status needs review. Further messages are blocked.';
+  if (error instanceof PaidSellerLimitError) return error.message;
+  if (error instanceof BuyerSessionRequired) return error.message;
   if (action === X402_ACTION.CONNECT || action === X402_ACTION.START_BUYER)
     return 'Unable to start the local buyer. Check its configuration or try again.';
   if (action === X402_ACTION.AUTHORIZE)
@@ -63,6 +68,7 @@ function sendResponse(
   id: string,
   prompt: string,
   progress?: (value: X402Progress) => void,
+  choice?: BuyerSellerChoice,
 ) {
   return client.send(
     id,
@@ -76,6 +82,7 @@ function sendResponse(
           progress({ id, text });
         }
       : undefined,
+    choice,
   );
 }
 function buyerAction(owner: Owner, event: Sender, args: readonly unknown[]) {
@@ -91,6 +98,29 @@ function buyerAction(owner: Owner, event: Sender, args: readonly unknown[]) {
     throw new Error('Unsupported buyer request');
   return args[0] as Record<string, unknown>;
 }
+function selectedOffer(
+  policy: ReturnType<X402Client['policy']>,
+  input: Record<string, unknown>,
+  resolveOffer?: (id: string) => BuyerSellerChoice | undefined,
+) {
+  if (!input.offerId && policy && policy.maxAtomic !== '0')
+    throw new PaidSellerLimitError(
+      'Select a seller and confirm its prices before sending.',
+    );
+  const selected =
+    typeof input.offerId === 'string'
+      ? resolveOffer?.(input.offerId)
+      : undefined;
+  if ('offerId' in input && !selected)
+    throw new PaidSellerLimitError(
+      'Refresh the model list and select the seller again. This listing has expired.',
+    );
+  if (selected && (!input.policyId || input.policyId !== policy?.policyId))
+    throw new PaidSellerLimitError(
+      'Select the seller again to confirm the current channel terms.',
+    );
+  return selected;
+}
 export function createX402Handlers(
   client: X402Client,
   budget: X402Budget,
@@ -101,6 +131,7 @@ export function createX402Handlers(
     throw new Error('Clipboard unavailable');
   },
   progress?: (value: X402Progress) => void,
+  resolveOffer?: (id: string) => BuyerSellerChoice | undefined,
 ) {
   const summary = async () => ({
     summary: await budget.summary(),
@@ -133,6 +164,7 @@ export function createX402Handlers(
         x402Id(input.id) &&
         typeof input.prompt === 'string'
       ) {
+        const selected = selectedOffer(client.policy(), input, resolveOffer);
         const reply = await sendResponse(
           client,
           owner,
@@ -140,6 +172,7 @@ export function createX402Handlers(
           input.id,
           input.prompt,
           progress,
+          selected,
         );
         return {
           ...(await summary()),

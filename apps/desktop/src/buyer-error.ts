@@ -1,17 +1,46 @@
 // Static desktop explanations for validated buyer failures; remote text is never displayed.
 // Presentation does not change retry decisions, budget reservations or payment uncertainty.
+import { BUYER_DEPOSIT_MINIMUM_HINT } from '@gyblos/config/batch-session';
 import {
+  BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
   type SellerSelectionCode,
 } from '@gyblos/core/constants';
-import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  BUYER_SIDECAR,
+  type BuyerApiPolicy,
+} from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_STOP_REASONS,
   type FreeExecutionCode,
 } from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
-type BuyerCode = FreeExecutionCode | SellerSelectionCode;
+export class BuyerSessionRequired extends Error {
+  constructor(
+    reason:
+      | typeof BUYER_SIDECAR.SESSION_REQUIRED
+      | typeof BUYER_SIDECAR.DEPOSIT_MINIMUM = BUYER_SIDECAR.SESSION_REQUIRED,
+  ) {
+    super(
+      reason === BUYER_SIDECAR.DEPOSIT_MINIMUM
+        ? BUYER_DEPOSIT_MINIMUM_HINT
+        : 'Paid settings need a payment channel. Add session.depositAtomic and session.lifetimeMs to buyer/selection.json before starting the buyer.',
+    );
+  }
+}
+
+type BuyerCode =
+  | typeof BUYER_ROUTING_CODES.BUSY
+  | typeof PAID_EXECUTION_CODES.PEER
+  | FreeExecutionCode
+  | SellerSelectionCode
+  | typeof SESSION_CODES.BINDING
+  | typeof SESSION_CODES.UNVERIFIED
+  | typeof SESSION_CODES.LIMIT;
 export class DesktopBuyerFailure extends Error {
   constructor(
     readonly code: BuyerCode,
@@ -22,6 +51,14 @@ export class DesktopBuyerFailure extends Error {
   }
 }
 function explanation(code: BuyerCode, reason: unknown, free: boolean) {
+  if (code === BUYER_ROUTING_CODES.BUSY)
+    return 'The selected seller or channel is busy. If your buyer uses one channel, settle the existing channel before switching sellers.';
+  if (code === SESSION_CODES.BINDING)
+    return 'The selected seller or terms changed. Refresh the listing before sending.';
+  if (code === SESSION_CODES.UNVERIFIED)
+    return 'The local buyer could not verify this seller. Review the listing and buyer settings.';
+  if (code === SESSION_CODES.LIMIT)
+    return 'Review the per-request maximum and channel deposit limits in the buyer profile before sending.';
   if (code === SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET)
     return free
       ? 'No free seller is available right now. Wait or choose another model.'
@@ -67,7 +104,19 @@ export function desktopBuyerFailure(
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+  if (
+    row.code === PAID_EXECUTION_CODES.PEER &&
+    row[BUYER_API.NEVER_SENT_FIELD] === true
+  )
+    return new DesktopBuyerFailure(
+      PAID_EXECUTION_CODES.PEER,
+      'The selected seller could not open a payment channel. Choose another seller.',
+    );
   const code = [
+    BUYER_ROUTING_CODES.BUSY,
+    SESSION_CODES.BINDING,
+    SESSION_CODES.UNVERIFIED,
+    SESSION_CODES.LIMIT,
     ...Object.values(FREE_EXECUTION_CODES),
     ...Object.values(SELLER_SELECTION_CODES),
   ].find((code) => code === row.code);

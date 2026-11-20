@@ -7,16 +7,14 @@ import type { ModelSelection } from '@gyblos/protocol/control-types';
 import { modelList } from './chat-api';
 import { replyJson } from './chat-errors';
 import { FREE_BUYER } from './constants';
+import type { RouteContext } from './free-context';
 import { endpointRoutes, type ModelRoute } from './model-routes';
 
 export interface ModelListSettings {
   selection: ModelSelection;
   maxTokens: number;
   models?: readonly ModelRoute[];
-  contextTokens?: (
-    route: ModelRoute,
-    signal: AbortSignal,
-  ) => Promise<number | undefined>;
+  contextTokens?: RouteContext<ModelRoute>;
 }
 export async function listModels(
   response: ServerResponse,
@@ -24,12 +22,14 @@ export async function listModels(
 ) {
   const routes = endpointRoutes(settings);
   const contexts = new Map<string, number>();
-  if (settings.contextTokens) {
+  // The buyer's reader already caches and bounds its reads; this deadline also covers any other reader.
+  const { contextTokens } = settings;
+  if (contextTokens) {
     const signal = AbortSignal.timeout(FREE_BUYER.modelContextMs);
     const found = await Promise.all(
       routes.map((route) =>
         Promise.race([
-          settings.contextTokens!(route, signal).catch(() => undefined),
+          contextTokens(route, signal).catch(() => undefined),
           new Promise<undefined>((resolve) =>
             signal.addEventListener('abort', () => resolve(undefined), {
               once: true,

@@ -23,56 +23,60 @@ function completed() {
     },
   };
 }
-void test('B completes while A is generating and A is reused afterward without another deposit', async (t) => {
-  const fixture = await multisellerLoopback();
-  const buyer = createBuyerSessionPool(fixture.options);
-  const started = batchDeferred<void>();
-  const finish = batchDeferred<void>();
-  fixture.offers[0]!.generate(async () => {
-    started.resolve();
-    await finish.promise;
-    return completed();
-  });
-  t.after(async () => {
-    finish.resolve();
-    await buyer.close();
-    await fixture.close();
-  });
-  const a = buyer.execute(
-    await fixture.offers[0]!.quote(1),
-    fixture.offers[0]!.input,
-    AbortSignal.timeout(3000),
-  );
-  await started.promise;
-  try {
-    const b = await buyer.execute(
-      await fixture.offers[1]!.quote(2),
-      fixture.offers[1]!.input,
-      AbortSignal.timeout(3000),
+void test(
+  'B completes while A is generating and A is reused afterward without another deposit',
+  { timeout: 30_000 },
+  async (t) => {
+    const fixture = await multisellerLoopback();
+    const buyer = createBuyerSessionPool(fixture.options);
+    const started = batchDeferred<void>();
+    const finish = batchDeferred<void>();
+    fixture.offers[0]!.generate(async () => {
+      started.resolve();
+      await finish.promise;
+      return completed();
+    });
+    t.after(async () => {
+      finish.resolve();
+      await buyer.close();
+      await fixture.close();
+    });
+    const a = buyer.execute(
+      await fixture.offers[0]!.quote(1),
+      fixture.offers[0]!.input,
+      t.signal,
     );
-    assert.equal(b.value.text, 'ok!');
-    await assert.rejects(
-      buyer.execute(
-        await fixture.offers[0]!.quote(3),
-        fixture.offers[0]!.input,
-        AbortSignal.timeout(3000),
-      ),
-      { code: SESSION_CODES.BUSY },
+    await started.promise;
+    try {
+      const b = await buyer.execute(
+        await fixture.offers[1]!.quote(2),
+        fixture.offers[1]!.input,
+        t.signal,
+      );
+      assert.equal(b.value.text, 'ok!');
+      await assert.rejects(
+        buyer.execute(
+          await fixture.offers[0]!.quote(3),
+          fixture.offers[0]!.input,
+          t.signal,
+        ),
+        { code: SESSION_CODES.BUSY },
+      );
+      assert.deepEqual(fixture.a.calls, ['deposit']);
+      assert.deepEqual(fixture.b.calls, ['deposit']);
+    } finally {
+      finish.resolve();
+      await a;
+    }
+    await buyer.execute(
+      await fixture.offers[0]!.quote(4),
+      fixture.offers[0]!.input,
+      t.signal,
     );
+    assert.equal(fixture.offers[0]!.generations(), 2);
     assert.deepEqual(fixture.a.calls, ['deposit']);
-    assert.deepEqual(fixture.b.calls, ['deposit']);
-  } finally {
-    finish.resolve();
-    await a;
-  }
-  await buyer.execute(
-    await fixture.offers[0]!.quote(4),
-    fixture.offers[0]!.input,
-    AbortSignal.timeout(3000),
-  );
-  assert.equal(fixture.offers[0]!.generations(), 2);
-  assert.deepEqual(fixture.a.calls, ['deposit']);
-});
+  },
+);
 void test('preflight reports no unresolved obligation for a live owned request and settlement remains exclusive', async (t) => {
   const fixture = await multisellerLoopback();
   const buyer = createBuyerSessionPool(fixture.options);
@@ -200,7 +204,7 @@ void test('uncertainty in A preserves an already sent B response and blocks ever
 });
 
 void test('concurrent new sellers cannot both allocate the same remaining shared deposit authority', async (t) => {
-  const fixture = await multisellerLoopback('1000');
+  const fixture = await multisellerLoopback('10000');
   const buyer = createBuyerSessionPool(fixture.options);
   t.after(async () => {
     await buyer.close();

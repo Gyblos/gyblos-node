@@ -39,7 +39,7 @@ function childSource(options: ShutdownProbeOptions) {
     'data:text/javascript,' +
     encodeURIComponent('export class RelayConfigurationError extends Error {}');
   const resolver = `
-    export function resolve(specifier, context, next) {
+    resolve(specifier, context, next) {
       if (specifier === '@gyblos/node' ||
           (specifier === './free-startup' && context.parentURL?.endsWith('/apps/buyer/src/free-main.ts')))
         return { url: ${JSON.stringify(hostUrl)}, shortCircuit: true };
@@ -48,7 +48,6 @@ function childSource(options: ShutdownProbeOptions) {
       return next(specifier, context);
     }
   `;
-  const resolverUrl = 'data:text/javascript,' + encodeURIComponent(resolver);
   const entry =
     options.entry === SHUTDOWN_PROBE_ENTRIES.SELLER
       ? '@gyblos/node-app/daemon'
@@ -65,8 +64,8 @@ function childSource(options: ShutdownProbeOptions) {
       })();
     `
       : `
-      const { register } = await import('node:module');
-      register(${JSON.stringify(resolverUrl)});
+      const { registerHooks } = await import('node:module');
+      registerHooks({${resolver}});
       const { main } = await import(${JSON.stringify(entry)});
       const task = main();
     `;

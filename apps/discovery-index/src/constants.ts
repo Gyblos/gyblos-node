@@ -49,6 +49,7 @@ export const INDEX_ROUTES = {
   HEALTH: '/v1/health',
   REGISTRATIONS: '/v1/registrations',
   UPTIME: '/v1/uptime',
+  NETWORK: '/v1/network',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
@@ -56,6 +57,7 @@ export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.MODELS,
   INDEX_ROUTES.HEALTH,
   INDEX_ROUTES.UPTIME,
+  INDEX_ROUTES.NETWORK,
 ]);
 
 export const INDEX_HEADERS = {
@@ -249,3 +251,19 @@ export const UPTIME = {
   // Ratios are rounded to four decimals.
   ratioScale: 10_000,
 } as const;
+
+// GET /v1/network (network.ts): every seller the index knows and whether it is online now.
+export const NETWORK = {
+  // Rows read per source (registrations, sightings, stored catalogs); the tracked-NodeId cap.
+  maxNodes: DISCOVERY_INDEX_LIMITS.maxNodes,
+  // Model rows read for the sellers online now (at most 64 per catalog).
+  maxModelRows: 20_000,
+  // Bytes reserved for the counts and framing around the node entries.
+  framingBytes: 256,
+} as const;
+export const NETWORK_STATES = {
+  ONLINE: 'online',
+  OFFLINE: 'offline',
+  UNPUBLISHED: 'unpublished',
+} as const;
+export type NetworkState = (typeof NETWORK_STATES)[keyof typeof NETWORK_STATES];

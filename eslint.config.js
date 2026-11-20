@@ -26,6 +26,7 @@ export default [
       'apps/docs/.source/**',
       'apps/docs/next-env.d.ts',
       'apps/explorer/.next/**',
+      'apps/explorer/public/r/**',
       'apps/explorer/.open-next/**',
       'apps/explorer/.wrangler/**',
       'apps/explorer/next-env.d.ts',

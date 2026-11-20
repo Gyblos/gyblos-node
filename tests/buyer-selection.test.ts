@@ -4,84 +4,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
-import { selectBuyerQuote } from '@gyblos/buyer/selection';
+import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import { parseBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
-import { createProxySelection } from '@gyblos/buyer/selection-proxy';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
 import { selectionFixture } from './support/buyer-selection';
 
-void test('loopback selection returns trusted v1 eligibility and binds signed follow-up without requoting', async () => {
-  const run = await selectionFixture();
-  try {
-    let selections = 0;
-    const router = createProxySelection(
-      async (signal) => {
-        selections++;
-        return selectBuyerQuote(run.config, run.dependencies, signal);
-      },
-      run.config.request.maxTokens,
-      run.context.now,
-    );
-    const body = Buffer.from(
-      JSON.stringify({ requestId: 'one', prompt: 'synthetic', maxTokens: 100 }),
-    );
-    assert.deepEqual(
-      await router.admit(body, false, new AbortController().signal),
-      { ok: true },
-    );
-    assert.deepEqual(
-      await router.admit(body, true, new AbortController().signal),
-      { ok: true },
-    );
-    assert.equal(selections, 1);
-    assert.equal(
-      (await router.admit(body, true, new AbortController().signal)).ok,
-      false,
-    );
-    assert.equal(selections, 1);
-    assert.equal(run.wire.queries, 3);
-  } finally {
-    await run.wire.close();
-  }
-});
-void test('loopback non-trusted seller yields a typed quote-only result and cannot authorize', async () => {
-  const run = await selectionFixture();
-  try {
-    const result = await selectBuyerQuote(run.config, {
-      ...run.dependencies,
-      trusted: { ...run.catalog, owner: '11111111111111111111111111111111' },
-    });
-    assert.equal(result.ok, false);
-    if (result.ok) assert.fail();
-    assert.equal(result.code, BUYER_SELECTION_CODES.QUOTE_ONLY);
-    let quotes = 0;
-    const router = createProxySelection(
-      async () => {
-        quotes++;
-        return result;
-      },
-      100,
-      run.context.now,
-    );
-    const body = Buffer.from(
-      JSON.stringify({ requestId: 'stop', maxTokens: 100 }),
-    );
-    assert.equal(
-      (await router.admit(body, false, new AbortController().signal)).ok,
-      false,
-    );
-    assert.equal(
-      (await router.admit(body, true, new AbortController().signal)).ok,
-      false,
-    );
-    assert.equal(quotes, 1);
-  } finally {
-    await run.wire.close();
-  }
-});
 void test('pinned seller cooldown is returned with cooldownUntil for the UI', async () => {
   const run = await selectionFixture();
   try {
@@ -96,7 +26,7 @@ void test('pinned seller cooldown is returned with cooldownUntil for the UI', as
       observedWaitMs: null,
     });
     assert.deepEqual(
-      await selectBuyerQuote(
+      await selectVerifiedBuyerQuote(
         { ...run.config, pinnedNodeId: run.catalog.nodeId },
         run.dependencies,
       ),
@@ -129,7 +59,7 @@ void test('withdrawal must reference the exact verified catalog before selection
     );
     run.config.sellers[0]!.withdrawal = withdrawal;
     assert.equal(
-      (await selectBuyerQuote(run.config, run.dependencies)).ok,
+      (await selectVerifiedBuyerQuote(run.config, run.dependencies)).ok,
       false,
     );
     assert.equal(run.wire.queries, 2);
@@ -154,7 +84,7 @@ void test('valid withdrawal tombstones the catalog; invalid static config is rej
       run.nodeSigner,
     );
     assert.equal(
-      (await selectBuyerQuote(run.config, run.dependencies)).ok,
+      (await selectVerifiedBuyerQuote(run.config, run.dependencies)).ok,
       false,
     );
     assert.throws(
@@ -172,7 +102,7 @@ void test('a slow snapshot cannot discard a healthy seller or consume its quote 
   try {
     const healthy = run.config.sellers[0]!;
     const slow = { ...healthy, nodeId: '3'.repeat(64) };
-    const result = await selectBuyerQuote(
+    const result = await selectVerifiedBuyerQuote(
       { ...run.config, sellers: [healthy, slow] },
       {
         ...run.dependencies,
@@ -220,7 +150,7 @@ void test('a buffered downgrade that expires while exact offers are pending cann
     const refused = new Promise<void>((resolve) => {
       refuse = resolve;
     });
-    const result = await selectBuyerQuote(
+    const result = await selectVerifiedBuyerQuote(
       {
         request: {
           ...exact.config.request,

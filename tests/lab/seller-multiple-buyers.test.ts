@@ -11,9 +11,7 @@ import {
   BATCH_METHODS,
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
-import { WINDOWS } from '@gyblos/runtime/private-mode';
 
 import { batchOfferFixture } from '../support/batch-iroh-offer';
 import { batchLoopback } from '../support/batch-loopback';
@@ -21,17 +19,13 @@ import { sellerRegistryRig } from '../support/seller-session-registry';
 
 void test(
   'two pilot buyers execute on one seller without mixing deposits, approvals or authenticated peers',
-  {
-    skip: WINDOWS
-      ? 'Reusable financial startup requires payment subtree ACL validation on Windows'
-      : false,
-  },
+  {},
   async (t) => {
     t.mock.method(Date, 'now', () => 1_800_000_000_000);
     t.mock.method(globalThis, 'fetch', async () =>
       assert.fail('External RPC forbidden'),
     );
-    const rig = await sellerRegistryRig(2);
+    const rig = await sellerRegistryRig(2, { depositAtomic: '10000' });
     t.after(rig.dispose);
     const registry = await rig.open();
     t.after(registry.dispose);
@@ -41,7 +35,6 @@ void test(
       [a, b].map((row) => batchOfferFixture(row.terms, rig.vm.seller, rig.now)),
     );
     const seller = await startSellerSessionHost({
-      buyerNodeIds: [a.terms.buyerNodeId, b.terms.buyerNodeId],
       registry,
       description: a.terms,
       owner: a.terms.owner,
@@ -64,7 +57,7 @@ void test(
         endpoint: wire.endpoint,
         destination: () => wire.destination,
         policy: {
-          depositAtomic: '1000',
+          depositAtomic: '10000',
           lifetimeMs: 3_600_000,
           withdrawDelaySeconds: 900,
         },
@@ -149,7 +142,7 @@ void test(
         rig.buyers[2]!.terms.buyerNodeId,
         signal,
       ),
-      { code: PAID_EXECUTION_CODES.PEER },
+      { code: SESSION_CODES.UNAVAILABLE },
     );
     assert.equal(rig.vm.sends(), baseline + 2);
     assert.equal((await clients[0]!.settle(signal))?.chargedAtomic, '40');

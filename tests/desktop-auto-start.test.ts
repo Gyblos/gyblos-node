@@ -47,6 +47,11 @@ void test('desktop creates private zero-price open settings once, preserving the
     assert.equal(config.discovery?.open, true);
     assert.ok(config.identity);
     assert.equal(config.request.maxAtomic, '0');
+    assert.deepEqual(config.session, {
+      depositAtomic: '1000000',
+      lifetimeMs: 3600000,
+      withdrawDelaySeconds: 900,
+    });
     assert.deepEqual(config.request.priceCeilings, {
       inputAtomicPerMtok: '0',
       outputAtomicPerMtok: '0',

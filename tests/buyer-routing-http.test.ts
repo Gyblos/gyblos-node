@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 import { FREE_BUYER } from '@gyblos/buyer/constants';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
-import { classifyPaidError } from '@gyblos/buyer/paid-http';
+import { classifyPaidError } from '@gyblos/buyer/session-errors';
 import { HTTP_STATUS } from '@gyblos/config';
 import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';

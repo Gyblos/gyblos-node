@@ -18,7 +18,8 @@ void test('the automatic runtime forwards open zero-price selection to free exec
   try {
     const fixture = await freeSellerFixture();
     const request = await fixture.request();
-    const config = buildBuyerInit({
+    // Older free-only profiles have no channel policy.
+    const { session: _session, ...config } = buildBuyerInit({
       ...answers(),
       sellerNodeId: '',
       sellerOwner: '',
@@ -36,16 +37,16 @@ void test('the automatic runtime forwards open zero-price selection to free exec
       const sources={
         './free-selection': "export async function selectWinner(prepared,options,excluded,signal,request,route){globalThis.probe.selections.push({request,route});return globalThis.winner}",
         './free-execution': "export async function executeSelectedBuyerFree(){globalThis.probe.executions++;return {text:'synthetic',usage:{inputTokens:1,outputTokens:1},finishReason:'${ENGINE_DONE_REASONS.STOP}'}}",
-        './paid-startup': "export function endpointToken(){return undefined} export function checkPaidSellerRequest(){throw Error('unexpected paid check')} export function payments(){globalThis.probe.payments++;throw Error('unexpected payments')} export function tokenizer(){throw Error('unexpected tokenizer')}",
+        './session-requirements': "export function endpointToken(){return undefined} export function checkPaidSellerRequest(){throw Error('unexpected paid check')} export function payments(){globalThis.probe.payments++;throw Error('unexpected payments')} export function tokenizer(){throw Error('unexpected tokenizer')}",
         '@gyblos/node/buyer-chain': "export async function buyerPaymentsUnresolved(){return false} export function buyerChainPayments(){globalThis.probe.payments++;throw Error('unexpected chain')}"
       };
       registerHooks({resolve(name,context,next){
-        const source=context.parentURL===${JSON.stringify(target)}?sources[name]:undefined;
+        const source=(context.parentURL===${JSON.stringify(target)} || context.parentURL===new URL('./session-startup.ts',${JSON.stringify(target)}).href)?sources[name]:undefined;
         return source?{url:'data:text/javascript,'+encodeURIComponent(source),shortCircuit:true}:next(name,context);
       }});
       const {quoteBuyerExecution}=await import('@gyblos/buyer/quote-startup');
       const runtime=await quoteBuyerExecution({})({
-        prepared:{config:${JSON.stringify(config)}},role:${JSON.stringify(role)},
+        prepared:{config:${JSON.stringify(config)},identity:{}},role:${JSON.stringify(role)},
         dependencies:{},endpoint:{},relayOnly:false,
       });
       try {

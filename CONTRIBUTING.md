@@ -193,5 +193,7 @@ right to Gyblos or third-party trademarks beyond its stated terms.
 | Desktop wallet and backups | macOS, Linux and Windows                                          | A manual workflow (`desktop-platforms.yml`); it uses simulated OS encryption, so it does not prove keystore protection. |
 | Desktop packages           | macOS arm64, Windows x64, Linux x64 (`.deb`, `.tar.gz`); unsigned | `desktop-packages.yml`, run by hand, on packaging changes and for each release.                                         |
 
+For ordinary code PRs to `develop`, Windows tests run from source. Windows- or distribution-sensitive changes also build and test the release archive, npm package, scheduled task and PowerShell installer. All PRs to `main` and pushes to either protected branch run the full suite. The path and platform-change rules live in [the CI selector](.github/scripts/ci-changes.sh).
+
 A configured workflow is not a successful run: report the revision and
 platform you tested. For the desktop app, see [docs/desktop.md](docs/desktop.md).

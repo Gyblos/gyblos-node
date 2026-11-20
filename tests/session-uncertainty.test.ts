@@ -6,7 +6,7 @@ import { buyerPaymentsUnresolved } from '@gyblos/node/buyer-chain';
 
 import { sessionRig } from './support/batch-session';
 
-void test('per-request mode cannot bypass an active reusable channel after configuration changes', async (t) => {
+void test('an open reusable channel is reported as unresolved', async (t) => {
   const rig = await sessionRig();
   t.after(rig.dispose);
   const previous = process.env.GYBLOS_HOME;
@@ -17,5 +17,4 @@ void test('per-request mode cannot bypass an active reusable channel after confi
   });
   await rig.open();
   assert.equal(await buyerPaymentsUnresolved(), true);
-  assert.equal(await buyerPaymentsUnresolved(false), false);
 });

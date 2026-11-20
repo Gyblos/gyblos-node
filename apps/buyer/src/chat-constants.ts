@@ -321,6 +321,8 @@ export const FREE_CHAT_DETAILS = {
   serverTools:
     'server tools (web search, code execution and others run by a provider) are not supported',
   noToolSeller: 'no seller offers tools for this model right now',
+  noFastSeller:
+    'no seller can read a request this size in time right now; shorten the conversation or try again later',
   paidTools: 'tools are served on free offers only for now',
   stop: `stop must be a non-empty string or a list of at most ${CHAT_STOP.maxSequences} of them, each at most ${CHAT_STOP.maxBytes} bytes`,
   models: `models must be a list of at most ${OPENROUTER.maxFallbacks} model names`,

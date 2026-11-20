@@ -1,6 +1,15 @@
 // Visual-fixture settings only; never operator configuration, credentials or payment permission.
 export const PREVIEW = {
   platform: 'darwin',
+  nodeStartupMs: 3000,
+  apiOnlyEvery: 3,
+  chatBaseTokens: 182,
+  chatTokenStep: 11,
+  apiBaseTokens: 368,
+  apiTokenStep: 23,
+  halfYearMonths: 6,
+  weekDays: 7,
+  percentScale: 100,
   dayMs: 86400000,
   minuteMs: 60000,
   halfHourMs: 1800000,

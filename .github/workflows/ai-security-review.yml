@@ -25,6 +25,7 @@ jobs:
       head: ${{ steps.context.outputs.head }}
       base: ${{ steps.context.outputs.base }}
       merge: ${{ steps.context.outputs.merge }}
+      failed_step: ${{ steps.failure.outputs.stage }}
       runner: ${{ github.sha }}
     steps:
       - name: Bind the request to a current same-repository PR into develop or main
@@ -40,7 +41,25 @@ jobs:
           const reference = request.pull_requests?.[0];
           if (!reference || !Number.isSafeInteger(reference.number)) process.exit(0);
           const repo = process.env.GITHUB_REPOSITORY;
-          const pr = JSON.parse(execFileSync('gh', ['api', 'repos/' + repo + '/pulls/' + reference.number], {encoding: 'utf8'}));
+          const api = (path) => JSON.parse(execFileSync('gh', ['api', path], {encoding: 'utf8'}));
+          // GitHub rebuilds the test merge commit after the base branch moves; wait briefly until it
+          // joins the current base and head, so the snapshot check below does not fail on a stale one.
+          let pr;
+          for (let attempt = 0; attempt < 6; attempt++) {
+            if (attempt) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10_000);
+            try {
+              pr = api('repos/' + repo + '/pulls/' + reference.number);
+              if (pr.state !== 'open' || request.head_sha !== pr.head.sha) break;
+              if (!/^[0-9a-f]{40}$/.test(pr.merge_commit_sha ?? '')) continue;
+              const parents = api('repos/' + repo + '/commits/' + pr.merge_commit_sha).parents;
+              // Only a definite mismatch waits; the snapshot step below still verifies the checked-out commit.
+              if (!Array.isArray(parents) || (parents.length === 2 && parents[0]?.sha === pr.base.sha &&
+                  parents[1]?.sha === pr.head.sha)) break;
+            } catch {
+              // GitHub may not serve a test merge commit it is still building; try again.
+            }
+          }
+          if (!pr) process.exit(0);
           if (pr.state !== 'open' || !['develop', 'main'].includes(pr.base.ref) ||
               pr.head.repo?.full_name !== repo || request.head_sha !== pr.head.sha) process.exit(0);
           if (!/^[0-9a-f]{40}$/.test(pr.merge_commit_sha) || !/^[0-9a-f]{40}$/.test(pr.base.sha)) process.exit(0);
@@ -48,6 +67,7 @@ jobs:
             'pr=' + reference.number + '\nhead=' + pr.head.sha + '\nmerge=' + pr.merge_commit_sha + '\nbase=' + pr.base.sha + '\n');
           NODE
       - name: Checkout trusted runner
+        id: trusted
         if: steps.context.outputs.pr
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,6 +75,7 @@ jobs:
           path: runner
           persist-credentials: false
       - name: Checkout immutable merge snapshot as data
+        id: source
         if: steps.context.outputs.pr
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,10 +86,12 @@ jobs:
           submodules: false
           lfs: false
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        id: pnpm
         if: steps.context.outputs.pr
         with:
           package_json_file: runner/package.json
       - name: Verify the merge snapshot parents
+        id: snapshot
         if: steps.context.outputs.pr
         env:
           REVIEW_MERGE: ${{ steps.context.outputs.merge }}
@@ -83,16 +106,19 @@ jobs:
             throw new Error('Merge snapshot does not match the reviewed base and head.');
           NODE
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        id: node
         if: steps.context.outputs.pr
         with:
           node-version: 24.22.1
       - name: Install trusted tooling without lifecycle scripts
+        id: install
         if: steps.context.outputs.pr
         working-directory: runner
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           npm ci --prefix tooling/security-review/runtime --ignore-scripts --no-audit --no-fund
       - name: Run advisory source review
+        id: analysis
         if: steps.context.outputs.pr
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -101,18 +127,35 @@ jobs:
           REVIEW_HEAD: ${{ steps.context.outputs.merge }}
           REVIEW_BASE: ${{ steps.context.outputs.base }}
         run: |
-          test -n "$PI_MODEL"
-          test -n "$OPENAI_API_KEY"
+          if [ -z "$PI_MODEL" ]; then echo "reason=model" >> "$GITHUB_OUTPUT"; exit 1; fi
+          if [ -z "$OPENAI_API_KEY" ]; then echo "reason=key" >> "$GITHUB_OUTPUT"; exit 1; fi
           pnpm --dir runner security-review run pr \
             --root "$GITHUB_WORKSPACE/source" --source-ref "$REVIEW_HEAD" --base-ref "$REVIEW_BASE" \
             --output "$RUNNER_TEMP/ai-review" --max-calls 300
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: upload
         if: always() && steps.context.outputs.pr
         with:
           name: ai-review-${{ github.run_id }}
           path: ${{ runner.temp }}/ai-review
           if-no-files-found: error
           retention-days: 7
+
+      - name: Identify the first failed review step
+        id: failure
+        if: failure()
+        env:
+          FAILED_STEP: >-
+            ${{ steps.trusted.outcome == 'failure' && 'trusted' ||
+                steps.source.outcome == 'failure' && 'source' ||
+                steps.pnpm.outcome == 'failure' && 'pnpm' ||
+                steps.snapshot.outcome == 'failure' && 'snapshot' ||
+                steps.node.outcome == 'failure' && 'node' ||
+                steps.install.outcome == 'failure' && 'install' ||
+                steps.analysis.outputs.reason ||
+                steps.analysis.outcome == 'failure' && 'analysis' ||
+                steps.upload.outcome == 'failure' && 'upload' || 'unknown' }}
+        run: echo "stage=$FAILED_STEP" >> "$GITHUB_OUTPUT"
 
   publish:
     concurrency:
@@ -127,18 +170,22 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - id: download
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: needs.review.result == 'success'
         with:
           name: ai-review-${{ github.run_id }}
           path: review-artifacts
       - name: Publish a validated fixed summary for the current PR head
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.review.outputs.pr }}
           REVIEW_HEAD: ${{ needs.review.outputs.head }}
           REVIEW_BASE: ${{ needs.review.outputs.base }}
           REVIEW_MERGE: ${{ needs.review.outputs.merge }}
+          FAILED_STEP: ${{ needs.review.outputs.failed_step }}
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
           REVIEW_JOB_RESULT: ${{ needs.review.result }}
         run: |
           node --input-type=module <<'NODE'
@@ -152,14 +199,61 @@ jobs:
           if (pr.state !== 'open' || !['develop', 'main'].includes(pr.base.ref) ||
               pr.head.repo?.full_name !== repo || pr.head.sha !== process.env.REVIEW_HEAD ||
               pr.base.sha !== process.env.REVIEW_BASE || pr.merge_commit_sha !== process.env.REVIEW_MERGE) process.exit(0);
-          let status = 'error';
-          if (process.env.REVIEW_JOB_RESULT === 'success') {
-            const file = 'review-artifacts/status.txt';
-            const info = fs.lstatSync(file);
-            if (!info.isFile() || info.isSymbolicLink() || info.size > 32) throw new Error('Invalid review status.');
-            status = fs.readFileSync(file, 'utf8').trim();
+          const reasons = new Map(Object.entries({
+            insufficient_quota: 'OpenAI rejected the request because its quota was exhausted. Further Pi calls stopped.',
+            invalid_api_key: 'OpenAI authentication failed. Further Pi calls stopped.',
+            rate_limited: 'OpenAI rate-limited a request.',
+            model_unavailable: 'OpenAI does not offer the configured model to this key. Further Pi calls stopped.',
+            context_limit: 'A review input exceeded the model context window.',
+            request_rejected: 'OpenAI rejected the request (HTTP 4xx).',
+            provider_unavailable: 'OpenAI returned a server error.',
+            pi_failed: 'Pi execution failed without a recognized provider cause.',
+            pi_timeout: 'Pi execution exceeded the time limit.',
+            pi_output_limit: 'Pi output exceeded its limit.',
+            source_omitted: 'Source preparation omitted one or more files. See the coverage ledger.',
+            invalid_review_response: 'Review response failed format or reviewer validation.',
+            invalid_coverage: 'Review evidence or claimed path coverage failed validation.',
+            invalid_verification: 'Independent verification failed response or evidence validation.',
+            invocation_budget: 'Scheduling reached the invocation budget.',
+          }));
+          const phases = new Map(Object.entries({review:'Source review', verify1:'First independent verification', verify2:'Second independent verification', schedule:'Scheduling'}));
+          const stages = new Map(Object.entries({
+            trusted: 'Trusted runner checkout failed.', source: 'PR snapshot checkout failed.',
+            pnpm: 'pnpm setup failed.', snapshot: 'Merge snapshot parent verification failed.',
+            node: 'Node setup failed.', install: 'Trusted dependency installation failed.',
+            key: 'Configuration failed because the API key was missing.',
+            model: 'Configuration failed because the model was missing.',
+            analysis: 'The review command failed before producing a completed report.',
+            upload: 'Review artifact upload failed.',
+          }));
+          function readSmall(name, max) {
+            const path = 'review-artifacts/' + name;
+            const stat = fs.lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink() || stat.size > max) throw new Error('Invalid artifact.');
+            return fs.readFileSync(path, 'utf8').trim();
           }
-          if (!['clean','needs-validation','error','not-run'].includes(status)) throw new Error('Invalid review status.');
+          let status = 'error';
+          let detail = stages.get(process.env.FAILED_STEP) ?? 'The review job failed before completion.';
+          if (process.env.REVIEW_JOB_RESULT === 'success') {
+            if (process.env.DOWNLOAD_OUTCOME === 'failure') detail = 'Review artifact download failed.';
+            else try {
+              const value = readSmall('status.txt', 32);
+              if (!['clean','needs-validation','error','not-run'].includes(value)) throw new Error('Invalid status.');
+              const [calls,tokens,...codes] = readSmall('diagnostics.txt', 2048).split('\n');
+              if (!/^\d{1,10}$/.test(calls) || !(tokens === 'unknown' || /^\d{1,16}$/.test(tokens))) throw new Error('Invalid diagnostics.');
+              detail = [...new Set(codes)].map(line => {
+                const [phase,code,...extra] = line.split(' ');
+                if (extra.length || !phases.has(phase) || !reasons.has(code)) throw new Error('Invalid diagnostic code.');
+                return phases.get(phase) + ': ' + reasons.get(code);
+              }).join(' ');
+              status = value;
+              if (status === 'not-run') detail += ' No source review tasks completed.';
+              if (status === 'error' && !detail) detail = 'Final report validation failed.';
+              detail += ' Pi processes started: ' + calls + '. Reported tokens: ' + tokens + '.';
+            } catch {
+              detail = 'Publication failed to validate the review artifacts.';
+            }
+          }
           const label = 'ai-review:' + (status === 'not-run' ? 'error' : status);
           const labels = JSON.parse(api('repos/' + repo + '/issues/' + number + '/labels'));
           for (const item of labels) {
@@ -169,7 +263,7 @@ jobs:
           api('-X', 'POST', 'repos/' + repo + '/issues/' + number + '/labels', '-f', 'labels[]=' + label);
           const marker = '<!-- gyblos-ai-review:' + process.env.REVIEW_HEAD + ':' + process.env.REVIEW_BASE + ':' + process.env.REVIEW_MERGE + ' -->';
           const body = marker + '\nAI source review: **' + status + '** for ' + process.env.REVIEW_HEAD +
-            '. Advisory result; clean means no retained candidates in the reviewed source, not proof of security. ' +
+            '. ' + detail + '\nAdvisory result; clean means no retained candidates in the reviewed source, not proof of security. ' +
             'Coverage gaps and pending synthetic validation are recorded in this Actions run.\n' +
             '<!-- gyblos-ai-review:' + process.env.REVIEW_HEAD + ':' + process.env.REVIEW_BASE + ':' + process.env.REVIEW_MERGE + ' -->';
           api('-X', 'POST', 'repos/' + repo + '/issues/' + number + '/comments', '-f', 'body=' + body);

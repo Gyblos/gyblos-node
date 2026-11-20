@@ -13,6 +13,7 @@ import {
 } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import {
+  atomicToUsdc,
   parseNodeConfig,
   pricePerMtokToAtomicPerMtok,
   readNodeConfigFile,
@@ -445,4 +446,12 @@ void test('unknown key names that look like pasted tokens are redacted in issue 
     ).map((issue) => issue.path),
     ['node.max_tokens_per_request_2026'],
   );
+});
+
+void test('USDC display preserves the last atomic unit at large amounts', () => {
+  assert.equal(atomicToUsdc(0n), '0');
+  assert.equal(atomicToUsdc(1n), '0.000001');
+  assert.equal(atomicToUsdc(10000n), '0.01');
+  assert.equal(atomicToUsdc(1000000n), '1');
+  assert.equal(atomicToUsdc(18446744073709551615n), '18446744073709.551615');
 });

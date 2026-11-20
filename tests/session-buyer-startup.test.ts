@@ -15,6 +15,7 @@ import { sessionRig } from './support/batch-session';
 
 void test('shared startup manager executes three prompts with one capped deposit and approved cumulative totals', async (t) => {
   const rig = await sessionRig({
+    depositAtomic: '10000',
     buyerNodeId: '12'.repeat(32),
     sellerNodeId: '34'.repeat(32),
     treasury: PROTOCOL_FEE.treasury,
@@ -39,7 +40,7 @@ void test('shared startup manager executes three prompts with one capped deposit
   const manager = createBuyerSessionManager({
     ...wire,
     policy: {
-      depositAtomic: '1000',
+      depositAtomic: rig.terms.depositAtomic,
       lifetimeMs: 3600000,
       withdrawDelaySeconds: 900,
     },

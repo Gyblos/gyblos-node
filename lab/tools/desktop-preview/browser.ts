@@ -12,7 +12,7 @@ export function startPreview(examples: AgentExamples) {
   const target =
     MAIN_NAV.find((item) => item.label.toLowerCase() === screen)?.label ??
     (screen === UI_VIEW.SETTINGS.toLowerCase() ? UI_VIEW.SETTINGS : undefined);
-  if (!target) return;
+  if (!target || target === UI_VIEW.CHAT) return;
   const observer = new MutationObserver(() => {
     const button = Array.from(document.querySelectorAll('.ui-nav-row')).find(
       (item) => item.getAttribute('aria-label') === target,

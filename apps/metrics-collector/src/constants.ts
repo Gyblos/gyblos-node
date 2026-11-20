@@ -139,12 +139,16 @@ export const IPV6 = {
 // Aggregates (#351). Changing a formula bumps formulaVersion; rows are then rebuilt from raw.
 export const AGGREGATES = {
   // 2: origin and failure breakdowns (recomputes every day once).
-  formulaVersion: 2,
+  // 3: per-model observations (recomputes every day once).
+  formulaVersion: 3,
   // Upper bounds of the latency histogram buckets, in ms; one more bucket holds everything above.
   // Fixed so histograms can be summed across hours, days, sellers and models.
   latencyBucketsMs: [
     100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000, 60_000,
   ],
+  // Upper bounds of the engine speed histogram buckets, in output tokens per second of generation;
+  // one more bucket holds everything above.
+  tokensPerSecondBuckets: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000],
   // Raw rows changed up to this long before the previous scan are scanned again, so an upload
   // committed while a scan ran is never missed. Recomputing a day twice is harmless.
   scanOverlapMs: 900_000,
@@ -160,6 +164,7 @@ export const AGGREGATES = {
   defaultRangeDays: 30,
   dayMs: 86_400_000,
   hourMs: 3_600_000,
+  msPerSecond: 1_000,
 } as const;
 // Breakdown labels: a receipt no buyer upload carried, and unserved demand, which has no reason.
 export const BREAKDOWNS = {
@@ -300,12 +305,21 @@ export const CHAIN_INDEX = {
   maxTransactionVersion: 1,
   msPerSecond: 1000,
 } as const;
+// Keyed providers whose key serves every Solana cluster under a per-cluster host: a configured
+// mainnet host is read on its devnet host with the same key, since the index reads devnet. The
+// genesis check (chain/rpc.ts) still refuses any endpoint that does not answer for devnet.
+export const CHAIN_DEVNET_HOSTS: Readonly<Record<string, string>> = {
+  'mainnet.helius-rpc.com': 'devnet.helius-rpc.com',
+  'solana-mainnet.g.alchemy.com': 'solana-devnet.g.alchemy.com',
+};
 // Optional keyed Solana RPC URLs (secrets), tried in this order only when the public RPC (and then the
 // previous one) fails the run: for example Helius, then Alchemy.
 export const COLLECTOR_SOLANA_RPC_BINDINGS = [
   'COLLECTOR_SOLANA_RPC_URL',
   'COLLECTOR_SOLANA_RPC_FALLBACK_URL',
 ] as const;
+// Operator token (secret) for the RPC probe; while unset the probe route does not exist.
+export const COLLECTOR_ADMIN_TOKEN_BINDING = 'COLLECTOR_ADMIN_TOKEN';
 // Log code of a scheduled run whose chain read failed; followed by a static reason only.
 export const COLLECTOR_CHAIN_INDEX_FAILED = 'COLLECTOR_CHAIN_INDEX_FAILED';
 // Log code of every scheduled chain read: calls per endpoint, rate limits, work done and backlog.

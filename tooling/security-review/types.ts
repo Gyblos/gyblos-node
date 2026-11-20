@@ -1,5 +1,11 @@
 // Owns source-review contracts; model output is data and never execution evidence.
-import type { PiThinkingLevel, REVIEW_VALUES, ReviewerId } from './constants';
+import type {
+  PiThinkingLevel,
+  REVIEW_PHASE,
+  REVIEW_VALUES,
+  ReviewerId,
+  ReviewFailure,
+} from './constants';
 
 type Value<Key extends keyof typeof REVIEW_VALUES> =
   (typeof REVIEW_VALUES)[Key];
@@ -60,8 +66,10 @@ export interface TaskResult {
   status: Value<'COMPLETE' | 'ERROR' | 'SKIPPED' | 'PENDING'>;
   findings: { fingerprint: string; title: string }[];
   error?: string;
+  failure?: ReviewFailure;
   coverage?: string[];
   omissions?: SourceBundle['omissions'];
+  excluded?: SourceBundle['excluded'];
 }
 export interface VerificationResponse {
   decision: VerificationDecision;
@@ -74,13 +82,18 @@ export interface VerificationResponse {
 export interface VerificationResult {
   fingerprint: string;
   decision: VerificationDecision | Value<'ERROR'>;
+  failedPass?:
+    typeof REVIEW_PHASE.VERIFY_FIRST | typeof REVIEW_PHASE.VERIFY_SECOND;
   record?: VerificationResponse;
   error?: string;
+  failure?: ReviewFailure;
 }
 export interface PiProcessResult {
   exitCode: number | null;
   signal: string | null;
   stdout: string;
+  failure?: ReviewFailure;
+  reportedTokens?: number;
   truncated: boolean;
   timedOut: boolean;
 }
@@ -93,6 +106,8 @@ export interface SourceBundle {
   files: SourceFile[];
   diff: string;
   omissions: { path: string; reason: string }[];
+  // Symlinks, submodules and binary blobs: listed for the task, contents never sent, never a reason to fail it.
+  excluded: { path: string; reason: string }[];
 }
 export interface ReviewRunResult {
   version: number;
@@ -110,6 +125,7 @@ export interface ReviewRunResult {
     thinking: PiThinkingLevel;
     maxCalls: number;
     callsStarted: number;
+    reportedTokens?: number;
   };
 }
 export interface ReviewPlanSummary {

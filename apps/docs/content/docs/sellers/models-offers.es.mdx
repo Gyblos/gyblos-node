@@ -55,8 +55,9 @@ Dos ajustes opcionales deciden lo larga que puede ser una solicitud:
   8.192 y el rango va de 1.024 a 32.768.
 
 Los agentes de programación envían preguntas de miles de tokens. Para atenderlos, sube `context_tokens` y usa
-una máquina rápida, con Apple Silicon o GPU; un servidor solo con CPU puede ser demasiado lento para ellos. Por
-ejemplo:
+una máquina rápida, con Apple Silicon o GPU; un servidor solo con CPU puede ser demasiado lento para ellos. Cada
+oferta mide qué tan rápido lee los prompts y rechaza, antes de recibir el prompt, las solicitudes que no
+alcanzaría a leer a tiempo; así un servidor lento sigue atendiendo las más cortas. Por ejemplo:
 
 ```toml
 [[offers]]
