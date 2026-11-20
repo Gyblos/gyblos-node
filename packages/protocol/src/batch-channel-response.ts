@@ -24,7 +24,7 @@ import {
   controlObject,
 } from './control-validation';
 import { parseExecutionResult } from './execution-wire';
-import { PAID_EXECUTION, PAID_EXECUTION_CODES } from './paid/constants';
+import { PAID_EXECUTION_CODES } from './paid/constants';
 import { PAYMENT_SESSION, SESSION_CODES } from './payment-session';
 import { checkToolCalls } from './tools';
 
@@ -59,7 +59,7 @@ function parsedResult(value: unknown, request: BatchChannelRequest) {
     if (
       settled.channelId !== request.params.channelId ||
       typeof settled.transaction !== 'string' ||
-      !PAID_EXECUTION.identifier.test(settled.transaction)
+      !BATCH_CHANNEL.transactionIdentifier.test(settled.transaction)
     )
       return batchFail(SESSION_CODES.BINDING);
     return {

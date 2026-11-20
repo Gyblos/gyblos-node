@@ -26,14 +26,14 @@ import type { BuyerExecutionFactory } from './free-startup';
 import { onBuyerSelectionFailure } from './free-telemetry';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
-import { classifyPaidError } from './paid-http';
+import { selectConfiguredThenOpen } from './quote-selection';
+import { classifyPaidError } from './session-errors';
+import { makeManager, type SessionState } from './session-manager';
 import {
   checkPaidSellerRequest,
   endpointToken,
-  type startPaidBuyer,
-} from './paid-startup';
-import { selectConfiguredThenOpen } from './quote-selection';
-import { makeManager, type SessionState } from './session-manager';
+  type BuyerStartupOptions,
+} from './session-requirements';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 import {
   prepareChosenSeller,
@@ -41,7 +41,7 @@ import {
 } from './session-seller-choice';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
-type Options = NonNullable<Parameters<typeof startPaidBuyer>[0]>;
+type Options = BuyerStartupOptions;
 
 async function executePaidSession(
   manager: ReturnType<typeof makeManager>,

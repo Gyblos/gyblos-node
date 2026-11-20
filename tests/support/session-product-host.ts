@@ -179,7 +179,6 @@ export async function sessionProductHost(
           (async () => conversation?.meter ?? paidAcceptanceMeter),
         batch: finance.buyer,
         pool: finance.pool,
-        chain: async () => assert.fail('legacy chain construction forbidden'),
       });
       return buyer;
     };

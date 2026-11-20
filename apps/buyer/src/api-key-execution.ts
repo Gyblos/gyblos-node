@@ -21,7 +21,6 @@ import type {
   FreeChatStreamExecutor,
 } from './free-sse';
 import type { RoutedModel } from './model-routes';
-import { PaidOutcomeError, paidSummary } from './paid-http';
 
 export async function reserveApiKey(
   operation: BuyerApiKeyOperation | undefined,
@@ -130,10 +129,8 @@ export async function executeApiKey(
     if (!operation.completed()) await complete(operation, result.payment);
     return result;
   } catch (error) {
-    if (operation.reserved() && error instanceof PaidOutcomeError)
-      await complete(operation, paidSummary(error.outcome));
     // A verified free route cannot create a financial obligation. Paid errors remain under review.
-    else if (operation.reserved() && operation.maximum() === '0')
+    if (operation.reserved() && operation.maximum() === '0')
       await operation.complete('0', BUYER_KEY_CHARGE.SETTLED);
     throw error;
   } finally {

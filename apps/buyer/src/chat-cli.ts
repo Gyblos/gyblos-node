@@ -125,7 +125,7 @@ export async function runOwnedChat(
       const payment = attempted ? observed : await inspect?.(digest);
       if (payment) {
         write(
-          `Configured RPC reports finalized charge ${payment.chargedAtomic}; refunded ${payment.refundedAtomic} atomic units.${host.chat.session ? ' The session is closed.' : ' Check the journal with buyer:reconcile:paid before continuing.'}\n`,
+          `Configured RPC reports finalized charge ${payment.chargedAtomic}; refunded ${payment.refundedAtomic} atomic units.${host.chat.session ? ' The session is closed.' : ''}\n`,
         );
         return;
       }

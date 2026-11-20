@@ -11,17 +11,6 @@ import {
   matchBatchChannelResponse,
   parseBatchChannelRequest,
 } from '@gyblos/protocol/batch-channel';
-import {
-  paidExecutionDigest,
-  type PaidExecutionRequest,
-  type PaidExecutionResponse,
-} from '@gyblos/protocol/paid-execution';
-import {
-  createPaidStreamVerifier,
-  encodePaidStreamEvent,
-} from '@gyblos/protocol/paid-stream';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import { TOOL_CALLS_DONE } from '@gyblos/protocol/tools';
 
 void test('tool-only session bytes match independent Node/OpenSSL and WebCrypto with contextual response checks', async () => {
   const vector: {
@@ -66,39 +55,4 @@ void test('tool-only session bytes match independent Node/OpenSSL and WebCrypto 
   if (!changed.result || !('value' in changed.result)) return assert.fail();
   changed.result.value.toolCalls![0]!.name = 'not_offered';
   await assert.rejects(matchBatchChannelResponse(changed, request));
-});
-void test('paid verifier maps a disallowed tool terminal to its own static error family', async () => {
-  const raw: {
-    request: PaidExecutionRequest;
-    streams: { full: { event: { response?: PaidExecutionResponse } }[] };
-  } = JSON.parse(
-    await readFile(
-      new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/paid-execution-v2.json'),
-      ),
-      'utf8',
-    ),
-  );
-  const original = raw.streams.full.at(-1)!.event.response!;
-  assert.ok(original.result);
-  const result = {
-    ...original.result,
-    text: '',
-    toolCalls: [{ id: 'synthetic_call', name: 'unoffered', arguments: '{}' }],
-    finishReason: TOOL_CALLS_DONE,
-  };
-  const response = { ...original, result };
-  const verifier = await createPaidStreamVerifier(raw.request);
-  const event = {
-    version: raw.request.version,
-    requestId: raw.request.requestId,
-    requestDigest: await paidExecutionDigest(raw.request),
-    sequence: 0,
-    type: 'terminal',
-    response,
-  };
-  assert.ok(encodePaidStreamEvent(event).length > 0);
-  await assert.rejects(verifier.accept(event), {
-    code: PAID_EXECUTION_CODES.INVALID,
-  });
 });
