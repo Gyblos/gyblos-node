@@ -4,7 +4,6 @@ import { recountSessionInput } from '@gyblos/core/session-input';
 import { verifyInferenceUsage } from '@gyblos/inference/conversation';
 import {
   BATCH_METHODS,
-  BatchChannelError,
   batchFail,
   batchSessionRequest,
   buildBatchExecutionRequest,
@@ -37,13 +36,6 @@ import {
 } from './batch-receipts';
 import { executeBatchBuyer } from './batch-session';
 import { bounded } from './buyer-operation';
-
-// Only a refusal of PREPARE for a channel without an ID can produce this local proof.
-export class UnsentChannelPeerError extends BatchChannelError {
-  constructor(readonly nodeId: string) {
-    super(PAID_EXECUTION_CODES.PEER);
-  }
-}
 
 export function batchBuyerSnapshot(
   result: BatchChannelResult,
@@ -125,21 +117,11 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     current.throwIfAborted();
   };
   await verify(signal);
-  const prepared = await rpc(
-    BATCH_METHODS.PREPARE,
-    { quote, terms },
-    signal,
-  ).catch((error: unknown) => {
-    if (
-      error instanceof BatchChannelError &&
-      error.code === PAID_EXECUTION_CODES.PEER &&
-      !options.buyer.snapshot().channelId
-    )
-      throw new UnsentChannelPeerError(terms.sellerNodeId);
-    throw error;
-  });
-  if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
-  matchBatchTerms(prepared.terms, terms);
+  if (!options.preparation?.consume(quote, terms, context.blockMode)) {
+    const prepared = await rpc(BATCH_METHODS.PREPARE, { quote, terms }, signal);
+    if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
+    matchBatchTerms(prepared.terms, terms);
+  }
   await verify(signal);
   signal.throwIfAborted();
   await bounded(

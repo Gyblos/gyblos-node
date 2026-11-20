@@ -23,6 +23,10 @@ import type {
 
 import { createBuyerBatchSession } from './batch-buyer';
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
+import {
+  prepareNewChannel,
+  type PreparedChannel,
+} from './buyer-channel-prepare';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
 import { sessionApproval } from './session-accounting';
@@ -34,6 +38,7 @@ import {
 } from './session-policy';
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
+  preparation?: PreparedChannel;
   receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
   policy: BuyerSessionPolicy;
   inspect(): Promise<BatchStoredSession | undefined>;
@@ -78,6 +83,10 @@ async function openCurrent<Remote extends BatchDestination>(
       options.endpoint.id().toString(),
       options.now(),
     );
+  const preparation =
+    quote && !stored
+      ? await prepareNewChannel(options, quote, terms, signal)
+      : options.preparation;
   signal.throwIfAborted();
   const destination = options.destination(terms);
   if (!state.backend) {
@@ -99,6 +108,7 @@ async function openCurrent<Remote extends BatchDestination>(
       financial,
       host: createBuyerBatchSession({
         ...options,
+        preparation,
         terms,
         buyer: financial,
         destination,
