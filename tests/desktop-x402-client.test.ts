@@ -361,7 +361,7 @@ void test('a paid seller cannot receive a request while either chat spending lim
       await assert.rejects(
         client.send('paid-seller', 'test', undefined, choice),
         maxAtomic === '0'
-          ? /raise the per-request maximum/i
+          ? /set (?:a|the) maximum per response in the app/i
           : /increase the budget in Payments/i,
       );
       assert.equal(posts, previousPosts);

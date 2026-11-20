@@ -61,7 +61,7 @@ export function paidSellerLimitNotice(
   if (!policy)
     return 'Connect the local buyer in Payments to use a paid seller.';
   if (policy.maxAtomic === '0')
-    return 'Raise the per-request maximum in buyer/selection.json (request.maxAtomic, in atomic USDC units) and restart the buyer to use a paid seller.';
+    return 'Select the seller and set a maximum per response in the app.';
   if (
     !policy.depositAtomic ||
     !policy.lifetimeMs ||
