@@ -3,6 +3,7 @@
 import { COLLECTOR_URL, RECEIPT_UPLOADER } from '@gyblos/config';
 import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 import {
+  isReceiptUploadAppVersion,
   RECEIPT_UPLOAD_ARCHES,
   RECEIPT_UPLOAD_CLIENTS,
   RECEIPT_UPLOAD_PLATFORMS,
@@ -30,7 +31,6 @@ const ARCHES: Readonly<Record<string, ReceiptUploadClient['arch']>> = {
   x64: RECEIPT_UPLOAD_ARCHES.X64,
   arm64: RECEIPT_UPLOAD_ARCHES.ARM64,
 };
-const APP_VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
   'localhost',
@@ -85,7 +85,9 @@ export function uploadClient(
           ? RECEIPT_UPLOAD_CLIENTS.BUYER_DESKTOP
           : RECEIPT_UPLOAD_CLIENTS.BUYER_CLI,
     appVersion:
-      version && APP_VERSION.test(version) ? version : DEVELOPMENT_VERSION,
+      version && isReceiptUploadAppVersion(version)
+        ? version
+        : DEVELOPMENT_VERSION,
     platform: PLATFORMS[runtime.platform] ?? RECEIPT_UPLOAD_PLATFORMS.OTHER,
     arch: ARCHES[runtime.arch] ?? RECEIPT_UPLOAD_ARCHES.OTHER,
   };
