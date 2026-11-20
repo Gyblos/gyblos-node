@@ -23,7 +23,7 @@ export const DISCOVERY = {
   runDeadlineMs: 20 * 1000,
   // Due uptimes a run tries before its catalog reading, none begun after reservedUptimesMs, so neither a
   // slow catalog read nor a slow /uptime takes every run's requests and time.
-  uptimeReservedPerRun: 15,
+  reservedUptimes: 15,
   reservedUptimesMs: 6 * 1000,
   // Uptime reads in flight at once: a Worker opens 6 connections at a time, and a queued read's
   // timeout would run while it waits.

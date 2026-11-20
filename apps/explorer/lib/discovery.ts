@@ -262,7 +262,7 @@ async function tryUptimes(
 }
 
 // One run over the previous stored read: first the uptimes most due, up to
-// DISCOVERY.uptimeReservedPerRun and within DISCOVERY.reservedUptimesMs; then the catalog read (begun
+// DISCOVERY.reservedUptimes and within DISCOVERY.reservedUptimesMs; then the catalog read (begun
 // when none is under way, or again when the one under way began DISCOVERY.restartAfterMs ago), replacing
 // the shown catalog once whole; then more due uptimes with what is left. Never throws: `problems` says
 // what went wrong.
@@ -280,7 +280,7 @@ export async function readIndex(
   await tryUptimes(
     run,
     stored,
-    dueUptimes(stored, now()).slice(0, DISCOVERY.uptimeReservedPerRun),
+    dueUptimes(stored, now()).slice(0, DISCOVERY.reservedUptimes),
     now,
     now() + DISCOVERY.reservedUptimesMs,
   );

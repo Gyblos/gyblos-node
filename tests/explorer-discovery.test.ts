@@ -108,7 +108,7 @@ void test('while a large catalog is read, a run still reads its share of due upt
   ({ stored } = await readIndex(stored, () => DISCOVERY.uptimeRefreshMs));
   assert.ok(stored.pending);
   assert.equal(requests.length, DISCOVERY.maxRequestsPerRun);
-  assert.equal(count(requests, '/uptime'), DISCOVERY.uptimeReservedPerRun);
+  assert.equal(count(requests, '/uptime'), DISCOVERY.reservedUptimes);
 });
 
 void test('a later page that fails ends the run’s catalog reading; the model is read again from its first page', async () => {
@@ -170,7 +170,7 @@ void test('a malformed seller entry is skipped and reported; the rest of its pag
   assert.deepEqual(shownNodes(stored, 0), ['n1', 'n2']);
 });
 
-void test('a shown catalog whose read began over an hour ago is dated, even while a read advances', () => {
+void test('a shown catalog whose read began over an hour ago is dated, even with recent progress', () => {
   const stored: StoredDiscovery = {
     progressAt: DISCOVERY.restartAfterMs + 1,
     catalog: {

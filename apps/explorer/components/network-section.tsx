@@ -47,7 +47,7 @@ export async function NetworkSection() {
             ? `Sellers and models as of ${utc(snapshot.datedAt)}. `
             : null}
           {snapshot.networkDatedAt
-            ? `Network status (online, offline, not published) as of ${utc(snapshot.networkDatedAt)}.`
+            ? `Online, offline and not published status as of ${utc(snapshot.networkDatedAt)}.`
             : null}
         </p>
       ) : null}
