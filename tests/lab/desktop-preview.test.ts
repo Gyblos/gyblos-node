@@ -118,13 +118,13 @@ void test('preview exposes bounded synthetic API key metadata without a credenti
     /PREVIEW_ONLY_NOT_A_VALID_API_KEY/,
   );
 });
-void test('the account budget includes chat and all API keys and preserves individual limits', async () => {
+void test('the optional chat budget excludes API keys and preserves individual limits', async () => {
   const call = await fixture('?screen=payments&review=ten-chats');
   const readAccount = async () =>
     object(await call('previewAccountBudget', 'current'));
   const original = await readAccount();
   assert.equal(original.limitAtomic, '1000000');
-  assert.equal(original.spentAtomic, '6000');
+  assert.equal(original.spentAtomic, '0');
   const setLimit = async (limitAtomic: string) =>
     parseX402Result(
       await call('desktopX402', 'run', {
@@ -132,7 +132,7 @@ void test('the account budget includes chat and all API keys and preserves indiv
         limitAtomic,
       }),
     );
-  assert.ok((await setLimit('5999')).error);
+  assert.ok((await setLimit('-1')).error);
   assert.deepEqual(await readAccount(), original);
   assert.equal((await setLimit('6000')).error, undefined);
   assert.equal((await readAccount()).limitAtomic, '6000');
@@ -150,7 +150,7 @@ void test('preview buyer status is runtime-loadable and keeps free replies trans
   assert.equal(result.summary.records[0]?.transaction, null);
   assert.equal(result.summary.records[0]?.chargeAtomic, '0');
 });
-void test('preview network catalog passes the desktop contract with a free and a paid group', async () => {
+void test('preview network catalog passes the desktop contract with one free listing and two paid sellers', async () => {
   const call = await fixture();
   const catalog = parseNetworkCatalog(await call('desktopCatalog', 'summary'));
   assert.equal(catalog.state, CATALOG_STATE.READY);
@@ -163,6 +163,7 @@ void test('preview network catalog passes the desktop contract with a free and a
     [
       [true, '0', '0'],
       [false, '52000', '208000'],
+      [false, '80000', '240000'],
     ],
   );
   assert.equal(

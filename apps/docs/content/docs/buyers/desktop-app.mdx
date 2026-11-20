@@ -7,7 +7,7 @@ The Gyblos desktop app lets you chat with models that sellers on the Gyblos netw
 free offers cost nothing and need no wallet funding. For most buyers, the app is the only setup you need.
 
 The app sets itself up the first time it opens. It keeps its data in its own private folder (`userData`),
-works without a relay token, and starts with a zero spending budget, so it never pays for an answer unless
+works without a relay token, and starts with a zero maximum per response, so it never pays for an answer unless
 you authorize it.
 
 The startup bar fills from left to right. It shows 0%, 50% or 100% according to whether local preparation and the first window render have finished.
@@ -92,8 +92,7 @@ To create a key and connect your tools, see [Connect your coding tools](/en/buye
 Free answers need no funding or transaction, and no wallet. The local buyer's identity is separate from
 the protected wallet in **Payments**.
 
-A priced answer needs a budget that you authorize in **Payments**; the app never authorizes one on its
-own. If the outcome of a paid request is uncertain, the app blocks new messages until you review it in
+To chat with a paid seller, set a positive maximum per response. Choose the seller in **Models** and confirm the prices, maximum per response, 1 USDC channel deposit and one-hour duration. You can also set a total chat budget in **Payments**. Each API key keeps its own required spending limit. If the outcome of a paid request is uncertain, the app blocks new messages until you review it in
 **Payments**. Stopping a response doesn't prove that no charge occurred.
 
 If the local buyer fails to start, choose **Payments → Retry local buyer**. That retries startup only: the

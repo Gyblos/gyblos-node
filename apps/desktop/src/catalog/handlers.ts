@@ -7,7 +7,7 @@ import {
 } from './model';
 
 interface CatalogSession {
-  summary(): NetworkCatalog;
+  summary(): NetworkCatalog | Promise<NetworkCatalog>;
   lookup(model: string): Promise<NetworkCatalog>;
 }
 interface CatalogWindow {

@@ -70,7 +70,7 @@ export function createPreviewHost(
   };
   const sessionId = '00000000-0000-4000-8000-000000000003';
   let connected = ready;
-  let active = ready;
+  let active = ready && query.get('seller-budget') !== 'ready';
   let authorized = ready;
   let limitAtomic = '1000000';
   let generation = 0;
@@ -217,14 +217,14 @@ export function createPreviewHost(
       : { ...result, state: CATALOG_STATE.EMPTY, models: [] };
   };
   const desktopCatalog = {
-    summary: async () => catalogResult(),
+    summary: async () => previewCatalog(model, now, ''),
     lookup: async (value: unknown) => {
       catalogQuery = typeof value === 'string' ? value.trim() : '';
       return catalogResult();
     },
   };
 
-  const accountBudget = () => accountBudgetSnapshot(limitAtomic, keys, records);
+  const accountBudget = () => accountBudgetSnapshot(limitAtomic, records);
   function buyerState() {
     return parseX402Result({
       summary: {
@@ -252,7 +252,7 @@ export function createPreviewHost(
       }
       if (request.action === X402_ACTION.AUTHORIZE) {
         if (!connected || typeof request.limitAtomic !== 'string')
-          return { ...buyerState(), error: 'Account budget unavailable.' };
+          return { ...buyerState(), error: 'Chat budget unavailable.' };
         const error = accountLimitError(
           request.limitAtomic,
           accountBudget().spentAtomic,

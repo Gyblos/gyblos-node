@@ -141,7 +141,7 @@ export function NetworkCatalogPanel({
                   <ListRow
                     key={model.id}
                     selected={!!onSelect && selected === model.id}
-                    onActivate={onSelect ? () => onSelect(model) : undefined}
+                    onActivate={model.offerId && onSelect ? () => onSelect(model) : undefined}
                     leading={
                       <ModelImage name={model.name} artwork={model.image} />
                     }

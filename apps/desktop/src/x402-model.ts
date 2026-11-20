@@ -12,6 +12,7 @@ import {
   parseBuyerApiPolicy,
   type BuyerApiPolicy,
 } from '@gyblos/protocol/buyer-api';
+import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import { parseResponseMetrics, type ResponseMetrics } from './response-metrics';
 import { DESKTOP_X402 } from './x402/constants';
@@ -53,15 +54,19 @@ export function emptyX402(): X402Summary {
 export function paidSellerLimitNotice(
   policy: BuyerApiPolicy | null,
   budget: X402Summary,
+  modelId: string,
 ) {
   if (budget.blocked)
     return 'Review the unfinished payment in Payments before sending another message.';
   if (!policy)
     return 'Connect the local buyer in Payments to use a paid seller.';
   if (policy.maxAtomic === '0')
-    return 'Raise the per-request maximum in the buyer profile (request.maxAtomic) and restart the buyer to use a paid seller.';
-  if (!budget.active || budget.policy?.policyId !== policy.policyId)
-    return 'Authorize a USDC chat budget in Payments for this buyer.';
+    return 'Raise the per-request maximum in buyer/selection.json (request.maxAtomic, in atomic USDC units) and restart the buyer to use a paid seller.';
+  if (modelId !== MODEL_IDS.QWEN3_0_6B)
+    return 'This model is unavailable for paid chat because its token counts cannot be verified.';
+  if (!budget.active) return undefined;
+  if (budget.policy?.policyId !== policy.policyId)
+    return 'Finish the previous chat budget in Payments before using this buyer.';
   if (
     BigInt(budget.limitAtomic) - BigInt(budget.spentAtomic) <
     BigInt(policy.maxAtomic)

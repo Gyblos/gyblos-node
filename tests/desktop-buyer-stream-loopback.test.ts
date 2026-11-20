@@ -13,6 +13,7 @@ import { X402Client } from '@gyblos/desktop/x402-client';
 import { createX402Handlers } from '@gyblos/desktop/x402-handlers';
 import { X402_ACTION } from '@gyblos/desktop/x402-model';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import {
   ENGINE_DONE_REASONS,
   OFFER_PRICING_KINDS,
@@ -303,7 +304,24 @@ void test('the desktop sends the selected seller to the authenticated channel ro
   const client = new X402Client(ledger);
   try {
     await client.connect(host.url, token);
-    await client.authorize('200');
+    assert.equal((await ledger.summary()).active, false);
+    const unbound = await fetch(
+      new URL(BUYER_API.CHANNEL_CHAT_PATH + '?stream=1', host.url),
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + token,
+          'content-type': 'application/json',
+          'if-match': '"' + client.policy()!.policyId + '"',
+        },
+        body: JSON.stringify({
+          model: seller.modelId,
+          messages: [{ role: 'user', content: 'test' }],
+        }),
+      },
+    );
+    assert.equal(unbound.ok, false);
+    assert.equal(calls, 0);
     const result = await client.send(
       'chosen-seller',
       'test',

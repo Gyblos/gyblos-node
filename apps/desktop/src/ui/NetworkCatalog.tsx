@@ -25,12 +25,13 @@ declare global {
 }
 export function useNetworkCatalog() {
   const [snapshot, setSnapshot] = useState(emptyCatalog);
+  const [searchResult, setSearchResult] = useState<NetworkCatalog | null>(null);
   const active = useRef(false);
   const sequence = useRef(0);
   const read = useCallback(async (query?: string) => {
-    const current = ++sequence.current;
+    const current = query === undefined ? undefined : ++sequence.current;
     if (query !== undefined)
-      setSnapshot(emptyCatalog(CATALOG_STATE.LOADING, query));
+      setSearchResult(emptyCatalog(CATALOG_STATE.LOADING, query));
     let next = emptyCatalog(CATALOG_STATE.ERROR);
     try {
       next = parseNetworkCatalog(
@@ -41,7 +42,10 @@ export function useNetworkCatalog() {
     } catch {
       /* No raw network/native diagnostics belong in the renderer. */
     }
-    if (active.current && sequence.current === current)
+    if (!active.current) return;
+    if (current !== undefined) {
+      if (current === sequence.current) setSearchResult(next);
+    } else
       setSnapshot((previous) =>
         JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
       );
@@ -59,6 +63,7 @@ export function useNetworkCatalog() {
   }, [read]);
   return {
     snapshot,
+    searchResult: searchResult ?? snapshot,
     lookup: (query: string) => {
       void read(query);
     },
@@ -221,7 +226,7 @@ export function NetworkCatalogPanel({
   return (
     <div className="network-search">
       <CatalogSearch search={search} />
-      {snapshot.query && query.trim() === snapshot.query && !expanded && (
+      {query.trim() === snapshot.query && !expanded && (
         <section aria-live="polite" aria-label="Search results">
           {models.length > 0 && (
             <>

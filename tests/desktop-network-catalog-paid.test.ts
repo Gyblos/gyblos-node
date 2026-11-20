@@ -190,3 +190,39 @@ void test('the buyer validates the selected seller and rejects expired terms bef
     parseBuyerSellerChoice({ ...choice, relayUrl: 'invalid' }, DISCOVERY_NOW),
   );
 });
+
+void test('opening chat discovers free and paid sellers of the same model without a lookup', async () => {
+  const { createCatalogSession } =
+    await import('@gyblos/desktop/network-catalog-session');
+  const { announcedModels } = await import('@gyblos/desktop/announced-models');
+  const free = await priced('0', '0');
+  const paid = await priced('52000', '208000');
+  const requests: string[] = [];
+  const session = createCatalogSession(
+    async (url) => {
+      requests.push(new URL(url).pathname);
+      return new URL(url).pathname.endsWith('/models')
+        ? jsonResponse(200, {
+            models: [{ id: 'qwen3:0.6b', sellers: 2 }],
+            generatedAt: DISCOVERY_NOW,
+          })
+        : jsonResponse(200, sellersBody([free.signed, paid.signed]));
+    },
+    () => DISCOVERY_NOW,
+    new AbortController().signal,
+  );
+  const listings = announcedModels(await session.browse(), DISCOVERY_NOW);
+  assert.deepEqual(
+    listings.map((row) => [row.name, row.free, row.input, row.output]),
+    [
+      ['qwen3:0.6b', true, 0, 0],
+      ['qwen3:0.6b', false, 0.052, 0.208],
+    ],
+  );
+  assert.equal(
+    session.resolve(listings[1]?.offerId ?? '')?.nodeId,
+    paid.signed.catalog.record.nodeId,
+  );
+  await session.browse();
+  assert.deepEqual(requests, ['/v1/models', '/v1/sellers']);
+});

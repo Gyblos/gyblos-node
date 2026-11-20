@@ -14,10 +14,9 @@ export interface AnnouncedModel {
   contextTokens: number;
   announcements: number;
   expiresAt: number;
-  // Whether the group's listings are free. A paid group may still charge zero on one side.
+  // Free announcements are grouped. Each paid row identifies a single seller.
   free: boolean;
-  // One listing's price, in atomic devnet USDC per million tokens: "0" and "0" for a free group, else
-  // the cheapest paid listing by input plus output.
+  // Advertised input and output prices in atomic devnet USDC per million tokens.
   inputAtomicPerMtok: string;
   outputAtomicPerMtok: string;
 }

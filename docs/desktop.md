@@ -78,13 +78,14 @@ from that environment are passed to the managed buyer.
 
 ### Pay for answers
 
-1. In **Payments**, authorize a Chat budget in the displayed asset. Approving it
-   moves no funds; it is a local permission.
+1. Choose a paid seller in **Models** and confirm the rates, maximum per
+   response, channel deposit and duration. You can set an optional total Chat
+   budget in **Payments**.
 2. Write in **Chat**. Each message runs a real buyer execution. Each request
    reserves the configured maximum before it is sent, so the remaining budget
    must cover that maximum.
-3. Paid answers settle automatically through x402, one payment per answer. A
-   zero-price offer never creates a transaction.
+3. Channel approvals accumulate for batch settlement. A zero-price offer never
+   creates a transaction.
 4. Finish the session to close this desktop's permission. Confirmed payment
    references stay in **Payments** and **Activity**.
 
@@ -131,13 +132,19 @@ synchronized, and conversation content is not encrypted.
 - Local dates are when this device observed a record, not the chain's block
   time.
 
-The sample model catalog and unimplemented web tools are previews. Exact-ID
-lookup reads signed announcements from the discovery index: free listings, and
-paid listings priced in devnet USDC, grouped apart. A paid group shows one real
-listing's price, the cheapest by input plus output, never sides mixed from
-different sellers; listings in other assets are not shown. An announcement alone
-is not registry identity, availability or proof of inference. x402 Chat uses the
-buyer's model and policy, never a sample model selection.
+The sample catalog is a preview. An exact-ID lookup shows signed network
+listings. Each paid listing identifies its seller and shows input and output
+prices in devnet USDC per million tokens. Choose a seller and confirm the
+displayed channel terms. The buyer verifies the seller and quote before sending
+the first paid message. An expired listing or a changed price requires a fresh
+selection.
+
+A zero per-request maximum blocks paid chat. Raise `request.maxAtomic` in the
+buyer profile and restart the buyer. If you set a chat budget in Payments, its
+remaining amount must cover that maximum. Choosing a seller does not change
+either limit. A recorded answer approval counts toward the budget while
+settlement is pending. The buyer checks the default 1 USDC deposit and one-hour
+lifetime when using the desktop seller picker.
 
 ## Network contact
 

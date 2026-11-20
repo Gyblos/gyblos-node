@@ -75,7 +75,7 @@ import { useX402 } from './ui/useX402';
 import { WalletBackup } from './ui/WalletBackup';
 import { useDesktopWallet } from './ui/WalletState';
 import { WindowTitlebar } from './ui/WindowTitlebar';
-import { paidSellerLimitNotice } from './x402-model';
+import { paidSellerLimitNotice, x402Amount, x402Asset } from './x402-model';
 
 const money = (value: number) => '$' + value.toFixed(2);
 export function DesktopApp() {
@@ -208,7 +208,11 @@ export function DesktopApp() {
   >(null);
   const [paidModel, setPaidModel] = useState<Model | null>(null);
   const sellerLimit = paidModel?.offerId
-    ? paidSellerLimitNotice(x402.state.policy, x402.state.summary)
+    ? paidSellerLimitNotice(
+        x402.state.policy,
+        x402.state.summary,
+        paidModel.name,
+      )
     : undefined;
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
@@ -417,6 +421,7 @@ export function DesktopApp() {
               connectedTools={connectedTools}
               onBrowseApplications={() => navigate(UI_VIEW.TOOLS)}
               models={chatModels}
+              onDefaultModel={() => setModel(MODELS[0])}
               onSelectModel={(id) => {
                 const next = chatModels.find((item) => item.id === id);
                 if (next) choose(next);
@@ -590,6 +595,15 @@ export function DesktopApp() {
                 <span>Output / 1M tokens</span>
                 <strong>{usdPerMtok(paidModel.output)}</strong>
               </div>
+              {paidModel.offerId && x402.state.policy && (
+                <div>
+                  <span>Maximum per response</span>
+                  <strong>
+                    {x402Amount(x402.state.policy.maxAtomic, x402.state.policy)}{' '}
+                    {x402Asset(x402.state.policy)}
+                  </strong>
+                </div>
+              )}
               <div>
                 <span>
                   {paidModel.offerId

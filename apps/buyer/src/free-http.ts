@@ -263,11 +263,13 @@ export function freeBuyerHandler(
     if (asksModels(request)) return listModels(response, settings);
     if (asksTokenCount(request))
       return countTokens(request, response, requestMs, diagnostic);
+    const channelRoute =
+      request.url?.split('?')[0] === BUYER_API.CHANNEL_CHAT_PATH;
     const localApi = desktop.accepts(request, isJson(request))
       ? defaultChatApi
       : undefined;
     if (
-      request.url === BUYER_API.CHANNEL_CHAT_PATH &&
+      channelRoute &&
       !(caller.owner && authorize && settings.sellerChoice && localApi)
     ) {
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
@@ -293,7 +295,7 @@ export function freeBuyerHandler(
           settings.sellerChoice &&
           authorize &&
           caller.owner &&
-          request.url === BUYER_API.CHANNEL_CHAT_PATH &&
+          channelRoute &&
           localApi,
         ),
         classify,

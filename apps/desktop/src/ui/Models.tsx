@@ -86,7 +86,7 @@ export function Models({
         <Modal title="Find network models" close={() => setNetwork(false)}>
           <div className="ui-section">
             <NetworkCatalogPanel
-              snapshot={catalog.snapshot}
+              snapshot={catalog.searchResult}
               onLookup={catalog.lookup}
               onSelect={canSelect ? chooseOffer : undefined}
               selected={selected}

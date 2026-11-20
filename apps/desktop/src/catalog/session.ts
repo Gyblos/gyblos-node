@@ -4,11 +4,16 @@ import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import {
   CATALOG_STATE,
   emptyCatalog,
+  NETWORK_CATALOG,
   parseNetworkCatalog,
   validCatalogQuery,
   type NetworkCatalog,
 } from './model';
-import { readAnnouncements, type CatalogSellerChoice } from './reader';
+import {
+  browseAnnouncements,
+  readAnnouncements,
+  type CatalogSellerChoice,
+} from './reader';
 
 function expireListings(
   snapshot: NetworkCatalog,
@@ -56,8 +61,55 @@ export function createCatalogSession(
     snapshot = emptyCatalog(CATALOG_STATE.ERROR);
   }
   if (!closed) signal.addEventListener('abort', close, { once: true });
+  let nextRefresh = 0;
+  async function load(model: string) {
+    if (closed || (model !== '' && !validCatalogQuery(model)))
+      return emptyCatalog(CATALOG_STATE.ERROR);
+    if (pending?.query === model) return pending.result;
+    pending?.controller.abort();
+    const current = ++sequence;
+    const controller = new AbortController();
+    if (model) snapshot = emptyCatalog(CATALOG_STATE.LOADING, model);
+    const result = (async () => {
+      try {
+        const offers = new Map<string, CatalogSellerChoice>();
+        const loaded = model
+          ? await readAnnouncements(
+              fetch,
+              model,
+              now,
+              controller.signal,
+              offers,
+            )
+          : await browseAnnouncements(fetch, now, controller.signal, offers);
+        if (!closed && sequence === current) {
+          choices = offers;
+          snapshot = loaded;
+        }
+      } catch {
+        if (!closed && sequence === current)
+          snapshot = emptyCatalog(CATALOG_STATE.ERROR, model);
+      } finally {
+        if (pending?.controller === controller) pending = null;
+      }
+      return summary();
+    })();
+    pending = { query: model, controller, result };
+    return result;
+  }
   return {
     summary,
+    browse() {
+      const current = now();
+      if (pending?.query === '') return pending.result;
+      if (
+        current < nextRefresh &&
+        current >= nextRefresh - NETWORK_CATALOG.REFRESH_MS
+      )
+        return Promise.resolve(summary());
+      nextRefresh = current + NETWORK_CATALOG.REFRESH_MS;
+      return load('');
+    },
     resolve(offerId: string) {
       if (
         closed ||
@@ -67,38 +119,10 @@ export function createCatalogSession(
       const choice = choices.get(offerId);
       return choice ? { ...choice } : undefined;
     },
-    async lookup(model: string): Promise<NetworkCatalog> {
-      if (closed || !validCatalogQuery(model))
-        return emptyCatalog(CATALOG_STATE.ERROR);
-      if (pending?.query === model) return pending.result;
-      pending?.controller.abort();
-      const current = ++sequence;
-      const controller = new AbortController();
-      snapshot = emptyCatalog(CATALOG_STATE.LOADING, model);
-      const result = (async () => {
-        try {
-          const offers = new Map<string, CatalogSellerChoice>();
-          const loaded = await readAnnouncements(
-            fetch,
-            model,
-            now,
-            controller.signal,
-            offers,
-          );
-          if (!closed && sequence === current) {
-            choices = offers;
-            snapshot = loaded;
-          }
-        } catch {
-          if (!closed && sequence === current)
-            snapshot = emptyCatalog(CATALOG_STATE.ERROR, model);
-        } finally {
-          if (pending?.controller === controller) pending = null;
-        }
-        return summary();
-      })();
-      pending = { query: model, controller, result };
-      return result;
+    lookup(model: string) {
+      return validCatalogQuery(model)
+        ? load(model)
+        : Promise.resolve(emptyCatalog(CATALOG_STATE.ERROR));
     },
   };
 }

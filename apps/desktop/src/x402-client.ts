@@ -220,17 +220,27 @@ export class X402Client {
   ) {
     const current = await this.budget.summary();
     external.throwIfAborted();
-    if (current.policy?.policyId !== connection.policy.policyId)
+    if (
+      (current.active || !choice) &&
+      current.policy?.policyId !== connection.policy.policyId
+    )
       throw new Error(
         'Buyer policy changed. Finish the previous budget before authorizing another.',
       );
     if (choice) {
       if (choice.expiresAt <= Date.now())
         throw new Error('Seller listing expired');
-      const notice = paidSellerLimitNotice(connection.policy, current);
+      const notice = paidSellerLimitNotice(
+        connection.policy,
+        current,
+        choice.modelId,
+      );
       if (notice) throw new PaidSellerLimitError(notice);
     }
-    const reserved = await this.budget.reserve(id);
+    const reserved = await this.budget.reserve(
+      id,
+      choice ? connection.policy : undefined,
+    );
     const policy = choice
       ? {
           ...reserved,

@@ -42,7 +42,12 @@ import { ChatAnswer } from './ChatAnswer';
 import { ChatComposer } from './ChatComposer';
 import { ToolsDropdown } from './ChatTools';
 import { ChatUserMessage } from './ChatUserMessage';
-import { BUTTON_VARIANT, CHAT_PREVIEW, CHAT_ROLE } from './constants';
+import {
+  BUTTON_VARIANT,
+  CHAT_PREVIEW,
+  CHAT_ROLE,
+  MODEL_SOURCE,
+} from './constants';
 import type { DemoAuthorizationStatus } from './demo-account';
 import { Modal } from './Modal';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
@@ -86,6 +91,7 @@ type Props = {
   onBrowseApplications: () => void;
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
+  onDefaultModel?: () => void;
   onBrowseModels: () => void;
   onReviewPaypal: () => void;
   onAuthorize: () => DemoAuthorizationStatus;
@@ -143,6 +149,7 @@ export function Chat({
   onBrowseApplications,
   models,
   onSelectModel,
+  onDefaultModel,
   onBrowseModels,
   onReviewPaypal,
   onAuthorize,
@@ -169,10 +176,12 @@ export function Chat({
   const usingX402 = !usingPaypal && !!x402;
   const x402Ready =
     x402 &&
-    x402.state.summary.active &&
+    !!x402.state.policy &&
+    (x402.state.summary.active || !!model.offerId) &&
     !x402.state.summary.blocked &&
     !x402.busy &&
-    x402.state.summary.policy?.policyId === x402.state.policy?.policyId;
+    (!x402.state.summary.active ||
+      x402.state.summary.policy?.policyId === x402.state.policy.policyId);
   const notice = usingPaypal
     ? paypal.state.notice || session.notice
     : session.notice;
@@ -195,9 +204,16 @@ export function Chat({
     (session.paypalRun &&
       session.messages.at(-1)?.paymentMethod === PAYMENT_METHOD.USDC),
   );
-  const limitNotice =
-    usingX402 && x402 && model.offerId
-      ? paidSellerLimitNotice(x402.state.policy, x402.state.summary)
+  const freeListingMismatch =
+    usingX402 &&
+    model.source === MODEL_SOURCE.ANNOUNCED &&
+    model.free &&
+    (x402?.state.policy?.maxAtomic !== '0' ||
+      x402?.state.policy?.model !== model.name);
+  const limitNotice = freeListingMismatch
+    ? 'Select this model and set the maximum per response to zero in Payments to use free inference.'
+    : usingX402 && x402 && model.offerId
+      ? paidSellerLimitNotice(x402.state.policy, x402.state.summary, model.name)
       : undefined;
   const canSend =
     !limitNotice &&
@@ -225,7 +241,7 @@ export function Chat({
   const composerModel = usingPaypal
     ? sandboxModel
     : usingX402
-      ? model.offerId
+      ? model.source === MODEL_SOURCE.ANNOUNCED
         ? model
         : buyerModel
       : model;
@@ -656,10 +672,19 @@ export function Chat({
                   usingPaypal
                     ? [sandboxModel]
                     : usingX402
-                      ? [buyerModel, ...models.filter((item) => item.offerId)]
+                      ? models.some(
+                          (item) => item.source === MODEL_SOURCE.ANNOUNCED,
+                        )
+                        ? models.filter(
+                            (item) => item.source === MODEL_SOURCE.ANNOUNCED,
+                          )
+                        : [buyerModel]
                       : models
                 }
-                onSelect={onSelectModel}
+                onSelect={(id) => {
+                  if (usingX402 && id === buyerModel.id) onDefaultModel?.();
+                  else onSelectModel(id);
+                }}
                 onBrowse={onBrowseModels}
                 showBrowse={!usingPaypal}
                 contextLabel={

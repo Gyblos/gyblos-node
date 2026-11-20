@@ -1,19 +1,21 @@
 // Restrict a single owner-authenticated chat to the verified seller and terms that were selected.
 import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
-import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import { primaryRelayUrl } from '@gyblos/transport-iroh/endpoint';
 
 import type { FreeWinner } from './free-execution';
 import type { PreparedSelection } from './free-selection';
+import { UnsentSellerChoiceError } from './seller-choice-error';
 
 export function prepareChosenSeller(
   prepared: PreparedSelection,
   choice: BuyerSellerChoice,
 ) {
   const { config } = prepared;
+  if (config.request.maxAtomic === '0')
+    throw new UnsentSellerChoiceError(SESSION_CODES.LIMIT);
   if (
-    config.request.maxAtomic === '0' ||
     !prepared.identity ||
     !prepared.discovery ||
     !config.session ||
@@ -23,7 +25,7 @@ export function prepareChosenSeller(
     choice.expiresAt <= Date.now() ||
     (config.pinnedNodeId && config.pinnedNodeId !== choice.nodeId)
   )
-    return sessionFail(SESSION_CODES.BINDING);
+    throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
   const known = config.sellers.find(
     (seller) => seller.nodeId === choice.nodeId,
   );
@@ -31,7 +33,7 @@ export function prepareChosenSeller(
     (known && known.owner !== choice.owner) ||
     (!known && !config.discovery?.open)
   )
-    return sessionFail(SESSION_CODES.UNVERIFIED);
+    throw new UnsentSellerChoiceError(SESSION_CODES.UNVERIFIED);
   const seller = known ?? {
     owner: choice.owner,
     nodeId: choice.nodeId,
@@ -64,5 +66,5 @@ export function verifyChosenOffer(
     offer.prices.inputAtomicPerMtok !== choice.inputAtomicPerMtok ||
     offer.prices.outputAtomicPerMtok !== choice.outputAtomicPerMtok
   )
-    return sessionFail(SESSION_CODES.BINDING);
+    throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
 }

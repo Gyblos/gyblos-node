@@ -1,5 +1,4 @@
-// Maps sanitized announcements into shared preview controls; never authorizes inference. A paid group
-// shows its cheapest price in USDC per million tokens; choosing it still asks before any spending.
+// Each paid listing shows that seller’s price per million tokens. Selection requires confirmation.
 import {
   CATALOG_STATE,
   NETWORK_CATALOG,

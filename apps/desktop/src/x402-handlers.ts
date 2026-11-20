@@ -107,7 +107,9 @@ function selectedOffer(
       ? resolveOffer?.(input.offerId)
       : undefined;
   if ('offerId' in input && !selected)
-    throw new Error('Seller listing expired');
+    throw new PaidSellerLimitError(
+      'Refresh the model list and select the seller again. This listing has expired.',
+    );
   return selected;
 }
 export function createX402Handlers(
