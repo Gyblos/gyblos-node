@@ -1,28 +1,34 @@
-// Owns the explorer's canonical values: units and display bounds. Public source URLs live in config.ts.
+// Owns the explorer's canonical values: source read bounds, the discovery schedule's budgets, units and
+// display bounds. Public source URLs live in config.ts.
 
 // Every read of a public source gives up after this long, so a slow source cannot hold a render.
 export const FETCH = {
   timeoutMs: 8_000,
 } as const;
 
-// The discovery index is read in one place, by the Worker's scheduled run (scheduled.ts, every 2
-// minutes), into KV that every render reads (discovery.ts): the index's load does not grow with viewers.
-// A run sends at most maxRequestsPerRun requests: under the Workers Free plan's 50 subrequests per
-// invocation (its KV read and write count too) and the index's 120 a minute per address. A whole read
-// of a large index spans several runs. On the Free plan a run also has 10 ms of CPU, which parsing and
-// storing a few thousand sellers would exceed: an index that large needs the Workers Paid plan.
+// The discovery index is read in one place, by the Worker's scheduled run (scheduled.ts, on the cron in
+// wrangler.jsonc), into KV that every render reads (discovery.ts): the index's load does not grow with
+// viewers. A run sends at most maxRequestsPerRun requests: under the Workers Free plan's 50 subrequests
+// per invocation (its KV read and write count too) and the index's 120 a minute per address. A whole
+// read of a large index spans several runs. On the Free plan a run also has 10 ms of CPU, which parsing
+// a few hundred sellers can exceed: an index that large needs the Workers Paid plan.
 export const DISCOVERY = {
+  // Bump the version whenever StoredDiscovery changes: renders then show nothing until the next whole read.
+  storedKey: 'discovery/v1',
   // Sellers per /sellers page: the index's largest page (DISCOVERY_INDEX_LIMITS.maxSellers).
   sellersPerPage: 200,
   maxRequestsPerRun: 45,
+  // No request of a run begins after this long, so a run with requests at the fetch timeout still ends
+  // well before the next run (2 minutes later) and never overlaps it.
+  runDeadlineMs: 20 * 1000,
   // Requests of a run kept for uptimes that are due, so a large catalog read never takes every run.
   uptimeReservedPerRun: 15,
   // Uptime reads in flight at once: a Worker opens 6 connections at a time, and a queued read's
   // timeout would run while it waits.
   uptimeConcurrency: 6,
-  // A seller's uptime is read again once its last read is this old (its windows span days).
+  // A seller's uptime is tried again this long after its last try (its windows span days).
   uptimeRefreshMs: 10 * 60 * 1000,
-  // A catalog read under way this long (a page that keeps failing) begins again from /models.
+  // A catalog read under way this long (a model that keeps failing or never fits in a run) begins again.
   restartAfterMs: 60 * 60 * 1000,
   // Past this age (two runs and a margin), the page says when the catalog it shows was read.
   staleAfterMs: 5 * 60 * 1000,

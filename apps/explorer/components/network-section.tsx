@@ -43,7 +43,7 @@ export async function NetworkSection() {
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
       {snapshot.readAt ? (
         <p className="-mt-2 mb-3 text-xs text-dim">
-          As read from the discovery index at {utc(snapshot.readAt)}.
+          Discovery index last read at {utc(snapshot.readAt)}.
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -72,7 +72,7 @@ export async function NetworkSection() {
           caption={
             summary.averageDayUptime === null
               ? undefined
-              : `Average of ${count(summary.dayUptimes)} of ${count(snapshot.sellers.length)} online sellers`
+              : `Over ${count(summary.dayUptimes)} of ${count(snapshot.sellers.length)} listed sellers`
           }
         />
       </div>

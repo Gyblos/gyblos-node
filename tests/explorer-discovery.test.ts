@@ -1,8 +1,8 @@
 // Protects the explorer's scheduled read of the discovery index (which answers no-store): a run stays
-// within a fixed number of requests, whatever the number of viewers; a catalog too large for one run is
-// carried on by the next ones and shown only once whole, so the page never shows part of the index as
-// all of it; a failed page is read again, and a read that never ends begins again; uptimes are read in
-// turns with a share of every run kept for them.
+// within a fixed number of requests, whatever the number of viewers; a catalog with more models than fit
+// in one run is carried on by the next ones and shown only once whole, each model read within one run, so
+// the page never shows part of the index as all of it; a failed page or uptime keeps the last good read
+// and is tried again later without starving the rest; what went wrong is reported as fixed codes.
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
@@ -34,8 +34,8 @@ const shownNodes = (stored: StoredDiscovery, now: number) =>
 
 void test('a run reads a small index whole, at the largest page size, and the render shows it', async () => {
   const { requests } = fakeIndex({ models: { a: ['n1', 'n2'], b: ['n2'] } });
-  const { stored, error } = await readIndex(null, () => 100);
-  assert.equal(error, null);
+  const { stored, problems } = await readIndex(null, () => 100);
+  assert.deepEqual(problems, []);
   assert.equal(requests.length, 1 + 1 + 2 + 2);
   assert.ok(
     requests
@@ -53,32 +53,55 @@ void test('a run reads a small index whole, at the largest page size, and the re
   assert.equal(snapshot.generatedAt, 7);
 });
 
-void test('seller pages are followed to the end', async () => {
+void test('seller pages are followed to the end within the run', async () => {
   const { requests } = fakeIndex({ models: { a: nodes('n', 5) }, perPage: 2 });
   const { stored } = await readIndex(null, () => 1);
   assert.equal(count(requests, '/sellers'), 3);
   assert.equal(shownNodes(stored, 1).length, 5);
 });
 
-void test('a catalog too large for one run is carried on by the next runs and shown only once whole', async () => {
+void test('a catalog with more models than fit in a run is carried on and shown only once whole, dated from its start', async () => {
   fakeIndex({ models: { a: ['n1'] } });
   let { stored } = await readIndex(null, () => 0);
   const models = { a: ['n1'], ...manyModels(DISCOVERY.maxRequestsPerRun) };
-  let runs = 0;
+  const began = 2 * MINUTE;
   let now = 0;
+  let runs = 0;
   do {
     now += 2 * MINUTE;
     runs += 1;
     const { requests } = fakeIndex({ models });
     ({ stored } = await readIndex(stored, () => now));
     assert.ok(requests.length <= DISCOVERY.maxRequestsPerRun);
+    assert.ok(requests.every((request) => !request.includes('cursor')));
     if (stored.pending) assert.deepEqual(shownNodes(stored, now), ['n1']);
   } while (stored.pending);
   assert.ok(runs > 1);
   assert.equal(shownNodes(stored, now).length, Object.keys(models).length);
+  assert.equal(stored.catalog?.readAt, began);
 });
 
-void test('while a large catalog is read, every run still reads its share of due uptimes', async () => {
+void test('a model whose pages do not all fit in the run is read again from its first page next run', async () => {
+  const models = {
+    ...manyModels(DISCOVERY.maxRequestsPerRun - 4),
+    big: nodes('b', 5),
+  };
+  fakeIndex({ models, perPage: 2 });
+  let { stored } = await readIndex(null, () => 0);
+  assert.ok(stored.pending);
+  const { requests } = fakeIndex({ models, perPage: 2 });
+  ({ stored } = await readIndex(stored, () => 2 * MINUTE));
+  const big = requests.filter((request) => request.includes('model=big'));
+  assert.equal(big.length, 3);
+  assert.ok(!big[0]?.includes('cursor'));
+  assert.equal(stored.pending, null);
+  assert.equal(
+    shownNodes(stored, 2 * MINUTE).length,
+    Object.keys(models).length + 4,
+  );
+});
+
+void test('while a large catalog is read, a run still reads its share of due uptimes', async () => {
   fakeIndex({ models: { a: nodes('n', 20) } });
   let { stored } = await readIndex(null, () => 0);
   assert.ok(snapshotOf(stored, 0).sellers.every((seller) => seller.uptime));
@@ -91,7 +114,7 @@ void test('while a large catalog is read, every run still reads its share of due
   assert.equal(count(requests, '/uptime'), DISCOVERY.uptimeReservedPerRun);
 });
 
-void test('a failed page ends the run’s reading; the model is read again from its first page next run', async () => {
+void test('a later page that fails ends the run’s catalog reading; the model is read again from its first page', async () => {
   fakeIndex({ models: { a: ['n1'] } });
   let { stored } = await readIndex(null, () => 0);
   const grown = { a: ['n1'], b: nodes('p', 5) };
@@ -99,49 +122,78 @@ void test('a failed page ends the run’s reading; the model is read again from 
     models: grown,
     perPage: 2,
     failSellers: new Set(['b']),
+    failLaterPages: true,
   });
-  ({ stored } = await readIndex(stored, () => 2 * MINUTE));
+  let problems;
+  ({ stored, problems } = await readIndex(stored, () => 2 * MINUTE));
+  assert.deepEqual(problems, ['sellers']);
   assert.ok(stored.pending);
-  assert.equal(count(index.requests, '/sellers'), 2);
+  assert.equal(count(index.requests, 'model=b'), 2);
   assert.deepEqual(shownNodes(stored, 2 * MINUTE), ['n1']);
 
   index = fakeIndex({ models: grown, perPage: 2 });
   ({ stored } = await readIndex(stored, () => 4 * MINUTE));
+  const again = index.requests.filter((request) => request.includes('model=b'));
+  assert.ok(!again[0]?.includes('cursor'));
   assert.equal(stored.pending, null);
-  assert.ok(
-    index.requests.some(
-      (request) => request.includes('model=b') && !request.includes('cursor'),
-    ),
-  );
   assert.equal(shownNodes(stored, 4 * MINUTE).length, 6);
 });
 
-void test('a catalog read that never ends begins again, and the last whole catalog stays shown', async () => {
+void test('a catalog read that never ends begins again, says so, and the last whole catalog stays shown', async () => {
   fakeIndex({ models: { a: ['n1'] } });
   let { stored } = await readIndex(null, () => 0);
-  fakeIndex({ models: { a: ['n1'], b: ['n2'] }, failSellers: new Set(['b']) });
+  const broken = {
+    models: { a: ['n1'], b: ['n2'] },
+    failSellers: new Set(['b']),
+  };
+  fakeIndex(broken);
   ({ stored } = await readIndex(stored, () => MINUTE));
   const began = stored.pending?.startedAt;
+  fakeIndex(broken);
   ({ stored } = await readIndex(stored, () => 2 * MINUTE));
   assert.equal(stored.pending?.startedAt, began);
   const later = MINUTE + DISCOVERY.restartAfterMs;
-  const { requests } = fakeIndex({
-    models: { a: ['n1'], b: ['n2'] },
-    failSellers: new Set(['b']),
-  });
-  ({ stored } = await readIndex(stored, () => later));
+  const { requests } = fakeIndex(broken);
+  let problems;
+  ({ stored, problems } = await readIndex(stored, () => later));
+  assert.ok(problems.includes('catalog-restarted'));
   assert.equal(count(requests, '/models'), 1);
   assert.equal(stored.pending?.startedAt, later);
   assert.deepEqual(shownNodes(stored, later), ['n1']);
   assert.equal(snapshotOf(stored, later).readAt, 0);
 });
 
-void test('uptimes are read in turns, oldest first, a few at a time, and again only once old', async () => {
+void test('a malformed seller entry is skipped and reported; the rest of its page is read', async () => {
+  fakeIndex({
+    models: { a: ['n1', 'bad', 'n2'] },
+    malformed: new Set(['bad']),
+  });
+  const { stored, problems } = await readIndex(null, () => 0);
+  assert.deepEqual(problems, ['seller-record']);
+  assert.deepEqual(shownNodes(stored, 0), ['n1', 'n2']);
+});
+
+void test('no request begins after the run’s deadline', async () => {
+  let now = 0;
+  const { requests } = fakeIndex({
+    models: manyModels(DISCOVERY.maxRequestsPerRun),
+  });
+  // Every request takes a tenth of the deadline.
+  const clock = () => {
+    now += DISCOVERY.runDeadlineMs / 20;
+    return now;
+  };
+  await readIndex(null, clock);
+  assert.ok(requests.length < DISCOVERY.maxRequestsPerRun);
+});
+
+void test('uptimes are tried in turns, never-tried first, a few at a time, and again only once old', async () => {
   const sellers = nodes('n', 100);
   let now = 0;
   let index = fakeIndex({ models: { a: sellers }, uptimeDelayMs: 1 });
   let { stored } = await readIndex(null, () => now);
   assert.equal(index.requests.length, DISCOVERY.maxRequestsPerRun);
+  assert.ok(index.uptimes.most > 1);
   assert.ok(index.uptimes.most <= DISCOVERY.uptimeConcurrency);
   const firstRead = uptimeNodes(index.requests);
   assert.equal(
@@ -157,7 +209,7 @@ void test('uptimes are read in turns, oldest first, a few at a time, and again o
     const read = uptimeNodes(index.requests);
     assert.ok(read.size > 0);
     for (const nodeId of read) {
-      assert.ok(!seen.has(nodeId ?? ''), 'a never-read uptime comes first');
+      assert.ok(!seen.has(nodeId ?? ''), 'a never-tried uptime comes first');
       seen.add(nodeId ?? '');
     }
   }
@@ -169,27 +221,40 @@ void test('uptimes are read in turns, oldest first, a few at a time, and again o
   assert.deepEqual(uptimeNodes(index.requests), firstRead);
 });
 
-void test('a failed uptime read keeps the last one; an uptime goes only with its seller', async () => {
+void test('a failed uptime keeps the last one and waits its turn; an uptime goes only with its seller', async () => {
   fakeIndex({ models: { a: ['n1', 'n2'] } });
   let { stored } = await readIndex(null, () => 0);
   const later = DISCOVERY.uptimeRefreshMs;
   fakeIndex({ models: { a: ['n1', 'n2'] }, failUptime: new Set(['n1']) });
-  ({ stored } = await readIndex(stored, () => later));
-  assert.equal(stored.uptimes.n1?.readAt, 0);
+  let problems;
+  ({ stored, problems } = await readIndex(stored, () => later));
+  assert.deepEqual(problems, ['uptime']);
+  assert.equal(stored.uptimes.n1?.triedAt, later);
   assert.ok(snapshotOf(stored, later).sellers[0]?.uptime);
+  // Not tried again in the next run.
+  const { requests } = fakeIndex({ models: { a: ['n1', 'n2'] } });
+  ({ stored } = await readIndex(stored, () => later + 2 * MINUTE));
+  assert.equal(count(requests, '/uptime'), 0);
 
   fakeIndex({ models: { a: ['n1'] } });
-  ({ stored } = await readIndex(stored, () => later + 1));
+  ({ stored } = await readIndex(stored, () => later + 4 * MINUTE));
   assert.ok(stored.uptimes.n1);
   assert.equal(stored.uptimes.n2, undefined);
 });
 
-void test('a malformed or missing /network answer leaves the catalog without one', async () => {
-  for (const offline of ['malformed', null] as const) {
-    fakeIndex({ models: { a: ['n1'] }, offline });
-    const { stored, error } = await readIndex(null, () => 0);
-    assert.equal(error, null);
-    assert.equal(snapshotOf(stored, 0).network, null);
-    assert.deepEqual(shownNodes(stored, 0), ['n1']);
-  }
+void test('a failed or malformed /network answer keeps the last one; an index without it has none', async () => {
+  fakeIndex({ models: { a: ['n1'] } });
+  let { stored } = await readIndex(null, () => 0);
+  const last = snapshotOf(stored, 0).network;
+  assert.ok(last);
+  fakeIndex({ models: { a: ['n1'] }, offline: 'malformed' });
+  let problems;
+  ({ stored, problems } = await readIndex(stored, () => 2 * MINUTE));
+  assert.deepEqual(problems, ['network']);
+  assert.deepEqual(snapshotOf(stored, 2 * MINUTE).network, last);
+
+  fakeIndex({ models: { a: ['n1'] }, offline: null });
+  const fresh = await readIndex(null, () => 0);
+  assert.equal(snapshotOf(fresh.stored, 0).network, null);
+  assert.deepEqual(shownNodes(fresh.stored, 0), ['n1']);
 });

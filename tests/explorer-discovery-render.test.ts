@@ -9,7 +9,6 @@ import { DISCOVERY, FETCH } from '@gyblos/explorer/constants';
 import {
   loadSnapshot,
   refreshDiscovery,
-  STORED_KEY,
   type DiscoveryKv,
 } from '@gyblos/explorer/discovery';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
@@ -24,15 +23,14 @@ afterEach(() => {
   AbortSignal.timeout = realTimeout;
 });
 
-void test('when the index stops answering, the last catalog stays shown, with when it was read, on every render', async () => {
+void test('when the index stops answering, the run says so and the last catalog stays shown, with when it was read, on every render', async () => {
   const { kv } = fakeKv();
   fakeIndex({ models: { a: ['n1'] } });
   await refreshDiscovery(kv, () => 1000);
   fakeIndex({ models: { a: ['n1'] }, down: true });
-  await assert.rejects(
-    refreshDiscovery(kv, () => 1000 + 2 * MINUTE),
-    /503/,
-  );
+  assert.deepEqual(await refreshDiscovery(kv, () => 1000 + 2 * MINUTE), [
+    'models',
+  ]);
 
   const before = await loadSnapshot(kv, 1000 + DISCOVERY.staleAfterMs);
   assert.equal(before.readAt, null);
@@ -84,12 +82,12 @@ void test('a failing KV serves the last read of it, or the index is unavailable'
     get: () => Promise.reject(new Error('kv down')),
     put: () => Promise.resolve(),
   };
-  assert.equal((await loadSnapshot(failing, 0)).error, 'kv down');
+  assert.equal((await loadSnapshot(failing, 0)).error, 'KV unavailable');
 });
 
 void test('a stored value of another shape is ignored, and the next run replaces it', async () => {
   const { kv, stored } = fakeKv();
-  stored.set(STORED_KEY, '{}');
+  stored.set(DISCOVERY.storedKey, '{}');
   assert.equal((await loadSnapshot(kv, 0)).error, 'discovery not read yet');
   fakeIndex({ models: { a: ['n1'] } });
   await refreshDiscovery(kv, () => 0);
@@ -97,6 +95,8 @@ void test('a stored value of another shape is ignored, and the next run replaces
 });
 
 void test('a source that never answers is given up after the fetch timeout', async () => {
+  // Node's timeout timer does not keep the process alive; this one does until the abort.
+  const hold = setTimeout(() => undefined, 1000);
   let asked = 0;
   AbortSignal.timeout = (ms: number) => {
     asked = ms;
@@ -113,6 +113,7 @@ void test('a source that never answers is given up after the fetch timeout', asy
     name: 'TimeoutError',
   });
   assert.equal(asked, FETCH.timeoutMs);
+  clearTimeout(hold);
 });
 
 void test('the average 24 h uptime is over the sellers with an uptime read, and says how many', () => {

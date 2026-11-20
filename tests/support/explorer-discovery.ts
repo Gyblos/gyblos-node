@@ -8,7 +8,11 @@ export interface IndexShape {
   // Node ids /network calls offline; null for no /network answer, 'malformed' for a bad one.
   offline?: string[] | null | 'malformed';
   down?: boolean;
+  // Models whose /sellers pages fail; with `failLaterPages`, only their pages after the first.
   failSellers?: Set<string>;
+  failLaterPages?: boolean;
+  // Node ids whose seller entry is malformed.
+  malformed?: Set<string>;
   failUptime?: Set<string>;
   perPage?: number;
   // Uptime answers wait this long, so reads overlap.
@@ -23,8 +27,8 @@ const offer = (modelId: string) => ({
 });
 function networkBody(shape: IndexShape, offline: string[]) {
   const gone = new Set(offline);
-  const all = [...new Set(Object.values(shape.models).flat()), ...offline];
-  const entries = [...new Set(all)].map((nodeId) => ({
+  const all = new Set([...Object.values(shape.models).flat(), ...offline]);
+  const entries = [...all].map((nodeId) => ({
     nodeId,
     state: gone.has(nodeId) ? 'offline' : 'online',
     firstSeenAt: 1,
@@ -60,7 +64,10 @@ export function fakeIndex(shape: IndexShape) {
       });
     if (url.pathname.endsWith('/sellers')) {
       const model = url.searchParams.get('model') ?? '';
-      if (shape.failSellers?.has(model))
+      if (
+        shape.failSellers?.has(model) &&
+        (!shape.failLaterPages || url.searchParams.has('cursor'))
+      )
         return new Response('{}', { status: 500 });
       const listed = shape.models[model] ?? [];
       const perPage = shape.perPage ?? Number(url.searchParams.get('limit'));
@@ -68,7 +75,11 @@ export function fakeIndex(shape: IndexShape) {
       const end = Math.min(start + perPage, listed.length);
       return json({
         sellers: listed.slice(start, end).map((nodeId) => ({
-          catalog: { record: { nodeId, owner: 'o', models: [offer(model)] } },
+          catalog: {
+            record: shape.malformed?.has(nodeId)
+              ? { nodeId }
+              : { nodeId, owner: 'o', models: [offer(model)] },
+          },
         })),
         next: end < listed.length ? String(end) : null,
       });
