@@ -1,28 +1,41 @@
 // Static desktop explanations for validated buyer failures; remote text is never displayed.
 // Presentation does not change retry decisions, budget reservations or payment uncertainty.
+import { BUYER_DEPOSIT_MINIMUM_HINT } from '@gyblos/config/batch-session';
 import {
   BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
   type SellerSelectionCode,
 } from '@gyblos/core/constants';
-import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  BUYER_SIDECAR,
+  type BuyerApiPolicy,
+} from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_STOP_REASONS,
   type FreeExecutionCode,
 } from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 export class BuyerSessionRequired extends Error {
-  constructor() {
+  constructor(
+    reason:
+      | typeof BUYER_SIDECAR.SESSION_REQUIRED
+      | typeof BUYER_SIDECAR.DEPOSIT_MINIMUM = BUYER_SIDECAR.SESSION_REQUIRED,
+  ) {
     super(
-      'Paid settings need a payment channel. Add session.depositAtomic and session.lifetimeMs to buyer/selection.json before starting the buyer.',
+      reason === BUYER_SIDECAR.DEPOSIT_MINIMUM
+        ? BUYER_DEPOSIT_MINIMUM_HINT
+        : 'Paid settings need a payment channel. Add session.depositAtomic and session.lifetimeMs to buyer/selection.json before starting the buyer.',
     );
   }
 }
 
 type BuyerCode =
   | typeof BUYER_ROUTING_CODES.BUSY
+  | typeof PAID_EXECUTION_CODES.PEER
   | FreeExecutionCode
   | SellerSelectionCode
   | typeof SESSION_CODES.BINDING
@@ -91,6 +104,14 @@ export function desktopBuyerFailure(
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+  if (
+    row.code === PAID_EXECUTION_CODES.PEER &&
+    row[BUYER_API.NEVER_SENT_FIELD] === true
+  )
+    return new DesktopBuyerFailure(
+      PAID_EXECUTION_CODES.PEER,
+      'The selected seller could not open a payment channel. Choose another seller.',
+    );
   const code = [
     BUYER_ROUTING_CODES.BUSY,
     SESSION_CODES.BINDING,

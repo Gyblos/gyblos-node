@@ -23,17 +23,24 @@ import type {
 
 import { createBuyerBatchSession } from './batch-buyer';
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
+import {
+  prepareNewChannel,
+  type PreparedChannel,
+} from './buyer-channel-prepare';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
+  newSessionTerms,
   parseBuyerSessionPolicy,
-  sessionTerms,
   type BuyerSessionPolicy,
 } from './session-policy';
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
+  // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
+  openingSupportsBlocks?: boolean;
+  preparation?: PreparedChannel;
   receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
   policy: BuyerSessionPolicy;
   inspect(): Promise<BatchStoredSession | undefined>;
@@ -69,7 +76,7 @@ async function openCurrent<Remote extends BatchDestination>(
   if (stored?.notCreated) return sessionFail(SESSION_CODES.CLOSED);
   const terms =
     stored?.terms ??
-    (quote ? sessionTerms(quote, options.policy, options.now()) : undefined);
+    (quote ? newSessionTerms(quote, options.policy, options.now()) : undefined);
   if (!terms) return sessionFail(SESSION_CODES.UNAVAILABLE);
   if (quote && !stored)
     await verifyBatchQuote(
@@ -78,6 +85,10 @@ async function openCurrent<Remote extends BatchDestination>(
       options.endpoint.id().toString(),
       options.now(),
     );
+  const preparation =
+    quote && !stored && options.openingSupportsBlocks !== undefined
+      ? await prepareNewChannel(options, quote, terms, signal)
+      : options.preparation;
   signal.throwIfAborted();
   const destination = options.destination(terms);
   if (!state.backend) {
@@ -99,6 +110,7 @@ async function openCurrent<Remote extends BatchDestination>(
       financial,
       host: createBuyerBatchSession({
         ...options,
+        preparation,
         terms,
         buyer: financial,
         destination,
@@ -192,7 +204,7 @@ async function renewable<Remote extends BatchDestination>(
         BigInt(opened.terms.depositAtomic))
   )
     return opened;
-  const proposed = sessionTerms(quote, options.policy, options.now());
+  const proposed = newSessionTerms(quote, options.policy, options.now());
   await verifyBatchQuote(
     quote,
     proposed,
@@ -201,20 +213,25 @@ async function renewable<Remote extends BatchDestination>(
   );
   const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
+  const authority =
+    BigInt(options.policy.depositAtomic) -
+    BigInt(stored.priorSpentAtomic ?? '0');
+  const replacement = (spent: string) =>
+    newSessionTerms(
+      quote,
+      {
+        ...options.policy,
+        depositAtomic: String(authority - BigInt(spent)),
+      },
+      options.now(),
+    );
+  if (snapshot.state !== SESSION_STATES.CLOSED)
+    replacement(snapshot.cumulativeAtomic);
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
       (await opened.host.close(signal)))
     : undefined;
-  const remaining =
-    BigInt(options.policy.depositAtomic) -
-    BigInt(stored.priorSpentAtomic ?? '0') -
-    BigInt(settlement?.chargedAtomic ?? '0');
-  if (remaining <= 0n) return sessionFail(SESSION_CODES.LIMIT);
-  const terms = sessionTerms(
-    quote,
-    { ...options.policy, depositAtomic: String(remaining) },
-    options.now(),
-  );
+  const terms = replacement(settlement?.chargedAtomic ?? '0');
   await verifyBatchQuote(
     quote,
     terms,

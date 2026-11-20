@@ -46,6 +46,7 @@ void test(
       for (const client of endpoints) await client.close();
     });
     const rig = await sellerRegistryRig(2, {
+      depositAtomic: '10000',
       sellerNodeId: sellerEndpoint.id().toString(),
       buyerNodeIds: endpoints.map((peer) => peer.id().toString()),
       prepareOpenings: false,
@@ -94,7 +95,7 @@ void test(
           endpoint: endpoints[index]!,
           destination: () => sellerEndpoint.addr(),
           policy: {
-            depositAtomic: '1000',
+            depositAtomic: '10000',
             lifetimeMs: 3_600_000,
             withdrawDelaySeconds: 900,
           },

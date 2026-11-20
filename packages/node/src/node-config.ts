@@ -42,6 +42,7 @@ import {
 
 export type { NodeConfigIssue, NodeConfigWarning } from './node-config-fields';
 export {
+  atomicToUsdc,
   pricePerMtokToAtomicPerMtok,
   readPriceDecimal,
   type PriceDecimal,

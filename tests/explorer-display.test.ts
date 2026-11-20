@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
 import { delta } from '@gyblos/explorer/board-delta';
+import { hoveredPoint } from '@gyblos/explorer/board-hovered';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
 import { FETCH } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
@@ -15,7 +16,7 @@ import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { summarizeOffers } from '@gyblos/explorer/offers';
 import { parseRange, rangeQuery } from '@gyblos/explorer/range';
-import { dailyRequests } from '@gyblos/explorer/usage';
+import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
 
 const realFetch = globalThis.fetch;
 const realTimeout = AbortSignal.timeout.bind(AbortSignal);
@@ -230,4 +231,25 @@ void test('the average 24 h uptime is over the sellers with an uptime read, and 
   });
   assert.equal(summary.sellersWithDayUptime, 2);
   assert.equal(summary.averageDayUptime, 0.75);
+});
+
+void test('the Usage note names the comparison only when the earlier span was read', () => {
+  const at = Date.UTC(2026, 10, 19, 20, 10);
+  assert.equal(
+    usageMeta(30, at, true),
+    'vs previous 30 days · updated 2026-11-19 20:10 UTC',
+  );
+  assert.equal(usageMeta(30, at, false), 'updated 2026-11-19 20:10 UTC');
+  assert.equal(usageMeta(30, null, true), 'no data yet');
+});
+
+void test('a chart hover picks a bar only at a real index, never the first day off the bars', () => {
+  const days = ['10-01', '10-02'];
+  assert.equal(hoveredPoint(days, 1), '10-02');
+  assert.equal(hoveredPoint(days, '0'), '10-01');
+  assert.equal(hoveredPoint(days, null), null);
+  assert.equal(hoveredPoint(days, undefined), null);
+  assert.equal(hoveredPoint(days, ''), null);
+  assert.equal(hoveredPoint(days, 5), null);
+  assert.equal(hoveredPoint(days, 1.5), null);
 });

@@ -3,7 +3,7 @@
 // refused. Offline.
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -31,6 +31,47 @@ const ICACLS = join(
   process.env.SystemRoot ?? 'C:\\Windows',
   'System32',
   'icacls.exe',
+);
+
+void test(
+  'windows: interrupted payment folder setup can be retried',
+  { skip: !WINDOWS },
+  async (t) => {
+    const root = await mkdtemp(join(tmpdir(), 'gyblos-payment-retry-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const directory = join(root, 'payments');
+    const paths = { directory, lock: join(directory, 'lock') };
+    // Start Node with the real Windows installation before making ACL tools unavailable.
+    const source = `
+      import { ensurePrivatePaymentPaths } from '@gyblos/runtime/private-file';
+      process.env.SystemRoot = process.argv[2];
+      await ensurePrivatePaymentPaths(JSON.parse(process.argv[1]));
+    `;
+    const failed = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        '--input-type=module',
+        '-e',
+        source,
+        JSON.stringify(paths),
+        root,
+      ],
+      {
+        cwd: REPOSITORY_ROOT,
+        encoding: 'utf8',
+      },
+    );
+    assert.equal(failed.status, 1);
+    assert.match(failed.stderr, /PRIVATE_FILE_UNAVAILABLE/);
+    await assert.rejects(lstat(directory), { code: 'ENOENT' });
+    await Promise.all([
+      ensurePrivatePaymentPaths(paths),
+      ensurePrivatePaymentPaths(paths),
+    ]);
+    assert.equal(await pathsArePrivate([directory]), ACL_VERDICTS.PRIVATE);
+  },
 );
 
 void test(

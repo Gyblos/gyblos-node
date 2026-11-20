@@ -36,6 +36,7 @@ import type {
 } from './batch-buyer-types';
 import { bounded } from './buyer-operation';
 
+export { UnsentChannelPeerError } from './buyer-channel-prepare';
 export type { BuyerBatchSessionOptions } from './batch-buyer-types';
 function createContext<Remote extends BatchDestination>(
   input: BuyerBatchSessionOptions<Remote>,

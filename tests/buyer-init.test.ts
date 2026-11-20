@@ -195,3 +195,20 @@ void test('old paid settings require a session and old free settings remain read
     /session/i,
   );
 });
+
+void test('buyer startup settings reject a subminimum channel deposit with an actionable reason', () => {
+  const config = buildBuyerInit(answers());
+  const withDeposit = (depositAtomic: string) => ({
+    ...config,
+    session: { ...config.session, depositAtomic },
+  });
+  for (const amount of ['0', '9999'])
+    assert.throws(
+      () => parseBuyerSelectionConfig(withDeposit(amount)),
+      /depositAtomic.*10000/i,
+    );
+  assert.equal(
+    parseBuyerSelectionConfig(withDeposit('10000')).session?.depositAtomic,
+    '10000',
+  );
+});

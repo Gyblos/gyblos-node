@@ -6,7 +6,10 @@ export {
   type BuyerSellerChoice,
 } from './buyer-api/seller-choice';
 export { BUYER_API } from './buyer-api/constants';
-export { BUYER_SIDECAR } from './buyer-api/constants';
+export {
+  BUYER_SIDECAR,
+  isBuyerSessionConfigFailure,
+} from './buyer-api/constants';
 export interface BuyerApiPolicy {
   version: typeof BUYER_API.VERSION;
   policyId: string;

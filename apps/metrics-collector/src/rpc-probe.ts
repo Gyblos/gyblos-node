@@ -83,6 +83,7 @@ async function probeOne(
             ? error.name
             : 'unknown',
       refused: error instanceof ChainRpcError && error.rateLimited,
+      wrongNetwork: error instanceof ChainRpcError && error.wrongNetwork,
     };
   }
 }

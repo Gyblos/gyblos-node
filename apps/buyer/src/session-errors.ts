@@ -2,8 +2,10 @@
 import { HTTP_STATUS } from '@gyblos/config';
 import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
+import { UnsentChannelPeerError } from '@gyblos/node/batch-buyer';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
@@ -29,7 +31,11 @@ const unavailable = (
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
-  if (error instanceof UnsentSellerChoiceError)
+  if (
+    error instanceof UnsentSellerChoiceError ||
+    error instanceof UnsentChannelLimitError ||
+    error instanceof UnsentChannelPeerError
+  )
     return unavailable(error.code, true);
   const keyError = buyerApiKeyErrorView(error);
   if (keyError) return keyError;

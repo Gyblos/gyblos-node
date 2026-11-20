@@ -25,7 +25,10 @@ void test(
     t.mock.method(globalThis, 'fetch', async () =>
       assert.fail('External RPC forbidden'),
     );
-    const rig = await sellerRegistryRig(1, { now: () => now });
+    const rig = await sellerRegistryRig(1, {
+      now: () => now,
+      depositAtomic: '10000',
+    });
     t.after(rig.dispose);
     let registry = await rig.open();
     t.after(() => registry.dispose());
@@ -95,6 +98,7 @@ void test(
       await registry.permits(rig.buyers[1]!.terms.buyerNodeId),
       false,
     );
+    const initialBalance = await rig.vm.balance(terms.buyer);
     rig.vm.loseConfirmation(true);
     await assert.rejects(
       host.service.exchange(
@@ -103,7 +107,10 @@ void test(
         signal,
       ),
     );
-    assert.equal(await rig.vm.balance(terms.buyer), 99000n);
+    assert.equal(
+      await rig.vm.balance(terms.buyer),
+      initialBalance - BigInt(terms.depositAtomic),
+    );
     await assert.rejects(
       host.service.exchange(
         request(BATCH_METHODS.PREPARE, {
