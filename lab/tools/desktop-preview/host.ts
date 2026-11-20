@@ -65,6 +65,8 @@ export function createPreviewHost(
     policyId: example,
     model,
     maxTokens: 256,
+    depositAtomic: '1000000',
+    lifetimeMs: PREVIEW.halfHourMs * 2,
     maxAtomic: query.get('seller-budget') === 'ready' ? '10000' : '0',
     ...scope,
   };

@@ -36,6 +36,9 @@ function expireListings(
   }
   return snapshot;
 }
+function freshUntil(now: number, until: number) {
+  return now < until && now >= until - NETWORK_CATALOG.REFRESH_MS;
+}
 export function createCatalogSession(
   fetch: DiscoveryFetch,
   now: () => number,
@@ -61,10 +64,17 @@ export function createCatalogSession(
     snapshot = emptyCatalog(CATALOG_STATE.ERROR);
   }
   if (!closed) signal.addEventListener('abort', close, { once: true });
+  const read = (
+    model: string,
+    signal: AbortSignal,
+    offers: Map<string, CatalogSellerChoice>,
+  ) =>
+    model
+      ? readAnnouncements(fetch, model, now, signal, offers)
+      : browseAnnouncements(fetch, now, signal, offers);
   let nextRefresh = 0;
   async function load(model: string) {
-    if (closed || (model !== '' && !validCatalogQuery(model)))
-      return emptyCatalog(CATALOG_STATE.ERROR);
+    if (closed) return emptyCatalog(CATALOG_STATE.ERROR);
     if (pending?.query === model) return pending.result;
     pending?.controller.abort();
     const current = ++sequence;
@@ -73,15 +83,7 @@ export function createCatalogSession(
     const result = (async () => {
       try {
         const offers = new Map<string, CatalogSellerChoice>();
-        const loaded = model
-          ? await readAnnouncements(
-              fetch,
-              model,
-              now,
-              controller.signal,
-              offers,
-            )
-          : await browseAnnouncements(fetch, now, controller.signal, offers);
+        const loaded = await read(model, controller.signal, offers);
         if (!closed && sequence === current) {
           choices = offers;
           snapshot = loaded;
@@ -102,11 +104,7 @@ export function createCatalogSession(
     browse() {
       const current = now();
       if (pending?.query === '') return pending.result;
-      if (
-        current < nextRefresh &&
-        current >= nextRefresh - NETWORK_CATALOG.REFRESH_MS
-      )
-        return Promise.resolve(summary());
+      if (freshUntil(current, nextRefresh)) return Promise.resolve(summary());
       nextRefresh = current + NETWORK_CATALOG.REFRESH_MS;
       return load('');
     },

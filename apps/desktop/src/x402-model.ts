@@ -62,6 +62,12 @@ export function paidSellerLimitNotice(
     return 'Connect the local buyer in Payments to use a paid seller.';
   if (policy.maxAtomic === '0')
     return 'Raise the per-request maximum in buyer/selection.json (request.maxAtomic, in atomic USDC units) and restart the buyer to use a paid seller.';
+  if (
+    !policy.depositAtomic ||
+    !policy.lifetimeMs ||
+    policy.mint !== DEVNET_USDC
+  )
+    return 'Connect a buyer with a devnet USDC channel configured in Payments.';
   if (modelId !== MODEL_IDS.QWEN3_0_6B)
     return 'This model is unavailable for paid chat because its token counts cannot be verified.';
   if (!budget.active) return undefined;

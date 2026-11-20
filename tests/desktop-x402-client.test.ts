@@ -354,7 +354,12 @@ void test('a paid seller cannot receive a request while either chat spending lim
     const ledger = budget();
     const client = new X402Client(ledger, async (_url, options) => {
       if (options?.method !== 'POST')
-        return Response.json({ ...policy, maxAtomic });
+        return Response.json({
+          ...policy,
+          maxAtomic,
+          depositAtomic: '750000',
+          lifetimeMs: 900000,
+        });
       posts++;
       return Response.json(reply());
     });

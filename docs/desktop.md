@@ -132,8 +132,8 @@ synchronized, and conversation content is not encrypted.
 - Local dates are when this device observed a record, not the chain's block
   time.
 
-The sample catalog is a preview. An exact-ID lookup shows signed network
-listings. Each paid listing identifies its seller and shows input and output
+Chat automatically lists signed network offers and refreshes them while the app
+is open. Each paid listing identifies its seller and shows input and output
 prices in devnet USDC per million tokens. Choose a seller and confirm the
 displayed channel terms. The buyer verifies the seller and quote before sending
 the first paid message. An expired listing or a changed price requires a fresh
@@ -143,22 +143,22 @@ A zero per-request maximum blocks paid chat. Raise `request.maxAtomic` in the
 buyer profile and restart the buyer. If you set a chat budget in Payments, its
 remaining amount must cover that maximum. Choosing a seller does not change
 either limit. A recorded answer approval counts toward the budget while
-settlement is pending. The buyer checks the default 1 USDC deposit and one-hour
-lifetime when using the desktop seller picker.
+settlement is pending. The buyer supplies the deposit and duration shown in the
+confirmation.
 
 ## Network contact
 
 The renderer has no network access. The host process makes these contacts:
 
-| Destination                     | When                                                                                                     | How to turn it off                                                     |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `api.github.com` release list   | At start and at most every 5 minutes, to show the update notice. It never downloads or installs anything | `GYBLOS_UPDATE_CHECK=0`                                                |
-| Discovery index (`/v1/sellers`) | Model network checks and exact-ID lookups                                                                |                                                                        |
-| Gyblos relays and sellers       | While the local buyer runs                                                                               | Stop the buyer                                                         |
-| Metrics collector               | Packaged app only: the managed buyer uploads receipts and telemetry observations, as a release CLI does  | `GYBLOS_OBSERVATIONS=off` stops observations; receipts have no opt-out |
-| Solana devnet RPC               | The buyer's payment and identity checks                                                                  |                                                                        |
-| Solana devnet explorer          | Only when you open a payment reference                                                                   |                                                                        |
-| PayPal Sandbox                  | Only during a PayPal Sandbox session                                                                     |                                                                        |
+| Destination                                   | When                                                                                                     | How to turn it off                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `api.github.com` release list                 | At start and at most every 5 minutes, to show the update notice. It never downloads or installs anything | `GYBLOS_UPDATE_CHECK=0`                                                |
+| Discovery index (`/v1/models`, `/v1/sellers`) | Model network checks and exact-ID lookups                                                                |                                                                        |
+| Gyblos relays and sellers                     | While the local buyer runs                                                                               | Stop the buyer                                                         |
+| Metrics collector                             | Packaged app only: the managed buyer uploads receipts and telemetry observations, as a release CLI does  | `GYBLOS_OBSERVATIONS=off` stops observations; receipts have no opt-out |
+| Solana devnet RPC                             | The buyer's payment and identity checks                                                                  |                                                                        |
+| Solana devnet explorer                        | Only when you open a payment reference                                                                   |                                                                        |
+| PayPal Sandbox                                | Only during a PayPal Sandbox session                                                                     |                                                                        |
 
 `GYBLOS_COLLECTOR_URL` from the launch environment overrides the collector
 address. See [receipts](receipts.md) and [telemetry](telemetry.md) for what is

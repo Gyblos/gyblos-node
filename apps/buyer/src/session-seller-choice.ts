@@ -1,5 +1,4 @@
 // Restrict a single owner-authenticated chat to the verified seller and terms that were selected.
-import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import { primaryRelayUrl } from '@gyblos/transport-iroh/endpoint';
@@ -19,9 +18,6 @@ export function prepareChosenSeller(
     !prepared.identity ||
     !prepared.discovery ||
     !config.session ||
-    config.session.depositAtomic !==
-      BUYER_SESSION_DEFAULT_POLICY.depositAtomic ||
-    config.session.lifetimeMs !== BUYER_SESSION_DEFAULT_POLICY.lifetimeMs ||
     choice.expiresAt <= Date.now() ||
     (config.pinnedNodeId && config.pinnedNodeId !== choice.nodeId)
   )

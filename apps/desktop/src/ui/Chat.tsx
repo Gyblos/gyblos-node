@@ -91,6 +91,7 @@ type Props = {
   onBrowseApplications: () => void;
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
+  confirmedPolicy?: string;
   onDefaultModel?: () => void;
   onBrowseModels: () => void;
   onReviewPaypal: () => void;
@@ -149,6 +150,7 @@ export function Chat({
   onBrowseApplications,
   models,
   onSelectModel,
+  confirmedPolicy,
   onDefaultModel,
   onBrowseModels,
   onReviewPaypal,
@@ -210,11 +212,18 @@ export function Chat({
     model.free &&
     (x402?.state.policy?.maxAtomic !== '0' ||
       x402?.state.policy?.model !== model.name);
-  const limitNotice = freeListingMismatch
-    ? 'Select this model and set the maximum per response to zero in Payments to use free inference.'
-    : usingX402 && x402 && model.offerId
-      ? paidSellerLimitNotice(x402.state.policy, x402.state.summary, model.name)
-      : undefined;
+  const limitNotice =
+    model.offerId && x402?.state.policy?.policyId !== confirmedPolicy
+      ? 'Select the seller again to confirm the current channel terms.'
+      : freeListingMismatch
+        ? 'Select this model and set the maximum per response to zero in Payments to use free inference.'
+        : usingX402 && x402 && model.offerId
+          ? paidSellerLimitNotice(
+              x402.state.policy,
+              x402.state.summary,
+              model.name,
+            )
+          : undefined;
   const canSend =
     !limitNotice &&
     !loadingHistory &&
@@ -429,7 +438,10 @@ export function Chat({
             action: X402_ACTION.SEND,
             id,
             prompt: session.draft,
-            ...(model.offerId && { offerId: model.offerId }),
+            ...(model.offerId && {
+              offerId: model.offerId,
+              policyId: confirmedPolicy,
+            }),
           },
           (text) => chat.appendBuyer(conversation, id, text),
         )

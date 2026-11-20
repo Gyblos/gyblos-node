@@ -18,19 +18,24 @@ export interface BuyerDesktopOptions {
   token?: string;
   desktopPolicy?: Pick<
     BuyerApiPolicy,
-    'network' | 'mint' | 'payer' | 'maxAtomic'
+    'network' | 'mint' | 'payer' | 'maxAtomic' | 'depositAtomic' | 'lifetimeMs'
   >;
 }
 export function configuredBuyerAccess(
   request: BuyerSelectionConfig['request'],
   role: RoleConfig | undefined,
   token: string | undefined,
+  session?: BuyerSelectionConfig['session'],
 ): BuyerDesktopOptions {
   return {
     token,
     desktopPolicy:
       token && role?.role === P2P_ROLES.BUYER
         ? {
+            ...(session && {
+              depositAtomic: session.depositAtomic,
+              lifetimeMs: session.lifetimeMs,
+            }),
             network: request.network,
             mint: request.asset,
             payer: role.buyer,

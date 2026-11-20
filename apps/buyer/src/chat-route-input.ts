@@ -5,8 +5,8 @@ import type { ModelSelection } from '@gyblos/protocol/control-types';
 import type { ChatApi } from './chat-api';
 import { withoutStop } from './chat-stop';
 import { FREE_BUYER_CODES, OPENROUTER } from './constants';
-import type { RouteContext } from './free-context';
 import { FreeBuyerError } from './free-chat';
+import type { RouteContext } from './free-context';
 import {
   endpointRoutes,
   requestedModel,

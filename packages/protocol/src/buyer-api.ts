@@ -13,6 +13,8 @@ export interface BuyerApiPolicy {
   model: string;
   maxTokens: number;
   maxAtomic: string;
+  depositAtomic?: string;
+  lifetimeMs?: number;
   network: string;
   mint: string;
   payer: string;
@@ -47,7 +49,12 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
     !BUYER_API.ADDRESS_PATTERN.test(value.payer)
   )
     throw new Error('Invalid buyer policy');
+  const session =
+    value.depositAtomic === undefined && value.lifetimeMs === undefined
+      ? {}
+      : parseTerms(value);
   return {
+    ...session,
     version: BUYER_API.VERSION,
     policyId: value.policyId,
     model: value.model,
@@ -57,4 +64,16 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
     mint: value.mint,
     payer: value.payer,
   };
+}
+
+function parseTerms(value: Record<string, unknown>) {
+  if (
+    !buyerAtomic(value.depositAtomic) ||
+    value.depositAtomic === '0' ||
+    typeof value.lifetimeMs !== 'number' ||
+    !Number.isSafeInteger(value.lifetimeMs) ||
+    value.lifetimeMs <= 0
+  )
+    throw new Error('Invalid buyer channel terms');
+  return { depositAtomic: value.depositAtomic, lifetimeMs: value.lifetimeMs };
 }

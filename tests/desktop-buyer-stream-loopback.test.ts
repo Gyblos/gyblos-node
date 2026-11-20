@@ -284,7 +284,7 @@ void test('the desktop sends the selected seller to the authenticated channel ro
           session: {
             approvedAtomic: '30',
             cumulativeAtomic: '30',
-            depositAtomic: '1000000',
+            depositAtomic: '750000',
           },
         },
       };
@@ -297,6 +297,8 @@ void test('the desktop sends the selected seller to the authenticated channel ro
         network: DEVNET,
         mint: DEVNET_USDC,
         payer: seller.owner,
+        depositAtomic: '750000',
+        lifetimeMs: 900000,
         maxAtomic: '100',
       },
     },
