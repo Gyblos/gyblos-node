@@ -80,6 +80,7 @@ export const REGISTRATION_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> =
 export const DISCOVERY_PATHS = {
   records: '/records',
   sellers: '/sellers',
+  models: '/models',
   registrations: '/registrations',
   uptime: '/uptime',
 } as const;

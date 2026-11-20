@@ -12,11 +12,6 @@ import {
 } from '@gyblos/runtime/constants';
 
 import {
-  createPrivateLog,
-  diagnosticDirectory,
-  rm,
-} from './support/facilitator-diagnostic-fixture';
-import {
   directorySnapshot,
   PRIVATE_LOG_PLATFORM_SKIP,
   seedJournal,
@@ -24,6 +19,11 @@ import {
   slotName,
   withLogIo,
 } from './support/private-log-fixture';
+import {
+  createPrivateLog,
+  diagnosticDirectory,
+  rm,
+} from './support/private-log-records';
 
 const OPTIONS = { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP };
 // `{"index":N}\n` is 12 bytes, so each rotated file holds exactly two records.

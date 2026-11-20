@@ -138,3 +138,20 @@ void test('lost conversational approval ACK recovers after restart without anoth
   assert.equal(result.approval.cumulativeAtomic, '30');
   assert.equal(f.generated.length, 2);
 });
+
+void test('a single-channel buyer refuses another seller before sending and preserves the first channel after restart', async (t) => {
+  const f = await batchConversation();
+  t.after(f.close);
+  const signal = new AbortController().signal;
+  await f.buyer().execute(await f.quote(1), CONVERSATION_INPUT, signal);
+  const before = await f.inspect();
+  for (const restart of [false, true]) {
+    if (restart) await f.restart();
+    const quote = await f.quote(2, { nodeId: '56'.repeat(32) });
+    await assert.rejects(f.buyer().execute(quote, CONVERSATION_INPUT, signal), {
+      neverSent: true,
+    });
+    assert.deepEqual(await f.inspect(), before);
+  }
+  assert.deepEqual(f.rig.calls, ['deposit']);
+});

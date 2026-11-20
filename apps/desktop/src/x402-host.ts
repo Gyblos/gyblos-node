@@ -65,6 +65,9 @@ export function registerDesktopX402(
   window: BrowserWindow,
   profile: string,
   directory: string,
+  resolveOffer: ReturnType<
+    typeof import('./catalog/host').registerNetworkCatalog
+  >,
 ) {
   const paths = desktopX402Paths(profile);
   let ownership: Promise<ProcessLock> | null = null;
@@ -104,6 +107,7 @@ export function registerDesktopX402(
         DESKTOP_X402.PROGRESS_CHANNEL,
         progress,
       ),
+    resolveOffer,
   );
   const apiKeys = createUsdcApiHandlers(
     client,

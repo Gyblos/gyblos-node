@@ -1,6 +1,6 @@
 // `pnpm buyer:withdraw:paid`: takes each stuck paid channel one step toward a refund on devnet, signed
 // and paid by the buyer's wallet; prints one JSON line per channel and a summary, never keys or URLs.
-// Run it again after `retryAfterSeconds` while it exits 2, then `pnpm buyer:reconcile:paid`.
+// Run it again after `retryAfterSeconds` while it exits 2.
 import {
   buyerChainWithdraw,
   WITHDRAW_STEPS,

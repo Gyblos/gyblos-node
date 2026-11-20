@@ -17,7 +17,6 @@ import {
   GYBLOS_ALPN,
   RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
-import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
 import { SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
 
 import {
@@ -40,10 +39,6 @@ import {
 import { handleIrohConnection } from './iroh-connection';
 import { createPeerLimiter } from './limiter';
 import { loopbackRequest } from './loopback';
-import {
-  handlePaidExecutionConnection,
-  type PaidExecutionService,
-} from './paid-server';
 import { relayOnlyAllows } from './paths';
 import { createReceiptServer } from './receipt-server';
 import type { ReceiptService } from './receipt-service';
@@ -65,7 +60,6 @@ export function serveIroh(
   freeExecution?: FreeExecutionService,
   limits: TransportLimits = TRANSPORT_LIMITS,
   receipts?: ReceiptService,
-  paidExecution?: PaidExecutionService,
   batchSessions?: BatchChannelService,
 ) {
   const receiptServer = receipts ? createReceiptServer(receipts) : undefined;
@@ -206,22 +200,6 @@ export function serveIroh(
     );
   }
 
-  async function paidConnection(
-    connection: Connection,
-    signal: AbortSignal,
-    peer: string,
-  ) {
-    if (!paidExecution) return;
-    await handlePaidExecutionConnection(
-      connection,
-      paidExecution,
-      signal,
-      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
-      () => closed,
-      () => routeAllowed(connection),
-    );
-  }
-
   async function handle(connection: Connection) {
     const peer = connection.remoteId().toString();
     const alpn = Buffer.from(connection.alpn()).toString();
@@ -279,10 +257,6 @@ export function serveIroh(
       }
       if (isBatchAlpn(alpn) && batchSessions) {
         await batchConnection(connection, controller.signal, peer);
-        return;
-      }
-      if (alpn === PAID_STREAM.alpn && paidExecution) {
-        await paidConnection(connection, controller.signal, peer);
         return;
       }
       if (alpn !== GYBLOS_ALPN) {

@@ -150,11 +150,11 @@ void test('wallet and PayPal actions belong to their payment method in the previ
     payments,
     /aria-label="USDC wallet"[\s\S]*?onClick=\{onBudget\}/,
   );
-  assert.match(payments, /label="Account budget"/);
-  assert.match(payments, /Edit account budget/);
+  assert.match(payments, /label="Chat budget"/);
+  assert.match(payments, /Edit chat budget/);
   assert.doesNotMatch(
     payments + (await render('X402Payments')),
-    /chat (budget|spending limit)/i,
+    /account (budget|spending limit)/i,
   );
   assert.match(payments, /aria-label="PayPal"[\s\S]*?onClick=\{openPaypal\}/);
   assert.doesNotMatch(await render('SpendingHistory'), /action=\{actions\}/);

@@ -8,15 +8,12 @@ market value: the beta tests the payment path, not real income. Mainnet is not o
 
 ## What you can sell [#beta-scope]
 
-| How you sell                 | Who can buy             | Tools (agents) | Availability                |
-| ---------------------------- | ----------------------- | -------------- | --------------------------- |
-| **Free**                     | Any buyer               | Yes            | Every seller                |
-| **Priced, paid per request** | Any buyer               | No, text only  | Every seller; this page     |
-| Priced, reusable channel     | Any authenticated buyer | Yes            | Sellers with a priced offer |
+| How you sell             | Who can buy             | Tools (agents) | Availability                |
+| ------------------------ | ----------------------- | -------------- | --------------------------- |
+| **Free**                 | Any buyer               | Yes            | Every seller                |
+| Priced, reusable channel | Any authenticated buyer | Yes            | Sellers with a priced offer |
 
-Coding agents can use tools with free offers and reusable channels. A priced
-per-request offer serves plain text conversations. To tune a free offer for agents, see
-[answer and context length](/en/sellers/models-offers#answer-and-context-length).
+Reusable channels support conversations with tools.
 
 ## Prerequisites [#requirements]
 
@@ -50,18 +47,7 @@ never both. You set the net price; buyers see it **plus the 4% Gyblos fee**.
 Run `gyblos doctor` (Docker seller: `docker compose run --rm seller gyblos doctor`) and copy the `fee payer`
 address. Send it about 0.05 devnet SOL from [the devnet faucet](https://faucet.solana.com).
 
-The fee payer spends devnet SOL on:
-
-- about 0.002 SOL once for each missing token account (your USDC payout account and the fee accounts), which
-  the seller creates at startup;
-- about 0.00002 SOL in transaction fees per paid request with the default settings (an estimate, not a
-  maximum);
-- about 0.002 SOL of rent per paid request, held until a cleanup recovers it. After a restart, some older rent
-  may not come back automatically.
-
-  0.05 SOL is a starting balance, not a budget: many requests in a row use it up fast, so fund more if you
-  expect heavy use. If it runs low, the seller does not start (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) or cannot
-  collect. Check its balance regularly and top it up from the faucet.
+The fee payer needs devnet SOL for channel transactions.
 
 ## 3. Apply and verify
 
@@ -73,27 +59,13 @@ Apply the change as described in
 
 ## How a buyer pays you [#how-payment-works]
 
-Each paid request is paid on its own:
-
-1. The buyer signs a maximum for the request and deposits it in a payment channel.
-2. Your seller answers and measures the usage. The buyer verifies the answer it received.
-3. Your seller settles the channel: the owner receives your price, Gyblos receives its fee and the rest
-   returns to the buyer.
-
-After each answer, the seller tries to settle it; confirmation can take time or stay pending. After a
-restart, the seller tries to recover pending charges whose amounts it saved, without repeating the answer or
-charging twice. Keep its data and keys, and keep the fee payer funded: network problems, missing SOL or an
-expired channel can prevent collection.
+The buyer opens a channel with your seller. Each answer is priced by usage. At settlement you receive your share in USDC and the buyer receives the unused deposit.
 
 ## See your earnings [#see-earnings]
 
 Your earnings are the devnet USDC balance of the **owner** address. Search for that address on
 [Solana Explorer](https://explorer.solana.com/?cluster=devnet) with the devnet cluster selected. A payment
 can take a few minutes to appear.
-
-`gyblos seller status` also shows the paid requests of the last 24 hours: how many settled, their gross USDC
-(including the Gyblos fee) and how many are still settling. These recent totals are not your lifetime
-earnings or your wallet balance. An unsafe or invalid payment ledger shows as unavailable.
 
 ## Reusable channels [#reusable-channel-pilot]
 

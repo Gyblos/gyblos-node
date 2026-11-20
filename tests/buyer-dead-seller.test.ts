@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  selectBuyerQuote,
+  selectVerifiedBuyerQuote,
   type BuyerControlClient,
 } from '@gyblos/buyer/selection';
 
@@ -57,7 +57,7 @@ void test('a seller whose connection hangs costs at most the snapshot deadline',
   const host = await rig();
   t.after(() => host.run.wire.close());
   const started = performance.now();
-  const result = await selectBuyerQuote(host.config, host.dependencies);
+  const result = await selectVerifiedBuyerQuote(host.config, host.dependencies);
   assert.equal(result.ok, true);
   assert.ok(performance.now() - started < 2000);
   assert.ok(host.dependencies.stats.get(DEAD)?.cooldownUntil);
@@ -70,15 +70,15 @@ void test('a seller whose connection hangs costs at most the snapshot deadline',
 void test('a seller cooling down is not contacted again, unless it is pinned', async (t) => {
   const host = await rig();
   t.after(() => host.run.wire.close());
-  await selectBuyerQuote(host.config, host.dependencies);
+  await selectVerifiedBuyerQuote(host.config, host.dependencies);
   host.attempts.length = 0;
   assert.equal(
-    (await selectBuyerQuote(host.config, host.dependencies)).ok,
+    (await selectVerifiedBuyerQuote(host.config, host.dependencies)).ok,
     true,
   );
   assert.equal(host.attempts.includes(DEAD), false);
   host.attempts.length = 0;
-  const pinned = await selectBuyerQuote(
+  const pinned = await selectVerifiedBuyerQuote(
     { ...host.config, pinnedNodeId: DEAD },
     host.dependencies,
   );
@@ -109,7 +109,7 @@ void test('a connection to a seller that stopped answering closes in the backgro
     },
   };
   const started = performance.now();
-  const result = await selectBuyerQuote(
+  const result = await selectVerifiedBuyerQuote(
     { ...run.config, sellers: [healthy, { ...healthy, nodeId: DEAD }] },
     {
       ...run.dependencies,
@@ -137,7 +137,9 @@ void test('a cooldown that ends during the snapshot does not skip the seller', a
     quotedWaitMs: null,
     observedWaitMs: null,
   });
-  await selectBuyerQuote(host.config, host.dependencies).catch(() => undefined);
+  await selectVerifiedBuyerQuote(host.config, host.dependencies).catch(
+    () => undefined,
+  );
   assert.equal(host.attempts.includes(healthy), true);
   host.arriveLate();
 });
@@ -161,7 +163,7 @@ void test("a pinned seller's failed connection is closed before the request retu
       closed = true;
     },
   };
-  await selectBuyerQuote(
+  await selectVerifiedBuyerQuote(
     {
       ...run.config,
       sellers: [healthy, { ...healthy, nodeId: DEAD }],

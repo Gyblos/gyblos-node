@@ -6,16 +6,17 @@ import { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 export { CATALOG_STATE, NETWORK_CATALOG } from './constants';
 export type CatalogState = (typeof CATALOG_STATE)[keyof typeof CATALOG_STATE];
 export interface AnnouncedModel {
+  offerId?: string;
+  sellerFingerprint?: string;
   modelId: string;
   variant: string | null;
   quantization: string | null;
   contextTokens: number;
   announcements: number;
   expiresAt: number;
-  // Whether the group's listings are free. A paid group may still charge zero on one side.
+  // Free announcements are grouped. Each paid row identifies a single seller.
   free: boolean;
-  // One listing's price, in atomic devnet USDC per million tokens: "0" and "0" for a free group, else
-  // the cheapest paid listing by input plus output.
+  // Advertised input and output prices in atomic devnet USDC per million tokens.
   inputAtomicPerMtok: string;
   outputAtomicPerMtok: string;
 }
@@ -75,6 +76,9 @@ function publicText(value: unknown): value is string | null {
 function parseModel(value: unknown): AnnouncedModel | null {
   if (
     !object(value, [
+      ...(value && typeof value === 'object' && 'offerId' in value
+        ? ['offerId', 'sellerFingerprint']
+        : []),
       'modelId',
       'variant',
       'quantization',
@@ -85,6 +89,12 @@ function parseModel(value: unknown): AnnouncedModel | null {
       'inputAtomicPerMtok',
       'outputAtomicPerMtok',
     ]) ||
+    (value.offerId !== undefined &&
+      (value.free !== false ||
+        typeof value.offerId !== 'string' ||
+        typeof value.sellerFingerprint !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(value.sellerFingerprint) ||
+        !/^[a-f0-9]{64}$/.test(value.offerId))) ||
     !validCatalogQuery(value.modelId) ||
     !publicText(value.variant) ||
     !publicText(value.quantization) ||
@@ -102,6 +112,11 @@ function parseModel(value: unknown): AnnouncedModel | null {
   )
     return null;
   return {
+    ...(typeof value.offerId === 'string' &&
+      typeof value.sellerFingerprint === 'string' && {
+        offerId: value.offerId,
+        sellerFingerprint: value.sellerFingerprint,
+      }),
     modelId: value.modelId,
     variant: value.variant,
     quantization: value.quantization,

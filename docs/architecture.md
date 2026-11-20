@@ -14,9 +14,8 @@ local data lives.
 
 ## Packages
 
-`pnpm-workspace.yaml` registers `packages/*`, `apps/*`, `lab/harness` and
-`lab/facilitator`. The layer of each package comes from
-`tooling/boundaries/config.ts`.
+`pnpm-workspace.yaml` registers `packages/*`, `apps/*` and `lab/harness`. The
+layer of each package comes from `tooling/boundaries/config.ts`.
 
 | Package                      | Layer      | Responsibility                                                                                                                                                                                                 |
 | ---------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -28,7 +27,6 @@ local data lives.
 | `packages/engine-ollama`     | adapter    | Ollama client as an `Engine`, with the pinned tokenizer and model constants.                                                                                                                                   |
 | `packages/engine-openai`     | adapter    | OpenAI-compatible chat completions client as an `Engine` (also LM Studio and other compatible servers).                                                                                                        |
 | `packages/engine-anthropic`  | adapter    | Anthropic Messages API client as an `Engine`.                                                                                                                                                                  |
-| `packages/payments-x402`     | adapter    | x402 `upto` client and facilitator, buyer signer, on-chain proofs, recovery locks.                                                                                                                             |
 | `packages/payments-upto`     | adapter    | `PaymentServer` over `x402-upto-metered`: maps Gyblos terms to upto terms, admits only this seller's terms, keeps the durable seller ledger and the reusable payment session. See [payments.md](payments.md).  |
 | `packages/payments-paypal`   | adapter    | Direct-merchant PayPal Sandbox authorization and capture for a local prototype. No live PayPal ([paypal-sandbox.md](paypal-sandbox.md)).                                                                       |
 | `packages/x402-upto-metered` | standalone | Metered x402 `upto` payments over any transport (Apache-2.0). Imports no workspace package; only `payments-*` adapters import it.                                                                              |
@@ -47,16 +45,16 @@ to its entry in `pnpm-workspace.yaml`.
 
 Apps are independent executables. They never import each other.
 
-| App                      | Run with                                                               | Responsibility                                                                                                                                                                                                                                       |
-| ------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/node`              | `pnpm gyblos <command>`, `pnpm node:start`                             | The seller daemon and the `gyblos` CLI (`start`, `doctor`, `logs`, `config validate`, `seller init/status/register/service`). Installs a systemd, launchd or Windows service.                                                                        |
-| `apps/buyer`             | `pnpm buyer`, `pnpm buyer:start`, `pnpm buyer:chat`, `pnpm buyer:init` | The local buyer and its buyer endpoint: seller selection, offer race, free and paid calls, payment sessions, reconciliation and withdrawal ([buyer-init.md](buyer-init.md)).                                                                         |
-| `apps/desktop`           | `pnpm desktop:start`, `pnpm desktop:package`                           | The desktop app (Electron): Chat, wallet, buyer API keys, activity and payments over a separately bundled local buyer ([desktop.md](desktop.md)).                                                                                                    |
-| `apps/discovery-index`   | Cloudflare Worker                                                      | The discovery index at `discovery.gyblos.com` (Hono, D1). Verifies records only through protocol ([discovery-index.md](discovery-index.md)).                                                                                                         |
-| `apps/metrics-collector` | Cloudflare Worker                                                      | The metrics collector at `collector.gyblos.com` (Hono, D1): receives signed receipts and observations, builds aggregates and serves public stats ([metrics-collector.md](metrics-collector.md)).                                                     |
-| `apps/receipt-collector` | `pnpm --filter @gyblos/receipt-collector start`                        | The local receipt receiver: a private loopback receiver for testing, with bounded retention ([receipts.md](receipts.md)).                                                                                                                            |
-| `apps/docs`              | `pnpm docs:dev`, `pnpm docs:build`                                     | The public docs site at `docs.gyblos.com`: a Fumadocs static export in English and Spanish ([README](../apps/docs/README.md)).                                                                                                                       |
-| `apps/explorer`          | `pnpm explorer:dev`                                                    | The public metrics explorer at explorer.gyblos.com: a server-rendered Next.js app on Cloudflare Workers that reads the metrics collector's stats API and Solana, and the discovery index through a scheduled run every 2 minutes into a KV snapshot. |
+| App                      | Run with                                           | Responsibility                                                                                                                                                                                                                                       |
+| ------------------------ | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/node`              | `pnpm gyblos <command>`, `pnpm node:start`         | The seller daemon and the `gyblos` CLI (`start`, `doctor`, `logs`, `config validate`, `seller init/status/register/service`). Installs a systemd, launchd or Windows service.                                                                        |
+| `apps/buyer`             | `pnpm buyer`, `pnpm buyer:chat`, `pnpm buyer:init` | The local buyer and its buyer endpoint: seller selection, offer race, free and paid calls, payment sessions, reconciliation and withdrawal ([buyer-init.md](buyer-init.md)).                                                                         |
+| `apps/desktop`           | `pnpm desktop:start`, `pnpm desktop:package`       | The desktop app (Electron): Chat, wallet, buyer API keys, activity and payments over a separately bundled local buyer ([desktop.md](desktop.md)).                                                                                                    |
+| `apps/discovery-index`   | Cloudflare Worker                                  | The discovery index at `discovery.gyblos.com` (Hono, D1). Verifies records only through protocol ([discovery-index.md](discovery-index.md)).                                                                                                         |
+| `apps/metrics-collector` | Cloudflare Worker                                  | The metrics collector at `collector.gyblos.com` (Hono, D1): receives signed receipts and observations, builds aggregates and serves public stats ([metrics-collector.md](metrics-collector.md)).                                                     |
+| `apps/receipt-collector` | `pnpm --filter @gyblos/receipt-collector start`    | The local receipt receiver: a private loopback receiver for testing, with bounded retention ([receipts.md](receipts.md)).                                                                                                                            |
+| `apps/docs`              | `pnpm docs:dev`, `pnpm docs:build`                 | The public docs site at `docs.gyblos.com`: a Fumadocs static export in English and Spanish ([README](../apps/docs/README.md)).                                                                                                                       |
+| `apps/explorer`          | `pnpm explorer:dev`                                | The public metrics explorer at explorer.gyblos.com: a server-rendered Next.js app on Cloudflare Workers that reads the metrics collector's stats API and Solana, and the discovery index through a scheduled run every 2 minutes into a KV snapshot. |
 
 Deploying a Worker or publishing a site is a maintainer action; see
 [public-decisions.md](public-decisions.md).
@@ -65,7 +63,7 @@ Deploying a Worker or publishing a site is a maintainer action; see
 
 | Path                                    | What it holds                                                                                                                                |
 | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lab/`                                  | Validation outside the product: `harness`, `facilitator`, `tools` and the historical `evidence` ([lab/README.md](../lab/README.md)).         |
+| `lab/`                                  | Validation outside the product: `harness`, `tools` and the historical `evidence` ([lab/README.md](../lab/README.md)).                        |
 | `tests/`                                | Product and lab test suites ([tests/README.md](../tests/README.md)). Standalone packages keep theirs in `packages/<name>/test/`.             |
 | `tooling/`                              | The boundary checker, lint rules, skills tooling, native and npm builds, and the [AI security review](../tooling/security-review/README.md). |
 | `examples/`                             | Sample seller `config.toml` files ([configuration.md](configuration.md)).                                                                    |
@@ -138,9 +136,6 @@ generate within the permit, measure delivered output, finish once and release
 the generation slot.
 
 - `policy-free.ts` applies replay protection, concurrency and token caps.
-- `policy-x402.ts` wraps the per-request `PaymentServer` with the allowance and
-  charge calculations in core. It keeps admission order, the claim-time reserve,
-  zero charge when nothing is delivered and settlement retry.
 - Reusable payment sessions apply their own policy around the same lifecycle
   ([below](#reusable-payment-session-composition)).
 
@@ -184,26 +179,6 @@ by weighted sampling:
 The buyer app composes it: `apps/buyer/src/selection*.ts` builds the inputs and
 persists stats, and `offer-race.ts` asks the candidates for live offers. The
 operator view is in [payment-sessions.md](payment-sessions.md#buyer-routing).
-
-### Trusted host dependencies
-
-`@gyblos/node/buyer-paid-execution` runs one paid request in process. Hosts
-supply selection, payment, metering, transport and record dependencies, and the
-orchestration trusts them to do these checks:
-
-- **Selection** verifies the owner–NodeId binding, the authenticated catalog,
-  the signed quote, request binding, freshness, exact selection and the buyer's
-  ceilings.
-- **Payment** enforces its own terms and durable journal.
-- **Transport** authenticates the selected peer, verifies the response and
-  reports an open as unsent only when it could not have left the buyer. Only
-  that result permits discard and failover.
-- **Unresolved payments** block earlier signed, unsettled opens, including ones
-  whose transmission is uncertain or whose discard failed, and fail closed when
-  state is unavailable.
-
-The outcome includes a signed authorization payload. Hosts must never expose it
-to UI, IPC or logs; they provide a safe projection instead.
 
 ## Reusable payment session composition
 
@@ -255,7 +230,7 @@ environment. No other module builds `.local/...` paths.
 $GYBLOS_HOME (default .local/gyblos from a checkout, ~/.gyblos for the packaged
               release, /data in the Docker image)
   seller.env, service.log   the seller service's private environment and log
-  buyer/     role.json, node.key, selection.json, trust.json, api-keys.json,
+  buyer/     role.json, node.key, selection.json, api-keys.json,
              journals, locks, status, telemetry/, diagnostics/, receipts/,
              payments/, measurements
   seller/    role.json, node.key, owner key (a paid seller also has payment
@@ -263,7 +238,7 @@ $GYBLOS_HOME (default .local/gyblos from a checkout, ~/.gyblos for the packaged
              sequence
   artifacts/ tokenizer/ (public, hash-pinned, shared), ollama-models/ (lab cache)
 $GYBLOS_LAB_HOME (default .local/lab)
-  lab config, keys, journals, measurements, facilitator-diagnostics/, identity/
+  identity/ and temporary lab data
 ```
 
 Payment adapters receive journal and lock paths from their callers, which take
@@ -273,7 +248,6 @@ exists and the new home is missing; see
 [running-a-node.md](running-a-node.md#local-home).
 
 Named values follow their readers. HTTP-over-Iroh framing limits and stream
-deadlines are `transport-iroh` constants, the offer lifetime is a core trust
-rule, call and proof bounds belong to the buyer app, and only operator-tunable
-capacity, rate, timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
+deadlines are `transport-iroh` constants. Operator-tunable capacity, rate,
+timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
 `TRANSPORT_TIMEOUTS`, `PORTS`).

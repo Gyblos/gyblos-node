@@ -273,7 +273,10 @@ void test('desktop catalog IPC rejects foreign windows, stale frames, extra argu
     'org/model',
   ]);
   assert.equal(calls, 1);
-  assert.equal(handlers.summary(event, ['extra']).state, CATALOG_STATE.ERROR);
+  assert.equal(
+    (await handlers.summary(event, ['extra'])).state,
+    CATALOG_STATE.ERROR,
+  );
 });
 
 void test('announced model presentation reuses zero-price controls with explicit source and local-only artwork', async () => {

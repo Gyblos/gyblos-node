@@ -11,10 +11,10 @@ import {
 } from '@gyblos/protocol/batch-channel';
 import {
   BATCH_STREAM,
+  batchStreamDeltas,
   encodeBatchStreamEvent,
 } from '@gyblos/protocol/batch-stream';
 import { FREE_EXECUTION } from '@gyblos/protocol/constants';
-import { paidStreamDeltas } from '@gyblos/protocol/paid-stream';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import type { BatchChannelService } from './batch-server';
@@ -62,7 +62,7 @@ async function emit(
     drained = resolve;
   });
   try {
-    for (const chunk of paidStreamDeltas(text)) {
+    for (const chunk of batchStreamDeltas(text)) {
       if (state.sealed) return batchFail();
       state.outputBytes += new TextEncoder().encode(chunk).length;
       if (

@@ -16,9 +16,7 @@ import {
   type ModelRoute,
   type RoutedModel,
 } from '@gyblos/buyer/model-routes';
-import { checkPaidRequest } from '@gyblos/buyer/paid-startup';
 import { parseBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
-import { DEVNET } from '@gyblos/config';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { FreeExecutionResult } from '@gyblos/protocol/free-execution';
 
@@ -253,38 +251,4 @@ void test('a 404 says when it lists only some of the names served', () => {
     () => requestedRoute(many, { model: 'nope' }),
     (error: { detail?: string }) => /m15, …$/.test(error.detail ?? ''),
   );
-});
-
-void test('paid modes refuse a model list with a model or limit the paid buyer cannot meter', async (t) => {
-  const fixture = await selectionFixture();
-  t.after(fixture.wire.close);
-  const mint = 'So11111111111111111111111111111111111111112';
-  const request = {
-    ...fixture.config.request,
-    selection: { modelId: PAID, variant: null, quantization: null },
-    maxTokens: 64,
-    reasoning: 'off',
-    lowestReasoning: null,
-    network: DEVNET,
-    asset: mint,
-  };
-  const paid = (models?: unknown[]) => () =>
-    checkPaidRequest(
-      {
-        config: parseBuyerSelectionConfig({
-          ...fixture.config,
-          request,
-          ...(models ? { models } : {}),
-        }),
-      } as never,
-      { mint } as never,
-    );
-  const own = { id: PAID, selection: request.selection };
-  paid()();
-  paid([own, { id: 'short', selection: request.selection, maxTokens: 32 }])();
-  assert.throws(paid([own, { id: 'big', selection: LARGE }]), {
-    reason: 'BUYER_PAID_MODEL_UNSUPPORTED',
-  });
-  // A paid answer is bounded by the model and the spending ceiling, not by a short fixed limit.
-  paid([{ ...own, maxTokens: 2000 }])();
 });

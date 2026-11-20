@@ -1,6 +1,9 @@
-// Maps sanitized announcements into shared preview controls; never authorizes inference. A paid group
-// shows its cheapest price in USDC per million tokens; choosing it still asks before any spending.
-import { CATALOG_STATE, type NetworkCatalog } from '../catalog/model';
+// Each paid listing shows that seller’s price per million tokens. Selection requires confirmation.
+import {
+  CATALOG_STATE,
+  NETWORK_CATALOG,
+  type NetworkCatalog,
+} from '../catalog/model';
 import { DESKTOP_X402 } from '../x402/constants';
 import {
   ADDITIONAL_MODEL_ARTWORK,
@@ -8,7 +11,7 @@ import {
   MODEL_SOURCE,
   MODELS,
 } from './constants';
-import type { CatalogModel, ModelArtwork } from './model-types';
+import type { CatalogModel, ModelArtwork, ModelOption } from './model-types';
 
 export function modelArtwork(modelId: string): ModelArtwork {
   const family = modelId.toLowerCase().split('/').at(-1) ?? '';
@@ -49,17 +52,34 @@ export function announcedModels(
         Number(item.outputAtomicPerMtok) / DESKTOP_X402.AMOUNT_SCALE;
       const { free } = item;
       return {
-        id: JSON.stringify([
-          item.modelId,
-          item.variant,
-          item.quantization,
-          item.contextTokens,
-          free,
-        ]),
+        id:
+          item.offerId ??
+          JSON.stringify([
+            item.modelId,
+            item.variant,
+            item.quantization,
+            item.contextTokens,
+            free,
+          ]),
+        ...(item.offerId && { offerId: item.offerId }),
         name: item.modelId,
         family:
-          [item.variant, item.quantization].filter(Boolean).join(' · ') ||
-          'Signed announcement',
+          [
+            item.sellerFingerprint &&
+              'Seller ' +
+                item.sellerFingerprint.slice(
+                  0,
+                  NETWORK_CATALOG.OFFER_LABEL_DIGITS,
+                ) +
+                '…' +
+                item.sellerFingerprint.slice(
+                  -NETWORK_CATALOG.OFFER_LABEL_DIGITS,
+                ),
+            item.variant,
+            item.quantization,
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'Signed announcement',
         image: modelArtwork(item.modelId),
         category: MODEL_CATEGORY.EVERYDAY,
         context: item.contextTokens.toLocaleString(),
@@ -70,4 +90,8 @@ export function announcedModels(
         source: MODEL_SOURCE.ANNOUNCED,
       };
     });
+}
+
+export function chatNetworkOptions(models: readonly ModelOption[]) {
+  return models.filter((item) => item.source === MODEL_SOURCE.ANNOUNCED);
 }

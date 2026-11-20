@@ -2,18 +2,15 @@
 // Only the native bind-failure probe opens a real endpoint, on an unassigned address;
 // offers use temporary, unfunded synthetic identities.
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import test, { type TestContext } from 'node:test';
+import test from 'node:test';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
   FREE_STREAM,
 } from '@gyblos/protocol/constants';
-import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
 import {
   RELAY_CONFIGURATION_CODES,
   RELAY_TOKEN_LENGTH,
@@ -25,21 +22,11 @@ import {
   PROBE_ACTIONS,
   RELAY_TOKEN_SENTINEL,
   UNASSIGNED_BIND_ADDRESS,
-  withRelayOffer,
 } from './support/relay-fixture';
 
 const OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 const TOKEN = `${RELAY_TOKEN_SENTINEL}-synthetic-relay-token`;
 const OWNED_RELAY = 'https://na1.relay.gyblos.com/';
-
-function setRelayUrls(context: TestContext, value: string) {
-  const previous = process.env.GYBLOS_RELAYS;
-  process.env.GYBLOS_RELAYS = value;
-  context.after(() => {
-    if (previous === undefined) delete process.env.GYBLOS_RELAYS;
-    else process.env.GYBLOS_RELAYS = previous;
-  });
-}
 
 void test(
   'endpoints replace n0 relays with the authenticated Gyblos map after applyN0',
@@ -200,100 +187,6 @@ void test(
 );
 
 void test(
-  'relay fixture isolates direct buyer reads from an absolute parent home',
-  OPTIONS,
-  async (context) => {
-    const directory = await mkdtemp(join(tmpdir(), 'gyblos-relay-parent-'));
-    const previous = process.env.GYBLOS_HOME;
-    const previousLab = process.env.GYBLOS_LAB_HOME;
-    try {
-      process.env.GYBLOS_HOME = join(directory, 'external-home');
-      process.env.GYBLOS_LAB_HOME = join(directory, 'external-lab');
-      setRelayUrls(context, OWNED_RELAY);
-      const { trustedOffer } = await import('@gyblos/buyer/buyer');
-      await withRelayOffer(OWNED_RELAY.slice(0, -1), async () => {
-        const { offer } = await trustedOffer();
-        assert.equal(offer.endpoint.relayUrl, OWNED_RELAY.slice(0, -1));
-      });
-      assert.deepEqual(await readdir(directory), []);
-      assert.equal(process.env.GYBLOS_HOME, join(directory, 'external-home'));
-      assert.equal(
-        process.env.GYBLOS_LAB_HOME,
-        join(directory, 'external-lab'),
-      );
-    } finally {
-      if (previous === undefined) delete process.env.GYBLOS_HOME;
-      else process.env.GYBLOS_HOME = previous;
-      if (previousLab === undefined) delete process.env.GYBLOS_LAB_HOME;
-      else process.env.GYBLOS_LAB_HOME = previousLab;
-      await rm(directory, { recursive: true, force: true });
-    }
-  },
-);
-
-void test(
-  'buyer accepts verified offers on its normalized owned relay',
-  OPTIONS,
-  async (context) => {
-    setRelayUrls(context, OWNED_RELAY);
-    const { buyerConnectionPlan, trustedOffer } =
-      await import('@gyblos/buyer/buyer');
-    await withRelayOffer(OWNED_RELAY.slice(0, -1), async () => {
-      const { offer } = await trustedOffer();
-      assert.equal(offer.endpoint.relayUrl, OWNED_RELAY.slice(0, -1));
-      assert.equal(buyerConnectionPlan(offer).remote.relayUrl, OWNED_RELAY);
-    });
-  },
-);
-
-void test(
-  'buyer rejects n0 and foreign relays absent from its configured map',
-  OPTIONS,
-  async (context) => {
-    setRelayUrls(context, OWNED_RELAY);
-    const { trustedOffer } = await import('@gyblos/buyer/buyer');
-    const n0 = NATIVE_CAPABILITY.sdk!.RelayMode.defaultMode()
-      .relayMap()
-      .urls()[0]!;
-    for (const url of [n0, 'https://unconfigured.example/'])
-      await withRelayOffer(url, async () => {
-        await assert.rejects(trustedOffer(), {
-          code: RELAY_CONFIGURATION_CODES.UNCONFIGURED,
-        });
-      });
-    const result = endpointProbe(
-      {
-        GYBLOS_RELAYS: OWNED_RELAY,
-        GYBLOS_RELAY_TOKEN: TOKEN,
-        PROBE_RELAY_URL: `https://${RELAY_TOKEN_SENTINEL}.example/`,
-      },
-      PROBE_ACTIONS.ADMISSION,
-    );
-    assert.equal(result.error?.code, RELAY_CONFIGURATION_CODES.UNCONFIGURED);
-  },
-);
-
-void test(
-  'buyer follows the operator relay override rather than a separate fixed allowlist',
-  OPTIONS,
-  async (context) => {
-    setRelayUrls(context, 'https://relay.example');
-    const { trustedOffer } = await import('@gyblos/buyer/buyer');
-    await withRelayOffer('https://relay.example/', async () => {
-      assert.equal(
-        (await trustedOffer()).offer.endpoint.relayUrl,
-        'https://relay.example/',
-      );
-    });
-    await withRelayOffer(OWNED_RELAY, async () => {
-      await assert.rejects(trustedOffer(), {
-        code: RELAY_CONFIGURATION_CODES.UNCONFIGURED,
-      });
-    });
-  },
-);
-
-void test(
   'relay-only endpoints close and fail when a bound UDP socket is external',
   OPTIONS,
   () => {
@@ -351,17 +244,17 @@ void test(
 );
 
 void test(
-  'a paid endpoint advertises the paid stream ALPN only when asked',
+  'a paid endpoint advertises the session ALPN only when asked',
   OPTIONS,
   () => {
     const result = endpointProbe({
       GYBLOS_RELAY_TOKEN: TOKEN,
       PROBE_CONTROL: '1',
-      PROBE_PAID_EXECUTION: '1',
+      PROBE_BATCH_SESSIONS: '1',
       PROBE_HTTP: '0',
     });
     assert.equal(result.error, undefined);
-    assert.deepEqual(result.alpns, [CONTROL_ALPN, PAID_STREAM.alpn]);
+    assert.deepEqual(result.alpns, [CONTROL_ALPN, BATCH_CHANNEL.alpn]);
   },
 );
 

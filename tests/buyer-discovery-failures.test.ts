@@ -5,7 +5,7 @@ import test from 'node:test';
 
 import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
 import {
-  selectBuyerQuote,
+  selectVerifiedBuyerQuote,
   type BuyerControlClient,
 } from '@gyblos/buyer/selection';
 import { BuyerSelectionError } from '@gyblos/buyer/selection-config';
@@ -40,7 +40,7 @@ void test('fatal replay persistence failure waits for pending connects and close
     };
   }
   let settled = false;
-  const result = selectBuyerQuote(
+  const result = selectVerifiedBuyerQuote(
     {
       ...first.config,
       sellers: [...first.config.sellers, ...second.config.sellers],

@@ -40,6 +40,7 @@ interface SellerControlStartupOptions {
   sequence: SellerSequence;
   catalogMs?: number;
   now?: () => number;
+  monotonic?: () => number;
   // The daemon's offer set, or one always-listed offer in lab acceptance.
   offers: ControlOffers;
   // Added on top of paid prices in the catalog; the v1 lab listing, which has no fee, passes 0.
@@ -101,6 +102,7 @@ export async function prepareSellerControl(
     catalogMs: options.catalogMs ?? PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
   });
   const service = createSellerControlService({
+    monotonic: options.monotonic,
     records,
     offers,
     context: {

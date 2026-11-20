@@ -183,10 +183,6 @@ setup on every run for this reason.
 | `receipts/`                                         | both   | Signed free-inference receipts ([Receipts](#private-free-inference-receipts)).                                         |
 | `diagnostics/`                                      | both   | Local operational logs, read with `pnpm gyblos logs` ([diagnostics.md](diagnostics.md)).                               |
 
-The lab's v1 files (`trust.json`, `offer.json`, `authorization.json`,
-`calls.json`) are described in
-[lab/README.md](../lab/README.md#legacy-v1-buyer).
-
 ## Seller
 
 Prerequisites:
@@ -996,34 +992,13 @@ Paid execution is devnet only and needs:
 - the pinned public tokenizer (`pnpm node:tokenizer`), because the buyer
   recounts every answer itself;
 - `request.selection.modelId` `qwen3-0.6b`, reasoning `off`, `network` devnet
-  and `asset` the role's mint, with `maxAtomic` the most one request may deposit
-  and `priceCeilings` the highest prices it accepts (protocol fee included).
+  and `asset` the role's mint, with `maxAtomic` the maximum charge for one
+  response and `priceCeilings` the highest prices it accepts (protocol fee
+  included).
 
-The explicit legacy per-request entry also requires a valid paid profile. It
-signs one channel open for at most `maxAtomic`, streams the answer and checks
-the seller's settlement against its own count. This single-request path accepts
-only one user message and no tools; it refuses anything else before paying
-(`PAID_BUYER_UNSUPPORTED_INPUT`). Conversations and tools on paid offers need a
-reusable session ([payment-sessions.md](payment-sessions.md)). A completed
-answer, and an error the seller answered after receiving the open, carries
-`gyblos_payment`: the verdict, the ceiling, the buyer's expected charge, the
-seller's charge, payout, fee and refund in atomic units, and whether a record
-was kept.
-
-One paid request runs at a time (`PAID_BUYER_BUSY`), and one buyer process holds
-the payment journal (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`). The buyer never fails
-over once a seller received the signed open, since that seller could still land
-it.
-
-Any channel not settled on the buyer's own count (a refusal, a stop, a pending
-or lapsed claim, a dispute or an unconfirmed settlement) blocks new automatic
-requests, including free ones (`PAID_BUYER_UNRESOLVED_PAYMENT`), until it is
-reconciled. The buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can. Stop the buyer and follow
-[recovery.md](recovery.md#single-request-paid-v2-recovery):
-`pnpm buyer:reconcile:paid` reads the chain and never signs;
-`pnpm buyer:withdraw:paid` signs and pays fees to withdraw an unclaimed channel.
-Never reset or delete a journal or lock to bypass the block.
+If a channel needs recovery, stop the buyer and follow the
+[channel recovery guide](recovery.md#reusable-batch-recovery). Never reset or
+delete a journal or lock to bypass the block.
 
 #### Endpoint token
 
@@ -1130,7 +1105,7 @@ also look like loopback, so do not run one on a relay-only machine.
 
 A free offer in `config.toml` starts the control protocol plus the
 `gyblos/free/4` (complete response) and `gyblos/free-stream/4` (streaming)
-execution protocols. Paid offers use the separate paid stream described in the
+execution protocols. Paid offers use reusable payment channels described in the
 protocol specification. Free execution serves a conversation (an optional system
 message, then alternating user and assistant turns that start and end with the
 user) with reasoning `off`, up to the offer's answer limit

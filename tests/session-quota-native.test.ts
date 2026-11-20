@@ -51,7 +51,6 @@ async function fixture(limits: TransportLimits) {
     undefined,
     limits,
     undefined,
-    undefined,
     {
       async exchange(request, ...args) {
         calls.push(request.method);

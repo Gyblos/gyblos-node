@@ -10,20 +10,10 @@ import {
   type NetworkCatalog,
 } from '../catalog/model';
 import { announcedModels } from './announced-models';
-import { BUTTON_VARIANT } from './constants';
 import { priceRange } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
-import {
-  Badge,
-  Button,
-  List,
-  ListRow,
-  Note,
-  RowCopy,
-  SearchField,
-  SectionTitle,
-} from './UI';
+import { Badge, List, ListRow, RowCopy, SearchField } from './UI';
 
 declare global {
   interface Window {
@@ -35,12 +25,13 @@ declare global {
 }
 export function useNetworkCatalog() {
   const [snapshot, setSnapshot] = useState(emptyCatalog);
+  const [searchResult, setSearchResult] = useState<NetworkCatalog | null>(null);
   const active = useRef(false);
   const sequence = useRef(0);
   const read = useCallback(async (query?: string) => {
-    const current = ++sequence.current;
+    const current = query === undefined ? undefined : ++sequence.current;
     if (query !== undefined)
-      setSnapshot(emptyCatalog(CATALOG_STATE.LOADING, query));
+      setSearchResult(emptyCatalog(CATALOG_STATE.LOADING, query));
     let next = emptyCatalog(CATALOG_STATE.ERROR);
     try {
       next = parseNetworkCatalog(
@@ -51,7 +42,10 @@ export function useNetworkCatalog() {
     } catch {
       /* No raw network/native diagnostics belong in the renderer. */
     }
-    if (active.current && sequence.current === current)
+    if (!active.current) return;
+    if (current !== undefined) {
+      if (current === sequence.current) setSearchResult(next);
+    } else
       setSnapshot((previous) =>
         JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
       );
@@ -69,136 +63,202 @@ export function useNetworkCatalog() {
   }, [read]);
   return {
     snapshot,
+    searchResult: searchResult ?? snapshot,
     lookup: (query: string) => {
       void read(query);
     },
   };
 }
-function CatalogStatus({ snapshot }: { snapshot: NetworkCatalog }) {
-  const message =
-    snapshot.state === CATALOG_STATE.IDLE
-      ? 'Enter an exact model ID to check announcements.'
-      : snapshot.state === CATALOG_STATE.LOADING
-        ? 'Checking announcements…'
-        : snapshot.state === CATALOG_STATE.ERROR
-          ? 'Could not check announcements. Try again.'
-          : snapshot.state === CATALOG_STATE.STALE
-            ? 'Announcements expired. Refresh to check again.'
-            : snapshot.state === CATALOG_STATE.EMPTY
-              ? 'No free or devnet USDC announcements returned for this model.'
-              : 'Signed announcements · availability not checked.';
-  return (
-    <p className="dropdown-note" role="status">
-      {message}
-      {snapshot.checkedAt !== null && (
-        <> · Checked {new Date(snapshot.checkedAt).toLocaleTimeString()}</>
-      )}
-    </p>
-  );
+function useCatalogSearch(
+  snapshot: NetworkCatalog,
+  onLookup: (query: string) => void,
+) {
+  const [query, setQuery] = useState(snapshot.query);
+  const [knownIds, setKnownIds] = useState<string[]>([]);
+  useEffect(() => {
+    const ids = announcedModels(snapshot, Date.now()).map(
+      (model) => model.name,
+    );
+    if (ids.length)
+      setKnownIds((previous) => [...new Set([...previous, ...ids])]);
+  }, [snapshot]);
+  const [editing, setEditing] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const matching = knownIds
+    .filter((id) => id.toLowerCase().includes(query.trim().toLowerCase()))
+    .slice(0, NETWORK_CATALOG.MAX_SUGGESTIONS);
+  const expanded = editing && matching.length > 0;
+  const submit = (id: string) => {
+    setQuery(id);
+    setEditing(false);
+    setActiveIndex(-1);
+    onLookup(id);
+  };
+  const loading = snapshot.state === CATALOG_STATE.LOADING;
+  const valid = validCatalogQuery(query.trim()) && !loading;
+  function keyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape' && expanded) {
+      event.preventDefault();
+      event.stopPropagation();
+      setEditing(false);
+      setActiveIndex(-1);
+    }
+    if (
+      (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+      matching.length
+    ) {
+      event.preventDefault();
+      setEditing(true);
+      setActiveIndex((index) =>
+        event.key === 'ArrowDown'
+          ? (index + 1) % matching.length
+          : index <= 0
+            ? matching.length - 1
+            : index - 1,
+      );
+    }
+    if (event.key === 'Enter' && expanded && activeIndex >= 0 && !loading) {
+      event.preventDefault();
+      submit(matching[activeIndex]!);
+    }
+  }
+  return {
+    query,
+    valid,
+    expanded,
+    submit,
+    activeIndex,
+    matching,
+    loading,
+    setQuery,
+    setEditing,
+    setActiveIndex,
+    keyDown,
+  };
 }
-function AnnouncementList({
-  models,
-  selected,
-  onSelect,
+function CatalogSearch({
+  search,
 }: {
-  models: CatalogModel[];
-  selected: string;
-  onSelect?: (model: CatalogModel) => void;
+  search: ReturnType<typeof useCatalogSearch>;
 }) {
   return (
-    <>
-      {' '}
-      {models.length > 0 && (
-        <List label="Network model announcements">
-          {models.map((model) => (
-            <ListRow
-              key={model.id}
-              selected={!!onSelect && selected === model.id}
-              leading={<ModelImage name={model.name} artwork={model.image} />}
-              trailing={
-                <Badge>{model.free ? 'Free' : priceRange(model)}</Badge>
-              }
-              onActivate={onSelect ? () => onSelect(model) : undefined}
-            >
-              <RowCopy
-                title={model.name}
-                detail={`${model.family} · ${model.context} context · ${model.providers} signed announcement${model.providers === 1 ? '' : 's'} · Chat preview`}
-              />
-            </ListRow>
-          ))}
-        </List>
-      )}
-    </>
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (search.valid) search.submit(search.query.trim());
+      }}
+    >
+      <label htmlFor="preview-network-model">Model ID</label>
+      <div className="network-model-picker">
+        <SearchField
+          label="Model ID"
+          id="preview-network-model"
+          role="combobox"
+          value={search.query}
+          placeholder="Search by model ID"
+          autoComplete="off"
+          spellCheck={false}
+          aria-autocomplete="list"
+          aria-expanded={search.expanded}
+          aria-controls={search.expanded ? 'preview-model-options' : undefined}
+          aria-activedescendant={
+            search.expanded && search.activeIndex >= 0
+              ? 'preview-model-option-' + search.activeIndex
+              : undefined
+          }
+          onFocus={() => search.setEditing(true)}
+          onBlur={() => search.setEditing(false)}
+          onValueChange={(value) => {
+            search.setQuery(value);
+            search.setEditing(true);
+            search.setActiveIndex(-1);
+          }}
+          onKeyDown={search.keyDown}
+        />
+        {search.expanded && (
+          <ul
+            role="listbox"
+            aria-label="Matching model IDs"
+            id="preview-model-options"
+          >
+            {search.matching.map((id, index) => (
+              <li
+                key={id}
+                id={'preview-model-option-' + index}
+                role="option"
+                aria-selected={index === search.activeIndex}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (!search.loading) search.submit(id);
+                }}
+              >
+                {id}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </form>
   );
 }
 export function NetworkCatalogPanel({
   snapshot,
   onLookup,
-  onSelect,
   selected,
+  onSelect,
 }: {
   snapshot: NetworkCatalog;
   onLookup: (query: string) => void;
-  onSelect?: (model: CatalogModel) => void;
   selected: string;
+  onSelect?: (model: CatalogModel) => void;
 }) {
-  const [query, setQuery] = useState(snapshot.query);
+  const search = useCatalogSearch(snapshot, onLookup);
+  const { query, expanded } = search;
   const models = announcedModels(snapshot, Date.now());
+  const messages = {
+    [CATALOG_STATE.LOADING]: 'Searching…',
+    [CATALOG_STATE.IDLE]: 'Enter a model ID to search.',
+    [CATALOG_STATE.EMPTY]: `No listings for “${snapshot.query}”.`,
+    [CATALOG_STATE.ERROR]: 'Search unavailable. Try again.',
+    [CATALOG_STATE.STALE]: 'Listings expired. Search again.',
+    [CATALOG_STATE.READY]: models.length ? '' : 'No current listings.',
+  };
   return (
-    <>
-      <SectionTitle trailing={<Badge>Read only</Badge>}>
-        Network announcements
-      </SectionTitle>
-      <form
-        className="ui-toolbar"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (
-            validCatalogQuery(query) &&
-            snapshot.state !== CATALOG_STATE.LOADING
-          )
-            onLookup(query);
-        }}
-      >
-        <SearchField
-          label="Model ID"
-          placeholder="Exact model ID, e.g. qwen3:0.6b"
-          value={query}
-          onValueChange={setQuery}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <Button
-          type="submit"
-          variant={BUTTON_VARIANT.PRIMARY}
-          disabled={
-            !validCatalogQuery(query) ||
-            snapshot.state === CATALOG_STATE.LOADING
-          }
-        >
-          Check network
-        </Button>
-      </form>
-      <CatalogStatus snapshot={snapshot} />
-      {snapshot.query && (
-        <p className="dropdown-note">
-          Results for {snapshot.query} · free, and paid in devnet USDC (in / out
-          per 1M tokens); other assets are not shown
-        </p>
+    <div className="network-search">
+      <CatalogSearch search={search} />
+      {query.trim() === snapshot.query && !expanded && (
+        <section aria-live="polite" aria-label="Search results">
+          {models.length > 0 && (
+            <>
+              <h3>Choose a seller</h3>
+              <p>Prices in USDC per million tokens, input / output.</p>
+              <List label="Network models">
+                {models.map((model) => (
+                  <ListRow
+                    key={model.id}
+                    selected={!!onSelect && selected === model.id}
+                    onActivate={onSelect ? () => onSelect(model) : undefined}
+                    leading={
+                      <ModelImage name={model.name} artwork={model.image} />
+                    }
+                    trailing={
+                      <Badge>{model.free ? 'Free' : priceRange(model)}</Badge>
+                    }
+                  >
+                    <RowCopy
+                      title={model.name}
+                      detail={model.family + ' · ' + model.context + ' tokens'}
+                    />
+                  </ListRow>
+                ))}
+              </List>
+            </>
+          )}
+          {messages[snapshot.state] && <p>{messages[snapshot.state]}</p>}
+          {snapshot.truncated && <small>Showing the first page.</small>}
+        </section>
       )}
-      <AnnouncementList
-        models={models}
-        selected={selected}
-        onSelect={onSelect}
-      />
-      {snapshot.truncated && (
-        <Note>First page only. More announcements may exist.</Note>
-      )}
-      <Note>
-        Search checks signed announcements for one model ID, not the whole
-        network. Provider identity and availability are not verified. Chat and
-        Connect remain simulated.
-      </Note>
-    </>
+      <small>Signed listings · Availability is checked when you send.</small>
+    </div>
   );
 }

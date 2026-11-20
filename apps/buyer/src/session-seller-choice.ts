@@ -1,0 +1,66 @@
+// Restrict a single owner-authenticated chat to the verified seller and terms that were selected.
+import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import { primaryRelayUrl } from '@gyblos/transport-iroh/endpoint';
+
+import type { FreeWinner } from './free-execution';
+import type { PreparedSelection } from './free-selection';
+import { UnsentSellerChoiceError } from './seller-choice-error';
+
+export function prepareChosenSeller(
+  prepared: PreparedSelection,
+  choice: BuyerSellerChoice,
+) {
+  const { config } = prepared;
+  if (config.request.maxAtomic === '0')
+    throw new UnsentSellerChoiceError(SESSION_CODES.LIMIT);
+  if (
+    !prepared.identity ||
+    !prepared.discovery ||
+    !config.session ||
+    choice.expiresAt <= Date.now() ||
+    (config.pinnedNodeId && config.pinnedNodeId !== choice.nodeId)
+  )
+    throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
+  const known = config.sellers.find(
+    (seller) => seller.nodeId === choice.nodeId,
+  );
+  if (
+    (known && known.owner !== choice.owner) ||
+    (!known && !config.discovery?.open)
+  )
+    throw new UnsentSellerChoiceError(SESSION_CODES.UNVERIFIED);
+  const seller = known ?? {
+    owner: choice.owner,
+    nodeId: choice.nodeId,
+    relayUrl: primaryRelayUrl(),
+    directAddresses: [],
+    manualTrust: false,
+  };
+  return {
+    seller,
+    prepared: {
+      ...prepared,
+      config: { ...config, sellers: [seller], pinnedNodeId: seller.nodeId },
+    },
+  };
+}
+export function verifyChosenOffer(
+  choice: BuyerSellerChoice,
+  winner: FreeWinner,
+) {
+  const { offer } = winner.quote;
+  if (
+    choice.expiresAt <= Date.now() ||
+    winner.nodeId !== choice.nodeId ||
+    offer.nodeId !== choice.nodeId ||
+    offer.owner !== choice.owner ||
+    offer.selection.modelId !== choice.modelId ||
+    offer.selection.variant !== choice.variant ||
+    offer.selection.quantization !== choice.quantization ||
+    offer.model.contextTokens !== choice.contextTokens ||
+    offer.prices.inputAtomicPerMtok !== choice.inputAtomicPerMtok ||
+    offer.prices.outputAtomicPerMtok !== choice.outputAtomicPerMtok
+  )
+    throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
+}

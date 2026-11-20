@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
-import { classifyPaidError, paidChat } from '@gyblos/buyer/paid-http';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { ChatController } from '@gyblos/desktop/chat-controller';
 import { MESSAGE_STATE } from '@gyblos/desktop/chat-state';
@@ -12,12 +11,13 @@ import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
 import { createX402Handlers } from '@gyblos/desktop/x402-handlers';
 import { X402_ACTION } from '@gyblos/desktop/x402-model';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import {
   ENGINE_DONE_REASONS,
   OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 
-import { header, setup as paidSetup, settlement } from './support/buyer-paid';
 import { latch, tick } from './support/desktop-stream';
 
 void test('desktop HTTP streaming shows a partial, stops the original execution and can send a new free turn', async () => {
@@ -170,68 +170,99 @@ void test('desktop HTTP streaming shows a partial, stops the original execution 
     await host.close();
   }
 });
-void test('desktop streaming preserves the existing confirmed paid producer without an execution marker', async () => {
-  const buyer = await paidSetup();
-  const transaction = '2'.repeat(88);
-  const progress: string[] = [];
-  buyer.scripts.push(async (request, onDelta) => {
-    await onDelta('Hi.');
-    return {
-      ...(await header(request)),
-      result: {
-        text: 'Hi.',
-        usage: { inputTokens: 4, outputTokens: 3 },
-        finishReason: ENGINE_DONE_REASONS.STOP,
-      },
-      charge: { inputTokens: 4, outputTokens: 3, chargedAtomic: '1' },
-      payment: { settlement: { ...settlement(request, '1'), transaction } },
-    };
+void test('the desktop sends the selected seller to the authenticated channel route and records its approval', async () => {
+  const ledger = new X402Budget({
+    read: async () => undefined,
+    write: async () => {},
   });
-  let saved: string | undefined;
-  const budget = new X402Budget({
-    read: async () => saved,
-    write: async (text) => {
-      saved = text;
-    },
-  });
-  const chat = paidChat(buyer.dependencies);
-  const quote = buyer.winners[0]!.quote.offer;
+  const seller = {
+    owner: '11111111111111111111111111111111',
+    nodeId: 'a'.repeat(64),
+    modelId: 'qwen3-0.6b',
+    variant: null,
+    quantization: null,
+    contextTokens: 2048,
+    inputAtomicPerMtok: '30',
+    outputAtomicPerMtok: '90',
+    expiresAt: Date.now() + 60_000,
+  };
+  const token = 'synthetic-local-buyer-token';
+  const defaultModel = {
+    modelId: 'another-model',
+    variant: null,
+    quantization: null,
+  };
+  let calls = 0;
   const host = await startFreeBuyerHttp(
-    chat.execute,
-    {
-      selection: { modelId: 'synthetic', variant: null, quantization: null },
-      maxTokens: 10,
+    async (_input, _signal, _delta, route) => {
+      assert.deepEqual(route?.sellerChoice, seller);
+      calls++;
+      return {
+        text: 'selected seller',
+        finishReason: ENGINE_DONE_REASONS.STOP,
+        usage: { inputTokens: 2, outputTokens: 1 },
+        execution: OFFER_PRICING_KINDS.PAID,
+        payment: {
+          verdict: SESSION_VERDICTS.APPROVED,
+          maxAtomic: '100',
+          expectedAtomic: '30',
+          chargedAtomic: null,
+          refundedAtomic: null,
+          sellerAtomic: null,
+          feeAtomic: null,
+          recorded: true,
+          session: {
+            approvedAtomic: '30',
+            cumulativeAtomic: '30',
+            depositAtomic: '750000',
+          },
+        },
+      };
     },
+    { selection: defaultModel, maxTokens: 10, sellerChoice: true },
     {
       port: 0,
-      token: 'synthetic-local-buyer-token',
-      stream: chat.stream,
-      classify: classifyPaidError,
+      token,
       desktopPolicy: {
-        network: quote.network,
-        mint: quote.mint,
-        payer: quote.buyer,
-        maxAtomic: quote.maxAtomic,
+        network: DEVNET,
+        mint: DEVNET_USDC,
+        payer: seller.owner,
+        depositAtomic: '750000',
+        lifetimeMs: 900000,
+        maxAtomic: '100',
       },
     },
   );
-  const client = new X402Client(budget);
+  const client = new X402Client(ledger);
   try {
-    await client.connect(host.url, 'synthetic-local-buyer-token');
-    await client.authorize(quote.maxAtomic);
-    await assert.doesNotReject(async () => {
-      const result = await client.send(
-        'paid-stream-one',
-        'Synthetic question',
-        (text) => progress.push(text),
-      );
-      assert.equal(result.text, 'Hi.');
-      assert.equal(result.summary.records[0]?.transaction, transaction);
-      assert.equal(result.summary.spentAtomic, '1');
-      assert.equal(result.summary.blocked, false);
-    });
-    assert.deepEqual(progress, ['Hi.']);
-    assert.equal(buyer.calls.executed.length, 1);
+    await client.connect(host.url, token);
+    assert.equal((await ledger.summary()).active, false);
+    const unbound = await fetch(
+      new URL(BUYER_API.CHANNEL_CHAT_PATH + '?stream=1', host.url),
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + token,
+          'content-type': 'application/json',
+          'if-match': '"' + client.policy()!.policyId + '"',
+        },
+        body: JSON.stringify({
+          model: seller.modelId,
+          messages: [{ role: 'user', content: 'test' }],
+        }),
+      },
+    );
+    assert.equal(unbound.ok, false);
+    assert.equal(calls, 0);
+    const result = await client.send(
+      'chosen-seller',
+      'test',
+      undefined,
+      seller,
+    );
+    assert.equal(result.model, seller.modelId);
+    assert.equal(result.summary.spentAtomic, '30');
+    assert.equal(calls, 1);
   } finally {
     await client.close();
     await host.close();

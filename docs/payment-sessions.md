@@ -9,15 +9,6 @@ Guided setup uses a payment session for priced offers. This page also owns how
 the buyer chooses between free and paid execution and what it does when a seller
 is busy ([Buyer routing](#buyer-routing)).
 
-| Question              | Per-request paid                   | Payment session                         |
-| --------------------- | ---------------------------------- | --------------------------------------- |
-| Deposits              | One per request                    | One per seller channel, reused          |
-| On-chain transactions | Open and settle on every request   | Open once, settle once; none per answer |
-| Conversation history  | One user turn in `pnpm buyer:chat` | Full text conversation                  |
-| Tools                 | Refused                            | Supported                               |
-| Who can use it        | Any buyer                          | Any authenticated buyer                 |
-| Windows               | Supported                          | Supported                               |
-
 ## Prerequisites
 
 - The seller and the buyer run the same Gyblos release. Older and newer peers
@@ -236,9 +227,6 @@ toward the input bound, and tool-call output counts toward tokens even when the
 text is empty. The API client runs the tools, never the node, the chat or the
 desktop app.
 
-Per-request paid refuses tool requests before opening a payment: it can't safely
-bill arguments held until the terminal without a buyer acknowledgement.
-
 ## Buyer routing
 
 ### Free or paid by signed quote
@@ -428,10 +416,9 @@ whole forced-close grace can lose signed earnings it never claimed.
   block with block checkpoints.
 - A remote status is metadata. A remote close reply becomes proof only after the
   buyer's own chain observation.
-- Every buyer startup mode (free, per-request, single session and multi-seller)
-  first takes the same buyer-home ownership guard. Only one application may own
-  a buyer home; running an older binary on the same financial state is
-  unsupported.
+- Every buyer startup mode (free, single session and multi-seller) first takes
+  the same buyer-home ownership guard. Only one application may own a buyer
+  home; running an older binary on the same financial state is unsupported.
 - These protections need the seller worker online within the withdrawal grace.
   They don't cover long simultaneous outages or a restored old backup.
 
@@ -442,6 +429,12 @@ in [recovery.md](recovery.md#reusable-batch-recovery).
 
 Keep both peers on the same release, and never delete a journal or lock to
 downgrade.
+
+- Beta.12 removed per-request payment. A beta.11 seller accepts no new channels
+  unless a buyer allowlist is set, so a paid seller must update before beta.12
+  buyers can pay it. Beta.12 neither settles a beta.11 seller's per-request
+  claims nor withdraws a beta.11 buyer's per-request funds: settle or withdraw
+  them with beta.11 before updating.
 
 - A renewed buyer journal uses private journal version 3. Versions 1 and 2 stay
   readable and keep their format until renewal; older binaries can't read a

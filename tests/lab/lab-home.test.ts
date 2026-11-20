@@ -3,13 +3,12 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, join } from 'node:path';
 import test from 'node:test';
 
 import { LEGACY_LOCAL_PATHS } from '@gyblos/config';
-import { labPaths, LEGACY_LAB_PATHS } from '@gyblos/lab-harness/constants';
-import { setupGate } from '@gyblos/lab-harness/setup';
-import { assertLabHome, configPath } from '@gyblos/lab-harness/wallet';
+import { LEGACY_LAB_PATHS } from '@gyblos/lab-harness/constants';
+import { assertLabHome } from '@gyblos/lab-harness/wallet';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 
 async function withLabEnvironment(
@@ -36,30 +35,6 @@ async function withLabEnvironment(
     await rm(directory, { recursive: true, force: true });
   }
 }
-
-void test('lab paths follow GYBLOS_LAB_HOME and GYBLOS_GATE_CONFIG keeps overriding the config', async () => {
-  await withLabEnvironment(
-    { GYBLOS_LAB_HOME: undefined, GYBLOS_GATE_CONFIG: undefined },
-    async () => {
-      assert.equal(labPaths().config, '.local/lab/config.json');
-      assert.equal(
-        labPaths().journals.inference,
-        '.local/lab/inference-attempt.json',
-      );
-      assert.equal(configPath(), resolve('.local/lab/config.json'));
-    },
-  );
-  await withLabEnvironment(
-    {
-      GYBLOS_LAB_HOME: '/lab-data',
-      GYBLOS_GATE_CONFIG: '/elsewhere/config.json',
-    },
-    async () => {
-      assert.equal(labPaths().lock, '/lab-data/buyer.lock');
-      assert.equal(configPath(), '/elsewhere/config.json');
-    },
-  );
-});
 
 void test('each legacy lab path blocks a missing lab home until it is moved', async () => {
   assert.ok(LEGACY_LAB_PATHS.includes(LEGACY_LOCAL_PATHS.labMeasurements));
@@ -94,29 +69,6 @@ void test('a legacy product tokenizer alone does not block the lab home', async 
     async () => {
       await mkdir(LEGACY_LOCAL_PATHS.tokenizer, { recursive: true });
       await assertLabHome();
-    },
-  );
-});
-
-void test('lab setup names the directory that holds the new keys', async () => {
-  await withLabEnvironment(
-    { GYBLOS_LAB_HOME: undefined, GYBLOS_GATE_CONFIG: undefined },
-    async (directory) => {
-      const keyDirectory = join(directory, 'elsewhere');
-      process.env.GYBLOS_GATE_CONFIG = join(keyDirectory, 'config.json');
-      const messages: unknown[] = [];
-      const original = console.log;
-      console.log = (...args: unknown[]) => messages.push(...args);
-      try {
-        await setupGate();
-      } finally {
-        console.log = original;
-      }
-      const output = messages.join(' ');
-      assert.ok(
-        output.includes(`Private keys stay in ${keyDirectory}.`),
-        output,
-      );
     },
   );
 });

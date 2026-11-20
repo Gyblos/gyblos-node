@@ -155,7 +155,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
       '      {retry && <span className="preview-node-retry">Retry</span>}\n    </button>',
     );
   if (target === `${base}/src/ui/NetworkCatalog.tsx`) {
-    const start = source.indexOf('function CatalogStatus(');
+    const start = source.indexOf('export function NetworkCatalogPanel(');
     if (start < 0) throw new Error('Missing network catalog view hook');
     return (
       source.slice(0, start) +
@@ -167,7 +167,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
   }
   if (target === `${base}/src/ui/Models.tsx`)
     return replaceOnce(
-      source.replaceAll('Check network', 'Find network models'),
+      source,
       'const [network, setNetwork] = useState(false)',
       "const [network, setNetwork] = useState(() => new URLSearchParams(location.search).get('review') === 'network')",
     );
@@ -205,12 +205,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
       );
   if (target === `${base}/src/ui/Chat.tsx`)
     return replaceOnce(
-      source
-        .replace("'x402 · devnet'", "'x402'")
-        .replace(
-          'Review the chat budget in Payments',
-          'Review the account budget in Payments',
-        ),
+      source.replace("'x402 · devnet'", "'x402'"),
       "'Free · Gyblos network'",
       "''",
     );

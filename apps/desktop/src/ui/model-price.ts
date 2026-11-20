@@ -10,7 +10,14 @@ const SMALLEST = 0.01;
 export function usdPerMtok(value: number) {
   if (value > 0 && value < SMALLEST)
     return '$' + value.toFixed(DESKTOP_X402.ATOMIC_DECIMALS).replace(/0+$/, '');
-  return '$' + value.toFixed(CENTS);
+  return (
+    '$' +
+    value.toLocaleString('en-US', {
+      minimumFractionDigits: CENTS,
+      maximumFractionDigits: DESKTOP_X402.ATOMIC_DECIMALS,
+      useGrouping: false,
+    })
+  );
 }
 
 // "$in / $out", as rows and badges show a paid model's price.
