@@ -50,7 +50,7 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 ## Writing code
 
 - State your assumptions before coding. When readings of a request lead to different behavior or scope, ask the founder or a maintainer; otherwise state your choice and continue. When a simpler approach exists, say so.
-- Write the least code that solves the request: no features, options or abstractions nobody asked for. Validation at trust boundaries, error handling for external input, diagnostics and security controls are always in scope (see Hard rules and Safety and privacy).
+- Write the least code that solves the request: no features, options or abstractions nobody asked for. Validation at trust boundaries, error handling for external input, the diagnostics Safety and privacy requires and security controls are always in scope (see Hard rules and Safety and privacy).
 - Keep changes surgical: every changed line traces to the request; match the surrounding style and do not reformat, rename or refactor neighboring code. A replacement removes the old path in the same PR (Hard rules: delete code no product path uses). Report, without fixing, unrelated unused code and any security or correctness defect you notice; fix one only when it blocks the request.
 - Define the check that proves a task is done before you start; for a behavior change that check is the failing test required under Tests.
 
