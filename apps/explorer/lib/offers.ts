@@ -78,7 +78,7 @@ export function summarizeOffers(snapshot: DiscoverySnapshot) {
       null,
     ),
     // Listed sellers with a 24 h uptime read, over which averageDayUptime is taken.
-    dayUptimes: day.length,
+    sellersWithDayUptime: day.length,
     averageDayUptime: day.length
       ? day.reduce((sum, ratio) => sum + ratio, 0) / day.length
       : null,

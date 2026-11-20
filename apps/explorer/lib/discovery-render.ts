@@ -10,7 +10,6 @@ import {
   readIndex,
   unavailable,
   type DiscoverySnapshot,
-  type RunProblem,
   type StoredDiscovery,
 } from './discovery';
 import {
@@ -34,11 +33,7 @@ function binding(): DiscoveryKv | null {
 }
 
 // The development server's last run (a Node process, where a value is shared by every request).
-let development: {
-  at: number;
-  stored: StoredDiscovery;
-  problems: RunProblem[];
-} | null = null;
+let development: { at: number; stored: StoredDiscovery } | null = null;
 
 export const getDiscovery = cache(async (): Promise<DiscoverySnapshot> => {
   const kv = binding();
@@ -46,13 +41,8 @@ export const getDiscovery = cache(async (): Promise<DiscoverySnapshot> => {
   if (process.env.NODE_ENV !== 'development')
     return unavailable('no DISCOVERY binding');
   if (!development || Date.now() - development.at >= DISCOVERY.reuseMs) {
-    const { stored, problems } = await readIndex(
-      development?.stored ?? null,
-      Date.now,
-    );
-    development = { at: Date.now(), stored, problems };
+    const { stored } = await readIndex(development?.stored ?? null, Date.now);
+    development = { at: Date.now(), stored };
   }
-  return development.stored.catalog || !development.problems.length
-    ? snapshotOf(development.stored, Date.now())
-    : unavailable(`discovery: ${development.problems.join(', ')}`);
+  return snapshotOf(development.stored, Date.now());
 });

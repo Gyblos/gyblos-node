@@ -77,14 +77,21 @@ export async function NetworkSection() {
           caption={
             summary.averageDayUptime === null
               ? undefined
-              : `Average over ${count(summary.dayUptimes)} of ${count(snapshot.sellers.length)} listed sellers`
+              : `Average over ${count(summary.sellersWithDayUptime)} of ${count(snapshot.sellers.length)} listed sellers`
           }
         />
       </div>
 
       <SectionTitle title="Sellers" />
       <SellersTable sellers={snapshot.sellers} />
-      {snapshot.network ? <NotOnlineTable network={snapshot.network} /> : null}
+      {snapshot.network ? (
+        <NotOnlineTable network={snapshot.network} />
+      ) : (
+        <p className="mt-2 text-xs text-dim">
+          The index&apos;s network status could not be read: registered and
+          offline sellers are unknown.
+        </p>
+      )}
     </>
   );
 }

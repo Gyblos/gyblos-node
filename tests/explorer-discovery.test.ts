@@ -170,6 +170,23 @@ void test('a malformed seller entry is skipped and reported; the rest of its pag
   assert.deepEqual(shownNodes(stored, 0), ['n1', 'n2']);
 });
 
+void test('a shown catalog whose read began over an hour ago is dated, even while a read advances', () => {
+  const stored: StoredDiscovery = {
+    progressAt: DISCOVERY.restartAfterMs + 1,
+    catalog: {
+      readAt: 0,
+      generatedAt: 1,
+      network: null,
+      networkReadAt: null,
+      sellers: [],
+    },
+    pending: null,
+    uptimes: {},
+  };
+  assert.equal(snapshotOf(stored, DISCOVERY.restartAfterMs).datedAt, null);
+  assert.equal(snapshotOf(stored, DISCOVERY.restartAfterMs + 1).datedAt, 0);
+});
+
 void test('no request begins after the run’s deadline', async () => {
   fakeIndex({ models: manyModels(DISCOVERY.maxRequestsPerRun) });
   // Every request takes a tenth of the deadline; record when each one begins.
@@ -211,7 +228,8 @@ void test('slow uptimes leave the run time for its catalog reading', async () =>
   let now = DISCOVERY.uptimeRefreshMs;
   const { requests } = fakeIndex({ models: { a: [...sellers, 'new'] } });
   const answer = globalThis.fetch;
-  // Every /uptime takes the fetch timeout; other answers are instant.
+  // Each /uptime advances the clock a sixth of the fetch timeout (six run at once); other answers are
+  // instant.
   globalThis.fetch = ((input: string | URL | Request) => {
     if (String(input).includes('/uptime')) now += FETCH.timeoutMs / 6;
     return answer(input);

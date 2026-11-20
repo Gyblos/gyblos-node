@@ -1,17 +1,28 @@
 // Protects the explorer's display choices: the date range accepts only its presets and maps to the
 // collector's inclusive UTC days; a model's mark comes from its id's family name, never a guess; the
 // daily series keep every day of the range, empty ones as zero; the index's network status is read
-// with its exact states and the sellers not online keep the index's order.
+// with its exact states and the sellers not online keep the index's order; the average uptime says over
+// how many sellers it is taken; a source read gives up after the fetch timeout.
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
 
 import { delta } from '@gyblos/explorer/board-delta';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
+import { FETCH } from '@gyblos/explorer/constants';
+import { fetchJson } from '@gyblos/explorer/fetch-json';
 import { tokensPerSecond, usdcDecimal } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
+import { summarizeOffers } from '@gyblos/explorer/offers';
 import { parseRange, rangeQuery } from '@gyblos/explorer/range';
 import { dailyRequests } from '@gyblos/explorer/usage';
+
+const realFetch = globalThis.fetch;
+const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+afterEach(() => {
+  globalThis.fetch = realFetch;
+  AbortSignal.timeout = realTimeout;
+});
 
 void test('the range is a preset or the 30-day default', () => {
   assert.equal(parseRange('7'), 7);
@@ -177,4 +188,46 @@ void test('engine speed reads as the lower bound of its bucket, the first bucket
   assert.equal(tokensPerSecond(1000), '≥ 1,000 tok/s');
   assert.equal(tokensPerSecond(0), '< 1 tok/s');
   assert.equal(tokensPerSecond(null), '—');
+});
+
+void test('a source that never answers is given up after the fetch timeout', async () => {
+  // Node's timeout timer does not keep the process alive; this one does until the abort.
+  const hold = setTimeout(() => undefined, 1000);
+  let asked = 0;
+  AbortSignal.timeout = (ms: number) => {
+    asked = ms;
+    return realTimeout(1);
+  };
+  // A fetch that answers only when its signal aborts, as a stalled connection would.
+  globalThis.fetch = ((_input: unknown, init?: RequestInit) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () =>
+        reject(init.signal?.reason),
+      );
+    })) as typeof fetch;
+  await assert.rejects(fetchJson('https://source.test/x', 'test'), {
+    name: 'TimeoutError',
+  });
+  assert.equal(asked, FETCH.timeoutMs);
+  clearTimeout(hold);
+});
+
+void test('the average 24 h uptime is over the sellers with an uptime read, and counts them', () => {
+  const seller = (nodeId: string, ratio: number | null) => ({
+    nodeId,
+    owner: 'o',
+    models: [],
+    uptime:
+      ratio === null ? null : { firstSeenAt: 1, windows: [{ days: 1, ratio }] },
+  });
+  const summary = summarizeOffers({
+    generatedAt: 0,
+    network: null,
+    datedAt: null,
+    networkDatedAt: null,
+    error: null,
+    sellers: [seller('a', 1), seller('b', 0.5), seller('c', null)],
+  });
+  assert.equal(summary.sellersWithDayUptime, 2);
+  assert.equal(summary.averageDayUptime, 0.75);
 });

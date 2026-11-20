@@ -14,8 +14,8 @@ import { UsageSection } from '../components/usage-section';
 import { RANGE } from '../lib/constants';
 import { parseRange } from '../lib/range';
 
-// Every request renders; the collector caches its answers at its own edge (5 minutes), and the discovery
-// index is read by the Worker's scheduled run into KV; renders read it (lib/discovery-render.ts).
+// Every request renders. The collector caches its answers at its own edge (5 minutes); the discovery
+// index is read into KV by the Worker's scheduled run, and renders read KV (lib/discovery-render.ts).
 export const dynamic = 'force-dynamic';
 
 export default async function Home({

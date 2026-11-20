@@ -28,10 +28,12 @@ export type { OfferedModel, Seller } from './discovery-shape';
 export interface DiscoverySnapshot {
   generatedAt: number;
   sellers: Seller[];
-  // Null when the index has not answered /network (an older index): only online sellers are known.
+  // Null when no network status has been read (/network failing, or absent from an older index): only
+  // online sellers are known.
   network: NetworkStatus | null;
   // When the shown catalog's read began, once the index's catalog has not been read further for
-  // DISCOVERY.staleAfterMs (it is not answering); else null.
+  // DISCOVERY.staleAfterMs (it is not answering) or that read began over DISCOVERY.restartAfterMs ago;
+  // else null.
   datedAt: number | null;
   // When the shown network status was read, when it is older than the shown catalog (/network failed
   // since); else null.

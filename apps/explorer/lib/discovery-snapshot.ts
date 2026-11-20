@@ -92,7 +92,10 @@ export function snapshotOf(
     })),
     network: catalog.network,
     datedAt:
-      now - stored.progressAt > DISCOVERY.staleAfterMs ? catalog.readAt : null,
+      now - stored.progressAt > DISCOVERY.staleAfterMs ||
+      now - catalog.readAt > DISCOVERY.restartAfterMs
+        ? catalog.readAt
+        : null,
     networkDatedAt:
       catalog.network &&
       catalog.networkReadAt !== null &&
