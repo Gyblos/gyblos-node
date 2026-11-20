@@ -14,24 +14,23 @@ import {
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { DEVNET, PRIVATE_LOG_LIMITS } from '@gyblos/config';
+import { PRIVATE_LOG_LIMITS } from '@gyblos/config';
 import {
   PRIVATE_LOG_CODES,
   PRIVATE_LOG_STATES,
 } from '@gyblos/runtime/constants';
 
 import {
+  PRIVATE_LOG_PLATFORM_SKIP,
+  withLogIo,
+} from './support/private-log-fixture';
+import {
   createPrivateLog,
   DIAGNOSTIC_CANARY,
   diagnosticDirectory,
   diagnosticRows,
   rm,
-  withDiagnosticHost,
-} from './support/facilitator-diagnostic-fixture';
-import {
-  PRIVATE_LOG_PLATFORM_SKIP,
-  withLogIo,
-} from './support/private-log-fixture';
+} from './support/private-log-records';
 
 for (const fault of [
   'symlink-parent',
@@ -126,7 +125,7 @@ void test(
   },
 );
 void test(
-  'fsync failure keeps SDK success and exposes only canonical degradation',
+  'fsync failure exposes only canonical degradation',
   { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
   async () => {
     const directory = await diagnosticDirectory();
@@ -136,15 +135,7 @@ void test(
         io.sync = async () => {
           throw new Error(DIAGNOSTIC_CANARY);
         };
-        await withDiagnosticHost(
-          { onDiagnostic: log.write },
-          async ({ call, calls }) => {
-            const response = await call();
-            assert.equal(response.status, 200);
-            assert.equal((await response.json()).success, true);
-            assert.equal(calls.settle, 1);
-          },
-        );
+        log.write({ synthetic: true });
         await log.close();
         assert.equal(log.health().state, PRIVATE_LOG_STATES.DEGRADED);
         assert.equal(log.health().code, PRIVATE_LOG_CODES.PERSISTENCE_FAILED);
@@ -153,40 +144,6 @@ void test(
         assert.ok(!JSON.stringify(log.health()).includes(DIAGNOSTIC_CANARY));
         assert.ok(!io.warnings.join('').includes(DIAGNOSTIC_CANARY));
       });
-    } finally {
-      await rm(directory, { recursive: true });
-    }
-  },
-);
-void test(
-  'persistent facilitator logs exclude non-URL secrets from SDK reasons and messages',
-  { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
-  async () => {
-    const directory = await diagnosticDirectory();
-    try {
-      const log = await createPrivateLog(join(directory, 'log'));
-      await withDiagnosticHost(
-        {
-          onDiagnostic: log.write,
-          settle: async () => ({
-            success: false,
-            network: DEVNET,
-            transaction: '',
-            errorReason: DIAGNOSTIC_CANARY,
-            errorMessage: DIAGNOSTIC_CANARY,
-          }),
-        },
-        async ({ call }) => {
-          const response = await call();
-          assert.equal(response.status, 200);
-          await response.json();
-        },
-      );
-      await log.close();
-      const bytes = await readFile(log.path!, 'utf8');
-      assert.ok(!bytes.includes(DIAGNOSTIC_CANARY));
-      assert.ok(!bytes.includes('errorMessage'));
-      assert.equal((await diagnosticRows(log.path!)).length, 4);
     } finally {
       await rm(directory, { recursive: true });
     }

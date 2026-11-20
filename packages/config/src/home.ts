@@ -72,7 +72,6 @@ export const ROLE_FILES = {
   sellerRegistrationLock: 'registration-8004-v1.lock',
   publicSequence: 'public-sequence-v2.json',
   publicSequenceLock: 'public-sequence-v2.lock',
-  facilitatorDiagnostics: 'facilitator-diagnostics',
 } as const;
 
 // Solana key files inside a role directory: buyer for the buyer role, the other three for the seller.
@@ -164,7 +163,6 @@ export function labLayout(environment: HomeEnvironment) {
     root,
     diagnostics: join(root, ROLE_FILES.diagnostics),
     measurements: join(root, ROLE_FILES.measurements),
-    facilitatorDiagnostics: join(root, ROLE_FILES.facilitatorDiagnostics),
     identityKeys: join(root, LAB_DIRECTORIES.identityKeys),
     identityValidator: join(root, LAB_DIRECTORIES.identityValidator),
     batchChannelKeys: join(

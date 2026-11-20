@@ -6,12 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import {
-  DEVNET_RPC_URL,
-  homeLayout,
-  MAX_ATOMIC,
-  ROLE_FILES,
-} from '@gyblos/config';
+import { DEVNET_RPC_URL, homeLayout, ROLE_FILES } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import {
   NODE_ERROR_CODES,
@@ -30,14 +25,6 @@ const ROLE = {
   mint: ADDRESS,
   nodeId: '1'.repeat(64),
   buyer: ADDRESS,
-};
-const TRUST = {
-  owner: ADDRESS,
-  nodeId: '2'.repeat(64),
-  mint: ADDRESS,
-  payTo: ADDRESS,
-  buyer: ADDRESS,
-  maxAtomic: MAX_ATOMIC,
 };
 
 function buyerDirectory() {
@@ -81,23 +68,6 @@ void test(
 );
 
 void test(
-  'local trust rejects non-string budgets before reading the signed offer',
-  { skip: NATIVE_CAPABILITY.bindingSkip },
-  async () => {
-    const { trustedOffer } = await import('@gyblos/buyer/buyer');
-    await withConfig(async (write) => {
-      await write(ROLE_FILES.trust, {
-        ...TRUST,
-        maxAtomic: Number(MAX_ATOMIC),
-      });
-      await assert.rejects(trustedOffer(), {
-        code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-      });
-    });
-  },
-);
-
-void test(
   'local role parser accepts both complete roles and rejects malformed required fields',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {
@@ -132,57 +102,17 @@ void test(
   },
 );
 
-void test('local trust parser validates identity fields and positive bounded decimal-string budgets', async () => {
-  const { parseOfferTrust } = await import('@gyblos/node/offers');
-  assert.deepEqual(parseOfferTrust(TRUST), TRUST);
-  for (const maxAtomic of [
-    null,
-    1000,
-    '',
-    '0',
-    '-1',
-    '0x10',
-    '10001',
-    '1000\n',
-    'PRIVATE_RPC_CREDENTIAL_SENTINEL',
-  ])
-    assert.throws(() => parseOfferTrust({ ...TRUST, maxAtomic }), {
-      code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-      message: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-    });
-  for (const value of [
-    null,
-    [],
-    {},
-    { ...TRUST, owner: false },
-    { ...TRUST, nodeId: 'invalid' },
-    { ...TRUST, nodeId: 'a'.repeat(63) + '\n' },
-    { ...TRUST, mint: 'invalid' },
-    { ...TRUST, buyer: undefined },
-  ])
-    assert.throws(() => parseOfferTrust(value), {
-      code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-    });
-});
-
 void test(
   'malformed local JSON never exposes credential snippets in validation errors',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {
     const { loadRole } = await import('@gyblos/node/roles');
-    const { trustedOffer } = await import('@gyblos/buyer/buyer');
-    await withConfig(async (write) => {
+    await withConfig(async () => {
       const malformed = 'https://PRIVATE_RPC_CREDENTIAL_SENTINEL';
       await writeFile(join(buyerDirectory(), ROLE_FILES.roleConfig), malformed);
       await assert.rejects(loadRole(P2P_ROLES.BUYER), {
         code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
         message: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
-      });
-      await write(ROLE_FILES.roleConfig, ROLE);
-      await writeFile(join(buyerDirectory(), ROLE_FILES.trust), malformed);
-      await assert.rejects(trustedOffer(), {
-        code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-        message: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
       });
     });
   },
@@ -217,57 +147,6 @@ void test(
 );
 
 void test(
-  'local role and trust reject uppercase NodeIds before offer matching',
-  { skip: NATIVE_CAPABILITY.bindingSkip },
-  async () => {
-    const { parseRoleConfig } = await import('@gyblos/node/roles');
-    const { parseOfferTrust } = await import('@gyblos/node/offers');
-    const lowercase = 'ab'.repeat(32);
-    assert.equal(
-      parseRoleConfig({ ...ROLE, nodeId: lowercase }).nodeId,
-      lowercase,
-    );
-    assert.equal(
-      parseOfferTrust({ ...TRUST, nodeId: lowercase }).nodeId,
-      lowercase,
-    );
-    assert.throws(
-      () => parseRoleConfig({ ...ROLE, nodeId: lowercase.toUpperCase() }),
-      {
-        code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
-      },
-    );
-    assert.throws(
-      () => parseOfferTrust({ ...TRUST, nodeId: lowercase.toUpperCase() }),
-      {
-        code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-      },
-    );
-  },
-);
-
-void test('local trust rejects noncanonical decimal budgets with static typed errors', async () => {
-  const { parseOfferTrust } = await import('@gyblos/node/offers');
-  for (const maxAtomic of ['0010', '01', '00', '+10', '1e1', '1.0', ' 10'])
-    assert.throws(() => parseOfferTrust({ ...TRUST, maxAtomic }), {
-      code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-      message: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-    });
-  assert.equal(parseOfferTrust({ ...TRUST, maxAtomic: '10' }).maxAtomic, '10');
-});
-
-void test('local trust rejects unknown fields without echoing input', async () => {
-  const { parseOfferTrust } = await import('@gyblos/node/offers');
-  assert.throws(
-    () => parseOfferTrust({ ...TRUST, PRIVATE_SENTINEL: 'PRIVATE_VALUE' }),
-    {
-      code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-      message: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-    },
-  );
-});
-
-void test(
   'local roles reject unknown and cross-role fields without echoing input',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {
@@ -289,5 +168,16 @@ void test(
         code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
         message: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
       });
+  },
+);
+
+void test(
+  'role configuration rejects uppercase NodeIds',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { parseRoleConfig } = await import('@gyblos/node/roles');
+    assert.throws(() => parseRoleConfig({ ...ROLE, nodeId: 'A'.repeat(64) }), {
+      code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
+    });
   },
 );

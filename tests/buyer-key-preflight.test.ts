@@ -16,24 +16,6 @@ import { controlFixture } from './support/control-fixture';
 import { keyPreflightProgram } from './support/key-preflight';
 
 const cases = [
-  'model',
-  'reasoning',
-  'downgrade',
-  'network',
-  'mint',
-  'quote-model',
-  'quote-reasoning',
-  'quote-mint',
-  'tokens',
-  'quote-tokens',
-  'bytes',
-  'escaped-bytes',
-  'context',
-  'history',
-  'meter-input',
-  'meter-load',
-  'warm',
-  'unrelated-model',
   'session-model',
   'session-model-pool',
   'session-context',
@@ -44,8 +26,6 @@ const cases = [
   'session-expired-pool',
   'session-deposit',
   'session-deposit-pool',
-  'aborted',
-  'uncertain',
 ];
 // tsx stores transforms under TMPDIR/tsx-<effective uid> on Linux.
 let transformCache: { name: string; directory: string } | undefined;

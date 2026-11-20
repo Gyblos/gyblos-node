@@ -3,12 +3,16 @@
 // script text), the private verdict, and that mode bits are not judged on Windows. The real ACLs are
 // exercised by tests/windows-seller.test.ts on Windows.
 import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { hasPrivateMode } from '@gyblos/runtime/private-mode';
 import {
   ACL_VERDICTS,
   aclIsPrivate,
+  createWindowsPaymentDirectory,
   parseAcls,
   pathsArePrivate,
   paymentPathsArePrivate,
@@ -170,4 +174,47 @@ void test('mode bits decide privacy on POSIX only; the public sequence never jud
   );
   assert.equal(hasPrivateMode(loose, 0o600, { platform: 'win32' }), true);
   assert.equal(hasPrivateMode(loose, 0o600, { platform: 'linux' }), false);
+});
+
+void test('a failed ACL grant leaves no payment directory and the next creation can succeed', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'gyblos-acl-retry-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const target = join(root, 'payments');
+  let failGrant = true;
+  const acl = {
+    run: async (tool: string, args: readonly string[]) => {
+      if (tool.endsWith('whoami.exe')) return '"test","' + SID + '"';
+      if (args.includes('/grant:r') && failGrant)
+        throw new Error('simulated ACL failure');
+      return '';
+    },
+  };
+  await assert.rejects(
+    createWindowsPaymentDirectory(target, acl),
+    /simulated ACL failure/,
+  );
+  assert.deepEqual(await readdir(root), []);
+  failGrant = false;
+  await createWindowsPaymentDirectory(target, acl);
+  assert.deepEqual(await readdir(root), ['payments']);
+});
+
+void test('interrupted child creation leaves the financial registry available on restart', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'gyblos-payment-registry-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const children = join(root, 'buyers');
+  await mkdir(children);
+  const previous = 'a'.repeat(64);
+  await mkdir(join(children, previous));
+  await mkdtemp(join(root, '.payment-creating-'));
+  const next = 'b'.repeat(64);
+  const acl = {
+    run: async (tool: string, args: readonly string[]) => {
+      if (tool.endsWith('whoami.exe')) return '"test","' + SID + '"';
+      assert.deepEqual(await readdir(children), [previous]);
+      return '';
+    },
+  };
+  await createWindowsPaymentDirectory(join(children, next), acl, root);
+  assert.deepEqual((await readdir(children)).sort(), [previous, next]);
 });

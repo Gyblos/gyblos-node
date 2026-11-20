@@ -68,3 +68,12 @@ export function pricePerMtokToAtomicPerMtok(decimal: string): bigint {
   if (!price.ok) throw new NodeError(NODE_ERROR_CODES.INVALID_PRICE);
   return atomicUnits(price);
 }
+
+export function atomicToUsdc(amount: bigint): string {
+  if (amount < 0n) throw new NodeError(NODE_ERROR_CODES.INVALID_PRICE);
+  const whole = amount / USDC_ATOMIC_UNITS_PER_USDC;
+  const fraction = String(amount % USDC_ATOMIC_UNITS_PER_USDC)
+    .padStart(NODE_CONFIG_LIMITS.priceFractionDigits, ZERO_DIGIT)
+    .replace(TRAILING_ZEROS, '');
+  return fraction ? whole + '.' + fraction : String(whole);
+}

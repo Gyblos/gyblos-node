@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { delta } from '@gyblos/explorer/board-delta';
+import { hoveredPoint } from '@gyblos/explorer/board-hovered';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
 import { tokensPerSecond, usdcDecimal } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
@@ -187,4 +188,15 @@ void test('the Usage note names the comparison only when the earlier span was re
   );
   assert.equal(usageMeta(30, at, false), 'updated 2026-11-19 20:10 UTC');
   assert.equal(usageMeta(30, null, true), 'no data yet');
+});
+
+void test('a chart hover picks a bar only at a real index, never the first day off the bars', () => {
+  const days = ['10-01', '10-02'];
+  assert.equal(hoveredPoint(days, 1), '10-02');
+  assert.equal(hoveredPoint(days, '0'), '10-01');
+  assert.equal(hoveredPoint(days, null), null);
+  assert.equal(hoveredPoint(days, undefined), null);
+  assert.equal(hoveredPoint(days, ''), null);
+  assert.equal(hoveredPoint(days, 5), null);
+  assert.equal(hoveredPoint(days, 1.5), null);
 });

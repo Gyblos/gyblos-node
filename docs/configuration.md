@@ -437,7 +437,7 @@ variable or the relay token's variable stops it with
 
 ### Paid offers
 
-A paid offer is sold on devnet over its own paid stream (x402 upto channels).
+A paid offer is sold on devnet over reusable x402 batch-settlement channels.
 Buyers pay the seller's price plus the protocol fee (`PROTOCOL_FEE` in
 `@gyblos/config`, 4% on devnet), rounded up. Startup accepts a paid offer only
 when:
@@ -452,15 +452,8 @@ when:
 - The payout, protocol fee treasury and fee payer token accounts exist or can be
   created (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`).
 
-The fee payer key needs devnet SOL. It pays every channel transaction, fronts
-each buyer channel's rent until the channel is reclaimed, and pays about 0.002
-devnet SOL of rent for each token account the seller creates. The payment
-program pays a missing account's share to its own treasury, so the seller
-creates missing accounts before it starts and before every claim. A frozen
-account cannot receive its share, so the seller refuses to start. A claim that
-cannot create an account is not sent; it stays pending with its recorded charge
-and is retried on recovery. See [payments](payments.md) and
-[limitations](limitations.md) for what paid v2 has proven.
+The fee payer needs devnet SOL to prepare the payout accounts and pay channel
+transaction fees. See [payment sessions](payment-sessions.md).
 
 ### Startup codes
 

@@ -204,7 +204,7 @@ void test('uncertainty in A preserves an already sent B response and blocks ever
 });
 
 void test('concurrent new sellers cannot both allocate the same remaining shared deposit authority', async (t) => {
-  const fixture = await multisellerLoopback('1000');
+  const fixture = await multisellerLoopback('10000');
   const buyer = createBuyerSessionPool(fixture.options);
   t.after(async () => {
     await buyer.close();

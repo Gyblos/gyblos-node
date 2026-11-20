@@ -82,7 +82,9 @@ function ownTerms(
     terms.withdrawDelaySeconds >
       BATCH_SESSION_DEFAULTS.maxWithdrawDelaySeconds ||
     (fresh &&
-      (terms.expiresAt <= options.now() ||
+      (BigInt(terms.depositAtomic) <
+        BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic) ||
+        terms.expiresAt <= options.now() ||
         terms.expiresAt > options.now() + BATCH_SESSION_DEFAULTS.maxLifetimeMs))
   )
     return batchFail(SESSION_CODES.LIMIT);

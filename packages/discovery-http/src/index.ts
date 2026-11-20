@@ -21,6 +21,7 @@ export {
   type SellerUptime,
 } from './uptime';
 export {
+  fetchModels,
   fetchSellers,
   type DiscoveredSeller,
   type FetchSellersInput,

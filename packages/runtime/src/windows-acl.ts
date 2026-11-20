@@ -3,8 +3,8 @@
 // with icacls; checks read the ACLs by SID with PowerShell before keys are used. Tools are called by
 // absolute path, never through PATH.
 import { execFile } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { lstat, mkdtemp, readdir, rename, rmdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -83,6 +83,39 @@ export async function restrictDirectory(
     grant(WINDOWS_SIDS.system),
     grant(WINDOWS_SIDS.administrators),
   ]);
+}
+
+// Only a directory created by this call may have its inherited permissions replaced.
+export async function createWindowsPaymentDirectory(
+  path: string,
+  tools: AclTools = defaultTools,
+  stagingParent = dirname(path),
+) {
+  const exists = async () =>
+    lstat(path).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return false;
+        throw error;
+      },
+    );
+  if (await exists()) return;
+  const temporary = await mkdtemp(join(stagingParent, '.payment-creating-'));
+  let published = false;
+  try {
+    await restrictDirectory(temporary, tools);
+    if ((await readdir(temporary)).length)
+      throw new Error('Unexpected payment folder contents');
+    // Windows refuses to replace an existing directory. The caller validates the winning path.
+    try {
+      await rename(temporary, path);
+      published = true;
+    } catch (error) {
+      if (!(await exists())) throw error;
+    }
+  } finally {
+    if (!published) await rmdir(temporary).catch(() => undefined);
+  }
 }
 
 // The folder restricted, and everything already inside reset to inherit from it: a key restored from a

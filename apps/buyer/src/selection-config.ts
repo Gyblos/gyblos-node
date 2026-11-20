@@ -3,6 +3,10 @@
 import { lstat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import {
+  BATCH_SESSION_DEFAULTS,
+  BUYER_DEPOSIT_MINIMUM_HINT,
+} from '@gyblos/config/batch-session';
 import { homeLayout, type HomeEnvironment } from '@gyblos/config/home';
 import {
   parseBuyerRoutingPolicy,
@@ -58,7 +62,11 @@ export class BuyerSelectionError extends Error {
   constructor(
     readonly code: (typeof BUYER_SELECTION_CODES)[keyof typeof BUYER_SELECTION_CODES],
   ) {
-    super(code);
+    super(
+      code === BUYER_SELECTION_CODES.DEPOSIT_MINIMUM
+        ? BUYER_DEPOSIT_MINIMUM_HINT
+        : code,
+    );
     this.name = 'BuyerSelectionError';
   }
 }
@@ -184,6 +192,18 @@ function parseStaticSeller(value: unknown): StaticControlSeller {
   }
   return result;
 }
+function configuredSession(value: unknown) {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'depositAtomic' in value &&
+    BigInt(controlAtomic(value.depositAtomic)) <
+      BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
+  )
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.DEPOSIT_MINIMUM);
+  return parseBuyerSessionPolicy(value);
+}
+
 export function parseBuyerSelectionConfig(
   value: unknown,
 ): BuyerSelectionConfig {
@@ -238,7 +258,7 @@ export function parseBuyerSelectionConfig(
         : { routing: parseBuyerRoutingPolicy(row.routing) }),
       ...(row.session === undefined
         ? {}
-        : { session: parseBuyerSessionPolicy(row.session) }),
+        : { session: configuredSession(row.session) }),
       sellers,
       ...(row.identity === undefined
         ? {}

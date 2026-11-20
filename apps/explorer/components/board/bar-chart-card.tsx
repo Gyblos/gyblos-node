@@ -20,6 +20,7 @@ import { CHART } from './constants';
 import { cx } from './cx';
 import type { Delta } from './delta';
 import { DeltaChip } from './delta-chip';
+import { hoveredPoint } from './hovered';
 import { SURFACE } from './styles';
 
 const TICK = {
@@ -79,12 +80,9 @@ export function BarChartCard({
               bottom: 0,
               left: 0,
             }}
-            onMouseMove={(state) => {
-              const index = Number(state.activeTooltipIndex);
-              setActive(
-                Number.isInteger(index) ? (points[index] ?? null) : null,
-              );
-            }}
+            onMouseMove={(state) =>
+              setActive(hoveredPoint(points, state.activeTooltipIndex))
+            }
             onMouseLeave={() => setActive(null)}
           >
             <XAxis

@@ -1,15 +1,9 @@
-// Prevents per-token/per-million confusion in selection and the unchanged trusted v1 execution boundary.
+// Checks per-million token pricing during seller selection.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { SelectionDecision } from '@gyblos/buyer/selection';
-import { requireLegacyQuoteCompatibility } from '@gyblos/buyer/selection-v1';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
-import { createControlQuote } from '@gyblos/core/control-quotes';
-import type { SellerCandidate } from '@gyblos/core/seller-selection';
-import type { InferenceOffer } from '@gyblos/protocol/offer';
 
-import { controlFixture } from './support/control-fixture';
 import {
   chosen,
   request,
@@ -42,39 +36,4 @@ void test('seller minimum budget rounds the combined per-million cost of one inp
     ).length,
     1,
   );
-});
-
-void test('advisory v2 rates must equal scaled trusted v1 rates before existing v1 execution can proceed', async () => {
-  const run = await controlFixture();
-  const quote = await createControlQuote(
-    run.request,
-    run.context,
-    run.ownerSigner,
-  );
-  const trusted: InferenceOffer = {
-    ...quote.offer,
-    prices: { inputAtomic: '1', outputAtomic: '2' },
-  };
-  const result: SelectionDecision = {
-    ok: true,
-    winner: {
-      quote: {
-        ...quote,
-        offer: {
-          ...quote.offer,
-          prices: {
-            inputAtomicPerMtok: '1000000',
-            outputAtomicPerMtok: '2000000',
-          },
-        },
-      },
-      candidate: {} as SellerCandidate,
-    },
-  };
-  assert.equal(requireLegacyQuoteCompatibility(result, trusted).ok, true);
-  result.winner.quote.offer.prices = {
-    inputAtomicPerMtok: '1',
-    outputAtomicPerMtok: '2',
-  };
-  assert.equal(requireLegacyQuoteCompatibility(result, trusted).ok, false);
 });

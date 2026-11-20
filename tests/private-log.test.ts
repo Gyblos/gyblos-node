@@ -12,6 +12,10 @@ import {
 } from '@gyblos/runtime/constants';
 
 import {
+  PRIVATE_LOG_PLATFORM_SKIP,
+  withLogIo,
+} from './support/private-log-fixture';
+import {
   createPrivateLog,
   DIAGNOSTIC_CANARY,
   diagnosticBarrier,
@@ -19,29 +23,18 @@ import {
   diagnosticRows,
   diagnosticUntil,
   rm,
-  withDiagnosticHost,
-} from './support/facilitator-diagnostic-fixture';
-import {
-  PRIVATE_LOG_PLATFORM_SKIP,
-  withLogIo,
-} from './support/private-log-fixture';
+} from './support/private-log-records';
 
 void test(
-  'facilitator records survive stop and restart in distinct private exclusive files',
+  'private records survive stop and restart in distinct private exclusive files',
   { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
   async () => {
     const directory = await diagnosticDirectory();
     try {
       await withLogIo(async (io) => {
         const log = await createPrivateLog(join(directory, 'log'));
-        await withDiagnosticHost(
-          { onDiagnostic: log.write },
-          async ({ call }) => {
-            const response = await call();
-            assert.equal(response.status, 200);
-            await response.json();
-          },
-        );
+        for (let index = 0; index < 4; index++) log.write({ index });
+
         const health = await log.close();
         assert.equal(health.state, PRIVATE_LOG_STATES.CLOSED);
         assert.equal(health.synced, 4);
@@ -69,7 +62,7 @@ void test(
   },
 );
 void test(
-  'stalled fsync cannot block facilitator response; queue and shutdown are bounded',
+  'stalled fsync leaves the log queue and shutdown bounded',
   { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
   async () => {
     const directory = await diagnosticDirectory();
@@ -86,22 +79,14 @@ void test(
           await release.promise;
         };
         try {
-          await withDiagnosticHost(
-            { onDiagnostic: log.write },
-            async ({ call, calls }) => {
-              const response = await call();
-              assert.equal(response.status, 200);
-              await response.json();
-              assert.equal(calls.settle, 1);
-              await reached.promise;
-              assert.equal(log.health().queued, 2);
-              assert.equal(log.health().code, PRIVATE_LOG_CODES.QUEUE_FULL);
-              const health = await log.close();
-              assert.equal(health.code, PRIVATE_LOG_CODES.DRAIN_TIMEOUT);
-              assert.equal(health.synced, 0);
-              assert.equal(health.closed, false);
-            },
-          );
+          for (let index = 0; index < 4; index++) log.write({ index });
+          await reached.promise;
+          assert.equal(log.health().queued, 2);
+          assert.equal(log.health().code, PRIVATE_LOG_CODES.QUEUE_FULL);
+          const health = await log.close();
+          assert.equal(health.code, PRIVATE_LOG_CODES.DRAIN_TIMEOUT);
+          assert.equal(health.synced, 0);
+          assert.equal(health.closed, false);
         } finally {
           release.resolve();
         }
@@ -117,7 +102,7 @@ void test(
   },
 );
 void test(
-  'open failure degrades diagnostics without changing the SDK payment response',
+  'open failure degrades the private log',
   { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
   async () => {
     const directory = await diagnosticDirectory();
@@ -125,15 +110,8 @@ void test(
       await withLogIo(async (io) => {
         io.openError = new Error(DIAGNOSTIC_CANARY);
         const log = await createPrivateLog(join(directory, 'log'));
-        await withDiagnosticHost(
-          { onDiagnostic: log.write },
-          async ({ call, calls }) => {
-            const response = await call();
-            assert.equal(response.status, 200);
-            await response.json();
-            assert.equal(calls.settle, 1);
-          },
-        );
+        for (let index = 0; index < 4; index++) log.write({ index });
+
         const health = await log.close();
         assert.equal(health.state, PRIVATE_LOG_STATES.DEGRADED);
         assert.equal(health.code, PRIVATE_LOG_CODES.PERSISTENCE_FAILED);

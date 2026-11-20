@@ -1,5 +1,6 @@
 // Owns the free buyer process lifetime. Importing this entry creates no endpoint, timer or files.
 import { FREE_OUTPUT_TOKENS, PORTS } from '@gyblos/config';
+import { BUYER_DEPOSIT_MINIMUM_HINT } from '@gyblos/config/batch-session';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { isMain, shutdownSignal } from '@gyblos/runtime';
@@ -29,6 +30,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
   [FREE_BUYER_STARTUP.NOT_BUYER]:
     'the role.json in the buyer directory does not describe a buyer',
   [FREE_BUYER_STARTUP.SELECTION_MISSING]: `create selection.json in the buyer home (.local/gyblos/buyer by default); see ${BUYER_DOCS}`,
+  [FREE_BUYER_STARTUP.DEPOSIT_MINIMUM]: BUYER_DEPOSIT_MINIMUM_HINT,
   [FREE_BUYER_STARTUP.SESSION_REQUIRED]: `paid settings require a session in selection.json. Add depositAtomic and lifetimeMs as described in docs/payment-sessions.md#explicit-startup-policy`,
   [FREE_BUYER_STARTUP.SELECTION_INVALID]: `selection.json is not valid; compare it with ${BUYER_DOCS}`,
   [FREE_BUYER_STARTUP.STATS_INVALID]:
@@ -42,7 +44,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
     'request.reasoning must be "off" and lowestReasoning null',
   [FREE_BUYER_STARTUP.NODE_KEY]:
     'node.key is missing, unreadable or does not match role.json',
-  [FREE_BUYER_STARTUP.PORT_IN_USE]: `port ${PORTS.buyerProxy} is in use; stop buyer:start or the other process first`,
+  [FREE_BUYER_STARTUP.PORT_IN_USE]: `port ${PORTS.buyerProxy} is in use; stop the process using it first`,
   [FREE_BUYER_STARTUP.PAID_NETWORK]:
     'paid mode is devnet only: role.json rpcUrl must serve devnet, and request.network and asset must match the role',
   [FREE_BUYER_STARTUP.PAID_MODEL]:

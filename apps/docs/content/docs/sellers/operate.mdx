@@ -111,6 +111,11 @@ After updating, check status, and add `--online` if you publish. If it fails, ke
 image (`docker compose images seller`, or `gyblos --version` on a native seller) and the error code. Do not
 keep restarting to clear a lock or get past a refusal.
 
+If you charge for inference, update as soon as a release changes how buyers pay. Since beta.12, buyers pay
+only through [payment channels](/en/sellers/get-paid), and a beta.11 seller accepts no new channels, so paid
+buyers cannot use it until it updates. Beta.12 no longer settles beta.11 per-request payments: if your
+seller still has some unsettled, keep beta.11 running until they settle, then update.
+
 ## Read the logs privately [#inspect-logs-privately]
 
 | Install type   | Command                                                    |

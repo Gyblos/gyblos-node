@@ -87,7 +87,7 @@ void test('a failed durable intent write cannot construct financial services or 
   assert.equal(fixture.offers[0]!.generations(), 0);
   assert.deepEqual(fixture.a.calls, []);
   const entry = (await inspectBatchPool(fixture.paths))[0]!;
-  assert.equal(entry.terms.depositAtomic, '1000');
+  assert.equal(entry.terms.depositAtomic, '10000');
   assert.equal(entry.refundedAtomic, '0');
 });
 

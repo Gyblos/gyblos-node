@@ -60,6 +60,7 @@ export type BuyerExecutionFactory = (context: {
     model?: RoutedModel,
     permission?: BuyerApiKeyOperation,
   ): Promise<ChatResult>;
+  sellerChoice?: boolean;
   token?: string;
   apiKeys?: BuyerApiKeys;
   requestMs?: number;
@@ -102,9 +103,10 @@ async function selectionConfig() {
   } catch (error) {
     if (
       error instanceof BuyerSelectionError &&
-      error.code === BUYER_SELECTION_CODES.SESSION_REQUIRED
+      (error.code === BUYER_SELECTION_CODES.SESSION_REQUIRED ||
+        error.code === BUYER_SELECTION_CODES.DEPOSIT_MINIMUM)
     )
-      return refuse(FREE_BUYER_STARTUP.SESSION_REQUIRED);
+      return refuse(error.code);
     return refuse(FREE_BUYER_STARTUP.SELECTION_INVALID);
   }
 }
@@ -188,7 +190,11 @@ async function closeBuyerResources(
 
 function buyerHttp(
   run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'],
-  { request, models }: Awaited<ReturnType<typeof buyerSelection>>['config'],
+  {
+    request,
+    models,
+    session,
+  }: Awaited<ReturnType<typeof buyerSelection>>['config'],
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
@@ -200,6 +206,7 @@ function buyerHttp(
       (input, signal, _onDelta, model, permission) =>
         run(input, signal, undefined, model, permission),
       {
+        sellerChoice: execution?.sellerChoice,
         selection: request.selection,
         maxTokens: request.maxTokens,
         ...(models ? { models } : {}),
@@ -212,7 +219,7 @@ function buyerHttp(
         stream: run,
         apiKeys: execution?.apiKeys,
         diagnostics,
-        ...configuredBuyerAccess(request, role, execution?.token),
+        ...configuredBuyerAccess(request, role, execution?.token, session),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
       },

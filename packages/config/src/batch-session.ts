@@ -14,11 +14,14 @@ export const BATCH_SESSION_DEFAULTS = {
   // Soft checkpoint target measured with the pinned tokenizer; an indivisible prefix can be larger.
   blockTargetTokens: 64,
   stateBytes: 512 * 1024,
+  minDepositAtomic: '10000',
   maxDepositAtomic: '1000000',
   minLifetimeMs: 5 * 60 * 1000,
   maxLifetimeMs: 24 * 60 * 60 * 1000,
   maxWithdrawDelaySeconds: 3600,
 } as const;
+
+export const BUYER_DEPOSIT_MINIMUM_HINT = `Set session.depositAtomic to at least ${BATCH_SESSION_DEFAULTS.minDepositAtomic} (0.01 USDC) to open a payment channel.`;
 
 // Written by guided buyer setup. The separate request ceiling still controls spending.
 export const BUYER_SESSION_DEFAULT_POLICY = {

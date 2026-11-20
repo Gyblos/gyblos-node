@@ -106,14 +106,27 @@ export class X402Budget {
       return structuredClone(this.state!.summary);
     });
   }
-  reserve(id: string) {
+  reserve(id: string, confirmedPolicy?: BuyerApiPolicy) {
     return this.serial(async () => {
       const state = await this.load();
-      const summary = state.summary;
+      // A confirmed seller authorizes this response only. Persist its reservation
+      // with the same recovery rules as a request under an optional chat budget.
+      const single = !state.summary.active && confirmedPolicy;
+      const summary = single
+        ? {
+            ...state.summary,
+            sessionId: randomUUID(),
+            policy: single,
+            limitAtomic: single.maxAtomic,
+            spentAtomic: '0',
+          }
+        : state.summary;
       if (
         this.failed ||
         state.pending ||
-        !summary.active ||
+        (!single && !summary.active) ||
+        (confirmedPolicy &&
+          confirmedPolicy.policyId !== summary.policy?.policyId) ||
         !summary.policy ||
         !x402Id(id) ||
         summary.records.some((record) => record.id === id) ||
@@ -138,6 +151,7 @@ export class X402Budget {
   complete(
     id: string,
     result: { chargeAtomic: string; transaction: string | null; free: boolean },
+    selectedModel?: string,
   ) {
     return this.serial(async () => {
       const state = await this.load();
@@ -164,6 +178,7 @@ export class X402Budget {
             sessionId: current.sessionId,
             at: Date.now(),
             policy: current.policy,
+            ...(selectedModel && { selectedModel }),
             ...result,
           },
         ],

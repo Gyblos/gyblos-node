@@ -6,6 +6,7 @@ import type {
   BatchChannelResponse,
 } from './batch-channel-types';
 import { batchBoundary, batchFail } from './batch-channel-validation';
+import { batchInputBoundary } from './batch-input';
 import { BATCH_CHANNEL, BATCH_METHODS, BATCH_STREAM } from './batch/constants';
 import { canonicalJson } from './canonical';
 import { CONTROL_LIMITS, FREE_EXECUTION } from './constants';
@@ -16,6 +17,7 @@ import {
   controlObject,
 } from './control-validation';
 import { freeExecutionText } from './free-execution-validation';
+import { freeStreamDeltas } from './free-stream';
 import { SESSION_CODES } from './payment-session';
 
 export { BATCH_STREAM } from './batch/constants';
@@ -141,4 +143,8 @@ export async function createBatchStreamVerifier(request: BatchChannelRequest) {
       }
     },
   };
+}
+
+export function batchStreamDeltas(text: string): string[] {
+  return batchInputBoundary(() => [...freeStreamDeltas(text)]);
 }

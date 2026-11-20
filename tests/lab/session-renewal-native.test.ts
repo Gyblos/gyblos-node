@@ -56,7 +56,7 @@ for (const blocks of [false, true]) {
         authorizer: vm.authorizer.address,
         treasury: PROTOCOL_FEE.treasury,
         protocolFeeBps: PROTOCOL_FEE.bps,
-        depositAtomic: '1000',
+        depositAtomic: '20000',
         expiresAt: now + 3_600_000,
         withdrawDelaySeconds: 900,
       };
@@ -94,7 +94,7 @@ for (const blocks of [false, true]) {
       t.after(seller.close);
       const wire = await batchLoopback(seller.service, terms, blocks);
       t.after(wire.close);
-      const start = (depositAtomic = '1000') =>
+      const start = (depositAtomic = '20000') =>
         createBuyerSessionManager({
           endpoint: wire.endpoint,
           destination: () => wire.destination,
@@ -120,18 +120,48 @@ for (const blocks of [false, true]) {
             ),
           verify: async () => {},
         });
-      let buyer = start();
+      let buyer = start('10000');
       t.after(() => buyer.close());
       const signal = () => new AbortController().signal;
       await buyer.execute(await offers.quote(1), offers.input, signal());
       const first = await inspectBatchSession(buyerPaths);
       assert.ok(first);
+      const beforeRefusedRenewal = vm.sends();
+      await assert.rejects(
+        buyer.execute(
+          await offers.quote(18, { maxAtomic: '10000' }),
+          offers.input,
+          signal(),
+        ),
+        { code: SESSION_CODES.LIMIT },
+      );
+      assert.equal(
+        vm.sends(),
+        beforeRefusedRenewal,
+        'an inadmissible replacement must not close the open channel',
+      );
+      assert.deepEqual(await inspectBatchSession(buyerPaths), first);
+
       assert.equal(
         (await buyer.settle(signal()))?.chargedAtomic,
         String(charge),
       );
       const beforeRenew = vm.sends();
       now += 1_000;
+      const closedJournal = await readFile(buyerPaths.state, 'utf8');
+      await assert.rejects(
+        buyer.execute(await offers.quote(19), offers.input, signal()),
+        {
+          code: SESSION_CODES.LIMIT,
+        },
+      );
+      assert.ok(
+        (await readFile(buyerPaths.state, 'utf8')) === closedJournal,
+        'the previous settlement journal must remain unchanged',
+      );
+      assert.equal(vm.sends(), beforeRenew);
+      await buyer.close();
+      buyer = start();
       local.hideOriginal(true);
       await assert.rejects(
         buyer.execute(await offers.quote(20), offers.input, signal()),
@@ -148,7 +178,7 @@ for (const blocks of [false, true]) {
       const second = await inspectBatchSession(buyerPaths);
       assert.ok(second);
       assert.notEqual(second.snapshot.channelId, first.snapshot.channelId);
-      assert.equal(second.terms.depositAtomic, String(1000 - charge));
+      assert.equal(second.terms.depositAtomic, String(20000 - charge));
       assert.equal(second.priorSpentAtomic, String(charge));
       assert.equal(
         vm.sends(),
@@ -157,7 +187,7 @@ for (const blocks of [false, true]) {
       );
       assert.equal(offers.generations(), 2);
       await buyer.close();
-      buyer = start(String(1000 - charge));
+      buyer = start(String(20000 - charge));
       await assert.rejects(
         buyer.execute(await offers.quote(21), offers.input, signal()),
         { code: SESSION_CODES.LIMIT },
@@ -177,6 +207,22 @@ for (const blocks of [false, true]) {
         second.snapshot.channelId,
       );
       assert.equal(vm.sends(), beforeRenew + 1);
+      const beforeExpensive = vm.sends();
+      const openJournal = await inspectBatchSession(buyerPaths);
+      await assert.rejects(
+        buyer.execute(
+          await offers.quote(22, { maxAtomic: String(20000 - charge) }),
+          offers.input,
+          signal(),
+        ),
+        { code: SESSION_CODES.LIMIT },
+      );
+      assert.equal(
+        vm.sends(),
+        beforeExpensive,
+        'a quote above the remaining authority must preserve the old channel',
+      );
+      assert.deepEqual(await inspectBatchSession(buyerPaths), openJournal);
       const beforeExpiry = vm.sends();
       now += 3_600_000;
       vm.time(Math.floor(now / 1_000));
@@ -184,7 +230,7 @@ for (const blocks of [false, true]) {
       const third = await inspectBatchSession(buyerPaths);
       assert.ok(third);
       assert.notEqual(third.snapshot.channelId, second.snapshot.channelId);
-      assert.equal(third.terms.depositAtomic, String(1000 - 3 * charge));
+      assert.equal(third.terms.depositAtomic, String(20000 - 3 * charge));
       assert.equal(third.priorSpentAtomic, String(3 * charge));
       assert.equal(
         vm.sends(),
@@ -199,10 +245,10 @@ for (const blocks of [false, true]) {
       assert.equal(raw.history.length, 2);
       assert.equal(
         raw.history[0].settlement.refundedAtomic,
-        String(1000 - charge),
+        String(10000 - charge),
       );
       const beforeRefusal = vm.sends();
-      const oversized = await offers.quote(5, { maxAtomic: '900' });
+      const oversized = await offers.quote(5, { maxAtomic: '19900' });
       await assert.rejects(buyer.execute(oversized, offers.input, signal()), {
         code: SESSION_CODES.LIMIT,
       });

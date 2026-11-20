@@ -4,6 +4,7 @@ export const BATCH_CHANNEL = {
   version: 4,
   requestBytes: 1048576,
   responseBytes: 1048576,
+  transactionIdentifier: /^[A-Za-z0-9]{1,128}$/,
   openingBytes: 524288,
   inputBytes: 65536,
   maxMessages: 1024,

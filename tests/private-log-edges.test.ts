@@ -11,17 +11,17 @@ import { PRIVATE_LOG_CODES } from '@gyblos/runtime/constants';
 import { PrivateLogError } from '@gyblos/runtime/private-log-file';
 
 import {
+  PRIVATE_LOG_PLATFORM_SKIP,
+  withLogIo,
+} from './support/private-log-fixture';
+import {
   createPrivateLog,
   DIAGNOSTIC_CANARY,
   diagnosticBarrier,
   diagnosticDirectory,
   diagnosticUntil,
   rm,
-} from './support/facilitator-diagnostic-fixture';
-import {
-  PRIVATE_LOG_PLATFORM_SKIP,
-  withLogIo,
-} from './support/private-log-fixture';
+} from './support/private-log-records';
 
 for (const hostile of [false, true])
   void test(

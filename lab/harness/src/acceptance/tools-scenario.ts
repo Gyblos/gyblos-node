@@ -86,7 +86,7 @@ export async function toolScenario(
     ...(automatic
       ? {
           buyerStart: (options) =>
-            startBuyer({ ...options, chain: forbidden, meter: forbidden }),
+            startBuyer({ ...options, batch: forbidden, meter: forbidden }),
         }
       : {}),
   });

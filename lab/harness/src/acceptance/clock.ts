@@ -21,3 +21,15 @@ export function createAcceptanceClock(
   };
 }
 export type AcceptanceClock = ReturnType<typeof createAcceptanceClock>;
+
+// Preserve real elapsed admission time between simulated refill intervals.
+export function createAdmissionClock() {
+  let offset = 0;
+  return {
+    now: () => performance.now() + offset,
+    advance(milliseconds: number) {
+      offset += milliseconds;
+    },
+  };
+}
+export type AdmissionClock = ReturnType<typeof createAdmissionClock>;

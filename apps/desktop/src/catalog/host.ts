@@ -26,25 +26,39 @@ export function registerNetworkCatalog(
       callback({
         cancel:
           target.origin !== endpoint.origin ||
-          target.pathname !== endpoint.pathname,
+          (target.pathname !== endpoint.pathname &&
+            target.pathname !==
+              endpoint.pathname.replace(/sellers$/, 'models')),
       });
     },
   );
-  const catalog = createCatalogSession(
-    (url, init) =>
-      isolated.fetch(url, { ...init, credentials: 'omit', cache: 'no-store' }),
-    Date.now,
-    signal,
+  const createSession = () =>
+    createCatalogSession(
+      (url, init) =>
+        isolated.fetch(url, {
+          ...init,
+          credentials: 'omit',
+          cache: 'no-store',
+        }),
+      Date.now,
+      signal,
+    );
+  const catalog = createSession();
+  const search = createSession();
+  const handlers = createCatalogHandlers(
+    { summary: catalog.browse, lookup: search.lookup },
+    {
+      contents: window.webContents,
+      mainFrame: () => window.webContents.mainFrame,
+      destroyed: () => window.isDestroyed(),
+    },
   );
-  const handlers = createCatalogHandlers(catalog, {
-    contents: window.webContents,
-    mainFrame: () => window.webContents.mainFrame,
-    destroyed: () => window.isDestroyed(),
-  });
   ipcMain.handle(NETWORK_CATALOG.STATUS_CHANNEL, (event, ...args: unknown[]) =>
     handlers.summary(event, args),
   );
   ipcMain.handle(NETWORK_CATALOG.LOOKUP_CHANNEL, (event, ...args: unknown[]) =>
     handlers.lookup(event, args),
   );
+  return (offerId: string) =>
+    catalog.resolve(offerId) ?? search.resolve(offerId);
 }

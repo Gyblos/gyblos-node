@@ -1,8 +1,6 @@
 // Exercises the real buyer discovery/selector/client and persistent replay store against one trusted node.
-// Every quote is observational only; selection receives an unrelated trusted-v1 identity and must stop.
-import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
 import { discoverBuyerSellers } from '@gyblos/buyer/discovery';
-import { selectBuyerQuote } from '@gyblos/buyer/selection';
+import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { SELLER_BADGES } from '@gyblos/core/constants';
@@ -84,15 +82,10 @@ export async function acceptQuote(run: AcceptanceSession) {
     .host()
     .wire.client(run.identity.owner.address, run.clock.now);
   try {
-    const outcome = await selectBuyerQuote(
+    const outcome = await selectVerifiedBuyerQuote(
       found,
       {
         buyer: run.identity.buyer.address,
-        // Deliberately not the selected seller: every successful race must be quote-only.
-        trusted: {
-          owner: run.identity.buyer.address,
-          nodeId: run.host().wire.nodeId,
-        },
         stats: new Map(),
         now: run.clock.now,
         random: () => 0,
@@ -103,10 +96,7 @@ export async function acceptQuote(run: AcceptanceSession) {
       },
       run.signal,
     );
-    acceptanceAssert(!outcome.ok && 'winner' in outcome);
-    acceptanceAssert(
-      'code' in outcome && outcome.code === BUYER_SELECTION_CODES.QUOTE_ONLY,
-    );
+    acceptanceAssert(outcome.ok);
     acceptanceAssert(outcome.winner.quote.offer.protocol === CONTROL_PAID_ALPN);
     acceptanceAssert(
       outcome.winner.quote.offer.expiresAt <=
