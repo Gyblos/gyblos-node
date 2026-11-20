@@ -33,6 +33,7 @@ import {
   type HttpMultiMethod,
 } from './http-multiseller-constants';
 import type { HttpMultiIpc } from './http-multiseller-ipc';
+import { singleBuyerRegistry } from './single-buyer-registry';
 
 export function httpMultiLedger(payer: KeyPairSigner) {
   const opened = new Map<string, { seller: string; deposit: bigint }>();
@@ -235,7 +236,7 @@ export async function httpMultiSellerPayments(
       protocolFeeBps: PROTOCOL_FEE.bps,
       treasury: PROTOCOL_FEE.treasury,
     },
-    sessions: { buyerNodeId, backend },
+    sessions: { registry: singleBuyerRegistry(buyerNodeId, backend) },
     close: async () => {},
   };
 }

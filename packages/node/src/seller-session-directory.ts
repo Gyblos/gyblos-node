@@ -12,15 +12,13 @@ import {
   type SellerSessionOptions,
 } from './seller-sessions';
 
-export type SellerSessionComposition =
-  | Pick<SellerSessionOptions, 'buyerNodeId' | 'backend'>
-  | { registry: BatchSellerRegistry };
+export interface SellerSessionComposition {
+  registry: BatchSellerRegistry;
+}
 type Common = Omit<SellerSessionOptions, 'buyerNodeId' | 'backend'>;
 type Options = Common & SellerSessionComposition;
 interface State {
-  options: Common & {
-    registry: BatchSellerRegistry;
-  };
+  options: Options;
   hosts: Map<string, SellerSessionHost>;
   active?: Promise<unknown>;
   closed: boolean;
@@ -82,7 +80,6 @@ async function close(state: State) {
 export async function startSellerSessionHost(
   options: Options,
 ): Promise<SellerSessionHost> {
-  if ('buyerNodeId' in options) return startSellerSessions(options);
   const entries = await options.registry.list();
   const state: State = {
     options,
