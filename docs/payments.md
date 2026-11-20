@@ -86,7 +86,8 @@ The [package table](architecture.md#packages) owns the details. In short:
   [README](../packages/x402-upto-metered/README.md).
 - `packages/payments-upto`: the `PaymentServer` adapter over it, the durable
   seller ledger in the seller's `payments/` directory, and payment sessions.
-- `packages/node`: composes paid execution when the seller has a payment server.
+- `packages/node`: opens the seller channel registry and serves paid inference
+  over reusable sessions.
 
 ## Related
 

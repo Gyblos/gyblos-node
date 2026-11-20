@@ -12,19 +12,21 @@ import {
   PAYMENT_ERROR_CODES,
 } from '@gyblos/protocol/constants';
 
+const approval = {
+  approvedAtomic: '5',
+  cumulativeAtomic: '5',
+  depositAtomic: '12',
+};
+const approvedPayment = {
+  verdict: 'approved',
+  chargedAtomic: null,
+  refundedAtomic: null,
+  session: approval,
+};
 const terminal = JSON.stringify({
   choices: [{ delta: {}, finish_reason: 'stop' }],
   usage: { prompt_tokens: 2, completion_tokens: 3 },
-  gyblos_payment: {
-    verdict: 'approved',
-    chargedAtomic: null,
-    refundedAtomic: null,
-    session: {
-      approvedAtomic: '5',
-      cumulativeAtomic: '5',
-      depositAtomic: '12',
-    },
-  },
+  gyblos_payment: approvedPayment,
 });
 const delta = JSON.stringify({
   choices: [{ delta: { content: 'Hello' }, finish_reason: null }],
@@ -46,7 +48,7 @@ const setup = () => {
   return { options, output };
 };
 
-void test('streams one answer and reports usage and paid settlement', async () => {
+void test('streams one answer and reports usage and channel approval', async () => {
   const { options, output } = setup();
   let calls = 0;
   const request: typeof fetch = async (url, init) => {
@@ -70,11 +72,7 @@ void test('streams one answer and reports usage and paid settlement', async () =
       verdict: 'approved',
       charged: null,
       refunded: null,
-      session: {
-        approvedAtomic: '5',
-        cumulativeAtomic: '5',
-        depositAtomic: '12',
-      },
+      session: approval,
     },
   });
 });
@@ -125,22 +123,13 @@ void test('a remote failure or cancelled request ends without retry or revealing
   assert.equal(output.join('').includes('secret'), false);
 });
 
-void test('preserves typed remote error and settlement without revealing arbitrary error text', async () => {
+void test('preserves typed remote error and channel approval without revealing arbitrary error text', async () => {
   const { options, output } = setup();
   const detail = {
     error: {
       code: 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE',
       message: 'secret',
-      gyblos_payment: {
-        verdict: 'approved',
-        chargedAtomic: null,
-        refundedAtomic: null,
-        session: {
-          approvedAtomic: '5',
-          cumulativeAtomic: '5',
-          depositAtomic: '12',
-        },
-      },
+      gyblos_payment: approvedPayment,
     },
   };
   const request: typeof fetch = async () =>
@@ -152,11 +141,7 @@ void test('preserves typed remote error and settlement without revealing arbitra
     verdict: 'approved',
     charged: null,
     refunded: null,
-    session: {
-      approvedAtomic: '5',
-      cumulativeAtomic: '5',
-      depositAtomic: '12',
-    },
+    session: approval,
   });
   assert.equal(output.join('').includes('secret'), false);
 });

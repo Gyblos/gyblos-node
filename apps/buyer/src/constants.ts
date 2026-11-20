@@ -259,7 +259,6 @@ export const PAID_BUYER = {
   // On shutdown, how long a running paid request may finish its receipt and record.
   drainMs: 90000,
   // Outcomes for reconciliation, one JSON line each, in the buyer home.
-  recordsFile: 'paid-records.jsonl',
   // Channels reconciliation resolved, one JSON line each, beside the records.
   reconciliationsFile: 'paid-reconciliations.jsonl',
   // Past this size the records file, and the reconciliations file, refuse new lines.
