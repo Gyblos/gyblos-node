@@ -36,6 +36,10 @@ import { parseBuyerReceiptV2, parseSellerReceiptV2 } from './receipt-v2-parser';
 import type { ReceiptV2 } from './receipt-v2-types';
 import { RECEIPT_V2 } from './receipt-v2/constants';
 
+const APP_VERSION = new RegExp(
+  `^[0-9A-Za-z.+-]{1,${RECEIPT_UPLOAD.maxAppVersionCharacters}}$`,
+);
+
 function closed<T extends string>(
   value: unknown,
   catalog: Record<string, T>,
@@ -57,14 +61,9 @@ function clientRole(kind: ReceiptUploadClientKind): P2PRole {
     ? P2P_ROLES.SELLER
     : P2P_ROLES.BUYER;
 }
-const APP_VERSION = new RegExp(
-  `^[0-9A-Za-z.+-]{1,${RECEIPT_UPLOAD.maxAppVersionCharacters}}$`,
-);
-
 export function isReceiptUploadAppVersion(value: string): boolean {
   return APP_VERSION.test(value);
 }
-
 function appVersion(value: unknown) {
   if (typeof value !== 'string' || !isReceiptUploadAppVersion(value))
     return controlFail();

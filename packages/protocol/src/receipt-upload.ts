@@ -11,7 +11,10 @@ import {
 import { bytesHex, hexBytes } from './public-validation';
 import { verifyReceipt } from './receipt';
 import type { ReceiptV1 } from './receipt-types';
-import { parseReceiptUpload } from './receipt-upload-parser';
+import {
+  isReceiptUploadAppVersion,
+  parseReceiptUpload,
+} from './receipt-upload-parser';
 import type {
   ReceiptUploadV1,
   SignedReceiptUpload,
@@ -22,8 +25,7 @@ import type { ReceiptV2 } from './receipt-v2-types';
 import { sign, type Signer } from './signing';
 
 export type * from './receipt-upload-types';
-export { parseReceiptUpload };
-export { isReceiptUploadAppVersion } from './receipt-upload-parser';
+export { isReceiptUploadAppVersion, parseReceiptUpload };
 export {
   RECEIPT_UPLOAD,
   RECEIPT_UPLOAD_ARCHES,
