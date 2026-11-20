@@ -42,17 +42,21 @@ function managedBuyer(
     app.isPackaged ? app.getVersion() : undefined,
   );
   const service = new ManagedBuyer(
-    () =>
-      utilityProcess.fork(join(directory, DESKTOP_X402.SERVICE_FILE), [], {
-        cwd: profile,
-        stdio: 'ignore',
-        env: environment,
-      }),
+    (_home, _token, maxAtomic) =>
+      utilityProcess.fork(
+        join(directory, DESKTOP_X402.SERVICE_FILE),
+        maxAtomic === undefined ? [] : [maxAtomic],
+        {
+          cwd: profile,
+          stdio: 'ignore',
+          env: environment,
+        },
+      ),
     () => client.disconnect(),
   );
   const managed = automaticBuyer(
     {
-      start: () => service.start(profile),
+      start: (maxAtomic) => service.start(profile, undefined, maxAtomic),
       stop: () => service.stop(),
       close: () => service.close(),
     },

@@ -1,4 +1,5 @@
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
+import { controlAtomic } from '@gyblos/protocol/control-validation';
 
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
 import { BuyerSessionRequired, DesktopBuyerFailure } from './buyer-error';
@@ -60,6 +61,8 @@ async function referenceAction(
 }
 export interface ManagedBuyerPorts {
   start(): Promise<void>;
+  configure?(maxAtomic: string, policyId?: string): Promise<void>;
+  changing?(): boolean;
 }
 function sendResponse(
   client: X402Client,
@@ -121,6 +124,23 @@ function selectedOffer(
     );
   return selected;
 }
+function configureAction(
+  managed: ManagedBuyerPorts | undefined,
+  input: Record<string, unknown>,
+): Promise<boolean> | false {
+  if (managed?.changing?.() && input.action !== X402_ACTION.STATUS)
+    throw new PaidSellerLimitError(
+      'Wait for the buyer settings to finish updating.',
+    );
+  if (input.action !== X402_ACTION.CONFIGURE_PAID || !managed?.configure)
+    return false;
+  if (input.policyId !== undefined && typeof input.policyId !== 'string')
+    throw new Error('Invalid buyer policy');
+  const maxAtomic = controlAtomic(input.maxAtomic);
+  if (maxAtomic === '0')
+    throw new PaidSellerLimitError('Enter a positive maximum per response.');
+  return managed.configure(maxAtomic, input.policyId).then(() => true);
+}
 export function createX402Handlers(
   client: X402Client,
   budget: X402Budget,
@@ -143,6 +163,7 @@ export function createX402Handlers(
   ): Promise<X402Result> => {
     const input = buyerAction(owner, event, args);
     try {
+      if (await configureAction(managed, input)) return await summary();
       if (
         (input.action === X402_ACTION.START_BUYER ||
           input.action === X402_ACTION.STATUS) &&

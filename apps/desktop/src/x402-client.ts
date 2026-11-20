@@ -88,6 +88,29 @@ export class X402Client {
   policy() {
     return this.connection ? { ...this.connection.policy } : null;
   }
+  disconnectForPolicyChange(
+    owner: { url: string; token: string } | undefined,
+    policyId?: string,
+  ) {
+    if (this.busy || this.closed || this.keyRequests.size)
+      throw new PaidSellerLimitError(
+        'Wait for the current buyer request to finish.',
+      );
+    if (
+      this.connection &&
+      (!owner ||
+        this.connection.token !== owner.token ||
+        this.connection.url.href !== owner.url)
+    )
+      throw new PaidSellerLimitError(
+        'Only the buyer managed by this app can be configured here.',
+      );
+    if (this.connection?.policy.policyId !== policyId)
+      throw new PaidSellerLimitError(
+        'The buyer changed. Select the seller again.',
+      );
+    this.disconnect();
+  }
   disconnect() {
     for (const controller of this.keyRequests.values()) controller.abort();
     this.connection = null;

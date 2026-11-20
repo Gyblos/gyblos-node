@@ -149,7 +149,15 @@ function sessionSelection(
         { endpoint, buyer, relayOnly },
         excluded,
         current,
-        policy,
+        options.desktopChosenPrices
+          ? {
+              ...policy,
+              priceCeilings: {
+                inputAtomicPerMtok: choice.inputAtomicPerMtok,
+                outputAtomicPerMtok: choice.outputAtomicPerMtok,
+              },
+            }
+          : policy,
         { pinnedNodeId: choice.nodeId },
       ).then((winner) => {
         verifyChosenOffer(choice, winner);
