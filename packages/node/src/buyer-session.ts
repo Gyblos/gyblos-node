@@ -30,6 +30,7 @@ import type { BuyerSessionBackend } from './session-backend';
 import {
   newSessionTerms,
   parseBuyerSessionPolicy,
+  UnsentDepositMinimumError,
   type BuyerSessionPolicy,
 } from './session-policy';
 
@@ -201,14 +202,20 @@ async function renewable<Remote extends BatchDestination>(
   );
   const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
+  const authority =
+    BigInt(options.policy.depositAtomic) -
+    BigInt(stored.priorSpentAtomic ?? '0');
+  if (
+    snapshot.state !== SESSION_STATES.CLOSED &&
+    authority - BigInt(snapshot.cumulativeAtomic) <
+      BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
+  )
+    throw new UnsentDepositMinimumError(quote.offer.nodeId);
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
       (await opened.host.close(signal)))
     : undefined;
-  const remaining =
-    BigInt(options.policy.depositAtomic) -
-    BigInt(stored.priorSpentAtomic ?? '0') -
-    BigInt(settlement?.chargedAtomic ?? '0');
+  const remaining = authority - BigInt(settlement?.chargedAtomic ?? '0');
   if (remaining <= 0n) return sessionFail(SESSION_CODES.LIMIT);
   const terms = newSessionTerms(
     quote,

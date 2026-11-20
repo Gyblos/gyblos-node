@@ -43,15 +43,14 @@ export async function runBuyerSidecar(
   } catch (error) {
     code = 1;
     try {
-      const sessionRequired =
-        error instanceof Error &&
-        'reason' in error &&
-        error.reason === BUYER_SIDECAR.SESSION_REQUIRED;
-      port.postMessage({
-        kind: sessionRequired
-          ? BUYER_SIDECAR.SESSION_REQUIRED
-          : BUYER_SIDECAR.ERROR,
-      });
+      const reason =
+        error instanceof Error && 'reason' in error ? error.reason : undefined;
+      const kind =
+        reason === BUYER_SIDECAR.SESSION_REQUIRED ||
+        reason === BUYER_SIDECAR.DEPOSIT_MINIMUM
+          ? reason
+          : BUYER_SIDECAR.ERROR;
+      port.postMessage({ kind });
     } catch {
       /* Parent already exited. */
     }

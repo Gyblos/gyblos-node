@@ -126,8 +126,11 @@ function supervise(
       return;
     }
     const value = message as Record<string, unknown>;
-    if (value.kind === BUYER_SIDECAR.SESSION_REQUIRED)
-      return fail(new BuyerSessionRequired());
+    if (
+      value.kind === BUYER_SIDECAR.SESSION_REQUIRED ||
+      value.kind === BUYER_SIDECAR.DEPOSIT_MINIMUM
+    )
+      return fail(new BuyerSessionRequired(value.kind));
     if (
       value.kind !== BUYER_SIDECAR.READY ||
       typeof value.url !== 'string' ||

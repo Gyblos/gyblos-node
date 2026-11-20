@@ -1,11 +1,12 @@
 // Static desktop explanations for validated buyer failures; remote text is never displayed.
 // Presentation does not change retry decisions, budget reservations or payment uncertainty.
+import { BUYER_DEPOSIT_MINIMUM_HINT } from '@gyblos/config/batch-session';
 import {
   BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
   type SellerSelectionCode,
 } from '@gyblos/core/constants';
-import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import { BUYER_SIDECAR, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_STOP_REASONS,
@@ -14,9 +15,15 @@ import {
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 export class BuyerSessionRequired extends Error {
-  constructor() {
+  constructor(
+    reason:
+      | typeof BUYER_SIDECAR.SESSION_REQUIRED
+      | typeof BUYER_SIDECAR.DEPOSIT_MINIMUM = BUYER_SIDECAR.SESSION_REQUIRED,
+  ) {
     super(
-      'Paid settings need a payment channel. Add session.depositAtomic and session.lifetimeMs to buyer/selection.json before starting the buyer.',
+      reason === BUYER_SIDECAR.DEPOSIT_MINIMUM
+        ? BUYER_DEPOSIT_MINIMUM_HINT
+        : 'Paid settings need a payment channel. Add session.depositAtomic and session.lifetimeMs to buyer/selection.json before starting the buyer.',
     );
   }
 }

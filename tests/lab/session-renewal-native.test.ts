@@ -126,6 +126,22 @@ for (const blocks of [false, true]) {
       await buyer.execute(await offers.quote(1), offers.input, signal());
       const first = await inspectBatchSession(buyerPaths);
       assert.ok(first);
+      const beforeRefusedRenewal = vm.sends();
+      await assert.rejects(
+        buyer.execute(
+          await offers.quote(18, { maxAtomic: '10000' }),
+          offers.input,
+          signal(),
+        ),
+        { code: SESSION_CODES.LIMIT },
+      );
+      assert.equal(
+        vm.sends(),
+        beforeRefusedRenewal,
+        'an inadmissible replacement must not close the open channel',
+      );
+      assert.deepEqual(await inspectBatchSession(buyerPaths), first);
+
       assert.equal(
         (await buyer.settle(signal()))?.chargedAtomic,
         String(charge),
