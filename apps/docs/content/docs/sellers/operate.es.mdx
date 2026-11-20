@@ -113,6 +113,12 @@ Después de actualizar, comprueba el estado y añade `--online` si publicas. Si 
 informa de la imagen (`docker compose images seller`, o `gyblos --version` en un vendedor nativo) y del código
 de error. No reinicies una y otra vez para quitar un lock o saltarte un rechazo.
 
+Si cobras por la inferencia, actualiza en cuanto un release cambie cómo pagan los compradores. Desde la
+beta.12, los compradores pagan solo con [canales de pago](/es/sellers/get-paid), y un vendedor beta.11 no
+acepta canales, así que los compradores que pagan no pueden usarlo hasta que actualice. La beta.12 ya no
+liquida los pagos por solicitud de la beta.11: si a tu vendedor le queda alguno sin liquidar, deja la beta.11
+funcionando hasta que se liquide y después actualiza.
+
 ## Lee los logs en privado [#inspecciona-los-logs-en-privado]
 
 | Tipo de instalación | Comando                                                    |

@@ -139,7 +139,7 @@ displayed channel terms. The buyer verifies the seller and quote before sending
 the first paid message. An expired listing or a changed price requires a fresh
 selection.
 
-A zero per-request maximum blocks paid chat. Raise `request.maxAtomic` in the
+A zero maximum per response blocks paid chat. Raise `request.maxAtomic` in the
 buyer profile and restart the buyer. If you set a chat budget in Payments, its
 remaining amount must cover that maximum. Choosing a seller does not change
 either limit. A recorded answer approval counts toward the budget while
