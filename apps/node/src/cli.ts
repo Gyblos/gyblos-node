@@ -274,6 +274,10 @@ function runRegister(context: CliContext) {
 }
 
 export async function runCli(args: readonly string[], context: CliContext) {
+  if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
+    context.stdout(USAGE);
+    return EXIT.ok;
+  }
   if (args[0] === 'logs') return logsCommand(args.slice(1), context);
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
