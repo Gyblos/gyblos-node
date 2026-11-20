@@ -7,8 +7,7 @@ mainnet. A free offer needs no payment at all.
 This page is the contributor overview of the payment paths. To charge for an
 offer as a seller operator, follow
 [Get paid](https://docs.gyblos.com/en/sellers/get-paid) on the docs site. Lab
-checks (gates, the local v1 facilitator and the published evidence) are in
-[lab/README.md](../lab/README.md).
+channel checks and historical evidence are in [lab/README.md](../lab/README.md).
 
 ## Payment paths
 
@@ -16,19 +15,14 @@ The signed quote decides the path. Both prices `"0"` means free; any positive
 price means paid. The buyer's `request.maxAtomic` is a spending ceiling, not a
 mode switch (see [Buyer routing](payment-sessions.md#buyer-routing)).
 
-| Path               | Who uses it                            | Channel                                      | Owner page                                 |
-| ------------------ | -------------------------------------- | -------------------------------------------- | ------------------------------------------ |
-| Free               | Any seller and buyer                   | None: no signer, deposit or settlement       | [running-a-node.md](running-a-node.md)     |
-| Per-request paid   | Explicit legacy entry only             | x402 `upto`: one channel per request         | This page and [recovery.md](recovery.md)   |
-| Payment session    | Authenticated buyers of a priced offer | x402 `batch-settlement`: one deposit, reused | [payment-sessions.md](payment-sessions.md) |
-| `exact`, v1 `upto` | Lab gates only                         | Fixed-price resource, legacy PoC facilitator | [lab/README.md](../lab/README.md)          |
+| Path            | Who uses it                            | Channel                                      | Owner page                                 |
+| --------------- | -------------------------------------- | -------------------------------------------- | ------------------------------------------ |
+| Free            | Any seller and buyer                   | None: no signer, deposit or settlement       | [running-a-node.md](running-a-node.md)     |
+| Payment session | Authenticated buyers of a priced offer | x402 `batch-settlement`: one deposit, reused | [payment-sessions.md](payment-sessions.md) |
 
 The desktop and guided buyer use a payment session for priced quotes. Existing
 profiles with a positive ceiling require the
 [session settings](payment-sessions.md#explicit-startup-policy).
-
-Per-request paid serves text conversations without tools. Tools on a priced
-offer need a payment session.
 
 ## Seller-sponsored channel transaction limits
 
@@ -50,30 +44,8 @@ uncertainty or rebuilds a channel. The independent standalone SDK wrapper
 accepts optional host limits and keeps its unconfigured defaults. The legacy v1
 path and the protocol commission are unchanged.
 
-## How a per-request payment works
-
-1. The buyer verifies the seller's signed quote, then signs a channel open whose
-   deposit is the request's ceiling. It records the opening in its private
-   journal before it signs.
-2. The seller verifies the open against its own offer terms, never against the
-   buyer's request. Its fee payer submits the deposit and pays the transaction
-   fees and the channel rent.
-3. The seller runs the inference and meters the output with the model's pinned
-   tokenizer. It stops publishing text that the deposit can't pay for.
-4. The seller claims the metered charge with a voucher signed by its authorizer
-   key. The channel pays the seller's payout address and the Gyblos treasury,
-   and refunds the rest of the deposit to the buyer.
-5. The buyer recounts the tokens and checks the charge against finalized chain
-   history. A charge that differs from its own count is recorded as a dispute.
-
-A recount **detects** an overcharge within the ceiling. It does not prevent,
-refund or penalize it.
-
-An unclear outcome (a timeout, a lost reply, a missing history entry) never
-counts as "no payment". It blocks new payments until it is reconciled; see
-[recovery.md](recovery.md). The buyer resolves its paid channels with
-`pnpm buyer:reconcile:paid` and takes a stuck channel toward a refund with
-`pnpm buyer:withdraw:paid`.
+For channel settlement and refunds, see [Payment sessions](payment-sessions.md)
+and [Recovery](recovery.md).
 
 ## Protocol fee
 
@@ -87,7 +59,6 @@ on top of the seller's net price, not taken out of it:
   (`paymentSplits`). The seller's basis points are rounded up, and the program
   floors each payout. The rounding residual goes to the payment program's own
   treasury, so the fee Gyblos collects is approximate, not exactly 4%.
-- Per-request channels and payment sessions use the same arithmetic.
 
 The devnet treasury is a public Gyblos test wallet (`DEVNET_GYBLOS_TREASURY`).
 
@@ -113,7 +84,8 @@ The [package table](architecture.md#packages) owns the details. In short:
   [README](../packages/x402-upto-metered/README.md).
 - `packages/payments-upto`: the `PaymentServer` adapter over it, the durable
   seller ledger in the seller's `payments/` directory, and payment sessions.
-- `packages/node`: composes paid execution when the seller has a payment server.
+- `packages/node`: opens the seller channel registry and serves paid inference
+  over reusable sessions.
 
 ## Related
 

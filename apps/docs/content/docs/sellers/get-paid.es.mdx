@@ -9,15 +9,12 @@ abierta.
 
 ## Qué puedes vender [#alcance-de-la-beta]
 
-| Cómo vendes                        | Quién puede comprar             | Herramientas (agentes) | Disponibilidad                       |
-| ---------------------------------- | ------------------------------- | ---------------------- | ------------------------------------ |
-| **Gratis**                         | Cualquier comprador             | Sí                     | Todos los vendedores                 |
-| **Con precio, pago por solicitud** | Cualquier comprador             | No, solo texto         | Todos los vendedores; esta página    |
-| Con precio, canal reutilizable     | Cualquier comprador autenticado | Sí                     | Vendedores con una oferta con precio |
+| Cómo vendes                    | Quién puede comprar             | Herramientas (agentes) | Disponibilidad                       |
+| ------------------------------ | ------------------------------- | ---------------------- | ------------------------------------ |
+| **Gratis**                     | Cualquier comprador             | Sí                     | Todos los vendedores                 |
+| Con precio, canal reutilizable | Cualquier comprador autenticado | Sí                     | Vendedores con una oferta con precio |
 
-Los agentes de programación pueden usar herramientas con ofertas gratuitas y canales reutilizables. Una oferta con precio por solicitud atiende conversaciones de solo texto. Para ajustar una oferta
-gratuita para agentes, consulta
-[longitud de respuesta y contexto](/es/sellers/models-offers#longitud-de-respuesta-y-contexto).
+Los canales reutilizables admiten conversaciones con herramientas.
 
 ## Requisitos previos [#requisitos]
 
@@ -52,18 +49,7 @@ gratis o con precio, nunca las dos cosas. Tú fijas el precio neto; los comprado
 Ejecuta `gyblos doctor` (vendedor Docker: `docker compose run --rm seller gyblos doctor`) y copia la dirección
 `fee payer`. Envíale unos 0,05 SOL de devnet desde [el faucet de devnet](https://faucet.solana.com).
 
-El pagador de comisiones gasta SOL de devnet en:
-
-- unos 0,002 SOL una sola vez por cada cuenta de token que falte (tu cuenta de cobro en USDC y las cuentas de la
-  comisión), que el vendedor crea al iniciar;
-- unos 0,00002 SOL de comisiones de transacción por solicitud pagada con los valores predeterminados (una
-  estimación, no un máximo);
-- unos 0,002 SOL de renta por solicitud pagada, retenidos hasta que una limpieza los recupera. Tras un reinicio,
-  parte de la renta antigua puede no volver automáticamente.
-
-0,05 SOL es un saldo inicial, no un presupuesto: muchas solicitudes seguidas lo gastan rápido, así que carga más
-si esperas mucho uso. Si se queda corto, el vendedor no inicia (`SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`) o no
-puede cobrar. Revisa su saldo con frecuencia y recárgalo desde el faucet.
+El pagador de comisiones necesita SOL de devnet para las transacciones del canal.
 
 ## 3. Aplica y comprueba
 
@@ -75,28 +61,13 @@ Aplica el cambio como se explica en
 
 ## Cómo te paga un comprador [#como-funciona-el-pago]
 
-Cada solicitud pagada se paga por separado:
-
-1. El comprador firma un máximo para la solicitud y lo deposita en un canal de pago.
-2. Tu vendedor responde y mide el uso. El comprador verifica la respuesta que recibió.
-3. Tu vendedor liquida el canal: el dueño recibe tu precio, Gyblos recibe su comisión y el resto vuelve al
-   comprador.
-
-Después de cada respuesta, el vendedor intenta liquidarla; la confirmación puede tardar o quedar pendiente. Al
-reiniciar, intenta recuperar los cobros pendientes cuyo importe guardó, sin repetir la respuesta ni cobrar dos
-veces. Conserva sus datos y llaves, y mantén con saldo al pagador de comisiones: problemas de red, falta de SOL
-o un canal vencido pueden impedir el cobro.
+El comprador abre un canal con tu vendedor. Cada respuesta se cobra según el uso. Al liquidar el canal, recibes tu parte en USDC y el comprador recupera el saldo sin gastar.
 
 ## Mira lo que ganaste [#mira-lo-que-ganaste]
 
 Tus ganancias son el saldo de USDC de devnet de la dirección del **dueño**. Busca esa dirección en
 [Solana Explorer](https://explorer.solana.com/?cluster=devnet) con la red devnet seleccionada. Un pago puede
 tardar unos minutos en aparecer.
-
-`gyblos seller status` también muestra las solicitudes pagadas de las últimas 24 horas: cuántas se liquidaron,
-su importe bruto en USDC (incluida la comisión de Gyblos) y cuántas siguen liquidándose. Estos totales recientes
-no son tus ganancias históricas ni el saldo de tu billetera. Si el registro de cobros es inseguro o inválido,
-aparece como no disponible.
 
 ## Canales reutilizables [#piloto-de-canal-reutilizable]
 

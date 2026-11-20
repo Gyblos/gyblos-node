@@ -24,6 +24,7 @@ import type {
 import { createBuyerBatchSession } from './batch-buyer';
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import { bounded } from './buyer-operation';
+import { UnsentSellerBusyError } from './buyer-routing';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
@@ -147,6 +148,12 @@ async function run<Remote extends BatchDestination>(
       state.options.policy.lifetimeMs
   )
     return sessionFail(SESSION_CODES.LIMIT);
+  if (
+    (opened.terms.sellerNodeId !== quote.offer.nodeId ||
+      opened.terms.owner !== quote.offer.owner) &&
+    opened.financial.snapshot().state !== SESSION_STATES.CLOSED
+  )
+    throw new UnsentSellerBusyError(quote.offer.nodeId);
   const ready = await renewable(state, opened, quote, signal);
   const before = ready.financial.snapshot();
   const value = await ready.host.execute(quote, input, signal, onDelta);

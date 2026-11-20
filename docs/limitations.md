@@ -22,51 +22,8 @@ Each bullet states one limit and its effect. The linked page owns the details.
 Behavior and recovery steps are in [payments.md](payments.md) and
 [recovery.md](recovery.md).
 
-**Fees and accounts**
-
-- The fee isn't collected at exactly 4%. Each payout is floored, and the
-  rounding residual goes to the payment program's treasury, not to Gyblos
-  ([Protocol fee](payments.md#protocol-fee)).
-- The fee treasury is a public Gyblos devnet test wallet. No mainnet treasury
-  exists, and the product refuses mainnet terms.
-- The program pays a share whose token account is missing to its own treasury,
-  for good. The seller creates the missing accounts (payout, fee treasury, fee
-  payer and the channel's payer) before it starts and before each claim
-  ([Seller startup](configuration.md#seller-startup)).
-- A buyer that closed its emptied token account makes the seller pay about 0.002
-  SOL rent to recreate it for the refund, at most about once per channel. This
-  rent isn't recovered.
-- Rent cleanup and a buyer's withdrawal distribute without that account check.
-  An owner that closes its own token account while the seller runs loses those
-  shares for good; the next claim or restart recreates the account.
-- A claim whose buyer refund account is frozen isn't sent. It stays pending and
-  is retried on recovery, with the same code as an unreachable RPC.
-- Rent cleanup knows only the channels the current process handled. After a
-  restart, an older channel that no claim sealed keeps the fee payer's rent
-  until its payer closes it.
-
-**Claims and deadlines**
-
-- A claim counts as landed only through a transaction signature the seller
-  recorded. If a claim lands without its signature being recorded (the process
-  stops right after sending, or the RPC fails a send that still propagated), the
-  seller was paid but its ledger never marks the channel settled. Reconcile it
-  by hand.
-- An unconfirmed claim is retried in the background for about a minute and a
-  half (at most about three minutes when every attempt times out). The retry
-  queue lives in memory: after a shutdown, only the next start's recovery drives
-  pending claims again, and a claim past the SDK payload's expiry lapses. A
-  broadcast transaction can still confirm later; recovery checks its signature
-  instead of assuming no payment happened.
-- The seller reserves the settlement wait before the claim deadline and stops
-  publishing at that cutoff. A transport write already issued can't be taken
-  back, and an engine that ignores abort can't be stopped. The buyer must
-  reconcile such an interrupted result; the prompt is never retried.
-- New paid channels use a 300-second withdrawal grace, which is part of the
-  channel authorization. Run buyer and seller on the same release, and don't
-  downgrade while paid channels are pending.
-- Collection needs inclusion before voucher or grace expiry, bounded clock drift
-  and a working RPC. A reserved wait is not a confirmation guarantee.
+For seller fees and channel closure, see
+[Payment sessions](payment-sessions.md).
 
 **Uncertain outcomes**
 
@@ -74,16 +31,10 @@ Behavior and recovery steps are in [payments.md](payments.md) and
   happened. Uncertain payments block new ones until reconciled. There is no
   automatic retry or provider switch after settlement was attempted.
 - A buyer can be charged and still not receive the answer, for example after a
-  disconnect. `pnpm buyer:reconcile:paid` records what the chain charged; it
-  doesn't refund a charge for an undelivered answer.
+  disconnect.
 - A lost reply to a closure or refund send keeps the signed transaction's
   signature and reports it unconfirmed. Finalized reconciliation is still
   required, and a missing account is not proof of a refund.
-- The legacy `pnpm buyer:reconcile` (for older per-request journals) clears only
-  zero-charge outcomes, and `--audit-only` verifies a charged payment. Its
-  verifier accepts only fresh, individually settled channels with the expected
-  account shapes; anything else needs manual investigation. It doesn't recover
-  channel rent.
 
 **Local state**
 
@@ -126,8 +77,7 @@ Behavior and recovery steps are in [payments.md](payments.md) and
 - Release builds upload signed receipts to `https://collector.gyblos.com/v1`
   with no setting to turn it off. Telemetry observations are uploaded too,
   unless `GYBLOS_OBSERVATIONS=off`.
-- Per-request paid requests produce no usage receipts; free requests and payment
-  sessions do.
+- Free requests and payment sessions can produce signed usage receipts.
 - A receipt signature attests its signer's claim, not true usage. "Agreed" means
   two node keys agreed; node keys are free, so it doesn't show two independent
   parties.

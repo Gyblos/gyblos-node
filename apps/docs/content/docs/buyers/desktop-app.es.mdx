@@ -8,7 +8,7 @@ Las respuestas de ofertas gratis no cuestan nada y no necesitan fondos en una bi
 los compradores, la app es todo lo que necesitas.
 
 La app se configura sola la primera vez que la abres. Guarda sus datos en su propia carpeta privada
-(`userData`), funciona sin token de relay y empieza con un presupuesto de gasto en cero, así que nunca paga
+(`userData`), funciona sin token de relay y empieza con un máximo por respuesta de cero, así que nunca paga
 una respuesta salvo que tú lo autorices.
 
 La barra de arranque avanza de izquierda a derecha. Muestra 0 %, 50 % o 100 % según hayan terminado la preparación local y la primera renderización de la ventana.
@@ -96,8 +96,7 @@ Para crear una key y conectar tus herramientas, consulta
 Las respuestas gratis no necesitan fondos, transacciones ni billetera. La identidad del comprador local es
 distinta de la billetera protegida de **Payments**.
 
-Una respuesta con precio necesita un presupuesto que autorizas en **Payments**; la app nunca lo autoriza
-sola. Si el resultado de una solicitud pagada es incierto, la app bloquea los mensajes nuevos hasta que lo
+Para chatear con un vendedor pagado, configura un máximo por respuesta mayor que cero. Abre el menú de modelos del chat para ver las ofertas gratis y pagadas de la red. Elige el vendedor y confirma sus tarifas, el máximo por respuesta, el depósito configurado y la duración del canal. También puedes fijar un presupuesto total del chat en **Payments**. Cada clave API conserva su límite de gasto obligatorio. Si el resultado de una solicitud pagada es incierto, la app bloquea los mensajes nuevos hasta que lo
 revises en **Payments**. Detener una respuesta no prueba que no hubo cobro.
 
 Si el comprador local no arranca, elige **Payments → Retry local buyer**. Eso solo reintenta el arranque: la

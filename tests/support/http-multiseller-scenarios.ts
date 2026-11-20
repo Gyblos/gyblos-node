@@ -11,6 +11,7 @@ import {
 import { chargeV2 } from '@gyblos/core/pricing-v2';
 import { ACCEPTANCE } from '@gyblos/lab-harness/acceptance/constants';
 
+import { acceptanceWait } from './acceptance-wait';
 import {
   HTTP_MULTI,
   HTTP_MULTI_CASES,
@@ -31,7 +32,6 @@ import {
 } from './http-multiseller-http';
 import { httpMultiPhase } from './http-multiseller-phase';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
-import { paidWait } from './paid-acceptance-host';
 
 function cost(host: HttpMultisellerHost, seller: number) {
   const price = host.catalogPrices.get(host.sellers[seller]!.role.nodeId)!;
@@ -52,7 +52,7 @@ async function generated(
   seller: number,
   count: number,
 ) {
-  await paidWait(
+  await acceptanceWait(
     async () => (await host.sellers[seller]!.health()).generations === count,
     host.signal,
   );

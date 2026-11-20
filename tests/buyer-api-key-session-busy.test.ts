@@ -6,7 +6,7 @@ import {
   executeApiKeySession,
   reserveApiKey,
 } from '@gyblos/buyer/api-key-execution';
-import { classifyPaidError } from '@gyblos/buyer/paid-http';
+import { classifyPaidError } from '@gyblos/buyer/session-errors';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import { BUYER_KEY_CHARGE } from '@gyblos/protocol/buyer-api-keys';

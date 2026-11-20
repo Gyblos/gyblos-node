@@ -211,7 +211,6 @@ export async function httpMultisellerHost(
         bind: wire.bind,
         meter: async () => paidAcceptanceMeter,
         pool: ledger.pool,
-        chain: async () => assert.fail('legacy chain forbidden'),
         batch: async () => assert.fail('single-seller backend forbidden'),
       });
     };

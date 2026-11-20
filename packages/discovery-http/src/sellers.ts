@@ -252,3 +252,42 @@ export async function fetchSellers(
     discoveryFail(DISCOVERY_ERROR_CODES.INVALID_INPUT);
   return verifyPage(page, { model, now, lastSequence: input.lastSequence });
 }
+
+// Model names are discovery hints. The seller pages still verify each signed listing.
+export async function fetchModels(
+  input: Pick<FetchSellersInput, 'baseUrl' | 'fetch' | 'timeoutMs' | 'signal'>,
+): Promise<string[]> {
+  return withDeadline(
+    {
+      ...input,
+      url: indexUrl(input.baseUrl, DISCOVERY_PATHS.models),
+      init: { method: 'GET', headers: { accept: 'application/json' } },
+      timeoutMs: timeoutOf(input.timeoutMs),
+    },
+    async (response, aborted) => {
+      if (response.status !== HTTP_STATUS.OK)
+        failStatus(
+          response,
+          STATUS_ERROR_MAP.get(response.status) ??
+            DISCOVERY_ERROR_CODES.HTTP_STATUS,
+        );
+      const body = await readJson(
+        response,
+        DISCOVERY_LIMITS.maxSellersResponseBytes,
+        aborted,
+      );
+      if (
+        !isPlainObject(body, ['models', 'generatedAt']) ||
+        !Array.isArray(body.models)
+      )
+        return discoveryFail(DISCOVERY_ERROR_CODES.MALFORMED_RESPONSE);
+      const names = new Set<string>();
+      for (const row of body.models) {
+        if (!isPlainObject(row, ['id', 'sellers']))
+          return discoveryFail(DISCOVERY_ERROR_CODES.MALFORMED_RESPONSE);
+        names.add(checkModel(row.id));
+      }
+      return [...names];
+    },
+  );
+}

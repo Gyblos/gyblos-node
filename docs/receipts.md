@@ -6,10 +6,9 @@ ended and, when paid, the price and charge. The seller signs it and the buyer
 countersigns it. Receipts never contain prompts, answers, keys or endpoint
 addresses.
 
-Free requests and [payment sessions](payment-sessions.md) produce receipts.
-Per-request paid requests don't. The wire formats (`receipt/v1`, the receipt
-channel and the upload envelopes) are owned by the
-[protocol specification](../packages/protocol/SPEC.md).
+Free requests and [payment sessions](payment-sessions.md) produce receipts. The
+wire formats (`receipt/v1`, the receipt channel and the upload envelopes) are
+owned by the [protocol specification](../packages/protocol/SPEC.md).
 
 ## Lifecycle
 
