@@ -2,6 +2,7 @@
 // Rate-limit key used when no client address header is present.
 export const LOCAL_CLIENT_KEY = 'local';
 
+// IPv6 text layout for ip-key: eight hextets, with the first four forming the /64 prefix.
 export const IPV6 = {
   groups: 8,
   prefixGroups: 4,
