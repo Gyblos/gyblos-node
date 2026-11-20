@@ -371,3 +371,28 @@ void test('a paid seller cannot receive a request while either chat spending lim
     }
   }
 });
+
+void test('an explicit free chat under a paid policy cannot spend or change API spending settings', async () => {
+  const ledger = budget();
+  let claimPaid = true;
+  let posts = 0;
+  const client = new X402Client(ledger, async (url, options) => {
+    if (options?.method !== 'POST') return Response.json(policy);
+    assert.equal(new URL(String(url)).pathname, BUYER_API.CHANNEL_CHAT_PATH);
+    assert.equal(JSON.parse(String(options.body))[BUYER_API.FREE_ONLY_FIELD], true);
+    posts++;
+    if (claimPaid) return Response.json(reply());
+    const { [BUYER_API.PAYMENT_FIELD]: _payment, ...free } = reply();
+    return Response.json({...free,[BUYER_API.EXECUTION_FIELD]:'free'});
+  });
+  await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+  await assert.rejects(client.send('wrong-kind', 'test', undefined, 'free'));
+  assert.equal(posts, 1);
+  claimPaid = false;
+  await client.send('free-turn', 'test', undefined, 'free');
+  assert.deepEqual(client.policy(), policy);
+  assert.equal((await ledger.summary()).spentAtomic, '0');
+  assert.equal((await ledger.summary()).active, false);
+  assert.equal((await ledger.summary()).records.at(-1)?.free, true);
+  await client.close();
+});
