@@ -96,14 +96,16 @@ export async function updateNotice(
   const latest = await latestRelease(fetch);
   if (!latest || !newerVersion(latest, current)) return undefined;
   // The image and the packaged release are installed and updated by install.sh (install.ps1 on Windows),
-  // or npm's package by npm.
-  let how = 'run `sh install.sh update` where you installed the seller';
+  // or npm's package by npm. The installers default to one directory, so a seller installed elsewhere is
+  // updated only when the same GYBLOS_DIR (Docker) or GYBLOS_HOME (packaged) is given again.
+  const sameDirectory = (variable: string) =>
+    `, with the same \`${variable}\` if you installed with one`;
+  let how = `run \`sh install.sh update\` where you installed the seller${sameDirectory(mode === RUN_MODES.CONTAINER ? 'GYBLOS_DIR' : 'GYBLOS_HOME')}`;
   if (mode === RUN_MODES.SOURCE) how = 'install the new release';
   else if (environment[NODE_ENVIRONMENT.installedBy] === INSTALLERS.npm)
     how =
       'run `npm install -g gyblos@latest`, then restart the seller (`gyblos seller service uninstall`, then `gyblos seller service install`)';
   else if (platform === 'win32')
-    how =
-      'run `powershell -ExecutionPolicy Bypass -File install.ps1 update` where you saved install.ps1';
+    how = `run \`powershell -ExecutionPolicy Bypass -File install.ps1 update\` where you saved install.ps1${sameDirectory('GYBLOS_HOME')}`;
   return `v${latest} is available (this seller runs v${current}); ${how}.`;
 }

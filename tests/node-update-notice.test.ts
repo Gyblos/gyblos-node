@@ -70,7 +70,26 @@ void test('updateNotice names a newer release only for a released image that che
       newer.fetch,
       RUN_MODES.CONTAINER,
     ),
-    'v0.1.0-beta.6 is available (this seller runs v0.1.0-beta.5); run `sh install.sh update` where you installed the seller.',
+    'v0.1.0-beta.6 is available (this seller runs v0.1.0-beta.5); run `sh install.sh update` where you installed the seller, with the same `GYBLOS_DIR` if you installed with one.',
+  );
+  // A seller installed outside the default directory updates only with the directory it was installed in.
+  assert.match(
+    (await updateNotice(
+      { GYBLOS_VERSION: '0.1.0-beta.5' },
+      latest({ tag_name: 'v0.1.0-beta.6' }).fetch,
+      RUN_MODES.PACKAGED,
+      'linux',
+    )) ?? '',
+    /with the same `GYBLOS_HOME` if you installed with one\.$/,
+  );
+  assert.match(
+    (await updateNotice(
+      { GYBLOS_VERSION: '0.1.0-beta.5' },
+      latest({ tag_name: 'v0.1.0-beta.6' }).fetch,
+      RUN_MODES.PACKAGED,
+      'win32',
+    )) ?? '',
+    /with the same `GYBLOS_HOME` if you installed with one\.$/,
   );
   assert.deepEqual(
     newer.requests.map((request) => request.url),
