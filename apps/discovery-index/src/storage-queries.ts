@@ -61,8 +61,7 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
   const page = database.$with('page').as(
     database
       .select({
-        nodeId: columnField(presence.nodeId, 'nodeId'),
-        issuedAt: columnField(presence.issuedAt, 'issuedAt'),
+        nodeId: columnField(models.nodeId, 'nodeId'),
       })
       .from(models)
       .innerJoin(
@@ -101,32 +100,23 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
                 ),
               ),
           ),
-          after
-            ? or(
-                lt(presence.issuedAt, after.issuedAt),
-                and(
-                  eq(presence.issuedAt, after.issuedAt),
-                  gt(presence.nodeId, after.nodeId),
-                ),
-              )
-            : undefined,
+          after ? gt(models.nodeId, after.nodeId) : undefined,
         ),
       )
-      .orderBy(desc(presence.issuedAt), asc(presence.nodeId))
+      .orderBy(asc(models.nodeId))
       .limit(query.limit),
   );
   return database
     .with(page)
     .select({
       nodeId: page.nodeId,
-      issuedAt: page.issuedAt,
       catalogJson: columnField(catalogs.json, 'catalogJson'),
       presenceJson: columnField(presence.json, 'presenceJson'),
     })
     .from(page)
     .innerJoin(catalogs, eq(catalogs.nodeId, page.nodeId))
     .innerJoin(presence, eq(presence.nodeId, page.nodeId))
-    .orderBy(desc(page.issuedAt), asc(page.nodeId));
+    .orderBy(asc(page.nodeId));
 }
 export function recordCountsQuery(database: DiscoveryDatabase, now: number) {
   return database

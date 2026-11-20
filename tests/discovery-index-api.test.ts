@@ -249,7 +249,7 @@ eachStorage('oversized bodies are rejected with 413', async ({ publish }) => {
 });
 
 eachStorage(
-  'query validation, limit cap and cursor paging are deterministic',
+  'query validation, limit cap and NodeId paging that a republished presence never skips',
   async ({ publish, sellers }) => {
     for (const query of [
       '',
@@ -263,30 +263,43 @@ eachStorage(
       'model=a&limit=1.5',
       'model=a&limit=abc',
       'model=a&cursor=bad',
-      'model=a&cursor=1-' + 'A'.repeat(64),
+      'model=a&cursor=' + 'A'.repeat(64),
+      'model=a&cursor=' + 'a'.repeat(63),
+      // The earlier issuedAt-NodeId form.
+      'model=a&cursor=1-' + 'a'.repeat(64),
     ]) {
       const { response, body } = await sellers(query);
       assert.equal(response.status, 400, query);
       assert.deepEqual(body, { error: 'INVALID_QUERY' });
     }
-    const nodes: { nodeId: string; issuedAt: number }[] = [];
+    const nodes: {
+      seller: ReturnType<typeof indexNode>;
+      catalog: ReturnType<ReturnType<typeof indexNode>['catalog']>;
+    }[] = [];
     for (let i = 0; i < 3; i++) {
       const seller = indexNode();
       const catalog = seller.catalog(1);
-      const issuedAt = T0 + (i === 2 ? 0 : 500);
       await publish(catalog);
-      await publish(await seller.presence(2, catalog, { issuedAt }));
-      nodes.push({ nodeId: seller.nodeId, issuedAt });
+      // Presence times run against NodeId order: the order is NodeId's alone.
+      await publish(
+        await seller.presence(2, catalog, { issuedAt: T0 + 100 * i }),
+      );
+      nodes.push({ seller, catalog });
     }
-    const expected = nodes
-      .sort((a, b) => b.issuedAt - a.issuedAt || (a.nodeId < b.nodeId ? -1 : 1))
-      .map((entry) => entry.nodeId);
+    nodes.sort((a, b) => (a.seller.nodeId < b.seller.nodeId ? -1 : 1));
+    const expected = nodes.map((entry) => entry.seller.nodeId);
     const nodeIds = (page: {
       sellers: { presence: { record: { nodeId: string } } }[];
     }) => page.sellers.map((entry) => entry.presence.record.nodeId);
     const page1 = (await sellers('model=qwen3-0.6b&limit=2')).body;
     assert.deepEqual(nodeIds(page1), expected.slice(0, 2));
-    assert.equal(page1.next, `${T0 + 500}-${expected[1]}`);
+    assert.equal(page1.next, expected[1]);
+    // The last seller republishes its presence between pages; it is still on the next page.
+    const last = nodes[2];
+    assert.ok(last);
+    await publish(
+      await last.seller.presence(3, last.catalog, { issuedAt: T0 + 1000 }),
+    );
     const page2 = (
       await sellers('model=qwen3-0.6b&limit=2&cursor=' + page1.next)
     ).body;

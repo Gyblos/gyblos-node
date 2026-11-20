@@ -103,7 +103,6 @@ export const DISCOVERY_INDEX_LIMITS = {
   retentionMs: PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
   maxJsonDepth: 16,
   maxLimitDigits: 6,
-  maxCursorIssuedDigits: 16,
 } as const;
 
 // Cloudflare rate-limit binding names (wrangler.jsonc); keyed by IP(/64), never stored,

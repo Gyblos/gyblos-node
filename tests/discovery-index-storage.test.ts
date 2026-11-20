@@ -271,44 +271,50 @@ CREATE TEMP TRIGGER withdrawal_deleted AFTER DELETE ON discovery_withdrawals BEG
   assert.equal(withdrawal?.sequence, 7);
 });
 
-void test('D1 listing sorts and limits keys only, then reads blobs by key for the page', async (context) => {
+void test('D1 listing takes its NodeId order from the model index, then reads blobs by key for the page', async (context) => {
   const made = await recordingD1();
   if (!made) return context.skip('node:sqlite unavailable');
   const { db, read, storage } = made;
-  await storage.list({ model: 'm', now: T0, limit: 51, after: null });
-  const statement = read.at(-1);
-  assert.ok(statement);
-  const plan = explainD1Statement(db, statement);
-  const byId = new Map(plan.map((row) => [row.id, row]));
-  const inPage = (row: SqliteQueryPlanRow): boolean => {
-    const parent = byId.get(row.parent);
-    if (!parent) return false;
-    return /^(CO-ROUTINE|MATERIALIZE) /.test(parent.detail) || inPage(parent);
-  };
-  const detail = plan.map((row) => row.detail).join('\n');
-  // The sort runs inside the key-only page, never over the blob join.
-  const sorts = plan.filter((row) => row.detail.includes('TEMP B-TREE'));
-  assert.ok(sorts.length > 0, detail);
-  for (const row of sorts) assert.ok(inPage(row), detail);
-  // Inside the page every table read is a covering index: no blob row is touched.
-  const pageReads = plan.filter(
-    (row) => inPage(row) && /^(SEARCH|SCAN) /.test(row.detail),
-  );
-  assert.ok(pageReads.length >= 3, detail);
-  for (const row of pageReads)
-    assert.match(row.detail, /USING COVERING INDEX/, detail);
-  // Blobs are read afterwards by primary key, once per page row.
-  const blobReads = plan.filter(
-    (row) => !inPage(row) && / USING PRIMARY KEY /.test(row.detail),
-  );
-  assert.equal(blobReads.length, 2, detail);
+  for (const after of [null, { nodeId: 'a'.repeat(64) }]) {
+    await storage.list({ model: 'm', now: T0, limit: 51, after });
+    const statement = read.at(-1);
+    assert.ok(statement);
+    const plan = explainD1Statement(db, statement);
+    const byId = new Map(plan.map((row) => [row.id, row]));
+    const inPage = (row: SqliteQueryPlanRow): boolean => {
+      const parent = byId.get(row.parent);
+      if (!parent) return false;
+      return /^(CO-ROUTINE|MATERIALIZE) /.test(parent.detail) || inPage(parent);
+    };
+    const detail = plan.map((row) => row.detail).join('\n');
+    // No sort: the page walks discovery_catalog_models_by_model in NodeId order from the cursor.
+    assert.ok(!detail.includes('TEMP B-TREE'), detail);
+    assert.match(
+      detail,
+      after
+        ? /SEARCH discovery_catalog_models USING COVERING INDEX discovery_catalog_models_by_model \(model_id=\? AND node_id>\?\)/
+        : /SEARCH discovery_catalog_models USING COVERING INDEX discovery_catalog_models_by_model \(model_id=\?\)/,
+    );
+    // Inside the page every table read is a covering index: no blob row is touched.
+    const pageReads = plan.filter(
+      (row) => inPage(row) && /^(SEARCH|SCAN) /.test(row.detail),
+    );
+    assert.ok(pageReads.length >= 3, detail);
+    for (const row of pageReads)
+      assert.match(row.detail, /USING COVERING INDEX/, detail);
+    // Blobs are read afterwards by primary key, once per page row.
+    const blobReads = plan.filter(
+      (row) => !inPage(row) && / USING PRIMARY KEY /.test(row.detail),
+    );
+    assert.equal(blobReads.length, 2, detail);
+  }
 });
 
 async function seedListing(storage: DiscoveryStorage) {
   for (let i = 1; i <= 40; i++) {
     const nodeId = hex(i);
     const digest = hex(1000 + i);
-    // Ties on issuedAt exercise the NodeId tiebreak and the cursor.
+    // Presence times out of NodeId order: the listing ignores them.
     const issuedAt = T0 - (i % 7);
     await storage.put(
       entry(PUBLIC_RECORD_KINDS.CATALOG, nodeId, 1, {
@@ -339,7 +345,7 @@ async function seedListing(storage: DiscoveryStorage) {
   }
 }
 
-void test('D1 and memory listings are identical across pages', async (context) => {
+void test('D1 and memory listings are identical across pages, in NodeId order', async (context) => {
   const made = await recordingD1();
   if (!made) return context.skip('node:sqlite unavailable');
   const memory = createMemoryStorage();
@@ -355,9 +361,10 @@ void test('D1 and memory listings are identical across pages', async (context) =
       pages.push(...fromD1.map((row) => row.nodeId));
       const last = fromD1.at(-1);
       if (!last || fromD1.length < limit) break;
-      after = { issuedAt: last.issuedAt, nodeId: last.nodeId };
+      after = { nodeId: last.nodeId };
     }
     assert.ok(pages.length > 10);
+    assert.deepEqual(pages, [...pages].sort());
     assert.equal(new Set(pages).size, pages.length);
   }
 });

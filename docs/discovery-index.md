@@ -380,9 +380,11 @@ is `400 INVALID_QUERY`):
 - A publish is one D1 batch (one transaction) that admits the high-water mark
   and NodeId quota together before writing the record. A failed batch rolls both
   back.
-- Listing is two-phase. A `page` CTE filters, sorts and limits only keys,
+- Listing is two-phase. A `page` CTE walks `discovery_catalog_models_by_model`
+  in NodeId order from the cursor (no sort) and filters and limits only keys,
   digests and times from covering indexes, then reads the signed JSON of the
-  page rows by primary key, at most `limit + 1` catalog and presence blobs.
+  page rows by primary key, at most `limit + 1` catalog and presence blobs. The
+  cursor is the last NodeId of the page.
 - Writes update in place: catalog, presence and withdrawal rows are upserted
   under the high-water guard, and a catalog republish writes only the model ids
   that changed. Model insertion binds at most 68 parameters for 64 models, below

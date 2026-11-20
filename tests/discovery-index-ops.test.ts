@@ -218,7 +218,7 @@ void test('response size is capped and paging continues from the last included s
   const body = JSON.parse(text);
   assert.ok(new TextEncoder().encode(text).byteLength <= 2500);
   assert.ok(body.sellers.length >= 1 && body.sellers.length < 3);
-  assert.match(body.next, /^\d+-[0-9a-f]{64}$/);
+  assert.match(body.next, /^[0-9a-f]{64}$/);
 });
 
 void test('publish body cap fits a maximal 32 KiB record plus envelope headroom', async () => {
