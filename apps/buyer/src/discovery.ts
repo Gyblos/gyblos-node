@@ -1,6 +1,9 @@
 // Collects bounded HTTP discovery hints for operator-trusted identities, persisting replay checks.
 // Only candidate IDs survive: fresh signed Iroh verification still precedes selection and quotes.
+import { randomInt } from 'node:crypto';
+
 import { SELLER_BADGES } from '@gyblos/core/constants';
+import { servesRequest } from '@gyblos/core/seller-selection';
 import {
   fetchSellers,
   type DiscoveredSeller,
@@ -128,7 +131,71 @@ export interface DiscoverOptions extends OpenOptions {
   now?: () => number;
   signal?: AbortSignal;
   timeoutMs?: number;
+  // A value in [0, 1): the order sellers found only in the index are looked up in. Defaults to crypto.
+  random?: () => number;
 }
+
+// Every page of the index's sellers of this request's model, up to the configured page bound.
+async function readAllPages(
+  config: BuyerSelectionConfig & { discovery: BuyerDiscoveryConfig },
+  options: DiscoverOptions,
+  now: () => number,
+  signal: AbortSignal,
+) {
+  const entries: DiscoveredSeller[] = [];
+  const cursors = new Set<string>();
+  let cursor: string | undefined;
+  for (let page = 0; page < config.discovery.maxPages; page++) {
+    signal.throwIfAborted();
+    // Keep equal-sequence entries visible for digest comparison. The persistent store enforces
+    // the high-water mark and retains live candidate IDs when the index repeats a held presence.
+    const result = await fetchSellers({
+      baseUrl: config.discovery.baseUrl,
+      model: config.request.selection.modelId,
+      fetch: options.fetch,
+      now,
+      signal,
+      timeoutMs: options.timeoutMs ?? BUYER_DISCOVERY.timeoutMs,
+      limit: BUYER_DISCOVERY.pageSize,
+      cursor,
+    });
+    entries.push(...result.sellers);
+    if (result.next === null) return entries;
+    if (cursors.has(result.next) || page + 1 >= config.discovery.maxPages)
+      throw new BuyerSelectionError(BUYER_SELECTION_CODES.DISCOVERY_LIMIT);
+    cursors.add(result.next);
+    cursor = result.next;
+  }
+  return entries;
+}
+
+// The sellers found only in the index that could serve this request (every hard filter, price included),
+// in a random order: which of them get the bounded identity lookups never depends on the index's order.
+function drawOpen(
+  entries: DiscoveredSeller[],
+  request: BuyerSelectionConfig['request'],
+  now: number,
+  random: () => number,
+) {
+  const drawn = entries.filter((entry) =>
+    servesRequest(
+      request,
+      {
+        ...entry,
+        badge: SELLER_BADGES.DECLARED_USAGE,
+        openChannel: false,
+      },
+      now,
+    ),
+  );
+  for (let index = drawn.length - 1; index > 0; index--) {
+    const other = Math.floor(random() * (index + 1));
+    [drawn[index], drawn[other]] = [drawn[other]!, drawn[index]!];
+  }
+  return drawn;
+}
+const cryptoRandom = () =>
+  randomInt(BUYER_SELECTION.randomRange) / BUYER_SELECTION.randomRange;
 export async function discoverBuyerSellers(
   config: BuyerSelectionConfig & { discovery: BuyerDiscoveryConfig },
   state: BuyerDiscoveryState,
@@ -159,28 +226,13 @@ export async function discoverBuyerSellers(
     lookups: 0,
     now: now(),
   };
-  const cursors = new Set<string>();
-  let cursor: string | undefined;
-  for (let page = 0; page < config.discovery.maxPages; page++) {
-    signal.throwIfAborted();
-    // Keep equal-sequence entries visible for digest comparison. The persistent store enforces
-    // the high-water mark and retains live candidate IDs when the index repeats a held presence.
-    const result = await fetchSellers({
-      baseUrl: config.discovery.baseUrl,
-      model: config.request.selection.modelId,
-      fetch: options.fetch,
-      now,
-      signal,
-      timeoutMs: options.timeoutMs ?? BUYER_DISCOVERY.timeoutMs,
-      limit: BUYER_DISCOVERY.pageSize,
-      cursor,
-    });
-    signal.throwIfAborted();
-    for (const entry of result.sellers) {
-      const trusted =
-        identities.get(entry.catalog.nodeId) ??
-        (await openSeller(entry, config, options, run, signal));
-      if (trusted?.owner !== entry.catalog.owner) continue;
+  const entries = await readAllPages(config, options, now, signal);
+  // Index entries of configured sellers first, then the open ones, drawn.
+  const open: DiscoveredSeller[] = [];
+  for (const entry of entries) {
+    const trusted = identities.get(entry.catalog.nodeId);
+    if (!trusted) open.push(entry);
+    else if (trusted.owner === entry.catalog.owner)
       await rememberEntry(
         entry,
         trusted,
@@ -188,13 +240,18 @@ export async function discoverBuyerSellers(
         now(),
         Boolean(config.identity),
       );
-      signal.throwIfAborted();
-    }
-    if (result.next === null) break;
-    if (cursors.has(result.next) || page + 1 >= config.discovery.maxPages)
-      throw new BuyerSelectionError(BUYER_SELECTION_CODES.DISCOVERY_LIMIT);
-    cursors.add(result.next);
-    cursor = result.next;
+    signal.throwIfAborted();
+  }
+  const drawn =
+    config.discovery.open && options.openRelay
+      ? drawOpen(open, config.request, now(), options.random ?? cryptoRandom)
+      : [];
+  for (const entry of drawn) {
+    const trusted = await openSeller(entry, config, options, run, signal);
+    signal.throwIfAborted();
+    if (trusted?.owner !== entry.catalog.owner) continue;
+    await rememberEntry(entry, trusted, state, now(), Boolean(config.identity));
+    signal.throwIfAborted();
   }
   signal.throwIfAborted();
   return eligibleConfig(

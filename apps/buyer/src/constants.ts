@@ -97,7 +97,7 @@ export const BUYER_DISCOVERY = {
   schemaVersion: 1,
   defaultPages: 3,
   maxPages: 8,
-  pageSize: 50,
+  pageSize: 200,
   timeoutMs: 10000,
   maxStateBytes: 1048576,
   maxStateRows: 1024,

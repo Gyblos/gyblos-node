@@ -102,11 +102,12 @@ To use the default index, add `discovery` to the buyer's `selection.json`:
 ```
 
 Inside `discovery` you can set `baseUrl` (same URL policy as the client) and
-`maxPages` (1 to 8, default 3). Each page holds at most 50 entries, and the
-whole discovery step has a 10-second deadline. A cursor cycle, or a non-final
-page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`, and no quotes are
-requested. An index error stops selection; it never switches the buyer to a
-different payment path. The rest of `selection.json` is described in
+`maxPages` (1 to 8, default 3). Each page asks for 200 entries, the index's
+largest page, and the whole discovery step has a 10-second deadline. A cursor
+cycle, or a non-final page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`,
+and no quotes are requested. An index error stops selection; it never switches
+the buyer to a different payment path. The rest of `selection.json` is described
+in
 [running-a-node.md](running-a-node.md#optional-buyer-selection-and-discovery).
 
 The index only supplies candidate NodeIds. The `sellers` list in
@@ -178,6 +179,11 @@ credentials or a query string; the other `identity` settings are in
 
 Open discovery has its own bounds:
 
+- The buyer reads every page first. It then drops the sellers that could not
+  serve the request (model, reasoning level, network, asset, context, price
+  ceilings and budget, data policy, live records) and looks up the rest in a
+  random order, so which sellers get a lookup never depends on the index's
+  order.
 - Each selection makes at most 16 new identity lookups. An identity the registry
   refused is not looked up again for five minutes.
 - At most 64 live unconfigured candidates are eligible at once, counted under
