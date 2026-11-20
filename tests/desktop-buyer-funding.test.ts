@@ -224,3 +224,32 @@ void test('a funded wallet cannot expand the authority of the channel selected f
     '1000000',
   );
 });
+
+void test('an exhausted open buyer channel cannot authorize another response using the wallet balance', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t);
+  const request = rig.request(2, '960');
+  await rig.buyer.begin(request);
+  await rig.seller().reserve(request, rig.terms.buyerNodeId);
+  const bill = await rig.seller().finish(request.requestId, '960');
+  const voucher = await rig.buyer.approve(bill, '960');
+  await rig.seller().accept(bill, voucher, rig.terms.buyerNodeId);
+  await rig.buyer.acknowledge(request.requestId);
+  const channelRemainingAtomic = await channelFundingRemaining(
+    environment,
+    policy,
+    seller,
+  );
+  assert.equal(
+    sellerResponseLimit(
+      {
+        payer,
+        network: DEVNET,
+        balanceAtomic: '2000000',
+        channelRemainingAtomic,
+        faucetAvailable: true,
+      },
+      '1000000',
+    ),
+    '0',
+  );
+});

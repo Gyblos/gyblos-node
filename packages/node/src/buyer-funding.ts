@@ -60,7 +60,7 @@ function available(
     BigInt(terms.depositAtomic) -
     BigInt(stored.snapshot.cumulativeAtomic) -
     BigInt(stored.snapshot.reservedAtomic);
-  return remaining > 0n ? String(remaining) : null;
+  return remaining >= 0n ? String(remaining) : null;
 }
 export async function channelFundingRemaining(
   environment: HomeEnvironment,

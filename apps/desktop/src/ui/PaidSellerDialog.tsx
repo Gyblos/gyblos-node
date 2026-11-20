@@ -109,6 +109,18 @@ export function PaidSellerDialog(
   // A legacy profile must acquire valid channel settings before its payer can be verified.
   if (!policy) return <SellerTerms {...props} confirm={refresh} />;
   const remaining = funding?.channelRemainingAtomic;
+  if (remaining === '0')
+    return (
+      <Modal title="Channel balance used" close={props.close}>
+        <div className="ui-form">
+          <p>
+            This channel has used its deposit. Review its settlement in Payments
+            or check its balance again.
+          </p>
+          <Button onClick={refresh}>Refresh balance</Button>
+        </div>
+      </Modal>
+    );
   const hasEscrow = remaining != null && BigInt(remaining) > 0n;
   const balance = funding?.balanceAtomic;
   if (!hasEscrow && (loading || balance == null))
@@ -202,7 +214,9 @@ function SellerTerms({
         </FormField>
         {remaining ? (
           <p>
-            Your existing channel has {fundingAmount(remaining)} available.{' '}
+            Your existing channel has {fundingAmount(remaining)} available. If
+            it needs replacing before your message, the new deposit can be up to{' '}
+            {fundingAmount(deposit)} for {minutes} minutes.{' '}
           </p>
         ) : (
           <p>
