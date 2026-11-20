@@ -41,10 +41,9 @@ export async function NetworkSection() {
   return (
     <>
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
-      {snapshot.staleFrom ? (
+      {snapshot.readAt ? (
         <p className="-mt-2 mb-3 text-xs text-dim">
-          The explorer last read the discovery index at{' '}
-          {utc(snapshot.staleFrom)}.
+          As read from the discovery index at {utc(snapshot.readAt)}.
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -80,13 +79,6 @@ export async function NetworkSection() {
 
       <SectionTitle title="Sellers" />
       <SellersTable sellers={snapshot.sellers} />
-      {snapshot.unreadModels.length ? (
-        <p className="mt-2 text-xs text-dim">
-          The explorer has not read the sellers of{' '}
-          {count(snapshot.unreadModels.length)} listed models yet: this list may
-          be incomplete.
-        </p>
-      ) : null}
       {snapshot.network ? <NotOnlineTable network={snapshot.network} /> : null}
     </>
   );

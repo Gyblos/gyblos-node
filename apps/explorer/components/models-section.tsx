@@ -95,23 +95,14 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
           <ModelRowView
             key={`${row.modelId}:${row.variant}:${row.quantization}`}
             row={row}
-            offersKnown={
-              offersKnown && !discovery.unreadModels.includes(row.modelId)
-            }
+            offersKnown={offersKnown}
           />
         ))}
       </Table>
-      {discovery.staleFrom ? (
+      {discovery.readAt ? (
         <p className="mt-1 text-xs text-dim">
-          The explorer last read the discovery index at{' '}
-          {utc(discovery.staleFrom)}: what is offered is as of then.
-        </p>
-      ) : null}
-      {offersKnown && discovery.unreadModels.length ? (
-        <p className="mt-1 text-xs text-dim">
-          The sellers of {count(discovery.unreadModels.length)} listed models
-          are unknown now: what they are offered at is unknown, and those not
-          served in the range are not shown.
+          What is offered is as read from the discovery index at{' '}
+          {utc(discovery.readAt)}.
         </p>
       ) : null}
       {offersKnown ? null : (
@@ -130,7 +121,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
 }
 
 // One model: what is offered now, then what was served on each side. Without the discovery index's
-// answer, or before the model's sellers are read, what is offered now reads unknown, never "not offered".
+// answer, what is offered now reads unknown, never "not offered".
 function ModelRowView({
   row,
   offersKnown,
@@ -138,8 +129,7 @@ function ModelRowView({
   row: ModelRow;
   offersKnown: boolean;
 }) {
-  const now = offersKnown ? row.now : null;
-  const shown = price(now);
+  const shown = price(row.now);
   return (
     <tr className="border-t border-line">
       <td className={td}>
@@ -150,14 +140,14 @@ function ModelRowView({
         />
       </td>
       <td className={numberCell}>
-        {now
-          ? pair(now.free, now.sellers - now.free, count)
+        {row.now
+          ? pair(row.now.free, row.now.sellers - row.now.free, count)
           : offersKnown
             ? 'Not offered now'
             : '—'}
       </td>
       <td className={shown.money ? moneyCell : numberCell}>{shown.text}</td>
-      <td className={numberCell}>{now ? count(now.context) : '—'}</td>
+      <td className={numberCell}>{row.now ? count(row.now.context) : '—'}</td>
       <td className={numberCell}>{completedText(row.free)}</td>
       <td className={numberCell}>{completedText(row.paid)}</td>
       <td className={numberCell}>

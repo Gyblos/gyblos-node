@@ -1,6 +1,7 @@
 // Protects how renders show the explorer's discovery snapshot: they read KV, never the index, reusing a
-// recent read; a failed run keeps the last snapshot, shown as old once it is; a failing KV or a stored
-// value of another shape never breaks the page; a read gives up after the fetch timeout.
+// recent read; when the index stops answering, the last catalog stays shown with when it was read; a
+// failing KV or a stored value of another shape never breaks the page; a read gives up after the fetch
+// timeout; the average uptime says over how many sellers it is taken.
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
@@ -23,23 +24,30 @@ afterEach(() => {
   AbortSignal.timeout = realTimeout;
 });
 
-void test('a failed run stores nothing; the last snapshot is shown as old once old, on every render', async () => {
-  const { kv, stored } = fakeKv();
+void test('when the index stops answering, the last catalog stays shown, with when it was read, on every render', async () => {
+  const { kv } = fakeKv();
   fakeIndex({ models: { a: ['n1'] } });
   await refreshDiscovery(kv, () => 1000);
-  const good = stored.get(STORED_KEY);
   fakeIndex({ models: { a: ['n1'] }, down: true });
-  await assert.rejects(refreshDiscovery(kv, () => 1000 + 2 * MINUTE));
-  assert.equal(stored.get(STORED_KEY), good);
+  await assert.rejects(
+    refreshDiscovery(kv, () => 1000 + 2 * MINUTE),
+    /503/,
+  );
 
   const before = await loadSnapshot(kv, 1000 + DISCOVERY.staleAfterMs);
-  assert.equal(before.staleFrom, null);
+  assert.equal(before.readAt, null);
   for (let step = 1; step <= 5; step += 1) {
     const late = await loadSnapshot(
       kv,
       1000 + DISCOVERY.staleAfterMs + step * DISCOVERY.reuseMs,
     );
-    assert.equal(late.staleFrom, 1000);
+    assert.equal(late.readAt, 1000);
+    assert.equal(late.error, null);
+    assert.deepEqual(
+      late.sellers.map((seller) => seller.nodeId),
+      ['n1'],
+    );
+    assert.ok(late.sellers[0]?.uptime);
   }
 });
 
@@ -118,8 +126,7 @@ void test('the average 24 h uptime is over the sellers with an uptime read, and 
   const summary = summarizeOffers({
     generatedAt: 0,
     network: null,
-    unreadModels: [],
-    staleFrom: null,
+    readAt: null,
     error: null,
     sellers: [seller('a', 1), seller('b', 0.5), seller('c', null)],
   });
