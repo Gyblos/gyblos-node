@@ -38,6 +38,8 @@ import {
 } from './session-policy';
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
+  // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
+  openingSupportsBlocks?: boolean;
   preparation?: PreparedChannel;
   receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
   policy: BuyerSessionPolicy;
@@ -84,7 +86,7 @@ async function openCurrent<Remote extends BatchDestination>(
       options.now(),
     );
   const preparation =
-    quote && !stored
+    quote && !stored && options.openingSupportsBlocks !== undefined
       ? await prepareNewChannel(options, quote, terms, signal)
       : options.preparation;
   signal.throwIfAborted();

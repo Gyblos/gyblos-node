@@ -34,13 +34,20 @@ export type PreparedChannel = Awaited<ReturnType<typeof prepareNewChannel>>;
 export async function prepareNewChannel<Remote extends BatchDestination>(
   options: Pick<
     BuyerSessionOptions<Remote>,
-    'endpoint' | 'destination' | 'transport' | 'meter' | 'now'
+    | 'endpoint'
+    | 'destination'
+    | 'transport'
+    | 'meter'
+    | 'now'
+    | 'openingSupportsBlocks'
   >,
   quote: SignedOfferV2,
   terms: PaymentSessionTerms,
   signal: AbortSignal,
 ) {
-  const blocks = typeof options.meter.stablePrefix === 'function';
+  const blocks =
+    options.openingSupportsBlocks === true &&
+    typeof options.meter.stablePrefix === 'function';
   const client = createBatchChannelClient(
     options.endpoint,
     options.destination(terms),

@@ -41,6 +41,7 @@ void test('desktop releases the reservation on an incompatible seller preparatio
   t.after(() => wire.close());
   let buyer = createBuyerSessionPool({
     ...fixture.options,
+    openingSupportsBlocks: true,
     endpoint: wire.endpoint,
     destination: () => wire.destination,
   });
@@ -129,6 +130,11 @@ void test('a single-channel buyer can select a compatible seller after a prepara
   const inspect = () => inspectBatchSession(paths);
   const buyer = createBuyerSessionManager({
     ...fixture.options,
+    openingSupportsBlocks: false,
+    meter: {
+      ...fixture.options.meter,
+      stablePrefix: () => assert.fail('block protocol unavailable'),
+    },
     inspect,
     endpoint: {
       ...fixture.options.endpoint,
@@ -139,8 +145,14 @@ void test('a single-channel buyer can select a compatible seller after a prepara
     },
     backend: async () => ({
       inspect,
-      create: (terms) =>
-        createBatchBuyer({ ...fixture.a.buyerOptions, terms, paths }),
+      create: async (terms) => {
+        const { beginBlocks: _beginBlocks, ...buyer } = await createBatchBuyer({
+          ...fixture.a.buyerOptions,
+          terms,
+          paths,
+        });
+        return buyer;
+      },
       observe: fixture.b.sellerOptions.observe,
     }),
   });

@@ -191,9 +191,10 @@ async function execute<Remote extends BatchDestination>(
       return sessionFail(SESSION_CODES.LIMIT);
     return { terms, fresh: !existing };
   });
-  const preparation = fresh
-    ? await prepareNewChannel(state.options, quote, terms, signal)
-    : undefined;
+  const preparation =
+    fresh && state.options.openingSupportsBlocks !== undefined
+      ? await prepareNewChannel(state.options, quote, terms, signal)
+      : undefined;
   const entry = await state.admission.serial(async () => {
     if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
     signal.throwIfAborted();
