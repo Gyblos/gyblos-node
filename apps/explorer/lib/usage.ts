@@ -3,7 +3,7 @@
 // summed histograms, never from averaged percentiles. Pure functions, no I/O.
 import type { CollectorSnapshot, NetworkDay, Totals } from './collector-shape';
 import { DISPLAY } from './constants';
-import { count, latencyMs, percent } from './format';
+import { count, latencyMs, percent, utc } from './format';
 import { mergedLatency } from './latency';
 
 type Section = Totals | null | undefined;
@@ -94,4 +94,15 @@ export function dailyRequests(days: NetworkDay[]) {
     free: day.free?.requests.headline ?? 0,
     paid: day.paid?.requests.headline ?? 0,
   }));
+}
+
+// The Usage title's note: the comparison is named only when the span before the range could be read.
+export function usageMeta(
+  days: number,
+  aggregatedAt: number | null,
+  compared: boolean,
+): string {
+  if (!aggregatedAt) return 'no data yet';
+  const updated = `updated ${utc(aggregatedAt)}`;
+  return compared ? `vs previous ${days} days · ${updated}` : updated;
 }

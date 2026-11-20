@@ -16,7 +16,7 @@ import {
   type NetworkSide,
 } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
-import { count, usdcDecimal, utc } from '../lib/format';
+import { count, usdcDecimal } from '../lib/format';
 import type { RangeDays } from '../lib/range';
 import {
   countText,
@@ -27,6 +27,7 @@ import {
   relayText,
   sideFigures,
   summarizeUsage,
+  usageMeta,
   type SideFigures,
 } from '../lib/usage';
 import { Flow, FlowPair } from './board/animated-number';
@@ -108,11 +109,7 @@ export async function UsageSection({ days }: { days: RangeDays }) {
     <>
       <SectionTitle
         title={`Usage · ${days} days`}
-        meta={
-          snapshot.aggregatedAt
-            ? `vs previous ${days} days · updated ${utc(snapshot.aggregatedAt)}`
-            : 'no data yet'
-        }
+        meta={usageMeta(days, snapshot.aggregatedAt, change !== null)}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatCard
