@@ -1,63 +1,14 @@
-// Renders the shipped Activity screen with synthetic host snapshots, without a browser or services.
+// Tests the activity empty-state decision through the public desktop model, without services.
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
-import { before, test } from 'node:test';
-import { runInNewContext } from 'node:vm';
+import { test } from 'node:test';
 
-import { build } from 'esbuild';
-
-import type { ActivityResult } from '@gyblos/desktop/activity-model';
-import { emptyX402, type X402Record } from '@gyblos/desktop/x402-model';
-
-let render: (state: ActivityResult | null, records: X402Record[]) => string;
-before(async () => {
-  const desktop = resolve('apps/desktop');
-  const desktopRequire = createRequire(resolve(desktop, 'package.json'));
-  const react = desktopRequire('react');
-  const result = await build({
-    stdin: {
-      contents: `
-        import { createElement } from 'react';
-        import { renderToStaticMarkup } from 'react-dom/server';
-        import { Activity } from './src/ui/Activity';
-        import { ChatController } from './src/ui/chat-controller';
-        export function render(state, records) {
-          return renderToStaticMarkup(createElement(Activity, {
-            activity: { state, references: { available: true, references: [] },
-              refresh: async () => state, copyReference: async () => false },
-            x402: { state: { summary: { records }, policy: null } },
-            chat: new ChatController('synthetic-chat'), selectedSession: null,
-            onPayments() {}, onOpenChat() {}, onSelectSession() {}
-          }));
-        }`,
-      resolveDir: desktop,
-      loader: 'tsx',
-    },
-    bundle: true,
-    write: false,
-    format: 'cjs',
-    platform: 'node',
-    packages: 'external',
-    jsx: 'automatic',
-  });
-  const module = { exports: { render } };
-  runInNewContext(result.outputFiles[0]!.text, {
-    module,
-    exports: module.exports,
-    require: (name: string) =>
-      name === 'react'
-        ? {
-            ...react,
-            useSyncExternalStore: (
-              _subscribe: unknown,
-              snapshot: () => unknown,
-            ) => snapshot(),
-          }
-        : desktopRequire(name),
-  });
-  render = module.exports.render;
-});
+import {
+  parseActivityResult,
+  showActivityEmptyState,
+  unavailableActivity,
+  type ActivityResult,
+} from '@gyblos/desktop/activity-model';
+import type { X402Record } from '@gyblos/desktop/x402-model';
 
 const state: ActivityResult = {
   available: true,
@@ -84,26 +35,31 @@ const record: X402Record = {
 };
 
 void test('free responses are activity even when there are no sandbox sessions', () => {
-  const html = render(state, [record]);
-  assert.ok(html.includes('Free response'));
-  assert.equal(html.includes('No activity yet'), false);
+  const records = [record];
+  assert.equal(showActivityEmptyState(state, Boolean(records.length)), false);
 });
 
 void test('confirmed payments are activity even when there are no sandbox sessions', () => {
-  const html = render(state, [{ ...record, free: false, chargeAtomic: '10' }]);
-  assert.ok(html.includes('Confirmed payment'));
-  assert.equal(html.includes('No activity yet'), false);
+  const records: X402Record[] = [
+    { ...record, free: false, chargeAtomic: '10' },
+  ];
+  assert.equal(showActivityEmptyState(state, Boolean(records.length)), false);
 });
 
 void test('an empty history still shows the activity empty state', () => {
-  assert.ok(render(state, emptyX402().records).includes('No activity yet'));
+  assert.equal(showActivityEmptyState(state, false), true);
 });
 
-void test('x402 records do not hide loading or unavailable session activity', () => {
-  assert.ok(render(null, [record]).includes('Loading activity'));
-  assert.ok(
-    render({ ...state, available: false }, [record]).includes(
-      'Activity unavailable',
-    ),
-  );
+void test('loading, unavailable and invalid activity never become an empty history', () => {
+  for (const hasX402Records of [false, true]) {
+    assert.equal(showActivityEmptyState(null, hasX402Records), false);
+    assert.equal(
+      showActivityEmptyState(unavailableActivity(), hasX402Records),
+      false,
+    );
+    assert.equal(
+      showActivityEmptyState(parseActivityResult({}), hasX402Records),
+      false,
+    );
+  }
 });

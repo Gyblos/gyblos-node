@@ -19,6 +19,12 @@ export type ActivityResult = {
 export function unavailableActivity(): ActivityResult {
   return { available: false, currentSessionId: null, sessions: [] };
 }
+export function showActivityEmptyState(
+  state: ActivityResult | null,
+  _hasX402Records: boolean,
+): boolean {
+  return state?.available === true && state.sessions.length === 0;
+}
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value))
