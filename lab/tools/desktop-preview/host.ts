@@ -40,6 +40,7 @@ import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 import { accountBudgetSnapshot, accountLimitError } from './account-budget';
 import { PREVIEW } from './constants';
 import { exampleKeys } from './example-keys';
+import { previewFunding } from './funding';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
 import { previewCatalog } from './seller-listings';
@@ -380,6 +381,7 @@ export function createPreviewHost(
   };
 
   return {
+    desktopFunding: previewFunding(query, payer),
     desktopWindow,
     desktopConversations,
     desktopWallet,

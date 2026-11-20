@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./buyer-funding": "./src/buyer-funding.ts",
     "./fee-payer": "./src/fee-payer.ts",
     ".": "./src/index.ts",
     "./batch-session": "./src/batch-session.ts"

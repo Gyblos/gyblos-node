@@ -62,6 +62,7 @@
     "./receipt-work": "./src/receipt-work.ts",
     "./receipts": "./src/receipts.ts",
     "./telemetry-startup": "./src/telemetry-startup.ts",
+    "./buyer-funding": "./src/buyer-funding.ts",
     "./buyer-chain": "./src/buyer-chain.ts",
     "./buyer-paid-error": "./src/buyer-paid-error.ts",
     "./buyer-withdraw": "./src/buyer-withdraw.ts",

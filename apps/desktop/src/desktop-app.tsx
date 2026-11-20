@@ -15,9 +15,9 @@ import {
 } from './paypal-model';
 import { prefersLightTheme, themeStyle } from './theme';
 import { Activity } from './ui/Activity';
-import { AddFunds } from './ui/AddFunds';
 import { announcedModels } from './ui/announced-models';
 import { Applications } from './ui/Applications';
+import { AddBuyerFunds } from './ui/BuyerFunding';
 import { BuyerSidebar } from './ui/BuyerSidebar';
 import { Chat, type ChatHandle } from './ui/Chat';
 import { ChatController } from './ui/chat-controller';
@@ -513,17 +513,8 @@ export function DesktopApp() {
       </MotionPresence>
       <MotionPresence>
         {modal === UI_DIALOG.ADD_FUNDS && (
-          <Modal
-            title="Add funds"
-            description="Choose how much to add to your wallet."
-            close={() => setModal(null)}
-          >
-            <AddFunds
-              onBackup={() => {
-                setModal(null);
-                navigate(UI_VIEW.PAYMENTS);
-              }}
-            />
+          <Modal title="Add funds" close={() => setModal(null)}>
+            <AddBuyerFunds payer={x402.state.policy?.payer} />
           </Modal>
         )}
       </MotionPresence>
@@ -576,6 +567,11 @@ export function DesktopApp() {
             key={paidModel.id}
             model={paidModel}
             buyer={x402}
+            addFunds={() => {
+              setPaidModel(null);
+              navigate(UI_VIEW.PAYMENTS);
+              setModal(UI_DIALOG.ADD_FUNDS);
+            }}
             close={() => setPaidModel(null)}
             confirm={(policyId) => {
               setConfirmedPolicy(policyId);

@@ -14,6 +14,7 @@ import {
   DESKTOP_UPDATE,
   STARTUP_PROGRESS,
 } from './constants';
+import { FUNDING, parseBuyerFunding } from './funding/model';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
 import { parsePaymentReferences } from './payment-reference-model';
 import {
@@ -82,6 +83,19 @@ contextBridge.exposeInMainWorld('desktopUsdcApiKeys', {
     parseUsdcApiSecret(
       await ipcRenderer.invoke(USDC_API.REVEAL_CHANNEL, request),
     ),
+});
+contextBridge.exposeInMainWorld('desktopFunding', {
+  balance: async (offerId?: string) =>
+    parseBuyerFunding(
+      await ipcRenderer.invoke(
+        FUNDING.balance,
+        ...(offerId === undefined ? [] : [offerId]),
+      ),
+    ),
+  copyAddress: async (payer: string) =>
+    (await ipcRenderer.invoke(FUNDING.copy, payer)) === true,
+  openFaucet: async (payer: string) =>
+    (await ipcRenderer.invoke(FUNDING.faucet, payer)) === true,
 });
 contextBridge.exposeInMainWorld('desktopX402', {
   run: async (request: unknown) =>
