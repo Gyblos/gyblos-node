@@ -6,12 +6,17 @@ import {
   SELLER_SELECTION_CODES,
   type SellerSelectionCode,
 } from '@gyblos/core/constants';
-import { BUYER_SIDECAR, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  BUYER_SIDECAR,
+  type BuyerApiPolicy,
+} from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_STOP_REASONS,
   type FreeExecutionCode,
 } from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 export class BuyerSessionRequired extends Error {
@@ -30,6 +35,7 @@ export class BuyerSessionRequired extends Error {
 
 type BuyerCode =
   | typeof BUYER_ROUTING_CODES.BUSY
+  | typeof PAID_EXECUTION_CODES.PEER
   | FreeExecutionCode
   | SellerSelectionCode
   | typeof SESSION_CODES.BINDING
@@ -98,6 +104,14 @@ export function desktopBuyerFailure(
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+  if (
+    row.code === PAID_EXECUTION_CODES.PEER &&
+    row[BUYER_API.NEVER_SENT_FIELD] === true
+  )
+    return new DesktopBuyerFailure(
+      PAID_EXECUTION_CODES.PEER,
+      'The selected seller could not open a payment channel. Choose another seller.',
+    );
   const code = [
     BUYER_ROUTING_CODES.BUSY,
     SESSION_CODES.BINDING,

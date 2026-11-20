@@ -24,6 +24,16 @@ export const BUYER_SIDECAR = {
   STOP: 'buyer-stop',
 } as const;
 
+export function isBuyerSessionConfigFailure(
+  kind: unknown,
+): kind is
+  typeof BUYER_SIDECAR.SESSION_REQUIRED | typeof BUYER_SIDECAR.DEPOSIT_MINIMUM {
+  return (
+    kind === BUYER_SIDECAR.SESSION_REQUIRED ||
+    kind === BUYER_SIDECAR.DEPOSIT_MINIMUM
+  );
+}
+
 // Delegated credentials are distinct from the buyer's private operator credential.
 export const BUYER_API_KEYS = {
   VERSION: 1,

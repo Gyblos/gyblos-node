@@ -1,5 +1,8 @@
 // Owns a buyer sidecar lifetime. Credentials cross only its private parent port, never stdout.
-import { BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_SIDECAR,
+  isBuyerSessionConfigFailure,
+} from '@gyblos/protocol/buyer-api';
 
 interface ParentPort {
   on(event: 'message', listener: (event: { data: unknown }) => void): unknown;
@@ -45,11 +48,9 @@ export async function runBuyerSidecar(
     try {
       const reason =
         error instanceof Error && 'reason' in error ? error.reason : undefined;
-      const kind =
-        reason === BUYER_SIDECAR.SESSION_REQUIRED ||
-        reason === BUYER_SIDECAR.DEPOSIT_MINIMUM
-          ? reason
-          : BUYER_SIDECAR.ERROR;
+      const kind = isBuyerSessionConfigFailure(reason)
+        ? reason
+        : BUYER_SIDECAR.ERROR;
       port.postMessage({ kind });
     } catch {
       /* Parent already exited. */

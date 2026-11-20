@@ -5,7 +5,10 @@ import {
   NODE_ENVIRONMENT,
   RECEIPT_UPLOADER,
 } from '@gyblos/config';
-import { BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_SIDECAR,
+  isBuyerSessionConfigFailure,
+} from '@gyblos/protocol/buyer-api';
 
 import { BuyerSessionRequired } from './buyer-error';
 import { DESKTOP_X402 } from './x402/constants';
@@ -126,10 +129,7 @@ function supervise(
       return;
     }
     const value = message as Record<string, unknown>;
-    if (
-      value.kind === BUYER_SIDECAR.SESSION_REQUIRED ||
-      value.kind === BUYER_SIDECAR.DEPOSIT_MINIMUM
-    )
+    if (isBuyerSessionConfigFailure(value.kind))
       return fail(new BuyerSessionRequired(value.kind));
     if (
       value.kind !== BUYER_SIDECAR.READY ||

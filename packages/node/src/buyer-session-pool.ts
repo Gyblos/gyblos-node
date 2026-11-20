@@ -17,6 +17,10 @@ import {
   type BatchDestination,
 } from '@gyblos/transport-iroh/batch-client';
 
+import {
+  prepareNewChannel,
+  type PreparedChannel,
+} from './buyer-channel-prepare';
 import { bounded } from './buyer-operation';
 import { createPoolAdmissions, type PoolLease } from './buyer-pool-admission';
 import { UnsentSellerBusyError } from './buyer-routing';
@@ -56,12 +60,14 @@ function catalog<Remote extends BatchDestination>(state: State<Remote>) {
 function manager<Remote extends BatchDestination>(
   state: State<Remote>,
   entry: BatchPoolEntry,
+  preparation?: PreparedChannel,
 ) {
   const id = entry.terms.sellerNodeId;
   let found = state.managers.get(id);
   if (!found) {
     found = createBuyerSessionManager({
       ...state.options,
+      preparation,
       transport: {
         ...state.options.transport,
         beforeExecute: (request) => {
@@ -148,7 +154,7 @@ async function execute<Remote extends BatchDestination>(
 ) {
   recountSessionInput(quote, input, state.options.meter);
   await state.options.verify(quote, signal);
-  const entry = await state.admission.serial(async () => {
+  const { terms, fresh } = await state.admission.serial(async () => {
     if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
     signal.throwIfAborted();
     const pool = await catalog(state);
@@ -178,13 +184,34 @@ async function execute<Remote extends BatchDestination>(
       )
     )
       return sessionFail(SESSION_CODES.LIMIT);
+    if (
+      !existing &&
+      BigInt(budget.availableAtomic) < BigInt(terms.depositAtomic)
+    )
+      return sessionFail(SESSION_CODES.LIMIT);
+    return { terms, fresh: !existing };
+  });
+  const preparation =
+    fresh && state.options.openingSupportsBlocks !== undefined
+      ? await prepareNewChannel(state.options, quote, terms, signal)
+      : undefined;
+  const entry = await state.admission.serial(async () => {
+    if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
+    signal.throwIfAborted();
+    await verifyBatchQuote(
+      quote,
+      terms,
+      state.options.endpoint.id().toString(),
+      state.options.now(),
+    );
+    const pool = await catalog(state);
     const entry = await pool.allocate(terms);
     signal.throwIfAborted();
     await pool.begin(terms.sellerNodeId, quote.offer.requestId);
     lease.registered = true;
     return entry;
   });
-  const result = await manager(state, entry).execute(
+  const result = await manager(state, entry, preparation).execute(
     quote,
     input,
     signal,
