@@ -6,6 +6,7 @@ import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY } from '../lib/constants';
 import { short } from '../lib/format';
 import { ModelLogo } from './model-logo';
+import { TableScroll } from './table-scroll';
 
 export const th = 'px-4 py-3 font-medium';
 export const td = 'px-4 py-3';
@@ -55,7 +56,7 @@ export function Table({
   minWidth?: number;
 }) {
   return (
-    <div className="explorer-table-scroll mt-4 overflow-x-auto rounded-2xl border border-line bg-panel">
+    <TableScroll>
       <table
         className="explorer-table w-full text-left text-sm whitespace-nowrap"
         style={{ minWidth }}
@@ -74,7 +75,7 @@ export function Table({
         </thead>
         <tbody>{children}</tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }
 
@@ -100,7 +101,7 @@ export function ModelName({
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
     <span
-      className="inline-flex max-w-full items-center gap-2 align-middle"
+      className="inline-flex max-w-full items-center gap-2"
       title={[modelId, detail].filter(Boolean).join(' ')}
     >
       <ModelLogo modelId={modelId} />
