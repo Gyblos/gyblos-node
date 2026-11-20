@@ -32,12 +32,15 @@ export const DISCOVERY = {
   uptimeRefreshMs: 10 * 60 * 1000,
   // An uptime whose tries have failed for this long is no longer shown.
   uptimeMaxAgeMs: 24 * 60 * 60 * 1000,
-  // A catalog read under way this long (a model that keeps failing or never fits in a run) begins again.
+  // A catalog read under way this long (a model that keeps failing or never fits in a run) begins again,
+  // and a shown catalog whose read began this long ago is dated on the page. A catalog needing more runs
+  // than fit in this time (about 800 seller pages) never completes, and the last one stays shown, dated.
   restartAfterMs: 60 * 60 * 1000,
   // When the catalog has not been read further for this long (two runs and a margin), the page says when
   // the catalog it shows was read.
   staleAfterMs: 5 * 60 * 1000,
-  // A render reuses the stored read its Worker instance read this recently instead of reading KV again.
+  // A render reuses the stored read its Worker instance read this recently instead of reading KV again;
+  // under `next dev`, how often a render runs the read itself.
   reuseMs: 30 * 1000,
 } as const;
 

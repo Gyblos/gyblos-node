@@ -101,7 +101,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
       </Table>
       {discovery.datedAt ? (
         <p className="mt-1 text-xs text-dim">
-          Offers as read at {utc(discovery.datedAt)}.
+          Offers as of {utc(discovery.datedAt)}.
         </p>
       ) : null}
       {offersKnown ? null : (

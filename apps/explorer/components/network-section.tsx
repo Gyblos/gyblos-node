@@ -44,10 +44,10 @@ export async function NetworkSection() {
       {snapshot.datedAt || snapshot.networkDatedAt ? (
         <p className="-mt-2 mb-3 text-xs text-dim">
           {snapshot.datedAt
-            ? `Sellers and models as read at ${utc(snapshot.datedAt)}. `
+            ? `Sellers and models as of ${utc(snapshot.datedAt)}. `
             : null}
           {snapshot.networkDatedAt
-            ? `Network status (online, registered, offline) as read at ${utc(snapshot.networkDatedAt)}.`
+            ? `Network status (online, offline, not published) as of ${utc(snapshot.networkDatedAt)}.`
             : null}
         </p>
       ) : null}
@@ -88,8 +88,8 @@ export async function NetworkSection() {
         <NotOnlineTable network={snapshot.network} />
       ) : (
         <p className="mt-2 text-xs text-dim">
-          The index&apos;s network status could not be read: registered and
-          offline sellers are unknown.
+          The index&apos;s network status could not be read: offline and not
+          published sellers are unknown.
         </p>
       )}
     </>

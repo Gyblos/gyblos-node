@@ -264,10 +264,8 @@ async function tryUptimes(
 // One run over the previous stored read: first the uptimes most due, up to
 // DISCOVERY.uptimeReservedPerRun and within DISCOVERY.reservedUptimesMs; then the catalog read (begun
 // when none is under way, or again when the one under way began DISCOVERY.restartAfterMs ago), replacing
-// the shown catalog once whole; then more due uptimes with what is left. Progress dates the shown
-// catalog as current (progressAt) only while the read under way began less than
-// DISCOVERY.restartAfterMs after it: a later one follows a read that never ended. Never throws:
-// `problems` says what went wrong.
+// the shown catalog once whole; then more due uptimes with what is left. Never throws: `problems` says
+// what went wrong.
 export async function readIndex(
   previous: StoredDiscovery | null,
   now: () => number,
@@ -300,11 +298,7 @@ export async function readIndex(
   } catch {
     run.problems.add('models');
   }
-  const current =
-    !stored.catalog ||
-    (stored.pending?.startedAt ?? 0) - stored.catalog.readAt <
-      DISCOVERY.restartAfterMs;
-  if (stored.pending && (await carryOn(run, stored.pending)) && current)
+  if (stored.pending && (await carryOn(run, stored.pending)))
     stored.progressAt = now();
   if (
     stored.pending &&

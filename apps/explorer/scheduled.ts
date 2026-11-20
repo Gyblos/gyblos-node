@@ -19,7 +19,7 @@ export function scheduled(_event: unknown, bindings: Bindings, ctx: Waiter) {
           console.error(`discovery run problems: ${problems.join(', ')}`);
       },
       () => {
-        console.error('discovery run failed: KV unavailable');
+        console.error('discovery run failed: nothing stored');
       },
     ),
   );
