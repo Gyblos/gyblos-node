@@ -12,17 +12,18 @@ const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
 const MERGE = 'c'.repeat(40);
 
-async function publisher(): Promise<string> {
+async function nodeBlock(index: number): Promise<string> {
   const workflow = await readFile(WORKFLOW, 'utf8');
   const blocks = [
     ...workflow.matchAll(
       /node --input-type=module <<'NODE'\n([\s\S]*?)\n\s*NODE/g,
     ),
   ];
-  const code = blocks.at(-1)?.[1];
+  const code = blocks.at(index)?.[1];
   assert.ok(code);
   return code.replace(/^\s*import .+;\n/gm, '');
 }
+const publisher = () => nodeBlock(-1);
 function runPublisher(
   code: string,
   base = BASE,
@@ -265,5 +266,109 @@ void test('publisher accepts every current diagnostic code and phase', async () 
     ].join('\n');
     const writes = runPublisher(code, BASE, MERGE, diagnostics, 'error');
     assert.match(writes.flat().join(' '), /Reported tokens: 10/);
+  }
+});
+
+// Runs the request binder against scripted PR reads; returns its outputs and how often it paused.
+function runBinder(
+  code: string,
+  reads: readonly {
+    merge: string | null;
+    parents: readonly string[] | 'error';
+  }[],
+) {
+  let read = 0;
+  let pauses = 0;
+  let output = '';
+  const stopped = new Error('synthetic exit');
+  try {
+    vm.runInNewContext(code, {
+      process: {
+        env: {
+          GITHUB_EVENT_PATH: 'event',
+          GITHUB_REPOSITORY: 'Gyblos/gyblos-node',
+          GITHUB_OUTPUT: 'out',
+        },
+        exit: () => {
+          throw stopped;
+        },
+      },
+      Atomics: {
+        wait: () => {
+          pauses++;
+          return 'timed-out';
+        },
+      },
+      Int32Array,
+      SharedArrayBuffer,
+      fs: {
+        readFileSync: () =>
+          JSON.stringify({
+            workflow_run: { head_sha: HEAD, pull_requests: [{ number: 7 }] },
+          }),
+        appendFileSync: (_path: string, text: string) => {
+          output += text;
+        },
+      },
+      execFileSync: (_command: string, args: string[]) => {
+        // A commit read belongs to the PR read just before it.
+        const at = (args[1] ?? '').endsWith('/pulls/7') ? read : read - 1;
+        const step = reads[Math.min(at, reads.length - 1)];
+        if ((args[1] ?? '').endsWith('/pulls/7')) {
+          read++;
+          return JSON.stringify({
+            state: 'open',
+            base: { ref: 'develop', sha: BASE },
+            merge_commit_sha: step?.merge,
+            head: { sha: HEAD, repo: { full_name: 'Gyblos/gyblos-node' } },
+          });
+        }
+        if (step?.parents === 'error') throw new Error('422');
+        return JSON.stringify({
+          parents: (step?.parents ?? []).map((sha) => ({ sha })),
+        });
+      },
+    });
+  } catch (error: unknown) {
+    if (error !== stopped) throw error;
+  }
+  return { output, pauses, reads: read };
+}
+
+void test('the request binder waits for a merge snapshot of the current base and head', async () => {
+  const code = await nodeBlock(0);
+  const STALE = 'd'.repeat(40);
+  const OLD_BASE = 'e'.repeat(40);
+  const current = { merge: MERGE, parents: [BASE, HEAD] };
+  for (const [name, reads, pauses, merge] of [
+    [
+      'stale, then current',
+      [{ merge: STALE, parents: [OLD_BASE, HEAD] }, current],
+      1,
+      MERGE,
+    ],
+    [
+      'still computing, then current',
+      [{ merge: null, parents: [] }, current],
+      1,
+      MERGE,
+    ],
+    [
+      'commit not served yet, then current',
+      [{ merge: MERGE, parents: 'error' }, current],
+      1,
+      MERGE,
+    ],
+    [
+      'stale until the wait runs out',
+      [{ merge: STALE, parents: [OLD_BASE, HEAD] }],
+      5,
+      STALE,
+    ],
+  ] as const) {
+    const result = runBinder(code, reads);
+    assert.equal(result.pauses, pauses, name);
+    assert.match(result.output, new RegExp('merge=' + merge), name);
+    assert.match(result.output, new RegExp('base=' + BASE), name);
   }
 });

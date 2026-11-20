@@ -160,12 +160,13 @@ export async function createFreeBuyer(
             return dependencies.execute(...args);
           },
           select: async (excluded, deadline) => {
-            // Evidence time is accelerated; the product's admission clock is real.
-            // Refill its peer burst before the next synthetic selection instead of
-            // depending on native transport latency or changing production quotas.
-            await delay(ACCEPTANCE.controlRefillMs, undefined, {
-              signal: deadline,
-            });
+            deadline.throwIfAborted();
+            if (run.admissionClock)
+              run.admissionClock.advance(ACCEPTANCE.controlRefillMs);
+            else
+              await delay(ACCEPTANCE.controlRefillMs, undefined, {
+                signal: deadline,
+              });
             const before = generations();
             const attempts = sellers.reduce(
               (sum, seller) => sum + seller.engine.attempts(),

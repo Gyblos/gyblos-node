@@ -17,9 +17,12 @@ export interface Latency {
   counts: number[];
 }
 
-// A stored histogram; anything malformed reads as empty rather than failing the response.
-export function counts(text: string): number[] {
-  const empty = Array<number>(BUCKETS.length + 1).fill(0);
+// A stored histogram over `edges`; anything malformed reads as empty rather than failing the response.
+export function counts(
+  text: string,
+  edges: readonly number[] = BUCKETS,
+): number[] {
+  const empty = Array<number>(edges.length + 1).fill(0);
   try {
     const value: unknown = JSON.parse(text);
     if (
@@ -33,13 +36,17 @@ export function counts(text: string): number[] {
   }
   return empty;
 }
-function percentile(values: readonly number[], share: number): number | null {
+function percentile(
+  values: readonly number[],
+  share: number,
+  edges: readonly number[] = BUCKETS,
+): number | null {
   const samples = values.reduce((sum, value) => sum + value, 0);
   if (!samples) return null;
   let seen = 0;
   for (const [index, value] of values.entries()) {
     seen += value;
-    if (seen >= samples * share) return BUCKETS[index] ?? null;
+    if (seen >= samples * share) return edges[index] ?? null;
   }
   return null;
 }
@@ -50,6 +57,41 @@ export function latency(text: string): Latency {
     p50Ms: percentile(values, PERCENTILES.p50),
     p95Ms: percentile(values, PERCENTILES.p95),
     bucketsMs: BUCKETS,
+    counts: values,
+  };
+}
+
+const SPEED_BUCKETS = AGGREGATES.tokensPerSecondBuckets;
+// The engine's output tokens per second of generation, from fixed buckets. Higher is better, so the
+// median reads as the lower bound of its bucket: never more than was measured.
+export interface Speed {
+  samples: number;
+  // Lower bound of the bucket holding the median (0 in the first bucket, the last bound above it);
+  // null only without samples.
+  p50MinTokensPerSecond: number | null;
+  // Upper bounds in tokens per second; the last count is everything above the last bound.
+  bucketsTokensPerSecond: readonly number[];
+  counts: number[];
+}
+function lowerPercentile(
+  values: readonly number[],
+  share: number,
+): number | null {
+  const samples = values.reduce((sum, value) => sum + value, 0);
+  if (!samples) return null;
+  let seen = 0;
+  for (const [index, value] of values.entries()) {
+    seen += value;
+    if (seen >= samples * share) return index ? SPEED_BUCKETS[index - 1]! : 0;
+  }
+  return null;
+}
+export function speed(text: string): Speed {
+  const values = counts(text, SPEED_BUCKETS);
+  return {
+    samples: values.reduce((sum, value) => sum + value, 0),
+    p50MinTokensPerSecond: lowerPercentile(values, PERCENTILES.p50),
+    bucketsTokensPerSecond: SPEED_BUCKETS,
     counts: values,
   };
 }

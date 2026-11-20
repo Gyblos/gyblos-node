@@ -32,6 +32,7 @@ export interface ReceiptFixture {
   reasoningTokens?: number | null;
   amountAtomic?: string;
   feeAtomic?: string;
+  requestId?: string;
 }
 
 export function insertReceipt(
@@ -55,7 +56,7 @@ export function insertReceipt(
       key,
       fixture.seller ?? SELLER_A,
       fixture.buyer ?? 'c3'.repeat(32),
-      hex(`request-${sequence}`).slice(0, 32),
+      fixture.requestId ?? hex(`request-${sequence}`).slice(0, 32),
       hex(`seller-${sequence}`),
       fixture.status === 'seller-only' ? null : hex(`buyer-${sequence}`),
       hex(`fingerprint-${sequence}`),
@@ -131,7 +132,7 @@ export function insertObservation(
     .prepare(
       `INSERT INTO collector_observations (event_key, envelope_id, event_index, type, at, request_id,
         seller_node_id, model_id, record_json, inserted_at)
-       VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       hex(`event-${++sequence}`),
@@ -139,6 +140,7 @@ export function insertObservation(
       sequence,
       record.type,
       record.at,
+      (record.requestId as string | null | undefined) ?? null,
       (record.sellerNodeId as string | null | undefined) ?? null,
       (record.model as string | undefined) ?? 'synthetic/model',
       JSON.stringify(record),

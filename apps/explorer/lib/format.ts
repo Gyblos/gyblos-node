@@ -1,6 +1,11 @@
 // Owns display formatting: USDC amounts from atomic units, short addresses, UTC times, percentages,
 // latency bounds and counts. Pure functions, no I/O.
-import { DISPLAY, LATENCY_BUCKETS_MS, UNITS } from './constants';
+import {
+  DISPLAY,
+  FIRST_SPEED_BOUND,
+  LATENCY_BUCKETS_MS,
+  UNITS,
+} from './constants';
 import type { LatencyBound } from './latency';
 
 const LAST_BOUND_MS = LATENCY_BUCKETS_MS.at(-1) ?? 0;
@@ -69,6 +74,15 @@ export function latencyMs(value: LatencyBound): string {
   return value < UNITS.msPerSecond
     ? `< ${value} ms`
     : `< ${value / UNITS.msPerSecond} s`;
+}
+
+// Engine speed as the lower bound of the median's bucket: "≥ 20 tok/s"; "< 1 tok/s" in the first
+// bucket; "—" without samples.
+export function tokensPerSecond(value: number | null): string {
+  if (value === null) return '—';
+  return value === 0
+    ? `< ${FIRST_SPEED_BOUND} tok/s`
+    : `≥ ${count(value)} tok/s`;
 }
 
 export function count(value: number): string {

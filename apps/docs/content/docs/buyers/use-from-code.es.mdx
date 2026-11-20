@@ -24,19 +24,17 @@ prompt. No envíes contraseñas, llaves ni otros secretos. Consulta
    arráncalo ahí.
 2. En **Create an API key**, escribe un **Name** y un **Spend limit**, y elige **Create API key**. El
    límite es el total que puede gastar esta key, en USDC de devnet. Nunca se reinicia y no se puede
-   subir después. Un límite de `0` permite solo modelos gratis, y la key muestra **Free only**.
-3. Elige **Copy API key** y **Copy Base URL**. El botón del ojo muestra la key solo mientras lo pides;
-   ocúltala antes de compartir tu pantalla.
+   subir después. Un límite de `0` permite solo modelos gratis.
+3. Elige **Copy API key** y **Copy Base URL**. La app mantiene la key oculta en pantalla; pégala
+   directamente en tu herramienta.
 
-Solo puedes ver o copiar una key en la sesión de la app que la creó. Después de reiniciar, una
-herramienta que ya tiene la key sigue funcionando, pero la app no puede volver a mostrarla. La key nunca
+Solo puedes copiar una key en la sesión de la app que la creó. Después de reiniciar, una herramienta que
+ya tiene la key sigue funcionando, pero la app no puede volver a copiarla. La key nunca
 aparece en la configuración guardada del agente ni en el historial del chat. **Revoke key** detiene las
 solicitudes nuevas con esa key; lo que ya gastó queda registrado.
 
-La Base URL usa el puerto fijo `4033`, así que no cambia cuando reinicias la app. Si otro programa usa ese
-puerto, ciérralo y elige **Payments → Retry local buyer**; Gyblos no cambia a otro puerto. Una
-herramienta configurada con una versión anterior de la app, cuando el puerto podía cambiar, necesita que
-copies o escribas su configuración otra vez.
+La Base URL puede cambiar cuando reinicias la app. Después de reiniciar, elige otra vez **Copy Base URL**
+y, si cambió, actualiza tu herramienta o elige otra vez **Write configuration**.
 
 ## Conecta un agente de código [#conectar-un-agente-de-codigo]
 
@@ -54,10 +52,9 @@ export GYBLOS_API_KEY=YOUR_API_KEY
 
 Reemplaza `YOUR_API_KEY` por la key que copiaste.
 
-Cuando la app no puede saber el tamaño de contexto de un modelo, la configuración usa 8.192 tokens de
-contexto y como máximo 4.096 de salida (menos si el límite de respuesta del comprador es menor). Los perfiles
-de Codex incluyen este límite, así que Codex compacta la conversación antes. Un vendedor aún puede
-ofrecer una ventana menor y rechazar una solicitud. Cuando cambien los modelos, elige **Write
+Cuando la app no puede saber el tamaño de contexto de un modelo, la configuración usa 32.768 tokens de
+contexto, y el límite de salida es el límite de respuesta del comprador. Un vendedor aún puede ofrecer una
+ventana menor y rechazar una solicitud. Cuando cambien los modelos, elige **Write
 configuration** otra vez.
 
 Luego elige un modelo de Gyblos con `/models` (OpenCode), `/model` (pi y Claude Code) o

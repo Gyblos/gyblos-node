@@ -47,7 +47,22 @@ export interface NetworkDay {
   } | null;
   demand: { modelId: string; requests: number }[];
 }
-export type ModelSide = Totals & { sellers: number };
+// Output tokens per second of generation, from engines that report their generation time: the lower
+// bound of the bucket holding the median, null without samples. The explorer reads the median only.
+export interface Speed {
+  samples: number;
+  p50MinTokensPerSecond: number | null;
+}
+// Per-model observations joined to their receipts: the first token as the buyer saw it (streaming
+// requests only) and the engine's generation speed.
+export interface ModelObserved {
+  buyerFirstToken: Latency;
+  engineSpeed: Speed;
+}
+export type ModelSide = Totals & {
+  // null without any observation joined to a receipt on that side: no data, never zero.
+  observed: ModelObserved | null;
+};
 export interface ModelStat {
   modelId: string;
   variant: string | null;
@@ -73,6 +88,15 @@ function latency(value: unknown, where: string): Latency {
     ),
     counts: list(source.counts, `${where}.counts`).map((value) =>
       num(value, where),
+    ),
+  };
+}
+function speed(value: unknown, where: string): Speed {
+  const source = record(value, where);
+  return {
+    samples: num(source.samples, `${where}.samples`),
+    p50MinTokensPerSecond: nullable(source.p50MinTokensPerSecond, (present) =>
+      num(present, `${where}.p50MinTokensPerSecond`),
     ),
   };
 }
@@ -164,7 +188,17 @@ function modelSide(value: unknown, where: string): ModelSide {
   const source = record(value, where);
   return {
     ...totals(source, where),
-    sellers: num(source.sellers, `${where}.sellers`),
+    observed: nullable(source.observed, (present) => {
+      const at = `${where}.observed`;
+      const observed = record(present, at);
+      return {
+        buyerFirstToken: latency(
+          observed.buyerFirstToken,
+          `${at}.buyerFirstToken`,
+        ),
+        engineSpeed: speed(observed.engineSpeed, `${at}.engineSpeed`),
+      };
+    }),
   };
 }
 export function parseModel(value: unknown): ModelStat {

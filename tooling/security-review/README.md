@@ -110,9 +110,11 @@ A run writes `review-results.json`, `coverage-ledger.json`, `findings.json`,
 | `error`            | A task or verification failed, or verifications do not match the candidates.                                    |
 | `not-run`          | No model was called, as in a `--dry-run`.                                                                       |
 
-Skipped tasks, oversized, binary or non-regular sources, missing input, errors
-and pending verification stay visible and can never produce `clean`. No earlier
-report suppresses current coverage.
+Skipped tasks, oversized sources, missing input, errors and pending verification
+stay visible and can never produce `clean`. Symlinks, submodules and binary
+blobs are not text source: each task lists them as excluded and still runs, and
+a changed one makes the run `needs-validation`. No earlier report suppresses
+current coverage.
 
 `clean` is not a security certification. The review is source-only and partial:
 sharded cross-cutting reviews can miss interactions between chunks, and it does
@@ -125,8 +127,9 @@ checks, human review and an external audit remain necessary.
    event, with no model credentials and no checkout.
 2. **AI security review** responds through `workflow_run`, so GitHub loads it
    from the default branch. It checks that the PR, head, base and repository are
-   current and runs the trusted runner against the immutable PR merge snapshot
-   as data.
+   current, waits up to about a minute for GitHub to rebuild the merge commit
+   after the base moves, and runs the trusted runner against the immutable PR
+   merge snapshot as data.
 3. Its publisher validates the fixed status, rechecks that the head, base and
    merge commit are unchanged, applies one fixed label and posts a deterministic
    summary. It never runs or renders model text. Stale heads and forks get no
@@ -164,8 +167,10 @@ through its JSON event stream. Only recognized error categories, process counts
 and available token totals enter the public diagnostic summary. Missing usage is
 shown as unknown. Reported tokens can be partial and are not a billing total.
 
-An explicit exhausted quota or rejected credential stops new Pi processes for
-the remainder of that run, including independent verifiers. Already started
+An explicit exhausted quota, rejected credential (401) or model the key cannot
+use stops new Pi processes for the remainder of that run, including independent
+verifiers. Other provider refusals are named by class (context window, other
+HTTP 4xx, server error); their text never enters the summary. Already started
 processes finish. Each new workflow run checks the provider independently. Pi
 session and provider retries are disabled in the isolated settings directory.
 Temporary rate limits, invalid response formats and incomplete coverage are

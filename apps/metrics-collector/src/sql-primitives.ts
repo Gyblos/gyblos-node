@@ -38,10 +38,12 @@ export const inRange = (
   range: { start: number; end: number },
 ) => and(gte(column, range.start), lt(column, range.end));
 
-// A JSON array of bucket counts over AGGREGATES.latencyBucketsMs; a value equal to a bound falls in
+// A JSON array of bucket counts over `edges` (latency by default); a value equal to a bound falls in
 // the next bucket, and null values are not counted.
-export function histogram(value: SQL | SQLiteColumn) {
-  const edges = AGGREGATES.latencyBucketsMs;
+export function histogram(
+  value: SQL | SQLiteColumn,
+  edges: readonly number[] = AGGREGATES.latencyBucketsMs,
+) {
   const parts = edges.map((edge, index) =>
     index === 0
       ? count(sql`${value} < ${number(edge)}`)
@@ -53,9 +55,12 @@ export function histogram(value: SQL | SQLiteColumn) {
   return sql<string>`json_array(${sql.join(parts, sql`, `)})`;
 }
 // Bucket-by-bucket sum of a histogram column over grouped rows, as a JSON array.
-export function histogramSum(column: SQLiteColumn) {
+export function histogramSum(
+  column: SQLiteColumn,
+  edges: readonly number[] = AGGREGATES.latencyBucketsMs,
+) {
   const parts = Array.from(
-    { length: AGGREGATES.latencyBucketsMs.length + 1 },
+    { length: edges.length + 1 },
     (_, index) =>
       sql`coalesce(sum(json_extract(${column}, ${sql.raw(`'$[${index}]'`)})), 0)`,
   );

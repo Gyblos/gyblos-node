@@ -5,6 +5,7 @@ import type { ModelSelection } from '@gyblos/protocol/control-types';
 import type { ChatApi } from './chat-api';
 import { withoutStop } from './chat-stop';
 import { FREE_BUYER_CODES, OPENROUTER } from './constants';
+import type { RouteContext } from './free-context';
 import { FreeBuyerError } from './free-chat';
 import {
   endpointRoutes,
@@ -20,10 +21,7 @@ export interface ChatSettings {
   // The models served by name; absent, `selection` is the one model.
   models?: readonly ModelRoute[];
   // The context every eligible seller of a route accepts, from verified catalogs; undefined if unknown.
-  contextTokens?: (
-    route: ModelRoute,
-    signal: AbortSignal,
-  ) => Promise<number | undefined>;
+  contextTokens?: RouteContext<ModelRoute>;
 }
 // The model a request names (or the first of its OpenRouter fallbacks that this endpoint serves), and its
 // input parsed against that model's route. The answer echoes the name that matched. The fallback list and

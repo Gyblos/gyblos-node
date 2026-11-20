@@ -21,6 +21,7 @@ import {
   type ChainAggregationResult,
 } from './aggregate-chain-run';
 import { firstSeenUpserts } from './aggregate-first-seen';
+import { modelObservedRollup } from './aggregate-model-observed';
 import {
   blank,
   buyerIdentity,
@@ -30,8 +31,11 @@ import {
   demandFields,
   headlineReceipt,
   modelKey,
+  modelObservedEvents,
   observationJoin,
   observedFields,
+  perReceiptObserved,
+  receiptOfObservation,
   receiptTotalsSelect,
   versionFields,
 } from './aggregate-sql';
@@ -45,6 +49,7 @@ import { dayBounds, type DayBounds } from './days';
 import {
   aggDemandDaily,
   aggDirtyDays,
+  aggModelObservedDaily,
   aggNetworkDaily,
   aggObservedDaily,
   aggOriginDaily,
@@ -77,7 +82,12 @@ function staleVersionMarks(
   database: CollectorDatabase,
   day: (value: ReturnType<typeof dayOf>) => { day: SQL.Aliased<string> },
 ): BatchItem[] {
-  return [aggSellerDaily, aggObservedDaily, aggOriginDaily].map((table) =>
+  return [
+    aggSellerDaily,
+    aggObservedDaily,
+    aggOriginDaily,
+    aggModelObservedDaily,
+  ].map((table) =>
     database
       .insert(aggDirtyDays)
       .select(
@@ -130,6 +140,19 @@ async function scan(database: CollectorDatabase, now: number) {
           .from(observations)
           .where(
             and(gte(observations.insertedAt, since), isNotNull(observationDay)),
+          ),
+      )
+      .onConflictDoNothing(),
+    // Per-model observations fall on their receipt's day, which may differ from the event's own.
+    database
+      .insert(aggDirtyDays)
+      .select(
+        database
+          .selectDistinct(day(receiptDay))
+          .from(observations)
+          .innerJoin(receipts, receiptOfObservation)
+          .where(
+            and(gte(observations.insertedAt, since), isNotNull(receiptDay)),
           ),
       )
       .onConflictDoNothing(),
@@ -294,6 +317,7 @@ export function dayBatch(
     ...sellerRollups(database, bounds, now),
     ...networkRollup(database, bounds, now),
     ...observationRollups(database, bounds, now),
+    ...modelObservedRollup(database, bounds, now),
     ...firstSeenUpserts(database, bounds),
     ...breakdownRollups(database, bounds, now),
   ];

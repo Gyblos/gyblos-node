@@ -7,7 +7,7 @@ import test from 'node:test';
 
 import { delta } from '@gyblos/explorer/board-delta';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
-import { usdcDecimal } from '@gyblos/explorer/format';
+import { tokensPerSecond, usdcDecimal } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { parseRange, rangeQuery } from '@gyblos/explorer/range';
@@ -170,4 +170,11 @@ void test('an animated USDC amount is the exact decimal of its atomic units', ()
   assert.equal(usdcDecimal(1_500_000n), '1.5');
   assert.equal(usdcDecimal(123_456_789_012_345_678n), '123456789012.345678');
   assert.equal(usdcDecimal(-70n), '-0.00007');
+});
+
+void test('engine speed reads as the lower bound of its bucket, the first bucket as below it, none as no data', () => {
+  assert.equal(tokensPerSecond(20), '≥ 20 tok/s');
+  assert.equal(tokensPerSecond(1000), '≥ 1,000 tok/s');
+  assert.equal(tokensPerSecond(0), '< 1 tok/s');
+  assert.equal(tokensPerSecond(null), '—');
 });

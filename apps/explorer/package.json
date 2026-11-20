@@ -10,6 +10,7 @@
     "./format": "./lib/format.ts",
     "./latency": "./lib/latency.ts",
     "./model-family": "./lib/model-family.ts",
+    "./model-table": "./lib/model-table.ts",
     "./network-status": "./lib/network-status.ts",
     "./offers": "./lib/offers.ts",
     "./range": "./lib/range.ts",

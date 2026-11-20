@@ -12,7 +12,6 @@ import {
 
 import {
   getCollector,
-  type ModelStat,
   type NetworkDay,
   type NetworkSide,
 } from '../lib/collector';
@@ -34,14 +33,7 @@ import { Flow, FlowPair } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
-import {
-  ModelName,
-  numberCell,
-  SectionTitle,
-  Table,
-  td,
-  Unavailable,
-} from './ui';
+import { numberCell, SectionTitle, Table, td, Unavailable } from './ui';
 
 const buyersText = (side: NetworkSide | null) =>
   !side
@@ -141,6 +133,7 @@ export async function UsageSection({ days }: { days: RangeDays }) {
               kind="percent"
             />
           }
+          caption="Cancellations are not counted as failures"
         />
         <StatCard
           icon={Hash}
@@ -156,7 +149,7 @@ export async function UsageSection({ days }: { days: RangeDays }) {
         />
         <StatCard
           icon={Timer}
-          label="First token p50 free · paid"
+          label="Seller first token p50 free · paid"
           value={pair(free.firstToken, paid.firstToken, latencyText)}
         />
         <StatCard
@@ -175,7 +168,6 @@ export async function UsageSection({ days }: { days: RangeDays }) {
       </div>
       <RequestCharts days={snapshot.days} change={change?.requests ?? null} />
       <DailyTable days={usage.active} />
-      <ModelsTable models={snapshot.models} />
       <DemandTable demand={usage.demand} />
     </>
   );
@@ -226,7 +218,7 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
         minWidth={DISPLAY.dailyTable}
         head={[
           { label: 'Day (UTC)' },
-          ...figureHead('First token'),
+          ...figureHead('Seller first token'),
           { label: 'Buyers free · paid', right: true },
           { label: 'Relay', right: true },
         ]}
@@ -243,47 +235,6 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
               {buyersText(day.free)} · {buyersText(day.paid)}
             </td>
             <td className={numberCell}>{relayText(day)}</td>
-          </tr>
-        ))}
-      </Table>
-    </>
-  );
-}
-
-function ModelsTable({ models }: { models: ModelStat[] }) {
-  return (
-    <>
-      <SectionTitle title="Models served" />
-      <Table
-        minWidth={DISPLAY.dailyTable}
-        head={[
-          { label: 'Model' },
-          ...figureHead('Total'),
-          { label: 'Sellers free · paid', right: true },
-        ]}
-      >
-        {models.map((model) => (
-          <tr
-            key={`${model.modelId}:${model.variant}:${model.quantization}`}
-            className="border-t border-line"
-          >
-            <td className={td}>
-              <ModelName
-                modelId={model.modelId}
-                variant={model.variant}
-                quantization={model.quantization}
-              />
-            </td>
-            <FigureCells
-              free={sideFigures([model.free])}
-              paid={sideFigures([model.paid])}
-              latency="total"
-            />
-            <td className={numberCell}>
-              {pair(model.free?.sellers, model.paid?.sellers, (value) =>
-                value === undefined ? '—' : count(value),
-              )}
-            </td>
           </tr>
         ))}
       </Table>
