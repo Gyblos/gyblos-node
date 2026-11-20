@@ -26,7 +26,7 @@ import { batchLoopback } from './support/batch-loopback';
 import { multisellerLoopback } from './support/multiseller-session';
 
 void test('desktop releases the reservation on an incompatible seller preparation refusal before opening', async (t) => {
-  const fixture = await multisellerLoopback('1000');
+  const fixture = await multisellerLoopback('10000');
   t.after(() => fixture.close());
   const methods: string[] = [];
   const wire = await batchLoopback(

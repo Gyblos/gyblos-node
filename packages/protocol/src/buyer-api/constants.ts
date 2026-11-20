@@ -19,9 +19,20 @@ export const BUYER_API = {
 export const BUYER_SIDECAR = {
   READY: 'buyer-ready',
   ERROR: 'buyer-error',
+  DEPOSIT_MINIMUM: 'BUYER_SESSION_DEPOSIT_BELOW_MINIMUM',
   SESSION_REQUIRED: 'PAID_SELECTION_REQUIRES_SESSION',
   STOP: 'buyer-stop',
 } as const;
+
+export function isBuyerSessionConfigFailure(
+  kind: unknown,
+): kind is
+  typeof BUYER_SIDECAR.SESSION_REQUIRED | typeof BUYER_SIDECAR.DEPOSIT_MINIMUM {
+  return (
+    kind === BUYER_SIDECAR.SESSION_REQUIRED ||
+    kind === BUYER_SIDECAR.DEPOSIT_MINIMUM
+  );
+}
 
 // Delegated credentials are distinct from the buyer's private operator credential.
 export const BUYER_API_KEYS = {

@@ -7,6 +7,7 @@ import type {
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
+import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import {
   BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
@@ -60,9 +61,10 @@ export async function executeApiKeySession<T>(
   try {
     return await execute();
   } catch (error) {
-    // Only the pool's durable resolution of an unsent intent authorizes release.
+    // Only locally proven unsent requests release their matching reservation.
     if (
       (error instanceof UnsentSellerBusyError ||
+        error instanceof UnsentChannelLimitError ||
         error instanceof UnsentChannelPeerError) &&
       error.nodeId === nodeId &&
       operation?.reserved()

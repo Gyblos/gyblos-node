@@ -15,7 +15,7 @@ import { batchOfferFixture } from './support/batch-iroh-offer';
 import { sessionRig } from './support/batch-session';
 
 void test('seller startup prepares statelessly, then keeps one proven financial session after OPEN', async (t) => {
-  const rig = await sessionRig();
+  const rig = await sessionRig({ depositAtomic: '10000' });
   t.after(rig.dispose);
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   let creates = 0;
@@ -44,6 +44,23 @@ void test('seller startup prepares statelessly, then keeps one proven financial 
     params: { quote, terms: rig.terms },
   });
   const signal = new AbortController().signal;
+  for (const method of [BATCH_METHODS.PREPARE, BATCH_METHODS.OPEN]) {
+    const terms = { ...rig.terms, depositAtomic: '9999' };
+    const params =
+      method === BATCH_METHODS.OPEN
+        ? { quote, terms, payload: '{}' }
+        : { quote, terms };
+    const belowMinimum = parseBatchChannelRequest({
+      ...request,
+      method,
+      params,
+    });
+    await assert.rejects(
+      host.service.exchange(belowMinimum, terms.buyerNodeId, signal),
+      { code: SESSION_CODES.LIMIT },
+    );
+    assert.equal(creates, 0);
+  }
   assert.deepEqual(
     await host.service.exchange(request, rig.terms.buyerNodeId, signal),
     { terms: rig.terms },
@@ -73,7 +90,7 @@ void test('seller startup prepares statelessly, then keeps one proven financial 
 
 for (const expires of ['quote', 'session'] as const) {
   void test(`unassigned seller preparation rejects ${expires} expiry during crypto without allocating a session`, async (t) => {
-    const rig = await sessionRig();
+    const rig = await sessionRig({ depositAtomic: '10000' });
     t.after(rig.dispose);
     const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
     let creates = 0;
@@ -164,7 +181,11 @@ void test('an expired unsubmitted seller preparation permits fresh terms but del
     },
   });
   t.after(host.close);
-  const terms = { ...rig.terms, expiresAt: rig.now() + 3_600_000 };
+  const terms = {
+    ...rig.terms,
+    depositAtomic: '10000',
+    expiresAt: rig.now() + 3_600_000,
+  };
   const quote = await offers.quote(50);
   const request = (
     method: typeof BATCH_METHODS.PREPARE | typeof BATCH_METHODS.OPEN,

@@ -46,7 +46,7 @@ void test('pooled insufficient reserve does not close, renew or execute an unacc
   await host.execute(await offers.quote(1), offers.input, signal);
   await assert.rejects(
     host.execute(
-      await offers.quote(2, { maxAtomic: '980' }),
+      await offers.quote(2, { maxAtomic: '9980' }),
       offers.input,
       signal,
     ),

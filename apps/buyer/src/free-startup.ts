@@ -103,9 +103,10 @@ async function selectionConfig() {
   } catch (error) {
     if (
       error instanceof BuyerSelectionError &&
-      error.code === BUYER_SELECTION_CODES.SESSION_REQUIRED
+      (error.code === BUYER_SELECTION_CODES.SESSION_REQUIRED ||
+        error.code === BUYER_SELECTION_CODES.DEPOSIT_MINIMUM)
     )
-      return refuse(FREE_BUYER_STARTUP.SESSION_REQUIRED);
+      return refuse(error.code);
     return refuse(FREE_BUYER_STARTUP.SELECTION_INVALID);
   }
 }

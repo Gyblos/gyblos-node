@@ -9,6 +9,7 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 import {
+  PaymentSessionError,
   SESSION_CODES,
   sessionFail,
   type PaymentSessionTerms,
@@ -94,6 +95,27 @@ export function sessionTerms(
     withdrawDelaySeconds: policy.withdrawDelaySeconds,
   };
   return matchBatchTerms(terms, terms);
+}
+
+export class UnsentChannelLimitError extends PaymentSessionError {
+  constructor(readonly nodeId: string) {
+    super(SESSION_CODES.LIMIT);
+  }
+}
+
+// Existing journals retain their original terms; only fresh generations require a minimum deposit.
+export function newSessionTerms(
+  quote: SignedOfferV2,
+  policy: BuyerSessionPolicy,
+  now: number,
+) {
+  const available = BigInt(policy.depositAtomic);
+  if (
+    available < BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic) ||
+    available < BigInt(quote.offer.maxAtomic)
+  )
+    throw new UnsentChannelLimitError(quote.offer.nodeId);
+  return sessionTerms(quote, policy, now);
 }
 
 function positiveTotal(value: unknown) {

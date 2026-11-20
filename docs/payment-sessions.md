@@ -60,8 +60,9 @@ one-hour lifetime. The initial request ceiling remains zero. For an existing
 profile with a positive request ceiling, add the following `session` object to
 `buyer/selection.json`, alongside `request` and `sellers`. Keep the existing
 price limits and private journals. Startup refuses paid settings until this
-field is present. An older profile with a zero ceiling can still serve free
-requests.
+field is present. When configuring a session, set `depositAtomic` to at least
+10,000 atomic units (0.01 USDC). The buyer checks this at startup. An older
+profile with a zero ceiling can still serve free requests.
 
 ```json
 {
@@ -73,12 +74,12 @@ requests.
 }
 ```
 
-| Field                  | Meaning                                                  | Allowed values                       |
-| ---------------------- | -------------------------------------------------------- | ------------------------------------ |
-| `depositAtomic`        | Deposit for each seller channel, in atomic units         | Positive, at most `1000000` (1 USDC) |
-| `totalDepositAtomic`   | Optional authority shared by several sellers             | Positive atomic decimal string       |
-| `lifetimeMs`           | How long the seller serves the session                   | 5 minutes to 24 hours                |
-| `withdrawDelaySeconds` | Grace for the seller to claim after a buyer-forced close | 900 to 3600; 900 when omitted        |
+| Field                  | Meaning                                                  | Allowed values                                      |
+| ---------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| `depositAtomic`        | Deposit for each seller channel, in atomic units         | New channels: `10000` to `1000000` (0.01 to 1 USDC) |
+| `totalDepositAtomic`   | Optional authority shared by several sellers             | Positive atomic decimal string                      |
+| `lifetimeMs`           | How long the seller serves the session                   | 5 minutes to 24 hours                               |
+| `withdrawDelaySeconds` | Grace for the seller to claim after a buyer-forced close | 900 to 3600; 900 when omitted                       |
 
 `request.maxAtomic` still limits each question, and a question can't exceed the
 session's remaining unreserved funds. The protocol fee and treasury always come
@@ -116,10 +117,11 @@ even when a session policy is present.
 ### Renewal and spending authority
 
 With one seller, the buyer can open a replacement channel when the old one is
-closed, expired or can't reserve the next quote. It first verifies the new
-quote, closes the old channel if needed and proves its final charge and refund.
-Missing or uncertain proof blocks renewal. Renewal never replays a failed
-inference or changes the seller or payment roles.
+closed, expired or can't reserve the next quote. It first verifies the new quote
+and checks that the remaining authority can fund the minimum deposit before
+closing the old channel. It then verifies the final charge and refund. Missing
+or uncertain proof blocks renewal. Renewal never replays a failed inference or
+changes the seller or payment roles.
 
 `depositAtomic` is the total spending authority across renewals: earlier actual
 charges plus the next deposit can't exceed it, so a replacement deposit shrinks

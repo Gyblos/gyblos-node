@@ -32,8 +32,8 @@ import { UnsentSellerBusyError } from './buyer-routing';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
+  newSessionTerms,
   parseBuyerSessionPolicy,
-  sessionTerms,
   type BuyerSessionPolicy,
 } from './session-policy';
 
@@ -76,7 +76,7 @@ async function openCurrent<Remote extends BatchDestination>(
   if (stored?.notCreated) return sessionFail(SESSION_CODES.CLOSED);
   const terms =
     stored?.terms ??
-    (quote ? sessionTerms(quote, options.policy, options.now()) : undefined);
+    (quote ? newSessionTerms(quote, options.policy, options.now()) : undefined);
   if (!terms) return sessionFail(SESSION_CODES.UNAVAILABLE);
   if (quote && !stored)
     await verifyBatchQuote(
@@ -204,7 +204,7 @@ async function renewable<Remote extends BatchDestination>(
         BigInt(opened.terms.depositAtomic))
   )
     return opened;
-  const proposed = sessionTerms(quote, options.policy, options.now());
+  const proposed = newSessionTerms(quote, options.policy, options.now());
   await verifyBatchQuote(
     quote,
     proposed,
@@ -213,20 +213,25 @@ async function renewable<Remote extends BatchDestination>(
   );
   const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
+  const authority =
+    BigInt(options.policy.depositAtomic) -
+    BigInt(stored.priorSpentAtomic ?? '0');
+  const replacement = (spent: string) =>
+    newSessionTerms(
+      quote,
+      {
+        ...options.policy,
+        depositAtomic: String(authority - BigInt(spent)),
+      },
+      options.now(),
+    );
+  if (snapshot.state !== SESSION_STATES.CLOSED)
+    replacement(snapshot.cumulativeAtomic);
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
       (await opened.host.close(signal)))
     : undefined;
-  const remaining =
-    BigInt(options.policy.depositAtomic) -
-    BigInt(stored.priorSpentAtomic ?? '0') -
-    BigInt(settlement?.chargedAtomic ?? '0');
-  if (remaining <= 0n) return sessionFail(SESSION_CODES.LIMIT);
-  const terms = sessionTerms(
-    quote,
-    { ...options.policy, depositAtomic: String(remaining) },
-    options.now(),
-  );
+  const terms = replacement(settlement?.chargedAtomic ?? '0');
   await verifyBatchQuote(
     quote,
     terms,
