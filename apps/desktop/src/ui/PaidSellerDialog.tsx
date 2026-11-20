@@ -2,6 +2,7 @@
 import { useState } from 'react';
 
 import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
+import { MILLISECONDS_PER_MINUTE } from '@gyblos/config/constants';
 import { atomicToUsdc, usdcToAtomic } from '@gyblos/node/node-config-price';
 
 import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
@@ -13,17 +14,11 @@ import type { CatalogModel } from './model-types';
 import { Button } from './UI';
 import type { X402View } from './useX402';
 
-export function PaidSellerDialog({
-  model,
-  buyer,
-  close,
-  confirm,
-}: {
-  model: CatalogModel;
-  buyer: X402View;
-  close(): void;
-  confirm(policyId: string): void;
-}) {
+function useSellerConfirmation(
+  model: CatalogModel,
+  buyer: X402View,
+  confirm: (id: string) => void,
+) {
   const { policy } = buyer.state;
   const [maximum, setMaximum] = useState(() =>
     policy && policy.maxAtomic !== '0'
@@ -32,10 +27,6 @@ export function PaidSellerDialog({
   );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const deposit =
-    policy?.depositAtomic ?? BUYER_SESSION_DEFAULT_POLICY.depositAtomic;
-  const minutes =
-    (policy?.lifetimeMs ?? BUYER_SESSION_DEFAULT_POLICY.lifetimeMs) / 60000;
   async function select() {
     let maxAtomic: string;
     try {
@@ -74,6 +65,27 @@ export function PaidSellerDialog({
       setSaving(false);
     }
   }
+  return { maximum, setMaximum, error, setError, saving, select };
+}
+export function PaidSellerDialog({
+  model,
+  buyer,
+  close,
+  confirm,
+}: {
+  model: CatalogModel;
+  buyer: X402View;
+  close(): void;
+  confirm(policyId: string): void;
+}) {
+  const { maximum, setMaximum, error, setError, saving, select } =
+    useSellerConfirmation(model, buyer, confirm);
+  const { policy } = buyer.state;
+  const deposit =
+    policy?.depositAtomic ?? BUYER_SESSION_DEFAULT_POLICY.depositAtomic;
+  const minutes =
+    (policy?.lifetimeMs ?? BUYER_SESSION_DEFAULT_POLICY.lifetimeMs) /
+    MILLISECONDS_PER_MINUTE;
   return (
     <Modal
       title="Confirm seller"
