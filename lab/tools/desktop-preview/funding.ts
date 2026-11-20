@@ -3,7 +3,7 @@ import { DEVNET } from '@gyblos/config/network';
 export function previewFunding(query: URLSearchParams, payer: string) {
   return {
     balance: async () =>
-      query.get('network') && query.get('network') !== DEVNET
+      query.get('network') && query.get('network') !== 'devnet'
         ? null
         : {
             network: DEVNET,
