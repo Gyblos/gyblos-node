@@ -106,6 +106,7 @@ export function Activity({
       {available && <HistorySummary entries={visible} method={method} />}
       <ActivityResults
         activity={activity}
+        hasX402Records={Boolean(x402?.state.summary.records.length)}
         available={available}
         entries={entries}
         visible={visible}
@@ -140,6 +141,7 @@ export function Activity({
 
 function ActivityResults({
   activity,
+  hasX402Records,
   available,
   entries,
   visible,
@@ -154,6 +156,7 @@ function ActivityResults({
   onPayments,
 }: {
   activity: ActivityView;
+  hasX402Records: boolean;
   available: boolean;
   entries: ActivityEntry[];
   visible: ActivityEntry[];
@@ -168,6 +171,7 @@ function ActivityResults({
   onPayments(): void;
 }) {
   if (!available) return <ActivityUnavailable activity={activity} />;
+  if (!entries.length && hasX402Records) return null;
   return visible.length ? (
     <>
       <ActivitySessions
