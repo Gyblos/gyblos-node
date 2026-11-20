@@ -1,7 +1,6 @@
 // Main-process-only connection to an explicitly configured, authenticated loopback buyer.
 // It never retries a transmitted request or treats a seller's unverified claim as a payment.
 import { LOCALHOST, ROUTES } from '@gyblos/config';
-import { DEVNET_USDC } from '@gyblos/config/network';
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
 import {
@@ -17,18 +16,19 @@ import {
 
 import { requestAgentEndpoint } from './agent-endpoint';
 import { desktopBuyerFailure } from './buyer-error';
-import { RESPONSE_COST_KIND, RESPONSE_COST_UNIT } from './constants';
-import { observedResponse } from './response-metrics';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
   DESKTOP_X402,
   PaidSellerLimitError,
   paidSellerLimitNotice,
-  x402Amount,
   x402Policy,
 } from './x402-model';
-import { buyerResponseObject as object, parseBuyerReply } from './x402-reply';
+import {
+  buyerReplyMetrics,
+  buyerResponseObject as object,
+  parseBuyerReply,
+} from './x402-reply';
 import { readBuyerStream } from './x402-stream';
 
 export type DesktopSellerChoice =
@@ -384,20 +384,7 @@ export class X402Client {
         ? await this.budget.recordFree(id, policy)
         : await this.budget.complete(id, reply, choice?.modelId);
     signal.throwIfAborted();
-    const metrics = observedResponse(
-      responseMs,
-      {
-        amount: x402Amount(reply.chargeAtomic, policy),
-        unit:
-          policy.mint === DEVNET_USDC
-            ? RESPONSE_COST_UNIT.USDC
-            : RESPONSE_COST_UNIT.ATOMIC,
-        kind: reply.sessionApproval
-          ? RESPONSE_COST_KIND.RECORDED
-          : RESPONSE_COST_KIND.SETTLED,
-      },
-      reply.usage,
-    );
+    const metrics = buyerReplyMetrics(reply, policy, responseMs);
     return { text: reply.text, model: policy.model, summary, metrics };
   }
   async close() {
