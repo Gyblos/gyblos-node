@@ -1,10 +1,11 @@
 // Owns the explorer's view of the discovery index: models offered now, sellers online and their uptime,
 // and the network status of every registered seller, checked at the boundary.
-// The index is read in one place: the Worker's scheduled run (worker.ts) calls refreshDiscovery, which
-// reads within DISCOVERY.maxRequestsPerRun requests and stores the result in KV; every render turns that
+// The index is read in one place: the Worker's scheduled run (scheduled.ts) calls refreshDiscovery, which
+// sends at most DISCOVERY.maxRequestsPerRun requests and stores the result in KV; every render turns that
 // stored read into a snapshot (loadSnapshot), so the index's load does not grow with viewers. A run reads
-// /models and /network, then the seller lists of the models least recently read, then the uptimes most
-// in need of a read; what does not fit waits for the next run, and the snapshot says what is missing.
+// /models and /network, then the seller lists least recently read, then the uptimes most in need of a
+// read (with a share of the run kept for them); what does not fit or fails keeps its last read and waits
+// for the next run, and the snapshot says what is unknown rather than showing it as absent.
 
 import { DISCOVERY_URL } from './config';
 import { DISCOVERY } from './constants';
@@ -32,11 +33,11 @@ export interface Seller {
 export interface DiscoverySnapshot {
   generatedAt: number;
   sellers: Seller[];
-  // Null when the index does not answer /network (an older index): only online sellers are known.
+  // Null without a recent network status (an older index, or /network not answering).
   network: NetworkStatus | null;
-  // Models listed by the index whose sellers have not been read yet: what they are offered at is unknown.
+  // Models listed by the index whose sellers are unknown now: what they are offered at is unknown.
   unreadModels: string[];
-  // Set when the last read is older than DISCOVERY.staleAfterMs (the index is not answering): when it ended.
+  // Set when the last read is older than DISCOVERY.staleAfterMs: when it ended.
   staleFrom: number | null;
   error: string | null;
 }
@@ -47,7 +48,7 @@ export interface StoredDiscovery {
   readAt: number;
   generatedAt: number;
   modelIds: string[];
-  network: NetworkStatus | null;
+  network: { readAt: number; status: NetworkStatus } | null;
   lists: Record<string, { readAt: number; sellers: Listed[] } | undefined>;
   uptimes: Record<string, { readAt: number; uptime: Uptime } | undefined>;
 }
@@ -56,8 +57,19 @@ export interface DiscoveryKv {
   get(key: string): Promise<string | null>;
   put(key: string, value: string): Promise<void>;
 }
-// Versioned: after a deploy that changes StoredDiscovery, renders show nothing until the first run.
+// Bump the version whenever StoredDiscovery changes: renders then show nothing until the next run.
 export const STORED_KEY = 'discovery/v1';
+
+export const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : 'discovery unavailable';
+export const unavailable = (error: string): DiscoverySnapshot => ({
+  generatedAt: 0,
+  sellers: [],
+  network: null,
+  unreadModels: [],
+  staleFrom: null,
+  error,
+});
 
 const readJson = (path: string) =>
   fetchJson(`${DISCOVERY_URL}${path}`, `discovery ${path}`);
@@ -104,18 +116,17 @@ class Budget {
   }
 }
 
-// Every seller of one model, page by page; null when the run's budget ends first (the model waits for
-// the next run and keeps its last list).
+// Every seller of one model, page by page; null when fewer than `keep` requests would be left for the
+// next page (the model keeps its last list). Throws when a page fails or is malformed.
 async function sellersOf(
   budget: Budget,
   modelId: string,
+  keep: number,
 ): Promise<Listed[] | null> {
   const sellers: Listed[] = [];
   let cursor: string | null = null;
-  for (let pages = 0; ; pages += 1) {
-    if (pages === DISCOVERY.maxSellerPages)
-      throw new Error(`discovery /sellers: more than ${pages} pages`);
-    if (budget.left <= 0) return null;
+  for (;;) {
+    if (budget.left <= keep) return null;
     const query = new URLSearchParams({
       model: modelId,
       limit: String(DISCOVERY.sellersPerPage),
@@ -136,22 +147,44 @@ async function sellersOf(
   }
 }
 
-// The sellers online now: every read list of a listed model, once per node; with a complete network
-// status, only the nodes it calls online (a list read in an earlier run may hold one gone since).
-function onlineSellers(stored: StoredDiscovery): Listed[] {
+const recent = (readAt: number, now: number) =>
+  now - readAt <= DISCOVERY.staleAfterMs;
+
+// The network status still recent at `now`, or null.
+function recentNetwork(stored: StoredDiscovery, now: number) {
+  return stored.network && recent(stored.network.readAt, now)
+    ? stored.network.status
+    : null;
+}
+
+// A model's sellers are known when its list was read and either the list is recent or a recent, complete
+// network status tells which of its sellers are still online.
+function listKnown(stored: StoredDiscovery, modelId: string, now: number) {
+  const listed = stored.lists[modelId];
+  if (!listed) return false;
+  const network = recentNetwork(stored, now);
+  return (network !== null && !network.truncated) || recent(listed.readAt, now);
+}
+
+// The sellers online now: the known lists of the listed models, once per node; with a recent, complete
+// network status, only the nodes it calls online (a list read in an earlier run may hold one gone since).
+function onlineSellers(stored: StoredDiscovery, now: number): Listed[] {
+  const network = recentNetwork(stored, now);
   const online =
-    stored.network && !stored.network.truncated
+    network && !network.truncated
       ? new Set(
-          stored.network.nodes
+          network.nodes
             .filter((node) => node.state === 'online')
             .map((node) => node.nodeId),
         )
       : null;
   const byNode = new Map<string, Listed>();
-  for (const modelId of stored.modelIds)
+  for (const modelId of stored.modelIds) {
+    if (!listKnown(stored, modelId, now)) continue;
     for (const seller of stored.lists[modelId]?.sellers ?? [])
       if (!byNode.has(seller.nodeId) && (!online || online.has(seller.nodeId)))
         byNode.set(seller.nodeId, seller);
+  }
   return [...byNode.values()];
 }
 
@@ -161,8 +194,36 @@ const oldestFirst =
   (left: string, right: string) =>
     (readAt(left) ?? -1) - (readAt(right) ?? -1);
 
+// The online sellers whose uptime is due, never read first, then the oldest.
+function dueUptimes(stored: StoredDiscovery, now: number) {
+  return onlineSellers(stored, now)
+    .map((seller) => seller.nodeId)
+    .filter((nodeId) => {
+      const last = stored.uptimes[nodeId];
+      return !last || now - last.readAt >= DISCOVERY.uptimeRefreshMs;
+    })
+    .sort(oldestFirst((key) => stored.uptimes[key]?.readAt));
+}
+
+// Runs `work` over `items`, at most `limit` at a time.
+async function inTurns<T>(
+  items: T[],
+  limit: number,
+  work: (item: T) => Promise<void>,
+) {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const item = items[next];
+      next += 1;
+      if (item !== undefined) await work(item);
+    }
+  };
+  await Promise.all(Array.from({ length: limit }, worker));
+}
+
 // One run: reads what fits in the budget over the previous stored read and returns the new one. Throws
-// when /models or a seller list fails or is malformed: nothing is stored, and the snapshot ages into old.
+// only when /models fails or is malformed: nothing is stored, and the snapshot ages into old.
 export async function readIndex(
   previous: StoredDiscovery | null,
   now: () => number,
@@ -172,40 +233,49 @@ export async function readIndex(
   const modelIds = list(listed.models, 'models.models').map((entry) =>
     text(record(entry, 'models.model').id, 'model.id'),
   );
-  const network = await budget
+  const status = await budget
     .read('/network')
-    .then(parseNetworkStatus, () => null);
-
-  const lists: StoredDiscovery['lists'] = {};
-  for (const modelId of modelIds) lists[modelId] = previous?.lists[modelId];
-  for (const modelId of [...modelIds].sort(
-    oldestFirst((key) => lists[key]?.readAt),
-  )) {
-    if (budget.left <= 0) break;
-    const sellers = await sellersOf(budget, modelId);
-    if (sellers) lists[modelId] = { readAt: now(), sellers };
-  }
+    .then(parseNetworkStatus)
+    .catch(() => null);
 
   const stored: StoredDiscovery = {
     readAt: 0,
     generatedAt: num(listed.generatedAt, 'models.generatedAt'),
     modelIds,
-    network,
-    lists,
+    network: status ? { readAt: now(), status } : (previous?.network ?? null),
+    lists: {},
     uptimes: {},
   };
-  const nodeIds = onlineSellers(stored).map((seller) => seller.nodeId);
-  for (const nodeId of nodeIds)
-    stored.uptimes[nodeId] = previous?.uptimes[nodeId];
-  const due = nodeIds
-    .filter((nodeId) => {
-      const last = stored.uptimes[nodeId];
-      return !last || now() - last.readAt >= DISCOVERY.uptimeRefreshMs;
-    })
-    .sort(oldestFirst((key) => stored.uptimes[key]?.readAt))
-    .slice(0, Math.max(0, budget.left));
-  await Promise.all(
-    due.map(async (nodeId) => {
+  for (const modelId of modelIds)
+    stored.lists[modelId] = previous?.lists[modelId];
+  for (const [nodeId, read] of Object.entries(previous?.uptimes ?? {}))
+    stored.uptimes[nodeId] = read;
+
+  const keep = Math.min(
+    dueUptimes(stored, now()).length,
+    DISCOVERY.uptimeReservedPerRun,
+  );
+  for (const modelId of [...modelIds].sort(
+    oldestFirst((key) => stored.lists[key]?.readAt),
+  )) {
+    if (budget.left <= keep) break;
+    try {
+      const sellers = await sellersOf(budget, modelId, keep);
+      if (sellers) stored.lists[modelId] = { readAt: now(), sellers };
+    } catch {
+      // The model keeps its last list, if any, until a later run.
+    }
+  }
+
+  const online = new Set(
+    onlineSellers(stored, now()).map((seller) => seller.nodeId),
+  );
+  for (const nodeId of Object.keys(stored.uptimes))
+    if (!online.has(nodeId)) delete stored.uptimes[nodeId];
+  await inTurns(
+    dueUptimes(stored, now()).slice(0, budget.left),
+    DISCOVERY.uptimeConcurrency,
+    async (nodeId) => {
       try {
         const read = uptime(
           await budget.read(`/uptime?node=${encodeURIComponent(nodeId)}`),
@@ -214,16 +284,29 @@ export async function readIndex(
       } catch {
         // The last uptime read, if any, stays until a later run.
       }
-    }),
+    },
   );
   stored.readAt = now();
   return stored;
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+// The stored read, or null when there is none or it is not the shape this version writes.
 function parseStored(raw: string | null): StoredDiscovery | null {
   if (raw === null) return null;
   try {
-    return JSON.parse(raw) as StoredDiscovery;
+    const value: unknown = JSON.parse(raw);
+    return isObject(value) &&
+      typeof value.readAt === 'number' &&
+      typeof value.generatedAt === 'number' &&
+      Array.isArray(value.modelIds) &&
+      (value.network === null || isObject(value.network)) &&
+      isObject(value.lists) &&
+      isObject(value.uptimes)
+      ? (value as unknown as StoredDiscovery)
+      : null;
   } catch {
     return null;
   }
@@ -235,15 +318,6 @@ export async function refreshDiscovery(kv: DiscoveryKv, now: () => number) {
   await kv.put(STORED_KEY, JSON.stringify(await readIndex(previous, now)));
 }
 
-const unavailable = (error: string): DiscoverySnapshot => ({
-  generatedAt: 0,
-  sellers: [],
-  network: null,
-  unreadModels: [],
-  staleFrom: null,
-  error,
-});
-
 // What a render shows from a stored read.
 export function snapshotOf(
   stored: StoredDiscovery | null,
@@ -252,35 +326,40 @@ export function snapshotOf(
   if (!stored) return unavailable('discovery not read yet');
   return {
     generatedAt: stored.generatedAt,
-    sellers: onlineSellers(stored).map((seller) => ({
+    sellers: onlineSellers(stored, now).map((seller) => ({
       ...seller,
       uptime: stored.uptimes[seller.nodeId]?.uptime ?? null,
     })),
-    network: stored.network,
-    unreadModels: stored.modelIds.filter((modelId) => !stored.lists[modelId]),
-    staleFrom:
-      now - stored.readAt > DISCOVERY.staleAfterMs ? stored.readAt : null,
+    network: recentNetwork(stored, now),
+    unreadModels: stored.modelIds.filter(
+      (modelId) => !listKnown(stored, modelId, now),
+    ),
+    staleFrom: recent(stored.readAt, now) ? null : stored.readAt,
     error: null,
   };
 }
 
-// A Worker instance's last KV read, reused for DISCOVERY.reuseMs. Only the settled value is kept: a
-// Worker cannot await another request's pending read.
-let reused: { at: number; stored: StoredDiscovery | null } | null = null;
+// A Worker instance's last read of a KV namespace, reused for DISCOVERY.reuseMs. Only the settled value is
+// kept: a Worker cannot await another request's pending read.
+let reused: {
+  kv: DiscoveryKv;
+  at: number;
+  stored: StoredDiscovery | null;
+} | null = null;
 
-// A render's read: the stored snapshot, from this instance's last KV read when it is recent enough.
+// A render's read: the stored snapshot, from this instance's last KV read when it is recent enough; when
+// KV fails, from that last read if there is one.
 export async function loadSnapshot(
   kv: DiscoveryKv,
   now: number,
 ): Promise<DiscoverySnapshot> {
-  if (!reused || now - reused.at >= DISCOVERY.reuseMs) {
-    try {
-      reused = { at: now, stored: parseStored(await kv.get(STORED_KEY)) };
-    } catch (error) {
-      return unavailable(
-        error instanceof Error ? error.message : 'discovery unavailable',
-      );
-    }
+  const last = reused?.kv === kv ? reused : null;
+  if (last && now >= last.at && now - last.at < DISCOVERY.reuseMs)
+    return snapshotOf(last.stored, now);
+  try {
+    reused = { kv, at: now, stored: parseStored(await kv.get(STORED_KEY)) };
+    return snapshotOf(reused.stored, now);
+  } catch (error) {
+    return last ? snapshotOf(last.stored, now) : unavailable(errorText(error));
   }
-  return snapshotOf(reused.stored, now);
 }

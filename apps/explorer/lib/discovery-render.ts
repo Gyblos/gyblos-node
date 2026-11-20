@@ -5,9 +5,11 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { cache } from 'react';
 
 import {
+  errorText,
   loadSnapshot,
   readIndex,
   snapshotOf,
+  unavailable,
   type DiscoveryKv,
   type DiscoverySnapshot,
 } from './discovery';
@@ -29,17 +31,11 @@ function binding(): DiscoveryKv | null {
 export const getDiscovery = cache(async (): Promise<DiscoverySnapshot> => {
   const kv = binding();
   if (kv) return loadSnapshot(kv, Date.now());
-  const unavailable = (error: string) => ({
-    ...snapshotOf(null, Date.now()),
-    error,
-  });
   if (process.env.NODE_ENV !== 'development')
     return unavailable('no DISCOVERY binding');
   try {
     return snapshotOf(await readIndex(null, Date.now), Date.now());
   } catch (error) {
-    return unavailable(
-      error instanceof Error ? error.message : 'discovery unavailable',
-    );
+    return unavailable(errorText(error));
   }
 });

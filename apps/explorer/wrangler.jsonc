@@ -13,7 +13,7 @@
   // The first deploy attaches explorer.gyblos.com (a gyblos.com zone record) to this Worker.
   "routes": [{ "pattern": "explorer.gyblos.com", "custom_domain": true }],
   // The discovery index is read every 2 minutes into this KV snapshot (lib/discovery.ts): 720 writes a
-  // day, within the KV free tier's 1000.
+  // day, within the KV free tier's 1000 a day for the whole account (this is its only namespace).
   "triggers": { "crons": ["*/2 * * * *"] },
   "kv_namespaces": [
     { "binding": "DISCOVERY", "id": "d6ac23a19e2e442386d67872433eb1a5" },

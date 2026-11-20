@@ -43,7 +43,7 @@ export async function NetworkSection() {
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
       {snapshot.staleFrom ? (
         <p className="-mt-2 mb-3 text-xs text-dim">
-          The discovery index is not answering: showing its answer from{' '}
+          The explorer last read the discovery index at{' '}
           {utc(snapshot.staleFrom)}.
         </p>
       ) : null}

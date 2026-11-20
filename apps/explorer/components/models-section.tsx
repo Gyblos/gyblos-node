@@ -103,13 +103,21 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
       </Table>
       {discovery.staleFrom ? (
         <p className="mt-1 text-xs text-dim">
-          The discovery index is not answering: what is offered is as of{' '}
-          {utc(discovery.staleFrom)}.
+          The explorer last read the discovery index at{' '}
+          {utc(discovery.staleFrom)}: what is offered is as of then.
+        </p>
+      ) : null}
+      {offersKnown && discovery.unreadModels.length ? (
+        <p className="mt-1 text-xs text-dim">
+          The sellers of {count(discovery.unreadModels.length)} listed models
+          are unknown now: what they are offered at is unknown, and those not
+          served in the range are not shown.
         </p>
       ) : null}
       {offersKnown ? null : (
         <p className="mt-1 text-xs text-dim">
-          The discovery index did not answer: what is offered now is unknown.
+          The explorer has no read of the discovery index: what is offered now
+          is unknown.
         </p>
       )}
       {collector.error ? (
