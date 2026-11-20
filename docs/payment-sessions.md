@@ -430,7 +430,7 @@ in [recovery.md](recovery.md#reusable-batch-recovery).
 Keep both peers on the same release, and never delete a journal or lock to
 downgrade.
 
-- Beta.12 removed per-request payment. A beta.11 seller accepts no channels
+- Beta.12 removed per-request payment. A beta.11 seller accepts no new channels
   unless a buyer allowlist is set, so a paid seller must update before beta.12
   buyers can pay it. Beta.12 neither settles a beta.11 seller's per-request
   claims nor withdraws a beta.11 buyer's per-request funds: settle or withdraw

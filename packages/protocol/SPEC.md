@@ -1106,7 +1106,8 @@ replaying the prompt. No detached post-cancellation approval is introduced.
 
 Independent Node/OpenSSL fixtures are batch-channel-v3.json,
 batch-prepare-v3.json, batch-startup-v3.json and batch-stream-v3.json. Existing
-per-request paid-stream/1 and free-stream contracts remain unchanged.
+free-stream contract remained unchanged; per-request paid-stream/1 is retired
+since.
 
 ### Session admission and inference quota
 
@@ -1187,8 +1188,9 @@ byte-identical and are tested independently along with explicit v1 rejection.
 ## Reusable single-seller session channel v1 (retired)
 
 Retired; see the [version matrix](#version-matrix). `gyblos/session/1` was a separate, opt-in Iroh ALPN. It is registered only by a host
-that supplies a matching session service. Existing control, free, paid-stream,
-receipt and reserved HTTP ALPNs, signed quote formats and vectors are unchanged.
+that supplies a matching session service. The control, free, receipt and
+reserved HTTP ALPNs, signed quote formats and vectors of that time were
+unchanged; paid-stream/1 is retired since.
 A quote's existing protocol field does not advertise this optional channel.
 The host independently pins both identities and financial session terms; the
 index and remote peer never choose those policies.
