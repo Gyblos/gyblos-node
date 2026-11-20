@@ -49,10 +49,10 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 
 ## Writing code
 
-- State your assumptions before coding. When a request has more than one reading, name them and ask instead of picking one silently; when a simpler approach exists, say so.
-- Write the least code that solves the request: no features, options, abstractions or error handling for cases nobody asked for or that cannot happen. If a reviewer would call it overcomplicated, simplify it.
-- Keep changes surgical: every changed line traces to the request. Match the surrounding style and do not reformat, rename or refactor neighboring code. Remove what your own change left unused; report other unused code and delete it in its own PR (see the next section).
-- Turn each task into a check that proves it is done, and give every step of a multi-step plan its own check.
+- State your assumptions before coding. When readings of a request lead to different behavior or scope, ask the founder or a maintainer; otherwise state your choice and continue. When a simpler approach exists, say so.
+- Write the least code that solves the request: no features, options or abstractions nobody asked for. Validation at trust boundaries, error handling for external input, diagnostics and security controls are always in scope (see Hard rules and Safety and privacy).
+- Keep changes surgical: every changed line traces to the request; match the surrounding style and do not reformat, rename or refactor neighboring code. A replacement removes the old path in the same PR (Hard rules: delete code no product path uses). Report, without fixing, unrelated unused code and any security or correctness defect you notice; fix one only when it blocks the request.
+- Define the check that proves a task is done before you start; for a behavior change that check is the failing test required under Tests.
 
 ## Hard rules
 
