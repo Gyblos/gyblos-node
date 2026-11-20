@@ -60,6 +60,7 @@ body {
   font-family: var(--font-instrument), system-ui, sans-serif;
 }
 
+/* Sticky first column and scroll divider; the opaque header mix prevents content showing through. */
 .explorer-table {
   background: var(--panel);
 }
@@ -109,11 +110,8 @@ body {
   }
 }
 
-@media (width < 48rem) {
-  .explorer-table tr > :first-child:not([colspan]) {
-    width: 1%;
-    max-width: 48vw;
-    overflow: hidden;
-    text-overflow: ellipsis;
+@media (width < theme(--breakpoint-md)) {
+  .explorer-table tr > :first-child:not([colspan]) > span {
+    max-width: calc(48vw - 2rem);
   }
 }
