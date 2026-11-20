@@ -15,6 +15,11 @@ import {
   type CatalogSellerChoice,
 } from './reader';
 
+interface PendingLookup {
+  query: string;
+  controller: AbortController;
+  result: Promise<NetworkCatalog>;
+}
 function expireListings(
   snapshot: NetworkCatalog,
   current: number,
@@ -59,11 +64,7 @@ export function createCatalogSession(
   let choices = new Map<string, CatalogSellerChoice>();
   let closed = signal.aborted;
   let sequence = 0;
-  let pending: {
-    query: string;
-    controller: AbortController;
-    result: Promise<NetworkCatalog>;
-  } | null = null;
+  let pending: PendingLookup | null = null;
   function summary() {
     snapshot = expireListings(snapshot, now());
     return parseNetworkCatalog(snapshot);
