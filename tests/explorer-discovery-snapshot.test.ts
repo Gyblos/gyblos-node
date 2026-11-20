@@ -33,13 +33,13 @@ void test('when the index stops answering, the run says so and the last catalog 
   ]);
 
   const before = await loadSnapshot(kv, 1000 + DISCOVERY.staleAfterMs);
-  assert.equal(before.readAt, null);
+  assert.equal(before.datedAt, null);
   for (let step = 1; step <= 5; step += 1) {
     const late = await loadSnapshot(
       kv,
       1000 + DISCOVERY.staleAfterMs + step * DISCOVERY.reuseMs,
     );
-    assert.equal(late.readAt, 1000);
+    assert.equal(late.datedAt, 1000);
     assert.equal(late.error, null);
     assert.deepEqual(
       late.sellers.map((seller) => seller.nodeId),
@@ -116,7 +116,7 @@ void test('a source that never answers is given up after the fetch timeout', asy
   clearTimeout(hold);
 });
 
-void test('the average 24 h uptime is over the sellers with an uptime read, and says how many', () => {
+void test('the average 24 h uptime is over the sellers with an uptime read, and counts them', () => {
   const seller = (nodeId: string, ratio: number | null) => ({
     nodeId,
     owner: 'o',
@@ -127,8 +127,8 @@ void test('the average 24 h uptime is over the sellers with an uptime read, and 
   const summary = summarizeOffers({
     generatedAt: 0,
     network: null,
-    readAt: null,
-    networkReadAt: null,
+    datedAt: null,
+    networkDatedAt: null,
     error: null,
     sellers: [seller('a', 1), seller('b', 0.5), seller('c', null)],
   });

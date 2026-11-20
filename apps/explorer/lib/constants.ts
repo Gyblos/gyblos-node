@@ -30,6 +30,8 @@ export const DISCOVERY = {
   uptimeConcurrency: 6,
   // A seller's uptime is tried again this long after its last try (its windows span days).
   uptimeRefreshMs: 10 * 60 * 1000,
+  // An uptime whose tries have failed for this long is no longer shown.
+  uptimeMaxAgeMs: 24 * 60 * 60 * 1000,
   // A catalog read under way this long (a model that keeps failing or never fits in a run) begins again.
   restartAfterMs: 60 * 60 * 1000,
   // When the catalog has not been read further for this long (two runs and a margin), the page says when

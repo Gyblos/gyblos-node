@@ -32,14 +32,15 @@ export interface DiscoverySnapshot {
   network: NetworkStatus | null;
   // When the shown catalog's read began, once the index's catalog has not been read further for
   // DISCOVERY.staleAfterMs (it is not answering); else null.
-  readAt: number | null;
+  datedAt: number | null;
   // When the shown network status was read, when it is older than the shown catalog (/network failed
   // since); else null.
-  networkReadAt: number | null;
+  networkDatedAt: number | null;
   error: string | null;
 }
 
-// One whole read of the index's catalog, from when it began.
+// One whole read of the index's catalog, from when it began (readAt), with when its network status was
+// read (networkReadAt: earlier when /network failed during the read).
 interface Catalog {
   readAt: number;
   generatedAt: number;
@@ -58,9 +59,10 @@ interface Pending {
   model: number;
   sellers: Record<string, Listed>;
 }
-// A seller's last uptime read: when it was tried, and the last uptime read (kept when a try fails).
+// A seller's uptime: when it was last tried, and the last uptime read with when (kept when a try fails).
 interface UptimeRead {
   triedAt: number;
+  readAt: number | null;
   uptime: Uptime | null;
 }
 // What a run stores in KV (DISCOVERY.storedKey, discovery-snapshot.ts).
@@ -84,8 +86,8 @@ export const unavailable = (error: string): DiscoverySnapshot => ({
   generatedAt: 0,
   sellers: [],
   network: null,
-  readAt: null,
-  networkReadAt: null,
+  datedAt: null,
+  networkDatedAt: null,
   error,
 });
 
@@ -235,15 +237,23 @@ async function tryUptimes(
     DISCOVERY.uptimeConcurrency,
     async (nodeId) => {
       if (run.left <= 0 || now() >= until) return;
-      const last = stored.uptimes[nodeId]?.uptime ?? null;
+      const last = stored.uptimes[nodeId];
       try {
         const fresh = uptime(
           await run.read(`/uptime?node=${encodeURIComponent(nodeId)}`),
         );
-        stored.uptimes[nodeId] = { triedAt: now(), uptime: fresh };
+        stored.uptimes[nodeId] = {
+          triedAt: now(),
+          readAt: now(),
+          uptime: fresh,
+        };
       } catch {
         run.problems.add('uptime');
-        stored.uptimes[nodeId] = { triedAt: now(), uptime: last };
+        stored.uptimes[nodeId] = {
+          triedAt: now(),
+          readAt: last?.readAt ?? null,
+          uptime: last?.uptime ?? null,
+        };
       }
     },
   );
@@ -252,9 +262,10 @@ async function tryUptimes(
 // One run over the previous stored read: first the uptimes most due, up to
 // DISCOVERY.uptimeReservedPerRun and within DISCOVERY.reservedUptimesMs; then the catalog read (begun
 // when none is under way, or again when the one under way began DISCOVERY.restartAfterMs ago), replacing
-// the shown catalog once whole; then more due uptimes with what is left. A read begun
-// DISCOVERY.restartAfterMs or more after the shown catalog's (one that never ended came before it) does
-// not date the shown catalog as current. Never throws: `problems` says what went wrong.
+// the shown catalog once whole; then more due uptimes with what is left. Progress dates the shown
+// catalog as current (progressAt) only while the read under way began less than
+// DISCOVERY.restartAfterMs after it: a later one follows a read that never ended. Never throws:
+// `problems` says what went wrong.
 export async function readIndex(
   previous: StoredDiscovery | null,
   now: () => number,

@@ -29,7 +29,7 @@ const manyModels = (n: number) =>
 const shownNodes = (stored: StoredDiscovery, now: number) =>
   snapshotOf(stored, now).sellers.map((seller) => seller.nodeId);
 
-void test('a run reads a small index whole, at the largest page size, and the render shows it', async () => {
+void test('a run reads a small index whole, at the largest page size, and its snapshot shows it', async () => {
   const { requests } = fakeIndex({ models: { a: ['n1', 'n2'], b: ['n2'] } });
   const { stored, problems } = await readIndex(null, () => 100);
   assert.deepEqual(problems, []);
@@ -43,7 +43,7 @@ void test('a run reads a small index whole, at the largest page size, and the re
   );
   const snapshot = snapshotOf(stored, 100);
   assert.equal(snapshot.error, null);
-  assert.equal(snapshot.readAt, null);
+  assert.equal(snapshot.datedAt, null);
   assert.deepEqual(shownNodes(stored, 100), ['n1', 'n2']);
   assert.ok(snapshot.sellers.every((seller) => seller.uptime));
   assert.ok(snapshot.network);
@@ -157,7 +157,7 @@ void test('a catalog read that never ends begins again, says so, and the last wh
   assert.equal(count(requests, '/models'), 1);
   assert.equal(stored.pending?.startedAt, later);
   assert.deepEqual(shownNodes(stored, later), ['n1']);
-  assert.equal(snapshotOf(stored, later).readAt, 0);
+  assert.equal(snapshotOf(stored, later).datedAt, 0);
 });
 
 void test('a malformed seller entry is skipped and reported; the rest of its page is read', async () => {
@@ -231,13 +231,13 @@ void test('a catalog read over several runs is not dated while it advances, and 
     now += 2 * MINUTE;
     fakeIndex({ models });
     ({ stored } = await readIndex(stored, () => now));
-    assert.equal(snapshotOf(stored, now).readAt, null);
+    assert.equal(snapshotOf(stored, now).datedAt, null);
   }
   assert.ok(stored.pending);
   fakeIndex({ models, down: true });
   ({ stored } = await readIndex(stored, () => now + 2 * MINUTE));
   const late = now + DISCOVERY.staleAfterMs + MINUTE;
-  assert.equal(snapshotOf(stored, late).readAt, stored.catalog?.readAt);
+  assert.equal(snapshotOf(stored, late).datedAt, stored.catalog?.readAt);
 });
 
 void test('uptimes are tried in turns, never-tried first, a few at a time, and again only once old', async () => {
@@ -295,20 +295,30 @@ void test('a failed uptime keeps the last one and waits its turn; an uptime goes
   assert.equal(stored.uptimes.n2, undefined);
 });
 
+void test('an uptime whose tries keep failing is no longer shown once a day old', async () => {
+  fakeIndex({ models: { a: ['n1'] } });
+  let { stored } = await readIndex(null, () => 0);
+  fakeIndex({ models: { a: ['n1'] }, failUptime: new Set(['n1']) });
+  ({ stored } = await readIndex(stored, () => DISCOVERY.uptimeMaxAgeMs));
+  assert.ok(snapshotOf(stored, DISCOVERY.uptimeMaxAgeMs).sellers[0]?.uptime);
+  const after = DISCOVERY.uptimeMaxAgeMs + 1;
+  assert.equal(snapshotOf(stored, after).sellers[0]?.uptime, null);
+});
+
 void test('a failed or malformed /network answer keeps the last one, dated; an index without it has none', async () => {
   fakeIndex({ models: { a: ['n1'] } });
   let { stored } = await readIndex(null, () => 0);
   const last = snapshotOf(stored, 0).network;
   assert.ok(last);
-  assert.equal(snapshotOf(stored, 0).networkReadAt, null);
+  assert.equal(snapshotOf(stored, 0).networkDatedAt, null);
   fakeIndex({ models: { a: ['n1'] }, offline: 'malformed' });
   let problems;
   ({ stored, problems } = await readIndex(stored, () => 2 * MINUTE));
   assert.deepEqual(problems, ['network']);
   const kept = snapshotOf(stored, 2 * MINUTE);
   assert.deepEqual(kept.network, last);
-  assert.equal(kept.networkReadAt, 0);
-  assert.equal(snapshotOf(stored, 2 * MINUTE).readAt, null);
+  assert.equal(kept.networkDatedAt, 0);
+  assert.equal(snapshotOf(stored, 2 * MINUTE).datedAt, null);
 
   fakeIndex({ models: { a: ['n1'] }, offline: null });
   const fresh = await readIndex(null, () => 0);

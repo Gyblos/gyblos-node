@@ -41,13 +41,13 @@ export async function NetworkSection() {
   return (
     <>
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
-      {snapshot.readAt || snapshot.networkReadAt ? (
+      {snapshot.datedAt || snapshot.networkDatedAt ? (
         <p className="-mt-2 mb-3 text-xs text-dim">
-          {snapshot.readAt
-            ? `Sellers and models as read at ${utc(snapshot.readAt)}. `
+          {snapshot.datedAt
+            ? `Sellers and models as read at ${utc(snapshot.datedAt)}. `
             : null}
-          {snapshot.networkReadAt
-            ? `Registered and offline counts as read at ${utc(snapshot.networkReadAt)}.`
+          {snapshot.networkDatedAt
+            ? `Network status (online, registered, offline) as read at ${utc(snapshot.networkDatedAt)}.`
             : null}
         </p>
       ) : null}

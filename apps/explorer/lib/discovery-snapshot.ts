@@ -8,6 +8,7 @@ import {
   type RunProblem,
   type StoredDiscovery,
 } from './discovery';
+import type { Uptime } from './discovery-shape';
 
 // The KV calls the explorer makes (a Workers KV namespace binding has them).
 export interface DiscoveryKv {
@@ -64,6 +65,18 @@ export async function refreshDiscovery(
   return problems;
 }
 
+// A seller's last uptime read while it is at most DISCOVERY.uptimeMaxAgeMs old (its tries since failed).
+function shownUptime(
+  read: StoredDiscovery['uptimes'][string],
+  now: number,
+): Uptime | null {
+  return read?.uptime &&
+    read.readAt !== null &&
+    now - read.readAt <= DISCOVERY.uptimeMaxAgeMs
+    ? read.uptime
+    : null;
+}
+
 // What a render shows from a stored read: its catalog, with each seller's last uptime read.
 export function snapshotOf(
   stored: StoredDiscovery | null,
@@ -75,12 +88,12 @@ export function snapshotOf(
     generatedAt: catalog.generatedAt,
     sellers: catalog.sellers.map((seller) => ({
       ...seller,
-      uptime: stored.uptimes[seller.nodeId]?.uptime ?? null,
+      uptime: shownUptime(stored.uptimes[seller.nodeId], now),
     })),
     network: catalog.network,
-    readAt:
+    datedAt:
       now - stored.progressAt > DISCOVERY.staleAfterMs ? catalog.readAt : null,
-    networkReadAt:
+    networkDatedAt:
       catalog.network &&
       catalog.networkReadAt !== null &&
       catalog.networkReadAt < catalog.readAt
