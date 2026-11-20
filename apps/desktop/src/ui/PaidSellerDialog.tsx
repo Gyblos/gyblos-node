@@ -59,7 +59,17 @@ function useSellerConfirmation(
         result.summary,
         model.name,
       );
-      if (notice) setError(notice);
+      if (
+        result.policy.depositAtomic !==
+          (policy?.depositAtomic ??
+            BUYER_SESSION_DEFAULT_POLICY.depositAtomic) ||
+        result.policy.lifetimeMs !==
+          (policy?.lifetimeMs ?? BUYER_SESSION_DEFAULT_POLICY.lifetimeMs)
+      )
+        setError(
+          'The channel terms were updated. Review them and confirm the seller.',
+        );
+      else if (notice) setError(notice);
       else confirm(result.policy.policyId);
     } finally {
       setSaving(false);
