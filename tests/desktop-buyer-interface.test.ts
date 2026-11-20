@@ -80,9 +80,12 @@ void test('every searchable desktop menu shows an empty state when nothing match
   for (const file of await readdir(directory)) {
     if (!file.endsWith('.tsx')) continue;
     const source = await readFile(`${directory}/${file}`, 'utf8');
-    if (!/searchLabel=/.test(source)) continue;
+    const searchable = source.match(/searchLabel=/g)?.length ?? 0;
+    if (!searchable) continue;
     menus.push(file);
-    assert.match(source, /className="dropdown-note" role="status"/, file);
+    const emptyStates =
+      source.match(/className="dropdown-note" role="status"/g)?.length ?? 0;
+    assert.ok(emptyStates >= searchable, file);
   }
   assert.ok(menus.includes('Management.tsx'));
 });
