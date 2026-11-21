@@ -287,6 +287,10 @@ export async function startSessionQuoteRuntime(
   };
   return {
     sellerChoice: true,
+    preparePaidChat:
+      options.preparePaidTokenizer && prepared.config.request.maxAtomic !== '0'
+        ? manager.preparePaidChat
+        : undefined,
     token,
     requestMs: PAID_BUYER_HTTP_MS,
     classify: classifyPaidError,

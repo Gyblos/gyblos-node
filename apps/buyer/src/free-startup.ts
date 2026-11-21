@@ -61,6 +61,7 @@ export type BuyerExecutionFactory = (context: {
     permission?: BuyerApiKeyOperation,
   ): Promise<ChatResult>;
   sellerChoice?: boolean;
+  preparePaidChat?: () => Promise<void>;
   token?: string;
   apiKeys?: BuyerApiKeys;
   requestMs?: number;
@@ -222,6 +223,7 @@ function buyerHttp(
         ...configuredBuyerAccess(request, role, execution?.token, session),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
+        preparePaidChat: execution?.preparePaidChat,
       },
     ),
   );

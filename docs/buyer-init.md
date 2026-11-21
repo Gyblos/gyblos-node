@@ -91,6 +91,12 @@ verifies its local copy when a paid profile starts and downloads both pinned
 files automatically if the copy is missing or fails verification. See
 [Paid endpoint](running-a-node.md#paid-v2-buyer-endpoint).
 
+Stopping a paid desktop chat during tokenizer preparation leaves its budget
+available. The app checks readiness with an authenticated, empty request to the
+local buyer before it reserves the response budget. If the chat request has
+already been sent, the buyer keeps the reservation until the payment outcome is
+known.
+
 ## Endpoints and relays
 
 The discovery index provides availability only. The generated settings always

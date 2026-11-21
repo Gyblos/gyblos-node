@@ -203,6 +203,9 @@ export function makeManager(
   );
   return {
     ...manager,
+    preparePaidChat: async () => {
+      await loadMeter();
+    },
     prepareChoice: (expiresAt: number, signal: AbortSignal) =>
       prepareChosenMeter(expiresAt, loadMeter, signal),
     async preflight(...args: Parameters<typeof check>) {
