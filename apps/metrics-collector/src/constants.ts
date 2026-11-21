@@ -125,15 +125,8 @@ export type CollectorLimiterName =
 // Hex radix for envelope ids derived from signatures; not a wire value.
 export const HEX_RADIX = 16;
 
-// Fallback rate-limit key when no client address header is present (local development only).
-export const LOCAL_CLIENT_KEY = 'local';
 // Key of the shared write budget.
 export const GLOBAL_LIMIT_KEY = 'global';
-export const IPV6 = {
-  groups: 8,
-  prefixGroups: 4,
-  hexRadix: 16,
-} as const;
 
 // Aggregates (#351). Changing a formula bumps formulaVersion; rows are then rebuilt from raw.
 export const AGGREGATES = {

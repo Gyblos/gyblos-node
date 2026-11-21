@@ -386,6 +386,9 @@ importers:
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@opentelemetry/api@1.9.0)

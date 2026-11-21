@@ -4,6 +4,7 @@ import { Hono, type Context, type Next } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 
 import { SELLER_VERSION } from '@gyblos/protocol/constants';
+import { ipKey } from '@gyblos/runtime/ip-key';
 
 import { isJsonContentType } from './body';
 import { cachedPage, sellersCacheKey, storePage } from './cache';
@@ -27,7 +28,6 @@ import {
   type RedeemResult,
 } from './constants';
 import { IndexError, statusOf } from './errors';
-import { ipKey } from './ip-key';
 import { allowed, type ResolvedLimiters } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
 import { networkPage, parseNetworkQuery } from './network';
