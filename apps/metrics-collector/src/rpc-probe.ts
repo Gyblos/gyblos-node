@@ -1,7 +1,9 @@
 // Owns the operator's RPC probe: one signature-list page of the channel program from each endpoint
 // the chain index may use (the public devnet RPC and each configured keyed URL), to check that every
-// endpoint is on the indexed network (its genesis hash), answers and what its page carries (length, memos, Gyblos opens, time span). The route
-// exists only while COLLECTOR_ADMIN_TOKEN is set and answers 404 without the matching bearer token.
+// endpoint is on the indexed network (its genesis hash), answers and what its page carries (length,
+// memos, Gyblos opens, time span). It is a route of the public app (app.ts), behind its https check,
+// fail-closed check, per-address limit and headers; it answers only while COLLECTOR_ADMIN_TOKEN is set
+// and the request carries it as a bearer token, and the app answers its usual 404 otherwise.
 // Only static facts are returned: never a URL, a key or a raw error text.
 import {
   CHANNEL_PROGRAM,
@@ -17,7 +19,6 @@ import {
   COLLECTOR_SOLANA_RPC_BINDINGS,
 } from './constants';
 
-export const RPC_PROBE_PATH = '/v1/admin/rpc-probe';
 const BEARER = 'Bearer ';
 // Shortest admin token accepted: a shorter secret leaves the route closed.
 const MIN_TOKEN_LENGTH = 32;
@@ -88,32 +89,28 @@ async function probeOne(
   }
 }
 
-// The probe's answer, or undefined when the request is not for the probe.
+// The probe's answer to an authorized GET of the probe route, or undefined (the app's 404) when the
+// method is not GET or the token is unset, too short, missing or wrong.
 export async function rpcProbe(
   request: Request,
   bindings: unknown,
   fetcher: typeof fetch = fetch,
 ): Promise<Response | undefined> {
   const url = new URL(request.url);
-  if (url.pathname !== RPC_PROBE_PATH) return undefined;
   const read = (name: string): unknown =>
     bindings && typeof bindings === 'object'
       ? Reflect.get(bindings, name)
       : undefined;
   const token = read(COLLECTOR_ADMIN_TOKEN_BINDING);
   const given = request.headers.get('authorization') ?? '';
-  const notFound = () => new Response('Not Found', { status: 404 });
   if (
     request.method !== 'GET' ||
     typeof token !== 'string' ||
-    token.length < MIN_TOKEN_LENGTH
-  )
-    return notFound();
-  if (
+    token.length < MIN_TOKEN_LENGTH ||
     !given.startsWith(BEARER) ||
     !(await sameToken(given.slice(BEARER.length), token))
   )
-    return notFound();
+    return undefined;
   const beforeParam = url.searchParams.get('before') ?? undefined;
   const before =
     beforeParam && SIGNATURE.test(beforeParam) ? beforeParam : undefined;
@@ -126,8 +123,10 @@ export async function rpcProbe(
   const results = [];
   for (const [name, endpoint] of endpoints)
     results.push(await probeOne(name, endpoint, before, fetcher));
-  return Response.json(
-    { program: CHANNEL_PROGRAM, before: before ?? null, results },
-    { headers: { 'cache-control': 'no-store' } },
-  );
+  // The app marks it no-store with its other headers.
+  return Response.json({
+    program: CHANNEL_PROGRAM,
+    before: before ?? null,
+    results,
+  });
 }

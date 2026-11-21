@@ -49,6 +49,8 @@ export const COLLECTOR_ROUTES = {
   STATS_MODELS: '/v1/stats/models',
   STATS_SELLER: '/v1/stats/sellers/:nodeId',
   STATS_CHAIN: '/v1/stats/chain',
+  // The operator's RPC probe (rpc-probe.ts): 404 unless its admin token is set and sent.
+  RPC_PROBE: '/v1/admin/rpc-probe',
 } as const;
 // What an accepted envelope carried.
 export const ENVELOPE_KINDS = {
