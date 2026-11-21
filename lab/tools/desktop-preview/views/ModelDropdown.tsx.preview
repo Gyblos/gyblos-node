@@ -154,7 +154,7 @@ export function ModelDropdown({
             {visible.map(([name, offers]) => {
               const first = offers[0];
               if (!first) return null;
-              const current = offers.some((item) => item.id === model.id);
+              const current = name === model.name || offers.some((item) => item.id === model.id);
               if (offers.length === 1 || contextLabel)
                 return (
                   <MenuItem
