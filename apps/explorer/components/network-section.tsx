@@ -123,20 +123,25 @@ function SellersOnline({ snapshot }: { snapshot: DiscoverySnapshot }) {
 }
 
 function SellersTable({ sellers }: { sellers: Seller[] }) {
+  const head = [
+    { label: 'Seller' },
+    { label: 'Status' },
+    { label: 'Model' },
+    { label: 'Context', right: true },
+    { label: 'Input / 1M', right: true },
+    { label: 'Output / 1M', right: true },
+    { label: 'Uptime 24 h · 7 d', right: true },
+    { label: 'Online since' },
+  ];
   return (
-    <Table
-      minWidth={DISPLAY.wideTable}
-      head={[
-        { label: 'Seller' },
-        { label: 'Status' },
-        { label: 'Model' },
-        { label: 'Context', right: true },
-        { label: 'Input / 1M', right: true },
-        { label: 'Output / 1M', right: true },
-        { label: 'Uptime 24 h · 7 d', right: true },
-        { label: 'Online since' },
-      ]}
-    >
+    <Table minWidth={DISPLAY.wideTable} head={head}>
+      {sellers.some((seller) => seller.models.length > 0) ? null : (
+        <tr>
+          <td className={`${td} text-muted`} colSpan={head.length}>
+            No sellers online.
+          </td>
+        </tr>
+      )}
       {sellers.flatMap((seller) =>
         seller.models.map((model) => (
           <tr
