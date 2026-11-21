@@ -113,7 +113,7 @@ eachCachedStorage(
       '203.0.113.2',
       '2001:db8::1',
     ].entries()) {
-      const cursor = `${i + 1}-${'a'.repeat(64)}`;
+      const cursor = String(i + 1).repeat(64);
       const response = await harness.call(
         `/v1/sellers?model=${MODEL}&cursor=${cursor}`,
         { headers: { 'CF-Connecting-IP': ip } },

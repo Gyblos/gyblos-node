@@ -390,8 +390,9 @@ nothing else.
   Envelopes are returned byte-for-byte as published.
 - A seller is included when its current catalog lists `model`, is live and not
   withdrawn, and its current presence is live and references that catalog. Order
-  is deterministic (reference index: presence `issuedAt` descending, then
-  NodeId). Ranking is the buyer's job.
+  is deterministic (reference index: NodeId ascending, so a seller keeps its
+  place when it republishes its presence and paging never skips one that stays
+  listed). Ranking is the buyer's job.
 - Cursors are opaque: pass `next` back verbatim, and never parse or build one.
   The client accepts 1 to 512 characters of `[A-Za-z0-9._~-]`. `next` is `null`
   on the last page.

@@ -43,14 +43,13 @@ export interface StoredEntry {
   json: string;
 }
 
+// The last NodeId of the previous page.
 export interface SellerCursor {
-  issuedAt: number;
   nodeId: string;
 }
 
 export interface SellerRow {
   nodeId: string;
-  issuedAt: number;
   catalogJson: string;
   presenceJson: string;
 }
@@ -90,7 +89,8 @@ export interface DiscoveryStorage extends UptimeStorage {
   // Atomic: true when applied, false when the sequence is not above the high-water mark.
   put(entry: StoredEntry): Promise<boolean>;
   // Live, non-withdrawn catalogs listing `model` with a live presence that references them,
-  // ordered by presence issuedAt descending, then NodeId ascending.
+  // ordered by NodeId ascending: a seller keeps its place while it republishes its presence, so paging
+  // never skips one that stays listed.
   list(query: SellerQuery): Promise<SellerRow[]>;
   // Every model those catalogs list, most sellers first, then model ID ascending; at most `limit`.
   models(now: number, limit: number): Promise<ModelRow[]>;
@@ -122,18 +122,8 @@ interface MemoryRecord {
   json: string;
 }
 
-function compareRows(left: SellerRow, right: SellerRow) {
-  if (left.issuedAt !== right.issuedAt) return right.issuedAt - left.issuedAt;
-  return left.nodeId < right.nodeId ? -1 : left.nodeId > right.nodeId ? 1 : 0;
-}
-
-function afterCursor(row: SellerRow, after: SellerCursor | null) {
-  return (
-    !after ||
-    row.issuedAt < after.issuedAt ||
-    (row.issuedAt === after.issuedAt && row.nodeId > after.nodeId)
-  );
-}
+const compareRows = (left: SellerRow, right: SellerRow) =>
+  left.nodeId < right.nodeId ? -1 : left.nodeId > right.nodeId ? 1 : 0;
 
 // Listed as soon as accepted: a record issued slightly ahead of this clock is live, expiry is exact.
 const live = (row: MemoryRecord, now: number) =>
@@ -252,13 +242,12 @@ function listMemory(tables: MemoryTables, query: SellerQuery): SellerRow[] {
       !live(alive, now)
     )
       continue;
-    const row = {
-      nodeId,
-      issuedAt: alive.issuedAt,
-      catalogJson: catalog.json,
-      presenceJson: alive.json,
-    };
-    if (afterCursor(row, after)) rows.push(row);
+    if (!after || nodeId > after.nodeId)
+      rows.push({
+        nodeId,
+        catalogJson: catalog.json,
+        presenceJson: alive.json,
+      });
   }
   return rows.sort(compareRows).slice(0, limit);
 }

@@ -10,9 +10,8 @@ const QUERY_KEYS: ReadonlySet<string> = new Set(['model', 'limit', 'cursor']);
 const LIMIT = new RegExp(
   `^[1-9][0-9]{0,${DISCOVERY_INDEX_LIMITS.maxLimitDigits - 1}}$`,
 );
-const CURSOR = new RegExp(
-  `^(0|[1-9][0-9]{0,${DISCOVERY_INDEX_LIMITS.maxCursorIssuedDigits - 1}})-([0-9a-f]{64})$`,
-);
+// The last NodeId of the previous page.
+const CURSOR = /^[0-9a-f]{64}$/;
 
 export type SellersQuery = Omit<SellerQuery, 'now'>;
 
@@ -21,10 +20,8 @@ function invalidQuery(): never {
 }
 
 function parseCursor(value: string): SellerCursor {
-  const match = CURSOR.exec(value);
-  const issuedAt = Number(match?.[1]);
-  if (!match?.[2] || !Number.isSafeInteger(issuedAt)) invalidQuery();
-  return { issuedAt, nodeId: match[2] };
+  if (!CURSOR.test(value)) invalidQuery();
+  return { nodeId: value };
 }
 
 // Missing/malformed model, malformed limit or cursor, unknown or repeated parameters: 400.
@@ -48,7 +45,6 @@ export async function parseSellersQuery(url: string): Promise<SellersQuery> {
 
 interface PageItem {
   text: string;
-  issuedAt: number;
   nodeId: string;
 }
 
@@ -69,10 +65,10 @@ export async function sellersPage(
     const bytes = encoder.encode(text).byteLength + 1;
     const last = items.at(-1);
     if (items.length === query.limit || size + bytes > maxResponseBytes) {
-      next = last ? `${last.issuedAt}-${last.nodeId}` : null;
+      next = last ? last.nodeId : null;
       break;
     }
-    items.push({ text, issuedAt: row.issuedAt, nodeId: row.nodeId });
+    items.push({ text, nodeId: row.nodeId });
     size += bytes;
   }
   const sellers = items.map((item) => item.text).join(',');
