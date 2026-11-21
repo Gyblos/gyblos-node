@@ -11,6 +11,7 @@ export {
   openBatchBuyerBackend,
   openBatchSellerBackend,
 } from './batch-session-backend';
+export { finalizedRequestCharge } from './batch-request-review';
 export { batchSessionObserver } from './batch-session-observer';
 export {
   openBatchSellerRegistry,

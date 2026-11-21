@@ -1,11 +1,13 @@
 // Read-only desktop funding observations use the active buyer role, never the wallet selector.
 import {
+  batchPoolChannelPaths,
   batchPoolPathsIn,
   batchSessionPathsIn,
   type HomeEnvironment,
 } from '@gyblos/config/home';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import {
+  finalizedRequestCharge,
   inspectBatchPool,
   inspectBatchSession,
   type BatchStoredSession,
@@ -93,4 +95,27 @@ export async function channelFundingRemaining(
     batchSessionPathsIn(environment, P2P_ROLES.BUYER),
   );
   return available(root, policy, seller, Date.now());
+}
+
+export async function reviewDesktopCharge(
+  environment: HomeEnvironment,
+  ref: import('./desktop-opening').DesktopRequestBinding,
+  policy: BuyerApiPolicy,
+) {
+  const role = await localFundingRole(environment, policy);
+  if (!role) return undefined;
+  const pool = batchPoolPathsIn(environment);
+  for (const paths of [
+    pool.legacy,
+    batchPoolChannelPaths(pool, ref.sellerNodeId),
+  ]) {
+    const result = await finalizedRequestCharge(
+      paths,
+      role.rpcUrl,
+      ref,
+      policy,
+    );
+    if (result) return result;
+  }
+  return undefined;
 }

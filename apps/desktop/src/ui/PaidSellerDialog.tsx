@@ -220,7 +220,8 @@ function SellerTerms({
           </p>
         ) : (
           <p>
-            Your first message opens a channel with a{' '}
+            Sending your first message settles any previous single-seller
+            channel before opening this one with a{' '}
             {atomicToUsdc(BigInt(deposit))} USDC deposit for {minutes} minutes.
           </p>
         )}

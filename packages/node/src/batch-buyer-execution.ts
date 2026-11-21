@@ -35,6 +35,7 @@ import {
   sessionReceiptPayment,
 } from './batch-receipts';
 import { executeBatchBuyer } from './batch-session';
+import { verifyDecline } from './buyer-declined-request';
 import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 
@@ -144,7 +145,12 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       verify,
       signal,
     );
-    await options.beforeInference?.(quote.offer.requestId);
+    await options.beforeInference?.(quote.offer.requestId, {
+      requestId: quote.offer.requestId,
+      channelId,
+      sellerNodeId: terms.sellerNodeId,
+      baseAtomic: options.buyer.snapshot().cumulativeAtomic,
+    });
     signal.throwIfAborted();
     return snapshot;
   };
@@ -200,6 +206,8 @@ async function runBuyerSession<Remote extends BatchDestination>(
             if (text) first ??= Math.floor(performance.now() - started);
             await onDelta?.(text);
           },
+        ).catch((error: unknown) =>
+          verifyDecline(context, pending, request.channelId, signal, error),
         );
         if (!('bill' in result)) return batchFail();
         billed = result.bill;

@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import {
   isOpeningIntent,
   type desktopOpening,
+  type DesktopRequestBinding,
 } from '@gyblos/node/desktop-opening';
 import { buyerAtomic, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
@@ -50,6 +51,34 @@ export class X402Budget {
       });
     }
     return this.state!;
+  }
+  async review(
+    observe: (
+      ref: DesktopRequestBinding,
+      policy: BuyerApiPolicy,
+    ) => Promise<{ chargeAtomic: string; transaction: string } | undefined>,
+  ) {
+    const state = await this.serial(async () =>
+      this.recoverIfIdle(await this.load()),
+    );
+    if (!state.pending) return true;
+    if (
+      !state.openingIntent ||
+      this.liveIntent === state.openingIntent ||
+      !state.summary.policy
+    )
+      return false;
+    const ref = await this.opening?.reference(state.openingIntent);
+    if (!ref) return false;
+    const result = await observe(ref, state.summary.policy);
+    if (!result) return false;
+    await this.complete(state.pending, { ...result, free: false });
+    return true;
+  }
+  private recoverIfIdle(state: State) {
+    return state.openingIntent && state.openingIntent !== this.liveIntent
+      ? this.recover(state)
+      : state;
   }
   recoverOpening() {
     return this.serial(async () => {

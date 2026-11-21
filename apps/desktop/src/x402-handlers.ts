@@ -19,6 +19,8 @@ import {
 type Owner = { contents: unknown; mainFrame(): unknown; destroyed(): boolean };
 type Sender = { sender: unknown; senderFrame: unknown };
 function actionError(action: unknown, blocked: boolean, error: unknown) {
+  if (blocked && action === X402_ACTION.REVIEW)
+    return 'The payment could not be confirmed yet. Check again after the channel settles.';
   if (blocked)
     return 'Spending status needs review. Further messages are blocked.';
   if (error instanceof PaidSellerLimitError) return error.message;
@@ -64,6 +66,7 @@ export interface ManagedBuyerPorts {
   start(): Promise<void>;
   configure?(maxAtomic: string, policyId?: string): Promise<void>;
   changing?(): boolean;
+  review?: Parameters<X402Budget['review']>[0];
 }
 function sendResponse(
   client: X402Client,
@@ -122,7 +125,7 @@ function selectedOffer(
       : undefined;
   if ('offerId' in input && !selected)
     throw new PaidSellerLimitError(
-      'Refresh the model list and select the seller again. This listing has expired.',
+      'Refresh the model list to verify this seller and its current price.',
     );
   if (selected && (!input.policyId || input.policyId !== policy?.policyId))
     throw new PaidSellerLimitError(
@@ -169,6 +172,11 @@ export function createX402Handlers(
   ): Promise<X402Result> => {
     const input = buyerAction(owner, event, args);
     try {
+      if (input.action === X402_ACTION.REVIEW && managed?.review) {
+        if (!(await budget.review(managed.review)))
+          throw new Error('Unconfirmed payment');
+        return summary();
+      }
       if (await configureAction(managed, input)) return await summary();
       if (
         (input.action === X402_ACTION.START_BUYER ||

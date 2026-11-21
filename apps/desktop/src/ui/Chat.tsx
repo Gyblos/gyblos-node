@@ -226,7 +226,7 @@ export function Chat({
       : usingX402 &&
           model.source === MODEL_SOURCE.ANNOUNCED &&
           !models.some((item) => item.id === model.id)
-        ? 'This listing has expired. Select an available seller before sending.'
+        ? 'The current catalog cannot confirm this seller and price. Refresh the model list before sending.'
         : usingX402 &&
             model.offerId &&
             x402?.state.policy?.policyId !== confirmedPolicy

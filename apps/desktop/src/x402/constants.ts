@@ -35,6 +35,7 @@ export const DESKTOP_X402_STREAM = {
 } as const;
 export const X402_ACTION = {
   STATUS: 'status',
+  REVIEW: 'review-payment',
   CONNECT: 'connect',
   AUTHORIZE: 'authorize',
   SEND: 'send',

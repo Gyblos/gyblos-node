@@ -9,6 +9,10 @@ import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import { ENGINE_DONE_REASONS, ENGINE_KINDS } from '@gyblos/protocol/constants';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
+  PaymentSessionError,
+  SESSION_CODES,
+} from '@gyblos/protocol/payment-session';
+import {
   TELEMETRY_EVENTS,
   type TelemetryEvent,
 } from '@gyblos/protocol/telemetry';
@@ -306,4 +310,22 @@ void test('an already funded legacy channel recovers and closes against a v4-onl
   assert.equal(settled.refundedAtomic, '990');
   assert.equal(offers.generations(), 0);
   assert.deepEqual(f.calls, ['deposit', 'refund']);
+});
+
+void test('a first voucher refused before reservation leaves the same channel available', async (t) => {
+  const f = await blockProduct();
+  t.after(f.close);
+  const reserve = t.mock.method(f.f.seller(), 'reserveBlocks');
+  reserve.mock.mockImplementationOnce(async () => {
+    throw new PaymentSessionError(SESSION_CODES.UNVERIFIED);
+  });
+  await assert.rejects(
+    f.buyer.execute(await f.offers.quote(1), f.offers.input),
+    { code: SESSION_CODES.REQUEST_DECLINED },
+  );
+  assert.equal(f.f.buyer.snapshot().reservedAtomic, '0');
+  assert.equal(f.offers.generations(), 0);
+  const next = await f.buyer.execute(await f.offers.quote(2), f.offers.input);
+  assert.equal(next.text, BLOCK_TEXT);
+  assert.deepEqual(f.f.calls, ['deposit']);
 });

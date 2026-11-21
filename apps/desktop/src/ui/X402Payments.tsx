@@ -90,6 +90,14 @@ export function X402Payments({
             'An unfinished payment needs review. New messages are blocked.'}
         </p>
       )}
+      {summary.blocked && summary.available && (
+        <Button
+          disabled={buyer.busy}
+          onClick={() => void buyer.run({ action: X402_ACTION.REVIEW })}
+        >
+          Check payment status
+        </Button>
+      )}
       <X402History buyer={buyer} />
     </section>
   );

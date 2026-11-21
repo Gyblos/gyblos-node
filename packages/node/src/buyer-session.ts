@@ -41,7 +41,9 @@ import {
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
   // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
+  onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
+  switchingAllowed?(): boolean;
   openingSupportsBlocks?: boolean;
   preparation?: PreparedChannel;
   receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
@@ -200,13 +202,12 @@ async function run<Remote extends BatchDestination>(
       state.options.policy.lifetimeMs
   )
     return sessionFail(SESSION_CODES.LIMIT);
-  if (
-    (opened.terms.sellerNodeId !== quote.offer.nodeId ||
-      opened.terms.owner !== quote.offer.owner) &&
-    opened.financial.snapshot().state !== SESSION_STATES.CLOSED
-  )
+  const switching =
+    opened.terms.sellerNodeId !== quote.offer.nodeId ||
+    opened.terms.owner !== quote.offer.owner;
+  if (switching && !state.options.switchingAllowed?.())
     throw new UnsentSellerBusyError(quote.offer.nodeId);
-  const ready = await renewable(state, opened, quote, signal);
+  const ready = await renewable(state, opened, quote, signal, switching);
   const before = ready.financial.snapshot();
   const value = await ready.host
     .execute(quote, input, signal, onDelta)
@@ -237,26 +238,32 @@ async function renewable<Remote extends BatchDestination>(
   opened: Current<Remote>,
   quote: SignedOfferV2,
   signal: AbortSignal,
+  switching: boolean,
 ): Promise<Current<Remote>> {
   const options = state.options;
   const backend = await state.backend!;
   if (
     (await checkPreviousOpening(state, opened, signal)) &&
+    !switching &&
     options.now() < opened.terms.expiresAt
   )
     return opened;
-  if (!backend.renew) return opened;
+  if (!backend.renew) {
+    if (switching) throw new UnsentSellerBusyError(quote.offer.nodeId);
+    return opened;
+  }
   if (opened.financial.snapshot().channelId)
     await opened.host.reconcile(signal);
   const snapshot = opened.financial.snapshot();
   if (
-    (!snapshot.channelId && options.now() < opened.terms.expiresAt) ||
-    (snapshot.state === SESSION_STATES.OPEN &&
-      options.now() < opened.terms.expiresAt &&
-      BigInt(snapshot.cumulativeAtomic) +
-        BigInt(snapshot.reservedAtomic) +
-        BigInt(quote.offer.maxAtomic) <=
-        BigInt(opened.terms.depositAtomic))
+    !switching &&
+    ((!snapshot.channelId && options.now() < opened.terms.expiresAt) ||
+      (snapshot.state === SESSION_STATES.OPEN &&
+        options.now() < opened.terms.expiresAt &&
+        BigInt(snapshot.cumulativeAtomic) +
+          BigInt(snapshot.reservedAtomic) +
+          BigInt(quote.offer.maxAtomic) <=
+          BigInt(opened.terms.depositAtomic)))
   )
     return opened;
   const proposed = newSessionTerms(quote, options.policy, options.now());
@@ -298,7 +305,12 @@ async function renewable<Remote extends BatchDestination>(
   await opened.host.settled();
   await opened.financial.dispose();
   state.current = undefined;
-  await backend.renew(snapshot.channelId, terms, options.policy.depositAtomic);
+  await backend.renew(
+    snapshot.channelId,
+    terms,
+    options.policy.depositAtomic,
+    switching,
+  );
   signal.throwIfAborted();
   return current(state, quote, signal);
 }

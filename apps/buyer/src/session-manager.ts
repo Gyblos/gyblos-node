@@ -152,9 +152,14 @@ export function makeManager(
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
     policy,
-    beforeInference: async () => {
+    switchingAllowed: () => !!state.openingIntent?.getStore(),
+    onDeclined: async () => {
       const intent = state.openingIntent?.getStore();
-      if (intent) await desktopOpening(process.env).consume(intent);
+      if (intent) await desktopOpening(process.env).declined(intent);
+    },
+    beforeInference: async (_id, ref) => {
+      const intent = state.openingIntent?.getStore();
+      if (intent) await desktopOpening(process.env).consume(intent, ref);
     },
     openingSupportsBlocks:
       (policy.totalDepositAtomic !== undefined
