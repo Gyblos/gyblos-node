@@ -72,10 +72,10 @@ settings for its local payment-channel records.
   observed boundary, not proof of a cause.
 - **Seller payment channels.** Component `seller-channel`, phase `exchange`: one
   record per failed operation attempt from the authenticated, bound buyer
-  (`prepare`, `open`, `execute`, `approve`, `close`, `resume-block`). The peer
-  check and concurrent-request guard precede recording. Admission and backend
-  failures during preparation, first opening and renewal are covered. Codes come
-  only from catalogs:
+  (`prepare`, `open`, `execute`, `approve`, `snapshot`, `close`,
+  `resume-block`). The peer check and concurrent-request guard precede
+  recording. Admission and backend failures during preparation, first opening
+  and renewal are covered. Codes come only from catalogs:
   - the payment SDK's error name when the failure carries one, even when a
     session layer replaced it with a generic code (for example
     `invalid_batch_settlement_svm_settlement_simulation`: the SDK reported a
