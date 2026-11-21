@@ -177,6 +177,7 @@ void test('refused identities stop at the lookup bound, and a seller listed twic
       },
     );
     assert.equal(draws, 2);
+    assert.equal(twice.checked.length, 3);
     assert.equal(new Set(twice.checked).size, 3);
   } finally {
     await run.wire.close();

@@ -9,6 +9,7 @@ import {
 } from '@gyblos/core/seller-selection';
 import {
   fetchSellers,
+  supersedes,
   type DiscoveredSeller,
   type DiscoveryFetch,
 } from '@gyblos/discovery-http';
@@ -95,8 +96,6 @@ async function openSeller(
   signal: AbortSignal,
 ): Promise<StaticControlSeller | undefined> {
   const { nodeId, owner } = entry.catalog;
-  const known = run.discovered.get(nodeId);
-  if (known) return known;
   const key = `${nodeId} ${owner}`;
   if (
     !config.discovery.open ||
@@ -150,7 +149,8 @@ async function readAllPages(
   let cursor: string | undefined;
   for (let page = 0; page < config.discovery.maxPages; page++) {
     signal.throwIfAborted();
-    // Keep equal-sequence entries visible for digest comparison. The persistent store enforces
+    // Keep equal-sequence entries visible for digest comparison (every entry of a configured or drawn
+    // NodeId is remembered). The persistent store enforces
     // the high-water mark and retains live candidate IDs when the index repeats a held presence.
     const result = await fetchSellers({
       baseUrl: config.discovery.baseUrl,
@@ -173,31 +173,36 @@ async function readAllPages(
   return entries;
 }
 
-// Whether `entry` is newer than `held`: catalog sequence, then presence sequence.
-const newer = (entry: DiscoveredSeller, held: DiscoveredSeller) =>
-  entry.catalog.sequence !== held.catalog.sequence
-    ? entry.catalog.sequence > held.catalog.sequence
-    : entry.presence.sequence > held.presence.sequence;
-
-// The sellers found only in the index that could serve this request (every hard filter), one
-// entry per NodeId, in a random order: which of them get the bounded identity lookups never depends on
-// the index's order or on how often it lists one.
+// A NodeId the index lists: its newest entry, and every entry in index order (all are remembered, so a
+// same-sequence fork across pages is still caught).
+interface Listing {
+  newest: DiscoveredSeller;
+  entries: DiscoveredSeller[];
+}
+// The sellers found only in the index whose newest entry could serve this request (every hard filter),
+// one place per NodeId, in a random order: which of them get the bounded identity lookups never depends
+// on the index's order or on how often it lists one.
 function drawOpen(
   entries: DiscoveredSeller[],
   request: SellerRequest,
   now: number,
   random: () => number,
 ) {
-  const unique = new Map<string, DiscoveredSeller>();
+  const listings = new Map<string, Listing>();
   for (const entry of entries) {
-    const held = unique.get(entry.catalog.nodeId);
-    if (!held || newer(entry, held)) unique.set(entry.catalog.nodeId, entry);
+    const held = listings.get(entry.catalog.nodeId);
+    if (!held)
+      listings.set(entry.catalog.nodeId, { newest: entry, entries: [entry] });
+    else {
+      held.entries.push(entry);
+      if (supersedes(entry, held.newest)) held.newest = entry;
+    }
   }
-  const drawn = [...unique.values()].filter((entry) =>
+  const drawn = [...listings.values()].filter(({ newest }) =>
     servesRequest(
       request,
       {
-        ...entry,
+        ...newest,
         badge: SELLER_BADGES.DECLARED_USAGE,
         openChannel: false,
       },
@@ -262,12 +267,21 @@ export async function discoverBuyerSellers(
     config.discovery.open && options.openRelay
       ? drawOpen(open, config.request, now(), options.random ?? cryptoRandom)
       : [];
-  for (const entry of drawn) {
-    const trusted = await openSeller(entry, config, options, run, signal);
+  for (const { newest, entries: listed } of drawn) {
+    const trusted = await openSeller(newest, config, options, run, signal);
     signal.throwIfAborted();
-    if (trusted?.owner !== entry.catalog.owner) continue;
-    await rememberEntry(entry, trusted, state, now(), Boolean(config.identity));
-    signal.throwIfAborted();
+    if (!trusted) continue;
+    for (const entry of listed) {
+      if (trusted.owner !== entry.catalog.owner) continue;
+      await rememberEntry(
+        entry,
+        trusted,
+        state,
+        now(),
+        Boolean(config.identity),
+      );
+      signal.throwIfAborted();
+    }
   }
   signal.throwIfAborted();
   return eligibleConfig(
