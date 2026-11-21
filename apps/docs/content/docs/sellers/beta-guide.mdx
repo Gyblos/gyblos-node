@@ -38,6 +38,31 @@ To make the check mandatory, run `GYBLOS_REQUIRE_SIGNATURE=1 sh install.sh`; it 
 signature verifies. To verify the image yourself or write each file by hand, see
 [Install without the script](/en/sellers/manual-install).
 
+### Your own devnet RPC, if you will charge [#own-rpc]
+
+A seller that charges sends channel transactions through the RPC chosen when its keys are created; an
+installed seller cannot change it yet. The default, the public `https://api.devnet.solana.com`, limits
+requests per IP address, so several services on one address make channel openings fail (`gyblos logs` then
+shows `invalid_batch_settlement_svm_channel_state` or `PAYMENT_UNAVAILABLE`). To use a dedicated devnet
+endpoint, set `GYBLOS_RPC_URL` before the **first** run of the installer (replace `DEVNET_RPC_URL` with
+your endpoint's URL):
+
+- **Docker:** create the folder and a private `seller.env` with the URL, then run the installer in Docker
+  mode, which keeps both and stops if Docker cannot run (with `GYBLOS_DIR`, use that folder):
+
+  ```sh
+  mkdir -m 700 ~/gyblos-seller
+  (umask 077 && printf 'GYBLOS_RPC_URL=%s\n' 'DEVNET_RPC_URL' > ~/gyblos-seller/seller.env)
+  GYBLOS_MODE=docker sh install.sh
+  ```
+
+- **Native on macOS or Linux:** `GYBLOS_RPC_URL='DEVNET_RPC_URL' GYBLOS_MODE=native sh install.sh`
+  (without `GYBLOS_MODE=native`, a running Docker is chosen and the variable is not used).
+- **Windows:** in PowerShell, `$env:GYBLOS_RPC_URL='DEVNET_RPC_URL'` before running `install.ps1`.
+
+The seller keeps the URL in its private role file. A URL with an API key is a secret: never put it in
+`config.toml`.
+
 ### Native seller on macOS or Linux
 
 Without a usable Docker, the same installer sets up the **native seller**: it checks the download against
