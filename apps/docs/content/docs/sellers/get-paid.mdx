@@ -51,6 +51,23 @@ The fee payer needs devnet SOL for channel transactions. With less than 0.01 SOL
 reports `FEE_PAYER_UNFUNDED`: a failure if the balance is zero and startup still has to create
 payment token accounts, a warning otherwise.
 
+### Use your own devnet RPC [#own-rpc]
+
+A seller that charges reads and sends channel transactions through its role's RPC. By default that is the
+public `https://api.devnet.solana.com`, which limits requests per IP address. When several services share
+an address, channel openings fail and `gyblos logs` shows `invalid_batch_settlement_svm_channel_state` or
+`UPTO_UNAVAILABLE`. A dedicated devnet endpoint, such as a free one from an RPC provider, avoids this.
+
+Set it in `GYBLOS_RPC_URL` before the first install, because the RPC is fixed when the seller's keys are
+created:
+
+- Docker: add `GYBLOS_RPC_URL=<your devnet RPC URL>` to `seller.env` in the install directory, then run the
+  installer.
+- macOS or Linux without Docker: run `GYBLOS_RPC_URL=<your devnet RPC URL> sh install.sh`.
+
+A keyed URL is a secret: keep it in `seller.env` or the environment, never in `config.toml`. An installed
+seller cannot change its RPC yet.
+
 ## 3. Apply and verify
 
 Apply the change as described in
