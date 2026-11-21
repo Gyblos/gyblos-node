@@ -1,6 +1,10 @@
 // SDK construction for startup-owned single sessions; restoring never replaces a durable financial attempt.
 import type { KeyPairSigner } from '@solana/kit';
-import { toFacilitatorSvmSigner, type FacilitatorSvmSigner } from '@x402/svm';
+import {
+  toFacilitatorSvmSigner,
+  type FacilitatorRpcClient,
+  type FacilitatorSvmSigner,
+} from '@x402/svm';
 
 import { TIMEOUTS } from '@gyblos/config';
 import { canonicalJson } from '@gyblos/protocol';
@@ -33,6 +37,7 @@ import { waitBatch } from './batch-session-wait';
 import { createBuyerObservationRpc } from './buyer-observation-transport';
 import { BATCH_OPENING_LIMITS } from './constants';
 import { assertFeeWire, limitedFeePayer } from './fee-payer';
+import { rateLimitedFetch, rateLimitedSolanaRpc } from './rpc-rate-limit';
 import { verifyPaymentNetwork } from './seller-network';
 
 interface Options {
@@ -168,9 +173,10 @@ export function openBatchSellerBackend(
 ): BatchSellerBackend {
   const signer =
     options.signer ??
-    toFacilitatorSvmSigner(limitedFeePayer(options.feePayer), {
-      defaultRpcUrl: options.rpcUrl,
-    });
+    toFacilitatorSvmSigner(
+      limitedFeePayer(options.feePayer),
+      rateLimitedSolanaRpc(options.rpcUrl) as FacilitatorRpcClient,
+    );
   return {
     inspect: () => inspectBatchSession(options.paths),
     async renew(
@@ -205,7 +211,12 @@ export function openBatchSellerBackend(
       )
         return sessionFail(SESSION_CODES.BINDING);
       const existing = await compatible(options, terms);
-      const rpc = options.rpc ?? createBuyerObservationRpc(options.rpcUrl);
+      const rpc =
+        options.rpc ??
+        createBuyerObservationRpc(
+          options.rpcUrl,
+          rateLimitedFetch(globalThis.fetch),
+        );
       await verifyPaymentNetwork(rpc, terms.network);
       const facilitator = batchFacilitatorFor(signer, terms);
       // A new session, or an empty preparation taking its slot back, proves its opening first.
