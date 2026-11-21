@@ -396,3 +396,46 @@ void test('Payments history tables become cards in narrow layouts', async () => 
     /@container \(max-width: 620px\)\s*\{[^@]*\.ui-table-region \.ui-data-table tbody tr \{\s*display: grid;/,
   );
 });
+
+void test('preview dialogs share small, medium and large sizes that shrink with the window', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const file = 'apps/desktop/src/ui/Modal.tsx';
+  const modal = transformBrand(
+    await readFile(file, 'utf8'),
+    file,
+    'apps/desktop',
+  );
+  assert.match(modal ?? '', /size\?: 'sm' \| 'md' \| 'lg'/);
+  assert.match(
+    modal ?? '',
+    /data-size=\{compact \? undefined : \(size \?\? 'md'\)\}/,
+    'every dialog except compact pickers gets a size, medium by default',
+  );
+  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  for (const [size, width] of [
+    ['sm', '440px'],
+    ['md', '560px'],
+    ['lg', '760px'],
+  ] as const)
+    assert.match(
+      css,
+      new RegExp(
+        `\\.modal\\[data-size='${size}'\\] \\{\\s*--modal-width: ${width};`,
+      ),
+    );
+  assert.match(
+    css,
+    /width: min\(var\(--modal-width\), calc\(100vw - 32px\)\);/,
+  );
+  assert.doesNotMatch(
+    css,
+    /width: min\(300px, calc\(100vw - 24px\)\)/,
+    'system status uses the shared small size instead of its own 300px width',
+  );
+  const keys = await readFile(
+    'lab/tools/desktop-preview/views/UsdcApiKeyDetails.tsx.preview',
+    'utf8',
+  );
+  assert.match(keys, /<Modal title="Revoke API key\?" size="sm"/);
+});
