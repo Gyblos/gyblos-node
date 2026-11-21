@@ -2230,7 +2230,7 @@ html .app.desktop-frame .pk-chips button:focus-visible {
 }
 html .app.desktop-frame > .buyer-sidebar {
   background: var(--pk-side);
-  border-inline-end: 1px solid var(--line);
+  border-inline-end: 0;
 }
 html .app.desktop-frame > .ui-window-chrome {
   border-bottom: 0;
@@ -2239,8 +2239,7 @@ html .app.desktop-frame > .ui-window-chrome {
       calc(100% - var(--pk-side-width)) 1px no-repeat,
     linear-gradient(
       90deg,
-      var(--pk-side) calc(var(--pk-side-width) - 1px),
-      var(--line) calc(var(--pk-side-width) - 1px) var(--pk-side-width),
+      var(--pk-side) var(--pk-side-width),
       var(--bg) var(--pk-side-width)
     );
   transition: background-size var(--motion-enter) var(--motion-push-ease);
@@ -2523,6 +2522,9 @@ html
   font-weight: 100 900;
   font-display: swap;
   src: url('./assets/InterVariable.woff2') format('woff2');
+}
+html[data-font='inter'] .app.desktop-frame {
+  --preview-ui-type: InterVariable, ui-sans-serif, system-ui, sans-serif;
 }
 html[data-font='inter'] body,
 html[data-font='inter'] .desktop-frame {
