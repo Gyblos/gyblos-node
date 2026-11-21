@@ -325,7 +325,8 @@ function Next-Steps {
 # the owner's registration, and the fee payer that pays channel transactions once an offer has a price.
 function Charge-Note {
   Say ''
-  Say "To charge for your model later, first send about 0.05 devnet SOL to the fee payer $script:FeePayer"
+  $to = if ($script:FeePayer) { " $script:FeePayer" } else { '' }
+  Say "To charge for your model later, first send about 0.05 devnet SOL to the fee payer$to"
   Say '  (https://faucet.solana.com, choose devnet). It pays the payment token accounts and channel'
   Say "  transactions; ``$(Typed 'doctor --online')`` says when it runs short. A free seller never needs it."
 }
@@ -466,7 +467,8 @@ function Main {
     Guided-Setup
   } else {
     Next-Steps
-  }  Charge-Note
+  }
+  Charge-Note
 }
 
 # The seller's commands find its home through GYBLOS_HOME like the service does.

@@ -5,7 +5,7 @@ import { address, createSolanaRpc } from '@solana/kit';
 import { DEVNET_GENESIS, UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
 import { uptoRecipientTokenAccounts } from '@gyblos/payments-upto';
 
-import { FEE_PAYER_FUNDING } from './constants';
+import { FEE_PAYER_FUNDING, GENESIS_READ_MS } from './constants';
 import { readGenesis, type GenesisReader } from './seller-chain';
 
 export interface PaymentAccountsQuery {
@@ -31,7 +31,7 @@ export async function feePayerLamports(query: {
 }): Promise<bigint> {
   const { value } = await createSolanaRpc(query.rpcUrl)
     .getBalance(address(query.address))
-    .send();
+    .send({ abortSignal: AbortSignal.timeout(GENESIS_READ_MS) });
   return value;
 }
 

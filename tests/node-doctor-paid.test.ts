@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { DEVNET_GENESIS, PROTOCOL_FEE } from '@gyblos/config';
+import { FEE_PAYER_FUNDING } from '@gyblos/node/constants';
 
 import {
   doctor,
@@ -282,3 +283,11 @@ void test('doctor names what the fee payer is for, for every seller', () =>
       /fee payer {2}\S+ {2}\(pays channel transactions once an offer has a price; send it about 0\.05 devnet SOL first\)/,
     );
   }));
+
+void test('the fee payer minimum is one value in lamports and in the SOL the hint prints', () => {
+  const LAMPORTS_PER_SOL = 1_000_000_000;
+  assert.equal(
+    Number(FEE_PAYER_FUNDING.minimumLamports) / LAMPORTS_PER_SOL,
+    Number(FEE_PAYER_FUNDING.minimumSol),
+  );
+});
