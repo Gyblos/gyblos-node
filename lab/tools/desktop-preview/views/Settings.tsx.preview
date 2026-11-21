@@ -119,7 +119,6 @@ function BuyerPreferences() {
           code={buyerConfig(mode, freeFallback, showTestnet)}
           language={CODE_LANGUAGE.TOML}
           title={BUYER_CONFIG_PATH}
-          onCopy={() => navigator.clipboard.writeText(buyerConfig(mode, freeFallback, showTestnet))}
         />
       </Section>
     </>
