@@ -40,6 +40,7 @@ import {
   depositSettlementsRunning,
   releaseUnsentOpening,
   trackDepositSettlement,
+  type BatchOpening,
 } from './batch-session-opening-release';
 import { openBatchStore, serial, type BatchStore } from './batch-session-store';
 import type {
@@ -132,7 +133,7 @@ export async function createBatchSeller(
 // SDK deposit verification reads/validates authority; it does not submit or simulate a payment.
 async function verifyFirstOpening(
   context: BatchSellerContext,
-  opening: ReturnType<typeof openingFor>,
+  opening: BatchOpening,
 ) {
   const { options, facilitator, requirements } = context;
   const verified = await waitBatch(

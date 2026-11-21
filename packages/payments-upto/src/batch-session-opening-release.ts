@@ -9,7 +9,7 @@ import type { openingFor } from './batch-session-checks';
 import type { BatchStore } from './batch-session-store';
 import { OPENING_RELEASE_FAILED } from './constants';
 
-type BatchOpening = ReturnType<typeof openingFor>;
+export type BatchOpening = ReturnType<typeof openingFor>;
 
 // Deposit settlements still running for a session, including ones a timed-out wait left behind: waiting
 // stops, the SDK does not, and it may yet send the deposit.
