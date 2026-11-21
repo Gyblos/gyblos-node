@@ -1,10 +1,6 @@
 // SDK construction for startup-owned single sessions; restoring never replaces a durable financial attempt.
 import type { KeyPairSigner } from '@solana/kit';
-import {
-  toFacilitatorSvmSigner,
-  type FacilitatorRpcClient,
-  type FacilitatorSvmSigner,
-} from '@x402/svm';
+import { toFacilitatorSvmSigner, type FacilitatorSvmSigner } from '@x402/svm';
 
 import { TIMEOUTS } from '@gyblos/config';
 import { canonicalJson } from '@gyblos/protocol';
@@ -37,7 +33,7 @@ import { waitBatch } from './batch-session-wait';
 import { createBuyerObservationRpc } from './buyer-observation-transport';
 import { BATCH_OPENING_LIMITS } from './constants';
 import { assertFeeWire, limitedFeePayer } from './fee-payer';
-import { rateLimitedFetch, rateLimitedSolanaRpc } from './rpc-rate-limit';
+import { rateLimitedFacilitatorRpc, rateLimitedFetch } from './rpc-rate-limit';
 import { verifyPaymentNetwork } from './seller-network';
 
 interface Options {
@@ -175,7 +171,7 @@ export function openBatchSellerBackend(
     options.signer ??
     toFacilitatorSvmSigner(
       limitedFeePayer(options.feePayer),
-      rateLimitedSolanaRpc(options.rpcUrl) as FacilitatorRpcClient,
+      rateLimitedFacilitatorRpc(options.rpcUrl),
     );
   return {
     inspect: () => inspectBatchSession(options.paths),

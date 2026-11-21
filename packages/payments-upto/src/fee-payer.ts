@@ -10,7 +10,6 @@ import {
 import {
   COMPUTE_BUDGET_PROGRAM_ADDRESS,
   toFacilitatorSvmSigner,
-  type FacilitatorRpcClient,
 } from '@x402/svm';
 import {
   createUptoFacilitator,
@@ -24,7 +23,7 @@ import { PAYMENT_TRANSACTION_LIMITS } from '@gyblos/config/payment-fees';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 
-import { rateLimitedSolanaRpc } from './rpc-rate-limit';
+import { rateLimitedFacilitatorRpc } from './rpc-rate-limit';
 
 const SET_COMPUTE_UNIT_LIMIT = 2;
 const SET_COMPUTE_UNIT_PRICE = 3;
@@ -152,7 +151,7 @@ export function sellerUptoFeePolicy(options: {
     facilitator: createUptoFacilitator(
       toFacilitatorSvmSigner(
         limitedFeePayer(feePayer),
-        rateLimitedSolanaRpc(rpcUrl) as FacilitatorRpcClient,
+        rateLimitedFacilitatorRpc(rpcUrl),
       ),
       store,
       PAYMENT_TRANSACTION_LIMITS,

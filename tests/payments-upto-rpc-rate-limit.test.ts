@@ -4,14 +4,19 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 import {
+  generateKeyPairSigner,
   SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
   SolanaError,
 } from '@solana/kit';
+import { toFacilitatorSvmSigner } from '@x402/svm';
 
+import { DEVNET, DEVNET_GENESIS } from '@gyblos/config';
+import { readGenesis } from '@gyblos/node/seller-chain';
 import {
+  rateLimitedFacilitatorRpc,
   rateLimitedFetch,
   rateLimitedSolanaRpc,
   rateLimitedTransport,
@@ -52,7 +57,7 @@ void test('a 429 is retried after the Retry-After seconds, then answers', async 
   assert.deepEqual(clock.slept, [2000, 2000]);
 });
 
-void test('waits are capped, follow backoff without Retry-After, and stop at the budget', async () => {
+void test('waits are capped and follow backoff without Retry-After, up to the retry count', async () => {
   const clock = waits();
   let calls = 0;
   const transport = rateLimitedTransport(
@@ -67,11 +72,39 @@ void test('waits are capped, follow backoff without Retry-After, and stop at the
     return true;
   });
   assert.equal(calls, RPC_RATE_LIMIT.retries + 1);
-  assert.ok(clock.slept.every((ms) => ms <= RPC_RATE_LIMIT.maxWaitMs));
-  assert.ok(
-    clock.slept.reduce((sum, ms) => sum + ms, 0) <= RPC_RATE_LIMIT.budgetMs,
+  assert.deepEqual(clock.slept, [RPC_RATE_LIMIT.maxWaitMs, 1000, 2000]);
+});
+
+void test('the wait budget stops retries before the count does', async () => {
+  const clock = waits();
+  let calls = 0;
+  const transport = rateLimitedTransport(
+    async () => {
+      calls += 1;
+      throw limited({ 'retry-after': '3600' });
+    },
+    { sleep: clock.sleep },
   );
-  assert.equal(clock.slept[0], RPC_RATE_LIMIT.maxWaitMs);
+  await assert.rejects(transport(request));
+  assert.deepEqual(clock.slept, [
+    RPC_RATE_LIMIT.maxWaitMs,
+    RPC_RATE_LIMIT.maxWaitMs,
+  ]);
+  assert.equal(calls, 3);
+});
+
+void test('a real wait is cut short by cancellation', async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const transport = rateLimitedTransport(async () => {
+    calls += 1;
+    setTimeout(() => controller.abort(new Error('cancelled')), 20);
+    throw limited({ 'retry-after': '3' });
+  });
+  const started = performance.now();
+  await assert.rejects(transport({ ...request, signal: controller.signal }));
+  assert.ok(performance.now() - started < 1000);
+  assert.equal(calls, 1);
 });
 
 void test('other failures and HTTP errors pass through without a retry', async () => {
@@ -166,7 +199,8 @@ void test('fetch: a 429 response is retried and its body released; others are re
   assert.equal((await failing('https://rpc.example.com', {})).status, 503);
 });
 
-void test('a real Solana RPC client rides out an HTTP 429 from the server', async (t) => {
+// A local JSON-RPC server that answers 429 to its first request, then `result` to every other.
+async function limitedOnce(t: TestContext, result: unknown) {
   let calls = 0;
   const server = createServer((_request, response) => {
     calls += 1;
@@ -176,12 +210,33 @@ void test('a real Solana RPC client rides out an HTTP 429 from the server', asyn
     }
     response
       .writeHead(200, { 'content-type': 'application/json' })
-      .end(JSON.stringify({ jsonrpc: '2.0', id: 0, result: 'genesis-hash' }));
+      .end(JSON.stringify({ jsonrpc: '2.0', id: 0, result }));
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => server.close());
   const { port } = server.address() as AddressInfo;
-  const rpc = rateLimitedSolanaRpc(`http://127.0.0.1:${port}`);
+  return { url: `http://127.0.0.1:${port}`, calls: () => calls };
+}
+
+void test('a real Solana RPC client rides out an HTTP 429 from the server', async (t) => {
+  const server = await limitedOnce(t, 'genesis-hash');
+  const rpc = rateLimitedSolanaRpc(server.url);
   assert.equal(await rpc.getGenesisHash().send(), 'genesis-hash');
-  assert.equal(calls, 2);
+  assert.equal(server.calls(), 2);
+});
+
+void test("the SDK's facilitator signer uses the client and rides out a 429", async (t) => {
+  const server = await limitedOnce(t, 42);
+  const signer = toFacilitatorSvmSigner(
+    await generateKeyPairSigner(),
+    rateLimitedFacilitatorRpc(server.url),
+  );
+  assert.equal(await signer.getSlot!(DEVNET), 42n);
+  assert.equal(server.calls(), 2);
+});
+
+void test("the seller's genesis read rides out a 429", async (t) => {
+  const server = await limitedOnce(t, DEVNET_GENESIS);
+  assert.equal(await readGenesis(server.url), DEVNET_GENESIS);
+  assert.equal(server.calls(), 2);
 });

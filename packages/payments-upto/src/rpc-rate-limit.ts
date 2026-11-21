@@ -13,8 +13,9 @@ import {
   SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
   type RpcTransport,
 } from '@solana/kit';
+import type { FacilitatorRpcClient } from '@x402/svm';
 
-import { HTTP_STATUS } from '@gyblos/config';
+import { HTTP_STATUS, UNITS } from '@gyblos/config';
 
 export const RPC_RATE_LIMIT = {
   retries: 3,
@@ -30,7 +31,6 @@ export interface RateLimitOptions {
   now?: () => number;
 }
 
-const MS_PER_SECOND = 1000;
 const SECONDS = /^\d+$/;
 
 // Retry-After as delay seconds or an HTTP date; without one (or unreadable), exponential backoff.
@@ -41,7 +41,7 @@ function waitMs(
 ) {
   const value = retryAfter?.trim() ?? '';
   let ms = RPC_RATE_LIMIT.baseMs * 2 ** attempt;
-  if (SECONDS.test(value)) ms = Number(value) * MS_PER_SECOND;
+  if (SECONDS.test(value)) ms = Number(value) * UNITS.millisecondsPerSecond;
   else if (value) {
     const at = Date.parse(value);
     if (Number.isFinite(at)) ms = Math.max(0, at - now());
@@ -140,3 +140,12 @@ export const rateLimitedSolanaRpc = (url: string) =>
   createSolanaRpcFromTransport(
     rateLimitedTransport(createDefaultRpcTransport({ url })),
   );
+
+// The SDK's facilitator signer, on the same client. It recognises a single client only by `in` checks a
+// @solana/kit RPC proxy does not answer, so the client goes in as the map entry used for every network,
+// as `defaultRpcUrl` did.
+export const rateLimitedFacilitatorRpc = (
+  url: string,
+): Record<string, FacilitatorRpcClient> => ({
+  '*': rateLimitedSolanaRpc(url) as FacilitatorRpcClient,
+});
