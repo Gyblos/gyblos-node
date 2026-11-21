@@ -64,7 +64,10 @@ export function utc(ms: number | null): string {
 }
 
 export function percent(ratio: number): string {
-  return `${(ratio * UNITS.percent).toFixed(ratio === 1 ? 0 : DISPLAY.percentDigits)}%`;
+  const value = ratio * UNITS.percent;
+  const belowComplete =
+    UNITS.percent - Number(DECIMAL_BASE) ** -DISPLAY.percentDigits;
+  return `${(ratio < 1 ? Math.min(value, belowComplete) : value).toFixed(DISPLAY.percentDigits)}%`;
 }
 
 // A latency bucket bound: "< 500 ms", "< 2 s", "> 60 s" past the last bound; "—" without samples.
