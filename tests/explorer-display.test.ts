@@ -4,6 +4,7 @@
 // with its exact states and the sellers not online keep the index's order; the average uptime says over
 // how many sellers it is taken; a source read gives up after the fetch timeout.
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test, { afterEach } from 'node:test';
 
 import { barAxis } from '@gyblos/explorer/board-bar-axis';
@@ -24,6 +25,28 @@ const realTimeout = AbortSignal.timeout.bind(AbortSignal);
 afterEach(() => {
   globalThis.fetch = realFetch;
   AbortSignal.timeout = realTimeout;
+});
+
+void test('the Sellers table includes a full-width empty row', async () => {
+  const section = await readFile(
+    new URL('../apps/explorer/components/network-section.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(
+    section,
+    /<td className=\{`\$\{td\} text-muted`\} colSpan=\{head.length\}>\s*No sellers online\.\s*<\/td>/,
+  );
+});
+
+void test('the Daily table includes a full-width empty row', async () => {
+  const section = await readFile(
+    new URL('../apps/explorer/components/usage-section.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(
+    section,
+    /<td className=\{`\$\{td\} text-muted`\} colSpan=\{head.length\}>\s*No daily activity in this range\.\s*<\/td>/,
+  );
 });
 
 void test('amount bars allow fractional ticks so tiny USDC values retain their scale', () => {
