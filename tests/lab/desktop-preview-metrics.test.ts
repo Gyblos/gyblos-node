@@ -336,6 +336,11 @@ void test('preview Connections leads with a tool grid and an inline setup guide'
     /view === 'choose'|view === 'guide'/,
     'tool setup no longer hides inside a modal',
   );
+  assert.match(
+    keys,
+    /useEffect\(\(\) => setKeyCopied\(false\), \[guideKey\?\.id, tool\]\)/,
+    'the copy step is redone after picking another key or tool',
+  );
   const chat = 'apps/desktop/src/ui/Chat.tsx';
   const source = await readFile(chat, 'utf8');
   const rendered = transformBrand(source, chat, 'apps/desktop') ?? source;
