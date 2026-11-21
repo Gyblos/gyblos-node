@@ -159,6 +159,24 @@ async function checkExpiredOpening<Remote extends BatchDestination>(
     await manager(state, existing).checkOpening(signal);
   }
 }
+async function checkPoolBudget<Remote extends BatchDestination>(
+  state: State<Remote>,
+  pool: BatchBuyerPool,
+  existing: BatchPoolEntry | undefined,
+  depositAtomic: string,
+) {
+  const budget = await pool.budget();
+  if (
+    BigInt(budget.committedAtomic) >
+    BigInt(
+      state.options.policy.totalDepositAtomic ??
+        state.options.policy.depositAtomic,
+    )
+  )
+    return sessionFail(SESSION_CODES.LIMIT);
+  if (!existing && BigInt(budget.availableAtomic) < BigInt(depositAtomic))
+    return sessionFail(SESSION_CODES.LIMIT);
+}
 async function execute<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2,
@@ -196,20 +214,7 @@ async function execute<Remote extends BatchDestination>(
         !existing?.stored?.openingPending)
     )
       return sessionFail(SESSION_CODES.CLOSED);
-    const budget = await pool.budget();
-    if (
-      BigInt(budget.committedAtomic) >
-      BigInt(
-        state.options.policy.totalDepositAtomic ??
-          state.options.policy.depositAtomic,
-      )
-    )
-      return sessionFail(SESSION_CODES.LIMIT);
-    if (
-      !existing &&
-      BigInt(budget.availableAtomic) < BigInt(terms.depositAtomic)
-    )
-      return sessionFail(SESSION_CODES.LIMIT);
+    await checkPoolBudget(state, pool, existing, terms.depositAtomic);
     return {
       terms,
       fresh:

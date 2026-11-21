@@ -70,6 +70,52 @@ interface PoolContext {
   store: Awaited<ReturnType<typeof openPoolStore>>;
   rowFor(id: string): PoolRow;
 }
+async function replacePoolEntry(
+  context: PoolContext,
+  row: PoolRow,
+  checked: PaymentSessionTerms,
+) {
+  const { options, store, total, rowFor } = context;
+  const old = await poolChild(options.paths, row);
+  if (row.requestId || row.uncertain || !replaceableOpening(old))
+    return sessionFail(SESSION_CODES.BINDING);
+  if (
+    BigInt(
+      budget(store.read().entries, total, context.unfunded).availableAtomic,
+    ) < BigInt(checked.depositAtomic)
+  )
+    return sessionFail(SESSION_CODES.LIMIT);
+  if (
+    !sameBatchParties(row.terms, checked) ||
+    checked.expiresAt <= row.terms.expiresAt
+  )
+    return sessionFail(SESSION_CODES.BINDING);
+  await store.update((next) => {
+    const replacing = next.entries.find(
+      (entry) => entry.terms.sellerNodeId === checked.sellerNodeId,
+    )!;
+    replacing.terms = checked;
+    replacing.ready = false;
+    replacing.replacing = old.channelId;
+    replacing.refundedAtomic = '0';
+  });
+  context.unfunded.delete(checked.sellerNodeId);
+  row = rowFor(checked.sellerNodeId);
+  try {
+    const backend = await options.backend(poolPaths(options.paths, row));
+    if (!backend.renew) return sessionFail(SESSION_CODES.UNAVAILABLE);
+    await backend.renew(old.channelId, checked, checked.depositAtomic);
+  } finally {
+    await store.prepare(row);
+    if (
+      batchOpeningAbsent(
+        await poolChild(options.paths, rowFor(checked.sellerNodeId)),
+      )
+    )
+      context.unfunded.add(checked.sellerNodeId);
+  }
+  return rowFor(checked.sellerNodeId);
+}
 async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
   const { options, store, total, rowFor } = context;
   const checked = termsFor(terms);
@@ -77,45 +123,7 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
     .read()
     .entries.find((entry) => entry.terms.sellerNodeId === checked.sellerNodeId);
   if (row && canonicalJson(row.terms) !== canonicalJson(checked)) {
-    const old = await poolChild(options.paths, row);
-    if (row.requestId || row.uncertain || !replaceableOpening(old))
-      return sessionFail(SESSION_CODES.BINDING);
-    if (
-      BigInt(
-        budget(store.read().entries, total, context.unfunded).availableAtomic,
-      ) < BigInt(checked.depositAtomic)
-    )
-      return sessionFail(SESSION_CODES.LIMIT);
-    if (
-      !sameBatchParties(row.terms, checked) ||
-      checked.expiresAt <= row.terms.expiresAt
-    )
-      return sessionFail(SESSION_CODES.BINDING);
-    await store.update((next) => {
-      const replacing = next.entries.find(
-        (entry) => entry.terms.sellerNodeId === checked.sellerNodeId,
-      )!;
-      replacing.terms = checked;
-      replacing.ready = false;
-      replacing.replacing = old.channelId;
-      replacing.refundedAtomic = '0';
-    });
-    context.unfunded.delete(checked.sellerNodeId);
-    row = rowFor(checked.sellerNodeId);
-    try {
-      const backend = await options.backend(poolPaths(options.paths, row));
-      if (!backend.renew) return sessionFail(SESSION_CODES.UNAVAILABLE);
-      await backend.renew(old.channelId, checked, checked.depositAtomic);
-    } finally {
-      await store.prepare(row);
-      if (
-        batchOpeningAbsent(
-          await poolChild(options.paths, rowFor(checked.sellerNodeId)),
-        )
-      )
-        context.unfunded.add(checked.sellerNodeId);
-    }
-    row = rowFor(checked.sellerNodeId);
+    row = await replacePoolEntry(context, row, checked);
   }
   if (!row) {
     const first = store.read().entries[0]?.terms;
