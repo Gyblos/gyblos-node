@@ -18,6 +18,7 @@ import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { reserved } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
+import { releasedPreparation } from './batch-session-opening-release';
 import type { BatchPaths, BatchRecord } from './batch-session-types';
 
 export interface BatchStoredSession {
@@ -29,6 +30,8 @@ export interface BatchStoredSession {
   notCreated?: true;
   // A released never-funded opening: terminal for admission, and its buyer may open again.
   released?: true;
+  // An empty preparation (released or not): no channel, opening, charge or pending attempt.
+  empty?: true;
   priorSpentAtomic?: string;
 }
 async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
@@ -92,6 +95,7 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     ...(archivedProof ? { archivedProof: true as const } : {}),
     ...(notCreated ? { notCreated: true as const } : {}),
     ...(record.released ? { released: true as const } : {}),
+    ...(releasedPreparation(record) ? { empty: true as const } : {}),
     terms: record.terms,
     ...(record.history
       ? { priorSpentAtomic: String(priorBatchSpent(record)) }
@@ -118,9 +122,16 @@ export function priorBatchSpent(record: BatchRecord): bigint {
   );
 }
 
-// Closed with proof, or released never funded: such a session may live outside the seller's buyer index.
+// Closed with proof, or released never funded: such a session leaves the seller's buyer index.
 export function batchSessionUnindexed(stored: BatchStoredSession | undefined) {
   return stored?.archivedProof === true || stored?.released === true;
+}
+// A session holding nothing (closed with proof, or an empty preparation, released or interrupted before
+// its index row) may be found outside the index; its buyer comes back through admission.
+export function batchSessionHoldsNothing(
+  stored: BatchStoredSession | undefined,
+) {
+  return batchSessionUnindexed(stored) || stored?.empty === true;
 }
 export function batchSessionTerminal(stored: BatchStoredSession | undefined) {
   return (

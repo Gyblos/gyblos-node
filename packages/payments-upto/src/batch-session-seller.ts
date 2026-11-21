@@ -65,7 +65,7 @@ export async function createBatchSeller(
   const requirements = await requirementsFor(options.terms);
   const store = await reserveReleasedSlot(
     await openBatchStore(options, initialRecord(options.terms, options.now())),
-    options.reserve,
+    options.reclaimReleasedSlot,
   );
   const exclusive = serial();
   const current = store.read();
@@ -167,6 +167,7 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     state.opening = opening;
     state.channelId = opening.voucher!.channelId;
     state.voucher = opening.voucher!;
+    // Normally cleared when the session was created for this opening; kept so no opening is stored marked.
     delete state.released;
   });
   // waitBatch stops waiting but cannot cancel the SDK: a settlement still running may yet send the deposit.

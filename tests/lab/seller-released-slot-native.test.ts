@@ -137,3 +137,75 @@ void test('a readmitted released buyer holds the slot from create, before it ope
     'one channel, indexed',
   );
 });
+
+void test('a readmission interrupted after its reserve leaves a registry that loads, and the buyer returns', async (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('External RPC forbidden'),
+  );
+  const rig = await sellerRegistryRig(1);
+  t.after(rig.dispose);
+  let refuse = true;
+  let hold: Promise<void> | undefined;
+  let entered = () => {};
+  const signer = {
+    ...rig.vm.signer,
+    simulateTransaction: async (
+      ...args: Parameters<typeof rig.vm.signer.simulateTransaction>
+    ) => {
+      if (refuse) throw new Error('synthetic simulation refusal');
+      return rig.vm.signer.simulateTransaction(...args);
+    },
+    // Lets the test stop the registry while a readmission verifies its opening.
+    getAccountInfo: async (
+      ...args: Parameters<NonNullable<typeof rig.vm.signer.getAccountInfo>>
+    ) => {
+      if (hold) {
+        entered();
+        await hold;
+      }
+      return rig.vm.signer.getAccountInfo!(...args);
+    },
+  };
+  const open = () =>
+    openBatchSellerRegistry({ ...rig.options, signer, maxSessions: 1 });
+  let registry = await open();
+  const [first] = rig.buyers;
+  const failed = await registry
+    .backend(first!.terms.buyerNodeId)
+    .create(first!.terms, first!.payload);
+  await assert.rejects(failed.open(first!.payload));
+  await failed.dispose();
+  refuse = false;
+  // As the host does before binding, admission reads the index, which drops the released row.
+  assert.deepEqual(await registry.list(), []);
+  let release = () => {};
+  hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const reached = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const readmission = registry
+    .backend(first!.terms.buyerNodeId)
+    .create(first!.terms, first!.payload);
+  await reached;
+  // The seller shuts down while the readmission is under way.
+  const closing = registry.dispose();
+  hold = undefined;
+  release();
+  await assert.rejects(readmission, { code: SESSION_CODES.UNAVAILABLE });
+  await closing;
+  // It restarts and loads; the buyer returns within capacity and opens.
+  registry = await open();
+  t.after(() => registry.dispose());
+  const returned = await registry
+    .backend(first!.terms.buyerNodeId)
+    .create(first!.terms, first!.payload);
+  t.after(returned.dispose);
+  await returned.open(first!.payload);
+  assert.deepEqual(
+    (await registry.list()).map((row) => row.buyerNodeId),
+    [first!.terms.buyerNodeId],
+  );
+});

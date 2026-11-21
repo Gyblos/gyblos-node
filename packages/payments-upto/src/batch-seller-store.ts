@@ -30,7 +30,7 @@ import { termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
 import {
-  batchSessionUnindexed,
+  batchSessionHoldsNothing,
   inspectBatchSession,
   readBatchRecord,
   storedBatchSession,
@@ -91,10 +91,10 @@ async function children(paths: BatchSellerPaths, entries: SellerRegistryRow[]) {
     const own = batchSellerBuyerPaths(paths, entry.name);
     if (!entries.some((row) => !row.legacy && row.buyerNodeId === entry.name)) {
       const stored = await inspectBatchSession(own);
-      // Only closed or released sessions leave the index.
+      // Only sessions holding nothing may be found outside the index.
       if (
         stored &&
-        (!batchSessionUnindexed(stored) ||
+        (!batchSessionHoldsNothing(stored) ||
           stored.terms.buyerNodeId !== entry.name)
       )
         return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -125,7 +125,7 @@ async function load(paths: BatchSellerPaths) {
   if (
     (legacy &&
       imported?.buyerNodeId !== legacy.terms.buyerNodeId &&
-      (imported || !batchSessionUnindexed(storedBatchSession(legacy)))) ||
+      (imported || !batchSessionHoldsNothing(storedBatchSession(legacy)))) ||
     (imported && !legacy)
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);

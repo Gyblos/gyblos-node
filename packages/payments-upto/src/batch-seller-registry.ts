@@ -18,6 +18,7 @@ import {
 } from './batch-seller-store';
 import { openBatchSellerBackend } from './batch-session-backend';
 import {
+  batchSessionHoldsNothing,
   batchSessionTerminal,
   batchSessionUnindexed,
   type BatchStoredSession,
@@ -123,7 +124,8 @@ async function create(
   if (!(await permits(state, peer))) return sessionFail(SESSION_CODES.BUSY);
   if (state.store.read().entries.length >= BATCH_SELLER_REGISTRY.maxBuyers)
     return sessionFail(SESSION_CODES.LIMIT);
-  if (old && !old.released) return sessionFail(SESSION_CODES.UNVERIFIED);
+  if (old && !batchSessionHoldsNothing(old))
+    return sessionFail(SESSION_CODES.UNVERIFIED);
   // The backend verifies the signed native opening before a new row is published; create never submits.
   const financial = await base.create(terms, payload);
   try {
@@ -160,7 +162,7 @@ function backend(state: State, peer: string): BatchSellerBackend {
           .entries.some((row) => row.buyerNodeId === buyerNodeId);
         if (
           stored &&
-          ((!known && !batchSessionUnindexed(stored)) ||
+          ((!known && !batchSessionHoldsNothing(stored)) ||
             stored.terms.buyerNodeId !== buyerNodeId)
         )
           return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -180,7 +182,7 @@ function backend(state: State, peer: string): BatchSellerBackend {
             .read()
             .entries.some((row) => row.buyerNodeId === buyerNodeId)
         ) {
-          if (!batchSessionUnindexed(await base.inspect()))
+          if (!batchSessionHoldsNothing(await base.inspect()))
             return sessionFail(SESSION_CODES.UNVERIFIED);
           if (
             state.store.read().entries.length >= BATCH_SELLER_REGISTRY.maxBuyers

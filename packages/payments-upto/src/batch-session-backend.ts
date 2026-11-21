@@ -193,7 +193,8 @@ export function openBatchSellerBackend(
       const rpc = options.rpc ?? createBuyerObservationRpc(options.rpcUrl);
       await verifyPaymentNetwork(rpc, terms.network);
       const facilitator = batchFacilitatorFor(signer, terms);
-      if (!existing) {
+      // A new session, or an empty preparation taking its slot back, proves its opening first.
+      if (!existing || (existing.empty && payload !== undefined)) {
         if (!payload) return sessionFail(SESSION_CODES.UNVERIFIED);
         await firstProof(facilitator, terms, payload);
       }
@@ -208,7 +209,7 @@ export function openBatchSellerBackend(
         observeOpening: observer.opening,
         closing: observer.closing,
         operationMs: options.operationMs,
-        reserve: payload !== undefined,
+        reclaimReleasedSlot: payload !== undefined,
       });
     },
   };

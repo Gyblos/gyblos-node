@@ -140,7 +140,7 @@ export interface BatchSellerOptions extends BatchCommonOptions {
   ) => Promise<boolean>;
   closing: (channelId: string) => Promise<boolean>;
   // Created for an opening: a released session takes its slot back now, before the opening is stored.
-  reserve?: boolean;
+  reclaimReleasedSlot?: boolean;
   idleMs?: number;
   minSettlementAtomic?: string;
   pollMs?: number;

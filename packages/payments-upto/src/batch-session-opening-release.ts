@@ -121,8 +121,11 @@ export const releasedField = (row: Record<string, unknown>) =>
   Object.hasOwn(row, 'released') ? { released: releasedFor(row.released) } : {};
 // A released session created again for an opening takes its slot back before the opening is stored, so
 // capacity never admits another buyer in between. A failed write closes the store it was opened on.
-export async function reserveReleasedSlot(store: BatchStore, reserve = false) {
-  if (!reserve || !store.read().released) return store;
+export async function reserveReleasedSlot(
+  store: BatchStore,
+  reclaim?: boolean,
+) {
+  if (!reclaim || !store.read().released) return store;
   try {
     await store.update((state) => {
       delete state.released;
