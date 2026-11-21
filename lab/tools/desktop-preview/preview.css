@@ -2404,7 +2404,7 @@ html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
   display: grid;
   align-content: start;
   gap: 2px;
-  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   translate: -4px 0;
   transition:
     opacity var(--motion-overlay) var(--motion-push-ease),
@@ -2412,16 +2412,6 @@ html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
     top var(--motion-overlay) var(--motion-push-ease),
     display var(--motion-overlay) allow-discrete,
     overlay var(--motion-overlay) allow-discrete;
-}
-html
-  .app.desktop-frame
-  .compact-dropdown.preview-seller-flyout[data-side='left'] {
-  translate: 4px 0;
-}
-html
-  .app.desktop-frame
-  .compact-dropdown.preview-seller-flyout[data-side='over'] {
-  translate: 0 -4px;
 }
 html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
   translate: 0 0;
@@ -2433,13 +2423,11 @@ html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
   }
 }
 html .app.desktop-frame .preview-flyout-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
+  display: grid;
+  gap: 2px;
+  margin: 0 0 4px;
   padding: 6px 10px 8px;
   border-bottom: 1px solid var(--subtle-line);
-  margin-bottom: 4px;
 }
 html .app.desktop-frame .preview-flyout-title strong {
   font-size: 13px;
@@ -2489,34 +2477,6 @@ html .app.desktop-frame .preview-seller-flyout .dropdown-footer {
     transition: none;
   }
 }
-html .app.desktop-frame .preview-flyout-title p {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-}
-html .app.desktop-frame .preview-flyout-back {
-  display: none;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid var(--subtle-line);
-  border-radius: 8px;
-  color: var(--muted);
-  background: transparent;
-  cursor: pointer;
-}
-html .app.desktop-frame .preview-flyout-back:hover,
-html .app.desktop-frame .preview-flyout-back:focus-visible {
-  color: var(--ink);
-  background: var(--soft);
-}
-html
-  .app.desktop-frame
-  .preview-seller-flyout[data-side='over']
-  .preview-flyout-back {
-  display: inline-grid;
-}
 
 /* Interface font comparison (?font=inter): Inter 4.1 (OFL) bundled locally; Instrument Sans stays the default. */
 @font-face {
@@ -2533,4 +2493,10 @@ html[data-font='inter'] body,
 html[data-font='inter'] .desktop-frame {
   font-family: InterVariable, ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: 'cv11', 'ss01';
+}
+@media (max-width: 560px) {
+  html .app.desktop-frame .preview-model-menu[data-split] .preview-mode-chip,
+  html .app.desktop-frame .preview-model-menu[data-split] .preview-menu-caret {
+    display: none;
+  }
 }

@@ -1,7 +1,6 @@
 // Groups network offers by model. Hovering a model with several sellers opens a side panel
 // with the seller strategy (Auto first); choosing a strategy keeps the menu open.
 import {
-  CaretLeft,
   CaretRight,
   Check,
   CurrencyCircleDollar,
@@ -90,7 +89,7 @@ function group(models: readonly ModelOption[]) {
   return [...groups.entries()];
 }
 
-const FLYOUT = { WIDTH: 288, GAP: 6, GUTTER: 12, HOVER_MS: 90 } as const;
+const FLYOUT = { GAP: 6, REPOSITION: 'preview:reposition' } as const;
 
 function moveFocus(event: KeyboardEvent<HTMLElement>, selector: string) {
   if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return false;
@@ -169,7 +168,6 @@ export function ModelDropdown({
   const [active, setActive] = useState<string | null>(null);
   const [, refresh] = useState(0);
   const flyout = useRef<HTMLDivElement>(null);
-  const hover = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const listed = models.some((item) => item.id === model.id);
   const isAuto = (name: string) =>
     automatic.has(name) || (!chosenTag.has(name) && models.filter((item) => item.name === name).length > 1);
@@ -184,10 +182,6 @@ export function ModelDropdown({
     else automatic.delete(item.name);
     refresh((value) => value + 1);
     onSelect(item.id);
-  };
-  const openSoon = (name: string | null) => {
-    clearTimeout(hover.current);
-    hover.current = setTimeout(() => setActive(name), FLYOUT.HOVER_MS);
   };
   const rowFor = (name: string) =>
     flyout.current?.parentElement
@@ -209,43 +203,55 @@ export function ModelDropdown({
   useLayoutEffect(() => {
     const panel = flyout.current;
     const row = active ? rowFor(active) : undefined;
-    if (!panel) return;
+    const menu = (row ?? panel)?.closest<HTMLElement>('.compact-dropdown:not(.preview-seller-flyout)');
+    if (!panel || !menu) return;
+    const reposition = () => menu.dispatchEvent(new Event(FLYOUT.REPOSITION));
     if (!row) {
       if (panel.matches(':popover-open')) panel.hidePopover();
+      if (menu.dataset.split) {
+        delete menu.dataset.split;
+        menu.style.minHeight = '';
+        reposition();
+      }
       return;
     }
-    const menu = row.closest<HTMLElement>('.compact-dropdown');
-    if (!menu) return;
     function place() {
-      if (!panel || !row || !menu) return;
-      const box = menu.getBoundingClientRect();
-      const at = row.getBoundingClientRect();
-      const width = Math.min(FLYOUT.WIDTH, window.innerWidth - FLYOUT.GUTTER * 2);
-      const right = box.right + FLYOUT.GAP;
-      const left = box.left - FLYOUT.GAP - width;
-      const beside = right + width <= window.innerWidth - FLYOUT.GUTTER;
-      const before = left >= FLYOUT.GUTTER;
-      panel.style.width = width + 'px';
-      panel.dataset.side = beside ? 'right' : before ? 'left' : 'over';
-      panel.style.left =
-        (beside ? right : before ? left : Math.max(FLYOUT.GUTTER, box.right - width)) + 'px';
-      const top = beside || before ? at.top - 6 : at.bottom + FLYOUT.GAP;
-      const height = panel.offsetHeight;
-      panel.style.top =
-        Math.max(FLYOUT.GUTTER, Math.min(top, window.innerHeight - height - FLYOUT.GUTTER)) + 'px';
+      if (!panel || !menu) return;
+      menu.style.minHeight = '';
+      reposition();
+      panel.style.height = 'auto';
+      const limit = Number.parseFloat(menu.style.maxHeight) || window.innerHeight;
+      menu.style.minHeight = Math.min(Math.max(panel.scrollHeight, menu.offsetHeight), limit) + 'px';
+      reposition();
+      sync();
     }
+    function sync() {
+      if (!panel || !menu) return;
+      const box = menu.getBoundingClientRect();
+      panel.style.width = box.width + 'px';
+      panel.style.height = box.height + 'px';
+      panel.style.left = box.right + FLYOUT.GAP + 'px';
+      panel.style.top = box.top + 'px';
+    }
+    menu.dataset.split = 'true';
     if (!panel.matches(':popover-open')) panel.showPopover();
     place();
     const closed = (event: Event) => {
       if (event instanceof ToggleEvent && event.newState === 'closed') setActive(null);
     };
-    menu.addEventListener('scroll', place);
+    const outside = (event: Event) => {
+      if (!(event.target instanceof Node && (menu.contains(event.target) || panel.contains(event.target)))) place();
+    };
+    const observer = new ResizeObserver(sync);
+    observer.observe(menu);
     menu.addEventListener('toggle', closed);
     window.addEventListener('resize', place);
+    window.addEventListener('scroll', outside, true);
     return () => {
-      menu.removeEventListener('scroll', place);
+      observer.disconnect();
       menu.removeEventListener('toggle', closed);
       window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', outside, true);
     };
   }, [active]);
 
@@ -331,18 +337,13 @@ export function ModelDropdown({
                         {several && <CaretRight size={13} className="preview-menu-caret" />}
                       </span>
                     }
-                    onPointerEnter={() => openSoon(several ? name : null)}
                     onClick={() => {
                       if (!several) {
                         close();
                         onSelect(first.id);
                         return;
                       }
-                      const all = models.filter((item) => item.name === name);
-                      const strategy = chosenTag.get(name);
-                      const pick = strategy ? recommended(all).find((option) => option.label === strategy)?.item : undefined;
-                      remember(pick ?? best(all) ?? first, !pick, pick ? strategy : undefined);
-                      setActive(name);
+                      setActive(active === name ? null : name);
                     }}
                   />
                 );
@@ -357,7 +358,6 @@ export function ModelDropdown({
               <MenuItem
                 footer
                 label="View all models"
-                onPointerEnter={() => openSoon(null)}
                 onClick={() => {
                   close();
                   onBrowse();
@@ -371,7 +371,6 @@ export function ModelDropdown({
               aria-label={(active ?? '') + ' seller'}
               className="compact-dropdown preview-seller-flyout"
               onToggle={(event) => event.stopPropagation()}
-              onPointerEnter={() => clearTimeout(hover.current)}
               onKeyDown={(event) => {
                 if (moveFocus(event, "[role^='menuitem']")) return;
                 if (event.key === 'ArrowLeft' || event.key === 'Escape') {
@@ -383,15 +382,10 @@ export function ModelDropdown({
             >
               {active && top && (
                 <>
-                  <div className="preview-flyout-title">
-                    <button type="button" className="preview-flyout-back" aria-label="Back to models" onClick={back}>
-                      <CaretLeft size={14} />
-                    </button>
-                    <p>
-                      <strong>Seller</strong>
-                      <small>{offers.length} sellers for {active}</small>
-                    </p>
-                  </div>
+                  <p className="preview-flyout-title">
+                    <strong>Seller</strong>
+                    <small>{offers.length} sellers for {active}</small>
+                  </p>
                   <StrategyRow
                     icon={Sparkle}
                     label="Auto"

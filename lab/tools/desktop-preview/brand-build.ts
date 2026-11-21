@@ -298,7 +298,19 @@ export function transformBrand(source: string, id: string, desktop: string) {
       ],
       [
         "window.removeEventListener('scroll', position, true);",
-        "window.removeEventListener('scroll', outside, true);",
+        "window.removeEventListener('scroll', outside, true);\n      menu.removeEventListener('preview:reposition', position);",
+      ],
+      [
+        "window.addEventListener('resize', position);",
+        "window.addEventListener('resize', position);\n    menu.addEventListener('preview:reposition', position);",
+      ],
+      [
+        'const width = Math.min(\n        MENU_GEOMETRY.WIDTH,\n        window.innerWidth - gutter * 2,\n      );',
+        "const split = menu.dataset.split === 'true';\n      const width = Math.min(\n        MENU_GEOMETRY.WIDTH,\n        split ? (window.innerWidth - gutter * 2 - 6) / 2 : window.innerWidth - gutter * 2,\n      );",
+      ],
+      [
+        'window.innerWidth - width - gutter',
+        'window.innerWidth - width - (split ? width + 6 : 0) - gutter',
       ],
     ]);
   if (target === `${base}/src/ui/BuyerFunding.tsx`)
