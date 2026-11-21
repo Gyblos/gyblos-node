@@ -27,13 +27,3 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
     "            {(previewFunds.blocked ? 'Add funds or choose a free model to send.' : limitNotice) ||",
   ],
 ];
-export const CHAT_TOOLS_REWRITES: readonly [string, string][] = [
-  [
-    "import { Check, Wrench } from '@phosphor-icons/react';",
-    "import { Check, Plus } from '@phosphor-icons/react';",
-  ],
-  [
-    'trigger={<Wrench size={16} aria-hidden="true" />}',
-    'trigger={<Plus size={16} weight="bold" aria-hidden="true" />}',
-  ],
-];

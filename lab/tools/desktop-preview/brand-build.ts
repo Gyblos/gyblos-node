@@ -311,12 +311,14 @@ export function transformBrand(source: string, id: string, desktop: string) {
         "const split = menu.dataset.split === 'true';\n      const width = Math.min(\n        MENU_GEOMETRY.WIDTH,\n        split ? (window.innerWidth - gutter * 2 - 6) / 2 : window.innerWidth - gutter * 2,\n      );",
       ],
       [
+        'const up =\n        below < Math.min(menu.scrollHeight, MENU_GEOMETRY.WIDTH) &&\n        above > below;',
+        "const fits = (space: number) => space >= Math.min(menu.scrollHeight, MENU_GEOMETRY.WIDTH);\n      const up = anchor.closest('.composer')\n        ? fits(above) || above > below\n        : !fits(below) && above > below;",
+      ],
+      [
         'window.innerWidth - width - gutter',
         'window.innerWidth - width - (split ? width + 6 : 0) - gutter',
       ],
     ]);
-  if (target === `${base}/src/ui/ChatTools.tsx`)
-    return replaceEach(source, [...funds.CHAT_TOOLS_REWRITES]);
   if (target === `${base}/src/ui/BuyerFunding.tsx`)
     return source.replaceAll(
       'Could not open the devnet faucet.',

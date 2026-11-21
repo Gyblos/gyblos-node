@@ -228,3 +228,24 @@ void test('preview payment, session and key lists use the same table component',
     assert.doesNotMatch(rendered, /<(?:DataTable|table)\b/);
   }
 });
+
+void test('preview composer keeps the tools icon, opens its menus upward and seeds past chats', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const tools = 'apps/desktop/src/ui/ChatTools.tsx';
+  const toolsSource = await readFile(tools, 'utf8');
+  const toolsView =
+    transformBrand(toolsSource, tools, 'apps/desktop') ?? toolsSource;
+  assert.match(toolsView, /trigger=\{<Wrench\b/);
+  const dropdown = 'apps/desktop/src/ui/Dropdown.tsx';
+  const dropdownSource = await readFile(dropdown, 'utf8');
+  const dropdownView =
+    transformBrand(dropdownSource, dropdown, 'apps/desktop') ?? dropdownSource;
+  assert.match(dropdownView, /anchor\.closest\('\.composer'\)/);
+  const host = await readFile('lab/tools/desktop-preview/host.ts', 'utf8');
+  assert.doesNotMatch(
+    host,
+    /setDraft\(title\)/,
+    'sample sidebar chats must contain messages, not empty drafts',
+  );
+});

@@ -143,8 +143,7 @@ export function createPreviewHost(
     );
   }
   for (const title of titles) {
-    if (tenChats) exampleChat(title, crypto.randomUUID());
-    else conversations.setDraft(title);
+    exampleChat(title, crypto.randomUUID());
     conversations.newChat(crypto.randomUUID());
   }
   exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
