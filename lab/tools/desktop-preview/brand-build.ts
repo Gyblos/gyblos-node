@@ -290,6 +290,17 @@ export function transformBrand(source: string, id: string, desktop: string) {
         "String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')\n  ).replace(/0+$/, '').replace(/\\.$/, '');",
       ],
     ]);
+  if (target === `${base}/src/ui/Dropdown.tsx`)
+    return replaceEach(source, [
+      [
+        "window.addEventListener('scroll', position, true);",
+        "const outside = (event: Event) => {\n      if (!(event.target instanceof Node && menu.contains(event.target))) position();\n    };\n    window.addEventListener('scroll', outside, true);",
+      ],
+      [
+        "window.removeEventListener('scroll', position, true);",
+        "window.removeEventListener('scroll', outside, true);",
+      ],
+    ]);
   if (target === `${base}/src/ui/BuyerFunding.tsx`)
     return source.replaceAll(
       'Could not open the devnet faucet.',

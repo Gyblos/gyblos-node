@@ -1,6 +1,21 @@
-// Groups network offers by model; the seller is a second choice under each model, with Automatic first.
-import { CaretDown, CaretRight, Check } from '@phosphor-icons/react';
-import { useState } from 'react';
+// Groups network offers by model. Hovering a model with several sellers opens a side panel
+// with the seller strategy (Auto first); choosing a strategy keeps the menu open.
+import {
+  CaretLeft,
+  CaretRight,
+  Check,
+  CurrencyCircleDollar,
+  Lightning,
+  ShieldCheck,
+  Sparkle,
+  type Icon,
+} from '@phosphor-icons/react';
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 
 import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
 import { Dropdown } from './Dropdown';
@@ -53,18 +68,17 @@ function latencyOf(model: ModelOption) {
 function recommended(offers: readonly ModelOption[]) {
   const sorted = (score: (item: ModelOption) => number) => [...offers].sort((a, b) => score(a) - score(b))[0];
   const picks = [
-    { label: 'Cheapest', item: sorted((item) => (item.free ? -1 : item.input + item.output)) },
-    { label: 'Fastest', item: sorted(latencyOf) },
-    { label: 'Most reliable', item: sorted((item) => -((latencyOf(item) * 7) % 13)) },
+    { label: 'Cheapest', icon: CurrencyCircleDollar, item: sorted((item) => (item.free ? -1 : item.input + item.output)) },
+    { label: 'Fastest', icon: Lightning, item: sorted(latencyOf) },
+    { label: 'Most reliable', icon: ShieldCheck, item: sorted((item) => -((latencyOf(item) * 7) % 13)) },
   ];
-  return picks.filter((pick): pick is { label: string; item: ModelOption } => !!pick.item);
+  return picks.filter((pick): pick is { label: string; icon: Icon; item: ModelOption } => !!pick.item);
 }
 function groupPrice(offers: readonly ModelOption[]) {
   const paid = offers.filter((item) => !item.free);
   const cheapest = paid.sort((a, b) => a.input - b.input)[0];
   if (!cheapest) return 'Free';
-  const from = 'from ' + usdPerMtok(cheapest.input) + ' in / 1M';
-  return offers.some((item) => item.free) ? 'Free · or ' + from : 'Paid · ' + from;
+  return offers.some((item) => item.free) ? 'Free' : 'From ' + usdPerMtok(cheapest.input) + '/M';
 }
 function group(models: readonly ModelOption[]) {
   const groups = new Map<string, ModelOption[]>();
@@ -74,6 +88,58 @@ function group(models: readonly ModelOption[]) {
     groups.set(item.name, list);
   }
   return [...groups.entries()];
+}
+
+const FLYOUT = { WIDTH: 288, GAP: 6, GUTTER: 12, HOVER_MS: 90 } as const;
+
+function moveFocus(event: KeyboardEvent<HTMLElement>, selector: string) {
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return false;
+  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(selector));
+  if (!items.length) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  const index = items.findIndex((item) => item === document.activeElement);
+  const next =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? items.length - 1
+        : event.key === 'ArrowDown'
+          ? (index + 1) % items.length
+          : (index - 1 + items.length) % items.length;
+  items[next]?.focus();
+  return true;
+}
+
+function StrategyRow({
+  icon: Glyph,
+  label,
+  detail,
+  checked,
+  onChoose,
+}: {
+  icon: Icon;
+  label: string;
+  detail: string;
+  checked: boolean;
+  onChoose: () => void;
+}) {
+  return (
+    <MenuItem
+      role="menuitemradio"
+      checked={checked}
+      data-strategy
+      label={label}
+      detail={detail}
+      leading={
+        <span className="preview-strategy-icon" aria-hidden="true">
+          <Glyph size={15} weight={checked ? 'fill' : 'regular'} />
+        </span>
+      }
+      trailing={checked ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
+      onClick={onChoose}
+    />
+  );
 }
 
 export function ModelDropdown({
@@ -100,15 +166,10 @@ export function ModelDropdown({
   const network =
     networkOnly ||
     models.some((item) => item.source === MODEL_SOURCE.ANNOUNCED);
-  const [expanded, setExpanded] = useState<string | null>(model.name);
-  const [closing, setClosing] = useState<string | null>(null);
-  const toggle = (name: string, open: boolean) => {
-    const previous = open ? name : expanded;
-    setExpanded(open ? null : name);
-    if (!previous || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    setClosing(previous);
-    setTimeout(() => setClosing((value) => (value === previous ? null : value)), 180);
-  };
+  const [active, setActive] = useState<string | null>(null);
+  const [, refresh] = useState(0);
+  const flyout = useRef<HTMLDivElement>(null);
+  const hover = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const listed = models.some((item) => item.id === model.id);
   const isAuto = (name: string) =>
     automatic.has(name) || (!chosenTag.has(name) && models.filter((item) => item.name === name).length > 1);
@@ -116,18 +177,82 @@ export function ModelDropdown({
   const ordered = network
     ? models
     : [model, ...models.filter((item) => item.id !== model.id)];
-  const choose = (close: () => void, item: ModelOption, byAutomatic: boolean, tag?: string) => {
+  const remember = (item: ModelOption, byAutomatic: boolean, tag?: string) => {
     if (tag) chosenTag.set(item.name, tag);
     else chosenTag.delete(item.name);
     if (byAutomatic) automatic.add(item.name);
     else automatic.delete(item.name);
-    close();
+    refresh((value) => value + 1);
     onSelect(item.id);
   };
+  const openSoon = (name: string | null) => {
+    clearTimeout(hover.current);
+    hover.current = setTimeout(() => setActive(name), FLYOUT.HOVER_MS);
+  };
+  const rowFor = (name: string) =>
+    flyout.current?.parentElement
+      ?.closest('.compact-dropdown')
+      ?.querySelector<HTMLElement>('[data-model-row="' + CSS.escape(name) + '"]') ?? undefined;
+  const focusFlyout = () =>
+    requestAnimationFrame(() =>
+      (
+        flyout.current?.querySelector<HTMLElement>('[aria-checked="true"]') ??
+        flyout.current?.querySelector<HTMLElement>("[role^='menuitem']")
+      )?.focus(),
+    );
+  const back = () => {
+    const row = active ? rowFor(active) : undefined;
+    setActive(null);
+    requestAnimationFrame(() => row?.focus());
+  };
+
+  useLayoutEffect(() => {
+    const panel = flyout.current;
+    const row = active ? rowFor(active) : undefined;
+    if (!panel) return;
+    if (!row) {
+      if (panel.matches(':popover-open')) panel.hidePopover();
+      return;
+    }
+    const menu = row.closest<HTMLElement>('.compact-dropdown');
+    if (!menu) return;
+    function place() {
+      if (!panel || !row || !menu) return;
+      const box = menu.getBoundingClientRect();
+      const at = row.getBoundingClientRect();
+      const width = Math.min(FLYOUT.WIDTH, window.innerWidth - FLYOUT.GUTTER * 2);
+      const right = box.right + FLYOUT.GAP;
+      const left = box.left - FLYOUT.GAP - width;
+      const beside = right + width <= window.innerWidth - FLYOUT.GUTTER;
+      const before = left >= FLYOUT.GUTTER;
+      panel.style.width = width + 'px';
+      panel.dataset.side = beside ? 'right' : before ? 'left' : 'over';
+      panel.style.left =
+        (beside ? right : before ? left : Math.max(FLYOUT.GUTTER, box.right - width)) + 'px';
+      const top = beside || before ? at.top - 6 : at.bottom + FLYOUT.GAP;
+      const height = panel.offsetHeight;
+      panel.style.top =
+        Math.max(FLYOUT.GUTTER, Math.min(top, window.innerHeight - height - FLYOUT.GUTTER)) + 'px';
+    }
+    if (!panel.matches(':popover-open')) panel.showPopover();
+    place();
+    const closed = (event: Event) => {
+      if (event instanceof ToggleEvent && event.newState === 'closed') setActive(null);
+    };
+    menu.addEventListener('scroll', place);
+    menu.addEventListener('toggle', closed);
+    window.addEventListener('resize', place);
+    return () => {
+      menu.removeEventListener('scroll', place);
+      menu.removeEventListener('toggle', closed);
+      window.removeEventListener('resize', place);
+    };
+  }, [active]);
+
   return (
     <Dropdown
       searchLabel="Search models"
-      label={(label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')) + ': ' + model.name + (auto ? ', Auto' : model.free ? ', Free' : '')}
+      label={(label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')) + ': ' + model.name + (auto ? ', Auto' : chosenTag.has(model.name) ? ', ' + chosenTag.get(model.name) : model.free ? ', Free' : '')}
       className={toolbar ? 'model-picker' : 'ui-model-trigger'}
       panelClassName="preview-model-menu"
       trigger={
@@ -138,6 +263,8 @@ export function ModelDropdown({
             <Badge>Local</Badge>
           ) : network && !listed ? null : auto ? (
             <Badge>Auto</Badge>
+          ) : chosenTag.has(model.name) ? (
+            <Badge>{chosenTag.get(model.name)}</Badge>
           ) : model.free ? (
             <Badge>Free</Badge>
           ) : (
@@ -156,77 +283,70 @@ export function ModelDropdown({
         const groups = group(filtered);
         const visible =
           network || needle ? groups : groups.slice(0, MENU_GEOMETRY.QUICK_MODELS);
+        const offers = active ? (group(models).find(([name]) => name === active)?.[1] ?? []) : [];
+        const top = best(offers);
+        const current = !!active && (active === model.name || offers.some((item) => item.id === model.id));
         return (
           <>
-            {visible.map(([name, offers]) => {
-              const first = offers[0];
-              if (!first) return null;
-              const current = name === model.name || offers.some((item) => item.id === model.id);
-              if (offers.length === 1 || contextLabel)
+            <div
+              className="preview-model-list"
+              onKeyDown={(event) => {
+                if (moveFocus(event, '.preview-model-list > [role^="menuitem"]')) return;
+                const name = event.target instanceof HTMLElement ? event.target.dataset.model : undefined;
+                if (event.key === 'ArrowRight' && name) {
+                  event.preventDefault();
+                  setActive(name);
+                  focusFlyout();
+                }
+              }}
+            >
+              {visible.map(([name, list]) => {
+                const first = list[0];
+                if (!first) return null;
+                const selected = name === model.name || list.some((item) => item.id === model.id);
+                const several = list.length > 1 && !contextLabel;
+                const mode = isAuto(name) ? 'Auto' : (chosenTag.get(name) ?? '');
                 return (
                   <MenuItem
                     key={name}
+                    data-model-row={name}
+                    data-model={several ? name : undefined}
+                    data-active={active === name || undefined}
                     role="menuitemradio"
-                    checked={current}
+                    checked={selected}
+                    aria-haspopup={several ? 'menu' : undefined}
+                    aria-expanded={several ? active === name : undefined}
                     label={name}
-                    detail={contextLabel ?? priceLabel(first) + ' · ' + sellerName(first)}
+                    detail={
+                      contextLabel ??
+                      (several
+                        ? groupPrice(list) + ' · ' + list.length + ' sellers'
+                        : priceLabel(first) + ' · ' + sellerName(first))
+                    }
                     leading={<ModelImage artwork={first.image} name={name} />}
-                    trailing={current && <Selected />}
-                    onClick={() => choose(close, first, false)}
+                    trailing={
+                      <span className="preview-menu-trail">
+                        {selected && several && mode && <span className="preview-mode-chip">{mode}</span>}
+                        {selected ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
+                        {several && <CaretRight size={13} className="preview-menu-caret" />}
+                      </span>
+                    }
+                    onPointerEnter={() => openSoon(several ? name : null)}
+                    onClick={() => {
+                      if (!several) {
+                        close();
+                        onSelect(first.id);
+                        return;
+                      }
+                      const strategy = chosenTag.get(name);
+                      const pick = strategy ? recommended(list).find((option) => option.label === strategy)?.item : undefined;
+                      remember(pick ?? best(list) ?? first, !pick, pick ? strategy : undefined);
+                      setActive(name);
+                    }}
                   />
                 );
-              const open = expanded === name || !!needle;
-              const shown = open || closing === name;
-              const top = best(offers) ?? first;
-              return (
-                <div key={name} className="preview-model-group" data-open={open} data-current={current || undefined}>
-                  <MenuItem
-                    aria-expanded={needle ? undefined : open}
-                    label={name}
-                    detail={groupPrice(offers) + ' · ' + offers.length + ' sellers'}
-                    leading={<ModelImage artwork={first.image} name={name} />}
-                    trailing={<span className="preview-menu-trail">{current && <Selected />}{needle ? null : open ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>}
-                    onClick={() => (needle ? choose(close, top, true) : toggle(name, open))}
-                  />
-                  {shown && (
-                    <div className="preview-reveal" data-state={closing === name && !open ? 'closing' : undefined}><div>
-                    <div className="preview-seller-list" role="group" aria-label={name + ' sellers'}>
-                      <MenuItem
-                        role="menuitemradio"
-                        checked={current && isAuto(name)}
-                        label="Auto"
-                        detail={'Recommended · now ' + sellerName(top) + ' · ' + priceLabel(top)}
-                        trailing={current && isAuto(name) && <Selected />}
-                        onClick={() => choose(close, top, true)}
-                      />
-                      {recommended(offers).map(({ label: tag, item }) => {
-                        const pinned = item.id === model.id && !isAuto(name) && chosenTag.get(name) === tag;
-                        return (
-                          <MenuItem
-                            key={tag + item.id}
-                            role="menuitemradio"
-                            checked={pinned}
-                            label={tag}
-                            detail={[sellerName(item), quantization(item), priceLabel(item)].filter(Boolean).join(' · ')}
-                            trailing={pinned && <Selected />}
-                            onClick={() => choose(close, item, false, tag)}
-                          />
-                        );
-                      })}
-                      <MenuItem
-                        label="Compare sellers in Models"
-                        detail={offers.length + ' sellers · opens the model catalog'}
-                        onClick={() => {
-                          close();
-                          onBrowse();
-                        }}
-                      />
-                    </div>
-                    </div></div>
-                  )}
-                </div>
-              );
-            })}
+              })}
+            </div>
             {!visible.length && (
               <p className="dropdown-note" role="status">
                 No models found
@@ -236,12 +356,69 @@ export function ModelDropdown({
               <MenuItem
                 footer
                 label="View all models"
+                onPointerEnter={() => openSoon(null)}
                 onClick={() => {
                   close();
                   onBrowse();
                 }}
               />
             )}
+            <div
+              ref={flyout}
+              popover="manual"
+              role="menu"
+              aria-label={(active ?? '') + ' seller'}
+              className="compact-dropdown preview-seller-flyout"
+              onToggle={(event) => event.stopPropagation()}
+              onPointerEnter={() => clearTimeout(hover.current)}
+              onKeyDown={(event) => {
+                if (moveFocus(event, "[role^='menuitem']")) return;
+                if (event.key === 'ArrowLeft' || event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  back();
+                }
+              }}
+            >
+              {active && top && (
+                <>
+                  <div className="preview-flyout-title">
+                    <button type="button" className="preview-flyout-back" aria-label="Back to models" onClick={back}>
+                      <CaretLeft size={14} />
+                    </button>
+                    <p>
+                      <strong>Seller</strong>
+                      <small>{offers.length} sellers for {active}</small>
+                    </p>
+                  </div>
+                  <StrategyRow
+                    icon={Sparkle}
+                    label="Auto"
+                    detail={'Recommended · now ' + sellerName(top) + ' · ' + priceLabel(top)}
+                    checked={current && isAuto(active)}
+                    onChoose={() => remember(top, true)}
+                  />
+                  {recommended(offers).map(({ label: tag, icon, item }) => (
+                    <StrategyRow
+                      key={tag}
+                      icon={icon}
+                      label={tag}
+                      detail={[sellerName(item), quantization(item), priceLabel(item)].filter(Boolean).join(' · ')}
+                      checked={current && !isAuto(active) && chosenTag.get(active) === tag}
+                      onChoose={() => remember(item, false, tag)}
+                    />
+                  ))}
+                  <MenuItem
+                    footer
+                    label={'Compare ' + offers.length + ' sellers in Models'}
+                    onClick={() => {
+                      close();
+                      onBrowse();
+                    }}
+                  />
+                </>
+              )}
+            </div>
           </>
         );
       }}

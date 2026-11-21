@@ -2378,3 +2378,147 @@ html
   line-height: 20px;
   background: transparent;
 }
+
+/* Model picker: flat model list with a side panel for the seller strategy. */
+html .app.desktop-frame .preview-model-menu .dropdown-row[data-active] {
+  background: var(--soft);
+}
+html .app.desktop-frame .preview-menu-caret {
+  color: var(--muted);
+}
+html .app.desktop-frame .preview-check-slot {
+  width: 18px;
+  flex: none;
+}
+html .app.desktop-frame .preview-mode-chip {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  max-height: calc(100vh - 24px);
+  translate: -4px 0;
+  transition:
+    opacity var(--motion-overlay) var(--motion-push-ease),
+    translate var(--motion-overlay) var(--motion-push-ease),
+    top var(--motion-overlay) var(--motion-push-ease),
+    display var(--motion-overlay) allow-discrete,
+    overlay var(--motion-overlay) allow-discrete;
+}
+html
+  .app.desktop-frame
+  .compact-dropdown.preview-seller-flyout[data-side='left'] {
+  translate: 4px 0;
+}
+html
+  .app.desktop-frame
+  .compact-dropdown.preview-seller-flyout[data-side='over'] {
+  translate: 0 -4px;
+}
+html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
+  translate: 0 0;
+}
+@starting-style {
+  html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
+    opacity: 0;
+    translate: -4px 0;
+  }
+}
+html .app.desktop-frame .preview-flyout-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid var(--subtle-line);
+  margin-bottom: 4px;
+}
+html .app.desktop-frame .preview-flyout-title strong {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+html .app.desktop-frame .preview-flyout-title small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {
+  gap: 10px;
+  border-radius: 8px;
+}
+html .app.desktop-frame .preview-strategy-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid var(--subtle-line);
+  border-radius: 8px;
+  color: var(--muted);
+  transition:
+    color var(--motion-overlay) ease,
+    background var(--motion-overlay) ease,
+    border-color var(--motion-overlay) ease;
+}
+html .app.desktop-frame .dropdown-row[data-strategy][aria-checked='true'] {
+  background: color-mix(in srgb, var(--pk-success) 9%, transparent);
+}
+html
+  .app.desktop-frame
+  .dropdown-row[data-strategy][aria-checked='true']
+  .preview-strategy-icon {
+  border-color: color-mix(in srgb, var(--pk-success) 45%, transparent);
+  color: var(--pk-success);
+  background: color-mix(in srgb, var(--pk-success) 14%, transparent);
+}
+html
+  .app.desktop-frame
+  .dropdown-row[data-strategy][aria-checked='true']
+  strong {
+  color: var(--ink);
+}
+html .app.desktop-frame .preview-seller-flyout .dropdown-footer {
+  margin-top: 4px;
+  border-top: 1px solid var(--subtle-line);
+}
+@media (prefers-reduced-motion: reduce) {
+  html .app.desktop-frame .compact-dropdown.preview-seller-flyout,
+  html .app.desktop-frame .preview-strategy-icon {
+    transition: none;
+  }
+}
+html .app.desktop-frame .preview-flyout-title p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+html .app.desktop-frame .preview-flyout-back {
+  display: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--subtle-line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+html .app.desktop-frame .preview-flyout-back:hover,
+html .app.desktop-frame .preview-flyout-back:focus-visible {
+  color: var(--ink);
+  background: var(--soft);
+}
+html
+  .app.desktop-frame
+  .preview-seller-flyout[data-side='over']
+  .preview-flyout-back {
+  display: inline-grid;
+}
