@@ -200,7 +200,35 @@ html .app.desktop-frame .ui-button:focus-visible {
   cursor: pointer;
 }
 .preview-tool-choices input {
-  accent-color: var(--accent);
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.preview-tool-choices label {
+  position: relative;
+  border: 1px solid transparent;
+  font-weight: 500;
+}
+.preview-tool-choices label:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--raised));
+}
+.preview-tool-choices label:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.preview-tool-logo {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--bg);
+}
+.preview-tool-logo img {
+  width: 18px;
+  height: 18px;
 }
 
 /* Every preview table uses the same header, cell spacing and scroll region. */
