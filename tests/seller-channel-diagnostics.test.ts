@@ -26,6 +26,9 @@ void test('a failed channel opening is recorded with its operation and stable co
   t.after(rig.dispose);
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const session = rig.seller();
+  // The fake backend hands out this one session; a real one creates a new session on every rebinding, so
+  // the host's dispose of a released (preparing) binding is a no-op here.
+  t.mock.method(session, 'dispose', async () => {});
   const records: DiagnosticRecord[] = [];
   let allowed = false;
   let created = false;

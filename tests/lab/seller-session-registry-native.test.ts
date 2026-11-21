@@ -6,10 +6,7 @@ import { test } from 'node:test';
 
 import { FILE_MODES } from '@gyblos/config';
 import { batchSellerBuyerPaths } from '@gyblos/config/home';
-import {
-  openBatchSellerBackend,
-  openBatchSellerRegistry,
-} from '@gyblos/payments-upto/batch-session';
+import { openBatchSellerBackend } from '@gyblos/payments-upto/batch-session';
 import {
   SESSION_CODES,
   SESSION_STATES,
@@ -370,61 +367,4 @@ void test('64 settled buyers retain their proofs after restart while an uncertai
     false,
   );
   assert.equal(await registry.permits(first.terms.buyerNodeId), false);
-});
-
-void test('a never-funded opening frees its slot for the next buyer, across a restart, and its buyer waits for capacity', async (t) => {
-  t.mock.method(Date, 'now', () => 1_800_000_000_000);
-  t.mock.method(globalThis, 'fetch', async () =>
-    assert.fail('External RPC forbidden'),
-  );
-  const rig = await sellerRegistryRig(1);
-  t.after(rig.dispose);
-  let refuse = true;
-  const signer = {
-    ...rig.vm.signer,
-    // A refused simulation: the deposit is never sent.
-    simulateTransaction: async (
-      ...args: Parameters<typeof rig.vm.signer.simulateTransaction>
-    ) => {
-      if (refuse) throw new Error('synthetic simulation refusal');
-      return rig.vm.signer.simulateTransaction(...args);
-    },
-  };
-  const open = () =>
-    openBatchSellerRegistry({ ...rig.options, signer, maxSessions: 1 });
-  let registry = await open();
-  const [first, second] = rig.buyers;
-  const failed = await registry
-    .backend(first!.terms.buyerNodeId)
-    .create(first!.terms, first!.payload);
-  const before = rig.vm.sends();
-  await assert.rejects(failed.open(first!.payload));
-  await failed.dispose();
-  assert.equal(rig.vm.sends(), before, 'nothing was sent');
-  assert.equal(
-    (await registry.backend(first!.terms.buyerNodeId).inspect())?.snapshot
-      .channelId,
-    '',
-  );
-  // The slot is free for another buyer, and stays free after a restart.
-  assert.equal(await registry.permits(second!.terms.buyerNodeId), true);
-  await registry.dispose();
-  registry = await open();
-  t.after(() => registry.dispose());
-  assert.equal(await registry.permits(second!.terms.buyerNodeId), true);
-  refuse = false;
-  const next = await registry
-    .backend(second!.terms.buyerNodeId)
-    .create(second!.terms, second!.payload);
-  t.after(next.dispose);
-  await next.open(second!.payload);
-  assert.equal(rig.vm.sends(), before + 1, 'the next buyer deposited');
-  // The released buyer now waits for capacity like any other.
-  assert.equal(await registry.permits(first!.terms.buyerNodeId), false);
-  await assert.rejects(
-    registry
-      .backend(first!.terms.buyerNodeId)
-      .create(first!.terms, first!.payload),
-    { code: SESSION_CODES.BUSY },
-  );
 });

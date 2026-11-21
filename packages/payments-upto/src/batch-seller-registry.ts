@@ -64,7 +64,9 @@ async function rows(state: State): Promise<BatchSellerRegistryEntry[]> {
     const stored = await backend.inspect();
     if (!stored || stored.terms.buyerNodeId !== row.buyerNodeId)
       return sessionFail(SESSION_CODES.UNVERIFIED);
-    if (stored.archivedProof) archived.add(row.buyerNodeId);
+    // A released never-funded session holds no evidence or slot: like a closed one, it leaves the index
+    // and its buyer comes back through create or renew, which check capacity again.
+    if (stored.archivedProof || stored.released) archived.add(row.buyerNodeId);
     else entries.push({ buyerNodeId: row.buyerNodeId, stored });
   }
   // Archive in place: remove only the index reference, never move or rewrite financial evidence.
@@ -113,9 +115,6 @@ async function create(
     .entries.find((row) => row.buyerNodeId === peer);
   if (found) {
     if (found.prepared !== null) return sessionFail(SESSION_CODES.UNAVAILABLE);
-    // A released buyer no longer holds a slot: it opens again only within capacity.
-    if ((await base.inspect())?.released && !(await permits(state, peer)))
-      return sessionFail(SESSION_CODES.BUSY);
     return base.create(terms, payload);
   }
   const old = await base.inspect();
@@ -123,7 +122,7 @@ async function create(
   if (!(await permits(state, peer))) return sessionFail(SESSION_CODES.BUSY);
   if (state.store.read().entries.length >= BATCH_SELLER_REGISTRY.maxBuyers)
     return sessionFail(SESSION_CODES.LIMIT);
-  if (old) return sessionFail(SESSION_CODES.UNVERIFIED);
+  if (old && !old.released) return sessionFail(SESSION_CODES.UNVERIFIED);
   // The backend verifies the signed native opening before a new row is published; create never submits.
   const financial = await base.create(terms, payload);
   try {
@@ -160,7 +159,7 @@ function backend(state: State, peer: string): BatchSellerBackend {
           .entries.some((row) => row.buyerNodeId === buyerNodeId);
         if (
           stored &&
-          ((!known && !stored.archivedProof) ||
+          ((!known && !stored.archivedProof && !stored.released) ||
             stored.terms.buyerNodeId !== buyerNodeId)
         )
           return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -180,7 +179,8 @@ function backend(state: State, peer: string): BatchSellerBackend {
             .read()
             .entries.some((row) => row.buyerNodeId === buyerNodeId)
         ) {
-          if (!(await base.inspect())?.archivedProof)
+          const old = await base.inspect();
+          if (!old?.archivedProof && !old?.released)
             return sessionFail(SESSION_CODES.UNVERIFIED);
           if (
             state.store.read().entries.length >= BATCH_SELLER_REGISTRY.maxBuyers

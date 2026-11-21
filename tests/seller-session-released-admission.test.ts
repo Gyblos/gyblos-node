@@ -1,5 +1,5 @@
-// A bound buyer whose opening was released (never funded, no channel) asks for capacity again before
-// its next opening, so a slot freed for another buyer is never taken twice.
+// A bound buyer whose opening was released (never funded, no channel) is bound again through the backend
+// and asks for capacity before its next opening, so a slot freed for another buyer is never taken twice.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -24,6 +24,7 @@ void test('a released opening asks for capacity again before the same buyer reop
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const session = rig.seller();
   let admissions = 0;
+  let creations = 0;
   let capacity = true;
   const { service, close } = await startSellerSessions({
     buyerNodeId: rig.terms.buyerNodeId,
@@ -32,7 +33,10 @@ void test('a released opening asks for capacity again before the same buyer reop
     description: rig.terms,
     backend: {
       inspect: async () => undefined,
-      create: async () => session,
+      create: async () => {
+        creations++;
+        return session;
+      },
     },
     admit: async () => {
       admissions++;
@@ -67,6 +71,7 @@ void test('a released opening asks for capacity again before the same buyer reop
   }));
   await assert.rejects(open(), { code: SESSION_CODES.UNAVAILABLE });
   const first = admissions;
+  const created = creations;
   // Another buyer took the freed slot: the next opening is refused before reaching the session.
   capacity = false;
   let opened = 0;
@@ -76,5 +81,6 @@ void test('a released opening asks for capacity again before the same buyer reop
   });
   await assert.rejects(open(), { code: SESSION_CODES.BUSY });
   assert.equal(admissions, first + 1, 'capacity was asked again');
+  assert.equal(creations, created, 'refused before binding the session again');
   assert.equal(opened, 0, 'the session never opened');
 });

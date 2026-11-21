@@ -90,9 +90,11 @@ async function children(paths: BatchSellerPaths, entries: SellerRegistryRow[]) {
     const own = batchSellerBuyerPaths(paths, entry.name);
     if (!entries.some((row) => !row.legacy && row.buyerNodeId === entry.name)) {
       const stored = await inspectBatchSession(own);
+      // Only closed or released sessions leave the index.
       if (
         stored &&
-        (!stored.archivedProof || stored.terms.buyerNodeId !== entry.name)
+        ((!stored.archivedProof && !stored.released) ||
+          stored.terms.buyerNodeId !== entry.name)
       )
         return sessionFail(SESSION_CODES.UNVERIFIED);
     }
@@ -122,7 +124,9 @@ async function load(paths: BatchSellerPaths) {
   if (
     (legacy &&
       imported?.buyerNodeId !== legacy.terms.buyerNodeId &&
-      (imported || !storedBatchSession(legacy).archivedProof)) ||
+      (imported ||
+        (!storedBatchSession(legacy).archivedProof &&
+          !storedBatchSession(legacy).released))) ||
     (imported && !legacy)
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -210,9 +214,11 @@ async function seed(
   const own = sellerRegistryPaths(paths, row);
   await ensurePrivatePaymentPaths(own);
   const existing = await readBatchRecord(own);
+  // A returning released buyer's session is the same empty preparation, apart from its mark.
+  const { released: _released, ...preparation } = existing ?? {};
   if (
     existing &&
-    canonicalJson(existing) !==
+    canonicalJson(preparation) !==
       canonicalJson(initialRecord(terms, existing.lastActivity))
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);
