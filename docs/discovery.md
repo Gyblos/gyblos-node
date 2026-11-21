@@ -180,10 +180,13 @@ credentials or a query string; the other `identity` settings are in
 Open discovery has its own bounds:
 
 - The buyer reads every page first. It then drops the sellers that could not
-  serve the request (model, reasoning level, network, asset, context, price
-  ceilings and budget, data policy, live records) and looks up the rest in a
-  random order, so which sellers get a lookup never depends on the index's
-  order.
+  serve the request (model, reasoning level, network, asset, a context of at
+  least the request's `maxTokens`, price ceilings and budget, data policy, the
+  `declared-usage` badge, live records). It looks up the seller that served the
+  conversation before and the one still holding it warm first, then the rest in
+  a random order, so which sellers get a lookup never depends on the index's
+  order. With more than 64 such sellers, lookups can reach sellers the
+  64-candidate bound below then refuses until earlier ones expire.
 - Each selection makes at most 16 new identity lookups. An identity the registry
   refused is not looked up again for five minutes.
 - At most 64 live unconfigured candidates are eligible at once, counted under

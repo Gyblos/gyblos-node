@@ -7,13 +7,14 @@ import test from 'node:test';
 
 import { BUYER_DISCOVERY, BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { discoverBuyerSellers } from '@gyblos/buyer/discovery';
+import { buyerDiscoveryState } from '@gyblos/buyer/discovery-storage';
 import { PUBLIC_V2_DOMAINS } from '@gyblos/protocol/constants';
 import type {
   PublicCatalogV2,
   PublicRecordV2,
   SignedPublicV2,
 } from '@gyblos/protocol/control-types';
-import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
+import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 import { signingBytes } from '@gyblos/protocol/signing';
 import { primaryRelayUrl } from '@gyblos/transport-iroh/endpoint';
 
@@ -87,11 +88,21 @@ async function discoverOpen(
   run: Run,
   state: Awaited<ReturnType<typeof discoveryHome>>['state'],
   pages: unknown[][],
-  options: { random?: () => number; accept?: boolean } = {},
+  options: {
+    random?: () => number;
+    accept?: boolean;
+    previousSeller?: string;
+  } = {},
 ) {
   const log: string[] = [];
   const checked: string[] = [];
-  const found = await discoverBuyerSellers(openConfig(run), state, {
+  const config = {
+    ...openConfig(run),
+    ...(options.previousSeller
+      ? { previousSeller: options.previousSeller }
+      : {}),
+  };
+  const found = await discoverBuyerSellers(config, state, {
     fetch: pagedIndex(pages, log),
     now: run.context.now,
     openRelay: primaryRelayUrl(),
@@ -134,6 +145,13 @@ void test('every page is read at the index page size before any lookup, and look
       moved.checked,
       listed.slice(1, BUYER_SELECTION.maxSellers + 1),
     );
+    // The conversation's previous seller is looked up first, wherever the index lists it.
+    const previous = listed.at(-1)!;
+    const resumed = await discoverOpen(run, home.state, pages, {
+      random: () => 0.999_999,
+      previousSeller: previous,
+    });
+    assert.equal(resumed.checked[0], previous);
   } finally {
     await run.wire.close();
     await home.close();
@@ -201,6 +219,47 @@ void test('a seller that could not serve the request is never looked up', async 
     assert.deepEqual(
       found.sellers.map((seller) => seller.nodeId),
       [cheap.nodeId],
+    );
+  } finally {
+    await run.wire.close();
+    await home.close();
+  }
+});
+
+void test('a drawn seller whose pages list a same-sequence fork is blocked, never silently chosen', async () => {
+  const home = await discoveryHome();
+  const run = await discoveryRun();
+  try {
+    const altered = {
+      ...run.catalog,
+      models: run.catalog.models.map((model) => ({
+        ...model,
+        contextTokens: model.contextTokens + 1,
+      })),
+    };
+    const fork = {
+      catalog: await signPublicV2(altered, run.nodeSigner),
+      presence: await signPublicV2(
+        {
+          ...run.known.presence!,
+          catalogDigest: await catalogDigestV2(altered),
+        },
+        run.nodeSigner,
+      ),
+    };
+    const { found } = await discoverOpen(run, home.state, [
+      [run.entry],
+      [fork],
+    ]);
+    assert.deepEqual(found.sellers, []);
+    const owner = run.entry.catalog.record.owner;
+    const nodeId = run.entry.catalog.record.nodeId;
+    assert.deepEqual(
+      (await buyerDiscoveryState(home.environment)).eligible(
+        [{ owner, nodeId }],
+        run.context.now(),
+      ),
+      [],
     );
   } finally {
     await run.wire.close();

@@ -149,8 +149,9 @@ async function readAllPages(
   let cursor: string | undefined;
   for (let page = 0; page < config.discovery.maxPages; page++) {
     signal.throwIfAborted();
-    // Keep equal-sequence entries visible for digest comparison (every entry of a configured or drawn
-    // NodeId is remembered). The persistent store enforces
+    // Keep equal-sequence entries visible for digest comparison: a fork across pages reaches the store
+    // through every remembered entry of a trusted seller (within one page the client keeps one entry per
+    // NodeId). The persistent store enforces
     // the high-water mark and retains live candidate IDs when the index repeats a held presence.
     const result = await fetchSellers({
       baseUrl: config.discovery.baseUrl,
@@ -173,20 +174,22 @@ async function readAllPages(
   return entries;
 }
 
-// A NodeId the index lists: its newest entry, and every entry in index order (all are remembered, so a
-// same-sequence fork across pages is still caught).
+// A NodeId the index lists: its newest entry, and every entry in index order. Once its identity is
+// confirmed, every entry under that owner is remembered, so a same-sequence fork across pages is caught.
 interface Listing {
   newest: DiscoveredSeller;
   entries: DiscoveredSeller[];
 }
 // The sellers found only in the index whose newest entry could serve this request (every hard filter),
-// one place per NodeId, in a random order: which of them get the bounded identity lookups never depends
-// on the index's order or on how often it lists one.
+// one place per NodeId: `preferred` first (the conversation's previous and warm sellers), then the rest in
+// a random order, so which of them get the bounded identity lookups never depends on the index's order or
+// on how often it lists one.
 function drawOpen(
   entries: DiscoveredSeller[],
   request: SellerRequest,
   now: number,
   random: () => number,
+  preferred: ReadonlySet<string>,
 ) {
   const listings = new Map<string, Listing>();
   for (const entry of entries) {
@@ -213,8 +216,19 @@ function drawOpen(
     const other = Math.floor(random() * (index + 1));
     [drawn[index], drawn[other]] = [drawn[other]!, drawn[index]!];
   }
-  return drawn;
+  const first = ({ newest }: Listing) => preferred.has(newest.catalog.nodeId);
+  return [
+    ...drawn.filter(first),
+    ...drawn.filter((listing) => !first(listing)),
+  ];
 }
+// The sellers this conversation reached before: the previous one and the one still holding it warm.
+const conversationSellers = (config: BuyerSelectionConfig) =>
+  new Set(
+    [config.previousSeller, config.warmSeller].filter(
+      (nodeId) => nodeId !== undefined,
+    ),
+  );
 const cryptoRandom = () =>
   randomInt(BUYER_SELECTION.randomRange) / BUYER_SELECTION.randomRange;
 export async function discoverBuyerSellers(
@@ -265,7 +279,13 @@ export async function discoverBuyerSellers(
   }
   const drawn =
     config.discovery.open && options.openRelay
-      ? drawOpen(open, config.request, now(), options.random ?? cryptoRandom)
+      ? drawOpen(
+          open,
+          config.request,
+          now(),
+          options.random ?? cryptoRandom,
+          conversationSellers(config),
+        )
       : [];
   for (const { newest, entries: listed } of drawn) {
     const trusted = await openSeller(newest, config, options, run, signal);
