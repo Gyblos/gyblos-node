@@ -481,10 +481,12 @@ only what concerns Gyblos and spends as few RPC calls as possible:
   read on that provider's devnet host with the same path and key
   (`CHAIN_DEVNET_HOSTS`: Helius and Alchemy). Before an endpoint's first call
   each run asks its genesis hash (`getGenesisHash`); an endpoint of another
-  network (`DEVNET_GENESIS` differs) is refused as a wrong network, never
-  counted as a rate limit, and the run moves to the next endpoint, so another
-  network's signatures are never stored. A failed check (a timeout, an HTTP
-  error) is asked again on the next call.
+  network (`DEVNET_GENESIS` differs) is refused as a wrong network for the rest
+  of the run, never counted as a rate limit, and the run moves to the next
+  endpoint (on the last one it fails), so another network's signatures are never
+  stored. The check is one more request per endpoint and run, not counted in the
+  call budgets or the logged calls. A check that fails otherwise moves the run
+  on or stops it like any call, and is asked again next run.
 - The public devnet RPC answers Cloudflare Workers with HTTP 403 (measured
   2026-11-18), so in production each run spends one public call and moves to the
   first key.
@@ -500,19 +502,25 @@ only what concerns Gyblos and spends as few RPC calls as possible:
   Gyblos accounts every 30 minutes.
 
 **RPC probe.** `GET /v1/admin/rpc-probe` lets the operator check every endpoint
-the index may use before relying on it. The route exists only while the
-`COLLECTOR_ADMIN_TOKEN` secret is set to at least 32 characters; without it, or
-without `Authorization: Bearer <token>` matching it (compared in constant time),
-or for any other method, it answers `404` like an unknown path. It calls the
-public devnet RPC and each configured key in turn, once each, for one page of
-the program's signature list (an optional `before=<signature>` pages back), with
-the same genesis check as the index. Per endpoint it returns static facts only:
-whether it is configured, whether it answered and in how many milliseconds, the
-page's length, failed transactions, memos, Gyblos opens, signatures without a
-block time, newest and oldest time and slot, and the last signature; on failure,
-the static error, and whether it was a refusal or a wrong network. It never
-returns a URL, a key or a provider's error text, and its answer is not cached
-(`no-store`). It writes nothing.
+the index may use before relying on it. It is a route like the others, behind
+the same https check, fail-closed check, per-address limit and headers. It
+answers only while the `COLLECTOR_ADMIN_TOKEN` secret is set to at least 32
+random characters (only the length is checked) and the request carries
+`Authorization: Bearer <token>` matching it (compared by SHA-256 digest in
+constant time); otherwise it is the same `404 NOT_FOUND` as an unknown path. It
+calls the public devnet RPC, then `COLLECTOR_SOLANA_RPC_URL`, then
+`COLLECTOR_SOLANA_RPC_FALLBACK_URL`, each even when an earlier one failed, with
+two requests each: the genesis check, then one page of the program's signature
+list (`before=<signature>` pages back; any other value is ignored). A key that
+is set but not a usable URL shows as not configured. Per endpoint it returns
+static facts only: whether it is configured, whether it answered and in how many
+milliseconds, the page's length, failed transactions, memos, Gyblos opens,
+signatures without a block time, newest and oldest time and slot, and the last
+signature; on failure, a fixed reason (the HTTP status, the JSON-RPC error code,
+the unreadable field, or the error's class name) and whether it was a refusal
+(403, 429 or the RPC's limit code) or a wrong network. It never returns a URL, a
+key or a provider's error message, its answer is `no-store`, and it writes
+nothing.
 
 **What is read, and when.** Finalized data, newest first, in five phases:
 
@@ -739,7 +747,7 @@ Cloudflare counts it per location, so it is approximate.
 | Layer       | Files                                                                                                                                                                           |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Entry       | `src/worker.ts`: bindings, the scheduled run and the stats edge cache; inert on import.                                                                                         |
-| HTTP        | `src/app.ts`, `src/ip-key.ts`, `src/http.ts`, `src/stats-routes.ts`                                                                                                             |
+| HTTP        | `src/app.ts`, `src/ip-key.ts`, `src/http.ts`, `src/stats-routes.ts`, `src/rpc-probe.ts`                                                                                         |
 | Use cases   | `src/ingest.ts`, `src/ingest-observations.ts`, `src/stats.ts`, `src/stats-chain.ts`                                                                                             |
 | Policy      | `@gyblos/core/public-receipts`: receipt verification, classification and merge rules.                                                                                           |
 | Storage     | `src/storage.ts` (port), `src/storage-d1*.ts` and `src/storage-memory.ts` (adapters)                                                                                            |
