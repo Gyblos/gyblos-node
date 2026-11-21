@@ -1,9 +1,10 @@
-import { Check, Copy, Info, Key, LinkSimple, PlugsConnected, Plus } from '@phosphor-icons/react';
+import { CaretDown, Check, Copy, Info, Key, LinkSimple, PlugsConnected, Plus } from '@phosphor-icons/react';
 // Buyer-owned USDC key management uses shared forms and financial facts; no wallet keys enter the view.
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { DEVNET_USDC } from '@gyblos/config/network';
 import {
+  AGENT_SETUP,
   AGENT_TOOLS,
   type AgentTool,
 } from '@gyblos/node/agent-setup-constants';
@@ -25,7 +26,8 @@ import { StatePanel } from './Management';
 import { Modal } from './Modal';
 import { ScrollTable } from './ScrollTable';
 import { ServiceLogo } from './ServiceLogo';
-import { Badge, Button, IconButton } from './UI';
+import { Dropdown } from './Dropdown';
+import { Badge, Button, IconButton, MenuItem } from './UI';
 import { AmountEditor } from './Payments';
 import { agentCodeLanguage, CodeBlock, DetailSummary, Tag, TONE } from './PreviewKit';
 import { RevokeConfirmation } from './UsdcApiKeyDetails';
@@ -142,10 +144,10 @@ const toolNames = {
   other: 'Other tools',
 };
 const toolFiles = {
-  [AGENT_TOOLS.OPENCODE]: 'opencode.json',
-  [AGENT_TOOLS.CODEX]: 'config.toml',
+  [AGENT_TOOLS.OPENCODE]: AGENT_SETUP.files.opencode,
+  [AGENT_TOOLS.CODEX]: AGENT_SETUP.files.codex,
   [AGENT_TOOLS.CLAUDE_CODE]: 'Terminal environment',
-  [AGENT_TOOLS.PI]: 'models.json',
+  [AGENT_TOOLS.PI]: AGENT_SETUP.files.pi,
 };
 type ToolChoice = AgentTool | 'other';
 const TOOL_CHOICES = [
@@ -331,19 +333,38 @@ export function UsdcApiKeys({
                     <small>Each key has its own USDC limit.</small>
                     {guideKey ? (
                       <div className="preview-guide-key">
-                        <select
-                          id="preview-guide-key"
-                          aria-label="API key"
-                          className="ui-input"
-                          value={guideKey.id}
-                          onChange={(event) => setGuideId(event.target.value)}
+                        <Dropdown
+                          label={`API key: ${guideKey.name}`}
+                          className="preview-guide-key-trigger"
+                          trigger={
+                            <>
+                              <Key size={14} aria-hidden="true" />
+                              <span>{guideKey.name}</span>
+                              <CaretDown size={12} aria-hidden="true" />
+                            </>
+                          }
                         >
-                          {active.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name}
-                            </option>
-                          ))}
-                        </select>
+                          {(close) =>
+                            active.map((item) => (
+                              <MenuItem
+                                key={item.id}
+                                role="menuitemradio"
+                                checked={item.id === guideKey.id}
+                                label={item.name}
+                                detail={`${amount(item.spentAtomic, snapshot.scope).split(' ')[0]} / ${amount(item.limitAtomic, snapshot.scope)} used`}
+                                trailing={
+                                  item.id === guideKey.id ? (
+                                    <Check size={14} aria-hidden="true" />
+                                  ) : undefined
+                                }
+                                onClick={() => {
+                                  setGuideId(item.id);
+                                  close();
+                                }}
+                              />
+                            ))
+                          }
+                        </Dropdown>
                         <span className="ui-help-text">
                           {amount(guideKey.spentAtomic, snapshot.scope).split(' ')[0]} /{' '}
                           {amount(guideKey.limitAtomic, snapshot.scope)} used

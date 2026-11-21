@@ -11,13 +11,12 @@ export function transformCodeSamples(
     return (
       "import { CodeBlock } from './PreviewKit';\n" +
       replaceBetween(
-        replaceBetween(
-          source,
-          '            <p className="ui-help-text">\n              Set your app\'s base URL',
-          '          </>\n        ) : (',
-          `            <p className="ui-help-text">
+        source,
+        '            <p className="ui-help-text">\n              Set your app\'s base URL',
+        '          </>\n        ) : (',
+        `            <p className="ui-help-text">
               Point any OpenAI-compatible client at this base URL and key. Text
-              and tool calls use Chat Completions.
+              and supported tool calls use Chat Completions.
             </p>
             {connection && (
               <CodeBlock
@@ -29,19 +28,9 @@ export function transformCodeSamples(
               />
             )}
             <p className="ui-help-text">
-              Export GYBLOS_API_KEY in your terminal first. Each request counts
-              toward the shared limit.
+              Set GYBLOS_API_KEY privately in your terminal before running the
+              example.
             </p>
-`,
-        ),
-        '        <p className="ui-help-text">\n          Each completed inference',
-        '        {!connection && (',
-        `        {preset !== CONNECTION_PRESET.GENERIC && (
-          <p className="ui-help-text">
-            Each completed inference counts toward the shared limit, even if
-            delivery fails.
-          </p>
-        )}
 `,
       )
     );

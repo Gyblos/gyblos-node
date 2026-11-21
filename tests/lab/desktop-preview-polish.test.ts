@@ -72,3 +72,13 @@ void test('metric cards explain their numbers with a help button and primary act
     /\.ui-button--primary:not\(\.ui-icon-button\) \{\s*background: var\(--ink\);\s*color: var\(--panel\);/,
   );
 });
+
+void test('preview views use the shared dropdown instead of unstyled native selects', async () => {
+  const { readdir } = await import('node:fs/promises');
+  const dir = 'lab/tools/desktop-preview/views/';
+  for (const name of await readdir(dir)) {
+    if (!name.endsWith('.preview')) continue;
+    const source = await readFile(`${dir}${name}`, 'utf8');
+    assert.doesNotMatch(source, /<select\b/, name);
+  }
+});

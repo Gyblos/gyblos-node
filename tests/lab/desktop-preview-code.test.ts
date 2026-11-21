@@ -147,3 +147,27 @@ void test('code token kinds and coding-tool languages use canonical closed value
   assert.match(kit, /tool === AGENT_TOOLS\.CODEX/);
   assert.match(kit, /tool === AGENT_TOOLS\.CLAUDE_CODE/);
 });
+
+void test('preview PayPal setup keeps the shipped spending warnings for every connection type', async () => {
+  const setup = await transformed('apps/desktop/src/ui/PaypalAgentSetup.tsx');
+  assert.match(setup, /Set GYBLOS_API_KEY privately in your terminal/);
+  assert.match(
+    setup,
+    /<p className="ui-help-text">\s*Each completed inference counts toward the shared limit, even if\s*delivery fails\. One instruction can need several inferences\.\s*<\/p>/,
+  );
+  assert.doesNotMatch(setup, /preset !== CONNECTION_PRESET\.GENERIC && \(/);
+});
+
+void test('preview tool guide takes configuration file names from AGENT_SETUP', async () => {
+  const source = await readFile(
+    new URL('UsdcApiKeys.tsx.preview', views),
+    'utf8',
+  );
+  for (const file of ['opencode.json', 'config.toml', 'models.json'])
+    assert.doesNotMatch(
+      source,
+      new RegExp(`'${file.replace('.', '\\.')}'`),
+      file,
+    );
+  assert.match(source, /AGENT_SETUP\.files\.opencode/);
+});
