@@ -791,16 +791,22 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
     gap: 6px;
   }
   .preview-metric-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    display: grid;
+    gap: 6px;
     padding: 12px;
   }
   .preview-metric-card dt {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .preview-metric-card dd {
+    padding-left: 38px;
+  }
+  .preview-metric-card dd > span {
+    white-space: nowrap;
   }
   .preview-metric-icon,
   .preview-metric-card dd {
@@ -1160,9 +1166,6 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   margin-top: -8px;
   color: var(--muted);
   font-size: 13px;
-}
-.desktop-frame .preview-steps .pk-code pre {
-  max-height: 220px;
 }
 .desktop-frame .preview-guide-key {
   display: flex;
@@ -2152,6 +2155,18 @@ html .app.desktop-frame .preview-network button:focus-visible {
 @media (max-width: 760px) {
   .desktop-frame .preview-network-note {
     display: none;
+  }
+}
+@media (max-width: 560px) {
+  .desktop-frame .ui-window-title {
+    display: none;
+  }
+  html .app.desktop-frame .preview-network button {
+    padding: 0 8px;
+  }
+  html .app.desktop-frame > .ui-window-chrome > .top-actions {
+    flex-shrink: 0;
+    max-width: none;
   }
 }
 
@@ -3171,8 +3186,7 @@ html .app.desktop-frame .pk-code-copy:disabled {
 html .app.desktop-frame .pk-code pre {
   margin: 0;
   padding: 12px 14px;
-  max-height: 320px;
-  overflow: auto;
+  overflow-x: auto;
   border: 0;
   border-radius: 0;
   background: transparent;
