@@ -46,13 +46,13 @@ requests per IP address, so several services on one address make channel opening
 shows `invalid_batch_settlement_svm_channel_state` or `PAYMENT_UNAVAILABLE`). To use a dedicated devnet
 endpoint, set `GYBLOS_RPC_URL` before the **first** run of the installer:
 
-- **Docker:** create the folder and a private `seller.env` with the URL, then run the installer, which
-  keeps both:
+- **Docker:** create the folder and a private `seller.env` with the URL, then run the installer in Docker
+  mode, which keeps both and stops if Docker cannot run (with `GYBLOS_DIR`, use that folder):
 
   ```sh
   mkdir -m 700 ~/gyblos-seller
   (umask 077 && printf 'GYBLOS_RPC_URL=%s\n' '<your devnet RPC URL>' > ~/gyblos-seller/seller.env)
-  sh install.sh
+  GYBLOS_MODE=docker sh install.sh
   ```
 
 - **Native on macOS or Linux:** `GYBLOS_RPC_URL='<your devnet RPC URL>' GYBLOS_MODE=native sh install.sh`

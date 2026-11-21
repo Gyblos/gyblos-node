@@ -47,13 +47,13 @@ misma dirección hacen fallar las aperturas de canal (`gyblos logs` muestra ento
 `invalid_batch_settlement_svm_channel_state` o `PAYMENT_UNAVAILABLE`). Para usar un endpoint de devnet
 propio, define `GYBLOS_RPC_URL` antes de ejecutar el instalador por **primera** vez:
 
-- **Docker:** crea la carpeta y un `seller.env` privado con la URL, y luego ejecuta el instalador, que
-  conserva ambos:
+- **Docker:** crea la carpeta y un `seller.env` privado con la URL, y luego ejecuta el instalador en modo
+  Docker, que conserva ambos y se detiene si Docker no puede correr (con `GYBLOS_DIR`, usa esa carpeta):
 
   ```sh
   mkdir -m 700 ~/gyblos-seller
   (umask 077 && printf 'GYBLOS_RPC_URL=%s\n' '<la URL de tu RPC de devnet>' > ~/gyblos-seller/seller.env)
-  sh install.sh
+  GYBLOS_MODE=docker sh install.sh
   ```
 
 - **Nativo en macOS o Linux:** `GYBLOS_RPC_URL='<la URL de tu RPC de devnet>' GYBLOS_MODE=native sh install.sh`
