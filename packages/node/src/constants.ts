@@ -1,6 +1,7 @@
 // Seller node lifecycle states and the local role-config schema version. Values only; no wallet,
 // network or process actions.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 
 export const NODE_STATES = {
@@ -417,6 +418,7 @@ export const BUYER_PAID_TIMEOUTS = {
 } as const;
 // The paid buyer's own refusals, before any payment.
 export const PAID_BUYER_CODES = {
+  TOKENIZER: BUYER_API.TOKENIZER_UNAVAILABLE,
   // An earlier channel still needs recovery.
   UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
   UNAVAILABLE: 'PAID_BUYER_NO_OFFER',

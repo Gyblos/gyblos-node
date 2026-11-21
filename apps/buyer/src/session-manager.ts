@@ -19,7 +19,7 @@ import {
 import { canonicalJson } from '@gyblos/protocol';
 import { batchFail, verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
@@ -31,7 +31,7 @@ import {
 } from './free-selection';
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
-import { tokenizer, type BuyerStartupOptions } from './session-requirements';
+import { sessionMeter, type BuyerStartupOptions } from './session-requirements';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = BuyerStartupOptions;
@@ -39,7 +39,6 @@ type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
   selections: Map<string, Winner>;
   sending: Map<string, () => void>;
-  meterLoading?: Promise<ChatTokenizer>;
   meter?: ChatTokenizer;
 }
 function trustedQuote(
@@ -85,23 +84,6 @@ function activeMeter(state: SessionState): ChatTokenizer {
     },
   };
 }
-function supportsChat(meter: RecountTokenizer): meter is ChatTokenizer {
-  return 'chat' in meter && typeof meter.chat === 'function';
-}
-async function prepareMeter(state: SessionState, options: Options) {
-  state.meterLoading ??= (options.meter ?? tokenizer)()
-    .then((meter) => {
-      if (!supportsChat(meter))
-        return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
-      return meter;
-    })
-    .catch((error: unknown) => {
-      state.meterLoading = undefined;
-      throw error;
-    });
-  state.meter = await state.meterLoading;
-  return state.meter;
-}
 function sessionReceipts(
   context: Context,
   state: SessionState,
@@ -118,7 +100,7 @@ function sessionReceipts(
 }
 function sessionPreflight(
   state: SessionState,
-  options: Options,
+  loadMeter: ReturnType<typeof sessionMeter>,
   context: Context,
   policy: Parameters<typeof sessionTerms>[1],
 ) {
@@ -126,7 +108,8 @@ function sessionPreflight(
     quote: Parameters<typeof recountSessionInput>[0],
     input: Parameters<typeof recountSessionInput>[1],
   ) => {
-    const meter = await prepareMeter(state, options);
+    const meter = await loadMeter();
+    state.meter = meter;
     recountSessionInput(quote, input, meter);
     const now = Date.now();
     const terms = sessionTerms(quote, policy, now);
@@ -231,6 +214,11 @@ export function makeManager(
       : createBuyerSessionManager(common);
   return {
     ...manager,
-    preflight: sessionPreflight(state, options, context, policy),
+    preflight: sessionPreflight(
+      state,
+      sessionMeter(prepared.config.request.maxAtomic, options),
+      context,
+      policy,
+    ),
   };
 }

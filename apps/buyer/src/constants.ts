@@ -243,7 +243,7 @@ export const FREE_BUYER_STARTUP = {
   // The explicit paid entry serves only `request.selection`; a `models` list needs the automatic buyer.
   PAID_MODELS: 'BUYER_PAID_MODELS_UNSUPPORTED',
   PAID_KEY: 'BUYER_WALLET_KEY_INVALID',
-  TOKENIZER: 'BUYER_TOKENIZER_UNAVAILABLE',
+  TOKENIZER: BUYER_API.TOKENIZER_UNAVAILABLE,
   // Unreadable, or held by another buyer process.
   JOURNAL: 'BUYER_PAYMENT_JOURNAL_UNAVAILABLE',
   // The paid endpoint's token file is not a private regular file holding a token.

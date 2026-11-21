@@ -11,6 +11,7 @@ import { startBuyer } from '@gyblos/buyer/buyer-main';
 import {
   BUYER_EXECUTION_FIELD,
   BUYER_SELECTION,
+  FREE_BUYER_STARTUP,
 } from '@gyblos/buyer/constants';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { FILE_MODES, ROLE_FILES } from '@gyblos/config';
@@ -24,6 +25,7 @@ import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { createSellerRecords } from '@gyblos/node/public-records';
 import { serveSellerTransport } from '@gyblos/node/seller-transport';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import {
   CONTROL_ALPN,
   FREE_CHAT_ROLES,
@@ -37,10 +39,8 @@ import { freeSellerFixture } from './support/free-seller';
 import { endpoint, within } from './support/native-fixture';
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 
-void test(
-  'automatic startup keeps free execution independent and cancels late paid preparation without authorization',
-  { skip: NATIVE_CAPABILITY.transportSkip },
-  async () => {
+function quoteStartup(desktop: boolean) {
+  return async () => {
     const fixture = await freeSellerFixture();
     const source = fixture.source;
     const now = Date.now();
@@ -148,6 +148,7 @@ void test(
     let host: Awaited<ReturnType<typeof startBuyer>> | undefined;
     let paymentPreparations = 0;
     let tokenizerLoads = 0;
+    const warmLoads = desktop ? 1 : 0;
     let financialCreations = 0;
     let releaseChain = () => {};
     let beganChain = () => {};
@@ -208,11 +209,12 @@ void test(
       });
       await save(BUYER_SELECTION.configFile, config);
       host = await startBuyer({
+        preparePaidTokenizer: desktop,
         port: 0,
         bind: (bytes) => endpoint(bytes),
         meter: async () => {
           tokenizerLoads++;
-          if (tokenizerLoads === 1)
+          if (tokenizerLoads <= warmLoads + 1)
             throw new Error('synthetic tokenizer unavailable');
           return { input: () => 4, chat: () => 4, count: () => 2 };
         },
@@ -258,7 +260,7 @@ void test(
       assert.equal(Object.hasOwn(result, 'gyblos_payment'), false);
       assert.equal(fixture.calls(), 1);
       assert.equal(paymentPreparations, 0);
-      assert.equal(tokenizerLoads, 0);
+      assert.equal(tokenizerLoads, warmLoads);
       await assert.rejects(
         readFile(join(buyer, 'payments', 'upto-journal-v1.json')),
         { code: 'ENOENT' },
@@ -273,13 +275,15 @@ void test(
       await prices(false);
       const refused = await within(ask());
       assert.notEqual(refused.status, 200);
-      await refused.arrayBuffer();
-      assert.equal(tokenizerLoads, 1);
+      const refusal = await refused.json();
+      assert.equal(refusal.error.code, FREE_BUYER_STARTUP.TOKENIZER);
+      assert.equal(refusal.error[BUYER_API.NEVER_SENT_FIELD], true);
+      assert.equal(tokenizerLoads, warmLoads + 1);
       assert.equal(paymentPreparations, 0);
       await prices(true);
       const recovered = await within(ask());
       assert.equal(recovered.status, 200, await recovered.text());
-      assert.equal(tokenizerLoads, 1);
+      assert.equal(tokenizerLoads, warmLoads + 1);
       assert.equal(paymentPreparations, 0);
       assert.equal(fixture.calls(), 2);
       await prices(false);
@@ -304,7 +308,7 @@ void test(
       await within(chainFinished);
       assert.equal(financialCreations, 0);
       assert.equal(paymentPreparations, 1);
-      assert.equal(tokenizerLoads, 2);
+      assert.equal(tokenizerLoads, warmLoads + 2);
       assert.equal(fixture.calls(), 2);
     } finally {
       releaseChain();
@@ -315,5 +319,14 @@ void test(
       Object.assign(process.env, environment);
       await rm(directory, { recursive: true, force: true });
     }
-  },
-);
+  };
+}
+
+for (const desktop of [false, true])
+  void test(
+    desktop
+      ? 'desktop starts a paid profile with a warm tokenizer and keeps free execution independent after a failed download'
+      : 'automatic startup keeps free execution independent and cancels late paid preparation without authorization',
+    { skip: NATIVE_CAPABILITY.transportSkip },
+    quoteStartup(desktop),
+  );
