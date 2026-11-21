@@ -31,6 +31,7 @@ rules. The local receipt receiver for private testing is a different app
 | `GET /v1/stats/models`          | Totals per model over a day range.                                     |
 | `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                             |
 | `GET /v1/stats/chain`           | Payment-channels program activity per UTC day ([chain](#chain-stats)). |
+| `GET /v1/admin/rpc-probe`       | Operator check of the chain RPC endpoints ([probe](#chain-index)).     |
 
 Every response carries `Cache-Control: no-store`, except a successful stats
 answer, which is `public, max-age=300`. Every response also carries
@@ -476,11 +477,20 @@ only what concerns Gyblos and spends as few RPC calls as possible:
   code), a server error (5xx) or a transport failure; an answer the index cannot
   read, or a transaction the RPC lists but cannot return yet, stops the run
   instead.
+- The index reads devnet only. A key set to a known provider's mainnet host is
+  read on that provider's devnet host with the same path and key
+  (`CHAIN_DEVNET_HOSTS`: Helius and Alchemy). Before an endpoint's first call
+  each run asks its genesis hash (`getGenesisHash`); an endpoint of another
+  network (`DEVNET_GENESIS` differs) is refused as a wrong network, never
+  counted as a rate limit, and the run moves to the next endpoint, so another
+  network's signatures are never stored. A failed check (a timeout, an HTTP
+  error) is asked again on the next call.
 - The public devnet RPC answers Cloudflare Workers with HTTP 403 (measured
   2026-11-18), so in production each run spends one public call and moves to the
   first key.
-- Every run logs `COLLECTOR_CHAIN_INDEX_RUN` with the calls and refusals of the
-  public endpoint and of the keys together, whether it moved on and to which
+- Every run logs `COLLECTOR_CHAIN_INDEX_RUN` with the calls, refusals and
+  wrong-network refusals of the public endpoint and of the keys together
+  (`publicWrongNetwork`, `paidWrongNetwork`), whether it moved on and to which
   endpoint (`endpoint=0` public, `1` the first key, `2` the second), what it
   counted, read and followed, the accounts read, and whether work is left
   (`backlog`).
@@ -488,6 +498,21 @@ only what concerns Gyblos and spends as few RPC calls as possible:
   history cost 10 to 18 calls per run with no rate limit; once caught up, an
   idle run costs 1 call, plus one per followed channel and one per hundred
   Gyblos accounts every 30 minutes.
+
+**RPC probe.** `GET /v1/admin/rpc-probe` lets the operator check every endpoint
+the index may use before relying on it. The route exists only while the
+`COLLECTOR_ADMIN_TOKEN` secret is set to at least 32 characters; without it, or
+without `Authorization: Bearer <token>` matching it (compared in constant time),
+or for any other method, it answers `404` like an unknown path. It calls the
+public devnet RPC and each configured key in turn, once each, for one page of
+the program's signature list (an optional `before=<signature>` pages back), with
+the same genesis check as the index. Per endpoint it returns static facts only:
+whether it is configured, whether it answered and in how many milliseconds, the
+page's length, failed transactions, memos, Gyblos opens, signatures without a
+block time, newest and oldest time and slot, and the last signature; on failure,
+the static error, and whether it was a refusal or a wrong network. It never
+returns a URL, a key or a provider's error text, and its answer is not cached
+(`no-store`). It writes nothing.
 
 **What is read, and when.** Finalized data, newest first, in five phases:
 
