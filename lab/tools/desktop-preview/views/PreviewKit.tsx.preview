@@ -210,6 +210,11 @@ export function usePreviewFunds(model: { name: string; free: boolean }, applies:
   return { model, blocked: applies && !model.free && atomic === 0 };
 }
 
+function subscribeNetwork(listener: () => void) {
+  window.addEventListener('preview:network', listener);
+  return () => window.removeEventListener('preview:network', listener);
+}
+
 export function useSpending(buyer?: X402View) {
   const keys = useUsdcApiKeys().state.snapshot;
   const account = window.previewAccountBudget.current();
@@ -236,7 +241,9 @@ export function PreviewComposerTab({
   const atomic = usePreviewBalance();
   const { spent, limit, limited } = useSpending(buyer);
   const percent = limited && limit > 0n ? Math.min(100, Number((spent * 100n) / limit)) : 0;
-  const network = new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet';
+  const network = useSyncExternalStore(subscribeNetwork, () =>
+    new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet',
+  );
   const free = models.find((item) => item.free && item.name === funds.model.name) ?? models.find((item) => item.free);
   return (
     <>

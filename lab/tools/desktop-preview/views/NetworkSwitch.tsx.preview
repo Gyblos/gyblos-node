@@ -5,6 +5,14 @@ function PreviewNetwork() {
   const [network, setNetwork] = usePreviewState<(typeof PREVIEW_NETWORKS)[number]>(
     () => (new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet'),
   );
+  const choose = (next: (typeof PREVIEW_NETWORKS)[number]) => {
+    setNetwork(next);
+    const params = new URLSearchParams(location.search);
+    if (next === 'Mainnet') params.set('network', 'mainnet');
+    else params.delete('network');
+    history.replaceState(null, '', '?' + params.toString());
+    window.dispatchEvent(new Event('preview:network'));
+  };
   return (
     <div
       className="preview-network"
@@ -15,7 +23,7 @@ function PreviewNetwork() {
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
         event.preventDefault();
         const next = network === 'Testnet' ? 'Mainnet' : 'Testnet';
-        setNetwork(next);
+        choose(next);
         event.currentTarget.querySelector<HTMLButtonElement>('[data-network="' + next.toLowerCase() + '"]')?.focus();
       }}
     >
@@ -27,7 +35,7 @@ function PreviewNetwork() {
           aria-checked={network === item}
           tabIndex={network === item ? 0 : -1}
           data-network={item.toLowerCase()}
-          onClick={() => setNetwork(item)}
+          onClick={() => choose(item)}
         >
           <span className="preview-network-dot" aria-hidden="true" />
           {item}
