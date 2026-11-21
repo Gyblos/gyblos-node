@@ -13,6 +13,7 @@ import { Button, IconButton, MenuItem, PagePanel } from './UI';
 import {
   CODE_LANGUAGE,
   CodeBlock,
+  PREVIEW_COPY,
   PREVIEW_EVENT,
   PreviewKitShowcase,
   READY_SELLER_MODES,
@@ -34,7 +35,7 @@ function chooseFont(font: (typeof FONTS)[number]) {
 
 const BUYER_CONFIG_PATH = '~/.gyblos/buyer/config.toml';
 function buyerConfig(mode: SellerMode, freeFallback: boolean, showTestnet: boolean) {
-  const key = (value: SellerMode) => value.toLowerCase().replace(' ', '_');
+  const key = (value: SellerMode) => value.toLowerCase().replaceAll(' ', '_');
   return [
     '[network]',
     'show_testnet = ' + showTestnet,
@@ -96,10 +97,10 @@ function BuyerPreferences() {
         <div className="preview-settings-rows">
           <div>
             <span>
-              Use a free model when out of funds
-              <small className="ui-help-text">Chat and every API key, also at a spending limit. Answers come from a similar free model and always say so.</small>
+              {PREVIEW_COPY.freeFallbackLabel}
+              <small className="ui-help-text">Chat and every API key. Answers come from a similar free model and always say so.</small>
             </span>
-            <Switch label="Use a free model when out of funds" checked={freeFallback} onChange={(value) => setPreviewSetting('freeFallback', value)} />
+            <Switch label={PREVIEW_COPY.freeFallbackLabel} checked={freeFallback} onChange={(value) => setPreviewSetting('freeFallback', value)} />
           </div>
         </div>
       </Section>

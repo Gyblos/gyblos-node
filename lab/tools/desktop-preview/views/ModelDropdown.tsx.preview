@@ -147,7 +147,7 @@ function StrategyRow({
       title={locked ? PREVIEW_COPY.needsFunds : undefined}
       data-strategy
       label={label}
-      detail={soon ? 'Available once real latency and reliability data exist' : locked ? 'Needs funds · ' + detail : detail}
+      detail={soon ? PREVIEW_COPY.sellerModeSoon : locked ? 'Needs funds · ' + detail : detail}
       leading={
         <span className="preview-strategy-icon" aria-hidden="true">
           <Glyph size={18} weight={checked ? 'fill' : 'regular'} />

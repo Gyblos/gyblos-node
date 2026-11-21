@@ -80,8 +80,11 @@ void test('preview API keys follow the account-wide free-model fallback, with no
   assert.match(details, /PREVIEW_COPY\.keyOutOfFunds/);
   assert.match(await view('UsdcApiKeys.tsx.preview'), /<KeyFallback \/>/);
   const settings = await view('Settings.tsx.preview');
-  assert.match(settings, /Use a free model when out of funds/);
-  assert.match(settings, /<Switch label="Use a free model when out of funds"/);
+  assert.match(settings, /<Switch label=\{PREVIEW_COPY\.freeFallbackLabel\}/);
+  assert.match(
+    await view('PreviewKit.tsx.preview'),
+    /freeFallbackLabel: 'Use a free model when out of funds'/,
+  );
   const kit = await view('PreviewKit.tsx.preview');
   assert.match(kit, /similarFreeModel\(/);
   assert.match(kit, /fallback: broke && fallback && !!free/);
@@ -150,15 +153,6 @@ void test('preview model rows keep one synthetic seller at the listed price', as
   assert.match(row, /const factor =\s*index === 0\s*\?\s*1\s*:/);
 });
 
-void test('preview free fallback lets the composer send instead of waiting for paid terms', async () => {
-  const { CHAT_FUNDS_REWRITES } =
-    await import('../../lab/tools/desktop-preview/funds-build');
-  const canSend = CHAT_FUNDS_REWRITES.find(([from]) =>
-    from.includes('const canSend'),
-  )?.[1];
-  assert.match(canSend ?? '', /\(previewFunds\.fallback \|\| !limitNotice\)/);
-});
-
 void test('preview menu arrow keys skip disabled options', async () => {
   const dropdown = await view('ModelDropdown.tsx.preview');
   assert.match(dropdown, /filter\(\(item\) => !item\.matches\(':disabled'\)\)/);
@@ -213,4 +207,27 @@ void test('preview shows the color marks of OpenCode and Codex', async () => {
   assert.match(logo, /\{ file: 'opencode-color' \}/);
   for (const name of ['tool-codex-color.svg', 'tool-opencode-color.svg'])
     assert.match(await readFile(new URL(name, preview), 'utf8'), /<svg/);
+});
+
+void test('preview free fallback never bypasses unfinished payments, expired listings or the wrong free listing', async () => {
+  const { CHAT_FUNDS_REWRITES } =
+    await import('../../lab/tools/desktop-preview/funds-build');
+  const canSend =
+    CHAT_FUNDS_REWRITES.find(([from]) => from.includes('const canSend'))?.[1] ??
+    '';
+  assert.match(canSend, /x402\?\.state\.summary\.blocked/);
+  assert.match(canSend, /freeListingMismatch/);
+  assert.match(
+    canSend,
+    /\(previewFunds\.fallback \? !previewHardNotice : !limitNotice\)/,
+  );
+});
+
+void test('preview switch geometry uses the shared radius tokens', async () => {
+  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const rules = css.slice(css.indexOf('/* Switch: global on/off setting. */'));
+  assert.doesNotMatch(
+    rules.slice(0, rules.indexOf('/* Seller modes')),
+    /border-radius: (999px|50%)/,
+  );
 });

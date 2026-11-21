@@ -3331,7 +3331,7 @@ html .app.desktop-frame .ui-button.pk-switch {
   height: 20px;
   min-height: 20px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-badge);
   background: var(--line);
 }
 html .app.desktop-frame .pk-switch-thumb {
@@ -3340,7 +3340,7 @@ html .app.desktop-frame .pk-switch-thumb {
   left: 2px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--ink);
   transition: transform var(--motion-overlay) ease;
 }

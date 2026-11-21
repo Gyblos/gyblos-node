@@ -360,6 +360,8 @@ export type SellerMode = (typeof SELLER_MODES)[number];
 // Fastest and Most reliable stay visible with "Soon" until real latency and reliability data exist.
 export const READY_SELLER_MODES: readonly SellerMode[] = ['Auto', 'Cheapest'];
 export const PREVIEW_COPY = {
+  sellerModeSoon: 'Available once real latency and reliability data exist',
+  freeFallbackLabel: 'Use a free model when out of funds',
   needsFunds: 'Needs funds · Add funds, or turn on the free-model fallback in Settings.',
   fallbackNext: (model: string) => 'Out of funds: answers will come from free model ' + model + '. Paid models resume when you add funds.',
   keyAtLimit: "At this key's limit, raise it in Connections.",
@@ -402,15 +404,17 @@ export function previewSetting<K extends keyof PreviewSettings>(key: K) {
 }
 
 export const PREVIEW_EVENT = { NETWORK: 'preview:network' } as const;
+export const PREVIEW_NETWORKS = ['Testnet', 'Mainnet'] as const;
+export type PreviewNetworkName = (typeof PREVIEW_NETWORKS)[number];
 
 function subscribeNetwork(listener: () => void) {
   window.addEventListener(PREVIEW_EVENT.NETWORK, listener);
   return () => window.removeEventListener(PREVIEW_EVENT.NETWORK, listener);
 }
 /** The one network reading for the title bar and the composer: the URL, or Mainnet while Testnet is hidden. */
-export function usePreviewNetwork() {
+export function usePreviewNetwork(): PreviewNetworkName {
   const showTestnet = usePreviewSetting('showTestnet');
-  return useSyncExternalStore(subscribeNetwork, () =>
+  return useSyncExternalStore(subscribeNetwork, (): PreviewNetworkName =>
     !showTestnet || new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet',
   );
 }

@@ -250,7 +250,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
   if (target === `${base}/src/ui/WindowTitlebar.tsx`)
     return replaceOnce(
       replaceOnce(
-        "import { PREVIEW_EVENT, usePreviewNetwork, usePreviewSetting } from './PreviewKit';\n" +
+        "import { PREVIEW_EVENT, PREVIEW_NETWORKS, usePreviewNetwork, usePreviewSetting } from './PreviewKit';\n" +
           source +
           readFileSync(
             new URL('./views/NetworkSwitch.tsx.preview', import.meta.url),

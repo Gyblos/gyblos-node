@@ -16,7 +16,7 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
   ],
   [
     '  const canSend =\n    !limitNotice &&',
-    '  const previewFunds = usePreviewFunds(model, !usingPaypal, models);\n  const canSend =\n    !previewFunds.blocked &&\n    (previewFunds.fallback || !limitNotice) &&',
+    '  const previewFunds = usePreviewFunds(model, !usingPaypal, models);\n  // The free fallback only replaces funds and paid-terms notices; unfinished payments, expired listings and the wrong free listing still block.\n  const previewHardNotice =\n    usingX402 &&\n    (x402?.state.summary.blocked ||\n      freeListingMismatch ||\n      (model.source === MODEL_SOURCE.ANNOUNCED && !models.some((item) => item.id === model.id)));\n  const canSend =\n    !previewFunds.blocked &&\n    (previewFunds.fallback ? !previewHardNotice : !limitNotice) &&',
   ],
   [
     '          <ChatComposer\n            disabled={loadingHistory}',
@@ -24,7 +24,7 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
   ],
   [
     '            {limitNotice ||',
-    "            {(previewFunds.blocked ? 'Add funds or choose a free model to send.' : previewFunds.fallback ? undefined : limitNotice) ||",
+    "            {(previewFunds.blocked ? 'Add funds or choose a free model to send.' : previewFunds.fallback && !previewHardNotice ? undefined : limitNotice) ||",
   ],
 ];
 

@@ -1,6 +1,5 @@
 
 // Preview-only network selector; it changes no routing, wallet or payment state.
-const PREVIEW_NETWORKS = ['Testnet', 'Mainnet'] as const;
 function PreviewNetwork() {
   const showTestnet = usePreviewSetting('showTestnet');
   const network = usePreviewNetwork();

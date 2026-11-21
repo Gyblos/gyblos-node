@@ -106,7 +106,7 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
                     data-strategy={strategy}
                     aria-checked={choice.strategy === strategy}
                     disabled={!ready}
-                    title={ready ? undefined : 'Available once real latency and reliability data exist'}
+                    title={ready ? undefined : PREVIEW_COPY.sellerModeSoon}
                     tabIndex={choice.strategy === strategy ? 0 : -1}
                     onClick={() => update({ strategy, pinned: choice.pinned })}
                   >
