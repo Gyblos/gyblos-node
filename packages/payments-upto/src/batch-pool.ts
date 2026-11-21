@@ -194,7 +194,11 @@ async function resolve(
     typeof checking === 'string' &&
     !Object.hasOwn(record.requests, checking) &&
     Object.keys(record.pending).every(
-      (key) => key === BATCH_BUYER_CHECKPOINTS.OPENING_SENT,
+      (key) =>
+        key === BATCH_BUYER_CHECKPOINTS.OPENING_SENT ||
+        (unsentRequestId !== undefined &&
+          key === BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST &&
+          record.pending[key] !== unsentRequestId),
     ) &&
     (pristine ||
       (record.state === SESSION_STATES.OPEN &&

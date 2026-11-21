@@ -20,13 +20,13 @@ import { requestAgentEndpoint } from './agent-endpoint';
 import { desktopBuyerFailure } from './buyer-error';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
-import { buyerEndpoint, readJson, waitForPaidBuyer } from './x402-http';
 import {
-  DESKTOP_X402,
-  PaidSellerLimitError,
-  paidSellerLimitNotice,
-  x402Policy,
-} from './x402-model';
+  buyerEndpoint,
+  readJson,
+  validateChoice,
+  waitForPaidBuyer,
+} from './x402-http';
+import { DESKTOP_X402, PaidSellerLimitError, x402Policy } from './x402-model';
 import {
   buyerReplyMetrics,
   buyerResponseObject as object,
@@ -34,18 +34,6 @@ import {
 } from './x402-reply';
 import { readBuyerStream } from './x402-stream';
 
-function validateChoice(
-  choice: BuyerSellerChoice | undefined,
-  policy: BuyerApiPolicy,
-  current: Awaited<ReturnType<X402Budget['summary']>>,
-) {
-  if (choice) {
-    if (choice.expiresAt <= Date.now())
-      throw new Error('Seller listing expired');
-    const notice = paidSellerLimitNotice(policy, current, choice.modelId);
-    if (notice) throw new PaidSellerLimitError(notice);
-  }
-}
 export type DesktopSellerChoice =
   BuyerSellerChoice | typeof OFFER_PRICING_KINDS.FREE;
 function policyForSeller(

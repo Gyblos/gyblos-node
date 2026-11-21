@@ -50,19 +50,7 @@ export async function createBatchBuyer(
       exclusive(() => releaseDeclined(store, channel, request)),
     openingRecovery: openingRecovery(options, store, exclusive),
     usesBlocks: () => store.read().blocks !== undefined,
-    pendingBlockRequest: () => {
-      const state = store.read();
-      const request = Object.values(state.requests).find(
-        (row) => !row.accepted && state.blocks?.[row.requestId],
-      );
-      return request
-        ? {
-            requestId: request.requestId,
-            requestDigest: request.requestDigest,
-            maxAtomic: request.maxAtomic,
-          }
-        : undefined;
-    },
+    pendingBlockRequest: () => pendingBlockRequest(store),
     beginBlocks: (request) =>
       exclusive(() => reserve(store, request, options.now(), true)),
     approveBlock: (intent, verified, check) =>
@@ -298,4 +286,18 @@ function releaseDeclined(
     delete state.requests[request.requestId];
     if (state.blocks) delete state.blocks[request.requestId];
   });
+}
+
+function pendingBlockRequest(store: BatchStore) {
+  const state = store.read();
+  const request = Object.values(state.requests).find(
+    (row) => !row.accepted && state.blocks?.[row.requestId],
+  );
+  return request
+    ? {
+        requestId: request.requestId,
+        requestDigest: request.requestDigest,
+        maxAtomic: request.maxAtomic,
+      }
+    : undefined;
 }

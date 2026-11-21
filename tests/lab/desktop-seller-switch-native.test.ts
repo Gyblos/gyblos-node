@@ -1,4 +1,3 @@
-// Product buyer/seller renewal over loopback and the native SDK program; every financial service is local.
 import assert from 'node:assert/strict';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

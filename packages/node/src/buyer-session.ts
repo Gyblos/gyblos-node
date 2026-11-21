@@ -36,6 +36,7 @@ import type { BuyerSessionBackend } from './session-backend';
 import {
   newSessionTerms,
   parseBuyerSessionPolicy,
+  replacementTerms,
   type BuyerSessionPolicy,
 } from './session-policy';
 
@@ -96,17 +97,12 @@ async function openCurrent<Remote extends BatchDestination>(
     if (!quote) return sessionFail(SESSION_CODES.CLOSED);
     const backend = await getBackend(state, signal);
     if (!backend.renew) return sessionFail(SESSION_CODES.CLOSED);
-    const replacement = newSessionTerms(
+    const replacement = replacementTerms(
+      options.policy,
+      options.now,
       quote,
-      {
-        ...options.policy,
-        depositAtomic: String(
-          BigInt(options.policy.depositAtomic) -
-            BigInt(stored.priorSpentAtomic ?? '0'),
-        ),
-      },
-      options.now(),
-    );
+      stored.priorSpentAtomic,
+    )('0');
     await verifyBatchQuote(
       quote,
       replacement,
@@ -282,7 +278,12 @@ async function renewable<Remote extends BatchDestination>(
   );
   const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
-  const replacement = replacementTerms(options, quote, stored.priorSpentAtomic);
+  const replacement = replacementTerms(
+    options.policy,
+    options.now,
+    quote,
+    stored.priorSpentAtomic,
+  );
   if (snapshot.state !== SESSION_STATES.CLOSED)
     replacement(snapshot.cumulativeAtomic);
   const settlement = snapshot.channelId
@@ -389,22 +390,4 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
       }
     },
   };
-}
-
-function replacementTerms<Remote extends BatchDestination>(
-  options: BuyerSessionOptions<Remote>,
-  quote: SignedOfferV2,
-  priorSpentAtomic?: string,
-) {
-  const authority =
-    BigInt(options.policy.depositAtomic) - BigInt(priorSpentAtomic ?? '0');
-  return (spent: string) =>
-    newSessionTerms(
-      quote,
-      {
-        ...options.policy,
-        depositAtomic: String(authority - BigInt(spent)),
-      },
-      options.now(),
-    );
 }

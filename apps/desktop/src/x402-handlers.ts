@@ -185,18 +185,9 @@ export function createX402Handlers(
     const input = buyerAction(owner, event, args);
     try {
       if (await configureAction(managed, input)) return await summary();
-      if (
-        (input.action === X402_ACTION.START_BUYER ||
-          input.action === X402_ACTION.STATUS) &&
-        managed &&
-        !client.policy()
-      ) {
-        if ((await budget.summary()).blocked)
-          throw new Error('Payment needs review');
-        await managed.start();
-      } else if (input.action === X402_ACTION.REVIEW && managed?.review)
-        await checkPayment(budget, managed.review);
-      else if (input.action === X402_ACTION.CONNECT)
+      if (await manageBuyer(input.action, managed, client, budget))
+        return await summary();
+      if (input.action === X402_ACTION.CONNECT)
         await client.connect(input.url, input.token);
       else if (
         input.action === X402_ACTION.AUTHORIZE &&
@@ -247,4 +238,26 @@ export function createX402Handlers(
       };
     }
   };
+}
+
+async function manageBuyer(
+  action: unknown,
+  managed: ManagedBuyerPorts | undefined,
+  client: X402Client,
+  budget: X402Budget,
+) {
+  if (
+    (action === X402_ACTION.START_BUYER || action === X402_ACTION.STATUS) &&
+    managed &&
+    !client.policy()
+  ) {
+    if ((await budget.summary()).blocked)
+      throw new Error('Payment needs review');
+    await managed.start();
+    return true;
+  } else if (action === X402_ACTION.REVIEW && managed?.review) {
+    await checkPayment(budget, managed.review);
+    return true;
+  }
+  return false;
 }

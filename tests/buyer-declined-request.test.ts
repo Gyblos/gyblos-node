@@ -45,5 +45,7 @@ void test('a restarted pooled buyer reconciles a persisted refusal before anothe
   await pool.dispose();
   pool = await f.options.pool();
   assert.equal(await pool.resolve(terms.sellerNodeId), true);
-  await pool.begin(terms.sellerNodeId, f.a.request(2).requestId);
+  const next = f.a.request(2).requestId;
+  await pool.begin(terms.sellerNodeId, next);
+  assert.equal(await pool.resolve(terms.sellerNodeId, next), true);
 });
