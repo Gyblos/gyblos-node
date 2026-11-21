@@ -1,4 +1,4 @@
-// Groups network offers by model. Hovering a model with several sellers opens a side panel
+// Groups network offers by model. Clicking a model with several sellers opens a side panel
 // with the seller strategy (Auto first); choosing a strategy keeps the menu open.
 import {
   CaretDown,
@@ -42,11 +42,16 @@ function priceLabel(model: ModelOption) {
     ? 'Free'
     : `${usdPerMtok(model.input)} in · ${usdPerMtok(model.output)} out / 1M`;
 }
+// Word joiners and a no-break space keep a shortened seller id on one line.
 function sellerName(model: ModelOption) {
   const seller = model.family
     ?.split(' · ')
     .find((part) => part.startsWith('Seller '));
-  return seller ?? (model.free ? 'Community node' : 'Signed seller');
+  if (!seller) return model.free ? 'Community node' : 'Signed seller';
+  return seller.replace('Seller ', 'Seller\u00a0').replace(/\.\.\.|…/, '\u2060…\u2060');
+}
+function offerPrice(model: ModelOption) {
+  return model.free ? 'Free' : `${usdPerMtok(model.input)} / ${usdPerMtok(model.output)}`;
 }
 function quantization(model: ModelOption) {
   return (
@@ -79,8 +84,9 @@ function recommended(offers: readonly ModelOption[]) {
 function groupPrice(offers: readonly ModelOption[]) {
   const paid = offers.filter((item) => !item.free);
   const cheapest = paid.sort((a, b) => a.input - b.input)[0];
-  if (!cheapest) return 'Free';
-  return offers.some((item) => item.free) ? 'Free' : 'From ' + usdPerMtok(cheapest.input) + '/M';
+  const sellers = offers.length + (offers.length === 1 ? ' seller' : ' sellers');
+  if (!cheapest || offers.some((item) => item.free)) return 'Free · ' + sellers;
+  return (offers.length > 1 ? 'From ' : '') + usdPerMtok(cheapest.input) + '/M · ' + sellers;
 }
 function group(models: readonly ModelOption[]) {
   const groups = new Map<string, ModelOption[]>();
@@ -117,12 +123,14 @@ function StrategyRow({
   icon: Glyph,
   label,
   detail,
+  price,
   checked,
   onChoose,
 }: {
   icon: Icon;
   label: string;
   detail: string;
+  price: string;
   checked: boolean;
   onChoose: () => void;
 }) {
@@ -138,6 +146,7 @@ function StrategyRow({
           <Glyph size={18} weight={checked ? 'fill' : 'regular'} />
         </span>
       }
+      badge={<span className="preview-offer-price">{price}</span>}
       trailing={checked ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
       onClick={onChoose}
     />
@@ -334,7 +343,6 @@ export function ModelDropdown({
                 if (!first) return null;
                 const selected = name === model.name || list.some((item) => item.id === model.id);
                 const several = list.length > 1 && !contextLabel;
-                const mode = isAuto(name) ? 'Auto' : (chosenTag.get(name) ?? '');
                 return (
                   <MenuItem
                     key={name}
@@ -346,24 +354,21 @@ export function ModelDropdown({
                     aria-haspopup={several ? 'menu' : undefined}
                     aria-expanded={several ? active === name : undefined}
                     label={name}
-                    detail={
-                      contextLabel ??
-                      (several
-                        ? groupPrice(list) + ' · ' + list.length + ' sellers'
-                        : priceLabel(first) + ' · ' + sellerName(first)) +
-                        (broke && !list.some((item) => item.free) ? ' · Needs funds' : '')
-                    }
+                    detail={contextLabel ?? groupPrice(list)}
                     leading={<ModelImage artwork={first.image} name={name} />}
                     trailing={
                       <span className="preview-menu-trail">
-                        {selected && several && mode && <span className="preview-mode-chip">{mode}</span>}
                         {broke && !list.some((item) => item.free) && (
-                          <span className="pk-needs-funds" aria-hidden="true">
-                            <Wallet size={14} weight="fill" />
+                          <span className="pk-needs-funds" role="img" aria-label="Needs funds" title="Needs funds">
+                            <Wallet size={14} weight="fill" aria-hidden="true" />
                           </span>
                         )}
                         {selected ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
-                        {several && <CaretRight size={13} className="preview-menu-caret" />}
+                        {several ? (
+                          <CaretRight size={13} className="preview-menu-caret" />
+                        ) : (
+                          <span className="preview-caret-slot" aria-hidden="true" />
+                        )}
                       </span>
                     }
                     onClick={() => {
@@ -412,32 +417,37 @@ export function ModelDropdown({
               {active && top && (
                 <>
                   <p className="preview-flyout-title">
-                    <strong>Seller</strong>
-                    <small>{offers.length} sellers for {active}</small>
+                    <strong>{active}</strong>
+                    <small>{offers.length} sellers · price per 1M tokens, in / out</small>
                   </p>
                   <StrategyRow
                     icon={Sparkle}
                     label="Auto"
-                    detail={
-                      broke && top.free
-                        ? 'Free seller while your balance is 0 · ' + sellerName(top)
-                        : 'Recommended · now ' + sellerName(top) + ' · ' + priceLabel(top)
-                    }
+                    detail={(broke && top.free ? 'Free while your balance is 0 · ' : 'Recommended · ') + sellerName(top)}
+                    price={offerPrice(top)}
                     checked={current && isAuto(active)}
                     onChoose={() => remember(top, true)}
                   />
-                  {recommended(offers).map(({ label: tag, icon, item }) => (
-                    <StrategyRow
-                      key={tag}
-                      icon={icon}
-                      label={tag}
-                      detail={[sellerName(item), quantization(item), priceLabel(item), broke && !item.free ? 'Needs funds' : '']
-                        .filter(Boolean)
-                        .join(' · ')}
-                      checked={current && !isAuto(active) && chosenTag.get(active) === tag}
-                      onChoose={() => remember(item, false, tag)}
-                    />
-                  ))}
+                  {recommended(offers).map(({ label: tag, icon, item }, index, picks) => {
+                    const earlier = [{ label: 'Auto', item: top }, ...picks.slice(0, index)].find(
+                      (pick) => pick.item.id === item.id,
+                    );
+                    return (
+                      <StrategyRow
+                        key={tag}
+                        icon={icon}
+                        label={tag}
+                        detail={
+                          earlier
+                            ? 'Same seller as ' + earlier.label
+                            : [sellerName(item), quantization(item)].filter(Boolean).join(' · ')
+                        }
+                        price={offerPrice(item)}
+                        checked={current && !isAuto(active) && chosenTag.get(active) === tag}
+                        onChoose={() => remember(item, false, tag)}
+                      />
+                    );
+                  })}
                   <MenuItem
                     footer
                     label={'Compare ' + offers.length + ' sellers in Models'}

@@ -272,3 +272,50 @@ void test('preview menus that open upward stay glued to their trigger when their
     'the seller panel follows the model menu bottom edge',
   );
 });
+
+void test('preview model picker keeps one selection signal, short seller rows and aligned columns', async () => {
+  const picker = await readFile(
+    'lab/tools/desktop-preview/views/ModelDropdown.tsx.preview',
+    'utf8',
+  );
+  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  assert.doesNotMatch(
+    picker,
+    /' · Needs funds'|'Needs funds' : ''/,
+    'the balance line and wallet icon say a model needs funds; rows do not repeat it',
+  );
+  assert.match(picker, /\\u2060…\\u2060/, 'a shortened seller id never wraps');
+  assert.match(
+    picker,
+    /className="preview-offer-price"/,
+    'the price sits in its own column',
+  );
+  assert.match(
+    picker,
+    /'Same seller as '/,
+    'strategies that pick the same seller say so',
+  );
+  assert.match(
+    picker,
+    /preview-caret-slot/,
+    'single-seller rows keep the caret column',
+  );
+  assert.doesNotMatch(
+    css,
+    /\.preview-model-menu \.dropdown-row\[data-active\] \{\n {2}background: var\(--soft\)/,
+    'the open model row is not tinted with the accent',
+  );
+  assert.match(
+    css,
+    /\.dropdown-row\[data-strategy\] \{\n {2}align-items: flex-start;/,
+  );
+  assert.match(
+    css,
+    /\.preview-seller-flyout\)\s+\.dropdown-footer \{\n {2}margin-top: auto;/,
+  );
+  assert.match(
+    css,
+    /--preview-name-type: 'Instrument Sans'/,
+    'model names do not mix in mono digits',
+  );
+});

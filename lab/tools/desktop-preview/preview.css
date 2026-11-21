@@ -2382,27 +2382,85 @@ html
 }
 
 /* Model picker: flat model list with a side panel for the seller strategy. */
-html .app.desktop-frame .preview-model-menu .dropdown-row[data-active] {
-  background: var(--soft);
+html
+  .app.desktop-frame
+  .preview-model-menu
+  .dropdown-row:is(:hover, :focus-visible, [data-active]),
+html
+  .app.desktop-frame
+  .preview-seller-flyout
+  .dropdown-row:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+html
+  .app.desktop-frame
+  :is(.preview-model-menu, .preview-seller-flyout)
+  .dropdown-row:focus-visible {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 28%, transparent);
 }
 html .app.desktop-frame .preview-menu-caret {
   color: var(--muted);
+  transition: color var(--motion-overlay) ease;
+}
+html .app.desktop-frame .dropdown-row[data-active] .preview-menu-caret {
+  color: var(--ink);
+}
+html .app.desktop-frame .preview-caret-slot {
+  width: 13px;
+  flex: none;
+}
+html .app.desktop-frame {
+  --preview-name-type: 'Instrument Sans', system-ui, sans-serif;
+}
+html[data-font='inter'] .app.desktop-frame {
+  --preview-name-type: InterVariable, ui-sans-serif, system-ui, sans-serif;
+}
+html
+  .app.desktop-frame
+  :is(
+    .preview-model-menu .dropdown-copy strong,
+    .preview-flyout-title strong,
+    .ui-model-trigger
+  ) {
+  font-family: var(--preview-name-type);
+}
+html .app.desktop-frame .ui-model-trigger .model-trigger-price {
+  font-family: var(--font-mono);
+}
+html .app.desktop-frame .dropdown-row[data-strategy] .ui-item-title {
+  justify-content: space-between;
+}
+html .app.desktop-frame .preview-offer-price {
+  flex: none;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+html
+  .app.desktop-frame
+  .compact-dropdown.preview-model-menu[data-split]:popover-open,
+html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
+  display: flex;
+  flex-direction: column;
+}
+html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
+  flex: 1;
+}
+html
+  .app.desktop-frame
+  :is(.preview-model-menu[data-split], .preview-seller-flyout)
+  .dropdown-footer {
+  margin-top: auto;
 }
 html .app.desktop-frame .preview-check-slot {
   width: 18px;
   flex: none;
 }
-html .app.desktop-frame .preview-mode-chip {
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-}
 html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
   overflow-y: auto;
   translate: -4px 0;
@@ -2440,6 +2498,7 @@ html .app.desktop-frame .preview-flyout-title small {
   color: var(--muted);
 }
 html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {
+  align-items: flex-start;
   gap: 10px;
   border-radius: 8px;
 }
@@ -2468,7 +2527,7 @@ html
   color: var(--ink);
 }
 html .app.desktop-frame .preview-seller-flyout .dropdown-footer {
-  margin-top: 4px;
+  flex: none;
   border-top: 1px solid var(--subtle-line);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2495,7 +2554,6 @@ html[data-font='inter'] .desktop-frame {
   font-feature-settings: 'cv11', 'ss01';
 }
 @media (max-width: 560px) {
-  html .app.desktop-frame .preview-model-menu[data-split] .preview-mode-chip,
   html .app.desktop-frame .preview-model-menu[data-split] .preview-menu-caret {
     display: none;
   }
