@@ -6,6 +6,7 @@ import {
 } from '@gyblos/config/home';
 import { canonicalJson } from '@gyblos/protocol';
 import {
+  controlAddress,
   controlArray,
   controlAtomic,
   controlHex,
@@ -26,12 +27,12 @@ import {
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
-import { batchOpeningAbsent } from './batch-opening-proof';
+import { batchOpeningAbsent, replaceableOpening } from './batch-opening-proof';
 import type { PoolRecord, PoolRow } from './batch-pool-types';
 import { termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
+import { sameBatchParties } from './batch-session-history';
 import { withBatchState } from './batch-session-io';
-import { renewBatchSession } from './batch-session-renewal';
 import { readBatchRecord } from './batch-session-state';
 import { BATCH_POOL_VERSION } from './constants';
 
@@ -47,6 +48,7 @@ function parse(value: unknown): PoolRecord {
       'terms',
       'legacy',
       'ready',
+      'replacing',
       'requestId',
       'uncertain',
       'refundedAtomic',
@@ -56,6 +58,8 @@ function parse(value: unknown): PoolRecord {
       typeof entry.legacy !== 'boolean' ||
       typeof entry.ready !== 'boolean' ||
       typeof entry.uncertain !== 'boolean' ||
+      (entry.ready && entry.replacing !== undefined) ||
+      (!entry.ready && entry.legacy && entry.replacing === undefined) ||
       keys.has(terms.sellerNodeId)
     )
       return sessionFail();
@@ -75,6 +79,9 @@ function parse(value: unknown): PoolRecord {
       terms,
       legacy: entry.legacy,
       ready: entry.ready,
+      ...(entry.replacing === undefined
+        ? {}
+        : { replacing: controlAddress(entry.replacing) }),
       uncertain: entry.uncertain,
       requestId:
         entry.requestId === null
@@ -115,7 +122,7 @@ export async function readPool(
   const legacy = await readBatchRecord(paths.legacy);
   // Pool generation accounting is separate; never silently discard a renewed root's historical spend.
   if (
-    legacy?.history?.some((entry) => !batchOpeningAbsent(entry)) &&
+    legacy?.history?.some((entry) => !replaceableOpening(entry)) &&
     (raw !== undefined || includeLegacy)
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -150,7 +157,9 @@ export async function readPool(
     legacy &&
     (!known ||
       (canonicalJson(known.terms) !== canonicalJson(legacy.terms) &&
-        (known.ready || !batchOpeningAbsent(legacy))))
+        (known.ready ||
+          known.replacing !== legacy.channelId ||
+          !replaceableOpening(legacy))))
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);
   if (known && !legacy) return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -158,7 +167,7 @@ export async function readPool(
 }
 export async function poolChild(paths: BatchPoolPaths, row: PoolRow) {
   const record = await readBatchRecord(poolPaths(paths, row));
-  if (record?.history?.some((entry) => !batchOpeningAbsent(entry)))
+  if (record?.history?.some((entry) => !replaceableOpening(entry)))
     return sessionFail(SESSION_CODES.UNVERIFIED);
   if (!record || canonicalJson(record.terms) !== canonicalJson(row.terms))
     return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -174,22 +183,18 @@ async function seed(paths: BatchPoolPaths, row: PoolRow, now: number) {
   const pathsFor = poolPaths(paths, row);
   const found = await readBatchRecord(pathsFor);
   if (found) {
+    // A crash before the child rotated leaves the original proof intact. Restore its row.
     if (
-      batchOpeningAbsent(found) &&
-      canonicalJson(found.terms) !== canonicalJson(row.terms)
-    ) {
-      await renewBatchSession({
-        paths: pathsFor,
-        expectedChannelId: found.channelId,
-        terms: row.terms,
-        totalBudgetAtomic: row.terms.depositAtomic,
-        now: () => now,
-        observe: async () => sessionFail(SESSION_CODES.UNVERIFIED),
-      });
-      return;
-    }
+      row.replacing === found.channelId &&
+      replaceableOpening(found) &&
+      canonicalJson(found.terms) !== canonicalJson(row.terms) &&
+      sameBatchParties(found.terms, row.terms)
+    )
+      return found;
     if (
       canonicalJson(found.terms) !== canonicalJson(row.terms) ||
+      (row.replacing !== undefined &&
+        found.history?.at(-1)?.channelId !== row.replacing) ||
       found.hints !== null ||
       found.opening !== null ||
       Object.keys(found.requests).length > 0
@@ -197,6 +202,7 @@ async function seed(paths: BatchPoolPaths, row: PoolRow, now: number) {
       return sessionFail(SESSION_CODES.UNVERIFIED);
     return;
   }
+  if (row.replacing !== undefined) return sessionFail(SESSION_CODES.UNVERIFIED);
   await ensurePrivatePaymentPaths(pathsFor);
   await withBatchState(pathsFor, () =>
     writePrivateFile(
@@ -250,11 +256,17 @@ export async function openPoolStore(paths: BatchPoolPaths, now: () => number) {
       await poolChild(paths, row);
       return;
     }
-    await seed(paths, row, now());
+    const previous = await seed(paths, row, now());
     await update((next) => {
-      next.entries.find(
+      const entry = next.entries.find(
         (entry) => entry.terms.sellerNodeId === row.terms.sellerNodeId,
-      )!.ready = true;
+      )!;
+      entry.ready = true;
+      delete entry.replacing;
+      if (previous) {
+        entry.terms = previous.terms;
+        entry.refundedAtomic = previous.settlement?.refundedAtomic ?? '0';
+      }
     });
   };
   try {

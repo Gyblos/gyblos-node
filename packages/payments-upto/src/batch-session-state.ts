@@ -14,7 +14,7 @@ import {
   readPrivateFile,
 } from '@gyblos/runtime/private-file';
 
-import { batchOpeningAbsent } from './batch-opening-proof';
+import { batchOpeningAbsent, returnedOpening } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { reserved } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
@@ -30,6 +30,7 @@ export interface BatchStoredSession {
   recoverable: boolean;
   notCreated?: true;
   openingPending?: true;
+  openingReturned?: true;
   // A released never-funded opening: terminal for admission, and its buyer may open again.
   released?: true;
   // An empty preparation (released or not): no channel, opening, charge or pending attempt.
@@ -94,6 +95,7 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     record.settlement.chargedAtomic === record.cumulativeAtomic &&
     !recoverable;
   return {
+    ...(returnedOpening(record) && { openingReturned: true as const }),
     ...(record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] && {
       openingPending: true as const,
     }),

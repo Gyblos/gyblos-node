@@ -38,8 +38,20 @@ export async function checkPreviousOpening<Remote extends BatchDestination>(
       await disposeAbsent(state, opened);
       throw new UnsentOpeningError(SESSION_CODES.OPENING_ABSENT);
     }
-    if (status !== OPENING_STATUS.PRESENT)
+    if (status !== OPENING_STATUS.PRESENT) {
+      const settled = await opened.host
+        .reconcile(signal)
+        .catch(() => undefined);
+      if (
+        settled &&
+        settled.chargedAtomic === '0' &&
+        settled.refundedAtomic === opened.terms.depositAtomic
+      ) {
+        await disposeAbsent(state, opened);
+        throw new UnsentOpeningError(SESSION_CODES.OPENING_RETURNED);
+      }
       throw new UnsentOpeningError(SESSION_CODES.OPENING_PENDING);
+    }
     return true;
   }
   return false;

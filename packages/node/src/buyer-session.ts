@@ -89,7 +89,7 @@ async function openCurrent<Remote extends BatchDestination>(
 ): Promise<Current<Remote>> {
   const options = state.options;
   const stored = await bounded(options.inspect(), signal);
-  if (stored?.notCreated) {
+  if (stored?.notCreated || stored?.openingReturned) {
     if (!quote) return sessionFail(SESSION_CODES.CLOSED);
     const backend = await getBackend(state, signal);
     if (!backend.renew) return sessionFail(SESSION_CODES.CLOSED);

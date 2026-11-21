@@ -134,12 +134,6 @@ function openingRecovery(
         });
         return true;
       }),
-    acknowledged: () =>
-      exclusive(() =>
-        store.update((record) => {
-          delete record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT];
-        }),
-      ),
     status: (signal: AbortSignal) => exclusive(() => status(store, signal)),
   };
 }

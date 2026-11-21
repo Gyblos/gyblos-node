@@ -153,6 +153,7 @@ async function checkExpiredOpening<Remote extends BatchDestination>(
   if (
     existing?.stored?.openingPending &&
     !existing.stored.notCreated &&
+    !existing.stored.openingReturned &&
     state.options.now() >= existing.terms.expiresAt
   ) {
     await manager(state, existing).checkOpening(signal);
@@ -177,7 +178,9 @@ async function execute<Remote extends BatchDestination>(
     );
     await checkExpiredOpening(state, existing, signal);
     const terms =
-      (existing?.stored?.notCreated ? undefined : existing?.terms) ??
+      (existing?.stored?.notCreated || existing?.stored?.openingReturned
+        ? undefined
+        : existing?.terms) ??
       newSessionTerms(quote, state.options.policy, state.options.now());
     await verifyBatchQuote(
       quote,
@@ -187,7 +190,8 @@ async function execute<Remote extends BatchDestination>(
     );
     if (
       (batchSessionTerminal(existing?.stored) &&
-        !existing?.stored?.notCreated) ||
+        !existing?.stored?.notCreated &&
+        !existing?.stored?.openingReturned) ||
       (state.options.now() >= terms.expiresAt &&
         !existing?.stored?.openingPending)
     )
@@ -206,7 +210,13 @@ async function execute<Remote extends BatchDestination>(
       BigInt(budget.availableAtomic) < BigInt(terms.depositAtomic)
     )
       return sessionFail(SESSION_CODES.LIMIT);
-    return { terms, fresh: !existing || !!existing.stored?.notCreated };
+    return {
+      terms,
+      fresh:
+        !existing ||
+        !!existing.stored?.notCreated ||
+        !!existing.stored?.openingReturned,
+    };
   });
   const preparation =
     fresh && state.options.openingSupportsBlocks !== undefined

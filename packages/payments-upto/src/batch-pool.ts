@@ -10,7 +10,7 @@ import {
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 
-import { batchOpeningAbsent } from './batch-opening-proof';
+import { batchOpeningAbsent, replaceableOpening } from './batch-opening-proof';
 import {
   openPoolStore,
   poolChild,
@@ -77,12 +77,8 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
     .read()
     .entries.find((entry) => entry.terms.sellerNodeId === checked.sellerNodeId);
   if (row && canonicalJson(row.terms) !== canonicalJson(checked)) {
-    if (
-      !context.unfunded.has(checked.sellerNodeId) ||
-      row.requestId ||
-      row.uncertain ||
-      !batchOpeningAbsent(await poolChild(options.paths, row))
-    )
+    const old = await poolChild(options.paths, row);
+    if (row.requestId || row.uncertain || !replaceableOpening(old))
       return sessionFail(SESSION_CODES.BINDING);
     if (
       BigInt(
@@ -101,7 +97,17 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
       )!;
       replacing.terms = checked;
       replacing.ready = false;
+      replacing.replacing = old.channelId;
+      replacing.refundedAtomic = '0';
     });
+    row = rowFor(checked.sellerNodeId);
+    try {
+      const backend = await options.backend(poolPaths(options.paths, row));
+      if (!backend.renew) return sessionFail(SESSION_CODES.UNAVAILABLE);
+      await backend.renew(old.channelId, checked, checked.depositAtomic);
+    } finally {
+      await store.prepare(row);
+    }
     context.unfunded.delete(checked.sellerNodeId);
     row = rowFor(checked.sellerNodeId);
   }

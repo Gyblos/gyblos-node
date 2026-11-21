@@ -86,6 +86,19 @@ export function batchOpeningAbsent(
   return proof;
 }
 
+export function returnedOpening(record: BatchRecord) {
+  return (
+    !!record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] &&
+    !!record.settlement &&
+    record.settlement.chargedAtomic === '0' &&
+    record.cumulativeAtomic === '0' &&
+    record.settlement.refundedAtomic === record.terms.depositAtomic &&
+    !Object.keys(record.requests).length
+  );
+}
+export function replaceableOpening(record: BatchRecord) {
+  return !!batchOpeningAbsent(record) || returnedOpening(record);
+}
 export function unfundedOpening(record: BatchRecord) {
   return (
     !record.settlement &&

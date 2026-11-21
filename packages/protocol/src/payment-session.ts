@@ -88,7 +88,6 @@ export interface SessionSeller {
 export interface SessionBuyer {
   openingRecovery?: {
     claim(): Promise<boolean>;
-    acknowledged(): Promise<void>;
     pending(): boolean;
     status(
       signal: AbortSignal,

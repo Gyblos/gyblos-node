@@ -15,7 +15,8 @@ export class UnsentOpeningError extends BatchChannelError {
   constructor(
     code:
       | typeof SESSION_CODES.OPENING_ABSENT
-      | typeof SESSION_CODES.OPENING_PENDING,
+      | typeof SESSION_CODES.OPENING_PENDING
+      | typeof SESSION_CODES.OPENING_RETURNED,
   ) {
     super(code);
   }
@@ -28,14 +29,10 @@ export async function recoverBuyerOpening<T>(
 ): Promise<T> {
   const evidence = buyer.openingRecovery;
   if (!evidence) return open();
-  const attempt = async () => {
-    const result = await open();
-    await evidence.acknowledged();
-    return result;
-  };
+
   if (await evidence.claim()) {
     try {
-      return await attempt();
+      return await open();
     } catch {
       signal.throwIfAborted();
     }
@@ -56,7 +53,7 @@ export async function recoverBuyerOpening<T>(
         throw new UnsentOpeningError(SESSION_CODES.OPENING_ABSENT);
       if (status === OPENING_STATUS.PRESENT) {
         await bounded(verify(recovery), recovery);
-        return await attempt();
+        return await open();
       }
     }
   } catch (error) {

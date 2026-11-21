@@ -51,9 +51,6 @@ export async function batchPrepareFixture(
             pending = true;
             return first;
           },
-          acknowledged: async () => {
-            pending = false;
-          },
           status: openingStatus,
         },
       }),

@@ -40,6 +40,7 @@ type BuyerCode =
   | FreeExecutionCode
   | SellerSelectionCode
   | typeof SESSION_CODES.OPENING_ABSENT
+  | typeof SESSION_CODES.OPENING_RETURNED
   | typeof SESSION_CODES.OPENING_PENDING
   | typeof SESSION_CODES.BINDING
   | typeof SESSION_CODES.UNVERIFIED
@@ -56,6 +57,8 @@ export class DesktopBuyerFailure extends Error {
 function explanation(code: BuyerCode, reason: unknown, free: boolean) {
   if (code === BUYER_ROUTING_CODES.BUSY)
     return 'The selected seller or channel is busy. If your buyer uses one channel, settle the existing channel before switching sellers.';
+  if (code === SESSION_CODES.OPENING_RETURNED)
+    return 'The unused channel deposit was returned. You can send your message again.';
   if (code === SESSION_CODES.OPENING_PENDING)
     return 'The network has not confirmed the channel deposit yet. Wait a moment and try again with the same seller. Your message has not been sent.';
   if (code === SESSION_CODES.OPENING_ABSENT)
@@ -138,6 +141,7 @@ export function desktopBuyerFailure(
   const code = [
     BUYER_ROUTING_CODES.BUSY,
     SESSION_CODES.OPENING_ABSENT,
+    SESSION_CODES.OPENING_RETURNED,
     SESSION_CODES.OPENING_PENDING,
     SESSION_CODES.BINDING,
     SESSION_CODES.UNVERIFIED,
