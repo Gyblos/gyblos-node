@@ -330,13 +330,14 @@ export function reviewBrand(desktop: string): Plugin {
     resolveId(source, importer) {
       if (
         source === './PreviewKit' &&
-        importer?.startsWith(`${desktop}/src/ui/`)
+        importer !== undefined &&
+        moduleId(importer).startsWith(`${moduleId(desktop)}/src/ui/`)
       )
         return `${desktop}/src/ui/PreviewKit.tsx`;
       return null;
     },
     load(id) {
-      if (id !== `${desktop}/src/ui/PreviewKit.tsx`) return null;
+      if (moduleId(id) !== `${moduleId(desktop)}/src/ui/PreviewKit.tsx`) return null;
       return readFileSync(
         new URL('./views/PreviewKit.tsx.preview', import.meta.url),
         'utf8',
