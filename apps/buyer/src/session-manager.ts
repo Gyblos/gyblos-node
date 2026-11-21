@@ -27,12 +27,12 @@ import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 import {
   permitsWinner,
   relayAllowed,
-  restoredSellerAddress,
   selectWinner,
   sellerAddress,
 } from './free-selection';
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
+import { restoredSellerAddress } from './seller-address';
 import {
   createSessionPreflight,
   prepareChosenMeter,
