@@ -38,6 +38,8 @@ interface Options {
   rpcUrl: string;
   now?: () => number;
   rpc?: BatchObserverOptions['rpc'];
+  // How long one SDK or RPC operation is awaited (BATCH_SESSION_DEFAULTS.operationMs by default).
+  operationMs?: number;
 }
 async function compatible(options: Options, terms: PaymentSessionTerms) {
   termsFor(terms);
@@ -191,7 +193,8 @@ export function openBatchSellerBackend(
       const rpc = options.rpc ?? createBuyerObservationRpc(options.rpcUrl);
       await verifyPaymentNetwork(rpc, terms.network);
       const facilitator = batchFacilitatorFor(signer, terms);
-      if (!existing) {
+      // A new session, or an empty preparation taking its slot back, proves its opening first.
+      if (!existing || (existing.empty && payload !== undefined)) {
         if (!payload) return sessionFail(SESSION_CODES.UNVERIFIED);
         await firstProof(facilitator, terms, payload);
       }
@@ -205,6 +208,8 @@ export function openBatchSellerBackend(
         observe: observer.settlement,
         observeOpening: observer.opening,
         closing: observer.closing,
+        operationMs: options.operationMs,
+        reclaimReleasedSlot: payload !== undefined,
       });
     },
   };

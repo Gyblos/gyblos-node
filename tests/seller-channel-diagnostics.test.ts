@@ -5,6 +5,7 @@ import { test } from 'node:test';
 
 import { SELLER_CHANNEL_DIAGNOSTICS } from '@gyblos/node/constants';
 import { startSellerSessions } from '@gyblos/node/seller-sessions';
+import { OPENING_RELEASE_FAILED } from '@gyblos/payments-upto/batch-session';
 import {
   BATCH_CHANNEL,
   BATCH_METHODS,
@@ -25,6 +26,9 @@ void test('a failed channel opening is recorded with its operation and stable co
   t.after(rig.dispose);
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const session = rig.seller();
+  // The fake backend hands out this one session; a real one creates a new session on every rebinding, so
+  // the host's dispose of a released (preparing) binding is a no-op here.
+  t.mock.method(session, 'dispose', async () => {});
   const records: DiagnosticRecord[] = [];
   let allowed = false;
   let created = false;
@@ -145,4 +149,19 @@ void test('a failed channel opening is recorded with its operation and stable co
   );
   assert.equal(records.length, 4);
   assert.equal(records[3]!.code, SESSION_CODES.UNVERIFIED);
+  // An opening failure whose release could not be written is recorded twice: the failure, then the
+  // release, so the operator learns why the channel stayed blocked.
+  t.mock.method(session, 'open', async () => {
+    const failure = new PaymentSessionError(SESSION_CODES.UNAVAILABLE);
+    Object.defineProperty(failure, OPENING_RELEASE_FAILED, { value: true });
+    throw failure;
+  });
+  await assert.rejects(open(), { code: SESSION_CODES.UNAVAILABLE });
+  assert.deepEqual(
+    records.slice(4).map((record) => [record.operation, record.code]),
+    [
+      [BATCH_METHODS.OPEN, SESSION_CODES.UNAVAILABLE],
+      [BATCH_METHODS.OPEN, SELLER_CHANNEL_DIAGNOSTICS.releaseFailedCode],
+    ],
+  );
 });

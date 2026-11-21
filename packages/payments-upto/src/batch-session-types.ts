@@ -89,6 +89,8 @@ interface BatchFinancialRecord {
   settlement: SessionSettlement | null;
   pending: Record<string, string>;
   blocks?: Record<string, BatchRequestBlocks>;
+  // A seller opening whose deposit was never funded was released: no channel, no obligation, no slot.
+  released?: true;
 }
 export interface BatchGeneration extends BatchFinancialRecord {
   version: typeof PAYMENT_SESSION.version | typeof BATCH_BLOCK_STATE.version;
@@ -137,6 +139,8 @@ export interface BatchSellerOptions extends BatchCommonOptions {
     terms: Readonly<PaymentSessionTerms>,
   ) => Promise<boolean>;
   closing: (channelId: string) => Promise<boolean>;
+  // Created for an opening: a released session takes its slot back now, before the opening is stored.
+  reclaimReleasedSlot?: boolean;
   idleMs?: number;
   minSettlementAtomic?: string;
   pollMs?: number;

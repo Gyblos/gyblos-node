@@ -36,7 +36,14 @@ import {
   reserve,
   snapshot,
 } from './batch-session-common';
-import { openBatchStore, serial } from './batch-session-store';
+import {
+  depositSettlementsRunning,
+  releaseUnsentOpening,
+  reserveReleasedSlot,
+  trackDepositSettlement,
+  type BatchOpening,
+} from './batch-session-opening-release';
+import { openBatchStore, serial, type BatchStore } from './batch-session-store';
 import type {
   BatchSellerContext,
   BatchSellerOptions,
@@ -56,9 +63,9 @@ export async function createBatchSeller(
     options.minSettlementAtomic ?? BATCH_SESSION_DEFAULTS.minSettlementAtomic,
   );
   const requirements = await requirementsFor(options.terms);
-  const store = await openBatchStore(
-    options,
-    initialRecord(options.terms, options.now()),
+  const store = await reserveReleasedSlot(
+    await openBatchStore(options, initialRecord(options.terms, options.now())),
+    options.reclaimReleasedSlot,
   );
   const exclusive = serial();
   const current = store.read();
@@ -127,7 +134,7 @@ export async function createBatchSeller(
 // SDK deposit verification reads/validates authority; it does not submit or simulate a payment.
 async function verifyFirstOpening(
   context: BatchSellerContext,
-  opening: ReturnType<typeof openingFor>,
+  opening: BatchOpening,
 ) {
   const { options, facilitator, requirements } = context;
   const verified = await waitBatch(
@@ -160,46 +167,58 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     state.opening = opening;
     state.channelId = opening.voucher!.channelId;
     state.voucher = opening.voucher!;
+    // Normally cleared when the session was created for this opening; kept so no opening is stored marked.
+    delete state.released;
   });
-  if (
-    await waitBatch(
+  // waitBatch stops waiting but cannot cancel the SDK: a settlement still running may yet send the deposit.
+  // The opening is forgotten only when the chain never showed the channel, no settlement for the session
+  // is still running and this one, if started, has finished.
+  let observed = false;
+  let settled = () => true;
+  try {
+    observed = await waitBatch(
       options.observeOpening(
         structuredClone(opening),
         structuredClone(options.terms),
       ),
       options.operationMs,
-    )
-  ) {
-    const verdict = await waitBatch(
-      facilitator.verify(
-        {
-          x402Version: 2,
-          accepted: requirements,
-          payload: {
-            type: 'voucher',
-            channelConfig: opening.channelConfig,
-            voucher: opening.voucher,
-          },
-        },
-        requirements,
-      ),
-      options.operationMs,
     );
-    requireVerifiedPayer(verdict, options.terms.buyer);
-    await store.update((state) => {
-      state.state = SESSION_STATES.OPEN;
-      state.lastActivity = options.now();
-    });
-    return snapshot(store);
+    if (observed) {
+      const verdict = await waitBatch(
+        facilitator.verify(
+          {
+            x402Version: 2,
+            accepted: requirements,
+            payload: {
+              type: 'voucher',
+              channelConfig: opening.channelConfig,
+              voucher: opening.voucher,
+            },
+          },
+          requirements,
+        ),
+        options.operationMs,
+      );
+      requireVerifiedPayer(verdict, options.terms.buyer);
+    } else {
+      const tracked = trackDepositSettlement(
+        store,
+        facilitator.settle(
+          { x402Version: 2, accepted: requirements, payload: opening },
+          requirements,
+        ),
+      );
+      settled = tracked.finished;
+      requireSettlementResponse(
+        await waitBatch(tracked.settlement, options.operationMs),
+        requirements.network,
+      );
+    }
+  } catch (error) {
+    if (!observed && settled() && !depositSettlementsRunning(store))
+      await releaseUnsentOpening(store, opening, error);
+    throw error;
   }
-  const response = await waitBatch(
-    facilitator.settle(
-      { x402Version: 2, accepted: requirements, payload: opening },
-      requirements,
-    ),
-    options.operationMs,
-  );
-  requireSettlementResponse(response, requirements.network);
   await store.update((state) => {
     state.state = SESSION_STATES.OPEN;
     state.lastActivity = options.now();
