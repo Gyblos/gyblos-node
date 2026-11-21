@@ -36,7 +36,6 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'utf8',
       );
   }
-  // Preview proposal: the color marks of OpenCode and Codex instead of the monochrome ones.
   if (target === `${base}/src/ui/ServiceLogo.tsx`)
     return replaceOnce(
       replaceOnce(
