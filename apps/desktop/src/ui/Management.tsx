@@ -100,13 +100,13 @@ export function ChoiceMenu<T extends string>({
       trigger={value}
       searchLabel={'Search ' + label.toLowerCase()}
     >
-      {(close, query) => (
-        <>
-          {options
-            .filter((option) =>
-              option.toLowerCase().includes(query.toLowerCase()),
-            )
-            .map((option) => (
+      {(close, query) => {
+        const matches = options.filter((option) =>
+          option.toLowerCase().includes(query.toLowerCase()),
+        );
+        return (
+          <>
+            {matches.map((option) => (
               <MenuItem
                 key={option}
                 role="menuitemradio"
@@ -119,8 +119,14 @@ export function ChoiceMenu<T extends string>({
                 }}
               />
             ))}
-        </>
-      )}
+            {!matches.length && (
+              <p className="dropdown-note" role="status">
+                No options found
+              </p>
+            )}
+          </>
+        );
+      }}
     </Dropdown>
   );
 }
