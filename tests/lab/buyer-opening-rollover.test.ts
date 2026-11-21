@@ -9,8 +9,9 @@ import {
 
 import { batchAbsenceRig } from '../support/batch-absence';
 
-for (const pooled of [false, true]) {
-  void test(`a proved absent deposit can be replaced for the same seller (pool = ${pooled})`, async (t) => {
+for (const mode of ['single', 'pool', 'pool-after-publication-error']) {
+  const pooled = mode !== 'single';
+  void test(`a proved absent deposit can be replaced for the same seller (${mode})`, async (t) => {
     const rig = await batchAbsenceRig(t);
     const { options, financial } = rig;
     const backend = openBatchBuyerBackend({
@@ -36,13 +37,28 @@ for (const pooled of [false, true]) {
         paths: options.paths,
         totalDepositAtomic: next.depositAtomic,
         now: options.now,
-        backend: async () => backend,
+        backend: async () => ({
+          ...backend,
+          async renew(...args: Parameters<NonNullable<typeof backend.renew>>) {
+            const result = await backend.renew!(...args);
+            if (mode === 'pool-after-publication-error')
+              throw new Error('simulated publication error');
+            return result;
+          },
+        }),
       });
       try {
         await pool.resolve(next.sellerNodeId);
         assert.equal((await pool.budget()).committedAtomic, '0');
-        const entry = await pool.allocate(next);
-        assert.equal(entry.stored?.snapshot.channelId, '');
+        if (mode === 'pool-after-publication-error') {
+          await assert.rejects(pool.allocate(next));
+          await assert.rejects(
+            pool.allocate({ ...next, sellerNodeId: 'bb'.repeat(32) }),
+          );
+        } else {
+          const entry = await pool.allocate(next);
+          assert.equal(entry.stored?.snapshot.channelId, '');
+        }
         assert.equal((await pool.budget()).availableAtomic, '0');
       } finally {
         await pool.dispose();

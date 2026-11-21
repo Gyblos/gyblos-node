@@ -48,7 +48,11 @@ function parse(value: unknown): PoolRecord {
       'terms',
       'legacy',
       'ready',
-      'replacing',
+      ...(value &&
+      typeof value === 'object' &&
+      Object.hasOwn(value, 'replacing')
+        ? ['replacing']
+        : []),
       'requestId',
       'uncertain',
       'refundedAtomic',

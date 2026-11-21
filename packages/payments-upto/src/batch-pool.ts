@@ -100,6 +100,7 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
       replacing.replacing = old.channelId;
       replacing.refundedAtomic = '0';
     });
+    context.unfunded.delete(checked.sellerNodeId);
     row = rowFor(checked.sellerNodeId);
     try {
       const backend = await options.backend(poolPaths(options.paths, row));
@@ -107,8 +108,13 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
       await backend.renew(old.channelId, checked, checked.depositAtomic);
     } finally {
       await store.prepare(row);
+      if (
+        batchOpeningAbsent(
+          await poolChild(options.paths, rowFor(checked.sellerNodeId)),
+        )
+      )
+        context.unfunded.add(checked.sellerNodeId);
     }
-    context.unfunded.delete(checked.sellerNodeId);
     row = rowFor(checked.sellerNodeId);
   }
   if (!row) {

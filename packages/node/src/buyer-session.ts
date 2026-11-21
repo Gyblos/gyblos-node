@@ -116,7 +116,8 @@ async function openCurrent<Remote extends BatchDestination>(
       replacement,
       options.policy.depositAtomic,
     );
-    if ((await options.inspect())?.notCreated)
+    const renewed = await options.inspect();
+    if (!renewed || renewed.notCreated || renewed.openingReturned)
       return sessionFail(SESSION_CODES.UNVERIFIED);
     return openCurrent(state, quote, signal);
   }
