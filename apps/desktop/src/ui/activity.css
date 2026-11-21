@@ -14,9 +14,6 @@
   color: var(--muted);
   margin: var(--space-2) 0 0;
 }
-.desktop-frame .activity-stats {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
 .desktop-frame .activity-breakdown {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -70,9 +67,4 @@
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
-}
-@media (max-width: 850px) {
-  .desktop-frame .activity-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
