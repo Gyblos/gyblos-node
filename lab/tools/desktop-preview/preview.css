@@ -2277,26 +2277,20 @@ html .app.desktop-frame .preview-model-menu [role='menu'] {
   max-height: none;
   overflow: visible;
 }
-html .app.desktop-frame .preview-model-menu [aria-checked='true'] {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  box-shadow: inset 2px 0 0 var(--accent);
-  color: var(--ink);
+html .app.desktop-frame .preview-check-circle {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pk-success);
+  color: var(--bg);
 }
-html
-  .app.desktop-frame
-  .preview-model-menu
-  [aria-checked='true']
-  svg:last-child {
-  color: var(--pk-info);
-}
-html
-  .app.desktop-frame
-  .preview-model-menu
-  .preview-model-group[data-current]
-  > :first-child {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  box-shadow: inset 2px 0 0 var(--accent);
-  border-radius: 8px;
+html .app.desktop-frame .preview-menu-trail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Setup steps: icon tiles instead of numbered circles; done steps turn into a check. */

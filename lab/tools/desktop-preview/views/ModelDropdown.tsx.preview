@@ -12,6 +12,13 @@ import { Badge, MenuItem } from './UI';
 export type { ModelOption } from './model-types';
 
 const automatic = new Set<string>();
+function Selected() {
+  return (
+    <span className="preview-check-circle" aria-hidden="true">
+      <Check size={11} weight="bold" />
+    </span>
+  );
+}
 const chosenTag = new Map<string, string>();
 function priceLabel(model: ModelOption) {
   return model.free
@@ -164,7 +171,7 @@ export function ModelDropdown({
                     label={name}
                     detail={contextLabel ?? priceLabel(first) + ' · ' + sellerName(first)}
                     leading={<ModelImage artwork={first.image} name={name} />}
-                    trailing={current && <Check size={16} />}
+                    trailing={current && <Selected />}
                     onClick={() => choose(close, first, false)}
                   />
                 );
@@ -178,7 +185,7 @@ export function ModelDropdown({
                     label={name}
                     detail={groupPrice(offers) + ' · ' + offers.length + ' sellers'}
                     leading={<ModelImage artwork={first.image} name={name} />}
-                    trailing={needle ? null : open ? <CaretDown size={14} /> : <CaretRight size={14} />}
+                    trailing={<span className="preview-menu-trail">{current && <Selected />}{needle ? null : open ? <CaretDown size={14} /> : <CaretRight size={14} />}</span>}
                     onClick={() => (needle ? choose(close, top, true) : toggle(name, open))}
                   />
                   {shown && (
@@ -189,7 +196,7 @@ export function ModelDropdown({
                         checked={current && isAuto(name)}
                         label="Auto"
                         detail={'Recommended · now ' + sellerName(top) + ' · ' + priceLabel(top)}
-                        trailing={current && isAuto(name) && <Check size={16} />}
+                        trailing={current && isAuto(name) && <Selected />}
                         onClick={() => choose(close, top, true)}
                       />
                       {recommended(offers).map(({ label: tag, item }) => {
@@ -201,7 +208,7 @@ export function ModelDropdown({
                             checked={pinned}
                             label={tag}
                             detail={[sellerName(item), quantization(item), priceLabel(item)].filter(Boolean).join(' · ')}
-                            trailing={pinned && <Check size={16} />}
+                            trailing={pinned && <Selected />}
                             onClick={() => choose(close, item, false, tag)}
                           />
                         );
