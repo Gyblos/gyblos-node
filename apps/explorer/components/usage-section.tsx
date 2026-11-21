@@ -208,18 +208,23 @@ function RequestCharts({
 }
 
 function DailyTable({ days }: { days: NetworkDay[] }) {
+  const head = [
+    { label: 'Day (UTC)' },
+    ...figureHead('Seller first token'),
+    { label: 'Buyers free · paid', right: true },
+    { label: 'Relay', right: true },
+  ];
   return (
     <>
       <SectionTitle title="Daily" />
-      <Table
-        minWidth={DISPLAY.dailyTable}
-        head={[
-          { label: 'Day (UTC)' },
-          ...figureHead('Seller first token'),
-          { label: 'Buyers free · paid', right: true },
-          { label: 'Relay', right: true },
-        ]}
-      >
+      <Table minWidth={DISPLAY.dailyTable} head={head}>
+        {days.length ? null : (
+          <tr>
+            <td className={`${td} text-muted`} colSpan={head.length}>
+              No daily activity in this range.
+            </td>
+          </tr>
+        )}
         {[...days].reverse().map((day) => (
           <tr key={day.day} className="border-t border-line">
             <td className={`${td} font-mono`}>{day.day}</td>
@@ -253,7 +258,9 @@ function DemandTable({ demand }: { demand: [string, number][] }) {
       >
         {demand.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
-            <td className={td}>{model}</td>
+            <td className={td} title={model}>
+              <span className="block max-w-full truncate">{model}</span>
+            </td>
             <td className={numberCell}>{count(requests)}</td>
           </tr>
         ))}

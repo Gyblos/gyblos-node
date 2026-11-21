@@ -3,6 +3,7 @@ import { HTTP_STATUS } from '@gyblos/config';
 import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import { UnsentChannelPeerError } from '@gyblos/node/batch-buyer';
+import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
 import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
@@ -29,9 +30,31 @@ const unavailable = (
   stop: {},
 });
 
+class UnsentSessionPreflightError extends BatchChannelError {}
+
+// Applies only around local recounting and quote verification, before opening a channel or sending input.
+export async function unsentSessionPreflight<T>(
+  operation: Promise<T>,
+  signal: AbortSignal,
+) {
+  try {
+    return await bounded(operation, signal);
+  } catch (error) {
+    if (
+      error instanceof PaymentSessionError ||
+      (error instanceof BatchChannelError && !error.remote)
+    )
+      throw new UnsentSessionPreflightError(error.code);
+    if (error instanceof DOMException && error.name === 'TimeoutError')
+      throw new UnsentSessionPreflightError(PAID_EXECUTION_CODES.TIMEOUT);
+    throw error;
+  }
+}
+
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
   if (
+    error instanceof UnsentSessionPreflightError ||
     error instanceof UnsentSellerChoiceError ||
     error instanceof UnsentChannelLimitError ||
     error instanceof UnsentChannelPeerError

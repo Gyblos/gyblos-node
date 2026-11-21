@@ -21,8 +21,7 @@ export interface ResponseCache {
 // here), the effective limit, and parameters in sorted order.
 export function sellersCacheKey(url: string, query: SellersQuery) {
   const params = new URLSearchParams();
-  if (query.after)
-    params.set('cursor', `${query.after.issuedAt}-${query.after.nodeId}`);
+  if (query.after) params.set('cursor', query.after.nodeId);
   params.set('limit', String(query.limit));
   params.set('model', query.model);
   return `${new URL(url).origin}${INDEX_ROUTES.SELLERS}?${params}`;

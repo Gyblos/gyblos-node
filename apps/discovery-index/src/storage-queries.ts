@@ -1,5 +1,5 @@
-// Builds reads and expiry cleanup with the typed ORM schema. Listing sorts only index keys
-// before reading the selected signed envelopes; no query contains request metadata.
+// Builds reads and expiry cleanup with the typed ORM schema. Listing pages only index keys, in NodeId
+// order, before reading the selected signed envelopes; no query contains request metadata.
 import {
   and,
   asc,
@@ -10,10 +10,8 @@ import {
   exists,
   gt,
   inArray,
-  lt,
   lte,
   notExists,
-  or,
 } from 'drizzle-orm';
 
 import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
@@ -61,8 +59,7 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
   const page = database.$with('page').as(
     database
       .select({
-        nodeId: columnField(presence.nodeId, 'nodeId'),
-        issuedAt: columnField(presence.issuedAt, 'issuedAt'),
+        nodeId: columnField(models.nodeId, 'nodeId'),
       })
       .from(models)
       .innerJoin(
@@ -101,32 +98,23 @@ export function listingQuery(database: DiscoveryDatabase, query: SellerQuery) {
                 ),
               ),
           ),
-          after
-            ? or(
-                lt(presence.issuedAt, after.issuedAt),
-                and(
-                  eq(presence.issuedAt, after.issuedAt),
-                  gt(presence.nodeId, after.nodeId),
-                ),
-              )
-            : undefined,
+          after ? gt(models.nodeId, after.nodeId) : undefined,
         ),
       )
-      .orderBy(desc(presence.issuedAt), asc(presence.nodeId))
+      .orderBy(asc(models.nodeId))
       .limit(query.limit),
   );
   return database
     .with(page)
     .select({
       nodeId: page.nodeId,
-      issuedAt: page.issuedAt,
       catalogJson: columnField(catalogs.json, 'catalogJson'),
       presenceJson: columnField(presence.json, 'presenceJson'),
     })
     .from(page)
     .innerJoin(catalogs, eq(catalogs.nodeId, page.nodeId))
     .innerJoin(presence, eq(presence.nodeId, page.nodeId))
-    .orderBy(desc(page.issuedAt), asc(page.nodeId));
+    .orderBy(asc(page.nodeId));
 }
 export function recordCountsQuery(database: DiscoveryDatabase, now: number) {
   return database
@@ -147,6 +135,40 @@ export function recordCountsQuery(database: DiscoveryDatabase, now: number) {
     );
 }
 
+export function activeVersionsQuery(
+  database: DiscoveryDatabase,
+  now: number,
+  limit: number,
+  nodeId?: string,
+) {
+  return database
+    .select({
+      nodeId: presence.nodeId,
+      version: presence.releaseVersion,
+      versionSequence: presence.versionSequence,
+      sequence: presence.sequence,
+    })
+    .from(presence)
+    .innerJoin(
+      catalogs,
+      and(
+        eq(catalogs.nodeId, presence.nodeId),
+        eq(catalogs.digest, presence.digest),
+      ),
+    )
+    .where(
+      and(
+        nodeId ? eq(presence.nodeId, nodeId) : undefined,
+        lte(catalogs.issuedAt, now + CONTROL_LIMITS.clockSkewMs),
+        gt(catalogs.expiresAt, now),
+        lte(presence.issuedAt, now + CONTROL_LIMITS.clockSkewMs),
+        gt(presence.expiresAt, now),
+        notExists(withdrawnCatalog(database)),
+      ),
+    )
+    .orderBy(asc(presence.nodeId))
+    .limit(limit);
+}
 export function modelsQuery(
   database: DiscoveryDatabase,
   now: number,

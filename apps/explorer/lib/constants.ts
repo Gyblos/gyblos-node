@@ -80,7 +80,7 @@ export const DISPLAY = {
   defaultTable: 640,
   // Median latency.
   median: 0.5,
-  // Decimal places of a percentage below 100%.
+  // Decimal places of a displayed percentage.
   percentDigits: 1,
   // Unique buyer counts below this are withheld by the collector.
   minPublicBuyers: 5,

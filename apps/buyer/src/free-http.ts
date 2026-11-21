@@ -243,8 +243,13 @@ export function freeBuyerHandler(
   desktopPolicy?: BuyerApiPolicy,
   apiKeys?: BuyerApiKeys,
   diagnostics?: DiagnosticSink,
+  preparePaidChat?: () => Promise<void>,
 ) {
-  const desktop = createDesktopApi(desktopPolicy, authorize !== undefined);
+  const desktop = createDesktopApi(
+    desktopPolicy,
+    authorize !== undefined,
+    preparePaidChat,
+  );
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   const observe = httpDiagnostics(diagnostics);
   let active = 0;
@@ -256,7 +261,7 @@ export function freeBuyerHandler(
       return;
     }
     const scoped = buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream);
-    if (desktop.handled(request, response)) {
+    if (await desktop.handled(request, response, caller.owner)) {
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
       return;
     }
@@ -333,6 +338,7 @@ export async function startFreeBuyerHttp(
       desktopApiPolicy(options, settings),
       options.apiKeys,
       options.diagnostics,
+      options.preparePaidChat,
     ),
   );
   await new Promise<void>((resolve, reject) => {

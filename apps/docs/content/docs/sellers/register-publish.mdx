@@ -150,3 +150,9 @@ delete keys to leave discovery: a used invite code cannot register new keys.
 - [Change models and limits](/en/sellers/models-offers)
 - [Get paid](/en/sellers/get-paid)
 - [Operate and update](/en/sellers/operate)
+
+## See the running seller release
+
+A packaged seller announces the release printed by `gyblos --version` with each discovery heartbeat. The index checks the declaration against the seller's NodeId and that exact heartbeat. An older seller or a source build without a release appears with an unknown version. A declared version identifies the software the seller reports. Buyers still negotiate supported protocols independently.
+
+Request `GET /v1/versions?node=<NodeId>` from the discovery index to see an active seller's version (`null` when unknown). An inactive seller returns `404`. `GET /v1/versions` counts active sellers by version and reports the number with unknown versions.

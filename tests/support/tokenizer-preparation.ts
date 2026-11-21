@@ -10,6 +10,7 @@ import { homeLayout } from '@gyblos/config';
 
 const PRODUCT_ENTRIES = {
   buyer: '@gyblos/buyer/setup',
+  desktop: '@gyblos/node/artifacts',
   node: '@gyblos/node-app/tokenizer',
 } as const;
 
@@ -52,7 +53,7 @@ export async function preparation(
   const adapter = `export const MODEL={publicModel:'synthetic/model',revision:'pinned',
     tokenizerSha256:${JSON.stringify(digest(artifacts.tokenizer))},configSha256:${JSON.stringify(digest(artifacts.config))}};
     export const createOllama=()=>{throw new Error('Unexpected engine')};
-    export function createModelTokenizer(input){if(input.tokenizer!==${JSON.stringify(artifacts.tokenizer)}||input.config!==${JSON.stringify(artifacts.config)})throw new Error('Public tokenizer artifact hash mismatch.');}`;
+    export function createModelTokenizer(input){if(input.tokenizer!==${JSON.stringify(artifacts.tokenizer)}||input.config!==${JSON.stringify(artifacts.config)})throw new Error('Public tokenizer artifact hash mismatch.');return {chat:()=>3,input:()=>2,count:text=>text.length};}`;
   const program = `import {registerHooks,syncBuiltinESMExports} from 'node:module';
     import fs from 'node:fs/promises';
     const failure=${JSON.stringify(failure)};
@@ -70,7 +71,9 @@ export async function preparation(
 
     registerHooks({resolve(name,context,next){if(name==='@gyblos/engine-ollama'||name==='@gyblos/engine-ollama/model')return {url:'data:text/javascript,'+encodeURIComponent(${JSON.stringify(adapter)}),shortCircuit:true};return next(name,context);}});
     if(${lab}) registerHooks({resolve(name,context,next){if(name==='@gyblos/runtime')return {url:'data:text/javascript,'+encodeURIComponent("export const isMain=()=>true; export const spawnChild=()=>{throw new Error('Unexpected process')}; export const stopChild=()=>{}; export const waitReady=()=>{};"),shortCircuit:true};return next(name,context);}});
+    let downloads=0;
     globalThis.fetch=async url=>{
+      downloads++;
       if(${lab} && String(url).endsWith('/api/version')) return new Response('{}');
       if(!String(url).startsWith('https://huggingface.co/synthetic/model/resolve/pinned/'))throw new Error('Unexpected download');
       if(failure==='oversize') {
@@ -84,7 +87,7 @@ export async function preparation(
       }
       return new Response(String(url).endsWith('tokenizer.json')?${JSON.stringify(corrupt === 'tokenizer' ? 'corrupt' : artifacts.tokenizer)}:${JSON.stringify(corrupt === 'config' ? 'corrupt' : artifacts.config)});
     };
-    await import(${JSON.stringify(import.meta.resolve(lab ? '@gyblos/lab-harness/commands/inference-setup' : PRODUCT_ENTRIES[entry]))}).then(module=>${lab ? 'undefined' : 'module.main()'});`;
+    await import(${JSON.stringify(import.meta.resolve(lab ? '@gyblos/lab-harness/commands/inference-setup' : PRODUCT_ENTRIES[entry]))}).then(module=>${lab ? 'undefined' : entry === 'desktop' ? 'module.ensureModelTokenizer().then(meter=>console.log("count="+meter.count("hello")+",chat="+meter.chat([])))' : 'module.main()'}); console.log('downloads='+downloads);`;
   const result = spawnSync(
     process.execPath,
     [
