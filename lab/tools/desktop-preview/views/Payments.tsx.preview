@@ -348,8 +348,8 @@ function LimitRow({ buyer, policy, spent, current, limited }: {
   const text = amount.trim();
   const atomic = text ? atomicOf(text, policy) : null;
   const dirty = text !== initial;
-  const error = dirty && !text
-    ? 'Enter a spending limit.'
+  const error = !text
+    ? dirty ? 'Enter a spending limit.' : ''
     : atomic === null
     ? 'Enter an amount with up to 6 decimals.'
     : atomic !== null && atomic < spent
