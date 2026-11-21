@@ -6,7 +6,7 @@ const modelChoice = new Map<string, { strategy: Strategy; pinned: string | null 
 type PreviewSeller = { id: string; name: string; quant: string; input: number; output: number; latency: number; uptime: number };
 function previewSellers(model: CatalogModel): PreviewSeller[] {
   return Array.from({ length: model.providers }, (_, index) => {
-    const factor = 1 + ((index * 37 + model.providers * 11) % 60) / 100;
+    const factor = index === 0 ? 1 : 1 + ((index * 37 + model.providers * 11) % 60) / 100;
     const hex = ((index + 3) * 2654435761 % 65536).toString(16).padStart(4, '0');
     return {
       id: model.id + '-' + index,
@@ -142,7 +142,7 @@ function SellerTable({ sellers, free, active, pinned, onPin }: {
           <caption className="sr-only">Sellers</caption>
           <thead><tr>
             <th scope="col">Seller</th><th scope="col">Quant</th>
-            <th scope="col" className="preview-num">{'In / out · 1M, ' + feeLabel}</th>
+            <th scope="col" className="preview-num">{free ? 'In / out · 1M' : 'In / out · 1M, ' + feeLabel}</th>
             <th scope="col" className="preview-num">Latency</th><th scope="col" className="preview-num">Uptime</th>
             <th scope="col" className="preview-num"><span className="sr-only">Pin</span></th>
           </tr></thead>

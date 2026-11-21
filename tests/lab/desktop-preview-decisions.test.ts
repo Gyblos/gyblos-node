@@ -90,3 +90,8 @@ void test('preview paid-model confirmation formats the same listed prices as the
     transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ?? '';
   assert.match(app, /import \{ usdPerMtok \} from '\.\/ui\/model-price';/);
 });
+
+void test('preview model rows keep one synthetic seller at the listed price', async () => {
+  const row = await view('ModelRow.tsx.preview');
+  assert.match(row, /const factor =\s*index === 0\s*\?\s*1\s*:/);
+});
