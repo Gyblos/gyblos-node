@@ -2456,16 +2456,11 @@ html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {
 html .app.desktop-frame .preview-strategy-icon {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   flex: none;
-  border: 1px solid var(--subtle-line);
-  border-radius: 8px;
   color: var(--muted);
-  transition:
-    color var(--motion-overlay) ease,
-    background var(--motion-overlay) ease,
-    border-color var(--motion-overlay) ease;
+  transition: color var(--motion-overlay) ease;
 }
 html .app.desktop-frame .dropdown-row[data-strategy][aria-checked='true'] {
   background: color-mix(in srgb, var(--pk-success) 9%, transparent);
@@ -2474,9 +2469,7 @@ html
   .app.desktop-frame
   .dropdown-row[data-strategy][aria-checked='true']
   .preview-strategy-icon {
-  border-color: color-mix(in srgb, var(--pk-success) 45%, transparent);
   color: var(--pk-success);
-  background: color-mix(in srgb, var(--pk-success) 14%, transparent);
 }
 html
   .app.desktop-frame

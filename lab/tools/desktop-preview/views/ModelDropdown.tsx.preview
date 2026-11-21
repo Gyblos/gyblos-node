@@ -133,7 +133,7 @@ function StrategyRow({
       detail={detail}
       leading={
         <span className="preview-strategy-icon" aria-hidden="true">
-          <Glyph size={15} weight={checked ? 'fill' : 'regular'} />
+          <Glyph size={18} weight={checked ? 'fill' : 'regular'} />
         </span>
       }
       trailing={checked ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
