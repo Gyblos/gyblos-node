@@ -68,6 +68,7 @@ void test('preview model views compare listed prices with the market median, not
   const row = await view('ModelRow.tsx.preview');
   assert.doesNotMatch(row, /function listPrice/);
   assert.match(row, /comparableMedian\(sellers, cheapest\)/);
+  assert.match(row, /'from ' \+ usdPerMtok\(cheapest\?\.input \?\? min\)/);
 });
 
 void test('preview API keys follow the account-wide free-model fallback, with no per-key choice', async () => {

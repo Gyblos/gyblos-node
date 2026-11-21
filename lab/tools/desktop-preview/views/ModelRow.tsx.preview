@@ -70,7 +70,7 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
         </span>
         <span className="preview-model-mode">{mode}</span>
         <span className="ui-price">
-          <strong>{model.free ? 'Free' : 'from ' + usdPerMtok(min)}</strong>
+          <strong>{model.free ? 'Free' : 'from ' + usdPerMtok(cheapest?.input ?? min)}</strong>
           <small>{model.free ? 'Community supported' : cheapest && <Savings price={cheapest.input} median={comparableMedian(sellers, cheapest)} />}</small>
         </span>
         <CaretRight size={14} aria-hidden="true" />
