@@ -102,11 +102,12 @@ To use the default index, add `discovery` to the buyer's `selection.json`:
 ```
 
 Inside `discovery` you can set `baseUrl` (same URL policy as the client) and
-`maxPages` (1 to 8, default 3). Each page holds at most 50 entries, and the
-whole discovery step has a 10-second deadline. A cursor cycle, or a non-final
-page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`, and no quotes are
-requested. An index error stops selection; it never switches the buyer to a
-different payment path. The rest of `selection.json` is described in
+`maxPages` (1 to 8, default 3). Each page asks for 200 entries, the index's
+largest page, and the whole discovery step has a 10-second deadline. A cursor
+cycle, or a non-final page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`,
+and no quotes are requested. An index error stops selection; it never switches
+the buyer to a different payment path. The rest of `selection.json` is described
+in
 [running-a-node.md](running-a-node.md#optional-buyer-selection-and-discovery).
 
 The index only supplies candidate NodeIds. The `sellers` list in
@@ -162,24 +163,41 @@ credentials or a query string; the other `identity` settings are in
 - For each catalog the index lists for the model, the catalog's owner must hold
   that NodeId in the 8004 agent registry. The buyer checks this before it
   remembers anything, exactly as for a configured seller.
-- The buyer dials such a seller by NodeId through the first configured relay
-  (`relays.urls` in `config.toml`, or `GYBLOS_RELAYS`). The index supplies no
-  address.
+- The buyer dials such a seller by NodeId through the first relay in
+  `GYBLOS_RELAYS`, or the built-in default relay when it is unset. The index
+  supplies no address.
+- A configured seller whose identity check fails is not looked up again as an
+  open seller under the owner the index lists.
 - Configured sellers come first, and the candidate list stays within 16. With
   open discovery, `sellers` may be empty.
 - `buyer:free` uses open sellers directly. The automatic buyer (`pnpm buyer`,
   `buyer:chat`, the desktop app) asks its configured sellers first at the
   request's own ceilings. When none can serve, or none is configured, it asks
-  the open network at zero price ceilings. A request never goes back to a seller
-  it already tried.
-- Paid requests and payment sessions use configured sellers only.
+  the open network at zero price ceilings. A seller that already won and failed
+  this request is not asked again; configured sellers that only declined in the
+  first pass can be asked again in the open pass.
+- Paid requests and automatically chosen payment sessions use configured sellers
+  only. With open discovery, a payment session for a seller the user chose in
+  the desktop app may use an unconfigured seller; it still passes the identity
+  and discovery checks.
 - Stats for open sellers live in memory only; `selection-stats.json` keeps the
   configured sellers alone.
 
 Open discovery has its own bounds:
 
-- Each selection makes at most 16 new identity lookups. An identity the registry
-  refused is not looked up again for five minutes.
+- The buyer reads every page first. It then drops the sellers that could not
+  serve the request (model, reasoning level, network, asset, a context of at
+  least the request's `maxTokens`, price ceilings and budget, data policy, the
+  `declared-usage` badge, live records). It looks up the seller that served the
+  conversation before and the one still holding it warm first, then the rest in
+  a random order, so which sellers get a lookup never depends on the index's
+  order. With more than 64 such sellers, lookups can reach sellers the
+  64-candidate bound below then refuses until earlier ones expire.
+- Each selection makes at most 16 identity lookups of index-only sellers.
+  Configured sellers are checked on every selection besides. A failed check of
+  an index-only seller (a registry refusal, an RPC failure, or a full identity
+  history) skips that NodeId and owner for five minutes in this process, for at
+  most 1,024 pairs.
 - At most 64 live unconfigured candidates are eligible at once, counted under
   the discovery lock from signed expiry and withdrawal or conflict state.
   Expiry, withdrawal or conflict frees a slot without deleting any replay floor.

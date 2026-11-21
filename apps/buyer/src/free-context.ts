@@ -69,9 +69,10 @@ export async function routeContext(
     verifyBuyerIdentity(prepared.identity, seller, query);
   const request = routedRequest(prepared.config.request, model);
   const open = prepared.config.discovery?.open === true;
+  // Open sellers are reached for free only, so the index's are drawn at zero prices.
   const config = await withDiscovered(
     prepared,
-    routedPolicy(prepared.config, new Set(), request),
+    routedPolicy(prepared.config, new Set(), open ? free(request) : request),
     { fetch: options.fetch ?? globalThis.fetch, now, signal, verifyIdentity },
     // With open discovery, every seller the index lists is read too (a desktop buyer configures none).
     open ? new Set() : undefined,
