@@ -1,6 +1,7 @@
 // Which sellers the automatic buyer asks: its configured sellers first, at the request's own ceilings.
 // With open discovery, a request no configured seller takes (none configured, or none available) goes to
-// the registered sellers the index lists, for free only: paid execution pays configured sellers alone.
+// the registered sellers the index lists, for free only: automatic paid execution pays configured sellers
+// alone.
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 
 import { FreeSelectionFailure } from './free-execution';

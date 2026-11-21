@@ -92,25 +92,23 @@ async function discoverOpen(
     random?: () => number;
     accept?: boolean;
     previousSeller?: string;
+    warmSeller?: string;
+    sellers?: Run['config']['sellers'];
   } = {},
 ) {
   const log: string[] = [];
   const checked: string[] = [];
-  const config = {
-    ...openConfig(run),
-    ...(options.previousSeller
-      ? { previousSeller: options.previousSeller }
-      : {}),
-  };
+  const { random, accept, ...overrides } = options;
+  const config = { ...openConfig(run), ...overrides };
   const found = await discoverBuyerSellers(config, state, {
     fetch: pagedIndex(pages, log),
     now: run.context.now,
     openRelay: primaryRelayUrl(),
-    ...(options.random ? { random: options.random } : {}),
+    ...(random ? { random } : {}),
     verifyIdentity: async (seller) => {
       log.push('lookup');
       checked.push(seller.nodeId);
-      return options.accept ?? true;
+      return accept ?? true;
     },
   });
   return { log, checked, found };
@@ -152,6 +150,14 @@ void test('every page is read at the index page size before any lookup, and look
       previousSeller: previous,
     });
     assert.equal(resumed.checked[0], previous);
+    assert.equal(resumed.checked.filter((id) => id === previous).length, 1);
+    // So is the seller still holding it warm.
+    const warm = listed.at(-2)!;
+    const warmed = await discoverOpen(run, home.state, pages, {
+      random: () => 0.999_999,
+      warmSeller: warm,
+    });
+    assert.equal(warmed.checked[0], warm);
   } finally {
     await run.wire.close();
     await home.close();
@@ -212,9 +218,13 @@ void test('a seller that could not serve the request is never looked up', async 
     );
     const cheap = await otherSeller(run);
     const dear = await otherSeller(run, String(ceiling + 1n));
-    const { checked, found } = await discoverOpen(run, home.state, [
-      [dear.entry, cheap.entry],
-    ]);
+    // Even as the conversation's previous seller, one that could not serve is never looked up.
+    const { checked, found } = await discoverOpen(
+      run,
+      home.state,
+      [[dear.entry, cheap.entry]],
+      { previousSeller: dear.nodeId },
+    );
     assert.deepEqual(checked, [cheap.nodeId]);
     assert.deepEqual(
       found.sellers.map((seller) => seller.nodeId),
@@ -247,6 +257,14 @@ void test('a drawn seller whose pages list a same-sequence fork is blocked, neve
         run.nodeSigner,
       ),
     };
+    // Listed alone, the seller is found: only the fork blocks it.
+    const clean = await discoveryHome();
+    try {
+      const alone = await discoverOpen(run, clean.state, [[run.entry]]);
+      assert.equal(alone.found.sellers.length, 1);
+    } finally {
+      await clean.close();
+    }
     const { found } = await discoverOpen(run, home.state, [
       [run.entry],
       [fork],
@@ -261,6 +279,32 @@ void test('a drawn seller whose pages list a same-sequence fork is blocked, neve
       ),
       [],
     );
+  } finally {
+    await run.wire.close();
+    await home.close();
+  }
+});
+
+void test('a configured seller whose identity check fails is not looked up again as an open one', async () => {
+  const home = await discoveryHome();
+  const run = await discoveryRun();
+  try {
+    const checked: string[] = [];
+    const found = await discoverBuyerSellers(
+      { ...openConfig(run), sellers: run.config.sellers },
+      home.state,
+      {
+        fetch: async () => discoveryResponse([run.entry]),
+        now: run.context.now,
+        openRelay: primaryRelayUrl(),
+        verifyIdentity: async (seller) => {
+          checked.push(seller.nodeId);
+          return false;
+        },
+      },
+    );
+    assert.deepEqual(checked, [run.entry.catalog.record.nodeId]);
+    assert.deepEqual(found.sellers, []);
   } finally {
     await run.wire.close();
     await home.close();

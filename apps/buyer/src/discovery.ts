@@ -1,4 +1,5 @@
-// Collects bounded HTTP discovery hints for operator-trusted identities, persisting replay checks.
+// Collects bounded HTTP discovery hints for operator-configured identities and, under open discovery,
+// registry-verified sellers found only in the index, persisting replay checks.
 // Only candidate IDs survive: fresh signed Iroh verification still precedes selection and quotes.
 import { randomInt } from 'node:crypto';
 
@@ -56,8 +57,9 @@ async function rememberEntry(
     { allowOwnerChange },
   );
 }
-// Identity refusals avoid repeating unavailable lookups. Live capacity is bounded separately by
-// discovery observations, so a temporary capacity refusal never enters this registry-denial cache.
+// Failed identity checks of index-only sellers (a registry refusal, an RPC failure or a full identity
+// history), by NodeId and owner, so they are not repeated soon. The 64-candidate bound is applied by
+// discovery observations instead, so its refusals never enter this cache.
 interface OpenMemory {
   refused: Map<string, number>;
 }
@@ -262,12 +264,15 @@ export async function discoverBuyerSellers(
     now: now(),
   };
   const entries = await readAllPages(config, options, now, signal);
-  // Index entries of configured sellers first, then the open ones, drawn.
+  // Index entries of configured sellers first, then the open ones, drawn. A configured seller whose
+  // identity check failed is never looked up again as an open one under the index's owner.
+  const configured = new Set(config.sellers.map((seller) => seller.nodeId));
   const open: DiscoveredSeller[] = [];
   for (const entry of entries) {
     const trusted = identities.get(entry.catalog.nodeId);
-    if (!trusted) open.push(entry);
-    else if (trusted.owner === entry.catalog.owner)
+    if (!trusted) {
+      if (!configured.has(entry.catalog.nodeId)) open.push(entry);
+    } else if (trusted.owner === entry.catalog.owner)
       await rememberEntry(
         entry,
         trusted,

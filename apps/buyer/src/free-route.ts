@@ -6,7 +6,8 @@ import type { PreparedSelection } from './free-selection';
 import type { BuyerSelectionConfig } from './selection-config';
 
 // The sellers discovery confirms, configured and (open discovery, free path only, where `excluded` is
-// passed) found only in the index; paid and session execution look sellers up in their configured list.
+// passed) found only in the index; paid and session execution look sellers up in their configured list
+// (a desktop-chosen session seller is that list's only entry).
 export async function withDiscovered(
   prepared: PreparedSelection,
   base: ReturnType<typeof routedPolicy>,

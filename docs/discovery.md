@@ -163,17 +163,23 @@ credentials or a query string; the other `identity` settings are in
 - For each catalog the index lists for the model, the catalog's owner must hold
   that NodeId in the 8004 agent registry. The buyer checks this before it
   remembers anything, exactly as for a configured seller.
-- The buyer dials such a seller by NodeId through the first configured relay
-  (`relays.urls` in `config.toml`, or `GYBLOS_RELAYS`). The index supplies no
-  address.
+- The buyer dials such a seller by NodeId through the first relay in
+  `GYBLOS_RELAYS`, or the built-in default relay when it is unset. The index
+  supplies no address.
+- A configured seller whose identity check fails is not looked up again as an
+  open seller under the owner the index lists.
 - Configured sellers come first, and the candidate list stays within 16. With
   open discovery, `sellers` may be empty.
 - `buyer:free` uses open sellers directly. The automatic buyer (`pnpm buyer`,
   `buyer:chat`, the desktop app) asks its configured sellers first at the
   request's own ceilings. When none can serve, or none is configured, it asks
-  the open network at zero price ceilings. A request never goes back to a seller
-  it already tried.
-- Paid requests and payment sessions use configured sellers only.
+  the open network at zero price ceilings. A seller that already won and failed
+  this request is not asked again; configured sellers that only declined in the
+  first pass can be asked again in the open pass.
+- Paid requests and automatically chosen payment sessions use configured sellers
+  only. With open discovery, a payment session for a seller the user chose in
+  the desktop app may use an unconfigured seller; it still passes the identity
+  and discovery checks.
 - Stats for open sellers live in memory only; `selection-stats.json` keeps the
   configured sellers alone.
 
@@ -187,8 +193,11 @@ Open discovery has its own bounds:
   a random order, so which sellers get a lookup never depends on the index's
   order. With more than 64 such sellers, lookups can reach sellers the
   64-candidate bound below then refuses until earlier ones expire.
-- Each selection makes at most 16 new identity lookups. An identity the registry
-  refused is not looked up again for five minutes.
+- Each selection makes at most 16 identity lookups of index-only sellers.
+  Configured sellers are checked on every selection besides. A failed check of
+  an index-only seller (a registry refusal, an RPC failure, or a full identity
+  history) skips that NodeId and owner for five minutes in this process, for at
+  most 1,024 pairs.
 - At most 64 live unconfigured candidates are eligible at once, counted under
   the discovery lock from signed expiry and withdrawal or conflict state.
   Expiry, withdrawal or conflict frees a slot without deleting any replay floor.
