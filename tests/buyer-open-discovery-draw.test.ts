@@ -150,7 +150,22 @@ void test('every page is read at the index page size before any lookup, and look
       previousSeller: previous,
     });
     assert.equal(resumed.checked[0], previous);
-    assert.equal(resumed.checked.filter((id) => id === previous).length, 1);
+    // Within the lookup bound, both conversation sellers come first and each is looked up once.
+    const few = await discoverOpen(
+      run,
+      home.state,
+      [sellers.slice(0, 4).map((seller) => seller.entry)],
+      {
+        random: () => 0.999_999,
+        previousSeller: listed[3]!,
+        warmSeller: listed[2]!,
+      },
+    );
+    assert.deepEqual(
+      new Set(few.checked.slice(0, 2)),
+      new Set(listed.slice(2, 4)),
+    );
+    assert.deepEqual([...few.checked].sort(), listed.slice(0, 4).sort());
     // So is the seller still holding it warm.
     const warm = listed.at(-2)!;
     const warmed = await discoverOpen(run, home.state, pages, {
@@ -261,7 +276,10 @@ void test('a drawn seller whose pages list a same-sequence fork is blocked, neve
     const clean = await discoveryHome();
     try {
       const alone = await discoverOpen(run, clean.state, [[run.entry]]);
-      assert.equal(alone.found.sellers.length, 1);
+      assert.deepEqual(
+        alone.found.sellers.map((seller) => seller.nodeId),
+        [run.entry.catalog.record.nodeId],
+      );
     } finally {
       await clean.close();
     }
