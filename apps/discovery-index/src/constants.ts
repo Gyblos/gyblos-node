@@ -225,15 +225,6 @@ export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
   '127.0.0.1',
   '[::1]',
 ]);
-// Rate-limit key used when no client address header is present.
-export const LOCAL_CLIENT_KEY = 'local';
-
-export const IPV6 = {
-  groups: 8,
-  prefixGroups: 4,
-  hexRadix: 16,
-} as const;
-
 // Public seller uptime (uptime.ts): five-minute slots, kept for the longest reported window.
 export const UPTIME = {
   // Five minutes.

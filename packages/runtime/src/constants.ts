@@ -1,4 +1,14 @@
-// Private diagnostic log states, error codes and the degraded-logging warning.
+// Runtime helper constants, diagnostic log states, error codes and degraded-logging warning.
+// Rate-limit key used when no client address header is present.
+export const LOCAL_CLIENT_KEY = 'local';
+
+// IPv6 text layout for ip-key: eight hextets, with the first four forming the /64 prefix.
+export const IPV6 = {
+  groups: 8,
+  prefixGroups: 4,
+  hexRadix: 16,
+} as const;
+
 export const UNKNOWN_ERROR_NAME = 'UnknownError';
 
 export const DIAGNOSTIC_LEVELS = {
