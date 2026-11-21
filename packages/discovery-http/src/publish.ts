@@ -1,5 +1,6 @@
 // Publishes one node-signed public v2 record to an HTTP discovery index.
 // It must not sign, schedule heartbeats or retry; the seller node owns that loop.
+import { SELLER_VERSION } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 
 import {
@@ -26,6 +27,7 @@ import {
 export interface PublishRecordInput {
   baseUrl: string;
   record: SignedPublicV2;
+  versionProof?: string;
   fetch: DiscoveryFetch;
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -95,6 +97,9 @@ export async function publishRecord(
       method: 'POST',
       headers: {
         accept: 'application/json',
+        ...(input.versionProof && {
+          [SELLER_VERSION.header]: input.versionProof,
+        }),
         'content-type': 'application/json',
       },
       body,

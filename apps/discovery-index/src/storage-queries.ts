@@ -147,6 +147,40 @@ export function recordCountsQuery(database: DiscoveryDatabase, now: number) {
     );
 }
 
+export function activeVersionsQuery(
+  database: DiscoveryDatabase,
+  now: number,
+  limit: number,
+  nodeId?: string,
+) {
+  return database
+    .select({
+      nodeId: presence.nodeId,
+      version: presence.releaseVersion,
+      versionSequence: presence.versionSequence,
+      sequence: presence.sequence,
+    })
+    .from(presence)
+    .innerJoin(
+      catalogs,
+      and(
+        eq(catalogs.nodeId, presence.nodeId),
+        eq(catalogs.digest, presence.digest),
+      ),
+    )
+    .where(
+      and(
+        nodeId ? eq(presence.nodeId, nodeId) : undefined,
+        lte(catalogs.issuedAt, now + CONTROL_LIMITS.clockSkewMs),
+        gt(catalogs.expiresAt, now),
+        lte(presence.issuedAt, now + CONTROL_LIMITS.clockSkewMs),
+        gt(presence.expiresAt, now),
+        notExists(withdrawnCatalog(database)),
+      ),
+    )
+    .orderBy(asc(presence.nodeId))
+    .limit(limit);
+}
 export function modelsQuery(
   database: DiscoveryDatabase,
   now: number,

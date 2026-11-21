@@ -1,6 +1,6 @@
 // Guards the buyer's no-accordion interaction rule without launching payment services.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 const buyerScreens = [
@@ -72,4 +72,20 @@ void test('the agents screen cannot create a PayPal connection while USDC is sel
     /<PaypalAgentConnection\s+onlyConnected=\{paymentMethod !== PAYMENT_METHOD\.PAYPAL\}/,
   );
   assert.match(source, /onPayments=\{reviewPaypalPayments\}/);
+});
+
+void test('every searchable desktop menu shows an empty state when nothing matches', async () => {
+  const directory = 'apps/desktop/src/ui';
+  const menus = [];
+  for (const file of await readdir(directory)) {
+    if (!file.endsWith('.tsx')) continue;
+    const source = await readFile(`${directory}/${file}`, 'utf8');
+    const searchable = source.match(/searchLabel=/g)?.length ?? 0;
+    if (!searchable) continue;
+    menus.push(file);
+    const emptyStates =
+      source.match(/className="dropdown-note" role="status"/g)?.length ?? 0;
+    assert.ok(emptyStates >= searchable, file);
+  }
+  assert.ok(menus.includes('Management.tsx'));
 });

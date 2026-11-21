@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
+import { barAxis } from '@gyblos/explorer/board-bar-axis';
 import { delta } from '@gyblos/explorer/board-delta';
 import { hoveredPoint } from '@gyblos/explorer/board-hovered';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
@@ -23,6 +24,16 @@ const realTimeout = AbortSignal.timeout.bind(AbortSignal);
 afterEach(() => {
   globalThis.fetch = realFetch;
   AbortSignal.timeout = realTimeout;
+});
+
+void test('amount bars allow fractional ticks so tiny USDC values retain their scale', () => {
+  assert.deepEqual(barAxis(false), { hide: true, allowDecimals: true });
+});
+
+void test('request bars keep visible integer ticks by default and explicitly', () => {
+  const counts = { hide: false, allowDecimals: false };
+  assert.deepEqual(barAxis(), counts);
+  assert.deepEqual(barAxis(true), counts);
 });
 
 void test('the range is a preset or the 30-day default', () => {

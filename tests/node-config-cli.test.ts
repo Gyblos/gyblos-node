@@ -197,6 +197,8 @@ void test('missing files, usage errors and invalid environment values exit 1', a
     [],
     ['config'],
     ['config', 'nope'],
+    ['not-a-command', '--help'],
+    ['-h', 'not-a-command'],
     ['start'],
     ['config', 'validate', '--bogus'],
   ]) {
@@ -214,6 +216,33 @@ void test('missing files, usage errors and invalid environment values exit 1', a
     assert.equal(result.output.includes('FAKE0SECRET'), false);
   });
 });
+
+for (const flag of ['--help', '-h']) {
+  void test(`gyblos ${flag} prints usage to stdout and exits 0`, async (t) => {
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-cli-help-'));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        import.meta.resolve('tsx'),
+        join(REPOSITORY_ROOT, 'apps/node/src/bin.ts'),
+        flag,
+      ],
+      {
+        cwd: directory,
+        encoding: 'utf8',
+        timeout: 30000,
+        env: { PATH: process.env.PATH, GYBLOS_HOME: join(directory, 'home') },
+      },
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /^Usage: gyblos start/);
+    assert.match(result.stdout, /gyblos config validate/);
+    assert.equal(result.stderr, '');
+  });
+}
 
 void test('the gyblos script entry sets the process exit code', async () => {
   const [example] = exampleFiles();

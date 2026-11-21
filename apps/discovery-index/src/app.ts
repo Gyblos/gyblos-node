@@ -3,6 +3,7 @@
 import { Hono, type Context, type Next } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 
+import { SELLER_VERSION } from '@gyblos/protocol/constants';
 import { ipKey } from '@gyblos/runtime/ip-key';
 
 import { isJsonContentType } from './body';
@@ -42,6 +43,7 @@ import {
 } from './settings';
 import type { DiscoveryStorage } from './storage';
 import { parseUptimeQuery, uptimePage } from './uptime';
+import { versionsPage } from './versions';
 
 export type { ResponseCache } from './cache';
 export type { DiscoveryIndexOptions } from './settings';
@@ -145,7 +147,11 @@ function publishHandler(settings: IndexSettings) {
       markSeen: settings.markSeen,
     };
     try {
-      await acceptRecord(bytes, publish);
+      await acceptRecord(
+        bytes,
+        publish,
+        context.req.header(SELLER_VERSION.header),
+      );
     } catch (error) {
       if (error instanceof IndexError) return rejection(context, error.code);
       throw error;
@@ -267,6 +273,23 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
       return {
         key: `${url.origin}${INDEX_ROUTES.MODELS}`,
         body: () => modelsPage(context.get('storage'), settings.now()),
+      };
+    }),
+  );
+  app.get(
+    INDEX_ROUTES.VERSIONS,
+    cachedRead(settings, async (context) => {
+      const url = new URL(context.req.url);
+      const node = url.search ? parseUptimeQuery(context.req.url) : undefined;
+      return {
+        key: url.origin + INDEX_ROUTES.VERSIONS + (node ? '?node=' + node : ''),
+        body: () =>
+          versionsPage(
+            context.get('storage'),
+            settings.now(),
+            settings.maxResponseBytes,
+            node,
+          ),
       };
     }),
   );

@@ -153,3 +153,9 @@ para salir del descubrimiento: un código de invitación usado no puede registra
 - [Cambia modelos y límites](/es/sellers/models-offers)
 - [Cobra](/es/sellers/get-paid)
 - [Opera y actualiza](/es/sellers/operate)
+
+## Consultar la versión de un vendedor
+
+Un vendedor instalado desde una versión publicada anuncia la versión de `gyblos --version` con cada señal de presencia. El índice verifica que la declaración corresponde al NodeId del vendedor y a esa señal concreta. Los vendedores antiguos y las compilaciones sin versión figuran con versión desconocida. La versión identifica el software que declara el vendedor. El comprador sigue negociando los protocolos compatibles por separado.
+
+Consulta `GET /v1/versions?node=<NodeId>` en el índice para ver la versión de un vendedor activo (`null` si se desconoce). Un vendedor inactivo devuelve `404`. `GET /v1/versions` cuenta los vendedores activos por versión e indica cuántos tienen una versión desconocida.

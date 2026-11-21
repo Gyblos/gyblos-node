@@ -123,6 +123,7 @@ export function indexNode() {
   return {
     nodeId,
     sign: signed,
+    signer: async (bytes: Uint8Array) => sign(null, bytes, keys.privateKey),
     catalog(
       sequence: number,
       { models = [MODEL], issuedAt = T0 }: CatalogOptions = {},
