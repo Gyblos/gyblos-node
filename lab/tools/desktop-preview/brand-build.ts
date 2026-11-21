@@ -337,7 +337,8 @@ export function reviewBrand(desktop: string): Plugin {
       return null;
     },
     load(id) {
-      if (moduleId(id) !== `${moduleId(desktop)}/src/ui/PreviewKit.tsx`) return null;
+      if (moduleId(id) !== `${moduleId(desktop)}/src/ui/PreviewKit.tsx`)
+        return null;
       return readFileSync(
         new URL('./views/PreviewKit.tsx.preview', import.meta.url),
         'utf8',

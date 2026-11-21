@@ -216,7 +216,9 @@ export function createPreviewHost(
   const catalogResult = () => {
     const result = previewCatalog(model, now, catalogQuery);
     if (!catalogQuery) return result;
-    const models = result.models.filter((item) => item.modelId === catalogQuery);
+    const models = result.models.filter(
+      (item) => item.modelId === catalogQuery,
+    );
     return models.length
       ? { ...result, models }
       : { ...result, state: CATALOG_STATE.EMPTY, models };

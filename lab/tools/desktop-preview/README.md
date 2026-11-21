@@ -1,8 +1,8 @@
 # Desktop web preview
 
-Review the buyer screens in a browser before changing the desktop app. The
-build uses the current desktop renderer and shared components, with synthetic
-host adapters in place of Electron, wallets, providers and payment services.
+Review the buyer screens in a browser before changing the desktop app. The build
+uses the current desktop renderer and shared components, with synthetic host
+adapters in place of Electron, wallets, providers and payment services.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -22,9 +22,10 @@ deliberately invalid. Connection examples can be copied from the setup dialog.
 The browser build applies the approved brand kit 3.0.0 terminal symbol and the
 published website's palette with darker layered surfaces proposed in this
 preview. `brand.json` records the source revision and token mapping;
-[DESIGN.md](DESIGN.md) holds the mockup tokens and shared components. Instrument Sans remains the interface face; technical values
-keep JetBrains Mono. There is one blue, `#0a28f0`; reading text stays neutral.
-Semantic status colors and third-party artwork retain their existing meaning.
+[DESIGN.md](DESIGN.md) holds the mockup tokens and shared components. Instrument
+Sans remains the interface face; technical values keep JetBrains Mono. There is
+one blue, `#0a28f0`; reading text stays neutral. Semantic status colors and
+third-party artwork retain their existing meaning.
 
 The two terminal SVGs are supplied brand-kit artwork with unchanged geometry.
 Typography licenses and attribution already live in `apps/docs/public/brand/`.
@@ -39,9 +40,10 @@ adapts renderer modules while bundling. The shared card is
 `views/Payments.tsx.preview`. Their styles are in `preview.css`. The unmodified
 desktop renderer is also built as a comparison baseline.
 
-Keep the Testnet / Mainnet selector in the title bar. Use “Wallet address” for the public
-address and “View transaction in explorer” for transaction links. Omit the fixed
-network from wallet facts and other screen labels, including accessible names.
+Keep the Testnet / Mainnet selector in the title bar. Use “Wallet address” for
+the public address and “View transaction in explorer” for transaction links.
+Omit the fixed network from wallet facts and other screen labels, including
+accessible names.
 
 The free-network caption beside Send is omitted in this proposal. The model
 name, Free badge and actionable authorization/generation status copy remain
@@ -51,9 +53,9 @@ Follow the root `AGENTS.md` and `apps/desktop/DESIGN.md`: show the mockup,
 obtain explicit approval, then port the accepted visual proposal to the desktop
 app. Publishing this preview or its PR is not desktop implementation approval.
 
-Usage & payments shows one account spending limit covering chat and every API key. Connections shows the
-individual limit of each API key. Revoking a key preserves its past spending in
-the account total.
+Usage & payments shows one account spending limit covering chat and every API
+key. Connections shows the individual limit of each API key. Revoking a key
+preserves its past spending in the account total.
 
 Open `?screen=payments&review=wallet-backup&backup=needed` to inspect the
 recovery warning, or use `backup=verified` to see the green check. Both use
@@ -105,6 +107,6 @@ Use the shared StatCard inside a StatGrid for summary metrics in the mockup.
 Each card shows an icon, label and regular-weight value. Supply the formatted
 unit for monetary amounts and the comparison when comparable observations exist.
 Equal readings show a neutral 0% pill, including two measured zeroes. A dash
-marks an unavailable percentage. Usage compares calendar periods; the USDC spending
-cards show no comparison. An unavailable measurement is
-distinct from a measured zero.
+marks an unavailable percentage. Usage compares calendar periods; the USDC
+spending cards show no comparison. An unavailable measurement is distinct from a
+measured zero.
