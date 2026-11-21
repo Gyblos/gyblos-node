@@ -632,9 +632,9 @@ activity that day has no row.
   saturate above. Instructions run through another program (CPI) are not read,
   so they are not counted.
 
-The explorer doesn't read these aggregates, there is no mainnet treasury, and
-nothing reconciles paid receipts against settled amounts: no node signs paid
-receipt v2.
+The explorer reads these aggregates through `GET /v1/stats/chain` (see
+[Chain stats](#chain-stats)). There is no mainnet treasury, and nothing
+reconciles paid receipts against settled amounts: no node signs paid receipt v2.
 
 ## Order of checks
 

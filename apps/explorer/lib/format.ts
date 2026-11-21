@@ -13,32 +13,35 @@ const LAST_BOUND_MS = LATENCY_BUCKETS_MS.at(-1) ?? 0;
 const LOCALE = 'en-US';
 const DECIMAL_BASE = 10n;
 
+// A USDC amount's sign, whole dollars and fraction (at most `digits` digits, trailing zeros dropped).
+function usdcParts(atomic: bigint, digits: number = UNITS.usdcDecimals) {
+  const negative = atomic < 0n;
+  const magnitude = negative ? -atomic : atomic;
+  const base = DECIMAL_BASE ** BigInt(UNITS.usdcDecimals);
+  const fraction = (magnitude % base)
+    .toString()
+    .padStart(UNITS.usdcDecimals, '0')
+    .slice(0, digits)
+    .replace(/0+$/, '');
+  return {
+    sign: negative ? '-' : '',
+    whole: magnitude / base,
+    decimals: fraction ? `.${fraction}` : '',
+  };
+}
+
 export function usdc(
   atomic: bigint,
   digits: number = UNITS.usdcDecimals,
 ): string {
-  const negative = atomic < 0n;
-  const magnitude = negative ? -atomic : atomic;
-  const base = DECIMAL_BASE ** BigInt(UNITS.usdcDecimals);
-  const whole = magnitude / base;
-  const fraction = (magnitude % base)
-    .toString()
-    .padStart(UNITS.usdcDecimals, '0')
-    .slice(0, digits);
-  const trimmed = fraction.replace(/0+$/, '');
-  return `${negative ? '-' : ''}$${whole.toLocaleString(LOCALE)}${trimmed ? `.${trimmed}` : ''}`;
+  const { sign, whole, decimals } = usdcParts(atomic, digits);
+  return `${sign}$${whole.toLocaleString(LOCALE)}${decimals}`;
 }
 
 // An exact USDC decimal string ("0.000032") from atomic units, for animated figures.
 export function usdcDecimal(atomic: bigint): `${number}` {
-  const negative = atomic < 0n;
-  const magnitude = negative ? -atomic : atomic;
-  const base = DECIMAL_BASE ** BigInt(UNITS.usdcDecimals);
-  const fraction = (magnitude % base)
-    .toString()
-    .padStart(UNITS.usdcDecimals, '0')
-    .replace(/0+$/, '');
-  return `${negative ? '-' : ''}${magnitude / base}${fraction ? `.${fraction}` : ''}` as `${number}`;
+  const { sign, whole, decimals } = usdcParts(atomic);
+  return `${sign}${whole}${decimals}` as `${number}`;
 }
 
 // Price per million tokens, from atomic units per million tokens.
