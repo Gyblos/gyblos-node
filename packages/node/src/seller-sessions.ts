@@ -18,10 +18,10 @@ import {
   type PaymentSessionTerms,
   type SessionSeller,
 } from '@gyblos/protocol/payment-session';
-import type { RouteProbe } from '@gyblos/transport-iroh';
 import type {
   BatchBlockExchange,
   BatchChannelService,
+  BatchExchangeTail,
 } from '@gyblos/transport-iroh/batch-server';
 
 import { batchLiveOffer } from './batch-generation';
@@ -139,11 +139,9 @@ async function operation(
   request: BatchChannelRequest,
   peer: string,
   signal: AbortSignal,
-  onDelta?: (text: string) => Promise<void>,
-  blocks?: BatchBlockExchange,
-  blockMode?: boolean,
-  route?: RouteProbe,
+  ...tail: BatchExchangeTail
 ) {
+  const [, , blockMode] = tail;
   signal.throwIfAborted();
   if (!state.current) {
     const stored = await options.backend.inspect();
@@ -205,15 +203,7 @@ async function operation(
     }
   }
   if (!state.current) return batchFail(SESSION_CODES.UNAVAILABLE);
-  return state.current.service.exchange(
-    request,
-    peer,
-    signal,
-    onDelta,
-    blocks,
-    blockMode,
-    route,
-  );
+  return state.current.service.exchange(request, peer, signal, ...tail);
 }
 export async function startSellerSessions(
   options: SellerSessionOptions,
@@ -264,19 +254,9 @@ export async function startSellerSessions(
       }
     },
     service: {
-      exchange: (request, peer, signal, onDelta, blocks, blockMode, route) =>
+      exchange: (request, peer, signal, ...tail) =>
         run(peer, signal, request.method, () =>
-          operation(
-            options,
-            state,
-            request,
-            peer,
-            signal,
-            onDelta,
-            blocks,
-            blockMode,
-            route,
-          ),
+          operation(options, state, request, peer, signal, ...tail),
         ),
       resumeBlock: (approval, peer, signal) =>
         run(peer, signal, SELLER_CHANNEL_DIAGNOSTICS.resumeBlock, () => {

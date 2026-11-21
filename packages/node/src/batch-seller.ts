@@ -73,16 +73,21 @@ function batchObserver(
     /* Optional metadata cannot block generation. */
   }
 }
+// What the transport hands one execution: streaming, block exchange and its connection's path.
+interface ExecutionTransport {
+  onDelta?: (text: string) => Promise<void>;
+  blocks?: BatchBlockExchange;
+  route?: RouteProbe;
+}
 async function executeObserved(
   request: BatchExecutionRequest,
   peer: string,
   signal: AbortSignal,
   options: SellerBatchSessionOptions,
   live: LiveSellerOffer,
-  onDelta?: (text: string) => Promise<void>,
-  blocks?: BatchBlockExchange,
-  route?: RouteProbe,
+  transport: ExecutionTransport,
 ) {
+  const { onDelta, blocks, route } = transport;
   const receivedAt = options.now();
   const started = performance.now();
   let first: number | null = null;
@@ -206,16 +211,11 @@ async function exchange(
       return { snapshot: await session.open(request.params.payload) };
     if (request.params.channelId !== session.snapshot().channelId)
       return batchFail(SESSION_CODES.BINDING);
-    return executeObserved(
-      request.params,
-      peer,
-      signal,
-      options,
-      live,
+    return executeObserved(request.params, peer, signal, options, live, {
       onDelta,
       blocks,
       route,
-    );
+    });
   }
   const channel =
     request.method === BATCH_METHODS.APPROVE
