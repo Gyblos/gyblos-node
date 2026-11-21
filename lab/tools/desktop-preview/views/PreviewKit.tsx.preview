@@ -361,6 +361,8 @@ export type SellerMode = (typeof SELLER_MODES)[number];
 export const READY_SELLER_MODES: readonly SellerMode[] = ['Auto', 'Cheapest'];
 export const PREVIEW_COPY = {
   needsFunds: 'Needs funds · Add funds, or turn on the free-model fallback in Settings.',
+  fallbackNext: (model: string) => 'Out of funds: answers will come from free model ' + model + '. Paid models resume when you add funds.',
+  keyAtLimit: "At this key's limit, raise it in Connections.",
   fallbackUsed: (model: string) => 'Out of funds: answered with free model ' + model + '. Paid models resume when you add funds.',
   keyOutOfFunds: 'Out of funds. Add funds in Gyblos, or turn on "Use a free model when out of funds" in Settings.',
   pinnedUnavailable: (seller: string, replacement: string, mode: SellerMode) => seller + ' is unavailable. Using ' + replacement + ' (' + mode + ') for now.',
@@ -445,7 +447,7 @@ export function PreviewComposerTab({
         {funds.fallback && free ? (
           <>
             <Info size={15} weight="fill" aria-hidden="true" />
-            <p role="status">{PREVIEW_COPY.fallbackUsed(free.name)}</p>
+            <p role="status">{PREVIEW_COPY.fallbackNext(free.name)}</p>
             <Button variant={BUTTON_VARIANT.PRIMARY} onClick={openPreviewFunds}>
               Add funds
             </Button>

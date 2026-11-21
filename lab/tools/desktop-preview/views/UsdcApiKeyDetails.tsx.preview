@@ -24,7 +24,7 @@ export function KeyFallback() {
     <div className="preview-key-fallback">
       <span>
         <strong>Out of funds or at its limit</strong>
-        <small>{fallback ? 'Answers with a similar free model and says so.' : PREVIEW_COPY.keyOutOfFunds}</small>
+        <small>{fallback ? 'Answers with a similar free model and says so.' : PREVIEW_COPY.keyOutOfFunds + ' ' + PREVIEW_COPY.keyAtLimit}</small>
       </span>
       <Button onClick={() => window.previewNavigate?.(UI_VIEW.SETTINGS)}>Open Settings</Button>
     </div>
