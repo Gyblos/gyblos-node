@@ -179,6 +179,7 @@ export function UsdcApiKeys({
     if (ready && guideKey && tool !== 'other')
       void run({ action: USDC_API_ACTION.PREVIEW_AGENT, id: guideKey.id, tool });
   }, [ready, guideKey?.id, tool]);
+  useEffect(() => setKeyCopied(false), [guideKey?.id, tool]);
   const go = (next: KeyView, keyId: string) => {
     setId(keyId);
     setView(next);

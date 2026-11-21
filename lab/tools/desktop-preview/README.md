@@ -15,7 +15,8 @@ Open `http://127.0.0.1:5196/?screen=connections&connection-state=ready`. The
 `activity`, `payments` and `settings`. Use `connection-state=unconfigured` for
 an unconfigured example. Subsequent navigation uses the normal desktop controls.
 Example changes last only until the page reloads. A copied API key is
-deliberately invalid. Connection examples can be copied from the setup dialog.
+deliberately invalid. Connection examples can be copied from the setup guide on
+the Connections screen.
 
 ## Brand proposal awaiting desktop approval
 
