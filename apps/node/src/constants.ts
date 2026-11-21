@@ -1,6 +1,6 @@
 // Canonical values of the node application: the seller background service's names, locations, limits and
 // error codes, `seller init`'s defaults and codes, and `seller status`'s windows, limits and results.
-// Rendering lives in service.ts and the CLIs in cli-service.ts, cli-init.ts and cli-status.ts. The unit and
+// Rendering lives in service.ts and the CLIs in cli-service.ts, cli-init.ts, cli-status.ts and cli-rpc.ts. The unit and
 // agent directories are operating-system locations under the account's home, not product-home paths
 // (config/src/home.ts).
 // 130 is the shell's code for a run stopped with Ctrl-C.
@@ -19,6 +19,9 @@ export const SERVICE_COMMANDS = {
 } as const;
 export type ServiceCommand =
   (typeof SERVICE_COMMANDS)[keyof typeof SERVICE_COMMANDS];
+
+// `seller rpc`'s subcommands (cli-rpc.ts); with none it shows the RPC in use.
+export const RPC_COMMANDS = { SET: 'set', RESET: 'reset' } as const;
 
 // Owner read/write only for files the service creates (launchd's log, the daemon's state).
 const SERVICE_UMASK = 0o077;

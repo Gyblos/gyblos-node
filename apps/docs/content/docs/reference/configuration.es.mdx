@@ -151,23 +151,23 @@ por defecto. El vendedor Docker toma su entorno de `seller.env`; una variable de
 host no llega al contenedor. El servicio nativo también lee solo su `seller.env`. Después de editar
 `seller.env`, reinicia el vendedor como explica [Operación](/es/sellers/operate).
 
-| Variable                    | Significado                                                                                       |
-| --------------------------- | ------------------------------------------------------------------------------------------------- |
-| `GYBLOS_CONFIG`             | El archivo que leen `start`, `doctor` y `seller init`; `config validate` usa `--config`           |
-| `GYBLOS_HOME`               | El home del vendedor (llaves y estado); fijo en `/data` en la imagen Docker                       |
-| `GYBLOS_RELAYS`             | Orígenes de relay separados por comas                                                             |
-| `GYBLOS_RELAY_TOKEN`        | Token de relay opcional, solo para un relay que lo exija; guárdalo en `seller.env`                |
-| `GYBLOS_RELAY_ONLY`         | `1` activa el modo solo relay, `0` lo desactiva; cualquier otro valor lo desactiva con un aviso   |
-| `GYBLOS_IROH_BIND`          | Reemplaza `transport.bind`; vacía se ignora                                                       |
-| `GYBLOS_IROH_EXTERNAL_ADDR` | Reemplaza `transport.external_addr`; vacía se ignora                                              |
-| `GYBLOS_DISCOVERY_PUBLISH`  | `1` o `0` estrictos para reemplazar `discovery.publish`; cualquier otro valor es un error         |
-| `GYBLOS_DISCOVERY_URL`      | Reemplaza `discovery.url`; se comprueba cuando la publicación está activa                         |
-| `GYBLOS_OBSERVATIONS`       | `off` deja de subir observaciones de telemetría; los recibos se siguen subiendo                   |
-| `GYBLOS_COLLECTOR_URL`      | Otro recolector de métricas (HTTPS, o HTTP en loopback); cualquier otro valor desactiva la subida |
-| `GYBLOS_UPDATE_CHECK`       | `0` impide que `gyblos seller status` busque una versión más nueva                                |
-| `GYBLOS_INVITE`             | El código de invitación para `gyblos seller register`; nunca lo pongas en TOML ni en el historial |
-| `GYBLOS_BUYER_RELAY_ONLY`   | Un ajuste del comprador; el vendedor lo ignora                                                    |
-| `GYBLOS_RPC_URL`            | La validación lo acepta pero el vendedor lo ignora; sus archivos de rol fijan el RPC              |
+| Variable                    | Significado                                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GYBLOS_CONFIG`             | El archivo que leen `start`, `doctor` y `seller init`; `config validate` usa `--config`                                                                                            |
+| `GYBLOS_HOME`               | El home del vendedor (llaves y estado); fijo en `/data` en la imagen Docker                                                                                                        |
+| `GYBLOS_RELAYS`             | Orígenes de relay separados por comas                                                                                                                                              |
+| `GYBLOS_RELAY_TOKEN`        | Token de relay opcional, solo para un relay que lo exija; guárdalo en `seller.env`                                                                                                 |
+| `GYBLOS_RELAY_ONLY`         | `1` activa el modo solo relay, `0` lo desactiva; cualquier otro valor lo desactiva con un aviso                                                                                    |
+| `GYBLOS_IROH_BIND`          | Reemplaza `transport.bind`; vacía se ignora                                                                                                                                        |
+| `GYBLOS_IROH_EXTERNAL_ADDR` | Reemplaza `transport.external_addr`; vacía se ignora                                                                                                                               |
+| `GYBLOS_DISCOVERY_PUBLISH`  | `1` o `0` estrictos para reemplazar `discovery.publish`; cualquier otro valor es un error                                                                                          |
+| `GYBLOS_DISCOVERY_URL`      | Reemplaza `discovery.url`; se comprueba cuando la publicación está activa                                                                                                          |
+| `GYBLOS_OBSERVATIONS`       | `off` deja de subir observaciones de telemetría; los recibos se siguen subiendo                                                                                                    |
+| `GYBLOS_COLLECTOR_URL`      | Otro recolector de métricas (HTTPS, o HTTP en loopback); cualquier otro valor desactiva la subida                                                                                  |
+| `GYBLOS_UPDATE_CHECK`       | `0` impide que `gyblos seller status` busque una versión más nueva                                                                                                                 |
+| `GYBLOS_INVITE`             | El código de invitación para `gyblos seller register`; nunca lo pongas en TOML ni en el historial                                                                                  |
+| `GYBLOS_BUYER_RELAY_ONLY`   | Un ajuste del comprador; el vendedor lo ignora                                                                                                                                     |
+| `GYBLOS_RPC_URL`            | El vendedor en marcha lo ignora, porque su archivo de rol fija el RPC; lo leen la primera ejecución del instalador y [`gyblos seller rpc set`](/es/sellers/beta-guide#cambiar-rpc) |
 
 `[limits]`, las ofertas, `[telemetry]` y `[diagnostics]` no tienen variable de entorno.
 
