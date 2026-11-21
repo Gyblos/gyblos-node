@@ -90,7 +90,7 @@ function ProbePanel({
         <img
           className="signature"
           alt="Gyblos"
-          src={`./assets/gyblos-mark-solid-${light ? 'light' : 'dark'}.svg`}
+          src={`./assets/startup-mark-${light ? 'light' : 'dark'}.svg`}
         />
         <h1>Desktop foundation</h1>
         <p>Electron + the Gyblos node lifecycle + native Iroh</p>
