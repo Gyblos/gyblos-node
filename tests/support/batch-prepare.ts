@@ -8,7 +8,7 @@ import { batchOfferFixture } from './batch-iroh-offer';
 import { batchLoopback } from './batch-loopback';
 import { sessionRig } from './batch-session';
 
-export async function batchPrepareFixture() {
+export async function batchPrepareFixture(openingStatus?: (signal: AbortSignal) => Promise<'present' | 'absent' | 'unknown'>) {
   const rig = await sessionRig();
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const session = rig.seller();
@@ -36,7 +36,7 @@ export async function batchPrepareFixture() {
   const buyer = createBuyerBatchSession({
     ...wire,
     terms: rig.terms,
-    buyer: rig.buyer,
+    buyer: { ...rig.buyer, openingStatus },
     meter: offers.meter,
     now: rig.now,
     unresolved: async () => false,
