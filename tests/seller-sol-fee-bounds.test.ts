@@ -37,6 +37,7 @@ import {
 import { DEVNET, UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
 import { PAYMENT_TRANSACTION_LIMITS } from '@gyblos/config/payment-fees';
 import {
+  assertFeeWire,
   feeBoundedUptoVerifier,
   limitedFeePayer,
   sellerUptoFeePolicy,
@@ -57,9 +58,16 @@ function price(value: bigint): Instruction {
   new DataView(data.buffer).setBigUint64(1, value, true);
   return { programAddress: address(COMPUTE_BUDGET_PROGRAM_ADDRESS), data };
 }
+// A well-formed recent blockhash: these transactions could be broadcast, so the ceilings apply.
+const SENDABLE_BLOCKHASH = blockhash(
+  '3WHpWRxwx1vqaw7Y5YACy7M2He8svYM2YWVE6LApB8EU',
+);
+// The SDK's simulation placeholder: 32 zero bytes, never a valid recent blockhash or nonce.
+const SIMULATION_BLOCKHASH = blockhash('1'.repeat(32));
 function transaction(
   signer: KeyPairSigner,
   instructions: readonly Instruction[],
+  lifetime = SENDABLE_BLOCKHASH,
 ) {
   const compiled = compileTransaction(
     pipe(
@@ -67,7 +75,7 @@ function transaction(
       (message) => setTransactionMessageFeePayerSigner(signer, message),
       (message) =>
         setTransactionMessageLifetimeUsingBlockhash(
-          { blockhash: blockhash('1'.repeat(32)), lastValidBlockHeight: 10n },
+          { blockhash: lifetime, lastValidBlockHeight: 10n },
           message,
         ),
       (message) => appendTransactionMessageInstructions(instructions, message),
@@ -340,4 +348,39 @@ void test('lookup tables cannot hide compute-budget programs from the signing gu
   });
   assert.equal(f.messages(), 0);
   assert.equal(f.transactions(), 0);
+});
+
+void test('the SDK pre-submission simulation is signed: its placeholder blockhash can never be broadcast', async () => {
+  const f = await fixture();
+  // The SDK simulates open + settle + distribute under the transaction maximum before submitting.
+  const simulation = transaction(
+    f.key,
+    [limit(1_400_000), price(1n)],
+    SIMULATION_BLOCKHASH,
+  );
+  await f.resolved.signTransactions([simulation]);
+  await f.sdk.signTransaction(
+    getBase64EncodedWireTransaction(simulation),
+    f.key.address,
+    DEVNET,
+  );
+  assert.equal(f.transactions(), 1);
+  assert.equal(f.messages(), 1);
+  // The same budget on a sendable transaction is still refused by both signing APIs.
+  const sendable = transaction(f.key, [limit(1_400_000), price(1n)]);
+  await assert.rejects(f.resolved.signTransactions([sendable]), {
+    code: PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+  });
+  // A buyer's opening wire is admitted only within the ceilings, whatever its blockhash.
+  const f2 = await fixture();
+  assert.throws(
+    () =>
+      assertFeeWire(
+        getBase64EncodedWireTransaction(
+          transaction(f2.key, [limit(1_400_000)], SIMULATION_BLOCKHASH),
+        ),
+        f2.key.address,
+      ),
+    { code: PAYMENT_ERROR_CODES.UNTRUSTED_TERMS },
+  );
 });

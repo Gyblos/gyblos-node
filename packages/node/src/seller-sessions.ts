@@ -31,6 +31,7 @@ import type { SellerSessionBackend } from './session-backend';
 export interface SellerSessionOptions {
   admit?: () => Promise<void>;
   receipts?: import('./batch-seller').SellerBatchSessionOptions['receipts'];
+  diagnostics?: import('./batch-seller').SellerBatchSessionOptions['diagnostics'];
   telemetry?: {
     sink: import('@gyblos/protocol/telemetry').TelemetrySink;
     engineKind: (
@@ -103,6 +104,7 @@ function binding(
       terms,
       telemetry: options.telemetry,
       receipts: options.receipts,
+      diagnostics: options.diagnostics,
       now: options.now,
       offers: options.offers,
     }),

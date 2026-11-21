@@ -168,8 +168,9 @@ gyblos logs --role buyer --json --component buyer-http --operation chat
 ```
 
 `gyblos logs` reads the local, content-free diagnostic log of a role. It never starts a node or contacts
-a service. The local buyer writes this log; the seller node writes its output to its service log
-instead (`docker compose logs seller`, `service.log` in the home, or `journalctl --user -u gyblos-seller`).
+a service. The local buyer writes this log. The seller records each failed payment-channel operation
+with a static code (Docker: `docker compose exec seller gyblos logs`); the rest of its output goes to its
+service log (`docker compose logs seller`, `service.log` in the home, or `journalctl --user -u gyblos-seller`).
 
 | Option                                                        | Meaning                                                     |
 | ------------------------------------------------------------- | ----------------------------------------------------------- |

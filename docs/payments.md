@@ -33,7 +33,13 @@ signatures. An explicit positive compute-unit limit is mandatory; duplicate,
 malformed or unsupported compute-budget instructions and lookup-table messages
 are refused before the seller signs. Omitting the price means zero priority fee.
 Both SDK signing APIs are guarded, including the message-signing path used for
-buyer-supplied opens and the transaction-signing path used for settlement.
+buyer-supplied opens and the transaction-signing path used for settlement. One
+message is signed without these bounds: the SDK's pre-submission simulation of
+open, settle and distribute, which uses the transaction maximum (1,400,000
+compute units) and the all-zero placeholder blockhash. No recent blockhash or
+durable nonce is zero, so that message can never be broadcast. A buyer's opening
+wire is admitted only within the bounds, whatever its blockhash. Without this,
+the seller refused to sign its own simulation and never sent a buyer's deposit.
 
 These are per-transaction instruction and signer-count bounds, not a total
 wallet, daily SOL, token-account creation or rent budget. The priority component

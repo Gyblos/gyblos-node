@@ -23,6 +23,7 @@ import {
   SESSION_BLOCK_KINDS,
   type SessionBlockAck,
 } from '@gyblos/protocol/session-blocks';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import type {
   BatchBlockExchange,
   BatchChannelService,
@@ -34,12 +35,15 @@ import { batchLiveOffer, generateBatch } from './batch-generation';
 import { publishSessionReceipt, sessionReceiptPayment } from './batch-receipts';
 import { sellerExecutionTelemetry } from './free-telemetry';
 import type { PaidSellerReceiptOptions } from './receipt-seller';
+import { reportChannelFailure } from './seller-channel-diagnostics';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export interface SellerBatchSessionOptions {
   receipts?: (index: number) => PaidSellerReceiptOptions;
   blockTargetTokens?: number;
   telemetry?: import('./seller-sessions').SellerSessionOptions['telemetry'];
+  // The seller's local diagnostics; failed operations are recorded without their error text.
+  diagnostics?: DiagnosticSink;
   session: SessionSeller;
   terms: Readonly<PaymentSessionTerms>;
   offers: () => readonly LiveSellerOffer[];
@@ -250,8 +254,10 @@ export function createSellerBatchSession(
   };
   return {
     exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
-      run(peer, signal, () =>
-        exchange(request, peer, signal, options, onDelta, blocks, blockMode),
+      reportChannelFailure(options.diagnostics, request.method, () =>
+        run(peer, signal, () =>
+          exchange(request, peer, signal, options, onDelta, blocks, blockMode),
+        ),
       ),
     resumeBlock: (approval, peer, signal) =>
       run(peer, signal, async (): Promise<SessionBlockAck> => {

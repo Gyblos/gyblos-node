@@ -25,9 +25,8 @@ gyblos logs --role lab --correlation-id CORRELATION_ID --limit 100
 From a checkout, use `pnpm gyblos` instead of `gyblos`. Replace `CORRELATION_ID`
 with the `correlationId` of a record you already found.
 
-- `--role` is `buyer`, `seller` or `lab`; the default is `seller`. Only the
-  buyer writes product diagnostics (see [Coverage](#coverage)), so use
-  `--role buyer`; the seller role usually prints nothing.
+- `--role` is `buyer`, `seller` or `lab`; the default is `seller`. The seller
+  records only failed payment-channel operations (see [Coverage](#coverage)).
 - `--level` is `debug`, `info`, `warn` or `error`.
 - `--limit` accepts 1 to 1000 records (default 100). With `--follow`, it bounds
   the initial tail; new matching records then print until you cancel.
@@ -70,13 +69,20 @@ writes no records. [configuration.md](configuration.md) has the key reference.
   stderr. The duration runs from when the parent began spawning the child. If
   the child never starts, the last phase is `startup`. A phase is the last
   observed boundary, not proof of a cause.
+- **Seller payment channels.** Component `seller-channel`: one `error` record
+  per failed channel operation from a buyer (`prepare`, `open`, `execute`,
+  `approve`, `close`), phase `exchange`. The code is the error's own static
+  code, or the payment SDK's error name (for example
+  `invalid_batch_settlement_svm_settlement_simulation` when the deposit could
+  not be simulated, so it was never sent), else `SELLER_CHANNEL_FAILED`. The
+  error text is never kept: it can hold transactions, addresses or RPC URLs.
 - **Cleanup.** `withDiagnosticCleanup` records cleanup failures separately and
   preserves the original thrown value, including `undefined`. A cleanup failure
   after successful work still fails the operation. Nested receipt-startup
   cleanup is not instrumented, so a cleanup failure there can hide its original
   startup error.
 
-Seller, transport, discovery and payment paths write no diagnostics. Other
+Other seller, transport, discovery and payment paths write no diagnostics. Other
 service output does not pass through this channel.
 
 ## Record contract
