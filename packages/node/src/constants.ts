@@ -104,6 +104,9 @@ export const DOCTOR_CODES = {
   PAYMENT_ACCOUNTS_UNCHECKED: 'PAYMENT_ACCOUNTS_UNCHECKED',
   // One of those token accounts can never receive a payout (frozen, say); startup refuses it.
   PAYMENT_ACCOUNTS_UNUSABLE: 'PAYMENT_ACCOUNTS_UNUSABLE',
+  // The fee payer holds less than FEE_PAYER_FUNDING.minimumLamports: startup cannot create a missing
+  // token account, and the seller cannot send channel transactions.
+  FEE_PAYER_UNFUNDED: 'FEE_PAYER_UNFUNDED',
   // Every offer's usage is declared by its provider, so no tokenizer is loaded.
   NOT_NEEDED: 'NOT_NEEDED',
   // A remote engine is called only with --online.
@@ -113,6 +116,14 @@ export const DOCTOR_CODES = {
   // The discovery index did not answer with its time, or answered too slowly to measure it.
   CLOCK_UNCHECKED: 'CLOCK_UNCHECKED',
   CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
+} as const;
+// Devnet SOL the fee payer needs before a priced offer: below the minimum it cannot pay the three
+// token accounts startup may create (about 0.002 SOL each) plus channel transaction fees; operators are
+// told to send the suggested amount.
+export const FEE_PAYER_FUNDING = {
+  minimumLamports: 10_000_000n,
+  minimumSol: '0.01',
+  suggestedSol: '0.05',
 } as const;
 // Buyers and the index accept a record issued at most CONTROL_LIMITS.clockSkewMs ahead of their clock;
 // doctor warns well before that. With the header's 1 s resolution and at most 1 s of round trip, a

@@ -1,10 +1,11 @@
 // The token accounts a seller's paid claim pays into (payout, protocol fee treasury and fee payer),
 // read on the role's RPC for the preflight. Startup creates the missing ones; this never sends.
-import { createSolanaRpc } from '@solana/kit';
+import { address, createSolanaRpc } from '@solana/kit';
 
 import { DEVNET_GENESIS, UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
 import { uptoRecipientTokenAccounts } from '@gyblos/payments-upto';
 
+import { FEE_PAYER_FUNDING } from './constants';
 import { readGenesis, type GenesisReader } from './seller-chain';
 
 export interface PaymentAccountsQuery {
@@ -23,9 +24,33 @@ export async function paymentAccountsStatus(query: PaymentAccountsQuery) {
   return { missing: missing.length, unusable: unusable.length };
 }
 
+// The fee payer's devnet SOL, in lamports; throws when the RPC cannot say.
+export async function feePayerLamports(query: {
+  rpcUrl: string;
+  address: string;
+}): Promise<bigint> {
+  const { value } = await createSolanaRpc(query.rpcUrl)
+    .getBalance(address(query.address))
+    .send();
+  return value;
+}
+
+// Whether the fee payer holds less devnet SOL than FEE_PAYER_FUNDING.minimumLamports; false when the RPC
+// cannot say, so an unanswered read never turns into a failure.
+export async function feePayerShort(
+  query: { rpcUrl: string; address: string },
+  probes: PaymentAccountsProbes,
+): Promise<boolean> {
+  const lamports = await (probes.feePayerLamports ?? feePayerLamports)(
+    query,
+  ).catch(() => undefined);
+  return lamports !== undefined && lamports < FEE_PAYER_FUNDING.minimumLamports;
+}
+
 export interface PaymentAccountsProbes {
   genesis?: GenesisReader;
   paymentAccounts?: typeof paymentAccountsStatus;
+  feePayerLamports?: typeof feePayerLamports;
 }
 
 // What startup would find: another chain (refused, so its accounts are not read), an account that

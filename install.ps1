@@ -321,6 +321,15 @@ function Next-Steps {
   Say "       $(Installer 'publish')"
 }
 
+# Printed after every install, priced offers or not, so a seller starting from zero knows both SOL needs:
+# the owner's registration, and the fee payer that pays channel transactions once an offer has a price.
+function Charge-Note {
+  Say ''
+  Say "To charge for your model later, first send about 0.05 devnet SOL to the fee payer $script:FeePayer"
+  Say '  (https://faucet.solana.com, choose devnet). It pays the payment token accounts and channel'
+  Say "  transactions; ``$(Typed 'doctor --online')`` says when it runs short. A free seller never needs it."
+}
+
 function Confirm([string]$Question) {
   $answer = Read-Host "$Question [Y/n]"
   return $answer -eq '' -or $answer -match '^(y|yes)$'
@@ -437,8 +446,10 @@ function Main {
   $doctor | ForEach-Object { Say "$_" }
   if (-not $ready) { Die 'The seller is not ready; fix the failures above, then run this script again.' }
   $script:Owner = ''
+  $script:FeePayer = ''
   foreach ($line in $doctor) {
-    if ("$line" -match '^  owner +([1-9A-HJ-NP-Za-km-z]{32,44})\s*$') { $script:Owner = $Matches[1]; break }
+    if ("$line" -match '^  owner +([1-9A-HJ-NP-Za-km-z]{32,44})\s*$') { $script:Owner = $Matches[1] }
+    if ("$line" -match '^  fee payer +([1-9A-HJ-NP-Za-km-z]{32,44})(\s|$)') { $script:FeePayer = $Matches[1] }
   }
   Switch-Native
   Reinstall-Service
@@ -455,7 +466,7 @@ function Main {
     Guided-Setup
   } else {
     Next-Steps
-  }
+  }  Charge-Note
 }
 
 # The seller's commands find its home through GYBLOS_HOME like the service does.

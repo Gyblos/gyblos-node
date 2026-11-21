@@ -47,7 +47,9 @@ never both. You set the net price; buyers see it **plus the 4% Gyblos fee**.
 Run `gyblos doctor` (Docker seller: `docker compose run --rm seller gyblos doctor`) and copy the `fee payer`
 address. Send it about 0.05 devnet SOL from [the devnet faucet](https://faucet.solana.com).
 
-The fee payer needs devnet SOL for channel transactions.
+The fee payer needs devnet SOL for channel transactions. With less than 0.01 SOL, `gyblos doctor --online`
+reports `FEE_PAYER_UNFUNDED`: a failure when startup still has to create the payment token accounts, a
+warning otherwise.
 
 ## 3. Apply and verify
 

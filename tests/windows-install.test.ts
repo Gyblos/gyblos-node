@@ -32,6 +32,7 @@ const run = promisify(execFile);
 const VERSION = '0.0.0-fake.1';
 const NAME = `gyblos-${VERSION}-win32-x64`;
 const OWNER = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+const FEE_PAYER = '11111111111111111111111111111113';
 const TOKEN = 'test-relay-token-for-the-installer-0123456789';
 const POWERSHELL = join(
   process.env.SystemRoot ?? 'C:\\Windows',
@@ -50,6 +51,7 @@ const FAKE_SELLER = [
   '  if not defined GYBLOS_RELAY_TOKEN exit /b 1',
   '  echo READY',
   `  echo   owner  ${OWNER}`,
+  `  echo   fee payer  ${FEE_PAYER}  pays channel transactions once an offer has a price`,
   ')',
   'exit /b 0',
   '',
@@ -190,6 +192,12 @@ void test(
       assert.ok(!first.output.includes(TOKEN));
       assert.match(first.output, new RegExp(`owner\\s+${OWNER}`));
       assert.match(first.output, /Next steps, to start selling/);
+      assert.match(
+        first.output,
+        new RegExp(
+          `first send about 0\\.05 devnet SOL to the fee payer ${FEE_PAYER}`,
+        ),
+      );
       assert.equal(
         await pathsArePrivate([home, join(home, 'seller.env')]),
         ACL_VERDICTS.PRIVATE,

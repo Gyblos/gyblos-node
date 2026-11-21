@@ -49,7 +49,9 @@ gratis o con precio, nunca las dos cosas. Tú fijas el precio neto; los comprado
 Ejecuta `gyblos doctor` (vendedor Docker: `docker compose run --rm seller gyblos doctor`) y copia la dirección
 `fee payer`. Envíale unos 0,05 SOL de devnet desde [el faucet de devnet](https://faucet.solana.com).
 
-El pagador de comisiones necesita SOL de devnet para las transacciones del canal.
+El pagador de comisiones necesita SOL de devnet para las transacciones del canal. Con menos de 0,01 SOL,
+`gyblos doctor --online` informa `FEE_PAYER_UNFUNDED`: un fallo cuando el arranque todavía debe crear las
+cuentas de token de pago, y una advertencia en otro caso.
 
 ## 3. Aplica y comprueba
 

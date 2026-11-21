@@ -92,6 +92,7 @@ void test('doctor --online: missing payment token accounts warn, an unreadable R
           asked.push({ mint, owners });
           return { missing: 2, unusable: 0 };
         },
+        feePayerLamports: async () => 10_000_000n,
       },
     );
     // A warning, not a failure: startup creates them.
@@ -199,5 +200,85 @@ void test('doctor accepts a paid seller whose payout is its owner', () =>
     assert.match(
       line((await doctor(run)).output, 'payments'),
       /^\s*OK\s+payments/,
+    );
+  }));
+
+void test('doctor --online: a fee payer short of devnet SOL fails when startup must create accounts, warns otherwise', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'config.toml'), paidToml(run));
+    const role = JSON.parse(
+      await readFile(join(run.seller, 'role.json'), 'utf8'),
+    ) as { facilitator: string };
+    const asked: string[] = [];
+    const balance =
+      (lamports: bigint) =>
+      async ({ address }: { rpcUrl: string; address: string }) => {
+        asked.push(address);
+        return lamports;
+      };
+    const probes = (missing: number, lamports: bigint) => ({
+      genesis: async () => DEVNET_GENESIS,
+      paymentAccounts: async () => ({ missing, unusable: 0 }),
+      feePayerLamports: balance(lamports),
+    });
+    // Startup pays the missing token accounts from the fee payer, so it cannot start.
+    const cannotStart = await doctor(run, ['--online'], {}, probes(1, 0n));
+    assert.equal(cannotStart.code, 1);
+    assert.match(
+      line(cannotStart.output, 'payments'),
+      /FAIL\s+payments\s+FEE_PAYER_UNFUNDED\s+.*about 0\.05 devnet SOL.*faucet\.solana\.com/,
+    );
+    assert.deepEqual(asked, [role.facilitator]);
+    // Accounts exist: it starts, but cannot send channel transactions.
+    const cannotCharge = await doctor(
+      run,
+      ['--online'],
+      {},
+      probes(0, 9_999_999n),
+    );
+    assert.equal(cannotCharge.code, 0);
+    assert.match(
+      line(cannotCharge.output, 'payments'),
+      /WARN\s+payments\s+FEE_PAYER_UNFUNDED/,
+    );
+    // Funded: the token-account verdict as before.
+    assert.match(
+      line(
+        (await doctor(run, ['--online'], {}, probes(0, 10_000_000n))).output,
+        'payments',
+      ),
+      /^\s*OK\s+payments/,
+    );
+    assert.match(
+      line(
+        (await doctor(run, ['--online'], {}, probes(2, 10_000_000n))).output,
+        'payments',
+      ),
+      /WARN\s+payments\s+PAYMENT_ACCOUNTS_MISSING/,
+    );
+    // An RPC that cannot say keeps the token-account verdict and never prints the RPC.
+    const unread = await doctor(
+      run,
+      ['--online'],
+      {},
+      {
+        ...probes(0, 0n),
+        feePayerLamports: async () => {
+          throw new Error('rpc down at https://rpc.example/?key=s');
+        },
+      },
+    );
+    assert.match(line(unread.output, 'payments'), /^\s*OK\s+payments/);
+    assert.equal(unread.output.includes('rpc.example'), false);
+  }));
+
+void test('doctor names what the fee payer is for, for every seller', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'config.toml'), freeToml(run));
+    assert.match(
+      (await doctor(run)).output,
+      /fee payer {2}\S+ {2}\(pays channel transactions once an offer has a price; send it about 0\.05 devnet SOL first\)/,
     );
   }));

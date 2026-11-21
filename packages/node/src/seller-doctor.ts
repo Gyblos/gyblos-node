@@ -44,6 +44,7 @@ import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus, type RoleConfig } from './roles';
 import type { SellerCatalogOffer } from './seller-offer';
 import {
+  feePayerShort,
   paymentAccountsVerdict,
   type PaymentAccountsProbes,
 } from './seller-payment-accounts';
@@ -82,6 +83,7 @@ export interface DoctorProbes {
   // The chain the role's RPC serves and its payment token accounts (--online).
   genesis?: PaymentAccountsProbes['genesis'];
   paymentAccounts?: PaymentAccountsProbes['paymentAccounts'];
+  feePayerLamports?: PaymentAccountsProbes['feePayerLamports'];
 }
 export interface DoctorOptions {
   environment: HomeEnvironment;
@@ -248,6 +250,15 @@ async function paymentsCheck(
     },
     options.probes ?? {},
   );
+  // Startup pays missing token accounts from the fee payer (so cannot start); otherwise it cannot charge.
+  const query = { rpcUrl: config.rpcUrl, address: config.facilitator };
+  if (
+    ['ready', 'missing'].includes(verdict) &&
+    (await feePayerShort(query, options.probes ?? {}))
+  )
+    return (verdict === 'missing' ? fail : warn)(
+      DOCTOR_CODES.FEE_PAYER_UNFUNDED,
+    );
   return {
     ready: OK,
     // Startup creates them.
