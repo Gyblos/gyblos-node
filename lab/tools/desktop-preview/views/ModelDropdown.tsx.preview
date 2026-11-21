@@ -23,7 +23,8 @@ import { Dropdown } from './Dropdown';
 import { Modal } from './Modal';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
-import { buyerPerMtok, openPreviewFunds, previewUsdc, usePreviewBalance } from './PreviewKit';
+import { priceRange, usdPerMtok } from './model-price';
+import { feeLabel, openPreviewFunds, previewUsdc, usePreviewBalance } from './PreviewKit';
 import { Badge, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
@@ -40,7 +41,7 @@ const chosenTag = new Map<string, string>();
 function priceLabel(model: ModelOption) {
   return model.free
     ? 'Free'
-    : `${buyerPerMtok(model.input)} in · ${buyerPerMtok(model.output)} out / 1M`;
+    : `${usdPerMtok(model.input)} in · ${usdPerMtok(model.output)} out / 1M`;
 }
 // Word joiners and a no-break space keep a shortened seller id on one line.
 function sellerName(model: ModelOption) {
@@ -51,7 +52,7 @@ function sellerName(model: ModelOption) {
   return seller.replace('Seller ', 'Seller\u00a0').replace(/\.\.\.|…/, '\u2060…\u2060');
 }
 function offerPrice(model: ModelOption) {
-  return model.free ? 'Free' : `${buyerPerMtok(model.input)} / ${buyerPerMtok(model.output)}`;
+  return model.free ? 'Free' : `${usdPerMtok(model.input)} / ${usdPerMtok(model.output)}`;
 }
 function quantization(model: ModelOption) {
   return (
@@ -86,7 +87,7 @@ function groupPrice(offers: readonly ModelOption[]) {
   const cheapest = paid.sort((a, b) => a.input - b.input)[0];
   const sellers = offers.length + (offers.length === 1 ? ' seller' : ' sellers');
   if (!cheapest || offers.some((item) => item.free)) return 'Free · ' + sellers;
-  return (offers.length > 1 ? 'From ' : '') + buyerPerMtok(cheapest.input) + '/M · ' + sellers;
+  return (offers.length > 1 ? 'From ' : '') + usdPerMtok(cheapest.input) + '/M · ' + sellers;
 }
 function group(models: readonly ModelOption[]) {
   const groups = new Map<string, ModelOption[]>();
@@ -276,7 +277,7 @@ export function ModelDropdown({
     <>
     {compare && (
       <Modal title={compare} size="lg" close={() => setCompare(null)}>
-        <p className="ui-help-text">{compareOffers.length + ' sellers · price per 1M tokens incl. 4% fee, in / out'}</p>
+        <p className="ui-help-text">{compareOffers.length + ' sellers · price per 1M tokens ' + feeLabel + ', in / out'}</p>
         <div className="preview-simple-table-region">
           <table className="preview-simple-table">
             <caption className="sr-only">{'Sellers for ' + compare}</caption>
@@ -318,7 +319,7 @@ export function ModelDropdown({
             <Badge>Free</Badge>
           ) : (
             <span className="model-trigger-price" title={priceLabel(model)}>
-              {buyerPerMtok(model.input) + ' / ' + buyerPerMtok(model.output)} /M
+              {priceRange(model)} /M
             </span>
           )}
           <CaretDown size={12} weight="bold" className="preview-trigger-caret" aria-hidden="true" />
@@ -446,7 +447,7 @@ export function ModelDropdown({
                 <>
                   <p className="preview-flyout-title">
                     <strong>{active}</strong>
-                    <small>{offers.length} sellers · price per 1M tokens incl. 4% fee, in / out</small>
+                    <small>{offers.length} sellers · price per 1M tokens {feeLabel}, in / out</small>
                   </p>
                   <StrategyRow
                     icon={Sparkle}

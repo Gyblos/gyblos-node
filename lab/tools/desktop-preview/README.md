@@ -14,6 +14,8 @@ Open `http://127.0.0.1:5196/?screen=connections&connection-state=ready`. The
 `screen` parameter accepts `chat`, `connections`, `models`, `applications`,
 `activity`, `payments` and `settings`. Use `connection-state=unconfigured` for
 an unconfigured example. Subsequent navigation uses the normal desktop controls.
+The spending limit starts unset; use `limit=set` for a 1 USDC limit, or
+`limit=0&keys=empty` for the free-models-only limit without earlier spending.
 Example changes last only until the page reloads. A copied API key is
 deliberately invalid. Connection examples can be copied from the setup guide on
 the Connections screen.

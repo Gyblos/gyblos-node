@@ -7,7 +7,7 @@ import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants'
 import { AddBuyerFunds } from './BuyerFunding';
 import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
-import { buyerTotal, marketMedian, similarFreeModel } from './market';
+import { similarFreeModel } from './market';
 import { Modal } from './Modal';
 import { usdPerMtok } from './model-price';
 import type { View } from './model-types';
@@ -20,10 +20,7 @@ import type { X402View } from './useX402';
 
 export { statusTone, TONE } from './status-tone';
 export type { Tone } from './status-tone';
-export { buyerTotal, marketMedian, similarFreeModel } from './market';
-
-/** Buyer-facing price per 1M tokens: the seller net price plus the network fee. */
-export const buyerPerMtok = (net: number) => usdPerMtok(buyerTotal(net));
+export { feeLabel, marketMedian, similarFreeModel } from './market';
 
 export function Tag({ tone = TONE.NEUTRAL, dot = false, children }: { tone?: Tone; dot?: boolean; children: ReactNode }) {
   return (
@@ -51,7 +48,7 @@ export function Savings({ price, median }: { price: number; median: number | nul
   if (median == null || !(median > 0) || price >= median) return null;
   const percent = Math.round(((median - price) / median) * 100);
   return (
-    <span className="pk-delta" data-tone={TONE.SUCCESS} title={'Median of current offers: ' + buyerPerMtok(median) + ' / 1M tokens'}>
+    <span className="pk-delta" data-tone={TONE.SUCCESS} title={'Median of current offers: ' + usdPerMtok(median) + ' / 1M tokens'}>
       {percent}% below median
     </span>
   );

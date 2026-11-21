@@ -74,8 +74,9 @@ export function createPreviewHost(
   let connected = ready;
   let active = ready && query.get('seller-budget') !== 'ready';
   let authorized = ready;
-  let limitAtomic = '1000000';
-  let limited = query.get('limit') === 'set';
+  const limitQuery = query.get('limit');
+  let limitAtomic = limitQuery === '0' ? '0' : '1000000';
+  let limited = limitQuery === 'set' || limitQuery === '0';
   let generation = 0;
   let selectedHome = ready;
   let keys = exampleKeys(query.get('keys') === 'empty');

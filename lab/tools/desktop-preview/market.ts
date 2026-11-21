@@ -1,16 +1,12 @@
-// Preview-only market helpers: buyer totals, the median reference and the closest free model.
+// Preview-only market helpers: the fee label, the median reference and the closest free model.
+import { PROTOCOL_FEE } from '@gyblos/config/network';
+
 import { PREVIEW } from './constants';
 
-const scale = PREVIEW.priceScale;
+// Listed prices already include the protocol fee (seller net price, rounded up).
+export const feeLabel = `incl. ${PROTOCOL_FEE.bps / PREVIEW.percentScale}% fee`;
 
-export function buyerTotal(net: number) {
-  return (
-    Math.round(
-      ((net * (PREVIEW.bpsScale + PREVIEW.networkFeeBps)) / PREVIEW.bpsScale) *
-        scale,
-    ) / scale
-  );
-}
+const scale = PREVIEW.priceScale;
 
 export function marketMedian(prices: readonly number[]) {
   if (prices.length < PREVIEW.medianMinOffers) return null;
@@ -26,7 +22,7 @@ export function marketMedian(prices: readonly number[]) {
 const family = (name: string) => name.toLowerCase().match(/^[a-z]+/)?.[0] ?? '';
 const size = (name: string) => {
   const match = name.toLowerCase().match(/(\d+(?:\.\d+)?)\s*b\b/);
-  return match ? Number(match[1]) : Number.POSITIVE_INFINITY;
+  return match ? Number(match[1]) : null;
 };
 
 export function similarFreeModel<T extends { name: string; free: boolean }>(
@@ -34,7 +30,12 @@ export function similarFreeModel<T extends { name: string; free: boolean }>(
   current: string,
 ) {
   const target = size(current);
-  const distance = (item: T) => Math.abs(size(item.name) - target);
+  const distance = (item: T) => {
+    const value = size(item.name);
+    return value === null || target === null
+      ? Number.MAX_SAFE_INTEGER
+      : Math.abs(value - target);
+  };
   const free = models.filter((item) => item.free);
   const same = free.filter((item) => family(item.name) === family(current));
   return [...(same.length ? same : free)].sort(

@@ -182,7 +182,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const row = models.indexOf('function ModelRow(');
     if (row < 0) throw new Error('Missing model row review hook');
     return (
-      "import { CaretRight, Check } from '@phosphor-icons/react';\nimport { buyerPerMtok, marketMedian, Savings } from './PreviewKit';\nimport { BUTTON_VARIANT } from './constants';\n" +
+      "import { CaretRight, Check } from '@phosphor-icons/react';\nimport { usdPerMtok } from './model-price';\nimport { feeLabel, marketMedian, Savings } from './PreviewKit';\nimport { BUTTON_VARIANT } from './constants';\n" +
       models.slice(0, row) +
       readFileSync(
         new URL('./views/ModelRow.tsx.preview', import.meta.url),
@@ -347,35 +347,29 @@ export function transformBrand(source: string, id: string, desktop: string) {
     );
   }
 }
+// Browser-only modules that the preview kit imports beside the desktop sources.
+const PREVIEW_KIT_HELPERS = [
+  'code-highlight',
+  'status-tone',
+  'market',
+] as const;
+
 export function reviewBrand(desktop: string): Plugin {
   return {
     name: 'desktop-brand-review',
     enforce: 'pre',
     resolveId(source, importer) {
+      if (importer === undefined) return null;
+      const from = moduleId(importer);
+      const kit = `${moduleId(desktop)}/src/ui/PreviewKit.tsx`;
       if (
         source === './PreviewKit' &&
-        importer !== undefined &&
-        moduleId(importer).startsWith(`${moduleId(desktop)}/src/ui/`)
+        from.startsWith(`${moduleId(desktop)}/src/ui/`)
       )
         return `${desktop}/src/ui/PreviewKit.tsx`;
-      if (
-        source === './code-highlight' &&
-        importer !== undefined &&
-        moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
-      )
-        return fileURLToPath(new URL('./code-highlight.ts', import.meta.url));
-      if (
-        source === './status-tone' &&
-        importer !== undefined &&
-        moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
-      )
-        return fileURLToPath(new URL('./status-tone.ts', import.meta.url));
-      if (
-        source === './market' &&
-        importer !== undefined &&
-        moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
-      )
-        return fileURLToPath(new URL('./market.ts', import.meta.url));
+      const helper = PREVIEW_KIT_HELPERS.find((name) => source === `./${name}`);
+      if (helper && from === kit)
+        return fileURLToPath(new URL(`./${helper}.ts`, import.meta.url));
       return null;
     },
     load(id) {

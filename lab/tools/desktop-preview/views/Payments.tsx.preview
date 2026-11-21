@@ -176,7 +176,7 @@ function SpendingSummary({ buyer, onLimits }: { buyer?: X402View; onLimits(): vo
       </div>
       <StatGrid>
         <StatCard label="Spent · USDC" help="USDC paid for chat replies and API key requests. Free models cost nothing." value={accountAmount(String(spent))} detail="Chat and API keys" icon={Receipt} />
-        <StatCard label="Spending limit · USDC" help="The most this wallet can spend across chat and every API key. New requests stop when it is reached." value={!limited ? 'No limit' : limit === 0n ? 'Free only' : accountAmount(String(limit))} detail={limited && limit === 0n ? 'Free models only' : 'Covers chat and every API key'} icon={Gauge} />
+        <StatCard label="Spending limit · USDC" help="The most this wallet can spend across chat and every API key. New requests stop when it is reached." value={!limited ? 'No limit' : limit === 0n ? 'Free models only' : accountAmount(String(limit))} detail="Covers chat and every API key" icon={Gauge} />
         <StatCard label="Remaining · USDC" help="Spending limit minus what is already spent. Your wallet balance can still be lower." value={limited ? accountAmount(String(remaining)) : 'No limit'} icon={Wallet} />
       </StatGrid>
     </section>
