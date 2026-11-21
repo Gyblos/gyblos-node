@@ -215,9 +215,11 @@ export function createPreviewHost(
   let catalogQuery = '';
   const catalogResult = () => {
     const result = previewCatalog(model, now, catalogQuery);
-    return !catalogQuery || catalogQuery === model
-      ? result
-      : { ...result, state: CATALOG_STATE.EMPTY, models: [] };
+    if (!catalogQuery) return result;
+    const models = result.models.filter((item) => item.modelId === catalogQuery);
+    return models.length
+      ? { ...result, models }
+      : { ...result, state: CATALOG_STATE.EMPTY, models };
   };
   const desktopCatalog = {
     summary: async () => previewCatalog(model, now, ''),
