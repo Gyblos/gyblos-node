@@ -160,7 +160,7 @@ function StrategyRow({
       role="menuitemradio"
       checked={checked}
       disabled={soon || locked}
-      title={locked ? PREVIEW_COPY.needsFunds : detail}
+      title={soon ? PREVIEW_COPY.sellerModeSoon : locked ? PREVIEW_COPY.needsFunds : detail}
       data-strategy
       label={label}
       detail={soon ? PREVIEW_COPY.sellerModeSoonShort : locked ? 'Needs funds · ' + detail : detail}
