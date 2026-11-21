@@ -1,12 +1,16 @@
 // Schedules bounded public announcements with injected transport; never infers, pays or reserves capacity.
 // Shutdown disables local snapshots first, then attempts one higher withdrawal; expiry covers failed delivery.
-import { SELLER_DISCOVERY } from '@gyblos/config';
+import { NODE_ENVIRONMENT, SELLER_DISCOVERY } from '@gyblos/config';
 import {
   DiscoveryError,
+  publishRecord,
   type DiscoveryErrorCode,
+  type PublishRecordInput,
 } from '@gyblos/discovery-http';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
+import { sellerVersionProof } from '@gyblos/protocol/seller-version';
+import type { Signer } from '@gyblos/protocol/signing';
 
 import {
   NODE_ERROR_CODES,
@@ -14,6 +18,20 @@ import {
   type SellerPublicationState,
 } from './constants';
 import type { SellerPublicRecords } from './public-records';
+
+export async function publishSellerRecord(
+  input: Omit<PublishRecordInput, 'versionProof'>,
+  environment: Readonly<Record<string, string | undefined>>,
+  signer: Signer,
+) {
+  // Version metadata is optional. A signer failure must not hide an already signed presence.
+  const versionProof = await sellerVersionProof(
+    input.record,
+    environment[NODE_ENVIRONMENT.version],
+    signer,
+  ).catch(() => undefined);
+  return publishRecord({ ...input, versionProof });
+}
 
 export interface SellerPublisherOptions {
   records: SellerPublicRecords;

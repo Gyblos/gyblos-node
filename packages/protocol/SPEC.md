@@ -404,6 +404,27 @@ The control contract and its admission, framing, trust and rollout constraints
 are described in this section. Broader discovery choices remain proposed; see
 [discovery](../../docs/discovery.md) and [limitations](../../docs/limitations.md).
 
+### Seller release declaration v1
+
+A seller may send a `Gyblos-Seller-Version` HTTP header with a signed v2
+presence. The header value is `<version>:<signature>`. The release is an ASCII
+semantic version of at most 64 characters (no leading `v` or build metadata).
+The signature is exactly 128 lowercase hexadecimal characters. Sign the UTF-8
+bytes of `gyblos/seller-version/v1\n` (the final character is a line feed)
+followed immediately by canonical JSON of
+`{"presenceSignature":"<hex signature of the signed v2 presence>","version":"<release>"}`.
+Use Ed25519 and the same NodeId key as the presence. Verify both signatures
+and the presence's ordinary admission rules before attributing the release.
+Missing, invalid or mismatched declarations leave the release unknown. The
+declaration expires with its exact heartbeat. The signed presence body and its
+domain remain unchanged, so older indexes can ignore the extra header.
+
+`vectors/seller-version-v1.json` fixes the presence, release, signing bytes and
+signature. To reproduce with an independent Ed25519 implementation, use the
+publicly specified TEST 1 key from RFC 8032 section 7.1. Sign the supplied
+presence record under the v2 presence domain, then sign the declaration bytes
+above. Both computed signatures must match the vector.
+
 ## Free inference execution v4
 
 `@gyblos/protocol/free-execution` and `./free-execution-framing` define a

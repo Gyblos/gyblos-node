@@ -4,6 +4,7 @@
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { PublicRecordV2 } from '@gyblos/protocol/control-types';
 import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
+import { verifiedSellerVersion } from '@gyblos/protocol/seller-version';
 
 import { readPublishBody } from './body';
 import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS } from './constants';
@@ -74,6 +75,7 @@ async function mayPublish(context: PublishContext, envelope: unknown) {
 export async function acceptRecord(
   bytes: ArrayBuffer,
   context: PublishContext,
+  versionProof?: string,
 ) {
   const { storage, now } = context;
   const { envelope, json } = readPublishBody(bytes);
@@ -93,13 +95,14 @@ export async function acceptRecord(
     await context.prune(now);
   }
   if (
-    !(await storage.put(
-      await storedEntry(record, signature, json, {
+    !(await storage.put({
+      ...(await storedEntry(record, signature, json, {
         now,
         maxNodes: context.maxNodes,
         maxPublications: context.maxPublications,
-      }),
-    ))
+      })),
+      version: await verifiedSellerVersion({ record, signature }, versionProof),
+    }))
   )
     indexFail(INDEX_ERRORS.STALE_RECORD);
   // Uptime counts only presence the index accepted, at the index's own clock. It is best effort: the

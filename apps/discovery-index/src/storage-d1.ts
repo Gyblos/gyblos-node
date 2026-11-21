@@ -15,6 +15,7 @@ import type {
   StoredEntry,
 } from './storage';
 import {
+  activeVersionsQuery,
   catalogStatusQuery,
   listingQuery,
   modelsQuery,
@@ -57,6 +58,10 @@ function sellerRow(row: D1Row): SellerRow {
   };
 }
 
+function modelRow(row: D1Row) {
+  return { modelId: text(row.modelId), sellers: integer(row.sellers) };
+}
+
 function referenceMissing(row: D1Row | undefined, entry: StoredEntry) {
   return (
     entry.kind !== PUBLIC_RECORD_KINDS.CATALOG &&
@@ -66,6 +71,22 @@ function referenceMissing(row: D1Row | undefined, entry: StoredEntry) {
         entry.admission.now + CONTROL_LIMITS.clockSkewMs ||
       integer(row.expiresAt) <= entry.admission.now ||
       integer(row.withdrawn) !== 0)
+  );
+}
+async function readActiveVersions(
+  database: ReturnType<typeof createD1Orm>,
+  now: number,
+  limit: number,
+  nodeId?: string,
+) {
+  return (await activeVersionsQuery(database, now, limit, nodeId)).map(
+    (row) => ({
+      nodeId: text(row.nodeId),
+      version:
+        row.versionSequence === row.sequence && row.version !== null
+          ? text(row.version)
+          : null,
+    }),
   );
 }
 export function createD1Storage(client: D1Database): DiscoveryStorage {
@@ -110,11 +131,10 @@ export function createD1Storage(client: D1Database): DiscoveryStorage {
       const rows = await recordCountsQuery(database, now);
       return rows.reduce((total, row) => total + integer(row.n), 0);
     },
+    activeVersions: (now, limit, nodeId) =>
+      readActiveVersions(database, now, limit, nodeId),
     async models(now, limit) {
-      return (await modelsQuery(database, now, limit)).map((row) => ({
-        modelId: text(row.modelId),
-        sellers: integer(row.sellers),
-      }));
+      return (await modelsQuery(database, now, limit)).map(modelRow);
     },
     async catalogStatus(now, limit, maxModels) {
       // One row past each cap tells whether the cap cut the answer.

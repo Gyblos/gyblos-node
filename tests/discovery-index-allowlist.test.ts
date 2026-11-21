@@ -75,6 +75,10 @@ function countingStorage(storage: DiscoveryStorage) {
       calls.push('sightings'),
       storage.sightings(since, limit)
     ),
+    activeVersions: (now, limit, nodeId) => (
+      calls.push('activeVersions'),
+      storage.activeVersions(now, limit, nodeId)
+    ),
     catalogStatus: (now, limit, maxModels) => (
       calls.push('catalogStatus'),
       storage.catalogStatus(now, limit, maxModels)

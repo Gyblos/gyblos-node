@@ -18,15 +18,16 @@ procedures kept outside the repository, and each needs founder approval.
 Routes sit at the root of the index host. The client base URL is
 `https://discovery.gyblos.com/v1` (`DISCOVERY_INDEX_URL` in `@gyblos/config`).
 
-| Route                    | Purpose                                                                                      |
-| ------------------------ | -------------------------------------------------------------------------------------------- |
-| `POST /v1/records`       | Publish one signed public v2 catalog, presence or withdrawal.                                |
-| `GET /v1/sellers`        | List live sellers of one model, paged by an opaque cursor.                                   |
-| `GET /v1/models`         | List models from live sellers, ordered by seller count; no query parameters.                 |
-| `GET /v1/uptime?node=`   | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).           |
-| `GET /v1/network`        | Every known seller, online, offline or unpublished, with counts ([Network](#network)).       |
-| `GET /v1/health`         | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes). |
-| `POST /v1/registrations` | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.    |
+| Route                              | Purpose                                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                |
+| `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                   |
+| `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                 |
+| `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).           |
+| `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                    |
+| `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).       |
+| `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes). |
+| `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.    |
 
 Common behavior:
 
@@ -38,11 +39,11 @@ Common behavior:
 - **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
-  `/v1/models`, `/v1/uptime`, `/v1/network` and `/v1/health` carry
-  `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
-  from `/v1/sellers`, `/v1/models`, `/v1/uptime` or `/v1/network` carries
-  `Cache-Control: public, max-age=10`; everything else carries
-  `Cache-Control: no-store`.
+  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network` and `/v1/health`
+  carry `Access-Control-Allow-Origin: *` on every status, errors included. A
+  `200` from `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions` or
+  `/v1/network` carries `Cache-Control: public, max-age=10`; everything else
+  carries `Cache-Control: no-store`.
 
 ## Publish modes
 
@@ -196,12 +197,12 @@ signed a record; clients re-verify everything.
 
 Rate limits:
 
-| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                       |
-| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                     |
-| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                       |
-| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime` or `/v1/network` cache miss, a stale health count |
-| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                             |
+| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                       |
+| ----------------------------------- | --------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                     |
+| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                       |
+| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions` or `/v1/network` cache miss, a stale health count |
+| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                             |
 
 - A Cloudflare limiter that refuses or fails gives `429 RATE_LIMITED` with
   `Retry-After: 60`. That `429` is `no-store` and never cached.
@@ -217,9 +218,10 @@ Rate limits:
 
 ## Caching
 
-- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime` and `/v1/network`
-  keep `200` answers in the Workers Cache API (`caches.default`, per Cloudflare
-  location) for 10 seconds, matching their `max-age`. Keys are normalized:
+- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`
+  and `/v1/network` keep `200` answers in the Workers Cache API
+  (`caches.default`, per Cloudflare location) for 10 seconds, matching their
+  `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
   - models and network: the route alone;
@@ -402,13 +404,14 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 
 Migrations, applied in order:
 
-| Migration                     | Adds                                                                         |
-| ----------------------------- | ---------------------------------------------------------------------------- |
-| `0001_discovery_index.sql`    | Record tables and their indexes.                                             |
-| `0002_listing_indexes.sql`    | Covering listing indexes (index-only; listing answers `503` without them).   |
-| `0003_registrations.sql`      | Invite and registration tables.                                              |
-| `0004_uptime.sql`             | Uptime tables.                                                               |
-| `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it). |
+| Migration                     | Adds                                                                                    |
+| ----------------------------- | --------------------------------------------------------------------------------------- |
+| `0001_discovery_index.sql`    | Record tables and their indexes.                                                        |
+| `0002_listing_indexes.sql`    | Covering listing indexes (index-only; listing answers `503` without them).              |
+| `0003_registrations.sql`      | Invite and registration tables.                                                         |
+| `0004_uptime.sql`             | Uptime tables.                                                                          |
+| `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it).            |
+| `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index. |
 
 Apply a migration before deploying code that needs it. Each migration adds
 tables, columns (with defaults) or indexes; `0002` also drops one unused index.
@@ -436,3 +439,23 @@ The output is similar to the following:
 ```text
 {"ok":true,"records":4,"publish":"registered"}
 ```
+
+## Seller release declarations
+
+A released seller adds the optional `Gyblos-Seller-Version` header to its
+existing signed presence POST. Its value is the release, a colon and the hex
+Ed25519 signature of the canonical object `{presenceSignature, version}` under
+the domain `gyblos/seller-version/v1\n` (ending in a newline). The index
+verifies the declaration with the presence's NodeId. It stores only the version
+and matching presence sequence. Older readers receive the same signed envelopes,
+and older index writers can still publish after migration. A heartbeat with an
+absent or invalid proof gives an unknown version.
+
+`GET /v1/versions` returns
+`{active, unknown, versions: [{version, nodes}], truncated}`. Only unexpired,
+non-withdrawn catalogs with matching live presence count. Version groups are
+sorted by release string. The flag indicates the source or response cap was
+reached. `GET /v1/versions?node=<NodeId>` returns `{nodeId, version}` (null for
+an unknown release) or 404 when inactive. Both reads use the public cache and
+read limits. These are current declarations, not a history or proof of binary
+integrity.

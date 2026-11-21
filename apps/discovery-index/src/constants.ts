@@ -49,6 +49,7 @@ export const INDEX_ROUTES = {
   HEALTH: '/v1/health',
   REGISTRATIONS: '/v1/registrations',
   UPTIME: '/v1/uptime',
+  VERSIONS: '/v1/versions',
   NETWORK: '/v1/network',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
@@ -57,6 +58,7 @@ export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.MODELS,
   INDEX_ROUTES.HEALTH,
   INDEX_ROUTES.UPTIME,
+  INDEX_ROUTES.VERSIONS,
   INDEX_ROUTES.NETWORK,
 ]);
 
