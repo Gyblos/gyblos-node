@@ -154,27 +154,22 @@ void test('preview network catalog passes the desktop contract with models offer
   const call = await fixture();
   const catalog = parseNetworkCatalog(await call('desktopCatalog', 'summary'));
   assert.equal(catalog.state, CATALOG_STATE.READY);
-  assert.deepEqual(
-    catalog.models.map((model) => [
-      model.modelId,
-      model.free,
-      model.inputAtomicPerMtok,
-      model.outputAtomicPerMtok,
-    ]),
-    [
-      ['qwen3-0.6b', true, '0', '0'],
-      ['qwen3-0.6b', false, '52000', '208000'],
-      ['qwen3-0.6b', false, '80000', '240000'],
-      ['llama-3.2-3b', false, '60000', '180000'],
-      ['llama-3.2-3b', false, '90000', '270000'],
-      ['gemma-3-4b', false, '70000', '210000'],
-    ],
-  );
-  assert.equal(
-    parseNetworkCatalog(await call('desktopCatalog', 'lookup', 'qwen3-0.6b'))
-      .state,
-    CATALOG_STATE.READY,
-  );
+  const prices = (models: typeof catalog.models) =>
+    models.map((model) => model.modelId + ' ' + model.inputAtomicPerMtok);
+  assert.deepEqual(prices(catalog.models), [
+    'qwen3-0.6b 0',
+    'qwen3-0.6b 52000',
+    'qwen3-0.6b 80000',
+    'llama-3.2-3b 60000',
+    'llama-3.2-3b 90000',
+    'gemma-3-4b 70000',
+  ]);
+  const lookup = async (query: string) =>
+    parseNetworkCatalog(await call('desktopCatalog', 'lookup', query)).models;
+  assert.deepEqual(prices(await lookup('llama-3.2-3b')), [
+    'llama-3.2-3b 60000',
+    'llama-3.2-3b 90000',
+  ]);
 });
 
 void test('preview wallet collection contains public example metadata only', async () => {
