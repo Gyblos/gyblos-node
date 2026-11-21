@@ -47,7 +47,7 @@ void test('the preview spending limit editor never finishes the payment session'
 
 void test('preview status tones map desktop payment statuses as DESIGN.md documents', async () => {
   const { statusTone } =
-    await import('../../lab/tools/desktop-preview/status-tone.ts');
+    await import('../../lab/tools/desktop-preview/status-tone');
   const expected = {
     'Payment captured': 'success',
     Confirmed: 'success',
