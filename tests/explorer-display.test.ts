@@ -2,7 +2,8 @@
 // collector's inclusive UTC days; a model's mark comes from its id's family name, never a guess; the
 // daily series keep every day of the range, empty ones as zero; the index's network status is read
 // with its exact states and the sellers not online keep the index's order; the average uptime says over
-// how many sellers it is taken; a source read gives up after the fetch timeout.
+// how many sellers it is taken; a settlement count is singular only for exactly one; a source read gives
+// up after the fetch timeout.
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
