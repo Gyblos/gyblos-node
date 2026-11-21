@@ -5,6 +5,7 @@ import { useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } fr
 import { AddBuyerFunds } from './BuyerFunding';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
 import { Modal } from './Modal';
+import type { View } from './model-types';
 import { ServiceLogo } from './ServiceLogo';
 import { MotionPresence } from './Motion';
 import { TONE, type Tone } from './status-tone';
@@ -303,7 +304,7 @@ export function PreviewComposerTab({
 
 declare global {
   interface Window {
-    previewNavigate?: (view: string) => void;
+    previewNavigate?: (view: View) => void;
   }
 }
 /** Placeholder lines shown under the progress label until the first words arrive. */
