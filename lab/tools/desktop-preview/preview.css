@@ -2346,3 +2346,35 @@ html .app.desktop-frame .composer-actions > span {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Menus: rows sized to their text so options read at the same rhythm as the rest of the app. */
+html .app.desktop-frame .compact-dropdown .dropdown-row {
+  min-height: 32px;
+  padding: 6px 10px;
+  line-height: 20px;
+}
+html .app.desktop-frame .compact-dropdown .dropdown-copy {
+  line-height: 20px;
+}
+html .app.desktop-frame .compact-dropdown .dropdown-copy small {
+  line-height: 16px;
+}
+html .app.desktop-frame .compact-dropdown {
+  translate: 0 -4px;
+}
+html .app.desktop-frame .compact-dropdown[data-direction='up'] {
+  translate: 0 4px;
+}
+html .app.desktop-frame .compact-dropdown:popover-open {
+  translate: 0 0;
+}
+html
+  .app.desktop-frame
+  .content
+  .compact-dropdown
+  .ui-search.dropdown-search
+  input {
+  font-size: 13px;
+  line-height: 20px;
+  background: transparent;
+}
