@@ -30,6 +30,7 @@ import {
 } from './seller-offer';
 
 export interface SellerSettings {
+  diagnostics?: NodeConfig['diagnostics'];
   telemetryFile: boolean;
   relayOnly: boolean;
   irohBind: string | undefined;
@@ -214,6 +215,7 @@ function resolveSeller(
     publication = { baseUrl: settings.discoveryUrl };
   }
   const base = {
+    ...(file?.diagnostics && { diagnostics: file.diagnostics }),
     telemetryFile: settings.telemetryFile,
     relayOnly: settings.relayOnly,
     irohBind: settings.irohBind,

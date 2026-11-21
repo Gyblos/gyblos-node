@@ -1,4 +1,6 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
@@ -51,6 +53,7 @@ async function executePaidSession(
   onDelta?: (text: string, requestDigest?: string) => Promise<void>,
   sending?: () => void,
   permission?: BuyerApiKeyOperation,
+  openingIntent?: string,
 ): Promise<ChatResult> {
   current.throwIfAborted();
   await manager.preflight(winner.quote, input, current);
@@ -58,18 +61,23 @@ async function executePaidSession(
   await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
+  const scope = (state.openingIntent ??= new AsyncLocalStorage<
+    string | undefined
+  >());
   state.selections.set(id, winner);
   if (sending) state.sending.set(id, sending);
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {
-    result = await executeApiKeySession(permission, winner.nodeId, () =>
-      manager.execute(
-        winner.quote,
-        input,
-        current,
-        onDelta
-          ? (text) => onDelta(text, winner.quote.offer.requestDigest)
-          : undefined,
+    result = await scope.run(openingIntent, () =>
+      executeApiKeySession(permission, winner.nodeId, () =>
+        manager.execute(
+          winner.quote,
+          input,
+          current,
+          onDelta
+            ? (text) => onDelta(text, winner.quote.offer.requestDigest)
+            : undefined,
+        ),
       ),
     );
   } finally {
@@ -232,6 +240,7 @@ function sessionExecutor(
               emit,
               sending,
               permission,
+              model?.openingIntent,
             );
           },
         );

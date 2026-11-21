@@ -6,6 +6,7 @@
   "exports": {
     "./buyer-funding": "./src/buyer-funding.ts",
     "./fee-payer": "./src/fee-payer.ts",
+    "./rpc-rate-limit": "./src/rpc-rate-limit.ts",
     ".": "./src/index.ts",
     "./batch-session": "./src/batch-session.ts"
   },

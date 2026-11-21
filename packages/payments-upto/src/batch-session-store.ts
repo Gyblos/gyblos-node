@@ -95,7 +95,9 @@ export function serial() {
       .then(run)
       .catch((error: unknown) => {
         if (error instanceof PaymentSessionError) throw error;
-        return sessionFail(SESSION_CODES.UNAVAILABLE);
+        throw new PaymentSessionError(SESSION_CODES.UNAVAILABLE, {
+          cause: error,
+        });
       })
       .finally(() => {
         queued--;

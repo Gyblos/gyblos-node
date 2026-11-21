@@ -1,8 +1,10 @@
 // The `gyblos` command: `config validate` checks config.toml and the GYBLOS_* environment; `doctor` runs the
 // seller's read-only startup preflight, calling remote engines only with --online; `seller init` writes a
 // starting config.toml, `seller service` installs the background service, `seller status` reports on
-// the running seller and `seller register` trades a beta invite for permission to publish. Prints codes, key paths and environment variable names; never a value read from the environment, and URLs only as
-// origins, because providers embed API keys in URL paths.
+// the running seller, `seller register` trades a beta invite for permission to publish and `seller rpc`
+// shows, sets or resets the seller's Solana RPC. Prints codes, key paths and environment variable names;
+// never a value read from the environment, and URLs only as origins, because providers embed API keys in
+// URL paths.
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -19,6 +21,7 @@ import {
   type NodeSettings,
   type SettingOrigin,
 } from '@gyblos/node/node-config-resolve';
+import type { GenesisReader } from '@gyblos/node/seller-chain';
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
@@ -27,6 +30,7 @@ import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 import { initCommand, terminalPrompt, type Prompt } from './cli-init';
 import { logsCommand } from './cli-logs';
 import { registerCommand, type FundsWait } from './cli-register';
+import { rpcCommand } from './cli-rpc';
 import { serviceCommand, type ServiceSystem } from './cli-service';
 import { statusCommand } from './cli-status';
 import { EXIT } from './constants';
@@ -54,10 +58,12 @@ export interface CliContext {
   waitForFunds?: FundsWait;
   // Ctrl+C on the terminal the prompt reads; stops a wait for SOL.
   interrupt?: AbortSignal;
+  // The chain an RPC serves, for `seller rpc set`; tests inject a fake.
+  genesis?: GenesisReader;
 }
 
 const USAGE =
-  'Usage: gyblos start   (runs the seller daemon)\n       gyblos logs [--role buyer|seller|lab] [--follow] [--json]\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or config.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n';
+  'Usage: gyblos start   (runs the seller daemon)\n       gyblos logs [--role buyer|seller|lab] [--follow] [--json]\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or config.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n       gyblos seller rpc [set|reset]   (the Solana RPC; set takes GYBLOS_RPC_URL or asks on a terminal)\n';
 // `seller init`'s flags, declared once for parsing and for refusing them on other commands.
 const INIT_OPTIONS = {
   engine: { type: 'string' },
@@ -286,6 +292,8 @@ export async function runCli(args: readonly string[], context: CliContext) {
   if (args.length === 1 && (args[0] === '--help' || args[0] === '-h'))
     return printUsage(context, EXIT.ok);
   if (args[0] === 'logs') return logsCommand(args.slice(1), context);
+  if (args[0] === 'seller' && args[1] === 'rpc')
+    return rpcCommand(args.slice(2), context);
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
   if (parsed && isBareRegister(parsed)) return runRegister(context);

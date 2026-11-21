@@ -5,7 +5,13 @@ export const BATCH_SESSION_DEFAULTS = {
   idleMs: 10 * 60 * 1000,
   minSettlementAtomic: '10000',
   pollMs: 15 * 1000,
+  openingRecheckMs: [0, 1000, 3000],
   operationMs: 20 * 1000,
+  // After this seller sent a deposit, how long it keeps looking for the channel a slow RPC has not
+  // shown yet, and how often, before answering unavailable.
+  openingConfirmMs: 30 * 1000,
+  openingConfirmPollMs: 2 * 1000,
+  maxOpeningConfirmMs: 120 * 1000,
   maxPendingOperations: 32,
   maxSessions: 16,
   poolBytes: 128 * 1024,

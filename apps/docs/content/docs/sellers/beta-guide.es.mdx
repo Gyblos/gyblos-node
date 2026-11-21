@@ -38,6 +38,48 @@ Para que la comprobación sea obligatoria, ejecuta `GYBLOS_REQUIRE_SIGNATURE=1 s
 firma no se verifica. Para verificar la imagen tú mismo o escribir cada archivo a mano, consulta
 [Instala sin el script](/es/sellers/manual-install).
 
+### Tu propio RPC de devnet, si vas a cobrar [#rpc-propio]
+
+Un vendedor que cobra envía las transacciones del canal por su RPC de Solana. El predeterminado, el
+público `https://api.devnet.solana.com`, no necesita cuenta y sirve para la mayoría de los vendedores. Pero
+limita las solicitudes por dirección IP, así que varios servicios en una misma dirección pueden hacer fallar
+las aperturas de canal (`gyblos logs` muestra entonces `invalid_batch_settlement_svm_channel_state` o
+`PAYMENT_UNAVAILABLE`). En ese caso usa un endpoint de devnet propio: cámbialo en un
+[vendedor instalado](#cambiar-rpc), o define `GYBLOS_RPC_URL` antes de ejecutar el instalador por
+**primera** vez (reemplaza `DEVNET_RPC_URL` por la URL de tu endpoint):
+
+- **Docker:** crea la carpeta y un `seller.env` privado con la URL, y luego ejecuta el instalador en modo
+  Docker, que conserva ambos y se detiene si Docker no puede correr (con `GYBLOS_DIR`, usa esa carpeta):
+
+  ```sh
+  mkdir -m 700 ~/gyblos-seller
+  (umask 077 && printf 'GYBLOS_RPC_URL=%s\n' 'DEVNET_RPC_URL' > ~/gyblos-seller/seller.env)
+  GYBLOS_MODE=docker sh install.sh
+  ```
+
+- **Nativo en macOS o Linux:** `GYBLOS_RPC_URL='DEVNET_RPC_URL' GYBLOS_MODE=native sh install.sh`
+  (sin `GYBLOS_MODE=native`, si Docker está en marcha se elige Docker y la variable no se usa).
+- **Windows:** en PowerShell, `$env:GYBLOS_RPC_URL='DEVNET_RPC_URL'` antes de ejecutar
+  `install.ps1`.
+
+El vendedor guarda la URL en su archivo de rol privado. Una URL con clave de API es un secreto: nunca la
+pongas en `config.toml`.
+
+#### Cambiar el RPC de un vendedor instalado [#cambiar-rpc]
+
+`gyblos seller rpc set` pide la URL en la terminal, comprueba que responda como Solana devnet y la guarda;
+tus llaves, tu NodeId y tu registro no cambian. Nunca recibe la URL como argumento, así no queda en el
+historial de la terminal, y después solo muestra la dirección, nunca la ruta ni la clave. Usa un proveedor
+de confianza: el pagador de comisiones del vendedor firma lo que este RPC le pide. Después reinicia el
+vendedor:
+
+- **Docker:** en la carpeta del vendedor, `docker compose exec seller gyblos seller rpc set`, y luego
+  `docker compose restart seller`.
+- **Nativo en macOS, Linux o Windows:** `gyblos seller rpc set`, y luego `gyblos seller service uninstall`
+  y `gyblos seller service install` (o detén `gyblos start` y vuelve a ejecutarlo si lo corres tú).
+
+`gyblos seller rpc` muestra el RPC en uso, y `gyblos seller rpc reset` vuelve al público.
+
 ### Vendedor nativo en macOS o Linux
 
 Si no hay un Docker utilizable, el mismo instalador prepara el **vendedor nativo**: comprueba la descarga con

@@ -18,6 +18,10 @@ import {
   resumeSellerBlock,
 } from './batch-block-seller';
 import {
+  requireSettlementResponse,
+  requireVerifiedPayer,
+} from './batch-sdk-diagnostics';
+import {
   atomic,
   billFor,
   openingFor,
@@ -32,29 +36,45 @@ import {
   reserve,
   snapshot,
 } from './batch-session-common';
-import { openBatchStore, serial } from './batch-session-store';
+import { confirmSentOpening } from './batch-session-opening-confirm';
+import {
+  depositSettlementsRunning,
+  releaseUnsentOpening,
+  reserveReleasedSlot,
+  trackDepositSettlement,
+  type BatchOpening,
+} from './batch-session-opening-release';
+import { openBatchStore, serial, type BatchStore } from './batch-session-store';
 import type {
   BatchSellerContext,
   BatchSellerOptions,
 } from './batch-session-types';
 import { waitBatch } from './batch-session-wait';
 
+function checkSellerOptions(options: BatchSellerOptions) {
+  controlInteger(options.idleMs ?? BATCH_SESSION_DEFAULTS.idleMs, 1);
+  controlInteger(options.pollMs ?? BATCH_SESSION_DEFAULTS.pollMs, 1);
+  controlInteger(options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs, 1);
+  controlInteger(
+    options.openingConfirmMs ?? BATCH_SESSION_DEFAULTS.openingConfirmMs,
+    0,
+    BATCH_SESSION_DEFAULTS.maxOpeningConfirmMs,
+  );
+  atomic(
+    options.minSettlementAtomic ?? BATCH_SESSION_DEFAULTS.minSettlementAtomic,
+  );
+}
 export async function createBatchSeller(
   input: BatchSellerOptions,
 ): Promise<SessionBlockSeller> {
   const options = { ...input, terms: termsFor(input.terms) };
   if (options.authorizer.address !== options.terms.authorizer)
     sessionFail(SESSION_CODES.BINDING);
-  controlInteger(options.idleMs ?? BATCH_SESSION_DEFAULTS.idleMs, 1);
-  controlInteger(options.pollMs ?? BATCH_SESSION_DEFAULTS.pollMs, 1);
-  controlInteger(options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs, 1);
-  atomic(
-    options.minSettlementAtomic ?? BATCH_SESSION_DEFAULTS.minSettlementAtomic,
-  );
+  checkSellerOptions(options);
   const requirements = await requirementsFor(options.terms);
-  const store = await openBatchStore(
-    options,
-    initialRecord(options.terms, options.now()),
+  const store = await reserveReleasedSlot(
+    await openBatchStore(options, initialRecord(options.terms, options.now())),
+    options.reclaimReleasedSlot,
   );
   const exclusive = serial();
   const current = store.read();
@@ -123,7 +143,7 @@ export async function createBatchSeller(
 // SDK deposit verification reads/validates authority; it does not submit or simulate a payment.
 async function verifyFirstOpening(
   context: BatchSellerContext,
-  opening: ReturnType<typeof openingFor>,
+  opening: BatchOpening,
 ) {
   const { options, facilitator, requirements } = context;
   const verified = await waitBatch(
@@ -133,8 +153,29 @@ async function verifyFirstOpening(
     ),
     options.operationMs,
   );
-  if (!verified.isValid || verified.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verified, options.terms.buyer);
+}
+async function verifyOpenedVoucher(
+  context: BatchSellerContext,
+  opening: BatchOpening,
+) {
+  const { options, facilitator, requirements } = context;
+  const verdict = await waitBatch(
+    facilitator.verify(
+      {
+        x402Version: 2,
+        accepted: requirements,
+        payload: {
+          type: 'voucher',
+          channelConfig: opening.channelConfig,
+          voucher: opening.voucher,
+        },
+      },
+      requirements,
+    ),
+    options.operationMs,
+  );
+  requireVerifiedPayer(verdict, options.terms.buyer);
 }
 async function openSeller(context: BatchSellerContext, payload: string) {
   const { options, store, facilitator, requirements } = context;
@@ -157,52 +198,52 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     state.opening = opening;
     state.channelId = opening.voucher!.channelId;
     state.voucher = opening.voucher!;
+    // Normally cleared when the session was created for this opening; kept so no opening is stored marked.
+    delete state.released;
   });
-  if (
-    await waitBatch(
-      options.observeOpening(
-        structuredClone(opening),
-        structuredClone(options.terms),
-      ),
-      options.operationMs,
-    )
-  ) {
-    const verdict = await waitBatch(
-      facilitator.verify(
-        {
-          x402Version: 2,
-          accepted: requirements,
-          payload: {
-            type: 'voucher',
-            channelConfig: opening.channelConfig,
-            voucher: opening.voucher,
-          },
-        },
-        requirements,
-      ),
-      options.operationMs,
+  // waitBatch stops waiting but cannot cancel the SDK: a settlement still running may yet send the deposit.
+  // The opening is forgotten only when the chain never showed the channel, no settlement for the session
+  // is still running and this one, if started, has finished.
+  const observe = () =>
+    options.observeOpening(
+      structuredClone(opening),
+      structuredClone(options.terms),
     );
-    if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-      sessionFail(SESSION_CODES.UNVERIFIED);
-    await store.update((state) => {
-      state.state = SESSION_STATES.OPEN;
-      state.lastActivity = options.now();
+  let observed = false;
+  let settled = () => true;
+  try {
+    observed = await waitBatch(observe(), options.operationMs);
+    if (observed) await verifyOpenedVoucher(context, opening);
+    else {
+      const tracked = trackDepositSettlement(
+        store,
+        facilitator.settle(
+          { x402Version: 2, accepted: requirements, payload: opening },
+          requirements,
+        ),
+      );
+      settled = tracked.finished;
+      requireSettlementResponse(
+        await waitBatch(tracked.settlement, options.operationMs),
+        requirements.network,
+      );
+    }
+  } catch (error) {
+    if (observed) throw error;
+    // A deposit already sent may land after the SDK stopped looking: observe it before giving up. A
+    // failed first observation lands here too; the wait only runs if a deposit may have been sent.
+    const confirmed = await confirmSentOpening(store, opening, {
+      observe,
+      operationMs: options.operationMs,
+      confirmMs: options.openingConfirmMs,
     });
-    return snapshot(store);
+    if (!confirmed) {
+      if (settled() && !depositSettlementsRunning(store))
+        await releaseUnsentOpening(store, opening, error);
+      throw error;
+    }
+    await verifyOpenedVoucher(context, opening);
   }
-  const response = await waitBatch(
-    facilitator.settle(
-      { x402Version: 2, accepted: requirements, payload: opening },
-      requirements,
-    ),
-    options.operationMs,
-  );
-  if (
-    !response.success ||
-    response.network !== requirements.network ||
-    !response.transaction
-  )
-    sessionFail(SESSION_CODES.UNAVAILABLE);
   await store.update((state) => {
     state.state = SESSION_STATES.OPEN;
     state.lastActivity = options.now();
@@ -279,8 +320,7 @@ async function acceptSeller(
     ),
     options.operationMs,
   );
-  if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verdict, options.terms.buyer);
   await store.update((state) => {
     state.voucher = voucher;
     state.cumulativeAtomic = bill.cumulativeAtomic;
@@ -316,7 +356,6 @@ async function reserveSeller(
     ),
     options.operationMs,
   );
-  if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verdict, options.terms.buyer);
   await reserve(store, request, options.now(), blocks);
 }

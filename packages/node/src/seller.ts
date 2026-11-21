@@ -30,6 +30,7 @@ import {
   SELLER_PUBLIC_RECORDS,
 } from './constants';
 import { prepareSellerControl } from './control-startup';
+import { createLocalDiagnostics } from './diagnostics-startup';
 import {
   assertReadinessCurrent,
   type ReadinessRecord,
@@ -164,6 +165,13 @@ export async function startSeller(
       observers: observations ? [observations.sink] : [],
     });
     disposers.push(telemetry.close);
+    // Local operational records for `gyblos logs`: channel failures, without their error text.
+    const diagnostics = createLocalDiagnostics(
+      process.env,
+      P2P_ROLES.SELLER,
+      settings.diagnostics,
+    );
+    disposers.push(diagnostics.close);
     const publicationConfig = settings.publication;
     const publicSequence = await openSellerSequence({
       environment: process.env,
@@ -223,6 +231,7 @@ export async function startSeller(
                   settings.offers[index]!.engine.engine.kind,
               }
             : undefined,
+          diagnostics: diagnostics.write,
           description: paid.description,
           owner: owner.address,
           nodeId: config.nodeId,

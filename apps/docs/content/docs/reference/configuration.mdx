@@ -68,7 +68,7 @@ engine. See the [CLI reference](/en/reference/cli#validate-the-mounted-configura
 | `transport.bind`          | Optional literal `ip:port` to bind; IPv6 in brackets; port may be `0`                                              |
 | `transport.external_addr` | Optional `ip:port` to advertise; port 1 to 65535                                                                   |
 | `telemetry.file`          | Boolean; default `false`. Writes private, content-free telemetry files on this machine; sends nothing              |
-| `diagnostics.enabled`     | Boolean; default `true`. The local buyer's diagnostic log; the seller node doesn't write one                       |
+| `diagnostics.enabled`     | Boolean; default `true`. Write local diagnostics for the buyer and for failed seller payment-channel attempts      |
 | `diagnostics.level`       | `debug`, `info`, `warn` or `error`; default `warn`                                                                 |
 | `buyer.relay_only`        | Boolean; default `false`. A buyer setting; the seller ignores it                                                   |
 
@@ -148,23 +148,23 @@ default. The Docker seller gets its environment from `seller.env`; a variable se
 doesn't reach the container. The native service also reads only its `seller.env`. After editing
 `seller.env`, restart the seller as [Operate and update](/en/sellers/operate) describes.
 
-| Variable                    | Meaning                                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------- |
-| `GYBLOS_CONFIG`             | The file `start`, `doctor` and `seller init` read; `config validate` uses `--config` instead |
-| `GYBLOS_HOME`               | The seller's home (keys and state); fixed to `/data` in the Docker image                     |
-| `GYBLOS_RELAYS`             | Comma-separated relay origins                                                                |
-| `GYBLOS_RELAY_TOKEN`        | Optional relay token, only for a relay that requires one; keep it in `seller.env`            |
-| `GYBLOS_RELAY_ONLY`         | `1` turns relay-only on, `0` off; any other value turns it off with a warning                |
-| `GYBLOS_IROH_BIND`          | Overrides `transport.bind`; empty is ignored                                                 |
-| `GYBLOS_IROH_EXTERNAL_ADDR` | Overrides `transport.external_addr`; empty is ignored                                        |
-| `GYBLOS_DISCOVERY_PUBLISH`  | Strict `1` or `0` override of `discovery.publish`; any other value is an error               |
-| `GYBLOS_DISCOVERY_URL`      | Overrides `discovery.url`; checked when publication is on                                    |
-| `GYBLOS_OBSERVATIONS`       | `off` stops uploading telemetry observations; receipts still upload                          |
-| `GYBLOS_COLLECTOR_URL`      | Another metrics collector (HTTPS, or HTTP on loopback); any other value turns uploading off  |
-| `GYBLOS_UPDATE_CHECK`       | `0` stops `gyblos seller status` from checking for a newer release                           |
-| `GYBLOS_INVITE`             | The invite code for `gyblos seller register`; never put it in TOML or shell history          |
-| `GYBLOS_BUYER_RELAY_ONLY`   | A buyer setting; the seller ignores it                                                       |
-| `GYBLOS_RPC_URL`            | Accepted by validation but ignored by the seller; its role files set the RPC                 |
+| Variable                    | Meaning                                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GYBLOS_CONFIG`             | The file `start`, `doctor` and `seller init` read; `config validate` uses `--config` instead                                                                       |
+| `GYBLOS_HOME`               | The seller's home (keys and state); fixed to `/data` in the Docker image                                                                                           |
+| `GYBLOS_RELAYS`             | Comma-separated relay origins                                                                                                                                      |
+| `GYBLOS_RELAY_TOKEN`        | Optional relay token, only for a relay that requires one; keep it in `seller.env`                                                                                  |
+| `GYBLOS_RELAY_ONLY`         | `1` turns relay-only on, `0` off; any other value turns it off with a warning                                                                                      |
+| `GYBLOS_IROH_BIND`          | Overrides `transport.bind`; empty is ignored                                                                                                                       |
+| `GYBLOS_IROH_EXTERNAL_ADDR` | Overrides `transport.external_addr`; empty is ignored                                                                                                              |
+| `GYBLOS_DISCOVERY_PUBLISH`  | Strict `1` or `0` override of `discovery.publish`; any other value is an error                                                                                     |
+| `GYBLOS_DISCOVERY_URL`      | Overrides `discovery.url`; checked when publication is on                                                                                                          |
+| `GYBLOS_OBSERVATIONS`       | `off` stops uploading telemetry observations; receipts still upload                                                                                                |
+| `GYBLOS_COLLECTOR_URL`      | Another metrics collector (HTTPS, or HTTP on loopback); any other value turns uploading off                                                                        |
+| `GYBLOS_UPDATE_CHECK`       | `0` stops `gyblos seller status` from checking for a newer release                                                                                                 |
+| `GYBLOS_INVITE`             | The invite code for `gyblos seller register`; never put it in TOML or shell history                                                                                |
+| `GYBLOS_BUYER_RELAY_ONLY`   | A buyer setting; the seller ignores it                                                                                                                             |
+| `GYBLOS_RPC_URL`            | Ignored by the running seller, whose role file sets the RPC; read by the installer's first run and by [`gyblos seller rpc set`](/en/sellers/beta-guide#change-rpc) |
 
 `[limits]`, offers, `[telemetry]` and `[diagnostics]` have no environment override.
 

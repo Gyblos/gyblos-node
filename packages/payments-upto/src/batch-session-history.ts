@@ -8,6 +8,7 @@ import {
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import type { BatchGeneration, BatchRecord } from './batch-session-types';
 import { BATCH_BLOCK_STATE, BATCH_RENEWAL_STATE } from './constants';
 
@@ -49,8 +50,8 @@ export function parseBatchHistory(
       return sessionFail();
     const entry = parse(raw, raw.terms);
     if (
-      entry.state !== SESSION_STATES.CLOSED ||
-      !entry.settlement ||
+      ((entry.state !== SESSION_STATES.CLOSED || !entry.settlement) &&
+        !batchOpeningAbsent(entry)) ||
       !entry.channelId ||
       channels.has(entry.channelId) ||
       entry.terms.expiresAt <= expiresAt ||

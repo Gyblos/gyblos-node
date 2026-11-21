@@ -233,19 +233,6 @@ export function transformBrand(source: string, id: string, desktop: string) {
       "'--focus': light ? colors.inkLight : colors.inkDark,",
     );
   }
-  if (target === `${base}/src/ui/Signal.tsx`) {
-    const start = source.indexOf('export function SignalMark(');
-    const end = source.indexOf('export function SignalTrace(');
-    if (start < 0 || end <= start)
-      throw new Error('Missing desktop mark review hook');
-    const mark = `export function SignalMark() { return createElement('span', {className:'preview-brand-mark','aria-hidden':true}, createElement('img',{className:'preview-brand-dark',src:'./gyblos-mark-solid-dark.svg',alt:''}),createElement('img',{className:'preview-brand-light',src:'./gyblos-mark-solid-light.svg',alt:''})); }\n`;
-    return (
-      "import { createElement } from 'react';\n" +
-      source.slice(0, start) +
-      mark +
-      source.slice(end)
-    );
-  }
 }
 export function reviewBrand(desktop: string): Plugin {
   return {

@@ -77,6 +77,14 @@ function rejects(code: string, run: () => unknown, offerIndex?: number) {
 }
 const freeFile = () => fileConfig(BASE + FREE_SELLER_OFFER);
 
+void test('seller settings retain the diagnostics from the validated configuration', () => {
+  const diagnostics = { enabled: false, level: 'debug' } as const;
+  assert.deepEqual(
+    sellerSettings({ ...freeFile(), diagnostics }, {}).diagnostics,
+    diagnostics,
+  );
+});
+
 void test('without offers the seller refuses to start; nothing runs that the seller did not ask for', () => {
   rejects(NODE_ERROR_CODES.SELLER_OFFERS_MISSING, () =>
     sellerSettings(undefined, {}),

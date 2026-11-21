@@ -14,7 +14,11 @@ import { batchOpeningAbsent } from './batch-opening-proof';
 import { requestFor } from './batch-session-checks';
 import type { BatchStore } from './batch-session-store';
 import type { BatchRecord } from './batch-session-types';
-import { BATCH_BLOCK_STATE, BATCH_RENEWAL_STATE } from './constants';
+import {
+  BATCH_BLOCK_STATE,
+  BATCH_BUYER_CHECKPOINTS,
+  BATCH_RENEWAL_STATE,
+} from './constants';
 
 export function initialRecord(
   terms: PaymentSessionTerms,
@@ -102,6 +106,7 @@ export async function reserve(
       BigInt(state.terms.depositAtomic)
     )
       sessionFail(SESSION_CODES.LIMIT);
+    delete state.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT];
     state.requests[request.requestId] = {
       ...request,
       bill: null,
