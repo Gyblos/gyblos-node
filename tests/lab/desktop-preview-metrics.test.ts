@@ -28,7 +28,10 @@ void test('Payments exposes the wallet directly and Activity lists usage without
     const source = await readFile(file, 'utf8');
     return transformBrand(source, file, 'apps/desktop') ?? source;
   };
-  assert.match(await view('Payments'), /<PagePanel>\s*<WalletOverview/);
+  assert.match(
+    await view('Payments'),
+    /<PagePanel>\s*<TabBar[\s\S]*?<WalletOverview/,
+  );
   assert.doesNotMatch(await view('Activity'), /<HistorySummary|<X402History/);
 });
 
@@ -104,7 +107,7 @@ void test('Activity and both payment methods render the shared metric cards', as
   }
 });
 
-void test('Payments presents three wallet metrics on the page and labels the address once', async () => {
+void test('Payments presents three spending metrics and shows the wallet address once', async () => {
   const { transformBrand } =
     await import('../../lab/tools/desktop-preview/brand-build');
   const file = 'apps/desktop/src/ui/Payments.tsx';
@@ -115,7 +118,7 @@ void test('Payments presents three wallet metrics on the page and labels the add
   );
   assert.ok(view);
   assert.doesNotMatch(view, /ui-wallet-overview|Wallet address · Solana/);
-  assert.match(view, /label="Wallet address"/);
+  assert.match(view, /<code title=\{address\}>/);
   assert.equal(view.match(/<StatCard\b/g)?.length, 3);
 });
 
@@ -148,10 +151,9 @@ void test('wallet and PayPal actions belong to their payment method in the previ
   const payments = await render('Payments');
   assert.match(
     payments,
-    /aria-label="USDC wallet"[\s\S]*?onClick=\{onBudget\}/,
+    /aria-label="Spending limit"[\s\S]*?onClick=\{onBudget\}/,
   );
-  assert.match(payments, /label="Chat budget"/);
-  assert.match(payments, /Edit chat budget/);
+  assert.match(payments, /label="Spending limit · USDC"/);
   assert.doesNotMatch(
     payments + (await render('X402Payments')),
     /account (budget|spending limit)/i,

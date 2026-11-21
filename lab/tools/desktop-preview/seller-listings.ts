@@ -17,7 +17,7 @@ export function previewCatalog(
     query: search,
     checkedAt: now,
     truncated: false,
-    // One free and one paid example group, so both catalog rows render.
+    // Several models, some offered by more than one seller, so grouping by model renders.
     models: [
       {
         modelId: model,
@@ -56,6 +56,60 @@ export function previewCatalog(
         inputAtomicPerMtok: '80000',
         outputAtomicPerMtok: '240000',
       },
+      ...extraModels(now),
     ],
   };
+}
+
+const seller = (head: string, tail: string) =>
+  head + '0'.repeat(FIXTURE_PADDING) + tail;
+function paidListing(
+  modelId: string,
+  fingerprint: string,
+  quantization: string,
+  input: string,
+  output: string,
+  now: number,
+) {
+  return {
+    modelId,
+    variant: null,
+    quantization,
+    contextTokens: 32768,
+    announcements: 1,
+    expiresAt: now + PREVIEW.dayMs,
+    free: false,
+    offerId: fingerprint,
+    sellerFingerprint: fingerprint,
+    inputAtomicPerMtok: input,
+    outputAtomicPerMtok: output,
+  };
+}
+function extraModels(now: number) {
+  return [
+    paidListing(
+      'llama-3.2-3b',
+      seller('4b91', '1f33'),
+      'Q4_K_M',
+      '60000',
+      '180000',
+      now,
+    ),
+    paidListing(
+      'llama-3.2-3b',
+      seller('c7d2', '5e10'),
+      'Q8_0',
+      '90000',
+      '270000',
+      now,
+    ),
+    paidListing(
+      'gemma-3-4b',
+      seller('83ce', 'a01a'),
+      'Q4_K_M',
+      '70000',
+      '210000',
+      now,
+    ),
+  ];
 }

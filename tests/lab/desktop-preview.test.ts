@@ -150,20 +150,24 @@ void test('preview buyer status is runtime-loadable and keeps free replies trans
   assert.equal(result.summary.records[0]?.transaction, null);
   assert.equal(result.summary.records[0]?.chargeAtomic, '0');
 });
-void test('preview network catalog passes the desktop contract with one free listing and two paid sellers', async () => {
+void test('preview network catalog passes the desktop contract with models offered by several sellers', async () => {
   const call = await fixture();
   const catalog = parseNetworkCatalog(await call('desktopCatalog', 'summary'));
   assert.equal(catalog.state, CATALOG_STATE.READY);
   assert.deepEqual(
     catalog.models.map((model) => [
+      model.modelId,
       model.free,
       model.inputAtomicPerMtok,
       model.outputAtomicPerMtok,
     ]),
     [
-      [true, '0', '0'],
-      [false, '52000', '208000'],
-      [false, '80000', '240000'],
+      ['qwen3-0.6b', true, '0', '0'],
+      ['qwen3-0.6b', false, '52000', '208000'],
+      ['qwen3-0.6b', false, '80000', '240000'],
+      ['llama-3.2-3b', false, '60000', '180000'],
+      ['llama-3.2-3b', false, '90000', '270000'],
+      ['gemma-3-4b', false, '70000', '210000'],
     ],
   );
   assert.equal(
@@ -267,7 +271,7 @@ void test('preview build retains a desktop baseline and declares its brand propo
   const brand = object(manifest.brand);
   const tokens = object(brand.themeTokens);
   assert.equal(tokens.blue, '#0a28f0');
-  assert.equal(tokens.charcoal, '#090909');
+  assert.equal(tokens.charcoal, '#141414');
   assert.equal(brand.kitVersion, '3.0.0');
   const baseline = object(manifest.baselineAssets);
   const preview = object(manifest.previewAssets);
@@ -371,7 +375,7 @@ void test('preview brand hooks normalize Windows module identifiers', async () =
   const desktop = 'C:\\repo\\apps\\desktop';
   assert.match(
     transformBrand(theme, 'C:/repo/apps/desktop/src/theme.ts', desktop) ?? '',
-    /#090909/,
+    /#141414/,
   );
   assert.match(
     transformBrand(signal, 'C:/repo/apps/desktop/src/ui/Signal.tsx', desktop) ??
@@ -392,7 +396,7 @@ void test('preview brand hooks accept Windows CRLF source files', async () => {
       'C:/repo/apps/desktop/src/theme.ts',
       'C:/repo/apps/desktop',
     ) ?? '',
-    /#090909/,
+    /#141414/,
   );
 });
 

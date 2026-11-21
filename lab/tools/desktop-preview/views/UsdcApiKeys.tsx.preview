@@ -17,7 +17,7 @@ import {
   USDC_API,
   USDC_API_ACTION,
 } from '../usdc-api-model';
-import { DESKTOP_X402, x402Asset, x402BudgetInput } from '../x402-model';
+import { x402Asset, x402BudgetInput } from '../x402-model';
 import { BUTTON_VARIANT } from './constants';
 import { DataCell, TableRow } from './DataTable';
 import { CopyField, FormActions, FormField, FormInput } from './Form';
@@ -25,6 +25,8 @@ import { StatePanel } from './Management';
 import { Modal } from './Modal';
 import { ScrollTable } from './ScrollTable';
 import { Badge, Button, IconButton } from './UI';
+import { AmountEditor } from './Payments';
+import { Tag, TONE } from './PreviewKit';
 import { RevokeConfirmation } from './UsdcApiKeyDetails';
 import { useUsdcApiKeys } from './useUsdcApiKeys';
 import { WorkspaceLayout } from './WorkspaceLayout';
@@ -37,6 +39,13 @@ function keyLimit(value: string, scope: BuyerKeyScope) {
     return null;
   }
 }
+const KEY_PRESETS = [
+  { value: '0', label: 'Free only' },
+  { value: '0.01', label: '0.01' },
+  { value: '0.05', label: '0.05' },
+  { value: '0.1', label: '0.1' },
+  { value: '1', label: '1' },
+];
 function NewKey({
   create,
   disabled,
@@ -65,27 +74,23 @@ function NewKey({
             onChange={(event) => setName(event.target.value)}
           />
         </FormField>
-        <FormField
-          label={`Spend limit · ${x402Asset(scope)}`}
-          htmlFor="usdc-key-limit"
-        >
-          <FormInput
-            id="usdc-key-limit"
-            type="number"
-            min="0"
-            step={
-              scope.mint === DEVNET_USDC ? 1 / DESKTOP_X402.AMOUNT_SCALE : 1
-            }
-            value={limit}
-            disabled={disabled}
-            aria-invalid={atomic === null}
-            onChange={(event) => setLimit(event.target.value)}
-          />
-        </FormField>
-        <p className="ui-help-text">
-          Total for this key. Shared across tools, saved on this computer, with
-          no automatic reset. A zero limit allows free models only.
-        </p>
+        <AmountEditor
+          id="usdc-key-limit"
+          label="Limit for this key"
+          unit={x402Asset(scope)}
+          value={limit}
+          onChange={setLimit}
+          disabled={disabled}
+          presets={KEY_PRESETS}
+          parse={(value) => {
+            const parsed = keyLimit(value, scope);
+            return parsed === null ? null : BigInt(parsed);
+          }}
+          format={(value) => amount(String(value), scope).split(' ')[0] ?? ''}
+          step={BigInt(keyLimit('0.01', scope) ?? '1')}
+          error={atomic === null ? 'Enter an amount with up to 6 decimals.' : ''}
+          help="Total for this key, inside your spending limit. No automatic reset. Zero allows free models only."
+        />
         <FormActions align="start">
           <Button
             variant={BUTTON_VARIANT.PRIMARY}
@@ -114,10 +119,9 @@ function UsdcKeyContext({
         <h3>Payment method</h3>
         <strong>{scope ? x402Asset(scope) : 'USDC'}</strong>
         <p className="ui-help-text">
-          Key usage is separate from Chat. Existing buyer and session limits
-          still apply.
+          Key usage counts toward your spending limit. Each key can also have its own limit.
         </p>
-        <Button onClick={onPayments}>View payments</Button>
+        <Button onClick={onPayments}>Spending limits</Button>
       </section>
       <section className="ui-context-section">
         <h3>Access</h3>
@@ -216,7 +220,7 @@ export function UsdcApiKeys({
           <StatePanel
             title="Connect your USDC buyer"
             description="Start the local buyer to create API keys."
-            action={<Button onClick={onPayments}>Go to Payments</Button>}
+            action={<Button onClick={onPayments}>Open Usage &amp; payments</Button>}
           />
         ) : (
           <>
@@ -227,6 +231,11 @@ export function UsdcApiKeys({
                 action={<Button onClick={onPayments}>Review payments</Button>}
               />
             )}
+            <ol className="preview-steps" aria-label="Connect a coding tool">
+              <li data-done={!!state.url}><span>1</span><div><strong>Copy the Base URL</strong><small>Your tool sends requests here.</small></div></li>
+              <li data-done={snapshot.keys.some((k) => !k.revoked)}><span>2</span><div><strong>Create an API key</strong><small>Each key has its own USDC limit.</small></div></li>
+              <li><span>3</span><div><strong>Connect your tool</strong><small>OpenCode, Codex, Claude Code or Pi.</small></div></li>
+            </ol>
             {urlField}
             <section className="ui-section">
               <div className="ui-section-title">
@@ -248,7 +257,7 @@ export function UsdcApiKeys({
                           </div>
                         </DataCell>
                         <DataCell label="State">
-                          <Badge>{item.revoked ? 'Revoked' : 'Active'}</Badge>
+                          <Tag tone={item.revoked ? TONE.NEUTRAL : TONE.SUCCESS} dot>{item.revoked ? 'Revoked' : 'Active'}</Tag>
                         </DataCell>
                         <DataCell label="Used / limit">
                           {
@@ -261,22 +270,20 @@ export function UsdcApiKeys({
                         <DataCell label="Actions">
                           <div className="ui-inline-actions">
                             {!item.revoked && (
-                              <Button
-                                variant={BUTTON_VARIANT.SECONDARY}
-                                title={'Connect a tool with ' + item.name}
+                              <IconButton
+                                label={'Connect a tool with ' + item.name}
                                 disabled={locked}
                                 onClick={() => choose(item.id)}
                               >
-                                <LinkSimple size={16} aria-hidden="true" />
-                              </Button>
+                                <LinkSimple size={14} aria-hidden="true" />
+                              </IconButton>
                             )}
-                            <Button
-                              variant={BUTTON_VARIANT.SECONDARY}
-                                title={'Details for ' + item.name}
+                            <IconButton
+                              label={'Details for ' + item.name}
                               onClick={() => go('detail', item.id)}
                             >
-                              <Info size={16} aria-hidden="true" />
-                            </Button>
+                              <Info size={14} aria-hidden="true" />
+                            </IconButton>
                           </div>
                         </DataCell>
                       </TableRow>
@@ -306,35 +313,64 @@ export function UsdcApiKeys({
             )}
             {key && view === 'detail' && (
               <Modal title={key.name} close={close}>
-                <div className="ui-section">
-                  <p>
-                    {amount(key.spentAtomic, snapshot.scope)} used of{' '}
-                    {amount(key.limitAtomic, snapshot.scope)}
-                  </p>
-                  {key.revoked ? (
-                    <p>Revoked</p>
-                  ) : (
-                    <>
-                      {copyKey}
-                      <FormActions align="start">
-                        <Button
-                          variant={BUTTON_VARIANT.PRIMARY}
-                          disabled={locked}
-                          onClick={() => choose(id)}
-                        >
-                          Connect a tool
-                        </Button>
-                        <Button
-                          disabled={busy}
-                          className="preview-destructive"
-                          onClick={() => setView('revoke')}
-                        >
-                          Revoke key
-                        </Button>
-                      </FormActions>
-                    </>
-                  )}
+                <div className="preview-detail-head">
+                  <Tag tone={key.revoked ? TONE.NEUTRAL : TONE.SUCCESS} dot>{key.revoked ? 'Revoked' : 'Active'}</Tag>
+                  <span className="ui-help-text">API key · USDC</span>
                 </div>
+                <dl className="preview-detail-totals">
+                  <div>
+                    <dt>Used</dt>
+                    <dd>{amount(key.spentAtomic, snapshot.scope)}</dd>
+                  </div>
+                  <div>
+                    <dt>Limit</dt>
+                    <dd>{amount(key.limitAtomic, snapshot.scope)}</dd>
+                  </div>
+                  <div>
+                    <dt>Available</dt>
+                    <dd>
+                      {amount(
+                        String(
+                          BigInt(key.limitAtomic) -
+                            BigInt(key.spentAtomic) -
+                            BigInt(key.reservedAtomic),
+                        ),
+                        snapshot.scope,
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+                {BigInt(key.limitAtomic) > 0n && (
+                  <progress
+                    className="preview-detail-progress"
+                    aria-label="Limit used"
+                    max={100}
+                    value={Number(
+                      (BigInt(key.spentAtomic) * 100n) / BigInt(key.limitAtomic),
+                    )}
+                  />
+                )}
+                {!key.revoked && (
+                  <>
+                    {copyKey}
+                    <FormActions>
+                      <Button
+                        disabled={busy}
+                        className="preview-destructive-ghost"
+                        onClick={() => setView('revoke')}
+                      >
+                        Revoke key
+                      </Button>
+                      <Button
+                        variant={BUTTON_VARIANT.PRIMARY}
+                        disabled={locked}
+                        onClick={() => choose(id)}
+                      >
+                        Connect a tool
+                      </Button>
+                    </FormActions>
+                  </>
+                )}
               </Modal>
             )}
             {key && view === 'revoke' && (

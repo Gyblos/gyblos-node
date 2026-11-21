@@ -13,6 +13,7 @@ import { Pagination } from './Pagination';
 import { PaymentReference } from './PaymentReference';
 import { ScrollTable } from './ScrollTable';
 import { Badge, IconButton } from './UI';
+import { FilterChips, statusTone, Tag } from './PreviewKit';
 import type { ActivityView } from './useActivity';
 import type { X402View } from './useX402';
 
@@ -50,13 +51,19 @@ export function SpendingHistory({ activity, buyer, chat, onActivity, onChat }: {
     }
   }
   const after = period === HISTORY_PERIOD.ALL ? 0 : Date.now() - HISTORY.DAY_MS * (period === HISTORY_PERIOD.WEEK ? HISTORY.WEEK_DAYS : HISTORY.MONTH_DAYS);
+  const scoped = rows.filter(row => row.at >= after && (method === HISTORY_METHOD.ALL || method === row.method));
+  const sources = [
+    { value: 'All sources' as const, label: 'All', count: scoped.length },
+    { value: 'Chat' as const, label: 'Chat', count: scoped.filter(row => row.source === 'Chat').length },
+    { value: 'API' as const, label: 'API', count: scoped.filter(row => row.source === 'API').length },
+  ];
   const visible = rows.filter(row => row.at >= after && (method === HISTORY_METHOD.ALL || method === row.method)
     && (source === 'All sources' || row.source === source)).sort((a, b) => b.at - a.at);
   const current = Math.min(page, Math.max(1, Math.ceil(visible.length / size)));
   const references = activity.references.available ? activity.references.references : [];
   return <Section title="Payment history">
     <div className="ui-toolbar preview-history-filters">
-      <ChoiceMenu label="Usage source" value={source} options={['All sources', 'API', 'Chat']} onChange={v => {setSource(v); setPage(1);}} />
+      <FilterChips label="Usage source" value={source} options={sources} onChange={v => {setSource(v); setPage(1);}} />
       <ChoiceMenu label="Payment method" value={method} options={Object.values(HISTORY_METHOD)} onChange={v => {setMethod(v); setPage(1);}} />
       <ChoiceMenu label="Period" value={period} options={Object.values(HISTORY_PERIOD)} onChange={v => {setPeriod(v); setPage(1);}} />
     </div>
@@ -74,9 +81,9 @@ export function SpendingHistory({ activity, buyer, chat, onActivity, onChat }: {
         return <TableRow key={row.id}>
           <th scope="row"><time dateTime={new Date(row.at).toISOString()}>{historyDate(row.at)}</time></th>
           <DataCell label="Source">{row.source ? <Badge>{row.source}</Badge> : '—'}</DataCell>
-          <DataCell label="Method"><span role="img" aria-label={row.method} title={row.method}>{entry ? <PaypalLogo size={18} /> : <CurrencyCircleDollar size={18} />}</span></DataCell>
+          <DataCell label="Method"><span className="preview-method">{entry ? <PaypalLogo size={16} aria-hidden="true" /> : <CurrencyCircleDollar size={16} aria-hidden="true" />}{row.method}</span></DataCell>
           <DataCell label="Amount">{amount}{row.method === 'PayPal' && row.authorization && <span className="activity-row-meta">Authorization</span>}</DataCell>
-          <DataCell label="Status">{row.method === 'PayPal' ? sessionOutcome(row.entry) : row.record.free ? 'Free' : 'Confirmed'}</DataCell>
+          <DataCell label="Status">{(() => { const status = row.method === 'PayPal' ? sessionOutcome(row.entry) : row.record.free ? 'Free' : 'Confirmed'; return <Tag tone={statusTone(status)} dot>{status}</Tag>; })()}</DataCell>
           <DataCell label="Payment ID">{record?.transaction
             ? <a href={x402Explorer(record.transaction)} target="_blank" rel="noreferrer" aria-label="View transaction in explorer">{shortReference(record.transaction)}</a>
             : <PaymentReference reference={reference} />}</DataCell>

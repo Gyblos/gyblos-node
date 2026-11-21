@@ -17,6 +17,22 @@
     40px 0 #28c840;
 }
 
+/* Full screen hides the macOS traffic lights, so the sidebar and history buttons move to the edge. */
+html
+  .desktop-frame
+  .ui-window-chrome[data-platform][data-fullscreen='true']
+  .ui-native-controls-space {
+  display: none;
+}
+@media (display-mode: fullscreen) {
+  html
+    .desktop-frame
+    .ui-window-chrome[data-platform]
+    .ui-native-controls-space {
+    display: none;
+  }
+}
+
 /* The supplied brand artwork replaces the retired bracket mark only in this review build. */
 .preview-brand-mark {
   display: inline-block;
@@ -770,4 +786,1438 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   .modal[data-size='lg'] .wallet-details .ui-row-leading + .ui-row-content {
     flex: 1 1 60%;
   }
+}
+
+/* Information architecture proposal: one usage and payments area, guided connections. */
+.desktop-frame .preview-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.desktop-frame .preview-tab {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--ui-font);
+  padding: 10px 12px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.desktop-frame .preview-tab:hover {
+  color: var(--ink);
+}
+.desktop-frame .preview-tab[aria-selected='true'] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.desktop-frame .preview-tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.desktop-frame .preview-tab-panel {
+  display: grid;
+  gap: var(--space-6, 24px);
+  min-width: 0;
+}
+.desktop-frame .preview-method-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.desktop-frame .preview-method-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.desktop-frame .preview-method-card > header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.desktop-frame .preview-method-card h3 {
+  margin: 0;
+  font-size: var(--ui-font);
+  font-weight: 600;
+}
+.desktop-frame .preview-method-card header .ui-help-text {
+  display: block;
+  font-size: var(--ui-detail, 12px);
+}
+.desktop-frame .preview-method-facts {
+  margin: 0;
+}
+.desktop-frame .preview-method-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.desktop-frame .preview-method-facts dt {
+  color: var(--muted);
+}
+.desktop-frame .preview-method-facts dd {
+  margin: 0;
+}
+.desktop-frame .preview-method-card .ui-copy-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.desktop-frame .preview-method-card .ui-copy-field input {
+  min-width: 0;
+  width: 100%;
+}
+.desktop-frame .preview-tabular {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.desktop-frame .preview-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.desktop-frame .preview-steps li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.desktop-frame .preview-steps li > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--raised);
+  font-size: 12px;
+  font-weight: 600;
+}
+.desktop-frame .preview-steps li[data-done='true'] > span {
+  background: var(--accent);
+  color: #fff;
+}
+.desktop-frame .preview-steps strong {
+  display: block;
+  font-size: 13px;
+}
+.desktop-frame .preview-steps small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-frame .preview-new-chat {
+  border: 1px solid var(--line);
+}
+
+/* Blurred ::backdrop mirrors the whole window in Chromium; a flat scrim keeps focus on the dialog. */
+.desktop-frame .modal::backdrop {
+  backdrop-filter: none;
+  background: color-mix(in srgb, #000 62%, transparent);
+}
+/* Hidden fixed tooltips must not widen the conversation and create a horizontal scrollbar. */
+.desktop-frame.app .conversation {
+  overflow-x: clip;
+}
+.desktop-frame .preview-tab-panel {
+  container-type: inline-size;
+}
+.desktop-frame .preview-simple-table-region {
+  container-type: inline-size;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+.desktop-frame .preview-simple-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.desktop-frame .preview-simple-table :is(th, td) {
+  height: 44px;
+  padding: 0 14px;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-weight: 400;
+  border-bottom: 1px solid var(--line);
+}
+.desktop-frame .preview-simple-table thead th {
+  height: 36px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--panel);
+}
+.desktop-frame .preview-simple-table tbody th {
+  font-weight: 500;
+  color: var(--ink);
+}
+.desktop-frame .preview-simple-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+.desktop-frame .preview-simple-table tbody tr:hover > * {
+  background: color-mix(in srgb, var(--ink) 4%, var(--bg));
+}
+.desktop-frame .preview-simple-table .preview-limit-scope {
+  color: var(--muted);
+  white-space: normal;
+}
+.desktop-frame .preview-simple-table .preview-num {
+  text-align: right;
+}
+.desktop-frame .preview-simple-table .preview-limit-action {
+  width: 1%;
+}
+.desktop-frame .preview-simple-table .ui-badge {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 8px;
+}
+html .app.desktop-frame .content .preview-simple-table .ui-button {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+}
+html .app.desktop-frame .content .preview-simple-table .ui-icon-button {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  border-color: transparent;
+  color: var(--muted);
+}
+html
+  .app.desktop-frame
+  .content
+  .preview-simple-table
+  .ui-button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--ink);
+}
+@container (max-width: 620px) {
+  .desktop-frame .preview-simple-table thead {
+    display: none;
+  }
+  .desktop-frame .preview-simple-table tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 2px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .desktop-frame .preview-simple-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .desktop-frame .preview-simple-table tbody tr > * {
+    height: auto;
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+  .desktop-frame .preview-simple-table tbody tr > .preview-num {
+    text-align: left;
+  }
+  .desktop-frame .preview-simple-table .preview-limit-scope {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+  .desktop-frame .preview-simple-table .preview-tabular {
+    grid-column: 1 / 3;
+    grid-row: 3;
+  }
+  .desktop-frame .preview-simple-table .preview-limit-action {
+    grid-column: 3;
+    grid-row: 1 / span 3;
+    width: auto;
+  }
+}
+
+/* Normalized tables: one type scale, one row height, right-aligned numbers and quiet actions. */
+html .app.desktop-frame .content .ui-table-region .ui-data-table :is(th, td) {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+html .app.desktop-frame .content .ui-table-region .ui-data-table thead th {
+  height: 36px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+html
+  .app.desktop-frame
+  .content
+  .ui-table-region
+  .ui-data-table
+  tbody
+  th[scope='row'],
+html
+  .app.desktop-frame
+  .content
+  .ui-table-region
+  .ui-data-table
+  tbody
+  th[scope='row']
+  *,
+html
+  .app.desktop-frame
+  .content
+  .ui-table-region
+  .ui-data-table
+  tbody
+  td:first-child
+  strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+html
+  .app.desktop-frame
+  .content
+  .ui-table-region
+  .ui-data-table
+  tbody
+  tr:hover
+  > * {
+  background: color-mix(in srgb, var(--ink) 4%, var(--bg));
+}
+html
+  .app.desktop-frame
+  .content
+  [aria-label='Usage history table']
+  tr
+  > :is(:nth-child(3), :nth-child(4)),
+html
+  .app.desktop-frame
+  .content
+  [aria-label='Payment history table']
+  tr
+  > :nth-child(4),
+html
+  .app.desktop-frame
+  .content
+  [aria-label='API key list']
+  tr
+  > :nth-child(3) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+html .app.desktop-frame .content .ui-table-region .ui-data-table .ui-badge {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 8px;
+}
+html .app.desktop-frame .content .ui-data-table .ui-button {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+}
+html .app.desktop-frame .content .ui-data-table .ui-icon-button {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  border-color: transparent;
+  color: var(--muted);
+}
+html
+  .app.desktop-frame
+  .content
+  .ui-data-table
+  .ui-button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--ink);
+}
+html .app.desktop-frame .content .ui-table-region td .ui-inline-actions {
+  gap: 2px;
+}
+.desktop-frame .preview-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Detail dialogs: status line, three headline numbers, then a plain key/value list. */
+.desktop-frame .preview-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.desktop-frame .preview-detail-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.desktop-frame .preview-detail-totals > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.desktop-frame .preview-detail-totals > div + div {
+  border-left: 1px solid var(--line);
+}
+.desktop-frame .preview-detail-totals dt,
+.desktop-frame .preview-detail-list dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-frame .preview-detail-totals dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.desktop-frame .preview-detail-list {
+  display: grid;
+  margin: 0;
+}
+.desktop-frame .preview-detail-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.desktop-frame .preview-detail-list > div:last-child {
+  border-bottom: 0;
+}
+.desktop-frame .preview-detail-list dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.desktop-frame .preview-detail-list dd small {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-frame .preview-detail-links {
+  display: grid;
+  gap: 4px;
+}
+.desktop-frame .preview-detail-links h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.desktop-frame .preview-detail-links button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.desktop-frame .preview-detail-links button:hover {
+  background: var(--raised);
+}
+.desktop-frame .preview-detail-links button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-frame .preview-detail-progress {
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--raised);
+  overflow: hidden;
+}
+.desktop-frame .preview-detail-progress::-webkit-progress-bar {
+  background: var(--raised);
+}
+.desktop-frame .preview-detail-progress::-webkit-progress-value {
+  background: var(--accent);
+}
+.desktop-frame .preview-detail-progress::-moz-progress-bar {
+  background: var(--accent);
+}
+.desktop-frame
+  .modal
+  :is(.preview-detail-head, .preview-detail-totals, .preview-detail-list) {
+  margin-block: 2px;
+}
+html
+  body
+  .app.desktop-frame
+  .modal
+  .ui-button.preview-destructive-ghost.preview-destructive-ghost {
+  background: transparent;
+  color: #e5484d;
+  border-color: color-mix(in srgb, #e5484d 40%, transparent);
+}
+html
+  .app.desktop-frame
+  .modal
+  .ui-button.preview-destructive-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, #e5484d 14%, transparent);
+  color: #e5484d;
+}
+.desktop-frame .modal .preview-metric-change {
+  display: none;
+}
+.desktop-frame .modal .preview-metric-grid {
+  gap: 8px;
+}
+.desktop-frame .modal .preview-metric-card {
+  padding: 12px;
+}
+.desktop-frame .modal .preview-metric-card dd {
+  font-size: 17px;
+}
+
+html .app.desktop-frame .content .preview-simple-table .ui-inline-actions {
+  display: inline-flex;
+  flex-flow: row nowrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Model picker: one row per model, sellers nested under it with Automatic first. */
+.desktop-frame .preview-model-menu .preview-model-group[data-open='true'] {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+.desktop-frame .preview-model-menu .preview-seller-list {
+  display: grid;
+  margin: 0 0 4px 22px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+.desktop-frame .preview-model-menu .preview-seller-list .dropdown-row {
+  min-height: 0;
+  padding-block: 6px;
+}
+.desktop-frame .preview-settings-rows > div > span small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+/* Payment methods are rows with right-aligned actions; they wrap below the copy on narrow widths. */
+.desktop-frame .preview-method-list {
+  container-type: inline-size;
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.desktop-frame .preview-method-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.desktop-frame .preview-method-row + .preview-method-row {
+  border-top: 1px solid var(--line);
+}
+.desktop-frame .preview-method-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.desktop-frame .preview-method-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.desktop-frame .preview-method-name h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.desktop-frame .preview-method-copy .ui-help-text {
+  font-size: 12px;
+}
+.desktop-frame .preview-method-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@container (max-width: 520px) {
+  .desktop-frame .preview-method-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .desktop-frame .preview-method-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+.desktop-frame .preview-spending .preview-metric-change {
+  display: none;
+}
+.desktop-frame .preview-limit-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.desktop-frame .preview-limit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.desktop-frame .preview-limit-head > div {
+  display: grid;
+  gap: 4px;
+}
+.desktop-frame .preview-limit-value {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .preview-limit-value small {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* Inline spending-limit editor: large numeric field, steppers, quick amounts and a live preview. */
+.desktop-frame :is(.preview-limit-editor, .preview-amount-editor) {
+  display: grid;
+  gap: 12px;
+}
+.desktop-frame .preview-amount-editor p {
+  margin: 0;
+  font-size: 12px;
+}
+.desktop-frame .preview-limit-editor {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+/* The editor opens below the summary by growing its row, so the card never swaps content at once. */
+.desktop-frame .preview-reveal {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: preview-reveal-in var(--motion-enter) var(--motion-push-ease) both;
+}
+.desktop-frame .preview-reveal > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.desktop-frame .preview-reveal[data-state='closing'] {
+  animation: preview-reveal-out var(--motion-overlay) var(--motion-push-ease)
+    both;
+  pointer-events: none;
+}
+@keyframes preview-reveal-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+@keyframes preview-reveal-out {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+.desktop-frame .preview-limit-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.desktop-frame .preview-amount-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.desktop-frame .preview-amount-field:focus-within {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent);
+}
+.desktop-frame .preview-amount-field[data-invalid='true'] {
+  border-color: #e5484d;
+}
+.desktop-frame .preview-amount-field input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.desktop-frame .preview-amount-field input::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+.desktop-frame .preview-amount-unit {
+  color: var(--muted);
+  font-size: 13px;
+}
+.desktop-frame .preview-amount-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.desktop-frame .preview-amount-presets button {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.desktop-frame .preview-amount-presets button:hover {
+  background: var(--raised);
+}
+.desktop-frame .preview-amount-presets button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.desktop-frame .preview-amount-presets button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.desktop-frame .preview-field-error {
+  margin: 0;
+  color: #e5484d;
+  font-size: 12px;
+}
+.desktop-frame .preview-limit-editor .ui-help-text {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* Reference contrast: page, one-step-lighter grouped panels, inputs sunk back to the page tone. */
+html
+  .app.desktop-frame
+  .content
+  :is(
+    .preview-settings-rows,
+    .preview-panel,
+    .preview-method-list,
+    .preview-simple-table-region,
+    .ui-table-region,
+    .preview-steps li
+  ) {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+html .app.desktop-frame .content .preview-metric-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+html
+  .app.desktop-frame
+  .content
+  .ui-table-region
+  .ui-data-table
+  :is(thead th, tbody th[scope='row'], th:first-child) {
+  background: var(--panel);
+}
+html .app.desktop-frame .content .ui-table-region .ui-data-table thead th,
+html .app.desktop-frame .content .preview-simple-table thead th {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+html
+  .app.desktop-frame
+  .content
+  :is(.ui-table-region .ui-data-table, .preview-simple-table)
+  :is(td, tbody th) {
+  border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent);
+}
+html
+  .app.desktop-frame
+  .content
+  :is(.ui-table-region .ui-data-table, .preview-simple-table)
+  tbody
+  tr:hover
+  > * {
+  background: color-mix(in srgb, var(--ink) 4%, var(--panel));
+}
+html .app.desktop-frame .content .preview-settings-rows {
+  padding: 4px 16px;
+}
+html .app.desktop-frame .content .preview-settings-rows > div {
+  min-height: 56px;
+  padding-block: 12px;
+  border-bottom: 0;
+}
+html .app.desktop-frame .content .preview-settings-rows > div + div {
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+html .app.desktop-frame .content .preview-settings-rows > div > span,
+.desktop-frame .preview-setting-copy {
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+  font-weight: 500;
+}
+html .app.desktop-frame .content .preview-settings-rows small {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+}
+html .app.desktop-frame .content .preview-settings-appearance > * {
+  padding-block: 12px;
+}
+html
+  .app.desktop-frame
+  .content
+  :is(.preview-settings-rows, .preview-panel)
+  :is(input, .ui-select-trigger) {
+  background: var(--bg);
+}
+/* Pill tabs. */
+html .app.desktop-frame .content .preview-tabs {
+  gap: 4px;
+  border-bottom: 0;
+}
+html .app.desktop-frame .content .preview-tab {
+  margin: 0;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+}
+html .app.desktop-frame .content .preview-tab[aria-selected='true'] {
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 500;
+}
+html
+  .app.desktop-frame
+  .content
+  .preview-tab:hover:not([aria-selected='true']) {
+  color: var(--ink);
+}
+/* Two usage panels side by side, stacked on narrow widths. */
+.desktop-frame .preview-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.desktop-frame .preview-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px 18px;
+}
+.desktop-frame .preview-panel h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.desktop-frame .preview-panel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+.desktop-frame .preview-panel-row strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .preview-panel .preview-detail-progress {
+  height: 8px;
+  border-radius: 4px;
+}
+/* A settings row: copy left, compact control right; Save appears only after a change. */
+html .app.desktop-frame .content .preview-settings-rows > .preview-setting-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.desktop-frame .preview-setting-copy {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.desktop-frame .preview-setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.desktop-frame .preview-compact-amount {
+  display: grid;
+  grid-template-columns: auto 96px auto auto;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.desktop-frame .preview-compact-amount:focus-within {
+  border-color: var(--focus);
+}
+.desktop-frame .preview-compact-amount[data-invalid='true'] {
+  border-color: #e5484d;
+}
+html .app.desktop-frame .content .preview-compact-amount input {
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+html .app.desktop-frame .content .preview-compact-amount .ui-icon-button {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+html
+  .app.desktop-frame
+  .content
+  .preview-compact-amount
+  .ui-icon-button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--ink);
+}
+.desktop-frame .preview-compact-amount .preview-amount-unit {
+  padding-right: 4px;
+  font-size: 12px;
+}
+.desktop-frame .preview-dirty-actions {
+  display: flex;
+  gap: 6px;
+  animation: preview-fade-in var(--motion-overlay) var(--motion-push-ease) both;
+}
+@keyframes preview-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Network selector in the title bar: Testnet is temporary and ends on December 9. */
+.desktop-frame .preview-network {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  -webkit-app-region: no-drag;
+}
+html .app.desktop-frame .preview-network button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+html .app.desktop-frame .preview-network button[aria-checked='true'] {
+  background: var(--raised);
+  color: var(--ink);
+}
+html .app.desktop-frame .preview-network button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.desktop-frame .preview-network-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.desktop-frame
+  .preview-network
+  [data-network='testnet'][aria-checked='true']
+  .preview-network-dot {
+  background: var(--warm);
+}
+.desktop-frame
+  .preview-network
+  [data-network='mainnet'][aria-checked='true']
+  .preview-network-dot {
+  background: var(--connected);
+}
+.desktop-frame .preview-network-note {
+  padding: 0 8px 0 4px;
+  color: var(--warm);
+  font-size: 11px;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .desktop-frame .preview-network-note {
+    display: none;
+  }
+}
+
+/* Models: one row per model, sellers expand beneath with Automatic first. */
+.desktop-frame .preview-model-item + .preview-model-item {
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.desktop-frame .preview-model-item[data-current='true'] > .preview-model-head {
+  background: var(--soft);
+}
+html .app.desktop-frame .content .preview-model-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+html .app.desktop-frame .content .preview-model-head:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.desktop-frame .preview-model-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.desktop-frame .preview-model-copy strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.desktop-frame .preview-model-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-frame .preview-model-mode {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.desktop-frame .preview-seller-panel {
+  display: grid;
+  margin: 0 14px 12px 50px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+html .app.desktop-frame .content .preview-seller-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+html .app.desktop-frame .content .preview-seller-row + .preview-seller-row {
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+html .app.desktop-frame .content .preview-seller-row:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.desktop-frame .preview-radio {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+}
+.desktop-frame .preview-seller-row[aria-checked='true'] .preview-radio {
+  border: 4px solid var(--accent);
+}
+.desktop-frame .preview-seller-price {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  html .app.desktop-frame .content .preview-model-head {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+  .desktop-frame .preview-model-mode {
+    display: none;
+  }
+  .desktop-frame .preview-seller-panel {
+    margin-left: 14px;
+  }
+}
+
+/* Models v2: summary stats with a price range, strategy pills and a seller table in a large dialog. */
+html .app.desktop-frame .content .preview-model-summary {
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 220px) auto auto auto;
+}
+.desktop-frame .preview-model-stats {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.desktop-frame .preview-model-stats small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.desktop-frame .preview-price-range {
+  display: grid;
+  grid-template-columns: auto minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .preview-price-track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--connected), var(--warm));
+  opacity: 0.8;
+}
+.desktop-frame .preview-price-track > span {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+  background: var(--ink);
+  transform: translate(-50%, -50%);
+}
+.desktop-frame .preview-seller-drawer {
+  display: grid;
+  gap: 12px;
+}
+.desktop-frame .preview-model-head-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.desktop-frame .preview-strategy {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  justify-self: start;
+}
+html .app.desktop-frame .preview-strategy button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
+  background: var(--raised);
+  color: var(--ink);
+}
+.desktop-frame .preview-simple-table tr[data-active='true'] > * {
+  background: var(--soft);
+}
+.desktop-frame .preview-simple-table th .preview-model-mode {
+  margin-left: 8px;
+}
+.desktop-frame .preview-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.desktop-frame .preview-pager .ui-help-text {
+  margin-right: auto;
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  html .app.desktop-frame .content .preview-model-summary {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+  .desktop-frame .preview-model-summary .preview-model-stats,
+  .desktop-frame .preview-model-summary .preview-model-mode {
+    display: none;
+  }
+}
+
+/* Keep the model menu width steady when expanding a model adds a scrollbar. */
+.desktop-frame .preview-model-menu,
+.desktop-frame .preview-model-menu [role='menu'] {
+  scrollbar-gutter: stable;
+}
+
+/* Preview kit tokens: one tone scale for tags, deltas, chips and segmented bars. */
+.desktop-frame {
+  --pk-success: var(--connected);
+  --pk-warning: var(--warm);
+  --pk-danger: var(--error);
+  --pk-info: color-mix(in srgb, var(--accent) 70%, var(--ink));
+  --pk-neutral: var(--muted);
+  --pk-side: color-mix(in srgb, var(--panel) 80%, var(--bg));
+  --pk-side-width: var(--compact-navigation-width);
+}
+.desktop-frame [data-tone='success'] {
+  --pk-tone: var(--pk-success);
+}
+.desktop-frame [data-tone='warning'] {
+  --pk-tone: var(--pk-warning);
+}
+.desktop-frame [data-tone='danger'] {
+  --pk-tone: var(--pk-danger);
+}
+.desktop-frame [data-tone='info'] {
+  --pk-tone: var(--pk-info);
+}
+.desktop-frame [data-tone='neutral'] {
+  --pk-tone: var(--pk-neutral);
+}
+.desktop-frame .pk-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--pk-tone) 14%, transparent);
+  color: color-mix(in srgb, var(--pk-tone) 82%, var(--ink));
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.desktop-frame .pk-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pk-tone, currentColor);
+}
+.desktop-frame .pk-delta {
+  color: var(--pk-tone);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.desktop-frame .pk-delta-suffix {
+  color: var(--muted);
+  font-weight: 400;
+}
+.desktop-frame .pk-segmented {
+  display: grid;
+  gap: 10px;
+}
+.desktop-frame .pk-segmented-track {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--raised);
+}
+.desktop-frame .pk-segmented-track > span {
+  min-width: 3px;
+  background: var(--pk-tone);
+  transition: width var(--motion-enter) var(--motion-push-ease);
+}
+.desktop-frame .pk-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-frame .pk-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.desktop-frame .pk-legend strong {
+  color: var(--ink);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .pk-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+html .app.desktop-frame .pk-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+html .app.desktop-frame .pk-chips button[aria-checked='true'] {
+  border-color: var(--line);
+  background: var(--raised);
+  color: var(--ink);
+}
+html .app.desktop-frame .pk-chips button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.desktop-frame .pk-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.desktop-frame .pk-showcase {
+  display: grid;
+  gap: 16px;
+}
+.desktop-frame .pk-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-frame .pk-segmented-track > span {
+    transition: none;
+  }
+}
+
+/* Sidebar surface: one step lighter than the content and reaching the top, under the macOS controls. */
+.desktop-frame.sidebar-collapsed {
+  --pk-side-width: 56px;
+}
+@media (max-width: 899px) {
+  .desktop-frame {
+    --pk-side-width: 56px;
+  }
+}
+html .app.desktop-frame > .buyer-sidebar {
+  background: var(--pk-side);
+  border-inline-end: 1px solid var(--line);
+}
+html .app.desktop-frame > .ui-window-chrome {
+  border-bottom: 0;
+  background:
+    linear-gradient(var(--line), var(--line)) right bottom /
+      calc(100% - var(--pk-side-width)) 1px no-repeat,
+    linear-gradient(
+      90deg,
+      var(--pk-side) calc(var(--pk-side-width) - 1px),
+      var(--line) calc(var(--pk-side-width) - 1px) var(--pk-side-width),
+      var(--bg) var(--pk-side-width)
+    );
+  transition: background-size var(--motion-enter) var(--motion-push-ease);
+}
+
+/* Interface font comparison (?font=inter); Instrument Sans stays the brand default. */
+html[data-font='inter'] body,
+html[data-font='inter'] .desktop-frame {
+  font-family: InterVariable, Inter, ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
 }

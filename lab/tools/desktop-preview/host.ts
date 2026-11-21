@@ -82,7 +82,7 @@ export function createPreviewHost(
   let setup: UsdcApiState['setup'];
   const clone = <T>(value: T) => structuredClone(value);
   const answer =
-    'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage in Activity and payment details in Payments.';
+    'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage and payments in Usage & payments.';
 
   const conversations = new ChatController('preview-first-chat');
   const records: X402Record[] = [];

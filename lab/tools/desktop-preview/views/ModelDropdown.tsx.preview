@@ -1,0 +1,243 @@
+// Groups network offers by model; the seller is a second choice under each model, with Automatic first.
+import { CaretDown, CaretRight, Check } from '@phosphor-icons/react';
+import { useState } from 'react';
+
+import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
+import { Dropdown } from './Dropdown';
+import { priceRange, usdPerMtok } from './model-price';
+import type { ModelOption } from './model-types';
+import { ModelImage } from './ModelImage';
+import { Badge, MenuItem } from './UI';
+
+export type { ModelOption } from './model-types';
+
+const automatic = new Set<string>();
+const chosenTag = new Map<string, string>();
+function priceLabel(model: ModelOption) {
+  return model.free
+    ? 'Free'
+    : `${usdPerMtok(model.input)} in · ${usdPerMtok(model.output)} out / 1M`;
+}
+function sellerName(model: ModelOption) {
+  const seller = model.family
+    ?.split(' · ')
+    .find((part) => part.startsWith('Seller '));
+  return seller ?? (model.free ? 'Community node' : 'Signed seller');
+}
+function quantization(model: ModelOption) {
+  return (
+    model.family
+      ?.split(' · ')
+      .filter((part) => !part.startsWith('Seller '))
+      .join(' · ') ?? ''
+  );
+}
+function best(offers: readonly ModelOption[]) {
+  return (
+    offers.find((item) => item.free) ??
+    [...offers].sort((a, b) => a.input + a.output - (b.input + b.output))[0]
+  );
+}
+function latencyOf(model: ModelOption) {
+  let hash = 0;
+  for (const char of model.id) hash = (hash * 31 + char.charCodeAt(0)) % 997;
+  return 180 + (hash % 420);
+}
+function recommended(offers: readonly ModelOption[]) {
+  const sorted = (score: (item: ModelOption) => number) => [...offers].sort((a, b) => score(a) - score(b))[0];
+  const picks = [
+    { label: 'Cheapest', item: sorted((item) => (item.free ? -1 : item.input + item.output)) },
+    { label: 'Fastest', item: sorted(latencyOf) },
+    { label: 'Most reliable', item: sorted((item) => -((latencyOf(item) * 7) % 13)) },
+  ];
+  return picks.filter((pick): pick is { label: string; item: ModelOption } => !!pick.item);
+}
+function groupPrice(offers: readonly ModelOption[]) {
+  const paid = offers.filter((item) => !item.free);
+  const cheapest = paid.sort((a, b) => a.input - b.input)[0];
+  if (!cheapest) return 'Free';
+  const from = 'from ' + usdPerMtok(cheapest.input) + ' in / 1M';
+  return offers.some((item) => item.free) ? 'Free · or ' + from : 'Paid · ' + from;
+}
+function group(models: readonly ModelOption[]) {
+  const groups = new Map<string, ModelOption[]>();
+  for (const item of models) {
+    const list = groups.get(item.name) ?? [];
+    list.push(item);
+    groups.set(item.name, list);
+  }
+  return [...groups.entries()];
+}
+
+export function ModelDropdown({
+  model,
+  models,
+  onSelect,
+  onBrowse,
+  toolbar = false,
+  label,
+  showBrowse = true,
+  networkOnly = false,
+  contextLabel,
+}: {
+  model: ModelOption;
+  models: readonly ModelOption[];
+  onSelect: (id: string) => void;
+  onBrowse: () => void;
+  toolbar?: boolean;
+  label?: string;
+  showBrowse?: boolean;
+  networkOnly?: boolean;
+  contextLabel?: string;
+}) {
+  const network =
+    networkOnly ||
+    models.some((item) => item.source === MODEL_SOURCE.ANNOUNCED);
+  const [expanded, setExpanded] = useState<string | null>(model.name);
+  const [closing, setClosing] = useState<string | null>(null);
+  const toggle = (name: string, open: boolean) => {
+    const previous = open ? name : expanded;
+    setExpanded(open ? null : name);
+    if (!previous || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    setClosing(previous);
+    setTimeout(() => setClosing((value) => (value === previous ? null : value)), 180);
+  };
+  const listed = models.some((item) => item.id === model.id);
+  const isAuto = (name: string) =>
+    isAuto(name) || (!chosenTag.has(name) && models.filter((item) => item.name === name).length > 1);
+  const auto = isAuto(model.name);
+  const ordered = network
+    ? models
+    : [model, ...models.filter((item) => item.id !== model.id)];
+  const choose = (close: () => void, item: ModelOption, byAutomatic: boolean, tag?: string) => {
+    if (tag) chosenTag.set(item.name, tag);
+    else chosenTag.delete(item.name);
+    if (byAutomatic) automatic.add(item.name);
+    else automatic.delete(item.name);
+    close();
+    onSelect(item.id);
+  };
+  return (
+    <Dropdown
+      searchLabel="Search models"
+      label={(label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')) + ': ' + model.name + (auto ? ', Auto' : model.free ? ', Free' : '')}
+      className={toolbar ? 'model-picker' : 'ui-model-trigger'}
+      panelClassName="preview-model-menu"
+      trigger={
+        <>
+          <ModelImage artwork={model.image} name={model.name} />
+          {model.name}
+          {contextLabel ? (
+            <Badge>Local</Badge>
+          ) : network && !listed ? null : auto ? (
+            <Badge>Auto</Badge>
+          ) : model.free ? (
+            <Badge>Free</Badge>
+          ) : (
+            <span className="model-trigger-price" title={priceLabel(model)}>
+              {priceRange(model)} /M
+            </span>
+          )}
+        </>
+      }
+    >
+      {(close, query) => {
+        const needle = query.trim().toLowerCase();
+        const filtered = ordered.filter((item) =>
+          `${item.name} ${item.family ?? ''}`.toLowerCase().includes(needle),
+        );
+        const groups = group(filtered);
+        const visible =
+          network || needle ? groups : groups.slice(0, MENU_GEOMETRY.QUICK_MODELS);
+        return (
+          <>
+            {visible.map(([name, offers]) => {
+              const first = offers[0];
+              if (!first) return null;
+              const current = offers.some((item) => item.id === model.id);
+              if (offers.length === 1 || contextLabel)
+                return (
+                  <MenuItem
+                    key={name}
+                    role="menuitemradio"
+                    checked={current}
+                    label={name}
+                    detail={contextLabel ?? priceLabel(first) + ' · ' + sellerName(first)}
+                    leading={<ModelImage artwork={first.image} name={name} />}
+                    trailing={current && <Check size={16} />}
+                    onClick={() => choose(close, first, false)}
+                  />
+                );
+              const open = expanded === name || !!needle;
+              const shown = open || closing === name;
+              const top = best(offers) ?? first;
+              return (
+                <div key={name} className="preview-model-group" data-open={open}>
+                  <MenuItem
+                    aria-expanded={needle ? undefined : open}
+                    label={name}
+                    detail={groupPrice(offers) + ' · ' + offers.length + ' sellers'}
+                    leading={<ModelImage artwork={first.image} name={name} />}
+                    trailing={needle ? null : open ? <CaretDown size={14} /> : <CaretRight size={14} />}
+                    onClick={() => (needle ? choose(close, top, true) : toggle(name, open))}
+                  />
+                  {shown && (
+                    <div className="preview-reveal" data-state={closing === name && !open ? 'closing' : undefined}><div>
+                    <div className="preview-seller-list" role="group" aria-label={name + ' sellers'}>
+                      <MenuItem
+                        role="menuitemradio"
+                        checked={current && isAuto(name)}
+                        label="Auto"
+                        detail={'Recommended · now ' + sellerName(top) + ' · ' + priceLabel(top)}
+                        trailing={current && isAuto(name) && <Check size={16} />}
+                        onClick={() => choose(close, top, true)}
+                      />
+                      {recommended(offers).map(({ label: tag, item }) => {
+                        const pinned = item.id === model.id && !isAuto(name) && chosenTag.get(name) === tag;
+                        return (
+                          <MenuItem
+                            key={tag + item.id}
+                            role="menuitemradio"
+                            checked={pinned}
+                            label={tag}
+                            detail={[sellerName(item), quantization(item), priceLabel(item)].filter(Boolean).join(' · ')}
+                            trailing={pinned && <Check size={16} />}
+                            onClick={() => choose(close, item, false, tag)}
+                          />
+                        );
+                      })}
+                      <MenuItem
+                        label="Compare sellers in Models"
+                        detail={offers.length + ' sellers · opens the model catalog'}
+                        onClick={() => {
+                          close();
+                          onBrowse();
+                        }}
+                      />
+                    </div>
+                    </div></div>
+                  )}
+                </div>
+              );
+            })}
+            {!visible.length && (
+              <p className="dropdown-note" role="status">
+                No models found
+              </p>
+            )}
+            {showBrowse && (
+              <MenuItem
+                footer
+                label="View all models"
+                onClick={() => {
+                  close();
+                  onBrowse();
+                }}
+              />
+            )}
+          </>
+        );
+      }}
+    </Dropdown>
+  );
+}
