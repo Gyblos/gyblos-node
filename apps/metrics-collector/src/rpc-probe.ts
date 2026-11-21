@@ -15,6 +15,7 @@ import { listsGyblosMemo } from './chain/writes';
 import {
   COLLECTOR_ADMIN_TOKEN_BINDING,
   COLLECTOR_SOLANA_RPC_BINDINGS,
+  COLLECTOR_STATUS,
 } from './constants';
 
 export const RPC_PROBE_PATH = '/v1/admin/rpc-probe';
@@ -102,7 +103,8 @@ export async function rpcProbe(
       : undefined;
   const token = read(COLLECTOR_ADMIN_TOKEN_BINDING);
   const given = request.headers.get('authorization') ?? '';
-  const notFound = () => new Response('Not Found', { status: 404 });
+  const notFound = () =>
+    new Response('Not Found', { status: COLLECTOR_STATUS.NOT_FOUND });
   if (
     request.method !== 'GET' ||
     typeof token !== 'string' ||
