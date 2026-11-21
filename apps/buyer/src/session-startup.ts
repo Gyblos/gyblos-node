@@ -31,7 +31,6 @@ import { makeManager, type SessionState } from './session-manager';
 import {
   checkPaidSellerRequest,
   endpointToken,
-  prepareChosenMeter,
   type BuyerStartupOptions,
 } from './session-requirements';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
@@ -200,11 +199,7 @@ function sessionExecutor(
     const config = context.prepared.config;
     const request = routedRequest(config.request, model);
     if (model?.sellerChoice && !permission && request.maxAtomic !== '0')
-      await prepareChosenMeter(
-        model.sellerChoice.expiresAt,
-        manager.loadMeter,
-        signal,
-      );
+      await manager.prepareChoice(model.sellerChoice.expiresAt, signal);
     const ports: BuyerRoutePorts<ChatResult> = {
       select: sessionSelection(
         context,

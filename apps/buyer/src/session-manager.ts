@@ -31,6 +31,7 @@ import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
 import {
   createSessionPreflight,
+  prepareChosenMeter,
   sessionMeter,
   type BuyerStartupOptions,
 } from './session-requirements';
@@ -202,7 +203,8 @@ export function makeManager(
   );
   return {
     ...manager,
-    loadMeter,
+    prepareChoice: (expiresAt: number, signal: AbortSignal) =>
+      prepareChosenMeter(expiresAt, loadMeter, signal),
     async preflight(...args: Parameters<typeof check>) {
       state.meter = await check(...args);
     },
