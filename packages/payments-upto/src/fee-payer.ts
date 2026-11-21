@@ -31,8 +31,9 @@ function refused(): never {
   throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
 }
 // The SDK signs its pre-submission simulation (open + settle + distribute under the transaction maximum)
-// with this all-zero blockhash (@x402/svm's SIM_PLACEHOLDER_BLOCKHASH, not exported). No recent blockhash or durable nonce is zero, so such a transaction can
-// never be broadcast and its compute budget can cost nothing.
+// with this all-zero blockhash (@x402/svm's SIM_PLACEHOLDER_BLOCKHASH, not exported). No recent
+// blockhash or durable nonce is zero, so such a transaction can never be broadcast and its compute
+// budget can cost nothing.
 const SIMULATION_ONLY_BLOCKHASH = '11111111111111111111111111111111';
 // allowSimulation: only when the fee payer itself signs, a simulation-only message may carry any budget;
 // admission of a buyer's wire always applies the ceilings.
