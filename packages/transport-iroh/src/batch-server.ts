@@ -42,23 +42,17 @@ export interface BatchChannelService {
     request: BatchChannelRequest,
     peer: string,
     signal: AbortSignal,
-    onDelta?: (text: string) => Promise<void>,
-    blocks?: BatchBlockExchange,
-    blockMode?: boolean,
-    // Reads the connection's selected path for the execution's telemetry, as free execution does.
-    route?: RouteProbe,
+    ...tail: BatchExchangeTail
   ): Promise<BatchChannelResult>;
 }
 // What an exchange takes after its request, peer and signal; layers that only forward it pass it whole.
-export type BatchExchangeTail =
-  Parameters<BatchChannelService['exchange']> extends [
-    unknown,
-    unknown,
-    unknown,
-    ...infer Tail,
-  ]
-    ? Tail
-    : never;
+export type BatchExchangeTail = [
+  onDelta?: (text: string) => Promise<void>,
+  blocks?: BatchBlockExchange,
+  blockMode?: boolean,
+  // Reads the connection's selected path for the execution's telemetry, as free execution does.
+  route?: RouteProbe,
+];
 export interface BatchStreamLimits {
   blocks?: boolean;
   ingressMs?: number;
