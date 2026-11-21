@@ -20,6 +20,7 @@
     "./worker": "./src/worker.ts"
   },
   "dependencies": {
+    "@gyblos/config": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/identity": "workspace:*",
     "@gyblos/protocol": "workspace:*",
