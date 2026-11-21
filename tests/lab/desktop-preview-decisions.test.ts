@@ -149,3 +149,22 @@ void test('preview model rows keep one synthetic seller at the listed price', as
   const row = await view('ModelRow.tsx.preview');
   assert.match(row, /const factor =\s*index === 0\s*\?\s*1\s*:/);
 });
+
+void test('preview free fallback lets the composer send instead of waiting for paid terms', async () => {
+  const { CHAT_FUNDS_REWRITES } =
+    await import('../../lab/tools/desktop-preview/funds-build');
+  const canSend = CHAT_FUNDS_REWRITES.find(([from]) =>
+    from.includes('const canSend'),
+  )?.[1];
+  assert.match(canSend ?? '', /\(previewFunds\.fallback \|\| !limitNotice\)/);
+});
+
+void test('preview menu arrow keys skip disabled options', async () => {
+  const dropdown = await view('ModelDropdown.tsx.preview');
+  assert.match(dropdown, /filter\(\(item\) => !item\.matches\(':disabled'\)\)/);
+});
+
+void test('preview buyer config block uses the default copy that confirms success', async () => {
+  const settings = await view('Settings.tsx.preview');
+  assert.doesNotMatch(settings, /onCopy=\{\(\) => navigator\.clipboard/);
+});

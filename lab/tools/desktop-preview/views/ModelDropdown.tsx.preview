@@ -103,7 +103,7 @@ const FLYOUT = { GAP: 6, REPOSITION: 'preview:reposition' } as const;
 
 function moveFocus(event: KeyboardEvent<HTMLElement>, selector: string) {
   if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return false;
-  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(selector));
+  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(selector)).filter((item) => !item.matches(':disabled'));
   if (!items.length) return false;
   event.preventDefault();
   event.stopPropagation();

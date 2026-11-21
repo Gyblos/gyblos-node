@@ -16,7 +16,7 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
   ],
   [
     '  const canSend =\n    !limitNotice &&',
-    '  const previewFunds = usePreviewFunds(model, !usingPaypal);\n  const canSend =\n    !previewFunds.blocked &&\n    !limitNotice &&',
+    '  const previewFunds = usePreviewFunds(model, !usingPaypal);\n  const canSend =\n    !previewFunds.blocked &&\n    (previewFunds.fallback || !limitNotice) &&',
   ],
   [
     '          <ChatComposer\n            disabled={loadingHistory}',
@@ -24,7 +24,7 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
   ],
   [
     '            {limitNotice ||',
-    "            {(previewFunds.blocked ? 'Add funds or choose a free model to send.' : limitNotice) ||",
+    "            {(previewFunds.blocked ? 'Add funds or choose a free model to send.' : previewFunds.fallback ? undefined : limitNotice) ||",
   ],
 ];
 
