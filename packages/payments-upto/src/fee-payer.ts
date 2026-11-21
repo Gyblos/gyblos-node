@@ -23,6 +23,8 @@ import { PAYMENT_TRANSACTION_LIMITS } from '@gyblos/config/payment-fees';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 
+import { rateLimitedFacilitatorRpc } from './rpc-rate-limit';
+
 const SET_COMPUTE_UNIT_LIMIT = 2;
 const SET_COMPUTE_UNIT_PRICE = 3;
 const LIMIT_BYTES = 5;
@@ -147,9 +149,10 @@ export function sellerUptoFeePolicy(options: {
   const { feePayer, rpcUrl, store, slot } = options;
   return {
     facilitator: createUptoFacilitator(
-      toFacilitatorSvmSigner(limitedFeePayer(feePayer), {
-        defaultRpcUrl: rpcUrl,
-      }),
+      toFacilitatorSvmSigner(
+        limitedFeePayer(feePayer),
+        rateLimitedFacilitatorRpc(rpcUrl),
+      ),
       store,
       PAYMENT_TRANSACTION_LIMITS,
     ),

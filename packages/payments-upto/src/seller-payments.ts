@@ -2,7 +2,7 @@
 // with the fee payer, offline verification, vouchers by the authorizer, channel reads over RPC, the
 // token accounts every claim pays into, recovery of earlier claims and the SDK's rent cleanup. Keys
 // are the caller's; nothing here reads key files.
-import { createSolanaRpc, type KeyPairSigner } from '@solana/kit';
+import type { KeyPairSigner } from '@solana/kit';
 import {
   createUptoChannelReaders,
   createUptoRecipientAccounts,
@@ -26,6 +26,7 @@ import { LEDGER_FILE, UPTO_SELLER } from './constants';
 import { sellerUptoFeePolicy } from './fee-payer';
 import { openUptoFileLedger, type UptoLedgerPaths } from './file-ledger';
 import { assertPaymentNetworkEnabled } from './mainnet';
+import { rateLimitedSolanaRpc } from './rpc-rate-limit';
 import { verifyPaymentNetwork, type PaymentGenesisRpc } from './seller-network';
 import { createUptoPaymentServer } from './server';
 import { uptoSellerTerms, type UptoChannelSettings } from './terms';
@@ -74,7 +75,7 @@ export async function openUptoSellerPayments(
   )
     // Keys that cannot sign for this description would only fail later, on a buyer's deposit.
     throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
-  const rpc = options.rpc ?? createSolanaRpc(rpcUrl);
+  const rpc = options.rpc ?? rateLimitedSolanaRpc(rpcUrl);
   await verifyPaymentNetwork(rpc, own.network);
   const ledger = await openUptoFileLedger({
     paths: options.paths,
