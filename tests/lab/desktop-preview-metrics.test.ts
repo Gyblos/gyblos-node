@@ -249,3 +249,26 @@ void test('preview composer keeps the tools icon, opens its menus upward and see
     'sample sidebar chats must contain messages, not empty drafts',
   );
 });
+
+void test('preview menus that open upward stay glued to their trigger when their height changes', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const dropdown = 'apps/desktop/src/ui/Dropdown.tsx';
+  const dropdownSource = await readFile(dropdown, 'utf8');
+  const dropdownView =
+    transformBrand(dropdownSource, dropdown, 'apps/desktop') ?? dropdownSource;
+  assert.match(
+    dropdownView,
+    /menu\.style\.bottom = up \?/,
+    'an upward menu is anchored by its bottom edge, not a top computed from a stale height',
+  );
+  const picker = await readFile(
+    'lab/tools/desktop-preview/views/ModelDropdown.tsx.preview',
+    'utf8',
+  );
+  assert.match(
+    picker,
+    /panel\.style\.bottom = /,
+    'the seller panel follows the model menu bottom edge',
+  );
+});

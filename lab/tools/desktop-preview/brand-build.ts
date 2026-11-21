@@ -318,6 +318,10 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'window.innerWidth - width - gutter',
         'window.innerWidth - width - (split ? width + 6 : 0) - gutter',
       ],
+      [
+        'menu.style.top = `${up ? bounds.top - gap - Math.min(menu.scrollHeight, available) : bounds.bottom + gap}px`;',
+        "menu.style.top = up ? 'auto' : `${bounds.bottom + gap}px`;\n      menu.style.bottom = up ? `${window.innerHeight - bounds.top + gap}px` : 'auto';",
+      ],
     ]);
   if (target === `${base}/src/ui/BuyerFunding.tsx`)
     return source.replaceAll(

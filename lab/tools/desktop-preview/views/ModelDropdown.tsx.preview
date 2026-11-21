@@ -236,7 +236,8 @@ export function ModelDropdown({
       panel.style.width = box.width + 'px';
       panel.style.height = box.height + 'px';
       panel.style.left = box.right + FLYOUT.GAP + 'px';
-      panel.style.top = box.top + 'px';
+      panel.style.top = menu.style.top;
+      panel.style.bottom = menu.style.bottom;
     }
     menu.dataset.split = 'true';
     if (!panel.matches(':popover-open')) panel.showPopover();
