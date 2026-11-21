@@ -7,14 +7,20 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
+import { INDEX_ROUTES } from '@gyblos/discovery-index/constants';
 import { DISPLAY, RANGE } from '@gyblos/explorer/constants';
-import { AGGREGATES } from '@gyblos/metrics-collector/constants';
+import {
+  AGGREGATES,
+  COLLECTOR_ROUTES,
+} from '@gyblos/metrics-collector/constants';
 
 const ROOT = resolve(import.meta.dirname, '../apps/explorer');
 const read = (path: string) => readFileSync(resolve(ROOT, path), 'utf8');
 
-// `--name: value;` declarations of one CSS block, from its opening line to its closing brace.
-function declarations(css: string, opening: string) {
+// `--name: value;` declarations of one CSS block, from its opening line to its closing brace, with
+// comments removed first so a commented-out token never counts.
+function declarations(source: string, opening: string) {
+  const css = source.replace(/\/\*[\s\S]*?\*\//g, '');
   const start = css.indexOf(opening);
   assert.ok(start >= 0, `missing ${opening}`);
   const block = css.slice(start, css.indexOf('}', start));
@@ -35,7 +41,12 @@ function resolved(tokens: Record<string, string>, name: string): string {
 
 void test('the registry theme has the CSS tokens colors, light and dark, and the same Tailwind names', () => {
   const css = read('app/globals.css');
-  const light = declarations(css, ':root {');
+  // The top-level block: the dark one nests its own `:root {` inside the media query.
+  assert.ok(
+    css.indexOf('\n:root {') < css.indexOf('@media'),
+    'top-level :root first',
+  );
+  const light = declarations(css, '\n:root {');
   const dark = {
     ...light,
     ...declarations(css, '@media (prefers-color-scheme: dark)'),
@@ -56,6 +67,12 @@ void test('the registry theme has the CSS tokens colors, light and dark, and the
     ['dark', dark],
   ] as const) {
     const published: Record<string, string> = vars[scheme]!;
+    // The same tokens both ways: none missing from the registry, none it publishes that the CSS lacks.
+    assert.deepEqual(
+      Object.keys(published).sort(),
+      Object.keys(tokens).sort(),
+      scheme,
+    );
     for (const name of Object.keys(published) as string[])
       assert.equal(
         published[name],
@@ -79,16 +96,31 @@ void test('llms.txt states the range presets, the buyer threshold, the longest r
     ),
   );
   for (const preset of presets) assert.ok(llms.includes(preset), preset);
-  assert.ok(llms.includes(`${RANGE.defaultDays} is the default`));
-  assert.ok(llms.includes(`below ${DISPLAY.minPublicBuyers}`));
+  assert.ok(llms.includes(`; ${RANGE.defaultDays} is the default`));
+  assert.ok(llms.includes(` below ${DISPLAY.minPublicBuyers} `));
   assert.ok(llms.includes(`"< ${DISPLAY.minPublicBuyers}"`));
   assert.equal(DISPLAY.minPublicBuyers, AGGREGATES.minPublicBuyers);
-  assert.ok(llms.includes(`at most ${AGGREGATES.maxRangeDays} days`));
-  // The public sources are the explorer's default ones.
+  assert.ok(llms.includes(` at most ${AGGREGATES.maxRangeDays} days`));
+  // The public sources are the explorer's default hosts and the routes those services serve.
   const config = read('lib/config.ts');
-  for (const binding of ['GYBLOS_DISCOVERY_URL', 'GYBLOS_COLLECTOR_URL']) {
-    const source = new RegExp(`${binding} \\?\\? '([^']+)'`).exec(config)?.[1];
-    assert.ok(source, binding);
-    assert.ok(llms.includes(`(${source}/`), source);
-  }
+  const origins = ['GYBLOS_DISCOVERY_URL', 'GYBLOS_COLLECTOR_URL'].map(
+    (binding) => {
+      const url = new RegExp(`${binding}\\s*\\?\\?\\s*'([^']+)'`).exec(
+        config,
+      )?.[1];
+      assert.ok(url, binding);
+      return new URL(url).origin;
+    },
+  );
+  const [discovery, collector] = origins;
+  for (const route of [
+    `${discovery}${INDEX_ROUTES.MODELS})`,
+    `\`${INDEX_ROUTES.SELLERS}?model=`,
+    `\`${INDEX_ROUTES.UPTIME}?node=`,
+    `\`${INDEX_ROUTES.NETWORK}\``,
+    `${collector}${COLLECTOR_ROUTES.STATS_NETWORK})`,
+    `\`${COLLECTOR_ROUTES.STATS_MODELS}\``,
+    `\`${COLLECTOR_ROUTES.STATS_CHAIN}\``,
+  ])
+    assert.ok(llms.includes(route), route);
 });

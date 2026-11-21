@@ -16,7 +16,7 @@ Gyblos is an open market where anyone can sell, buy or give away AI inference. T
 
 ## Public data sources
 
-- [Discovery index](https://discovery.gyblos.com/v1/models): models offered now; `/v1/sellers?model=<id>` lists live sellers, and `/v1/uptime?node=<NodeId>` a seller's uptime.
+- [Discovery index](https://discovery.gyblos.com/v1/models): models offered now; `/v1/sellers?model=<id>` lists live sellers, `/v1/uptime?node=<NodeId>` a seller's uptime, and `/v1/network` every registered seller's online, offline or not-published state.
 - [Metrics collector](https://collector.gyblos.com/v1/stats/network): daily network totals; `/v1/stats/models` per model and `/v1/stats/chain` on-chain settlements. Each takes `from` and `to` as `YYYY-MM-DD`, at most 92 days.
 
 ## More about Gyblos
