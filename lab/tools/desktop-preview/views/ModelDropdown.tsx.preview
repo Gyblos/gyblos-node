@@ -7,6 +7,7 @@ import {
   Lightning,
   ShieldCheck,
   Sparkle,
+  Wallet,
   type Icon,
 } from '@phosphor-icons/react';
 import {
@@ -21,6 +22,7 @@ import { Dropdown } from './Dropdown';
 import { priceRange, usdPerMtok } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
+import { openPreviewFunds, previewUsdc, usePreviewBalance } from './PreviewKit';
 import { Badge, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
@@ -166,6 +168,8 @@ export function ModelDropdown({
     networkOnly ||
     models.some((item) => item.source === MODEL_SOURCE.ANNOUNCED);
   const [active, setActive] = useState<string | null>(null);
+  const balance = usePreviewBalance();
+  const broke = balance === 0 && !contextLabel;
   const [, refresh] = useState(0);
   const flyout = useRef<HTMLDivElement>(null);
   const listed = models.some((item) => item.id === model.id);
@@ -294,6 +298,22 @@ export function ModelDropdown({
         const current = !!active && (active === model.name || offers.some((item) => item.id === model.id));
         return (
           <>
+            {!contextLabel && (
+              <p className="pk-balance-line">
+                Balance <strong>{previewUsdc(balance)}</strong>
+                {broke && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close();
+                      openPreviewFunds();
+                    }}
+                  >
+                    Add funds
+                  </button>
+                )}
+              </p>
+            )}
             <div
               className="preview-model-list"
               onKeyDown={(event) => {
@@ -327,12 +347,18 @@ export function ModelDropdown({
                       contextLabel ??
                       (several
                         ? groupPrice(list) + ' · ' + list.length + ' sellers'
-                        : priceLabel(first) + ' · ' + sellerName(first))
+                        : priceLabel(first) + ' · ' + sellerName(first)) +
+                        (broke && !list.some((item) => item.free) ? ' · Needs funds' : '')
                     }
                     leading={<ModelImage artwork={first.image} name={name} />}
                     trailing={
                       <span className="preview-menu-trail">
                         {selected && several && mode && <span className="preview-mode-chip">{mode}</span>}
+                        {broke && !list.some((item) => item.free) && (
+                          <span className="pk-needs-funds" aria-hidden="true">
+                            <Wallet size={14} weight="fill" />
+                          </span>
+                        )}
                         {selected ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
                         {several && <CaretRight size={13} className="preview-menu-caret" />}
                       </span>
@@ -389,7 +415,11 @@ export function ModelDropdown({
                   <StrategyRow
                     icon={Sparkle}
                     label="Auto"
-                    detail={'Recommended · now ' + sellerName(top) + ' · ' + priceLabel(top)}
+                    detail={
+                      broke && top.free
+                        ? 'Free seller while your balance is 0 · ' + sellerName(top)
+                        : 'Recommended · now ' + sellerName(top) + ' · ' + priceLabel(top)
+                    }
                     checked={current && isAuto(active)}
                     onChoose={() => remember(top, true)}
                   />
@@ -398,7 +428,9 @@ export function ModelDropdown({
                       key={tag}
                       icon={icon}
                       label={tag}
-                      detail={[sellerName(item), quantization(item), priceLabel(item)].filter(Boolean).join(' · ')}
+                      detail={[sellerName(item), quantization(item), priceLabel(item), broke && !item.free ? 'Needs funds' : '']
+                        .filter(Boolean)
+                        .join(' · ')}
                       checked={current && !isAuto(active) && chosenTag.get(active) === tag}
                       onChoose={() => remember(item, false, tag)}
                     />

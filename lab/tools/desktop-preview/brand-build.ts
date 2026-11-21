@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { InlineConfig, Plugin } from 'vite';
 
 import brand from './brand.json' with { type: 'json' };
+import { APP_FUNDS_REWRITES, CHAT_FUNDS_REWRITES } from './funds-build';
 
 export { brand };
 const moduleId = (value: string) => value.replaceAll('\\', '/');
@@ -217,9 +218,10 @@ export function transformBrand(source: string, id: string, desktop: string) {
       '{view === UI_VIEW.ACTIVITY && (\n            <Activity',
       '{false && (\n            <Activity',
     );
+    const funded = replaceEach(routed, [...APP_FUNDS_REWRITES]);
     return replaceOnce(
       replaceOnce(
-        routed,
+        funded,
         '  const navigation = MAIN_NAV;\n',
         '  const navigation = MAIN_NAV;\n  useEffect(() => { Object.assign(window, { previewNavigate: navigate }); });\n',
       ),
@@ -322,6 +324,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     return replaceEach(source, [
       ["'x402 · devnet'", "'x402'"],
       ["'Free · Gyblos network'", "''"],
+      ...CHAT_FUNDS_REWRITES,
     ]);
   if (target === `${base}/src/theme.ts`) {
     for (const [name, value] of Object.entries(brand.themeTokens)) {

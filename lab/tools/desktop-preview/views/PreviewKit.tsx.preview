@@ -1,7 +1,13 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Warning } from '@phosphor-icons/react';
+import { useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
+import { AddBuyerFunds } from './BuyerFunding';
+import { BUTTON_VARIANT } from './constants';
+import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
 import { TONE, type Tone } from './status-tone';
+import { Button } from './UI';
 
 export { statusTone, TONE } from './status-tone';
 export type { Tone } from './status-tone';
@@ -160,5 +166,91 @@ export function PreviewKitShowcase() {
         />
       </Panel>
     </div>
+  );
+}
+
+/* Synthetic buyer balance for the funds-needed flow; it never reads or moves real funds. */
+declare global {
+  interface Window {
+    previewFunds?: { atomic: number; open: boolean };
+  }
+}
+const FUNDS = { READY_ATOMIC: 2_000_000, ATOMIC_PER_USDC: 1_000_000 } as const;
+const fundsListeners = new Set<() => void>();
+function fundsState() {
+  window.previewFunds ??= {
+    atomic: new URLSearchParams(location.search).get('funding') === 'ready' ? FUNDS.READY_ATOMIC : 0,
+    open: false,
+  };
+  return window.previewFunds;
+}
+function subscribeFunds(listener: () => void) {
+  fundsListeners.add(listener);
+  return () => {
+    fundsListeners.delete(listener);
+  };
+}
+function updateFunds(next: Partial<{ atomic: number; open: boolean }>) {
+  window.previewFunds = { ...fundsState(), ...next };
+  fundsListeners.forEach((listener) => listener());
+}
+export function openPreviewFunds() {
+  updateFunds({ open: true });
+}
+export function usePreviewBalance() {
+  return useSyncExternalStore(subscribeFunds, () => fundsState().atomic);
+}
+export function previewUsdc(atomic: number) {
+  return (atomic / FUNDS.ATOMIC_PER_USDC).toFixed(2) + ' USDC';
+}
+export function usePreviewFunds(model: { name: string; free: boolean }, applies: boolean) {
+  const atomic = usePreviewBalance();
+  return { model, blocked: applies && !model.free && atomic === 0 };
+}
+
+export function PreviewFundsStrip({
+  funds,
+  models,
+  onSelectModel,
+}: {
+  funds: ReturnType<typeof usePreviewFunds>;
+  models: readonly { id: string; name: string; free: boolean }[];
+  onSelectModel: (id: string) => void;
+}) {
+  const open = useSyncExternalStore(subscribeFunds, () => fundsState().open);
+  const free = models.find((item) => item.free && item.name === funds.model.name) ?? models.find((item) => item.free);
+  return (
+    <>
+      <div className="pk-funds-strip" data-open={funds.blocked || undefined} inert={!funds.blocked}>
+        <div>
+          <Warning size={15} weight="fill" aria-hidden="true" />
+          <p role="status">
+            {funds.blocked && (
+              <>
+                <strong>{funds.model.name}</strong> needs USDC to send. Your draft is kept.
+              </>
+            )}
+          </p>
+          {free && (
+            <Button onClick={() => onSelectModel(free.id)}>
+              {free.name === funds.model.name ? 'Use a free seller' : 'Use ' + free.name}
+            </Button>
+          )}
+          <Button variant={BUTTON_VARIANT.PRIMARY} onClick={openPreviewFunds}>
+            Add funds
+          </Button>
+        </div>
+      </div>
+      <MotionPresence>
+        {open && (
+          <Modal title="Add funds" description="Your draft stays in the chat." close={() => updateFunds({ open: false })}>
+            <AddBuyerFunds />
+            <Button className="wide" onClick={() => updateFunds({ atomic: FUNDS.READY_ATOMIC, open: false })}>
+              Preview: simulate 2 USDC arriving
+            </Button>
+          </Modal>
+        )}
+      </MotionPresence>
+    </>
   );
 }

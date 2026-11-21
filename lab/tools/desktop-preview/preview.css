@@ -2500,3 +2500,96 @@ html[data-font='inter'] .desktop-frame {
     display: none;
   }
 }
+
+/* Funds-needed strip attached to the top of the composer. */
+html .app.desktop-frame .pk-funds-strip {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-inline: 14px;
+  transition: grid-template-rows var(--motion-overlay) var(--motion-push-ease);
+}
+html .app.desktop-frame .pk-funds-strip[data-open] {
+  grid-template-rows: 1fr;
+}
+html .app.desktop-frame .pk-funds-strip > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 8px 0 12px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  background: color-mix(in srgb, var(--pk-warning) 10%, var(--panel));
+  transition:
+    padding var(--motion-overlay) var(--motion-push-ease),
+    border-color var(--motion-overlay) ease;
+}
+html .app.desktop-frame .pk-funds-strip[data-open] > div {
+  padding-block: 6px;
+  border-color: color-mix(in srgb, var(--pk-warning) 35%, var(--line));
+}
+html .app.desktop-frame .pk-funds-strip svg {
+  flex: none;
+  color: var(--pk-warning);
+}
+html .app.desktop-frame .pk-funds-strip p {
+  flex: 1;
+  min-width: 160px;
+  margin: 0;
+}
+html .app.desktop-frame .pk-funds-strip .ui-button {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+html .app.desktop-frame .pk-balance-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  padding: 2px 10px 8px;
+  border-bottom: 1px solid var(--subtle-line);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+html .app.desktop-frame .pk-balance-line strong {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--ink);
+}
+html .app.desktop-frame .pk-balance-line button {
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--pk-warning);
+  background: none;
+  cursor: pointer;
+}
+html .app.desktop-frame .pk-balance-line button:hover,
+html .app.desktop-frame .pk-balance-line button:focus-visible {
+  background: color-mix(in srgb, var(--pk-warning) 12%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  html .app.desktop-frame .pk-funds-strip,
+  html .app.desktop-frame .pk-funds-strip > div {
+    transition: none;
+  }
+}
+html .app.desktop-frame .pk-needs-funds {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--pk-warning);
+}
+html .app.desktop-frame .compact-dropdown.preview-model-menu {
+  overflow-x: hidden;
+}
