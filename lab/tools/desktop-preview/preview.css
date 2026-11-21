@@ -2245,3 +2245,43 @@ html .app.desktop-frame > .ui-window-chrome {
     );
   transition: background-size var(--motion-enter) var(--motion-push-ease);
 }
+
+/* One native select treatment: interface-size text, padded chevron away from the edge. */
+html .app.desktop-frame select.ui-input {
+  appearance: none;
+  padding: 0 32px 0 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+html .app.desktop-frame .ui-select-trigger {
+  font-size: 14px;
+}
+
+/* Model picker: bounded height that scrolls, and a clear mark on the model in use. */
+html .app.desktop-frame .preview-model-menu {
+  max-height: min(520px, calc(100vh - 140px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+html .app.desktop-frame .preview-model-menu [role='menu'] {
+  max-height: none;
+  overflow: visible;
+}
+html .app.desktop-frame .preview-model-menu [aria-checked='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+  color: var(--ink);
+}
+html .app.desktop-frame .preview-model-menu [aria-checked='true'] svg:last-child {
+  color: var(--pk-info);
+}
