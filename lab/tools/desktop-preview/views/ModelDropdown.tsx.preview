@@ -104,7 +104,7 @@ export function ModelDropdown({
   };
   const listed = models.some((item) => item.id === model.id);
   const isAuto = (name: string) =>
-    isAuto(name) || (!chosenTag.has(name) && models.filter((item) => item.name === name).length > 1);
+    automatic.has(name) || (!chosenTag.has(name) && models.filter((item) => item.name === name).length > 1);
   const auto = isAuto(model.name);
   const ordered = network
     ? models
