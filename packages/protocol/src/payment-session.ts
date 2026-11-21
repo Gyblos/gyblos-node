@@ -12,9 +12,13 @@ export {
   SESSION_CODES,
   SESSION_STATES,
 } from './sessions/constants';
+// cause: the original failure a generic code replaced, for local diagnostics only; never sent to a peer.
 export class PaymentSessionError extends Error {
-  constructor(readonly code: SessionCode) {
-    super(code);
+  constructor(
+    readonly code: SessionCode,
+    options?: { cause?: unknown },
+  ) {
+    super(code, options);
     this.name = 'PaymentSessionError';
   }
 }

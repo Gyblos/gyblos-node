@@ -69,13 +69,21 @@ writes no records. [configuration.md](configuration.md) has the key reference.
   stderr. The duration runs from when the parent began spawning the child. If
   the child never starts, the last phase is `startup`. A phase is the last
   observed boundary, not proof of a cause.
-- **Seller payment channels.** Component `seller-channel`: one `error` record
-  per failed channel operation from a buyer (`prepare`, `open`, `execute`,
-  `approve`, `close`), phase `exchange`. The code is the error's own static
-  code, or the payment SDK's error name (for example
-  `invalid_batch_settlement_svm_settlement_simulation` when the deposit could
-  not be simulated, so it was never sent), else `SELLER_CHANNEL_FAILED`. The
-  error text is never kept: it can hold transactions, addresses or RPC URLs.
+- **Seller payment channels.** Component `seller-channel`, phase `exchange`: one
+  record per failed channel operation from the bound buyer (`prepare`, `open`,
+  `execute`, `approve`, `close`, `resume-block`). A wrong peer or a busy session
+  is refused before that and leaves no record. Codes come only from catalogs:
+  - the payment SDK's error name when the failure carries one, even when a
+    session layer replaced it with a generic code (for example
+    `invalid_batch_settlement_svm_settlement_simulation`: the deposit could not
+    be simulated, so it was never sent);
+  - otherwise the typed session, payment or channel code;
+  - otherwise `SELLER_CHANNEL_FAILED`.
+
+  Refusals a buyer can cause (`PAYMENT_SESSION_INVALID`, `_BINDING`, `_BUSY`,
+  `_CLOSED`, `_LIMIT`) are `warn`; the rest are `error`. The error text is never
+  kept: it can hold transactions, addresses or RPC URLs.
+
 - **Cleanup.** `withDiagnosticCleanup` records cleanup failures separately and
   preserves the original thrown value, including `undefined`. A cleanup failure
   after successful work still fails the operation. Nested receipt-startup

@@ -4,6 +4,7 @@ import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import {
+  PaymentSessionError,
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
@@ -134,7 +135,14 @@ async function verifyFirstOpening(
     options.operationMs,
   );
   if (!verified.isValid || verified.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+    throw new PaymentSessionError(SESSION_CODES.UNVERIFIED, {
+      cause: sdkReason(verified.invalidReason),
+    });
+}
+// The SDK's failure name (an `invalid_batch_settlement_svm_*` reason) as an error the seller's local
+// diagnostics can match; its free-text message is never kept.
+function sdkReason(reason: unknown) {
+  return typeof reason === 'string' ? new Error(`${reason}:`) : undefined;
 }
 async function openSeller(context: BatchSellerContext, payload: string) {
   const { options, store, facilitator, requirements } = context;
@@ -202,7 +210,9 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     response.network !== requirements.network ||
     !response.transaction
   )
-    sessionFail(SESSION_CODES.UNAVAILABLE);
+    throw new PaymentSessionError(SESSION_CODES.UNAVAILABLE, {
+      cause: sdkReason(response.errorReason),
+    });
   await store.update((state) => {
     state.state = SESSION_STATES.OPEN;
     state.lastActivity = options.now();
