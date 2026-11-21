@@ -61,6 +61,7 @@ Open `?screen=design-system` (Settings → Preview components) to review them al
 Instrument Sans for the interface and JetBrains Mono (bundled as `GeistMono`) for
 technical values. The preview loads no remote fonts (its CSP blocks network access).
 Interface / supporting text 14 / 12 px; tables 13 px with 12 px headers.
+`?font=inter` (Settings → Interface font) switches to Inter 4.1, bundled in `fonts/` under the OFL, for comparison only.
 
 ## Interaction
 

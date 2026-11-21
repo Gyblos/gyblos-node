@@ -95,6 +95,11 @@ export async function buildPreview(output = resolve(directory, 'dist')) {
     'gyblos-mark-solid-light.svg',
   ])
     await copyFile(resolve(directory, name), resolve(output, name));
+  for (const name of ['InterVariable.woff2', 'Inter-LICENSE.txt'])
+    await copyFile(
+      resolve(directory, 'fonts', name),
+      resolve(output, 'assets', name),
+    );
   await cp(
     resolve(desktop, 'public/assets/tools'),
     resolve(output, 'assets/tools'),

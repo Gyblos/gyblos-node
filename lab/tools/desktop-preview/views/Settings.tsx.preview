@@ -10,6 +10,13 @@ import { Modal } from './Modal';
 import { Button, IconButton, PagePanel } from './UI';
 import { PreviewKitShowcase } from './PreviewKit';
 
+const FONTS = ['Instrument Sans', 'Inter'] as const;
+function chooseFont(font: (typeof FONTS)[number]) {
+  const params = new URLSearchParams(location.search);
+  if (font === 'Inter') params.set('font', 'inter');
+  else params.delete('font');
+  location.search = params.toString();
+}
 
 const SELLER_ORDER = [
   'Automatic',
@@ -66,6 +73,18 @@ export function Settings({
       <Section title="Appearance">
         <div className="preview-settings-rows preview-settings-appearance">
           <Appearance label="Theme" light={light} onLightChange={onLightChange} />
+          <div>
+            <span>
+              Interface font
+              <small className="ui-help-text">Preview only: compares the brand font with Inter.</small>
+            </span>
+            <ChoiceMenu
+              label="Interface font"
+              value={document.documentElement.dataset.font === 'inter' ? 'Inter' : 'Instrument Sans'}
+              options={FONTS}
+              onChange={chooseFont}
+            />
+          </div>
         </div>
       </Section>
       <SellerPreferences />
