@@ -165,3 +165,9 @@ export const BATCH_SDK_DIAGNOSTIC_CODES = [
   'invalid_batch_settlement_svm_refund_transaction',
   'invalid_batch_settlement_svm_payout_attribution_ambiguous',
 ] as const;
+
+// Set on a seller opening failure whose release could not be written, so the host can record it
+// separately while the opening failure stays the reported error.
+export const OPENING_RELEASE_FAILED = Symbol.for(
+  'gyblos.batch.openingReleaseFailed',
+);

@@ -39,5 +39,5 @@ export type {
 } from './batch-pool-types';
 
 export { batchSdkDiagnosticCode } from './batch-sdk-diagnostics';
-export { OPENING_RELEASE_FAILED } from './batch-session-seller';
+export { OPENING_RELEASE_FAILED } from './constants';
 export { BATCH_SDK_DIAGNOSTIC_CODES } from './constants';
