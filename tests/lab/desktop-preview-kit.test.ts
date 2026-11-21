@@ -35,3 +35,9 @@ void test('preview kit status tones follow the mockup design rules', async () =>
   for (const tone of ['success', 'warning', 'danger', 'info', 'neutral'])
     assert.match(design, new RegExp('`' + tone + '`'));
 });
+
+void test('the preview spending limit editor never finishes the payment session', async () => {
+  const payments = await readFile(new URL('Payments.tsx.preview', views), 'utf8');
+  assert.doesNotMatch(payments, /X402_ACTION\.FINISH/);
+  assert.doesNotMatch(payments, /Leave empty for no limit/);
+});
