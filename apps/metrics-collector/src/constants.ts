@@ -1,5 +1,6 @@
 // Owns the metrics collector's canonical values: wire error codes, statuses, routes, limits and binding
 // names. Upload formats and signing domains belong to protocol; receipt policy belongs to core.
+import { LOOPBACK_HOST_NAMES } from '@gyblos/config/hosts';
 
 // Static `error` values on the wire. Request input is never echoed.
 export const COLLECTOR_ERRORS = {
@@ -84,11 +85,7 @@ export const COLLECTOR_PROTOCOLS = {
   SECURE: 'https:',
   LOOPBACK: 'http:',
 } as const;
-export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
-  'localhost',
-  '127.0.0.1',
-  '[::1]',
-]);
+export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(LOOPBACK_HOST_NAMES);
 
 export const COLLECTOR_LIMITS = {
   // Above the envelope's structural maximum (about 170 KiB) plus JSON whitespace.
@@ -128,15 +125,8 @@ export type CollectorLimiterName =
 // Hex radix for envelope ids derived from signatures; not a wire value.
 export const HEX_RADIX = 16;
 
-// Fallback rate-limit key when no client address header is present (local development only).
-export const LOCAL_CLIENT_KEY = 'local';
 // Key of the shared write budget.
 export const GLOBAL_LIMIT_KEY = 'global';
-export const IPV6 = {
-  groups: 8,
-  prefixGroups: 4,
-  hexRadix: 16,
-} as const;
 
 // Aggregates (#351). Changing a formula bumps formulaVersion; rows are then rebuilt from raw.
 export const AGGREGATES = {

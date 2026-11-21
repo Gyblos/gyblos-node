@@ -748,7 +748,7 @@ Cloudflare counts it per location, so it is approximate.
 | Layer       | Files                                                                                                                                                                           |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Entry       | `src/worker.ts`: bindings, the scheduled run and the stats edge cache; inert on import.                                                                                         |
-| HTTP        | `src/app.ts`, `src/ip-key.ts`, `src/http.ts`, `src/stats-routes.ts`, `src/rpc-probe.ts`                                                                                         |
+| HTTP        | `src/app.ts`, `src/http.ts`, `src/stats-routes.ts`, `src/rpc-probe.ts`; shared runtime rate-limit key: `@gyblos/runtime/ip-key`.                                                |
 | Use cases   | `src/ingest.ts`, `src/ingest-observations.ts`, `src/stats.ts`, `src/stats-chain.ts`                                                                                             |
 | Policy      | `@gyblos/core/public-receipts`: receipt verification, classification and merge rules.                                                                                           |
 | Storage     | `src/storage.ts` (port), `src/storage-d1*.ts` and `src/storage-memory.ts` (adapters)                                                                                            |

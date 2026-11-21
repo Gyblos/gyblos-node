@@ -13,6 +13,7 @@ import {
   SESSION_CODES,
 } from '@gyblos/protocol/payment-session';
 import {
+  EXECUTION_ROUTES,
   TELEMETRY_EVENTS,
   type TelemetryEvent,
 } from '@gyblos/protocol/telemetry';
@@ -329,3 +330,33 @@ void test('a first voucher refused before reservation leaves the same channel av
   assert.equal(next.text, BLOCK_TEXT);
   assert.deepEqual(f.f.calls, ['deposit']);
 });
+for (const blocks of [true, false])
+  void test(`a paid execution reports the network route it travelled, like a free one (blocks ${blocks})`, async (t) => {
+    const records: TelemetryEvent[] = [];
+    const f = await blockProduct({
+      telemetry: {
+        sink: {
+          emit(record) {
+            records.push(record);
+          },
+          async flush() {},
+          async close() {
+            return { emitted: records.length, dropped: 0, failed: false };
+          },
+        },
+        engineKind: () => ENGINE_KINDS.OLLAMA,
+      },
+      route: () => EXECUTION_ROUTES.RELAY,
+      blocks,
+    });
+    t.after(f.close);
+    await f.buyer.execute(await f.offers.quote(1), f.offers.input);
+    const completed = records.find(
+      (record) => record.type === TELEMETRY_EVENTS.COMPLETED,
+    );
+    assert.ok(completed, 'a completed observation');
+    assert.deepEqual((completed as { path?: unknown }).path, {
+      route: EXECUTION_ROUTES.RELAY,
+      routeChanged: false,
+    });
+  });

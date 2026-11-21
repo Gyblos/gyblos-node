@@ -7,7 +7,6 @@
     "./admin": "./scripts/admin.ts",
     "./app": "./src/app.ts",
     "./constants": "./src/constants.ts",
-    "./ip-key": "./src/ip-key.ts",
     "./network": "./src/network.ts",
     "./publishers": "./src/publishers.ts",
     "./registration-store": "./src/registration-store.ts",
@@ -20,6 +19,7 @@
     "./worker": "./src/worker.ts"
   },
   "dependencies": {
+    "@gyblos/config": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/identity": "workspace:*",
     "@gyblos/protocol": "workspace:*",
