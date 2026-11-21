@@ -1,4 +1,5 @@
-// Runtime helper constants, diagnostic log states, error codes and degraded-logging warning.
+// Rate-limit IP key constants, private diagnostic log states, error codes and the degraded-logging
+// warning.
 // Rate-limit key used when no client address header is present.
 export const LOCAL_CLIENT_KEY = 'local';
 
