@@ -5,9 +5,49 @@ import { useState } from 'react';
 import { Appearance } from './Appearance';
 import { BUTTON_VARIANT } from './constants';
 import { FormField, FormInput } from './Form';
-import { Section } from './Management';
+import { ChoiceMenu, Section } from './Management';
 import { Modal } from './Modal';
 import { Button, IconButton, PagePanel } from './UI';
+import { PreviewKitShowcase } from './PreviewKit';
+
+const FONTS = ['Instrument Sans', 'Inter'] as const;
+function chooseFont(font: (typeof FONTS)[number]) {
+  const params = new URLSearchParams(location.search);
+  if (font === 'Inter') params.set('font', 'inter');
+  else params.delete('font');
+  location.search = params.toString();
+}
+
+const SELLER_ORDER = [
+  'Automatic',
+  'Free first',
+  'Lowest price',
+] as const;
+function SellerPreferences() {
+  const [order, setOrder] =
+    useState<(typeof SELLER_ORDER)[number]>('Automatic');
+  return (
+    <Section title="Sellers">
+      <div className="preview-settings-rows">
+        <div>
+          <span>
+            Seller selection
+            <small className="ui-help-text">
+              Used when a model has more than one seller. Does not change
+              routing in this preview.
+            </small>
+          </span>
+          <ChoiceMenu
+            label="Seller selection"
+            value={order}
+            options={SELLER_ORDER}
+            onChange={setOrder}
+          />
+        </div>
+      </div>
+    </Section>
+  );
+}
 
 export function Settings({
   light,
@@ -22,23 +62,50 @@ export function Settings({
     () => new URLSearchParams(location.search).get('review') === 'buttons',
   );
   const [aboutOpen, setAboutOpen] = useState(false);
+  if (new URLSearchParams(location.search).get('screen') === 'design-system')
+    return (
+      <PagePanel>
+        <PreviewKitShowcase />
+      </PagePanel>
+    );
   return (
     <PagePanel>
       <Section title="Appearance">
-        <Appearance label="Theme" light={light} onLightChange={onLightChange} />
+        <div className="preview-settings-rows preview-settings-appearance">
+          <Appearance label="Theme" light={light} onLightChange={onLightChange} />
+          <div>
+            <span>
+              Interface font
+              <small className="ui-help-text">Preview only: compares the brand font with Inter.</small>
+            </span>
+            <ChoiceMenu
+              label="Interface font"
+              value={document.documentElement.dataset.font === 'inter' ? 'Inter' : 'Instrument Sans'}
+              options={FONTS}
+              onChange={chooseFont}
+            />
+          </div>
+        </div>
       </Section>
+      <SellerPreferences />
+      <Section title="About">
       <section className="preview-settings-rows">
         <div>
           <span>Design system</span>
           <Button onClick={() => setDesignOpen(true)}>View controls</Button>
         </div>
         <div>
+          <span>Preview components</span>
+          <Button onClick={() => { location.search = '?screen=design-system'; }}>Open</Button>
+        </div>
+        <div>
           <span>About Gyblos</span>
           <Button onClick={() => setAboutOpen(true)}>View details</Button>
         </div>
       </section>
+      </Section>
       {aboutOpen && (
-        <Modal title="About Gyblos" close={() => setAboutOpen(false)}>
+        <Modal title="About Gyblos" size="sm" close={() => setAboutOpen(false)}>
           <div className="ui-section">
             <p>Gyblos desktop</p>
             <p className="ui-help-text">Version {version}</p>
@@ -47,7 +114,7 @@ export function Settings({
         </Modal>
       )}
       {designOpen && (
-        <Modal title="Design system" close={() => setDesignOpen(false)}>
+        <Modal title="Design system" size="lg" close={() => setDesignOpen(false)}>
           <div className="ui-section">
             <Section title="Buttons">
               <div className="preview-settings-rows">

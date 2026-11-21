@@ -28,7 +28,10 @@ void test('Payments exposes the wallet directly and Activity lists usage without
     const source = await readFile(file, 'utf8');
     return transformBrand(source, file, 'apps/desktop') ?? source;
   };
-  assert.match(await view('Payments'), /<PagePanel>\s*<WalletOverview/);
+  assert.match(
+    await view('Payments'),
+    /<PagePanel>\s*<TabBar[\s\S]*?<WalletOverview/,
+  );
   assert.doesNotMatch(await view('Activity'), /<HistorySummary|<X402History/);
 });
 
@@ -104,7 +107,7 @@ void test('Activity and both payment methods render the shared metric cards', as
   }
 });
 
-void test('Payments presents three wallet metrics on the page and labels the address once', async () => {
+void test('Payments presents three spending metrics and shows the wallet address once', async () => {
   const { transformBrand } =
     await import('../../lab/tools/desktop-preview/brand-build');
   const file = 'apps/desktop/src/ui/Payments.tsx';
@@ -115,7 +118,7 @@ void test('Payments presents three wallet metrics on the page and labels the add
   );
   assert.ok(view);
   assert.doesNotMatch(view, /ui-wallet-overview|Wallet address · Solana/);
-  assert.match(view, /label="Wallet address"/);
+  assert.match(view, /<code title=\{address\}>/);
   assert.equal(view.match(/<StatCard\b/g)?.length, 3);
 });
 
@@ -148,10 +151,9 @@ void test('wallet and PayPal actions belong to their payment method in the previ
   const payments = await render('Payments');
   assert.match(
     payments,
-    /aria-label="USDC wallet"[\s\S]*?onClick=\{onBudget\}/,
+    /aria-label="Spending limit"[\s\S]*?onClick=\{onBudget\}/,
   );
-  assert.match(payments, /label="Chat budget"/);
-  assert.match(payments, /Edit chat budget/);
+  assert.match(payments, /label="Spending limit · USDC"/);
   assert.doesNotMatch(
     payments + (await render('X402Payments')),
     /account (budget|spending limit)/i,
@@ -225,4 +227,172 @@ void test('preview payment, session and key lists use the same table component',
     );
     assert.doesNotMatch(rendered, /<(?:DataTable|table)\b/);
   }
+});
+
+void test('preview composer keeps the tools icon, opens its menus upward and seeds past chats', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const tools = 'apps/desktop/src/ui/ChatTools.tsx';
+  const toolsSource = await readFile(tools, 'utf8');
+  const toolsView =
+    transformBrand(toolsSource, tools, 'apps/desktop') ?? toolsSource;
+  assert.match(toolsView, /trigger=\{<Wrench\b/);
+  const dropdown = 'apps/desktop/src/ui/Dropdown.tsx';
+  const dropdownSource = await readFile(dropdown, 'utf8');
+  const dropdownView =
+    transformBrand(dropdownSource, dropdown, 'apps/desktop') ?? dropdownSource;
+  assert.match(dropdownView, /anchor\.closest\('\.composer'\)/);
+  const host = await readFile('lab/tools/desktop-preview/host.ts', 'utf8');
+  assert.doesNotMatch(
+    host,
+    /setDraft\(title\)/,
+    'sample sidebar chats must contain messages, not empty drafts',
+  );
+});
+
+void test('preview menus that open upward stay glued to their trigger when their height changes', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const dropdown = 'apps/desktop/src/ui/Dropdown.tsx';
+  const dropdownSource = await readFile(dropdown, 'utf8');
+  const dropdownView =
+    transformBrand(dropdownSource, dropdown, 'apps/desktop') ?? dropdownSource;
+  assert.match(
+    dropdownView,
+    /menu\.style\.bottom = up \?/,
+    'an upward menu is anchored by its bottom edge, not a top computed from a stale height',
+  );
+  const picker = await readFile(
+    'lab/tools/desktop-preview/views/ModelDropdown.tsx.preview',
+    'utf8',
+  );
+  assert.match(
+    picker,
+    /panel\.style\.bottom = /,
+    'the seller panel follows the model menu bottom edge',
+  );
+});
+
+void test('preview model picker keeps one selection signal, short seller rows and aligned columns', async () => {
+  const picker = await readFile(
+    'lab/tools/desktop-preview/views/ModelDropdown.tsx.preview',
+    'utf8',
+  );
+  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  assert.doesNotMatch(
+    picker,
+    /' · Needs funds'|'Needs funds' : ''/,
+    'the balance line and wallet icon say a model needs funds; rows do not repeat it',
+  );
+  assert.match(picker, /\\u2060…\\u2060/, 'a shortened seller id never wraps');
+  assert.match(
+    picker,
+    /className="preview-offer-price"/,
+    'the price sits in its own column',
+  );
+  assert.match(
+    picker,
+    /'Same seller as '/,
+    'strategies that pick the same seller say so',
+  );
+  assert.match(
+    picker,
+    /preview-caret-slot/,
+    'single-seller rows keep the caret column',
+  );
+  assert.doesNotMatch(
+    css,
+    /\.preview-model-menu \.dropdown-row\[data-active\] \{\n {2}background: var\(--soft\)/,
+    'the open model row is not tinted with the accent',
+  );
+  assert.match(
+    css,
+    /\.dropdown-row\[data-strategy\] \{\n {2}align-items: flex-start;/,
+  );
+  assert.match(
+    css,
+    /\.preview-seller-flyout\)\s+\.dropdown-footer \{\n {2}margin-top: auto;/,
+  );
+  assert.match(
+    css,
+    /--preview-name-type: 'Instrument Sans'/,
+    'model names do not mix in mono digits',
+  );
+});
+
+void test('preview Connections leads with a tool grid and an inline setup guide', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const keys = await readFile(
+    'lab/tools/desktop-preview/views/UsdcApiKeys.tsx.preview',
+    'utf8',
+  );
+  assert.match(keys, /className="preview-tool-grid"/);
+  assert.match(keys, /aria-pressed=\{/, 'tool cards are toggle buttons');
+  assert.match(keys, /'Configured'/, 'each tool shows its setup state');
+  assert.match(keys, /className="preview-tool-guide"/);
+  assert.doesNotMatch(
+    keys,
+    /view === 'choose'|view === 'guide'/,
+    'tool setup no longer hides inside a modal',
+  );
+  assert.match(
+    keys,
+    /useEffect\(\(\) => setKeyCopied\(false\), \[guideKey\?\.id, tool\]\)/,
+    'the copy step is redone after picking another key or tool',
+  );
+  const chat = 'apps/desktop/src/ui/Chat.tsx';
+  const source = await readFile(chat, 'utf8');
+  const rendered = transformBrand(source, chat, 'apps/desktop') ?? source;
+  assert.ok(
+    rendered.includes('<PreviewConnectEntry'),
+    'the empty chat offers to connect a dev tool',
+  );
+});
+
+void test('preview chat answers show a skeleton while the reply is pending', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const file = 'apps/desktop/src/ui/ChatAnswer.tsx';
+  const source = await readFile(file, 'utf8');
+  const rendered = transformBrand(source, file, 'apps/desktop') ?? source;
+  assert.ok(rendered.includes('<PreviewAnswerSkeleton'));
+  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  assert.match(css, /\.preview-answer-skeleton/);
+  assert.match(
+    css,
+    /prefers-reduced-motion: reduce\)\s*\{[^}]*preview-answer-skeleton/,
+    'the shimmer stops for reduced motion',
+  );
+});
+
+void test('Compare sellers opens the detail of that model', async () => {
+  const picker = await readFile(
+    'lab/tools/desktop-preview/views/ModelDropdown.tsx.preview',
+    'utf8',
+  );
+  const row = await readFile(
+    'lab/tools/desktop-preview/views/ModelRow.tsx.preview',
+    'utf8',
+  );
+  assert.doesNotMatch(picker, /sellers in Models/);
+  assert.doesNotMatch(
+    picker + row,
+    /previewOpenModel/,
+    'the catalog rows are other models; matching them by name opened the wrong detail',
+  );
+  assert.match(picker, /setCompare\(active\)/);
+  assert.match(
+    picker,
+    /<Modal\s+title=\{compare\}\s+size="lg"[\s\S]*compareOffers\.map/,
+    'the dialog lists the sellers of the exact model being compared',
+  );
+});
+
+void test('Payments history tables become cards in narrow layouts', async () => {
+  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  assert.match(
+    css,
+    /@container \(max-width: 620px\)\s*\{[^@]*\.ui-table-region \.ui-data-table tbody tr \{\s*display: grid;/,
+  );
 });

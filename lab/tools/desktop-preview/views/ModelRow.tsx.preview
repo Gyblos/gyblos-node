@@ -1,0 +1,205 @@
+// Preview-only: a model row summarizes its sellers; a side panel holds strategy, the seller table and pinning.
+const STRATEGIES = ['Auto', 'Cheapest', 'Fastest', 'Most reliable'] as const;
+type Strategy = (typeof STRATEGIES)[number];
+const QUANTS = ['Q4_K_M', 'Q8_0', 'FP16'] as const;
+const modelChoice = new Map<string, { strategy: Strategy; pinned: string | null }>();
+type PreviewSeller = { id: string; name: string; quant: string; input: number; output: number; latency: number; uptime: number };
+function previewSellers(model: CatalogModel): PreviewSeller[] {
+  return Array.from({ length: model.providers }, (_, index) => {
+    const factor = 1 + ((index * 37) % 60) / 100;
+    const hex = ((index + 3) * 2654435761 % 65536).toString(16).padStart(4, '0');
+    return {
+      id: model.id + '-' + index,
+      name: hex + '…' + ((index + 7) * 40503 % 65536).toString(16).padStart(4, '0'),
+      quant: QUANTS[index % QUANTS.length] ?? 'Q4_K_M',
+      input: Math.round(model.input * factor * 100) / 100,
+      output: Math.round(model.output * factor * 100) / 100,
+      latency: 180 + ((index * 53) % 420),
+      uptime: 99.9 - ((index * 13) % 40) / 10,
+    };
+  });
+}
+// Synthetic public list prices (input, USD per 1M tokens) for the comparison badge.
+function listPrice(model: CatalogModel) {
+  return Math.round(model.input * (1.6 + (model.providers % 5) * 0.2) * 100) / 100;
+}
+function pick(sellers: PreviewSeller[], strategy: Strategy) {
+  const by = (score: (seller: PreviewSeller) => number) => [...sellers].sort((a, b) => score(a) - score(b))[0];
+  if (strategy === 'Cheapest') return by((s) => s.input + s.output);
+  if (strategy === 'Fastest') return by((s) => s.latency);
+  if (strategy === 'Most reliable') return by((s) => -s.uptime);
+  return by((s) => (s.input + s.output) * 10 + s.latency / 100 - s.uptime);
+}
+function ModelRow({ model, selected, canSelect, onSelect }: {
+  model: CatalogModel; selected: string; canSelect: boolean; onSelect(model: CatalogModel): void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState(() => modelChoice.get(model.id) ?? { strategy: 'Auto' as Strategy, pinned: null });
+  const sellers = previewSellers(model);
+  const prices = sellers.map((s) => s.input);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const active = sellers.find((s) => s.id === choice.pinned) ?? pick(sellers, choice.strategy);
+  const position = max > min && active ? ((active.input - min) / (max - min)) * 100 : 0;
+  const latency = Math.round(sellers.reduce((sum, s) => sum + s.latency, 0) / sellers.length);
+  const update = (next: { strategy: Strategy; pinned: string | null }) => {
+    modelChoice.set(model.id, next);
+    setChoice(next);
+  };
+  const current = canSelect && selected === model.id;
+  const mode = choice.pinned ? 'Pinned' : choice.strategy;
+  return (
+    <div className="preview-model-item" data-current={current}>
+      <button type="button" className="preview-model-head preview-model-summary" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        <ModelImage name={model.name} artwork={model.image} />
+        <span className="preview-model-copy">
+          <strong>{model.name}{current && <Check size={14} aria-label="In use" />}</strong>
+          <small>{model.family + ' · ' + model.context + ' context'}</small>
+        </span>
+        <span className="preview-model-stats">
+          <small>{sellers.length} sellers · ~{latency} ms</small>
+          {!model.free && (
+            <span className="preview-price-range" aria-label={'Input price from ' + usdPerMtok(min) + ' to ' + usdPerMtok(max)}>
+              <span>{usdPerMtok(min)}</span>
+              <span className="preview-price-track"><span style={{ left: position + '%' }} /></span>
+              <span>{usdPerMtok(max)}</span>
+            </span>
+          )}
+        </span>
+        <span className="preview-model-mode">{mode}</span>
+        <span className="ui-price">
+          <strong>{model.free ? 'Free' : 'from ' + usdPerMtok(min)}</strong>
+          <small>{model.free ? 'Community supported' : <Savings price={min} list={listPrice(model)} />}</small>
+        </span>
+        <CaretRight size={14} aria-hidden="true" />
+      </button>
+      {open && (
+        <Modal title={model.name} size="lg" close={() => setOpen(false)}>
+          <div className="preview-seller-drawer">
+            <div className="preview-model-head-line">
+              <span className="ui-help-text">{model.family + ' · ' + model.context + ' context · ' + sellers.length + ' sellers'}</span>
+              {canSelect && !current && <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => { setOpen(false); onSelect(model); }}>Use this model</Button>}
+            </div>
+            <div
+              className="preview-strategy"
+              role="radiogroup"
+              aria-label="Seller selection"
+              onKeyDown={(event) => {
+                const step =
+                  event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+                if (!step) return;
+                event.preventDefault();
+                const index = STRATEGIES.indexOf(choice.strategy);
+                const next = STRATEGIES[(index + step + STRATEGIES.length) % STRATEGIES.length] ?? 'Auto';
+                update({ strategy: next, pinned: null });
+                event.currentTarget.querySelector<HTMLButtonElement>('[data-strategy="' + next + '"]')?.focus();
+              }}
+            >
+              {STRATEGIES.map((strategy) => (
+                <button
+                  key={strategy}
+                  type="button"
+                  role="radio"
+                  data-strategy={strategy}
+                  aria-checked={!choice.pinned && choice.strategy === strategy}
+                  tabIndex={choice.strategy === strategy ? 0 : -1}
+                  onClick={() => update({ strategy, pinned: null })}
+                >
+                  {strategy}
+                </button>
+              ))}
+            </div>
+            <p className="ui-help-text">
+              {choice.pinned
+                ? 'Pinned to ' + (active?.name ?? '') + '. Unpin to let Gyblos choose again.'
+                : (choice.strategy === 'Auto' ? 'Gyblos balances price, speed and reliability' : choice.strategy + ' seller first') + ' · now ' + (active?.name ?? '') + '.'}
+            </p>
+            <SellerTable sellers={sellers} free={model.free} active={active?.id} pinned={choice.pinned}
+              onPin={(id) => update({ strategy: choice.strategy, pinned: choice.pinned === id ? null : id })} />
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+const SORTS = ['Price', 'Latency', 'Uptime'] as const;
+function SellerTable({ sellers, free, active, pinned, onPin }: {
+  sellers: PreviewSeller[]; free: boolean; active?: string; pinned: string | null; onPin(id: string): void;
+}) {
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<(typeof SORTS)[number]>('Price');
+  const [page, setPage] = useState(0);
+  const size = 6;
+  const rows = sellers
+    .filter((s) => (s.name + ' ' + s.quant).toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a, b) => sort === 'Price' ? a.input - b.input : sort === 'Latency' ? a.latency - b.latency : b.uptime - a.uptime);
+  const pages = Math.max(1, Math.ceil(rows.length / size));
+  const current = Math.min(page, pages - 1);
+  return (
+    <>
+      <div className="ui-toolbar">
+        <SearchField label="Search sellers" placeholder="Search sellers or quantization" value={query} onValueChange={(v) => { setQuery(v); setPage(0); }} />
+        <ChoiceMenu label="Sort sellers" value={sort} options={SORTS} onChange={setSort} />
+      </div>
+      <div className="preview-simple-table-region">
+        <table className="preview-simple-table">
+          <caption className="sr-only">Sellers</caption>
+          <thead><tr>
+            <th scope="col">Seller</th><th scope="col">Quant</th>
+            <th scope="col" className="preview-num">In / out · 1M</th>
+            <th scope="col" className="preview-num">Latency</th><th scope="col" className="preview-num">Uptime</th>
+            <th scope="col" className="preview-num"><span className="sr-only">Pin</span></th>
+          </tr></thead>
+          <tbody>
+            {rows.slice(current * size, current * size + size).map((s) => (
+              <tr key={s.id} data-active={s.id === active}>
+                <th scope="row">{s.name}{s.id === active && <span className="preview-model-mode">{pinned === s.id ? 'Pinned' : 'In use'}</span>}</th>
+                <td>{s.quant}</td>
+                <td className="preview-num preview-tabular">{free ? 'Free' : usdPerMtok(s.input) + ' / ' + usdPerMtok(s.output)}</td>
+                <td className="preview-num preview-tabular">{s.latency} ms</td>
+                <td className="preview-num preview-tabular">{s.uptime.toFixed(1)}%</td>
+                <td className="preview-num preview-limit-action">
+                  <Button aria-label={(pinned === s.id ? 'Unpin seller ' : 'Pin seller ') + s.name} onClick={() => onPin(s.id)}>{pinned === s.id ? 'Unpin' : 'Pin'}</Button>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && <tr><td colSpan={6}>No sellers match.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {pages > 1 && (
+        <div className="preview-pager">
+          <span className="ui-help-text" aria-live="polite">
+            {rows.length} sellers · page {current + 1} of {pages}
+          </span>
+          <Button
+            disabled={current === 0}
+            onClick={(event) => {
+              const next = current - 1;
+              setPage(next);
+              if (next === 0) {
+                const pager = event.currentTarget.parentElement;
+                requestAnimationFrame(() => pager?.querySelectorAll('button')[1]?.focus());
+              }
+            }}
+          >
+            Previous
+          </Button>
+          <Button
+            disabled={current >= pages - 1}
+            onClick={(event) => {
+              const next = current + 1;
+              setPage(next);
+              if (next >= pages - 1) {
+                const pager = event.currentTarget.parentElement;
+                requestAnimationFrame(() => pager?.querySelectorAll('button')[0]?.focus());
+              }
+            }}
+          >
+            Next
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}

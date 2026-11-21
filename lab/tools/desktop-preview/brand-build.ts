@@ -2,29 +2,17 @@
 // Shipped desktop sources and operational configuration are never changed.
 
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import type { InlineConfig, Plugin } from 'vite';
 
+import { transformCodeSamples } from './brand-code';
+import { replaceEach, replaceOnce } from './brand-replace';
 import brand from './brand.json' with { type: 'json' };
+import * as funds from './funds-build';
 
 export { brand };
 const moduleId = (value: string) => value.replaceAll('\\', '/');
-function replaceOnce(source: string, before: string, after: string) {
-  if (
-    !source.includes(before) ||
-    source.indexOf(before) !== source.lastIndexOf(before)
-  )
-    throw new Error(
-      'Desktop brand review hook changed; update the preview explicitly.',
-    );
-  return source.replace(before, after);
-}
-// Applies each replacement in order, each exactly once (replaceOnce).
-const replaceEach = (source: string, pairs: readonly [string, string][]) =>
-  pairs.reduce(
-    (text, [before, after]) => replaceOnce(text, before, after),
-    source,
-  );
 export function transformBrand(source: string, id: string, desktop: string) {
   source = source.replaceAll('\r\n', '\n');
   const target = moduleId(id);
@@ -38,6 +26,8 @@ export function transformBrand(source: string, id: string, desktop: string) {
     'SpendingHistory',
     'UsdcApiKeys',
     'UsdcApiKeyDetails',
+    'ActivitySessionDetails',
+    'ModelDropdown',
     'Settings',
   ]) {
     if (target === `${base}/src/ui/${component}.tsx`)
@@ -67,8 +57,16 @@ export function transformBrand(source: string, id: string, desktop: string) {
       ['<dt>Solana address</dt>', '<dt>Wallet address</dt>'],
     ]);
     return replaceOnce(
-      facts,
-      '      <div>\n        <dt>Network</dt>\n        <dd>Solana</dd>\n      </div>\n',
+      replaceOnce(
+        replaceOnce(
+          facts,
+          '      <div>\n        <dt>Network</dt>\n        <dd>Solana</dd>\n      </div>\n',
+          '',
+        ),
+        '      <div>\n        <dt>Private key</dt>\n        <dd>Protected on this device</dd>\n      </div>\n',
+        '',
+      ),
+      '        <strong>On this device</strong>\n',
       '',
     );
   }
@@ -81,12 +79,17 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const typed = replaceOnce(
       props,
       '  compact?: boolean;',
-      "  compact?: boolean;\n  size?: 'lg';",
+      "  compact?: boolean;\n  size?: 'sm' | 'md' | 'lg';",
+    );
+    const restoring = replaceOnce(
+      typed,
+      '  const dismissal = useRef(createModalDismissal());',
+      '  const dismissal = useRef(createModalDismissal());\n  useEffect(() => {\n    const opener = document.activeElement;\n    return () => {\n      if (opener instanceof HTMLElement && opener.isConnected)\n        requestAnimationFrame(() => opener.focus());\n    };\n  }, []);',
     );
     return replaceOnce(
-      typed,
+      restoring,
       '      ref={ref}',
-      '      data-size={size}\n      ref={ref}',
+      "      data-size={compact ? undefined : (size ?? 'md')}\n      ref={ref}",
     );
   }
   if (target === `${base}/src/ui/UI.tsx`) {
@@ -99,7 +102,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
       'utf8',
     );
     return (
-      "import { ChartBar, type Icon } from '@phosphor-icons/react';\n" +
+      "import { ChartBar, Question, type Icon } from '@phosphor-icons/react';\n" +
       source.slice(0, start) +
       card +
       source.slice(end)
@@ -170,52 +173,149 @@ export function transformBrand(source: string, id: string, desktop: string) {
       )
     );
   }
-  if (target === `${base}/src/ui/Models.tsx`)
-    return replaceOnce(
+  if (target === `${base}/src/ui/Models.tsx`) {
+    const models = replaceOnce(
       source,
       'const [network, setNetwork] = useState(false)',
       "const [network, setNetwork] = useState(() => new URLSearchParams(location.search).get('review') === 'network')",
     );
-  if (target === `${base}/src/desktop-app.tsx`)
+    const row = models.indexOf('function ModelRow(');
+    if (row < 0) throw new Error('Missing model row review hook');
+    return (
+      "import { CaretRight, Check } from '@phosphor-icons/react';\nimport { usdPerMtok } from './model-price';\nimport { Savings } from './PreviewKit';\nimport { BUTTON_VARIANT } from './constants';\n" +
+      models.slice(0, row) +
+      readFileSync(
+        new URL('./views/ModelRow.tsx.preview', import.meta.url),
+        'utf8',
+      )
+    );
+  }
+  if (target === `${base}/src/desktop-app.tsx`) {
+    const routed = replaceOnce(
+      replaceOnce(
+        replaceOnce(
+          source,
+          '<Payments\n',
+          "<Payments key={view} chat={chatController} initialTab={view === UI_VIEW.ACTIVITY ? 'activity' : undefined} selectedSession={activitySession}\n",
+        ),
+        '{view === UI_VIEW.PAYMENTS && (',
+        '{(view === UI_VIEW.PAYMENTS || view === UI_VIEW.ACTIVITY) && (',
+      ),
+      '{view === UI_VIEW.ACTIVITY && (\n            <Activity',
+      '{false && (\n            <Activity',
+    );
+    const funded = replaceEach(routed, [...funds.APP_FUNDS_REWRITES]);
     return replaceOnce(
-      replaceOnce(source, '<Payments\n', '<Payments chat={chatController}\n'),
+      replaceOnce(
+        funded,
+        '  const navigation = MAIN_NAV;\n',
+        '  const navigation = MAIN_NAV;\n  useEffect(() => { Object.assign(window, { previewNavigate: navigate }); });\n',
+      ),
       'const [light, setLight] = useState(prefersLightTheme)',
       "const [light, setLight] = useState(() => new URLSearchParams(location.search).get('theme') === 'light')",
     );
+  }
+  if (target === `${base}/src/ui/constants.ts`)
+    return replaceOnce(
+      replaceOnce(
+        source,
+        "{ name: UI_VIEW.ACTIVITY, label: 'Activity' }",
+        "{ name: UI_VIEW.ACTIVITY, label: 'Usage & payments' }",
+      ),
+      "{ name: UI_VIEW.PAYMENTS, label: 'Payments' }",
+      "{ name: UI_VIEW.PAYMENTS, label: 'Usage & payments' }",
+    );
+  if (target === `${base}/src/ui/BuyerSidebar.tsx`) {
+    const start = source.indexOf('export function BuyerSidebar(');
+    if (start < 0) throw new Error('Missing sidebar review hook');
+    return (
+      source.slice(0, start) +
+      readFileSync(
+        new URL('./views/BuyerSidebar.tsx.preview', import.meta.url),
+        'utf8',
+      )
+    );
+  }
   if (target === `${base}/src/ui/WindowTitlebar.tsx`)
     return replaceOnce(
-      source,
-      '{props.children}',
-      '<span className="preview-environment">Beta · Devnet</span>{props.children}',
+      replaceOnce(
+        "import { useState as usePreviewState } from 'react';\nimport { PREVIEW_EVENT } from './PreviewKit';\n" +
+          source +
+          readFileSync(
+            new URL('./views/NetworkSwitch.tsx.preview', import.meta.url),
+            'utf8',
+          ),
+        '{props.children}',
+        '<PreviewNetwork />{props.children}',
+      ),
+      'data-platform={platform}',
+      "data-platform={platform}\n      data-fullscreen={new URLSearchParams(location.search).get('fullscreen') === '1' || undefined}",
     );
   if (target === `${base}/src/ui/BuyerAgentSetup.tsx`)
-    return replaceEach(source, [
-      [
-        '<Button disabled={disabled} onClick',
-        '<Button variant={BUTTON_VARIANT.PRIMARY} disabled={disabled} onClick',
-      ],
-      ['Connect agent', 'Connect a tool'],
-      ['Connect an agent', 'Connect a tool'],
-      ['label="Agent"', 'label="Tool"'],
-      [
-        'Uses the models served by your local buyer.',
-        'Supports OpenAI Chat Completions, Responses and Anthropic Messages through your local buyer.',
-      ],
-    ]);
+    return (
+      "import { agentCodeLanguage, CodeBlock } from './PreviewKit';\n" +
+      replaceEach(source, [
+        [
+          '      <pre className="ui-code-block" aria-label="Generated agent configuration">\n        {preview.text}\n      </pre>',
+          '      <CodeBlock language={agentCodeLanguage(preview.tool)} title="Generated agent configuration" code={preview.text} />',
+        ],
+        [
+          '<Button disabled={disabled} onClick',
+          '<Button variant={BUTTON_VARIANT.PRIMARY} disabled={disabled} onClick',
+        ],
+        ['Connect agent', 'Connect a tool'],
+        ['Connect an agent', 'Connect a tool'],
+        ['label="Agent"', 'label="Tool"'],
+        [
+          'Uses the models served by your local buyer.',
+          'Supports OpenAI Chat Completions, Responses and Anthropic Messages through your local buyer.',
+        ],
+      ])
+    );
   if (target === `${base}/src/x402-model.ts`)
     return replaceEach(source, [
       ["'USDC · devnet'", "'USDC'"],
       ['Only Solana devnet is supported', 'Unsupported payment network'],
       [
+        'Connect a buyer with a devnet USDC channel configured in Payments.',
+        'Connect a buyer with a testnet USDC channel configured in Usage & payments.',
+      ],
+      [
         "String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')\n  );",
         "String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')\n  ).replace(/0+$/, '').replace(/\\.$/, '');",
       ],
     ]);
+  const codeSample = transformCodeSamples(source, target, base);
+  if (codeSample !== undefined) return codeSample;
+  if (target === `${base}/src/ui/Dropdown.tsx`)
+    return replaceEach(source, [...funds.MENU_REWRITES]);
+  if (target === `${base}/src/ui/BuyerFunding.tsx`)
+    return source.replaceAll(
+      'Could not open the devnet faucet.',
+      'Could not open the testnet faucet.',
+    );
+  if (target === `${base}/src/ui/ChatAnswer.tsx`)
+    return (
+      "import { PreviewAnswerSkeleton } from './PreviewKit';\n" +
+      replaceOnce(
+        source,
+        '        </AssistantProgress>\n      )}\n',
+        '        </AssistantProgress>\n      )}\n      {message.state === MESSAGE_STATE.PENDING && !message.text && <PreviewAnswerSkeleton />}\n',
+      )
+    );
   if (target === `${base}/src/ui/Chat.tsx`)
-    return replaceEach(source, [
-      ["'x402 · devnet'", "'x402'"],
-      ["'Free · Gyblos network'", "''"],
-    ]);
+    return (
+      "import { PreviewConnectEntry } from './PreviewKit';\n" +
+      replaceEach(source, [
+        [
+          '<p>Choose how to pay. Keep the conversation.</p>',
+          '<p>Choose how to pay. Keep the conversation.</p>\n              <PreviewConnectEntry />',
+        ],
+        ["'x402 · devnet'", "'x402'"],
+        ["'Free · Gyblos network'", "''"],
+        ...funds.CHAT_FUNDS_REWRITES,
+      ])
+    );
   if (target === `${base}/src/theme.ts`) {
     for (const [name, value] of Object.entries(brand.themeTokens)) {
       const pattern = new RegExp(`  ${name}: '[^']+',`);
@@ -251,6 +351,35 @@ export function reviewBrand(desktop: string): Plugin {
   return {
     name: 'desktop-brand-review',
     enforce: 'pre',
+    resolveId(source, importer) {
+      if (
+        source === './PreviewKit' &&
+        importer !== undefined &&
+        moduleId(importer).startsWith(`${moduleId(desktop)}/src/ui/`)
+      )
+        return `${desktop}/src/ui/PreviewKit.tsx`;
+      if (
+        source === './code-highlight' &&
+        importer !== undefined &&
+        moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
+      )
+        return fileURLToPath(new URL('./code-highlight.ts', import.meta.url));
+      if (
+        source === './status-tone' &&
+        importer !== undefined &&
+        moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
+      )
+        return fileURLToPath(new URL('./status-tone.ts', import.meta.url));
+      return null;
+    },
+    load(id) {
+      if (moduleId(id) !== `${moduleId(desktop)}/src/ui/PreviewKit.tsx`)
+        return null;
+      return readFileSync(
+        new URL('./views/PreviewKit.tsx.preview', import.meta.url),
+        'utf8',
+      );
+    },
     transform(source, id) {
       return transformBrand(source, id, desktop);
     },

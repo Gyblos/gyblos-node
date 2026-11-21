@@ -2,7 +2,7 @@
 // Never bundles Electron main/preload, starts native services, or reads operational configuration.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFile, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, cp, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -95,6 +95,16 @@ export async function buildPreview(output = resolve(directory, 'dist')) {
     'gyblos-mark-solid-light.svg',
   ])
     await copyFile(resolve(directory, name), resolve(output, name));
+  for (const name of ['InterVariable.woff2', 'Inter-LICENSE.txt'])
+    await copyFile(
+      resolve(directory, 'fonts', name),
+      resolve(output, 'assets', name),
+    );
+  await cp(
+    resolve(desktop, 'public/assets/tools'),
+    resolve(output, 'assets/tools'),
+    { recursive: true },
+  );
   const html = await readFile(resolve(output, 'index.html'), 'utf8');
   await writeFile(
     resolve(output, 'index.html'),

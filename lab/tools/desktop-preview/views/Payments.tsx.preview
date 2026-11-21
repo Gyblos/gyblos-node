@@ -1,6 +1,9 @@
 // Composes wallet metadata and the guarded shared PayPal session. Navigation never starts a payment.
-import { Gauge, PaypalLogo, Receipt, Wallet } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { ArrowUpRight, Gauge, Minus, PaypalLogo, Plus, Receipt, Wallet } from '@phosphor-icons/react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { ActivitySessions } from './ActivitySessions';
+import { useUsdcApiKeys } from './useUsdcApiKeys';
+import { usdcApiAmount } from '../usdc-api-model';
 import { ActivitySessionDetails } from './ActivitySessionDetails';
 
 import {
@@ -8,15 +11,16 @@ import {
   paypalPaymentSummary,
   type PaymentMethod,
 } from '../paypal-model';
-import { usageChange } from '../../../../lab/tools/desktop-preview/usage';
-import { x402Amount, x402Asset } from '../x402-model';
+import { X402_ACTION, x402Amount, x402Asset, x402BudgetInput } from '../x402-model';
+import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
-import { CopyField, FormActions } from './Form';
+import { SegmentedBar, Tag, TONE, useSpending } from './PreviewKit';
+import { FormActions } from './Form';
 import { Modal } from './Modal';
 import { PaypalSessionPanel } from './PaypalSessionPanel';
 import { SpendingHistory } from './SpendingHistory';
-import { Badge, Button, PagePanel, StatCard, StatGrid } from './UI';
+import { Badge, Button, IconButton, PagePanel, StatCard, StatGrid } from './UI';
 import type { ActivityView } from './useActivity';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
@@ -27,12 +31,23 @@ import { X402Payments } from './X402Payments';
 type AccountBudget = ReturnType<typeof import('../../../../lab/tools/desktop-preview/account-budget').accountBudgetSnapshot>;
 declare global { interface Window { previewAccountBudget: { current(): AccountBudget; baseline: AccountBudget } } }
 
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Usage' },
+  { id: 'history', label: 'Payments' },
+  { id: 'limits', label: 'Limits' },
+] as const;
+type Tab = (typeof TABS)[number]['id'];
+const isTab = (value: string | null | undefined): value is Tab => TABS.some(tab => tab.id === value);
+
 type Props = {
   chat: import('./chat-controller').ChatController;
   x402?: X402View;
   session: PaypalSessionView;
   activity: ActivityView;
   managePaypal: boolean;
+  initialTab?: Tab;
+  selectedSession?: string | null;
   onManagePaypal(open: boolean): void;
   onChat(): void;
   onConnections(): void;
@@ -41,42 +56,82 @@ type Props = {
   onAddFunds(): void;
   onPaymentMethod(method: PaymentMethod): boolean;
 };
+function TabBar({ tab, onTab }: { tab: Tab; onTab(tab: Tab): void }) {
+  const move = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const index = (TABS.findIndex(item => item.id === tab) + step + TABS.length) % TABS.length;
+    const next = TABS[index];
+    if (!next) return;
+    onTab(next.id);
+    document.getElementById('preview-tab-' + next.id)?.focus();
+  };
+  return (
+    <div className="preview-tabs" role="tablist" aria-label="Usage and payments sections" onKeyDown={move}>
+      {TABS.map(item => (
+        <button key={item.id} id={'preview-tab-' + item.id} type="button" role="tab" className="preview-tab"
+          aria-selected={tab === item.id} aria-controls="preview-tab-panel" tabIndex={tab === item.id ? 0 : -1}
+          onClick={() => onTab(item.id)}>
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 export function Payments(props: Props) {
+  const requested = new URLSearchParams(location.search).get('tab');
+  const [tab, setTab] = useState<Tab>(props.initialTab ?? (isTab(requested) ? requested : 'overview'));
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(
     () => new URLSearchParams(location.search).get('review') === 'wallet-backup',
   );
-  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(props.selectedSession ?? null);
   const entry = props.activity.state?.sessions.find(item => item.id === receiptId);
   const openPaypal = () => managePaypal(props.onPaymentMethod, () => props.onManagePaypal(true));
   const { status, statusFresh, busy } = props.session.state;
   const paypal = paypalPaymentSummary(status, statusFresh, busy);
+  const openChat = (id: string) => { props.chat.openChat(id); props.onChat(); };
   return (
     <PagePanel>
-      <WalletOverview buyer={props.x402} onBudget={() => setBudgetOpen(true)} onAddFunds={props.onAddFunds} onDetails={() => setWalletOpen(true)} />
-      <section className="ui-paypal-summary" aria-label="PayPal">
-        <span className="ui-icon-tile" aria-hidden="true"><PaypalLogo size={22} /></span>
-        <div className="ui-paypal-summary-copy">
-          <h2>PayPal</h2>
-          <span className="ui-help-text">{statusFresh || busy ? paypal.label : 'Approve a spending limit for chat and tools.'}</span>
-        </div>
-        <Button disabled={busy} onClick={openPaypal}>
-          {statusFresh ? 'Manage session' : 'Select PayPal'}
-        </Button>
-      </section>
-      <SpendingHistory
-        activity={props.activity} buyer={props.x402} chat={props.chat}
-        onActivity={setReceiptId}
-        onChat={id => { props.chat.openChat(id); props.onChat(); }}
-      />
-      {budgetOpen && props.x402 && <Modal title="Chat budget" close={() => setBudgetOpen(false)}>
+      <TabBar tab={tab} onTab={setTab} />
+      <div id="preview-tab-panel" role="tabpanel" aria-labelledby={'preview-tab-' + tab} className="preview-tab-panel">
+        {tab === 'overview' && <>
+          <SpendingSummary buyer={props.x402} onLimits={() => setTab('limits')} />
+          <section className="ui-section" aria-label="Payment methods">
+            <div className="ui-section-title"><h2>Payment methods</h2></div>
+            <ul className="preview-method-list">
+              <WalletOverview buyer={props.x402} onAddFunds={props.onAddFunds} onDetails={() => setWalletOpen(true)} />
+              <li className="preview-method-row" aria-label="PayPal">
+                <span className="ui-icon-tile" aria-hidden="true"><PaypalLogo size={18} /></span>
+                <div className="preview-method-copy">
+                  <span className="preview-method-name"><h3>PayPal</h3><Tag tone={TONE.WARNING}>Demo</Tag></span>
+                  <span className="ui-help-text">{statusFresh || busy ? paypal.label : 'Approve a session limit once and use it until the session ends.'}</span>
+                </div>
+                <div className="preview-method-actions">
+                  <Button disabled={busy} onClick={openPaypal}>{statusFresh ? 'Manage session' : 'Select PayPal'}</Button>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </>}
+        {tab === 'activity' && <ActivitySessions conversations={props.chat.getSnapshot().sessions} activity={props.activity}
+          x402={props.x402} onOpenChat={openChat} onSelect={setReceiptId} />}
+        {tab === 'history' && <SpendingHistory
+          activity={props.activity} buyer={props.x402} chat={props.chat}
+          onActivity={setReceiptId} onChat={openChat}
+        />}
+        {tab === 'limits' && <Limits buyer={props.x402}
+          onBudget={() => setBudgetOpen(true)} onConnections={props.onConnections} />}
+      </div>
+      {budgetOpen && props.x402 && <Modal title="Spending limit" close={() => setBudgetOpen(false)}>
         <X402Payments buyer={props.x402} onSaved={() => setBudgetOpen(false)} />
       </Modal>}
       {entry && <ActivitySessionDetails entry={entry}
         reference={props.activity.references.references.find(item => item.sessionId === entry.id)}
         onCopyReference={() => props.activity.copyReference(entry.id)}
         conversations={props.chat.getSnapshot().sessions} close={() => setReceiptId(null)}
-        onOpenChat={id => { props.chat.openChat(id); props.onChat(); }}
+        onOpenChat={openChat}
         onPayments={openPaypal} canReview={false}
       />}
       {props.managePaypal && (
@@ -88,16 +143,6 @@ export function Payments(props: Props) {
               props.onChat();
             }}
           />
-          <FormActions align="start">
-            <Button
-              onClick={() => {
-                props.onManagePaypal(false);
-                props.onConnections();
-              }}
-            >
-              Connect a tool
-            </Button>
-          </FormActions>
         </Modal>
       )}
       {walletOpen && (
@@ -117,45 +162,255 @@ export function Payments(props: Props) {
     </PagePanel>
   );
 }
+function accountAmount(atomic: string) {
+  const account = window.previewAccountBudget.current();
+  return x402Amount(atomic, account) + ' ' + x402Asset(account);
+}
+function SpendingSummary({ buyer, onLimits }: { buyer?: X402View; onLimits(): void }) {
+  const { spent, limit, limited, remaining } = useSpending(buyer);
+  return (
+    <section className="ui-section preview-spending" aria-label="Spending">
+      <div className="ui-section-title">
+        <h2>Spending</h2>
+        <Button onClick={onLimits}><Gauge size={16} />Spending limits</Button>
+      </div>
+      <StatGrid>
+        <StatCard label="Spent · USDC" help="USDC paid for chat replies and API key requests. Free models cost nothing." value={accountAmount(String(spent))} detail="Chat and API keys" icon={Receipt} />
+        <StatCard label="Spending limit · USDC" help="The most this wallet can spend across chat and every API key. New requests stop when it is reached." value={limited ? accountAmount(String(limit)) : 'No limit'} detail="Covers chat and every API key" icon={Gauge} />
+        <StatCard label="Remaining · USDC" help="Spending limit minus what is already spent. Your wallet balance can still be lower." value={limited ? accountAmount(String(remaining)) : 'No limit'} icon={Wallet} />
+      </StatGrid>
+    </section>
+  );
+}
+function Limits({ buyer, onBudget, onConnections }: {
+  buyer?: X402View; onBudget(): void; onConnections(): void;
+}) {
+  const { keys, spent, limit, limited, remaining } = useSpending(buyer);
+  const policy = buyer?.state.policy;
+  const percent = limited && limit > 0n ? Number((spent * 10000n) / limit) / 100 : 0;
+  const active = (keys?.keys ?? []).filter(key => !key.revoked);
+  const keySpend = (keys?.keys ?? []).reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
+  const revokedSpend = keySpend - active.reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
+  return (
+    <>
+      <div className="preview-usage-grid">
+        <section className="preview-panel" aria-label="Limit used">
+          <h3>Spending limit used</h3>
+          <div className="preview-panel-row">
+            <span>{limited ? accountAmount(String(spent)) + ' of ' + accountAmount(String(limit)) : accountAmount(String(spent)) + ' spent'}</span>
+            <span className="ui-help-text">{limited ? percent.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '% used' : 'No limit'}</span>
+          </div>
+          <SegmentedBar
+            label="Spending by source"
+            total={Number(limited ? limit : spent)}
+            format={(value) => accountAmount(String(value))}
+            segments={[
+              { label: 'Chat', value: Number(spent - keySpend), tone: TONE.INFO },
+              ...active.map((key, index) => ({ label: key.name, value: Number(BigInt(key.spentAtomic)), tone: index % 2 ? TONE.WARNING : TONE.SUCCESS })),
+              ...(revokedSpend > 0n ? [{ label: 'Revoked keys', value: Number(revokedSpend), tone: TONE.NEUTRAL }] : []),
+            ]}
+          />
+        </section>
+        <section className="preview-panel" aria-label="Spending breakdown">
+          <h3>Spending</h3>
+          <div className="preview-panel-row"><span>Chat</span><strong>{accountAmount(String(spent - keySpend))}</strong></div>
+          <div className="preview-panel-row"><span>API keys</span><strong>{accountAmount(String(keySpend))}</strong></div>
+          <div className="preview-panel-row"><span>Remaining</span><strong>{limited ? accountAmount(String(remaining)) : 'No limit'}</strong></div>
+        </section>
+      </div>
+      <section className="ui-section" aria-label="Spending limit">
+        <div className="preview-settings-rows">
+          {buyer && policy
+            ? <LimitRow key={String(limited) + String(limit)} buyer={buyer} policy={policy} spent={spent} current={limit} limited={limited} />
+            : <div>
+                <span>Spending limit<small className="ui-help-text">Start the buyer to set a limit.</small></span>
+                <Button disabled={!buyer} onClick={onBudget}>Set up buyer</Button>
+              </div>}
+        </div>
+      </section>
+      <section className="ui-section" aria-label="API key limits">
+        <div className="ui-section-title">
+          <h2>API keys</h2>
+          <Button onClick={onConnections}>Manage keys</Button>
+        </div>
+        <p className="ui-help-text">Each key can have its own limit inside the spending limit.</p>
+        <div className="preview-simple-table-region">
+          <table className="preview-simple-table">
+            <caption className="sr-only">API key limits</caption>
+            <thead>
+              <tr>
+                <th scope="col">Key</th>
+                <th scope="col" className="preview-num">Used / limit</th>
+                <th scope="col" className="preview-num"><span className="sr-only">Action</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {active.map(key => <tr key={key.id}>
+                <th scope="row">{key.name}</th>
+                <td className="preview-num preview-tabular">{usdcApiAmount(key.spentAtomic, keys!.scope)} / {usdcApiAmount(key.limitAtomic, keys!.scope)}</td>
+                <td className="preview-num preview-limit-action">
+                  <IconButton label={'Manage ' + key.name + ' in Connections'} onClick={onConnections}><ArrowUpRight size={14} /></IconButton>
+                </td>
+              </tr>)}
+              {!active.length && <tr><td colSpan={3}>No API keys yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}
+export function CompactAmount({ id, value, onChange, unit, parse, format, step, invalid, placeholder, describedBy, onEnter, onEscape }: {
+  id: string; value: string; onChange(value: string): void; unit: string;
+  parse(value: string): bigint | null; format(atomic: bigint): string; step: bigint;
+  invalid: boolean; placeholder?: string; describedBy?: string; onEnter?(): void; onEscape?(): void;
+}) {
+  const atomic = value.trim() ? parse(value.trim()) : null;
+  const nudge = (direction: bigint) => {
+    const next = (atomic ?? 0n) + direction * step;
+    onChange(format(next > 0n ? next : 0n));
+  };
+  return (
+    <div className="preview-compact-amount" data-invalid={invalid}>
+      <IconButton label={'Decrease by ' + format(step) + ' ' + unit} disabled={!atomic} onClick={() => nudge(-1n)}><Minus size={13} /></IconButton>
+      <input id={id} inputMode="decimal" autoComplete="off" placeholder={placeholder} value={value}
+        aria-invalid={invalid} aria-describedby={describedBy}
+        onChange={event => onChange(event.target.value.replace(',', '.'))}
+        onKeyDown={event => {
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); nudge(event.key === 'ArrowUp' ? 1n : -1n); }
+          if (event.key === 'Enter' && onEnter) { event.preventDefault(); onEnter(); }
+          if (event.key === 'Escape' && onEscape) { event.preventDefault(); onEscape(); }
+        }} />
+      <span className="preview-amount-unit">{unit}</span>
+      <IconButton label={'Increase by ' + format(step) + ' ' + unit} onClick={() => nudge(1n)}><Plus size={13} /></IconButton>
+    </div>
+  );
+}
+export function AmountEditor({ id, label, value, onChange, unit, presets, empty, parse, format, step, error, help, onEnter, disabled = false, autoFocus = false }: {
+  id: string; label: string; value: string; onChange(value: string): void; unit: string;
+  presets: readonly { value: string; label: string }[]; empty?: { label: string; placeholder: string };
+  parse(value: string): bigint | null; format(atomic: bigint): string; step: bigint;
+  error: string; help: ReactNode; onEnter?(): void; disabled?: boolean; autoFocus?: boolean;
+}) {
+  const text = value.trim();
+  const atomic = text ? parse(text) : null;
+  const nudge = (direction: bigint) => {
+    const next = (atomic ?? 0n) + direction * step;
+    onChange(format(next > 0n ? next : 0n));
+  };
+  return (
+    <div className="preview-amount-editor">
+      <label htmlFor={id} className="preview-limit-label">{label}</label>
+      <div className="preview-amount-field" data-invalid={!!error}>
+        <IconButton label={'Decrease by ' + format(step) + ' ' + unit} disabled={disabled || !atomic} onClick={() => nudge(-1n)}><Minus size={14} /></IconButton>
+        <input id={id} autoFocus={autoFocus} inputMode="decimal" autoComplete="off" placeholder={empty?.placeholder} disabled={disabled}
+          value={value} aria-invalid={!!error} aria-describedby={id + '-help'}
+          onChange={event => onChange(event.target.value.replace(',', '.'))}
+          onKeyDown={event => {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); nudge(event.key === 'ArrowUp' ? 1n : -1n); }
+            if (event.key === 'Enter' && onEnter) { event.preventDefault(); onEnter(); }
+          }} />
+        <span className="preview-amount-unit">{unit}</span>
+        <IconButton label={'Increase by ' + format(step) + ' ' + unit} disabled={disabled} onClick={() => nudge(1n)}><Plus size={14} /></IconButton>
+      </div>
+      <div className="preview-amount-presets" role="group" aria-label="Quick amounts">
+        {presets.map(preset => (
+          <button key={preset.value} type="button" disabled={disabled} aria-pressed={text === preset.value} onClick={() => onChange(preset.value)}>{preset.label}</button>
+        ))}
+        {empty && <button type="button" disabled={disabled} aria-pressed={!text} onClick={() => onChange('')}>{empty.label}</button>}
+      </div>
+      <p id={id + '-help'} className={error ? 'preview-field-error' : 'ui-help-text'} role={error ? 'alert' : undefined}>{error || help}</p>
+    </div>
+  );
+}
+function atomicOf(value: string, policy: BuyerApiPolicy) {
+  try {
+    return BigInt(x402BudgetInput(value, policy));
+  } catch {
+    return null;
+  }
+}
+function LimitRow({ buyer, policy, spent, current, limited }: {
+  buyer: X402View; policy: BuyerApiPolicy; spent: bigint; current: bigint; limited: boolean;
+}) {
+  const initial = limited ? x402Amount(String(current), policy) : '';
+  const [amount, setAmount] = useState(initial);
+  const [saveError, setSaveError] = useState('');
+  const text = amount.trim();
+  const atomic = text ? atomicOf(text, policy) : null;
+  const dirty = text !== initial;
+  const error = !text
+    ? dirty ? 'Enter a spending limit.' : ''
+    : atomic === null
+    ? 'Enter an amount with up to 6 decimals.'
+    : atomic !== null && atomic < spent
+      ? 'Must cover the ' + accountAmount(String(spent)) + ' already spent.'
+      : '';
+  const save = () => {
+    if (!dirty || error || buyer.busy) return;
+    setSaveError('');
+    if (atomic === null) return;
+    void buyer.run({ action: X402_ACTION.AUTHORIZE, limitAtomic: String(atomic) })
+      .then(result => { if (!result || result.error) setSaveError(result?.error ?? 'Could not save the limit.'); })
+      .catch(() => setSaveError('Could not save the limit.'));
+  };
+  return (
+    <div className="preview-setting-row">
+      <label htmlFor="spending-limit-input" className="preview-setting-copy">
+        Spending limit
+        <small id="spending-limit-help" className={error || saveError ? 'preview-field-error' : 'ui-help-text'} role={error || saveError ? 'alert' : undefined}>
+          {error || saveError || (dirty && atomic !== null
+            ? accountAmount(String(atomic - spent)) + ' left after saving.'
+            : 'Covers chat and every API key.')}
+        </small>
+      </label>
+      <div className="preview-setting-control">
+        {dirty && (
+          <div className="preview-dirty-actions">
+            <Button onClick={() => { setAmount(initial); setSaveError(''); }}>Cancel</Button>
+            <Button variant={BUTTON_VARIANT.PRIMARY} disabled={!!error || buyer.busy} onClick={save}>Save</Button>
+          </div>
+        )}
+        <CompactAmount id="spending-limit-input" unit="USDC" value={amount} onChange={setAmount} placeholder="0"
+          parse={value => atomicOf(value, policy)} format={value => x402Amount(String(value), policy)}
+          step={atomicOf('0.5', policy) ?? 1n} invalid={!!error} describedBy="spending-limit-help"
+          onEnter={save} onEscape={() => setAmount(initial)} />
+      </div>
+    </div>
+  );
+}
 function WalletOverview({
   buyer,
-  onBudget,
   onAddFunds,
   onDetails,
 }: {
   buyer?: X402View;
-  onBudget(): void;
   onAddFunds(): void;
   onDetails(): void;
 }) {
   const wallet = useDesktopWallet();
-  const account = window.previewAccountBudget.current();
-  const amount = (atomic: string) => x402Amount(atomic, account) + ' ' + x402Asset(account);
-  const changeSinceOpen = (field: 'limitAtomic' | 'spentAtomic') =>
-    usageChange(Number(account[field]), Number(window.previewAccountBudget.baseline[field]));
   const ready = wallet.status === WALLET_STATUS.READY;
+  const address = wallet.address;
   return (
-    <section className="ui-section" aria-label="USDC wallet">
-      <div className="ui-section-title">
-        <h2>USDC wallet</h2>
-        <FormActions align="start">
-        <Badge>
-          {ready
-            ? wallet.backupVerified
-              ? 'Backup verified'
-              : 'Backup needed'
-            : wallet.status === WALLET_STATUS.LOCKED ? 'Locked' : 'Not available'}
-        </Badge>
-        {buyer && <Button onClick={onBudget}><Gauge size={16} />Edit chat budget</Button>}
-        </FormActions>
+    <li className="preview-method-row" aria-label="USDC wallet">
+      <span className="ui-icon-tile" aria-hidden="true"><Wallet size={18} /></span>
+      <div className="preview-method-copy">
+        <span className="preview-method-name">
+          <h3>USDC wallet</h3>
+          <Tag tone={!ready ? TONE.NEUTRAL : wallet.backupVerified ? TONE.SUCCESS : TONE.WARNING} dot>
+            {ready
+              ? wallet.backupVerified
+                ? 'Backup verified'
+                : 'Backup needed'
+              : wallet.status === WALLET_STATUS.LOCKED ? 'Locked' : 'Not available'}
+          </Tag>
+        </span>
+        <span className="ui-help-text">
+          {buyer ? 'Pay per reply' : 'Buyer not started'}
+          {address && <> · <code title={address}>{address.slice(0, 4)}…{address.slice(-4)}</code></>}
+        </span>
       </div>
-      <StatGrid>
-        <StatCard label="Available balance" value="Unavailable" icon={Wallet} />
-        <StatCard label="Chat budget" value={buyer?.state.summary.active ? amount(account.limitAtomic) : 'No total limit'} change={changeSinceOpen('limitAtomic')} comparison="Since the preview opened" icon={Gauge} />
-        <StatCard label="Chat spending" value={amount(account.spentAtomic)} change={changeSinceOpen('spentAtomic')} comparison="Since the preview opened" icon={Receipt} />
-      </StatGrid>
-      <WalletAddress />
-      <FormActions align="start">
+      <div className="preview-method-actions">
         <Button
           variant={BUTTON_VARIANT.PRIMARY}
           disabled={!wallet.fundingEnabled}
@@ -163,36 +418,8 @@ function WalletOverview({
         >
           Add funds
         </Button>
-        <Button onClick={onDetails}>Wallet details</Button>
-      </FormActions>
-    </section>
-  );
-}
-function WalletAddress() {
-  const wallet = useDesktopWallet();
-  const [notice, setNotice] = useState('');
-  return (
-    <>
-      <CopyField
-        id="wallet-address"
-        label="Wallet address"
-        value={wallet.address ?? 'Not available'}
-        actionLabel="Copy address"
-        disabled={!wallet.address}
-        onCopy={() => {
-          if (wallet.address)
-            void window.desktopWallet
-              ?.copyAddress(wallet.address)
-              .then((ok) =>
-                setNotice(ok ? 'Address copied.' : 'Could not copy address.'),
-              )
-              .catch(() => setNotice('Could not copy address.'));
-        }}
-      />
-
-      <span className="sr-only" role="status">
-        {notice}
-      </span>
-    </>
+        <Button onClick={onDetails}>Details</Button>
+      </div>
+    </li>
   );
 }

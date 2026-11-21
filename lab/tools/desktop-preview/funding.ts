@@ -1,5 +1,13 @@
 import { DEVNET } from '@gyblos/config/network';
 
+declare global {
+  interface Window {
+    previewFunds?: { atomic: number; open: boolean };
+  }
+}
+
+const READY_ATOMIC = 2_000_000;
+
 export function previewFunding(query: URLSearchParams, payer: string) {
   return {
     balance: async () =>
@@ -8,7 +16,10 @@ export function previewFunding(query: URLSearchParams, payer: string) {
         : {
             network: DEVNET,
             payer,
-            balanceAtomic: query.get('funding') === 'ready' ? '2000000' : '0',
+            balanceAtomic: String(
+              window.previewFunds?.atomic ??
+                (query.get('funding') === 'ready' ? READY_ATOMIC : 0),
+            ),
             faucetAvailable: true,
             channelRemainingAtomic: null,
           },

@@ -111,18 +111,18 @@ function AccountBudgetForm({ buyer, policy, onSaved }: {
         const limitAtomic = amount.trim() && x402BudgetInput(amount, policy);
         const result = await buyer.run(limitAtomic ? { action: X402_ACTION.AUTHORIZE, limitAtomic } : { action: X402_ACTION.FINISH });
         if (result && !result.error) onSaved();
-        else setError(result?.error ?? 'Could not save the budget.');
+        else setError(result?.error ?? 'Could not save the limit.');
       } catch (failure) {
         setError(failure instanceof Error ? failure.message : 'Enter a valid amount.');
       }
     }}>
-      <FormField htmlFor="account-budget" label="Optional chat limit · USDC">
+      <FormField htmlFor="account-budget" label="Spending limit · USDC">
         <FormInput id="account-budget" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} />
       </FormField>
-      <p className="ui-help-text">Leave blank for no total chat limit. The maximum per response still applies.</p>
+      <p className="ui-help-text">Covers chat and every API key. Leave blank for no limit. The maximum per response still applies.</p>
       {error && <p role="status">{error}</p>}
       <FormActions align="start">
-        <Button type="submit" disabled={buyer.busy || buyer.state.summary.blocked} variant={BUTTON_VARIANT.PRIMARY}>Save budget</Button>
+        <Button type="submit" disabled={buyer.busy || buyer.state.summary.blocked} variant={BUTTON_VARIANT.PRIMARY}>Save limit</Button>
       </FormActions>
     </form>
   );
