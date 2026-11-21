@@ -43,6 +43,7 @@ void test('the preview spending limit editor never finishes the payment session'
   );
   assert.doesNotMatch(payments, /X402_ACTION\.FINISH/);
   assert.doesNotMatch(payments, /Leave empty for no limit/);
+  assert.match(payments, /!text\s*\?\s*dirty\s*\?\s*'Enter a spending limit\.'\s*:\s*''/);
 });
 
 void test('preview status tones map desktop payment statuses as DESIGN.md documents', async () => {
