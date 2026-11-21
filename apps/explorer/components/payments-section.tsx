@@ -20,7 +20,7 @@ import {
 } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
 import { DISPLAY, UNITS } from '../lib/constants';
-import { count, usdc, usdcDecimal, utc } from '../lib/format';
+import { count, settlementCount, usdc, usdcDecimal, utc } from '../lib/format';
 import type { RangeDays } from '../lib/range';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
@@ -169,7 +169,7 @@ function SettledChart({
     day: day.day,
     value: Number(day.settled) / UNITS.atomicPerUsdc,
     amount: usdcDecimal(day.settled),
-    detail: `${count(day.settles)} settlements`,
+    detail: settlementCount(day.settles),
   }));
   if (!points.length) return null;
   return (

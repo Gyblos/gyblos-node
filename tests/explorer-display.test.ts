@@ -12,7 +12,11 @@ import { hoveredPoint } from '@gyblos/explorer/board-hovered';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
 import { FETCH } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
-import { tokensPerSecond, usdcDecimal } from '@gyblos/explorer/format';
+import {
+  settlementCount,
+  tokensPerSecond,
+  usdcDecimal,
+} from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { summarizeOffers } from '@gyblos/explorer/offers';
@@ -20,6 +24,13 @@ import { parseRange, rangeQuery } from '@gyblos/explorer/range';
 import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
 
 const realFetch = globalThis.fetch;
+
+void test('settlement counts use singular only for one settlement', () => {
+  assert.equal(settlementCount(0), '0 settlements');
+  assert.equal(settlementCount(1), '1 settlement');
+  assert.equal(settlementCount(2), '2 settlements');
+  assert.equal(settlementCount(1000), '1,000 settlements');
+});
 const realTimeout = AbortSignal.timeout.bind(AbortSignal);
 afterEach(() => {
   globalThis.fetch = realFetch;
