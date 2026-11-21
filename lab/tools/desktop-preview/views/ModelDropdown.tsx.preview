@@ -20,6 +20,7 @@ import {
 
 import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
 import { Dropdown } from './Dropdown';
+import { Modal } from './Modal';
 import { priceRange, usdPerMtok } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
@@ -178,6 +179,7 @@ export function ModelDropdown({
     networkOnly ||
     models.some((item) => item.source === MODEL_SOURCE.ANNOUNCED);
   const [active, setActive] = useState<string | null>(null);
+  const [compare, setCompare] = useState<string | null>(null);
   const balance = usePreviewBalance();
   const broke = balance === 0 && !contextLabel;
   const [, refresh] = useState(0);
@@ -270,7 +272,34 @@ export function ModelDropdown({
     };
   }, [active]);
 
+  const compareOffers = compare ? (group(models).find(([name]) => name === compare)?.[1] ?? []) : [];
   return (
+    <>
+    {compare && (
+      <Modal title={compare} size="lg" close={() => setCompare(null)}>
+        <p className="ui-help-text">{compareOffers.length + ' sellers · price per 1M tokens, in / out'}</p>
+        <div className="preview-simple-table-region">
+          <table className="preview-simple-table">
+            <caption className="sr-only">{'Sellers for ' + compare}</caption>
+            <thead><tr>
+              <th scope="col">Seller</th><th scope="col">Quant</th>
+              <th scope="col" className="preview-num">In / out · 1M</th>
+              <th scope="col" className="preview-num">Latency</th>
+            </tr></thead>
+            <tbody>
+              {compareOffers.map((item) => (
+                <tr key={item.id} data-active={item.id === model.id}>
+                  <th scope="row">{sellerName(item)}{item.id === model.id && <span className="preview-model-mode">In use</span>}</th>
+                  <td>{quantization(item)}</td>
+                  <td className="preview-num preview-tabular">{offerPrice(item)}</td>
+                  <td className="preview-num preview-tabular">{latencyOf(item)} ms</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Modal>
+    )}
     <Dropdown
       searchLabel="Search models"
       label={(label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')) + ': ' + model.name + (auto ? ', Auto' : chosenTag.has(model.name) ? ', ' + chosenTag.get(model.name) : model.free ? ', Free' : '')}
@@ -452,9 +481,8 @@ export function ModelDropdown({
                     footer
                     label={'Compare ' + offers.length + ' sellers'}
                     onClick={() => {
-                      window.previewOpenModel = active;
+                      setCompare(active);
                       close();
-                      onBrowse();
                     }}
                   />
                 </>
@@ -464,5 +492,6 @@ export function ModelDropdown({
         );
       }}
     </Dropdown>
+    </>
   );
 }

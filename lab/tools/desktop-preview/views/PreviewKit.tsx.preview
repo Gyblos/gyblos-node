@@ -304,7 +304,6 @@ export function PreviewComposerTab({
 declare global {
   interface Window {
     previewNavigate?: (view: string) => void;
-    previewOpenModel?: string;
   }
 }
 /** Placeholder lines shown under the progress label until the first words arrive. */

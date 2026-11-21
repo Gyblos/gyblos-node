@@ -33,14 +33,7 @@ function pick(sellers: PreviewSeller[], strategy: Strategy) {
 function ModelRow({ model, selected, canSelect, onSelect }: {
   model: CatalogModel; selected: string; canSelect: boolean; onSelect(model: CatalogModel): void;
 }) {
-  const [open, setOpen] = useState(() => {
-    const target = window.previewOpenModel?.toLowerCase();
-    return !!target && target.includes(model.id);
-  });
-  const hide = () => {
-    window.previewOpenModel = undefined;
-    setOpen(false);
-  };
+  const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState(() => modelChoice.get(model.id) ?? { strategy: 'Auto' as Strategy, pinned: null });
   const sellers = previewSellers(model);
   const prices = sellers.map((s) => s.input);
@@ -81,11 +74,11 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
         <CaretRight size={14} aria-hidden="true" />
       </button>
       {open && (
-        <Modal title={model.name} size="lg" close={() => hide()}>
+        <Modal title={model.name} size="lg" close={() => setOpen(false)}>
           <div className="preview-seller-drawer">
             <div className="preview-model-head-line">
               <span className="ui-help-text">{model.family + ' · ' + model.context + ' context · ' + sellers.length + ' sellers'}</span>
-              {canSelect && !current && <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => { hide(); onSelect(model); }}>Use this model</Button>}
+              {canSelect && !current && <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => { setOpen(false); onSelect(model); }}>Use this model</Button>}
             </div>
             <div
               className="preview-strategy"

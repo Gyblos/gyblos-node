@@ -371,8 +371,17 @@ void test('Compare sellers opens the detail of that model', async () => {
     'utf8',
   );
   assert.doesNotMatch(picker, /sellers in Models/);
-  assert.match(picker, /previewOpenModel = /);
-  assert.match(row, /previewOpenModel/);
+  assert.doesNotMatch(
+    picker + row,
+    /previewOpenModel/,
+    'the catalog rows are other models; matching them by name opened the wrong detail',
+  );
+  assert.match(picker, /setCompare\(active\)/);
+  assert.match(
+    picker,
+    /<Modal\s+title=\{compare\}\s+size="lg"[\s\S]*compareOffers\.map/,
+    'the dialog lists the sellers of the exact model being compared',
+  );
 });
 
 void test('Payments history tables become cards in narrow layouts', async () => {
