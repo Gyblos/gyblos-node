@@ -10,7 +10,14 @@ function PreviewNetwork() {
       className="preview-network"
       role="radiogroup"
       aria-label="Network"
-      title={network === 'Testnet' ? 'Testnet uses test funds and is turned off on December 9.' : 'Mainnet uses real USDC.'}
+      title={network === 'Testnet' ? 'Testnet uses test funds and is turned off on December 9.' : 'Mainnet is shown for review; the preview keeps example data.'}
+      onKeyDown={(event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        const next = network === 'Testnet' ? 'Mainnet' : 'Testnet';
+        setNetwork(next);
+        event.currentTarget.querySelector<HTMLButtonElement>('[data-network="' + next.toLowerCase() + '"]')?.focus();
+      }}
     >
       {PREVIEW_NETWORKS.map((item) => (
         <button
@@ -18,6 +25,7 @@ function PreviewNetwork() {
           type="button"
           role="radio"
           aria-checked={network === item}
+          tabIndex={network === item ? 0 : -1}
           data-network={item.toLowerCase()}
           onClick={() => setNetwork(item)}
         >
