@@ -503,24 +503,25 @@ only what concerns Gyblos and spends as few RPC calls as possible:
 
 **RPC probe.** `GET /v1/admin/rpc-probe` lets the operator check every endpoint
 the index may use before relying on it. It is a route like the others, behind
-the same https check, fail-closed check, per-address limit and headers. It
-answers only while the `COLLECTOR_ADMIN_TOKEN` secret is set to at least 32
-random characters (only the length is checked) and the request carries
-`Authorization: Bearer <token>` matching it (compared by SHA-256 digest in
-constant time); otherwise it is the same `404 NOT_FOUND` as an unknown path. It
-calls the public devnet RPC, then `COLLECTOR_SOLANA_RPC_URL`, then
-`COLLECTOR_SOLANA_RPC_FALLBACK_URL`, each even when an earlier one failed, with
-two requests each: the genesis check, then one page of the program's signature
-list (`before=<signature>` pages back; any other value is ignored). A key that
-is set but not a usable URL shows as not configured. Per endpoint it returns
-static facts only: whether it is configured, whether it answered and in how many
-milliseconds, the page's length, failed transactions, memos, Gyblos opens,
-signatures without a block time, newest and oldest time and slot, and the last
-signature; on failure, a fixed reason (the HTTP status, the JSON-RPC error code,
-the unreadable field, or the error's class name) and whether it was a refusal
-(403, 429 or the RPC's limit code) or a wrong network. It never returns a URL, a
-key or a provider's error message, its answer is `no-store`, and it writes
-nothing.
+the same https check, fail-closed check (`503 COLLECTOR_UNAVAILABLE` without
+storage or a limiter) and headers, and it spends the per-address upload budget
+(`COLLECTOR_IP_LIMITER`), not the stats read budget. It answers only while the
+`COLLECTOR_ADMIN_TOKEN` secret is set to at least 32 random characters (only the
+length is checked) and the request carries `Authorization: Bearer <token>`
+matching it (compared by SHA-256 digest in constant time); otherwise it is the
+same `404 NOT_FOUND` as an unknown path. It calls the public devnet RPC, then
+`COLLECTOR_SOLANA_RPC_URL`, then `COLLECTOR_SOLANA_RPC_FALLBACK_URL`, each even
+when an earlier one failed, with two requests each: the genesis check, then one
+page of the program's signature list (`before=<signature>` pages back; any other
+value is ignored). A key that is set but not a usable URL shows as not
+configured. Per endpoint it returns static facts only: whether it is configured,
+whether it answered and in how many milliseconds, the page's length, failed
+transactions, memos, Gyblos opens, signatures without a block time, newest and
+oldest time and slot, and the last signature; on failure, a fixed reason (the
+HTTP status, the JSON-RPC error code, the unreadable field, or the error's class
+name) and whether it was a refusal (403, 429 or the RPC's limit code) or a wrong
+network. It never returns a URL, a key or a provider's error message, its answer
+is `no-store`, and it writes nothing.
 
 **What is read, and when.** Finalized data, newest first, in five phases:
 
