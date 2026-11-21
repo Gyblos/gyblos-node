@@ -6,6 +6,7 @@ import {
   Check,
   CurrencyCircleDollar,
   Lightning,
+  Plus,
   ShieldCheck,
   Sparkle,
   Wallet,
@@ -24,8 +25,8 @@ import { Modal } from './Modal';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
 import { priceRange, usdPerMtok } from './model-price';
-import { feeLabel, openPreviewFunds, PREVIEW_COPY, previewUsdc, READY_SELLER_MODES, Tag, usePreviewBalance, usePreviewSetting, type SellerMode } from './PreviewKit';
-import { Badge, MenuItem } from './UI';
+import { feeLabel, openPreviewFunds, PREVIEW_COPY, previewUsdc, READY_SELLER_MODES, Tag, TONE, usePreviewBalance, usePreviewSetting, type SellerMode } from './PreviewKit';
+import { Badge, Button, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
 
@@ -82,12 +83,26 @@ function recommended(offers: readonly ModelOption[]) {
   ];
   return picks.filter((pick): pick is { label: SellerMode; icon: Icon; item: ModelOption } => !!pick.item);
 }
-function groupPrice(offers: readonly ModelOption[]) {
-  const paid = offers.filter((item) => !item.free);
-  const cheapest = paid.sort((a, b) => a.input - b.input)[0];
-  const sellers = offers.length + (offers.length === 1 ? ' seller' : ' sellers');
-  if (!cheapest || offers.some((item) => item.free)) return 'Free · ' + sellers;
-  return (offers.length > 1 ? 'From ' : '') + usdPerMtok(cheapest.input) + '/M · ' + sellers;
+function sellerCount(offers: readonly ModelOption[]) {
+  return offers.length + (offers.length === 1 ? ' seller' : ' sellers');
+}
+function fromPrice(offers: readonly ModelOption[]) {
+  const cheapest = offers.filter((item) => !item.free).sort((a, b) => a.input - b.input)[0];
+  return cheapest ? (offers.length > 1 ? 'from ' : '') + usdPerMtok(cheapest.input) + '/M' : null;
+}
+/** Free or Paid pill, then the input price and the number of sellers on the line below. */
+function ModelBadges({ offers, locked }: { offers: readonly ModelOption[]; locked: boolean }) {
+  const free = offers.some((item) => item.free);
+  const price = fromPrice(offers);
+  return (
+    <>
+      <Tag pill tone={free ? TONE.SUCCESS : locked ? TONE.WARNING : TONE.NEUTRAL}>{free ? 'Free' : 'Paid'}</Tag>
+      <span className="pk-badge-line">
+        {!free && price && <Tag>{price}</Tag>}
+        <Tag>{sellerCount(offers)}</Tag>
+      </span>
+    </>
+  );
 }
 function group(models: readonly ModelOption[]) {
   const groups = new Map<string, ModelOption[]>();
@@ -349,19 +364,20 @@ export function ModelDropdown({
         return (
           <>
             {!contextLabel && (
-              <p className="pk-balance-line">
-                Balance <strong>{previewUsdc(balance)}</strong>
-                {broke && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      close();
-                      openPreviewFunds();
-                    }}
-                  >
-                    Add funds
-                  </button>
-                )}
+              <p className="pk-balance-line" data-empty={broke || undefined}>
+                <Wallet size={14} aria-hidden="true" />
+                <span>Balance</span>
+                <strong>{previewUsdc(balance)}</strong>
+                <Button
+                  className="pk-balance-add"
+                  onClick={() => {
+                    close();
+                    openPreviewFunds();
+                  }}
+                >
+                  <Plus size={12} weight="bold" aria-hidden="true" />
+                  Add funds
+                </Button>
               </p>
             )}
             <div
@@ -395,7 +411,8 @@ export function ModelDropdown({
                     disabled={locked}
                     title={locked ? PREVIEW_COPY.needsFunds : undefined}
                     label={name}
-                    detail={contextLabel ?? (locked ? 'Needs funds' : groupPrice(list))}
+                    detail={contextLabel}
+                    badge={contextLabel ? undefined : <ModelBadges offers={list} locked={needsFunds(list)} />}
                     leading={<ModelImage artwork={first.image} name={name} />}
                     trailing={
                       <span className="preview-menu-trail">

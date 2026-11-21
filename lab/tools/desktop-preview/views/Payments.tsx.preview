@@ -272,7 +272,6 @@ export function CompactAmount({ id, value, onChange, unit, parse, format, step, 
   };
   return (
     <div className="preview-compact-amount" data-invalid={invalid}>
-      <IconButton label={'Decrease by ' + format(step) + ' ' + unit} disabled={!atomic} onClick={() => nudge(-1n)}><Minus size={13} /></IconButton>
       <input id={id} inputMode="decimal" autoComplete="off" placeholder={placeholder} value={value}
         aria-invalid={invalid} aria-describedby={describedBy}
         onChange={event => onChange(event.target.value.replace(',', '.'))}
@@ -282,7 +281,10 @@ export function CompactAmount({ id, value, onChange, unit, parse, format, step, 
           if (event.key === 'Escape' && onEscape) { event.preventDefault(); onEscape(); }
         }} />
       <span className="preview-amount-unit">{unit}</span>
-      <IconButton label={'Increase by ' + format(step) + ' ' + unit} onClick={() => nudge(1n)}><Plus size={13} /></IconButton>
+      <span className="preview-steppers">
+        <IconButton label={'Decrease by ' + format(step) + ' ' + unit} disabled={!atomic} onClick={() => nudge(-1n)}><Minus size={14} /></IconButton>
+        <IconButton label={'Increase by ' + format(step) + ' ' + unit} onClick={() => nudge(1n)}><Plus size={14} /></IconButton>
+      </span>
     </div>
   );
 }
@@ -302,7 +304,6 @@ export function AmountEditor({ id, label, value, onChange, unit, presets, empty,
     <div className="preview-amount-editor">
       <label htmlFor={id} className="preview-limit-label">{label}</label>
       <div className="preview-amount-field" data-invalid={!!error}>
-        <IconButton label={'Decrease by ' + format(step) + ' ' + unit} disabled={disabled || !atomic} onClick={() => nudge(-1n)}><Minus size={14} /></IconButton>
         <input id={id} autoFocus={autoFocus} inputMode="decimal" autoComplete="off" placeholder={empty?.placeholder} disabled={disabled}
           value={value} aria-invalid={!!error} aria-describedby={id + '-help'}
           onChange={event => onChange(event.target.value.replace(',', '.'))}
@@ -311,7 +312,10 @@ export function AmountEditor({ id, label, value, onChange, unit, presets, empty,
             if (event.key === 'Enter' && onEnter) { event.preventDefault(); onEnter(); }
           }} />
         <span className="preview-amount-unit">{unit}</span>
-        <IconButton label={'Increase by ' + format(step) + ' ' + unit} disabled={disabled} onClick={() => nudge(1n)}><Plus size={14} /></IconButton>
+        <span className="preview-steppers">
+          <IconButton label={'Decrease by ' + format(step) + ' ' + unit} disabled={disabled || !atomic} onClick={() => nudge(-1n)}><Minus size={14} /></IconButton>
+          <IconButton label={'Increase by ' + format(step) + ' ' + unit} disabled={disabled} onClick={() => nudge(1n)}><Plus size={14} /></IconButton>
+        </span>
       </div>
       <div className="preview-amount-presets" role="group" aria-label="Quick amounts">
         {presets.map(preset => (

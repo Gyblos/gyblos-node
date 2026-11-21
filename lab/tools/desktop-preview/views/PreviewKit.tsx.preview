@@ -22,9 +22,9 @@ export type { Tone } from './status-tone';
 export { feeLabel, marketMedian, similarFreeModel } from './market';
 export { CODE_LANGUAGE } from './code-highlight';
 
-export function Tag({ tone = TONE.NEUTRAL, dot = false, children }: { tone?: Tone; dot?: boolean; children: ReactNode }) {
+export function Tag({ tone = TONE.NEUTRAL, dot = false, pill = false, children }: { tone?: Tone; dot?: boolean; pill?: boolean; children: ReactNode }) {
   return (
-    <span className="pk-tag" data-tone={tone}>
+    <span className="pk-tag" data-tone={tone} data-pill={pill || undefined}>
       {dot && <span className="pk-dot" aria-hidden="true" />}
       {children}
     </span>
@@ -259,6 +259,8 @@ export function PreviewKitShowcase() {
     <div className="pk-showcase">
       <Panel title="Tags">
         <div className="pk-row">
+          <Tag tone={TONE.SUCCESS} pill>Free</Tag>
+          <Tag pill>Paid</Tag>
           <Tag tone={TONE.SUCCESS} dot>Active</Tag>
           <Tag tone={TONE.INFO} dot>Session open</Tag>
           <Tag tone={TONE.WARNING}>Demo</Tag>

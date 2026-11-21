@@ -1832,13 +1832,14 @@ html .app.desktop-frame .content .preview-simple-table .ui-inline-actions {
 }
 .desktop-frame .preview-amount-field {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   max-width: 420px;
-  padding: 6px 8px;
+  height: 36px;
+  padding: 0 4px 0 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--bg);
 }
 .desktop-frame .preview-amount-field:focus-within {
@@ -1855,10 +1856,10 @@ html .app.desktop-frame .content .preview-simple-table .ui-inline-actions {
   outline: 0;
   background: transparent;
   color: var(--ink);
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: left;
 }
 .desktop-frame .preview-amount-field input::placeholder {
   color: var(--muted);
@@ -2064,13 +2065,13 @@ html .app.desktop-frame .content .preview-settings-rows > .preview-setting-row {
 }
 .desktop-frame .preview-compact-amount {
   display: grid;
-  grid-template-columns: auto 96px auto auto;
+  grid-template-columns: 96px auto auto;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   height: 36px;
-  padding: 0 4px;
+  padding: 0 4px 0 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--bg);
 }
 .desktop-frame .preview-compact-amount:focus-within {
@@ -2089,13 +2090,14 @@ html .app.desktop-frame .content .preview-compact-amount input {
   font: inherit;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
-  text-align: center;
+  text-align: left;
 }
-html .app.desktop-frame .content .preview-compact-amount .ui-icon-button {
-  width: 26px;
-  min-width: 26px;
-  height: 26px;
-  min-height: 26px;
+html .app.desktop-frame .content .preview-steppers .ui-icon-button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  border-radius: 6px;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -2103,7 +2105,7 @@ html .app.desktop-frame .content .preview-compact-amount .ui-icon-button {
 html
   .app.desktop-frame
   .content
-  .preview-compact-amount
+  .preview-steppers
   .ui-icon-button:hover:not(:disabled) {
   background: var(--raised);
   color: var(--ink);
@@ -2447,6 +2449,9 @@ html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
   font-weight: 500;
   white-space: nowrap;
 }
+.desktop-frame .pk-tag[data-pill] {
+  border-radius: var(--radius-badge);
+}
 .desktop-frame .pk-dot {
   width: 6px;
   height: 6px;
@@ -2677,14 +2682,63 @@ html .app.desktop-frame .compact-dropdown .dropdown-copy {
 html .app.desktop-frame .compact-dropdown .dropdown-copy small {
   line-height: 16px;
 }
+/* Menu motion: 150 ms fade with a 0.95 scale and 2 px blur, grown from the trigger side. */
 html .app.desktop-frame .compact-dropdown {
-  translate: 0 -4px;
+  translate: none;
+  opacity: 0;
+  scale: 0.95;
+  filter: blur(2px);
+  transform-origin: top left;
+  transition:
+    opacity var(--pk-menu-motion) ease-out,
+    scale var(--pk-menu-motion) ease-out,
+    filter var(--pk-menu-motion) ease-out,
+    display var(--pk-menu-motion) allow-discrete,
+    overlay var(--pk-menu-motion) allow-discrete;
 }
 html .app.desktop-frame .compact-dropdown[data-direction='up'] {
-  translate: 0 4px;
+  translate: none;
+  transform-origin: bottom left;
 }
 html .app.desktop-frame .compact-dropdown:popover-open {
-  translate: 0 0;
+  translate: none;
+  opacity: 1;
+  scale: 1;
+  filter: none;
+}
+@starting-style {
+  html .app.desktop-frame .compact-dropdown:popover-open {
+    opacity: 0;
+    scale: 0.95;
+    filter: blur(2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html .app.desktop-frame .compact-dropdown {
+    scale: 1;
+    filter: none;
+    transition: opacity var(--pk-menu-motion) ease-out;
+  }
+}
+html .app.desktop-frame {
+  --pk-menu-motion: 150ms;
+}
+html .app.desktop-frame .compact-dropdown .dropdown-row {
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-control);
+}
+/* A trigger's caret turns while its menu is open. */
+html
+  .app.desktop-frame
+  [aria-expanded='true']
+  > :is(.preview-trigger-caret, svg:last-child:not(:only-child)) {
+  rotate: 180deg;
+}
+html
+  .app.desktop-frame
+  :is(.preview-trigger-caret, .ui-menu-trigger > svg:last-child) {
+  transition: rotate 200ms ease;
 }
 html
   .app.desktop-frame
@@ -2779,22 +2833,14 @@ html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
-  translate: -4px 0;
+  transform-origin: left center;
   transition:
-    opacity var(--motion-overlay) var(--motion-push-ease),
-    translate var(--motion-overlay) var(--motion-push-ease),
+    opacity var(--pk-menu-motion) ease-out,
+    scale var(--pk-menu-motion) ease-out,
+    filter var(--pk-menu-motion) ease-out,
     top var(--motion-overlay) var(--motion-push-ease),
-    display var(--motion-overlay) allow-discrete,
-    overlay var(--motion-overlay) allow-discrete;
-}
-html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
-  translate: 0 0;
-}
-@starting-style {
-  html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
-    opacity: 0;
-    translate: -4px 0;
-  }
+    display var(--pk-menu-motion) allow-discrete,
+    overlay var(--pk-menu-motion) allow-discrete;
 }
 html .app.desktop-frame .preview-flyout-title {
   display: grid;
@@ -2891,21 +2937,6 @@ html .app.desktop-frame .pk-balance-line strong {
   font-family: var(--font-mono);
   font-weight: 500;
   color: var(--ink);
-}
-html .app.desktop-frame .pk-balance-line button {
-  margin-left: auto;
-  padding: 2px 6px;
-  border: 0;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 600;
-  color: var(--pk-warning);
-  background: none;
-  cursor: pointer;
-}
-html .app.desktop-frame .pk-balance-line button:hover,
-html .app.desktop-frame .pk-balance-line button:focus-visible {
-  background: color-mix(in srgb, var(--pk-warning) 12%, transparent);
 }
 html .app.desktop-frame .pk-needs-funds {
   display: inline-grid;
@@ -3378,4 +3409,63 @@ html .app.desktop-frame .preview-simple-table th .pk-tag {
 }
 html .app.desktop-frame .preview-network-single .preview-network-dot {
   background: var(--connected);
+}
+
+/* Number field steppers: minus and plus together at the end of the field. */
+html .app.desktop-frame .preview-steppers {
+  display: inline-flex;
+  gap: 2px;
+}
+html .app.desktop-frame .preview-amount-field .ui-icon-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+/* Model picker rows: Free/Paid pill beside the name, price and sellers below. */
+html .app.desktop-frame .preview-model-list .ui-item-title {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+html .app.desktop-frame .preview-model-list .pk-tag {
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+html .app.desktop-frame .pk-badge-line {
+  display: flex;
+  flex-basis: 100%;
+  gap: 4px;
+}
+html .app.desktop-frame .pk-badge-line .pk-tag {
+  font-family: var(--font-mono);
+  font-weight: 450;
+}
+/* Balance line: wallet, amount and an Add funds button. */
+html .app.desktop-frame .pk-balance-line {
+  gap: 8px;
+  padding: 2px 6px 8px 8px;
+  font-size: 13px;
+  line-height: 18px;
+}
+html .app.desktop-frame .pk-balance-line[data-empty] > svg {
+  color: var(--pk-warning);
+}
+html .app.desktop-frame .pk-balance-line .ui-button.pk-balance-add {
+  gap: 4px;
+  min-height: 26px;
+  height: 26px;
+  margin-left: auto;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+/* One badge size across the mockup, matching Tag. */
+html .app.desktop-frame .ui-badge {
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+html .app.desktop-frame .pk-balance-line strong {
+  white-space: nowrap;
 }

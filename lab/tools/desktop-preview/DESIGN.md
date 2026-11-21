@@ -85,6 +85,13 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 - `SegmentedBar`: one bar split by source with a text legend (the legend carries
   the values for assistive technology).
 - `FilterChips`: single-choice filter with counts; one Tab stop, arrow keys move.
+- `Tag` `pill`: Free and Paid labels in the model picker; price and seller counts
+  use plain `Tag`s on the line below.
+- Menus (`Dropdown` panels and the seller flyout): 150 ms fade with a 0.95 scale
+  and 2 px blur, grown from the trigger side; rows use the control radius
+  (10 px) inside the 16 px panel. A trigger's caret turns while its menu is open.
+- Number fields (`CompactAmount`, `AmountEditor`): 36 px field, value on the left,
+  unit, then minus and plus together at the end (24 px steppers).
 - `Notice`: one toned line that must stay visible, such as a pinned seller being
   replaced or an answer coming from the free-model fallback.
   The composer context tab keeps its own warning layout, because it is attached

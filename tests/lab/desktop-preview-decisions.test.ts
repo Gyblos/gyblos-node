@@ -231,3 +231,22 @@ void test('preview switch geometry uses the shared radius tokens', async () => {
     /border-radius: (999px|50%)/,
   );
 });
+
+void test('preview menus, number fields and model rows follow the shared component recipe', async () => {
+  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  assert.match(css, /--pk-menu-motion: 150ms/);
+  assert.match(css, /scale: 0\.95;\n\s*filter: blur\(2px\);/);
+  assert.match(
+    css,
+    /\.pk-tag\[data-pill\] \{\n\s*border-radius: var\(--radius-badge\);/,
+  );
+  const payments = await view('Payments.tsx.preview');
+  assert.equal(
+    payments.match(/<span className="preview-steppers">/g)?.length,
+    2,
+  );
+  const dropdown = await view('ModelDropdown.tsx.preview');
+  assert.match(dropdown, /<ModelBadges offers=\{list\}/);
+  assert.match(dropdown, /\{free \? 'Free' : 'Paid'\}/);
+  assert.match(dropdown, /className="pk-balance-add"/);
+});
