@@ -215,7 +215,7 @@ function uploadEnvironment(
   const url = environment[RECEIPT_UPLOADER.urlEnvironment];
   if (
     url &&
-    url.length <= DESKTOP_X402.MAX_RELAYS_LENGTH &&
+    url.length <= DESKTOP_X402.MAX_COLLECTOR_URL_LENGTH &&
     !/[\r\n]/.test(url)
   )
     result[RECEIPT_UPLOADER.urlEnvironment] = url;

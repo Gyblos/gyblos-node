@@ -1,6 +1,10 @@
 // Composes the receipt uploader for a role's startup: release builds always upload to the collector;
 // builds without GYBLOS_VERSION upload only when GYBLOS_COLLECTOR_URL is set (tests and development).
-import { COLLECTOR_URL, RECEIPT_UPLOADER } from '@gyblos/config';
+import {
+  COLLECTOR_URL,
+  LOOPBACK_HOST_NAMES,
+  RECEIPT_UPLOADER,
+} from '@gyblos/config';
 import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 import {
   RECEIPT_UPLOAD_ARCHES,
@@ -32,11 +36,7 @@ const ARCHES: Readonly<Record<string, ReceiptUploadClient['arch']>> = {
 };
 const APP_VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
 
-const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
-  'localhost',
-  '127.0.0.1',
-  '[::1]',
-]);
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(LOOPBACK_HOST_NAMES);
 // An https URL, or http only on a loopback host; no credentials, query or fragment. Anything else
 // turns uploading off rather than sending signed receipts somewhere unexpected.
 function validCollectorUrl(value: string): string | undefined {
