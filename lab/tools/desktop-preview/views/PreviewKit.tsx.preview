@@ -16,7 +16,6 @@ import { MotionPresence } from './Motion';
 import { TONE, type Tone } from './status-tone';
 import { Button } from './UI';
 import { useUsdcApiKeys } from './useUsdcApiKeys';
-import type { X402View } from './useX402';
 
 export { statusTone, TONE } from './status-tone';
 export type { Tone } from './status-tone';
@@ -335,24 +334,22 @@ export function useSpending() {
   const spent = BigInt(account.spentAtomic) + keySpend;
   const limited = account.limited;
   const limit = BigInt(account.limitAtomic);
-  return { keys, spent, limit, limited, remaining: limit > spent ? limit - spent : 0n };
+  return { keys, spent, limit, limited, freeOnly: limited && limit === 0n, remaining: limit > spent ? limit - spent : 0n };
 }
 
 /** Context tab attached above the composer: network, balance and limit, or the funds-needed notice. */
 export function PreviewComposerTab({
   funds,
   models,
-  buyer,
   onSelectModel,
 }: {
   funds: ReturnType<typeof usePreviewFunds>;
   models: readonly { id: string; name: string; free: boolean }[];
-  buyer?: X402View;
   onSelectModel: (id: string) => void;
 }) {
   const open = useSyncExternalStore(subscribeFunds, () => fundsState().open);
   const atomic = usePreviewBalance();
-  const { spent, limit, limited } = useSpending();
+  const { spent, limit, limited, freeOnly } = useSpending();
   const percent = limited && limit > 0n ? Math.min(100, Number((spent * 100n) / limit)) : 0;
   const network = useSyncExternalStore(subscribeNetwork, () =>
     new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet',
@@ -392,7 +389,7 @@ export function PreviewComposerTab({
                 aria-hidden="true"
                 style={{ background: `conic-gradient(var(--ink) ${percent * 3.6}deg, var(--line) 0deg)` }}
               />
-              {!limited ? 'No limit' : limit === 0n ? 'Free models only' : percent + '% of limit'}
+              {!limited ? 'No limit' : freeOnly ? 'Free models only' : percent + '% of limit'}
             </span>
           </>
         )}

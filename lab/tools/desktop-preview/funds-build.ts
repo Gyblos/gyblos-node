@@ -20,7 +20,7 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
   ],
   [
     '          <ChatComposer\n            disabled={loadingHistory}',
-    '          <PreviewComposerTab funds={previewFunds} models={models} buyer={x402} onSelectModel={onSelectModel} />\n          <ChatComposer\n            disabled={loadingHistory}',
+    '          <PreviewComposerTab funds={previewFunds} models={models} onSelectModel={onSelectModel} />\n          <ChatComposer\n            disabled={loadingHistory}',
   ],
   [
     '            {limitNotice ||',

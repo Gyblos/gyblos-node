@@ -1173,7 +1173,10 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   gap: 8px 12px;
   align-items: center;
 }
-html .app.desktop-frame .preview-guide-key .preview-guide-key-trigger {
+html
+  .app.desktop-frame
+  :is(.preview-guide-key, .preview-fallback-model)
+  .preview-guide-key-trigger {
   display: inline-flex;
   gap: 8px;
   align-items: center;
@@ -1188,7 +1191,11 @@ html .app.desktop-frame .preview-guide-key .preview-guide-key-trigger {
   font-size: var(--ui-font);
   font-weight: 500;
 }
-html .app.desktop-frame .preview-guide-key .preview-guide-key-trigger > span {
+html
+  .app.desktop-frame
+  :is(.preview-guide-key, .preview-fallback-model)
+  .preview-guide-key-trigger
+  > span {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1196,7 +1203,10 @@ html .app.desktop-frame .preview-guide-key .preview-guide-key-trigger > span {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-html .app.desktop-frame .preview-guide-key .preview-guide-key-trigger:hover {
+html
+  .app.desktop-frame
+  :is(.preview-guide-key, .preview-fallback-model)
+  .preview-guide-key-trigger:hover {
   border-color: var(--control-border-hover);
 }
 .desktop-frame .preview-connect-entry {

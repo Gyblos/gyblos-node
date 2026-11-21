@@ -97,7 +97,7 @@ export function Payments(props: Props) {
       <TabBar tab={tab} onTab={setTab} />
       <div id="preview-tab-panel" role="tabpanel" aria-labelledby={'preview-tab-' + tab} className="preview-tab-panel">
         {tab === 'overview' && <>
-          <SpendingSummary buyer={props.x402} onLimits={() => setTab('limits')} />
+          <SpendingSummary onLimits={() => setTab('limits')} />
           <section className="ui-section" aria-label="Payment methods">
             <div className="ui-section-title"><h2>Payment methods</h2></div>
             <ul className="preview-method-list">
@@ -166,8 +166,8 @@ function accountAmount(atomic: string) {
   const account = window.previewAccountBudget.current();
   return x402Amount(atomic, account) + ' ' + x402Asset(account);
 }
-function SpendingSummary({ buyer, onLimits }: { buyer?: X402View; onLimits(): void }) {
-  const { spent, limit, limited, remaining } = useSpending();
+function SpendingSummary({ onLimits }: { onLimits(): void }) {
+  const { spent, limit, limited, freeOnly, remaining } = useSpending();
   return (
     <section className="ui-section preview-spending" aria-label="Spending">
       <div className="ui-section-title">
@@ -176,7 +176,7 @@ function SpendingSummary({ buyer, onLimits }: { buyer?: X402View; onLimits(): vo
       </div>
       <StatGrid>
         <StatCard label="Spent · USDC" help="USDC paid for chat replies and API key requests. Free models cost nothing." value={accountAmount(String(spent))} detail="Chat and API keys" icon={Receipt} />
-        <StatCard label="Spending limit · USDC" help="The most this wallet can spend across chat and every API key. New requests stop when it is reached." value={!limited ? 'No limit' : limit === 0n ? 'Free models only' : accountAmount(String(limit))} detail="Covers chat and every API key" icon={Gauge} />
+        <StatCard label="Spending limit · USDC" help="The most this wallet can spend across chat and every API key. New requests stop when it is reached." value={!limited ? 'No limit' : freeOnly ? 'Free models only' : accountAmount(String(limit))} detail="Covers chat and every API key" icon={Gauge} />
         <StatCard label="Remaining · USDC" help="Spending limit minus what is already spent. Your wallet balance can still be lower." value={limited ? accountAmount(String(remaining)) : 'No limit'} icon={Wallet} />
       </StatGrid>
     </section>
