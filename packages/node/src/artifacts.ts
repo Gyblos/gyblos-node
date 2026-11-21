@@ -77,7 +77,7 @@ export async function prepareModelTokenizer() {
   }
   const tokenizer = bodies[0]!;
   const config = bodies[1]!;
-  createModelTokenizer({ tokenizer, config });
+  const verified = createModelTokenizer({ tokenizer, config });
   await mkdir(directory, {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
@@ -93,5 +93,23 @@ export async function prepareModelTokenizer() {
     for (const path of paths) await rename(join(staging, basename(path)), path);
   } finally {
     await rm(staging, { recursive: true, force: true });
+  }
+  return verified;
+}
+
+// Reuse a verified local copy without contacting the artifact host. Only the public pair is prepared.
+export async function ensureModelTokenizer() {
+  try {
+    return await modelTokenizer();
+  } catch (error) {
+    // A filesystem or legacy-layout refusal is not permission to replace existing files.
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code !== 'ENOENT'
+    )
+      throw error;
+    return prepareModelTokenizer();
   }
 }

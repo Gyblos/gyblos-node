@@ -1,6 +1,8 @@
 // Public local-buyer API names; these do not change the signed inference protocol.
 export const BUYER_API = {
   STATUS_PATH: '/v1/gyblos/status',
+  PAID_PREPARATION_PATH: '/v1/gyblos/prepare-paid-chat',
+  PAID_PREPARATION_HEADER: 'gyblos-paid-preparation',
   CHANNEL_CHAT_PATH: '/v1/gyblos/channel-chat',
   FREE_ONLY_FIELD: 'gyblos_free_only',
   SELLER_CHOICE_FIELD: 'gyblos_seller_choice',
@@ -11,6 +13,7 @@ export const BUYER_API = {
   VERSION: 1,
   POLICY_CHANGED_STATUS: 412,
   POLICY_CHANGED_CODE: 'BUYER_POLICY_CHANGED',
+  TOKENIZER_UNAVAILABLE: 'BUYER_TOKENIZER_UNAVAILABLE',
   MAX_ATOMIC_DIGITS: 20,
   MAX_MODEL_LENGTH: 128,
   POLICY_PATTERN:

@@ -76,6 +76,7 @@ export const RETRIES = {
 export const HTTP_STATUS = {
   ok: 200,
   created: 201,
+  noContent: 204,
   unauthorized: 401,
   paymentRequired: 402,
   forbidden: 403,

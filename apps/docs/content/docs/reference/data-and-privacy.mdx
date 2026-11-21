@@ -32,6 +32,10 @@ A development build from a source checkout uploads no receipts or observations u
   carry no message text. The metrics collector refuses any upload with a field it does not expect, such
   as a prompt.
 
+## Desktop tokenizer download [#desktop-tokenizer]
+
+A desktop profile with paid chat enabled checks its local tokenizer when the buyer starts. If either public file is missing or fails its integrity check, the app downloads the two pinned files from Hugging Face. The provider receives the model revision and filenames in the request URL and ordinary connection information such as your IP address. The request includes no chat text, credentials or wallet details. The buyer verifies both SHA-256 hashes before installing the files. It reuses a verified local copy offline. Free-only profiles do not start the download.
+
 ## Who can read your messages [#who-reads-messages]
 
 - **The seller.** The seller that serves your request runs the model, so it can read your prompt and the

@@ -1,23 +1,35 @@
 // Prerequisites for the buyer's authenticated channel host and verified session quotes.
 import { DEVNET, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { SellerRequest } from '@gyblos/core/seller-selection';
-import { modelTokenizer } from '@gyblos/node/artifacts';
+import { recountSessionInput } from '@gyblos/core/session-input';
+import { ensureModelTokenizer, modelTokenizer } from '@gyblos/node/artifacts';
+import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
+import { PAID_BUYER_CODES } from '@gyblos/node/constants';
 import { rolePath, type RoleConfig } from '@gyblos/node/roles';
 import type { BuyerSessionBackend } from '@gyblos/node/session-backend';
+import {
+  sessionTerms,
+  type BuyerSessionPolicy,
+} from '@gyblos/node/session-policy';
 import type { BatchBuyerPool } from '@gyblos/payments-upto/batch-session';
+import { batchFail, verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import {
   MODEL_IDS,
   P2P_ROLES,
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
-import type { RecountTokenizer } from '@gyblos/protocol/engine';
+import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import type { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { FREE_BUYER_STARTUP, PAID_BUYER } from './constants';
 import { refuse } from './free-startup';
 import { paidToken } from './paid-token';
+import { UnsentSellerChoiceError } from './seller-choice-error';
 import type { SellerFailureReporter } from './seller-failures';
+import { unsentSessionPreflight } from './session-errors';
 
 export function checkPaidSellerRequest(
   request: SellerRequest,
@@ -66,6 +78,7 @@ export async function endpointToken() {
 
 export interface BuyerStartupOptions {
   desktopChosenPrices?: boolean;
+  preparePaidTokenizer?: boolean;
   telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;
   pool?: (
     role: RoleConfig,
@@ -77,4 +90,79 @@ export interface BuyerStartupOptions {
   onSellerFailure?: SellerFailureReporter;
   // Tests inject a tokenizer; the default loads the pinned one from the home.
   meter?: () => Promise<RecountTokenizer>;
+}
+
+function supportsChat(meter: RecountTokenizer): meter is ChatTokenizer {
+  return 'chat' in meter && typeof meter.chat === 'function';
+}
+
+// One verified meter per buyer process. A paid desktop policy starts preparation without delaying
+// the listener or unrelated free requests. The first paid preflight shares any download in progress.
+export function sessionMeter(maxAtomic: string, options: BuyerStartupOptions) {
+  const load =
+    options.meter ??
+    (options.preparePaidTokenizer ? ensureModelTokenizer : tokenizer);
+  let ready: Promise<ChatTokenizer> | undefined;
+  const get = () => {
+    ready ??= Promise.resolve()
+      .then(load)
+      .catch(() => {
+        // This boundary only loads a local metering prerequisite and precedes channel preparation.
+        throw new PaidBuyerError(PAID_BUYER_CODES.TOKENIZER);
+      })
+      .then((meter) => {
+        if (!supportsChat(meter))
+          return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+        return meter;
+      })
+      .catch((error: unknown) => {
+        ready = undefined;
+        throw error;
+      });
+    return ready;
+  };
+  if (options.preparePaidTokenizer && maxAtomic !== '0')
+    void get().catch(() => {});
+  return get;
+}
+
+// A seller chosen in the desktop is known to be paid. Load before asking it for a short-lived quote.
+export async function prepareChosenMeter(
+  expiresAt: number,
+  load: ReturnType<typeof sessionMeter>,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  if (expiresAt <= Date.now())
+    throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
+  await unsentSessionPreflight(load(), signal);
+  if (expiresAt <= Date.now())
+    throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
+}
+
+export function createSessionPreflight(
+  load: ReturnType<typeof sessionMeter>,
+  policy: BuyerSessionPolicy,
+  peer: () => string,
+) {
+  const check = async (
+    quote: SignedOfferV2,
+    input: Parameters<typeof recountSessionInput>[1],
+  ) => {
+    const meter = await load();
+    recountSessionInput(quote, input, meter);
+    const now = Date.now();
+    await verifyBatchQuote(
+      quote,
+      sessionTerms(quote, policy, now),
+      peer(),
+      now,
+    );
+    return meter;
+  };
+  return (
+    quote: SignedOfferV2,
+    input: Parameters<typeof recountSessionInput>[1],
+    signal: AbortSignal,
+  ) => unsentSessionPreflight(check(quote, input), signal);
 }

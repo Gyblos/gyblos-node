@@ -32,6 +32,10 @@ definas `GYBLOS_COLLECTOR_URL`.
   telemetría y los logs de diagnóstico no llevan texto de mensajes. El recolector de métricas rechaza
   cualquier envío con un campo que no espera, como un prompt.
 
+## Descarga del tokenizador en escritorio [#tokenizador-de-escritorio]
+
+Al iniciar el comprador, la app comprueba el tokenizador local si el perfil tiene el chat pagado activado. Si falta uno de los dos archivos públicos o falla la verificación, descarga ambos desde Hugging Face. El proveedor recibe la revisión del modelo y los nombres de archivo en la URL, además de datos de conexión como tu dirección IP. La petición no incluye el texto del chat, credenciales ni datos de la billetera. El comprador verifica los dos hashes SHA-256 antes de instalar los archivos. La copia verificada se puede reutilizar sin conexión. Un perfil configurado solo para uso gratis no inicia la descarga.
+
 ## Quién puede leer tus mensajes [#quién-lee-tus-mensajes]
 
 - **El vendedor.** El vendedor que atiende tu solicitud ejecuta el modelo, así que puede leer tu prompt y
