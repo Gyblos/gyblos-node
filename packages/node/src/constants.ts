@@ -473,3 +473,13 @@ export const SELLER_REGISTRATION_STATE = {
 
 // Bounded private delegated-key ledger; it never contains inference content or signed payments.
 export const BUYER_API_KEY_STORAGE = { MAX_BYTES: 262144 } as const;
+
+// Local diagnostics for failed seller payment-channel operations (`gyblos logs`). Codes come only from
+// these catalogs, never from error text.
+export const SELLER_CHANNEL_DIAGNOSTICS = {
+  component: 'seller-channel',
+  resumeBlock: 'resume-block',
+  phase: 'exchange',
+  // No catalog code was found: the cause stays unknown rather than guessed.
+  unknownCode: 'SELLER_CHANNEL_FAILED',
+} as const;

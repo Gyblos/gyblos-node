@@ -25,12 +25,18 @@ import type {
 
 import { batchLiveOffer } from './batch-generation';
 import { createSellerBatchSession } from './batch-seller';
+import { SELLER_CHANNEL_DIAGNOSTICS } from './constants';
+import {
+  sellerChannelDiagnostics,
+  type SellerChannelOperation,
+} from './seller-channel-diagnostics';
 import type { LiveSellerOffer } from './seller-offer-set';
 import type { SellerSessionBackend } from './session-backend';
 
 export interface SellerSessionOptions {
   admit?: () => Promise<void>;
   receipts?: import('./batch-seller').SellerBatchSessionOptions['receipts'];
+  diagnostics?: import('@gyblos/runtime/diagnostics').DiagnosticSink;
   telemetry?: {
     sink: import('@gyblos/protocol/telemetry').TelemetrySink;
     engineKind: (
@@ -204,9 +210,11 @@ export async function startSellerSessions(
   }
   let active: Promise<unknown> | undefined;
   let closed = false;
+  const report = sellerChannelDiagnostics(options.diagnostics);
   const run = async <T>(
     peer: string,
     signal: AbortSignal,
+    method: SellerChannelOperation,
     operation: () => Promise<T>,
   ) => {
     if (closed) return batchFail(SESSION_CODES.UNAVAILABLE);
@@ -214,7 +222,7 @@ export async function startSellerSessions(
       return batchFail(PAID_EXECUTION_CODES.PEER);
     if (active) return batchFail(SESSION_CODES.BUSY);
     signal.throwIfAborted();
-    const running = operation();
+    const running = report(method, operation);
     active = running;
     try {
       return await running;
@@ -237,7 +245,7 @@ export async function startSellerSessions(
     },
     service: {
       exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
-        run(peer, signal, () =>
+        run(peer, signal, request.method, () =>
           operation(
             options,
             state,
@@ -250,7 +258,7 @@ export async function startSellerSessions(
           ),
         ),
       resumeBlock: (approval, peer, signal) =>
-        run(peer, signal, () => {
+        run(peer, signal, SELLER_CHANNEL_DIAGNOSTICS.resumeBlock, () => {
           if (!state.current?.service.resumeBlock)
             return batchFail(SESSION_CODES.UNAVAILABLE);
           return state.current.service.resumeBlock(approval, peer, signal);

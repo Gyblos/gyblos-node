@@ -18,6 +18,10 @@ import {
   resumeSellerBlock,
 } from './batch-block-seller';
 import {
+  requireSettlementResponse,
+  requireVerifiedPayer,
+} from './batch-sdk-diagnostics';
+import {
   atomic,
   billFor,
   openingFor,
@@ -133,8 +137,7 @@ async function verifyFirstOpening(
     ),
     options.operationMs,
   );
-  if (!verified.isValid || verified.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verified, options.terms.buyer);
 }
 async function openSeller(context: BatchSellerContext, payload: string) {
   const { options, store, facilitator, requirements } = context;
@@ -182,8 +185,7 @@ async function openSeller(context: BatchSellerContext, payload: string) {
       ),
       options.operationMs,
     );
-    if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-      sessionFail(SESSION_CODES.UNVERIFIED);
+    requireVerifiedPayer(verdict, options.terms.buyer);
     await store.update((state) => {
       state.state = SESSION_STATES.OPEN;
       state.lastActivity = options.now();
@@ -197,12 +199,7 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     ),
     options.operationMs,
   );
-  if (
-    !response.success ||
-    response.network !== requirements.network ||
-    !response.transaction
-  )
-    sessionFail(SESSION_CODES.UNAVAILABLE);
+  requireSettlementResponse(response, requirements.network);
   await store.update((state) => {
     state.state = SESSION_STATES.OPEN;
     state.lastActivity = options.now();
@@ -279,8 +276,7 @@ async function acceptSeller(
     ),
     options.operationMs,
   );
-  if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verdict, options.terms.buyer);
   await store.update((state) => {
     state.voucher = voucher;
     state.cumulativeAtomic = bill.cumulativeAtomic;
@@ -316,7 +312,6 @@ async function reserveSeller(
     ),
     options.operationMs,
   );
-  if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verdict, options.terms.buyer);
   await reserve(store, request, options.now(), blocks);
 }
