@@ -258,6 +258,9 @@ importers:
 
   apps/discovery-index:
     dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@gyblos/core':
         specifier: workspace:*
         version: link:../../packages/core
