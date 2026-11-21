@@ -99,7 +99,7 @@ function releasedFor(value: unknown): true {
   if (value !== true) return sessionFail();
   return true;
 }
-export function releasedPreparation(record: BatchRecord) {
+export function emptyPreparation(record: BatchRecord) {
   return (
     record.state === SESSION_STATES.OPENING &&
     record.channelId === '' &&

@@ -18,7 +18,7 @@ import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { reserved } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
-import { releasedPreparation } from './batch-session-opening-release';
+import { emptyPreparation } from './batch-session-opening-release';
 import type { BatchPaths, BatchRecord } from './batch-session-types';
 
 export interface BatchStoredSession {
@@ -95,7 +95,7 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     ...(archivedProof ? { archivedProof: true as const } : {}),
     ...(notCreated ? { notCreated: true as const } : {}),
     ...(record.released ? { released: true as const } : {}),
-    ...(releasedPreparation(record) ? { empty: true as const } : {}),
+    ...(emptyPreparation(record) ? { empty: true as const } : {}),
     terms: record.terms,
     ...(record.history
       ? { priorSpentAtomic: String(priorBatchSpent(record)) }

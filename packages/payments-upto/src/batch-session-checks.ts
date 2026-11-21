@@ -36,9 +36,9 @@ import { coherentRecord } from './batch-session-consistency';
 import { parseBatchHistory } from './batch-session-history';
 import { strictBatchOpening } from './batch-session-opening';
 import {
+  emptyPreparation,
   releasedField,
   releasedKey,
-  releasedPreparation,
 } from './batch-session-opening-release';
 import type { BatchRecord } from './batch-session-types';
 import {
@@ -306,7 +306,7 @@ export function parseRecord(
     ...releasedField(row),
   };
   coherentRecord(record);
-  if (record.released && !releasedPreparation(record)) sessionFail();
+  if (record.released && !emptyPreparation(record)) sessionFail();
   return record;
 }
 
