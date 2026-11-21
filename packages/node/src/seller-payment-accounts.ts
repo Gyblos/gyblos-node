@@ -5,7 +5,7 @@ import { address, createSolanaRpc } from '@solana/kit';
 import { DEVNET_GENESIS, UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
 import { uptoRecipientTokenAccounts } from '@gyblos/payments-upto';
 
-import { FEE_PAYER_FUNDING, GENESIS_READ_MS } from './constants';
+import { GENESIS_READ_MS } from './constants';
 import { readGenesis, type GenesisReader } from './seller-chain';
 
 export interface PaymentAccountsQuery {
@@ -35,16 +35,14 @@ export async function feePayerLamports(query: {
   return value;
 }
 
-// Whether the fee payer holds less devnet SOL than FEE_PAYER_FUNDING.minimumLamports; false when the RPC
-// cannot say, so an unanswered read never turns into a failure.
-export async function feePayerShort(
+// An unanswered read never turns into a failure.
+export function feePayerBalance(
   query: { rpcUrl: string; address: string },
   probes: PaymentAccountsProbes,
-): Promise<boolean> {
-  const lamports = await (probes.feePayerLamports ?? feePayerLamports)(
-    query,
-  ).catch(() => undefined);
-  return lamports !== undefined && lamports < FEE_PAYER_FUNDING.minimumLamports;
+): Promise<bigint | undefined> {
+  return (probes.feePayerLamports ?? feePayerLamports)(query).catch(
+    () => undefined,
+  );
 }
 
 export interface PaymentAccountsProbes {

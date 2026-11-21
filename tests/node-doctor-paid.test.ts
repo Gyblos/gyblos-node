@@ -204,7 +204,7 @@ void test('doctor accepts a paid seller whose payout is its owner', () =>
     );
   }));
 
-void test('doctor --online: a fee payer short of devnet SOL fails when startup must create accounts, warns otherwise', () =>
+void test('doctor --online: an empty fee payer fails when startup must create accounts; a low balance warns', () =>
   scenario({}, async (run) => {
     await withOllama(run);
     await writeFile(join(run.root, 'config.toml'), paidToml(run));
@@ -231,16 +231,16 @@ void test('doctor --online: a fee payer short of devnet SOL fails when startup m
       /FAIL\s+payments\s+FEE_PAYER_UNFUNDED\s+.*about 0\.05 devnet SOL.*faucet\.solana\.com/,
     );
     assert.deepEqual(asked, [role.facilitator]);
-    // Accounts exist: it starts, but cannot send channel transactions.
-    const cannotCharge = await doctor(
+    // Accounts exist: a low balance is a warning.
+    const lowBalance = await doctor(
       run,
       ['--online'],
       {},
       probes(0, 9_999_999n),
     );
-    assert.equal(cannotCharge.code, 0);
+    assert.equal(lowBalance.code, 0);
     assert.match(
-      line(cannotCharge.output, 'payments'),
+      line(lowBalance.output, 'payments'),
       /WARN\s+payments\s+FEE_PAYER_UNFUNDED/,
     );
     // Funded: the token-account verdict as before.
@@ -272,6 +272,27 @@ void test('doctor --online: a fee payer short of devnet SOL fails when startup m
     );
     assert.match(line(unread.output, 'payments'), /^\s*OK\s+payments/);
     assert.equal(unread.output.includes('rpc.example'), false);
+  }));
+
+void test('doctor --online warns without failing when a low balance covers the missing token accounts', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'config.toml'), paidToml(run));
+    const result = await doctor(
+      run,
+      ['--online'],
+      {},
+      {
+        paymentAccounts: async () => ({ missing: 3, unusable: 0 }),
+        feePayerLamports: async () => 9_000_000n,
+      },
+    );
+
+    assert.match(
+      line(result.output, 'payments'),
+      /WARN\s+payments\s+FEE_PAYER_UNFUNDED/,
+    );
+    assert.equal(result.code, 0);
   }));
 
 void test('doctor names what the fee payer is for, for every seller', () =>

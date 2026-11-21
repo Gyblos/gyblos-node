@@ -104,8 +104,7 @@ export const DOCTOR_CODES = {
   PAYMENT_ACCOUNTS_UNCHECKED: 'PAYMENT_ACCOUNTS_UNCHECKED',
   // One of those token accounts can never receive a payout (frozen, say); startup refuses it.
   PAYMENT_ACCOUNTS_UNUSABLE: 'PAYMENT_ACCOUNTS_UNUSABLE',
-  // The fee payer holds less than FEE_PAYER_FUNDING.minimumLamports: startup cannot create a missing
-  // token account, and the seller cannot send channel transactions.
+  // The fee payer holds less than the recommended balance for startup and channel transactions.
   FEE_PAYER_UNFUNDED: 'FEE_PAYER_UNFUNDED',
   // Every offer's usage is declared by its provider, so no tokenizer is loaded.
   NOT_NEEDED: 'NOT_NEEDED',
@@ -117,9 +116,8 @@ export const DOCTOR_CODES = {
   CLOCK_UNCHECKED: 'CLOCK_UNCHECKED',
   CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
 } as const;
-// Devnet SOL the fee payer needs before a priced offer: below the minimum it cannot pay the three
-// token accounts startup may create (about 0.002 SOL each) plus channel transaction fees; operators are
-// told to send the suggested amount.
+// Devnet SOL the fee payer should hold for token accounts and channel transactions. The minimum is a
+// warning threshold, not the cost of creating the token accounts.
 export const FEE_PAYER_FUNDING = {
   minimumLamports: 10_000_000n,
   minimumSol: '0.01',

@@ -48,8 +48,8 @@ Run `gyblos doctor` (Docker seller: `docker compose run --rm seller gyblos docto
 address. Send it about 0.05 devnet SOL from [the devnet faucet](https://faucet.solana.com).
 
 The fee payer needs devnet SOL for channel transactions. With less than 0.01 SOL, `gyblos doctor --online`
-reports `FEE_PAYER_UNFUNDED`: a failure when startup still has to create the payment token accounts, a
-warning otherwise.
+reports `FEE_PAYER_UNFUNDED`: a failure if the balance is zero and startup still has to create
+payment token accounts, a warning otherwise.
 
 ## 3. Apply and verify
 
