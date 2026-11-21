@@ -42,7 +42,7 @@ import { exampleKeys } from './example-keys';
 import { previewFunding } from './funding';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
-import { previewDesktopCatalog, previewFreeModels } from './seller-listings';
+import { previewDesktopCatalog } from './seller-listings';
 
 export function createPreviewHost(
   search: string,
@@ -381,7 +381,6 @@ export function createPreviewHost(
     desktopCatalog,
     desktopX402,
     previewAccountBudget: { current: accountBudget, baseline: accountBudget() },
-    previewFreeModels: () => previewFreeModels(model, now),
     desktopUsdcApiKeys,
     ...createPaypalPreview(ready, answer, now, agentExamples.paypal),
   };

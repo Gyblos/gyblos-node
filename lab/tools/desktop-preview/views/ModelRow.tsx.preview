@@ -1,9 +1,10 @@
 // Preview-only: a model row summarizes its sellers; a side panel holds strategy, the seller table and pinning.
-const STRATEGIES = ['Auto', 'Cheapest', 'Fastest', 'Most reliable'] as const;
-type Strategy = (typeof STRATEGIES)[number];
+const STRATEGIES = SELLER_MODES;
+type Strategy = SellerMode;
+const READY = READY_SELLER_MODES;
 const QUANTS = ['Q4_K_M', 'Q8_0', 'FP16'] as const;
 const modelChoice = new Map<string, { strategy: Strategy; pinned: string | null }>();
-type PreviewSeller = { id: string; name: string; quant: string; input: number; output: number; latency: number; uptime: number };
+type PreviewSeller = { id: string; name: string; quant: string; input: number; output: number; latency: number; uptime: number; online: boolean };
 function previewSellers(model: CatalogModel): PreviewSeller[] {
   return Array.from({ length: model.providers }, (_, index) => {
     const factor = index === 0 ? 1 : 1 + ((index * 37 + model.providers * 11) % 60) / 100;
@@ -16,11 +17,13 @@ function previewSellers(model: CatalogModel): PreviewSeller[] {
       output: Math.round(model.output * factor * 100) / 100,
       latency: 180 + ((index * 53) % 420),
       uptime: 99.9 - ((index * 13) % 40) / 10,
+      // One synthetic seller is offline so the pinned-seller replacement can be reviewed.
+      online: !(model.providers > 3 && index === 2),
     };
   });
 }
 function pick(sellers: PreviewSeller[], strategy: Strategy) {
-  const by = (score: (seller: PreviewSeller) => number) => [...sellers].sort((a, b) => score(a) - score(b))[0];
+  const by = (score: (seller: PreviewSeller) => number) => sellers.filter((s) => s.online).sort((a, b) => score(a) - score(b))[0];
   if (strategy === 'Cheapest') return by((s) => s.input + s.output);
   if (strategy === 'Fastest') return by((s) => s.latency);
   if (strategy === 'Most reliable') return by((s) => -s.uptime);
@@ -30,12 +33,14 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
   model: CatalogModel; selected: string; canSelect: boolean; onSelect(model: CatalogModel): void;
 }) {
   const [open, setOpen] = useState(false);
-  const [choice, setChoice] = useState(() => modelChoice.get(model.id) ?? { strategy: 'Auto' as Strategy, pinned: null });
+  const [choice, setChoice] = useState(() => modelChoice.get(model.id) ?? { strategy: previewSetting('sellerMode'), pinned: null });
   const sellers = previewSellers(model);
   const prices = sellers.map((s) => s.input);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
-  const active = sellers.find((s) => s.id === choice.pinned) ?? pick(sellers, choice.strategy);
+  const pinnedSeller = sellers.find((s) => s.id === choice.pinned);
+  const unavailable = pinnedSeller && !pinnedSeller.online ? pinnedSeller : undefined;
+  const active = unavailable ? pick(sellers, choice.strategy) : (pinnedSeller ?? pick(sellers, choice.strategy));
   const position = max > min && active ? ((active.input - min) / (max - min)) * 100 : 0;
   const latency = Math.round(sellers.reduce((sum, s) => sum + s.latency, 0) / sellers.length);
   const update = (next: { strategy: Strategy; pinned: string | null }) => {
@@ -85,29 +90,42 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
                   event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
                 if (!step) return;
                 event.preventDefault();
-                const index = STRATEGIES.indexOf(choice.strategy);
-                const next = STRATEGIES[(index + step + STRATEGIES.length) % STRATEGIES.length] ?? 'Auto';
-                update({ strategy: next, pinned: null });
+                const index = READY.indexOf(choice.strategy);
+                const next = READY[(index + step + READY.length) % READY.length] ?? 'Auto';
+                update({ strategy: next, pinned: choice.pinned });
                 event.currentTarget.querySelector<HTMLButtonElement>('[data-strategy="' + next + '"]')?.focus();
               }}
             >
-              {STRATEGIES.map((strategy) => (
-                <button
-                  key={strategy}
-                  type="button"
-                  role="radio"
-                  data-strategy={strategy}
-                  aria-checked={!choice.pinned && choice.strategy === strategy}
-                  tabIndex={choice.strategy === strategy ? 0 : -1}
-                  onClick={() => update({ strategy, pinned: null })}
-                >
-                  {strategy}
-                </button>
-              ))}
+              {STRATEGIES.map((strategy) => {
+                const ready = READY.includes(strategy);
+                return (
+                  <button
+                    key={strategy}
+                    type="button"
+                    role="radio"
+                    data-strategy={strategy}
+                    aria-checked={choice.strategy === strategy}
+                    disabled={!ready}
+                    title={ready ? undefined : 'Available once real latency and reliability data exist'}
+                    tabIndex={choice.strategy === strategy ? 0 : -1}
+                    onClick={() => update({ strategy, pinned: choice.pinned })}
+                  >
+                    {strategy}
+                    {!ready && <Tag>Soon</Tag>}
+                  </button>
+                );
+              })}
             </div>
+            {unavailable && (
+              <Notice>
+                {active
+                  ? PREVIEW_COPY.pinnedUnavailable(unavailable.name, active.name, choice.strategy)
+                  : PREVIEW_COPY.pinnedNoReplacement(unavailable.name)}
+              </Notice>
+            )}
             <p className="ui-help-text">
               {choice.pinned
-                ? 'Pinned to ' + (active?.name ?? '') + '. Unpin to let Gyblos choose again.'
+                ? 'Pinned to ' + (pinnedSeller?.name ?? '') + '. It comes first; if it is unavailable, ' + choice.strategy + ' picks another.'
                 : (choice.strategy === 'Auto' ? 'Gyblos balances price, speed and reliability' : choice.strategy + ' seller first') + ' · now ' + (active?.name ?? '') + '.'}
             </p>
             <SellerTable sellers={sellers} free={model.free} active={active?.id} pinned={choice.pinned}
@@ -149,7 +167,12 @@ function SellerTable({ sellers, free, active, pinned, onPin }: {
           <tbody>
             {rows.slice(current * size, current * size + size).map((s) => (
               <tr key={s.id} data-active={s.id === active}>
-                <th scope="row">{s.name}{s.id === active && <span className="preview-model-mode">{pinned === s.id ? 'Pinned' : 'In use'}</span>}</th>
+                <th scope="row">
+                  {s.name}
+                  {s.id === active && <span className="preview-model-mode">{pinned === s.id ? 'Pinned' : 'In use'}</span>}
+                  {pinned === s.id && s.id !== active && <span className="preview-model-mode">Pinned</span>}
+                  {!s.online && <Tag tone={TONE.WARNING}>Offline</Tag>}
+                </th>
                 <td>{s.quant}</td>
                 <td className="preview-num preview-tabular">{free ? 'Free' : usdPerMtok(s.input) + ' / ' + usdPerMtok(s.output)}</td>
                 <td className="preview-num preview-tabular">{s.latency} ms</td>

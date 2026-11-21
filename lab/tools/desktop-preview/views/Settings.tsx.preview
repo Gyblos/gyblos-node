@@ -1,14 +1,27 @@
 // Flat appearance and product information use the shared compact design primitives.
-import { Info } from '@phosphor-icons/react';
+import { Check, Info } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import { Appearance } from './Appearance';
 import { BUTTON_VARIANT } from './constants';
+import { Dropdown } from './Dropdown';
 import { FormField, FormInput } from './Form';
 import { ChoiceMenu, Section } from './Management';
 import { Modal } from './Modal';
-import { Button, IconButton, PagePanel } from './UI';
-import { PreviewKitShowcase } from './PreviewKit';
+import { Button, IconButton, MenuItem, PagePanel } from './UI';
+import {
+  CODE_LANGUAGE,
+  CodeBlock,
+  PREVIEW_EVENT,
+  PreviewKitShowcase,
+  READY_SELLER_MODES,
+  SELLER_MODES,
+  setPreviewSetting,
+  Switch,
+  Tag,
+  usePreviewSetting,
+  type SellerMode,
+} from './PreviewKit';
 
 const FONTS = ['Instrument Sans', 'Inter'] as const;
 function chooseFont(font: (typeof FONTS)[number]) {
@@ -18,34 +31,98 @@ function chooseFont(font: (typeof FONTS)[number]) {
   location.search = params.toString();
 }
 
-const SELLER_ORDER = [
-  'Automatic',
-  'Free first',
-  'Lowest price',
-] as const;
-function SellerPreferences() {
-  const [order, setOrder] =
-    useState<(typeof SELLER_ORDER)[number]>('Automatic');
+const BUYER_CONFIG_PATH = '~/.gyblos/buyer/config.toml';
+function buyerConfig(mode: SellerMode, freeFallback: boolean, showTestnet: boolean) {
+  const key = (value: SellerMode) => value.toLowerCase().replace(' ', '_');
+  return [
+    '[network]',
+    'show_testnet = ' + showTestnet,
+    '',
+    '[funds]',
+    'free_fallback = ' + freeFallback,
+    '',
+    '[routing]',
+    'mode = "' + key(mode) + '"',
+  ].join('\n');
+}
+function chooseShowTestnet(show: boolean) {
+  setPreviewSetting('showTestnet', show);
+  if (show) return;
+  const params = new URLSearchParams(location.search);
+  params.set('network', 'mainnet');
+  history.replaceState(null, '', '?' + params.toString());
+  window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));
+}
+function BuyerPreferences() {
+  const mode = usePreviewSetting('sellerMode');
+  const freeFallback = usePreviewSetting('freeFallback');
+  const showTestnet = usePreviewSetting('showTestnet');
   return (
-    <Section title="Sellers">
-      <div className="preview-settings-rows">
-        <div>
-          <span>
-            Seller selection
-            <small className="ui-help-text">
-              Used when a model has more than one seller. Does not change
-              routing in this preview.
-            </small>
-          </span>
-          <ChoiceMenu
-            label="Seller selection"
-            value={order}
-            options={SELLER_ORDER}
-            onChange={setOrder}
-          />
+    <>
+      <Section title="Sellers">
+        <div className="preview-settings-rows">
+          <div>
+            <span>
+              Seller selection
+              <small className="ui-help-text">Used when a model has more than one seller. A pinned seller always comes first.</small>
+            </span>
+            <Dropdown label={'Seller selection: ' + mode} className="ui-select-trigger" trigger={mode}>
+              {(close) =>
+                SELLER_MODES.map((option) => {
+                  const ready = READY_SELLER_MODES.includes(option);
+                  return (
+                    <MenuItem
+                      key={option}
+                      role="menuitemradio"
+                      checked={option === mode}
+                      disabled={!ready}
+                      label={option}
+                      badge={ready ? undefined : <Tag>Soon</Tag>}
+                      trailing={option === mode ? <Check size={16} /> : undefined}
+                      onClick={() => {
+                        setPreviewSetting('sellerMode', option);
+                        close();
+                      }}
+                    />
+                  );
+                })
+              }
+            </Dropdown>
+          </div>
         </div>
-      </div>
-    </Section>
+      </Section>
+      <Section title="Funds">
+        <div className="preview-settings-rows">
+          <div>
+            <span>
+              Use a free model when out of funds
+              <small className="ui-help-text">Chat and every API key. Answers come from a similar free model and always say so.</small>
+            </span>
+            <Switch label="Use a free model when out of funds" checked={freeFallback} onChange={(value) => setPreviewSetting('freeFallback', value)} />
+          </div>
+        </div>
+      </Section>
+      <Section title="Developer">
+        <div className="preview-settings-rows">
+          <div>
+            <span>
+              Show Testnet
+              <small className="ui-help-text">Adds Testnet to the network menu. Test funds and keys never move to Mainnet.</small>
+            </span>
+            <Switch label="Show Testnet" checked={showTestnet} onChange={chooseShowTestnet} />
+          </div>
+        </div>
+      </Section>
+      <Section title="Configuration file">
+        <p className="ui-help-text">These settings live in the buyer configuration file. Proposed path; the buyer CLI is not built yet.</p>
+        <CodeBlock
+          code={buyerConfig(mode, freeFallback, showTestnet)}
+          language={CODE_LANGUAGE.TOML}
+          title={BUYER_CONFIG_PATH}
+          onCopy={() => navigator.clipboard.writeText(buyerConfig(mode, freeFallback, showTestnet))}
+        />
+      </Section>
+    </>
   );
 }
 
@@ -87,7 +164,7 @@ export function Settings({
           </div>
         </div>
       </Section>
-      <SellerPreferences />
+      <BuyerPreferences />
       <Section title="About">
       <section className="preview-settings-rows">
         <div>

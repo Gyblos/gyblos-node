@@ -83,16 +83,6 @@ export function previewDesktopCatalog(model: string, now: number) {
   };
 }
 
-export function previewFreeModels(model: string, now: number) {
-  return [
-    ...new Set(
-      previewCatalog(model, now, '')
-        .models.filter((item) => item.free)
-        .map((item) => item.modelId),
-    ),
-  ];
-}
-
 const seller = (head: string, tail: string) =>
   head + '0'.repeat(FIXTURE_PADDING) + tail;
 function paidListing(

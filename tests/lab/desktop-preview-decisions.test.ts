@@ -70,16 +70,70 @@ void test('preview model views compare listed prices with the market median, not
   assert.match(row, /marketMedian\(/);
 });
 
-void test('preview API key details offer an optional fallback model', async () => {
+void test('preview API keys follow the account-wide free-model fallback, with no per-key choice', async () => {
   const details = await view('UsdcApiKeyDetails.tsx.preview');
-  assert.match(details, /Fallback model/);
-  assert.match(details, /<Dropdown/);
-  assert.match(
-    await view('UsdcApiKeys.tsx.preview'),
-    /<FallbackModel id=\{id\} \/>/,
+  assert.doesNotMatch(
+    details,
+    /Fallback model|FallbackModel|previewFreeModels/,
   );
+  assert.match(details, /usePreviewSetting\('freeFallback'\)/);
+  assert.match(details, /PREVIEW_COPY\.keyOutOfFunds/);
+  assert.match(await view('UsdcApiKeys.tsx.preview'), /<KeyFallback \/>/);
+  const settings = await view('Settings.tsx.preview');
+  assert.match(settings, /Use a free model when out of funds/);
+  assert.match(settings, /<Switch label="Use a free model when out of funds"/);
   const kit = await view('PreviewKit.tsx.preview');
   assert.match(kit, /similarFreeModel\(/);
+  assert.match(kit, /blocked: broke && !fallback, fallback: broke && fallback/);
+});
+
+void test('preview shows four seller modes with Fastest and Most reliable marked Soon', async () => {
+  const kit = await view('PreviewKit.tsx.preview');
+  assert.match(
+    kit,
+    /SELLER_MODES = \['Auto', 'Cheapest', 'Fastest', 'Most reliable'\] as const/,
+  );
+  assert.match(
+    kit,
+    /READY_SELLER_MODES: readonly SellerMode\[\] = \['Auto', 'Cheapest'\]/,
+  );
+  for (const name of [
+    'ModelRow.tsx.preview',
+    'ModelDropdown.tsx.preview',
+    'Settings.tsx.preview',
+  ]) {
+    const source = await view(name);
+    assert.match(source, /<Tag>Soon<\/Tag>/, name);
+    assert.match(source, /READY(_SELLER_MODES)?\.includes\(/, name);
+  }
+});
+
+void test('preview keeps a pinned seller first and announces its replacement when it is unavailable', async () => {
+  const row = await view('ModelRow.tsx.preview');
+  assert.match(row, /update\(\{ strategy, pinned: choice\.pinned \}\)/);
+  assert.doesNotMatch(row, /update\(\{ strategy[^}]*pinned: null \}\)/);
+  assert.match(row, /PREVIEW_COPY\.pinnedUnavailable\(/);
+  assert.match(row, /PREVIEW_COPY\.pinnedNoReplacement\(/);
+  assert.match(row, /sellers\.filter\(\(s\) => s\.online\)/);
+});
+
+void test('preview disables paid-only models without funds unless the free fallback is on', async () => {
+  const dropdown = await view('ModelDropdown.tsx.preview');
+  assert.match(
+    dropdown,
+    /broke && !fallback && !list\.some\(\(item\) => item\.free\)/,
+  );
+  assert.match(dropdown, /disabled=\{locked\}/);
+  assert.match(dropdown, /aria-label="Needs funds"/);
+});
+
+void test('preview hides Testnet behind a developer setting', async () => {
+  const network = await view('NetworkSwitch.tsx.preview');
+  assert.match(network, /usePreviewSetting\('showTestnet'\)/);
+  assert.doesNotMatch(network, /until Dec 9|turned off on December 9/);
+  const settings = await view('Settings.tsx.preview');
+  assert.match(settings, /<Switch label="Show Testnet"/);
+  assert.match(settings, /~\/\.gyblos\/buyer\/config\.toml/);
 });
 
 void test('preview paid-model confirmation formats the same listed prices as the picker', async () => {

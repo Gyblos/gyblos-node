@@ -1,5 +1,5 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { CaretRight, Check, Copy, Wallet, Warning } from '@phosphor-icons/react';
+import { CaretRight, Check, Copy, Info, Wallet, Warning } from '@phosphor-icons/react';
 import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
@@ -20,6 +20,7 @@ import { useUsdcApiKeys } from './useUsdcApiKeys';
 export { statusTone, TONE } from './status-tone';
 export type { Tone } from './status-tone';
 export { feeLabel, marketMedian, similarFreeModel } from './market';
+export { CODE_LANGUAGE } from './code-highlight';
 
 export function Tag({ tone = TONE.NEUTRAL, dot = false, children }: { tone?: Tone; dot?: boolean; children: ReactNode }) {
   return (
@@ -31,6 +32,26 @@ export function Tag({ tone = TONE.NEUTRAL, dot = false, children }: { tone?: Ton
 }
 
 /** Signed percentage; `lowerIsBetter` colors a decrease green (prices, latency) and an increase red. */
+/** One-line notice with a tone: replacement, fallback or limit messages that must stay visible. */
+export function Notice({ tone = TONE.WARNING, children }: { tone?: Tone; children: ReactNode }) {
+  const Glyph = tone === TONE.WARNING || tone === TONE.DANGER ? Warning : Info;
+  return (
+    <p className="pk-notice" data-tone={tone} role="status">
+      <Glyph size={15} weight="fill" aria-hidden="true" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/** On/off control for a global setting; the row beside it carries the label and help. */
+export function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange(checked: boolean): void }) {
+  return (
+    <Button className="pk-switch" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}>
+      <span className="pk-switch-thumb" aria-hidden="true" />
+    </Button>
+  );
+}
+
 export function Delta({ percent, lowerIsBetter = false, suffix }: { percent: number; lowerIsBetter?: boolean; suffix?: string }) {
   const rounded = Math.round(percent);
   const good = lowerIsBetter ? rounded < 0 : rounded > 0;
@@ -245,6 +266,14 @@ export function PreviewKitShowcase() {
           <Tag>Revoked</Tag>
         </div>
       </Panel>
+      <Panel title="Notices and switches">
+        <Notice>Seller 4b91…1f32 is unavailable. Using 83ce…a019 (Cheapest) for now.</Notice>
+        <Notice tone={TONE.INFO}>{PREVIEW_COPY.fallbackUsed('Qwen3 0.6B')}</Notice>
+        <div className="pk-row">
+          <Switch label="Example switch off" checked={false} onChange={() => undefined} />
+          <Switch label="Example switch on" checked onChange={() => undefined} />
+        </div>
+      </Panel>
       <Panel title="Deltas and savings">
         <div className="pk-row">
           <Delta percent={12.4} suffix="this week" />
@@ -317,7 +346,54 @@ export function previewUsdc(atomic: number) {
 }
 export function usePreviewFunds(model: { name: string; free: boolean }, applies: boolean) {
   const atomic = usePreviewBalance();
-  return { model, blocked: applies && !model.free && atomic === 0 };
+  const fallback = usePreviewSetting('freeFallback');
+  const broke = applies && !model.free && atomic === 0;
+  return { model, blocked: broke && !fallback, fallback: broke && fallback };
+}
+
+/* Account-wide buyer settings (the buyer config.toml in the product); synthetic and kept until reload. */
+export const SELLER_MODES = ['Auto', 'Cheapest', 'Fastest', 'Most reliable'] as const;
+export type SellerMode = (typeof SELLER_MODES)[number];
+// Fastest and Most reliable stay visible with "Soon" until real latency and reliability data exist.
+export const READY_SELLER_MODES: readonly SellerMode[] = ['Auto', 'Cheapest'];
+export const PREVIEW_COPY = {
+  needsFunds: 'Needs funds · Add funds, or turn on the free-model fallback in Settings.',
+  fallbackUsed: (model: string) => 'Out of funds: answered with free model ' + model + '. Paid models resume when you add funds.',
+  keyOutOfFunds: 'Out of funds. Add funds in Gyblos, or turn on "Use a free model when out of funds" in Settings.',
+  pinnedUnavailable: (seller: string, replacement: string, mode: SellerMode) => seller + ' is unavailable. Using ' + replacement + ' (' + mode + ') for now.',
+  pinnedNoReplacement: (seller: string) => seller + ' is unavailable. Choose another seller to continue.',
+} as const;
+type PreviewSettings = { freeFallback: boolean; showTestnet: boolean; sellerMode: SellerMode };
+declare global {
+  interface Window {
+    previewSettings?: PreviewSettings;
+  }
+}
+const settingsListeners = new Set<() => void>();
+function settingsState() {
+  const query = new URLSearchParams(location.search);
+  window.previewSettings ??= {
+    freeFallback: query.get('fallback') === 'on',
+    showTestnet: query.get('testnet') !== 'hidden',
+    sellerMode: 'Auto',
+  };
+  return window.previewSettings;
+}
+function subscribeSettings(listener: () => void) {
+  settingsListeners.add(listener);
+  return () => {
+    settingsListeners.delete(listener);
+  };
+}
+export function usePreviewSetting<K extends keyof PreviewSettings>(key: K) {
+  return useSyncExternalStore(subscribeSettings, () => settingsState()[key]);
+}
+export function setPreviewSetting<K extends keyof PreviewSettings>(key: K, value: PreviewSettings[K]) {
+  window.previewSettings = { ...settingsState(), [key]: value };
+  settingsListeners.forEach((listener) => listener());
+}
+export function previewSetting<K extends keyof PreviewSettings>(key: K) {
+  return settingsState()[key];
 }
 
 export const PREVIEW_EVENT = { NETWORK: 'preview:network' } as const;
@@ -351,14 +427,23 @@ export function PreviewComposerTab({
   const atomic = usePreviewBalance();
   const { spent, limit, limited, freeOnly } = useSpending();
   const percent = limited && limit > 0n ? Math.min(100, Number((spent * 100n) / limit)) : 0;
+  const showTestnet = usePreviewSetting('showTestnet');
   const network = useSyncExternalStore(subscribeNetwork, () =>
-    new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet',
+    !showTestnet || new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet',
   );
   const free = models.find((item) => item.free && item.name === funds.model.name) ?? similarFreeModel(models, funds.model.name);
   return (
     <>
-      <div className="pk-composer-tab" data-warning={funds.blocked || undefined}>
-        {funds.blocked ? (
+      <div className="pk-composer-tab" data-warning={funds.blocked || funds.fallback || undefined}>
+        {funds.fallback && free ? (
+          <>
+            <Info size={15} weight="fill" aria-hidden="true" />
+            <p role="status">{PREVIEW_COPY.fallbackUsed(free.name)}</p>
+            <Button variant={BUTTON_VARIANT.PRIMARY} onClick={openPreviewFunds}>
+              Add funds
+            </Button>
+          </>
+        ) : funds.blocked ? (
           <>
             <Warning size={15} weight="fill" aria-hidden="true" />
             <p role="status">

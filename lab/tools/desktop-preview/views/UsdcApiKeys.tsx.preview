@@ -30,7 +30,7 @@ import { Dropdown } from './Dropdown';
 import { Badge, Button, IconButton, MenuItem } from './UI';
 import { AmountEditor } from './Payments';
 import { agentCodeLanguage, CodeBlock, DetailSummary, Tag, TONE } from './PreviewKit';
-import { FallbackModel, RevokeConfirmation } from './UsdcApiKeyDetails';
+import { KeyFallback, RevokeConfirmation } from './UsdcApiKeyDetails';
 import { useUsdcApiKeys } from './useUsdcApiKeys';
 import { WorkspaceLayout } from './WorkspaceLayout';
 
@@ -555,7 +555,7 @@ export function UsdcApiKeys({
                 {!key.revoked && (
                   <>
                     {secretField(key, 'preview-tool-secret')}
-                    <FallbackModel id={id} />
+                    <KeyFallback />
                     <FormActions>
                       <Button
                         disabled={busy}

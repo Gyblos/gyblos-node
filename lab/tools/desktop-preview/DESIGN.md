@@ -49,7 +49,8 @@ in the same change. Agents load this through the
 
 This table governs the mockup. `CodeBlock`, `DetailSummary`, `Tag`,
 `statusTone`, `FilterChips`, `Delta`, `Savings`, `SegmentedBar`, `StatGrid`,
-`Panel`, `TableRow`, `AmountEditor`, `CompactAmount` and `PreviewAnswerSkeleton`
+`Panel`, `TableRow`, `AmountEditor`, `CompactAmount`, `PreviewAnswerSkeleton`,
+`Notice` and `Switch`
 exist only in the preview views until a port is approved; shipped desktop code
 follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 
@@ -58,11 +59,13 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 | Button, icon-only button          | `Button`, `IconButton` (`./UI`)                       | raw `<button>` with its own styles  |
 | Pick one value from a list        | `Dropdown` + `MenuItem role="menuitemradio"`          | native `<select>`                   |
 | Pick among 2-5 visible options    | `FilterChips` (counts) or `ChoiceCard` (`./UI`)       | ad-hoc pill rows                    |
+| Turn a global setting on or off   | `Switch` in a settings row                            | checkbox or custom toggle           |
 | Text field, label, help, error    | `FormField` + `FormInput` (`./Form`)                  | bare `<input>` and `<label>`        |
 | Copy a value (key, URL)           | `CopyField` (`./Form`)                                | input plus a separate copy button   |
 | Code, commands, config files      | `CodeBlock` with `language` and `title`               | `<pre>` or `.ui-code-block`         |
 | USDC amount input                 | `AmountEditor` / `CompactAmount` (`./Payments`)       | number inputs with custom steppers  |
 | Status or label                   | `Tag` (`tone`, `dot`), `statusTone(text)`             | colored spans, local status classes |
+| Replacement, fallback or warning  | `Notice` (`tone`)                                     | inline warning paragraphs           |
 | Detail dialog header and totals   | `DetailSummary`                                       | local status/total/key-value markup |
 | Key/value facts                   | `Facts` / `Pair` (`./Management`)                     | hand-built `<dl>` grids             |
 | Metrics                           | `StatGrid` + `StatCard` with `help`                   | custom metric cards                 |
@@ -82,6 +85,10 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 - `SegmentedBar`: one bar split by source with a text legend (the legend carries
   the values for assistive technology).
 - `FilterChips`: single-choice filter with counts; one Tab stop, arrow keys move.
+- `Notice`: one toned line that must stay visible, such as a pinned seller being
+  replaced or an answer coming from the free-model fallback.
+- `Switch`: `role="switch"` button for account-wide settings (the buyer
+  `config.toml`); the row beside it carries the label and help.
 - `CodeBlock`: language label (Shell, JSON, TOML, TypeScript, Text), optional file
   title, highlighted tokens and a Copy button that shows "Copied" only after a
   confirmed copy. Chat fences map through `fenceLanguage`, tools through

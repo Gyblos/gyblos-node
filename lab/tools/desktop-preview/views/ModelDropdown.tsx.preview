@@ -24,7 +24,7 @@ import { Modal } from './Modal';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
 import { priceRange, usdPerMtok } from './model-price';
-import { feeLabel, openPreviewFunds, previewUsdc, usePreviewBalance } from './PreviewKit';
+import { feeLabel, openPreviewFunds, PREVIEW_COPY, previewUsdc, READY_SELLER_MODES, Tag, usePreviewBalance, usePreviewSetting, type SellerMode } from './PreviewKit';
 import { Badge, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
@@ -75,12 +75,12 @@ function latencyOf(model: ModelOption) {
 }
 function recommended(offers: readonly ModelOption[]) {
   const sorted = (score: (item: ModelOption) => number) => [...offers].sort((a, b) => score(a) - score(b))[0];
-  const picks = [
+  const picks: { label: SellerMode; icon: Icon; item: ModelOption | undefined }[] = [
     { label: 'Cheapest', icon: CurrencyCircleDollar, item: sorted((item) => (item.free ? -1 : item.input + item.output)) },
     { label: 'Fastest', icon: Lightning, item: sorted(latencyOf) },
     { label: 'Most reliable', icon: ShieldCheck, item: sorted((item) => -((latencyOf(item) * 7) % 13)) },
   ];
-  return picks.filter((pick): pick is { label: string; icon: Icon; item: ModelOption } => !!pick.item);
+  return picks.filter((pick): pick is { label: SellerMode; icon: Icon; item: ModelOption } => !!pick.item);
 }
 function groupPrice(offers: readonly ModelOption[]) {
   const paid = offers.filter((item) => !item.free);
@@ -126,6 +126,8 @@ function StrategyRow({
   detail,
   price,
   checked,
+  soon = false,
+  locked = false,
   onChoose,
 }: {
   icon: Icon;
@@ -133,21 +135,25 @@ function StrategyRow({
   detail: string;
   price: string;
   checked: boolean;
+  soon?: boolean;
+  locked?: boolean;
   onChoose: () => void;
 }) {
   return (
     <MenuItem
       role="menuitemradio"
       checked={checked}
+      disabled={soon || locked}
+      title={locked ? PREVIEW_COPY.needsFunds : undefined}
       data-strategy
       label={label}
-      detail={detail}
+      detail={soon ? 'Available once real latency and reliability data exist' : locked ? 'Needs funds · ' + detail : detail}
       leading={
         <span className="preview-strategy-icon" aria-hidden="true">
           <Glyph size={18} weight={checked ? 'fill' : 'regular'} />
         </span>
       }
-      badge={<span className="preview-offer-price">{price}</span>}
+      badge={soon ? <Tag>Soon</Tag> : <span className="preview-offer-price">{price}</span>}
       trailing={checked ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
       onClick={onChoose}
     />
@@ -182,6 +188,9 @@ export function ModelDropdown({
   const [compare, setCompare] = useState<string | null>(null);
   const balance = usePreviewBalance();
   const broke = balance === 0 && !contextLabel;
+  // Without funds and with the account-wide free fallback off, paid-only models cannot be chosen.
+  const fallback = usePreviewSetting('freeFallback');
+  const needsFunds = (list: readonly ModelOption[]) => broke && !fallback && !list.some((item) => item.free);
   const [, refresh] = useState(0);
   const flyout = useRef<HTMLDivElement>(null);
   const listed = models.some((item) => item.id === model.id);
@@ -372,6 +381,7 @@ export function ModelDropdown({
                 if (!first) return null;
                 const selected = name === model.name || list.some((item) => item.id === model.id);
                 const several = list.length > 1 && !contextLabel;
+                const locked = needsFunds(list) && !selected;
                 return (
                   <MenuItem
                     key={name}
@@ -381,19 +391,21 @@ export function ModelDropdown({
                     role="menuitemradio"
                     checked={selected}
                     aria-haspopup={several ? 'menu' : undefined}
-                    aria-expanded={several ? active === name : undefined}
+                    aria-expanded={several && !locked ? active === name : undefined}
+                    disabled={locked}
+                    title={locked ? PREVIEW_COPY.needsFunds : undefined}
                     label={name}
-                    detail={contextLabel ?? groupPrice(list)}
+                    detail={contextLabel ?? (locked ? 'Needs funds' : groupPrice(list))}
                     leading={<ModelImage artwork={first.image} name={name} />}
                     trailing={
                       <span className="preview-menu-trail">
-                        {broke && !list.some((item) => item.free) && (
+                        {needsFunds(list) && (
                           <span className="pk-needs-funds" role="img" aria-label="Needs funds" title="Needs funds">
                             <Wallet size={14} weight="fill" aria-hidden="true" />
                           </span>
                         )}
                         {selected ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
-                        {several ? (
+                        {several && !locked ? (
                           <CaretRight size={13} className="preview-menu-caret" />
                         ) : (
                           <span className="preview-caret-slot" aria-hidden="true" />
@@ -461,6 +473,8 @@ export function ModelDropdown({
                     const earlier = [{ label: 'Auto', item: top }, ...picks.slice(0, index)].find(
                       (pick) => pick.item.id === item.id,
                     );
+                    const soon = !READY_SELLER_MODES.includes(tag);
+                    const unpayable = broke && !fallback && !item.free;
                     return (
                       <StrategyRow
                         key={tag}
@@ -472,6 +486,8 @@ export function ModelDropdown({
                             : [sellerName(item), quantization(item)].filter(Boolean).join(' · ')
                         }
                         price={offerPrice(item)}
+                        soon={soon}
+                        locked={!soon && unpayable}
                         checked={current && !isAuto(active) && chosenTag.get(active) === tag}
                         onChoose={() => remember(item, false, tag)}
                       />

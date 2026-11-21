@@ -2,6 +2,7 @@
 // Preview-only network selector; it changes no routing, wallet or payment state.
 const PREVIEW_NETWORKS = ['Testnet', 'Mainnet'] as const;
 function PreviewNetwork() {
+  const showTestnet = usePreviewSetting('showTestnet');
   const [network, setNetwork] = usePreviewState<(typeof PREVIEW_NETWORKS)[number]>(
     () => (new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet'),
   );
@@ -13,12 +14,21 @@ function PreviewNetwork() {
     history.replaceState(null, '', '?' + params.toString());
     window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));
   };
+  if (!showTestnet)
+    return (
+      <div className="preview-network" role="group" aria-label="Network">
+        <span className="preview-network-single" data-network="mainnet">
+          <span className="preview-network-dot" aria-hidden="true" />
+          Mainnet
+        </span>
+      </div>
+    );
   return (
     <div
       className="preview-network"
       role="radiogroup"
       aria-label="Network"
-      title={network === 'Testnet' ? 'Testnet uses test funds and is turned off on December 9.' : 'Mainnet is shown for review; the preview keeps example data.'}
+      title={network === 'Testnet' ? 'Testnet uses test funds. After December 9 it stays available for developers through Settings.' : 'Mainnet is shown for review; the preview keeps example data.'}
       onKeyDown={(event) => {
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
         event.preventDefault();
@@ -41,7 +51,6 @@ function PreviewNetwork() {
           {item}
         </button>
       ))}
-      {network === 'Testnet' && <span className="preview-network-note">until Dec 9</span>}
     </div>
   );
 }
