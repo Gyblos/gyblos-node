@@ -2,6 +2,7 @@
 // Shipped desktop sources and operational configuration are never changed.
 
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import type { InlineConfig, Plugin } from 'vite';
 
@@ -334,6 +335,12 @@ export function reviewBrand(desktop: string): Plugin {
         moduleId(importer).startsWith(`${moduleId(desktop)}/src/ui/`)
       )
         return `${desktop}/src/ui/PreviewKit.tsx`;
+      if (
+        source === './status-tone' &&
+        importer !== undefined &&
+        moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
+      )
+        return fileURLToPath(new URL('./status-tone.ts', import.meta.url));
       return null;
     },
     load(id) {

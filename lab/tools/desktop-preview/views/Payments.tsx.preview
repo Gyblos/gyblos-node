@@ -406,7 +406,7 @@ function WalletOverview({
       <div className="preview-method-copy">
         <span className="preview-method-name">
           <h3>USDC wallet</h3>
-          <Tag tone={ready && !wallet.backupVerified ? TONE.WARNING : TONE.SUCCESS} dot>
+          <Tag tone={!ready ? TONE.NEUTRAL : wallet.backupVerified ? TONE.SUCCESS : TONE.WARNING} dot>
             {ready
               ? wallet.backupVerified
                 ? 'Backup verified'
