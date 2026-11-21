@@ -95,7 +95,7 @@ void test('the managed buyer settles A before funding B and retains spent author
   const b = await startSeller('56'.repeat(32));
   const target = (id: string) => (id === base.sellerNodeId ? a : b);
   let permitted = true;
-  const buyer = createBuyerSessionManager({
+  const buyer = createBuyerSessionManager<typeof a.wire.destination>({
     endpoint: {
       id: a.wire.endpoint.id,
       connect: (dest, alpn) =>
