@@ -27,6 +27,7 @@ import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 import {
   permitsWinner,
   relayAllowed,
+  restoredSellerAddress,
   selectWinner,
   sellerAddress,
 } from './free-selection';
@@ -129,16 +130,10 @@ function sessionDestination(
       policy.totalDepositAtomic === undefined
     )
       return sessionFail(SESSION_CODES.BINDING);
-    return sellerAddress(
-      seller ??
-        selected ?? {
-          owner: terms.owner,
-          nodeId: terms.sellerNodeId,
-          relayUrl: null,
-          directAddresses: [],
-        },
-      relayOnly,
-    );
+    const known = seller ?? selected;
+    return known
+      ? sellerAddress(known, relayOnly)
+      : restoredSellerAddress(terms.sellerNodeId, terms.owner, relayOnly);
   };
 }
 function desktopPermissions(

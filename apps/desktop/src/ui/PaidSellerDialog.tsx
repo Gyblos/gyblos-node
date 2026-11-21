@@ -1,7 +1,10 @@
 // The first paid message opens the channel after the selected seller and maximum are confirmed.
 import { useState } from 'react';
 
-import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
+import {
+  BATCH_SESSION_DEFAULTS,
+  BUYER_SESSION_DEFAULT_POLICY,
+} from '@gyblos/config/batch-session';
 import { MILLISECONDS_PER_MINUTE } from '@gyblos/config/constants';
 import { atomicToUsdc, usdcToAtomic } from '@gyblos/node/node-config-price';
 
@@ -109,6 +112,12 @@ export function PaidSellerDialog(
   // A legacy profile must acquire valid channel settings before its payer can be verified.
   if (!policy) return <SellerTerms {...props} confirm={refresh} />;
   const remaining = funding?.channelRemainingAtomic;
+  if (
+    funding?.replacementAtomic != null &&
+    BigInt(funding.replacementAtomic) <
+      BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
+  )
+    return <MinimumDepositNotice close={props.close} />;
   if (remaining === '0')
     return (
       <Modal title="Channel balance used" close={props.close}>
@@ -140,7 +149,9 @@ export function PaidSellerDialog(
       </Modal>
     );
   const deposit =
-    policy.depositAtomic ?? BUYER_SESSION_DEFAULT_POLICY.depositAtomic;
+    funding?.replacementAtomic ??
+    policy.depositAtomic ??
+    BUYER_SESSION_DEFAULT_POLICY.depositAtomic;
   const missing = balance == null ? null : depositShortfall(balance, deposit);
   if (!hasEscrow && missing && missing !== '0' && balance != null)
     return (
@@ -161,6 +172,7 @@ export function PaidSellerDialog(
       {...props}
       remaining={remaining ?? undefined}
       switching={funding?.switchingAtomic}
+      replacement={funding?.replacementAtomic}
       availableMaximum={sellerResponseLimit(funding, deposit)}
     />
   );
@@ -173,16 +185,20 @@ function SellerTerms({
   remaining,
   switching,
   availableMaximum,
+  replacement,
 }: SellerDialogProps & {
   remaining?: string;
   switching?: string;
+  replacement?: string;
   availableMaximum?: string;
 }) {
   const { maximum, setMaximum, error, setError, saving, select } =
     useSellerConfirmation(model, buyer, confirm, availableMaximum);
   const { policy } = buyer.state;
   const deposit =
-    policy?.depositAtomic ?? BUYER_SESSION_DEFAULT_POLICY.depositAtomic;
+    replacement ??
+    policy?.depositAtomic ??
+    BUYER_SESSION_DEFAULT_POLICY.depositAtomic;
   const minutes =
     (policy?.lifetimeMs ?? BUYER_SESSION_DEFAULT_POLICY.lifetimeMs) /
     MILLISECONDS_PER_MINUTE;
@@ -225,13 +241,7 @@ function SellerTerms({
           deposit={deposit}
           minutes={minutes}
         />
-        <details>
-          <summary>Seller rates</summary>
-          <p>
-            {usdPerMtok(model.input)} input · {usdPerMtok(model.output)} output
-            per 1M tokens
-          </p>
-        </details>
+        <SellerRates model={model} />
         {error && <p role="alert">{error}</p>}
         <Button
           type="submit"
@@ -273,5 +283,28 @@ function ChannelTerms({
       before opening this one with a {atomicToUsdc(BigInt(deposit))} USDC
       deposit for {minutes} minutes.
     </p>
+  );
+}
+
+function SellerRates({ model }: { model: CatalogModel }) {
+  return (
+    <details>
+      <summary>Seller rates</summary>
+      <p>
+        {usdPerMtok(model.input)} input · {usdPerMtok(model.output)} output per
+        1M tokens
+      </p>
+    </details>
+  );
+}
+function MinimumDepositNotice({ close }: { close: () => void }) {
+  return (
+    <Modal title="Channel spending limit reached" close={close}>
+      <p>
+        The remaining spending allowance is below the minimum deposit of{' '}
+        {fundingAmount(BATCH_SESSION_DEFAULTS.minDepositAtomic)} for a new
+        channel.
+      </p>
+    </Modal>
   );
 }

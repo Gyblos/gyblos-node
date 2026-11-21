@@ -137,8 +137,8 @@ void test('only the same connected devnet buyer can copy or open the fixed Circl
   assert.deepEqual(actions, [payer, FUNDING.circle]);
 });
 
-async function fundedChannel(t: TestContext) {
-  const rig = await sessionRig();
+async function fundedChannel(t: TestContext, depositAtomic?: string) {
+  const rig = await sessionRig({ depositAtomic });
   t.after(rig.dispose);
   t.mock.method(Date, 'now', rig.now);
   const environment = { GYBLOS_HOME: rig.root };
@@ -258,13 +258,29 @@ void test('an exhausted open buyer channel cannot authorize another response usi
 });
 
 void test('an empty wallet can select B against the refund from a single channel with A', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t, '20000');
+  const read = () =>
+    switchingCredit(
+      environment,
+      { ...policy, depositAtomic: rig.terms.depositAtomic },
+      { ...seller, nodeId: '56'.repeat(32) },
+    );
+  assert.deepEqual(await read(), { switchingAtomic: '19960' });
+  rig.time(rig.terms.expiresAt);
+  assert.deepEqual(await read(), { switchingAtomic: '19960' });
+  await rig.seller().close();
+  await rig.buyer.reconcile(rig.sellerOptions.observe);
+  assert.deepEqual(await read(), { replacementAtomic: '19960' });
+});
+
+void test('a subminimum replacement is exposed as a reduced ceiling, never as available escrow', async (t) => {
   const { rig, environment, policy, seller } = await fundedChannel(t);
-  assert.equal(
+  assert.deepEqual(
     await switchingCredit(
       environment,
       { ...policy, depositAtomic: rig.terms.depositAtomic },
       { ...seller, nodeId: '56'.repeat(32) },
     ),
-    '960',
+    { replacementAtomic: '960' },
   );
 });

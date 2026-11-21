@@ -21,7 +21,10 @@ interface FundingPorts {
   switching?(
     policy: BuyerApiPolicy,
     seller: BuyerSellerChoice,
-  ): Promise<string | null>;
+  ): Promise<Pick<
+    BuyerFunding,
+    'switchingAtomic' | 'replacementAtomic'
+  > | null>;
   remaining(
     policy: BuyerApiPolicy,
     seller: BuyerSellerChoice,
@@ -114,7 +117,7 @@ export function fundingHandlers(ports: FundingPorts) {
               balanceAtomic,
               faucetAvailable: balanceAtomic !== null,
               channelRemainingAtomic,
-              ...(switching && { switchingAtomic: switching }),
+              ...switching,
             }
           : null;
       } catch {

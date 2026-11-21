@@ -350,3 +350,22 @@ void test('a buyer may switch sellers after independently verifying the old refu
   assert.deepEqual(restored?.terms, next);
   assert.equal(restored?.priorSpentAtomic, '40');
 });
+
+void test('a buyer may redirect a completely unsigned preparation after the selected seller refuses', async () => {
+  const { options } = await closedGeneration();
+  await renewBatchSession(options);
+  await renewBatchSession({
+    ...options,
+    expectedChannelId: '',
+    terms: {
+      ...options.terms,
+      expiresAt: options.terms.expiresAt + 1,
+      sellerNodeId: 'ab'.repeat(32),
+    },
+    switchSeller: true,
+  });
+  assert.equal(
+    (await inspectBatchSession(options.paths))?.terms.sellerNodeId,
+    'ab'.repeat(32),
+  );
+});

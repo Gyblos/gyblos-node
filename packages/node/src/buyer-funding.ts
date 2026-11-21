@@ -1,4 +1,5 @@
 // Read-only desktop funding observations use the active buyer role, never the wallet selector.
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import {
   batchPoolChannelPaths,
   batchPoolPathsIn,
@@ -113,20 +114,30 @@ export async function switchingCredit(
     root.openingPending
   )
     return null;
-  const availableHere = available(
-    root,
-    policy,
-    { ...seller, nodeId: root.terms.sellerNodeId, owner: root.terms.owner },
-    Date.now(),
-  );
-  if (!availableHere) return null;
+  if (
+    root.pending ||
+    root.recoverable ||
+    root.terms.buyer !== policy.payer ||
+    root.terms.network !== policy.network ||
+    root.terms.mint !== policy.mint ||
+    root.snapshot.reservedAtomic !== '0'
+  )
+    return null;
+  const funded =
+    !!root.snapshot.channelId && root.snapshot.state === SESSION_STATES.OPEN;
+  if (!funded && !root.archivedProof && !root.empty) return null;
+  const spent = BigInt(root.snapshot.cumulativeAtomic);
   const authority =
-    BigInt(policy.depositAtomic) -
-    BigInt(root.priorSpentAtomic ?? '0') -
-    BigInt(root.snapshot.cumulativeAtomic);
-  return authority > 0n && authority <= BigInt(availableHere)
-    ? String(authority)
-    : null;
+    BigInt(policy.depositAtomic) - BigInt(root.priorSpentAtomic ?? '0') - spent;
+  if (authority < 0n) return null;
+  const replacementAtomic = String(authority);
+  if (
+    !funded ||
+    authority < BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic) ||
+    authority > BigInt(root.terms.depositAtomic) - spent
+  )
+    return { replacementAtomic };
+  return { switchingAtomic: replacementAtomic };
 }
 
 export async function reviewDesktopCharge(

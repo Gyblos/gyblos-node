@@ -191,7 +191,9 @@ function canRenew(
     sameBatchParties(previous.terms, terms) ||
     (options.switchSeller &&
       options.totalBudgetAtomic !== undefined &&
-      (previous.settlement || batchOpeningAbsent(previous)) &&
+      (previous.settlement ||
+        batchOpeningAbsent(previous) ||
+        unsignedPreparation(previous)) &&
       compatibleBuyerGeneration(previous.terms, terms))
   );
 }

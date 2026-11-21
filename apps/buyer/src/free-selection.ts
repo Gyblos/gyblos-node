@@ -1,6 +1,6 @@
 // Reuses verified discovery/selection for zero-price quotes without trusted-v1 authorization.
 // The configured identity map remains the trust source, and replay metadata is checked before execution.
-import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
+import type { Endpoint } from '@number0/iroh';
 
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
@@ -44,6 +44,7 @@ import {
 } from './selection-config';
 import type { prepareBuyerSelection } from './selection-runtime';
 import { mergeSelectionStats } from './selection-stats';
+import { sellerAddress } from './seller-address';
 import type { SellerFailureReporter } from './seller-failures';
 import { refusedDetail } from './slow-seller';
 
@@ -169,14 +170,7 @@ export interface FreeSelectionOptions {
   // Repeated failures of each seller, for longer cooldowns; the free buyer keeps one for its lifetime.
   backoff?: SellerBackoffMemory;
 }
-export function sellerAddress(seller: StaticControlSeller, relayOnly: boolean) {
-  if (seller.relayUrl) assertConfiguredRelay(seller.relayUrl);
-  return new EndpointAddr(
-    EndpointId.fromString(seller.nodeId),
-    seller.relayUrl ?? undefined,
-    relayOnly ? [] : seller.directAddresses,
-  );
-}
+export { restoredSellerAddress, sellerAddress } from './seller-address';
 export function relayAllowed(origin: string) {
   try {
     assertConfiguredRelay(origin);
