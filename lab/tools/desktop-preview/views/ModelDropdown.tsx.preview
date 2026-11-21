@@ -1,6 +1,7 @@
 // Groups network offers by model. Hovering a model with several sellers opens a side panel
 // with the seller strategy (Auto first); choosing a strategy keeps the menu open.
 import {
+  CaretDown,
   CaretRight,
   Check,
   CurrencyCircleDollar,
@@ -282,6 +283,7 @@ export function ModelDropdown({
               {priceRange(model)} /M
             </span>
           )}
+          <CaretDown size={12} weight="bold" className="preview-trigger-caret" aria-hidden="true" />
         </>
       }
     >

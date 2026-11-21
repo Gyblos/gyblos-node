@@ -12,7 +12,7 @@ export const APP_FUNDS_REWRITES: readonly [string, string][] = [
 export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
   [
     "import { ChatComposer } from './ChatComposer';",
-    "import { ChatComposer } from './ChatComposer';\nimport { PreviewFundsStrip, usePreviewFunds } from './PreviewKit';",
+    "import { ChatComposer } from './ChatComposer';\nimport { PreviewComposerTab, usePreviewFunds } from './PreviewKit';",
   ],
   [
     '  const canSend =\n    !limitNotice &&',
@@ -20,10 +20,20 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
   ],
   [
     '          <ChatComposer\n            disabled={loadingHistory}',
-    '          <PreviewFundsStrip funds={previewFunds} models={models} onSelectModel={onSelectModel} />\n          <ChatComposer\n            disabled={loadingHistory}',
+    '          <PreviewComposerTab funds={previewFunds} models={models} buyer={x402} onSelectModel={onSelectModel} />\n          <ChatComposer\n            disabled={loadingHistory}',
   ],
   [
     '            {limitNotice ||',
     "            {(previewFunds.blocked ? 'Add funds or choose a free model to send.' : limitNotice) ||",
+  ],
+];
+export const CHAT_TOOLS_REWRITES: readonly [string, string][] = [
+  [
+    "import { Check, Wrench } from '@phosphor-icons/react';",
+    "import { Check, Plus } from '@phosphor-icons/react';",
+  ],
+  [
+    'trigger={<Wrench size={16} aria-hidden="true" />}',
+    'trigger={<Plus size={16} weight="bold" aria-hidden="true" />}',
   ],
 ];

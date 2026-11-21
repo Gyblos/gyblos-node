@@ -1,5 +1,5 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { Warning } from '@phosphor-icons/react';
+import { Wallet, Warning } from '@phosphor-icons/react';
 import { useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AddBuyerFunds } from './BuyerFunding';
@@ -8,6 +8,8 @@ import { Modal } from './Modal';
 import { MotionPresence } from './Motion';
 import { TONE, type Tone } from './status-tone';
 import { Button } from './UI';
+import { useUsdcApiKeys } from './useUsdcApiKeys';
+import type { X402View } from './useX402';
 
 export { statusTone, TONE } from './status-tone';
 export type { Tone } from './status-tone';
@@ -208,38 +210,72 @@ export function usePreviewFunds(model: { name: string; free: boolean }, applies:
   return { model, blocked: applies && !model.free && atomic === 0 };
 }
 
-export function PreviewFundsStrip({
+export function useSpending(buyer?: X402View) {
+  const keys = useUsdcApiKeys().state.snapshot;
+  const account = window.previewAccountBudget.current();
+  const keySpend = (keys?.keys ?? []).reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
+  const spent = BigInt(account.spentAtomic) + keySpend;
+  const limited = buyer?.state.summary.active === true;
+  const limit = BigInt(account.limitAtomic);
+  return { keys, spent, limit, limited, remaining: limit > spent ? limit - spent : 0n };
+}
+
+/** Context tab attached above the composer: network, balance and limit, or the funds-needed notice. */
+export function PreviewComposerTab({
   funds,
   models,
+  buyer,
   onSelectModel,
 }: {
   funds: ReturnType<typeof usePreviewFunds>;
   models: readonly { id: string; name: string; free: boolean }[];
+  buyer?: X402View;
   onSelectModel: (id: string) => void;
 }) {
   const open = useSyncExternalStore(subscribeFunds, () => fundsState().open);
+  const atomic = usePreviewBalance();
+  const { spent, limit, limited } = useSpending(buyer);
+  const percent = limited && limit > 0n ? Math.min(100, Number((spent * 100n) / limit)) : 0;
+  const network = new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet';
   const free = models.find((item) => item.free && item.name === funds.model.name) ?? models.find((item) => item.free);
   return (
     <>
-      <div className="pk-funds-strip" data-open={funds.blocked || undefined} inert={!funds.blocked}>
-        <div>
-          <Warning size={15} weight="fill" aria-hidden="true" />
-          <p role="status">
-            {funds.blocked && (
-              <>
-                <strong>{funds.model.name}</strong> needs USDC to send. Your draft is kept.
-              </>
+      <div className="pk-composer-tab" data-warning={funds.blocked || undefined}>
+        {funds.blocked ? (
+          <>
+            <Warning size={15} weight="fill" aria-hidden="true" />
+            <p role="status">
+              <strong>{funds.model.name}</strong> needs USDC to send. Your draft is kept.
+            </p>
+            {free && (
+              <Button onClick={() => onSelectModel(free.id)}>
+                {free.name === funds.model.name ? 'Use a free seller' : 'Use ' + free.name}
+              </Button>
             )}
-          </p>
-          {free && (
-            <Button onClick={() => onSelectModel(free.id)}>
-              {free.name === funds.model.name ? 'Use a free seller' : 'Use ' + free.name}
+            <Button variant={BUTTON_VARIANT.PRIMARY} onClick={openPreviewFunds}>
+              Add funds
             </Button>
-          )}
-          <Button variant={BUTTON_VARIANT.PRIMARY} onClick={openPreviewFunds}>
-            Add funds
-          </Button>
-        </div>
+          </>
+        ) : (
+          <>
+            <span className="pk-tab-item" data-network={network.toLowerCase()}>
+              <span className="pk-dot" aria-hidden="true" />
+              {network}
+            </span>
+            <span className="pk-tab-item">
+              <Wallet size={14} aria-hidden="true" />
+              {previewUsdc(atomic)}
+            </span>
+            <span className="pk-tab-item pk-tab-limit" title="Spending limit used">
+              <span
+                className="pk-ring"
+                aria-hidden="true"
+                style={{ background: `conic-gradient(var(--ink) ${percent * 3.6}deg, var(--line) 0deg)` }}
+              />
+              {limited ? percent + '% of limit' : 'No limit'}
+            </span>
+          </>
+        )}
       </div>
       <MotionPresence>
         {open && (

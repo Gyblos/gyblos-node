@@ -15,7 +15,7 @@ import { X402_ACTION, x402Amount, x402Asset, x402BudgetInput } from '../x402-mod
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
-import { SegmentedBar, Tag, TONE } from './PreviewKit';
+import { SegmentedBar, Tag, TONE, useSpending } from './PreviewKit';
 import { FormActions } from './Form';
 import { Modal } from './Modal';
 import { PaypalSessionPanel } from './PaypalSessionPanel';
@@ -165,15 +165,6 @@ export function Payments(props: Props) {
 function accountAmount(atomic: string) {
   const account = window.previewAccountBudget.current();
   return x402Amount(atomic, account) + ' ' + x402Asset(account);
-}
-function useSpending(buyer?: X402View) {
-  const keys = useUsdcApiKeys().state.snapshot;
-  const account = window.previewAccountBudget.current();
-  const keySpend = (keys?.keys ?? []).reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
-  const spent = BigInt(account.spentAtomic) + keySpend;
-  const limited = buyer?.state.summary.active === true;
-  const limit = BigInt(account.limitAtomic);
-  return { keys, spent, limit, limited, remaining: limit > spent ? limit - spent : 0n };
 }
 function SpendingSummary({ buyer, onLimits }: { buyer?: X402View; onLimits(): void }) {
   const { spent, limit, limited, remaining } = useSpending(buyer);

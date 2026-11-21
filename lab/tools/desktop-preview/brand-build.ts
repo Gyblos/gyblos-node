@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { InlineConfig, Plugin } from 'vite';
 
 import brand from './brand.json' with { type: 'json' };
-import { APP_FUNDS_REWRITES, CHAT_FUNDS_REWRITES } from './funds-build';
+import * as funds from './funds-build';
 
 export { brand };
 const moduleId = (value: string) => value.replaceAll('\\', '/');
@@ -218,7 +218,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
       '{view === UI_VIEW.ACTIVITY && (\n            <Activity',
       '{false && (\n            <Activity',
     );
-    const funded = replaceEach(routed, [...APP_FUNDS_REWRITES]);
+    const funded = replaceEach(routed, [...funds.APP_FUNDS_REWRITES]);
     return replaceOnce(
       replaceOnce(
         funded,
@@ -315,6 +315,8 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'window.innerWidth - width - (split ? width + 6 : 0) - gutter',
       ],
     ]);
+  if (target === `${base}/src/ui/ChatTools.tsx`)
+    return replaceEach(source, [...funds.CHAT_TOOLS_REWRITES]);
   if (target === `${base}/src/ui/BuyerFunding.tsx`)
     return source.replaceAll(
       'Could not open the devnet faucet.',
@@ -324,7 +326,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     return replaceEach(source, [
       ["'x402 · devnet'", "'x402'"],
       ["'Free · Gyblos network'", "''"],
-      ...CHAT_FUNDS_REWRITES,
+      ...funds.CHAT_FUNDS_REWRITES,
     ]);
   if (target === `${base}/src/theme.ts`) {
     for (const [name, value] of Object.entries(brand.themeTokens)) {
