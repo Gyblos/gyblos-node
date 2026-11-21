@@ -273,7 +273,18 @@ function runRegister(context: CliContext) {
   );
 }
 
+function printUsage(
+  context: CliContext,
+  code: typeof EXIT.ok | typeof EXIT.failure,
+) {
+  if (code === EXIT.ok) context.stdout(USAGE);
+  else context.stderr(USAGE);
+  return code;
+}
+
 export async function runCli(args: readonly string[], context: CliContext) {
+  if (args.length === 1 && (args[0] === '--help' || args[0] === '-h'))
+    return printUsage(context, EXIT.ok);
   if (args[0] === 'logs') return logsCommand(args.slice(1), context);
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
@@ -300,10 +311,8 @@ export async function runCli(args: readonly string[], context: CliContext) {
     !usesInitFlags(parsed.values)
   )
     return runStatus(parsed.values.online === true, context);
-  if (parsed && usesInitFlags(parsed.values)) {
-    context.stderr(USAGE);
-    return EXIT.failure;
-  }
+  if (parsed && usesInitFlags(parsed.values))
+    return printUsage(context, EXIT.failure);
   if (
     parsed &&
     group === 'seller' &&
@@ -341,10 +350,8 @@ export async function runCli(args: readonly string[], context: CliContext) {
     rest.length ||
     parsed.values.online !== undefined ||
     usesServiceFlags(parsed.values)
-  ) {
-    context.stderr(USAGE);
-    return EXIT.failure;
-  }
+  )
+    return printUsage(context, EXIT.failure);
   // validate checks the file it is given (--config, else ./config.toml), not GYBLOS_CONFIG: doctor does that.
   return validate(
     resolve(
