@@ -97,6 +97,38 @@ export async function channelFundingRemaining(
   return available(root, policy, seller, Date.now());
 }
 
+export async function switchingCredit(
+  environment: HomeEnvironment,
+  policy: BuyerApiPolicy,
+  seller: BuyerSellerChoice,
+) {
+  const pool = batchPoolPathsIn(environment);
+  if ((await inspectBatchPool(pool, { includeLegacy: false })).length)
+    return null;
+  const root = await inspectBatchSession(pool.legacy);
+  if (
+    !root ||
+    root.terms.sellerNodeId === seller.nodeId ||
+    !policy.depositAtomic ||
+    root.openingPending
+  )
+    return null;
+  const availableHere = available(
+    root,
+    policy,
+    { ...seller, nodeId: root.terms.sellerNodeId, owner: root.terms.owner },
+    Date.now(),
+  );
+  if (!availableHere) return null;
+  const authority =
+    BigInt(policy.depositAtomic) -
+    BigInt(root.priorSpentAtomic ?? '0') -
+    BigInt(root.snapshot.cumulativeAtomic);
+  return authority > 0n && authority <= BigInt(availableHere)
+    ? String(authority)
+    : null;
+}
+
 export async function reviewDesktopCharge(
   environment: HomeEnvironment,
   ref: import('./desktop-opening').DesktopRequestBinding,

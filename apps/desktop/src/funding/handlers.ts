@@ -18,6 +18,10 @@ interface FundingPorts {
   rpcUrl(policy: BuyerApiPolicy): Promise<string | null>;
   balance(payer: string, url: string): Promise<string | null>;
   resolveOffer(id: string): BuyerSellerChoice | undefined;
+  switching?(
+    policy: BuyerApiPolicy,
+    seller: BuyerSellerChoice,
+  ): Promise<string | null>;
   remaining(
     policy: BuyerApiPolicy,
     seller: BuyerSellerChoice,
@@ -99,6 +103,10 @@ export function fundingHandlers(ports: FundingPorts) {
             ? ports.remaining(target.policy, seller).catch(() => null)
             : null,
         ]);
+        const switching =
+          seller && channelRemainingAtomic === null
+            ? await ports.switching?.(target.policy, seller).catch(() => null)
+            : null;
         return target.current()
           ? {
               payer: target.policy.payer,
@@ -106,6 +114,7 @@ export function fundingHandlers(ports: FundingPorts) {
               balanceAtomic,
               faucetAvailable: balanceAtomic !== null,
               channelRemainingAtomic,
+              ...(switching && { switchingAtomic: switching }),
             }
           : null;
       } catch {

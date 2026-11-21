@@ -83,6 +83,9 @@ export class X402Client {
     readonly budget: X402Budget,
     private readonly request: typeof fetch = fetch,
   ) {}
+  managed() {
+    return this.connection?.managed === true;
+  }
   policy() {
     return this.connection ? { ...this.connection.policy } : null;
   }

@@ -28,6 +28,7 @@ interface State {
   pending: string | null;
   openingIntent?: string;
 }
+export class LegacyPaymentReview extends Error {}
 export class X402Budget {
   private state: State | null = null;
   private failed = false;
@@ -41,7 +42,7 @@ export class X402Budget {
     if (
       state.pending &&
       state.openingIntent &&
-      (await this.opening?.retire(state.openingIntent))
+      (await this.opening?.retire(state.openingIntent).catch(() => false))
     ) {
       await this.save({
         ...state,
@@ -56,23 +57,32 @@ export class X402Budget {
     observe: (
       ref: DesktopRequestBinding,
       policy: BuyerApiPolicy,
-    ) => Promise<{ chargeAtomic: string; transaction: string } | undefined>,
+    ) => Promise<
+      { chargeAtomic: string; transaction: string | null } | undefined
+    >,
   ) {
     const state = await this.serial(async () =>
       this.recoverIfIdle(await this.load()),
     );
     if (!state.pending) return true;
-    if (
-      !state.openingIntent ||
-      this.liveIntent === state.openingIntent ||
-      !state.summary.policy
-    )
+    if (!state.openingIntent) throw new LegacyPaymentReview();
+    if (this.liveIntent === state.openingIntent || !state.summary.policy)
       return false;
     const ref = await this.opening?.reference(state.openingIntent);
-    if (!ref) return false;
+    if (!ref) throw new LegacyPaymentReview();
     const result = await observe(ref, state.summary.policy);
     if (!result) return false;
-    await this.complete(state.pending, { ...result, free: false });
+    if (result.transaction === null) {
+      if (result.chargeAtomic !== '0') return false;
+      await this.cancelUnsent(state.pending, state.openingIntent);
+      return true;
+    }
+    await this.complete(
+      state.pending,
+      { ...result, free: false },
+      undefined,
+      state.openingIntent,
+    );
     return true;
   }
   private recoverIfIdle(state: State) {
@@ -251,6 +261,7 @@ export class X402Budget {
     id: string,
     result: { chargeAtomic: string; transaction: string | null; free: boolean },
     selectedModel?: string,
+    expectedIntent?: string,
   ) {
     return this.serial(async () => {
       const state = await this.load();
@@ -258,6 +269,8 @@ export class X402Budget {
       if (
         this.failed ||
         state.pending !== id ||
+        (expectedIntent !== undefined &&
+          expectedIntent !== state.openingIntent) ||
         !current.policy ||
         !current.sessionId ||
         !buyerAtomic(result.chargeAtomic) ||
@@ -292,10 +305,14 @@ export class X402Budget {
     });
   }
   // Only a trusted buyer response can prove non-transmission; never exposed as a renderer action.
-  cancelUnsent(id: string) {
+  cancelUnsent(id: string, expectedIntent?: string) {
     return this.serial(async () => {
       const state = await this.load();
-      if (this.failed || state.pending !== id)
+      if (
+        this.failed ||
+        state.pending !== id ||
+        (expectedIntent !== undefined && state.openingIntent !== expectedIntent)
+      )
         throw new Error('Payment needs review');
       await this.save({
         ...state,

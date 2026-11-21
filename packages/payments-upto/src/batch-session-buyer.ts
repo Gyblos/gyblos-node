@@ -46,29 +46,8 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
-    releaseDeclined: (channelId, request) =>
-      exclusive(() =>
-        store.update((state) => {
-          const entry = state.requests[request.requestId];
-          const block = state.blocks?.[request.requestId];
-          if (
-            state.channelId !== channelId ||
-            state.state !== SESSION_STATES.OPEN ||
-            !entry ||
-            entry.requestDigest !== request.requestDigest ||
-            entry.maxAtomic !== request.maxAtomic ||
-            entry.accepted ||
-            entry.bill ||
-            block?.pending ||
-            block?.accepted ||
-            (block && block.baseAtomic !== state.cumulativeAtomic) ||
-            Object.keys(state.pending).length
-          )
-            return sessionFail(SESSION_CODES.UNVERIFIED);
-          delete state.requests[request.requestId];
-          if (state.blocks) delete state.blocks[request.requestId];
-        }),
-      ),
+    releaseDeclined: (channel, request) =>
+      exclusive(() => releaseDeclined(store, channel, request)),
     openingRecovery: openingRecovery(options, store, exclusive),
     usesBlocks: () => store.read().blocks !== undefined,
     pendingBlockRequest: () => {
@@ -291,4 +270,32 @@ async function recoverApproval(options: BatchBuyerOptions, store: BatchStore) {
     state.cumulativeAtomic = bill.cumulativeAtomic;
   });
   return { bill, voucher };
+}
+
+function releaseDeclined(
+  store: BatchStore,
+  channelId: string,
+  request: Parameters<SessionBuyer['begin']>[0],
+) {
+  return store.update((state) => {
+    const entry = state.requests[request.requestId];
+    const block = state.blocks?.[request.requestId];
+    if (
+      state.channelId !== channelId ||
+      state.state !== SESSION_STATES.OPEN ||
+      !entry ||
+      entry.requestDigest !== request.requestDigest ||
+      entry.maxAtomic !== request.maxAtomic ||
+      entry.accepted ||
+      entry.bill ||
+      block?.pending ||
+      block?.accepted ||
+      (block && block.baseAtomic !== state.cumulativeAtomic) ||
+      Object.keys(state.pending).length
+    )
+      return sessionFail(SESSION_CODES.UNVERIFIED);
+    state.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST] = request.requestId;
+    delete state.requests[request.requestId];
+    if (state.blocks) delete state.blocks[request.requestId];
+  });
 }

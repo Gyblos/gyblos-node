@@ -4,6 +4,7 @@ import { blockCharge } from './batch-block-state';
 import { batchSessionObserver } from './batch-session-observer';
 import { readBatchRecord } from './batch-session-state';
 import type { BatchPaths } from './batch-session-types';
+import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export async function finalizedRequestCharge(
   paths: BatchPaths,
@@ -16,11 +17,13 @@ export async function finalizedRequestCharge(
   },
   policy: BuyerApiPolicy,
 ) {
-  const current = await readBatchRecord(paths);
-  const record =
-    current?.channelId === ref.channelId
+  const readGeneration = async () => {
+    const current = await readBatchRecord(paths);
+    return current?.channelId === ref.channelId
       ? current
       : current?.history?.find((entry) => entry.channelId === ref.channelId);
+  };
+  let record = await readGeneration();
   if (
     !record ||
     record.terms.buyer !== policy.payer ||
@@ -29,6 +32,12 @@ export async function finalizedRequestCharge(
     record.terms.sellerNodeId !== ref.sellerNodeId
   )
     return undefined;
+  if (
+    record.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST] ===
+      ref.requestId &&
+    !Object.hasOwn(record.requests, ref.requestId)
+  )
+    return { chargeAtomic: '0', transaction: null };
   const confirmed =
     record.settlement ??
     (await batchSessionObserver({
@@ -37,6 +46,15 @@ export async function finalizedRequestCharge(
       terms: record.terms,
     }).settlement(ref.channelId));
   if (!confirmed || confirmed.channelId !== ref.channelId) return undefined;
+  record = await readGeneration();
+  if (
+    !record ||
+    record.terms.buyer !== policy.payer ||
+    record.terms.network !== policy.network ||
+    record.terms.mint !== policy.mint ||
+    record.terms.sellerNodeId !== ref.sellerNodeId
+  )
+    return undefined;
   const request = record.requests[ref.requestId];
   const progress = record.blocks?.[ref.requestId];
   const authorized = progress
@@ -51,6 +69,8 @@ export async function finalizedRequestCharge(
   )
     return undefined;
   const delta = BigInt(confirmed.chargedAtomic) - base;
+  if (delta > authorized && (!request?.accepted || authorized === 0n))
+    return undefined;
   const charge = delta <= 0n ? 0n : delta < authorized ? delta : authorized;
   return { chargeAtomic: String(charge), transaction: confirmed.transaction };
 }

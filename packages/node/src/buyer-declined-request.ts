@@ -15,7 +15,7 @@ import {
 import type { BuyerBatchContext } from './batch-buyer-types';
 
 export class DeclinedChannelRequest extends BatchChannelError {
-  constructor() {
+  constructor(readonly nodeId: string) {
     super(SESSION_CODES.REQUEST_DECLINED);
   }
 }
@@ -57,5 +57,5 @@ export async function verifyDecline<Remote extends BatchDestination>(
     throw failure;
   }
   await context.options.onDeclined?.();
-  throw new DeclinedChannelRequest();
+  throw new DeclinedChannelRequest(context.terms.sellerNodeId);
 }

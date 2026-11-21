@@ -15,7 +15,10 @@ import {
   FUNDING,
   sellerResponseLimit,
 } from '@gyblos/desktop/funding-model';
-import { channelFundingRemaining } from '@gyblos/node/buyer-funding';
+import {
+  channelFundingRemaining,
+  switchingCredit,
+} from '@gyblos/node/buyer-funding';
 import { openBatchBuyerPool } from '@gyblos/payments-upto/batch-session';
 import { buyerUsdcBalance } from '@gyblos/payments-upto/buyer-funding';
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
@@ -251,5 +254,17 @@ void test('an exhausted open buyer channel cannot authorize another response usi
       '1000000',
     ),
     '0',
+  );
+});
+
+void test('an empty wallet can select B against the refund from a single channel with A', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t);
+  assert.equal(
+    await switchingCredit(
+      environment,
+      { ...policy, depositAtomic: rig.terms.depositAtomic },
+      { ...seller, nodeId: '56'.repeat(32) },
+    ),
+    '960',
   );
 });

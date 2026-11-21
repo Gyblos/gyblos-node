@@ -81,6 +81,26 @@ export function desktopOpening(
     }
   };
   return {
+    async whileArmed<T>(id: string, operation: () => Promise<T>) {
+      if (!isOpeningIntent(id)) return sessionFail(SESSION_CODES.UNVERIFIED);
+      const lock = await acquireProcessLock(paths.lock);
+      try {
+        if (
+          (await readPrivateFile(paths.state, MAX_BYTES)) !==
+          STATES.ARMED + id
+        )
+          return sessionFail(SESSION_CODES.UNVERIFIED);
+        return await operation();
+      } finally {
+        await lock.release();
+      }
+    },
+    async armed(id: string) {
+      return (
+        isOpeningIntent(id) &&
+        (await readPrivateFile(paths.state, MAX_BYTES)) === STATES.ARMED + id
+      );
+    },
     declined: (id: string) => transition(id, STATES.RETIRED, STATES.USED),
     arm: (id: string) => transition(id, STATES.ARMED),
     retire: (id: string) => transition(id, STATES.RETIRED),

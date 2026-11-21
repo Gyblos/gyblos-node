@@ -74,7 +74,8 @@ export function parseBatchHistory(
       entry.terms.expiresAt >= terms.expiresAt ||
       !(
         sameBatchParties(entry.terms, terms) ||
-        (entry.settlement && compatibleBuyerGeneration(entry.terms, terms))
+        ((entry.settlement || batchOpeningAbsent(entry)) &&
+          compatibleBuyerGeneration(entry.terms, terms))
       )
     )
       return sessionFail(SESSION_CODES.BINDING);

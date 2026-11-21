@@ -106,6 +106,7 @@ export async function reserve(
       BigInt(state.terms.depositAtomic)
     )
       sessionFail(SESSION_CODES.LIMIT);
+    delete state.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST];
     delete state.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT];
     state.requests[request.requestId] = {
       ...request,

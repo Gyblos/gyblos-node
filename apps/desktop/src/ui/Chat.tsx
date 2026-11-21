@@ -225,6 +225,7 @@ export function Chat({
       ? 'Choose a seller in the model menu and confirm its prices before sending.'
       : usingX402 &&
           model.source === MODEL_SOURCE.ANNOUNCED &&
+          !model.offerId &&
           !models.some((item) => item.id === model.id)
         ? 'The current catalog cannot confirm this seller and price. Refresh the model list before sending.'
         : usingX402 &&

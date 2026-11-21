@@ -70,3 +70,19 @@ void test('Payments checks the finalized charge for the original dispatched chat
   );
   assert.equal((await restarted.summary()).blocked, false);
 });
+
+void test('retiring a desktop request cannot race an authorized channel switch', async () => {
+  const env = { GYBLOS_HOME: await mkdtemp(join(tmpdir(), 'gyb-switch-')) };
+  const permission = desktopOpening(env);
+  const id = randomUUID();
+  await permission.arm(id);
+  await permission.whileArmed(id, async () => {
+    await assert.rejects(permission.retire(id));
+  });
+  assert.equal(await permission.retire(id), true);
+  await assert.rejects(
+    permission.whileArmed(id, async () =>
+      assert.fail('retired channel switch'),
+    ),
+  );
+});

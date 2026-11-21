@@ -141,6 +141,31 @@ function sessionDestination(
     );
   };
 }
+function desktopPermissions(
+  state: SessionState,
+): Pick<
+  BuyerSessionOptions<ReturnType<typeof sellerAddress>>,
+  'financialPermission' | 'switchingAllowed' | 'onDeclined' | 'beforeInference'
+> {
+  return {
+    financialPermission(run) {
+      const id = state.openingIntent?.getStore();
+      return id ? desktopOpening(process.env).whileArmed(id, run) : run();
+    },
+    switchingAllowed: async () => {
+      const intent = state.openingIntent?.getStore();
+      return !!intent && desktopOpening(process.env).armed(intent);
+    },
+    onDeclined: async () => {
+      const intent = state.openingIntent?.getStore();
+      if (intent) await desktopOpening(process.env).declined(intent);
+    },
+    beforeInference: async (_id, ref) => {
+      const intent = state.openingIntent?.getStore();
+      if (intent) await desktopOpening(process.env).consume(intent, ref);
+    },
+  };
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -152,15 +177,7 @@ export function makeManager(
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
     policy,
-    switchingAllowed: () => !!state.openingIntent?.getStore(),
-    onDeclined: async () => {
-      const intent = state.openingIntent?.getStore();
-      if (intent) await desktopOpening(process.env).declined(intent);
-    },
-    beforeInference: async (_id, ref) => {
-      const intent = state.openingIntent?.getStore();
-      if (intent) await desktopOpening(process.env).consume(intent, ref);
-    },
+    ...desktopPermissions(state),
     openingSupportsBlocks:
       (policy.totalDepositAtomic !== undefined
         ? options.pool

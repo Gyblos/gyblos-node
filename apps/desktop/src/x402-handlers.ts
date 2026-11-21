@@ -4,7 +4,7 @@ import { controlAtomic } from '@gyblos/protocol/control-validation';
 
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
 import { BuyerSessionRequired, DesktopBuyerFailure } from './buyer-error';
-import type { X402Budget } from './x402-budget';
+import { LegacyPaymentReview, type X402Budget } from './x402-budget';
 import type { DesktopSellerChoice, X402Client } from './x402-client';
 import {
   effectiveX402Policy,
@@ -19,6 +19,8 @@ import {
 type Owner = { contents: unknown; mainFrame(): unknown; destroyed(): boolean };
 type Sender = { sender: unknown; senderFrame: unknown };
 function actionError(action: unknown, blocked: boolean, error: unknown) {
+  if (error instanceof LegacyPaymentReview)
+    return 'This older payment has no request reference. Contact support to review it before spending again.';
   if (blocked && action === X402_ACTION.REVIEW)
     return 'The payment could not be confirmed yet. Check again after the channel settles.';
   if (blocked)
@@ -105,10 +107,12 @@ function buyerAction(owner: Owner, event: Sender, args: readonly unknown[]) {
     throw new Error('Unsupported buyer request');
   return args[0] as Record<string, unknown>;
 }
-function selectedOffer(
+async function selectedOffer(
   policy: ReturnType<X402Client['policy']>,
   input: Record<string, unknown>,
-  resolveOffer?: (id: string) => BuyerSellerChoice | undefined,
+  resolveOffer?: (
+    id: string,
+  ) => BuyerSellerChoice | undefined | Promise<BuyerSellerChoice | undefined>,
 ) {
   if (input.freeOnly === true) {
     if (input.offerId || !policy || input.policyId !== policy.policyId)
@@ -121,7 +125,7 @@ function selectedOffer(
     );
   const selected =
     typeof input.offerId === 'string'
-      ? resolveOffer?.(input.offerId)
+      ? await resolveOffer?.(input.offerId)
       : undefined;
   if ('offerId' in input && !selected)
     throw new PaidSellerLimitError(
@@ -150,6 +154,12 @@ function configureAction(
     throw new PaidSellerLimitError('Enter a positive maximum per response.');
   return managed.configure(maxAtomic, input.policyId).then(() => true);
 }
+async function checkPayment(
+  budget: X402Budget,
+  review: NonNullable<ManagedBuyerPorts['review']>,
+) {
+  if (!(await budget.review(review))) throw new Error('Unconfirmed payment');
+}
 export function createX402Handlers(
   client: X402Client,
   budget: X402Budget,
@@ -160,7 +170,9 @@ export function createX402Handlers(
     throw new Error('Clipboard unavailable');
   },
   progress?: (value: X402Progress) => void,
-  resolveOffer?: (id: string) => BuyerSellerChoice | undefined,
+  resolveOffer?: (
+    id: string,
+  ) => BuyerSellerChoice | undefined | Promise<BuyerSellerChoice | undefined>,
 ) {
   const summary = async () => ({
     summary: await budget.summary(),
@@ -172,11 +184,6 @@ export function createX402Handlers(
   ): Promise<X402Result> => {
     const input = buyerAction(owner, event, args);
     try {
-      if (input.action === X402_ACTION.REVIEW && managed?.review) {
-        if (!(await budget.review(managed.review)))
-          throw new Error('Unconfirmed payment');
-        return summary();
-      }
       if (await configureAction(managed, input)) return await summary();
       if (
         (input.action === X402_ACTION.START_BUYER ||
@@ -187,7 +194,9 @@ export function createX402Handlers(
         if ((await budget.summary()).blocked)
           throw new Error('Payment needs review');
         await managed.start();
-      } else if (input.action === X402_ACTION.CONNECT)
+      } else if (input.action === X402_ACTION.REVIEW && managed?.review)
+        await checkPayment(budget, managed.review);
+      else if (input.action === X402_ACTION.CONNECT)
         await client.connect(input.url, input.token);
       else if (
         input.action === X402_ACTION.AUTHORIZE &&
@@ -199,7 +208,11 @@ export function createX402Handlers(
         x402Id(input.id) &&
         typeof input.prompt === 'string'
       ) {
-        const selected = selectedOffer(client.policy(), input, resolveOffer);
+        const selected = await selectedOffer(
+          client.policy(),
+          input,
+          resolveOffer,
+        );
         const reply = await sendResponse(
           client,
           owner,

@@ -18,12 +18,13 @@ export interface BuyerFunding {
   balanceAtomic: string | null;
   faucetAvailable: boolean;
   channelRemainingAtomic: string | null;
+  switchingAtomic?: string;
 }
 export function sellerResponseLimit(
   funding: BuyerFunding | null,
   deposit: string,
 ) {
-  return funding?.channelRemainingAtomic ?? deposit;
+  return funding?.channelRemainingAtomic ?? funding?.switchingAtomic ?? deposit;
 }
 export function depositShortfall(balanceAtomic: string, depositAtomic: string) {
   const difference =
@@ -38,6 +39,11 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
       'balanceAtomic',
       'faucetAvailable',
       'channelRemainingAtomic',
+      ...(value &&
+      typeof value === 'object' &&
+      Object.hasOwn(value, 'switchingAtomic')
+        ? ['switchingAtomic']
+        : []),
     ]);
     if (
       row.network !== DEVNET ||
@@ -46,6 +52,9 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
       return null;
     return {
       network: DEVNET,
+      ...(row.switchingAtomic !== undefined && {
+        switchingAtomic: controlAtomic(row.switchingAtomic),
+      }),
       faucetAvailable: row.faucetAvailable,
       payer: controlAddress(row.payer),
       balanceAtomic:

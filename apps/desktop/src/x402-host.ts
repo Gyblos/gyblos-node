@@ -119,7 +119,8 @@ export function registerDesktopX402(
     window,
     environment,
     () => client.policy(),
-    resolveOffer,
+    () => client.managed(),
+    resolveOffer.resolve,
   );
   const owner = frameOwner(window);
   const handle = createX402Handlers(
@@ -137,7 +138,7 @@ export function registerDesktopX402(
         DESKTOP_X402.PROGRESS_CHANNEL,
         progress,
       ),
-    resolveOffer,
+    resolveOffer.current,
   );
   const apiKeys = createUsdcApiHandlers(
     client,

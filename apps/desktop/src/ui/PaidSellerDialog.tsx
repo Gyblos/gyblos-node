@@ -121,7 +121,8 @@ export function PaidSellerDialog(
         </div>
       </Modal>
     );
-  const hasEscrow = remaining != null && BigInt(remaining) > 0n;
+  const hasEscrow =
+    (remaining != null && BigInt(remaining) > 0n) || !!funding?.switchingAtomic;
   const balance = funding?.balanceAtomic;
   if (!hasEscrow && (loading || balance == null))
     return (
@@ -158,7 +159,8 @@ export function PaidSellerDialog(
   return (
     <SellerTerms
       {...props}
-      remaining={hasEscrow ? remaining : undefined}
+      remaining={remaining ?? undefined}
+      switching={funding?.switchingAtomic}
       availableMaximum={sellerResponseLimit(funding, deposit)}
     />
   );
@@ -169,8 +171,13 @@ function SellerTerms({
   close,
   confirm,
   remaining,
+  switching,
   availableMaximum,
-}: SellerDialogProps & { remaining?: string; availableMaximum?: string }) {
+}: SellerDialogProps & {
+  remaining?: string;
+  switching?: string;
+  availableMaximum?: string;
+}) {
   const { maximum, setMaximum, error, setError, saving, select } =
     useSellerConfirmation(model, buyer, confirm, availableMaximum);
   const { policy } = buyer.state;
@@ -212,19 +219,12 @@ function SellerTerms({
             }}
           />
         </FormField>
-        {remaining ? (
-          <p>
-            Your existing channel has {fundingAmount(remaining)} available. If
-            it needs replacing before your message, the new deposit can be up to{' '}
-            {fundingAmount(deposit)} for {minutes} minutes.{' '}
-          </p>
-        ) : (
-          <p>
-            Sending your first message settles any previous single-seller
-            channel before opening this one with a{' '}
-            {atomicToUsdc(BigInt(deposit))} USDC deposit for {minutes} minutes.
-          </p>
-        )}
+        <ChannelTerms
+          switching={switching}
+          remaining={remaining}
+          deposit={deposit}
+          minutes={minutes}
+        />
         <details>
           <summary>Seller rates</summary>
           <p>
@@ -242,5 +242,36 @@ function SellerTerms({
         </Button>
       </form>
     </Modal>
+  );
+}
+
+function ChannelTerms({
+  switching,
+  remaining,
+  deposit,
+  minutes,
+}: {
+  switching?: string;
+  remaining?: string;
+  deposit: string;
+  minutes: number;
+}) {
+  return switching ? (
+    <p>
+      Sending your first message will close the previous seller’s channel and
+      open this one with up to {fundingAmount(switching)} from the refund.
+    </p>
+  ) : remaining ? (
+    <p>
+      Your existing channel has {fundingAmount(remaining)} available. If it
+      needs replacing before your message, the new deposit can be up to{' '}
+      {fundingAmount(deposit)} for {minutes} minutes.{' '}
+    </p>
+  ) : (
+    <p>
+      Sending your first message settles any previous single-seller channel
+      before opening this one with a {atomicToUsdc(BigInt(deposit))} USDC
+      deposit for {minutes} minutes.
+    </p>
   );
 }

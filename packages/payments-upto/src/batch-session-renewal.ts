@@ -68,13 +68,7 @@ export async function renewBatchSession(
     }
     if (
       previous.channelId !== options.expectedChannelId ||
-      !(
-        sameBatchParties(previous.terms, terms) ||
-        (options.switchSeller &&
-          options.totalBudgetAtomic !== undefined &&
-          previous.settlement &&
-          compatibleBuyerGeneration(previous.terms, terms))
-      )
+      !canRenew(previous, terms, options)
     )
       return sessionFail(SESSION_CODES.BINDING);
     const absent =
@@ -185,5 +179,19 @@ function unsignedPreparation(record: BatchRecord) {
     record.closing === null &&
     record.settlement === null &&
     record.blocks === undefined
+  );
+}
+
+function canRenew(
+  previous: BatchRecord,
+  terms: PaymentSessionTerms,
+  options: BatchRenewalOptions,
+) {
+  return (
+    sameBatchParties(previous.terms, terms) ||
+    (options.switchSeller &&
+      options.totalBudgetAtomic !== undefined &&
+      (previous.settlement || batchOpeningAbsent(previous)) &&
+      compatibleBuyerGeneration(previous.terms, terms))
   );
 }
