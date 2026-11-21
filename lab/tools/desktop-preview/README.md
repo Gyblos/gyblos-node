@@ -1,6 +1,6 @@
 # Desktop web preview
 
-Review the seven buyer screens in a browser before changing the desktop app. The
+Review the buyer screens in a browser before changing the desktop app. The
 build uses the current desktop renderer and shared components, with synthetic
 host adapters in place of Electron, wallets, providers and payment services.
 
@@ -20,8 +20,9 @@ deliberately invalid. Connection examples can be copied from the setup dialog.
 ## Brand proposal awaiting desktop approval
 
 The browser build applies the approved brand kit 3.0.0 terminal symbol and the
-published website's darker neutrals. `brand.json` records the source revision
-and token mapping. Instrument Sans remains the interface face; technical values
+published website's palette with darker layered surfaces proposed in this
+preview. `brand.json` records the source revision and token mapping;
+[DESIGN.md](DESIGN.md) holds the mockup tokens and shared components. Instrument Sans remains the interface face; technical values
 keep JetBrains Mono. There is one blue, `#0a28f0`; reading text stays neutral.
 Semantic status colors and third-party artwork retain their existing meaning.
 
@@ -38,7 +39,7 @@ adapts renderer modules while bundling. The shared card is
 `views/Payments.tsx.preview`. Their styles are in `preview.css`. The unmodified
 desktop renderer is also built as a comparison baseline.
 
-Keep the environment in the title bar. Use “Wallet address” for the public
+Keep the Testnet / Mainnet selector in the title bar. Use “Wallet address” for the public
 address and “View transaction in explorer” for transaction links. Omit the fixed
 network from wallet facts and other screen labels, including accessible names.
 
@@ -50,7 +51,7 @@ Follow the root `AGENTS.md` and `apps/desktop/DESIGN.md`: show the mockup,
 obtain explicit approval, then port the accepted visual proposal to the desktop
 app. Publishing this preview or its PR is not desktop implementation approval.
 
-Payments shows an optional USDC budget for manual chat. Connections shows the
+Usage & payments shows one account spending limit covering chat and every API key. Connections shows the
 individual limit of each API key. Revoking a key preserves its past spending in
 the account total.
 
@@ -62,7 +63,7 @@ synthetic wallet metadata.
 
 Run `node --import tsx --test "tests/lab/desktop-preview*.test.ts"` for the
 fixture, brand, isolation and build checks. Run the repository checks before a
-PR. Review all seven screens at wide and narrow widths, both themes, keyboard
+PR. Review all buyer screens at wide and narrow widths, both themes, keyboard
 focus, reduced motion, sidebar/context motion and relevant connection/payment
 states.
 
@@ -84,7 +85,7 @@ response has no transaction hash. Data and metrics are illustrative, not
 evidence of a working provider or payment. Browser navigation never validates
 native window controls, clipboard permissions or operating-system dialogs.
 
-All seven screens share the preview button standard: filled neutral for ordinary
+All buyer screens share the preview button standard: filled neutral for ordinary
 actions, brand blue for the primary action, and integrated icon controls with a
 hover surface and visible keyboard focus. Use a switch for a binary setting and
 plain text for selection status. Destructive confirmation uses a separate danger
@@ -104,6 +105,6 @@ Use the shared StatCard inside a StatGrid for summary metrics in the mockup.
 Each card shows an icon, label and regular-weight value. Supply the formatted
 unit for monetary amounts and the comparison when comparable observations exist.
 Equal readings show a neutral 0% pill, including two measured zeroes. A dash
-marks an unavailable percentage. Activity compares calendar periods and Payments
-compares with the opening preview snapshot. An unavailable measurement is
+marks an unavailable percentage. Usage compares calendar periods; the USDC spending
+cards show no comparison. An unavailable measurement is
 distinct from a measured zero.
