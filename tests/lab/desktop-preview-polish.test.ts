@@ -75,10 +75,13 @@ void test('metric cards explain their numbers with a help button and primary act
 
 void test('preview views use the shared dropdown instead of unstyled native selects', async () => {
   const { readdir } = await import('node:fs/promises');
-  const dir = 'lab/tools/desktop-preview/views/';
+  const dir = new URL(
+    '../../lab/tools/desktop-preview/views/',
+    import.meta.url,
+  );
   for (const name of await readdir(dir)) {
     if (!name.endsWith('.preview')) continue;
-    const source = await readFile(`${dir}${name}`, 'utf8');
+    const source = await readFile(new URL(name, dir), 'utf8');
     assert.doesNotMatch(source, /<select\b/, name);
   }
 });

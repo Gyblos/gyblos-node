@@ -1,6 +1,6 @@
 ---
 name: gyblos-desktop-ui
-description: Reuse the shared desktop UI components in gyblos-node. Use before creating or editing any desktop screen, dialog, form, table, code sample or style in lab/tools/desktop-preview or apps/desktop/src/ui, and whenever you are about to write raw markup (select, pre, button, input, table, status span) or a new CSS class.
+description: Reuse the shared desktop UI components in the gyblos-node web mockup. Use before creating or editing any screen, dialog, form, table, code sample or style in lab/tools/desktop-preview, and whenever you are about to write raw markup (select, pre, button, input, table, status span) or a new CSS class.
 ---
 
 # Gyblos desktop UI
@@ -9,13 +9,17 @@ The binding rules are in `AGENTS.md` (Desktop visual changes) and
 `apps/desktop/DESIGN.md`. The component catalog is the Components table in
 `lab/tools/desktop-preview/DESIGN.md`. This skill only helps apply them.
 
+The catalog covers the mockup. Shipped desktop code in `apps/desktop/src/ui`
+follows `apps/desktop/DESIGN.md`; mockup-only components reach it only through
+a port the founder approved.
+
 ## Before writing UI
 
 1. Read the Components table in `lab/tools/desktop-preview/DESIGN.md`.
 2. For each element you need, use the listed component. Open
    `?screen=design-system` in the preview to see them.
 3. Search for an existing use before adding markup:
-   `rg "<CodeBlock|<Dropdown|<DetailSummary|<Tag" lab/tools/desktop-preview apps/desktop/src/ui`.
+   `rg "<CodeBlock|<Dropdown|<DetailSummary|<Tag" lab/tools/desktop-preview`.
 4. If a component almost fits, extend it with a prop instead of copying its
    markup into the view.
 
@@ -30,8 +34,8 @@ The binding rules are in `AGENTS.md` (Desktop visual changes) and
 
 ## When you create a reusable component
 
-1. Put it in `views/PreviewKit.tsx.preview` (mockup) or `apps/desktop/src/ui`
-   (after the founder approves a port).
+1. Put it in `views/PreviewKit.tsx.preview`. It moves to `apps/desktop/src/ui`
+   only in an approved port.
 2. Add its row to the Components table in `lab/tools/desktop-preview/DESIGN.md`
    in the same change, and show it on the design-system screen.
 3. Replace the copies it supersedes in the same change.

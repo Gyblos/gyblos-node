@@ -46,6 +46,8 @@ See the root `AGENTS.md` for the binding contributor workflow.
 - `UI`, `Form`, `Management`, `Dropdown`, `ScrollTable`, `Pagination` and
   `WorkspaceLayout`: reusable component anatomy. Route components compose them;
   they do not introduce a separate control or page scale.
+- The mockup's component catalog (`lab/tools/desktop-preview/DESIGN.md`) also
+  lists proposal-only components; they are not shipped until a port is approved.
 
 ## Scale and composition
 

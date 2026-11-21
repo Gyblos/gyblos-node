@@ -47,6 +47,12 @@ or extend a shared component (in `PreviewKit` for proposals) and add its row her
 in the same change. Agents load this through the
 [`gyblos-desktop-ui` skill](../../../.agents/skills/gyblos-desktop-ui/SKILL.md).
 
+This table governs the mockup. `CodeBlock`, `DetailSummary`, `Tag`,
+`statusTone`, `FilterChips`, `Delta`, `Savings`, `SegmentedBar`, `StatGrid`,
+`Panel`, `TableRow`, `AmountEditor`, `CompactAmount` and `PreviewAnswerSkeleton`
+exist only in the preview views until a port is approved; shipped desktop code
+follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
+
 | Need                              | Use                                                   | Not                                 |
 | --------------------------------- | ----------------------------------------------------- | ----------------------------------- |
 | Button, icon-only button          | `Button`, `IconButton` (`./UI`)                       | raw `<button>` with its own styles  |
