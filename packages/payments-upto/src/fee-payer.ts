@@ -30,7 +30,18 @@ const PRICE_BYTES = 9;
 function refused(): never {
   throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
 }
-function feeMessage(bytes: ReadonlyUint8Array, feePayer: string) {
+// The SDK signs its pre-submission simulation (open + settle + distribute under the transaction maximum)
+// with this all-zero blockhash (@x402/svm's SIM_PLACEHOLDER_BLOCKHASH, not exported). No recent
+// blockhash or durable nonce is zero, so such a transaction can never be broadcast and its compute
+// budget can cost nothing.
+const SIMULATION_ONLY_BLOCKHASH = '11111111111111111111111111111111';
+// allowSimulation: only when the fee payer itself signs, a simulation-only message may carry any budget;
+// admission of a buyer's wire always applies the ceilings.
+function feeMessage(
+  bytes: ReadonlyUint8Array,
+  feePayer: string,
+  { allowSimulation = false } = {},
+) {
   try {
     if (bytes.byteLength > TRANSACTION_SIZE_LIMIT) return refused();
     const message = getCompiledTransactionMessageDecoder().decode(bytes);
@@ -42,6 +53,8 @@ function feeMessage(bytes: ReadonlyUint8Array, feePayer: string) {
       ('addressTableLookups' in message && message.addressTableLookups?.length)
     )
       return refused();
+    if (allowSimulation && message.lifetimeToken === SIMULATION_ONLY_BLOCKHASH)
+      return;
     let limit = false;
     let price = false;
     for (const instruction of message.instructions) {
@@ -87,12 +100,14 @@ export function limitedFeePayer(signer: KeyPairSigner): KeyPairSigner {
     keyPair: signer.keyPair,
     signMessages: async (messages, options) => {
       for (const message of messages)
-        feeMessage(message.content, signer.address);
+        feeMessage(message.content, signer.address, { allowSimulation: true });
       return signer.signMessages(messages, options);
     },
     signTransactions: async (transactions, options) => {
       for (const transaction of transactions)
-        feeMessage(transaction.messageBytes, signer.address);
+        feeMessage(transaction.messageBytes, signer.address, {
+          allowSimulation: true,
+        });
       return signer.signTransactions(transactions, options);
     },
   };

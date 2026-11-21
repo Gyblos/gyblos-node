@@ -119,10 +119,7 @@ const [packaged] = await packager({
   arch: target.arch,
   electronVersion: manifest.devDependencies.electron,
   appBundleId: DESKTOP_PACKAGE.bundleId,
-  // Windows icons need rcedit (wine off Windows); macOS takes the .icns, Linux the .png in the .deb.
-  ...(target.platform === 'darwin'
-    ? { icon: resolve('resources/gyblos.icns') }
-    : {}),
+  ...(target.platform !== 'linux' ? { icon: resolve('resources/gyblos') } : {}),
   asar: false,
   overwrite: true,
   prune: false,

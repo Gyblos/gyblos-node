@@ -2,7 +2,10 @@
 import { HTTP_STATUS } from '@gyblos/config';
 import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
-import { UnsentChannelPeerError } from '@gyblos/node/batch-buyer';
+import {
+  UnsentChannelPeerError,
+  UnsentOpeningError,
+} from '@gyblos/node/batch-buyer';
 import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
@@ -54,6 +57,7 @@ export async function unsentSessionPreflight<T>(
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
   if (
+    error instanceof UnsentOpeningError ||
     error instanceof UnsentSessionPreflightError ||
     error instanceof UnsentSellerChoiceError ||
     error instanceof UnsentChannelLimitError ||

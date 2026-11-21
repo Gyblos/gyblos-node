@@ -5,12 +5,15 @@ import { toFacilitatorSvmSigner, type FacilitatorSvmSigner } from '@x402/svm';
 import { TIMEOUTS } from '@gyblos/config';
 import { canonicalJson } from '@gyblos/protocol';
 import {
+  OPENING_STATUS,
   SESSION_CODES,
   sessionFail,
   type PaymentSessionTerms,
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
 
+import { resolveAbsentBatchOpening } from './batch-opening-absence';
+import { requireVerifiedPayer } from './batch-sdk-diagnostics';
 import { createBatchBuyer } from './batch-session-buyer';
 import { openingFor, requirementsFor, termsFor } from './batch-session-checks';
 import { batchFacilitatorFor } from './batch-session-facilitator';
@@ -37,6 +40,8 @@ interface Options {
   rpcUrl: string;
   now?: () => number;
   rpc?: BatchObserverOptions['rpc'];
+  // How long one SDK or RPC operation is awaited (BATCH_SESSION_DEFAULTS.operationMs by default).
+  operationMs?: number;
 }
 async function compatible(options: Options, terms: PaymentSessionTerms) {
   termsFor(terms);
@@ -79,11 +84,22 @@ export function openBatchBuyerBackend(
         return sessionFail(SESSION_CODES.BINDING);
       await compatible(options, terms);
       await verifyPaymentNetwork(rpc, terms.network);
+      const current = batchSessionObserver({ ...options, terms });
       const buyer = await createBatchBuyer({
         terms,
         paths: options.paths,
         payer: options.payer,
         now: options.now ?? Date.now,
+        openingStatus: async (store, signal) => {
+          const record = store.read();
+          if (!record.opening) return OPENING_STATUS.UNKNOWN;
+          if (await current.opening(record.opening, signal))
+            return OPENING_STATUS.PRESENT;
+          signal.throwIfAborted();
+          return (await resolveAbsentBatchOpening(store, rpc, signal))
+            ? OPENING_STATUS.ABSENT
+            : OPENING_STATUS.UNKNOWN;
+        },
         hints: async () => {
           const abortSignal = AbortSignal.timeout(TIMEOUTS.rpc);
           const block = await rpc
@@ -99,7 +115,7 @@ export function openBatchBuyerBackend(
           };
         },
       });
-      observer = batchSessionObserver({ ...options, terms });
+      observer = current;
       return buyer;
     },
     observe: async (channelId: string) => {
@@ -139,8 +155,7 @@ async function firstProof(
       requirements,
     ),
   );
-  if (!verified.isValid || verified.payer !== terms.buyer)
-    return sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verified, terms.buyer);
 }
 export function openBatchSellerBackend(
   options: Options & {
@@ -191,7 +206,8 @@ export function openBatchSellerBackend(
       const rpc = options.rpc ?? createBuyerObservationRpc(options.rpcUrl);
       await verifyPaymentNetwork(rpc, terms.network);
       const facilitator = batchFacilitatorFor(signer, terms);
-      if (!existing) {
+      // A new session, or an empty preparation taking its slot back, proves its opening first.
+      if (!existing || (existing.empty && payload !== undefined)) {
         if (!payload) return sessionFail(SESSION_CODES.UNVERIFIED);
         await firstProof(facilitator, terms, payload);
       }
@@ -203,8 +219,10 @@ export function openBatchSellerBackend(
         now: options.now ?? Date.now,
         facilitator,
         observe: observer.settlement,
-        observeOpening: observer.opening,
+        observeOpening: (opening) => observer.opening(opening),
         closing: observer.closing,
+        operationMs: options.operationMs,
+        reclaimReleasedSlot: payload !== undefined,
       });
     },
   };

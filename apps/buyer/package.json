@@ -15,6 +15,7 @@
     "./session-requirements": "./src/session-requirements.ts",
     "./constants": "./src/constants.ts",
     "./diagnostics": "./src/diagnostics.ts",
+    "./http-diagnostics": "./src/http-diagnostics.ts",
     "./slow-seller": "./src/slow-seller.ts",
     "./withdraw-paid": "./src/withdraw-paid.ts",
     "./setup": "./src/setup.ts",

@@ -13,6 +13,7 @@ import {
   type SetupView,
 } from '../wallet/setup-model';
 import { BUTTON_VARIANT } from './constants';
+import { SignalMark } from './Signal';
 import { StartupSplash } from './StartupSplash';
 import { Button, Note } from './UI';
 import { PasswordField } from './WalletBackup';
@@ -140,7 +141,7 @@ export function WalletSetup() {
       style={themeStyle(false)}
     >
       <div className="startup-splash-brand">
-        <span>[g]</span> Gyblos
+        <SignalMark /> Gyblos
       </div>
       <h1>
         {restored

@@ -234,8 +234,8 @@ destination, and a programmatically injected sink takes precedence. See
 | `enabled` | boolean | `true`  | Write operational diagnostics under `<home>/<role>/diagnostics/` |
 | `level`   | string  | `warn`  | Minimum level: `debug`, `info`, `warn` or `error`                |
 
-File-only; no environment variable overrides it. The local buyer applies these
-settings; the seller accepts the section. See
+The buyer and seller apply these settings from the configuration file. The
+seller records failed payment-channel attempts. See
 [Operational diagnostics](diagnostics.md#configuration).
 
 ### `[limits]`

@@ -372,11 +372,11 @@ void test('preview brand hooks normalize Windows module identifiers', async () =
     transformBrand(theme, 'C:/repo/apps/desktop/src/theme.ts', desktop) ?? '',
     /#141414/,
   );
-  assert.match(
-    transformBrand(signal, 'C:/repo/apps/desktop/src/ui/Signal.tsx', desktop) ??
-      '',
-    /preview-brand-mark/,
+  assert.equal(
+    transformBrand(signal, 'C:/repo/apps/desktop/src/ui/Signal.tsx', desktop),
+    undefined,
   );
+  assert.match(signal, /startup-mark-dark[.]svg/);
 });
 void test('preview brand hooks accept Windows CRLF source files', async () => {
   const { transformBrand } =

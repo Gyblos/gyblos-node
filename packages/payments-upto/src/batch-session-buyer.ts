@@ -46,6 +46,7 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
+    openingRecovery: openingRecovery(options, store, exclusive),
     usesBlocks: () => store.read().blocks !== undefined,
     pendingBlockRequest: () => {
       const state = store.read();
@@ -111,6 +112,29 @@ export async function createBatchBuyer(
     recoverApproval: () => exclusive(() => recoverApproval(options, store)),
     snapshot: () => snapshot(store),
     dispose: () => exclusive(store.dispose),
+  };
+}
+
+function openingRecovery(
+  options: BatchBuyerOptions,
+  store: BatchStore,
+  exclusive: ReturnType<typeof serial>,
+): SessionBuyer['openingRecovery'] {
+  const status = options.openingStatus;
+  if (!status) return undefined;
+  return {
+    pending: () => !!store.read().pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT],
+    claim: () =>
+      exclusive(async () => {
+        if (store.read().pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT])
+          return false;
+        await store.update((record) => {
+          record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] =
+            record.channelId;
+        });
+        return true;
+      }),
+    status: (signal: AbortSignal) => exclusive(() => status(store, signal)),
   };
 }
 

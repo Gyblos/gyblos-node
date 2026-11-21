@@ -69,6 +69,7 @@ async function connectManaged(
     const connectedPolicy = await client.connect(
       connection.url,
       connection.token,
+      true,
     );
     if (
       maxAtomic !== undefined &&

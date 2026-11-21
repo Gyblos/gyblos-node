@@ -1,5 +1,8 @@
 // Catalogs for reusable payment sessions; existing execution and payment contracts stay independent.
 export const SESSION_CODES = {
+  OPENING_ABSENT: 'PAYMENT_SESSION_OPENING_ABSENT',
+  OPENING_RETURNED: 'PAYMENT_SESSION_OPENING_RETURNED',
+  OPENING_PENDING: 'PAYMENT_SESSION_OPENING_PENDING',
   INVALID: 'PAYMENT_SESSION_INVALID',
   BINDING: 'PAYMENT_SESSION_BINDING',
   BUSY: 'PAYMENT_SESSION_BUSY',
@@ -9,6 +12,13 @@ export const SESSION_CODES = {
   UNAVAILABLE: 'PAYMENT_SESSION_UNAVAILABLE',
 } as const;
 export type SessionCode = (typeof SESSION_CODES)[keyof typeof SESSION_CODES];
+export const OPENING_STATUS = {
+  PRESENT: 'present',
+  ABSENT: 'absent',
+  UNKNOWN: 'unknown',
+} as const;
+export type OpeningStatus =
+  (typeof OPENING_STATUS)[keyof typeof OPENING_STATUS];
 export const SESSION_STATES = {
   OPENING: 'opening',
   OPEN: 'open',

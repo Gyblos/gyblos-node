@@ -35,6 +35,11 @@ import { parseBlocks } from './batch-block-state';
 import { coherentRecord } from './batch-session-consistency';
 import { parseBatchHistory } from './batch-session-history';
 import { strictBatchOpening } from './batch-session-opening';
+import {
+  emptyPreparation,
+  releasedField,
+  releasedKey,
+} from './batch-session-opening-release';
 import type { BatchRecord } from './batch-session-types';
 import {
   BATCH_BLOCK_STATE,
@@ -222,6 +227,7 @@ function recordFields(value: unknown) {
       ? ['blocks']
       : []),
     ...(renewalVersion ? ['history'] : []),
+    ...releasedKey(value),
   ]);
   return { row, blockVersion, renewalVersion };
 }
@@ -297,8 +303,10 @@ export function parseRecord(
           ),
         }
       : {}),
+    ...releasedField(row),
   };
   coherentRecord(record);
+  if (record.released && !emptyPreparation(record)) sessionFail();
   return record;
 }
 

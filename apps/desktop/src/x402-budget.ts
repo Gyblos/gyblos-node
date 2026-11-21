@@ -2,6 +2,10 @@
 // This permission bounds only chat requests made by this desktop, never other clients of the buyer.
 import { randomUUID } from 'node:crypto';
 
+import {
+  isOpeningIntent,
+  type desktopOpening,
+} from '@gyblos/node/desktop-opening';
 import { buyerAtomic, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 import {
@@ -21,12 +25,38 @@ interface State {
   version: typeof DESKTOP_X402.VERSION;
   summary: X402Summary;
   pending: string | null;
+  openingIntent?: string;
 }
 export class X402Budget {
   private state: State | null = null;
   private failed = false;
+  private liveIntent?: string;
   private queue: Promise<unknown> = Promise.resolve();
-  constructor(private readonly files: Files) {}
+  constructor(
+    private readonly files: Files,
+    readonly opening?: ReturnType<typeof desktopOpening>,
+  ) {}
+  private async recover(state: State) {
+    if (
+      state.pending &&
+      state.openingIntent &&
+      (await this.opening?.retire(state.openingIntent))
+    ) {
+      await this.save({
+        ...state,
+        openingIntent: undefined,
+        pending: null,
+        summary: { ...state.summary, blocked: false },
+      });
+    }
+    return this.state!;
+  }
+  recoverOpening() {
+    return this.serial(async () => {
+      this.liveIntent = undefined;
+      await this.recover(await this.load());
+    });
+  }
   private serial<T>(work: () => Promise<T>) {
     const result = this.queue.then(work);
     this.queue = result.catch(() => {});
@@ -53,11 +83,18 @@ export class X402Budget {
     const summary = parseX402Summary(saved.summary);
     if (Boolean(saved.pending) !== summary.blocked)
       throw new Error('Spending record unavailable');
-    return (this.state = {
+    if (
+      saved.openingIntent !== undefined &&
+      !isOpeningIntent(saved.openingIntent)
+    )
+      throw new Error('Invalid payment reservation');
+    this.state = {
+      ...(saved.openingIntent && { openingIntent: saved.openingIntent }),
       version: DESKTOP_X402.VERSION,
       summary,
       pending: saved.pending,
-    });
+    };
+    return this.state;
   }
   private async save(next: State) {
     try {
@@ -72,7 +109,12 @@ export class X402Budget {
   }
   async summary() {
     return this.serial(async () => {
-      const current = (await this.load()).summary;
+      const state = await this.load();
+      const current = (
+        state.openingIntent && state.openingIntent !== this.liveIntent
+          ? await this.recover(state)
+          : state
+      ).summary;
       return structuredClone({
         ...current,
         blocked: current.blocked || this.failed,
@@ -106,7 +148,7 @@ export class X402Budget {
       return structuredClone(this.state!.summary);
     });
   }
-  reserve(id: string, confirmedPolicy?: BuyerApiPolicy) {
+  reserve(id: string, confirmedPolicy?: BuyerApiPolicy, intent?: string) {
     return this.serial(async () => {
       const state = await this.load();
       // A confirmed seller authorizes this response only. Persist its reservation
@@ -140,8 +182,13 @@ export class X402Budget {
         throw new Error(
           'Remaining budget cannot cover the maximum cost of another response',
         );
+      if (intent) {
+        await this.opening!.arm(intent);
+        this.liveIntent = intent;
+      }
       await this.save({
         ...state,
+        openingIntent: intent,
         pending: id,
         summary: { ...summary, blocked: true },
       });
@@ -206,7 +253,12 @@ export class X402Budget {
           },
         ],
       });
-      await this.save({ ...state, summary: next, pending: null });
+      await this.save({
+        ...state,
+        summary: next,
+        openingIntent: undefined,
+        pending: null,
+      });
       return structuredClone(next);
     });
   }
@@ -218,6 +270,7 @@ export class X402Budget {
         throw new Error('Payment needs review');
       await this.save({
         ...state,
+        openingIntent: undefined,
         pending: null,
         summary: { ...state.summary, blocked: false },
       });
@@ -235,6 +288,7 @@ export class X402Budget {
         throw new Error('Payment needs review');
       await this.save({
         ...state,
+        openingIntent: undefined,
         pending: null,
         summary: { ...state.summary, blocked: false },
       });

@@ -68,7 +68,7 @@ engine. See the [CLI reference](/en/reference/cli#validate-the-mounted-configura
 | `transport.bind`          | Optional literal `ip:port` to bind; IPv6 in brackets; port may be `0`                                              |
 | `transport.external_addr` | Optional `ip:port` to advertise; port 1 to 65535                                                                   |
 | `telemetry.file`          | Boolean; default `false`. Writes private, content-free telemetry files on this machine; sends nothing              |
-| `diagnostics.enabled`     | Boolean; default `true`. The local buyer's diagnostic log; the seller node doesn't write one                       |
+| `diagnostics.enabled`     | Boolean; default `true`. Write local diagnostics for the buyer and for failed seller payment-channel attempts      |
 | `diagnostics.level`       | `debug`, `info`, `warn` or `error`; default `warn`                                                                 |
 | `buyer.relay_only`        | Boolean; default `false`. A buyer setting; the seller ignores it                                                   |
 
