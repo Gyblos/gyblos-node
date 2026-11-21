@@ -12,6 +12,7 @@ import {
 
 import {
   depositSettlementsRunning,
+  pendingNamesChannel,
   type BatchOpening,
 } from './batch-session-opening-release';
 import type { BatchStore } from './batch-session-store';
@@ -21,18 +22,11 @@ export interface OpeningConfirmation {
   observe: () => Promise<boolean>;
   operationMs?: number;
   confirmMs?: number;
-  pollMs?: number;
 }
 
-// Any pending key naming the channel: the SDK reserves it before sending and drops it only when the
-// deposit failed on chain.
-export const depositMayBeSent = (store: BatchStore, opening: BatchOpening) => {
-  const channelId = opening.voucher!.channelId;
-  return (
-    depositSettlementsRunning(store) ||
-    Object.keys(store.read().pending).some((key) => key.includes(channelId))
-  );
-};
+const depositMayBeSent = (store: BatchStore, opening: BatchOpening) =>
+  depositSettlementsRunning(store) ||
+  pendingNamesChannel(store.read().pending, opening.voucher!.channelId);
 
 // A channel seen in another state, or another opening, is an answer: waiting longer cannot change it.
 const settledAnswer = (error: unknown) =>
@@ -47,8 +41,7 @@ export async function confirmSentOpening(
 ) {
   const confirmMs =
     confirmation.confirmMs ?? BATCH_SESSION_DEFAULTS.openingConfirmMs;
-  const pollMs =
-    confirmation.pollMs ?? BATCH_SESSION_DEFAULTS.openingConfirmPollMs;
+  const pollMs = BATCH_SESSION_DEFAULTS.openingConfirmPollMs;
   const operationMs =
     confirmation.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs;
   const deadline = performance.now() + confirmMs;

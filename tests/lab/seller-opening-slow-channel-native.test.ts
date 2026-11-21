@@ -17,13 +17,14 @@ void test('a sent deposit whose channel the SDK cannot see yet still opens', asy
   t.mock.method(globalThis, 'fetch', async () =>
     assert.fail('External RPC forbidden'),
   );
-  const rig = await sellerRegistryRig(1);
+  const rig = await sellerRegistryRig(1, { openingConfirmMs: 30_000 });
   t.after(rig.dispose);
   const [first] = rig.buyers;
   const channelId = (
     JSON.parse(first!.payload) as { voucher: { channelId: string } }
   ).voucher.channelId;
-  // The SDK's RPC lags: its first reads of the landed channel come back empty, past its own retries.
+  // The SDK's RPC lags: its first reads of the landed channel come back empty, past its own retries (the
+  // SDK reads 5 times; `hidden` reaching 0 below proves the SDK missed it and the seller found it).
   let hidden = 6;
   const signer = {
     ...rig.vm.signer,
@@ -92,7 +93,7 @@ void test('a sent deposit whose channel never shows is kept, bounded, and opens 
   t.mock.method(globalThis, 'fetch', async () =>
     assert.fail('External RPC forbidden'),
   );
-  const rig = await sellerRegistryRig(1);
+  const rig = await sellerRegistryRig(1, { openingConfirmMs: 30_000 });
   t.after(rig.dispose);
   const [first] = rig.buyers;
   const channelId = (
@@ -134,7 +135,7 @@ void test('an opening whose deposit was never sent fails at once, without waitin
   t.mock.method(globalThis, 'fetch', async () =>
     assert.fail('External RPC forbidden'),
   );
-  const rig = await sellerRegistryRig(1);
+  const rig = await sellerRegistryRig(1, { openingConfirmMs: 30_000 });
   t.after(rig.dispose);
   const signer = {
     ...rig.vm.signer,
@@ -156,4 +157,7 @@ void test('an opening whose deposit was never sent fails at once, without waitin
   const started = performance.now();
   await assert.rejects(session.open(first!.payload));
   assert.ok(performance.now() - started < 5_000, 'no confirmation wait');
+  // Released as before: the opening and its channel are forgotten.
+  const released = await registry.backend(first!.terms.buyerNodeId).inspect();
+  assert.equal(released?.snapshot.channelId, '');
 });

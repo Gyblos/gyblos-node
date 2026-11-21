@@ -40,7 +40,7 @@ interface Options {
   rpc?: BatchObserverOptions['rpc'];
   // How long one SDK or RPC operation is awaited (BATCH_SESSION_DEFAULTS.operationMs by default).
   operationMs?: number;
-  // How long a sent deposit's channel is looked for (BATCH_SESSION_DEFAULTS.openingConfirmMs by default).
+  // After a deposit was sent, how long its channel is looked for (BATCH_SESSION_DEFAULTS.openingConfirmMs by default).
   openingConfirmMs?: number;
 }
 async function compatible(options: Options, terms: PaymentSessionTerms) {

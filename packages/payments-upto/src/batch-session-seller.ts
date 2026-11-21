@@ -58,6 +58,7 @@ function checkSellerOptions(options: BatchSellerOptions) {
   controlInteger(
     options.openingConfirmMs ?? BATCH_SESSION_DEFAULTS.openingConfirmMs,
     0,
+    BATCH_SESSION_DEFAULTS.maxOpeningConfirmMs,
   );
   atomic(
     options.minSettlementAtomic ?? BATCH_SESSION_DEFAULTS.minSettlementAtomic,
@@ -203,16 +204,15 @@ async function openSeller(context: BatchSellerContext, payload: string) {
   // waitBatch stops waiting but cannot cancel the SDK: a settlement still running may yet send the deposit.
   // The opening is forgotten only when the chain never showed the channel, no settlement for the session
   // is still running and this one, if started, has finished.
+  const observe = () =>
+    options.observeOpening(
+      structuredClone(opening),
+      structuredClone(options.terms),
+    );
   let observed = false;
   let settled = () => true;
   try {
-    observed = await waitBatch(
-      options.observeOpening(
-        structuredClone(opening),
-        structuredClone(options.terms),
-      ),
-      options.operationMs,
-    );
+    observed = await waitBatch(observe(), options.operationMs);
     if (observed) await verifyOpenedVoucher(context, opening);
     else {
       const tracked = trackDepositSettlement(
@@ -230,13 +230,10 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     }
   } catch (error) {
     if (observed) throw error;
-    // A deposit already sent may land after the SDK stopped looking: observe it before giving up.
+    // A deposit already sent may land after the SDK stopped looking: observe it before giving up. A
+    // failed first observation lands here too; the wait only runs if a deposit may have been sent.
     const confirmed = await confirmSentOpening(store, opening, {
-      observe: () =>
-        options.observeOpening(
-          structuredClone(opening),
-          structuredClone(options.terms),
-        ),
+      observe,
       operationMs: options.operationMs,
       confirmMs: options.openingConfirmMs,
     });

@@ -55,6 +55,13 @@ function depositAttempts(
   });
 }
 
+// Any pending key naming the channel (deliberately wide, as the SDK's key format is internal): the SDK
+// reserves it before sending and drops it only when the deposit failed on chain.
+export const pendingNamesChannel = (
+  pending: Record<string, string>,
+  channelId: string,
+) => Object.keys(pending).some((key) => key.includes(channelId));
+
 // Call only when the chain never showed the channel and no settlement is still running. Any key naming
 // the channel (deliberately wide, as the SDK's key format is internal) keeps everything. A release that
 // cannot be written marks the opening failure, which stays the reported error.
@@ -69,7 +76,7 @@ export async function releaseUnsentOpening(
       if (
         state.state !== SESSION_STATES.OPENING ||
         state.channelId !== channelId ||
-        Object.keys(state.pending).some((key) => key.includes(channelId))
+        pendingNamesChannel(state.pending, channelId)
       )
         return;
       for (const key of depositAttempts(state.pending, opening))
