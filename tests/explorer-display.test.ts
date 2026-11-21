@@ -34,7 +34,7 @@ void test('the Sellers table includes a full-width empty row', async () => {
   );
   assert.match(
     section,
-    /<td className=\{`\$\{td\} text-muted`\} colSpan=\{head.length\}>\s*No sellers online\.\s*<\/td>/,
+    /<td className=\{`\$\{td\} text-muted`\} colSpan=\{head.length\}>\s*No offers from online sellers\.\s*<\/td>/,
   );
 });
 

@@ -138,7 +138,7 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
       {sellers.some((seller) => seller.models.length > 0) ? null : (
         <tr>
           <td className={`${td} text-muted`} colSpan={head.length}>
-            No sellers online.
+            No offers from online sellers.
           </td>
         </tr>
       )}
