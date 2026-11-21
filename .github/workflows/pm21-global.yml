@@ -1,4 +1,4 @@
-name: PM21 isolated docs correction
+name: PM21 global compatibility correction
 on:
   push:
     branches: [codex/bench-installers-20261121-b]
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pm21-isolated-${{ github.ref }}
+  group: pm21-global-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -84,12 +84,13 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
           fail-on-cache-miss: true
       - name: Frozen dependency install
         shell: bash
         run: |
-          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=0 bun install --frozen-lockfile --linker isolated
+          if [[ "$RUNNER_OS" = Windows ]]; then test ! -e "$PM_STORE/links"; fi
+          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=1 bun install --frozen-lockfile --linker isolated
           git restore package.json
           rm bun.lock
       - name: Save cold dependency store
@@ -97,7 +98,7 @@ jobs:
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
       - name: Verify patched SDK and native Iroh with Node
         if: github.job == 'docs' || github.job == 'windows'
         shell: bash
@@ -106,8 +107,9 @@ jobs:
           grep -Eq '^# skipped 0' "$RUNNER_TEMP/pmcases.tap"
           grep -Eq '^# pass 10([^0-9]|$)' "$RUNNER_TEMP/pmcases.tap"
           python "$RUNNER_TEMP/pmverify.py"
+          node -e "const f=require('node:fs');const p='node_modules/.bun';console.log('shared package links',f.readdirSync(p).filter(x=>f.lstatSync(p+'/'+x).isSymbolicLink()).length)"
       - run: pnpm exec prettier --check .
-      - run: pnpm docs:build
+      - run: pnpm --filter @gyblos/docs exec next build --webpack
       - run: pnpm docs:test
       - run: node --import tsx --test "tests/docs-*.test.ts"
 
@@ -155,12 +157,13 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
           fail-on-cache-miss: true
       - name: Frozen dependency install
         shell: bash
         run: |
-          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=0 bun install --frozen-lockfile --linker isolated
+          if [[ "$RUNNER_OS" = Windows ]]; then test ! -e "$PM_STORE/links"; fi
+          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=1 bun install --frozen-lockfile --linker isolated
           git restore package.json
           rm bun.lock
       - name: Save cold dependency store
@@ -168,7 +171,7 @@ jobs:
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
       - name: Verify patched SDK and native Iroh with Node
         if: github.job == 'docs' || github.job == 'windows'
         shell: bash
@@ -177,6 +180,7 @@ jobs:
           grep -Eq '^# skipped 0' "$RUNNER_TEMP/pmcases.tap"
           grep -Eq '^# pass 10([^0-9]|$)' "$RUNNER_TEMP/pmcases.tap"
           python "$RUNNER_TEMP/pmverify.py"
+          node -e "const f=require('node:fs');const p='node_modules/.bun';console.log('shared package links',f.readdirSync(p).filter(x=>f.lstatSync(p+'/'+x).isSymbolicLink()).length)"
       - run: pnpm typecheck
       - run: pnpm lint
 
@@ -229,12 +233,13 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
           fail-on-cache-miss: true
       - name: Frozen dependency install
         shell: bash
         run: |
-          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=0 bun install --frozen-lockfile --linker isolated
+          if [[ "$RUNNER_OS" = Windows ]]; then test ! -e "$PM_STORE/links"; fi
+          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=1 bun install --frozen-lockfile --linker isolated
           git restore package.json
           rm bun.lock
       - name: Save cold dependency store
@@ -242,7 +247,7 @@ jobs:
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
       - name: Verify patched SDK and native Iroh with Node
         if: github.job == 'docs' || github.job == 'windows'
         shell: bash
@@ -251,6 +256,7 @@ jobs:
           grep -Eq '^# skipped 0' "$RUNNER_TEMP/pmcases.tap"
           grep -Eq '^# pass 10([^0-9]|$)' "$RUNNER_TEMP/pmcases.tap"
           python "$RUNNER_TEMP/pmverify.py"
+          node -e "const f=require('node:fs');const p='node_modules/.bun';console.log('shared package links',f.readdirSync(p).filter(x=>f.lstatSync(p+'/'+x).isSymbolicLink()).length)"
       - run: node --import tsx --test --test-shard=${{ matrix.shard }}/3 "tests/*.test.ts" "packages/*/test/**/*.test.ts"
 
   # `pnpm test:lab` split by file; the pattern matches its script in package.json.
@@ -302,12 +308,13 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
           fail-on-cache-miss: true
       - name: Frozen dependency install
         shell: bash
         run: |
-          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=0 bun install --frozen-lockfile --linker isolated
+          if [[ "$RUNNER_OS" = Windows ]]; then test ! -e "$PM_STORE/links"; fi
+          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=1 bun install --frozen-lockfile --linker isolated
           git restore package.json
           rm bun.lock
       - name: Save cold dependency store
@@ -315,7 +322,7 @@ jobs:
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
       - name: Verify patched SDK and native Iroh with Node
         if: github.job == 'docs' || github.job == 'windows'
         shell: bash
@@ -324,6 +331,7 @@ jobs:
           grep -Eq '^# skipped 0' "$RUNNER_TEMP/pmcases.tap"
           grep -Eq '^# pass 10([^0-9]|$)' "$RUNNER_TEMP/pmcases.tap"
           python "$RUNNER_TEMP/pmverify.py"
+          node -e "const f=require('node:fs');const p='node_modules/.bun';console.log('shared package links',f.readdirSync(p).filter(x=>f.lstatSync(p+'/'+x).isSymbolicLink()).length)"
       - run: node --import tsx --test --test-shard=${{ matrix.shard }}/2 "tests/lab/**/*.test.ts"
 
   build:
@@ -370,12 +378,13 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
           fail-on-cache-miss: true
       - name: Frozen dependency install
         shell: bash
         run: |
-          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=0 bun install --frozen-lockfile --linker isolated
+          if [[ "$RUNNER_OS" = Windows ]]; then test ! -e "$PM_STORE/links"; fi
+          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=1 bun install --frozen-lockfile --linker isolated
           git restore package.json
           rm bun.lock
       - name: Save cold dependency store
@@ -383,7 +392,7 @@ jobs:
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
       - name: Verify patched SDK and native Iroh with Node
         if: github.job == 'docs' || github.job == 'windows'
         shell: bash
@@ -392,6 +401,7 @@ jobs:
           grep -Eq '^# skipped 0' "$RUNNER_TEMP/pmcases.tap"
           grep -Eq '^# pass 10([^0-9]|$)' "$RUNNER_TEMP/pmcases.tap"
           python "$RUNNER_TEMP/pmverify.py"
+          node -e "const f=require('node:fs');const p='node_modules/.bun';console.log('shared package links',f.readdirSync(p).filter(x=>f.lstatSync(p+'/'+x).isSymbolicLink()).length)"
       - run: pnpm desktop:build
       # The release's path: pinned Node and iroh downloads, then the packaged seller runs.
       - name: Build the packaged seller for linux-x64
@@ -444,12 +454,13 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
           fail-on-cache-miss: true
       - name: Frozen dependency install
         shell: bash
         run: |
-          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=0 bun install --frozen-lockfile --linker isolated
+          if [[ "$RUNNER_OS" = Windows ]]; then test ! -e "$PM_STORE/links"; fi
+          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=1 bun install --frozen-lockfile --linker isolated
           git restore package.json
           rm bun.lock
       - name: Save cold dependency store
@@ -457,7 +468,7 @@ jobs:
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
       - name: Verify patched SDK and native Iroh with Node
         if: github.job == 'docs' || github.job == 'windows'
         shell: bash
@@ -466,6 +477,7 @@ jobs:
           grep -Eq '^# skipped 0' "$RUNNER_TEMP/pmcases.tap"
           grep -Eq '^# pass 10([^0-9]|$)' "$RUNNER_TEMP/pmcases.tap"
           python "$RUNNER_TEMP/pmverify.py"
+          node -e "const f=require('node:fs');const p='node_modules/.bun';console.log('shared package links',f.readdirSync(p).filter(x=>f.lstatSync(p+'/'+x).isSymbolicLink()).length)"
       - run: pnpm build:native --version 0.0.0-ci.1 --target win32-x64 --out dist/windows
       - run: pnpm build:npm --version 0.0.0-ci.1 --target win32-x64 --archives dist/windows --out dist/windows
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -524,12 +536,13 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
           fail-on-cache-miss: true
       - name: Frozen dependency install
         shell: bash
         run: |
-          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=0 bun install --frozen-lockfile --linker isolated
+          if [[ "$RUNNER_OS" = Windows ]]; then test ! -e "$PM_STORE/links"; fi
+          BUN_INSTALL_CACHE_DIR="$PM_STORE" BUN_INSTALL_GLOBAL_STORE=1 bun install --frozen-lockfile --linker isolated
           git restore package.json
           rm bun.lock
       - name: Save cold dependency store
@@ -537,7 +550,7 @@ jobs:
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ runner.os == 'Windows' && 'D:/pmstore21' || '/home/runner/pmstore21' }}
-          key: pm21-expB-isolated-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
+          key: pm21-expB-${{ runner.os == 'Windows' && 'isolated' || 'global' }}-6b23cff2f3-${{ runner.os }}-${{ runner.arch }}
       - name: Verify patched SDK and native Iroh with Node
         if: github.job == 'docs' || github.job == 'windows'
         shell: bash
@@ -546,6 +559,7 @@ jobs:
           grep -Eq '^# skipped 0' "$RUNNER_TEMP/pmcases.tap"
           grep -Eq '^# pass 10([^0-9]|$)' "$RUNNER_TEMP/pmcases.tap"
           python "$RUNNER_TEMP/pmverify.py"
+          node -e "const f=require('node:fs');const p='node_modules/.bun';console.log('shared package links',f.readdirSync(p).filter(x=>f.lstatSync(p+'/'+x).isSymbolicLink()).length)"
       - name: Desktop seller selection and channel chat
         run: node --import tsx --test tests/desktop-network-catalog-paid.test.ts tests/desktop-buyer-stream-loopback.test.ts
       - if: needs.changes.outputs.windows_full == 'true'
