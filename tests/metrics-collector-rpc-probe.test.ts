@@ -1,11 +1,20 @@
-// Protects the operator's RPC probe: it does not exist without its token, refuses a wrong one, probes
-// the public and each configured keyed endpoint, refuses an endpoint of another network (its genesis
-// hash), and never returns an endpoint's URL or key.
+// Protects the operator's RPC probe: it answers nothing without its token or with a wrong one, is served
+// by the app behind its https check, limit and headers with its usual 404, probes the public and each
+// configured keyed endpoint, refuses an endpoint of another network (its genesis hash), and never
+// returns an endpoint's URL or key.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { DEVNET_GENESIS } from '@gyblos/config/network';
+import { COLLECTOR_ROUTES } from '@gyblos/metrics-collector/constants';
 import { rpcProbe } from '@gyblos/metrics-collector/rpc-probe';
+import { createMemoryStorage } from '@gyblos/metrics-collector/storage-memory';
+
+import {
+  COLLECTOR_CLIENT_IP,
+  COLLECTOR_ORIGIN,
+  testCollector,
+} from './support/metrics-collector';
 
 const TOKEN = 'a'.repeat(40);
 const KEYED = 'https://rpc.example.test/?api-key=secret-key-value';
@@ -47,19 +56,77 @@ const request = (token?: string, path = '/v1/admin/rpc-probe') =>
     headers: token ? { authorization: `Bearer ${token}` } : {},
   });
 
-void test('the probe is absent without its token and refuses a wrong one', async () => {
+void test('the probe answers nothing without its token, with a short one, or with a wrong one', async () => {
   const fetcher = fakeFetch({});
+  assert.equal(await rpcProbe(request(TOKEN), {}, fetcher), undefined);
+  const short = { COLLECTOR_ADMIN_TOKEN: 'a'.repeat(31) };
   assert.equal(
-    await rpcProbe(request(TOKEN, '/health'), {}, fetcher),
+    await rpcProbe(request('a'.repeat(31)), short, fetcher),
     undefined,
   );
-  assert.equal((await rpcProbe(request(TOKEN), {}, fetcher))?.status, 404);
   const bindings = { COLLECTOR_ADMIN_TOKEN: TOKEN };
-  assert.equal((await rpcProbe(request(), bindings, fetcher))?.status, 404);
+  assert.equal(await rpcProbe(request(), bindings, fetcher), undefined);
   assert.equal(
-    (await rpcProbe(request('b'.repeat(40)), bindings, fetcher))?.status,
-    404,
+    await rpcProbe(request('b'.repeat(40)), bindings, fetcher),
+    undefined,
   );
+  const post = new Request(request(TOKEN), { method: 'POST' });
+  assert.equal(await rpcProbe(post, bindings, fetcher), undefined);
+});
+
+void test('the app serves the probe behind its https check, limit and headers, and its usual 404', async () => {
+  const bindings = { COLLECTOR_ADMIN_TOKEN: TOKEN };
+  const probe = (incoming: Request) =>
+    rpcProbe(incoming, bindings, fakeFetch({}));
+  const { app, ip } = testCollector(createMemoryStorage().storage, { probe });
+  const call = (origin: string, token?: string) =>
+    app.request(`${origin}${COLLECTOR_ROUTES.RPC_PROBE}`, {
+      headers: {
+        'cf-connecting-ip': COLLECTOR_CLIENT_IP,
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  // Plain http is refused before the token is read.
+  const insecure = await call('http://collector.test', TOKEN);
+  assert.equal(insecure.status, 400);
+  assert.deepEqual(await insecure.json(), { error: 'HTTPS_REQUIRED' });
+  // Without the token it is the same 404 as any unknown path, headers included.
+  const missing = await call(COLLECTOR_ORIGIN);
+  const unknown = await app.request(`${COLLECTOR_ORIGIN}/v1/admin/other`, {
+    headers: { 'cf-connecting-ip': COLLECTOR_CLIENT_IP },
+  });
+  assert.equal(missing.status, 404);
+  assert.deepEqual(await missing.json(), await unknown.json());
+  const headersOf = (response: Response) => {
+    const seen: Record<string, string> = {};
+    response.headers.forEach((value, name) => {
+      seen[name] = value;
+    });
+    return seen;
+  };
+  assert.deepEqual(headersOf(missing), headersOf(unknown));
+  // With it, the probe answers, never cached, with the app's headers, after the per-address limit.
+  const used = ip.keys.length;
+  const answered = await call(COLLECTOR_ORIGIN, TOKEN);
+  assert.equal(answered.status, 200);
+  assert.equal(answered.headers.get('cache-control'), 'no-store');
+  assert.equal(answered.headers.get('x-robots-tag'), 'noindex');
+  assert.equal(answered.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(ip.keys.length, used + 1);
+  const limited = testCollector(createMemoryStorage().storage, {
+    ip: false,
+    probe,
+  });
+  const refused = await limited.app.request(
+    `${COLLECTOR_ORIGIN}${COLLECTOR_ROUTES.RPC_PROBE}`,
+    {
+      headers: {
+        'cf-connecting-ip': COLLECTOR_CLIENT_IP,
+        authorization: `Bearer ${TOKEN}`,
+      },
+    },
+  );
+  assert.equal(refused.status, 429);
 });
 
 void test('the probe reports each endpoint, refuses another network and hides URLs', async () => {
