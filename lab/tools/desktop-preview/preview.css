@@ -2622,7 +2622,10 @@ html
 html .app.desktop-frame .composer-actions > span {
   display: none;
 }
-html .app.desktop-frame .composer-leading [aria-label='Choose chat tools'] {
+html
+  .app.desktop-frame
+  .composer-leading
+  button[aria-label='Choose chat tools'] {
   width: 32px;
   height: 32px;
   padding: 0;
