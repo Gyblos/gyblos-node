@@ -84,6 +84,12 @@ export interface SessionSeller {
   dispose(): Promise<void>;
 }
 export interface SessionBuyer {
+  // Only the original OPEN may be repeated; a surviving intent requires chain evidence first.
+  claimOpening?(): Promise<boolean>;
+  acknowledgeOpening?(): Promise<void>;
+  openingStatus?(
+    signal: AbortSignal,
+  ): Promise<'present' | 'absent' | 'unknown'>;
   open(check?: () => void): Promise<string>;
   begin(request: SessionRequest): Promise<void>;
   acknowledge(requestId: string): Promise<void>;

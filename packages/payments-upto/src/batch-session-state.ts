@@ -117,7 +117,7 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
 
 export function priorBatchSpent(record: BatchRecord): bigint {
   return (record.history ?? []).reduce(
-    (total, entry) => total + BigInt(entry.settlement!.chargedAtomic),
+    (total, entry) => total + BigInt(entry.settlement?.chargedAtomic ?? '0'),
     0n,
   );
 }

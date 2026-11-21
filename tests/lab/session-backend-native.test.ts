@@ -65,6 +65,8 @@ void test(
     const buyer = await buyerBackend.create(terms);
     t.after(buyer.dispose);
     const payload = await buyer.open();
+    const signal = new AbortController().signal;
+    assert.equal(await buyer.openingStatus!(signal), 'unknown');
     const sellerBackend = openBatchSellerBackend({
       ...base,
       paths: sellerPaths,
@@ -92,6 +94,8 @@ void test(
     await assert.rejects(seller.open(payload));
     vm.loseConfirmation(false);
     const submitted = vm.sends();
+    assert.equal(await buyer.openingStatus!(signal), 'present');
+    assert.equal(await buyer.open(), payload);
     assert.ok(submitted > before);
     assert.equal(
       await vm.balance(terms.buyer),

@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { BATCH_METHODS, BatchChannelError } from '@gyblos/protocol/batch-channel';
+import {
+  BATCH_METHODS,
+  BatchChannelError,
+} from '@gyblos/protocol/batch-channel';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { batchPrepareFixture } from './support/batch-prepare';
@@ -34,7 +37,12 @@ for (const status of ['present', 'absent', 'unknown'] as const) {
       assert.equal(f.offers.generations(), 1);
       assert.deepEqual(f.rig.calls, ['deposit']);
     } else {
-      await assert.rejects(run, {code: status === 'absent' ? 'PAYMENT_SESSION_OPENING_ABSENT' : 'PAYMENT_SESSION_OPENING_PENDING'});
+      await assert.rejects(run, {
+        code:
+          status === 'absent'
+            ? 'PAYMENT_SESSION_OPENING_ABSENT'
+            : 'PAYMENT_SESSION_OPENING_PENDING',
+      });
       assert.equal(payloads.length, 1);
       assert.equal(f.offers.generations(), 0);
     }

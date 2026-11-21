@@ -17,6 +17,7 @@ import {
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
 import { sameBatchParties } from './batch-session-history';
@@ -66,8 +67,11 @@ export async function renewBatchSession(
       !sameBatchParties(previous.terms, terms)
     )
       return sessionFail(SESSION_CODES.BINDING);
+    const absent =
+      options.totalBudgetAtomic !== undefined && !!batchOpeningAbsent(previous);
     if (
       !unsigned &&
+      !absent &&
       (previous.state !== SESSION_STATES.CLOSED || !previous.settlement)
     )
       return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -78,11 +82,13 @@ export async function renewBatchSession(
         (previous.history?.length ?? 0) >= BATCH_RENEWAL_STATE.maxHistory)
     )
       return sessionFail(SESSION_CODES.LIMIT);
-    const observed = unsigned
-      ? undefined
-      : await options.observe(previous.channelId);
+    const observed =
+      unsigned || absent
+        ? undefined
+        : await options.observe(previous.channelId);
     if (
       !unsigned &&
+      !absent &&
       (!observed ||
         canonicalJson(observed) !== canonicalJson(previous.settlement))
     )

@@ -6,6 +6,7 @@ import { UPTO_WITHDRAW_STEPS } from 'x402-upto-metered';
 export const PAYMENT_PHASES = { ADMIT: 'admit', SETTLE: 'settle' } as const;
 export const BUYER_OBSERVATION = { maxResponseBytes: 1024 * 1024 } as const;
 export const BATCH_BUYER_CHECKPOINTS = {
+  OPENING_SENT: 'gyblos:opening:sent',
   OPENING_ABSENT: 'gyblos:opening:absent',
   OPENING_TRANSACTION: 'gyblos:opening:transaction',
   OPENING_VOUCHER: 'gyblos:opening:voucher',

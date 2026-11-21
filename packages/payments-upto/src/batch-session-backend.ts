@@ -11,6 +11,7 @@ import {
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
 
+import { resolveAbsentBatchOpening } from './batch-opening-absence';
 import { requireVerifiedPayer } from './batch-sdk-diagnostics';
 import { createBatchBuyer } from './batch-session-buyer';
 import { openingFor, requirementsFor, termsFor } from './batch-session-checks';
@@ -82,11 +83,21 @@ export function openBatchBuyerBackend(
         return sessionFail(SESSION_CODES.BINDING);
       await compatible(options, terms);
       await verifyPaymentNetwork(rpc, terms.network);
+      const current = batchSessionObserver({ ...options, terms });
       const buyer = await createBatchBuyer({
         terms,
         paths: options.paths,
         payer: options.payer,
         now: options.now ?? Date.now,
+        openingStatus: async (store, signal) => {
+          const record = store.read();
+          if (!record.opening) return 'unknown';
+          if (await current.opening(record.opening, signal)) return 'present';
+          signal.throwIfAborted();
+          return (await resolveAbsentBatchOpening(store, rpc, signal))
+            ? 'absent'
+            : 'unknown';
+        },
         hints: async () => {
           const abortSignal = AbortSignal.timeout(TIMEOUTS.rpc);
           const block = await rpc
@@ -102,7 +113,7 @@ export function openBatchBuyerBackend(
           };
         },
       });
-      observer = batchSessionObserver({ ...options, terms });
+      observer = current;
       return buyer;
     },
     observe: async (channelId: string) => {

@@ -112,9 +112,7 @@ export function ChatAnswer(props: Props) {
       {message.text ? (
         <MessageText text={message.text} />
       ) : message.state === MESSAGE_STATE.FAILED ? (
-        <p className="stopped-note">
-          The response could not be confirmed. Review its status in Payments.
-        </p>
+        <p className="stopped-note">Response unavailable.</p>
       ) : message.state === MESSAGE_STATE.STOPPED ? (
         <p className="stopped-note">Stopped before a response arrived.</p>
       ) : null}

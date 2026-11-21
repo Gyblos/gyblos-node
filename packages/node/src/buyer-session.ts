@@ -27,6 +27,7 @@ import {
   prepareNewChannel,
   type PreparedChannel,
 } from './buyer-channel-prepare';
+import { UnsentOpeningError } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
 import { sessionApproval } from './session-accounting';
@@ -73,7 +74,25 @@ async function openCurrent<Remote extends BatchDestination>(
 ): Promise<Current<Remote>> {
   const options = state.options;
   const stored = await bounded(options.inspect(), signal);
-  if (stored?.notCreated) return sessionFail(SESSION_CODES.CLOSED);
+  if (stored?.notCreated) {
+    if (!quote) return sessionFail(SESSION_CODES.CLOSED);
+    const backend = await (state.backend ??= options.backend());
+    if (!backend.renew) return sessionFail(SESSION_CODES.CLOSED);
+    const replacement = newSessionTerms(quote, options.policy, options.now());
+    await verifyBatchQuote(
+      quote,
+      replacement,
+      options.endpoint.id().toString(),
+      options.now(),
+    );
+    signal.throwIfAborted();
+    await backend.renew(
+      stored.snapshot.channelId,
+      replacement,
+      options.policy.depositAtomic,
+    );
+    return openCurrent(state, quote, signal);
+  }
   const terms =
     stored?.terms ??
     (quote ? newSessionTerms(quote, options.policy, options.now()) : undefined);
@@ -168,7 +187,20 @@ async function run<Remote extends BatchDestination>(
     throw new UnsentSellerBusyError(quote.offer.nodeId);
   const ready = await renewable(state, opened, quote, signal);
   const before = ready.financial.snapshot();
-  const value = await ready.host.execute(quote, input, signal, onDelta);
+  const value = await ready.host
+    .execute(quote, input, signal, onDelta)
+    .catch(async (error: unknown) => {
+      if (
+        error instanceof UnsentOpeningError &&
+        error.code === SESSION_CODES.OPENING_ABSENT
+      ) {
+        await ready.host.disconnect();
+        await ready.host.settled();
+        await ready.financial.dispose();
+        state.current = undefined;
+      }
+      throw error;
+    });
   const after = ready.financial.snapshot();
   return {
     value,

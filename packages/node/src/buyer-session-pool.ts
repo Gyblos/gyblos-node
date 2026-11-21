@@ -21,6 +21,7 @@ import {
   prepareNewChannel,
   type PreparedChannel,
 } from './buyer-channel-prepare';
+import { UnsentOpeningError } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 import { createPoolAdmissions, type PoolLease } from './buyer-pool-admission';
 import { UnsentSellerBusyError } from './buyer-routing';
@@ -290,6 +291,14 @@ async function run<Remote extends BatchDestination>(
       } catch (error) {
         lease.running = false;
         if (lease.registered) {
+          if (
+            error instanceof UnsentOpeningError &&
+            !lease.sent &&
+            (await state.admission.serial(async () =>
+              (await catalog(state)).resolve(id, lease.requestId),
+            ))
+          )
+            throw error;
           if (
             !lease.sent &&
             error instanceof BatchClientError &&

@@ -25,6 +25,7 @@ import type {
 import { termsFor } from './batch-session-checks';
 import { inspectBatchSession, storedBatchSession } from './batch-session-state';
 import { serial } from './batch-session-store';
+import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 function budget(
   entries: PoolRow[],
@@ -133,7 +134,9 @@ async function resolve(
     unsentRequestId === row.requestId &&
     unsentRequestId !== undefined &&
     !Object.hasOwn(record.requests, unsentRequestId) &&
-    Object.keys(record.pending).length === 0 &&
+    Object.keys(record.pending).every(
+      (key) => key === BATCH_BUYER_CHECKPOINTS.OPENING_SENT,
+    ) &&
     (pristine ||
       (record.state === SESSION_STATES.OPEN &&
         Object.values(record.requests).every((request) => request.accepted)));

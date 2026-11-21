@@ -46,6 +46,26 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
+    ...(options.openingStatus && {
+      claimOpening: () =>
+        exclusive(async () => {
+          if (store.read().pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT])
+            return false;
+          await store.update((record) => {
+            record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] =
+              record.channelId;
+          });
+          return true;
+        }),
+      acknowledgeOpening: () =>
+        exclusive(() =>
+          store.update((record) => {
+            delete record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT];
+          }),
+        ),
+      openingStatus: (signal: AbortSignal) =>
+        exclusive(() => options.openingStatus!(store, signal)),
+    }),
     usesBlocks: () => store.read().blocks !== undefined,
     pendingBlockRequest: () => {
       const state = store.read();
