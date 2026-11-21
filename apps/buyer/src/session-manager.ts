@@ -1,4 +1,6 @@
 // Composes single-channel or shared-budget buyer sessions; all financial state stays in the adapter.
+import type { AsyncLocalStorage } from 'node:async_hooks';
+
 import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
 import {
   createBuyerSessionManager,
@@ -41,9 +43,7 @@ type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = BuyerStartupOptions;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
-  openingIntent?: import('node:async_hooks').AsyncLocalStorage<
-    string | undefined
-  >;
+  openingIntent?: AsyncLocalStorage<string | undefined>;
   selections: Map<string, Winner>;
   sending: Map<string, () => void>;
   meter?: ChatTokenizer;
