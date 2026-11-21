@@ -784,6 +784,71 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   }
 }
 
+/* Every dialog opens and closes with one motion: fade, 0.96 scale and a short
+   travel from its origin (center by default). */
+html body .desktop-frame dialog.modal[data-origin] {
+  --pk-modal-x: 0;
+  --pk-modal-y: 0;
+}
+html body .desktop-frame dialog.modal[data-origin='top'] {
+  --pk-modal-y: -16px;
+}
+html body .desktop-frame dialog.modal[data-origin='bottom'] {
+  --pk-modal-y: 16px;
+}
+html body .desktop-frame dialog.modal[data-origin='left'] {
+  --pk-modal-x: -16px;
+}
+html body .desktop-frame dialog.modal[data-origin='right'] {
+  --pk-modal-x: 16px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html body .desktop-frame dialog.modal[data-origin][open] {
+    animation: pk-modal-in var(--motion-overlay) var(--motion-push-ease) both;
+  }
+  html body .desktop-frame dialog.modal[data-origin][open]::backdrop {
+    animation: backdrop-in var(--motion-overlay) ease-out both;
+  }
+  html
+    body
+    .desktop-frame
+    .motion-presence[data-motion='exit']
+    > dialog.modal[data-origin] {
+    animation: pk-modal-out var(--motion-overlay) var(--motion-push-ease) both;
+  }
+  html
+    body
+    .desktop-frame
+    .motion-presence[data-motion='exit']
+    > dialog.modal[data-origin]::backdrop {
+    animation: backdrop-out var(--motion-overlay) ease-in both;
+  }
+}
+@keyframes pk-modal-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+    translate: var(--pk-modal-x) var(--pk-modal-y);
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+@keyframes pk-modal-out {
+  from {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+  to {
+    opacity: 0;
+    scale: 0.96;
+    translate: var(--pk-modal-x) var(--pk-modal-y);
+  }
+}
+
 /* Dialog sizes: small confirmations, medium forms and details, large tables. */
 .desktop-frame .modal[data-size] {
   box-sizing: border-box;

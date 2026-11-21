@@ -24,6 +24,7 @@ import { DataCell, TableRow } from './DataTable';
 import { CopyField, FormActions, FormField, FormInput } from './Form';
 import { StatePanel } from './Management';
 import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
 import { ScrollTable } from './ScrollTable';
 import { ServiceLogo } from './ServiceLogo';
 import { Dropdown } from './Dropdown';
@@ -505,7 +506,7 @@ export function UsdcApiKeys({
                   </ScrollTable>
               )}
             </section>
-            {view === 'new' && (
+            <MotionPresence>{view === 'new' && (
               <Modal title="Create an API key" close={close}>
                 <NewKey
                   scope={snapshot.scope}
@@ -524,8 +525,8 @@ export function UsdcApiKeys({
                   }}
                 />
               </Modal>
-            )}
-            {key && view === 'detail' && (
+            )}</MotionPresence>
+            <MotionPresence>{key && view === 'detail' && (
               <Modal title={key.name} close={close}>
                 <DetailSummary
                   status={{ label: key.revoked ? 'Revoked' : 'Active', tone: key.revoked ? TONE.NEUTRAL : TONE.SUCCESS }}
@@ -575,10 +576,10 @@ export function UsdcApiKeys({
                   </>
                 )}
               </Modal>
-            )}
-            {key && view === 'revoke' && (
+            )}</MotionPresence>
+            <MotionPresence>{key && view === 'revoke' && (
               <RevokeConfirmation id={id} run={run} close={close} />
-            )}
+            )}</MotionPresence>
           </>
         )}
         {state.error && <p role="alert">{state.error}</p>}

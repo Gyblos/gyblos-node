@@ -23,6 +23,7 @@ import {
 import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
 import { Dropdown } from './Dropdown';
 import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
 import { priceRange, usdPerMtok } from './model-price';
@@ -309,7 +310,7 @@ export function ModelDropdown({
   const compareOffers = compare ? (group(models).find(([name]) => name === compare)?.[1] ?? []) : [];
   return (
     <>
-    {compare && (
+    <MotionPresence>{compare && (
       <Modal title={compare} size="lg" close={() => setCompare(null)}>
         <p className="ui-help-text">{compareOffers.length + ' sellers · price per 1M tokens ' + feeLabel + ', in / out'}</p>
         <div className="preview-simple-table-region">
@@ -333,7 +334,7 @@ export function ModelDropdown({
           </table>
         </div>
       </Modal>
-    )}
+    )}</MotionPresence>
     <Dropdown
       searchLabel="Search models"
       label={(label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')) + ': ' + model.name + (auto ? ', Auto' : chosenTag.has(model.name) ? ', ' + chosenTag.get(model.name) : model.free ? ', Free' : '')}

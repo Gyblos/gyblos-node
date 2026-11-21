@@ -361,3 +361,45 @@ void test('account spending limit form uses the shared number field', async () =
   assert.match(x402, /<CompactAmount id="account-budget"/);
   assert.doesNotMatch(x402, /<FormInput id="account-budget"/);
 });
+
+void test('every preview dialog opens and closes with one shared motion and an origin option', async () => {
+  const build = await readFile(new URL('brand-build.ts', preview), 'utf8');
+  assert.match(
+    build,
+    /origin\?: 'center' \| 'top' \| 'bottom' \| 'left' \| 'right';/,
+  );
+  assert.match(build, /data-origin=\{origin \?\? 'center'\}/);
+  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  for (const origin of ['top', 'bottom', 'left', 'right'])
+    assert.match(
+      css,
+      new RegExp(`dialog\\.modal\\[data-origin='${origin}'\\]`),
+    );
+  assert.match(css, /@keyframes pk-modal-in/);
+  assert.match(css, /@keyframes pk-modal-out/);
+  for (const name of [
+    'Activity',
+    'ModelDropdown',
+    'ModelRow',
+    'Payments',
+    'Settings',
+    'UsdcApiKeys',
+    'X402Payments',
+  ]) {
+    const source = await view(`${name}.tsx.preview`);
+    const opened =
+      source.match(
+        /\{[^{}]*&&\s*\(?\s*<(Modal|ActivitySessionDetails|RevokeConfirmation)\b/g,
+      ) ?? [];
+    const wrapped =
+      source.match(
+        /<MotionPresence>\s*\{[^{}]*&&\s*\(?\s*<(Modal|ActivitySessionDetails|RevokeConfirmation)\b/g,
+      ) ?? [];
+    assert.ok(opened.length > 0, `${name} opens a dialog`);
+    assert.equal(
+      wrapped.length,
+      opened.length,
+      `${name}: every dialog is inside MotionPresence`,
+    );
+  }
+});

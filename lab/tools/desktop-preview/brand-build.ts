@@ -84,12 +84,12 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const props = replaceOnce(
       source,
       '  compact = false,',
-      '  compact = false,\n  size,',
+      '  compact = false,\n  size,\n  origin,',
     );
     const typed = replaceOnce(
       props,
       '  compact?: boolean;',
-      "  compact?: boolean;\n  size?: 'sm' | 'md' | 'lg';",
+      "  compact?: boolean;\n  size?: 'sm' | 'md' | 'lg';\n  origin?: 'center' | 'top' | 'bottom' | 'left' | 'right';",
     );
     const restoring = replaceOnce(
       typed,
@@ -99,7 +99,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     return replaceOnce(
       restoring,
       '      ref={ref}',
-      "      data-size={compact ? undefined : (size ?? 'md')}\n      ref={ref}",
+      "      data-size={compact ? undefined : (size ?? 'md')}\n      data-origin={origin ?? 'center'}\n      ref={ref}",
     );
   }
   if (target === `${base}/src/ui/UI.tsx`) {
@@ -192,7 +192,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const row = models.indexOf('function ModelRow(');
     if (row < 0) throw new Error('Missing model row review hook');
     return (
-      "import { CaretRight, Check } from '@phosphor-icons/react';\nimport { usdPerMtok } from './model-price';\nimport { comparableMedian, feeLabel, Notice, PREVIEW_COPY, previewSetting, READY_SELLER_MODES, Savings, SELLER_MODES, Tag, TONE, type SellerMode } from './PreviewKit';\nimport { BUTTON_VARIANT } from './constants';\n" +
+      "import { CaretRight, Check } from '@phosphor-icons/react';\nimport { usdPerMtok } from './model-price';\nimport { comparableMedian, feeLabel, Notice, PREVIEW_COPY, previewSetting, READY_SELLER_MODES, Savings, SELLER_MODES, Tag, TONE, type SellerMode } from './PreviewKit';\nimport { BUTTON_VARIANT } from './constants';\nimport { MotionPresence } from './Motion';\n" +
       models.slice(0, row) +
       readFileSync(
         new URL('./views/ModelRow.tsx.preview', import.meta.url),

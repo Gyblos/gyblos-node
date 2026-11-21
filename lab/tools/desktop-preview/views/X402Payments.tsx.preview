@@ -9,6 +9,7 @@ import { X402_ACTION, x402Amount, x402BudgetInput } from '../x402-model';
 import { BUTTON_VARIANT } from './constants';
 import { FormActions, FormField, FormInput } from './Form';
 import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
 import { CompactAmount } from './Payments';
 import { Button } from './UI';
 import type { X402View } from './useX402';
@@ -41,11 +42,11 @@ function X402Connection({ buyer }: { buyer: X402View }) {
           Connect a running buyer
         </Button>
       </FormActions>
-      {external && (
+      <MotionPresence>{external && (
         <Modal title="Connect a running buyer" close={() => setExternal(false)}>
           <X402ExternalConnection buyer={buyer} />
         </Modal>
-      )}
+      )}</MotionPresence>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Dropdown } from './Dropdown';
 import { FormField, FormInput } from './Form';
 import { ChoiceMenu, Section } from './Management';
 import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
 import { Button, IconButton, MenuItem, PagePanel } from './UI';
 import {
   CODE_LANGUAGE,
@@ -182,7 +183,7 @@ export function Settings({
         </div>
       </section>
       </Section>
-      {aboutOpen && (
+      <MotionPresence>{aboutOpen && (
         <Modal title="About Gyblos" size="sm" close={() => setAboutOpen(false)}>
           <div className="ui-section">
             <p>Gyblos desktop</p>
@@ -190,8 +191,8 @@ export function Settings({
             <p className="ui-help-text">Local desktop application</p>
           </div>
         </Modal>
-      )}
-      {designOpen && (
+      )}</MotionPresence>
+      <MotionPresence>{designOpen && (
         <Modal title="Design system" size="lg" close={() => setDesignOpen(false)}>
           <div className="ui-section">
             <Section title="Buttons">
@@ -239,7 +240,7 @@ export function Settings({
             </Section>
           </div>
         </Modal>
-      )}
+      )}</MotionPresence>
     </PagePanel>
   );
 }

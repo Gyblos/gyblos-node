@@ -75,7 +75,7 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
         </span>
         <CaretRight size={14} aria-hidden="true" />
       </button>
-      {open && (
+      <MotionPresence>{open && (
         <Modal title={model.name} size="lg" close={() => setOpen(false)}>
           <div className="preview-seller-drawer">
             <div className="preview-model-head-line">
@@ -133,7 +133,7 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
               onPin={(id) => update({ strategy: choice.strategy, pinned: choice.pinned === id ? null : id })} />
           </div>
         </Modal>
-      )}
+      )}</MotionPresence>
     </div>
   );
 }
