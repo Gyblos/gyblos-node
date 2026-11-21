@@ -3,11 +3,13 @@ import { once } from 'node:events';
 import { connect, createServer, type Socket } from 'node:net';
 
 import { LOCALHOST } from '@gyblos/config';
+import type { RouteProbe } from '@gyblos/transport-iroh';
 import type {
   BatchConnection,
   BatchEndpoint,
 } from '@gyblos/transport-iroh/batch-client';
 import {
+  routedBatchService,
   serveBatchChannelStream,
   type BatchChannelService,
 } from '@gyblos/transport-iroh/batch-server';
@@ -19,6 +21,8 @@ export async function batchLoopback(
   service: BatchChannelService,
   ids: { buyerNodeId: string; sellerNodeId: string },
   blocks = false,
+  // The path the seller observes, as an Iroh connection would report it; none over plain TCP.
+  route?: RouteProbe,
 ) {
   const sockets = new Set<Socket>();
   const running = new Set<Promise<void>>();
@@ -43,7 +47,7 @@ export async function batchLoopback(
     socket.once('close', () => sockets.delete(socket));
     const task = serveBatchChannelStream(
       socketStream(socket),
-      service,
+      route ? routedBatchService(service, route) : service,
       ids.buyerNodeId,
       () => socket.destroy(),
       connection.signal,

@@ -23,6 +23,7 @@ import {
   SESSION_BLOCK_KINDS,
   type SessionBlockAck,
 } from '@gyblos/protocol/session-blocks';
+import type { RouteProbe } from '@gyblos/transport-iroh';
 import type {
   BatchBlockExchange,
   BatchChannelService,
@@ -50,6 +51,7 @@ function batchObserver(
   options: SellerBatchSessionOptions,
   live: LiveSellerOffer,
   streaming: boolean,
+  route?: RouteProbe,
 ) {
   try {
     return sellerExecutionTelemetry(
@@ -65,10 +67,17 @@ function batchObserver(
         meter: live.meter,
       },
       streaming,
+      route,
     );
   } catch {
     /* Optional metadata cannot block generation. */
   }
+}
+// What the transport hands one execution: streaming, block exchange and its connection's path.
+interface ExecutionTransport {
+  onDelta?: (text: string) => Promise<void>;
+  blocks?: BatchBlockExchange;
+  route?: RouteProbe;
 }
 async function executeObserved(
   request: BatchExecutionRequest,
@@ -76,9 +85,9 @@ async function executeObserved(
   signal: AbortSignal,
   options: SellerBatchSessionOptions,
   live: LiveSellerOffer,
-  onDelta?: (text: string) => Promise<void>,
-  blocks?: BatchBlockExchange,
+  transport: ExecutionTransport,
 ) {
+  const { onDelta, blocks, route } = transport;
   const receivedAt = options.now();
   const started = performance.now();
   let first: number | null = null;
@@ -88,6 +97,7 @@ async function executeObserved(
     options,
     live,
     Boolean(onDelta || blocks),
+    route,
   );
   let plan: Awaited<ReturnType<typeof createSellerBlockPlan>> | undefined;
   try {
@@ -160,6 +170,7 @@ async function exchange(
   onDelta?: (text: string) => Promise<void>,
   blocks?: BatchBlockExchange,
   blockMode?: boolean,
+  route?: RouteProbe,
 ) {
   signal.throwIfAborted();
   const session = options.session;
@@ -200,15 +211,11 @@ async function exchange(
       return { snapshot: await session.open(request.params.payload) };
     if (request.params.channelId !== session.snapshot().channelId)
       return batchFail(SESSION_CODES.BINDING);
-    return executeObserved(
-      request.params,
-      peer,
-      signal,
-      options,
-      live,
+    return executeObserved(request.params, peer, signal, options, live, {
       onDelta,
       blocks,
-    );
+      route,
+    });
   }
   const channel =
     request.method === BATCH_METHODS.APPROVE
@@ -249,9 +256,18 @@ export function createSellerBatchSession(
     }
   };
   return {
-    exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
+    exchange: (request, peer, signal, onDelta, blocks, blockMode, route) =>
       run(peer, signal, () =>
-        exchange(request, peer, signal, options, onDelta, blocks, blockMode),
+        exchange(
+          request,
+          peer,
+          signal,
+          options,
+          onDelta,
+          blocks,
+          blockMode,
+          route,
+        ),
       ),
     resumeBlock: (approval, peer, signal) =>
       run(peer, signal, async (): Promise<SessionBlockAck> => {

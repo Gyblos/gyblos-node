@@ -9,6 +9,7 @@ import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import { ENGINE_DONE_REASONS, ENGINE_KINDS } from '@gyblos/protocol/constants';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
+  EXECUTION_ROUTES,
   TELEMETRY_EVENTS,
   type TelemetryEvent,
 } from '@gyblos/protocol/telemetry';
@@ -307,3 +308,33 @@ void test('an already funded legacy channel recovers and closes against a v4-onl
   assert.equal(offers.generations(), 0);
   assert.deepEqual(f.calls, ['deposit', 'refund']);
 });
+for (const blocks of [true, false])
+  void test(`a paid execution reports the network route it travelled, like a free one (blocks ${blocks})`, async (t) => {
+    const records: TelemetryEvent[] = [];
+    const f = await blockProduct({
+      telemetry: {
+        sink: {
+          emit(record) {
+            records.push(record);
+          },
+          async flush() {},
+          async close() {
+            return { emitted: records.length, dropped: 0, failed: false };
+          },
+        },
+        engineKind: () => ENGINE_KINDS.OLLAMA,
+      },
+      route: () => EXECUTION_ROUTES.RELAY,
+      blocks,
+    });
+    t.after(f.close);
+    await f.buyer.execute(await f.offers.quote(1), f.offers.input);
+    const completed = records.find(
+      (record) => record.type === TELEMETRY_EVENTS.COMPLETED,
+    );
+    assert.ok(completed, 'a completed observation');
+    assert.deepEqual((completed as { path?: unknown }).path, {
+      route: EXECUTION_ROUTES.RELAY,
+      routeChanged: false,
+    });
+  });
