@@ -8,6 +8,7 @@ import { recountedMeter } from '@gyblos/node/free-meter';
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
+import type { RouteProbe } from '@gyblos/transport-iroh';
 
 import { batchOfferFixture } from './batch-iroh-offer';
 import { batchLoopback } from './batch-loopback';
@@ -55,6 +56,7 @@ export async function blockProduct(
     receipt?: (evidence: BuyerReceiptEvidence) => void | Promise<void>;
     // false runs the same paid session without blocks (no stable-prefix meter, no block transport).
     blocks?: boolean;
+    route?: RouteProbe;
   } = {},
 ) {
   const f = await sessionRig({
@@ -74,7 +76,7 @@ export async function blockProduct(
     blockTargetTokens: 2,
   });
   const blocks = options.blocks ?? true;
-  const wire = await batchLoopback(service, f.terms, blocks);
+  const wire = await batchLoopback(service, f.terms, blocks, options.route);
   const buyer = createBuyerBatchSession({
     ...wire,
     terms: f.terms,

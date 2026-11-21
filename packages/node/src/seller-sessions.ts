@@ -18,6 +18,7 @@ import {
   type PaymentSessionTerms,
   type SessionSeller,
 } from '@gyblos/protocol/payment-session';
+import type { RouteProbe } from '@gyblos/transport-iroh';
 import type {
   BatchBlockExchange,
   BatchChannelService,
@@ -141,6 +142,7 @@ async function operation(
   onDelta?: (text: string) => Promise<void>,
   blocks?: BatchBlockExchange,
   blockMode?: boolean,
+  route?: RouteProbe,
 ) {
   signal.throwIfAborted();
   if (!state.current) {
@@ -210,6 +212,7 @@ async function operation(
     onDelta,
     blocks,
     blockMode,
+    route,
   );
 }
 export async function startSellerSessions(
@@ -261,7 +264,7 @@ export async function startSellerSessions(
       }
     },
     service: {
-      exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
+      exchange: (request, peer, signal, onDelta, blocks, blockMode, route) =>
         run(peer, signal, request.method, () =>
           operation(
             options,
@@ -272,6 +275,7 @@ export async function startSellerSessions(
             onDelta,
             blocks,
             blockMode,
+            route,
           ),
         ),
       resumeBlock: (approval, peer, signal) =>

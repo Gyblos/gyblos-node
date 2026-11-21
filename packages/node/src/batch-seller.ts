@@ -23,6 +23,7 @@ import {
   SESSION_BLOCK_KINDS,
   type SessionBlockAck,
 } from '@gyblos/protocol/session-blocks';
+import type { RouteProbe } from '@gyblos/transport-iroh';
 import type {
   BatchBlockExchange,
   BatchChannelService,
@@ -50,6 +51,7 @@ function batchObserver(
   options: SellerBatchSessionOptions,
   live: LiveSellerOffer,
   streaming: boolean,
+  route?: RouteProbe,
 ) {
   try {
     return sellerExecutionTelemetry(
@@ -65,6 +67,7 @@ function batchObserver(
         meter: live.meter,
       },
       streaming,
+      route,
     );
   } catch {
     /* Optional metadata cannot block generation. */
@@ -78,6 +81,7 @@ async function executeObserved(
   live: LiveSellerOffer,
   onDelta?: (text: string) => Promise<void>,
   blocks?: BatchBlockExchange,
+  route?: RouteProbe,
 ) {
   const receivedAt = options.now();
   const started = performance.now();
@@ -88,6 +92,7 @@ async function executeObserved(
     options,
     live,
     Boolean(onDelta || blocks),
+    route,
   );
   let plan: Awaited<ReturnType<typeof createSellerBlockPlan>> | undefined;
   try {
@@ -160,6 +165,7 @@ async function exchange(
   onDelta?: (text: string) => Promise<void>,
   blocks?: BatchBlockExchange,
   blockMode?: boolean,
+  route?: RouteProbe,
 ) {
   signal.throwIfAborted();
   const session = options.session;
@@ -208,6 +214,7 @@ async function exchange(
       live,
       onDelta,
       blocks,
+      route,
     );
   }
   const channel =
@@ -249,9 +256,18 @@ export function createSellerBatchSession(
     }
   };
   return {
-    exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
+    exchange: (request, peer, signal, onDelta, blocks, blockMode, route) =>
       run(peer, signal, () =>
-        exchange(request, peer, signal, options, onDelta, blocks, blockMode),
+        exchange(
+          request,
+          peer,
+          signal,
+          options,
+          onDelta,
+          blocks,
+          blockMode,
+          route,
+        ),
       ),
     resumeBlock: (approval, peer, signal) =>
       run(peer, signal, async (): Promise<SessionBlockAck> => {

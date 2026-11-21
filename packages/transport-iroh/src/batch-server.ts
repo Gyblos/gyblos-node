@@ -27,6 +27,8 @@ import { streamBatchResponse } from './batch-stream-server';
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import type { ControlStream } from './control-io';
 import { handleIrohConnection } from './iroh-connection';
+import { selectedRoute } from './paths';
+import type { RouteProbe } from './types';
 
 export type { BatchBlockExchange } from './batch-block-types';
 
@@ -43,6 +45,8 @@ export interface BatchChannelService {
     onDelta?: (text: string) => Promise<void>,
     blocks?: BatchBlockExchange,
     blockMode?: boolean,
+    // Reads the connection's selected path for the execution's telemetry, as free execution does.
+    route?: RouteProbe,
   ): Promise<BatchChannelResult>;
 }
 export interface BatchStreamLimits {
@@ -300,6 +304,27 @@ export async function serveBatchChannelStream(
     release?.();
   }
 }
+// The service with each execution handed the probe of its connection's path, as free execution does.
+export function routedBatchService(
+  service: BatchChannelService,
+  route: RouteProbe,
+): BatchChannelService {
+  return {
+    ...(service.resumeBlock
+      ? { resumeBlock: service.resumeBlock.bind(service) }
+      : {}),
+    exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
+      service.exchange(
+        request,
+        peer,
+        signal,
+        onDelta,
+        blocks,
+        blockMode,
+        route,
+      ),
+  };
+}
 export function handleBatchChannelConnection(
   connection: Connection,
   service: BatchChannelService,
@@ -314,6 +339,7 @@ export function handleBatchChannelConnection(
 ) {
   const controller = new AbortController();
   const current = AbortSignal.any([signal, controller.signal]);
+  const routed = routedBatchService(service, () => selectedRoute(connection));
   void connection.closed().then(
     () => controller.abort(),
     () => controller.abort(),
@@ -323,7 +349,7 @@ export function handleBatchChannelConnection(
     (stream) =>
       serveBatchChannelStream(
         stream,
-        service,
+        routed,
         connection.remoteId().toString(),
         () => connection.close(HTTP_OVER_IROH.streamCloseCode, []),
         current,
