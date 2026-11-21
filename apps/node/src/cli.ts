@@ -1,8 +1,10 @@
 // The `gyblos` command: `config validate` checks config.toml and the GYBLOS_* environment; `doctor` runs the
 // seller's read-only startup preflight, calling remote engines only with --online; `seller init` writes a
 // starting config.toml, `seller service` installs the background service, `seller status` reports on
-// the running seller and `seller register` trades a beta invite for permission to publish. Prints codes, key paths and environment variable names; never a value read from the environment, and URLs only as
-// origins, because providers embed API keys in URL paths.
+// the running seller, `seller register` trades a beta invite for permission to publish and `seller rpc`
+// shows, sets or resets the seller's Solana RPC. Prints codes, key paths and environment variable names;
+// never a value read from the environment, and URLs only as origins, because providers embed API keys in
+// URL paths.
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 

@@ -67,12 +67,13 @@ The seller keeps the URL in its private role file. A URL with an API key is a se
 
 `gyblos seller rpc set` asks for the URL on the terminal, checks that it answers as Solana devnet and saves
 it; your keys, NodeId and registration stay. It never takes the URL as an argument, so it stays out of your
-shell history, and it shows only the address, never the path or key. Then restart the seller:
+shell history, and afterwards it shows only the address, never the path or key. Use a provider you trust:
+the seller's fee payer signs what this RPC asks it to. Then restart the seller:
 
 - **Docker:** in the seller folder, `docker compose exec seller gyblos seller rpc set`, then
   `docker compose restart seller`.
 - **Native on macOS, Linux or Windows:** `gyblos seller rpc set`, then `gyblos seller service uninstall`
-  and `gyblos seller service install`.
+  and `gyblos seller service install` (or stop `gyblos start` and run it again if you run it yourself).
 
 `gyblos seller rpc` shows the RPC in use, and `gyblos seller rpc reset` goes back to the public one.
 
