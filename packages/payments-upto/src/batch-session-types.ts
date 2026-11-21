@@ -139,6 +139,8 @@ export interface BatchSellerOptions extends BatchCommonOptions {
     terms: Readonly<PaymentSessionTerms>,
   ) => Promise<boolean>;
   closing: (channelId: string) => Promise<boolean>;
+  // Created for an opening: a released session takes its slot back now, before the opening is stored.
+  reserve?: boolean;
   idleMs?: number;
   minSettlementAtomic?: string;
   pollMs?: number;

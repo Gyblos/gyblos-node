@@ -83,3 +83,57 @@ void test('released openings free their slot and leave the index; their buyers r
     'the returning buyer is indexed again before its deposit',
   );
 });
+
+void test('a readmitted released buyer holds the slot from create, before it opens', async (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('External RPC forbidden'),
+  );
+  const rig = await sellerRegistryRig(1);
+  t.after(rig.dispose);
+  let refuse = true;
+  const signer = {
+    ...rig.vm.signer,
+    simulateTransaction: async (
+      ...args: Parameters<typeof rig.vm.signer.simulateTransaction>
+    ) => {
+      if (refuse) throw new Error('synthetic simulation refusal');
+      return rig.vm.signer.simulateTransaction(...args);
+    },
+  };
+  const registry = await openBatchSellerRegistry({
+    ...rig.options,
+    signer,
+    maxSessions: 1,
+  });
+  t.after(() => registry.dispose());
+  const [first, second] = rig.buyers;
+  const failed = await registry
+    .backend(first!.terms.buyerNodeId)
+    .create(first!.terms, first!.payload);
+  await assert.rejects(failed.open(first!.payload));
+  await failed.dispose();
+  refuse = false;
+  // A is readmitted: from here it holds the only slot, before its opening.
+  const readmitted = await registry
+    .backend(first!.terms.buyerNodeId)
+    .create(first!.terms, first!.payload);
+  t.after(readmitted.dispose);
+  assert.equal(await registry.permits(second!.terms.buyerNodeId), false);
+  await assert.rejects(
+    registry
+      .backend(second!.terms.buyerNodeId)
+      .create(second!.terms, second!.payload),
+    { code: SESSION_CODES.BUSY },
+  );
+  assert.deepEqual(
+    (await registry.list()).map((row) => row.buyerNodeId),
+    [first!.terms.buyerNodeId],
+  );
+  await readmitted.open(first!.payload);
+  assert.deepEqual(
+    (await registry.list()).map((row) => row.buyerNodeId),
+    [first!.terms.buyerNodeId],
+    'one channel, indexed',
+  );
+});

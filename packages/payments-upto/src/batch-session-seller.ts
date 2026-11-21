@@ -39,6 +39,7 @@ import {
 import {
   depositSettlementsRunning,
   releaseUnsentOpening,
+  reserveReleasedSlot,
   trackDepositSettlement,
   type BatchOpening,
 } from './batch-session-opening-release';
@@ -62,9 +63,9 @@ export async function createBatchSeller(
     options.minSettlementAtomic ?? BATCH_SESSION_DEFAULTS.minSettlementAtomic,
   );
   const requirements = await requirementsFor(options.terms);
-  const store = await openBatchStore(
-    options,
-    initialRecord(options.terms, options.now()),
+  const store = await reserveReleasedSlot(
+    await openBatchStore(options, initialRecord(options.terms, options.now())),
+    options.reserve,
   );
   const exclusive = serial();
   const current = store.read();

@@ -208,6 +208,7 @@ export function openBatchSellerBackend(
         observeOpening: observer.opening,
         closing: observer.closing,
         operationMs: options.operationMs,
+        reserve: payload !== undefined,
       });
     },
   };
