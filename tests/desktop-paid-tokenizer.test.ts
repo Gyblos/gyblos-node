@@ -51,6 +51,7 @@ void test('desktop verifies cached artifacts offline and obtains both pinned fil
     );
     t.after(() => rm(run.directory, { recursive: true, force: true }));
     assert.equal(run.result.status, 0, run.result.stderr);
+    assert.match(run.result.stdout, /count=5,chat=3/);
     assert.match(
       run.result.stdout,
       new RegExp('downloads=' + (cached ? 0 : 2)),

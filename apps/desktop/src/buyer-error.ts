@@ -35,6 +35,7 @@ export class BuyerSessionRequired extends Error {
 type BuyerCode =
   | typeof BUYER_API.TOKENIZER_UNAVAILABLE
   | typeof BUYER_ROUTING_CODES.BUSY
+  | typeof PAID_EXECUTION_CODES.EXPIRED
   | typeof PAID_EXECUTION_CODES.PEER
   | FreeExecutionCode
   | SellerSelectionCode
@@ -104,6 +105,14 @@ export function desktopBuyerFailure(
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+  if (
+    row.code === PAID_EXECUTION_CODES.EXPIRED &&
+    row[BUYER_API.NEVER_SENT_FIELD] === true
+  )
+    return new DesktopBuyerFailure(
+      PAID_EXECUTION_CODES.EXPIRED,
+      'The seller quote expired before payment. Refresh the listing and send your message again.',
+    );
   if (
     row.code === BUYER_API.TOKENIZER_UNAVAILABLE &&
     row[BUYER_API.NEVER_SENT_FIELD] === true

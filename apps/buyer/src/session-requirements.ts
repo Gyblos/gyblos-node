@@ -1,13 +1,18 @@
 // Prerequisites for the buyer's authenticated channel host and verified session quotes.
 import { DEVNET, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { SellerRequest } from '@gyblos/core/seller-selection';
+import { recountSessionInput } from '@gyblos/core/session-input';
 import { ensureModelTokenizer, modelTokenizer } from '@gyblos/node/artifacts';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
 import { rolePath, type RoleConfig } from '@gyblos/node/roles';
 import type { BuyerSessionBackend } from '@gyblos/node/session-backend';
+import {
+  sessionTerms,
+  type BuyerSessionPolicy,
+} from '@gyblos/node/session-policy';
 import type { BatchBuyerPool } from '@gyblos/payments-upto/batch-session';
-import { batchFail } from '@gyblos/protocol/batch-channel';
+import { batchFail, verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import {
   MODEL_IDS,
   P2P_ROLES,
@@ -16,12 +21,15 @@ import {
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import type { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { FREE_BUYER_STARTUP, PAID_BUYER } from './constants';
 import { refuse } from './free-startup';
 import { paidToken } from './paid-token';
+import { UnsentSellerChoiceError } from './seller-choice-error';
 import type { SellerFailureReporter } from './seller-failures';
+import { unsentSessionPreflight } from './session-errors';
 
 export function checkPaidSellerRequest(
   request: SellerRequest,
@@ -116,4 +124,45 @@ export function sessionMeter(maxAtomic: string, options: BuyerStartupOptions) {
   if (options.preparePaidTokenizer && maxAtomic !== '0')
     void get().catch(() => {});
   return get;
+}
+
+// A seller chosen in the desktop is known to be paid. Load before asking it for a short-lived quote.
+export async function prepareChosenMeter(
+  expiresAt: number,
+  load: ReturnType<typeof sessionMeter>,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  if (expiresAt <= Date.now())
+    throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
+  await unsentSessionPreflight(load(), signal);
+  if (expiresAt <= Date.now())
+    throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
+}
+
+export function createSessionPreflight(
+  load: ReturnType<typeof sessionMeter>,
+  policy: BuyerSessionPolicy,
+  peer: () => string,
+) {
+  const check = async (
+    quote: SignedOfferV2,
+    input: Parameters<typeof recountSessionInput>[1],
+  ) => {
+    const meter = await load();
+    recountSessionInput(quote, input, meter);
+    const now = Date.now();
+    await verifyBatchQuote(
+      quote,
+      sessionTerms(quote, policy, now),
+      peer(),
+      now,
+    );
+    return meter;
+  };
+  return (
+    quote: SignedOfferV2,
+    input: Parameters<typeof recountSessionInput>[1],
+    signal: AbortSignal,
+  ) => unsentSessionPreflight(check(quote, input), signal);
 }

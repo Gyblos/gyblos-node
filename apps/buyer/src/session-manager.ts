@@ -1,6 +1,5 @@
 // Composes single-channel or shared-budget buyer sessions; all financial state stays in the adapter.
 import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
-import { recountSessionInput } from '@gyblos/core/session-input';
 import {
   createBuyerSessionManager,
   type BuyerSessionOptions,
@@ -10,14 +9,13 @@ import {
   buyerSessionPoolChain,
 } from '@gyblos/node/buyer-session-chain';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
-import { sessionTerms } from '@gyblos/node/session-policy';
 import {
   batchSessionTerminal,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
-import { batchFail, verifyBatchQuote } from '@gyblos/protocol/batch-channel';
+import { batchFail } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
@@ -31,7 +29,11 @@ import {
 } from './free-selection';
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
-import { sessionMeter, type BuyerStartupOptions } from './session-requirements';
+import {
+  createSessionPreflight,
+  sessionMeter,
+  type BuyerStartupOptions,
+} from './session-requirements';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = BuyerStartupOptions;
@@ -96,24 +98,6 @@ function sessionReceipts(
         evidence,
         new AbortController().signal,
       );
-  };
-}
-function sessionPreflight(
-  state: SessionState,
-  loadMeter: ReturnType<typeof sessionMeter>,
-  context: Context,
-  policy: Parameters<typeof sessionTerms>[1],
-) {
-  return async (
-    quote: Parameters<typeof recountSessionInput>[0],
-    input: Parameters<typeof recountSessionInput>[1],
-  ) => {
-    const meter = await loadMeter();
-    state.meter = meter;
-    recountSessionInput(quote, input, meter);
-    const now = Date.now();
-    const terms = sessionTerms(quote, policy, now);
-    await verifyBatchQuote(quote, terms, context.endpoint.id().toString(), now);
   };
 }
 function sessionDestination(
@@ -212,13 +196,15 @@ export function makeManager(
             ),
         })
       : createBuyerSessionManager(common);
+  const loadMeter = sessionMeter(prepared.config.request.maxAtomic, options);
+  const check = createSessionPreflight(loadMeter, policy, () =>
+    context.endpoint.id().toString(),
+  );
   return {
     ...manager,
-    preflight: sessionPreflight(
-      state,
-      sessionMeter(prepared.config.request.maxAtomic, options),
-      context,
-      policy,
-    ),
+    loadMeter,
+    async preflight(...args: Parameters<typeof check>) {
+      state.meter = await check(...args);
+    },
   };
 }

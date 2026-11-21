@@ -1,6 +1,5 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
 import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
-import { bounded } from '@gyblos/node/buyer-operation';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
@@ -32,6 +31,7 @@ import { makeManager, type SessionState } from './session-manager';
 import {
   checkPaidSellerRequest,
   endpointToken,
+  prepareChosenMeter,
   type BuyerStartupOptions,
 } from './session-requirements';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
@@ -54,7 +54,7 @@ async function executePaidSession(
   permission?: BuyerApiKeyOperation,
 ): Promise<ChatResult> {
   current.throwIfAborted();
-  await bounded(manager.preflight(winner.quote, input), current);
+  await manager.preflight(winner.quote, input, current);
   current.throwIfAborted();
   await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
@@ -199,6 +199,12 @@ function sessionExecutor(
   return async (input, signal, onDelta, model, permission) => {
     const config = context.prepared.config;
     const request = routedRequest(config.request, model);
+    if (model?.sellerChoice && !permission && request.maxAtomic !== '0')
+      await prepareChosenMeter(
+        model.sellerChoice.expiresAt,
+        manager.loadMeter,
+        signal,
+      );
     const ports: BuyerRoutePorts<ChatResult> = {
       select: sessionSelection(
         context,

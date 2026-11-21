@@ -53,7 +53,7 @@ export async function preparation(
   const adapter = `export const MODEL={publicModel:'synthetic/model',revision:'pinned',
     tokenizerSha256:${JSON.stringify(digest(artifacts.tokenizer))},configSha256:${JSON.stringify(digest(artifacts.config))}};
     export const createOllama=()=>{throw new Error('Unexpected engine')};
-    export function createModelTokenizer(input){if(input.tokenizer!==${JSON.stringify(artifacts.tokenizer)}||input.config!==${JSON.stringify(artifacts.config)})throw new Error('Public tokenizer artifact hash mismatch.');}`;
+    export function createModelTokenizer(input){if(input.tokenizer!==${JSON.stringify(artifacts.tokenizer)}||input.config!==${JSON.stringify(artifacts.config)})throw new Error('Public tokenizer artifact hash mismatch.');return {chat:()=>3,input:()=>2,count:text=>text.length};}`;
   const program = `import {registerHooks,syncBuiltinESMExports} from 'node:module';
     import fs from 'node:fs/promises';
     const failure=${JSON.stringify(failure)};
@@ -87,7 +87,7 @@ export async function preparation(
       }
       return new Response(String(url).endsWith('tokenizer.json')?${JSON.stringify(corrupt === 'tokenizer' ? 'corrupt' : artifacts.tokenizer)}:${JSON.stringify(corrupt === 'config' ? 'corrupt' : artifacts.config)});
     };
-    await import(${JSON.stringify(import.meta.resolve(lab ? '@gyblos/lab-harness/commands/inference-setup' : PRODUCT_ENTRIES[entry]))}).then(module=>${lab ? 'undefined' : entry === 'desktop' ? 'module.ensureModelTokenizer()' : 'module.main()'}); console.log('downloads='+downloads);`;
+    await import(${JSON.stringify(import.meta.resolve(lab ? '@gyblos/lab-harness/commands/inference-setup' : PRODUCT_ENTRIES[entry]))}).then(module=>${lab ? 'undefined' : entry === 'desktop' ? 'module.ensureModelTokenizer().then(meter=>console.log("count="+meter.count("hello")+",chat="+meter.chat([])))' : 'module.main()'}); console.log('downloads='+downloads);`;
   const result = spawnSync(
     process.execPath,
     [

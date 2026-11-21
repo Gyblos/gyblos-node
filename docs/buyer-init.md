@@ -85,8 +85,11 @@ accepts free quotes only, and `buyer:chat` shows the mode
 The ceiling applies per request and includes the protocol fee. A positive
 ceiling does not force payment: the buyer still chooses free or paid execution
 from each verified signed quote. Paid execution also needs devnet SOL and devnet
-USDC in the buyer wallet and the pinned tokenizer (`pnpm node:tokenizer`); setup
-prepares neither. See [Paid endpoint](running-a-node.md#paid-v2-buyer-endpoint).
+USDC in the buyer wallet and the pinned tokenizer. CLI setup prepares neither;
+run `pnpm node:tokenizer` to install the CLI tokenizer. The desktop buyer
+verifies its local copy when a paid profile starts and downloads both pinned
+files automatically if the copy is missing or fails verification. See
+[Paid endpoint](running-a-node.md#paid-v2-buyer-endpoint).
 
 ## Endpoints and relays
 
