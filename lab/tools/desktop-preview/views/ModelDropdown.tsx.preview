@@ -338,9 +338,10 @@ export function ModelDropdown({
                         onSelect(first.id);
                         return;
                       }
+                      const all = models.filter((item) => item.name === name);
                       const strategy = chosenTag.get(name);
-                      const pick = strategy ? recommended(list).find((option) => option.label === strategy)?.item : undefined;
-                      remember(pick ?? best(list) ?? first, !pick, pick ? strategy : undefined);
+                      const pick = strategy ? recommended(all).find((option) => option.label === strategy)?.item : undefined;
+                      remember(pick ?? best(all) ?? first, !pick, pick ? strategy : undefined);
                       setActive(name);
                     }}
                   />
