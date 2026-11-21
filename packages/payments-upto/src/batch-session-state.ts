@@ -27,6 +27,8 @@ export interface BatchStoredSession {
   pending: boolean;
   recoverable: boolean;
   notCreated?: true;
+  // A released never-funded opening: terminal for admission, and its buyer may open again.
+  released?: true;
   priorSpentAtomic?: string;
 }
 async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
@@ -89,6 +91,7 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
   return {
     ...(archivedProof ? { archivedProof: true as const } : {}),
     ...(notCreated ? { notCreated: true as const } : {}),
+    ...(record.released ? { released: true as const } : {}),
     terms: record.terms,
     ...(record.history
       ? { priorSpentAtomic: String(priorBatchSpent(record)) }
@@ -119,6 +122,7 @@ export function batchSessionTerminal(stored: BatchStoredSession | undefined) {
   return (
     stored !== undefined &&
     (stored.notCreated === true ||
+      stored.released === true ||
       stored.snapshot.state === SESSION_STATES.CLOSED)
   );
 }

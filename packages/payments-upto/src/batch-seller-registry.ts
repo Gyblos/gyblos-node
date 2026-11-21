@@ -113,6 +113,9 @@ async function create(
     .entries.find((row) => row.buyerNodeId === peer);
   if (found) {
     if (found.prepared !== null) return sessionFail(SESSION_CODES.UNAVAILABLE);
+    // A released buyer no longer holds a slot: it opens again only within capacity.
+    if ((await base.inspect())?.released && !(await permits(state, peer)))
+      return sessionFail(SESSION_CODES.BUSY);
     return base.create(terms, payload);
   }
   const old = await base.inspect();

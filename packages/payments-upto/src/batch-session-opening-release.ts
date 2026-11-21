@@ -76,6 +76,7 @@ export async function releaseUnsentOpening(
       state.opening = null;
       state.channelId = '';
       state.voucher = null;
+      state.released = true;
     });
   } catch {
     try {

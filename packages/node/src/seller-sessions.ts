@@ -163,7 +163,14 @@ async function operation(
     const live = batchLiveOffer(offer, options.offers(), options.now());
     if (blockMode && !live.meter.stablePrefix)
       return batchFail(SESSION_CODES.UNAVAILABLE);
-    if (request.method === BATCH_METHODS.PREPARE || !state.current || replacing)
+    // A session preparing again without a channel (a released, never-funded opening) holds no slot, so
+    // it asks for capacity like a new one.
+    if (
+      request.method === BATCH_METHODS.PREPARE ||
+      !state.current ||
+      replacing ||
+      preparing
+    )
       await options.admit?.();
     if (request.method === BATCH_METHODS.PREPARE) return { terms };
     if (replacing && state.current) {

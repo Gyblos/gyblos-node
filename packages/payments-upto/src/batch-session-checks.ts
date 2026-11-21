@@ -222,8 +222,30 @@ function recordFields(value: unknown) {
       ? ['blocks']
       : []),
     ...(renewalVersion ? ['history'] : []),
+    ...(!!value && typeof value === 'object' && Object.hasOwn(value, 'released')
+      ? ['released']
+      : []),
   ]);
   return { row, blockVersion, renewalVersion };
+}
+// Only an empty preparation can be released: no channel, opening, voucher, request, charge or pending
+// attempt.
+function releasedFor(value: unknown): true {
+  if (value !== true) return sessionFail();
+  return true;
+}
+export function releasedPreparation(record: BatchRecord) {
+  return (
+    record.state === SESSION_STATES.OPENING &&
+    record.channelId === '' &&
+    record.opening === null &&
+    record.voucher === null &&
+    record.cumulativeAtomic === '0' &&
+    Object.keys(record.requests).length === 0 &&
+    Object.keys(record.pending).length === 0 &&
+    record.closing === null &&
+    record.settlement === null
+  );
 }
 export function parseRecord(
   value: unknown,
@@ -297,8 +319,12 @@ export function parseRecord(
           ),
         }
       : {}),
+    ...(Object.hasOwn(row, 'released')
+      ? { released: releasedFor(row.released) }
+      : {}),
   };
   coherentRecord(record);
+  if (record.released && !releasedPreparation(record)) sessionFail();
   return record;
 }
 

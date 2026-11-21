@@ -166,6 +166,7 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     state.opening = opening;
     state.channelId = opening.voucher!.channelId;
     state.voucher = opening.voucher!;
+    delete state.released;
   });
   // waitBatch stops waiting but cannot cancel the SDK: a settlement still running may yet send the deposit.
   // The opening is forgotten only when the chain never showed the channel, no settlement for the session
