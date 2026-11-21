@@ -8,19 +8,21 @@ export const CODE_LANGUAGE = {
   TEXT: 'text',
 } as const;
 export type CodeLanguage = (typeof CODE_LANGUAGE)[keyof typeof CODE_LANGUAGE];
+export const CODE_TOKEN = {
+  COMMENT: 'comment',
+  STRING: 'string',
+  KEY: 'key',
+  NUMBER: 'number',
+  LITERAL: 'literal',
+  KEYWORD: 'keyword',
+  FLAG: 'flag',
+  COMMAND: 'command',
+  VARIABLE: 'variable',
+  SECTION: 'section',
+} as const;
 export type CodeToken = {
   text: string;
-  kind?:
-    | 'comment'
-    | 'string'
-    | 'key'
-    | 'number'
-    | 'literal'
-    | 'keyword'
-    | 'flag'
-    | 'command'
-    | 'variable'
-    | 'section';
+  kind?: (typeof CODE_TOKEN)[keyof typeof CODE_TOKEN];
 };
 type Rule = [RegExp, CodeToken['kind']];
 
@@ -28,36 +30,36 @@ const STRING = String.raw`"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'`;
 const RULES: Record<CodeLanguage, Rule[]> = {
   text: [],
   shell: [
-    [/#[^\n]*/y, 'comment'],
-    [new RegExp(STRING, 'y'), 'string'],
-    [/\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/y, 'variable'],
-    [/(?<=^|\s)--?[A-Za-z][\w-]*/my, 'flag'],
-    [/(?<=^|[|;&]\s*)(?:[A-Za-z_][\w./-]*)(?=\s|$)/my, 'command'],
+    [/#[^\n]*/y, CODE_TOKEN.COMMENT],
+    [new RegExp(STRING, 'y'), CODE_TOKEN.STRING],
+    [/\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/y, CODE_TOKEN.VARIABLE],
+    [/(?<=^|\s)--?[A-Za-z][\w-]*/my, CODE_TOKEN.FLAG],
+    [/(?<=^|[|;&]\s*)(?:[A-Za-z_][\w./-]*)(?=\s|$)/my, CODE_TOKEN.COMMAND],
   ],
   json: [
-    [/"(?:[^"\\\n]|\\.)*"(?=\s*:)/y, 'key'],
-    [/"(?:[^"\\\n]|\\.)*"/y, 'string'],
-    [/-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y, 'number'],
-    [/\b(?:true|false|null)\b/y, 'literal'],
+    [/"(?:[^"\\\n]|\\.)*"(?=\s*:)/y, CODE_TOKEN.KEY],
+    [/"(?:[^"\\\n]|\\.)*"/y, CODE_TOKEN.STRING],
+    [/-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y, CODE_TOKEN.NUMBER],
+    [/\b(?:true|false|null)\b/y, CODE_TOKEN.LITERAL],
   ],
   toml: [
-    [/#[^\n]*/y, 'comment'],
-    [/(?<=^\s*)\[[^\]\n]+\]+/my, 'section'],
-    [/(?<=^\s*)[A-Za-z0-9_.-]+(?=\s*=)/my, 'key'],
-    [new RegExp(STRING, 'y'), 'string'],
-    [/\b(?:true|false)\b/y, 'literal'],
-    [/(?<![\w.])-?\d+(?:\.\d+)?(?![\w.])/y, 'number'],
+    [/#[^\n]*/y, CODE_TOKEN.COMMENT],
+    [/(?<=^\s*)\[[^\]\n]+\]+/my, CODE_TOKEN.SECTION],
+    [/(?<=^\s*)[A-Za-z0-9_.-]+(?=\s*=)/my, CODE_TOKEN.KEY],
+    [new RegExp(STRING, 'y'), CODE_TOKEN.STRING],
+    [/\b(?:true|false)\b/y, CODE_TOKEN.LITERAL],
+    [/(?<![\w.])-?\d+(?:\.\d+)?(?![\w.])/y, CODE_TOKEN.NUMBER],
   ],
   ts: [
-    [/\/\/[^\n]*|\/\*[\s\S]*?\*\//y, 'comment'],
-    [new RegExp(STRING + '|`(?:[^`\\\\]|\\\\.)*`', 'y'), 'string'],
+    [/\/\/[^\n]*|\/\*[\s\S]*?\*\//y, CODE_TOKEN.COMMENT],
+    [new RegExp(STRING + '|`(?:[^`\\\\]|\\\\.)*`', 'y'), CODE_TOKEN.STRING],
     [
       /\b(?:const|let|var|new|await|async|function|return|import|from|export|type|if|else|for|of|in)\b/y,
-      'keyword',
+      CODE_TOKEN.KEYWORD,
     ],
-    [/\b(?:true|false|null|undefined)\b/y, 'literal'],
-    [/(?<![\w.])\d+(?:\.\d+)?(?![\w.])/y, 'number'],
-    [/[A-Za-z_$][\w$]*(?=\s*:)/y, 'key'],
+    [/\b(?:true|false|null|undefined)\b/y, CODE_TOKEN.LITERAL],
+    [/(?<![\w.])\d+(?:\.\d+)?(?![\w.])/y, CODE_TOKEN.NUMBER],
+    [/[A-Za-z_$][\w$]*(?=\s*:)/y, CODE_TOKEN.KEY],
   ],
 };
 

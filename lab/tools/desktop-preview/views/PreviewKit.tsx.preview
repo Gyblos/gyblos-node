@@ -2,6 +2,8 @@
 import { CaretRight, Check, Copy, Wallet, Warning } from '@phosphor-icons/react';
 import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
+import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
+
 import { AddBuyerFunds } from './BuyerFunding';
 import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
@@ -143,7 +145,7 @@ export function CodeBlock({ code, language, title, onCopy, copyDisabled = false 
           aria-label={copied ? 'Copied' : 'Copy ' + (title ?? 'code')}
           onClick={() => {
             void Promise.resolve(onCopy ? onCopy() : navigator.clipboard.writeText(code))
-              .then((result) => setCopied(result !== false))
+              .then((result) => setCopied(onCopy ? result === true : true))
               .catch(() => setCopied(false));
           }}
         >
@@ -171,9 +173,9 @@ export function fenceLanguage(fence: string): CodeLanguage {
   return FENCE_LANGUAGE[/^```\s*([\w-]*)/.exec(fence)?.[1]?.toLowerCase() ?? ''] ?? CODE_LANGUAGE.TEXT;
 }
 /** Coding-tool configuration format: Codex uses TOML, Claude Code shell variables, the others JSON. */
-export function agentCodeLanguage(tool: string): CodeLanguage {
-  if (tool === 'codex') return CODE_LANGUAGE.TOML;
-  if (tool === 'claude') return CODE_LANGUAGE.SHELL;
+export function agentCodeLanguage(tool: AgentTool): CodeLanguage {
+  if (tool === AGENT_TOOLS.CODEX) return CODE_LANGUAGE.TOML;
+  if (tool === AGENT_TOOLS.CLAUDE_CODE) return CODE_LANGUAGE.SHELL;
   return CODE_LANGUAGE.JSON;
 }
 

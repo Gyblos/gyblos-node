@@ -63,5 +63,15 @@ export function transformCodeSamples(
         "            <CodeBlock key={index} language={fenceLanguage(section)} code={code.replace(/\\n$/, '')} />",
       )
     );
+  if (target === `${base}/src/ui/paypal-agent-connection-hook.ts`)
+    return replaceOnce(
+      replaceOnce(
+        source,
+        '    if (!connection) return;\n    const copied',
+        '    if (!connection) return false;\n    const copied',
+      ),
+      "          : 'Could not copy. Check the connection and try again.',\n      );\n  }",
+      "          : 'Could not copy. Check the connection and try again.',\n      );\n    return copied === true;\n  }",
+    );
   return undefined;
 }

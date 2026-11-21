@@ -105,3 +105,45 @@ void test('detail dialogs share one summary component with room between rows', a
     /<Tag tone=\{TONE\.SUCCESS\} dot>Connection ready<\/Tag>/,
   );
 });
+
+void test('code block copy reports success only when the copy action confirms it', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const kit = await readFile(
+    'lab/tools/desktop-preview/views/PreviewKit.tsx.preview',
+    'utf8',
+  );
+  assert.match(kit, /setCopied\(onCopy \? result === true : true\)/);
+  const hookFile = 'apps/desktop/src/ui/paypal-agent-connection-hook.ts';
+  const hook =
+    transformBrand(
+      await readFile(hookFile, 'utf8'),
+      hookFile,
+      'apps/desktop',
+    ) ?? '';
+  assert.match(hook, /if \(!connection\) return false;/);
+  assert.match(hook, /return copied === true;/);
+});
+
+void test('code token kinds and coding-tool languages use canonical closed values', async () => {
+  const highlight = await readFile(
+    'lab/tools/desktop-preview/code-highlight.ts',
+    'utf8',
+  );
+  assert.match(highlight, /export const CODE_TOKEN = \{/);
+  assert.match(
+    highlight,
+    /kind\?: \(typeof CODE_TOKEN\)\[keyof typeof CODE_TOKEN\]/,
+  );
+  assert.doesNotMatch(
+    highlight,
+    /, '(comment|string|key|number|literal|keyword|flag|command|variable|section)'\]/,
+  );
+  const kit = await readFile(
+    'lab/tools/desktop-preview/views/PreviewKit.tsx.preview',
+    'utf8',
+  );
+  assert.match(kit, /export function agentCodeLanguage\(tool: AgentTool\)/);
+  assert.match(kit, /tool === AGENT_TOOLS\.CODEX/);
+  assert.match(kit, /tool === AGENT_TOOLS\.CLAUDE_CODE/);
+});
