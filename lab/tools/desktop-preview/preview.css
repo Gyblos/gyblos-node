@@ -2214,10 +2214,3 @@ html .app.desktop-frame > .ui-window-chrome {
     );
   transition: background-size var(--motion-enter) var(--motion-push-ease);
 }
-
-/* Interface font comparison (?font=inter); Instrument Sans stays the brand default. */
-html[data-font='inter'] body,
-html[data-font='inter'] .desktop-frame {
-  font-family: InterVariable, Inter, ui-sans-serif, system-ui, sans-serif;
-  font-feature-settings: 'cv11', 'ss01';
-}

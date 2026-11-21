@@ -346,7 +346,9 @@ function LimitRow({ buyer, policy, spent, current, limited }: {
   const text = amount.trim();
   const atomic = text ? atomicOf(text, policy) : null;
   const dirty = text !== initial;
-  const error = text && atomic === null
+  const error = dirty && !text
+    ? 'Enter a spending limit.'
+    : atomic === null
     ? 'Enter an amount with up to 6 decimals.'
     : atomic !== null && atomic < spent
       ? 'Must cover the ' + accountAmount(String(spent)) + ' already spent.'
@@ -354,7 +356,8 @@ function LimitRow({ buyer, policy, spent, current, limited }: {
   const save = () => {
     if (!dirty || error || buyer.busy) return;
     setSaveError('');
-    void buyer.run(atomic === null ? { action: X402_ACTION.FINISH } : { action: X402_ACTION.AUTHORIZE, limitAtomic: String(atomic) })
+    if (atomic === null) return;
+    void buyer.run({ action: X402_ACTION.AUTHORIZE, limitAtomic: String(atomic) })
       .then(result => { if (!result || result.error) setSaveError(result?.error ?? 'Could not save the limit.'); })
       .catch(() => setSaveError('Could not save the limit.'));
   };
@@ -365,7 +368,7 @@ function LimitRow({ buyer, policy, spent, current, limited }: {
         <small id="spending-limit-help" className={error || saveError ? 'preview-field-error' : 'ui-help-text'} role={error || saveError ? 'alert' : undefined}>
           {error || saveError || (dirty && atomic !== null
             ? accountAmount(String(atomic - spent)) + ' left after saving.'
-            : 'Covers chat and every API key. Leave empty for no limit.')}
+            : 'Covers chat and every API key.')}
         </small>
       </label>
       <div className="preview-setting-control">
@@ -375,7 +378,7 @@ function LimitRow({ buyer, policy, spent, current, limited }: {
             <Button variant={BUTTON_VARIANT.PRIMARY} disabled={!!error || buyer.busy} onClick={save}>Save</Button>
           </div>
         )}
-        <CompactAmount id="spending-limit-input" unit="USDC" value={amount} onChange={setAmount} placeholder="No limit"
+        <CompactAmount id="spending-limit-input" unit="USDC" value={amount} onChange={setAmount} placeholder="0"
           parse={value => atomicOf(value, policy)} format={value => x402Amount(String(value), policy)}
           step={atomicOf('0.5', policy) ?? 1n} invalid={!!error} describedBy="spending-limit-help"
           onEnter={save} onEscape={() => setAmount(initial)} />

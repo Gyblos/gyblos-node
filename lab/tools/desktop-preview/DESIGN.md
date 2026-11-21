@@ -59,7 +59,7 @@ Open `?screen=design-system` (Settings → Preview components) to review them al
 ## Type
 
 Instrument Sans for the interface and JetBrains Mono (bundled as `GeistMono`) for
-technical values. `?font=inter` loads Inter from rsms.me for comparison only.
+technical values. The preview loads no remote fonts (its CSP blocks network access).
 Interface / supporting text 14 / 12 px; tables 13 px with 12 px headers.
 
 ## Interaction
