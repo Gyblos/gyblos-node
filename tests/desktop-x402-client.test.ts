@@ -13,6 +13,7 @@ import {
 } from '@gyblos/desktop/x402-client';
 import { parseX402Result, x402Explorer } from '@gyblos/desktop/x402-model';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 const policy: BuyerApiPolicy = {
@@ -325,6 +326,44 @@ void test('x402 accepts a valid short Solana signature through reply, persistenc
   );
   for (const invalid of ['0'.repeat(88), '2'.repeat(80), '2'.repeat(89)])
     assert.throws(() => x402Explorer(invalid));
+});
+
+void test('selected paid chat respects the channel, buyer and seller output limits on the wire', async () => {
+  for (const [maxTokens, contextTokens, expected] of [
+    [4096, 16384, BATCH_CHANNEL.maxOutputTokens],
+    [32, 16384, 32],
+    [4096, 64, 64],
+  ] as const) {
+    const client = new X402Client(budget(), async (_url, options) => {
+      if (options?.method !== 'POST')
+        return Response.json({
+          ...policy,
+          maxTokens,
+          depositAtomic: '1000000',
+          lifetimeMs: 3600000,
+        });
+      const body: unknown = JSON.parse(String(options.body));
+      assert.ok(body && typeof body === 'object' && 'max_tokens' in body);
+      assert.equal(body.max_tokens, expected);
+      return Response.json(reply());
+    });
+    try {
+      await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+      await client.send('selected-seller', 'Synthetic input', undefined, {
+        owner: policy.payer,
+        nodeId: 'a'.repeat(64),
+        modelId: policy.model,
+        variant: null,
+        quantization: null,
+        contextTokens,
+        inputAtomicPerMtok: '100',
+        outputAtomicPerMtok: '200',
+        expiresAt: Date.now() + 60000,
+      });
+    } finally {
+      await client.close();
+    }
+  }
 });
 
 void test('a paid seller cannot receive a request while either chat spending limit is insufficient', async () => {
