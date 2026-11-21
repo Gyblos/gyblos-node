@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import { CONTROL_CODES, RECEIPT } from '@gyblos/protocol/constants';
 import {
+  isReceiptUploadAppVersion,
   RECEIPT_UPLOAD,
   RECEIPT_UPLOAD_CLIENTS,
   signReceiptUpload,
@@ -172,4 +173,12 @@ void test('the envelope signing domain is separate from every receipt domain', (
     RECEIPT_V2.buyerDomain,
   ])
     assert.notEqual(RECEIPT_UPLOAD.domain, domain);
+});
+
+void test('the app version rule accepts release tags and refuses anything else', () => {
+  const longest = '1'.repeat(RECEIPT_UPLOAD.maxAppVersionCharacters);
+  for (const version of ['0.1.0', '1.2.3-beta.4+build', longest])
+    assert.equal(isReceiptUploadAppVersion(version), true, version);
+  for (const version of ['', `${longest}1`, '1.0\n', '1.0 ', '1/0', 'ñ'])
+    assert.equal(isReceiptUploadAppVersion(version), false, version);
 });
