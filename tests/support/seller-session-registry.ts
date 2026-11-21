@@ -39,6 +39,7 @@ export async function sellerRegistryRig(
     prepareOpenings?: boolean;
     buyerCount?: number;
     depositAtomic?: string;
+    openingConfirmMs?: number;
   } = {},
 ) {
   const now = options.now ?? (() => 1_800_000_000_000);
@@ -57,6 +58,9 @@ export async function sellerRegistryRig(
     signer: vm.signer,
     feePayer: vm.feePayer,
     authorizer: vm.authorizer,
+    // Seller gives up at once on a sent deposit it cannot see, so lost-confirmation tests reach restart
+    // recovery; tests of the bounded confirmation wait set their own.
+    openingConfirmMs: options.openingConfirmMs ?? 0,
   };
   const buyers: RegistryBuyer[] = [];
   for (let index = 0; index < (options.buyerCount ?? 3); index++) {

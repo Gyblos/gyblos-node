@@ -149,6 +149,7 @@ export interface BatchSellerOptions extends BatchCommonOptions {
   minSettlementAtomic?: string;
   pollMs?: number;
   operationMs?: number;
+  openingConfirmMs?: number;
 }
 
 export interface BatchSellerContext {
