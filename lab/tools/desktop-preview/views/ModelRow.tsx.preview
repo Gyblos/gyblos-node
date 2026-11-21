@@ -19,10 +19,6 @@ function previewSellers(model: CatalogModel): PreviewSeller[] {
     };
   });
 }
-// Synthetic public list prices (input, USD per 1M tokens) for the comparison badge.
-function listPrice(model: CatalogModel) {
-  return Math.round(model.input * (1.6 + (model.providers % 5) * 0.2) * 100) / 100;
-}
 function pick(sellers: PreviewSeller[], strategy: Strategy) {
   const by = (score: (seller: PreviewSeller) => number) => [...sellers].sort((a, b) => score(a) - score(b))[0];
   if (strategy === 'Cheapest') return by((s) => s.input + s.output);
@@ -59,17 +55,17 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
         <span className="preview-model-stats">
           <small>{sellers.length} sellers · ~{latency} ms</small>
           {!model.free && (
-            <span className="preview-price-range" aria-label={'Input price from ' + usdPerMtok(min) + ' to ' + usdPerMtok(max)}>
-              <span>{usdPerMtok(min)}</span>
+            <span className="preview-price-range" aria-label={'Input price from ' + buyerPerMtok(min) + ' to ' + buyerPerMtok(max)}>
+              <span>{buyerPerMtok(min)}</span>
               <span className="preview-price-track"><span style={{ left: position + '%' }} /></span>
-              <span>{usdPerMtok(max)}</span>
+              <span>{buyerPerMtok(max)}</span>
             </span>
           )}
         </span>
         <span className="preview-model-mode">{mode}</span>
         <span className="ui-price">
-          <strong>{model.free ? 'Free' : 'from ' + usdPerMtok(min)}</strong>
-          <small>{model.free ? 'Community supported' : <Savings price={min} list={listPrice(model)} />}</small>
+          <strong>{model.free ? 'Free' : 'from ' + buyerPerMtok(min)}</strong>
+          <small>{model.free ? 'Community supported' : <Savings price={min} median={marketMedian(prices)} />}</small>
         </span>
         <CaretRight size={14} aria-hidden="true" />
       </button>
@@ -146,7 +142,7 @@ function SellerTable({ sellers, free, active, pinned, onPin }: {
           <caption className="sr-only">Sellers</caption>
           <thead><tr>
             <th scope="col">Seller</th><th scope="col">Quant</th>
-            <th scope="col" className="preview-num">In / out · 1M</th>
+            <th scope="col" className="preview-num">In / out · 1M, incl. 4% fee</th>
             <th scope="col" className="preview-num">Latency</th><th scope="col" className="preview-num">Uptime</th>
             <th scope="col" className="preview-num"><span className="sr-only">Pin</span></th>
           </tr></thead>
@@ -155,7 +151,7 @@ function SellerTable({ sellers, free, active, pinned, onPin }: {
               <tr key={s.id} data-active={s.id === active}>
                 <th scope="row">{s.name}{s.id === active && <span className="preview-model-mode">{pinned === s.id ? 'Pinned' : 'In use'}</span>}</th>
                 <td>{s.quant}</td>
-                <td className="preview-num preview-tabular">{free ? 'Free' : usdPerMtok(s.input) + ' / ' + usdPerMtok(s.output)}</td>
+                <td className="preview-num preview-tabular">{free ? 'Free' : buyerPerMtok(s.input) + ' / ' + buyerPerMtok(s.output)}</td>
                 <td className="preview-num preview-tabular">{s.latency} ms</td>
                 <td className="preview-num preview-tabular">{s.uptime.toFixed(1)}%</td>
                 <td className="preview-num preview-limit-action">

@@ -167,7 +167,7 @@ function accountAmount(atomic: string) {
   return x402Amount(atomic, account) + ' ' + x402Asset(account);
 }
 function SpendingSummary({ buyer, onLimits }: { buyer?: X402View; onLimits(): void }) {
-  const { spent, limit, limited, remaining } = useSpending(buyer);
+  const { spent, limit, limited, remaining } = useSpending();
   return (
     <section className="ui-section preview-spending" aria-label="Spending">
       <div className="ui-section-title">
@@ -176,7 +176,7 @@ function SpendingSummary({ buyer, onLimits }: { buyer?: X402View; onLimits(): vo
       </div>
       <StatGrid>
         <StatCard label="Spent · USDC" help="USDC paid for chat replies and API key requests. Free models cost nothing." value={accountAmount(String(spent))} detail="Chat and API keys" icon={Receipt} />
-        <StatCard label="Spending limit · USDC" help="The most this wallet can spend across chat and every API key. New requests stop when it is reached." value={limited ? accountAmount(String(limit)) : 'No limit'} detail="Covers chat and every API key" icon={Gauge} />
+        <StatCard label="Spending limit · USDC" help="The most this wallet can spend across chat and every API key. New requests stop when it is reached." value={!limited ? 'No limit' : limit === 0n ? 'Free only' : accountAmount(String(limit))} detail={limited && limit === 0n ? 'Free models only' : 'Covers chat and every API key'} icon={Gauge} />
         <StatCard label="Remaining · USDC" help="Spending limit minus what is already spent. Your wallet balance can still be lower." value={limited ? accountAmount(String(remaining)) : 'No limit'} icon={Wallet} />
       </StatGrid>
     </section>
@@ -185,7 +185,7 @@ function SpendingSummary({ buyer, onLimits }: { buyer?: X402View; onLimits(): vo
 function Limits({ buyer, onBudget, onConnections }: {
   buyer?: X402View; onBudget(): void; onConnections(): void;
 }) {
-  const { keys, spent, limit, limited, remaining } = useSpending(buyer);
+  const { keys, spent, limit, limited, remaining } = useSpending();
   const policy = buyer?.state.policy;
   const percent = limited && limit > 0n ? Number((spent * 10000n) / limit) / 100 : 0;
   const active = (keys?.keys ?? []).filter(key => !key.revoked);

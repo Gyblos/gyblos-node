@@ -77,7 +77,8 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 
 - `Tag`: status or label with a tinted background; `dot` for live states.
 - `Delta`: signed percentage; set `lowerIsBetter` for prices and latency.
-- `Savings`: "N% cheaper" against a reference list price; hidden when not cheaper.
+- `Savings`: "N% below median" against the median of the current offers for the
+  same model; hidden with fewer than 3 offers or when not cheaper.
 - `SegmentedBar`: one bar split by source with a text legend (the legend carries
   the values for assistive technology).
 - `FilterChips`: single-choice filter with counts; one Tab stop, arrow keys move.

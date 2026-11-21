@@ -7,7 +7,9 @@ import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants'
 import { AddBuyerFunds } from './BuyerFunding';
 import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
+import { buyerTotal, marketMedian, similarFreeModel } from './market';
 import { Modal } from './Modal';
+import { usdPerMtok } from './model-price';
 import type { View } from './model-types';
 import { ServiceLogo } from './ServiceLogo';
 import { MotionPresence } from './Motion';
@@ -18,6 +20,10 @@ import type { X402View } from './useX402';
 
 export { statusTone, TONE } from './status-tone';
 export type { Tone } from './status-tone';
+export { buyerTotal, marketMedian, similarFreeModel } from './market';
+
+/** Buyer-facing price per 1M tokens: the seller net price plus the network fee. */
+export const buyerPerMtok = (net: number) => usdPerMtok(buyerTotal(net));
 
 export function Tag({ tone = TONE.NEUTRAL, dot = false, children }: { tone?: Tone; dot?: boolean; children: ReactNode }) {
   return (
@@ -40,13 +46,13 @@ export function Delta({ percent, lowerIsBetter = false, suffix }: { percent: num
   );
 }
 
-/** "50% cheaper" against a reference list price. */
-export function Savings({ price, list }: { price: number; list: number }) {
-  if (!(list > 0) || price >= list) return null;
-  const percent = Math.round(((list - price) / list) * 100);
+/** "20% below median" against the median of the current offers for the same model. */
+export function Savings({ price, median }: { price: number; median: number | null }) {
+  if (median == null || !(median > 0) || price >= median) return null;
+  const percent = Math.round(((median - price) / median) * 100);
   return (
-    <span className="pk-delta" data-tone={TONE.SUCCESS} title={'List price ' + list.toFixed(2) + ' / 1M tokens'}>
-      {percent}% cheaper
+    <span className="pk-delta" data-tone={TONE.SUCCESS} title={'Median of current offers: ' + buyerPerMtok(median) + ' / 1M tokens'}>
+      {percent}% below median
     </span>
   );
 }
@@ -248,7 +254,7 @@ export function PreviewKitShowcase() {
           <Delta percent={12.4} suffix="this week" />
           <Delta percent={-6} suffix="this week" />
           <Delta percent={-18} lowerIsBetter suffix="latency" />
-          <Savings price={0.12} list={0.24} />
+          <Savings price={0.12} median={0.24} />
         </div>
       </Panel>
       <Panel title="Segmented usage">
@@ -325,12 +331,12 @@ function subscribeNetwork(listener: () => void) {
   return () => window.removeEventListener(PREVIEW_EVENT.NETWORK, listener);
 }
 
-export function useSpending(buyer?: X402View) {
+export function useSpending() {
   const keys = useUsdcApiKeys().state.snapshot;
   const account = window.previewAccountBudget.current();
   const keySpend = (keys?.keys ?? []).reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
   const spent = BigInt(account.spentAtomic) + keySpend;
-  const limited = buyer?.state.summary.active === true;
+  const limited = account.limited;
   const limit = BigInt(account.limitAtomic);
   return { keys, spent, limit, limited, remaining: limit > spent ? limit - spent : 0n };
 }
@@ -349,12 +355,12 @@ export function PreviewComposerTab({
 }) {
   const open = useSyncExternalStore(subscribeFunds, () => fundsState().open);
   const atomic = usePreviewBalance();
-  const { spent, limit, limited } = useSpending(buyer);
+  const { spent, limit, limited } = useSpending();
   const percent = limited && limit > 0n ? Math.min(100, Number((spent * 100n) / limit)) : 0;
   const network = useSyncExternalStore(subscribeNetwork, () =>
     new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet',
   );
-  const free = models.find((item) => item.free && item.name === funds.model.name) ?? models.find((item) => item.free);
+  const free = models.find((item) => item.free && item.name === funds.model.name) ?? similarFreeModel(models, funds.model.name);
   return (
     <>
       <div className="pk-composer-tab" data-warning={funds.blocked || undefined}>
@@ -389,7 +395,7 @@ export function PreviewComposerTab({
                 aria-hidden="true"
                 style={{ background: `conic-gradient(var(--ink) ${percent * 3.6}deg, var(--line) 0deg)` }}
               />
-              {limited ? percent + '% of limit' : 'No limit'}
+              {!limited ? 'No limit' : limit === 0n ? 'Free models only' : percent + '% of limit'}
             </span>
           </>
         )}

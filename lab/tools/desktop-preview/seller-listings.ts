@@ -61,6 +61,38 @@ export function previewCatalog(
   };
 }
 
+// Desktop catalog bridge: an exact-model lookup returns only that model.
+export function previewDesktopCatalog(model: string, now: number) {
+  let catalogQuery = '';
+  const catalogResult = () => {
+    const result = previewCatalog(model, now, catalogQuery);
+    if (!catalogQuery) return result;
+    const models = result.models.filter(
+      (item) => item.modelId === catalogQuery,
+    );
+    return models.length
+      ? { ...result, models }
+      : { ...result, state: CATALOG_STATE.EMPTY, models };
+  };
+  return {
+    summary: async () => previewCatalog(model, now, ''),
+    lookup: async (value: unknown) => {
+      catalogQuery = typeof value === 'string' ? value.trim() : '';
+      return catalogResult();
+    },
+  };
+}
+
+export function previewFreeModels(model: string, now: number) {
+  return [
+    ...new Set(
+      previewCatalog(model, now, '')
+        .models.filter((item) => item.free)
+        .map((item) => item.modelId),
+    ),
+  ];
+}
+
 const seller = (head: string, tail: string) =>
   head + '0'.repeat(FIXTURE_PADDING) + tail;
 function paidListing(

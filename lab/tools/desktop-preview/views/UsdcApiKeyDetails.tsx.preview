@@ -1,4 +1,5 @@
 // Connection fields and immutable key budget use shared buyer primitives; secrets copy only in the host.
+import { CaretDown, Check } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import type {
@@ -9,13 +10,62 @@ import type {
 import { usdcApiAmount as amount, USDC_API_ACTION } from '../usdc-api-model';
 import { BuyerAgentSetup } from './BuyerAgentSetup';
 import { BUTTON_VARIANT } from './constants';
+import { Dropdown } from './Dropdown';
 import { CopyField, FormActions } from './Form';
 import { Facts, Pair } from './Management';
 import { Modal } from './Modal';
-import { Badge, Button } from './UI';
+import { Badge, Button, MenuItem } from './UI';
 import type { useUsdcApiKeys } from './useUsdcApiKeys';
 
 type Controller = ReturnType<typeof useUsdcApiKeys>;
+declare global { interface Window { previewFreeModels(): string[] } }
+
+const NO_FALLBACK = 'Return an error';
+const fallbackChoice = new Map<string, string | null>();
+// Preview-only: an optional free model the key may switch to; without one the key never changes model.
+export function FallbackModel({ id }: { id: string }) {
+  const [choice, setChoice] = useState(() => fallbackChoice.get(id) ?? null);
+  const choose = (value: string | null) => {
+    fallbackChoice.set(id, value);
+    setChoice(value);
+  };
+  const options = [null, ...window.previewFreeModels()];
+  return (
+    <div className="preview-fallback-model">
+      <span>
+        <strong>Fallback model</strong>
+        <small>Used only when the requested model has no free seller and the wallet has no balance.</small>
+      </span>
+      <Dropdown
+        label={'Fallback model: ' + (choice ?? NO_FALLBACK)}
+        className="preview-guide-key-trigger"
+        trigger={
+          <>
+            <span>{choice ?? NO_FALLBACK}</span>
+            <CaretDown size={12} aria-hidden="true" />
+          </>
+        }
+      >
+        {(close) =>
+          options.map((value) => (
+            <MenuItem
+              key={value ?? 'none'}
+              role="menuitemradio"
+              checked={value === choice}
+              label={value ?? NO_FALLBACK}
+              detail={value ? 'Free model' : 'Default: the key never switches model'}
+              trailing={value === choice ? <Check size={14} aria-hidden="true" /> : undefined}
+              onClick={() => {
+                choose(value);
+                close();
+              }}
+            />
+          ))
+        }
+      </Dropdown>
+    </div>
+  );
+}
 function KeyUsage({
   keyStatus: key,
   scope,

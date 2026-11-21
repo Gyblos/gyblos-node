@@ -182,7 +182,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const row = models.indexOf('function ModelRow(');
     if (row < 0) throw new Error('Missing model row review hook');
     return (
-      "import { CaretRight, Check } from '@phosphor-icons/react';\nimport { usdPerMtok } from './model-price';\nimport { Savings } from './PreviewKit';\nimport { BUTTON_VARIANT } from './constants';\n" +
+      "import { CaretRight, Check } from '@phosphor-icons/react';\nimport { buyerPerMtok, marketMedian, Savings } from './PreviewKit';\nimport { BUTTON_VARIANT } from './constants';\n" +
       models.slice(0, row) +
       readFileSync(
         new URL('./views/ModelRow.tsx.preview', import.meta.url),
@@ -370,6 +370,12 @@ export function reviewBrand(desktop: string): Plugin {
         moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
       )
         return fileURLToPath(new URL('./status-tone.ts', import.meta.url));
+      if (
+        source === './market' &&
+        importer !== undefined &&
+        moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
+      )
+        return fileURLToPath(new URL('./market.ts', import.meta.url));
       return null;
     },
     load(id) {

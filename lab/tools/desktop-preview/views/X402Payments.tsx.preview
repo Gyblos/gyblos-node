@@ -101,7 +101,7 @@ function AccountBudgetForm({ buyer, policy, onSaved }: {
   onSaved(): void;
 }) {
   const account = window.previewAccountBudget.current();
-  const [amount, setAmount] = useState(() => buyer.state.summary.active ? x402Amount(account.limitAtomic, policy) : '');
+  const [amount, setAmount] = useState(() => account.limited ? x402Amount(account.limitAtomic, policy) : '');
   const [error, setError] = useState('');
   return (
     <form className="ui-form" onSubmit={async (event) => {

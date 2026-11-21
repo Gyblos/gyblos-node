@@ -7,7 +7,6 @@ import {
   type ChatArchiveSave,
 } from '@gyblos/desktop/chat-archive-model';
 import { ChatController } from '@gyblos/desktop/chat-controller';
-import { CATALOG_STATE } from '@gyblos/desktop/network-catalog';
 import { LOCAL_NODE_STATE } from '@gyblos/desktop/node-status';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import {
@@ -43,7 +42,7 @@ import { exampleKeys } from './example-keys';
 import { previewFunding } from './funding';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
-import { previewCatalog } from './seller-listings';
+import { previewDesktopCatalog, previewFreeModels } from './seller-listings';
 
 export function createPreviewHost(
   search: string,
@@ -76,6 +75,7 @@ export function createPreviewHost(
   let active = ready && query.get('seller-budget') !== 'ready';
   let authorized = ready;
   let limitAtomic = '1000000';
+  let limited = query.get('limit') === 'set';
   let generation = 0;
   let selectedHome = ready;
   let keys = exampleKeys(query.get('keys') === 'empty');
@@ -211,26 +211,10 @@ export function createPreviewHost(
       return nodeState;
     },
   };
-  let catalogQuery = '';
-  const catalogResult = () => {
-    const result = previewCatalog(model, now, catalogQuery);
-    if (!catalogQuery) return result;
-    const models = result.models.filter(
-      (item) => item.modelId === catalogQuery,
-    );
-    return models.length
-      ? { ...result, models }
-      : { ...result, state: CATALOG_STATE.EMPTY, models };
-  };
-  const desktopCatalog = {
-    summary: async () => previewCatalog(model, now, ''),
-    lookup: async (value: unknown) => {
-      catalogQuery = typeof value === 'string' ? value.trim() : '';
-      return catalogResult();
-    },
-  };
+  const desktopCatalog = previewDesktopCatalog(model, now);
 
-  const accountBudget = () => accountBudgetSnapshot(limitAtomic, records);
+  const accountBudget = () =>
+    accountBudgetSnapshot(limitAtomic, records, limited);
   function buyerState() {
     return parseX402Result({
       summary: {
@@ -274,10 +258,14 @@ export function createPreviewHost(
         );
         if (error) return { ...buyerState(), error };
         limitAtomic = request.limitAtomic;
+        limited = true;
         active = true;
         authorized = true;
       }
-      if (request.action === X402_ACTION.FINISH) active = false;
+      if (request.action === X402_ACTION.FINISH) {
+        active = false;
+        limited = false;
+      }
       if (request.action === X402_ACTION.COPY_PAYER)
         await navigator.clipboard.writeText(payer);
       if (request.action === X402_ACTION.COPY_MINT)
@@ -392,6 +380,7 @@ export function createPreviewHost(
     desktopCatalog,
     desktopX402,
     previewAccountBudget: { current: accountBudget, baseline: accountBudget() },
+    previewFreeModels: () => previewFreeModels(model, now),
     desktopUsdcApiKeys,
     ...createPaypalPreview(ready, answer, now, agentExamples.paypal),
   };

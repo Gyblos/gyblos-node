@@ -3245,3 +3245,53 @@ html .app.desktop-frame .pk-code pre:focus-visible {
 .desktop-frame .pk-code [data-token='flag'] {
   color: color-mix(in srgb, var(--pk-info) 60%, var(--muted));
 }
+
+/* Devin-like density: 20 px card padding, bordered cards, 13 px secondary text. */
+html .app.desktop-frame .content .preview-settings-rows {
+  padding: 4px 20px;
+}
+html .app.desktop-frame .content .preview-settings-rows > div {
+  padding-block: 14px;
+}
+html
+  .app.desktop-frame
+  .content
+  :is(.preview-settings-rows small, .preview-metric-detail, .ui-help-text) {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+html .app.desktop-frame .content .preview-metric-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+}
+@container metric-region (min-width: 421px) {
+  html .app.desktop-frame .content .preview-metric-grid {
+    gap: 16px;
+  }
+  html .app.desktop-frame .content .preview-metric-card {
+    padding: 18px 20px;
+  }
+}
+html .app.desktop-frame .content .preview-fallback-model {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  & > span {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  & small {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 18px;
+  }
+}
+@media (max-width: 640px) {
+  html .app.desktop-frame .content .preview-fallback-model {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
