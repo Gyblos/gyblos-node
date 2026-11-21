@@ -118,6 +118,10 @@ export function priorBatchSpent(record: BatchRecord): bigint {
   );
 }
 
+// Closed with proof, or released never funded: such a session may live outside the seller's buyer index.
+export function batchSessionUnindexed(stored: BatchStoredSession | undefined) {
+  return stored?.archivedProof === true || stored?.released === true;
+}
 export function batchSessionTerminal(stored: BatchStoredSession | undefined) {
   return (
     stored !== undefined &&

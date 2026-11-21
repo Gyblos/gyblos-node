@@ -118,7 +118,7 @@ function binding(
 // session preparing without a channel is bound again through the backend before an OPEN with its terms,
 // so the registry checks capacity and indexes the buyer first (a released never-funded one left the
 // index); new terms still renew.
-async function checkBinding(
+async function refuseBusyOrRebind(
   state: { current?: Binding },
   replacing: boolean,
   opening: boolean,
@@ -162,7 +162,11 @@ async function operation(
       state.current !== undefined &&
       canonicalJson(state.current.terms) !== canonicalJson(proposed);
     const terms = ownTerms(proposed, options, !state.current || replacing);
-    await checkBinding(state, replacing, request.method === BATCH_METHODS.OPEN);
+    await refuseBusyOrRebind(
+      state,
+      replacing,
+      request.method === BATCH_METHODS.OPEN,
+    );
     const offer = await verifyBatchQuote(
       request.params.quote,
       terms,

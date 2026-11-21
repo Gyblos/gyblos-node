@@ -19,6 +19,7 @@ import {
 import { openBatchSellerBackend } from './batch-session-backend';
 import {
   batchSessionTerminal,
+  batchSessionUnindexed,
   type BatchStoredSession,
 } from './batch-session-state';
 import { serial } from './batch-session-store';
@@ -66,7 +67,7 @@ async function rows(state: State): Promise<BatchSellerRegistryEntry[]> {
       return sessionFail(SESSION_CODES.UNVERIFIED);
     // A released never-funded session holds no evidence or slot: like a closed one, it leaves the index
     // and its buyer comes back through create or renew, which check capacity again.
-    if (stored.archivedProof || stored.released) archived.add(row.buyerNodeId);
+    if (batchSessionUnindexed(stored)) archived.add(row.buyerNodeId);
     else entries.push({ buyerNodeId: row.buyerNodeId, stored });
   }
   // Archive in place: remove only the index reference, never move or rewrite financial evidence.
@@ -159,7 +160,7 @@ function backend(state: State, peer: string): BatchSellerBackend {
           .entries.some((row) => row.buyerNodeId === buyerNodeId);
         if (
           stored &&
-          ((!known && !stored.archivedProof && !stored.released) ||
+          ((!known && !batchSessionUnindexed(stored)) ||
             stored.terms.buyerNodeId !== buyerNodeId)
         )
           return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -179,8 +180,7 @@ function backend(state: State, peer: string): BatchSellerBackend {
             .read()
             .entries.some((row) => row.buyerNodeId === buyerNodeId)
         ) {
-          const old = await base.inspect();
-          if (!old?.archivedProof && !old?.released)
+          if (!batchSessionUnindexed(await base.inspect()))
             return sessionFail(SESSION_CODES.UNVERIFIED);
           if (
             state.store.read().entries.length >= BATCH_SELLER_REGISTRY.maxBuyers

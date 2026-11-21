@@ -30,6 +30,7 @@ import { termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
 import {
+  batchSessionUnindexed,
   inspectBatchSession,
   readBatchRecord,
   storedBatchSession,
@@ -93,7 +94,7 @@ async function children(paths: BatchSellerPaths, entries: SellerRegistryRow[]) {
       // Only closed or released sessions leave the index.
       if (
         stored &&
-        ((!stored.archivedProof && !stored.released) ||
+        (!batchSessionUnindexed(stored) ||
           stored.terms.buyerNodeId !== entry.name)
       )
         return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -124,9 +125,7 @@ async function load(paths: BatchSellerPaths) {
   if (
     (legacy &&
       imported?.buyerNodeId !== legacy.terms.buyerNodeId &&
-      (imported ||
-        (!storedBatchSession(legacy).archivedProof &&
-          !storedBatchSession(legacy).released))) ||
+      (imported || !batchSessionUnindexed(storedBatchSession(legacy)))) ||
     (imported && !legacy)
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);
