@@ -2232,6 +2232,9 @@ html .app.desktop-frame > .buyer-sidebar {
   background: var(--pk-side);
   border-inline-end: 0;
 }
+html .app.desktop-frame > .buyer-sidebar::after {
+  display: none;
+}
 html .app.desktop-frame > .ui-window-chrome {
   border-bottom: 0;
   background:
