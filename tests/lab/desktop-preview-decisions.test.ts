@@ -127,7 +127,7 @@ void test('preview disables paid-only models without funds unless the free fallb
     /broke && !fallback && !list\.some\(\(item\) => item\.free\)/,
   );
   assert.match(dropdown, /disabled=\{locked\}/);
-  assert.match(dropdown, /aria-label="Needs funds"/);
+  assert.match(dropdown, /title=\{locked \? PREVIEW_COPY\.needsFunds : undefined\}/);
 });
 
 void test('preview hides Testnet behind a developer setting', async () => {
@@ -249,4 +249,16 @@ void test('preview menus, number fields and model rows follow the shared compone
   assert.match(dropdown, /<ModelBadges offers=\{list\}/);
   assert.match(dropdown, /\{free \? 'Free' : 'Paid'\}/);
   assert.match(dropdown, /className="pk-balance-add"/);
+});
+
+void test('model picker lets Paid speak for itself and sizes the seller flyout to its content', async () => {
+  const dropdown = await view('ModelDropdown.tsx.preview');
+  assert.doesNotMatch(dropdown, /pk-needs-funds/);
+  assert.doesNotMatch(dropdown, /panel\.style\.height = box\.height/);
+  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  assert.match(
+    css,
+    /\.preview-model-list \.dropdown-copy strong \{\n\s*font-size: 14px;/,
+  );
+  assert.doesNotMatch(css, /\.pk-balance-line\[data-empty\] > svg/);
 });

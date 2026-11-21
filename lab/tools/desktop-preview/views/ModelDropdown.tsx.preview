@@ -91,12 +91,12 @@ function fromPrice(offers: readonly ModelOption[]) {
   return cheapest ? (offers.length > 1 ? 'from ' : '') + usdPerMtok(cheapest.input) + '/M' : null;
 }
 /** Free or Paid pill, then the input price and the number of sellers on the line below. */
-function ModelBadges({ offers, locked }: { offers: readonly ModelOption[]; locked: boolean }) {
+function ModelBadges({ offers }: { offers: readonly ModelOption[] }) {
   const free = offers.some((item) => item.free);
   const price = fromPrice(offers);
   return (
     <>
-      <Tag pill tone={free ? TONE.SUCCESS : locked ? TONE.WARNING : TONE.NEUTRAL}>{free ? 'Free' : 'Paid'}</Tag>
+      <Tag pill tone={free ? TONE.SUCCESS : TONE.NEUTRAL}>{free ? 'Free' : 'Paid'}</Tag>
       <span className="pk-badge-line">
         {!free && price && <Tag>{price}</Tag>}
         <Tag>{sellerCount(offers)}</Tag>
@@ -162,10 +162,10 @@ function StrategyRow({
       title={locked ? PREVIEW_COPY.needsFunds : undefined}
       data-strategy
       label={label}
-      detail={soon ? PREVIEW_COPY.sellerModeSoon : locked ? 'Needs funds · ' + detail : detail}
+      detail={soon ? PREVIEW_COPY.sellerModeSoonShort : locked ? 'Needs funds · ' + detail : detail}
       leading={
         <span className="preview-strategy-icon" aria-hidden="true">
-          <Glyph size={18} weight={checked ? 'fill' : 'regular'} />
+          <Glyph size={16} weight={checked ? 'fill' : 'regular'} />
         </span>
       }
       badge={soon ? <Tag>Soon</Tag> : <span className="preview-offer-price">{price}</span>}
@@ -259,17 +259,13 @@ export function ModelDropdown({
       if (!panel || !menu) return;
       menu.style.minHeight = '';
       reposition();
-      panel.style.height = 'auto';
-      const limit = Number.parseFloat(menu.style.maxHeight) || window.innerHeight;
-      menu.style.minHeight = Math.min(Math.max(panel.scrollHeight, menu.offsetHeight), limit) + 'px';
-      reposition();
       sync();
     }
     function sync() {
       if (!panel || !menu) return;
       const box = menu.getBoundingClientRect();
       panel.style.width = box.width + 'px';
-      panel.style.height = box.height + 'px';
+      panel.style.maxHeight = (Number.parseFloat(menu.style.maxHeight) || window.innerHeight) + 'px';
       panel.style.left = box.right + FLYOUT.GAP + 'px';
       panel.style.top = menu.style.top;
       panel.style.bottom = menu.style.bottom;
@@ -412,15 +408,10 @@ export function ModelDropdown({
                     title={locked ? PREVIEW_COPY.needsFunds : undefined}
                     label={name}
                     detail={contextLabel}
-                    badge={contextLabel ? undefined : <ModelBadges offers={list} locked={needsFunds(list)} />}
+                    badge={contextLabel ? undefined : <ModelBadges offers={list} />}
                     leading={<ModelImage artwork={first.image} name={name} />}
                     trailing={
                       <span className="preview-menu-trail">
-                        {needsFunds(list) && (
-                          <span className="pk-needs-funds" role="img" aria-label="Needs funds" title="Needs funds">
-                            <Wallet size={14} weight="fill" aria-hidden="true" />
-                          </span>
-                        )}
                         {selected ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
                         {several && !locked ? (
                           <CaretRight size={13} className="preview-menu-caret" />
@@ -476,7 +467,7 @@ export function ModelDropdown({
                 <>
                   <p className="preview-flyout-title">
                     <strong>{active}</strong>
-                    <small>{offers.length} sellers · price per 1M tokens {feeLabel}, in / out</small>
+                    <small>{offers.length} sellers · in / out per 1M {feeLabel}</small>
                   </p>
                   <StrategyRow
                     icon={Sparkle}
