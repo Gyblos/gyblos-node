@@ -427,9 +427,6 @@ html .app.desktop-frame .content .ui-tooltip {
   html .app.desktop-frame .content .ui-button {
     transition-duration: 80ms;
   }
-  html .app.desktop-frame .content .ui-tooltip {
-    transition-duration: 80ms;
-  }
 }
 
 /* Headers, values, status badges and actions share a regular table weight. */
@@ -2715,17 +2712,61 @@ html .app.desktop-frame .compact-dropdown:popover-open {
     filter: blur(2px);
   }
 }
-/* A trigger's caret turns while its menu is open. */
+/* A trigger's caret turns while its menu is open. The renderer freezes icon
+   transitions, so the turn needs a stronger, motion-only override. */
 html
   .app.desktop-frame
   [aria-expanded='true']
   > :is(.preview-trigger-caret, svg:last-child:not(:only-child)) {
   rotate: 180deg;
 }
+@media (prefers-reduced-motion: no-preference) {
+  html
+    body
+    .app.desktop-frame
+    [aria-expanded]
+    > :is(.preview-trigger-caret, svg:last-child:not(:only-child)) {
+    transition: rotate var(--pk-menu-motion) ease-out !important;
+  }
+}
+html .app.desktop-frame .ui-select-trigger::after {
+  transition:
+    rotate var(--pk-menu-motion) ease-out,
+    translate var(--pk-menu-motion) ease-out;
+}
+html .app.desktop-frame .ui-select-trigger[aria-expanded='true']::after {
+  rotate: 225deg;
+  translate: 0 3px;
+}
+/* Combobox: while typing, the first match is marked; Enter picks it. */
 html
   .app.desktop-frame
-  :is(.preview-trigger-caret, .ui-menu-trigger > svg:last-child) {
-  transition: rotate var(--pk-menu-motion) ease-out;
+  .preview-model-menu:has(.dropdown-search input:focus:not(:placeholder-shown))
+  .preview-model-list
+  > :nth-child(1 of [data-model-row]:not(:disabled)) {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+/* Tooltips open like a BoardUI popover: fade, 0.95 scale and 2 px blur. */
+html .app.desktop-frame .ui-tooltip {
+  translate: none;
+  scale: 0.95;
+  filter: blur(2px);
+  transform-origin: top left;
+  transition:
+    opacity var(--pk-menu-motion) ease-out,
+    scale var(--pk-menu-motion) ease-out,
+    filter var(--pk-menu-motion) ease-out,
+    visibility var(--pk-menu-motion);
+}
+html .app.desktop-frame .sidebar .ui-tooltip {
+  transform-origin: left center;
+}
+html
+  .app.desktop-frame
+  .ui-button:is(:hover, :focus-visible)
+  + .ui-tooltip:not([data-dismissed]) {
+  scale: 1;
+  filter: none;
 }
 html
   .app.desktop-frame
@@ -2815,10 +2856,12 @@ html .app.desktop-frame .preview-check-slot {
   width: 18px;
   flex: none;
 }
-html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
+html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
   overflow-y: auto;
   transform-origin: left center;
   transition:

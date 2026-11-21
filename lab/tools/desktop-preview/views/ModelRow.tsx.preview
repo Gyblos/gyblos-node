@@ -37,6 +37,7 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
   const sellers = previewSellers(model);
   const prices = sellers.map((s) => s.input);
   const min = Math.min(...prices);
+  const cheapest = sellers.filter((s) => s.online).sort((a, b) => a.input - b.input)[0];
   const max = Math.max(...prices);
   const pinnedSeller = sellers.find((s) => s.id === choice.pinned);
   const unavailable = pinnedSeller && !pinnedSeller.online ? pinnedSeller : undefined;
@@ -70,7 +71,7 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
         <span className="preview-model-mode">{mode}</span>
         <span className="ui-price">
           <strong>{model.free ? 'Free' : 'from ' + usdPerMtok(min)}</strong>
-          <small>{model.free ? 'Community supported' : <Savings price={min} median={marketMedian(prices)} />}</small>
+          <small>{model.free ? 'Community supported' : cheapest && <Savings price={cheapest.input} median={comparableMedian(sellers, cheapest)} />}</small>
         </span>
         <CaretRight size={14} aria-hidden="true" />
       </button>

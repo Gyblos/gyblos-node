@@ -19,7 +19,7 @@ import { useUsdcApiKeys } from './useUsdcApiKeys';
 
 export { statusTone, TONE } from './status-tone';
 export type { Tone } from './status-tone';
-export { feeLabel, marketMedian, similarFreeModel } from './market';
+export { comparableMedian, feeLabel, marketMedian, similarFreeModel } from './market';
 export { CODE_LANGUAGE } from './code-highlight';
 
 export function Tag({ tone = TONE.NEUTRAL, dot = false, pill = false, children }: { tone?: Tone; dot?: boolean; pill?: boolean; children: ReactNode }) {

@@ -13,6 +13,7 @@ import {
   type Icon,
 } from '@phosphor-icons/react';
 import {
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -240,6 +241,20 @@ export function ModelDropdown({
     setActive(null);
     requestAnimationFrame(() => row?.focus());
   };
+
+  useEffect(() => {
+    const pickFirst = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Enter' || !(event.target instanceof HTMLInputElement)) return;
+      const first = event.target
+        .closest('.preview-model-menu')
+        ?.querySelector<HTMLElement>('[data-model-row]:not(:disabled)');
+      if (!first) return;
+      event.preventDefault();
+      first.click();
+    };
+    document.addEventListener('keydown', pickFirst, true);
+    return () => document.removeEventListener('keydown', pickFirst, true);
+  }, []);
 
   useLayoutEffect(() => {
     const panel = flyout.current;

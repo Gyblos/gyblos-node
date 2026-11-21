@@ -67,7 +67,7 @@ void test('preview spending limit starts unset and zero allows free models only'
 void test('preview model views compare listed prices with the market median, not synthetic list prices', async () => {
   const row = await view('ModelRow.tsx.preview');
   assert.doesNotMatch(row, /function listPrice/);
-  assert.match(row, /marketMedian\(/);
+  assert.match(row, /comparableMedian\(sellers, cheapest\)/);
 });
 
 void test('preview API keys follow the account-wide free-model fallback, with no per-key choice', async () => {
@@ -297,4 +297,66 @@ void test('preview stylesheet declares each picker and flyout rule once, on shar
     /border-radius: [0-9]+px;\n[^}]*\}\nhtml \.app\.desktop-frame \.preview-strategy-icon/,
   );
   assert.doesNotMatch(css, /rotate 200ms/);
+});
+
+void test('preview median counts only online offers at the same quantization (option B)', async () => {
+  const { comparableMedian } =
+    await import('../../lab/tools/desktop-preview/market');
+  const offer = (input: number, quant: string, online = true) => ({
+    input,
+    quant,
+    online,
+  });
+  const cheapest = offer(0.1, 'Q4_K_M');
+  const offers = [
+    cheapest,
+    offer(0.2, 'Q4_K_M'),
+    offer(0.3, 'Q8_0'),
+    offer(0.4, 'FP16'),
+  ];
+  assert.equal(comparableMedian(offers, cheapest), null);
+  assert.equal(
+    comparableMedian([...offers, offer(0.5, 'Q4_K_M', false)], cheapest),
+    null,
+  );
+  assert.equal(
+    comparableMedian([...offers, offer(0.3, 'Q4_K_M')], cheapest),
+    0.2,
+  );
+});
+
+void test('closed seller flyout takes no room, so a short model menu needs no scrollbar', async () => {
+  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const rule =
+    /html \.app\.desktop-frame \.compact-dropdown\.preview-seller-flyout(:popover-open)? \{\n  display: flex;/.exec(
+      css,
+    );
+  assert.ok(rule, 'flyout layout rule');
+  assert.equal(rule[1], ':popover-open');
+});
+
+void test('preview overlays follow the BoardUI recipe: turning carets, popover tooltips, combobox Enter', async () => {
+  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  assert.match(
+    css,
+    /@media \(prefers-reduced-motion: no-preference\) \{\n\s*html\n\s*body\n\s*\.app\.desktop-frame\n\s*\[aria-expanded\]\n\s*> :is\(\.preview-trigger-caret, svg:last-child:not\(:only-child\)\) \{\n\s*transition: rotate var\(--pk-menu-motion\) ease-out !important;/,
+  );
+  assert.match(
+    css,
+    /\.ui-select-trigger\[aria-expanded='true'\]::after \{\n\s*rotate: 225deg;/,
+  );
+  assert.match(
+    css,
+    /html \.app\.desktop-frame \.ui-tooltip \{\n\s*translate: none;\n\s*scale: 0\.95;\n\s*filter: blur\(2px\);/,
+  );
+  assert.doesNotMatch(css, /\.ui-tooltip \{\n\s*transition-duration: 80ms;/);
+  const dropdown = await view('ModelDropdown.tsx.preview');
+  assert.match(dropdown, /\[data-model-row\]:not\(:disabled\)/);
+  assert.match(css, /:nth-child\(1 of \[data-model-row\]:not\(:disabled\)\)/);
+});
+
+void test('account spending limit form uses the shared number field', async () => {
+  const x402 = await view('X402Payments.tsx.preview');
+  assert.match(x402, /<CompactAmount id="account-budget"/);
+  assert.doesNotMatch(x402, /<FormInput id="account-budget"/);
 });

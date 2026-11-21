@@ -80,8 +80,9 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 
 - `Tag`: status or label with a tinted background; `dot` for live states.
 - `Delta`: signed percentage; set `lowerIsBetter` for prices and latency.
-- `Savings`: "N% below median" against the median of the current offers for the
-  same model; hidden with fewer than 3 offers or when not cheaper.
+- `Savings`: "N% below median" against the median of the paid offers for the
+  same model and quantization from sellers online now (`comparableMedian`);
+  hidden with fewer than 3 such offers or when not cheaper.
 - `SegmentedBar`: one bar split by source with a text legend (the legend carries
   the values for assistive technology).
 - `FilterChips`: single-choice filter with counts; one Tab stop, arrow keys move.
@@ -92,8 +93,13 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 - Menus (`Dropdown` panels and the seller flyout): 150 ms fade with a 0.95 scale
   and 2 px blur, grown from the trigger side; rows use the control radius
   (10 px) inside the 16 px panel. A trigger's caret turns while its menu is open.
+  The caret turn (and the `ui-select-trigger` chevron) animates only without
+  reduced motion. Tooltips open with the same popover recipe. In the model
+  picker search (combobox), the first match is marked while typing and Enter
+  picks it.
 - Number fields (`CompactAmount`, `AmountEditor`): 36 px field, value on the left,
   unit, then minus and plus together at the end (24 px steppers).
+  Every amount input uses one of them, including the account spending limit.
 - `Notice`: one toned line that must stay visible, such as a pinned seller being
   replaced or an answer coming from the free-model fallback.
   The composer context tab keeps its own warning layout, because it is attached

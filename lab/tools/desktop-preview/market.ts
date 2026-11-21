@@ -19,6 +19,17 @@ export function marketMedian(prices: readonly number[]) {
   return Math.round(median * scale) / scale;
 }
 
+// Option B: only offers from sellers online now, at the reference offer's quantization.
+export function comparableMedian<
+  T extends { input: number; quant: string; online: boolean },
+>(offers: readonly T[], reference: T) {
+  return marketMedian(
+    offers
+      .filter((offer) => offer.online && offer.quant === reference.quant)
+      .map((offer) => offer.input),
+  );
+}
+
 const family = (name: string) => name.toLowerCase().match(/^[a-z]+/)?.[0] ?? '';
 const size = (name: string) => {
   const match = name.toLowerCase().match(/(\d+(?:\.\d+)?)\s*b\b/);
