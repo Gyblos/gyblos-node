@@ -44,3 +44,25 @@ void test('the preview spending limit editor never finishes the payment session'
   assert.doesNotMatch(payments, /X402_ACTION\.FINISH/);
   assert.doesNotMatch(payments, /Leave empty for no limit/);
 });
+
+void test('preview status tones map desktop payment statuses as DESIGN.md documents', async () => {
+  const { statusTone } =
+    await import('../../lab/tools/desktop-preview/status-tone.ts');
+  const expected = {
+    'Payment captured': 'success',
+    Confirmed: 'success',
+    Active: 'success',
+    'Session open': 'info',
+    'Awaiting approval': 'info',
+    'Capture unconfirmed': 'warning',
+    'Response unconfirmed': 'warning',
+    'Needs review': 'warning',
+    Failed: 'danger',
+    'Authorization voided': 'neutral',
+    'Checkout cancelled': 'neutral',
+    Revoked: 'neutral',
+    Free: 'neutral',
+  };
+  for (const [status, tone] of Object.entries(expected))
+    assert.equal(statusTone(status), tone, status);
+});
