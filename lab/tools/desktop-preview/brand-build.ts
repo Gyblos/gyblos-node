@@ -93,7 +93,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const typed = replaceOnce(
       props,
       '  compact?: boolean;',
-      "  compact?: boolean;\n  size?: 'lg';",
+      "  compact?: boolean;\n  size?: 'sm' | 'md' | 'lg';",
     );
     const restoring = replaceOnce(
       typed,
@@ -103,7 +103,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     return replaceOnce(
       restoring,
       '      ref={ref}',
-      '      data-size={size}\n      ref={ref}',
+      "      data-size={compact ? undefined : (size ?? 'md')}\n      ref={ref}",
     );
   }
   if (target === `${base}/src/ui/UI.tsx`) {

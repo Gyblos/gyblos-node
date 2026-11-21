@@ -61,7 +61,7 @@ export function RevokeConfirmation({
   run: Controller['run'];
 }) {
   return (
-    <Modal title="Revoke API key?" close={close}>
+    <Modal title="Revoke API key?" size="sm" close={close}>
       <p>
         Stops new requests from every tool using this key. An inference already
         sent can still count. Its consumption and pending reservations stay

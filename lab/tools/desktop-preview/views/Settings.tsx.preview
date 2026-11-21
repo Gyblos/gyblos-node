@@ -105,7 +105,7 @@ export function Settings({
       </section>
       </Section>
       {aboutOpen && (
-        <Modal title="About Gyblos" close={() => setAboutOpen(false)}>
+        <Modal title="About Gyblos" size="sm" close={() => setAboutOpen(false)}>
           <div className="ui-section">
             <p>Gyblos desktop</p>
             <p className="ui-help-text">Version {version}</p>
@@ -114,7 +114,7 @@ export function Settings({
         </Modal>
       )}
       {designOpen && (
-        <Modal title="Design system" close={() => setDesignOpen(false)}>
+        <Modal title="Design system" size="lg" close={() => setDesignOpen(false)}>
           <div className="ui-section">
             <Section title="Buttons">
               <div className="preview-settings-rows">

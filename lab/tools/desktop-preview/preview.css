@@ -584,8 +584,8 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   }
 }
 .desktop-frame dialog.modal:has(.preview-node-hex) {
-  width: min(300px, calc(100vw - 24px));
-  padding: 10px 14px;
+  --modal-width: 440px;
+  gap: 8px;
 }
 .desktop-frame .modal:has(.preview-node-hex) .ui-section {
   gap: 0;
@@ -782,11 +782,81 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   }
 }
 
-.desktop-frame .modal[data-size='lg'] {
+/* Dialog sizes: small confirmations, medium forms and details, large tables. */
+.desktop-frame .modal[data-size] {
   box-sizing: border-box;
-  width: min(45rem, calc(100vw - 2rem));
-  max-height: calc(100dvh - 2rem);
-  padding: clamp(16px, 3vw, 24px);
+  width: min(var(--modal-width), calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 24px;
+}
+.desktop-frame .modal[data-size='sm'] {
+  --modal-width: 440px;
+}
+.desktop-frame .modal[data-size='md'] {
+  --modal-width: 560px;
+}
+.desktop-frame .modal[data-size='lg'] {
+  --modal-width: 760px;
+}
+.desktop-frame .modal[data-size][open] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.desktop-frame .modal[data-size] > * {
+  flex-shrink: 0;
+  margin-block: 0;
+}
+.desktop-frame .modal[data-size] > header {
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+.desktop-frame .modal[data-size] > header h2 {
+  font-size: 18px;
+  line-height: 24px;
+}
+.desktop-frame .modal[data-size] .ui-form-actions {
+  gap: 8px;
+  margin-top: 4px;
+}
+.desktop-frame .modal[data-size] .ui-form--limited {
+  max-width: none;
+}
+.desktop-frame .modal[data-size] .payment-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+.desktop-frame .modal[data-size] .payment-session > * {
+  flex: 1 1 100%;
+  margin-inline: 0;
+}
+.desktop-frame .modal[data-size] .payment-session > .payment-session-state {
+  padding-inline: 0;
+}
+.desktop-frame
+  .modal[data-size]
+  .payment-session
+  > :is(.paypal-session-actions, .ui-inline-actions) {
+  flex: 0 0 auto;
+  padding: 0;
+}
+@media (max-width: 560px) {
+  .desktop-frame .modal[data-size] {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    padding: 20px;
+  }
+  .desktop-frame .modal[data-size] .ui-form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .desktop-frame .modal[data-size] .ui-form-actions > * {
+    justify-content: center;
+    width: 100%;
+  }
 }
 .wallet-details .backup-verified-icon {
   color: var(--connected);
