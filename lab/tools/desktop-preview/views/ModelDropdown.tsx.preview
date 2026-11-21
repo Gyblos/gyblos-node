@@ -91,7 +91,7 @@ function fromPrice(offers: readonly ModelOption[]) {
   return cheapest ? (offers.length > 1 ? 'from ' : '') + usdPerMtok(cheapest.input) + '/M' : null;
 }
 /** Free or Paid pill, then the input price and the number of sellers on the line below. */
-function ModelBadges({ offers }: { offers: readonly ModelOption[] }) {
+function ModelBadges({ offers, locked }: { offers: readonly ModelOption[]; locked: boolean }) {
   const free = offers.some((item) => item.free);
   const price = fromPrice(offers);
   return (
@@ -100,6 +100,7 @@ function ModelBadges({ offers }: { offers: readonly ModelOption[] }) {
       <span className="pk-badge-line">
         {!free && price && <Tag>{price}</Tag>}
         <Tag>{sellerCount(offers)}</Tag>
+        {locked && <span className="sr-only">Needs funds</span>}
       </span>
     </>
   );
@@ -159,7 +160,7 @@ function StrategyRow({
       role="menuitemradio"
       checked={checked}
       disabled={soon || locked}
-      title={locked ? PREVIEW_COPY.needsFunds : undefined}
+      title={locked ? PREVIEW_COPY.needsFunds : detail}
       data-strategy
       label={label}
       detail={soon ? PREVIEW_COPY.sellerModeSoonShort : locked ? 'Needs funds · ' + detail : detail}
@@ -250,14 +251,12 @@ export function ModelDropdown({
       if (panel.matches(':popover-open')) panel.hidePopover();
       if (menu.dataset.split) {
         delete menu.dataset.split;
-        menu.style.minHeight = '';
         reposition();
       }
       return;
     }
     function place() {
       if (!panel || !menu) return;
-      menu.style.minHeight = '';
       reposition();
       sync();
     }
@@ -360,7 +359,7 @@ export function ModelDropdown({
         return (
           <>
             {!contextLabel && (
-              <p className="pk-balance-line" data-empty={broke || undefined}>
+              <p className="pk-balance-line">
                 <Wallet size={14} aria-hidden="true" />
                 <span>Balance</span>
                 <strong>{previewUsdc(balance)}</strong>
@@ -408,7 +407,7 @@ export function ModelDropdown({
                     title={locked ? PREVIEW_COPY.needsFunds : undefined}
                     label={name}
                     detail={contextLabel}
-                    badge={contextLabel ? undefined : <ModelBadges offers={list} />}
+                    badge={contextLabel ? undefined : <ModelBadges offers={list} locked={needsFunds(list)} />}
                     leading={<ModelImage artwork={first.image} name={name} />}
                     trailing={
                       <span className="preview-menu-trail">
@@ -472,7 +471,7 @@ export function ModelDropdown({
                   <StrategyRow
                     icon={Sparkle}
                     label="Auto"
-                    detail={(broke && top.free ? 'Free while your balance is 0 · ' : 'Recommended · ') + sellerName(top)}
+                    detail={(broke && top.free ? 'Free · ' : 'Recommended · ') + sellerName(top)}
                     price={offerPrice(top)}
                     checked={current && isAuto(active)}
                     onChoose={() => remember(top, true)}

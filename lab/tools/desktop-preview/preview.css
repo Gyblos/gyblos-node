@@ -2097,7 +2097,7 @@ html .app.desktop-frame .content .preview-steppers .ui-icon-button {
   min-width: 24px;
   height: 24px;
   min-height: 24px;
-  border-radius: 6px;
+  border-radius: var(--radius-option);
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -2418,6 +2418,7 @@ html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
   --pk-neutral: var(--muted);
   --pk-side: color-mix(in srgb, var(--panel) 80%, var(--bg));
   --pk-side-width: var(--compact-navigation-width);
+  --pk-radius-tag: 6px;
 }
 .desktop-frame [data-tone='success'] {
   --pk-tone: var(--pk-success);
@@ -2442,7 +2443,7 @@ html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
   gap: 6px;
   height: 22px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--pk-radius-tag);
   background: color-mix(in srgb, var(--pk-tone) 14%, transparent);
   color: color-mix(in srgb, var(--pk-tone) 82%, var(--ink));
   font-size: 12px;
@@ -2711,13 +2712,6 @@ html .app.desktop-frame .compact-dropdown:popover-open {
     opacity: 0;
     scale: 0.95;
     filter: blur(2px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  html .app.desktop-frame .compact-dropdown {
-    scale: 1;
-    filter: none;
-    transition: opacity var(--pk-menu-motion) ease-out;
   }
 }
 html .app.desktop-frame {
@@ -3433,15 +3427,15 @@ html .app.desktop-frame .pk-badge-line {
 html .app.desktop-frame .pk-badge-line .pk-tag {
   height: 16px;
   padding: 0 5px;
-  border-radius: 4px;
+  border-radius: var(--pk-radius-tag);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--muted) 55%, var(--ink));
 }
 /* Balance line: wallet, amount and an Add funds button. */
 html .app.desktop-frame .pk-balance-line {
-  gap: 8px;
-  padding: 2px 6px 8px 8px;
+  gap: 6px;
+  padding: 2px 4px 8px 8px;
   font-size: 13px;
   line-height: 18px;
 }
@@ -3454,7 +3448,7 @@ html .app.desktop-frame .pk-balance-line .ui-button.pk-balance-add {
   min-height: 26px;
   height: 26px;
   margin-left: auto;
-  padding: 0 8px;
+  padding: 0 6px;
   font-size: 12px;
   font-weight: 500;
 }
@@ -3462,7 +3456,7 @@ html .app.desktop-frame .pk-balance-line .ui-button.pk-balance-add {
 html .app.desktop-frame .ui-badge {
   height: 20px;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: var(--pk-radius-tag);
   font-size: 11px;
 }
 html .app.desktop-frame .pk-balance-line strong {
@@ -3490,7 +3484,7 @@ html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  border-radius: var(--radius-option);
+  border-radius: var(--radius-control);
 }
 html .app.desktop-frame .preview-seller-flyout .dropdown-copy strong {
   font-size: 13px;
