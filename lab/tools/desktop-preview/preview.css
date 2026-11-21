@@ -2298,3 +2298,23 @@ html
   box-shadow: inset 2px 0 0 var(--accent);
   border-radius: 8px;
 }
+
+/* Setup steps: icon tiles instead of numbered circles; done steps turn into a check. */
+html .app.desktop-frame .preview-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+html .app.desktop-frame .preview-steps li[data-done='true'] > span {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--pk-success) 16%, transparent);
+  color: var(--pk-success);
+}
+html .app.desktop-frame .preview-steps li[data-done='true'] strong {
+  color: var(--muted);
+}

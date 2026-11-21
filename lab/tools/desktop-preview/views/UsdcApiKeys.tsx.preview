@@ -1,4 +1,4 @@
-import { Info, LinkSimple, Plus } from '@phosphor-icons/react';
+import { Check, Info, Key, LinkSimple, PlugsConnected, Plus } from '@phosphor-icons/react';
 // Buyer-owned USDC key management uses shared forms and financial facts; no wallet keys enter the view.
 import { useState } from 'react';
 
@@ -233,9 +233,9 @@ export function UsdcApiKeys({
               />
             )}
             <ol className="preview-steps" aria-label="Connect a coding tool">
-              <li data-done={!!state.url}><span>1</span><div><strong>Copy the Base URL</strong><small>Your tool sends requests here.</small></div></li>
-              <li data-done={snapshot.keys.some((k) => !k.revoked)}><span>2</span><div><strong>Create an API key</strong><small>Each key has its own USDC limit.</small></div></li>
-              <li><span>3</span><div><strong>Connect your tool</strong><small>OpenCode, Codex, Claude Code or Pi.</small></div></li>
+              <li data-done={!!state.url}><span aria-hidden="true">{state.url ? <Check size={14} weight="bold" /> : <LinkSimple size={15} />}</span><div><strong>Copy the Base URL</strong><small>Your tool sends requests here.</small></div></li>
+              <li data-done={snapshot.keys.some((k) => !k.revoked)}><span aria-hidden="true">{snapshot.keys.some((k) => !k.revoked) ? <Check size={14} weight="bold" /> : <Key size={15} />}</span><div><strong>Create an API key</strong><small>Each key has its own USDC limit.</small></div></li>
+              <li><span aria-hidden="true"><PlugsConnected size={15} /></span><div><strong>Connect your tool</strong><small>OpenCode, Codex, Claude Code or Pi.</small></div></li>
             </ol>
             {urlField}
             <section className="ui-section">
