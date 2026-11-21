@@ -23,6 +23,7 @@
     "./engine-registry-ollama": "./src/engine-registry-ollama.ts",
     "./lifecycle": "./src/lifecycle.ts",
     "./roles": "./src/roles.ts",
+    "./role-rpc": "./src/role-rpc.ts",
     "./configuration": "./src/configuration.ts",
     "./errors": "./src/errors.ts",
     "./home": "./src/home.ts",

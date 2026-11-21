@@ -40,12 +40,12 @@ signature verifies. To verify the image yourself or write each file by hand, see
 
 ### Your own devnet RPC, if you will charge [#own-rpc]
 
-A seller that charges sends channel transactions through the RPC chosen when its keys are created; an
-installed seller cannot change it yet. The default, the public `https://api.devnet.solana.com`, limits
-requests per IP address, so several services on one address make channel openings fail (`gyblos logs` then
-shows `invalid_batch_settlement_svm_channel_state` or `PAYMENT_UNAVAILABLE`). To use a dedicated devnet
-endpoint, set `GYBLOS_RPC_URL` before the **first** run of the installer (replace `DEVNET_RPC_URL` with
-your endpoint's URL):
+A seller that charges sends channel transactions through its Solana RPC. The default, the public
+`https://api.devnet.solana.com`, needs no account and works for most sellers. It limits requests per IP
+address, though, so several services on one address can make channel openings fail (`gyblos logs` then
+shows `invalid_batch_settlement_svm_channel_state` or `PAYMENT_UNAVAILABLE`). Then use a dedicated devnet
+endpoint: set it on an [installed seller](#change-rpc), or set `GYBLOS_RPC_URL` before the **first** run of
+the installer (replace `DEVNET_RPC_URL` with your endpoint's URL):
 
 - **Docker:** create the folder and a private `seller.env` with the URL, then run the installer in Docker
   mode, which keeps both and stops if Docker cannot run (with `GYBLOS_DIR`, use that folder):
@@ -62,6 +62,19 @@ your endpoint's URL):
 
 The seller keeps the URL in its private role file. A URL with an API key is a secret: never put it in
 `config.toml`.
+
+#### Change the RPC of an installed seller [#change-rpc]
+
+`gyblos seller rpc set` asks for the URL on the terminal, checks that it answers as Solana devnet and saves
+it; your keys, NodeId and registration stay. It never takes the URL as an argument, so it stays out of your
+shell history, and it shows only the address, never the path or key. Then restart the seller:
+
+- **Docker:** in the seller folder, `docker compose exec seller gyblos seller rpc set`, then
+  `docker compose restart seller`.
+- **Native on macOS, Linux or Windows:** `gyblos seller rpc set`, then `gyblos seller service uninstall`
+  and `gyblos seller service install`.
+
+`gyblos seller rpc` shows the RPC in use, and `gyblos seller rpc reset` goes back to the public one.
 
 ### Native seller on macOS or Linux
 
