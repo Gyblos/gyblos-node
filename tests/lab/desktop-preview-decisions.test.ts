@@ -244,9 +244,9 @@ void test('preview menus, number fields and model rows follow the shared compone
     css,
     /\.pk-tag\[data-pill\] \{\n\s*border-radius: var\(--radius-badge\);/,
   );
-  const payments = await view('Payments.tsx.preview');
+  const amounts = await view('PreviewKit.tsx.preview');
   assert.equal(
-    payments.match(/<span className="preview-steppers">/g)?.length,
+    amounts.match(/<span className="preview-steppers">/g)?.length,
     2,
   );
   const dropdown = await view('ModelDropdown.tsx.preview');
@@ -402,4 +402,24 @@ void test('every preview dialog opens and closes with one shared motion and an o
       `${name}: every dialog is inside MotionPresence`,
     );
   }
+});
+
+void test('model search Enter ignores IME composition and acts once across mounted pickers', async () => {
+  const source = await view('ModelDropdown.tsx.preview');
+  assert.match(source, /event\.isComposing/);
+  assert.match(source, /event\.defaultPrevented/);
+});
+
+void test('shared amount fields live in the preview kit without import cycles or dead exports', async () => {
+  const kit = await view('PreviewKit.tsx.preview');
+  assert.match(kit, /export function CompactAmount\(/);
+  assert.match(kit, /export function AmountEditor\(/);
+  assert.doesNotMatch(kit, /marketMedian/);
+  const payments = await view('Payments.tsx.preview');
+  assert.doesNotMatch(payments, /function (CompactAmount|AmountEditor)\(/);
+  for (const name of ['X402Payments', 'UsdcApiKeys'])
+    assert.doesNotMatch(
+      await view(`${name}.tsx.preview`),
+      /from '\.\/Payments'/,
+    );
 });

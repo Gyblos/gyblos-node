@@ -10,7 +10,7 @@ import { BUTTON_VARIANT } from './constants';
 import { FormActions, FormField, FormInput } from './Form';
 import { Modal } from './Modal';
 import { MotionPresence } from './Motion';
-import { CompactAmount } from './Payments';
+import { CompactAmount } from './PreviewKit';
 import { Button } from './UI';
 import type { X402View } from './useX402';
 
