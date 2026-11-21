@@ -112,6 +112,6 @@ body {
 
 @media (width < theme(--breakpoint-md)) {
   [data-overflow] > .explorer-table tr > :first-child:not([colspan]) > span {
-    max-width: calc(48vw - 2rem);
+    max-width: calc(55vw - 2rem);
   }
 }
