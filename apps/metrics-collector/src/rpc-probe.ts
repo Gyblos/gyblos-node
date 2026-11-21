@@ -90,7 +90,7 @@ async function probeOne(
 }
 
 // The probe's answer to an authorized GET of the probe route, or undefined (the app's 404) when the
-// token is unset, too short, missing or wrong.
+// method is not GET or the token is unset, too short, missing or wrong.
 export async function rpcProbe(
   request: Request,
   bindings: unknown,

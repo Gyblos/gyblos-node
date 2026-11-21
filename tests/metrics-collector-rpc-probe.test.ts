@@ -51,8 +51,8 @@ const page = (id: number) =>
       },
     ],
   });
-const request = (token?: string, path = '/v1/admin/rpc-probe') =>
-  new Request(`https://collector.example.test${path}`, {
+const request = (token?: string) =>
+  new Request(`https://collector.example.test${COLLECTOR_ROUTES.RPC_PROBE}`, {
     headers: token ? { authorization: `Bearer ${token}` } : {},
   });
 
