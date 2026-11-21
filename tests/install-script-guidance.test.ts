@@ -45,6 +45,12 @@ void test('after installing it prints the steps to start selling, with the owner
       ),
     );
     assert.match(result.stdout, /A free seller never needs it\./);
+    assert.ok(
+      result.stdout.includes(
+        `cd '${install.directory}' && docker compose run --rm seller gyblos doctor --online`,
+      ),
+      'the suggested doctor command must work even if the seller container stopped',
+    );
     assert.match(
       steps,
       /2\. Register with the gyb_ invite code from your invitation/,

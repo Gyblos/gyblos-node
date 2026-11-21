@@ -418,10 +418,15 @@ next_steps() {
 # Printed after every install, priced offers or not, so a seller starting from zero knows both SOL needs:
 # the owner's registration, and the fee payer that pays channel transactions once an offer has a price.
 charge_note() {
+  if [ "$mode" = native ]; then
+    doctor_online=$(seller_typed 'doctor --online')
+  else
+    doctor_online="cd $(quoted "$dir") && docker compose run --rm seller gyblos doctor --online"
+  fi
   say ''
   say "To charge for your model later, first send about 0.05 devnet SOL to the fee payer${fee_payer:+ $fee_payer}"
   say '  (https://faucet.solana.com, choose devnet). It pays the payment token accounts and channel'
-  say "  transactions; \`$(seller_typed 'doctor --online')\` says when it runs short. A free seller never needs it."
+  say "  transactions; \`$doctor_online\` says when it runs short. A free seller never needs it."
 }
 
 # y, yes or an empty answer (the default) from the terminal; anything else, or no answer, declines.

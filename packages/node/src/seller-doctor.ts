@@ -28,7 +28,6 @@ import {
   DOCTOR_CHECKS,
   DOCTOR_CODES,
   DOCTOR_STATUS,
-  FEE_PAYER_FUNDING,
   NODE_ERROR_CODES,
   type DoctorCheckName,
   type DoctorCode,
@@ -45,7 +44,7 @@ import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus, type RoleConfig } from './roles';
 import type { SellerCatalogOffer } from './seller-offer';
 import {
-  feePayerBalance,
+  feePayerFundingStatus,
   paymentAccountsVerdict,
   type PaymentAccountsProbes,
 } from './seller-payment-accounts';
@@ -251,16 +250,13 @@ async function paymentsCheck(
     },
     options.probes ?? {},
   );
-  if (verdict === 'ready' || verdict === 'missing') {
-    const balance = await feePayerBalance(
-      { rpcUrl: config.rpcUrl, address: config.facilitator },
-      options.probes ?? {},
-    );
-    if (verdict === 'missing' && balance === 0n)
-      return fail(DOCTOR_CODES.FEE_PAYER_UNFUNDED);
-    if (balance !== undefined && balance < FEE_PAYER_FUNDING.minimumLamports)
-      return warn(DOCTOR_CODES.FEE_PAYER_UNFUNDED);
-  }
+  const funding = await feePayerFundingStatus(
+    { rpcUrl: config.rpcUrl, address: config.facilitator },
+    verdict,
+    options.probes ?? {},
+  );
+  if (funding)
+    return { status: funding, code: DOCTOR_CODES.FEE_PAYER_UNFUNDED };
   return {
     ready: OK,
     // Startup creates them.
