@@ -24,17 +24,17 @@ import { parseRange, rangeQuery } from '@gyblos/explorer/range';
 import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
 
 const realFetch = globalThis.fetch;
+const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+afterEach(() => {
+  globalThis.fetch = realFetch;
+  AbortSignal.timeout = realTimeout;
+});
 
 void test('settlement counts use singular only for one settlement', () => {
   assert.equal(settlementCount(0), '0 settlements');
   assert.equal(settlementCount(1), '1 settlement');
   assert.equal(settlementCount(2), '2 settlements');
   assert.equal(settlementCount(1000), '1,000 settlements');
-});
-const realTimeout = AbortSignal.timeout.bind(AbortSignal);
-afterEach(() => {
-  globalThis.fetch = realFetch;
-  AbortSignal.timeout = realTimeout;
 });
 
 void test('amount bars allow fractional ticks so tiny USDC values retain their scale', () => {
