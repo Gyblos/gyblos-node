@@ -36,7 +36,7 @@ import {
   reserve,
   snapshot,
 } from './batch-session-common';
-import { openBatchStore, serial } from './batch-session-store';
+import { openBatchStore, serial, type BatchStore } from './batch-session-store';
 import type {
   BatchSellerContext,
   BatchSellerOptions,
@@ -192,19 +192,41 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     });
     return snapshot(store);
   }
-  const response = await waitBatch(
-    facilitator.settle(
-      { x402Version: 2, accepted: requirements, payload: opening },
-      requirements,
-    ),
-    options.operationMs,
-  );
-  requireSettlementResponse(response, requirements.network);
+  try {
+    const response = await waitBatch(
+      facilitator.settle(
+        { x402Version: 2, accepted: requirements, payload: opening },
+        requirements,
+      ),
+      options.operationMs,
+    );
+    requireSettlementResponse(response, requirements.network);
+  } catch (error) {
+    await forgetUnsentOpening(store, opening.voucher!.channelId);
+    throw error;
+  }
   await store.update((state) => {
     state.state = SESSION_STATES.OPEN;
     state.lastActivity = options.now();
   });
   return snapshot(store);
+}
+// Only this seller's fee payer completes the buyer's deposit, and the SDK records an attempt under the
+// channel before it signs or sends. With no such record the deposit was never sent and can never land:
+// keeping the opening would leave a channel the seller later tries to close forever. The buyer may open
+// again; any recorded attempt keeps the opening for recovery.
+async function forgetUnsentOpening(store: BatchStore, channelId: string) {
+  await store.update((state) => {
+    if (
+      state.state !== SESSION_STATES.OPENING ||
+      state.channelId !== channelId ||
+      Object.keys(state.pending).some((key) => key.includes(channelId))
+    )
+      return;
+    state.opening = null;
+    state.channelId = '';
+    state.voucher = null;
+  });
 }
 async function finishSeller(
   context: BatchSellerContext,

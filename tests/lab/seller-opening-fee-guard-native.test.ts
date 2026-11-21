@@ -10,6 +10,7 @@ import { SOLANA_TESTNET_CAIP2 } from '@x402/svm';
 
 import { batchSessionPathsIn, PROTOCOL_FEE } from '@gyblos/config';
 import {
+  inspectBatchSession,
   openBatchBuyerBackend,
   openBatchSellerBackend,
 } from '@gyblos/payments-upto/batch-session';
@@ -17,6 +18,7 @@ import { limitedFeePayer } from '@gyblos/payments-upto/fee-payer';
 import {
   PaymentSessionError,
   SESSION_CODES,
+  SESSION_STATES,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 
@@ -105,9 +107,10 @@ void test('a deposit the seller cannot simulate fails with the SDK error kept as
   }).create(terms);
   t.after(buyer.dispose);
   const payload = await buyer.open();
+  const sellerPaths = batchSessionPathsIn({ GYBLOS_HOME: root }, 'seller');
   const seller = await openBatchSellerBackend({
     ...base,
-    paths: batchSessionPathsIn({ GYBLOS_HOME: root }, 'seller'),
+    paths: sellerPaths,
     feePayer: vm.feePayer,
     authorizer: vm.authorizer,
     signer: {
@@ -131,4 +134,25 @@ void test('a deposit the seller cannot simulate fails with the SDK error kept as
     'invalid_batch_settlement_svm_settlement_simulation',
   );
   assert.equal(vm.sends(), before, 'nothing was sent');
+  // A deposit the seller never broadcast can never land: only the seller's fee payer completes it. The
+  // seller keeps no opening, so it never tries to close a channel that does not exist.
+  const stored = await inspectBatchSession(sellerPaths);
+  assert.equal(stored?.snapshot.channelId, '');
+  assert.equal(stored?.snapshot.state, SESSION_STATES.OPENING);
+  now = terms.expiresAt + 1;
+  assert.equal(await seller.tick(), undefined);
+  assert.equal(vm.sends(), before, 'no close was attempted');
+  now = terms.expiresAt - 60_000;
+  // The same buyer can then open the same channel once the seller can simulate again.
+  await seller.dispose();
+  const retry = await openBatchSellerBackend({
+    ...base,
+    paths: sellerPaths,
+    feePayer: vm.feePayer,
+    authorizer: vm.authorizer,
+    signer: vm.signer,
+  }).create(terms, payload);
+  t.after(() => retry.dispose());
+  await retry.open(payload);
+  assert.equal(await vm.balance(terms.buyer), 99000n, 'the deposit landed');
 });
