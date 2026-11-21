@@ -78,12 +78,23 @@ doctor. La salida se parece a esta:
 Seller identity (public; `docker compose exec seller gyblos seller register` enrolls it in discovery):
   nodeId  NODE_ID
   owner   OWNER_ADDRESS
-  fee payer  FEE_PAYER_ADDRESS  (pays priced offers' transactions; needs devnet SOL only to charge)
+  fee payer  FEE_PAYER_ADDRESS  (pays channel transactions once an offer has a price; send it about 0.05 devnet SOL first)
 ```
 
 Estos valores son públicos y puedes compartirlos. Tu vendedor empieza **sin publicar**: los compradores no lo
 encuentran hasta que lo registras y lo publicas. Qué hace cada llave está en
 [Identidad y copias de seguridad](/es/sellers/identity#llaves).
+
+Dos de estas direcciones necesitan SOL de devnet, que es dinero de prueba gratis de
+[faucet.solana.com](https://faucet.solana.com) (elige **devnet**):
+
+| Dirección   | Cuándo                               | Cuánto                                                                              |
+| ----------- | ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `owner`     | Antes de registrar, todo vendedor    | Unos 0,02 SOL; el registro cuesta unos 0,01 una sola vez                            |
+| `fee payer` | Antes de ponerle precio a una oferta | Unos 0,05 SOL; paga las cuentas de token de pago y las transacciones de los canales |
+
+Un vendedor gratuito solo necesita SOL en el owner. El instalador termina con el aviso del fee payer, y
+`gyblos doctor --online` señala si el saldo del fee payer es bajo ([Cobra](/es/sellers/get-paid#carga-el-pagador-de-comisiones)).
 
 ## 2. Registra y publica [#completa-el-alta]
 

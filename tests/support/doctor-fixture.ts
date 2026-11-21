@@ -49,6 +49,7 @@ export const REMOTE_FREE =
 const ALL_OK = {
   tokenizer: async () => undefined,
   paymentAccounts: async () => ({ missing: 0, unusable: 0 }),
+  feePayerLamports: async () => 10_000_000n,
   // Never the network: the role's RPC serves devnet.
   genesis: async () => DEVNET_GENESIS,
 } satisfies NonNullable<CliContext['doctor']>;
