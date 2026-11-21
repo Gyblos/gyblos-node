@@ -1,5 +1,7 @@
 // Stores buyer-authorized totals before acknowledging them; the autonomous worker owns final closure.
 // No engine calls, automatic topups or prompt retries. Financial reservations outlive request signals.
+import { getTransactionDecoder } from '@solana/kit';
+
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
 import { controlInteger } from '@gyblos/protocol/control-validation';
@@ -161,57 +163,57 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     state.channelId = opening.voucher!.channelId;
     state.voucher = opening.voucher!;
   });
-  if (
-    await waitBatch(
+  // waitBatch stops waiting but cannot cancel the SDK: a settlement still running may yet send the deposit.
+  // The opening is forgotten only when the chain never showed the channel, no settlement for the session
+  // is still running and this one, if started, has finished.
+  let observed = false;
+  let finished = true;
+  try {
+    observed = await waitBatch(
       options.observeOpening(
         structuredClone(opening),
         structuredClone(options.terms),
       ),
       options.operationMs,
-    )
-  ) {
-    const verdict = await waitBatch(
-      facilitator.verify(
-        {
-          x402Version: 2,
-          accepted: requirements,
-          payload: {
-            type: 'voucher',
-            channelConfig: opening.channelConfig,
-            voucher: opening.voucher,
-          },
-        },
-        requirements,
-      ),
-      options.operationMs,
     );
-    requireVerifiedPayer(verdict, options.terms.buyer);
-    await store.update((state) => {
-      state.state = SESSION_STATES.OPEN;
-      state.lastActivity = options.now();
-    });
-    return snapshot(store);
-  }
-  // waitBatch stops waiting but cannot cancel the SDK: a settlement still running may yet send the deposit.
-  // So the opening is forgotten only once this settlement has itself finished and none is still running.
-  let finished = false;
-  settling.set(store, (settling.get(store) ?? 0) + 1);
-  const settlement = facilitator
-    .settle(
-      { x402Version: 2, accepted: requirements, payload: opening },
-      requirements,
-    )
-    .finally(() => {
-      finished = true;
-      settling.set(store, (settling.get(store) ?? 1) - 1);
-    });
-  try {
-    const response = await waitBatch(settlement, options.operationMs);
-    requireSettlementResponse(response, requirements.network);
+    if (observed) {
+      const verdict = await waitBatch(
+        facilitator.verify(
+          {
+            x402Version: 2,
+            accepted: requirements,
+            payload: {
+              type: 'voucher',
+              channelConfig: opening.channelConfig,
+              voucher: opening.voucher,
+            },
+          },
+          requirements,
+        ),
+        options.operationMs,
+      );
+      requireVerifiedPayer(verdict, options.terms.buyer);
+    } else {
+      finished = false;
+      settling.set(store, (settling.get(store) ?? 0) + 1);
+      const settlement = facilitator
+        .settle(
+          { x402Version: 2, accepted: requirements, payload: opening },
+          requirements,
+        )
+        .finally(() => {
+          finished = true;
+          settling.set(store, (settling.get(store) ?? 1) - 1);
+        });
+      requireSettlementResponse(
+        await waitBatch(settlement, options.operationMs),
+        requirements.network,
+      );
+    }
   } catch (error) {
-    if (finished && !settling.get(store))
-      await forgetUnsentOpening(store, opening.voucher!.channelId).catch(() => {
-        /* The settlement failure stays the reported error. */
+    if (!observed && finished && !settling.get(store))
+      await forgetUnsentOpening(store, opening).catch(() => {
+        markReleaseFailure(error);
       });
     throw error;
   }
@@ -223,13 +225,53 @@ async function openSeller(context: BatchSellerContext, payload: string) {
 }
 // Deposit settlements still running for a session, including ones a timed-out wait left behind.
 const settling = new WeakMap<BatchStore, number>();
+// Set on an opening failure whose release could not be written, so the host can record it separately
+// while the opening failure stays the reported error.
+export const OPENING_RELEASE_FAILED = Symbol.for(
+  'gyblos.batch.openingReleaseFailed',
+);
+function markReleaseFailure(error: unknown) {
+  try {
+    if (error && typeof error === 'object' && Object.isExtensible(error))
+      Object.defineProperty(error, OPENING_RELEASE_FAILED, { value: true });
+  } catch {
+    /* The opening failure is still reported. */
+  }
+}
+const WIRE_KEY = /^batch:transaction:.+:wire$/;
+// The SDK stores a signed attempt as a `…:wire` transaction keyed by signature before it reserves the
+// channel key and sends. With no key naming the channel, an attempt of this deposit was never sent or
+// failed on chain (the SDK drops the channel key only then, or discards the wire itself), so its wire is
+// no evidence of funds; any other key keeps everything.
+function depositAttempts(
+  pending: Record<string, string>,
+  opening: ReturnType<typeof openingFor>,
+) {
+  const message = Buffer.from(
+    getTransactionDecoder().decode(
+      Buffer.from(opening.deposit.transaction, 'base64'),
+    ).messageBytes,
+  );
+  return Object.entries(pending).flatMap(([key, wire]) => {
+    if (!WIRE_KEY.test(key)) return [];
+    try {
+      const sent = getTransactionDecoder().decode(Buffer.from(wire, 'base64'));
+      return message.equals(Buffer.from(sent.messageBytes)) ? [key] : [];
+    } catch {
+      return [];
+    }
+  });
+}
 // Only this seller's fee payer completes the buyer's deposit, and the SDK records an attempt under the
-// channel before it signs or sends. With no such record, and no settlement still running, the deposit was
-// never sent and can never land: keeping the opening would leave a channel the seller later tries to close
-// forever. The buyer may open again; any recorded attempt keeps the opening for recovery. The match is
-// deliberately wide (any key naming the channel) because the SDK's key format is internal; an extra match
-// only keeps the opening.
-async function forgetUnsentOpening(store: BatchStore, channelId: string) {
+// channel before it signs or sends. With no such record the deposit was never sent or failed on chain,
+// and can never land: keeping the opening would leave a channel the seller later tries to close forever
+// and block the buyer's next channel. The match on the channel is deliberately wide because the SDK's
+// key format is internal; an extra match only keeps the opening.
+async function forgetUnsentOpening(
+  store: BatchStore,
+  opening: ReturnType<typeof openingFor>,
+) {
+  const channelId = opening.voucher!.channelId;
   await store.update((state) => {
     if (
       state.state !== SESSION_STATES.OPENING ||
@@ -237,6 +279,8 @@ async function forgetUnsentOpening(store: BatchStore, channelId: string) {
       Object.keys(state.pending).some((key) => key.includes(channelId))
     )
       return;
+    for (const key of depositAttempts(state.pending, opening))
+      delete state.pending[key];
     state.opening = null;
     state.channelId = '';
     state.voucher = null;

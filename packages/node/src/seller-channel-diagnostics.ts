@@ -5,6 +5,7 @@
 import {
   BATCH_SDK_DIAGNOSTIC_CODES,
   batchSdkDiagnosticCode,
+  OPENING_RELEASE_FAILED,
 } from '@gyblos/payments-upto/batch-session';
 import {
   BatchChannelError,
@@ -34,6 +35,7 @@ const CODES = [
   ...Object.values(PAID_EXECUTION_CODES),
   ...BATCH_SDK_DIAGNOSTIC_CODES,
   CHANNEL.unknownCode,
+  CHANNEL.releaseFailedCode,
 ];
 // Refusals a buyer can cause on purpose stay below the failures that need the operator.
 const EXPECTED: readonly string[] = [
@@ -90,6 +92,18 @@ export function sellerChannelDiagnostics(sink: DiagnosticSink | undefined) {
             : DIAGNOSTIC_LEVELS.ERROR,
           cause: diagnosticCause(error),
         });
+        // The opening's release was not written: a second record says why the channel stays blocked.
+        if (
+          error &&
+          typeof error === 'object' &&
+          Object.getOwnPropertyDescriptor(error, OPENING_RELEASE_FAILED)
+            ?.value === true
+        )
+          byOperation.get(operation)!.start().report({
+            phase: CHANNEL.phase,
+            code: CHANNEL.releaseFailedCode,
+            level: DIAGNOSTIC_LEVELS.ERROR,
+          });
       } catch {
         /* Logging never changes the operation's outcome. */
       }

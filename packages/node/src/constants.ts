@@ -482,4 +482,6 @@ export const SELLER_CHANNEL_DIAGNOSTICS = {
   phase: 'exchange',
   // No catalog code was found: the cause stays unknown rather than guessed.
   unknownCode: 'SELLER_CHANNEL_FAILED',
+  // A failed opening could not release its never-funded channel, so the buyer stays blocked.
+  releaseFailedCode: 'SELLER_OPENING_RELEASE_FAILED',
 } as const;
