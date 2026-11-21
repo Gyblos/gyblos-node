@@ -1,8 +1,9 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { CaretRight, Wallet, Warning } from '@phosphor-icons/react';
-import { useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
+import { CaretRight, Check, Copy, Wallet, Warning } from '@phosphor-icons/react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AddBuyerFunds } from './BuyerFunding';
+import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
 import { Modal } from './Modal';
 import type { View } from './model-types';
@@ -110,6 +111,109 @@ export function FilterChips<T extends string>({ label, options, value, onChange 
           <span className="pk-count">{option.count}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+/** The one code sample: language label, colored tokens and a copy action. `onCopy` returning false keeps "Copy". */
+export function CodeBlock({ code, language, title, onCopy, copyDisabled = false }: {
+  code: string;
+  language: CodeLanguage;
+  title?: string;
+  onCopy?: () => Promise<unknown> | unknown;
+  copyDisabled?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const tokens = useMemo(() => highlightCode(code, language), [code, language]);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  useEffect(() => setCopied(false), [code]);
+  return (
+    <figure className="pk-code">
+      <figcaption>
+        <span className="pk-code-language">{codeLanguageLabel(language)}</span>
+        {title && <span className="pk-code-title">{title}</span>}
+        <button
+          type="button"
+          className="pk-code-copy"
+          disabled={copyDisabled}
+          aria-label={copied ? 'Copied' : 'Copy ' + (title ?? 'code')}
+          onClick={() => {
+            void Promise.resolve(onCopy ? onCopy() : navigator.clipboard.writeText(code))
+              .then((result) => setCopied(result !== false))
+              .catch(() => setCopied(false));
+          }}
+        >
+          {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+          <span aria-hidden="true">{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </figcaption>
+      <pre tabIndex={0}>
+        <code>
+          {tokens.map((token, index) =>
+            token.kind ? <span key={index} data-token={token.kind}>{token.text}</span> : token.text,
+          )}
+        </code>
+      </pre>
+    </figure>
+  );
+}
+const FENCE_LANGUAGE: Record<string, CodeLanguage> = {
+  sh: CODE_LANGUAGE.SHELL, bash: CODE_LANGUAGE.SHELL, zsh: CODE_LANGUAGE.SHELL, shell: CODE_LANGUAGE.SHELL, console: CODE_LANGUAGE.SHELL,
+  json: CODE_LANGUAGE.JSON, toml: CODE_LANGUAGE.TOML,
+  ts: CODE_LANGUAGE.TS, tsx: CODE_LANGUAGE.TS, typescript: CODE_LANGUAGE.TS, js: CODE_LANGUAGE.TS, javascript: CODE_LANGUAGE.TS,
+};
+/** Language of a Markdown fence such as "```json"; unlabeled fences stay plain text. */
+export function fenceLanguage(fence: string): CodeLanguage {
+  return FENCE_LANGUAGE[/^```\s*([\w-]*)/.exec(fence)?.[1]?.toLowerCase() ?? ''] ?? CODE_LANGUAGE.TEXT;
+}
+/** Coding-tool configuration format: Codex uses TOML, Claude Code shell variables, the others JSON. */
+export function agentCodeLanguage(tool: string): CodeLanguage {
+  if (tool === 'codex') return CODE_LANGUAGE.TOML;
+  if (tool === 'claude') return CODE_LANGUAGE.SHELL;
+  return CODE_LANGUAGE.JSON;
+}
+
+export type DetailItem = { label: string; value: ReactNode; note?: string };
+/** The one detail-dialog summary: status line, headline numbers, then a key/value list. */
+export function DetailSummary({ status, meta, totals, rows = [] }: {
+  status?: { label: string; tone: Tone };
+  meta?: string;
+  totals: DetailItem[];
+  rows?: DetailItem[];
+}) {
+  return (
+    <div className="pk-detail">
+      {(status || meta) && (
+        <div className="preview-detail-head">
+          {status && <Tag tone={status.tone} dot>{status.label}</Tag>}
+          {meta && <span className="ui-help-text">{meta}</span>}
+        </div>
+      )}
+      <dl className="preview-detail-totals">
+        {totals.map((item) => (
+          <div key={item.label}>
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {rows.length > 0 && (
+        <dl className="preview-detail-list">
+          {rows.map((item) => (
+            <div key={item.label}>
+              <dt>{item.label}</dt>
+              <dd>
+                <span>{item.value}</span>
+                {item.note && <small>{item.note}</small>}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </div>
   );
 }

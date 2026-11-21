@@ -832,6 +832,10 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
 .desktop-frame .modal[data-size] > * {
   flex-shrink: 0;
   margin-block: 0;
+  min-width: 0;
+}
+.desktop-frame .modal[data-size] {
+  overflow-x: hidden;
 }
 .desktop-frame .modal[data-size] > header {
   align-items: flex-start;
@@ -1157,10 +1161,8 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
   color: var(--muted);
   font-size: 13px;
 }
-.desktop-frame .preview-steps .ui-code-block {
+.desktop-frame .preview-steps .pk-code pre {
   max-height: 220px;
-  margin: 0;
-  overflow: auto;
 }
 .desktop-frame .preview-guide-key {
   display: flex;
@@ -1464,26 +1466,35 @@ html .app.desktop-frame .content .ui-table-region td .ui-inline-actions {
 }
 
 /* Detail dialogs: status line, three headline numbers, then a plain key/value list. */
+.desktop-frame .pk-detail {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
 .desktop-frame .preview-detail-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
 }
 .desktop-frame .preview-detail-totals {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   margin: 0;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
 }
+/* Hairlines on every cell's right and bottom; the clipped container hides the outer ones when rows wrap. */
 .desktop-frame .preview-detail-totals > div {
   display: grid;
+  align-content: start;
   gap: 4px;
+  margin: 0 -1px -1px 0;
   padding: 12px 14px;
   min-width: 0;
-}
-.desktop-frame .preview-detail-totals > div + div {
-  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .desktop-frame .preview-detail-totals dt,
 .desktop-frame .preview-detail-list dt {
@@ -1513,15 +1524,25 @@ html .app.desktop-frame .content .ui-table-region td .ui-inline-actions {
 .desktop-frame .preview-detail-list > div:last-child {
   border-bottom: 0;
 }
+.desktop-frame .preview-detail-list dt {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .desktop-frame .preview-detail-list dd {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
   margin: 0;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 .desktop-frame .preview-detail-list dd small {
-  margin-left: 8px;
   color: var(--muted);
   font-size: 12px;
+  white-space: nowrap;
 }
 .desktop-frame .preview-detail-links {
   display: grid;
@@ -2369,6 +2390,8 @@ html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
 .desktop-frame .pk-tag {
   display: inline-flex;
   align-items: center;
+  width: fit-content;
+  max-width: 100%;
   gap: 6px;
   height: 22px;
   padding: 0 8px;
@@ -3080,4 +3103,108 @@ html .app.desktop-frame .composer-bottom .ui-composer-action {
     .ui-table-cell-label {
     display: none;
   }
+}
+
+/* The one code sample: language, file name and copy on top; tokens colored from theme tones. */
+.desktop-frame .pk-code {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--raised);
+}
+.desktop-frame .pk-code figcaption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-frame .pk-code-language {
+  font:
+    500 11px/1 GeistMono,
+    monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.desktop-frame .pk-code-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-frame .pk-code-title::before {
+  content: '·';
+  margin-right: 8px;
+}
+html .app.desktop-frame .pk-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+html .app.desktop-frame .pk-code-copy:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+html .app.desktop-frame .pk-code-copy:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+html .app.desktop-frame .pk-code-copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+html .app.desktop-frame .pk-code pre {
+  margin: 0;
+  padding: 12px 14px;
+  max-height: 320px;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  white-space: pre;
+  font:
+    12px/1.7 GeistMono,
+    monospace;
+}
+html .app.desktop-frame .pk-code pre:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.desktop-frame .pk-code [data-token='comment'] {
+  color: var(--muted);
+  font-style: italic;
+}
+.desktop-frame .pk-code [data-token='string'] {
+  color: var(--pk-success);
+}
+.desktop-frame .pk-code :is([data-token='key'], [data-token='variable']) {
+  color: var(--pk-info);
+}
+.desktop-frame .pk-code :is([data-token='number'], [data-token='literal']) {
+  color: var(--pk-warning);
+}
+.desktop-frame
+  .pk-code
+  :is([data-token='keyword'], [data-token='command'], [data-token='section']) {
+  color: color-mix(in srgb, var(--pk-danger) 70%, var(--ink));
+  font-weight: 500;
+}
+.desktop-frame .pk-code [data-token='flag'] {
+  color: color-mix(in srgb, var(--pk-info) 60%, var(--muted));
 }

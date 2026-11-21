@@ -6,27 +6,13 @@ import { fileURLToPath } from 'node:url';
 
 import type { InlineConfig, Plugin } from 'vite';
 
+import { transformCodeSamples } from './brand-code';
+import { replaceEach, replaceOnce } from './brand-replace';
 import brand from './brand.json' with { type: 'json' };
 import * as funds from './funds-build';
 
 export { brand };
 const moduleId = (value: string) => value.replaceAll('\\', '/');
-function replaceOnce(source: string, before: string, after: string) {
-  if (
-    !source.includes(before) ||
-    source.indexOf(before) !== source.lastIndexOf(before)
-  )
-    throw new Error(
-      'Desktop brand review hook changed; update the preview explicitly.',
-    );
-  return source.replace(before, after);
-}
-// Applies each replacement in order, each exactly once (replaceOnce).
-const replaceEach = (source: string, pairs: readonly [string, string][]) =>
-  pairs.reduce(
-    (text, [before, after]) => replaceOnce(text, before, after),
-    source,
-  );
 export function transformBrand(source: string, id: string, desktop: string) {
   source = source.replaceAll('\r\n', '\n');
   const target = moduleId(id);
@@ -266,19 +252,26 @@ export function transformBrand(source: string, id: string, desktop: string) {
       "data-platform={platform}\n      data-fullscreen={new URLSearchParams(location.search).get('fullscreen') === '1' || undefined}",
     );
   if (target === `${base}/src/ui/BuyerAgentSetup.tsx`)
-    return replaceEach(source, [
-      [
-        '<Button disabled={disabled} onClick',
-        '<Button variant={BUTTON_VARIANT.PRIMARY} disabled={disabled} onClick',
-      ],
-      ['Connect agent', 'Connect a tool'],
-      ['Connect an agent', 'Connect a tool'],
-      ['label="Agent"', 'label="Tool"'],
-      [
-        'Uses the models served by your local buyer.',
-        'Supports OpenAI Chat Completions, Responses and Anthropic Messages through your local buyer.',
-      ],
-    ]);
+    return (
+      "import { agentCodeLanguage, CodeBlock } from './PreviewKit';\n" +
+      replaceEach(source, [
+        [
+          '      <pre className="ui-code-block" aria-label="Generated agent configuration">\n        {preview.text}\n      </pre>',
+          '      <CodeBlock language={agentCodeLanguage(preview.tool)} title="Generated agent configuration" code={preview.text} />',
+        ],
+        [
+          '<Button disabled={disabled} onClick',
+          '<Button variant={BUTTON_VARIANT.PRIMARY} disabled={disabled} onClick',
+        ],
+        ['Connect agent', 'Connect a tool'],
+        ['Connect an agent', 'Connect a tool'],
+        ['label="Agent"', 'label="Tool"'],
+        [
+          'Uses the models served by your local buyer.',
+          'Supports OpenAI Chat Completions, Responses and Anthropic Messages through your local buyer.',
+        ],
+      ])
+    );
   if (target === `${base}/src/x402-model.ts`)
     return replaceEach(source, [
       ["'USDC · devnet'", "'USDC'"],
@@ -292,6 +285,8 @@ export function transformBrand(source: string, id: string, desktop: string) {
         "String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')\n  ).replace(/0+$/, '').replace(/\\.$/, '');",
       ],
     ]);
+  const codeSample = transformCodeSamples(source, target, base);
+  if (codeSample !== undefined) return codeSample;
   if (target === `${base}/src/ui/Dropdown.tsx`)
     return replaceEach(source, [...funds.MENU_REWRITES]);
   if (target === `${base}/src/ui/BuyerFunding.tsx`)
@@ -363,6 +358,12 @@ export function reviewBrand(desktop: string): Plugin {
         moduleId(importer).startsWith(`${moduleId(desktop)}/src/ui/`)
       )
         return `${desktop}/src/ui/PreviewKit.tsx`;
+      if (
+        source === './code-highlight' &&
+        importer !== undefined &&
+        moduleId(importer) === `${moduleId(desktop)}/src/ui/PreviewKit.tsx`
+      )
+        return fileURLToPath(new URL('./code-highlight.ts', import.meta.url));
       if (
         source === './status-tone' &&
         importer !== undefined &&

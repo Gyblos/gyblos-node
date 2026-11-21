@@ -27,7 +27,7 @@ import { ScrollTable } from './ScrollTable';
 import { ServiceLogo } from './ServiceLogo';
 import { Badge, Button, IconButton } from './UI';
 import { AmountEditor } from './Payments';
-import { Tag, TONE } from './PreviewKit';
+import { agentCodeLanguage, CodeBlock, DetailSummary, Tag, TONE } from './PreviewKit';
 import { RevokeConfirmation } from './UsdcApiKeyDetails';
 import { useUsdcApiKeys } from './useUsdcApiKeys';
 import { WorkspaceLayout } from './WorkspaceLayout';
@@ -140,6 +140,12 @@ const toolNames = {
   [AGENT_TOOLS.CLAUDE_CODE]: 'Claude Code',
   [AGENT_TOOLS.PI]: 'Pi',
   other: 'Other tools',
+};
+const toolFiles = {
+  [AGENT_TOOLS.OPENCODE]: 'opencode.json',
+  [AGENT_TOOLS.CODEX]: 'config.toml',
+  [AGENT_TOOLS.CLAUDE_CODE]: 'Terminal environment',
+  [AGENT_TOOLS.PI]: 'models.json',
 };
 type ToolChoice = AgentTool | 'other';
 const TOOL_CHOICES = [
@@ -398,25 +404,25 @@ export function UsdcApiKeys({
                     ) : (
                       guideKey && (
                         <>
-                          <pre className="ui-code-block">{state.setup?.text}</pre>
-                          <FormActions align="start">
-                            <Button
-                              disabled={locked || !state.setup}
-                              onClick={() =>
-                                void run({
+                          {state.setup && (
+                            <CodeBlock
+                              language={agentCodeLanguage(tool)}
+                              title={toolFiles[tool]}
+                              code={state.setup.text}
+                              copyDisabled={locked}
+                              onCopy={() =>
+                                run({
                                   action: USDC_API_ACTION.COPY_AGENT,
                                   id: guideKey.id,
                                   tool,
                                 }).then((result) => {
-                                  if (result?.setup?.tool === tool && !result.error)
-                                    markConfigured(tool);
+                                  const ok = result?.setup?.tool === tool && !result.error;
+                                  if (ok) markConfigured(tool);
+                                  return ok;
                                 })
                               }
-                            >
-                              <Copy size={16} />
-                              Copy configuration
-                            </Button>
-                          </FormActions>
+                            />
+                          )}
                         </>
                       )
                     )}
@@ -500,33 +506,21 @@ export function UsdcApiKeys({
             )}
             {key && view === 'detail' && (
               <Modal title={key.name} close={close}>
-                <div className="preview-detail-head">
-                  <Tag tone={key.revoked ? TONE.NEUTRAL : TONE.SUCCESS} dot>{key.revoked ? 'Revoked' : 'Active'}</Tag>
-                  <span className="ui-help-text">API key · USDC</span>
-                </div>
-                <dl className="preview-detail-totals">
-                  <div>
-                    <dt>Used</dt>
-                    <dd>{amount(key.spentAtomic, snapshot.scope)}</dd>
-                  </div>
-                  <div>
-                    <dt>Limit</dt>
-                    <dd>{amount(key.limitAtomic, snapshot.scope)}</dd>
-                  </div>
-                  <div>
-                    <dt>Available</dt>
-                    <dd>
-                      {amount(
-                        String(
-                          BigInt(key.limitAtomic) -
-                            BigInt(key.spentAtomic) -
-                            BigInt(key.reservedAtomic),
-                        ),
+                <DetailSummary
+                  status={{ label: key.revoked ? 'Revoked' : 'Active', tone: key.revoked ? TONE.NEUTRAL : TONE.SUCCESS }}
+                  meta="API key · USDC"
+                  totals={[
+                    { label: 'Used', value: amount(key.spentAtomic, snapshot.scope) },
+                    { label: 'Limit', value: amount(key.limitAtomic, snapshot.scope) },
+                    {
+                      label: 'Available',
+                      value: amount(
+                        String(BigInt(key.limitAtomic) - BigInt(key.spentAtomic) - BigInt(key.reservedAtomic)),
                         snapshot.scope,
-                      )}
-                    </dd>
-                  </div>
-                </dl>
+                      ),
+                    },
+                  ]}
+                />
                 {BigInt(key.limitAtomic) > 0n && (
                   <progress
                     className="preview-detail-progress"
