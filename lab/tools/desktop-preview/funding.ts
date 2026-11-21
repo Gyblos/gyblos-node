@@ -6,6 +6,8 @@ declare global {
   }
 }
 
+const READY_ATOMIC = 2_000_000;
+
 export function previewFunding(query: URLSearchParams, payer: string) {
   return {
     balance: async () =>
@@ -16,7 +18,7 @@ export function previewFunding(query: URLSearchParams, payer: string) {
             payer,
             balanceAtomic: String(
               window.previewFunds?.atomic ??
-                (query.get('funding') === 'ready' ? 2_000_000 : 0),
+                (query.get('funding') === 'ready' ? READY_ATOMIC : 0),
             ),
             faucetAvailable: true,
             channelRemainingAtomic: null,
