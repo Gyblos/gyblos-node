@@ -23,6 +23,7 @@ export {
 export {
   fetchModels,
   fetchSellers,
+  supersedes,
   type DiscoveredSeller,
   type FetchSellersInput,
   type FetchSellersResult,

@@ -6,6 +6,7 @@ import {
   DOCTOR_CHECKS,
   DOCTOR_CODES,
   DOCTOR_STATUS,
+  FEE_PAYER_FUNDING,
 } from '@gyblos/node/constants';
 import { sellerDoctor, type DoctorProbes } from '@gyblos/node/seller-doctor';
 
@@ -70,7 +71,7 @@ export async function doctor(
     stdout(`  owner   ${report.seller.owner}\n`);
     if (report.seller.feePayer)
       stdout(
-        `  fee payer  ${report.seller.feePayer}  (pays priced offers' transactions; needs devnet SOL only to charge)\n`,
+        `  fee payer  ${report.seller.feePayer}  (pays channel transactions once an offer has a price; send it about ${FEE_PAYER_FUNDING.suggestedSol} devnet SOL first)\n`,
       );
   }
   if (report.offers) {

@@ -12,7 +12,8 @@ import { FAKE_SECRET } from './support/node-config-fixtures';
 
 // A synthetic owner in doctor's output format; only public identity is printed by doctor.
 const OWNER = '11111111111111111111111111111112';
-const DOCTOR = `Seller doctor (read-only)\n  OK    config\nSeller identity (public; \`gyblos seller register\` enrolls it in discovery):\n  nodeId  ${'a'.repeat(64)}\n  owner   ${OWNER}\nResult: READY`;
+const FEE_PAYER = '11111111111111111111111111111113';
+const DOCTOR = `Seller doctor (read-only)\n  OK    config\nSeller identity (public; \`gyblos seller register\` enrolls it in discovery):\n  nodeId  ${'a'.repeat(64)}\n  owner   ${OWNER}\n  fee payer  ${FEE_PAYER}  (pays channel transactions once an offer has a price; send it about 0.05 devnet SOL first)\nResult: READY`;
 const VALIDATE =
   'compose run --rm seller gyblos config validate --config /config/config.toml';
 const RECREATE = 'compose up -d --force-recreate seller';
@@ -36,6 +37,20 @@ void test('after installing it prints the steps to start selling, with the owner
       ),
     );
     assert.match(steps, /https:\/\/faucet\.solana\.com, choose devnet/);
+    // A seller starting from zero learns both SOL needs at install, even with only free offers.
+    assert.match(
+      result.stdout,
+      new RegExp(
+        `To charge for your model later, first send about 0\\.05 devnet SOL to the fee payer ${FEE_PAYER}`,
+      ),
+    );
+    assert.match(result.stdout, /A free seller never needs it\./);
+    assert.ok(
+      result.stdout.includes(
+        `cd '${install.directory}' && docker compose run --rm seller gyblos doctor --online`,
+      ),
+      'the suggested doctor command must work even if the seller container stopped',
+    );
     assert.match(
       steps,
       /2\. Register with the gyb_ invite code from your invitation/,
@@ -59,13 +74,14 @@ void test('after installing it prints the steps to start selling, with the owner
         .replace(/^publish = false$/m, 'publish=true # listed')
         .replaceAll('\n', '\r\n'),
     );
-    const rerun = install.run();
+    const rerun = install.run({ FAKE_DOCTOR_OUTPUT: DOCTOR });
     assert.equal(rerun.status, 0, rerun.output);
     assert.doesNotMatch(rerun.stdout, /Next steps/);
     assert.match(
       rerun.stdout,
       /Publishing is on\. Check that the index lists it:/,
     );
+    assert.match(rerun.stdout, new RegExp(`fee payer ${FEE_PAYER}`));
   } finally {
     await install.cleanup();
   }

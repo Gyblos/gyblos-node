@@ -556,9 +556,15 @@ runs, read-only, the checks startup would fail on, and prints one line per check
 | `payments`  | Only with a paid offer: the payout and payment keys, as startup checks them. With `--online`, also that the role's RPC serves devnet and the token accounts: warns `PAYMENT_ACCOUNTS_MISSING` (startup creates them) or `PAYMENT_ACCOUNTS_UNCHECKED` (no answer), fails `PAYMENT_ACCOUNTS_UNUSABLE` (frozen or not a token account)                                |
 | `clock`     | Only with `--online` and publication on: this clock against the discovery index's HTTP `Date` header. `CLOCK_SKEWED` warns when it is over 2 s off; buyers and the index refuse records issued over 5 s ahead, so turn on automatic time sync (NTP). `CLOCK_UNCHECKED` when the index gives no time or answers in over 1 s                                         |
 
-It then prints the seller's public **NodeId and owner** address from
-`role.json`, and the effective [seller limits](#seller-limits). The exit code is
-0 when no check fails (warnings do not fail) and 1 otherwise.
+For paid offers, `doctor --online` warns with `FEE_PAYER_UNFUNDED` below 0.01
+devnet SOL if the token accounts are ready or missing. That code fails the check
+only when the balance is zero and startup must create token accounts. This
+warning threshold is not a cost estimate. If the balance read fails, the
+token-account verdict is unchanged.
+
+It then prints the seller's public **NodeId, owner and fee payer** addresses
+from `role.json`, and the effective [seller limits](#seller-limits). The exit
+code is 0 when no check fails (warnings do not fail) and 1 otherwise.
 
 `doctor` starts, spawns, sends and writes nothing. It never prints the home
 location, the RPC URL, the relay token, an API key or key material. It reaches

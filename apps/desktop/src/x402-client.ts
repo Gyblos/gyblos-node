@@ -18,6 +18,7 @@ import { requestAgentEndpoint } from './agent-endpoint';
 import { desktopBuyerFailure } from './buyer-error';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
+import { readJson, waitForPaidBuyer } from './x402-http';
 import {
   DESKTOP_X402,
   PaidSellerLimitError,
@@ -33,6 +34,17 @@ import { readBuyerStream } from './x402-stream';
 
 export type DesktopSellerChoice =
   BuyerSellerChoice | typeof OFFER_PRICING_KINDS.FREE;
+function policyForSeller(
+  policy: BuyerApiPolicy,
+  choice?: BuyerSellerChoice,
+): BuyerApiPolicy {
+  if (!choice) return policy;
+  return {
+    ...policy,
+    model: choice.modelId,
+    maxTokens: Math.min(choice.contextTokens, policy.maxTokens),
+  };
+}
 export function buyerEndpoint(input: unknown) {
   if (typeof input !== 'string') throw new Error('Enter a local buyer URL');
   const url = new URL(input);
@@ -51,33 +63,12 @@ export function buyerEndpoint(input: unknown) {
     );
   return url;
 }
-async function readJson(response: Response, allowError = false) {
-  if ((!response.ok && !allowError) || !response.body)
-    throw new Error('Buyer did not complete the request');
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const next = await reader.read();
-      if (next.done) break;
-      size += next.value.byteLength;
-      if (size > DESKTOP_X402.MAX_RESPONSE)
-        throw new Error('Buyer response is too large');
-      chunks.push(next.value);
-    }
-  } finally {
-    await reader.cancel().catch(() => {});
-  }
-  const text = Buffer.concat(chunks).toString('utf8');
-  const value: unknown = JSON.parse(text);
-  return value;
-}
 export { parseBuyerReply } from './x402-reply';
 export class X402Client {
   private connection: {
     url: URL;
     token: string;
+    preparesPaidChat: boolean;
     policy: BuyerApiPolicy;
   } | null = null;
   private busy = false;
@@ -140,7 +131,14 @@ export class X402Client {
         signal: AbortSignal.timeout(DESKTOP_X402.STATUS_MS),
       });
       const policy = x402Policy(await readJson(response));
-      this.connection = { url, token, policy };
+      this.connection = {
+        url,
+        token,
+        policy,
+        preparesPaidChat:
+          response.headers.get(BUYER_API.PAID_PREPARATION_HEADER) ===
+          BUYER_API.PAID_PREPARATION_PATH,
+      };
       return policy;
     } finally {
       this.busy = false;
@@ -283,17 +281,17 @@ export class X402Client {
       );
       if (notice) throw new PaidSellerLimitError(notice);
     }
+    await waitForPaidBuyer(
+      connection,
+      this.request,
+      external,
+      choice?.expiresAt,
+    );
     const reserved = await this.budget.reserve(
       id,
       choice ? connection.policy : undefined,
     );
-    const policy = choice
-      ? {
-          ...reserved,
-          model: choice.modelId,
-          maxTokens: Math.min(choice.contextTokens, reserved.maxTokens),
-        }
-      : reserved;
+    const policy = policyForSeller(reserved, choice);
     let sent = false;
     try {
       external.throwIfAborted();

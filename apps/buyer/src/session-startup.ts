@@ -1,6 +1,5 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
 import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
-import { bounded } from '@gyblos/node/buyer-operation';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
@@ -54,7 +53,7 @@ async function executePaidSession(
   permission?: BuyerApiKeyOperation,
 ): Promise<ChatResult> {
   current.throwIfAborted();
-  await bounded(manager.preflight(winner.quote, input), current);
+  await manager.preflight(winner.quote, input, current);
   current.throwIfAborted();
   await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
@@ -199,6 +198,8 @@ function sessionExecutor(
   return async (input, signal, onDelta, model, permission) => {
     const config = context.prepared.config;
     const request = routedRequest(config.request, model);
+    if (model?.sellerChoice && !permission && request.maxAtomic !== '0')
+      await manager.prepareChoice(model.sellerChoice.expiresAt, signal);
     const ports: BuyerRoutePorts<ChatResult> = {
       select: sessionSelection(
         context,
@@ -286,6 +287,10 @@ export async function startSessionQuoteRuntime(
   };
   return {
     sellerChoice: true,
+    preparePaidChat:
+      options.preparePaidTokenizer && prepared.config.request.maxAtomic !== '0'
+        ? manager.preparePaidChat
+        : undefined,
     token,
     requestMs: PAID_BUYER_HTTP_MS,
     classify: classifyPaidError,

@@ -78,11 +78,22 @@ The output is similar to the following:
 Seller identity (public; `docker compose exec seller gyblos seller register` enrolls it in discovery):
   nodeId  NODE_ID
   owner   OWNER_ADDRESS
-  fee payer  FEE_PAYER_ADDRESS  (pays priced offers' transactions; needs devnet SOL only to charge)
+  fee payer  FEE_PAYER_ADDRESS  (pays channel transactions once an offer has a price; send it about 0.05 devnet SOL first)
 ```
 
 These values are public and safe to share. Your seller starts **unlisted**: buyers cannot find it until you
 register and publish it. What each key does is in [Identity and backups](/en/sellers/identity#keys).
+
+Two of these addresses need devnet SOL, which is free test money from
+[faucet.solana.com](https://faucet.solana.com) (choose **devnet**):
+
+| Address     | When                               | How much                                                                    |
+| ----------- | ---------------------------------- | --------------------------------------------------------------------------- |
+| `owner`     | Before registering, every seller   | About 0.02 SOL; registration costs about 0.01 once                          |
+| `fee payer` | Before you set a price on an offer | About 0.05 SOL; it pays the payment token accounts and channel transactions |
+
+A free seller funds only the owner. The installer ends with the fee payer note, and `gyblos doctor --online`
+flags a low fee payer balance ([Get paid](/en/sellers/get-paid#fund-the-fee-payer)).
 
 ## 2. Register and publish [#finish-onboarding]
 

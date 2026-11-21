@@ -50,6 +50,7 @@
   --color-money: var(--money);
   --color-good: var(--good);
   --color-bad: var(--bad);
+  --color-chart: var(--chart);
   --font-sans: var(--font-instrument), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }

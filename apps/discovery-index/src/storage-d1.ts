@@ -52,7 +52,6 @@ function nodeState(row: D1Row): NodeState {
 function sellerRow(row: D1Row): SellerRow {
   return {
     nodeId: text(row.nodeId),
-    issuedAt: integer(row.issuedAt),
     catalogJson: text(row.catalogJson),
     presenceJson: text(row.presenceJson),
   };

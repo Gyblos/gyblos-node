@@ -62,6 +62,7 @@ function appFor(bindings: unknown) {
     stats: isDatabase(database) ? statsReader(database) : undefined,
     limiters,
     development: false,
+    probe: (request) => rpcProbe(request, bindings),
   });
 }
 
@@ -236,9 +237,6 @@ const edgeCache = () =>
 let worker: ReturnType<typeof createWorker> | undefined;
 export default {
   async fetch(request: Request, bindings: unknown, context: ExecutionContext) {
-    // The operator's probe is answered before the cache and the public app (rpc-probe.ts).
-    const probe = await rpcProbe(request, bindings);
-    if (probe) return probe;
     worker ??= createWorker();
     const app = worker;
     return cachedFetch(request, edgeCache(), context, (incoming) =>

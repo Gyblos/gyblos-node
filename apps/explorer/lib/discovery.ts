@@ -4,10 +4,10 @@
 // DISCOVERY.maxRequestsPerRun requests within DISCOVERY.runDeadlineMs, into KV that every render reads
 // (discovery-snapshot.ts), so the index's load does not grow with viewers.
 // A catalog is one whole read of /models, /network and every model's seller pages. Each model's pages
-// are read within one run: the index orders them by each seller's latest presence, so a cursor does not
-// outlive a run, and a seller that publishes a new presence while its model's later pages are read can be
-// missed by that read; a catalog with more models than fit in a run is carried on by the next runs, and it
-// replaces the shown catalog only once whole, so the page never shows part of the index as all of it.
+// are read within one run, so its sellers come from one short span (the index pages by NodeId, so a seller
+// that stays listed is never skipped); a catalog with more models than fit in a run is carried on by the
+// next runs, and it replaces the shown catalog only once whole, so the page never shows part of the index
+// as all of it.
 // Uptimes change slowly and are read in turns, with a share of each run kept for them.
 
 import { DISCOVERY_URL } from './config';
