@@ -90,5 +90,5 @@ export function count(value: number): string {
 }
 
 export function settlementCount(value: number): string {
-  return `${count(value)} settlements`;
+  return `${count(value)} settlement${value === 1 ? '' : 's'}`;
 }
