@@ -172,7 +172,7 @@ export function ModelDropdown({
               const shown = open || closing === name;
               const top = best(offers) ?? first;
               return (
-                <div key={name} className="preview-model-group" data-open={open}>
+                <div key={name} className="preview-model-group" data-open={open} data-current={current || undefined}>
                   <MenuItem
                     aria-expanded={needle ? undefined : open}
                     label={name}

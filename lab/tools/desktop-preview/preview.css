@@ -2282,6 +2282,19 @@ html .app.desktop-frame .preview-model-menu [aria-checked='true'] {
   box-shadow: inset 2px 0 0 var(--accent);
   color: var(--ink);
 }
-html .app.desktop-frame .preview-model-menu [aria-checked='true'] svg:last-child {
+html
+  .app.desktop-frame
+  .preview-model-menu
+  [aria-checked='true']
+  svg:last-child {
   color: var(--pk-info);
+}
+html
+  .app.desktop-frame
+  .preview-model-menu
+  .preview-model-group[data-current]
+  > :first-child {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+  border-radius: 8px;
 }
