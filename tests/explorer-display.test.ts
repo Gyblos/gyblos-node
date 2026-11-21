@@ -2,7 +2,8 @@
 // collector's inclusive UTC days; a model's mark comes from its id's family name, never a guess; the
 // daily series keep every day of the range, empty ones as zero; the index's network status is read
 // with its exact states and the sellers not online keep the index's order; the average uptime says over
-// how many sellers it is taken; a source read gives up after the fetch timeout.
+// how many sellers it is taken; a settlement count is singular only for exactly one; a source read gives
+// up after the fetch timeout.
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
@@ -12,7 +13,12 @@ import { hoveredPoint } from '@gyblos/explorer/board-hovered';
 import { dailySettled } from '@gyblos/explorer/chain-shape';
 import { FETCH } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
-import { percent, tokensPerSecond, usdcDecimal } from '@gyblos/explorer/format';
+import {
+  percent,
+  settlementCount,
+  tokensPerSecond,
+  usdcDecimal,
+} from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { summarizeOffers } from '@gyblos/explorer/offers';
@@ -24,6 +30,13 @@ const realTimeout = AbortSignal.timeout.bind(AbortSignal);
 afterEach(() => {
   globalThis.fetch = realFetch;
   AbortSignal.timeout = realTimeout;
+});
+
+void test('settlement counts use singular only for one settlement', () => {
+  assert.equal(settlementCount(0), '0 settlements');
+  assert.equal(settlementCount(1), '1 settlement');
+  assert.equal(settlementCount(2), '2 settlements');
+  assert.equal(settlementCount(1000), '1,000 settlements');
 });
 
 void test('percentages below one never round to complete', () => {

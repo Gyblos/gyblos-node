@@ -91,3 +91,7 @@ export function tokensPerSecond(value: number | null): string {
 export function count(value: number): string {
   return value.toLocaleString(LOCALE);
 }
+
+export function settlementCount(value: number): string {
+  return `${count(value)} settlement${value === 1 ? '' : 's'}`;
+}
