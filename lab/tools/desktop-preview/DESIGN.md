@@ -87,6 +87,8 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 - `FilterChips`: single-choice filter with counts; one Tab stop, arrow keys move.
 - `Notice`: one toned line that must stay visible, such as a pinned seller being
   replaced or an answer coming from the free-model fallback.
+  The composer context tab keeps its own warning layout, because it is attached
+  to the composer and carries its actions inline.
 - `Switch`: `role="switch"` button for account-wide settings (the buyer
   `config.toml`); the row beside it carries the label and help.
 - `CodeBlock`: language label (Shell, JSON, TOML, TypeScript, Text), optional file

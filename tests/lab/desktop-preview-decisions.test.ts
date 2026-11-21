@@ -84,7 +84,7 @@ void test('preview API keys follow the account-wide free-model fallback, with no
   assert.match(settings, /<Switch label="Use a free model when out of funds"/);
   const kit = await view('PreviewKit.tsx.preview');
   assert.match(kit, /similarFreeModel\(/);
-  assert.match(kit, /blocked: broke && !fallback, fallback: broke && fallback/);
+  assert.match(kit, /fallback: broke && fallback && !!free/);
 });
 
 void test('preview shows four seller modes with Fastest and Most reliable marked Soon', async () => {
@@ -167,4 +167,26 @@ void test('preview menu arrow keys skip disabled options', async () => {
 void test('preview buyer config block uses the default copy that confirms success', async () => {
   const settings = await view('Settings.tsx.preview');
   assert.doesNotMatch(settings, /onCopy=\{\(\) => navigator\.clipboard/);
+});
+
+void test('preview title bar and composer read the same network after the Testnet switch changes', async () => {
+  const network = await view('NetworkSwitch.tsx.preview');
+  assert.match(network, /const network = usePreviewNetwork\(\);/);
+  assert.doesNotMatch(network, /usePreviewState/);
+  const kit = await view('PreviewKit.tsx.preview');
+  assert.match(kit, /export function usePreviewNetwork\(\)/);
+  assert.match(kit, /const network = usePreviewNetwork\(\);/);
+});
+
+void test('preview free fallback applies only when a free model exists', async () => {
+  const kit = await view('PreviewKit.tsx.preview');
+  assert.match(kit, /const free = models\.find/);
+  assert.match(kit, /blocked: broke && !\(fallback && free\)/);
+  const { CHAT_FUNDS_REWRITES } =
+    await import('../../lab/tools/desktop-preview/funds-build');
+  assert.ok(
+    CHAT_FUNDS_REWRITES.some(([, to]) =>
+      to.includes('usePreviewFunds(model, !usingPaypal, models)'),
+    ),
+  );
 });

@@ -1,4 +1,5 @@
-// Flat appearance and product information use the shared compact design primitives.
+// Appearance, account-wide buyer preferences (seller mode, free-model fallback, Testnet) with the
+// proposed buyer config.toml, and product information, built from the shared compact primitives.
 import { Check, Info } from '@phosphor-icons/react';
 import { useState } from 'react';
 
@@ -96,7 +97,7 @@ function BuyerPreferences() {
           <div>
             <span>
               Use a free model when out of funds
-              <small className="ui-help-text">Chat and every API key. Answers come from a similar free model and always say so.</small>
+              <small className="ui-help-text">Chat and every API key, also at a spending limit. Answers come from a similar free model and always say so.</small>
             </span>
             <Switch label="Use a free model when out of funds" checked={freeFallback} onChange={(value) => setPreviewSetting('freeFallback', value)} />
           </div>
@@ -114,7 +115,7 @@ function BuyerPreferences() {
         </div>
       </Section>
       <Section title="Configuration file">
-        <p className="ui-help-text">These settings live in the buyer configuration file. Proposed path; the buyer CLI is not built yet.</p>
+        <p className="ui-help-text">These settings live in the buyer configuration file. Proposed file and path; the app does not read it yet.</p>
         <CodeBlock
           code={buyerConfig(mode, freeFallback, showTestnet)}
           language={CODE_LANGUAGE.TOML}

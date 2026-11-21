@@ -3,11 +3,8 @@
 const PREVIEW_NETWORKS = ['Testnet', 'Mainnet'] as const;
 function PreviewNetwork() {
   const showTestnet = usePreviewSetting('showTestnet');
-  const [network, setNetwork] = usePreviewState<(typeof PREVIEW_NETWORKS)[number]>(
-    () => (new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet'),
-  );
+  const network = usePreviewNetwork();
   const choose = (next: (typeof PREVIEW_NETWORKS)[number]) => {
-    setNetwork(next);
     const params = new URLSearchParams(location.search);
     if (next === 'Mainnet') params.set('network', 'mainnet');
     else params.delete('network');

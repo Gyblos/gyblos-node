@@ -16,7 +16,7 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
   ],
   [
     '  const canSend =\n    !limitNotice &&',
-    '  const previewFunds = usePreviewFunds(model, !usingPaypal);\n  const canSend =\n    !previewFunds.blocked &&\n    (previewFunds.fallback || !limitNotice) &&',
+    '  const previewFunds = usePreviewFunds(model, !usingPaypal, models);\n  const canSend =\n    !previewFunds.blocked &&\n    (previewFunds.fallback || !limitNotice) &&',
   ],
   [
     '          <ChatComposer\n            disabled={loadingHistory}',

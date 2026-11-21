@@ -23,6 +23,8 @@ void test('preview kit status tones follow the mockup design rules', async () =>
   const kit = await readFile(new URL('PreviewKit.tsx.preview', views), 'utf8');
   for (const name of [
     'Tag',
+    'Notice',
+    'Switch',
     'Delta',
     'Savings',
     'SegmentedBar',
