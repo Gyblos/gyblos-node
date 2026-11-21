@@ -40,6 +40,8 @@ interface Options {
   rpc?: BatchObserverOptions['rpc'];
   // How long one SDK or RPC operation is awaited (BATCH_SESSION_DEFAULTS.operationMs by default).
   operationMs?: number;
+  // How long a sent deposit's channel is looked for (BATCH_SESSION_DEFAULTS.openingConfirmMs by default).
+  openingConfirmMs?: number;
 }
 async function compatible(options: Options, terms: PaymentSessionTerms) {
   termsFor(terms);
@@ -209,6 +211,7 @@ export function openBatchSellerBackend(
         observeOpening: observer.opening,
         closing: observer.closing,
         operationMs: options.operationMs,
+        openingConfirmMs: options.openingConfirmMs,
         reclaimReleasedSlot: payload !== undefined,
       });
     },
