@@ -17,33 +17,6 @@
     40px 0 #28c840;
 }
 
-/* The supplied brand artwork replaces the retired bracket mark only in this review build. */
-.preview-brand-mark {
-  display: inline-block;
-  width: 64px;
-  height: 48px;
-  flex: 0 0 auto;
-}
-.preview-brand-mark img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.preview-brand-light {
-  display: none;
-}
-.light .preview-brand-dark {
-  display: none;
-}
-.light .preview-brand-light {
-  display: block;
-}
-.chat-start > .preview-brand-mark {
-  width: 80px;
-  height: 64px;
-  margin-bottom: 16px;
-}
-
 .desktop-frame .preview-environment {
   color: var(--muted);
   font-size: 11px;
