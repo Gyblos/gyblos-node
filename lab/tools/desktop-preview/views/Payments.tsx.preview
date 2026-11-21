@@ -198,7 +198,8 @@ function Limits({ buyer, onBudget, onConnections }: {
   const policy = buyer?.state.policy;
   const percent = limited && limit > 0n ? Number((spent * 10000n) / limit) / 100 : 0;
   const active = (keys?.keys ?? []).filter(key => !key.revoked);
-  const keySpend = active.reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
+  const keySpend = (keys?.keys ?? []).reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
+  const revokedSpend = keySpend - active.reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
   return (
     <>
       <div className="preview-usage-grid">
@@ -215,6 +216,7 @@ function Limits({ buyer, onBudget, onConnections }: {
             segments={[
               { label: 'Chat', value: Number(spent - keySpend), tone: TONE.INFO },
               ...active.map((key, index) => ({ label: key.name, value: Number(BigInt(key.spentAtomic)), tone: index % 2 ? TONE.WARNING : TONE.SUCCESS })),
+              ...(revokedSpend > 0n ? [{ label: 'Revoked keys', value: Number(revokedSpend), tone: TONE.NEUTRAL }] : []),
             ]}
           />
         </section>
