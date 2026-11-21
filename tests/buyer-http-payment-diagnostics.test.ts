@@ -4,8 +4,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ERROR_DIAGNOSTICS } from '@gyblos/buyer/constants';
+import { ERROR_DIAGNOSTICS, PAID_BUYER_CODES } from '@gyblos/buyer/constants';
 import { httpDiagnostics } from '@gyblos/buyer/http-diagnostics';
+import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 import {
@@ -45,6 +46,10 @@ void test('buyer HTTP failures keep the payment cause from closed catalogs', () 
   assert.equal(
     failed(new PaymentError(PAYMENT_ERROR_CODES.UNAVAILABLE)).code,
     PAYMENT_ERROR_CODES.UNAVAILABLE,
+  );
+  assert.equal(
+    failed(new PaidBuyerError(PAID_BUYER_CODES.BUSY)).code,
+    PAID_BUYER_CODES.BUSY,
   );
   // A code outside the catalogs and plain text stay unknown.
   assert.equal(

@@ -1,6 +1,7 @@
 // Content-free observations of the compatibility boundary. Logging never decides retry or admission.
 import type { ServerResponse } from 'node:http';
 
+import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import {
   BATCH_SDK_DIAGNOSTIC_CODES,
   batchSdkDiagnosticCode,
@@ -63,7 +64,8 @@ function failureCode(error: unknown) {
       error instanceof FreeExecutionError ||
       error instanceof PaymentSessionError ||
       error instanceof PaymentError ||
-      error instanceof BatchChannelError
+      error instanceof BatchChannelError ||
+      error instanceof PaidBuyerError
     ) {
       const code: unknown = error.code;
       const known = CODES.find((item) => item === code);
