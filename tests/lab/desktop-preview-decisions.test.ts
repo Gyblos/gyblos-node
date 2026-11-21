@@ -127,7 +127,10 @@ void test('preview disables paid-only models without funds unless the free fallb
     /broke && !fallback && !list\.some\(\(item\) => item\.free\)/,
   );
   assert.match(dropdown, /disabled=\{locked\}/);
-  assert.match(dropdown, /title=\{locked \? PREVIEW_COPY\.needsFunds : undefined\}/);
+  assert.match(
+    dropdown,
+    /title=\{locked \? PREVIEW_COPY\.needsFunds : undefined\}/,
+  );
 });
 
 void test('preview hides Testnet behind a developer setting', async () => {
