@@ -202,3 +202,15 @@ void test('preview settings read review states from the URL and write them to th
   const row = await view('ModelRow.tsx.preview');
   assert.match(row, /const index = READY\.indexOf\(choice\.strategy\);/);
 });
+
+void test('preview shows the color marks of OpenCode and Codex', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const file = 'apps/desktop/src/ui/ServiceLogo.tsx';
+  const logo =
+    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ?? '';
+  assert.match(logo, /\{ file: 'codex-color' \}/);
+  assert.match(logo, /\{ file: 'opencode-color' \}/);
+  for (const name of ['tool-codex-color.svg', 'tool-opencode-color.svg'])
+    assert.match(await readFile(new URL(name, preview), 'utf8'), /<svg/);
+});

@@ -105,6 +105,11 @@ export async function buildPreview(output = resolve(directory, 'dist')) {
     resolve(output, 'assets/tools'),
     { recursive: true },
   );
+  for (const tool of ['codex', 'opencode'])
+    await copyFile(
+      resolve(directory, `tool-${tool}-color.svg`),
+      resolve(output, 'assets/tools', `${tool}-color.svg`),
+    );
   const html = await readFile(resolve(output, 'index.html'), 'utf8');
   await writeFile(
     resolve(output, 'index.html'),

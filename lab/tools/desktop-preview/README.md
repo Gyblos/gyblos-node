@@ -33,9 +33,15 @@ one blue, `#0a28f0`; reading text stays neutral. Semantic status colors and
 third-party artwork retain their existing meaning.
 
 The two terminal SVGs are supplied brand-kit artwork with unchanged geometry.
-Typography licenses and attribution already live in `apps/docs/public/brand/`.
-The brand source is [web-gyblos](https://github.com/Gyblos/web-gyblos):
-`web/src/brand.css`, `web/src/components/focus-landing.css` and the versioned
+The color tool marks are third-party artwork used unchanged:
+`tool-codex-color.svg` is Lobe Icons `codex-color.svg` at commit `7d7d0379`
+(MIT), and `tool-opencode-color.svg` is the opencode.ai favicon geometry
+(OpenCode, MIT; see `apps/desktop/public/assets/tools/opencode-LICENSE.txt`).
+The preview build swaps them in for the monochrome marks; the desktop app keeps
+its own assets. Typography licenses and attribution already live in
+`apps/docs/public/brand/`. The brand source is
+[web-gyblos](https://github.com/Gyblos/web-gyblos): `web/src/brand.css`,
+`web/src/components/focus-landing.css` and the versioned
 `web/public/brand-assets/` distribution. No private vault content is required to
 build this preview.
 

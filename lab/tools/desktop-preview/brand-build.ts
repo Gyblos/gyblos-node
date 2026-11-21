@@ -36,6 +36,17 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'utf8',
       );
   }
+  // Preview proposal: the color marks of OpenCode and Codex instead of the monochrome ones.
+  if (target === `${base}/src/ui/ServiceLogo.tsx`)
+    return replaceOnce(
+      replaceOnce(
+        source,
+        "{ file: 'codex', monochrome: true }",
+        "{ file: 'codex-color' }",
+      ),
+      "{ file: 'opencode', monochrome: true }",
+      "{ file: 'opencode-color' }",
+    );
   if (target === `${base}/src/ui/WalletDetails.tsx`) {
     const recovery = replaceOnce(
       source,
