@@ -6,6 +6,7 @@ import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY } from '../lib/constants';
 import { short } from '../lib/format';
 import { ModelLogo } from './model-logo';
+import { TableScroll } from './table-scroll';
 
 export const th = 'px-4 py-3 font-medium';
 export const td = 'px-4 py-3';
@@ -55,12 +56,12 @@ export function Table({
   minWidth?: number;
 }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-panel">
+    <TableScroll>
       <table
-        className="w-full text-left text-sm whitespace-nowrap"
+        className="explorer-table w-full text-left text-sm whitespace-nowrap"
         style={{ minWidth }}
       >
-        <thead className="border-b border-line bg-raised/50 text-muted">
+        <thead className="border-b border-line text-muted">
           <tr>
             {head.map((column) => (
               <th
@@ -74,7 +75,7 @@ export function Table({
         </thead>
         <tbody>{children}</tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }
 
@@ -99,9 +100,12 @@ export function ModelName({
 }) {
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
-    <span className="inline-flex items-center gap-2">
+    <span
+      className="inline-flex max-w-full items-center gap-2"
+      title={[modelId, detail].filter(Boolean).join(' ')}
+    >
       <ModelLogo modelId={modelId} />
-      <span>
+      <span className="truncate">
         {modelId}
         {detail ? (
           <span className="ml-2 font-mono text-xs text-dim">{detail}</span>

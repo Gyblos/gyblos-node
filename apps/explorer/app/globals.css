@@ -59,3 +59,59 @@ body {
   color: var(--ink);
   font-family: var(--font-instrument), system-ui, sans-serif;
 }
+
+/* Sticky first column and scroll divider; the opaque header mix prevents content showing through. */
+.explorer-table {
+  background: var(--panel);
+}
+
+.explorer-table-scroll {
+  scroll-timeline: --table-scroll inline;
+}
+
+.explorer-table thead {
+  background: color-mix(in srgb, var(--raised) 50%, var(--panel));
+}
+
+.explorer-table :is(tbody, tr) {
+  background: inherit;
+}
+
+.explorer-table tr > :first-child:not([colspan]) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+}
+
+.explorer-table tr > :first-child:not([colspan])::after {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 8px;
+  content: '';
+  pointer-events: none;
+  opacity: 0;
+  box-shadow:
+    inset -1px 0 var(--line),
+    inset -6px 0 8px -8px var(--muted);
+}
+
+@supports (animation-timeline: scroll()) {
+  .explorer-table tr > :first-child:not([colspan])::after {
+    animation: table-divider linear both;
+    animation-timeline: --table-scroll;
+    animation-range: 0px 1px;
+  }
+}
+
+@keyframes table-divider {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (width < theme(--breakpoint-md)) {
+  [data-overflow] > .explorer-table tr > :first-child:not([colspan]) > span {
+    max-width: calc(55vw - 2rem);
+  }
+}
