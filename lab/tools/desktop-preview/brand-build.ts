@@ -299,12 +299,28 @@ export function transformBrand(source: string, id: string, desktop: string) {
       'Could not open the devnet faucet.',
       'Could not open the testnet faucet.',
     );
+  if (target === `${base}/src/ui/ChatAnswer.tsx`)
+    return (
+      "import { PreviewAnswerSkeleton } from './PreviewKit';\n" +
+      replaceOnce(
+        source,
+        '        </AssistantProgress>\n      )}\n',
+        '        </AssistantProgress>\n      )}\n      {message.state === MESSAGE_STATE.PENDING && !message.text && <PreviewAnswerSkeleton />}\n',
+      )
+    );
   if (target === `${base}/src/ui/Chat.tsx`)
-    return replaceEach(source, [
-      ["'x402 · devnet'", "'x402'"],
-      ["'Free · Gyblos network'", "''"],
-      ...funds.CHAT_FUNDS_REWRITES,
-    ]);
+    return (
+      "import { PreviewConnectEntry } from './PreviewKit';\n" +
+      replaceEach(source, [
+        [
+          '<p>Choose how to pay. Keep the conversation.</p>',
+          '<p>Choose how to pay. Keep the conversation.</p>\n              <PreviewConnectEntry />',
+        ],
+        ["'x402 · devnet'", "'x402'"],
+        ["'Free · Gyblos network'", "''"],
+        ...funds.CHAT_FUNDS_REWRITES,
+      ])
+    );
   if (target === `${base}/src/theme.ts`) {
     for (const [name, value] of Object.entries(brand.themeTokens)) {
       const pattern = new RegExp(`  ${name}: '[^']+',`);

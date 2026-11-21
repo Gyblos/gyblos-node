@@ -13,7 +13,7 @@ export const PREVIEW = {
   dayMs: 86400000,
   minuteMs: 60000,
   halfHourMs: 1800000,
-  replyDelayMs: 450,
+  replyDelayMs: 1400,
   replyCents: 10,
   paymentIdCharacters: 64,
   recordedCents: 20,

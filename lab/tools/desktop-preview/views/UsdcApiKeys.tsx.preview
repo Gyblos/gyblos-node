@@ -1,6 +1,6 @@
-import { Check, Info, Key, LinkSimple, PlugsConnected, Plus } from '@phosphor-icons/react';
+import { Check, Copy, Info, Key, LinkSimple, PlugsConnected, Plus } from '@phosphor-icons/react';
 // Buyer-owned USDC key management uses shared forms and financial facts; no wallet keys enter the view.
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { DEVNET_USDC } from '@gyblos/config/network';
 import {
@@ -141,7 +141,16 @@ const toolNames = {
   [AGENT_TOOLS.PI]: 'Pi',
   other: 'Other tools',
 };
-type KeyView = 'list' | 'choose' | 'guide' | 'detail' | 'revoke' | 'new';
+type ToolChoice = AgentTool | 'other';
+const TOOL_CHOICES = [
+  AGENT_TOOLS.OPENCODE,
+  AGENT_TOOLS.CLAUDE_CODE,
+  AGENT_TOOLS.CODEX,
+  AGENT_TOOLS.PI,
+  'other',
+] as const;
+type KeyView = 'list' | 'detail' | 'revoke' | 'new';
+// Synthetic setup state: a tool counts as configured once its configuration was copied in this preview.
 export function UsdcApiKeys({
   onPayments,
   contextOpen,
@@ -155,37 +164,54 @@ export function UsdcApiKeys({
   const snapshot = state.snapshot;
   const [view, setView] = useState<KeyView>('list');
   const [id, setId] = useState('');
-  const [tool, setTool] = useState<AgentTool | 'other'>(AGENT_TOOLS.OPENCODE);
+  const [guideId, setGuideId] = useState('');
+  const [tool, setTool] = useState<ToolChoice>(AGENT_TOOLS.OPENCODE);
+  const [configured, setConfigured] = useState<ReadonlySet<ToolChoice>>(
+    () => new Set(),
+  );
+  const [keyCopied, setKeyCopied] = useState(false);
   const key = snapshot?.keys.find((item) => item.id === id);
+  const active = snapshot?.keys.filter((item) => !item.revoked) ?? [];
+  const guideKey = active.find((item) => item.id === guideId) ?? active[0];
   const locked = busy || !!state.error || !!snapshot?.blocked;
+  const ready = !!snapshot;
+  useEffect(() => {
+    if (ready && guideKey && tool !== 'other')
+      void run({ action: USDC_API_ACTION.PREVIEW_AGENT, id: guideKey.id, tool });
+  }, [ready, guideKey?.id, tool]);
   const go = (next: KeyView, keyId: string) => {
     setId(keyId);
     setView(next);
   };
+  const markConfigured = (choice: ToolChoice) =>
+    setConfigured((current) => new Set(current).add(choice));
   const choose = (keyId: string) => {
-    setTool(AGENT_TOOLS.OPENCODE);
-    go('choose', keyId);
+    setGuideId(keyId);
+    setView('list');
+    const guide = document.getElementById('preview-tool-guide');
+    guide?.scrollIntoView({ block: 'nearest' });
+    guide?.focus({ preventScroll: true });
   };
   const close = () => setView('list');
-  const copyKey = key && (
+  const secretField = (
+    item: NonNullable<typeof key>,
+    fieldId: string,
+    onCopied?: () => void,
+  ) => (
     <CopyField
       label="API key"
-      id="preview-tool-secret"
+      id={fieldId}
       secret
       value="Preview key"
       actionLabel="Copy API key"
-      disabled={locked || key.revoked || !state.copyable.includes(id)}
-      onCopy={() => void run({ action: USDC_API_ACTION.COPY_KEY, id })}
-    />
-  );
-  const urlField = (
-    <CopyField
-      label="Base URL"
-      id="preview-base-url"
-      value={state.url ?? ''}
-      actionLabel="Copy Base URL"
-      disabled={!state.url || busy}
-      onCopy={() => void run({ action: USDC_API_ACTION.COPY_URL })}
+      disabled={locked || item.revoked || !state.copyable.includes(item.id)}
+      onCopy={() =>
+        void run({ action: USDC_API_ACTION.COPY_KEY, id: item.id }).then(
+          (result) => {
+            if (!result?.error) onCopied?.();
+          },
+        )
+      }
     />
   );
   const newDisabled =
@@ -207,6 +233,11 @@ export function UsdcApiKeys({
       <Plus size={16} />
       Create your first API key
     </Button>
+  );
+  const done = (value: boolean, icon: ReactNode) => (
+    <span aria-hidden="true">
+      {value ? <Check size={13} weight="bold" /> : icon}
+    </span>
   );
   return (
     <WorkspaceLayout
@@ -232,12 +263,166 @@ export function UsdcApiKeys({
                 action={<Button onClick={onPayments}>Review payments</Button>}
               />
             )}
-            <ol className="preview-steps" aria-label="Connect a coding tool">
-              <li data-done={!!state.url}><span aria-hidden="true">{state.url ? <Check size={14} weight="bold" /> : <LinkSimple size={15} />}</span><div><strong>Copy the Base URL</strong><small>Your tool sends requests here.</small></div></li>
-              <li data-done={snapshot.keys.some((k) => !k.revoked)}><span aria-hidden="true">{snapshot.keys.some((k) => !k.revoked) ? <Check size={14} weight="bold" /> : <Key size={15} />}</span><div><strong>Create an API key</strong><small>Each key has its own USDC limit.</small></div></li>
-              <li><span aria-hidden="true"><PlugsConnected size={15} /></span><div><strong>Connect your tool</strong><small>OpenCode, Codex, Claude Code or Pi.</small></div></li>
-            </ol>
-            {urlField}
+            <section className="ui-section" aria-labelledby="preview-tools-heading">
+              <div className="preview-section-intro">
+                <h2 id="preview-tools-heading">Connect a coding tool</h2>
+                <p className="ui-help-text">
+                  Your tool sends requests to Gyblos on this computer and pays sellers in USDC, inside the key limit.
+                </p>
+              </div>
+              <div className="preview-tool-grid" role="group" aria-label="Choose a tool">
+                {TOOL_CHOICES.map((choice) => (
+                  <button
+                    type="button"
+                    key={choice}
+                    className="preview-tool-card"
+                    aria-pressed={tool === choice}
+                    onClick={() => setTool(choice)}
+                  >
+                    <span className="preview-tool-logo">
+                      <ServiceLogo service={toolNames[choice]} />
+                    </span>
+                    <strong>{toolNames[choice]}</strong>
+                    <Tag
+                      tone={configured.has(choice) ? TONE.SUCCESS : TONE.NEUTRAL}
+                      dot={configured.has(choice)}
+                    >
+                      {configured.has(choice) ? 'Configured' : 'Not set up'}
+                    </Tag>
+                  </button>
+                ))}
+              </div>
+            </section>
+            <section
+              id="preview-tool-guide"
+              className="preview-tool-guide"
+              tabIndex={-1}
+              aria-labelledby="preview-guide-heading"
+            >
+              <header>
+                <span className="preview-tool-logo">
+                  <ServiceLogo service={toolNames[tool]} />
+                </span>
+                <div>
+                  <h2 id="preview-guide-heading">
+                    {tool === 'other'
+                      ? 'Connect another tool'
+                      : 'Set up ' + toolNames[tool]}
+                  </h2>
+                  <small>
+                    {tool === 'other'
+                      ? 'Any tool that speaks OpenAI Chat Completions, Responses or Anthropic Messages.'
+                      : 'Three steps. The key stays on this computer.'}
+                  </small>
+                </div>
+              </header>
+              <ol className="preview-steps" aria-label={'Steps to connect ' + toolNames[tool]}>
+                <li data-done={!!guideKey}>
+                  {done(!!guideKey, <Key size={14} />)}
+                  <div>
+                    <strong>Choose an API key</strong>
+                    <small>Each key has its own USDC limit.</small>
+                    {guideKey ? (
+                      <div className="preview-guide-key">
+                        <select
+                          id="preview-guide-key"
+                          aria-label="API key"
+                          className="ui-input"
+                          value={guideKey.id}
+                          onChange={(event) => setGuideId(event.target.value)}
+                        >
+                          {active.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="ui-help-text">
+                          {amount(guideKey.spentAtomic, snapshot.scope).split(' ')[0]} /{' '}
+                          {amount(guideKey.limitAtomic, snapshot.scope)} used
+                        </span>
+                      </div>
+                    ) : (
+                      <FormActions align="start">
+                        <Button
+                          variant={BUTTON_VARIANT.PRIMARY}
+                          disabled={newDisabled}
+                          onClick={() => setView('new')}
+                        >
+                          <Plus size={16} />
+                          Create an API key
+                        </Button>
+                      </FormActions>
+                    )}
+                  </div>
+                </li>
+                <li data-done={keyCopied}>
+                  {done(keyCopied, <Copy size={14} />)}
+                  <div>
+                    <strong>Copy the API key</strong>
+                    <small>
+                      {tool === 'other'
+                        ? 'Paste it where your tool asks for an API key.'
+                        : 'Set GYBLOS_API_KEY to it in the environment where ' + toolNames[tool] + ' runs.'}
+                    </small>
+                    {guideKey && secretField(guideKey, 'preview-guide-secret', () => setKeyCopied(true))}
+                  </div>
+                </li>
+                <li data-done={configured.has(tool)}>
+                  {done(configured.has(tool), <PlugsConnected size={14} />)}
+                  <div>
+                    <strong>
+                      {tool === 'other' ? 'Copy the Base URL' : 'Add the configuration'}
+                    </strong>
+                    <small>
+                      {tool === 'other'
+                        ? 'Use it as the OpenAI or Anthropic base URL.'
+                        : 'Paste it into the ' + toolNames[tool] + ' settings file.'}
+                    </small>
+                    {tool === 'other' ? (
+                      <CopyField
+                        label="Base URL"
+                        id="preview-base-url"
+                        value={state.url ?? ''}
+                        actionLabel="Copy Base URL"
+                        disabled={!state.url || busy}
+                        onCopy={() =>
+                          void run({ action: USDC_API_ACTION.COPY_URL }).then(
+                            (result) => {
+                              if (!result?.error) markConfigured('other');
+                            },
+                          )
+                        }
+                      />
+                    ) : (
+                      guideKey && (
+                        <>
+                          <pre className="ui-code-block">{state.setup?.text}</pre>
+                          <FormActions align="start">
+                            <Button
+                              disabled={locked || !state.setup}
+                              onClick={() =>
+                                void run({
+                                  action: USDC_API_ACTION.COPY_AGENT,
+                                  id: guideKey.id,
+                                  tool,
+                                }).then((result) => {
+                                  if (result?.setup?.tool === tool && !result.error)
+                                    markConfigured(tool);
+                                })
+                              }
+                            >
+                              <Copy size={16} />
+                              Copy configuration
+                            </Button>
+                          </FormActions>
+                        </>
+                      )
+                    )}
+                  </div>
+                </li>
+              </ol>
+            </section>
             <section className="ui-section">
               <div className="ui-section-title">
                 <h2>API keys</h2>
@@ -353,7 +538,7 @@ export function UsdcApiKeys({
                 )}
                 {!key.revoked && (
                   <>
-                    {copyKey}
+                    {secretField(key, 'preview-tool-secret')}
                     <FormActions>
                       <Button
                         disabled={busy}
@@ -376,126 +561,6 @@ export function UsdcApiKeys({
             )}
             {key && view === 'revoke' && (
               <RevokeConfirmation id={id} run={run} close={close} />
-            )}
-            {key && !key.revoked && view === 'choose' && (
-              <Modal title="Connect a tool" close={close}>
-                <div className="ui-section">
-                  <fieldset className="preview-tool-choices">
-                    <legend>Choose a tool</legend>
-                    {Object.entries(toolNames).map(([value, label]) => (
-                      <label key={value}>
-                        <input
-                          type="radio"
-                          name="preview-client"
-                          value={value}
-                          checked={tool === value}
-                          onChange={() =>
-                            setTool(
-                              Object.values(AGENT_TOOLS).find(
-                                (t) => t === value,
-                              ) ?? 'other',
-                            )
-                          }
-                        />
-                        <span className="preview-tool-logo">
-                          <ServiceLogo service={label} />
-                        </span>
-                        {label}
-                      </label>
-                    ))}
-                  </fieldset>
-                  <FormField label="API key" htmlFor="preview-selected-key">
-                    <select
-                      id="preview-selected-key"
-                      className="ui-input"
-                      value={id}
-                      onChange={(event) => setId(event.target.value)}
-                    >
-                      {snapshot.keys
-                        .filter((k) => !k.revoked)
-                        .map((k) => (
-                          <option key={k.id} value={k.id}>
-                            {k.name}
-                          </option>
-                        ))}
-                    </select>
-                  </FormField>
-                  <p className="ui-help-text">
-                    {amount(key.spentAtomic, snapshot.scope)} used of{' '}
-                    {amount(key.limitAtomic, snapshot.scope)}
-                  </p>
-                  <FormActions align="start">
-                    <Button
-                      variant={BUTTON_VARIANT.PRIMARY}
-                      disabled={locked}
-                      onClick={() => {
-                        if (tool === 'other') setView('guide');
-                        else
-                          void run({
-                            action: USDC_API_ACTION.PREVIEW_AGENT,
-                            id,
-                            tool,
-                          }).then((result) => {
-                            if (result?.setup?.tool === tool && !result.error)
-                              setView('guide');
-                          });
-                      }}
-                    >
-                      {tool === 'other'
-                        ? 'Show API details'
-                        : 'Set up ' + toolNames[tool]}
-                    </Button>
-                    <Button
-                      onClick={() => setView('new')}
-                      disabled={
-                        locked ||
-                        snapshot.keys.length >= BUYER_API_KEYS.MAX_KEYS
-                      }
-                    >
-                      New API key
-                    </Button>
-                  </FormActions>
-                </div>
-              </Modal>
-            )}
-            {key && !key.revoked && view === 'guide' && (
-              <Modal
-                title={
-                  tool === 'other' ? 'API details' : 'Set up ' + toolNames[tool]
-                }
-                close={close}
-              >
-                <div className="ui-section">
-                  <strong>{key.name}</strong>
-                  {copyKey}
-                  {tool === 'other' ? (
-                    urlField
-                  ) : (
-                    <>
-                      <p className="ui-help-text">
-                        Set GYBLOS_API_KEY to the copied key in your tool’s
-                        environment.
-                      </p>
-                      <pre className="ui-code-block">{state.setup?.text}</pre>
-                      <Button
-                        disabled={locked}
-                        onClick={() =>
-                          void run({
-                            action: USDC_API_ACTION.COPY_AGENT,
-                            id,
-                            tool,
-                          })
-                        }
-                      >
-                        Copy configuration
-                      </Button>
-                    </>
-                  )}
-                  <Button onClick={() => setView('choose')}>
-                    Back to tools
-                  </Button>
-                </div>
-              </Modal>
             )}
           </>
         )}

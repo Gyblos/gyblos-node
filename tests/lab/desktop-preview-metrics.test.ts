@@ -319,3 +319,66 @@ void test('preview model picker keeps one selection signal, short seller rows an
     'model names do not mix in mono digits',
   );
 });
+
+void test('preview Connections leads with a tool grid and an inline setup guide', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const keys = await readFile(
+    'lab/tools/desktop-preview/views/UsdcApiKeys.tsx.preview',
+    'utf8',
+  );
+  assert.match(keys, /className="preview-tool-grid"/);
+  assert.match(keys, /aria-pressed=\{/, 'tool cards are toggle buttons');
+  assert.match(keys, /'Configured'/, 'each tool shows its setup state');
+  assert.match(keys, /className="preview-tool-guide"/);
+  assert.doesNotMatch(
+    keys,
+    /view === 'choose'|view === 'guide'/,
+    'tool setup no longer hides inside a modal',
+  );
+  const chat = 'apps/desktop/src/ui/Chat.tsx';
+  const source = await readFile(chat, 'utf8');
+  const rendered = transformBrand(source, chat, 'apps/desktop') ?? source;
+  assert.ok(
+    rendered.includes('<PreviewConnectEntry'),
+    'the empty chat offers to connect a dev tool',
+  );
+});
+
+void test('preview chat answers show a skeleton while the reply is pending', async () => {
+  const { transformBrand } =
+    await import('../../lab/tools/desktop-preview/brand-build');
+  const file = 'apps/desktop/src/ui/ChatAnswer.tsx';
+  const source = await readFile(file, 'utf8');
+  const rendered = transformBrand(source, file, 'apps/desktop') ?? source;
+  assert.ok(rendered.includes('<PreviewAnswerSkeleton'));
+  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  assert.match(css, /\.preview-answer-skeleton/);
+  assert.match(
+    css,
+    /prefers-reduced-motion: reduce\)\s*\{[^}]*preview-answer-skeleton/,
+    'the shimmer stops for reduced motion',
+  );
+});
+
+void test('Compare sellers opens the detail of that model', async () => {
+  const picker = await readFile(
+    'lab/tools/desktop-preview/views/ModelDropdown.tsx.preview',
+    'utf8',
+  );
+  const row = await readFile(
+    'lab/tools/desktop-preview/views/ModelRow.tsx.preview',
+    'utf8',
+  );
+  assert.doesNotMatch(picker, /sellers in Models/);
+  assert.match(picker, /previewOpenModel = /);
+  assert.match(row, /previewOpenModel/);
+});
+
+void test('Payments history tables become cards in narrow layouts', async () => {
+  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  assert.match(
+    css,
+    /@container \(max-width: 620px\)\s*\{[^@]*\.ui-table-region \.ui-data-table tbody tr \{\s*display: grid;/,
+  );
+});

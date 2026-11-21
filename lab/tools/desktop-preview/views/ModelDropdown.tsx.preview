@@ -450,8 +450,9 @@ export function ModelDropdown({
                   })}
                   <MenuItem
                     footer
-                    label={'Compare ' + offers.length + ' sellers in Models'}
+                    label={'Compare ' + offers.length + ' sellers'}
                     onClick={() => {
+                      window.previewOpenModel = active;
                       close();
                       onBrowse();
                     }}

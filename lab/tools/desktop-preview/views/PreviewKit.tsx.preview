@@ -1,10 +1,11 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { Wallet, Warning } from '@phosphor-icons/react';
+import { CaretRight, Wallet, Warning } from '@phosphor-icons/react';
 import { useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AddBuyerFunds } from './BuyerFunding';
-import { BUTTON_VARIANT } from './constants';
+import { BUTTON_VARIANT, UI_VIEW } from './constants';
 import { Modal } from './Modal';
+import { ServiceLogo } from './ServiceLogo';
 import { MotionPresence } from './Motion';
 import { TONE, type Tone } from './status-tone';
 import { Button } from './UI';
@@ -297,5 +298,47 @@ export function PreviewComposerTab({
         )}
       </MotionPresence>
     </>
+  );
+}
+
+declare global {
+  interface Window {
+    previewNavigate?: (view: string) => void;
+    previewOpenModel?: string;
+  }
+}
+/** Placeholder lines shown under the progress label until the first words arrive. */
+export function PreviewAnswerSkeleton() {
+  return (
+    <span className="preview-answer-skeleton" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
+const ENTRY_TOOLS = ['OpenCode', 'Codex', 'Claude Code', 'Pi'] as const;
+/** Empty-chat shortcut to the Connections setup guide. */
+export function PreviewConnectEntry() {
+  return (
+    <button
+      type="button"
+      className="preview-connect-entry"
+      onClick={() => window.previewNavigate?.(UI_VIEW.CONNECT)}
+    >
+      <span className="preview-connect-logos" aria-hidden="true">
+        {ENTRY_TOOLS.map((tool) => (
+          <span key={tool} className="preview-tool-logo">
+            <ServiceLogo service={tool} />
+          </span>
+        ))}
+      </span>
+      <span className="preview-connect-copy">
+        <strong>Connect a dev tool</strong>
+        <small>Use Gyblos models in OpenCode, Codex, Claude Code or Pi.</small>
+      </span>
+      <CaretRight size={14} aria-hidden="true" />
+    </button>
   );
 }
