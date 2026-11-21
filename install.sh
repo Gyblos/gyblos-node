@@ -415,6 +415,20 @@ next_steps() {
   say "       $(publish_command publish)"
 }
 
+# Printed after every install, priced offers or not, so a seller starting from zero knows both SOL needs:
+# the owner's registration, and the fee payer that pays channel transactions once an offer has a price.
+charge_note() {
+  if [ "$mode" = native ]; then
+    doctor_online=$(seller_typed 'doctor --online')
+  else
+    doctor_online="cd $(quoted "$dir") && docker compose run --rm seller gyblos doctor --online"
+  fi
+  say ''
+  say "To charge for your model later, first send about 0.05 devnet SOL to the fee payer${fee_payer:+ $fee_payer}"
+  say '  (https://faucet.solana.com, choose devnet). It pays the payment token accounts and channel'
+  say "  transactions; \`$doctor_online\` says when it runs short. A free seller never needs it."
+}
+
 # y, yes or an empty answer (the default) from the terminal; anything else, or no answer, declines.
 confirm() {
   printf '%s [Y/n] ' "$1"
@@ -766,6 +780,7 @@ main_native() {
   [ -n "$ready" ] ||
     die "The seller is not ready; fix the failures above, then run this script again."
   owner=$(printf '%s\n' "$doctor" | sed -n 's/^  owner  *\([1-9A-HJ-NP-Za-km-z]\{32,44\}\)[[:space:]]*$/\1/p' | sed -n 1p)
+  fee_payer=$(printf '%s\n' "$doctor" | sed -n 's/^  fee payer  *\([1-9A-HJ-NP-Za-km-z]\{32,44\}\) .*$/\1/p' | sed -n 1p)
   switch_native
   # Reinstalled so a rerun or an update runs this release with the current config.toml and seller.env;
   # removing the service stops the seller first (it withdraws within 120 s). It runs app/current.
@@ -792,6 +807,7 @@ main_native() {
   elif ! guided_setup; then
     next_steps
   fi
+  charge_note
 }
 
 # An existing install's mode; for a new one Docker when it runs, otherwise the packaged seller.
@@ -862,6 +878,7 @@ main() {
   [ -n "$ready" ] ||
     die "The seller is not ready; fix the failures above, then run this script again (cd $dir)."
   owner=$(printf '%s\n' "$doctor" | sed -n 's/^  owner  *\([1-9A-HJ-NP-Za-km-z]\{32,44\}\)[[:space:]]*$/\1/p' | sed -n 1p)
+  fee_payer=$(printf '%s\n' "$doctor" | sed -n 's/^  fee payer  *\([1-9A-HJ-NP-Za-km-z]\{32,44\}\) .*$/\1/p' | sed -n 1p)
   # Recreated so a rerun applies the current config.toml and seller.env; stopping sends SIGINT.
   docker compose up -d --force-recreate seller
   say ''
@@ -878,6 +895,7 @@ main() {
   elif ! guided_setup; then
     next_steps
   fi
+  charge_note
 }
 
 case "${1:-}" in

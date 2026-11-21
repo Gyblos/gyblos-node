@@ -173,7 +173,11 @@ async function verifyEntry(
   }
 }
 
-function supersedes(candidate: DiscoveredSeller, held: DiscoveredSeller) {
+// Whether `candidate` is a newer listing of its NodeId than `held`: catalog sequence, then presence.
+export function supersedes(
+  candidate: DiscoveredSeller,
+  held: DiscoveredSeller,
+) {
   return (
     candidate.catalog.sequence > held.catalog.sequence ||
     (candidate.catalog.sequence === held.catalog.sequence &&

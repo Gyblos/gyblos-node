@@ -2,12 +2,16 @@
 // one-line startup failure, written as `gyblos <command>` (from a checkout, `pnpm gyblos <command>`).
 // Kept apart from the doctor command so the daemon entry does not load it.
 import { runMode } from '@gyblos/config';
-import { DOCTOR_CODES, NODE_ERROR_CODES } from '@gyblos/node/constants';
+import {
+  DOCTOR_CODES,
+  FEE_PAYER_FUNDING,
+  NODE_ERROR_CODES,
+} from '@gyblos/node/constants';
 import type { DoctorResultCode } from '@gyblos/node/seller-doctor';
 import { ENGINE_ERROR_CODES } from '@gyblos/protocol/constants';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
-import { commandsFor } from './cli-next';
+import { commandsFor, FAUCET } from './cli-next';
 
 const SEE_STARTUP = 'see docs/configuration.md#seller-startup';
 // Short operator hints by code; codes without one are explained in the docs.
@@ -54,6 +58,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'fund the fee payer with devnet SOL and check the RPC; startup creates the payout, fee and fee payer token accounts, and refuses a frozen one',
   [DOCTOR_CODES.PAYMENT_ACCOUNTS_MISSING]:
     'startup creates the missing payout, fee or fee payer token account, about 0.002 devnet SOL each from the fee payer',
+  [DOCTOR_CODES.FEE_PAYER_UNFUNDED]: `the fee payer has under ${FEE_PAYER_FUNDING.minimumSol} devnet SOL: send it about ${FEE_PAYER_FUNDING.suggestedSol} devnet SOL (${FAUCET}); it pays the payment token accounts and channel transactions`,
   [DOCTOR_CODES.PAYMENT_ACCOUNTS_UNCHECKED]:
     'the RPC did not answer; startup checks the token accounts again',
   [DOCTOR_CODES.PAYMENT_ACCOUNTS_UNUSABLE]:

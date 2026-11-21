@@ -14,6 +14,7 @@ import { dailySettled } from '@gyblos/explorer/chain-shape';
 import { FETCH } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
 import {
+  percent,
   settlementCount,
   tokensPerSecond,
   usdcDecimal,
@@ -36,6 +37,19 @@ void test('settlement counts use singular only for one settlement', () => {
   assert.equal(settlementCount(1), '1 settlement');
   assert.equal(settlementCount(2), '2 settlements');
   assert.equal(settlementCount(1000), '1,000 settlements');
+});
+
+void test('percentages below one never round to complete', () => {
+  for (const ratio of [0.9995, 0.9996, 0.9999, 1 - Number.EPSILON])
+    assert.equal(percent(ratio), '99.9%');
+});
+
+void test('percentages keep consistent precision and ordinary rounding', () => {
+  assert.equal(percent(1), '100.0%');
+  assert.equal(percent(0), '0.0%');
+  assert.equal(percent(0.1236), '12.4%');
+  assert.equal(percent(0.999), '99.9%');
+  assert.equal(percent(0.9984), '99.8%');
 });
 
 void test('amount bars allow fractional ticks so tiny USDC values retain their scale', () => {
