@@ -478,36 +478,8 @@ export const BUYER_API_KEY_STORAGE = { MAX_BYTES: 262144 } as const;
 // these catalogs, never from error text.
 export const SELLER_CHANNEL_DIAGNOSTICS = {
   component: 'seller-channel',
+  resumeBlock: 'resume-block',
   phase: 'exchange',
   // No catalog code was found: the cause stays unknown rather than guessed.
   unknownCode: 'SELLER_CHANNEL_FAILED',
-  // The pinned @x402/svm batch-settlement error names (its BatchError, which it does not export). Each
-  // SDK error message starts with sdkPrefix + one of these, then free text that is never kept.
-  sdkPrefix: 'invalid_batch_settlement_svm_',
-  sdkErrors: [
-    'payload_type',
-    'payment_flow',
-    'token_program',
-    'voucher_signature',
-    'channel_id_mismatch',
-    'fee_payer_mismatch',
-    'receiver_authorizer_mismatch',
-    'receiver_binding_unavailable',
-    'delegated_unauthenticated',
-    'close_authorization',
-    'close_amount_unsupported',
-    'close_state',
-    'channel_closing',
-    'withdraw_delay_mismatch',
-    'withdraw_delay_out_of_range',
-    'cumulative_amount_mismatch',
-    'cumulative_exceeds_deposit',
-    'voucher_expiry',
-    'setup_transaction',
-    'settlement_simulation',
-    'deposit_below_min_deposit',
-    'channel_state',
-    'refund_transaction',
-    'payout_attribution_ambiguous',
-  ],
 } as const;

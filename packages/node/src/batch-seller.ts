@@ -23,7 +23,6 @@ import {
   SESSION_BLOCK_KINDS,
   type SessionBlockAck,
 } from '@gyblos/protocol/session-blocks';
-import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import type {
   BatchBlockExchange,
   BatchChannelService,
@@ -35,15 +34,12 @@ import { batchLiveOffer, generateBatch } from './batch-generation';
 import { publishSessionReceipt, sessionReceiptPayment } from './batch-receipts';
 import { sellerExecutionTelemetry } from './free-telemetry';
 import type { PaidSellerReceiptOptions } from './receipt-seller';
-import { sellerChannelDiagnostics } from './seller-channel-diagnostics';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export interface SellerBatchSessionOptions {
   receipts?: (index: number) => PaidSellerReceiptOptions;
   blockTargetTokens?: number;
   telemetry?: import('./seller-sessions').SellerSessionOptions['telemetry'];
-  // The seller's local diagnostics; failed operations are recorded without their error text.
-  diagnostics?: DiagnosticSink;
   session: SessionSeller;
   terms: Readonly<PaymentSessionTerms>;
   offers: () => readonly LiveSellerOffer[];
@@ -236,7 +232,6 @@ export function createSellerBatchSession(
     terms: matchBatchTerms(input.terms, input.terms),
   };
   let active = false;
-  const reported = sellerChannelDiagnostics(options.diagnostics);
   const run = async <T>(
     peer: string,
     signal: AbortSignal,
@@ -254,32 +249,27 @@ export function createSellerBatchSession(
     }
   };
   return {
-    // Inside run: a wrong peer or a busy session is refused before it can reach the log.
     exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
       run(peer, signal, () =>
-        reported(request.method, () =>
-          exchange(request, peer, signal, options, onDelta, blocks, blockMode),
-        ),
+        exchange(request, peer, signal, options, onDelta, blocks, blockMode),
       ),
     resumeBlock: (approval, peer, signal) =>
-      run(peer, signal, () =>
-        reported('resume-block', async (): Promise<SessionBlockAck> => {
-          const session = options.session;
-          if (!isBlockSeller(session))
-            return batchFail(SESSION_CODES.UNAVAILABLE);
-          const intent = await session.resumeBlock(approval, peer);
-          signal.throwIfAborted();
-          return {
-            version: approval.version,
-            kind: SESSION_BLOCK_KINDS.ACK,
-            channelId: approval.channelId,
-            requestId: approval.requestId,
-            requestDigest: approval.requestDigest,
-            index: approval.index,
-            blockDigest: intent.digest,
-            cumulativeAtomic: intent.bill.cumulativeAtomic,
-          };
-        }),
-      ),
+      run(peer, signal, async (): Promise<SessionBlockAck> => {
+        const session = options.session;
+        if (!isBlockSeller(session))
+          return batchFail(SESSION_CODES.UNAVAILABLE);
+        const intent = await session.resumeBlock(approval, peer);
+        signal.throwIfAborted();
+        return {
+          version: approval.version,
+          kind: SESSION_BLOCK_KINDS.ACK,
+          channelId: approval.channelId,
+          requestId: approval.requestId,
+          requestDigest: approval.requestDigest,
+          index: approval.index,
+          blockDigest: intent.digest,
+          cumulativeAtomic: intent.bill.cumulativeAtomic,
+        };
+      }),
   };
 }

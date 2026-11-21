@@ -30,10 +30,7 @@ import {
   SELLER_PUBLIC_RECORDS,
 } from './constants';
 import { prepareSellerControl } from './control-startup';
-import {
-  createLocalDiagnostics,
-  loadLocalDiagnostics,
-} from './diagnostics-startup';
+import { createLocalDiagnostics } from './diagnostics-startup';
 import {
   assertReadinessCurrent,
   type ReadinessRecord,
@@ -172,7 +169,7 @@ export async function startSeller(
     const diagnostics = createLocalDiagnostics(
       process.env,
       P2P_ROLES.SELLER,
-      await loadLocalDiagnostics(process.env),
+      settings.diagnostics,
     );
     disposers.push(diagnostics.close);
     const publicationConfig = settings.publication;

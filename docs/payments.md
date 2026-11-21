@@ -39,7 +39,8 @@ open, settle and distribute, which uses the transaction maximum (1,400,000
 compute units) and the all-zero placeholder blockhash. No recent blockhash or
 durable nonce is zero, so that message can never be broadcast. A buyer's opening
 wire is admitted only within the bounds, whatever its blockhash. Without this,
-the seller refused to sign its own simulation and never sent a buyer's deposit.
+the seller could reject its own simulation before submitting the deposit on that
+attempt. Confirmed chain state determines the outcome of any earlier attempt.
 
 These are per-transaction instruction and signer-count bounds, not a total
 wallet, daily SOL, token-account creation or rent budget. The priority component

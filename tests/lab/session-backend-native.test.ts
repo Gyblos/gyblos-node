@@ -75,6 +75,11 @@ void test(
     const invalid = JSON.parse(payload);
     invalid.voucher.signature = Buffer.alloc(64).toString('base64');
     await assert.rejects(sellerBackend.create(terms, JSON.stringify(invalid)));
+    invalid.voucher.signature = '1'.repeat(64);
+    await assert.rejects(sellerBackend.create(terms, JSON.stringify(invalid)), {
+      code: SESSION_CODES.UNVERIFIED,
+      cause: new Error('invalid_batch_settlement_svm_voucher_signature'),
+    });
     assert.equal(await inspectBatchSession(sellerPaths), undefined);
     await assert.rejects(sellerBackend.create(terms, ' '.repeat(8193)), {
       code: SESSION_CODES.LIMIT,

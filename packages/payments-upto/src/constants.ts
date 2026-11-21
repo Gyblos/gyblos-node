@@ -137,3 +137,31 @@ export const BATCH_SELLER_REGISTRY = {
   maxBuyers: 64,
   stateBytes: 128 * 1024,
 } as const;
+
+// Stable BatchError codes from the pinned @x402/svm SDK, which does not export its catalog.
+export const BATCH_SDK_DIAGNOSTIC_CODES = [
+  'invalid_batch_settlement_svm_payload_type',
+  'invalid_batch_settlement_svm_payment_flow',
+  'invalid_batch_settlement_svm_token_program',
+  'invalid_batch_settlement_svm_voucher_signature',
+  'invalid_batch_settlement_svm_channel_id_mismatch',
+  'invalid_batch_settlement_svm_fee_payer_mismatch',
+  'invalid_batch_settlement_svm_receiver_authorizer_mismatch',
+  'invalid_batch_settlement_svm_receiver_binding_unavailable',
+  'invalid_batch_settlement_svm_delegated_unauthenticated',
+  'invalid_batch_settlement_svm_close_authorization',
+  'invalid_batch_settlement_svm_close_amount_unsupported',
+  'invalid_batch_settlement_svm_close_state',
+  'invalid_batch_settlement_svm_channel_closing',
+  'invalid_batch_settlement_svm_withdraw_delay_mismatch',
+  'invalid_batch_settlement_svm_withdraw_delay_out_of_range',
+  'invalid_batch_settlement_svm_cumulative_amount_mismatch',
+  'invalid_batch_settlement_svm_cumulative_exceeds_deposit',
+  'invalid_batch_settlement_svm_voucher_expiry',
+  'invalid_batch_settlement_svm_setup_transaction',
+  'invalid_batch_settlement_svm_settlement_simulation',
+  'invalid_batch_settlement_svm_deposit_below_min_deposit',
+  'invalid_batch_settlement_svm_channel_state',
+  'invalid_batch_settlement_svm_refund_transaction',
+  'invalid_batch_settlement_svm_payout_attribution_ambiguous',
+] as const;

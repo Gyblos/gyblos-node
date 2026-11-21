@@ -4,7 +4,6 @@ import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import {
-  PaymentSessionError,
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
@@ -18,6 +17,10 @@ import {
   checkpointSeller,
   resumeSellerBlock,
 } from './batch-block-seller';
+import {
+  requireSettlementResponse,
+  requireVerifiedPayer,
+} from './batch-sdk-diagnostics';
 import {
   atomic,
   billFor,
@@ -134,15 +137,7 @@ async function verifyFirstOpening(
     ),
     options.operationMs,
   );
-  if (!verified.isValid || verified.payer !== options.terms.buyer)
-    throw new PaymentSessionError(SESSION_CODES.UNVERIFIED, {
-      cause: sdkReason(verified.invalidReason),
-    });
-}
-// The SDK's failure name (an `invalid_batch_settlement_svm_*` reason) as an error the seller's local
-// diagnostics can match; its free-text message is never kept.
-function sdkReason(reason: unknown) {
-  return typeof reason === 'string' ? new Error(`${reason}:`) : undefined;
+  requireVerifiedPayer(verified, options.terms.buyer);
 }
 async function openSeller(context: BatchSellerContext, payload: string) {
   const { options, store, facilitator, requirements } = context;
@@ -190,8 +185,7 @@ async function openSeller(context: BatchSellerContext, payload: string) {
       ),
       options.operationMs,
     );
-    if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-      sessionFail(SESSION_CODES.UNVERIFIED);
+    requireVerifiedPayer(verdict, options.terms.buyer);
     await store.update((state) => {
       state.state = SESSION_STATES.OPEN;
       state.lastActivity = options.now();
@@ -205,14 +199,7 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     ),
     options.operationMs,
   );
-  if (
-    !response.success ||
-    response.network !== requirements.network ||
-    !response.transaction
-  )
-    throw new PaymentSessionError(SESSION_CODES.UNAVAILABLE, {
-      cause: sdkReason(response.errorReason),
-    });
+  requireSettlementResponse(response, requirements.network);
   await store.update((state) => {
     state.state = SESSION_STATES.OPEN;
     state.lastActivity = options.now();
@@ -289,8 +276,7 @@ async function acceptSeller(
     ),
     options.operationMs,
   );
-  if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verdict, options.terms.buyer);
   await store.update((state) => {
     state.voucher = voucher;
     state.cumulativeAtomic = bill.cumulativeAtomic;
@@ -326,7 +312,6 @@ async function reserveSeller(
     ),
     options.operationMs,
   );
-  if (!verdict.isValid || verdict.payer !== options.terms.buyer)
-    sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verdict, options.terms.buyer);
   await reserve(store, request, options.now(), blocks);
 }

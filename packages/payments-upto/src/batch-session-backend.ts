@@ -11,6 +11,7 @@ import {
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
 
+import { requireVerifiedPayer } from './batch-sdk-diagnostics';
 import { createBatchBuyer } from './batch-session-buyer';
 import { openingFor, requirementsFor, termsFor } from './batch-session-checks';
 import { batchFacilitatorFor } from './batch-session-facilitator';
@@ -139,8 +140,7 @@ async function firstProof(
       requirements,
     ),
   );
-  if (!verified.isValid || verified.payer !== terms.buyer)
-    return sessionFail(SESSION_CODES.UNVERIFIED);
+  requireVerifiedPayer(verified, terms.buyer);
 }
 export function openBatchSellerBackend(
   options: Options & {

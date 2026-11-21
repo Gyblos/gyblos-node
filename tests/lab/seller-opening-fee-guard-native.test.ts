@@ -126,9 +126,9 @@ void test('a deposit the seller cannot simulate fails with the SDK error kept as
   assert.ok(error instanceof PaymentSessionError);
   assert.equal(error.code, SESSION_CODES.UNAVAILABLE);
   assert.ok(error.cause instanceof Error);
-  assert.match(
+  assert.equal(
     error.cause.message,
-    /^invalid_batch_settlement_svm_settlement_simulation:/,
+    'invalid_batch_settlement_svm_settlement_simulation',
   );
   assert.equal(vm.sends(), before, 'nothing was sent');
 });

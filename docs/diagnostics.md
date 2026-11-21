@@ -49,8 +49,9 @@ level = "warn"
 
 Diagnostics are on by default at level `warn`. Levels, in order, are `debug`,
 `info`, `warn` and `error`; `debug` adds metadata only, never content. There is
-no environment override. Seller startup accepts the `[diagnostics]` table, but
-writes no records. [configuration.md](configuration.md) has the key reference.
+no environment override. The seller uses the same validated `[diagnostics]`
+settings for its local payment-channel records.
+[configuration.md](configuration.md) has the key reference.
 
 `packages/config/src/home.ts` owns the paths:
 
@@ -70,19 +71,23 @@ writes no records. [configuration.md](configuration.md) has the key reference.
   the child never starts, the last phase is `startup`. A phase is the last
   observed boundary, not proof of a cause.
 - **Seller payment channels.** Component `seller-channel`, phase `exchange`: one
-  record per failed channel operation from the bound buyer (`prepare`, `open`,
-  `execute`, `approve`, `close`, `resume-block`). A wrong peer or a busy session
-  is refused before that and leaves no record. Codes come only from catalogs:
+  record per failed operation attempt from the authenticated, bound buyer
+  (`prepare`, `open`, `execute`, `approve`, `close`, `resume-block`). The peer
+  check and concurrent-request guard precede recording. Admission and backend
+  failures during preparation, first opening and renewal are covered. Codes come
+  only from catalogs:
   - the payment SDK's error name when the failure carries one, even when a
     session layer replaced it with a generic code (for example
-    `invalid_batch_settlement_svm_settlement_simulation`: the deposit could not
-    be simulated, so it was never sent);
+    `invalid_batch_settlement_svm_settlement_simulation`: the SDK reported a
+    simulation failure for this attempt);
   - otherwise the typed session, payment or channel code;
   - otherwise `SELLER_CHANNEL_FAILED`.
 
   Refusals a buyer can cause (`PAYMENT_SESSION_INVALID`, `_BINDING`, `_BUSY`,
   `_CLOSED`, `_LIMIT`) are `warn`; the rest are `error`. The error text is never
-  kept: it can hold transactions, addresses or RPC URLs.
+  kept: it can hold transactions, addresses or RPC URLs. A failed attempt does
+  not establish the outcome of earlier attempts. Check confirmed chain state and
+  local recovery status before considering a retry.
 
 - **Cleanup.** `withDiagnosticCleanup` records cleanup failures separately and
   preserves the original thrown value, including `undefined`. A cleanup failure
