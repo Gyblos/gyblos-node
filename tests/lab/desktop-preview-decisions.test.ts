@@ -265,3 +265,36 @@ void test('model picker lets Paid speak for itself and sizes the seller flyout t
   );
   assert.doesNotMatch(css, /\.pk-balance-line\[data-empty\] > svg/);
 });
+
+void test('model picker announces Needs funds only on rows that are actually disabled', async () => {
+  const dropdown = await view('ModelDropdown.tsx.preview');
+  assert.match(dropdown, /<ModelBadges offers=\{list\} locked=\{locked\} \/>/);
+  assert.match(
+    dropdown,
+    /title=\{\s*soon\s*\? PREVIEW_COPY\.sellerModeSoon\s*: locked\s*\? PREVIEW_COPY\.needsFunds\s*: detail\s*\}/,
+  );
+});
+
+void test('preview stylesheet declares each picker and flyout rule once, on shared tokens', async () => {
+  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  for (const selector of [
+    'html .app.desktop-frame .compact-dropdown .dropdown-row {',
+    'html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {',
+    'html .app.desktop-frame .preview-strategy-icon {',
+    'html .app.desktop-frame .preview-flyout-title {',
+    'html .app.desktop-frame .pk-balance-line {',
+    'html .app.desktop-frame .pk-balance-line strong {',
+    'html .app.desktop-frame .preview-model-list .ui-item-title {',
+  ]) {
+    assert.equal(css.split('\n' + selector).length - 1, 1, selector);
+  }
+  assert.match(
+    css,
+    /\.desktop-frame \{[^}]*--pk-radius-tag: 6px;[^}]*--pk-menu-motion: 150ms;/,
+  );
+  assert.doesNotMatch(
+    css,
+    /border-radius: [0-9]+px;\n[^}]*\}\nhtml \.app\.desktop-frame \.preview-strategy-icon/,
+  );
+  assert.doesNotMatch(css, /rotate 200ms/);
+});

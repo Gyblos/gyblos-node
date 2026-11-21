@@ -307,7 +307,7 @@ void test('preview model picker keeps one selection signal, short seller rows an
   );
   assert.match(
     css,
-    /\.dropdown-row\[data-strategy\] \{\n {2}align-items: flex-start;/,
+    /\.dropdown-row\[data-strategy\] \{\n {2}align-items: center;/,
   );
   assert.match(
     css,

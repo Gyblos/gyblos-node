@@ -407,7 +407,7 @@ export function ModelDropdown({
                     title={locked ? PREVIEW_COPY.needsFunds : undefined}
                     label={name}
                     detail={contextLabel}
-                    badge={contextLabel ? undefined : <ModelBadges offers={list} locked={needsFunds(list)} />}
+                    badge={contextLabel ? undefined : <ModelBadges offers={list} locked={locked} />}
                     leading={<ModelImage artwork={first.image} name={name} />}
                     trailing={
                       <span className="preview-menu-trail">

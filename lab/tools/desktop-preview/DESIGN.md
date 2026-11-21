@@ -87,6 +87,8 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 - `FilterChips`: single-choice filter with counts; one Tab stop, arrow keys move.
 - `Tag` `pill`: Free and Paid labels in the model picker; price and seller counts
   use plain `Tag`s on the line below.
+- `Tag` and `Badge` share one size across the mockup: 20 px high, 11 px text,
+  `--pk-radius-tag` (6 px); picker and flyout tags drop to 18 px.
 - Menus (`Dropdown` panels and the seller flyout): 150 ms fade with a 0.95 scale
   and 2 px blur, grown from the trigger side; rows use the control radius
   (10 px) inside the 16 px panel. A trigger's caret turns while its menu is open.

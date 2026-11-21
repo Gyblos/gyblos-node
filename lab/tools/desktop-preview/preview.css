@@ -2419,6 +2419,7 @@ html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
   --pk-side: color-mix(in srgb, var(--panel) 80%, var(--bg));
   --pk-side-width: var(--compact-navigation-width);
   --pk-radius-tag: 6px;
+  --pk-menu-motion: 150ms;
 }
 .desktop-frame [data-tone='success'] {
   --pk-tone: var(--pk-success);
@@ -2673,8 +2674,10 @@ html .app.desktop-frame .composer-actions > span {
 
 /* Menus: rows sized to their text so options read at the same rhythm as the rest of the app. */
 html .app.desktop-frame .compact-dropdown .dropdown-row {
+  gap: 8px;
   min-height: 32px;
-  padding: 6px 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-control);
   line-height: 20px;
 }
 html .app.desktop-frame .compact-dropdown .dropdown-copy {
@@ -2698,11 +2701,9 @@ html .app.desktop-frame .compact-dropdown {
     overlay var(--pk-menu-motion) allow-discrete;
 }
 html .app.desktop-frame .compact-dropdown[data-direction='up'] {
-  translate: none;
   transform-origin: bottom left;
 }
 html .app.desktop-frame .compact-dropdown:popover-open {
-  translate: none;
   opacity: 1;
   scale: 1;
   filter: none;
@@ -2714,14 +2715,6 @@ html .app.desktop-frame .compact-dropdown:popover-open {
     filter: blur(2px);
   }
 }
-html .app.desktop-frame {
-  --pk-menu-motion: 150ms;
-}
-html .app.desktop-frame .compact-dropdown .dropdown-row {
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-control);
-}
 /* A trigger's caret turns while its menu is open. */
 html
   .app.desktop-frame
@@ -2732,7 +2725,7 @@ html
 html
   .app.desktop-frame
   :is(.preview-trigger-caret, .ui-menu-trigger > svg:last-child) {
-  transition: rotate 200ms ease;
+  transition: rotate var(--pk-menu-motion) ease-out;
 }
 html
   .app.desktop-frame
@@ -2839,8 +2832,8 @@ html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
 html .app.desktop-frame .preview-flyout-title {
   display: grid;
   gap: 2px;
-  margin: 0 0 4px;
-  padding: 6px 10px 8px;
+  margin: 0 0 2px;
+  padding: 4px 8px 6px;
   border-bottom: 1px solid var(--subtle-line);
 }
 html .app.desktop-frame .preview-flyout-title strong {
@@ -2854,15 +2847,13 @@ html .app.desktop-frame .preview-flyout-title small {
   color: var(--muted);
 }
 html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {
-  align-items: flex-start;
-  gap: 10px;
-  border-radius: 8px;
+  align-items: center;
 }
 html .app.desktop-frame .preview-strategy-icon {
   display: inline-grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   flex: none;
   color: var(--muted);
   transition: color var(--motion-overlay) ease;
@@ -2915,22 +2906,23 @@ html[data-font='inter'] .desktop-frame {
   }
 }
 
-/* Funds-needed strip attached to the top of the composer. */
+/* Balance line at the top of the model picker: wallet, amount and an Add funds button. */
 html .app.desktop-frame .pk-balance-line {
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 0 0 4px;
-  padding: 2px 10px 8px;
+  padding: 2px 4px 8px 8px;
   border-bottom: 1px solid var(--subtle-line);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 18px;
   color: var(--muted);
 }
 html .app.desktop-frame .pk-balance-line strong {
   font-family: var(--font-mono);
   font-weight: 500;
   color: var(--ink);
+  white-space: nowrap;
 }
 html .app.desktop-frame .compact-dropdown.preview-model-menu {
   overflow-x: hidden;
@@ -3412,9 +3404,13 @@ html .app.desktop-frame .preview-amount-field .ui-icon-button {
 /* Model picker rows: Free/Paid pill beside the name, price and sellers below. */
 html .app.desktop-frame .preview-model-list .ui-item-title {
   flex-wrap: wrap;
-  row-gap: 4px;
+  row-gap: 2px;
+  column-gap: 6px;
 }
-html .app.desktop-frame .preview-model-list .pk-tag {
+html
+  .app.desktop-frame
+  :is(.preview-model-list, .preview-seller-flyout)
+  .pk-tag {
   height: 18px;
   padding: 0 6px;
   font-size: 11px;
@@ -3431,13 +3427,6 @@ html .app.desktop-frame .pk-badge-line .pk-tag {
   font-weight: 400;
   font-variant-numeric: tabular-nums;
   color: color-mix(in srgb, var(--muted) 55%, var(--ink));
-}
-/* Balance line: wallet, amount and an Add funds button. */
-html .app.desktop-frame .pk-balance-line {
-  gap: 6px;
-  padding: 2px 4px 8px 8px;
-  font-size: 13px;
-  line-height: 18px;
 }
 html .app.desktop-frame .pk-balance-line > svg {
   flex: none;
@@ -3459,33 +3448,16 @@ html .app.desktop-frame .ui-badge {
   border-radius: var(--pk-radius-tag);
   font-size: 11px;
 }
-html .app.desktop-frame .pk-balance-line strong {
-  white-space: nowrap;
-}
 /* Picker proportions: the model name leads at 14 px; pills at 11 px and meta at 11 px muted sit below it. */
 html .app.desktop-frame .preview-model-list .dropdown-copy strong {
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
 }
-html .app.desktop-frame .preview-model-list .ui-item-title {
-  row-gap: 2px;
-  column-gap: 6px;
-}
 html .app.desktop-frame .preview-model-list .dropdown-row {
   padding-block: 6px;
 }
 /* Seller flyout: content height, one-line rows, 13 px labels and 12 px details. */
-html .app.desktop-frame .preview-flyout-title {
-  margin: 0 0 2px;
-  padding: 4px 8px 6px;
-}
-html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-control);
-}
 html .app.desktop-frame .preview-seller-flyout .dropdown-copy strong {
   font-size: 13px;
   font-weight: 500;
@@ -3497,15 +3469,6 @@ html .app.desktop-frame .preview-seller-flyout .dropdown-copy small {
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-html .app.desktop-frame .preview-strategy-icon {
-  width: 16px;
-  height: 16px;
-}
-html .app.desktop-frame .preview-seller-flyout .pk-tag {
-  height: 18px;
-  padding: 0 6px;
-  font-size: 11px;
 }
 html .app.desktop-frame .preview-seller-flyout .preview-offer-price {
   font-family: var(--font-mono);
