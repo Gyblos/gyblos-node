@@ -5,6 +5,7 @@ import { toFacilitatorSvmSigner, type FacilitatorSvmSigner } from '@x402/svm';
 import { TIMEOUTS } from '@gyblos/config';
 import { canonicalJson } from '@gyblos/protocol';
 import {
+  OPENING_STATUS,
   SESSION_CODES,
   sessionFail,
   type PaymentSessionTerms,
@@ -91,12 +92,13 @@ export function openBatchBuyerBackend(
         now: options.now ?? Date.now,
         openingStatus: async (store, signal) => {
           const record = store.read();
-          if (!record.opening) return 'unknown';
-          if (await current.opening(record.opening, signal)) return 'present';
+          if (!record.opening) return OPENING_STATUS.UNKNOWN;
+          if (await current.opening(record.opening, signal))
+            return OPENING_STATUS.PRESENT;
           signal.throwIfAborted();
           return (await resolveAbsentBatchOpening(store, rpc, signal))
-            ? 'absent'
-            : 'unknown';
+            ? OPENING_STATUS.ABSENT
+            : OPENING_STATUS.UNKNOWN;
         },
         hints: async () => {
           const abortSignal = AbortSignal.timeout(TIMEOUTS.rpc);
@@ -217,7 +219,7 @@ export function openBatchSellerBackend(
         now: options.now ?? Date.now,
         facilitator,
         observe: observer.settlement,
-        observeOpening: observer.opening,
+        observeOpening: (opening) => observer.opening(opening),
         closing: observer.closing,
         operationMs: options.operationMs,
         reclaimReleasedSlot: payload !== undefined,

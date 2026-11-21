@@ -28,6 +28,7 @@ import {
   type PreparedChannel,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
+import { checkPreviousOpening, disposeAbsent } from './buyer-opening-state';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
 import { sessionApproval } from './session-accounting';
@@ -40,6 +41,7 @@ import {
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
   // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
+  beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
   openingSupportsBlocks?: boolean;
   preparation?: PreparedChannel;
   receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
@@ -54,18 +56,31 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
   verify(quote: SignedOfferV2, signal: AbortSignal): Promise<void>;
   transport?: BatchClientOptions;
 }
-interface Current<Remote extends BatchDestination> {
+export interface Current<Remote extends BatchDestination> {
   terms: PaymentSessionTerms;
   priorSpentAtomic: string;
   financial: SessionBuyer;
   host: ReturnType<typeof createBuyerBatchSession<Remote>>;
 }
-interface State<Remote extends BatchDestination> {
+export interface State<Remote extends BatchDestination> {
   options: BuyerSessionOptions<Remote>;
   lifetime: AbortController;
   backend?: Promise<BuyerSessionBackend>;
   current?: Promise<Current<Remote>>;
   active: boolean;
+}
+function getBackend<Remote extends BatchDestination>(
+  state: State<Remote>,
+  signal: AbortSignal,
+) {
+  if (!state.backend) {
+    const pending = state.options.backend();
+    state.backend = pending;
+    void pending.catch(() => {
+      if (state.backend === pending) state.backend = undefined;
+    });
+  }
+  return bounded(state.backend, signal);
 }
 async function openCurrent<Remote extends BatchDestination>(
   state: State<Remote>,
@@ -76,9 +91,19 @@ async function openCurrent<Remote extends BatchDestination>(
   const stored = await bounded(options.inspect(), signal);
   if (stored?.notCreated) {
     if (!quote) return sessionFail(SESSION_CODES.CLOSED);
-    const backend = await (state.backend ??= options.backend());
+    const backend = await getBackend(state, signal);
     if (!backend.renew) return sessionFail(SESSION_CODES.CLOSED);
-    const replacement = newSessionTerms(quote, options.policy, options.now());
+    const replacement = newSessionTerms(
+      quote,
+      {
+        ...options.policy,
+        depositAtomic: String(
+          BigInt(options.policy.depositAtomic) -
+            BigInt(stored.priorSpentAtomic ?? '0'),
+        ),
+      },
+      options.now(),
+    );
     await verifyBatchQuote(
       quote,
       replacement,
@@ -91,6 +116,8 @@ async function openCurrent<Remote extends BatchDestination>(
       replacement,
       options.policy.depositAtomic,
     );
+    if ((await options.inspect())?.notCreated)
+      return sessionFail(SESSION_CODES.UNVERIFIED);
     return openCurrent(state, quote, signal);
   }
   const terms =
@@ -110,14 +137,7 @@ async function openCurrent<Remote extends BatchDestination>(
       : options.preparation;
   signal.throwIfAborted();
   const destination = options.destination(terms);
-  if (!state.backend) {
-    const pending = options.backend();
-    state.backend = pending;
-    void pending.catch(() => {
-      if (state.backend === pending) state.backend = undefined;
-    });
-  }
-  const backend = await bounded(state.backend, signal);
+  const backend = await getBackend(state, signal);
   signal.throwIfAborted();
   const financial = await backend.create(terms);
   try {
@@ -194,10 +214,7 @@ async function run<Remote extends BatchDestination>(
         error instanceof UnsentOpeningError &&
         error.code === SESSION_CODES.OPENING_ABSENT
       ) {
-        await ready.host.disconnect();
-        await ready.host.settled();
-        await ready.financial.dispose();
-        state.current = undefined;
+        await disposeAbsent(state, ready);
       }
       throw error;
     });
@@ -222,6 +239,11 @@ async function renewable<Remote extends BatchDestination>(
 ): Promise<Current<Remote>> {
   const options = state.options;
   const backend = await state.backend!;
+  if (
+    (await checkPreviousOpening(state, opened, signal)) &&
+    options.now() < opened.terms.expiresAt
+  )
+    return opened;
   if (!backend.renew) return opened;
   if (opened.financial.snapshot().channelId)
     await opened.host.reconcile(signal);
@@ -332,6 +354,10 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
       } finally {
         state.active = false;
       }
+    },
+    async checkOpening(signal: AbortSignal) {
+      const opened = await current(state, undefined, signal);
+      return checkPreviousOpening(state, opened, signal);
     },
     async reconcile(signal: AbortSignal) {
       const stored = await options.inspect();

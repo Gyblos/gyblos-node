@@ -31,6 +31,7 @@ import type { PoolRecord, PoolRow } from './batch-pool-types';
 import { termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
+import { renewBatchSession } from './batch-session-renewal';
 import { readBatchRecord } from './batch-session-state';
 import { BATCH_POOL_VERSION } from './constants';
 
@@ -62,8 +63,7 @@ function parse(value: unknown): PoolRecord {
     const refundedAtomic = controlAtomic(entry.refundedAtomic);
     if (
       (!entry.ready &&
-        (entry.legacy ||
-          entry.uncertain ||
+        (entry.uncertain ||
           entry.requestId !== null ||
           refundedAtomic !== '0')) ||
       (entry.requestId !== null && !entry.uncertain)
@@ -114,7 +114,10 @@ export async function readPool(
   );
   const legacy = await readBatchRecord(paths.legacy);
   // Pool generation accounting is separate; never silently discard a renewed root's historical spend.
-  if (legacy?.history?.length && (raw !== undefined || includeLegacy))
+  if (
+    legacy?.history?.some((entry) => !batchOpeningAbsent(entry)) &&
+    (raw !== undefined || includeLegacy)
+  )
     return sessionFail(SESSION_CODES.UNVERIFIED);
   if (raw === undefined) {
     if (!includeLegacy) return { version: BATCH_POOL_VERSION, entries: [] };
@@ -145,7 +148,9 @@ export async function readPool(
   const known = record.entries.find((entry) => entry.legacy);
   if (
     legacy &&
-    (!known || canonicalJson(known.terms) !== canonicalJson(legacy.terms))
+    (!known ||
+      (canonicalJson(known.terms) !== canonicalJson(legacy.terms) &&
+        (known.ready || !batchOpeningAbsent(legacy))))
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);
   if (known && !legacy) return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -153,7 +158,8 @@ export async function readPool(
 }
 export async function poolChild(paths: BatchPoolPaths, row: PoolRow) {
   const record = await readBatchRecord(poolPaths(paths, row));
-  if (record?.history?.length) return sessionFail(SESSION_CODES.UNVERIFIED);
+  if (record?.history?.some((entry) => !batchOpeningAbsent(entry)))
+    return sessionFail(SESSION_CODES.UNVERIFIED);
   if (!record || canonicalJson(record.terms) !== canonicalJson(row.terms))
     return sessionFail(SESSION_CODES.UNVERIFIED);
   if (
@@ -168,6 +174,20 @@ async function seed(paths: BatchPoolPaths, row: PoolRow, now: number) {
   const pathsFor = poolPaths(paths, row);
   const found = await readBatchRecord(pathsFor);
   if (found) {
+    if (
+      batchOpeningAbsent(found) &&
+      canonicalJson(found.terms) !== canonicalJson(row.terms)
+    ) {
+      await renewBatchSession({
+        paths: pathsFor,
+        expectedChannelId: found.channelId,
+        terms: row.terms,
+        totalBudgetAtomic: row.terms.depositAtomic,
+        now: () => now,
+        observe: async () => sessionFail(SESSION_CODES.UNVERIFIED),
+      });
+      return;
+    }
     if (
       canonicalJson(found.terms) !== canonicalJson(row.terms) ||
       found.hints !== null ||

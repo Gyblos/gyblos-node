@@ -20,6 +20,7 @@ import { reserved } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
 import { emptyPreparation } from './batch-session-opening-release';
 import type { BatchPaths, BatchRecord } from './batch-session-types';
+import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export interface BatchStoredSession {
   terms: PaymentSessionTerms;
@@ -28,6 +29,7 @@ export interface BatchStoredSession {
   pending: boolean;
   recoverable: boolean;
   notCreated?: true;
+  openingPending?: true;
   // A released never-funded opening: terminal for admission, and its buyer may open again.
   released?: true;
   // An empty preparation (released or not): no channel, opening, charge or pending attempt.
@@ -92,6 +94,9 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     record.settlement.chargedAtomic === record.cumulativeAtomic &&
     !recoverable;
   return {
+    ...(record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] && {
+      openingPending: true as const,
+    }),
     ...(archivedProof ? { archivedProof: true as const } : {}),
     ...(notCreated ? { notCreated: true as const } : {}),
     ...(record.released ? { released: true as const } : {}),

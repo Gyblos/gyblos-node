@@ -10,6 +10,8 @@ export type { SessionState, SessionCode } from './sessions/constants';
 export {
   PAYMENT_SESSION,
   SESSION_CODES,
+  OPENING_STATUS,
+  type OpeningStatus,
   SESSION_STATES,
 } from './sessions/constants';
 // cause: the original failure a generic code replaced, for local diagnostics only; never sent to a peer.
@@ -84,12 +86,14 @@ export interface SessionSeller {
   dispose(): Promise<void>;
 }
 export interface SessionBuyer {
-  // Only the original OPEN may be repeated; a surviving intent requires chain evidence first.
-  claimOpening?(): Promise<boolean>;
-  acknowledgeOpening?(): Promise<void>;
-  openingStatus?(
-    signal: AbortSignal,
-  ): Promise<'present' | 'absent' | 'unknown'>;
+  openingRecovery?: {
+    claim(): Promise<boolean>;
+    acknowledged(): Promise<void>;
+    pending(): boolean;
+    status(
+      signal: AbortSignal,
+    ): Promise<import('./sessions/constants').OpeningStatus>;
+  };
   open(check?: () => void): Promise<string>;
   begin(request: SessionRequest): Promise<void>;
   acknowledge(requestId: string): Promise<void>;

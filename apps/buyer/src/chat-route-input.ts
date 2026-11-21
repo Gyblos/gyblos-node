@@ -1,4 +1,5 @@
 // Parse the authenticated chat request before asking any seller for a quote.
+import { isOpeningIntent } from '@gyblos/node/desktop-opening';
 import { BUYER_API, parseBuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 
@@ -52,7 +53,11 @@ export function routedInput(
   ) {
     if (!selectedSellerAllowed)
       throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
-    const { [BUYER_API.SELLER_CHOICE_FIELD]: value, ...rest } = body;
+    const { [BUYER_API.SELLER_CHOICE_FIELD]: value, ...choiceBody } = body;
+    const fields: Record<string, unknown> = choiceBody;
+    const { [BUYER_API.OPENING_INTENT_FIELD]: intent, ...rest } = fields;
+    if (intent !== undefined && !isOpeningIntent(intent))
+      throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
     const sellerChoice = parseBuyerSellerChoice(value, Date.now());
     const { modelId, variant, quantization } = sellerChoice;
     const selection = { modelId, variant, quantization };
@@ -60,6 +65,7 @@ export function routedInput(
       selection,
       maxTokens: Math.min(settings.maxTokens, sellerChoice.contextTokens),
       sellerChoice,
+      ...(intent && { openingIntent: intent }),
     };
     const input = api.parse(rest, selection, route.maxTokens, streaming, false);
     const { stream: _stream, ...payload } = input;

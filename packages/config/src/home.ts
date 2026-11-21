@@ -304,6 +304,16 @@ export function desktopX402Paths(profile: string) {
   };
 }
 
+// The desktop and its managed buyer arbitrate one outstanding chat under a private process lock.
+export function desktopOpeningPaths(environment: HomeEnvironment) {
+  const directory = rolePathIn(environment, 'buyer', ROLE_FILES.payments);
+  return {
+    directory,
+    state: join(directory, 'desktop-opening-v1.json'),
+    lock: join(directory, 'desktop-opening.lock'),
+  };
+}
+
 // One bounded reusable channel journal per role; no prompts, answers or signing keys.
 export const BATCH_SESSION_FILES = {
   state: 'batch-session-v1.json',

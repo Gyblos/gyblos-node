@@ -1,5 +1,5 @@
 // Bounded host-side responses from the owner-authenticated loopback buyer.
-import { HTTP_STATUS } from '@gyblos/config';
+import { HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 import { desktopBuyerFailure } from './buyer-error';
@@ -76,4 +76,23 @@ export async function waitForPaidBuyer(
   throw new PaidSellerLimitError(
     'The local buyer could not prepare this chat. Reconnect the buyer and select the seller again.',
   );
+}
+
+export function buyerEndpoint(input: unknown) {
+  if (typeof input !== 'string') throw new Error('Enter a local buyer URL');
+  const url = new URL(input);
+  if (
+    url.protocol !== 'http:' ||
+    url.hostname !== LOCALHOST ||
+    !url.port ||
+    url.pathname !== ROUTES.inference ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  )
+    throw new Error(
+      'Use the local buyer URL at http://127.0.0.1:port/v1/chat/completions',
+    );
+  return url;
 }

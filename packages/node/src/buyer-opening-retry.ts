@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import {
+  OPENING_STATUS,
   SESSION_CODES,
   type SessionBuyer,
 } from '@gyblos/protocol/payment-session';
@@ -25,13 +26,14 @@ export async function recoverBuyerOpening<T>(
   verify: (signal: AbortSignal) => Promise<void>,
   signal: AbortSignal,
 ): Promise<T> {
-  if (!buyer.openingStatus) return open();
+  const evidence = buyer.openingRecovery;
+  if (!evidence) return open();
   const attempt = async () => {
     const result = await open();
-    await buyer.acknowledgeOpening?.();
+    await evidence.acknowledged();
     return result;
   };
-  if ((await buyer.claimOpening?.()) !== false) {
+  if (await evidence.claim()) {
     try {
       return await attempt();
     } catch {
@@ -46,14 +48,13 @@ export async function recoverBuyerOpening<T>(
     // Observe only the original transaction. A missing RPC response proves neither outcome.
     for (const wait of BATCH_SESSION_DEFAULTS.openingRecheckMs) {
       if (wait) await delay(wait, undefined, { signal: recovery });
-      const status = await bounded(
-        buyer.openingStatus(recovery),
-        recovery,
-      ).catch(() => 'unknown');
+      const status = await bounded(evidence.status(recovery), recovery).catch(
+        () => OPENING_STATUS.UNKNOWN,
+      );
       recovery.throwIfAborted();
-      if (status === 'absent')
+      if (status === OPENING_STATUS.ABSENT)
         throw new UnsentOpeningError(SESSION_CODES.OPENING_ABSENT);
-      if (status === 'present') {
+      if (status === OPENING_STATUS.PRESENT) {
         await bounded(verify(recovery), recovery);
         return await attempt();
       }

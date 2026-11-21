@@ -109,7 +109,7 @@ export interface BatchBuyerOptions extends BatchCommonOptions {
   openingStatus?: (
     store: import('./batch-session-store').BatchStore,
     signal: AbortSignal,
-  ) => ReturnType<NonNullable<SessionBuyer['openingStatus']>>;
+  ) => ReturnType<NonNullable<SessionBuyer['openingRecovery']>['status']>;
   hints: () => Promise<BatchHint>;
 }
 export interface BatchFacilitator {

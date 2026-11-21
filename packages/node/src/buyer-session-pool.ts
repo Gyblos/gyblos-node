@@ -145,6 +145,19 @@ async function unresolved<Remote extends BatchDestination>(
   }
   return state.admission.block(pending, revision);
 }
+async function checkExpiredOpening<Remote extends BatchDestination>(
+  state: State<Remote>,
+  existing: BatchPoolEntry | undefined,
+  signal: AbortSignal,
+) {
+  if (
+    existing?.stored?.openingPending &&
+    !existing.stored.notCreated &&
+    state.options.now() >= existing.terms.expiresAt
+  ) {
+    await manager(state, existing).checkOpening(signal);
+  }
+}
 async function execute<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2,
@@ -162,8 +175,9 @@ async function execute<Remote extends BatchDestination>(
     const existing = (await pool.list()).find(
       (entry) => entry.terms.sellerNodeId === quote.offer.nodeId,
     );
+    await checkExpiredOpening(state, existing, signal);
     const terms =
-      existing?.terms ??
+      (existing?.stored?.notCreated ? undefined : existing?.terms) ??
       newSessionTerms(quote, state.options.policy, state.options.now());
     await verifyBatchQuote(
       quote,
@@ -172,8 +186,10 @@ async function execute<Remote extends BatchDestination>(
       state.options.now(),
     );
     if (
-      batchSessionTerminal(existing?.stored) ||
-      state.options.now() >= terms.expiresAt
+      (batchSessionTerminal(existing?.stored) &&
+        !existing?.stored?.notCreated) ||
+      (state.options.now() >= terms.expiresAt &&
+        !existing?.stored?.openingPending)
     )
       return sessionFail(SESSION_CODES.CLOSED);
     const budget = await pool.budget();
@@ -190,7 +206,7 @@ async function execute<Remote extends BatchDestination>(
       BigInt(budget.availableAtomic) < BigInt(terms.depositAtomic)
     )
       return sessionFail(SESSION_CODES.LIMIT);
-    return { terms, fresh: !existing };
+    return { terms, fresh: !existing || !!existing.stored?.notCreated };
   });
   const preparation =
     fresh && state.options.openingSupportsBlocks !== undefined

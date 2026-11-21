@@ -1,6 +1,7 @@
 // Main-process-only connection to an explicitly configured, authenticated loopback buyer.
 // It never retries a transmitted request or treats a seller's unverified claim as a payment.
-import { LOCALHOST, ROUTES } from '@gyblos/config';
+import { randomUUID } from 'node:crypto';
+
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
 import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
@@ -19,7 +20,7 @@ import { requestAgentEndpoint } from './agent-endpoint';
 import { desktopBuyerFailure } from './buyer-error';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
-import { readJson, waitForPaidBuyer } from './x402-http';
+import { buyerEndpoint, readJson, waitForPaidBuyer } from './x402-http';
 import {
   DESKTOP_X402,
   PaidSellerLimitError,
@@ -33,6 +34,18 @@ import {
 } from './x402-reply';
 import { readBuyerStream } from './x402-stream';
 
+function validateChoice(
+  choice: BuyerSellerChoice | undefined,
+  policy: BuyerApiPolicy,
+  current: Awaited<ReturnType<X402Budget['summary']>>,
+) {
+  if (choice) {
+    if (choice.expiresAt <= Date.now())
+      throw new Error('Seller listing expired');
+    const notice = paidSellerLimitNotice(policy, current, choice.modelId);
+    if (notice) throw new PaidSellerLimitError(notice);
+  }
+}
 export type DesktopSellerChoice =
   BuyerSellerChoice | typeof OFFER_PRICING_KINDS.FREE;
 function policyForSeller(
@@ -50,29 +63,13 @@ function policyForSeller(
     ),
   };
 }
-export function buyerEndpoint(input: unknown) {
-  if (typeof input !== 'string') throw new Error('Enter a local buyer URL');
-  const url = new URL(input);
-  if (
-    url.protocol !== 'http:' ||
-    url.hostname !== LOCALHOST ||
-    !url.port ||
-    url.pathname !== ROUTES.inference ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash
-  )
-    throw new Error(
-      'Use the local buyer URL at http://127.0.0.1:port/v1/chat/completions',
-    );
-  return url;
-}
+export { buyerEndpoint } from './x402-http';
 export { parseBuyerReply } from './x402-reply';
 export class X402Client {
   private connection: {
     url: URL;
     token: string;
+    managed: boolean;
     preparesPaidChat: boolean;
     policy: BuyerApiPolicy;
   } | null = null;
@@ -117,7 +114,7 @@ export class X402Client {
     this.connection = null;
     this.controller?.abort();
   }
-  async connect(input: unknown, token: unknown) {
+  async connect(input: unknown, token: unknown, managed = false) {
     if (this.busy || this.closed || this.keyRequests.size > 0)
       throw new Error('Wait for the current response');
     const url = buyerEndpoint(input);
@@ -139,6 +136,7 @@ export class X402Client {
       this.connection = {
         url,
         token,
+        managed,
         policy,
         preparesPaidChat:
           response.headers.get(BUYER_API.PAID_PREPARATION_HEADER) ===
@@ -276,25 +274,21 @@ export class X402Client {
       throw new Error(
         'Buyer policy changed. Finish the previous budget before authorizing another.',
       );
-    if (choice) {
-      if (choice.expiresAt <= Date.now())
-        throw new Error('Seller listing expired');
-      const notice = paidSellerLimitNotice(
-        connection.policy,
-        current,
-        choice.modelId,
-      );
-      if (notice) throw new PaidSellerLimitError(notice);
-    }
+    validateChoice(choice, connection.policy, current);
     await waitForPaidBuyer(
       connection,
       this.request,
       external,
       choice?.expiresAt,
     );
+    const intent =
+      choice && connection.managed && this.budget.opening
+        ? randomUUID()
+        : undefined;
     const reserved = await this.budget.reserve(
       id,
       choice ? connection.policy : undefined,
+      intent,
     );
     const policy = policyForSeller(reserved, choice);
     let sent = false;
@@ -309,9 +303,11 @@ export class X402Client {
         external,
         onDelta,
         choice,
+        intent,
       );
     } catch (error) {
-      if (!sent) await this.budget.cancelUnsent(id);
+      if (intent) await this.budget.recoverOpening();
+      else if (!sent) await this.budget.cancelUnsent(id);
       else if (
         policy.maxAtomic === '0' &&
         (await this.budget.summary()).blocked
@@ -328,6 +324,7 @@ export class X402Client {
     external: AbortSignal,
     onDelta?: (text: string) => void,
     choice?: DesktopSellerChoice,
+    intent?: string,
   ) {
     const started = performance.now();
     const signal = AbortSignal.any([
@@ -353,6 +350,7 @@ export class X402Client {
           ...(choice === OFFER_PRICING_KINDS.FREE
             ? { [BUYER_API.FREE_ONLY_FIELD]: true }
             : choice && { [BUYER_API.SELLER_CHOICE_FIELD]: choice }),
+          ...(intent && { [BUYER_API.OPENING_INTENT_FIELD]: intent }),
           model: policy.model,
           messages: [{ role: FREE_CHAT_ROLES.USER, content: prompt }],
           max_tokens: policy.maxTokens,
@@ -370,6 +368,7 @@ export class X402Client {
     if (!response.ok) {
       const error = object(object(body).error);
       if (
+        !intent &&
         choice !== OFFER_PRICING_KINDS.FREE &&
         error[BUYER_API.NEVER_SENT_FIELD] === true &&
         error.code !== PAID_BUYER_CODES.UNRESOLVED

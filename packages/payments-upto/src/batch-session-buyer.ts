@@ -46,26 +46,7 @@ export async function createBatchBuyer(
   );
   const exclusive = serial();
   return {
-    ...(options.openingStatus && {
-      claimOpening: () =>
-        exclusive(async () => {
-          if (store.read().pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT])
-            return false;
-          await store.update((record) => {
-            record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] =
-              record.channelId;
-          });
-          return true;
-        }),
-      acknowledgeOpening: () =>
-        exclusive(() =>
-          store.update((record) => {
-            delete record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT];
-          }),
-        ),
-      openingStatus: (signal: AbortSignal) =>
-        exclusive(() => options.openingStatus!(store, signal)),
-    }),
+    openingRecovery: openingRecovery(options, store, exclusive),
     usesBlocks: () => store.read().blocks !== undefined,
     pendingBlockRequest: () => {
       const state = store.read();
@@ -131,6 +112,35 @@ export async function createBatchBuyer(
     recoverApproval: () => exclusive(() => recoverApproval(options, store)),
     snapshot: () => snapshot(store),
     dispose: () => exclusive(store.dispose),
+  };
+}
+
+function openingRecovery(
+  options: BatchBuyerOptions,
+  store: BatchStore,
+  exclusive: ReturnType<typeof serial>,
+): SessionBuyer['openingRecovery'] {
+  const status = options.openingStatus;
+  if (!status) return undefined;
+  return {
+    pending: () => !!store.read().pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT],
+    claim: () =>
+      exclusive(async () => {
+        if (store.read().pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT])
+          return false;
+        await store.update((record) => {
+          record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] =
+            record.channelId;
+        });
+        return true;
+      }),
+    acknowledged: () =>
+      exclusive(() =>
+        store.update((record) => {
+          delete record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT];
+        }),
+      ),
+    status: (signal: AbortSignal) => exclusive(() => status(store, signal)),
   };
 }
 

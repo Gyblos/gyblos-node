@@ -11,6 +11,13 @@ export const SESSION_CODES = {
   UNAVAILABLE: 'PAYMENT_SESSION_UNAVAILABLE',
 } as const;
 export type SessionCode = (typeof SESSION_CODES)[keyof typeof SESSION_CODES];
+export const OPENING_STATUS = {
+  PRESENT: 'present',
+  ABSENT: 'absent',
+  UNKNOWN: 'unknown',
+} as const;
+export type OpeningStatus =
+  (typeof OPENING_STATUS)[keyof typeof OPENING_STATUS];
 export const SESSION_STATES = {
   OPENING: 'opening',
   OPEN: 'open',

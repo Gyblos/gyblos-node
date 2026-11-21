@@ -37,10 +37,27 @@ export async function batchPrepareFixture(
   );
   let verified = 0;
   let verification: (() => Promise<void>) | undefined;
+  let pending = false;
   const buyer = createBuyerBatchSession({
     ...wire,
     terms: rig.terms,
-    buyer: { ...rig.buyer, openingStatus },
+    buyer: {
+      ...rig.buyer,
+      ...(openingStatus && {
+        openingRecovery: {
+          pending: () => pending,
+          claim: async () => {
+            const first = !pending;
+            pending = true;
+            return first;
+          },
+          acknowledged: async () => {
+            pending = false;
+          },
+          status: openingStatus,
+        },
+      }),
+    },
     meter: offers.meter,
     now: rig.now,
     unresolved: async () => false,
