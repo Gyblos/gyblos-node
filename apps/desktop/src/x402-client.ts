@@ -3,6 +3,7 @@
 import { LOCALHOST, ROUTES } from '@gyblos/config';
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   BUYER_API,
   type BuyerApiPolicy,
@@ -42,7 +43,11 @@ function policyForSeller(
   return {
     ...policy,
     model: choice.modelId,
-    maxTokens: Math.min(choice.contextTokens, policy.maxTokens),
+    maxTokens: Math.min(
+      choice.contextTokens,
+      policy.maxTokens,
+      BATCH_CHANNEL.maxOutputTokens,
+    ),
   };
 }
 export function buyerEndpoint(input: unknown) {
