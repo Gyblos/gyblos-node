@@ -32,6 +32,7 @@ export interface ModelRoute {
 
 // What a request needs to find and quote a seller for one model.
 export type RoutedModel = Pick<ModelRoute, 'selection' | 'maxTokens'> & {
+  openingIntent?: string;
   freeOnly?: boolean;
   sellerChoice?: import('@gyblos/protocol/buyer-api').BuyerSellerChoice;
 };

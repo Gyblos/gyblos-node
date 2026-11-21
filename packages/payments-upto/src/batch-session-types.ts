@@ -106,6 +106,10 @@ export interface BatchCommonOptions {
 }
 export interface BatchBuyerOptions extends BatchCommonOptions {
   payer: TransactionPartialSigner & MessagePartialSigner;
+  openingStatus?: (
+    store: import('./batch-session-store').BatchStore,
+    signal: AbortSignal,
+  ) => ReturnType<NonNullable<SessionBuyer['openingRecovery']>['status']>;
   hints: () => Promise<BatchHint>;
 }
 export interface BatchFacilitator {

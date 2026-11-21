@@ -48,9 +48,12 @@ interface ObserverState {
   rpc: NonNullable<BatchObserverOptions['rpc']>;
   terms: PaymentSessionTerms;
 }
-async function context(state: ObserverState) {
+async function context(state: ObserverState, external?: AbortSignal) {
   const { options, rpc, terms } = state;
-  const signal = AbortSignal.timeout(TIMEOUTS.rpc);
+  const signal = AbortSignal.any([
+    AbortSignal.timeout(TIMEOUTS.rpc),
+    ...(external ? [external] : []),
+  ]);
   await verifyPaymentNetwork(rpc, terms.network);
   const record = await readBatchRecord(options.paths);
   if (!record?.opening || canonicalJson(record.terms) !== canonicalJson(terms))
@@ -201,8 +204,8 @@ export function batchSessionObserver(options: BatchObserverOptions) {
       if (!found) return sessionFail(SESSION_CODES.UNVERIFIED);
       return found.status;
     },
-    async opening(opening: BatchDepositPayload) {
-      const current = await context(state);
+    async opening(opening: BatchDepositPayload, signal?: AbortSignal) {
+      const current = await context(state, signal);
       if (canonicalJson(current.record.opening) !== canonicalJson(opening))
         return sessionFail(SESSION_CODES.BINDING);
       const found = await channel(state, current);

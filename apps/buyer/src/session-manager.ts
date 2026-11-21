@@ -1,4 +1,6 @@
 // Composes single-channel or shared-budget buyer sessions; all financial state stays in the adapter.
+import type { AsyncLocalStorage } from 'node:async_hooks';
+
 import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
 import {
   createBuyerSessionManager,
@@ -9,6 +11,7 @@ import {
   buyerSessionPoolChain,
 } from '@gyblos/node/buyer-session-chain';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
+import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   batchSessionTerminal,
   inspectBatchPool,
@@ -40,6 +43,7 @@ type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = BuyerStartupOptions;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
+  openingIntent?: AsyncLocalStorage<string | undefined>;
   selections: Map<string, Winner>;
   sending: Map<string, () => void>;
   meter?: ChatTokenizer;
@@ -148,6 +152,10 @@ export function makeManager(
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
     policy,
+    beforeInference: async () => {
+      const intent = state.openingIntent?.getStore();
+      if (intent) await desktopOpening(process.env).consume(intent);
+    },
     openingSupportsBlocks:
       (policy.totalDepositAtomic !== undefined
         ? options.pool

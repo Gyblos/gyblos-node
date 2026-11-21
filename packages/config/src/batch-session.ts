@@ -5,6 +5,7 @@ export const BATCH_SESSION_DEFAULTS = {
   idleMs: 10 * 60 * 1000,
   minSettlementAtomic: '10000',
   pollMs: 15 * 1000,
+  openingRecheckMs: [0, 1000, 3000],
   operationMs: 20 * 1000,
   maxPendingOperations: 32,
   maxSessions: 16,

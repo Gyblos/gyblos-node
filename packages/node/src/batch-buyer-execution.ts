@@ -35,6 +35,7 @@ import {
   sessionReceiptPayment,
 } from './batch-receipts';
 import { executeBatchBuyer } from './batch-session';
+import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 
 export function batchBuyerSnapshot(
@@ -136,8 +137,17 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   signal.throwIfAborted();
   const channelId = options.buyer.snapshot().channelId;
   const request = buildBatchExecutionRequest(channelId, quote, input);
-  const open = (payload: string) =>
-    openBuyerChannel(context, request, signal, payload);
+  const open = async (payload: string) => {
+    const snapshot = await recoverBuyerOpening(
+      options.buyer,
+      () => openBuyerChannel(context, request, signal, payload),
+      verify,
+      signal,
+    );
+    await options.beforeInference?.(quote.offer.requestId);
+    signal.throwIfAborted();
+    return snapshot;
+  };
   if (context.blockMode) {
     await verify(signal);
     await open(await options.buyer.open());

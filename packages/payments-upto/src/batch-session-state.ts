@@ -14,12 +14,13 @@ import {
   readPrivateFile,
 } from '@gyblos/runtime/private-file';
 
-import { batchOpeningAbsent } from './batch-opening-proof';
+import { batchOpeningAbsent, returnedOpening } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { reserved } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
 import { emptyPreparation } from './batch-session-opening-release';
 import type { BatchPaths, BatchRecord } from './batch-session-types';
+import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export interface BatchStoredSession {
   terms: PaymentSessionTerms;
@@ -28,6 +29,8 @@ export interface BatchStoredSession {
   pending: boolean;
   recoverable: boolean;
   notCreated?: true;
+  openingPending?: true;
+  openingReturned?: true;
   // A released never-funded opening: terminal for admission, and its buyer may open again.
   released?: true;
   // An empty preparation (released or not): no channel, opening, charge or pending attempt.
@@ -92,6 +95,10 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     record.settlement.chargedAtomic === record.cumulativeAtomic &&
     !recoverable;
   return {
+    ...(returnedOpening(record) && { openingReturned: true as const }),
+    ...(record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] && {
+      openingPending: true as const,
+    }),
     ...(archivedProof ? { archivedProof: true as const } : {}),
     ...(notCreated ? { notCreated: true as const } : {}),
     ...(record.released ? { released: true as const } : {}),
@@ -117,7 +124,7 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
 
 export function priorBatchSpent(record: BatchRecord): bigint {
   return (record.history ?? []).reduce(
-    (total, entry) => total + BigInt(entry.settlement!.chargedAtomic),
+    (total, entry) => total + BigInt(entry.settlement?.chargedAtomic ?? '0'),
     0n,
   );
 }

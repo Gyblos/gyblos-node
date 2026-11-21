@@ -12,6 +12,7 @@ import {
 } from 'electron';
 
 import { desktopX402Paths } from '@gyblos/config/home';
+import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   acquireProcessLock,
   readPrivateFile,
@@ -73,6 +74,30 @@ function frameOwner(window: BrowserWindow) {
     destroyed: () => window.isDestroyed(),
   };
 }
+function ownedBudget(profile: string) {
+  const paths = desktopX402Paths(profile);
+  let ownership: Promise<ProcessLock> | null = null;
+  const budget = new X402Budget(
+    {
+      async read() {
+        ownership ??= acquireProcessLock(paths.lock);
+        await ownership;
+        return readPrivateFile(paths.state, DESKTOP_X402.MAX_BYTES);
+      },
+      async write(text) {
+        const lock = await ownership;
+        if (!lock) throw new Error('Storage unavailable');
+        await lock.verify();
+        await writePrivateFile(paths.state, text, DESKTOP_X402.MAX_BYTES);
+      },
+    },
+    desktopOpening({ GYBLOS_HOME: profile }),
+  );
+  return {
+    budget,
+    release: async () => (await ownership?.catch(() => null))?.release(),
+  };
+}
 export function registerDesktopX402(
   window: BrowserWindow,
   profile: string,
@@ -81,21 +106,7 @@ export function registerDesktopX402(
     typeof import('./catalog/host').registerNetworkCatalog
   >,
 ) {
-  const paths = desktopX402Paths(profile);
-  let ownership: Promise<ProcessLock> | null = null;
-  const budget = new X402Budget({
-    async read() {
-      ownership ??= acquireProcessLock(paths.lock);
-      await ownership;
-      return readPrivateFile(paths.state, DESKTOP_X402.MAX_BYTES);
-    },
-    async write(text) {
-      const lock = await ownership;
-      if (!lock) throw new Error('Storage unavailable');
-      await lock.verify();
-      await writePrivateFile(paths.state, text, DESKTOP_X402.MAX_BYTES);
-    },
-  });
+  const { budget, release } = ownedBudget(profile);
   const client = new X402Client(budget);
   const { environment, managed } = managedBuyer(
     profile,
@@ -148,7 +159,7 @@ export function registerDesktopX402(
       await client.close();
       await managed.close();
       ipcMain.removeHandler(DESKTOP_X402.CHANNEL);
-      await (await ownership?.catch(() => null))?.release();
+      await release();
     },
   };
 }
