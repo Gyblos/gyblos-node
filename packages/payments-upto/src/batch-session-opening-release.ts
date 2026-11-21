@@ -3,10 +3,11 @@
 // deposit, and the SDK records an attempt under the channel before it signs or sends.
 import { getTransactionDecoder } from '@solana/kit';
 
-import { SESSION_STATES } from '@gyblos/protocol/payment-session';
+import { SESSION_STATES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import type { openingFor } from './batch-session-checks';
 import type { BatchStore } from './batch-session-store';
+import type { BatchRecord } from './batch-session-types';
 import { OPENING_RELEASE_FAILED } from './constants';
 
 export type BatchOpening = ReturnType<typeof openingFor>;
@@ -91,3 +92,30 @@ export async function releaseUnsentOpening(
     }
   }
 }
+
+// Only an empty preparation can be released: no channel, opening, voucher, request, charge or pending
+// attempt.
+function releasedFor(value: unknown): true {
+  if (value !== true) return sessionFail();
+  return true;
+}
+export function releasedPreparation(record: BatchRecord) {
+  return (
+    record.state === SESSION_STATES.OPENING &&
+    record.channelId === '' &&
+    record.opening === null &&
+    record.voucher === null &&
+    record.cumulativeAtomic === '0' &&
+    Object.keys(record.requests).length === 0 &&
+    Object.keys(record.pending).length === 0 &&
+    record.closing === null &&
+    record.settlement === null
+  );
+}
+// The stored record's optional `released` key and its parsed value.
+export const releasedKey = (value: unknown) =>
+  !!value && typeof value === 'object' && Object.hasOwn(value, 'released')
+    ? ['released']
+    : [];
+export const releasedField = (row: Record<string, unknown>) =>
+  Object.hasOwn(row, 'released') ? { released: releasedFor(row.released) } : {};

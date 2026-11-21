@@ -35,6 +35,11 @@ import { parseBlocks } from './batch-block-state';
 import { coherentRecord } from './batch-session-consistency';
 import { parseBatchHistory } from './batch-session-history';
 import { strictBatchOpening } from './batch-session-opening';
+import {
+  releasedField,
+  releasedKey,
+  releasedPreparation,
+} from './batch-session-opening-release';
 import type { BatchRecord } from './batch-session-types';
 import {
   BATCH_BLOCK_STATE,
@@ -222,30 +227,9 @@ function recordFields(value: unknown) {
       ? ['blocks']
       : []),
     ...(renewalVersion ? ['history'] : []),
-    ...(!!value && typeof value === 'object' && Object.hasOwn(value, 'released')
-      ? ['released']
-      : []),
+    ...releasedKey(value),
   ]);
   return { row, blockVersion, renewalVersion };
-}
-// Only an empty preparation can be released: no channel, opening, voucher, request, charge or pending
-// attempt.
-function releasedFor(value: unknown): true {
-  if (value !== true) return sessionFail();
-  return true;
-}
-export function releasedPreparation(record: BatchRecord) {
-  return (
-    record.state === SESSION_STATES.OPENING &&
-    record.channelId === '' &&
-    record.opening === null &&
-    record.voucher === null &&
-    record.cumulativeAtomic === '0' &&
-    Object.keys(record.requests).length === 0 &&
-    Object.keys(record.pending).length === 0 &&
-    record.closing === null &&
-    record.settlement === null
-  );
 }
 export function parseRecord(
   value: unknown,
@@ -319,9 +303,7 @@ export function parseRecord(
           ),
         }
       : {}),
-    ...(Object.hasOwn(row, 'released')
-      ? { released: releasedFor(row.released) }
-      : {}),
+    ...releasedField(row),
   };
   coherentRecord(record);
   if (record.released && !releasedPreparation(record)) sessionFail();

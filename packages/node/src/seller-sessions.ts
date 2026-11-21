@@ -114,6 +114,16 @@ function binding(
     }),
   };
 }
+// A session preparing again without a channel (a released, never-funded opening) holds no slot, so it
+// asks for capacity like a new one.
+function needsAdmission(
+  method: BatchChannelRequest['method'],
+  bound: boolean,
+  replacing: boolean,
+  preparing: boolean,
+) {
+  return method === BATCH_METHODS.PREPARE || !bound || replacing || preparing;
+}
 async function operation(
   options: SellerSessionOptions,
   state: { current?: Binding },
@@ -163,14 +173,7 @@ async function operation(
     const live = batchLiveOffer(offer, options.offers(), options.now());
     if (blockMode && !live.meter.stablePrefix)
       return batchFail(SESSION_CODES.UNAVAILABLE);
-    // A session preparing again without a channel (a released, never-funded opening) holds no slot, so
-    // it asks for capacity like a new one.
-    if (
-      request.method === BATCH_METHODS.PREPARE ||
-      !state.current ||
-      replacing ||
-      preparing
-    )
+    if (needsAdmission(request.method, !!state.current, replacing, preparing))
       await options.admit?.();
     if (request.method === BATCH_METHODS.PREPARE) return { terms };
     if (replacing && state.current) {
