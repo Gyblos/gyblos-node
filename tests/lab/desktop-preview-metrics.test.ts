@@ -439,3 +439,31 @@ void test('preview dialogs share small, medium and large sizes that shrink with 
   );
   assert.match(keys, /<Modal title="Revoke API key\?" size="sm"/);
 });
+
+void test('metric cards explain their numbers with a help button and primary actions use high contrast', async () => {
+  const card = await readFile(
+    'lab/tools/desktop-preview/views/StatCard.tsx.preview',
+    'utf8',
+  );
+  assert.match(card, /help\?: string;/);
+  assert.match(
+    card,
+    /<IconButton\s+className="preview-info-tip"\s+label=\{'About ' \+ label\}\s+title=\{help\}/,
+    'the help button is named after the metric and shows the explanation as its tooltip',
+  );
+  for (const view of ['Payments', 'ActivitySessions']) {
+    const source = await readFile(
+      `lab/tools/desktop-preview/views/${view}.tsx.preview`,
+      'utf8',
+    );
+    const cards = source.match(/<StatCard\b[^>]*>/g) ?? [];
+    assert.ok(cards.length >= 3, view + ' shows its metric cards');
+    for (const tag of cards)
+      assert.match(tag, /\bhelp=/, view + ' explains every metric: ' + tag);
+  }
+  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  assert.match(
+    css,
+    /\.ui-button--primary:not\(\.ui-icon-button\) \{\s*background: var\(--ink\);\s*color: var\(--panel\);/,
+  );
+});
