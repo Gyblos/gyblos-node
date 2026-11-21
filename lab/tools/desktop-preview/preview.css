@@ -157,6 +157,32 @@ html
   border-color: transparent;
   font-weight: 600;
 }
+/* High-contrast primary action: ink on panel, like a white button in the dark theme. */
+html .app.desktop-frame .ui-button--primary:not(.ui-icon-button) {
+  background: var(--ink);
+  color: var(--panel);
+  border-color: transparent;
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ink) 86%, var(--panel));
+    color: var(--panel);
+  }
+}
+/* Help button: a muted question mark that explains a number on hover or focus. */
+html .app.desktop-frame .preview-info-tip.ui-icon-button {
+  --control-size: 20px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  margin-left: 4px;
+  vertical-align: middle;
+  color: var(--muted);
+  &:hover:not(:disabled) {
+    background: transparent;
+    color: var(--ink);
+  }
+}
 html .app.desktop-frame .ui-button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -712,7 +738,7 @@ html .app.desktop-frame #app-sidebar .modal .network-status-copy strong {
 .preview-metric-card {
   margin: 0;
   min-width: 0;
-  padding: 16px;
+  padding: 14px 16px;
   border-radius: 14px;
   background: var(--panel);
 }

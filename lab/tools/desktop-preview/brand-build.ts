@@ -116,7 +116,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
       'utf8',
     );
     return (
-      "import { ChartBar, type Icon } from '@phosphor-icons/react';\n" +
+      "import { ChartBar, Question, type Icon } from '@phosphor-icons/react';\n" +
       source.slice(0, start) +
       card +
       source.slice(end)
