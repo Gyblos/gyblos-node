@@ -210,9 +210,11 @@ export function usePreviewFunds(model: { name: string; free: boolean }, applies:
   return { model, blocked: applies && !model.free && atomic === 0 };
 }
 
+export const PREVIEW_EVENT = { NETWORK: 'preview:network' } as const;
+
 function subscribeNetwork(listener: () => void) {
-  window.addEventListener('preview:network', listener);
-  return () => window.removeEventListener('preview:network', listener);
+  window.addEventListener(PREVIEW_EVENT.NETWORK, listener);
+  return () => window.removeEventListener(PREVIEW_EVENT.NETWORK, listener);
 }
 
 export function useSpending(buyer?: X402View) {

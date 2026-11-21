@@ -11,7 +11,7 @@ function PreviewNetwork() {
     if (next === 'Mainnet') params.set('network', 'mainnet');
     else params.delete('network');
     history.replaceState(null, '', '?' + params.toString());
-    window.dispatchEvent(new Event('preview:network'));
+    window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));
   };
   return (
     <div
