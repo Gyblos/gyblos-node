@@ -2318,3 +2318,37 @@ html .app.desktop-frame .preview-steps li[data-done='true'] > span {
 html .app.desktop-frame .preview-steps li[data-done='true'] strong {
   color: var(--muted);
 }
+
+/* Composer: a panel with a visible edge and pill controls for model, tools and payment. */
+html .app.desktop-frame .composer {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--bg) 60%, transparent);
+}
+html .app.desktop-frame .composer:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+html .app.desktop-frame .composer-leading {
+  gap: 6px;
+}
+html
+  .app.desktop-frame
+  .composer-leading
+  :is(.ui-menu-trigger, .ui-icon-button) {
+  height: 30px;
+  padding-inline: 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--ink);
+}
+html
+  .app.desktop-frame
+  .composer-leading
+  :is(.ui-menu-trigger, .ui-icon-button):hover {
+  border-color: color-mix(in srgb, var(--ink) 25%, var(--line));
+}
+html .app.desktop-frame .composer-actions > span {
+  color: var(--muted);
+  font-size: 12px;
+}
