@@ -1047,6 +1047,9 @@ html
     grid-column: 1 / 3;
     grid-row: 3;
   }
+  .desktop-frame .preview-simple-table .preview-tabular ~ .preview-tabular {
+    grid-row: auto;
+  }
   .desktop-frame .preview-simple-table .preview-limit-action {
     grid-column: 3;
     grid-row: 1 / span 3;
