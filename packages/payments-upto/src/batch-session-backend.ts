@@ -38,6 +38,8 @@ interface Options {
   rpcUrl: string;
   now?: () => number;
   rpc?: BatchObserverOptions['rpc'];
+  // How long one SDK or RPC operation is awaited (BATCH_SESSION_DEFAULTS.operationMs by default).
+  operationMs?: number;
 }
 async function compatible(options: Options, terms: PaymentSessionTerms) {
   termsFor(terms);
@@ -205,6 +207,7 @@ export function openBatchSellerBackend(
         observe: observer.settlement,
         observeOpening: observer.opening,
         closing: observer.closing,
+        operationMs: options.operationMs,
       });
     },
   };

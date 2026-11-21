@@ -192,17 +192,27 @@ async function openSeller(context: BatchSellerContext, payload: string) {
     });
     return snapshot(store);
   }
+  // waitBatch stops waiting but cannot cancel the SDK: a settlement still running may yet send the deposit.
+  // So the opening is forgotten only once this settlement has itself finished and none is still running.
+  let finished = false;
+  settling.set(store, (settling.get(store) ?? 0) + 1);
+  const settlement = facilitator
+    .settle(
+      { x402Version: 2, accepted: requirements, payload: opening },
+      requirements,
+    )
+    .finally(() => {
+      finished = true;
+      settling.set(store, (settling.get(store) ?? 1) - 1);
+    });
   try {
-    const response = await waitBatch(
-      facilitator.settle(
-        { x402Version: 2, accepted: requirements, payload: opening },
-        requirements,
-      ),
-      options.operationMs,
-    );
+    const response = await waitBatch(settlement, options.operationMs);
     requireSettlementResponse(response, requirements.network);
   } catch (error) {
-    await forgetUnsentOpening(store, opening.voucher!.channelId);
+    if (finished && !settling.get(store))
+      await forgetUnsentOpening(store, opening.voucher!.channelId).catch(() => {
+        /* The settlement failure stays the reported error. */
+      });
     throw error;
   }
   await store.update((state) => {
@@ -211,10 +221,14 @@ async function openSeller(context: BatchSellerContext, payload: string) {
   });
   return snapshot(store);
 }
+// Deposit settlements still running for a session, including ones a timed-out wait left behind.
+const settling = new WeakMap<BatchStore, number>();
 // Only this seller's fee payer completes the buyer's deposit, and the SDK records an attempt under the
-// channel before it signs or sends. With no such record the deposit was never sent and can never land:
-// keeping the opening would leave a channel the seller later tries to close forever. The buyer may open
-// again; any recorded attempt keeps the opening for recovery.
+// channel before it signs or sends. With no such record, and no settlement still running, the deposit was
+// never sent and can never land: keeping the opening would leave a channel the seller later tries to close
+// forever. The buyer may open again; any recorded attempt keeps the opening for recovery. The match is
+// deliberately wide (any key naming the channel) because the SDK's key format is internal; an extra match
+// only keeps the opening.
 async function forgetUnsentOpening(store: BatchStore, channelId: string) {
   await store.update((state) => {
     if (
