@@ -2,8 +2,8 @@
 // working directory) under flag > env > file > default. Without a file the values equal today's
 // environment-only startup; invalid environment values now fail here with NODE_CONFIG_INVALID.
 // The daemon serves every listed offer it can warm; each offer's engine plugin refuses what it cannot
-// honor. Paid offers are refused unless the caller has paid selling wired, and then only when their
-// usage is recounted with the model's pinned public tokenizer.
+// honor. Paid offers are refused unless the caller has paid selling wired; their engine recounts them with
+// the model's pinned public tokenizer or declares its provider's usage, which the buyer bounds by bytes.
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
 import { FREE_CONTEXT_TOKENS } from '@gyblos/engine-ollama/constants';

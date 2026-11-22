@@ -30,6 +30,7 @@ import type {
 
 import { runBatchSellerExecution } from './batch-session';
 import { createBatchStreamOutput } from './batch-stream-output';
+import { boundDeclaredUsage, declaredCharge } from './declared-usage';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export function batchLiveOffer(
@@ -99,15 +100,17 @@ export async function generateBatch(
       cancelled: () => new BatchChannelError(PAID_EXECUTION_CODES.CANCELLED),
     },
     nothing: { inputTokens, outputTokens: 0, completed: false },
-    charge: (outcome) =>
-      outcome.outputTokens
-        ? String(
-            chargeV2(
-              { input: outcome.inputTokens, output: outcome.outputTokens },
-              request.quote.offer.prices,
-            ),
-          )
-        : '0',
+    charge: (outcome) => {
+      if (!outcome.outputTokens) return '0';
+      if (live.meter.mode === CONTROL_METERING_MODES.DECLARED)
+        return declaredCharge(outcome, request.quote.offer);
+      return String(
+        chargeV2(
+          { input: outcome.inputTokens, output: outcome.outputTokens },
+          request.quote.offer.prices,
+        ),
+      );
+    },
     open: (window) =>
       batchGeneration(live, input, inputTokens, window, onDelta, generated),
   });
@@ -163,7 +166,10 @@ function batchGeneration(
       window.check();
       if (!emitted && generated.text) await output.onText(generated.text);
       output.complete(generated.text);
-      return generated;
+      // A declared bill is held to the bounds the buyer checks, in the result it sees as well.
+      return live.meter.mode === CONTROL_METERING_MODES.DECLARED
+        ? { ...generated, usage: boundDeclaredUsage(input, generated) }
+        : generated;
     },
     measure: (
       generated: import('@gyblos/inference').Generated<ExecutionResult>,

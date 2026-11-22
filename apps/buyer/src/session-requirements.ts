@@ -14,6 +14,7 @@ import {
 import type { BatchBuyerPool } from '@gyblos/payments-upto/batch-session';
 import { batchFail, verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import {
+  CONTROL_METERING_MODES,
   MODEL_IDS,
   P2P_ROLES,
   REASONING_LEVELS,
@@ -43,10 +44,16 @@ export function checkPaidSellerRequest(
     request.lowestReasoning !== null
   )
     refuse(FREE_BUYER_STARTUP.REASONING);
-  if (request.selection.modelId !== MODEL_IDS.QWEN3_0_6B)
-    refuse(FREE_BUYER_STARTUP.PAID_MODEL);
   if (request.network !== DEVNET || request.asset !== role.mint)
     refuse(FREE_BUYER_STARTUP.PAID_NETWORK);
+  // Any model can be bought on declared usage, except one this buyer can recount: a recounted quote needs
+  // the pinned tokenizer, and a recountable model is never bought on the seller's word.
+  if (
+    quote &&
+    (quote.offer.meteringMode === CONTROL_METERING_MODES.RECOUNTED) !==
+      (quote.offer.selection.modelId === MODEL_IDS.QWEN3_0_6B)
+  )
+    refuse(FREE_BUYER_STARTUP.PAID_MODEL);
   if (quote)
     checkPaidSellerRequest(
       {

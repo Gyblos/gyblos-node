@@ -40,7 +40,7 @@ import { executeBatchBuyer } from './batch-session';
 import { verifyDecline } from './buyer-declined-request';
 import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
-import { verifyDeclaredUsage } from './declared-usage';
+import { declaredCharge, verifyDeclaredUsage } from './declared-usage';
 
 export function batchBuyerSnapshot(
   result: BatchChannelResult,
@@ -66,6 +66,11 @@ function verifiedCharge<Remote extends BatchDestination>(
     return batchFail(SESSION_CODES.UNVERIFIED);
   }
   const { inputTokens, outputTokens } = usage;
+  if (
+    outputTokens &&
+    quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED
+  )
+    return declaredCharge(usage, quote.offer);
   return outputTokens
     ? String(
         chargeV2(

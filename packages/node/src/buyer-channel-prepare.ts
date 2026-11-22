@@ -9,6 +9,7 @@ import {
   batchFail,
   matchBatchTerms,
 } from '@gyblos/protocol/batch-channel';
+import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
@@ -45,9 +46,11 @@ export async function prepareNewChannel<Remote extends BatchDestination>(
   terms: PaymentSessionTerms,
   signal: AbortSignal,
 ) {
+  // Blocks certify prefixes with the model's tokenizer; a declared offer has none, so it prepares without.
   const blocks =
     options.openingSupportsBlocks === true &&
-    typeof options.meter.stablePrefix === 'function';
+    typeof options.meter.stablePrefix === 'function' &&
+    quote.offer.meteringMode !== CONTROL_METERING_MODES.DECLARED;
   const client = createBatchChannelClient(
     options.endpoint,
     options.destination(terms),

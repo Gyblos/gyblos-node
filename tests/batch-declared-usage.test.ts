@@ -9,18 +9,25 @@ import {
   buildPaidSellerReceipt,
   type PaidSellerReceiptInput,
 } from '@gyblos/core/receipts';
+import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
+import { FREE_METERING } from '@gyblos/node/constants';
 import { DECLARED_METER } from '@gyblos/node/free-meter';
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
+import { BATCH_CHANNEL, batchFail } from '@gyblos/protocol/batch-channel';
 import {
   CONTROL_METERING_MODES,
   ENGINE_DONE_REASONS,
   ENGINE_KINDS,
 } from '@gyblos/protocol/constants';
 import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import { SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
 
-import { blockProduct } from './support/batch-block-product';
+import { blockProduct, blockTestMeter } from './support/batch-block-product';
 import type { batchOfferFixture } from './support/batch-iroh-offer';
+import { batchLoopback } from './support/batch-loopback';
+import { multisellerLoopback } from './support/multiseller-session';
 
 const PRICES = {
   inputAtomicPerMtok: '1000000',
@@ -77,18 +84,18 @@ void test('a declared paid offer bills the provider-reported usage, even for a b
   );
 });
 
-void test('a seller declaring more output tokens than the text has bytes is refused and not paid', async (t) => {
+void test('a provider count above the byte bound is billed only up to it, and approved', async (t) => {
   const f = await blockProduct({
     offer: declaredSeller(90, 'ok'),
     declared: true,
   });
   t.after(f.close);
-  await assert.rejects(
-    f.buyer.execute(await f.offers.quote(1, DECLARED), input(f.offers)),
-    { code: SESSION_CODES.UNVERIFIED },
+  await f.buyer.execute(await f.offers.quote(1, DECLARED), input(f.offers));
+  const ceiling = 'ok'.length + FREE_METERING.declaredTemplateTokens;
+  assert.equal(
+    f.f.buyer.snapshot().cumulativeAtomic,
+    String(chargeV2({ input: 7, output: ceiling }, PRICES)),
   );
-  assert.equal(f.offers.generations(), 1, 'the seller generated');
-  assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '0', 'nothing approved');
 });
 
 void test('a recounted offer still requires the buyer recount', async (t) => {
@@ -124,3 +131,51 @@ void test('a declared paid request is attested by both halves, marked declared',
   assert.equal(record.metering, CONTROL_METERING_MODES.DECLARED);
   assert.deepEqual(buyer[0]!.payment, seller[0]!.payment);
 });
+
+for (const metering of [
+  CONTROL_METERING_MODES.RECOUNTED,
+  CONTROL_METERING_MODES.DECLARED,
+])
+  void test(`a new ${metering} channel prepares ${metering === CONTROL_METERING_MODES.DECLARED ? 'without' : 'with'} blocks for a buyer that supports them`, async (t) => {
+    const fixture = await multisellerLoopback('10000');
+    t.after(() => fixture.close());
+    const alpns: string[] = [];
+    const wire = await batchLoopback(
+      {
+        async exchange() {
+          return batchFail(PAID_EXECUTION_CODES.PEER);
+        },
+      },
+      fixture.a.terms,
+    );
+    t.after(() => wire.close());
+    const connect = wire.endpoint.connect.bind(wire.endpoint);
+    wire.endpoint.connect = async (...args: Parameters<typeof connect>) => {
+      alpns.push(Buffer.from(args[1]).toString());
+      return connect(...args);
+    };
+    const buyer = createBuyerSessionPool({
+      ...fixture.options,
+      meter: {
+        ...fixture.options.meter,
+        stablePrefix: blockTestMeter.stablePrefix,
+      },
+      openingSupportsBlocks: true,
+      endpoint: wire.endpoint,
+      destination: () => wire.destination,
+    });
+    t.after(() => buyer.close());
+    const offer = fixture.offers[0]!;
+    await assert.rejects(
+      buyer.execute(
+        await offer.quote(1, { meteringMode: metering }),
+        offer.input,
+        AbortSignal.timeout(3000),
+      ),
+    );
+    assert.deepEqual(alpns, [
+      metering === CONTROL_METERING_MODES.DECLARED
+        ? BATCH_CHANNEL.alpn
+        : SESSION_BLOCKS.alpn,
+    ]);
+  });

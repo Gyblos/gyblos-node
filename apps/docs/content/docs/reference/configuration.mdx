@@ -124,7 +124,8 @@ Each offer has exactly one of `free` or `price`. Free counters reset when the se
 To charge for an offer, replace `free` with `price`: `price.input_per_mtok` and `price.output_per_mtok`
 are decimal strings in devnet USDC per million tokens, with `price.currency = "USDC"`. At least one rate
 must be positive. Write no sign, exponent or leading zero, and at most four integer and six decimal
-digits. Only `qwen3:0.6b` can be priced. See [Get paid](/en/sellers/get-paid) before you price an offer.
+digits. Any model can be priced: `qwen3:0.6b` is recounted by the buyer, other models bill the usage your
+provider reports within byte limits the buyer checks. See [Get paid](/en/sellers/get-paid) before you price an offer.
 
 ### Engines [#engine-compatibility-at-startup]
 
