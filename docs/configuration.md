@@ -533,7 +533,9 @@ Fixed values, not configurable:
 - The seller runs one generation at a time. Each buyer has one request in
   flight, and the seller at most two (one running, one queued; one for a free
   offer).
-- Each buyer keeps one control and one data connection.
+- Each buyer keeps one control and one data connection. A buyer that switches a
+  channel between checkpointed and whole-response requests closes one data
+  connection before it opens the other.
 - Wire sizes and deadlines protect the protocol, not capacity.
 
 `[limits]` is file-only: no `GYBLOS_*` variable sets it, and the buyer ignores
