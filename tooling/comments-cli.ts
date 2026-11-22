@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { lstatSync } from 'node:fs';
 import { readFile, realpath } from 'node:fs/promises';
-import { extname, relative, resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseForESLint } from '@typescript-eslint/parser';
+import { addedComments, physicalLineCount } from './comment-lines';
+import { commentRanges, commentTexts, isSourceFile } from './comment-scanner';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const BUDGET_PATH = resolve(ROOT, 'tooling/source-comment-budget.json');
@@ -20,223 +21,112 @@ const SOURCE_ROOTS = new Set([
   'scripts',
   'patches',
 ]);
-const SOURCE_EXTENSIONS = new Set([
-  '.cjs',
-  '.css',
-  '.dockerfile',
-  '.headers',
-  '.html',
-  '.js',
-  '.jsonc',
-  '.jsx',
-  '.mjs',
-  '.ps1',
-  '.py',
-  '.sh',
-  '.shell',
-  '.redirects',
-  '.sql',
-  '.svg',
-  '.ts',
-  '.tsx',
-  '.toml',
-  '.yaml',
-  '.yml',
-]);
-const TYPESCRIPT_EXTENSIONS = new Set([
-  '.cjs',
-  '.js',
-  '.jsx',
-  '.mjs',
-  '.ts',
-  '.tsx',
-]);
+const GIT_OUTPUT_BYTES = 67_108_864;
+const RENAME_FIELDS = 3;
+const CHANGE_FIELDS = 2;
 
-type CommentRange = { start: number; end: number };
-type CommentOptions = {
-  blockMarkers: { start: string; end: string }[];
-  hashMarker?: string;
-  adjacentHash?: boolean;
-  powershell?: boolean;
-  python?: boolean;
-  lineMarkers: string[];
-};
 type SourceCommentStats = { comments: number; lines: number };
 type BudgetRecord = Record<string, number>;
+type Git = (args: string[]) => string;
 
-function sourceExtension(path: string): string {
-  const basename = path.split(/[\\/]/).at(-1) ?? '';
-  if (['Dockerfile', 'Containerfile'].includes(basename)) return '.dockerfile';
-  if (basename === '_headers') return '.headers';
-  if (basename === '_redirects') return '.redirects';
-  if (basename === 'gyblos') return '.shell';
-  if (basename === '.env.example') return '.shell';
-  return extname(path).toLowerCase();
+function isScannedPath(path: string): boolean {
+  return (
+    path.length > 0 &&
+    (!path.includes('/') || SOURCE_ROOTS.has(path.split('/')[0] ?? '')) &&
+    !path.includes('/evidence/') &&
+    isSourceFile(path)
+  );
 }
 
-function isSourceFile(path: string): boolean {
-  return SOURCE_EXTENSIONS.has(sourceExtension(path));
+export function renamedBaseComments(
+  text: string,
+  previous: string,
+  path: string,
+): string[] {
+  return isScannedPath(previous) && isScannedPath(path)
+    ? commentTexts(text, previous)
+    : [];
 }
 
 function sourceFiles(): string[] {
   const paths = execFileSync(
     'git',
     ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
-    { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+    { cwd: ROOT, encoding: 'utf8', maxBuffer: GIT_OUTPUT_BYTES },
   );
   return paths
     .split('\0')
-    .filter(
-      (path) =>
-        path &&
-        (!path.includes('/') || SOURCE_ROOTS.has(path.split('/')[0] ?? '')) &&
-        !path.includes('/evidence/') &&
-        isSourceFile(path),
-    )
+    .filter(isScannedPath)
     .sort()
     .map((path) => resolve(ROOT, path));
 }
 
-function typescriptCommentRanges(text: string, path: string): CommentRange[] {
-  const { ast } = parseForESLint(text, {
-    filePath: path,
-    comment: true,
-    range: true,
-    jsx: true,
-  });
-  return (ast.comments ?? [])
-    .filter(
-      (comment) => text.slice(comment.range[0], comment.range[0] + 2) !== '#!',
-    )
-    .map((comment) => ({ start: comment.range[0], end: comment.range[1] }));
-}
-
-function delimitedCommentRanges(
-  text: string,
-  options: CommentOptions,
-): CommentRange[] {
-  const ranges: CommentRange[] = [];
-  let index = 0;
-  let quote = '';
-  let quoteLength = 1;
-  while (index < text.length) {
-    const character = text[index];
-    if (quote.length > 0) {
-      if (
-        options.powershell
-          ? quote === '"' && character === '`'
-          : character === '\\'
-      ) {
-        index += 2;
-        continue;
-      }
-      if (
-        character === quote &&
-        (quoteLength === 1 ||
-          text.slice(index, index + quoteLength) === quote.repeat(quoteLength))
-      ) {
-        if (quoteLength === 1 && quote === "'" && text[index + 1] === "'") {
-          index += 2;
-          continue;
-        }
-        quote = '';
-        index += quoteLength;
-        continue;
-      }
-      index += 1;
+export function commentBase(
+  env: Record<string, string | undefined>,
+  git: Git,
+): string {
+  if (env.COMMENT_BASE_SHA) return env.COMMENT_BASE_SHA;
+  for (const ref of ['upstream/develop', 'origin/develop']) {
+    try {
+      return git(['merge-base', 'HEAD', ref]).trim();
+    } catch {
       continue;
     }
-    if (
-      (character === "'" &&
-        (options.python || !/[a-z0-9]/i.test(text[index - 1] ?? ''))) ||
-      character === '"' ||
-      (!options.powershell && character === '`')
-    ) {
-      quote = character;
-      quoteLength =
-        character !== '`' &&
-        text.slice(index, index + 3) === character.repeat(3)
-          ? 3
-          : 1;
-      index += quoteLength;
-      continue;
-    }
-    const block = options.blockMarkers.find((marker) =>
-      text.startsWith(marker.start, index),
-    );
-    if (block) {
-      const close = text.indexOf(block.end, index + block.start.length);
-      const end = close < 0 ? text.length : close + block.end.length;
-      ranges.push({ start: index, end });
-      index = end;
-      continue;
-    }
-    const line = options.lineMarkers.find((marker) =>
-      text.startsWith(marker, index),
-    );
-    if (line) {
-      const end = text.indexOf('\n', index);
-      ranges.push({ start: index, end: end < 0 ? text.length : end });
-      index = end < 0 ? text.length : end;
-      continue;
-    }
-    if (
-      options.hashMarker &&
-      character === options.hashMarker &&
-      (options.adjacentHash || index === 0 || /\s/.test(text[index - 1] ?? ''))
-    ) {
-      const end = text.indexOf('\n', index);
-      ranges.push({ start: index, end: end < 0 ? text.length : end });
-      index = end < 0 ? text.length : end;
-      continue;
-    }
-    index += 1;
   }
-  return ranges;
+  throw new Error(
+    'No develop branch to compare comments against: fetch origin/develop or upstream/develop, or set COMMENT_BASE_SHA.',
+  );
 }
 
-export function commentRanges(text: string, path: string): CommentRange[] {
-  const extension = sourceExtension(path);
-  if (TYPESCRIPT_EXTENSIONS.has(extension))
-    return typescriptCommentRanges(text, path);
-  if (extension === '.css')
-    return delimitedCommentRanges(text, {
-      blockMarkers: [{ start: '/*', end: '*/' }],
-      lineMarkers: [],
-    });
-  if (extension === '.sql')
-    return delimitedCommentRanges(text, {
-      blockMarkers: [{ start: '/*', end: '*/' }],
-      lineMarkers: ['--'],
-    });
-  if (extension === '.html' || extension === '.svg')
-    return delimitedCommentRanges(text, {
-      blockMarkers: [{ start: '<!--', end: '-->' }],
-      lineMarkers: [],
-    });
-  if (extension === '.jsonc')
-    return delimitedCommentRanges(text, {
-      blockMarkers: [{ start: '/*', end: '*/' }],
-      lineMarkers: ['//'],
-    });
-  if (extension === '.ps1')
-    return delimitedCommentRanges(text, {
-      powershell: true,
-      blockMarkers: [{ start: '<#', end: '#>' }],
-      hashMarker: '#',
-      lineMarkers: [],
-    });
-  return delimitedCommentRanges(text, {
-    blockMarkers: [],
-    python: extension === '.py',
-    adjacentHash: extension === '.py' || extension === '.toml',
-    hashMarker: '#',
-    lineMarkers: [],
-  }).filter((range) => range.start !== 0 || !text.startsWith('#!'));
+export function changedSources(git: Git, base: string): [string, string?][] {
+  const fields = git(['diff', '--name-status', '-z', '-M', base, '--']).split(
+    '\0',
+  );
+  const changed: [string, string?][] = [];
+  for (let index = 0; index < fields.length - 1;) {
+    const status = fields[index] ?? '';
+    if (/^[RC]/.test(status)) {
+      changed.push([fields[index + 2] ?? '', fields[index + 1]]);
+      index += RENAME_FIELDS;
+      continue;
+    }
+    if (status !== 'D')
+      changed.push([
+        fields[index + 1] ?? '',
+        status === 'A' ? undefined : fields[index + 1],
+      ]);
+    index += CHANGE_FIELDS;
+  }
+  for (const path of git([
+    'ls-files',
+    '--others',
+    '--exclude-standard',
+    '-z',
+  ]).split('\0'))
+    if (path) changed.push([path, undefined]);
+  return changed;
 }
 
-function physicalLines(text: string, range: CommentRange): number {
-  return text.slice(range.start, range.end).split(/\r\n|\r|\n/).length;
+async function newCommentProblems(
+  git: Git,
+  base: string,
+  stats: Map<string, SourceCommentStats>,
+): Promise<string[]> {
+  const problems: string[] = [];
+  for (const [path, previous] of changedSources(git, base)) {
+    if (!stats.has(path)) continue;
+    const before = previous
+      ? renamedBaseComments(
+          git(['show', base + ':' + previous]),
+          previous,
+          path,
+        )
+      : [];
+    const after = await readFile(resolve(ROOT, path), 'utf8');
+    for (const comment of addedComments(before, commentTexts(after, path)))
+      problems.push(`${path}: new comment ${JSON.stringify(comment)}`);
+  }
+  return problems;
 }
 
 async function scanSourceFiles(): Promise<Map<string, SourceCommentStats>> {
@@ -252,10 +142,7 @@ async function scanSourceFiles(): Promise<Map<string, SourceCommentStats>> {
     const ranges = commentRanges(text, path);
     stats.set(relative(ROOT, path).split('\\').join('/'), {
       comments: ranges.length,
-      lines: ranges.reduce(
-        (total, range) => total + physicalLines(text, range),
-        0,
-      ),
+      lines: physicalLineCount(text, ranges),
     });
   }
   return stats;
@@ -325,20 +212,15 @@ async function run(): Promise<void> {
   const budgets = await readBudgets();
   const problems: string[] = [];
 
-  const filename = 'tooling/source-comment-budget.json';
-  const git = (args: string[]) =>
-    execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
-  const base =
-    process.env.COMMENT_BASE_SHA ||
-    git(['merge-base', 'HEAD', 'origin/develop']).trim();
-  if (git(['ls-tree', base, '--', filename]).trim()) {
-    const previous: unknown = JSON.parse(git(['show', base + ':' + filename]));
-    if (!isBudgetRecord(previous))
-      throw new Error('Invalid base comment budget.');
-    for (const [path, count] of Object.entries(budgets))
-      if (count > (previous[path] ?? 0))
-        problems.push(path + ': comment budget increased');
-  }
+  const git: Git = (args) =>
+    execFileSync('git', args, {
+      cwd: ROOT,
+      encoding: 'utf8',
+      maxBuffer: GIT_OUTPUT_BYTES,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  const base = commentBase(process.env, git);
+  problems.push(...(await newCommentProblems(git, base, stats)));
   for (const [path, row] of stats) {
     const budget = budgets[path] ?? 0;
     if (row.comments > budget)
