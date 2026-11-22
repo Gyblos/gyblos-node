@@ -17,6 +17,7 @@ import {
   INDEX_ROUTES,
   INDEX_STATUS,
   LOOPBACK_HOSTS,
+  PUBLIC_READ_PREFIXES,
   PUBLIC_READ_ROUTES,
   REDEEM_RESULTS,
   REGISTRATION,
@@ -24,6 +25,7 @@ import {
   type RedeemResult,
 } from './constants';
 import { IndexError } from './errors';
+import { githubClaimRoutes } from './github-claim-routes';
 import { allowed } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
 import { networkPage, parseNetworkQuery } from './network';
@@ -57,7 +59,11 @@ function finishHeaders(context: Context) {
   if (!headers.has(INDEX_HEADERS.CACHE_CONTROL))
     headers.set(INDEX_HEADERS.CACHE_CONTROL, INDEX_HEADER_VALUES.NO_STORE);
   const read = context.req.method === 'GET' || context.req.method === 'HEAD';
-  if (read && PUBLIC_READ_ROUTES.has(context.req.path))
+  const path = context.req.path;
+  const publicRead =
+    PUBLIC_READ_ROUTES.has(path) ||
+    PUBLIC_READ_PREFIXES.some((prefix) => path.startsWith(prefix));
+  if (read && publicRead)
     headers.set(INDEX_HEADERS.CORS_ORIGIN, INDEX_HEADER_VALUES.ANY_ORIGIN);
   headers.set(INDEX_HEADERS.ROBOTS, INDEX_HEADER_VALUES.NOINDEX);
   headers.set(INDEX_HEADERS.CONTENT_TYPE_OPTIONS, INDEX_HEADER_VALUES.NOSNIFF);
@@ -239,6 +245,7 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
           networkPage(
             context.get('storage'),
             settings.registrations,
+            settings.claims,
             settings.now(),
             settings.maxResponseBytes,
           ),
@@ -291,6 +298,7 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
       registrationHandler(settings, registrations, registry),
     );
   readRoutes(app, settings);
+  githubClaimRoutes(app, settings);
   // Reports the publish mode only, never the allowlisted or registered NodeIds.
   app.get(INDEX_ROUTES.HEALTH, async (context) => {
     const records = await settings.records.read(

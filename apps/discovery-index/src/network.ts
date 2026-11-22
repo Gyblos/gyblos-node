@@ -4,14 +4,20 @@
 // published without a registration (allowlist or open mode) is listed while seen within the last 30
 // days. A revoked NodeId is listed only while it is online, exactly as /v1/sellers lists it. Takes no
 // parameters; cached like a sellers page. Built only from records the index verified and from its own
-// registrations; no IP, contact, owner or country is returned.
+// registrations; no IP, contact, owner or country is returned. Each node also carries `github`: the
+// account and state of its GitHub claim, or null; only `verified` means the gist proof was found.
 import {
   INDEX_ERRORS,
   NETWORK,
   NETWORK_STATES,
+  type GithubClaimState,
   type NetworkState,
 } from './constants';
 import { indexFail } from './errors';
+import type {
+  GithubClaimStore,
+  GithubClaimSummary,
+} from './github-claim-store';
 import type { RegistrationStore } from './registration-store';
 import type { CatalogStatusRow, DiscoveryStorage } from './storage';
 import { reportedHour, type Sighting } from './uptime';
@@ -22,6 +28,7 @@ interface NetworkNode {
   firstSeenAt: number | null;
   lastSeenAt: number | null;
   models: string[];
+  github: { account: string; state: GithubClaimState } | null;
 }
 
 const RANK: Record<NetworkState, number> = {
@@ -39,6 +46,7 @@ function nodeOf(
   nodeId: string,
   sighting: Sighting | undefined,
   catalog: CatalogStatusRow | undefined,
+  github: GithubClaimSummary | undefined,
 ): NetworkNode {
   const state = catalog?.online
     ? NETWORK_STATES.ONLINE
@@ -51,6 +59,7 @@ function nodeOf(
     firstSeenAt: sighting?.firstAt ?? null,
     lastSeenAt: sighting?.lastAt ?? null,
     models: catalog?.online ? catalog.models : [],
+    github: github ? { account: github.account, state: github.state } : null,
   };
 }
 
@@ -65,13 +74,16 @@ function compareNodes(left: NetworkNode, right: NetworkNode) {
 async function knownNodes(
   storage: DiscoveryStorage,
   registrations: RegistrationStore | undefined,
+  claims: GithubClaimStore | undefined,
   now: number,
 ) {
-  const [registered, sightings, catalogs] = await Promise.all([
+  const [registered, sightings, catalogs, github] = await Promise.all([
     registrations?.registered(NETWORK.maxNodes) ?? { active: [], revoked: [] },
     storage.sightings(reportedHour(now), NETWORK.maxNodes),
     storage.catalogStatus(now, NETWORK.maxNodes, NETWORK.maxModelRows),
+    claims?.list(NETWORK.maxNodes) ?? [],
   ]);
+  const claimed = new Map(github.map((row) => [row.nodeId, row]));
   const revoked = new Set(registered.revoked);
   const seen = new Map(sightings.map((row) => [row.nodeId, row]));
   const stored = new Map(catalogs.rows.map((row) => [row.nodeId, row]));
@@ -81,15 +93,18 @@ async function knownNodes(
     ...catalogs.rows.filter((row) => row.online).map((row) => row.nodeId),
   ]);
   const nodes = [...members]
-    .map((nodeId) => nodeOf(nodeId, seen.get(nodeId), stored.get(nodeId)))
+    .map((nodeId) =>
+      nodeOf(nodeId, seen.get(nodeId), stored.get(nodeId), claimed.get(nodeId)),
+    )
     .filter(
       (node) =>
         !revoked.has(node.nodeId) || node.state === NETWORK_STATES.ONLINE,
     )
     .sort(compareNodes);
-  // A source that filled its cap may have left sellers (or online models) out of the answer.
+  // A source that filled its cap may have left sellers (or online models or claims) out of the answer.
   const complete =
     catalogs.complete &&
+    github.length < NETWORK.maxNodes &&
     sightings.length < NETWORK.maxNodes &&
     registered.active.length < NETWORK.maxNodes &&
     registered.revoked.length < NETWORK.maxNodes;
@@ -103,10 +118,16 @@ const byteLength = (text: string) => new TextEncoder().encode(text).length;
 export async function networkPage(
   storage: DiscoveryStorage,
   registrations: RegistrationStore | undefined,
+  claims: GithubClaimStore | undefined,
   now: number,
   maxBytes: number,
 ) {
-  const { nodes, complete } = await knownNodes(storage, registrations, now);
+  const { nodes, complete } = await knownNodes(
+    storage,
+    registrations,
+    claims,
+    now,
+  );
   const counts = { total: nodes.length, online: 0, offline: 0, unpublished: 0 };
   for (const node of nodes) counts[node.state]++;
   const entries: string[] = [];

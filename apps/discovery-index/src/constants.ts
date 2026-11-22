@@ -25,6 +25,12 @@ export const INDEX_ERRORS = {
   IDENTITY_NOT_REGISTERED: 'IDENTITY_NOT_REGISTERED',
   // An operator revoked this NodeId; only the operator can readmit it (`pnpm index:restore`).
   NODE_REVOKED: 'NODE_REVOKED',
+  // POST /v1/identity/github: a malformed body or claim, or one issued too far ahead of the index's
+  // clock; a claim not newer than the stored one or older than GITHUB_CLAIM.maxAgeMs; a NodeId with
+  // neither an active registration nor a stored catalog.
+  INVALID_CLAIM: 'INVALID_CLAIM',
+  STALE_CLAIM: 'STALE_CLAIM',
+  UNKNOWN_NODE: 'UNKNOWN_NODE',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
 } as const;
 export type IndexErrorCode = (typeof INDEX_ERRORS)[keyof typeof INDEX_ERRORS];
@@ -52,6 +58,8 @@ export const INDEX_ROUTES = {
   UPTIME: '/v1/uptime',
   VERSIONS: '/v1/versions',
   NETWORK: '/v1/network',
+  // POST a signed GitHub claim here; GET `${GITHUB_IDENTITY}/<nodeId>` reads one.
+  GITHUB_IDENTITY: '/v1/identity/github',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
@@ -62,6 +70,10 @@ export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.VERSIONS,
   INDEX_ROUTES.NETWORK,
 ]);
+// Public reads below a prefix (GET /v1/identity/github/<nodeId>), CORS-readable like the routes above.
+export const PUBLIC_READ_PREFIXES: readonly string[] = [
+  `${INDEX_ROUTES.GITHUB_IDENTITY}/`,
+];
 
 export const INDEX_HEADERS = {
   CACHE_CONTROL: 'Cache-Control',
@@ -255,3 +267,43 @@ export const NETWORK_STATES = {
   UNPUBLISHED: 'unpublished',
 } as const;
 export type NetworkState = (typeof NETWORK_STATES)[keyof typeof NETWORK_STATES];
+
+// Seller GitHub claims (github-claims.ts): a node-signed claim names an account and a public gist; the
+// index reads the gist's raw text at the account's own URL, which answers only when that account owns
+// the gist, and looks for the NodeId's proof line. No GitHub API, token or redirect is used.
+export const GITHUB_CLAIM_STATES = {
+  // Not proven yet: the last check found no proof, or none has finished.
+  PENDING: 'pending',
+  VERIFIED: 'verified',
+  // Proven before; the last conclusive check found the proof gone.
+  LOST: 'lost',
+} as const;
+export type GithubClaimState =
+  (typeof GITHUB_CLAIM_STATES)[keyof typeof GITHUB_CLAIM_STATES];
+// Static outcome codes of a gist check. Only the first two are ever stored; an outage keeps the state.
+export const GITHUB_CLAIM_REASONS = {
+  // The raw URL answered 404 or 410: no such gist, or the account does not own it.
+  GIST_NOT_FOUND: 'GIST_NOT_FOUND',
+  // The gist exists but its first GITHUB_CLAIM.maxGistBytes hold no proof line for the NodeId.
+  NODE_ID_MISSING: 'NODE_ID_MISSING',
+  // Timeout, network error or any other status, redirects included: inconclusive.
+  GITHUB_UNAVAILABLE: 'GITHUB_UNAVAILABLE',
+} as const;
+export type GithubClaimReason =
+  (typeof GITHUB_CLAIM_REASONS)[keyof typeof GITHUB_CLAIM_REASONS];
+export const GITHUB_CLAIM = {
+  // A signed claim is a few hundred bytes.
+  maxBodyBytes: 1024,
+  // How old a claim may be when it arrives. Cancelling deletes the row, so this bounds a replay of
+  // an older signed claim after a cancel.
+  maxAgeMs: 60_000,
+  gistOrigin: 'https://gist.githubusercontent.com',
+  fetchTimeoutMs: 3000,
+  maxGistBytes: 16_384,
+  // The scheduled run rechecks claims last checked this long ago, at most `recheckBatch` per run.
+  recheckAfterMs: 6 * 60 * 60 * 1000,
+  recheckBatch: 25,
+  // Statuses of the raw gist URL that conclude a check.
+  found: 200,
+  missing: [404, 410],
+} as const;

@@ -14,6 +14,7 @@ import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
 
 import {
   DISCOVERY_LISTING_INDEXES,
+  GITHUB_CLAIM_STATES,
   REGISTRATION,
   REGISTRATION_STATUS,
   UPTIME,
@@ -199,6 +200,37 @@ export const uptimeSlots = sqliteTable(
     check(
       'discovery_uptime_slots',
       between(table.slots, 1, 2 ** UPTIME.slotsPerHour - 1),
+    ),
+  ],
+);
+
+export const githubClaims = sqliteTable(
+  'discovery_github_claims',
+  {
+    nodeId: text('node_id').primaryKey(),
+    account: text('account').notNull(),
+    gist: text('gist').notNull(),
+    issuedAt: integer('issued_at').notNull(),
+    state: text('state', {
+      enum: [
+        GITHUB_CLAIM_STATES.PENDING,
+        GITHUB_CLAIM_STATES.VERIFIED,
+        GITHUB_CLAIM_STATES.LOST,
+      ],
+    }).notNull(),
+    reason: text('reason'),
+    checkedAt: integer('checked_at'),
+    verifiedAt: integer('verified_at'),
+  },
+  (table) => [
+    index('discovery_github_claims_by_check').on(table.checkedAt),
+    check(
+      'discovery_github_claims_node_id',
+      eq(textLength(table.nodeId), nodeIdCharacters),
+    ),
+    check(
+      'discovery_github_claims_state',
+      inArray(table.state, Object.values(GITHUB_CLAIM_STATES)),
     ),
   ],
 );
