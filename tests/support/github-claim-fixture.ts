@@ -101,7 +101,11 @@ export async function claimStoreOf(
 
 export async function claimHarness(
   kind: ClaimKind,
-  { limiter, noClaims }: { limiter?: FakeLimiter; noClaims?: boolean } = {},
+  {
+    limiter,
+    noClaims,
+    gistFetch,
+  }: { limiter?: FakeLimiter; noClaims?: boolean; gistFetch?: GistFetch } = {},
 ) {
   const made = await claimStoreOf(kind);
   if (!made) return null;
@@ -116,7 +120,7 @@ export async function claimHarness(
     limiters: allLimiters(limiter),
     publishers: { mode: PUBLISH_MODES.OPEN },
     registrations,
-    ...(noClaims ? {} : { claims, gistFetch: gists.fetcher }),
+    ...(noClaims ? {} : { claims, gistFetch: gistFetch ?? gists.fetcher }),
     now: () => clock.now,
   });
   const call = (path: string, init?: RequestInit) =>

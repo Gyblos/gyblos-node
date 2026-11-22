@@ -74,13 +74,13 @@ export interface GithubClaimStore {
   ): Promise<number>;
   // Records a conclusive check of the claim issued at `issuedAt`, computed from the snapshot whose
   // checked_at was `seen`: written only while that snapshot is still current, so a newer claim or a check
-  // that landed meanwhile is never replaced.
+  // that landed meanwhile is never replaced. Resolves whether it wrote.
   record(
     nodeId: string,
     issuedAt: number,
     seen: number | null,
     check: RecordedCheck,
-  ): Promise<void>;
+  ): Promise<boolean>;
   // Records an inconclusive check: checked_at moves forward only, next_check_at is not brought earlier, and
   // only a pending claim's reason becomes GITHUB_UNAVAILABLE. State and verifiedAt never change.
   touch(
@@ -134,8 +134,11 @@ export function createMemoryGithubClaimStore(): GithubClaimStore {
         isClaim(current) &&
         current.issuedAt === issuedAt &&
         current.checkedAt === seen
-      )
+      ) {
         entries.set(nodeId, { ...current, ...check });
+        return true;
+      }
+      return false;
     },
     async touch(nodeId, issuedAt, checkedAt, nextCheckAt) {
       const current = entries.get(nodeId);

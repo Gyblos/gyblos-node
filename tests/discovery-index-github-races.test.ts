@@ -10,10 +10,11 @@ import { recheckGithubClaims } from '@gyblos/discovery-index/github-claims';
 import type { GistFetch } from '@gyblos/discovery-index/github-gist';
 import { githubProofLine } from '@gyblos/protocol/identity-claim';
 
-import { T0 } from './support/discovery-index-fixture';
+import { indexNode, T0 } from './support/discovery-index-fixture';
 import {
   ACCOUNT,
   CLAIM_KINDS,
+  claimHarness,
   claimStoreOf,
   GIST,
 } from './support/github-claim-fixture';
@@ -106,5 +107,32 @@ for (const kind of CLAIM_KINDS) {
     const stored = await claims.get(NODE);
     assert.equal(stored?.state, 'verified');
     assert.equal(stored?.checkedAt, T0 + 20);
+  });
+
+  void test(`github claim races (${kind}): a POST whose check lost the race answers what is stored`, async (context) => {
+    let landFirst: () => Promise<unknown> = async () => undefined;
+    const index = await claimHarness(kind, {
+      // While the POST's own fetch is in flight, a scheduled run verifies the same snapshot first.
+      gistFetch: async () => {
+        await landFirst();
+        return new Response('no proof\n', { status: 200 });
+      },
+    });
+    if (!index) return context.skip('node:sqlite unavailable');
+    const node = indexNode();
+    await index.publish(node);
+    landFirst = async () => {
+      landFirst = async () => undefined;
+      return recheckGithubClaims(
+        index.claims,
+        async () =>
+          new Response(`${githubProofLine(node.nodeId)}\n`, { status: 200 }),
+        index.clock.now,
+      );
+    };
+    const answer = await index.claim(node);
+    const stored = await index.claims.get(node.nodeId);
+    assert.equal(stored?.state, 'verified');
+    assert.deepEqual(answer, { ok: true, state: 'verified', reason: null });
   });
 }
