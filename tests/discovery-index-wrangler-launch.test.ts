@@ -59,10 +59,26 @@ void test('on macOS and Linux, npx-cli.js under lib/node_modules runs under the 
     );
 });
 
-void test('without npm beside node the launch is refused with a static message, never a shell', () => {
-  for (const platform of ['win32', 'linux'] as const)
-    assert.throws(
-      () => wranglerLaunch(platform, '/opt/node/bin/node', ARGS, () => false),
-      /npm's npx was not found next to this Node\.js/,
+void test('on macOS and Linux without npm beside node, npx on PATH runs without a shell', () => {
+  const seen: string[] = [];
+  for (const platform of ['darwin', 'linux'] as const)
+    assert.deepEqual(
+      wranglerLaunch(platform, '/opt/node/bin/node', ARGS, (path) => {
+        seen.push(path);
+        return false;
+      }),
+      { file: 'npx', args: ['wrangler@4.151.1', ...ARGS] },
     );
+  // The beside-node path is always tried first.
+  assert.deepEqual(seen, [
+    '/opt/node/lib/node_modules/npm/bin/npx-cli.js',
+    '/opt/node/lib/node_modules/npm/bin/npx-cli.js',
+  ]);
+});
+
+void test('on Windows without npm beside node.exe the launch is refused with a static message, never a shell', () => {
+  assert.throws(
+    () => wranglerLaunch('win32', 'C:\\node\\node.exe', ARGS, () => false),
+    /npm's npx was not found next to this Node\.js/,
+  );
 });

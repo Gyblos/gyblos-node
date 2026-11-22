@@ -163,7 +163,8 @@ function recordQuery(
           ? isNull(githubClaims.checkedAt)
           : eq(githubClaims.checkedAt, seen),
       ),
-    );
+    )
+    .returning({ nodeId: githubClaims.nodeId });
 }
 
 // An inconclusive check: decided in the write, so it never rewinds a check that landed meanwhile.
@@ -222,7 +223,14 @@ export function createD1GithubClaimStore(client: D1Database): GithubClaimStore {
     reserveFetch: (nodeId, issuedAt, now, intervalMs) =>
       reserveFetch(database, nodeId, issuedAt, now, intervalMs),
     async record(nodeId, issuedAt, seen, check) {
-      await recordQuery(database, nodeId, issuedAt, seen, check);
+      const written = await recordQuery(
+        database,
+        nodeId,
+        issuedAt,
+        seen,
+        check,
+      );
+      return written.length === 1;
     },
     async touch(nodeId, issuedAt, checkedAt, nextCheckAt) {
       await touchQuery(database, nodeId, issuedAt, checkedAt, nextCheckAt);

@@ -98,6 +98,7 @@ export function nextCheck(
 
 // Checks the stored claim's gist and records the outcome against that exact claim. A conclusive outcome is
 // written only onto the snapshot it was computed from; an inconclusive one only moves checked_at forward.
+// The answer is what storage holds afterwards, so a POST never reports a state that lost a race.
 async function check(
   claims: GithubClaimStore,
   fetcher: GistFetch,
@@ -106,10 +107,15 @@ async function check(
 ): Promise<GithubClaimResult> {
   const outcome = await checkGist(fetcher, row);
   const next = nextCheck(row, outcome, now);
-  if (outcome === GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE)
-    await claims.touch(row.nodeId, row.issuedAt, now, next.nextCheckAt);
-  else await claims.record(row.nodeId, row.issuedAt, row.checkedAt, next);
-  return { state: next.state, reason: next.reason };
+  if (outcome !== GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE) {
+    if (await claims.record(row.nodeId, row.issuedAt, row.checkedAt, next))
+      return { state: next.state, reason: next.reason };
+  } else await claims.touch(row.nodeId, row.issuedAt, now, next.nextCheckAt);
+  // Another check landed first, or an outage left the stored state as it is: answer what is stored.
+  const stored = await claims.get(row.nodeId);
+  return stored?.state != null && stored.issuedAt === row.issuedAt
+    ? { state: stored.state, reason: stored.reason }
+    : { state: next.state, reason: next.reason };
 }
 
 // A seller the index already knows: an active registration or a stored catalog.

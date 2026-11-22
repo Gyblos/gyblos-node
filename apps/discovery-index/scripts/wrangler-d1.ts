@@ -32,7 +32,7 @@ export function compileSql(build: (database: DiscoveryDatabase) => SQLWrapper) {
 // npm's npx script beside this Node binary, run by that binary: the same on every platform, with no shell
 // (SQL never meets a command interpreter) and no npx.cmd, which Node does not spawn without one. Node's
 // installers and version managers place npm at node_modules/npm next to node.exe on Windows and at
-// lib/node_modules/npm under the prefix elsewhere.
+// lib/node_modules/npm under the prefix elsewhere; macOS and Linux fall back to npx on PATH.
 export function wranglerLaunch(
   platform: NodeJS.Platform,
   execPath: string,
@@ -53,11 +53,13 @@ export function wranglerLaunch(
           'bin',
           'npx-cli.js',
         );
-  if (!exists(npx))
-    throw new Error(
-      "npm's npx was not found next to this Node.js; install Node.js with npm.",
-    );
-  return { file: execPath, args: [npx, WRANGLER, ...args] };
+  if (exists(npx)) return { file: execPath, args: [npx, WRANGLER, ...args] };
+  // macOS and Linux run a PATH npx directly (execFile, no shell); Windows has only npx.cmd, which Node does
+  // not spawn without a shell, so it needs npm beside node.exe.
+  if (platform !== 'win32') return { file: 'npx', args: [WRANGLER, ...args] };
+  throw new Error(
+    "npm's npx was not found next to this Node.js; install Node.js with npm.",
+  );
 }
 
 // Runs one SQL command through Wrangler. `target` is `--remote` or `--local`; with `json`, Wrangler's

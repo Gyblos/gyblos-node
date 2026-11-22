@@ -519,8 +519,9 @@ skipped, so it never blocks the batch.
 tombstones: NodeId, account, gist, state, reason, `issuedAt` and `checkedAt`,
 newest first within each state, at most 1000 rows. It is read-only and runs
 `wrangler d1 execute --json` (through npm's npx script under the same Node.js,
-so it works the same on Windows, macOS and Linux) against the local database, or
-the remote one with `--remote` (a maintainer action).
+so it works the same on Windows, macOS and Linux; on macOS and Linux without npm
+beside Node.js it uses `npx` on `PATH`, still without a shell) against the local
+database, or the remote one with `--remote` (a maintainer action).
 
 ### What is stored
 
