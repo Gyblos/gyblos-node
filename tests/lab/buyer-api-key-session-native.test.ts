@@ -132,9 +132,16 @@ void test(
       BATCH_CHANNEL.maxOutputTokens,
       BATCH_CHANNEL.maxOutputTokens,
     ]);
-    const simultaneous = await Promise.all([ask(64), ask(64)]);
-    for (const answer of simultaneous)
+    const prior = (await withoutMaximum.json()).gyblos_payment.session
+      .approvedAtomic;
+    let total = spent + BigInt(prior);
+    const simultaneous = await Promise.all([ask(64), ask(64), ask(64)]);
+    for (const answer of simultaneous) {
       assert.equal(answer.status, 200, await answer.clone().text());
+      const approval = (await answer.json()).gyblos_payment.session;
+      assert.ok(BigInt(approval.approvedAtomic) > 0n);
+      total += BigInt(approval.approvedAtomic);
+    }
     const final = parseBuyerApiKeysReply(
       await (
         await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
@@ -142,6 +149,8 @@ void test(
     ).snapshot;
     assert.equal(final.keys[0]?.reservedAtomic, '0');
     assert.equal(final.blocked, false);
+    assert.equal(final.keys[0]?.spentAtomic, String(total));
+    assert.equal(host.finance.approvals(), 6);
     assert.deepEqual(host.finance.calls, ['deposit']);
   },
 );
@@ -250,15 +259,23 @@ void test(
     try {
       await started;
       const cancel = new AbortController();
-      const competing = [ask(64, cancel.signal), ask(64, cancel.signal)];
+      const competing = Array.from({ length: 4 }, () => ask(64, cancel.signal));
       const done = Promise.allSettled(competing);
       const overflow = await Promise.race(competing);
       assert.equal(overflow.status, 429);
+      const running = parseBuyerApiKeysReply(
+        await (
+          await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
+        ).json(),
+      ).snapshot;
+      assert.equal(running.keys[0]?.spentAtomic, '0');
+      assert.equal(running.keys[0]?.reservedAtomic, '1000');
+      assert.equal(host.engine.attempts(), 1);
       cancel.abort();
       const results = await done;
       assert.equal(
         results.filter((answer) => answer.status === 'rejected').length,
-        1,
+        3,
       );
     } finally {
       host.engine.release();
