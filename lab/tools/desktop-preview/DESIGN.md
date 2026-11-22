@@ -18,13 +18,13 @@ Views never use raw color values; colors come from theme variables or `--pk-*` t
 
 ## Surfaces
 
-| Layer               | Dark       | Use                                                                                                                |
-| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--radius-panel` start corners                             |
-| Frame (`--pk-side`) | `panel`    | Conversation panel and title bar; rail and status bar use `--pk-rail` (55% frame toward page) with a `--line` edge |
-| Panel (`--panel`)   | `panel`    | Grouped settings, usage panels, tables                                                                             |
-| Raised (`--raised`) | `raised`   | Selected pills, chips, controls on panels                                                                          |
-| Line (`--line`)     | `line`     | 1 px borders and row dividers                                                                                      |
+| Layer               | Dark       | Use                                                                                                                                                                                              |
+| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--radius-panel` start corners                                                                                                           |
+| Frame (`--pk-side`) | `panel`    | Conversation panel and title bar; rail, status bar and sidebar backdrop use `--pk-rail` (55% frame toward page); the panel has a `--line` left and bottom edge with a rounded bottom-left corner |
+| Panel (`--panel`)   | `panel`    | Grouped settings, usage panels, tables                                                                                                                                                           |
+| Raised (`--raised`) | `raised`   | Selected pills, chips, controls on panels                                                                                                                                                        |
+| Line (`--line`)     | `line`     | 1 px borders and row dividers                                                                                                                                                                    |
 
 ## Tones
 

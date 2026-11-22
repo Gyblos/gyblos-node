@@ -629,8 +629,6 @@ html .app.desktop-frame > .preview-status-bar {
   gap: 12px;
   min-width: 0;
   padding: 0 8px;
-  border-start-start-radius: var(--radius-panel);
-  border-start-end-radius: var(--radius-panel);
   background: var(--pk-rail);
   color: var(--muted);
   font-size: 12px;
@@ -1378,24 +1376,72 @@ html .app.desktop-frame .preview-guide-key .preview-guide-key-trigger:hover {
 .desktop-frame .preview-connect-copy small {
   font-size: 12px;
 }
-.desktop-frame :is(.preview-new-chat, .preview-agents-entry) {
+html .app.desktop-frame :is(.preview-new-chat, .preview-agents-entry) {
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
   background: var(--raised);
   color: var(--ink);
 }
-.desktop-frame
+html
+  .app.desktop-frame
   :is(.preview-new-chat, .preview-agents-entry):hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--ink) 30%, var(--line));
   background: var(--line);
 }
-.desktop-frame .preview-agents-entry {
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-  background: var(--soft);
+@property --pk-agents-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
-.desktop-frame .preview-agents-entry:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+html .app.desktop-frame .preview-agents-entry {
+  --pk-agents-fill: color-mix(in srgb, var(--accent) 10%, var(--pk-side));
+  border-color: transparent;
+  background:
+    linear-gradient(var(--pk-agents-fill), var(--pk-agents-fill)) padding-box,
+    conic-gradient(
+        from var(--pk-agents-angle),
+        transparent 0 40%,
+        var(--accent) 62%,
+        color-mix(in srgb, var(--accent) 50%, var(--pk-danger)) 78%,
+        var(--pk-success) 90%,
+        transparent
+      )
+      border-box,
+    linear-gradient(
+        color-mix(in srgb, var(--accent) 30%, var(--line)),
+        color-mix(in srgb, var(--accent) 30%, var(--line))
+      )
+      border-box;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 22%, transparent);
+  animation: pk-agents-border 4s linear infinite;
+}
+html .app.desktop-frame .preview-agents-entry:hover:not(:disabled) {
+  --pk-agents-fill: color-mix(in srgb, var(--accent) 18%, var(--pk-side));
+  border-color: transparent;
+  background:
+    linear-gradient(var(--pk-agents-fill), var(--pk-agents-fill)) padding-box,
+    conic-gradient(
+        from var(--pk-agents-angle),
+        transparent 0 40%,
+        var(--accent) 62%,
+        color-mix(in srgb, var(--accent) 50%, var(--pk-danger)) 78%,
+        var(--pk-success) 90%,
+        transparent
+      )
+      border-box,
+    linear-gradient(var(--accent), var(--accent)) border-box;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 34%, transparent);
+  animation-duration: 2s;
+}
+@keyframes pk-agents-border {
+  to {
+    --pk-agents-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html .app.desktop-frame .preview-agents-entry {
+    animation: none;
+  }
 }
 
 /* Blurred ::backdrop mirrors the whole window in Chromium; a flat scrim keeps focus on the dialog. */
@@ -2749,7 +2795,7 @@ html .app.desktop-frame .pk-chips button:focus-visible {
 }
 
 html .app.desktop-frame > .buyer-sidebar {
-  background: var(--pk-side);
+  background: var(--pk-rail);
   border-inline-end: 0;
 }
 html .app.desktop-frame > .buyer-sidebar::after {
@@ -2763,10 +2809,10 @@ html .app.desktop-frame > .ui-window-chrome {
   background: linear-gradient(
     to right,
     var(--pk-rail) 0,
-    var(--pk-rail) calc(var(--navigation-rail-width) - 1px),
-    var(--line) calc(var(--navigation-rail-width) - 1px),
+    var(--pk-rail) var(--navigation-rail-width),
     var(--line) var(--navigation-rail-width),
-    var(--pk-side) var(--navigation-rail-width)
+    var(--line) calc(var(--navigation-rail-width) + 1px),
+    var(--pk-side) calc(var(--navigation-rail-width) + 1px)
   );
 }
 html .app.desktop-frame > .app-body {
@@ -3736,7 +3782,6 @@ html .app.desktop-frame .preview-rail {
   min-height: 0;
   padding: var(--space-2) 0 var(--space-3);
   background: var(--pk-rail);
-  border-inline-end: 1px solid var(--line);
 }
 .desktop-frame .preview-rail-spacer {
   flex: 1;
@@ -3758,6 +3803,10 @@ html .app.desktop-frame .preview-rail-item.ui-icon-button[aria-current='page'] {
   min-width: 0;
   min-height: 0;
   padding: var(--space-2) var(--space-3) var(--space-3);
+  border-block-end: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
+  border-end-start-radius: var(--radius-panel);
+  background: var(--pk-side);
 }
 .desktop-frame.sidebar-collapsed .preview-chat-panel {
   display: none;

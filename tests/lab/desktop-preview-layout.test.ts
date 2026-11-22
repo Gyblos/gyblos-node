@@ -80,7 +80,16 @@ void test('the title bar adds a conversation menu and a details panel for the ch
   assert.doesNotMatch(css, /--pk-side-width/);
   assert.match(
     css,
-    /\.preview-rail \{[^}]*border-inline-end: 1px solid var\(--line\);/s,
+    /\.preview-chat-panel \{[^}]*border-inline-start: 1px solid var\(--line\);[^}]*border-end-start-radius: var\(--radius-panel\);/s,
+  );
+  assert.doesNotMatch(
+    css,
+    /> \.preview-status-bar \{[^}]*border-start-(start|end)-radius/s,
+  );
+  assert.match(css, /animation: pk-agents-border 4s linear infinite;/);
+  assert.match(
+    css,
+    /prefers-reduced-motion: reduce\) \{\s*html \.app\.desktop-frame \.preview-agents-entry \{\s*animation: none;/,
   );
   assert.match(css, /\.preview-new-chat, \.preview-agents-entry\)/);
   assert.match(
