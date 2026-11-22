@@ -40,7 +40,9 @@ import {
   type ServiceInput,
 } from './service';
 import { readEnvironmentFile } from './service-environment';
+import { waitForTaskStop, windowsTaskRunning } from './service-restart';
 import { servicePipe, stopWindowsService } from './service-run';
+import { taskName } from './service-windows';
 
 const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
   [SERVICE_ERRORS.UNSAFE_PATH]:
@@ -97,6 +99,8 @@ export interface ServiceSystem {
   // runs).
   windowsUser: () => Promise<string>;
   stopWindowsService: (home: string) => Promise<boolean>;
+  // Windows: whether Task Scheduler still reports the task running.
+  windowsTaskRunning: (task: string) => Promise<boolean>;
 }
 
 export interface ServiceOptions {
@@ -139,6 +143,7 @@ export function defaultServiceSystem(
     run: runCommand,
     windowsUser: () => userSid(),
     stopWindowsService,
+    windowsTaskRunning,
   };
 }
 
@@ -324,9 +329,22 @@ async function restart(
       output.stdout(`  ${command.join(' ')}\n`);
     return;
   }
-  if (kind === SERVICE_KINDS.SCHEDULED_TASK)
+  if (kind === SERVICE_KINDS.SCHEDULED_TASK) {
     await system.stopWindowsService(sellerHome(output));
-  await runAll(location.restart, system, output);
+    await waitForTaskStop(system, taskName(system.accountHome));
+  }
+  // A launch agent that was booted out has nothing to kickstart: load it again from its plist.
+  if (
+    kind === SERVICE_KINDS.LAUNCHD &&
+    (await system.run(location.restart[0]!)) !== EXIT.ok
+  )
+    await runAll(
+      [['launchctl', 'bootstrap', `gui/${uid}`, location.path]],
+      system,
+      output,
+    );
+  else if (kind !== SERVICE_KINDS.LAUNCHD)
+    await runAll(location.restart, system, output);
   output.stdout(`Restarted: ${location.path}\n`);
 }
 

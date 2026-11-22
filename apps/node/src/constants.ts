@@ -30,6 +30,9 @@ const SERVICE_UMASK = 0o077;
 export const SERVICE = {
   unit: 'gyblos-seller.service',
   label: 'com.gyblos.seller',
+  // How long restart waits for a stopped Windows task to end, and how often it checks.
+  taskStopWaitMs: 30_000,
+  taskStopPollMs: 500,
   description: 'Gyblos seller',
   // Relative to the repository, which is also the working directory so `--import tsx` resolves; the
   // daemon is its `start` command.

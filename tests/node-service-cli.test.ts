@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import {
   chmod,
+  mkdir,
   readFile,
   rename,
   rm,
@@ -31,6 +32,7 @@ import {
   type ServiceInput,
 } from '@gyblos/node-app/service';
 import { parseEnvironmentFile } from '@gyblos/node-app/service-environment';
+import { waitForTaskStop } from '@gyblos/node-app/service-restart';
 
 import {
   freeToml,
@@ -194,6 +196,7 @@ function fakeSystem(run: Fixture, platform: NodeJS.Platform = 'linux') {
       commands.push(['stop-windows-service']);
       return true;
     },
+    windowsTaskRunning: async () => false,
   };
   return { system, commands };
 }
@@ -398,3 +401,53 @@ void test('each platform restarts its service in place: launchd kickstart, Windo
   assert.equal(task.length, 1);
   assert.deepEqual(task[0]!.slice(0, 3), ['schtasks.exe', '/Run', '/TN']);
 });
+
+void test('Windows waits for the stopped task to end before running it again, within a bound', async () => {
+  const states = [true, true, false];
+  const asked: string[] = [];
+  const system = {
+    windowsTaskRunning: async (task: string) => {
+      asked.push(task);
+      return states.shift() ?? false;
+    },
+  };
+  await waitForTaskStop(system, 'Gyblos\\Seller-abc', {
+    waitMs: 1000,
+    pollMs: 1,
+  });
+  assert.equal(asked.length, 3);
+  await assert.rejects(
+    waitForTaskStop(
+      { windowsTaskRunning: async () => true },
+      'Gyblos\\Seller-abc',
+      { waitMs: 5, pollMs: 1 },
+    ),
+    (error) =>
+      error instanceof ServiceError &&
+      error.code === SERVICE_ERRORS.COMMAND_FAILED,
+  );
+});
+
+void test('macOS restart bootstraps the agent again when kickstart finds it unloaded', () =>
+  scenario({ free: true }, async (run) => {
+    await readySeller(run);
+    const { system, commands } = fakeSystem(run, 'darwin');
+    const plist = join(
+      run.root,
+      'account/Library/LaunchAgents/com.gyblos.seller.plist',
+    );
+    await mkdir(join(run.root, 'account/Library/LaunchAgents'), {
+      recursive: true,
+    });
+    await writeFile(plist, '<plist/>');
+    system.run = async (argv) => {
+      commands.push([...argv]);
+      return argv[1] === 'kickstart' ? 1 : 0;
+    };
+    const restarted = await service(run, ['restart'], system);
+    assert.equal(restarted.code, 0, restarted.output);
+    assert.deepEqual(commands, [
+      ['launchctl', 'kickstart', '-k', `gui/${system.uid}/com.gyblos.seller`],
+      ['launchctl', 'bootstrap', `gui/${system.uid}`, plist],
+    ]);
+  }));

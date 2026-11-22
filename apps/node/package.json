@@ -16,6 +16,7 @@
     "./service": "./src/service.ts",
     "./service-environment": "./src/service-environment.ts",
     "./service-run": "./src/service-run.ts",
+    "./service-restart": "./src/service-restart.ts",
     "./service-windows": "./src/service-windows.ts",
     "./setup": "./src/setup.ts",
     "./tokenizer": "./src/tokenizer.ts"
