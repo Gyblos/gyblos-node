@@ -93,6 +93,10 @@ void test('the title bar adds a conversation menu and a details panel for the ch
   assert.match(css, /animation: pk-agents-border 4s linear infinite;/);
   assert.match(
     css,
+    /html \.app\.desktop-frame \.preview-chat-pin \{\s*position: absolute;\s*right: 6px;\s*width: 20px;\s*min-width: 20px;/,
+  );
+  assert.match(
+    css,
     /prefers-reduced-motion: reduce\) \{\s*html \.app\.desktop-frame \.preview-agents-entry \{\s*animation: none;/,
   );
   assert.match(css, /\.preview-new-chat, \.preview-agents-entry\)/);

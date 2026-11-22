@@ -3890,10 +3890,11 @@ html .app.desktop-frame.sidebar-collapsed > .ui-window-chrome {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.desktop-frame .preview-chat-pin {
+html .app.desktop-frame .preview-chat-pin {
   position: absolute;
   right: 6px;
   width: 20px;
+  min-width: 20px;
   height: 20px;
   min-height: 20px;
   opacity: 0;
