@@ -121,7 +121,6 @@ export const BUYER_WITHDRAW = {
 
 // Bound the SDK opening far below the journal capacity; use the SDK's Solana packet limit.
 export const BATCH_OPENING_LIMITS = {
-  signatureBytes: 64,
   bytes: 8 * 1024,
   transactionBytes: TRANSACTION_SIZE_LIMIT,
   transactionBase64Chars: Math.ceil(TRANSACTION_SIZE_LIMIT / 3) * 4,

@@ -1,9 +1,13 @@
 import {
   address,
   assertIsSignatureBytes,
-  createNoopSigner,
+  getAddressEncoder,
+  getCompiledTransactionMessageDecoder,
+  getProgramDerivedAddress,
   getPublicKeyFromAddress,
   getTransactionDecoder,
+  getU64Encoder,
+  getUtf8Encoder,
   verifySignature,
 } from '@solana/kit';
 
@@ -13,28 +17,96 @@ import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { buildBuyerOpening } from './batch-opening-build';
 import { openingMessage } from './batch-opening-proof';
-import type { BatchRecord } from './batch-session-types';
+import type { BatchBuyerOptions, BatchRecord } from './batch-session-types';
 import { BATCH_BUYER_CHECKPOINTS, BATCH_OPENING_LIMITS } from './constants';
 
+const CHANNEL_SEED = 'channel';
+
+async function unsignedOpeningMessage(record: BatchRecord) {
+  const stop = new Error('Opening message captured');
+  let captured: Uint8Array | undefined;
+  const capture: BatchBuyerOptions['payer'] = {
+    address: address(record.terms.buyer),
+    async signTransactions(transactions) {
+      const transaction = transactions[0];
+      if (captured || transactions.length !== 1 || !transaction)
+        return sessionFail(SESSION_CODES.BINDING);
+      captured = Uint8Array.from(transaction.messageBytes);
+      throw stop;
+    },
+    async signMessages() {
+      return sessionFail(SESSION_CODES.BINDING);
+    },
+  };
+  try {
+    await buildBuyerOpening(record, capture);
+  } catch (error) {
+    if (error !== stop) throw error;
+  }
+  if (!captured) return sessionFail(SESSION_CODES.UNVERIFIED);
+  return captured;
+}
+
+async function openedChannel(
+  record: BatchRecord,
+  slot: string,
+  message: Uint8Array,
+) {
+  const compiled = getCompiledTransactionMessageDecoder().decode(message);
+  const accounts = compiled.staticAccounts;
+  const encode = getAddressEncoder();
+  const seeds = [
+    getUtf8Encoder().encode(CHANNEL_SEED),
+    encode.encode(address(record.terms.buyer)),
+    encode.encode(address(record.terms.feePayer)),
+    encode.encode(address(record.terms.mint)),
+    encode.encode(address(record.terms.buyer)),
+    getU64Encoder().encode(BigInt(record.salt)),
+    getU64Encoder().encode(BigInt(slot)),
+  ];
+  for (const instruction of compiled.instructions) {
+    const program = accounts[instruction.programAddressIndex];
+    if (!program) continue;
+    const [channel] = await getProgramDerivedAddress({
+      programAddress: program,
+      seeds,
+    });
+    if (
+      instruction.accountIndices?.some((index) => accounts[index] === channel)
+    )
+      return channel;
+  }
+  return sessionFail(SESSION_CODES.BINDING);
+}
+
+function channelConfig(record: BatchRecord, slot: string) {
+  return {
+    openSlot: Number(slot),
+    payer: record.terms.buyer,
+    payerAuthorizer: record.terms.buyer,
+    receiver: record.terms.payTo,
+    receiverAuthorizer: record.terms.authorizer,
+    salt: BigInt(record.salt).toString(),
+    token: record.terms.mint,
+    withdrawDelay: record.terms.withdrawDelaySeconds,
+  };
+}
+
 export async function originalBatchOpening(record: BatchRecord) {
+  const slot = record.hints?.slot;
+  if (slot === undefined) return sessionFail(SESSION_CODES.UNVERIFIED);
   const original = openingMessage(record);
   if (original.length > BATCH_OPENING_LIMITS.bytes)
     return sessionFail(SESSION_CODES.LIMIT);
-  const placeholder = new Uint8Array(BATCH_OPENING_LIMITS.signatureBytes);
-  assertIsSignatureBytes(placeholder);
-  const built = await buildBuyerOpening(record, {
-    ...createNoopSigner(address(record.terms.buyer)),
-    signMessages: async () => [{ [record.terms.buyer]: placeholder }],
-  });
-  const expected = getTransactionDecoder().decode(
-    Buffer.from(built.payload.deposit.transaction, 'base64'),
-  ).messageBytes;
+  const expected = await unsignedOpeningMessage(record);
+  if (!Buffer.from(original).equals(Buffer.from(expected)))
+    return sessionFail(SESSION_CODES.BINDING);
+  const channelId = await openedChannel(record, slot, expected);
   if (
-    !Buffer.from(original).equals(Buffer.from(expected)) ||
-    (record.channelId !== '' && record.channelId !== built.channelId) ||
+    (record.channelId !== '' && record.channelId !== channelId) ||
     (record.opening &&
       canonicalJson(record.opening.channelConfig) !==
-        canonicalJson(built.payload.channelConfig))
+        canonicalJson(channelConfig(record, slot)))
   )
     return sessionFail(SESSION_CODES.BINDING);
   let signed;
@@ -68,5 +140,5 @@ export async function originalBatchOpening(record: BatchRecord) {
   )
     return sessionFail(SESSION_CODES.UNVERIFIED);
   if (record.opening && !signed) return sessionFail(SESSION_CODES.UNVERIFIED);
-  return { channelId: built.channelId, message: original };
+  return { channelId, message: original };
 }
