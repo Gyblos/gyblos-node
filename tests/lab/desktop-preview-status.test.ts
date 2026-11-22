@@ -25,6 +25,8 @@ void test('system status moves to a footer status bar with one checklist dialog'
     assert.match(status, new RegExp(`label: '${label}'`));
   assert.match(status, /Sellers are checked when you send a message\./);
   assert.match(status, /openPreviewUpdate/);
+  assert.match(status, /issues\[0\]\?\.summary/);
+  assert.match(status, /summary: 'Wallet unavailable'/);
 });
 
 void test('the status bar shows the version and an update button only when a new version exists', async () => {
@@ -35,10 +37,13 @@ void test('the status bar shows the version and an update button only when a new
   assert.match(kit, /UPDATE: 'preview:update'/);
   assert.match(kit, /observeDesktopUpdates\(/);
   assert.match(kit, /DESKTOP_UPDATE\.OPEN/);
-  assert.match(kit, /\{available && <PreviewUpdateButton/);
+  assert.match(kit, /useSyncExternalStore\(subscribeUpdate, readUpdate\)/);
+  assert.match(kit, /available && available !== version/);
   const host = await read('host.ts');
   assert.match(host, /query\.get\('update'\) === 'available'/);
   assert.match(host, /desktopUpdate,/);
+  assert.match(host, /Pick<DesktopUpdate, 'available'>/);
+  assert.doesNotMatch(await read('constants.ts'), /installedVersion/);
   const css = await read('preview.css');
   assert.match(css, /> \.preview-status-bar \{[^}]*grid-row: 3;/);
   assert.match(css, /--pk-status-bar: 28px;/);
@@ -47,6 +52,7 @@ void test('the status bar shows the version and an update button only when a new
   const design = await read('DESIGN.md');
   assert.match(design, /`PreviewStatusBar`/);
   assert.match(design, /`PreviewUpdateButton`/);
+  assert.match(design, /\| Status checklist /);
   const readme = await read('README.md');
   assert.match(readme, /`update=available`/);
 });

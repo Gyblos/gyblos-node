@@ -213,8 +213,7 @@ export function createPreviewHost(
       return nodeState;
     },
   };
-  const update: DesktopUpdate = {
-    current: PREVIEW.installedVersion,
+  const update: Pick<DesktopUpdate, 'available'> = {
     available: query.get('update') === 'available' ? PREVIEW.nextVersion : null,
   };
   const desktopUpdate = { run: async () => update };

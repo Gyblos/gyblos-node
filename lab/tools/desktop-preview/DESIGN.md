@@ -80,6 +80,7 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 | Grouped block, settings card      | `Panel`, `Section`, settings rows                                                                                           | new card classes                                       |
 | Page and side panel layout        | `WorkspaceLayout`, `PageBody`                                                                                               | a second page gutter                                   |
 | App status, version, new version  | `PreviewStatusBar` (status trigger, version, `PreviewUpdateButton` when `usePreviewUpdate` reports one)                     | status rows in the sidebar, a toolbar update banner    |
+| Status checklist                  | `preview-status-list` rows in `SystemStatus` (tone icon, label, value, at most one action)                                  | separate cards or badges per check                     |
 
 - `Tag`: status or label with a tinted background; `dot` for live states.
 - `Delta`: signed percentage; set `lowerIsBetter` for prices and latency.

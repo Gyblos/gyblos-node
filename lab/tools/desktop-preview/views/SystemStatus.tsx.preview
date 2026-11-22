@@ -13,7 +13,7 @@ import { openPreviewUpdate, TONE, usePreviewNetwork, usePreviewUpdate, type Tone
 import { Button } from './UI';
 import { useDesktopWallet } from './WalletState';
 
-type StatusCheck = { label: string; value: string; tone: Tone; action?: { label: string; run(): void } };
+type StatusCheck = { label: string; value: string; tone: Tone; summary?: string; action?: { label: string; run(): void } };
 const ISSUE: readonly Tone[] = [TONE.WARNING, TONE.DANGER];
 const GLYPH = { [TONE.SUCCESS]: CheckCircle, [TONE.WARNING]: Warning, [TONE.DANGER]: WarningCircle, [TONE.INFO]: Info, [TONE.NEUTRAL]: Info };
 
@@ -37,14 +37,14 @@ export function SystemStatus({ state, onRetry, onPayments }: { state: LocalNodeS
         : wallet.status === WALLET_STATUS.LOADING
           ? { label: 'Wallet', value: 'Loading', tone: TONE.INFO }
           : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED
-            ? { label: 'Wallet', value: 'Recovery required', tone: TONE.DANGER, action: manage }
-            : { label: 'Wallet', value: 'Unavailable', tone: TONE.DANGER, action: manage },
+            ? { label: 'Wallet', value: 'Recovery required', tone: TONE.DANGER, summary: 'Wallet recovery required', action: manage }
+            : { label: 'Wallet', value: 'Unavailable', tone: TONE.DANGER, summary: 'Wallet unavailable', action: manage },
   ];
   if (wallet.status === WALLET_STATUS.READY)
     checks.push(
       wallet.backupVerified
         ? { label: 'Recovery backup', value: 'Verified', tone: TONE.SUCCESS }
-        : { label: 'Recovery backup', value: 'Not verified yet', tone: TONE.WARNING, action: { ...manage, label: 'Back up' } },
+        : { label: 'Recovery backup', value: 'Not verified yet', tone: TONE.WARNING, summary: 'Backup needed', action: { ...manage, label: 'Back up' } },
     );
   checks.push(
     update
@@ -53,23 +53,20 @@ export function SystemStatus({ state, onRetry, onPayments }: { state: LocalNodeS
     { label: 'Network', value: network === 'Testnet' ? 'Testnet · test funds only' : 'Mainnet', tone: network === 'Testnet' ? TONE.INFO : TONE.SUCCESS },
   );
   const nodeIssue = nodeTone(state) === TONE.DANGER;
-  const issues = checks.filter((check) => ISSUE.includes(check.tone)).length + (nodeIssue ? 1 : 0);
-  const tone = nodeIssue || checks.some((check) => check.tone === TONE.DANGER)
+  const issues = [
+    ...(nodeIssue ? [{ tone: TONE.DANGER, summary: LOCAL_NODE_LABELS[state] }] : []),
+    ...checks.filter((check) => ISSUE.includes(check.tone)),
+  ];
+  const tone = issues.some((issue) => issue.tone === TONE.DANGER)
     ? TONE.DANGER
-    : issues
+    : issues.length
       ? TONE.WARNING
       : state === LOCAL_NODE_STATE.READY
         ? TONE.SUCCESS
         : TONE.INFO;
-  const summary = issues > 1
-    ? issues + ' items need attention'
-    : nodeIssue
-      ? LOCAL_NODE_LABELS[state]
-      : issues
-        ? 'Backup needed'
-        : state === LOCAL_NODE_STATE.READY
-          ? 'All systems ready'
-          : LOCAL_NODE_LABELS[state];
+  const summary = issues.length > 1
+    ? issues.length + ' items need attention'
+    : (issues[0]?.summary ?? (state === LOCAL_NODE_STATE.READY ? 'All systems ready' : LOCAL_NODE_LABELS[state]));
   return (
     <>
       <Button
