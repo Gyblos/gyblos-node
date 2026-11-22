@@ -14,7 +14,10 @@ import {
 import { recheckGithubClaims } from '@gyblos/discovery-index/github-claims';
 import { checkGist } from '@gyblos/discovery-index/github-gist';
 import { scheduledRecheck } from '@gyblos/discovery-index/worker';
-import { githubProofLine } from '@gyblos/protocol/identity-claim';
+import {
+  githubProofLine,
+  IDENTITY_CLAIM,
+} from '@gyblos/protocol/identity-claim';
 
 import { T0 } from './support/discovery-index-fixture';
 import {
@@ -75,7 +78,7 @@ void test('the proof line must stand on its own line with the exact lowercase No
 
 void test('only the first 16 KiB are read, and a line cut at the bound never counts', async () => {
   const proof = githubProofLine(NODE);
-  const max = GITHUB_CLAIM.maxGistBytes;
+  const max = IDENTITY_CLAIM.maxProofBytes;
   const early = `${proof}\n${'x'.repeat(max * 4)}`;
   assert.equal(await outcome({ status: 200, body: early }), null);
   const late = `${'x'.repeat(max)}\n${proof}\n`;

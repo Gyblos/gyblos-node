@@ -122,14 +122,17 @@ void test('seller status --online pages the index for the served model until it 
       const online = await status(home, fake, ['--online']);
       const pages = index.calls.filter((call) => call.url.includes('/sellers'));
       assert.equal(pages.length, 2);
-      // Paging sellers sends only the model; the NodeId goes only to the uptime lookup.
+      // Paging sellers sends only the model; the NodeId goes only to the GitHub claim and uptime lookups.
       for (const call of pages)
         assert.equal(call.url.includes(home.nodeId), false);
       assert.deepEqual(
         index.calls
           .filter((call) => !call.url.includes('/sellers'))
           .map((call) => call.url),
-        [`${DISCOVERY_BASE}/uptime?node=${home.nodeId}`],
+        [
+          `${DISCOVERY_BASE}/identity/github/${home.nodeId}`,
+          `${DISCOVERY_BASE}/uptime?node=${home.nodeId}`,
+        ],
       );
       assert.match(online.stdout, /uptime\s+never seen by the index/);
       assert.match(online.stdout, /; listed in the index/);

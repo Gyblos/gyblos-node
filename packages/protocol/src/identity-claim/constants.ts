@@ -18,4 +18,6 @@ export const IDENTITY_CLAIM = {
   // A gist id: lowercase hex, 20 to 32 characters.
   gistId: /^[0-9a-f]{20,32}$/,
   maxGistCharacters: 32,
+  // How much of a gist's text is read for the proof line; a line cut at this bound never counts.
+  maxProofBytes: 16_384,
 } as const;

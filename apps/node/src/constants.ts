@@ -236,3 +236,64 @@ export const LOG_ROLES = {
   SELLER: 'seller',
   LAB: 'lab',
 } as const;
+
+// `gyblos seller verify github` (cli-verify-github.ts): its steps, bounds and codes.
+export const VERIFY_GITHUB = {
+  gistWebOrigin: 'https://gist.github.com',
+  gistRawOrigin: 'https://gist.githubusercontent.com',
+  // The gist's description, followed by the NodeId, so a gist made before an interruption is found again.
+  gistDescription: 'Gyblos node verification',
+  // Public gists of the signed-in account that `gh gist list` reads when looking for that gist.
+  ghListLimit: 100,
+  indexTimeoutMs: 15_000,
+  gistTimeoutMs: 5_000,
+  ghTimeoutMs: 30_000,
+  ghOutputCharacters: 64 * 1024,
+  stateVersion: 1,
+  stateBytes: 4_096,
+  // A CHECK_DEFERRED wait this short is waited out once; a longer one is left to a later run.
+  maxWaitSeconds: 120,
+  msPerSecond: 1000,
+} as const;
+// What a local verification has done so far; every run checks the index and the gist again first.
+export const VERIFY_STEPS = {
+  // A gist is chosen and not verified yet.
+  GIST: 'gist',
+  VERIFIED: 'verified',
+  // The saved gist was not found on GitHub: neither it nor the index's copy of it is used again.
+  GIST_MISSING: 'gist-missing',
+} as const;
+export type VerifyStep = (typeof VERIFY_STEPS)[keyof typeof VERIFY_STEPS];
+// Where the gist a run uses came from.
+export const GIST_SOURCES = {
+  GIVEN: 'given',
+  SAVED: 'saved',
+  INDEX: 'index',
+  CREATED: 'created',
+} as const;
+export type GistSource = (typeof GIST_SOURCES)[keyof typeof GIST_SOURCES];
+// What reading a gist's raw text found.
+export const GIST_CHECKS = {
+  FOUND: 'found',
+  MISSING: 'missing',
+  NOT_FOUND: 'not-found',
+  // The gist exists for the account but has no file named IDENTITY_CLAIM.proofFile.
+  WRONG_FILE: 'wrong-file',
+  // Any other answer (403, 5xx, a timeout): the index is asked anyway.
+  UNKNOWN: 'unknown',
+} as const;
+export type GistCheck = (typeof GIST_CHECKS)[keyof typeof GIST_CHECKS];
+export const VERIFY_ERRORS = {
+  ACCOUNT_INVALID: 'VERIFY_ACCOUNT_INVALID',
+  GIST_INVALID: 'VERIFY_GIST_INVALID',
+  GIST_OWNER: 'VERIFY_GIST_OWNER_MISMATCH',
+  NO_GIST: 'VERIFY_NO_GIST',
+  PROOF_MISSING: 'VERIFY_PROOF_MISSING',
+  PROOF_FILE_MISSING: 'VERIFY_PROOF_FILE_MISSING',
+  GIST_NOT_FOUND: 'VERIFY_GIST_NOT_FOUND',
+  CONFIG_INVALID: 'VERIFY_CONFIG_INVALID',
+  STATE_FAILED: 'VERIFY_STATE_FAILED',
+  SIGNING_FAILED: 'VERIFY_SIGNING_FAILED',
+  GH_FAILED: 'VERIFY_GH_FAILED',
+  NOT_VERIFIED: 'VERIFY_NOT_VERIFIED',
+} as const;

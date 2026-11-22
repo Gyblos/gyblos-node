@@ -45,6 +45,8 @@ accepts an optional `timeoutMs` and `signal`.
 | `fetchSellers({ baseUrl, model, fetch, now, limit?, cursor?, lastSequence? })` | Returns `{ sellers, dropped, next, generatedAt }`. Each seller is `{ catalog, presence, withdrawal: null }` (`DiscoveredSeller`). `limit` (default 50, at most 200) is always sent. A NodeId repeated within a page keeps its highest catalog sequence. `next` is the opaque cursor. |
 | `publishRecord({ baseUrl, record, fetch })`                                    | Posts one signed record (body at most 34,816 bytes). Resolves `{ ok: true }` on `201`.                                                                                                                                                                                               |
 | `registerSeller({ baseUrl, invite, nodeId, fetch })`                           | Trades a one-use invite code for permission to publish (`POST /registrations`). Resolves `registered` (`201`) or `already-active` (`200`). The invite code never appears in an error.                                                                                                |
+| `submitGithubClaim({ baseUrl, signed, fetch })`                                | Posts a node-signed GitHub claim (`POST /identity/github`). Resolves `{ state, reason, retryAfter? }`; `retryAfter` (seconds) comes only with `CHECK_DEFERRED`.                                                                                                                      |
+| `fetchGithubClaim({ baseUrl, nodeId, fetch })`                                 | Reads one NodeId's GitHub claim (`GET /identity/github/<nodeId>`), or `null` when the index has none.                                                                                                                                                                                |
 | `validateDiscoveryBaseUrl(url)`                                                | Applies the client's URL policy to operator configuration: `https`, or `http` on loopback; no credentials, query string or fragment.                                                                                                                                                 |
 
 Failures throw `DiscoveryError` with a static code from `DISCOVERY_ERROR_CODES`
@@ -60,6 +62,8 @@ response text.
 | `403` on publish                                                                  | `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does not accept this NodeId as a publisher) |
 | `403` `INVITE_INVALID`, `IDENTITY_NOT_REGISTERED`, `NODE_REVOKED` on registration | `DISCOVERY_` plus the same name                                                        |
 | `400 INVALID_REGISTRATION`, or another `400`/`403` body on registration           | `DISCOVERY_REGISTRATION_REJECTED`                                                      |
+| `400 INVALID_CLAIM` or another `400`/`403` body on a GitHub claim                 | `DISCOVERY_CLAIM_REJECTED` (`INVALID_SIGNATURE` stays `DISCOVERY_INVALID_SIGNATURE`)   |
+| `403 UNKNOWN_NODE` and `409` on a GitHub claim                                    | `DISCOVERY_UNKNOWN_NODE`, `DISCOVERY_STALE_CLAIM`                                      |
 | `413`, `429`, `503`                                                               | `DISCOVERY_PAYLOAD_TOO_LARGE`, `DISCOVERY_RATE_LIMITED`, `DISCOVERY_UNAVAILABLE`       |
 | Any other status                                                                  | `DISCOVERY_HTTP_STATUS`                                                                |
 

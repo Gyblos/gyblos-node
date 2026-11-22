@@ -19,23 +19,24 @@ Replace `COMMAND` with a command from the table below. The examples on this page
 
 ## Commands [#command-index]
 
-| Command                                     | Options                                                | Exit codes                                           |
-| ------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------- |
-| `gyblos start`                              | None                                                   | Runs until stopped                                   |
-| `gyblos setup`                              | `--role seller --mint MINT`                            | 0 keys ready; non-zero on failure                    |
-| `gyblos tokenizer`                          | None                                                   | 0 verified; non-zero on failure                      |
-| `gyblos --version`                          | None                                                   | 0                                                    |
-| `gyblos --help` / `gyblos -h`               | None                                                   | 0 prints usage to stdout                             |
-| `gyblos config validate`                    | `--config PATH`                                        | 0 valid; 1 invalid or usage error                    |
-| `gyblos doctor`                             | `--online`                                             | 0 no failed check, even with warnings; 1 a failure   |
-| `gyblos seller status`                      | `--online`                                             | 0 only for `RUNNING`; 1 for any other state or error |
-| `gyblos seller register`                    | None                                                   | 0 registered or already registered; 1 failure        |
-| `gyblos seller rpc`, `rpc set`, `rpc reset` | None                                                   | 0 shown or saved; 1 failure, nothing changed         |
-| `gyblos seller init`                        | See [`seller init`](#init-flags-for-a-native-checkout) | 0 written; 1 failure; 130 prompt cancelled           |
-| `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`          | 0 success; 1 failure                                 |
-| `gyblos seller service uninstall`           | `--dry-run`                                            | 0 success; 1 failure                                 |
-| `gyblos seller service restart`             | `--dry-run`                                            | 0 success; 1 failure or not installed                |
-| `gyblos logs`                               | See [`logs`](#local-operational-logs)                  | 0 read completed; 1 usage error or unreadable data   |
+| Command                                     | Options                                                | Exit codes                                                |
+| ------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| `gyblos start`                              | None                                                   | Runs until stopped                                        |
+| `gyblos setup`                              | `--role seller --mint MINT`                            | 0 keys ready; non-zero on failure                         |
+| `gyblos tokenizer`                          | None                                                   | 0 verified; non-zero on failure                           |
+| `gyblos --version`                          | None                                                   | 0                                                         |
+| `gyblos --help` / `gyblos -h`               | None                                                   | 0 prints usage to stdout                                  |
+| `gyblos config validate`                    | `--config PATH`                                        | 0 valid; 1 invalid or usage error                         |
+| `gyblos doctor`                             | `--online`                                             | 0 no failed check, even with warnings; 1 a failure        |
+| `gyblos seller status`                      | `--online`                                             | 0 only for `RUNNING`; 1 for any other state or error      |
+| `gyblos seller register`                    | None                                                   | 0 registered or already registered; 1 failure             |
+| `gyblos seller rpc`, `rpc set`, `rpc reset` | None                                                   | 0 shown or saved; 1 failure, nothing changed              |
+| `gyblos seller verify github USER`          | `--gist URL`; or `--status`, `--cancel` without `USER` | 0 verified, shown or cancelled; 1 not verified or failure |
+| `gyblos seller init`                        | See [`seller init`](#init-flags-for-a-native-checkout) | 0 written; 1 failure; 130 prompt cancelled                |
+| `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`          | 0 success; 1 failure                                      |
+| `gyblos seller service uninstall`           | `--dry-run`                                            | 0 success; 1 failure                                      |
+| `gyblos seller service restart`             | `--dry-run`                                            | 0 success; 1 failure or not installed                     |
+| `gyblos logs`                               | See [`logs`](#local-operational-logs)                  | 0 read completed; 1 usage error or unreadable data        |
 
 There is no `gyblos stop`, and no general `--home`, `--relay`, `--rpc-url` or `--discovery-url` flag.
 Stop a Docker seller with Compose and a native seller through its service (see
@@ -101,13 +102,15 @@ cd ~/gyblos-seller
 docker compose exec seller gyblos seller status
 docker compose exec seller gyblos seller status --online
 docker compose exec seller gyblos seller register
+docker compose exec seller gyblos seller verify github USER
 ```
 
 `seller status` is read-only. `--online` also looks up the seller's NodeId in the discovery index. While
 the index refuses or fails this seller's publication, the discovery line adds `publishing refused:` and a
 static code. While a model is served, an `uptime` line shows how often the index accepted this seller's
 presence over the last 24 hours, 7 days and 30 days, and either `online, last presence … ago` or
-`offline since …`; that lookup sends the public NodeId to the index. The
+`offline since …`, and a `github` line shows the GitHub account the index links to this seller and its
+state; those lookups send the public NodeId to the index. The
 activity summary comes from signed receipts kept on the machine; it is not a quota balance. The
 `receipt queue` line shows receipts waiting to upload to the metrics collector, the bytes reserved for
 them and any rejected writes. `FULL` means new receipts can't be saved until some are uploaded. On a
@@ -123,6 +126,20 @@ you run it.
 interactive terminal (a script without one sets `GYBLOS_RPC_URL`), never takes it as an argument, saves it only after it answers as
 devnet, and changes nothing else; `seller rpc reset` goes back to the public devnet RPC. The seller reads
 it at startup, so restart it afterwards with `gyblos seller service restart` (see [Change the RPC of an installed seller](/en/sellers/beta-guide#change-rpc)).
+
+## seller verify github [#verify-github]
+
+`seller verify github USER` shows buyers which GitHub account runs this seller. The seller must already be
+registered or publishing. It needs a gist owned by `USER` with a file named `gyblos-proof.txt` that contains the line `gyblos-node=NODEID` (an unlisted gist works too; its id is published anyway); the node key then signs a claim naming the account and the gist, and the index checks
+the gist itself. If the GitHub CLI (`gh`) is signed in as `USER`, the command creates the gist. Otherwise
+it prints the text to put in a file named `gyblos-proof.txt` in a new gist at gist.github.com and asks for the gist's address, or
+takes it from `--gist`. A gist owned by another account is refused.
+
+It saves its progress in the seller home and checks the index and the gist first on every run, so you can
+stop it at any point and run it again. `Verified` exits 0; `pending` or `lost` exits 1 and says why, for
+example that the proof line is missing or that the index could not reach GitHub (run it again later).
+`--status` shows what the index holds; `--cancel` removes the link and leaves the gist for you to delete.
+Only `verified` means the index found the proof.
 
 ## seller init [#init-flags-for-a-native-checkout]
 
