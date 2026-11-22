@@ -1,10 +1,12 @@
 // Real product startup, encrypted loopback and durable delegated authority; engine and finance are synthetic.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { PAID_BUYER } from '@gyblos/buyer/constants';
+import { BUYER_SELECTION, PAID_BUYER } from '@gyblos/buyer/constants';
+import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { rolePathIn } from '@gyblos/config';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
@@ -13,6 +15,7 @@ import {
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { NATIVE_CAPABILITY } from '../support/native-runtime';
+import { paidAcceptanceMeter } from '../support/paid-acceptance-engine';
 import { sessionProductHost } from '../support/session-product-host';
 
 void test(
@@ -20,7 +23,11 @@ void test(
   { skip: NATIVE_CAPABILITY.transportSkip },
   async (t) => {
     const request = globalThis.fetch;
-    const host = await sessionProductHost();
+    const limits: number[] = [];
+    const host = await sessionProductHost(undefined, undefined, {
+      meter: paidAcceptanceMeter,
+      observe: (input) => limits.push(input.maxTokens),
+    });
     t.after(host.close);
     const token = (
       await readFile(
@@ -55,7 +62,7 @@ void test(
     assert.equal(created.status, 200, await created.clone().text());
     const key = parseBuyerApiKeysReply(await created.json()).created;
     assert.ok(key);
-    const ask = () =>
+    const ask = (maxTokens?: number) =>
       request(host.buyer().url, {
         method: 'POST',
         headers: {
@@ -65,18 +72,28 @@ void test(
         body: JSON.stringify({
           model: policy.model,
           messages: [{ role: 'user', content: 'synthetic' }],
-          max_tokens: 64,
+          max_completion_tokens: maxTokens,
         }),
       });
-    const first = await ask();
+    const first = await ask(64);
     assert.equal(first.status, 200, await first.clone().text());
     const firstReply = await first.json();
     assert.equal(firstReply.gyblos_payment.maxAtomic, '1000');
     assert.equal(firstReply.gyblos_payment.chargedAtomic, null);
     const firstUsage = BigInt(firstReply.gyblos_payment.session.approvedAtomic);
     assert.ok(firstUsage > 0n);
+    const path = rolePathIn(
+      process.env,
+      P2P_ROLES.BUYER,
+      BUYER_SELECTION.configFile,
+    );
+    const config: BuyerSelectionConfig = JSON.parse(
+      await readFile(path, 'utf8'),
+    );
+    config.request.maxTokens = 256;
+    await writeFile(path, JSON.stringify(config));
     await host.restartBuyer();
-    const second = await ask();
+    const second = await ask(1024);
     assert.equal(second.status, 200, await second.clone().text());
     const secondReply = await second.json();
     assert.equal(
@@ -92,6 +109,17 @@ void test(
     assert.equal(snapshot.keys[0]?.settledAtomic, '0');
     assert.equal(snapshot.keys[0]?.reservedAtomic, '0');
     assert.equal(snapshot.blocked, false);
+    const withoutMaximum = await ask();
+    assert.equal(
+      withoutMaximum.status,
+      200,
+      await withoutMaximum.clone().text(),
+    );
+    assert.deepEqual(limits, [
+      64,
+      BATCH_CHANNEL.maxOutputTokens,
+      BATCH_CHANNEL.maxOutputTokens,
+    ]);
     assert.deepEqual(host.finance.calls, ['deposit']);
   },
 );
