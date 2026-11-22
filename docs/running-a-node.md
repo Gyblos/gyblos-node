@@ -517,6 +517,38 @@ Only `verified` means the index found the proof. The command prints public
 identifiers only (NodeId, account, gist URL and the index origin), never a key
 or the home location.
 
+### Seller display name
+
+```sh
+pnpm gyblos seller name "<name>"
+pnpm gyblos seller name --clear
+pnpm gyblos seller name --status
+```
+
+`seller name` sets an optional public name for this seller, which the discovery
+index lists beside its NodeId (`name` in `GET /v1/network`). The name is chosen
+by the seller: it is not verified and not unique, so it never proves who runs a
+seller; only [GitHub verification](#github-verification) does. Unquoted words
+are joined with one space. The command checks the name locally with the shared
+rule (`parseSellerName` in `@gyblos/protocol/profile-claim`): NFKC, trimmed,
+runs of spaces collapsed, 1 to 32 letters, numbers, spaces and `-`, `_`, `.`,
+`'`, with at least one letter or number; no emoji, symbols (such as check
+marks), controls or invisible characters, and nothing containing `gyblos` in any
+letter case. A refused name stops with `NAME_INVALID` or `NAME_RESERVED` before
+the key or the index is used.
+
+It then signs the name with the node key and sends it to `discovery.url`
+([discovery-index.md](discovery-index.md#seller-names)). Setting a name needs a
+seller the index already knows, as for GitHub verification
+(`DISCOVERY_UNKNOWN_NODE` otherwise). `--clear` signs an empty name, so the
+index stops showing one. `--status` prints the name the index holds and when it
+was set, or that there is none. Index refusals end with the static code in
+brackets, such as `DISCOVERY_STALE_CLAIM` (check this computer's clock) or
+`DISCOVERY_RATE_LIMITED`. Nothing is stored locally. The command prints public
+identifiers only (NodeId, the name and the index origin), never a key or the
+home location. With Docker, run it as
+`docker compose exec seller gyblos seller name "<name>"`.
+
 ### Docker
 
 `compose.yaml` runs a seller from this checkout with its own Ollama. The host

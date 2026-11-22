@@ -47,6 +47,8 @@ accepts an optional `timeoutMs` and `signal`.
 | `registerSeller({ baseUrl, invite, nodeId, fetch })`                           | Trades a one-use invite code for permission to publish (`POST /registrations`). Resolves `registered` (`201`) or `already-active` (`200`). The invite code never appears in an error.                                                                                                |
 | `submitGithubClaim({ baseUrl, signed, fetch })`                                | Posts a node-signed GitHub claim (`POST /identity/github`). Resolves `{ state, reason, retryAfter? }`; `retryAfter` (seconds) comes only with `CHECK_DEFERRED`.                                                                                                                      |
 | `fetchGithubClaim({ baseUrl, nodeId, fetch })`                                 | Reads one NodeId's GitHub claim (`GET /identity/github/<nodeId>`), with its `issuedAt` and node `signature` (`signature` is null when the index has none that verifies for the served claim; both are null from an index that predates them), or `null` when the index has none.     |
+| `submitSellerProfile({ baseUrl, signed, fetch })`                              | Posts a node-signed seller display name or clear (`POST /profile`). Resolves `{ name }`.                                                                                                                                                                                             |
+| `fetchSellerProfile({ baseUrl, nodeId, fetch })`                               | Reads one NodeId's display name (`GET /profile/<nodeId>`) with its `issuedAt` and node `signature`, or `null` when the index has none.                                                                                                                                               |
 | `validateDiscoveryBaseUrl(url)`                                                | Applies the client's URL policy to operator configuration: `https`, or `http` on loopback; no credentials, query string or fragment.                                                                                                                                                 |
 
 Failures throw `DiscoveryError` with a static code from `DISCOVERY_ERROR_CODES`
@@ -448,4 +450,6 @@ The reference index also serves `GET /uptime?node=<NodeId>`, a public uptime
 report built from the presences it accepted. It is not part of the contract a
 client relies on; see [discovery-index.md](discovery-index.md#uptime). It also
 accepts and serves seller GitHub claims under `/identity/github`, outside the
-client contract; see [discovery-index.md](discovery-index.md#github-claims).
+client contract; see [discovery-index.md](discovery-index.md#github-claims). It
+also accepts and serves seller display names under `/profile`, outside the
+client contract; see [discovery-index.md](discovery-index.md#seller-names).

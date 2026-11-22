@@ -31,6 +31,8 @@ Routes sit at the root of the index host. The client base URL is
 | `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.       |
 | `POST /v1/identity/github`         | Submit a node-signed GitHub claim; the index checks its gist ([GitHub claims](#github-claims)). |
 | `GET /v1/identity/github/<NodeId>` | One seller's GitHub claim and the state of its last check.                                      |
+| `POST /v1/profile`                 | Set or clear a seller's node-signed display name ([Seller names](#seller-names)).               |
+| `GET /v1/profile/<NodeId>`         | One seller's display name, with its signed claim.                                               |
 
 Common behavior:
 
@@ -42,11 +44,12 @@ Common behavior:
 - **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
-  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/health` and
-  `/v1/identity/github/<NodeId>` carry `Access-Control-Allow-Origin: *` on every
-  status, errors included. A `200` from `/v1/sellers`, `/v1/models`,
-  `/v1/uptime`, `/v1/versions`, `/v1/network` or `/v1/identity/github/<NodeId>`
-  carries `Cache-Control: public, max-age=10`; everything else carries
+  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/health`,
+  `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` carry
+  `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
+  from `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
+  `/v1/identity/github/<NodeId>` or `/v1/profile/<NodeId>` carries
+  `Cache-Control: public, max-age=10`; everything else carries
   `Cache-Control: no-store`.
 
 ## Publish modes
@@ -223,15 +226,16 @@ Rate limits:
 ## Caching
 
 - **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`,
-  `/v1/network` and `/v1/identity/github/<NodeId>` keep `200` answers in the
-  Workers Cache API (`caches.default`, per Cloudflare location) for 10 seconds,
-  matching their `max-age`. Keys are normalized:
+  `/v1/network`, `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` keep
+  `200` answers in the Workers Cache API (`caches.default`, per Cloudflare
+  location) for 10 seconds, matching their `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
   - models and network: the route alone;
   - uptime: `?node=<NodeId>`, however the query was spelled;
   - GitHub claims: the route and the NodeId. A claim's new state can therefore
     take up to 10 seconds to show at a location that cached the old one.
+  - seller names: the route and the NodeId, with the same 10-second delay.
 
   Invalid queries are rejected before the cache. Errors and publishes are never
   cached. Cached answers get the same CORS, `noindex` and `nosniff` headers as
@@ -322,7 +326,8 @@ is `400 INVALID_QUERY`):
       "github": {
         "account": "octo-cat",
         "gist": "0123456789abcdef0123456789abcdef"
-      }
+      },
+      "name": "Ada Lovelace"
     },
     {
       "nodeId": "…",
@@ -330,7 +335,8 @@ is `400 INVALID_QUERY`):
       "firstSeenAt": 1762473600000,
       "lastSeenAt": 1762990000000,
       "models": [],
-      "github": null
+      "github": null,
+      "name": null
     },
     {
       "nodeId": "…",
@@ -338,7 +344,8 @@ is `400 INVALID_QUERY`):
       "firstSeenAt": null,
       "lastSeenAt": null,
       "models": [],
-      "github": null
+      "github": null,
+      "name": null
     }
   ],
   "truncated": false,
@@ -369,16 +376,19 @@ is `400 INVALID_QUERY`):
   `pending` or `lost` claim is read only through
   `GET /v1/identity/github/<NodeId>`. If the claims read fails (for example
   before migration `0007` is applied), every `github` is `null`, `truncated` is
-  `true` and the route still answers. No owner, contact, country or IP is
-  returned.
+  `true` and the route still answers. `name` is the seller's
+  [display name](#seller-names), or `null` when it has none; it is self-chosen
+  and never verified. If the names read fails (for example before migration
+  `0009` is applied), every `name` is `null`, `truncated` is `true` and the
+  route still answers. No owner, contact, country or IP is returned.
 - **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
   NodeId. `counts` cover every listed seller. The `nodes` list stops before the
   answer would exceed 1 MiB.
 - **Bounds.** Each source (active and revoked registrations, sightings, stored
-  catalogs, verified GitHub claims) is read up to `maxNodes` rows by NodeId, and
-  online models up to 20,000 rows. `truncated` is `true` when the list stopped
-  at the size limit or a source filled its cap, so sellers, counts or models may
-  be incomplete.
+  catalogs, verified GitHub claims, seller names) is read up to `maxNodes` rows
+  by NodeId, and online models up to 20,000 rows. `truncated` is `true` when the
+  list stopped at the size limit or a source filled its cap, so sellers, counts
+  or models may be incomplete.
 - **Cost.** One cache miss reads each source once. A NodeId's last sighting is
   its newest hourly uptime row, one primary-key lookup per tracked NodeId.
 - In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
@@ -554,6 +564,57 @@ per NodeId: `node_id`, `account`, `gist`, `issued_at`, `state` (`pending`,
 `issued_at` and `last_fetch_at`, with every other column `NULL`. The signature
 is checked and not kept. No IP or request data is stored or logged.
 
+## Seller names
+
+A seller may choose a public display name with `gyblos seller name "<name>"`
+([running-a-node.md](running-a-node.md#seller-display-name)). The name is not
+verified and not unique: any seller can pick any name the rule allows, including
+another seller's. Only a `verified` [GitHub claim](#github-claims) says who runs
+a seller, so a client must never show a name as verified or give it a check
+mark. The name is a separate node-signed message (the
+[profile claim](../packages/protocol/SPEC.md#profile-claim-v1) in
+`@gyblos/protocol/profile-claim`); it is never part of a public record or offer,
+so buyers and older nodes are unaffected.
+
+The rule (`parseSellerName`, shared by the CLI, the index and the client)
+applies NFKC, trims, collapses runs of spaces, and accepts 1 to 32 characters of
+Unicode letters, numbers, spaces and `-`, `_`, `.`, `'`, with at least one
+letter or number. Controls, format and bidi characters, zero-width and other
+invisible characters, combining marks, emoji and symbols (so no `✓` or `✅`) are
+refused, as is any name containing `gyblos` in any letter case.
+
+`POST /v1/profile` takes
+`{"claim":{"schemaVersion":1,"nodeId":"…","name":"…","issuedAt":…},"signature":"<128 hex>"}`
+(JSON, at most 1024 bytes). It is checked like a
+[GitHub claim](#submitting-a-claim), with the same codes: rate limits
+(`429 RATE_LIMITED`), content type, size (`413 PAYLOAD_TOO_LARGE`) and the
+strict claim shape, including a name already in the rule's form
+(`400 INVALID_CLAIM`); the node signature (`400 INVALID_SIGNATURE`); `issuedAt`
+at most 5 seconds ahead (`400 INVALID_CLAIM`), at most 60 seconds old and newer
+than the stored name or clear (`409 STALE_CLAIM`); and, to set a name, a seller
+the index knows (an active registration or a stored catalog; otherwise
+`403 UNKNOWN_NODE`). It answers `200 {"ok":true,"name":"Ada Lovelace"}`.
+
+A clear (`"name": null`) replaces the name with a tombstone that keeps only the
+NodeId and `issuedAt`, so an older signed name cannot be replayed, and answers
+`200 {"ok":true,"name":null}`. Like a GitHub cancel, it needs no known seller,
+and from a NodeId with nothing stored that the index does not know it writes
+nothing.
+
+`GET /v1/profile/<NodeId>` (lowercase NodeId, no query string; anything else is
+`400 INVALID_QUERY`) answers
+`{"nodeId":"…","name":"Ada Lovelace","issuedAt":1763078399000,"signature":"…"}`,
+so anyone can rebuild the `ProfileClaimV1` and check it with
+`verifyProfileClaim`. A NodeId without a name, or whose name was cleared, is
+`404 NOT_FOUND`. `/v1/network` carries each seller's `name`
+([Network](#network)). Without the profile store (no D1 binding) both routes
+answer `503 DISCOVERY_UNAVAILABLE`.
+
+Table `discovery_seller_profiles` (migration `0009_seller_profiles.sql`), one
+row per NodeId: `node_id`, `name`, `issued_at` and `signature`; a tombstone has
+`name` and `signature` `NULL`. A stored name outside the rule fails closed
+(`503`). No IP or request data is stored or logged.
+
 ## Storage
 
 - `src/storage.ts` defines the storage contract and an in-memory adapter for
@@ -564,11 +625,11 @@ is checked and not kept. No IP or request data is stored or logged.
   and the migration is generated from it (see the migrations below); tests check
   its metadata against the migrations.
 - `storage-queries.ts`, `storage-writes.ts`, `registration-queries.ts`,
-  `uptime-d1.ts` and `github-claim-store-d1.ts` build every query through
-  Drizzle. `d1-client.ts` runs only ORM-generated statements and native
-  transactional batches. The admin script uses the same schema and mutation
-  builders, rendered through Drizzle's SQLite dialect because the Wrangler CLI
-  takes SQL rather than bind parameters.
+  `uptime-d1.ts`, `github-claim-store-d1.ts` and `profile-store-d1.ts` build
+  every query through Drizzle. `d1-client.ts` runs only ORM-generated statements
+  and native transactional batches. The admin script uses the same schema and
+  mutation builders, rendered through Drizzle's SQLite dialect because the
+  Wrangler CLI takes SQL rather than bind parameters.
 - A publish is one D1 batch (one transaction) that admits the high-water mark
   and NodeId quota together before writing the record. A failed batch rolls both
   back.
@@ -606,6 +667,7 @@ Migrations, applied in order:
 | `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it).            |
 | `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index. |
 | `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.     |
+| `0009_seller_profiles.sql`    | Seller display names. Apply before deploying the profile routes.                        |
 
 Migrations are generated with drizzle-kit from `src/schema.ts`
 (`pnpm index:db:generate --name <change>`, configured in

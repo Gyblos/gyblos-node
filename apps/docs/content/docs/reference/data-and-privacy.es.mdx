@@ -17,6 +17,7 @@ desactivar lo que es opcional.
 | [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red, más tiempo                                       | En parte: pon `publish = false`                                  |
 | [Registro](#descubrimiento)                                 | El índice de descubrimiento y Solana devnet                  | Una vez, cuando ejecutas `gyblos seller register`                                                       | Tú decides si te registras                                       |
 | [Verificación de GitHub](#github)                           | El índice de descubrimiento, que luego lee tu gist en GitHub | Solo cuando ejecutas `gyblos seller verify github`; el índice vuelve a revisar cada 6 horas más o menos | Tú decides si verificas; `--cancel` lo quita                     |
+| [Nombre del vendedor](#nombre-del-vendedor)                 | El índice de descubrimiento                                  | Solo cuando ejecutas `gyblos seller name`                                                               | Tú decides si pones uno; `--clear` lo quita                      |
 | [Búsqueda de actualizaciones](#búsqueda-de-actualizaciones) | La API de GitHub                                             | App de escritorio: al iniciar y cada 5 minutos. Vendedor: con `status`                                  | Sí: `GYBLOS_UPDATE_CHECK=0`                                      |
 | [Metadatos de red](#red)                                    | Relays, pares, el índice, el recolector y el RPC de Solana   | En cada conexión                                                                                        | En parte: [modo solo relay](/es/reference/configuration)         |
 
@@ -209,6 +210,24 @@ falle, y las revisiones programadas no la cambian. La hora de la cancelación ha
 cualquier declaración más vieja, así que nadie puede volver a enviar una declaración vieja; la hora de la
 reserva evita que una declaración nueva haga que el índice lea GitHub más de una vez por minuto. El gist sigue
 en GitHub: bórralo tú o, si otros vendedores lo usan, quita solo la línea de este vendedor. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
+
+## Nombre del vendedor [#nombre-del-vendedor]
+
+Un nombre público para tu vendedor es opcional. No se envía nada salvo que ejecutes `gyblos seller name`
+(consulta [`seller name`](/es/reference/cli#nombre-del-vendedor)).
+
+**Qué se vuelve público.** El índice publica el nombre en `GET /v1/profile/<NodeId>`, con tu NodeId, la hora
+en que tu nodo lo firmó y la firma, y lo muestra junto a tu vendedor en la lista de la red (`/v1/network`).
+Cualquiera puede leerlo. El nombre no está verificado y no es único: quien lo vea debe tomarlo como una
+etiqueta que elegiste, no como prueba de quién opera el vendedor. No pongas información privada en él.
+
+**Qué envía tu equipo.** El comando firma el nombre con la llave del nodo y lo envía al índice: tu NodeId, el
+nombre y la hora. `--status` le pide el nombre al índice por tu NodeId. No se guarda nada en tu equipo.
+
+**Cómo quitarlo.** Ejecuta `gyblos seller name --clear`. El índice deja de mostrar el nombre, la ruta GET
+responde `404` y el índice guarda solo tu NodeId y la hora firmada del borrado, así que nadie puede volver a
+enviar un nombre más viejo. Las copias que otros hicieron mientras era público quedan fuera del control de
+Gyblos.
 
 ## Solana devnet [#solana]
 

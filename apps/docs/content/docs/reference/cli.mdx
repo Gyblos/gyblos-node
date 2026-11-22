@@ -32,6 +32,7 @@ Replace `COMMAND` with a command from the table below. The examples on this page
 | `gyblos seller register`                    | None                                                   | 0 registered or already registered; 1 failure             |
 | `gyblos seller rpc`, `rpc set`, `rpc reset` | None                                                   | 0 shown or saved; 1 failure, nothing changed              |
 | `gyblos seller verify github USER`          | `--gist URL`; or `--status`, `--cancel` without `USER` | 0 verified, shown or cancelled; 1 not verified or failure |
+| `gyblos seller name NAME`                   | Or `--clear`, `--status` without `NAME`                | 0 set, cleared or shown; 1 refused or failure             |
 | `gyblos seller init`                        | See [`seller init`](#init-flags-for-a-native-checkout) | 0 written; 1 failure; 130 prompt cancelled                |
 | `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`          | 0 success; 1 failure                                      |
 | `gyblos seller service uninstall`           | `--dry-run`                                            | 0 success; 1 failure                                      |
@@ -103,6 +104,7 @@ docker compose exec seller gyblos seller status
 docker compose exec seller gyblos seller status --online
 docker compose exec seller gyblos seller register
 docker compose exec seller gyblos seller verify github USER
+docker compose exec seller gyblos seller name "NAME"
 ```
 
 `seller status` is read-only. `--online` also looks up the seller's NodeId in the discovery index. While
@@ -140,6 +142,24 @@ stop it at any point and run it again. `Verified` exits 0; `pending` or `lost` e
 example that the proof line is missing or that the index could not reach GitHub (run it again later).
 `--status` shows what the index holds; `--cancel` removes the link and leaves the gist for you to delete.
 Only `verified` means the index found the proof.
+
+## seller name [#seller-name]
+
+`seller name "NAME"` sets an optional public name that the discovery index shows beside this seller's
+NodeId. You choose it: the index doesn't verify it, and two sellers can use the same name, so it never shows
+a check mark. Only [`seller verify github`](#verify-github) proves who runs a seller. The index must already
+know the seller, as for `seller verify github`.
+
+A name has 1 to 32 characters: letters and numbers in any language, spaces and `-` `_` `.` `'`, with at
+least one letter or number. Emoji, symbols such as check marks, and invisible characters are refused, and
+so is any name that contains `gyblos`. Extra spaces are removed. A refused name stops with `NAME_INVALID` or
+`NAME_RESERVED` before anything is sent. The node key signs the name and the command sends it to the
+index.
+
+`--clear` removes the name; `--status` shows the name the index holds. Refusals from the index end with a
+static code in brackets, such as `DISCOVERY_UNKNOWN_NODE` (register or publish the seller first) or
+`DISCOVERY_STALE_CLAIM` (check the computer's clock). See
+[Data and privacy](/en/reference/data-and-privacy#seller-name) for what becomes public.
 
 ## seller init [#init-flags-for-a-native-checkout]
 

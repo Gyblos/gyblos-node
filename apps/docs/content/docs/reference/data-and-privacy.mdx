@@ -17,6 +17,7 @@ what is optional.
 | [Public seller records](#discovery)     | The discovery index, `discovery.gyblos.com`                 | While a seller is listed; the network list longer                                       | Partly: set `publish = false`                          |
 | [Registration](#discovery)              | The discovery index and Solana devnet                       | Once, when you run `gyblos seller register`                                             | You choose whether to register                         |
 | [GitHub verification](#github)          | The discovery index, which then reads your gist on GitHub   | Only when you run `gyblos seller verify github`; the index rechecks about every 6 hours | You choose whether to verify; `--cancel` removes it    |
+| [Seller name](#seller-name)             | The discovery index                                         | Only when you run `gyblos seller name`                                                  | You choose whether to set one; `--clear` removes it    |
 | [Update checks](#update-checks)         | The GitHub API                                              | Desktop app: at start and every 5 minutes. Seller: on `status`                          | Yes: `GYBLOS_UPDATE_CHECK=0`                           |
 | [Network metadata](#network)            | Relays, peers, the index, the collector and the Solana RPC  | Every connection                                                                        | Partly: [relay-only mode](/en/reference/configuration) |
 
@@ -205,6 +206,24 @@ can't be sent again; the reservation time keeps a new claim from making the inde
 a minute. The gist stays on GitHub: delete it yourself, or, if other sellers share it, remove only this
 seller's line.
 Copies that others made while it was public are outside Gyblos's control.
+
+## Seller name [#seller-name]
+
+A public name for your seller is optional. Nothing is sent unless you run `gyblos seller name` (see
+[`seller name`](/en/reference/cli#seller-name)).
+
+**What becomes public.** The index publishes the name at `GET /v1/profile/<NodeId>`, with your NodeId, the
+time your node signed it and the signature, and shows it next to your seller in the network list
+(`/v1/network`). Anyone can read it. The name is not verified and not unique: anyone who sees it should
+treat it as a label you chose, not as proof of who runs the seller. Don't put private information in it.
+
+**What your machine sends.** The command signs the name with the node key and sends it to the index: your
+NodeId, the name and the time. `--status` asks the index for the name by NodeId. Nothing is saved on your
+machine.
+
+**Remove it.** Run `gyblos seller name --clear`. The index stops showing the name, the GET route answers
+`404`, and the index keeps only your NodeId and the signed time of the clear, so an older name can't be sent
+again. Copies that others made while it was public are outside Gyblos's control.
 
 ## Solana devnet [#solana]
 

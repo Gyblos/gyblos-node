@@ -267,6 +267,28 @@ Each error starts with a sentence that says what to do and ends with a code in b
 | `VERIFY_SIGNING_FAILED`                                  | The node key couldn't sign the claim. Run `gyblos doctor`.                                                                                                                      |
 | `VERIFY_STATE_FAILED`                                    | The command couldn't save its progress in the seller home. Check that the seller folder is yours and writable (`gyblos doctor`), then run the command again.                    |
 
+## Choose a public name [#seller-name]
+
+You can give your seller an optional public name. The discovery index shows it next to your NodeId in the
+network list. You choose it, so the index doesn't verify it and another seller can use the same name. It
+never gets a check mark: only a [verified GitHub account](#verify-github) shows who runs a seller. The index
+must already know your seller, as for GitHub verification.
+
+```sh
+gyblos seller name "My Seller"
+gyblos seller name --status
+gyblos seller name --clear
+```
+
+For a Docker seller, run them from `~/gyblos-seller` with `docker compose exec seller` in front, for example
+`docker compose exec seller gyblos seller name "My Seller"`.
+
+A name has 1 to 32 characters: letters and numbers in any language, spaces and `-` `_` `.` `'`, with at least
+one letter or number. Emoji, symbols such as check marks, invisible characters and any name that contains
+`gyblos` are refused (`NAME_INVALID` or `NAME_RESERVED`). The name is public: see
+[Data and privacy](/en/reference/data-and-privacy#seller-name). Every option is in the
+[CLI reference](/en/reference/cli#seller-name).
+
 ## Privacy [#buyer-data-and-network-privacy]
 
 A local engine processes buyers' messages on your machine; do not store or share them. A remote engine

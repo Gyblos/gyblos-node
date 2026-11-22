@@ -271,6 +271,29 @@ Cada error empieza con una frase que dice qué hacer y termina con un código en
 | `VERIFY_SIGNING_FAILED`                                 | La llave del nodo no pudo firmar la declaración. Ejecuta `gyblos doctor`.                                                                                                                    |
 | `VERIFY_STATE_FAILED`                                   | El comando no pudo guardar su avance en el home del vendedor. Revisa que la carpeta del vendedor sea tuya y se pueda escribir (`gyblos doctor`) y ejecuta el comando otra vez.               |
 
+## Elige un nombre público [#nombre-del-vendedor]
+
+Puedes darle a tu vendedor un nombre público opcional. El índice de descubrimiento lo muestra junto a tu
+NodeId en la lista de la red. Lo eliges tú, así que el índice no lo verifica y otro vendedor puede usar el
+mismo nombre. Nunca lleva una marca de verificación: solo una [cuenta de GitHub verificada](#verificar-github)
+muestra quién opera un vendedor. El índice ya debe conocer tu vendedor, igual que para la verificación de
+GitHub.
+
+```sh
+gyblos seller name "My Seller"
+gyblos seller name --status
+gyblos seller name --clear
+```
+
+En un vendedor Docker, ejecútalos desde `~/gyblos-seller` con `docker compose exec seller` delante, por
+ejemplo `docker compose exec seller gyblos seller name "My Seller"`.
+
+Un nombre tiene de 1 a 32 caracteres: letras y números de cualquier idioma, espacios y `-` `_` `.` `'`, con al
+menos una letra o un número. Se rechazan los emoji, los símbolos como las marcas de verificación, los
+caracteres invisibles y cualquier nombre que contenga `gyblos` (`NAME_INVALID` o `NAME_RESERVED`). El nombre
+es público: consulta [Datos y privacidad](/es/reference/data-and-privacy#nombre-del-vendedor). Todas las
+opciones están en la [referencia de la CLI](/es/reference/cli#nombre-del-vendedor).
+
 ## Privacidad [#datos-del-comprador-y-privacidad-de-red]
 
 Un motor local procesa los mensajes de los compradores en tu equipo; no los guardes ni los compartas. Un

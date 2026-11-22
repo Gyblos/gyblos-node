@@ -32,6 +32,7 @@ Reemplaza `COMMAND` por un comando de la tabla siguiente. Los ejemplos de esta p
 | `gyblos seller register`                    | Ninguna                                                             | 0 registrado o ya registrado; 1 fallo                        |
 | `gyblos seller rpc`, `rpc set`, `rpc reset` | Ninguna                                                             | 0 mostrado o guardado; 1 fallo, sin cambios                  |
 | `gyblos seller verify github USER`          | `--gist URL`; o `--status`, `--cancel` sin `USER`                   | 0 verificado, mostrado o cancelado; 1 sin verificar o fallo  |
+| `gyblos seller name NAME`                   | O `--clear`, `--status` sin `NAME`                                  | 0 puesto, quitado o mostrado; 1 rechazado o fallo            |
 | `gyblos seller init`                        | Consulta [`seller init`](#opciones-de-init-para-un-checkout-nativo) | 0 escrito; 1 fallo; 130 pregunta cancelada                   |
 | `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`                       | 0 éxito; 1 fallo                                             |
 | `gyblos seller service uninstall`           | `--dry-run`                                                         | 0 éxito; 1 fallo                                             |
@@ -105,6 +106,7 @@ docker compose exec seller gyblos seller status
 docker compose exec seller gyblos seller status --online
 docker compose exec seller gyblos seller register
 docker compose exec seller gyblos seller verify github USER
+docker compose exec seller gyblos seller name "NAME"
 ```
 
 `seller status` solo lee. `--online` además busca el NodeId del vendedor en el índice de descubrimiento.
@@ -143,6 +145,24 @@ que puedes detenerlo en cualquier momento y volver a ejecutarlo. `Verified` sale
 salen con 1 y dicen por qué, por ejemplo que falta la línea de prueba o que el índice no pudo llegar a
 GitHub (vuelve a ejecutarlo más tarde). `--status` muestra lo que tiene el índice; `--cancel` quita el
 vínculo y deja el gist para que lo borres tú. Solo `verified` significa que el índice encontró la prueba.
+
+## seller name [#nombre-del-vendedor]
+
+`seller name "NAME"` pone un nombre público opcional que el índice de descubrimiento muestra junto al
+NodeId de este vendedor. Lo eliges tú: el índice no lo verifica y dos vendedores pueden usar el mismo nombre,
+así que nunca lleva una marca de verificación. Solo [`seller verify github`](#verificar-github) prueba quién
+opera un vendedor. El índice ya debe conocer el vendedor, igual que para `seller verify github`.
+
+Un nombre tiene de 1 a 32 caracteres: letras y números de cualquier idioma, espacios y `-` `_` `.` `'`, con
+al menos una letra o un número. Se rechazan los emoji, los símbolos como las marcas de verificación y los
+caracteres invisibles, y también cualquier nombre que contenga `gyblos`. Los espacios de más se quitan. Un
+nombre rechazado se detiene con `NAME_INVALID` o `NAME_RESERVED` antes de enviar nada. La clave del nodo
+firma el nombre y el comando lo envía al índice.
+
+`--clear` quita el nombre; `--status` muestra el nombre que tiene el índice. Los rechazos del índice
+terminan con un código estático entre corchetes, como `DISCOVERY_UNKNOWN_NODE` (primero registra o publica el
+vendedor) o `DISCOVERY_STALE_CLAIM` (revisa el reloj del equipo). Consulta
+[Datos y privacidad](/es/reference/data-and-privacy#nombre-del-vendedor) para saber qué se vuelve público.
 
 ## seller init [#opciones-de-init-para-un-checkout-nativo]
 
