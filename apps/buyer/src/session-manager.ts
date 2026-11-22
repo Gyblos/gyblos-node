@@ -178,6 +178,21 @@ async function previousSeller(
 function inspectSingle() {
   return inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER));
 }
+function singleKeyProof(
+  context: Context,
+  reconcile: (signal: AbortSignal) => Promise<unknown>,
+): ConfirmUnchargedKey | undefined {
+  if (context.prepared.config.session?.totalDepositAtomic !== undefined)
+    return undefined;
+  return (ref, scope) =>
+    finalizedUnchargedRequest(
+      batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+      ref,
+      scope,
+      context.endpoint.id().toString(),
+      () => reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
+    );
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -238,23 +253,13 @@ export function makeManager(
             ),
         })
       : createBuyerSessionManager(common);
-  const confirmUnchargedKey: ConfirmUnchargedKey = async (ref, scope) => {
-    return finalizedUnchargedRequest(
-      batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
-      ref,
-      scope,
-      context.endpoint.id().toString(),
-      () => manager.reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
-    );
-  };
   const loadMeter = sessionMeter(prepared.config.request.maxAtomic, options);
   const check = createSessionPreflight(loadMeter, policy, () =>
     context.endpoint.id().toString(),
   );
   return {
     ...manager,
-    confirmUnchargedKey:
-      policy.totalDepositAtomic === undefined ? confirmUnchargedKey : undefined,
+    confirmUnchargedKey: singleKeyProof(context, manager.reconcile),
     previousSeller: () =>
       previousSeller(policy.totalDepositAtomic, common.inspect),
     preparePaidChat: async () => {
