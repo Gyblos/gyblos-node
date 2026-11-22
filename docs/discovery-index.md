@@ -623,11 +623,11 @@ nothing.
 `400 INVALID_QUERY`) answers
 `{"nodeId":"…","name":"Ada Lovelace","issuedAt":1763078399000,"signature":"…"}`,
 so anyone can rebuild the `ProfileClaimV1` and check it with
-`verifyProfileClaim`. A NodeId without a name, whose name was cleared or held,
-or that the index no longer knows (no active registration and no stored catalog,
-for example after a revocation) is `404 NO_PROFILE`, a code an index without
-this route never sends (its unknown routes answer `404 NOT_FOUND`). A NodeId
-whose name an operator holds is `403 PROFILE_HELD`. `/v1/network` carries each
+`verifyProfileClaim`. A NodeId without a name, whose name was cleared, or that
+the index no longer knows (no active registration and no stored catalog, for
+example after a revocation) is `404 NO_PROFILE`, a code an index without this
+route never sends (its unknown routes answer `404 NOT_FOUND`). A NodeId whose
+name an operator holds is `403 PROFILE_HELD`. `/v1/network` carries each
 seller's `name` ([Network](#network)). Without the profile store (no D1 binding)
 both routes answer `503 DISCOVERY_UNAVAILABLE`.
 
