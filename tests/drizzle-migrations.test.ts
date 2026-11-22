@@ -85,6 +85,35 @@ const described = ({ id, prevId, _meta, ...rest }: Record<string, unknown>) => {
   return rest;
 };
 
+// True when SQL names no schema or database-level statement outside strings and comments. One
+// left-to-right pass, so `'--'` in a string or an apostrophe in a comment cannot hide a statement.
+const dataOnly = (sql: string) =>
+  !/\b(create|alter|drop|pragma|reindex|vacuum|attach|detach)\b/i.test(
+    sql.replaceAll(/'(?:[^']|'')*'|--[^\n]*|\/\*[\s\S]*?\*\//g, ' '),
+  );
+
+void test('the data-only check sees DDL hidden behind a string that looks like a comment', () => {
+  assert.equal(dataOnly("UPDATE t SET a = '--'; DROP TABLE x;"), false);
+  assert.equal(dataOnly("-- it's a backfill\nDROP TABLE x; -- '"), false);
+  for (const statement of [
+    'PRAGMA foreign_keys = OFF;',
+    'REINDEX t;',
+    'VACUUM;',
+    "ATTACH 'x.db' AS x;",
+    'DETACH x;',
+  ])
+    assert.equal(dataOnly(statement), false, statement);
+});
+
+void test('the data-only check accepts data statements with comments and strings', () => {
+  assert.equal(
+    dataOnly(
+      "-- Custom SQL migration file, put your code below! --\nUPDATE t SET note = 'drop -- create' WHERE id = 1; /* backfill */\nDELETE FROM u WHERE a = 'it''s';",
+    ),
+    true,
+  );
+});
+
 for (const app of APPS) {
   void test(`${app.name}: the latest drizzle-kit snapshot matches schema.ts (run db:generate)`, async () => {
     const entries = journal(app.name).entries;
@@ -203,12 +232,8 @@ for (const app of APPS) {
         described(snapshot(app.name, previous.idx)),
       );
       if (schemaChanged) return;
-      const statements = read(new URL(`${entry.tag}.sql`, migrations(app.name)))
-        .replaceAll(/--.*$/gm, '')
-        .replaceAll(/\/\*[\s\S]*?\*\//g, '');
-      assert.doesNotMatch(
-        statements,
-        /\b(create|alter|drop)\b/i,
+      assert.ok(
+        dataOnly(read(new URL(`${entry.tag}.sql`, migrations(app.name)))),
         `${entry.tag} is a custom migration: schema changes must be generated from schema.ts`,
       );
     });
