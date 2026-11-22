@@ -137,7 +137,7 @@ function advanceInQuote(scanner: Scanner): void {
     (quoteLength === 1 ||
       text.slice(scanner.index, scanner.index + quoteLength) ===
         quote.repeat(quoteLength));
-  if (options.lineQuotes && character === '\n') {
+  if (options.lineQuotes && quote !== '`' && character === '\n') {
     scanner.quote = '';
     return;
   }
@@ -259,9 +259,10 @@ function takeComment(scanner: Scanner): boolean {
     text[index] === options.hashMarker &&
     (options.adjacentHash ||
       index === 0 ||
-      (options.shell && !options.yaml ? SHELL_COMMENT_PREFIX : /\s/).test(
-        text[index - 1] ?? '',
-      ));
+      ((options.shell && !options.yaml) || options.powershell
+        ? SHELL_COMMENT_PREFIX
+        : /\s/
+      ).test(text[index - 1] ?? ''));
   if (!hash && !options.lineMarkers.some((m) => text.startsWith(m, index)))
     return false;
   const end = lineEnd(text, index);
@@ -379,7 +380,6 @@ export function commentRanges(text: string, path: string): CommentRange[] {
     python: extension === '.py',
     singleQuoteEscapes: extension === '.py',
     yaml: extension === '.yaml' || extension === '.yml',
-    lineQuotes: extension === '.yaml' || extension === '.yml',
     shell: SHELL_EXTENSIONS.has(extension),
     adjacentHash: extension === '.py' || extension === '.toml',
     hashMarker: '#',

@@ -129,9 +129,9 @@ void test('quoting edge cases hide no following comments', () => {
   const cases: [string, string][] = [
     ["$t = @'\nmachine's\n# data\n'@\n# actual", 'a.ps1'],
     ['echo hi;# actual', 'a.sh'],
+    ['Write-Host hi;# actual', 'a.ps1'],
     ["echo 'C:\\'\n# actual", 'a.sh'],
     ["p: 'C:\\'\n# actual", 'a.yml'],
-    ["d: '90s style\n# actual", 'a.yml'],
     ['body: use `x\n# actual', 'a.yml'],
     ["<em>Bob</em>'s\n<!-- actual -->", 'a.html'],
     ['((cd a) || true)\n# actual\nx=$(f $(g))', 'a.sh'],
@@ -232,5 +232,18 @@ void test('YAML anchors, ANSI-C quotes and patch regex quotes', () => {
       'a.patch',
     ),
     ['// in'],
+  );
+});
+
+void test('multi-line YAML strings and patch templates keep trailing comments', () => {
+  assert.deepEqual(commentTexts('k: "one\n  two" # actual\n', 'a.yml'), [
+    '# actual',
+  ]);
+  assert.deepEqual(
+    commentTexts(
+      '@@ -1 +1,4 @@\n x\n+const s = `\n+  select 1\n+`; // actual\n',
+      'a.patch',
+    ),
+    ['// actual'],
   );
 });
