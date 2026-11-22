@@ -9,7 +9,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { MODEL_CATALOG, resolveModel } from '@gyblos/protocol/models';
 
-void test('canonical model catalog contains the website IDs plus the small offline-test model', () => {
+void test('canonical model catalog contains the website IDs, the small offline-test model and the Qwen3 sizes', () => {
   assert.deepEqual(
     MODEL_CATALOG.map((model) => model.id),
     [
@@ -23,6 +23,11 @@ void test('canonical model catalog contains the website IDs plus the small offli
       'llama-3.3-70b',
       'gemma-4-26b',
       'qwen3-0.6b',
+      'qwen3-1.7b',
+      'qwen3-4b',
+      'qwen3-8b',
+      'qwen3-14b',
+      'qwen3-32b',
     ],
   );
   const ids = new Set<string>();
@@ -63,9 +68,9 @@ void test('model alias matching is explicit, preserves variants and accepts cust
     });
 });
 
-void test('unknown tokenizer metadata stays explicit; the known tiny tokenizer is pinned without a verification badge', () => {
+void test('unknown tokenizer metadata stays explicit; the Qwen3 family pins its shared tokenizer without a verification badge', () => {
   for (const model of MODEL_CATALOG.filter(
-    (model) => model.id !== MODEL_IDS.QWEN3_0_6B,
+    (model) => !model.id.startsWith('qwen3-'),
   ))
     assert.equal(model.tokenizer, null);
   const tiny = resolveModel(MODEL_IDS.QWEN3_0_6B);
@@ -75,6 +80,8 @@ void test('unknown tokenizer metadata stays explicit; the known tiny tokenizer i
     repository: 'Qwen/Qwen3-0.6B',
     revision: 'c1899de289a04d12100db370d81485cdf75e47ca',
     sha256: 'aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4',
+    configSha256:
+      'd5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101',
   });
   assert.ok(Object.isFrozen(tiny.model.tokenizer));
 });
@@ -118,6 +125,11 @@ void test('catalog reasoning levels follow primary model sources; unverified mod
     'llama-3.3-70b': { levels: ['off'], defaultReasoning: 'off' },
     'gemma-4-26b': { levels: ['off', 'high'], defaultReasoning: 'off' },
     'qwen3-0.6b': { levels: ['off', 'high'], defaultReasoning: 'off' },
+    'qwen3-1.7b': { levels: ['off', 'high'], defaultReasoning: 'off' },
+    'qwen3-4b': { levels: ['off', 'high'], defaultReasoning: 'off' },
+    'qwen3-8b': { levels: ['off', 'high'], defaultReasoning: 'off' },
+    'qwen3-14b': { levels: ['off', 'high'], defaultReasoning: 'off' },
+    'qwen3-32b': { levels: ['off', 'high'], defaultReasoning: 'off' },
   };
   assert.deepEqual(
     Object.fromEntries(

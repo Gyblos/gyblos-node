@@ -13,7 +13,9 @@ import { publicIdentifier } from './public-validation';
 export interface PublicTokenizer {
   repository: string;
   revision: string;
+  // tokenizer.json and tokenizer_config.json, whose chat template the recount renders.
   sha256: string;
+  configSha256: string;
 }
 
 // Levels a model supports, in REASONING_LEVELS order, and the level an offer gets when it lists none.
@@ -94,16 +96,32 @@ const NO_REASONING: ReasoningSupport = {
   defaultReasoning: REASONING_LEVELS.OFF,
 };
 
+// The Qwen3 hybrid models share one public tokenizer and chat template: every member's tokenizer.json and
+// tokenizer_config.json hash to this pair (Hugging Face, checked 2026-11-21), which the recount uses.
+const QWEN3_TOKENIZER = {
+  sha256: 'aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4',
+  configSha256:
+    'd5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101',
+} as const;
+const qwen3 = (size: string, revision: string): PublicTokenizer => ({
+  repository: `Qwen/Qwen3-${size}`,
+  revision,
+  ...QWEN3_TOKENIZER,
+});
+
 // The shared catalog is the canonical source for model names, aliases and reasoning support.
-// Only the tiny tokenizer has a pre-existing pinned local-adapter reference.
 export const MODEL_CATALOG: readonly Readonly<CatalogModel>[] = Object.freeze([
   entry(MODEL_IDS.QWEN3_30B_A3B, {
     // Ollama's bare qwen3:30b-a3b tag now points at the thinking-only 2507 build; the hybrid q4_K_M tag
     // keeps the on/off switch, so only it is an alias.
     aliases: ['qwen3:30b-a3b-q4_K_M'],
+    tokenizer: qwen3('30B-A3B', 'ad44e777bcd18fa416d9da3bd8f70d33ebb85d39'),
     reasoning: THINKING_SWITCH,
   }),
-  entry(MODEL_IDS.QWEN3_235B_A22B, { reasoning: THINKING_SWITCH }),
+  entry(MODEL_IDS.QWEN3_235B_A22B, {
+    tokenizer: qwen3('235B-A22B', '8efa61729e24bd65b1d152b5ab5409052aa80e65'),
+    reasoning: THINKING_SWITCH,
+  }),
   entry(MODEL_IDS.DEEPSEEK_V4_1_FLASH),
   entry(MODEL_IDS.KIMI_K3),
   entry(MODEL_IDS.GLM_5_3_FLASH),
@@ -113,15 +131,46 @@ export const MODEL_CATALOG: readonly Readonly<CatalogModel>[] = Object.freeze([
   entry(MODEL_IDS.GEMMA_4_26B, { reasoning: THINKING_SWITCH }),
   entry(MODEL_IDS.QWEN3_0_6B, {
     aliases: ['qwen3:0.6b'],
-    tokenizer: {
-      repository: 'Qwen/Qwen3-0.6B',
-      revision: 'c1899de289a04d12100db370d81485cdf75e47ca',
-      sha256:
-        'aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4',
-    },
+    tokenizer: qwen3('0.6B', 'c1899de289a04d12100db370d81485cdf75e47ca'),
+    reasoning: THINKING_SWITCH,
+  }),
+  entry(MODEL_IDS.QWEN3_1_7B, {
+    aliases: ['qwen3:1.7b'],
+    tokenizer: qwen3('1.7B', '70d244cc86ccca08cf5af4e1e306ecf908b1ad5e'),
+    reasoning: THINKING_SWITCH,
+  }),
+  entry(MODEL_IDS.QWEN3_4B, {
+    aliases: ['qwen3:4b'],
+    tokenizer: qwen3('4B', '1cfa9a7208912126459214e8b04321603b3df60c'),
+    reasoning: THINKING_SWITCH,
+  }),
+  entry(MODEL_IDS.QWEN3_8B, {
+    aliases: ['qwen3:8b'],
+    tokenizer: qwen3('8B', 'b968826d9c46dd6066d109eabc6255188de91218'),
+    reasoning: THINKING_SWITCH,
+  }),
+  entry(MODEL_IDS.QWEN3_14B, {
+    aliases: ['qwen3:14b'],
+    tokenizer: qwen3('14B', '40c069824f4251a91eefaf281ebe4c544efd3e18'),
+    reasoning: THINKING_SWITCH,
+  }),
+  entry(MODEL_IDS.QWEN3_32B, {
+    aliases: ['qwen3:32b'],
+    tokenizer: qwen3('32B', '9216db5781bf21249d130ec9da846c4624c16137'),
     reasoning: THINKING_SWITCH,
   }),
 ]);
+
+// A model whose catalog pin is the public tokenizer and template the recount uses: its usage is recounted
+// exactly, whatever engine serves it. Any other model can only be sold on declared usage.
+export function usesPinnedTokenizer(value: string): boolean {
+  const resolved = resolveModel(value);
+  return (
+    resolved.kind === MODEL_CLASSIFICATIONS.CATALOG &&
+    resolved.model.tokenizer?.sha256 === QWEN3_TOKENIZER.sha256 &&
+    resolved.model.tokenizer.configSha256 === QWEN3_TOKENIZER.configSha256
+  );
+}
 
 export function resolveModel(value: string): ModelResolution {
   const modelId = publicIdentifier(value);

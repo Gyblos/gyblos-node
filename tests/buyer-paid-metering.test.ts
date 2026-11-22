@@ -60,3 +60,8 @@ void test('a recounted quote for a model without the pinned tokenizer is refused
 void test('the recountable model is never bought on declared usage', () => {
   refusedModel(check(MODEL_IDS.QWEN3_0_6B, CONTROL_METERING_MODES.DECLARED));
 });
+
+void test('the whole Qwen3 family shares the pinned tokenizer: recounted yes, declared no', () => {
+  assert.doesNotThrow(check('qwen3-4b', CONTROL_METERING_MODES.RECOUNTED));
+  refusedModel(check('qwen3-4b', CONTROL_METERING_MODES.DECLARED));
+});

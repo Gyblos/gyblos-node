@@ -129,6 +129,21 @@ void test('a remote openai engine is declared, described for readiness and carri
   ]);
 });
 
+void test('any Qwen3 model behind an openai server is recounted with the shared pinned tokenizer', () => {
+  const prepared = createSellerEngine(
+    {
+      ...LOCAL,
+      model: {
+        kind: MODEL_CLASSIFICATIONS.CATALOG,
+        id: 'qwen3-4b',
+        requested: 'qwen3:4b',
+      },
+    },
+    { fetch: globalThis.fetch, environment: {} },
+  );
+  assert.equal(prepared.metering.mode, CONTROL_METERING_MODES.RECOUNTED);
+});
+
 void test('a loopback openai server serving a pinned-tokenizer model is recounted and warmed locally', () => {
   const prepared = createSellerEngine(LOCAL, {
     fetch: globalThis.fetch,
