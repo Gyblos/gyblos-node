@@ -32,6 +32,7 @@ import { initCommand, terminalPrompt, type Prompt } from './cli-init';
 import { logsCommand } from './cli-logs';
 import { registerCommand, type FundsWait } from './cli-register';
 import { rpcCommand } from './cli-rpc';
+import { nameCommand } from './cli-seller-name';
 import { serviceCommand, type ServiceSystem } from './cli-service';
 import { statusCommand } from './cli-status';
 import { verifyCommand, type VerifyOptions } from './cli-verify-github';
@@ -67,7 +68,7 @@ export interface CliContext {
 }
 
 const USAGE =
-  'Usage: gyblos start   (runs the seller daemon)\n       gyblos logs [--role buyer|seller|lab] [--follow] [--json]\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or config.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller service restart [--dry-run]   (keeps the installed service settings)\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n       gyblos seller rpc [set|reset]   (the Solana RPC; set asks on a terminal, or takes GYBLOS_RPC_URL in scripts)\n       gyblos seller verify github <user> [--gist <url|id>]   (links this seller to a GitHub account through a public or unlisted gist; its id becomes public)\n       gyblos seller verify github --status | --cancel\n';
+  'Usage: gyblos start   (runs the seller daemon)\n       gyblos logs [--role buyer|seller|lab] [--follow] [--json]\n       gyblos setup --role seller --mint <mint>\n       gyblos tokenizer\n       gyblos --version\n       gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or config.toml, like gyblos start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller service restart [--dry-run]   (keeps the installed service settings)\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n       gyblos seller register   (the invite from GYBLOS_INVITE, or asked for on a terminal)\n       gyblos seller rpc [set|reset]   (the Solana RPC; set asks on a terminal, or takes GYBLOS_RPC_URL in scripts)\n       gyblos seller verify github <user> [--gist <url|id>]   (links this seller to a GitHub account through a public or unlisted gist; its id becomes public)\n       gyblos seller verify github --status | --cancel\n       gyblos seller name "<name>" | --clear | --status   (an optional public name, not verified and not unique)\n';
 // `seller init`'s flags, declared once for parsing and for refusing them on other commands.
 const INIT_OPTIONS = {
   engine: { type: 'string' },
@@ -292,16 +293,20 @@ function printUsage(
   return code;
 }
 
-const isVerify = (args: readonly string[]) =>
-  args[0] === 'seller' && args[1] === 'verify';
+function sellerRoute(args: readonly string[], context: CliContext) {
+  if (args[0] !== 'seller') return undefined;
+  if (args[1] === 'rpc') return rpcCommand(args.slice(2), context);
+  if (args[1] === 'verify') return verifyCommand(args.slice(2), context);
+  if (args[1] === 'name') return nameCommand(args.slice(2), context);
+  return undefined;
+}
 
 export async function runCli(args: readonly string[], context: CliContext) {
   if (args.length === 1 && (args[0] === '--help' || args[0] === '-h'))
     return printUsage(context, EXIT.ok);
   if (args[0] === 'logs') return logsCommand(args.slice(1), context);
-  if (args[0] === 'seller' && args[1] === 'rpc')
-    return rpcCommand(args.slice(2), context);
-  if (isVerify(args)) return verifyCommand(args.slice(2), context);
+  const routed = sellerRoute(args, context);
+  if (routed) return routed;
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
   if (parsed && isBareRegister(parsed)) return runRegister(context);
