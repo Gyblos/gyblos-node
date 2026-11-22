@@ -146,7 +146,8 @@ function batchGeneration(
   );
   let emitted = false;
   // A declared bill is held to the bounds the buyer checks before the shared pipeline validates it, so a
-  // provider count past maxTokens is capped instead of failing an answer that was delivered.
+  // provider count past maxTokens is capped instead of failing an answer that was delivered. A delivery
+  // whose byte floor exceeds maxTokens has no bill and fails as an invalid response.
   const meter =
     live.meter.mode === CONTROL_METERING_MODES.DECLARED
       ? {

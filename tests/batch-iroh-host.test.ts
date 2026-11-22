@@ -189,7 +189,7 @@ void test('expired or invalidly signed quotes cannot open a deposit', async (t) 
   assert.equal(f.offers.generations(), 0);
   assert.deepEqual(f.rig.calls, []);
 });
-void test('a quote that expires while OPEN confirms the deposit reserves nothing and keeps the funded channel', async (t) => {
+void test('a quote that expires before OPEN is confirmed reserves nothing, and the funded channel serves the next request', async (t) => {
   // A slow opening can outlast the quote; the buyer must refuse it before reserving payment, or recovery
   // would treat the reservation as interrupted inference and close the channel it just funded.
   const f = await fixture();
@@ -207,6 +207,11 @@ void test('a quote that expires while OPEN confirms the deposit reserves nothing
   assert.equal(f.offers.generations(), 0);
   assert.equal(f.rig.seller().snapshot().state, SESSION_STATES.OPEN);
   assert.equal(f.rig.buyer.snapshot().state, SESSION_STATES.OPEN);
+  f.intercept(undefined);
+  const channelId = f.rig.buyer.snapshot().channelId;
+  await f.buyer.execute(await f.offers.quote(2), f.offers.input);
+  assert.equal(f.rig.buyer.snapshot().channelId, channelId);
+  assert.equal(f.offers.generations(), 1);
 });
 void test('an already used execution id never generates or charges again', async (t) => {
   const f = await fixture();
