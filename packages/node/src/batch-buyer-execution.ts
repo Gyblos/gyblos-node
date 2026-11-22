@@ -31,12 +31,12 @@ import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import { runBuyerBlocks } from './batch-block-buyer';
 import { isBlockBuyer } from './batch-block-ports';
+import { executeOpenedBatchBuyer } from './batch-buyer-opened';
 import type { BuyerBatchContext } from './batch-buyer-types';
 import {
   publishBuyerSessionReceipt,
   sessionReceiptPayment,
 } from './batch-receipts';
-import { executeBatchBuyer } from './batch-session';
 import { verifyDecline } from './buyer-declined-request';
 import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
@@ -98,6 +98,14 @@ async function openBuyerChannel<Remote extends BatchDestination>(
     return batchFail(SESSION_CODES.BINDING);
   return snapshot;
 }
+function verifyOpeningTime(
+  quote: SignedOfferV2,
+  expiresAt: number,
+  now: number,
+) {
+  validateOfferV2Time(quote.offer, now);
+  if (now >= expiresAt) return batchFail(SESSION_CODES.LIMIT);
+}
 export async function runBuyerBatch<Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
   value: SignedOfferV2,
@@ -105,7 +113,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   signal: AbortSignal,
   onDelta?: (text: string) => Promise<void>,
 ) {
-  const { options, terms, rpc, approve } = context;
+  const { options, terms, rpc } = context;
   const quote = {
     offer: parseOfferV2(value.offer),
     signature: parseOfferSignatureV2(value.signature),
@@ -129,9 +137,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       options.endpoint.id().toString(),
       options.now(),
     );
-    const checkedAt = options.now();
-    validateOfferV2Time(quote.offer, checkedAt);
-    if (checkedAt >= terms.expiresAt) return batchFail(SESSION_CODES.LIMIT);
+    verifyOpeningTime(quote, terms.expiresAt, options.now());
     current.throwIfAborted();
   };
   await verify(signal);
@@ -141,30 +147,38 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     matchBatchTerms(prepared.terms, terms);
   }
   await verify(signal);
-  signal.throwIfAborted();
-  await bounded(
-    options.buyer.open(() => {
+  const { request, started } = await recoverBuyerOpening(
+    options.buyer,
+    async () => {
       signal.throwIfAborted();
-      validateOfferV2Time(quote.offer, options.now());
-      if (options.now() >= terms.expiresAt)
-        return batchFail(SESSION_CODES.LIMIT);
-    }),
-    signal,
-  );
-  signal.throwIfAborted();
-  const channelId = options.buyer.snapshot().channelId;
-  const request = buildBatchExecutionRequest(channelId, quote, input);
-  const open = (payload: string) =>
-    openVerified(context, request, verify, signal, payload);
-  if (blockMode) {
-    await verify(signal);
-    await open(await options.buyer.open());
-    signal.throwIfAborted();
-    return runBuyerBlocks(context, request, signal, onDelta);
-  }
-  return runBuyerSession(context, request, {
+      const payload = await options.buyer.open(() => {
+        signal.throwIfAborted();
+        verifyOpeningTime(quote, terms.expiresAt, options.now());
+      });
+      const channelId = options.buyer.snapshot().channelId;
+      const prepared = buildBatchExecutionRequest(channelId, quote, input);
+      const started = performance.now();
+      await verify(signal);
+      return async () => {
+        await openBuyerChannel(context, prepared, signal, payload);
+        return { request: prepared, started };
+      };
+    },
     verify,
-    open,
+    signal,
+    options.financialPermission,
+  );
+  await verify(signal);
+  await options.beforeInference?.(request.requestId, {
+    requestId: request.requestId,
+    channelId: request.channelId,
+    sellerNodeId: terms.sellerNodeId,
+    baseAtomic: options.buyer.snapshot().cumulativeAtomic,
+  });
+  signal.throwIfAborted();
+  if (blockMode) return runBuyerBlocks(context, request, signal, onDelta);
+  return runBuyerSession(context, request, {
+    started,
     verifyUsage: async (result) =>
       verifiedCharge(context, quote, input, result),
     signal,
@@ -178,27 +192,21 @@ async function runBuyerSession<Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
   request: import('@gyblos/protocol/batch-channel').BatchExecutionRequest,
   steps: {
-    verify: (signal: AbortSignal) => Promise<void>;
-    open: (
-      payload: string,
-    ) => Promise<import('@gyblos/protocol/payment-session').SessionSnapshot>;
+    started: number;
     verifyUsage: (result: FreeExecutionResult) => Promise<string>;
     signal: AbortSignal;
     onDelta?: (text: string) => Promise<void>;
   },
 ) {
   const { options, terms, rpc, approve } = context;
-  const { signal, onDelta } = steps;
+  const { signal, onDelta, started } = steps;
   const pending = await batchSessionRequest(request);
-  const started = performance.now();
   let first: number | null = null;
   let billed: SessionBill | undefined;
   const baseAtomic = options.buyer.snapshot().cumulativeAtomic;
-  const generated = await executeBatchBuyer(
+  const generated = await executeOpenedBatchBuyer(
     {
       buyer: options.buyer,
-      verify: steps.verify,
-      open: steps.open,
       execute: async () => {
         const result = await rpc(
           BATCH_METHODS.EXECUTE,
@@ -233,39 +241,4 @@ async function runBuyerSession<Remote extends BatchDestination>(
       Math.floor(performance.now() - started),
     );
   return generated;
-}
-
-async function openVerified<Remote extends BatchDestination>(
-  context: BuyerBatchContext<Remote>,
-  request: Parameters<typeof openBuyerChannel>[1],
-  verify: (signal: AbortSignal) => Promise<void>,
-  signal: AbortSignal,
-  payload: string,
-) {
-  const { options, terms } = context;
-  const channelId = request.channelId;
-
-  const snapshot = await recoverBuyerOpening(
-    options.buyer,
-    () => {
-      const send = () => openBuyerChannel(context, request, signal, payload);
-      return options.financialPermission
-        ? options.financialPermission(send)
-        : send();
-    },
-    verify,
-    signal,
-  );
-  // An opening may outlast the quote (openMs exceeds its lifetime): check it again before any payment is
-  // reserved, so an expired quote leaves the funded channel open for the next request instead of an
-  // interrupted reservation that recovery would close.
-  await verify(signal);
-  await options.beforeInference?.(request.requestId, {
-    requestId: request.requestId,
-    channelId,
-    sellerNodeId: terms.sellerNodeId,
-    baseAtomic: options.buyer.snapshot().cumulativeAtomic,
-  });
-  signal.throwIfAborted();
-  return snapshot;
 }

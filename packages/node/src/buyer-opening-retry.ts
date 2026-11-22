@@ -23,20 +23,25 @@ export class UnsentOpeningError extends BatchChannelError {
 }
 export async function recoverBuyerOpening<T>(
   buyer: SessionBuyer,
-  open: () => Promise<T>,
+  prepare: () => Promise<() => Promise<T>>,
   verify: (signal: AbortSignal) => Promise<void>,
   signal: AbortSignal,
+  permit: <R>(work: () => Promise<R>) => Promise<R> = (work) => work(),
 ): Promise<T> {
   const evidence = buyer.openingRecovery;
-  if (!evidence) return open();
-
-  if (await evidence.claim()) {
-    try {
-      return await open();
-    } catch {
-      signal.throwIfAborted();
+  const first = await permit(async () => {
+    const open = await prepare();
+    if (!evidence) return { value: await open() };
+    if (await evidence.claim()) {
+      try {
+        return { value: await open() };
+      } catch {
+        signal.throwIfAborted();
+      }
     }
-  }
+    return { replay: open, evidence };
+  });
+  if (!first.replay) return first.value;
   const recovery = AbortSignal.any([
     signal,
     AbortSignal.timeout(BATCH_SESSION_DEFAULTS.operationMs),
@@ -45,15 +50,16 @@ export async function recoverBuyerOpening<T>(
     // Observe only the original transaction. A missing RPC response proves neither outcome.
     for (const wait of BATCH_SESSION_DEFAULTS.openingRecheckMs) {
       if (wait) await delay(wait, undefined, { signal: recovery });
-      const status = await bounded(evidence.status(recovery), recovery).catch(
-        () => OPENING_STATUS.UNKNOWN,
-      );
+      const status = await bounded(
+        first.evidence.status(recovery),
+        recovery,
+      ).catch(() => OPENING_STATUS.UNKNOWN);
       recovery.throwIfAborted();
       if (status === OPENING_STATUS.ABSENT)
         throw new UnsentOpeningError(SESSION_CODES.OPENING_ABSENT);
       if (status === OPENING_STATUS.PRESENT) {
         await bounded(verify(recovery), recovery);
-        return await open();
+        return await permit(first.replay);
       }
     }
   } catch (error) {

@@ -17,6 +17,7 @@ import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
+import { desktopOpening } from '@gyblos/node/desktop-opening';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { FREE_EXECUTION } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
@@ -199,6 +200,11 @@ async function serveChat(
       scoped.stream !== undefined,
       selectedSellerAllowed,
     );
+    if (
+      route.openingIntent &&
+      !(await desktopOpening(process.env).armed(route.openingIntent))
+    )
+      throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
     const run = stopping(scoped, input.stop);
     diagnostic.executing();
     if (input.stream && run.stream) {

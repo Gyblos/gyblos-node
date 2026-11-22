@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { createBuyerBatchSession } from '@gyblos/node/batch-buyer';
 import { createSellerBatchSession } from '@gyblos/node/batch-seller';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
+import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import {
   BATCH_CHANNEL,
   BATCH_METHODS,
@@ -23,7 +24,12 @@ import { batchOfferFixture } from './support/batch-iroh-offer';
 import { batchLoopback } from './support/batch-loopback';
 import { sessionRig } from './support/batch-session';
 
-async function fixture(input: { verify?: () => Promise<void> } = {}) {
+async function fixture(
+  input: {
+    verify?: () => Promise<void>;
+    receipt?: (value: BuyerReceiptEvidence) => void;
+  } = {},
+) {
   const rig = await sessionRig();
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const service = createSellerBatchSession({
@@ -57,6 +63,7 @@ async function fixture(input: { verify?: () => Promise<void> } = {}) {
       assert.equal(quote.offer.owner, rig.terms.owner);
     },
     observe: rig.sellerOptions.observe,
+    receipt: input.receipt,
   });
   return {
     rig,
@@ -322,4 +329,22 @@ void test('disconnect during identity verification forbids a late opening signat
   assert.equal(opening.mock.callCount(), 0);
   assert.equal(f.offers.generations(), 0);
   assert.deepEqual(f.rig.calls, []);
+});
+
+void test('whole-response buyer receipts include time waiting for OPEN', async (t) => {
+  const observations: BuyerReceiptEvidence['observed'][] = [];
+  const f = await fixture({
+    receipt: (value) => {
+      observations.push(value.observed);
+    },
+  });
+  t.after(f.close);
+  let elapsed = 0;
+  t.mock.method(performance, 'now', () => elapsed);
+  f.intercept(async (request) => {
+    if (request.method === BATCH_METHODS.OPEN) elapsed += 3000;
+  });
+  await f.buyer.execute(await f.offers.quote(1), f.offers.input);
+  assert.equal(observations[0]?.firstTokenMs, 3000);
+  assert.equal(observations[0]?.totalMs, 3000);
 });
