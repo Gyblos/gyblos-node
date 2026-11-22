@@ -1,6 +1,7 @@
 // Owns static naming/import/version checks; it must not start applications.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 type Identifier = { type: 'Identifier'; name: string };
 type BindingPattern =
@@ -32,6 +33,36 @@ type RuleContext = {
     data?: Record<string, string>;
   }) => void;
 };
+type CommentRuleContext = RuleContext & {
+  sourceCode: { getAllComments: () => { type: string }[] };
+};
+
+const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const COMMENT_BUDGET_PATH = resolve(
+  REPOSITORY_ROOT,
+  'tooling/source-comment-budget.json',
+);
+
+function isCommentBudgetRecord(
+  value: unknown,
+): value is Record<string, number> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return false;
+  return Object.entries(value).every(
+    ([path, budget]) =>
+      path.length > 0 &&
+      typeof budget === 'number' &&
+      Number.isSafeInteger(budget) &&
+      budget >= 0,
+  );
+}
+
+const parsedCommentBudgets: unknown = JSON.parse(
+  readFileSync(COMMENT_BUDGET_PATH, 'utf8'),
+);
+if (!isCommentBudgetRecord(parsedCommentBudgets))
+  throw new Error('Source comment budget is invalid.');
+const COMMENT_BUDGETS = parsedCommentBudgets;
 
 const SHORT_BINDINGS = new Set([
   'c',
@@ -238,8 +269,40 @@ const versionPins = {
   },
 };
 
+const noNewComments = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: {
+      budget:
+        'Source comments are banned; this file has {{count}} comments but its ratchet budget is {{budget}}.',
+    },
+  },
+  create(context: CommentRuleContext) {
+    const path = relative(REPOSITORY_ROOT, context.filename).replaceAll(
+      '\\',
+      '/',
+    );
+    const budget = COMMENT_BUDGETS[path] ?? 0;
+    return {
+      Program(node: object) {
+        const count = context.sourceCode
+          .getAllComments()
+          .filter((comment) => comment.type !== 'Shebang').length;
+        if (count <= budget) return;
+        context.report({
+          node,
+          messageId: 'budget',
+          data: { budget: String(budget), count: String(count) },
+        });
+      },
+    };
+  },
+};
+
 export default {
   rules: {
+    'no-new-comments': noNewComments,
     structure,
     'package-boundaries': packageBoundaries,
     'import-extensions': importExtensions,

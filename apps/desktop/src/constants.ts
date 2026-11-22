@@ -204,10 +204,8 @@ export const CHAT_STORAGE_STATE = {
 export type ChatArchiveState =
   (typeof CHAT_STORAGE_STATE)[keyof typeof CHAT_STORAGE_STATE];
 
-// Preserves the local hackathon engine; network agents discover their models from the buyer.
 export const PAYPAL_SANDBOX_AGENT_MODEL = 'gpt-oss:20b';
 
-// Desktop notices never install code; the host owns the sole release destination.
 export const DESKTOP_UPDATE = {
   CHANNEL: 'desktop:update',
   STATUS: 'status',

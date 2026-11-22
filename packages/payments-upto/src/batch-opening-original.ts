@@ -1,4 +1,3 @@
-// Reconstructs only original SDK bytes, using no wallet authority; temporary placeholder payloads never escape.
 import {
   address,
   assertIsSignatureBytes,
@@ -21,8 +20,6 @@ export async function originalBatchOpening(record: BatchRecord) {
   const original = openingMessage(record);
   if (original.length > BATCH_OPENING_LIMITS.bytes)
     return sessionFail(SESSION_CODES.LIMIT);
-  // The SDK has no public unsigned batch builder. Noop signs no transaction; this zero placeholder
-  // merely lets its zero-voucher construction finish. Neither voucher nor payload is returned or saved.
   const placeholder = new Uint8Array(BATCH_OPENING_LIMITS.signatureBytes);
   assertIsSignatureBytes(placeholder);
   const built = await buildBuyerOpening(record, {

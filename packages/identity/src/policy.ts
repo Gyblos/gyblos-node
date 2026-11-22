@@ -1,6 +1,3 @@
-// Owns the sponsorship decision: one sponsored registration per canonical device key and owner, a cap, a
-// budget, and a required online check answered by the node key. Must not know about RPC or storage.
-// Wiring is blocked until a real Iroh + catalog online check exists; see docs/identity.md.
 import { address, getAddressEncoder, isAddress } from '@solana/kit';
 
 import {
@@ -17,8 +14,6 @@ import {
 } from './constants';
 import { IdentityError } from './errors';
 
-// deviceKey is the canonical NodeId (64 lowercase hex); owner is a base58 Solana address.
-// costLamports is everything the sponsor pays: prefund plus transaction fee.
 export interface SponsorRequest {
   deviceKey: string;
   owner: string;
@@ -41,10 +36,6 @@ export interface SponsorDecision {
   reason: SponsorReason;
 }
 
-// The online check has no default and cannot be a bare "true": it must deliver the fresh challenge to the
-// node (the real check dials its NodeId over Iroh and checks its catalog) and return the node key's
-// signature over onlineChallengeMessage(challenge, request). That proves only that the check reached a
-// holder of the device key; Sybil resistance still depends on what the real check verifies.
 export type OnlineCheck = (
   request: SponsorRequest,
   challenge: Uint8Array,
@@ -67,7 +58,6 @@ export const EMPTY_LEDGER: SponsorLedger = {
   spentLamports: 0n,
 };
 
-// An operator config with a zero or negative cap or budget is a mistake, not a policy; it throws.
 export function assertSponsorPolicyConfig(config: SponsorPolicyConfig): void {
   if (config.budgetLamports <= 0n || config.maxPerRegistrationLamports <= 0n) {
     throw new IdentityError(
@@ -77,7 +67,6 @@ export function assertSponsorPolicyConfig(config: SponsorPolicyConfig): void {
   }
 }
 
-// Ledger keys must be canonical so one device or owner cannot appear under two spellings.
 function inputReason(request: SponsorRequest): SponsorReason | undefined {
   if (!isCanonicalNodeId(request.deviceKey))
     return SPONSOR_REASONS.INVALID_DEVICE_KEY;
@@ -85,7 +74,6 @@ function inputReason(request: SponsorRequest): SponsorReason | undefined {
   return undefined;
 }
 
-// Pure, synchronous rules; cheap checks run before the (network) online check.
 export function evaluateSponsorRules(
   request: SponsorRequest,
   ledger: SponsorLedger,
@@ -106,7 +94,6 @@ export function evaluateSponsorRules(
   return ALLOWED;
 }
 
-// What the node signs to answer a challenge: domain ‖ challenge ‖ nodeId ‖ owner.
 export function onlineChallengeMessage(
   challenge: Uint8Array,
   request: SponsorRequest,
@@ -126,7 +113,6 @@ async function onlineProofValid(
   const challenge = crypto.getRandomValues(
     new Uint8Array(ONLINE_CHALLENGE.challengeBytes),
   );
-  // The check gets a copy so it cannot change the challenge it is judged against.
   const proof = await onlineCheck(request, challenge.slice());
   return verifyNodeSignature(
     request.deviceKey,
@@ -135,8 +121,6 @@ async function onlineProofValid(
   );
 }
 
-// A wrong or missing signature denies (ONLINE_CHECK_FAILED); a throwing check denies (ONLINE_CHECK_ERROR),
-// never an allow. The caller that owns the check is responsible for logging its failure.
 export async function decideSponsorship(
   request: SponsorRequest,
   ledger: SponsorLedger,
@@ -154,8 +138,6 @@ export async function decideSponsorship(
   }
 }
 
-// Returns the ledger after a sponsorship; the caller persists it atomically with the decision.
-// A non-canonical request never reaches the ledger.
 export function recordSponsorship(
   ledger: SponsorLedger,
   request: SponsorRequest,
