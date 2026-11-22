@@ -8,7 +8,7 @@ import {
   type SessionVoucher,
 } from '@gyblos/protocol/payment-session';
 
-export interface OpenedBatchBuyerExecution<T> {
+interface OpenedBatchBuyerExecution<T> {
   buyer: SessionBuyer;
   execute(
     request: SessionRequest,

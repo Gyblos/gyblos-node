@@ -6,42 +6,12 @@ import {
   type AdmittedExecution,
 } from '@gyblos/inference';
 import type { ExecutionOutcome } from '@gyblos/protocol/execution-policy';
-import {
-  SESSION_CODES,
-  sessionFail,
-  type SessionBill,
-  type SessionRequest,
-  type SessionSeller,
-  type SessionSnapshot,
+import type {
+  SessionBill,
+  SessionRequest,
+  SessionSeller,
 } from '@gyblos/protocol/payment-session';
 
-import {
-  executeOpenedBatchBuyer,
-  type OpenedBatchBuyerExecution,
-} from './batch-buyer-opened';
-
-export interface BatchBuyerExecution<T> extends OpenedBatchBuyerExecution<T> {
-  // Must enforce independent identity, authenticated peer, quote signature/digest/time, exact input,
-  // capability and price policy, and the existing unresolved-payment barrier before any prompt.
-  verify(signal: AbortSignal): Promise<void>;
-  open(payload: string, signal: AbortSignal): Promise<SessionSnapshot>;
-}
-export async function executeBatchBuyer<T>(
-  dependencies: BatchBuyerExecution<T>,
-  request: SessionRequest,
-  signal: AbortSignal,
-): Promise<T> {
-  signal.throwIfAborted();
-  await dependencies.verify(signal);
-  signal.throwIfAborted();
-  const opened = await dependencies.open(
-    await dependencies.buyer.open(),
-    signal,
-  );
-  if (opened.channelId !== dependencies.buyer.snapshot().channelId)
-    sessionFail(SESSION_CODES.BINDING);
-  return executeOpenedBatchBuyer(dependencies, request, signal);
-}
 export interface BatchSellerExecution<T> {
   seller: SessionSeller;
   request: SessionRequest;
