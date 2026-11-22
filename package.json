@@ -9,7 +9,7 @@
     "node": ">=24.22.1"
   },
   "scripts": {
-    "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm skills:check && pnpm boundaries",
+    "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm skills:check && pnpm boundaries && pnpm db:check",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json && tsc -p apps/docs/tsconfig.json && tsc -p apps/explorer/tsconfig.json",
@@ -31,6 +31,9 @@
     "index:revoke": "node --import tsx apps/discovery-index/scripts/admin.ts revoke",
     "index:restore": "node --import tsx apps/discovery-index/scripts/admin.ts restore",
     "index:github-claims": "node --import tsx apps/discovery-index/scripts/github-claims.ts",
+    "index:db:generate": "pnpm --filter @gyblos/discovery-index db:generate",
+    "collector:db:generate": "pnpm --filter @gyblos/metrics-collector db:generate",
+    "db:check": "pnpm --filter @gyblos/discovery-index --filter @gyblos/metrics-collector db:check",
     "node:start": "node --import tsx apps/node/src/bin.ts start",
     "paypal:sandbox": "node --import tsx apps/node/src/paypal-main.ts",
     "gyblos": "node --import tsx apps/node/src/bin.ts",
@@ -96,6 +99,7 @@
     "@types/express": "4.17.21",
     "@types/node": "26.6.6",
     "dependency-cruiser": "18.7.2",
+    "drizzle-kit": "0.31.11",
     "drizzle-orm": "0.45.4",
     "esbuild": "0.28.2",
     "eslint": "9.39.1",

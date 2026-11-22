@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check"
+  },
   "exports": {
     "./app": "./src/app.ts",
     "./constants": "./src/constants.ts",
