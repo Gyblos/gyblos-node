@@ -500,10 +500,11 @@ else is `400 INVALID_QUERY`) answers:
 ```
 
 `checkedAt` is the last check attempt, including one where GitHub did not
-answer; `verifiedAt` is when the current verified run began. The answer carries
-no signed claim or signature (they are not stored). A NodeId without a claim, or
-whose claim was cancelled, is `404 NOT_FOUND`. `/v1/network` carries the account
-and gist of every verified claim ([Network](#network)).
+answer; `verifiedAt` is when the latest verified run began; it is kept after the
+claim turns `lost` and is `null` if the claim was never verified. The answer
+carries no signed claim or signature (they are not stored). A NodeId without a
+claim, or whose claim was cancelled, is `404 NOT_FOUND`. `/v1/network` carries
+the account and gist of every verified claim ([Network](#network)).
 
 ### Recheck
 

@@ -171,7 +171,7 @@ Linking a GitHub account to your seller is optional. Nothing is sent unless you 
 
 **What becomes public.** The index publishes your claim at `GET /v1/identity/github/<NodeId>`: your
 NodeId, your GitHub account name, the gist id, the state (`pending`, `verified` or `lost`), the reason for
-the last result, when the index last tried to check (even if GitHub didn't answer) and since when the account is verified. Anyone can read it,
+the last result, when the index last tried to check (even if GitHub didn't answer) and since when it was last verified (still shown after it turns `lost`). Anyone can read it,
 whatever the state. While the state is `verified`, the network list (`/v1/network`) also shows the account
 and the gist next to your seller. The gist itself is public on GitHub. A secret gist works too, but its id
 is published, so treat it as public.

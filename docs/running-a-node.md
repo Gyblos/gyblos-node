@@ -456,19 +456,21 @@ pnpm gyblos seller verify github --cancel
 needs a seller the index already knows: registered (`seller register`) or with a
 catalog the index still stores. A seller leaves the listing soon after it stops
 publishing (its presence lasts 90 seconds, its catalog 10 minutes), but the
-index removes expired catalogs only when it prunes, so an unregistered seller
-may stay eligible for a while; only registration or ongoing publishing is
-reliable. The binding has two halves: a gist owned by `<user>` with a file named
-`gyblos-proof.txt` that contains the line `gyblos-node=<NodeId>` (an unlisted
-gist works too: the index publishes its id, so the proof is public either way),
-and a claim signed by the node key naming the account and the gist, which the
-discovery index checks ([discovery-index.md](discovery-index.md#github-claims)).
-Anyone can re-check the gist; the index does not keep or serve the signature.
-One `gyblos-proof.txt` may hold several sellers' proof lines, one per line; only
-its first 16 KiB (about 200 lines) is read. The command reads the same part
-before it sends a claim, so a line beyond it stops the command with
-`VERIFY_PROOF_MISSING` and no claim is sent; a line that moves there after
-verification turns the seller `lost` at the next check.
+index deletes expired catalogs only when it prunes, which happens only when a
+NodeId it has never stored publishes (at most once a minute per Worker
+instance), so an unregistered seller may stay eligible for a while; only
+registration or ongoing publishing is reliable. The binding has two halves: a
+gist owned by `<user>` with a file named `gyblos-proof.txt` that contains the
+line `gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its
+id, so the proof is public either way), and a claim signed by the node key
+naming the account and the gist, which the discovery index checks
+([discovery-index.md](discovery-index.md#github-claims)). Anyone can re-check
+the gist; the index does not keep or serve the signature. One `gyblos-proof.txt`
+may hold several sellers' proof lines, one per line; only its first 16 KiB
+(about 200 lines) is read. The command reads the same part before it sends a
+claim, so a line beyond it stops the command with `VERIFY_PROOF_MISSING` and no
+claim is sent; a line that moves there after verification turns the seller
+`lost` at the next check.
 
 1. The account is lowercased and checked (letters, digits and single hyphens, at
    most 39 characters).
