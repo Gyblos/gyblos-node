@@ -9,11 +9,13 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 import {
-  PaymentSessionError,
   SESSION_CODES,
   sessionFail,
+  UnsentChannelLimitError,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
+
+export { UnsentChannelLimitError } from '@gyblos/protocol/payment-session';
 
 export interface BuyerSessionPolicy {
   depositAtomic: string;
@@ -95,12 +97,6 @@ export function sessionTerms(
     withdrawDelaySeconds: policy.withdrawDelaySeconds,
   };
   return matchBatchTerms(terms, terms);
-}
-
-export class UnsentChannelLimitError extends PaymentSessionError {
-  constructor(readonly nodeId: string) {
-    super(SESSION_CODES.LIMIT);
-  }
 }
 
 // Existing journals retain their original terms; only fresh generations require a minimum deposit.

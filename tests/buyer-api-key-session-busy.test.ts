@@ -110,6 +110,52 @@ void test('a rejected new deposit releases only the unsent delegated request', a
   await reserveApiKey(next, await fixture.offers[1]!.quote(2));
   await next.releaseUnsent();
 });
+void test('a full pool releases the rejected seller reservation and the funded seller stays usable', async (t) => {
+  const fixture = await multisellerLoopback('10000');
+  const buyer = createBuyerSessionPool(fixture.options);
+  const keys = await createBuyerApiKeys({
+    files: { read: async () => undefined, write: async () => {} },
+    scope: {
+      network: fixture.a.terms.network,
+      mint: fixture.a.terms.mint,
+      payer: fixture.a.terms.buyer,
+    },
+  });
+  t.after(async () => {
+    await buyer.close();
+    await keys.close();
+    await fixture.close();
+  });
+  const key = await keys.create('Synthetic agent', '1000');
+  const funded = fixture.offers[0]!;
+  const rejected = fixture.offers[1]!;
+  const signal = new AbortController().signal;
+  await buyer.execute(await funded.quote(1), funded.input, signal);
+  const quote = await rejected.quote(2);
+  const operation = keys.operation(key.id);
+  await reserveApiKey(operation, quote);
+  await assert.rejects(
+    executeApiKeySession(operation, quote.offer.nodeId, () =>
+      buyer.execute(quote, rejected.input, signal),
+    ),
+    { code: SESSION_CODES.LIMIT },
+  );
+  assert.equal((await keys.snapshot()).keys[0]?.reservedAtomic, '0');
+  assert.equal(fixture.prepared(), 1);
+  assert.deepEqual(fixture.b.calls, []);
+  const next = await funded.quote(3);
+  await reserveApiKey(operation, next);
+  const completed = await executeApiKeySession(
+    operation,
+    next.offer.nodeId,
+    () => buyer.execute(next, funded.input, signal),
+  );
+  await operation.complete(
+    completed.approval.approvedAtomic,
+    BUYER_KEY_CHARGE.APPROVED,
+  );
+  assert.equal((await keys.snapshot()).blocked, false);
+});
 void test('a generic busy-shaped failure cannot release a delegated paid reservation', async () => {
   const keys = await createBuyerApiKeys({
     files: { read: async () => undefined, write: async () => {} },

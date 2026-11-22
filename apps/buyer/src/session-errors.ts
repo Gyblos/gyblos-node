@@ -10,6 +10,7 @@ import {
 import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import { UnsentSellerSwitchError } from '@gyblos/node/buyer-session';
 import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
@@ -61,6 +62,7 @@ export function classifyPaidError(error: unknown): ChatErrorView | undefined {
     error instanceof UnsentOpeningError ||
     error instanceof UnsentSessionPreflightError ||
     error instanceof UnsentSellerChoiceError ||
+    error instanceof UnsentSellerSwitchError ||
     error instanceof UnsentChannelLimitError ||
     error instanceof UnsentChannelPeerError
   )

@@ -11,7 +11,11 @@ import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
+import {
+  SESSION_CODES,
+  sessionFail,
+  UnsentChannelLimitError,
+} from '@gyblos/protocol/payment-session';
 import {
   BatchClientError,
   type BatchDestination,
@@ -163,7 +167,7 @@ async function checkPoolBudget<Remote extends BatchDestination>(
   state: State<Remote>,
   pool: BatchBuyerPool,
   existing: BatchPoolEntry | undefined,
-  depositAtomic: string,
+  terms: BatchPoolEntry['terms'],
 ) {
   const budget = await pool.budget();
   if (
@@ -173,9 +177,9 @@ async function checkPoolBudget<Remote extends BatchDestination>(
         state.options.policy.depositAtomic,
     )
   )
-    return sessionFail(SESSION_CODES.LIMIT);
-  if (!existing && BigInt(budget.availableAtomic) < BigInt(depositAtomic))
-    return sessionFail(SESSION_CODES.LIMIT);
+    throw new UnsentChannelLimitError(terms.sellerNodeId);
+  if (!existing && BigInt(budget.availableAtomic) < BigInt(terms.depositAtomic))
+    throw new UnsentChannelLimitError(terms.sellerNodeId);
 }
 async function execute<Remote extends BatchDestination>(
   state: State<Remote>,
@@ -214,7 +218,7 @@ async function execute<Remote extends BatchDestination>(
         !existing?.stored?.openingPending)
     )
       return sessionFail(SESSION_CODES.CLOSED);
-    await checkPoolBudget(state, pool, existing, terms.depositAtomic);
+    await checkPoolBudget(state, pool, existing, terms);
     return {
       terms,
       fresh:
