@@ -7,6 +7,7 @@ import {
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
+  UnsentChannelLimitError,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 
@@ -121,7 +122,7 @@ async function replacePoolEntry(
       budget(store.read().entries, total, context.unfunded).availableAtomic,
     ) < BigInt(checked.depositAtomic)
   )
-    return sessionFail(SESSION_CODES.LIMIT);
+    throw new UnsentChannelLimitError(checked.sellerNodeId);
   if (
     !sameBatchParties(row.terms, checked) ||
     checked.expiresAt <= row.terms.expiresAt
@@ -178,7 +179,7 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
         budget(store.read().entries, total, context.unfunded).availableAtomic,
       ) < BigInt(checked.depositAtomic)
     )
-      return sessionFail(SESSION_CODES.LIMIT);
+      throw new UnsentChannelLimitError(checked.sellerNodeId);
     row = {
       terms: checked,
       legacy: false,

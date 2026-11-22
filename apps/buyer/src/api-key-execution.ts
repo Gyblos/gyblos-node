@@ -8,6 +8,7 @@ import type {
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
 import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
@@ -73,6 +74,7 @@ export async function executeApiKeySession<T>(
     // Only locally proven unsent requests release their matching reservation.
     if (
       (error instanceof UnsentSellerBusyError ||
+        error instanceof UnsentChannelRequestError ||
         error instanceof UnsentChannelLimitError ||
         error instanceof UnsentChannelPeerError) &&
       error.nodeId === nodeId &&
