@@ -192,3 +192,16 @@ void test('?density=compact is a comparison mode that leaves the default view un
     /<Section title="Appearance" icon=\{<PreviewSectionIcon icon=\{Palette\} \/>\}>/,
   );
 });
+
+void test('compact loading and shortcut hints stay accessible', async () => {
+  const kit = await read('views/PreviewKit.tsx.preview');
+  assert.match(
+    kit,
+    /<span className="pk-skeleton-rows" role="status" aria-label="Loading conversations">/,
+  );
+  assert.match(kit, /<kbd className="pk-kbd" aria-hidden="true">/);
+  assert.match(
+    kit,
+    /label="New chat"\s+aria-keyshortcuts=\{previewShortcut\(PREVIEW_SHORTCUT\.NEW_CHAT\)\.aria\}/,
+  );
+});
