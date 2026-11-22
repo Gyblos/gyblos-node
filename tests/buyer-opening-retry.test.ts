@@ -49,3 +49,26 @@ for (const status of ['present', 'absent', 'unknown'] as const) {
     assert.ok(observations >= (status === 'unknown' ? 2 : 1));
   });
 }
+
+void test('permission withdrawn before OPEN does not claim or observe a deposit', async (t) => {
+  let observations = 0;
+  const denied = new BatchChannelError(SESSION_CODES.UNVERIFIED);
+  const fixture = await batchPrepareFixture(
+    async () => {
+      observations++;
+      return 'absent';
+    },
+    async () => {
+      throw denied;
+    },
+  );
+  t.after(fixture.close);
+  await assert.rejects(
+    fixture.buyer.execute(await fixture.offers.quote(1), fixture.offers.input),
+    (error: unknown) => error === denied,
+  );
+  assert.equal(fixture.rig.buyer.snapshot().channelId, '');
+  assert.equal(fixture.pendingOpening(), false);
+  assert.equal(observations, 0);
+  assert.deepEqual(fixture.rig.calls, []);
+});

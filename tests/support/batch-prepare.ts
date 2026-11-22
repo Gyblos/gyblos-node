@@ -12,6 +12,7 @@ export async function batchPrepareFixture(
   openingStatus?: (
     signal: AbortSignal,
   ) => Promise<'present' | 'absent' | 'unknown'>,
+  financialPermission?: <T>(run: () => Promise<T>) => Promise<T>,
 ) {
   const rig = await sessionRig();
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
@@ -40,6 +41,7 @@ export async function batchPrepareFixture(
   let pending = false;
   const buyer = createBuyerBatchSession({
     ...wire,
+    financialPermission,
     terms: rig.terms,
     buyer: {
       ...rig.buyer,
@@ -71,6 +73,7 @@ export async function batchPrepareFixture(
     service,
     buyer,
     verified: () => verified,
+    pendingOpening: () => pending,
     verification: (next: typeof verification) => {
       verification = next;
     },

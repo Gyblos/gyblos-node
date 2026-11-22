@@ -49,6 +49,13 @@ export async function executeBatchBuyer<T>(
   );
   if (opened.channelId !== dependencies.buyer.snapshot().channelId)
     sessionFail(SESSION_CODES.BINDING);
+  return executeOpenedBatchBuyer(dependencies, request, signal);
+}
+export async function executeOpenedBatchBuyer<T>(
+  dependencies: Omit<BatchBuyerExecution<T>, 'verify' | 'open'>,
+  request: SessionRequest,
+  signal: AbortSignal,
+): Promise<T> {
   signal.throwIfAborted();
   await dependencies.buyer.begin(request);
   // From here the host may have transmitted content. Failures retain the reservation; no retry.
