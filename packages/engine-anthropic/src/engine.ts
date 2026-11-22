@@ -68,6 +68,9 @@ export interface AnthropicEngineSettings {
   // The model's context size from config.toml; the API does not report it.
   contextTokens: number;
   apiKey: string;
+  // Whether the model's usage is recounted with its pinned public tokenizer (the Qwen3 family); Claude and
+  // other models are declared by the provider.
+  recountable?: boolean;
 }
 
 export interface AnthropicOptions {
@@ -325,7 +328,7 @@ export function createAnthropicEngine(
       reportsUsage: true,
       logprobs: false,
       cancellable: true,
-      recountable: false,
+      recountable: settings.recountable === true,
       modelIdentity: MODEL_IDENTITIES.NAME_ONLY,
     }),
     describe: () => describeModel(settings, fetchImpl, describeTimeoutMs),

@@ -112,7 +112,7 @@ ready offers are published.
 | `reasoning`              | Distinct levels from `off`, `low`, `medium`, `high`; defaults to the catalog's, or `off`. The seller serves `["off"]` only   |
 | `engine.kind`            | Required: `ollama`, `openai` or `anthropic`                                                                                  |
 | `engine.url`             | Required base URL; HTTPS, or HTTP for loopback or `host.docker.internal`; see [Engines](#engine-compatibility-at-startup)    |
-| `engine.upstream_model`  | Optional provider model name, up to 256 characters; defaults to `model`                                                      |
+| `engine.upstream_model`  | Optional provider model name, up to 256 characters; defaults to `model` as written                                           |
 | `engine.api_key_env`     | Name of the API key variable; required for Anthropic; must not start with `GYBLOS_` or reuse the relay-token variable        |
 | `engine.context_tokens`  | Integer 1024 to 2,000,000; required for OpenAI and Anthropic; for Ollama it sets the context (default 8,192, at most 32,768) |
 | `free.daily_token_cap`   | Required for a free offer; integer 1 to 1,000,000,000,000; input plus output tokens per UTC day                              |
