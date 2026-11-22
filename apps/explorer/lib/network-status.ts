@@ -21,6 +21,7 @@ export interface NetworkNode {
   firstSeenAt: number | null;
   lastSeenAt: number | null;
   models: string[];
+  name: string | null;
 }
 export interface NetworkStatus {
   counts: {
@@ -53,6 +54,7 @@ function node(value: unknown): NetworkNode {
     models: list(source.models, 'node.models').map((model) =>
       text(model, 'node.model'),
     ),
+    name: nullable(source.name, (present) => text(present, 'node.name')),
   };
 }
 

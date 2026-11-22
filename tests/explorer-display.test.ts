@@ -172,6 +172,7 @@ const STATUS = {
       firstSeenAt: 1,
       lastSeenAt: 2,
       models: [],
+      name: 'Ada Lovelace',
     },
     {
       nodeId: NODE('c'),
@@ -196,6 +197,22 @@ void test('the network status is read with its exact states', () => {
     ],
   );
   assert.equal(status.nodes[2]?.lastSeenAt, null);
+});
+
+void test('a seller display name is read when present and null when absent', () => {
+  const status = parseNetworkStatus(STATUS);
+  assert.deepEqual(
+    status.nodes.map((node) => node.name),
+    [null, 'Ada Lovelace', null],
+  );
+  const cleared = { ...STATUS, nodes: [{ ...STATUS.nodes[0], name: null }] };
+  assert.equal(parseNetworkStatus(cleared).nodes[0]?.name, null);
+  assert.throws(() =>
+    parseNetworkStatus({
+      ...STATUS,
+      nodes: [{ ...STATUS.nodes[1], name: 42 }],
+    }),
+  );
 });
 
 void test('an unknown state or a malformed status is refused', () => {
