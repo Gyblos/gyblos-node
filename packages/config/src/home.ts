@@ -35,8 +35,7 @@ export const ARTIFACT_DIRECTORIES = {
   ollamaModels: 'ollama-models',
 } as const;
 
-// File names directly in the product home: the seller service's private environment file (secrets such as
-// the relay token, mode 0600) and the log a background service writes.
+// Product-home files: the seller service's private environment (secrets, mode 0600) and service log.
 export const HOME_FILES = {
   sellerEnvironment: 'seller.env',
   serviceLog: 'service.log',
@@ -72,6 +71,7 @@ export const ROLE_FILES = {
   sellerRegistrationLock: 'registration-8004-v1.lock',
   publicSequence: 'public-sequence-v2.json',
   publicSequenceLock: 'public-sequence-v2.lock',
+  githubVerification: 'github-verification.json',
 } as const;
 
 // Solana key files inside a role directory: buyer for the buyer role, the other three for the seller.

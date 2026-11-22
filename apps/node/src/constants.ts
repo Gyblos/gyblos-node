@@ -236,8 +236,6 @@ export const VERIFY_GITHUB = {
   maxGistBytes: 16_384,
   ghTimeoutMs: 30_000,
   ghOutputCharacters: 64 * 1024,
-  // The private progress file, in the seller role directory (config/src/home.ts rolePathIn).
-  progressFile: 'github-verification.json',
   stateVersion: 1,
   stateBytes: 4_096,
   // A CHECK_DEFERRED wait this short is waited out once; a longer one is left to a later run.

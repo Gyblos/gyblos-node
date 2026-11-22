@@ -31,6 +31,7 @@ Reemplaza `COMMAND` por un comando de la tabla siguiente. Los ejemplos de esta p
 | `gyblos seller status`                      | `--online`                                                          | 0 solo con `RUNNING`; 1 con cualquier otro estado o error    |
 | `gyblos seller register`                    | Ninguna                                                             | 0 registrado o ya registrado; 1 fallo                        |
 | `gyblos seller rpc`, `rpc set`, `rpc reset` | Ninguna                                                             | 0 mostrado o guardado; 1 fallo, sin cambios                  |
+| `gyblos seller verify github USER`          | `--gist URL`; o `--status`, `--cancel` sin `USER`                   | 0 verificado, mostrado o cancelado; 1 sin verificar o fallo  |
 | `gyblos seller init`                        | Consulta [`seller init`](#opciones-de-init-para-un-checkout-nativo) | 0 escrito; 1 fallo; 130 pregunta cancelada                   |
 | `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`                       | 0 éxito; 1 fallo                                             |
 | `gyblos seller service uninstall`           | `--dry-run`                                                         | 0 éxito; 1 fallo                                             |
@@ -102,13 +103,15 @@ cd ~/gyblos-seller
 docker compose exec seller gyblos seller status
 docker compose exec seller gyblos seller status --online
 docker compose exec seller gyblos seller register
+docker compose exec seller gyblos seller verify github USER
 ```
 
 `seller status` solo lee. `--online` además busca el NodeId del vendedor en el índice de descubrimiento.
 Mientras el índice rechace o falle la publicación de este vendedor, la línea de descubrimiento agrega
 `publishing refused:` y un código estático. Mientras sirva algún modelo, una línea `uptime` muestra qué
 tan seguido el índice aceptó la presencia de este vendedor en las últimas 24 horas, 7 días y 30 días, y
-`online, last presence … ago` u `offline since …`; esa consulta envía al índice el NodeId, que es público. El
+`online, last presence … ago` u `offline since …`, y una línea `github` muestra la cuenta de GitHub que el
+índice vincula a este vendedor y su estado; esas consultas envían al índice el NodeId, que es público. El
 resumen de actividad sale de los recibos firmados guardados en el equipo; no es un saldo de cuota. La línea
 `receipt queue` muestra los recibos que esperan subirse al recolector de métricas, los bytes reservados
 para ellos y las escrituras rechazadas. `FULL` significa que no se pueden guardar recibos nuevos hasta que
@@ -125,6 +128,21 @@ antes de ejecutarlo.
 responde como devnet y no cambia nada más; `seller rpc reset` vuelve al RPC público de devnet. El vendedor
 la lee al arrancar, así que reinícialo después (mira
 [Cambiar el RPC de un vendedor instalado](/es/sellers/beta-guide#cambiar-rpc)).
+
+## seller verify github [#verificar-github]
+
+`seller verify github USER` muestra a los compradores qué cuenta de GitHub opera este vendedor. El
+vendedor ya debe estar registrado o publicando. Hace falta un gist público de `USER` que contenga la
+línea `gyblos-node=NODEID`; luego la clave del nodo firma una declaración con la cuenta y el gist, y el
+índice revisa el gist por su cuenta. Si la CLI de GitHub (`gh`) tiene la sesión iniciada como `USER`, el
+comando crea el gist. Si no, imprime el texto para pegar en un gist público nuevo en gist.github.com y pide
+la dirección del gist, o la toma de `--gist`. Rechaza un gist de otra cuenta.
+
+Guarda su avance en el directorio del vendedor y en cada ejecución revisa primero el índice y el gist, así
+que puedes detenerlo en cualquier momento y volver a ejecutarlo. `Verified` sale con 0; `pending` o `lost`
+salen con 1 y dicen por qué, por ejemplo que falta la línea de prueba o que el índice no pudo llegar a
+GitHub (vuelve a ejecutarlo más tarde). `--status` muestra lo que tiene el índice; `--cancel` quita el
+vínculo y deja el gist para que lo borres tú. Solo `verified` significa que el índice encontró la prueba.
 
 ## seller init [#opciones-de-init-para-un-checkout-nativo]
 

@@ -72,8 +72,17 @@ void test('verify github: with the GitHub CLI signed in as the account it create
 void test('verify github: without the CLI it prints the text, takes --gist or a pasted URL, and refuses another owner', () =>
   withKeyedHome(async (home) => {
     const gists = new Map([[rawUrl(), proofBody(home.nodeId)]]);
-    const stuck = await verifyRun(home, ['github', ACCOUNT], world({ gists }));
+    const stuck = await verifyRun(
+      home,
+      ['github', ACCOUNT],
+      world({ gists, ghLogin: 'someone-else' }),
+    );
     assert.equal(stuck.code, 1);
+    assert.match(
+      stuck.stdout,
+      /^The GitHub CLI is signed in as someone-else, not octo-cat, so it is not used\.$/m,
+    );
+    assert.equal(stuck.created.length, 0);
     assert.ok(stuck.stdout.includes(githubProofLine(home.nodeId)));
     assert.match(stuck.stderr, /^VERIFY_NO_GIST: .*--gist/m);
     assert.equal(stuck.posted.length, 0);

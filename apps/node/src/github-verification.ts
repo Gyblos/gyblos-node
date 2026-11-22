@@ -5,7 +5,7 @@
 import { rm } from 'node:fs/promises';
 
 import { HTTP_STATUS } from '@gyblos/config';
-import { rolePathIn } from '@gyblos/config/home';
+import { ROLE_FILES, rolePathIn } from '@gyblos/config/home';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import {
   githubProofLine,
@@ -28,7 +28,7 @@ export interface VerifyProgress {
 }
 
 const progressPath = (environment: HomeEnvironment) =>
-  rolePathIn(environment, 'seller', VERIFY_GITHUB.progressFile);
+  rolePathIn(environment, 'seller', ROLE_FILES.githubVerification);
 
 const stepOf = (value: unknown) =>
   Object.values(VERIFY_STEPS).find((step) => step === value);

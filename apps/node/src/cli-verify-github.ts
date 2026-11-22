@@ -97,7 +97,12 @@ async function gistFor(
   if (view?.account === account) return { id: view.gist, created: false };
   const text = proofText(session.nodeId);
   const tool = session.system.gist ?? githubCli;
-  if ((await tool.login()) === account) {
+  const login = await tool.login();
+  if (login !== undefined && login !== account)
+    output.stdout(
+      `The GitHub CLI is signed in as ${login}, not ${account}, so it is not used.\n`,
+    );
+  if (login === account) {
     output.stdout(
       `Creating a public gist as ${account} with the GitHub CLI...\n`,
     );
