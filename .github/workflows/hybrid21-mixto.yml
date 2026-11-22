@@ -1,0 +1,265 @@
+name: Hybrid21 mixto
+on:
+  push:
+    branches: [codex/bench-hybrid-typecheck-21]
+permissions:
+  contents: read
+
+concurrency:
+  group: hybrid21-mixto-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Whether a pull request touches more than the docs site; pushes to main always run everything.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+      windows_full: ${{ steps.diff.outputs.windows_full }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 268ac89b8426948c0f6f8de35d86d4fc4bcddd54
+          fetch-depth: 0
+      - run: bash .github/scripts/test-ci-changes.sh
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          TARGET: ${{ github.base_ref }}
+        run: |
+          echo 'code=true' >> "$GITHUB_OUTPUT"
+          echo 'windows_full=false' >> "$GITHUB_OUTPUT"
+
+  # Formatting, the docs site and the tests that read its pages; every run.
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 268ac89b8426948c0f6f8de35d86d4fc4bcddd54
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --check .
+      - run: pnpm docs:build
+      - run: pnpm docs:test
+      - run: node --import tsx --test "tests/docs-*.test.ts"
+
+  static:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 268ac89b8426948c0f6f8de35d86d4fc4bcddd54
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Prepare pinned Bun
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir bun-typecheck
+          curl -fsSL --retry 3 -o bun-typecheck/package.tgz https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.5.tgz
+          echo "2165fd0442e8187014b4ca2791e49a35a6705f3464fa80f0e8c93e1c115777728760804d06c20646ea4c64f7203680db2692eeea00098c8a0854f66db75689d6  bun-typecheck/package.tgz" | sha512sum -c -
+          tar -xzf bun-typecheck/package.tgz -C bun-typecheck package/bin/bun
+          test "$(bun-typecheck/package/bin/bun --revision)" = '1.4.5+a7733435c'
+      - name: Run mixed typecheck
+        shell: bash
+        run: |
+          bun="$RUNNER_TEMP/bun-typecheck/package/bin/bun"
+          "$bun" check --no-script -p tsconfig.json
+          "$bun" check --no-script -p tsconfig.tests.json
+          pnpm exec tsc -p apps/desktop/tsconfig.renderer.json
+          "$bun" check --no-script -p apps/docs/tsconfig.json
+          "$bun" check --no-script -p apps/explorer/tsconfig.json
+      - run: pnpm lint
+
+  # `pnpm test` split by file; the patterns match its script in package.json.
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 268ac89b8426948c0f6f8de35d86d4fc4bcddd54
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/3 "tests/*.test.ts" "packages/*/test/**/*.test.ts"
+
+  # `pnpm test:lab` split by file; the pattern matches its script in package.json.
+  lab:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 268ac89b8426948c0f6f8de35d86d4fc4bcddd54
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/2 "tests/lab/**/*.test.ts"
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 268ac89b8426948c0f6f8de35d86d4fc4bcddd54
+      # Version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The packaged seller's runtime (tooling/native-build.ts); its build test reuses this Node.
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm desktop:build
+      # The release's path: pinned Node and iroh downloads, then the packaged seller runs.
+      - name: Build the packaged seller for linux-x64
+        run: |
+          pnpm build:native --version 0.0.0-ci.1 --target linux-x64 --out "$RUNNER_TEMP/native"
+          tar -xzf "$RUNNER_TEMP/native/gyblos-0.0.0-ci.1-linux-x64.tar.gz" -C "$RUNNER_TEMP"
+          test "$("$RUNNER_TEMP/gyblos-0.0.0-ci.1-linux-x64/bin/gyblos" --version)" = 0.0.0-ci.1
+
+  # The packaged seller for Windows, built as the release builds it: on Linux, from Node's pinned zip and
+  # the lockfile's iroh binding. The windows job installs and runs it.
+  windows-package:
+    needs: changes
+    if: needs.changes.outputs.windows_full == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 268ac89b8426948c0f6f8de35d86d4fc4bcddd54
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:native --version 0.0.0-ci.1 --target win32-x64 --out dist/windows
+      - run: pnpm build:npm --version 0.0.0-ci.1 --target win32-x64 --archives dist/windows --out dist/windows
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-package
+          path: dist/windows
+          retention-days: 1
+          if-no-files-found: error
+
+  # The seller on Windows (#235): private files and keys protected by the folder ACL, setup, init and
+  # doctor, the packaged seller from its archive and from npm, its service and installer, and the
+  # running daemon. Windows runners bill at twice Linux, so
+  # only the Windows-specific tests run here.
+  windows:
+    needs: [changes, windows-package]
+    if: >-
+      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.code == 'true' &&
+      ((needs.changes.outputs.windows_full == 'true' && needs.windows-package.result == 'success') ||
+      (needs.changes.outputs.windows_full == 'false' && needs.windows-package.result == 'skipped'))
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: 268ac89b8426948c0f6f8de35d86d4fc4bcddd54
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Desktop seller selection and channel chat
+        run: node --import tsx --test tests/desktop-network-catalog-paid.test.ts tests/desktop-buyer-stream-loopback.test.ts
+      - if: needs.changes.outputs.windows_full == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-package
+          path: ${{ runner.temp }}/windows-package
+      - if: needs.changes.outputs.windows_full == 'false'
+        run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-service.test.ts
+      - if: needs.changes.outputs.windows_full == 'true'
+        run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts tests/windows-service.test.ts tests/windows-task.test.ts tests/windows-install.test.ts
+        env:
+          GYBLOS_WINDOWS_PACKAGE: ${{ runner.temp }}/windows-package
+          GYBLOS_WINDOWS_VERSION: 0.0.0-ci.1
+      # The running seller on Windows: the real daemon over native loopback with a synthetic engine, its
+      # files, and the free transport. No network or devnet. The buyer-side lab acceptance joins once the
+      # buyer's own files work on Windows.
+      - run: node --import tsx --test tests/lab/seller-daemon-files.test.ts tests/free-execution-iroh.test.ts tests/iroh-transport.test.ts tests/node-startup-failure.test.ts
+
+  # One result for the whole run: fails when any part failed or was cancelled; parts skipped for a
+  # docs-only change count as passed.
+  check:
+    if: always()
+    needs: [changes, docs, static, test, lab, build, windows-package, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          CODE: ${{ needs.changes.outputs.code }}
+          FULL: ${{ needs.changes.outputs.windows_full }}
+          WINDOWS: ${{ needs.windows.result }}
+          PACKAGE: ${{ needs.windows-package.result }}
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          case "$CODE/$FULL/$WINDOWS/$PACKAGE" in
+            true/true/success/success | true/false/success/skipped | false/false/skipped/skipped) ;;
+            *) echo "Unexpected Windows check results"; exit 1 ;;
+          esac
+          for result in $RESULTS; do
+            case "$result" in
+              success | skipped) ;;
+              *) echo "A CI part ended with: $result"; exit 1 ;;
+            esac
+          done
