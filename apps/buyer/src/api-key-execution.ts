@@ -124,6 +124,7 @@ export async function executeApiKey(
     operation?: BuyerApiKeyOperation,
   ) => Promise<ChatResult>,
 ) {
+  await keys?.reconcileAbandoned();
   keys?.assertReady();
   if (!keys || !keyId) return execute(signal);
   const operation = keys.operation(keyId);

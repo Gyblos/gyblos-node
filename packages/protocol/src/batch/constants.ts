@@ -12,6 +12,15 @@ export const BATCH_CHANNEL = {
   requestDomain: 'gyblos/session-request/v4\n',
   replyDomain: 'gyblos/session-rpc/v4\n',
 } as const;
+export function withBatchOutputLimit<T extends { maxTokens: number }>(
+  input: T,
+): Omit<T, 'maxTokens'> & { maxTokens: number } {
+  return {
+    ...input,
+    maxTokens: Math.min(input.maxTokens, BATCH_CHANNEL.maxOutputTokens),
+  };
+}
+
 export const BATCH_METHODS = {
   PREPARE: 'prepare',
   OPEN: 'open',

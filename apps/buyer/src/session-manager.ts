@@ -2,6 +2,7 @@
 import type { AsyncLocalStorage } from 'node:async_hooks';
 
 import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import type { ConfirmUnchargedKey } from '@gyblos/node/buyer-api-keys';
 import {
   createBuyerSessionManager,
   type BuyerSessionOptions,
@@ -14,6 +15,7 @@ import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   batchSessionTerminal,
+  finalizedUnchargedRequest,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
@@ -24,6 +26,7 @@ import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
+import { PAID_BUYER_HTTP_MS } from './constants';
 import {
   permitsWinner,
   relayAllowed,
@@ -175,6 +178,21 @@ async function previousSeller(
 function inspectSingle() {
   return inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER));
 }
+function singleKeyProof(
+  context: Context,
+  reconcile: (signal: AbortSignal) => Promise<unknown>,
+): ConfirmUnchargedKey | undefined {
+  if (context.prepared.config.session?.totalDepositAtomic !== undefined)
+    return undefined;
+  return (ref, scope) =>
+    finalizedUnchargedRequest(
+      batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+      ref,
+      scope,
+      context.endpoint.id().toString(),
+      () => reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
+    );
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -241,6 +259,7 @@ export function makeManager(
   );
   return {
     ...manager,
+    confirmUnchargedKey: singleKeyProof(context, manager.reconcile),
     previousSeller: () =>
       previousSeller(policy.totalDepositAtomic, common.inspect),
     preparePaidChat: async () => {
