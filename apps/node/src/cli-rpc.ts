@@ -3,8 +3,6 @@
 // reinstalling. The URL comes from GYBLOS_RPC_URL or a terminal question, never an argument, because
 // providers embed API keys in it, and output shows only its origin. A URL is saved only once it answers as
 // devnet, so a seller never spends real SOL by mistake.
-import { homedir } from 'node:os';
-
 import {
   DEVNET_GENESIS,
   DEVNET_RPC_URL,
@@ -20,8 +18,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
-import { EXIT, RPC_COMMANDS, SERVICE } from './constants';
-import { taskName } from './service-windows';
+import { EXIT, RPC_COMMANDS } from './constants';
 
 export interface RpcCommandContext {
   env: Readonly<Record<string, string | undefined>>;
@@ -33,24 +30,17 @@ export interface RpcCommandContext {
 }
 
 const USAGE =
-  'Usage: gyblos seller rpc          (shows the RPC this seller uses)\n       gyblos seller rpc set      (the URL from GYBLOS_RPC_URL, or asked for on a terminal)\n       gyblos seller rpc reset    (back to the public devnet RPC)\n';
-// How this platform's installed background service restarts in place, keeping its definition and limits.
-function serviceRestart(platform: NodeJS.Platform) {
-  if (platform === 'darwin')
-    return `\`launchctl kickstart -k gui/$(id -u)/${SERVICE.label}\``;
-  if (platform === 'win32') {
-    const task = taskName(homedir());
-    return `\`schtasks /End /TN "${task}"\`, then \`schtasks /Run /TN "${task}"\``;
-  }
-  return `\`systemctl --user restart ${SERVICE.unit}\``;
-}
-const restart = (platform: NodeJS.Platform) =>
-  `Restart the seller to use it: Docker, \`docker compose restart seller\` where you installed it; background service, ${serviceRestart(platform)}; otherwise stop \`gyblos start\` and run it again.\n`;
+  'Usage: gyblos seller rpc          (shows the RPC this seller uses)\n       gyblos seller rpc set      (asked for on a terminal; scripts set GYBLOS_RPC_URL)\n       gyblos seller rpc reset    (back to the public devnet RPC)\n';
+const RESTART =
+  'Restart the seller to use it: Docker, `docker compose restart seller` where you installed it; background service, `gyblos seller service restart`, which keeps its settings; otherwise stop `gyblos start` and run it again.\n';
 const NO_SELLER =
   'gyblos seller rpc: no seller is set up in this home; run setup first.\n';
 const UNWRITABLE =
   "gyblos seller rpc: this seller's role file cannot be written; nothing was changed.\n";
-const STALE = `gyblos seller rpc set: ${NODE_ENVIRONMENT.rpcUrl} already uses this seller's RPC; set the new URL there, or run it on a terminal to be asked.\n`;
+const STALE_MESSAGE = `gyblos seller rpc set: ${NODE_ENVIRONMENT.rpcUrl} already uses this seller's RPC; run it on a terminal (for Docker, \`docker compose exec\` without -T) to be asked for the new one.
+`;
+// urlOf's answer when GYBLOS_RPC_URL is the saved RPC and no terminal can be asked.
+const STALE = Symbol('stale');
 const UNREADABLE =
   "gyblos seller rpc: this seller's role file cannot be read; nothing was changed.\n";
 const HELP = new Set(['--help', '-h']);
@@ -59,16 +49,25 @@ const LOCAL_HOSTS: ReadonlySet<string> = new Set(LOOPBACK_HOST_NAMES);
 const environment = (values: RpcCommandContext['env']) =>
   values as Record<string, string | undefined>;
 
-// The new URL: GYBLOS_RPC_URL, unless it is the RPC already saved (Docker's seller.env keeps the first
-// install's value in the container), in which case a terminal is asked.
-async function urlOf(context: RpcCommandContext, current: string) {
-  const given = context.env[NODE_ENVIRONMENT.rpcUrl]?.trim();
-  if (given !== undefined && given !== current) {
-    context.stdout(`Using ${NODE_ENVIRONMENT.rpcUrl}.\n`);
-    return given;
+const sameUrl = (left: string, right: string) => {
+  try {
+    return new URL(left).href === new URL(right).href;
+  } catch {
+    return left === right;
   }
-  if (!context.prompt) return given === undefined ? undefined : STALE;
-  return (await context.prompt('Solana devnet RPC URL: ')).trim();
+};
+
+// The new URL: asked on a terminal, always, since GYBLOS_RPC_URL may be the first install's value Docker's
+// seller.env keeps in the container. Without a terminal (a script), GYBLOS_RPC_URL, unless it is the RPC
+// already saved.
+async function urlOf(context: RpcCommandContext, current: string) {
+  if (context.prompt)
+    return (await context.prompt('Solana devnet RPC URL: ')).trim();
+  const given = context.env[NODE_ENVIRONMENT.rpcUrl]?.trim();
+  if (given === undefined) return undefined;
+  if (sameUrl(given, current)) return STALE;
+  context.stdout(`Using ${NODE_ENVIRONMENT.rpcUrl}.\n`);
+  return given;
 }
 
 async function save(context: RpcCommandContext, raw: string, check = true) {
@@ -105,9 +104,7 @@ async function save(context: RpcCommandContext, raw: string, check = true) {
     context.stderr(UNWRITABLE);
     return EXIT.failure;
   }
-  context.stdout(
-    `Saved: this seller now uses ${urlOrigin(url)}.\n${restart(process.platform)}`,
-  );
+  context.stdout(`Saved: this seller now uses ${urlOrigin(url)}.\n${RESTART}`);
   return EXIT.ok;
 }
 
@@ -156,7 +153,7 @@ export async function rpcCommand(
     return save(context, DEVNET_RPC_URL, false);
   const url = await urlOf(context, role.rpcUrl);
   if (url === STALE) {
-    context.stderr(STALE);
+    context.stderr(STALE_MESSAGE);
     return EXIT.failure;
   }
   if (url === undefined) {

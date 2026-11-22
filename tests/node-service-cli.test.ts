@@ -26,6 +26,7 @@ import {
   DEFAULT_MEMORY_MAX,
   memoryBytes,
   ServiceError,
+  serviceLocation,
   servicePlan,
   type ServiceInput,
 } from '@gyblos/node-app/service';
@@ -357,4 +358,43 @@ void test('service flags are refused outside `seller service`', async () => {
   });
   assert.equal(code, 1);
   assert.match(output, /Usage:/);
+});
+
+void test('restart keeps the installed unit and its limits; without a service it says so', () =>
+  scenario({ free: true }, async (run) => {
+    await readySeller(run);
+    const { system, commands } = fakeSystem(run);
+    const missing = await service(run, ['restart'], system);
+    assert.equal(missing.code, 1);
+    assert.match(missing.output, /Not installed/);
+    assert.equal(
+      (await service(run, ['install', '--memory', '3G'], system)).code,
+      0,
+    );
+    const path = join(
+      run.root,
+      'account/.config/systemd/user/gyblos-seller.service',
+    );
+    const before = await readFile(path, 'utf8');
+    commands.length = 0;
+    const restarted = await service(run, ['restart'], system);
+    assert.equal(restarted.code, 0, restarted.output);
+    assert.deepEqual(commands, [
+      ['systemctl', '--user', 'restart', 'gyblos-seller.service'],
+    ]);
+    assert.equal(await readFile(path, 'utf8'), before);
+  }));
+
+void test('each platform restarts its service in place: launchd kickstart, Windows graceful stop then run', () => {
+  assert.deepEqual(
+    serviceLocation(SERVICE_KINDS.LAUNCHD, '/Users/synthetic', 501).restart,
+    [['launchctl', 'kickstart', '-k', 'gui/501/com.gyblos.seller']],
+  );
+  const task = serviceLocation(
+    SERVICE_KINDS.SCHEDULED_TASK,
+    'C:\\Users\\synthetic',
+    0,
+  ).restart;
+  assert.equal(task.length, 1);
+  assert.deepEqual(task[0]!.slice(0, 3), ['schtasks.exe', '/Run', '/TN']);
 });

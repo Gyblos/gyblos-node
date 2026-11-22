@@ -36,6 +36,8 @@ export function taskLocation(accountHome: string) {
     files: [taskFile(accountHome, SERVICE.taskScript)],
     disable: [['schtasks.exe', '/Delete', '/TN', taskName(accountHome), '/F']],
     reload: [],
+    // After the supervisor stops the seller gracefully over its pipe (cli-service.ts).
+    restart: [['schtasks.exe', '/Run', '/TN', taskName(accountHome)]],
   };
 }
 

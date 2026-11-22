@@ -34,6 +34,7 @@ Reemplaza `COMMAND` por un comando de la tabla siguiente. Los ejemplos de esta p
 | `gyblos seller init`                        | Consulta [`seller init`](#opciones-de-init-para-un-checkout-nativo) | 0 escrito; 1 fallo; 130 pregunta cancelada                   |
 | `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`                       | 0 éxito; 1 fallo                                             |
 | `gyblos seller service uninstall`           | `--dry-run`                                                         | 0 éxito; 1 fallo                                             |
+| `gyblos seller service restart`             | `--dry-run`                                                         | 0 éxito; 1 fallo o no instalado                              |
 | `gyblos logs`                               | Consulta [`logs`](#logs-operativos-locales)                         | 0 lectura completa; 1 error de uso o datos ilegibles         |
 
 No existe `gyblos stop`, ni flags generales `--home`, `--relay`, `--rpc-url` o `--discovery-url`. Detén un
@@ -120,10 +121,10 @@ desde un argumento de la línea de comandos. Pregunta antes de firmar y enviar u
 cuesta SOL, y no cambia `config.toml` ni publica. Lee [Registra y publica](/es/sellers/register-publish)
 antes de ejecutarlo.
 
-`seller rpc` muestra el origen del RPC de Solana que usa el vendedor. `seller rpc set` lee la URL desde
-`GYBLOS_RPC_URL` o una terminal interactiva, nunca desde un argumento, la guarda solo después de que
+`seller rpc` muestra el origen del RPC de Solana que usa el vendedor. `seller rpc set` pide la URL en una
+terminal interactiva (un script sin terminal usa `GYBLOS_RPC_URL`), nunca la recibe como argumento, la guarda solo después de que
 responde como devnet y no cambia nada más; `seller rpc reset` vuelve al RPC público de devnet. El vendedor
-la lee al arrancar, así que reinícialo después (mira
+la lee al arrancar, así que reinícialo después con `gyblos seller service restart` (mira
 [Cambiar el RPC de un vendedor instalado](/es/sellers/beta-guide#cambiar-rpc)).
 
 ## seller init [#opciones-de-init-para-un-checkout-nativo]

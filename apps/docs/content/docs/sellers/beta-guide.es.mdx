@@ -75,12 +75,11 @@ vendedor:
 
 - **Docker:** en la carpeta del vendedor, `docker compose exec seller gyblos seller rpc set`, y luego
   `docker compose restart seller`.
-- **Nativo en macOS, Linux o Windows:** `gyblos seller rpc set`, y luego ejecuta el comando de reinicio que
-  muestra (`launchctl` en macOS, `systemctl --user` en Linux, `schtasks` en Windows), que conserva los
-  ajustes del servicio en segundo plano. Si corres `gyblos start` tú mismo, detenlo y vuelve a ejecutarlo.
+- **Nativo en macOS, Linux o Windows:** `gyblos seller rpc set`, y luego `gyblos seller service restart`,
+  que conserva los ajustes del servicio en segundo plano. Si corres `gyblos start` tú mismo, detenlo y vuelve
+  a ejecutarlo.
 
-Si `GYBLOS_RPC_URL` (por ejemplo en el `seller.env` de Docker) todavía tiene el RPC que usa el vendedor, el
-comando pide el nuevo en la terminal.
+En una terminal, el comando siempre pide la URL. Un script sin terminal usa `GYBLOS_RPC_URL`.
 
 `gyblos seller rpc` muestra el RPC en uso, y `gyblos seller rpc reset` vuelve al público.
 

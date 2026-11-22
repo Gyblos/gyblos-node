@@ -1,4 +1,4 @@
-// `gyblos seller service install|uninstall`: runs the seller in the background as the installing account,
+// `gyblos seller service install|uninstall|restart`: runs the seller in the background as the installing account,
 // under a systemd user unit (Linux), a launch agent (macOS) or a scheduled task with its supervisor
 // (Windows, packaged release only); never as root. Install first runs the offline
 // doctor with exactly the environment the service will have (seller.env, GYBLOS_HOME and GYBLOS_CONFIG), so
@@ -60,6 +60,8 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
     'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, GYBLOS_CONTAINER, GYBLOS_PACKAGED, GYBLOS_LAUNCHER, PATH, HOME, shell variables (UID, IFS, BASH*, …) or NODE_*/LD_*/DYLD_*/TSX_*/OPENSSL_* variables',
   [SERVICE_ERRORS.ALREADY_INSTALLED]:
     'run `gyblos seller service uninstall` first',
+  [SERVICE_ERRORS.NOT_INSTALLED]:
+    'Not installed: no background service to restart; restart `gyblos start` yourself, or run `gyblos seller service install`',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
     'the service sees only the environment file, GYBLOS_HOME and GYBLOS_CONFIG; fix the failures above',
   [SERVICE_ERRORS.EPHEMERAL_INSTALL]:
@@ -304,13 +306,38 @@ async function uninstall(
   output.stdout(`Removed: ${location.path}\n`);
 }
 
+// Restarts the installed service from its own definition, so its config path and limits stay; a new
+// setting such as the role's RPC takes effect. Windows stops the seller gracefully over the supervisor's
+// pipe first, as uninstall does.
+async function restart(
+  system: ServiceSystem,
+  options: ServiceOptions,
+  output: ServiceOutput,
+) {
+  const { kind, uid } = account(system);
+  const location = serviceLocation(kind, system.accountHome, uid);
+  if (!(await exists(location.path)))
+    throw new ServiceError(SERVICE_ERRORS.NOT_INSTALLED);
+  if (options.dryRun) {
+    output.stdout('Commands:\n');
+    for (const command of location.restart)
+      output.stdout(`  ${command.join(' ')}\n`);
+    return;
+  }
+  if (kind === SERVICE_KINDS.SCHEDULED_TASK)
+    await system.stopWindowsService(sellerHome(output));
+  await runAll(location.restart, system, output);
+  output.stdout(`Restarted: ${location.path}\n`);
+}
+
 const COMMANDS = {
   [SERVICE_COMMANDS.INSTALL]: install,
   [SERVICE_COMMANDS.UNINSTALL]: uninstall,
+  [SERVICE_COMMANDS.RESTART]: restart,
 } as const;
 
 const isServiceCommand = (value: string | undefined): value is ServiceCommand =>
-  value === SERVICE_COMMANDS.INSTALL || value === SERVICE_COMMANDS.UNINSTALL;
+  Object.values<string | undefined>(SERVICE_COMMANDS).includes(value);
 
 export async function serviceCommand(
   command: string | undefined,

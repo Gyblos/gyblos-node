@@ -160,24 +160,21 @@ void test('seller rpc reset: goes back to the public devnet RPC without reaching
     assert.match(shown.stdout, /public devnet RPC/);
   }));
 
-void test('seller rpc set: GYBLOS_RPC_URL wins without a question, and a question never echoes the URL', () =>
+void test('seller rpc set: a terminal is always asked, so a stale GYBLOS_RPC_URL never comes back; its question never echoes a URL', () =>
   withHome(async (home) => {
     const questions: string[] = [];
-    const prompt = async (question: string) => {
-      questions.push(question);
-      return PRIVATE;
-    };
-    const given = await rpc(home, ['set'], {
-      env: { GYBLOS_RPC_URL: PRIVATE },
-      prompt,
+    const asked = await rpc(home, ['set'], {
+      env: { GYBLOS_RPC_URL: 'https://stale.example-rpc.com' },
+      prompt: async (question) => {
+        questions.push(question);
+        return PRIVATE;
+      },
       genesis: devnet,
     });
-    assert.equal(given.code, 0, given.stderr);
-    assert.deepEqual(questions, []);
-    const asked = await rpc(home, ['set'], { prompt, genesis: devnet });
     assert.equal(asked.code, 0, asked.stderr);
     assert.equal(questions.length, 1);
-    assert.equal(questions.join(' ').includes('example-rpc'), false);
+    assert.equal(questions[0]!.includes('example-rpc'), false);
+    assert.equal((await role(home)).rpcUrl, PRIVATE);
   }));
 
 void test('seller rpc: an unknown subcommand prints usage and writes nothing', () =>
@@ -238,26 +235,15 @@ void test('seller rpc: an unreadable role file is not reported as a missing sell
     assert.match(result.stderr, /cannot be read/);
   }));
 
-void test('seller rpc set: a GYBLOS_RPC_URL equal to the saved RPC is stale, so a terminal is asked for the new one', () =>
+void test('seller rpc set: in a script, a GYBLOS_RPC_URL equal to the saved RPC (however spelled) is stale', () =>
   withHome(async (home) => {
-    const questions: string[] = [];
-    const result = await rpc(home, ['set'], {
-      env: { GYBLOS_RPC_URL: 'https://rpc.example.com' },
-      prompt: async (question) => {
-        questions.push(question);
-        return PRIVATE;
-      },
-      genesis: devnet,
-    });
-    assert.equal(result.code, 0, result.stderr);
-    assert.equal(questions.length, 1);
-    assert.equal((await role(home)).rpcUrl, PRIVATE);
     const scripted = await rpc(home, ['set'], {
-      env: { GYBLOS_RPC_URL: PRIVATE },
+      env: { GYBLOS_RPC_URL: 'https://RPC.example.com/' },
       genesis: devnet,
     });
     assert.equal(scripted.code, 1);
     assert.match(scripted.stderr, /already uses/);
+    assert.deepEqual(scripted.asked, []);
   }));
 
 void test('seller rpc: restart advice keeps the installed service, never uninstalling it', () =>
@@ -265,10 +251,7 @@ void test('seller rpc: restart advice keeps the installed service, never uninsta
     const result = await rpc(home, ['reset']);
     assert.equal(result.code, 0, result.stderr);
     assert.equal(/uninstall/.test(result.stdout), false, result.stdout);
-    assert.match(
-      result.stdout,
-      /systemctl --user restart|launchctl kickstart -k|schtasks/,
-    );
+    assert.match(result.stdout, /gyblos seller service restart/);
   }));
 
 void test('seller rpc: only rpcUrl changes in role.json; a legacy buyer field is kept as written', () =>
@@ -291,14 +274,21 @@ void test('seller rpc: only rpcUrl changes in role.json; a legacy buyer field is
     assert.deepEqual(await role(home), { ...legacy, rpcUrl: DEVNET_RPC_URL });
   }));
 
-void test('seller rpc: a role that cannot be written fails without printing private paths', () =>
-  withHome(async (home) => {
-    await chmod(home.seller, 0o500);
-    try {
-      const result = await rpc(home, ['reset']);
-      assert.equal(result.code, 1);
-      assert.match(result.stderr, /cannot be written/);
-    } finally {
-      await chmod(home.seller, 0o700);
-    }
-  }));
+void test(
+  'seller rpc: a role that cannot be written fails without printing private paths',
+  {
+    // Windows ignores the directory mode and root bypasses it.
+    skip: process.platform === 'win32' || process.getuid?.() === 0,
+  },
+  () =>
+    withHome(async (home) => {
+      await chmod(home.seller, 0o500);
+      try {
+        const result = await rpc(home, ['reset']);
+        assert.equal(result.code, 1);
+        assert.match(result.stderr, /cannot be written/);
+      } finally {
+        await chmod(home.seller, 0o700);
+      }
+    }),
+);
