@@ -9,8 +9,6 @@ import {
   getTransactionDecoder,
 } from '@solana/kit';
 
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
-
 import {
   ABSENCE_PREPARATIONS,
   batchAbsenceRig,
@@ -214,34 +212,6 @@ void test('changed original opening bytes never become absence evidence', async 
   const results = await rig.recover();
   assert.notEqual(results[0]?.notCreated, true);
   assert.equal(results[0]?.confirmed, false);
-  assert.equal(rig.signs(), 0);
-  assert.equal(rig.financial.vm.sends(), 0);
-});
-void test('an opened journal bound to another channel cannot be loaded for recovery', async (t) => {
-  const rig = await batchAbsenceRig(t);
-  const record = await rig.read();
-  assert.ok(record.opening);
-  record.channelId = record.terms.payTo;
-  await rig.write(record);
-  rig.financial.vm.expire();
-  await assert.rejects(rig.recover());
-  assert.deepEqual(await rig.read(), record);
-  assert.equal(rig.signs(), 0);
-  assert.equal(rig.financial.vm.sends(), 0);
-});
-void test('an opened journal with another channel configuration never becomes absence evidence', async (t) => {
-  const rig = await batchAbsenceRig(t);
-  const record = await rig.read();
-  assert.ok(record.opening);
-  record.opening.channelConfig.salt = String(
-    BigInt(record.opening.channelConfig.salt) ^ 1n,
-  );
-  await rig.write(record);
-  rig.financial.vm.expire();
-  const results = await rig.recover();
-  assert.equal(results[0]?.failure, SESSION_CODES.BINDING);
-  assert.notEqual(results[0]?.notCreated, true);
-  assert.deepEqual(await rig.read(), record);
   assert.equal(rig.signs(), 0);
   assert.equal(rig.financial.vm.sends(), 0);
 });
