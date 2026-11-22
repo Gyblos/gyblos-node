@@ -88,7 +88,13 @@ export function cachedRead(
     if (cached) return cached;
     if (!(await readAllowed(context)))
       return rejection(context, INDEX_ERRORS.RATE_LIMITED);
-    const text = await body();
+    let text: string | null;
+    try {
+      text = await body();
+    } catch (error) {
+      if (error instanceof IndexError) return rejection(context, error.code);
+      throw error;
+    }
     if (text === null) return rejection(context, missing);
     const response = context.body(text, INDEX_STATUS.OK, {
       [INDEX_HEADERS.CONTENT_TYPE]: INDEX_HEADER_VALUES.JSON,

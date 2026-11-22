@@ -87,6 +87,7 @@ export async function sellerProfilePage(
   nodeId: string,
 ): Promise<string | null> {
   const row = await context.profiles.get(nodeId);
+  if (row?.held) return indexFail(INDEX_ERRORS.PROFILE_HELD);
   if (!row || row.name === null || !(await known(context, nodeId))) return null;
   const { name, issuedAt, signature } = row;
   return JSON.stringify({ nodeId, name, issuedAt, signature });

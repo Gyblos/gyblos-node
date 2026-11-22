@@ -338,4 +338,7 @@ export const GITHUB_CLAIM = {
 export const SELLER_PROFILE = {
   maxBodyBytes: 1024,
   maxAgeMs: 60_000,
+  held: 1,
+  open: 0,
+  maxListedRows: 1000,
 } as const;

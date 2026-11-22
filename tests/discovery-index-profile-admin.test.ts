@@ -54,6 +54,7 @@ void test('the operator lists names, holds one so the seller cannot replace it, 
   const held = run(['--hold', node(2), '--remote']);
   assert.equal(held.code, 0);
   assert.deepEqual(held.targets, ['execute:true']);
+  assert.match(held.out, /remote database/);
   assert.deepEqual(await profiles.get(node(2)), {
     ...sellerProfileTombstone(node(2), NOW - 2, true),
   });
@@ -62,14 +63,17 @@ void test('the operator lists names, holds one so the seller cannot replace it, 
     await profiles.put({ ...row(2, 'Again'), issuedAt: NOW + 1 }),
     false,
   );
-  assert.equal(run(['--hold', node(4)]).code, 0);
+  const local = run(['--hold', node(4), '--local']);
+  assert.equal(local.code, 0);
+  assert.deepEqual(local.targets, ['execute:false']);
+  assert.match(local.out, /local database/);
   assert.deepEqual(
     await profiles.get(node(4)),
     sellerProfileTombstone(node(4), NOW, true),
   );
   assert.match(run([]).out, new RegExp(`${node(2)}\\t-\\tyes\\t`));
 
-  assert.equal(run(['--release', node(2)]).code, 0);
+  assert.equal(run(['--release', node(2), '--local']).code, 0);
   assert.deepEqual(
     await profiles.get(node(2)),
     sellerProfileTombstone(node(2), NOW - 2),
@@ -82,7 +86,11 @@ void test('the operator lists names, holds one so the seller cannot replace it, 
   for (const argv of [
     ['--hold', 'AB'.repeat(32)],
     ['--hold'],
-    ['--hold', node(1), '--release', node(1)],
+    ['--hold', node(1), '--release', node(1), '--local'],
+    ['--hold', node(1)],
+    ['--release', node(1)],
+    ['--hold', node(1), '--local', '--remote'],
+    ['--local'],
     ['--nope'],
   ]) {
     const bad = run(argv);
@@ -90,4 +98,23 @@ void test('the operator lists names, holds one so the seller cannot replace it, 
     assert.deepEqual(bad.targets, []);
     assert.match(bad.err, /usage/);
   }
+});
+
+void test('the operator listing says when it stopped at 1,000 rows', () => {
+  const rows = Array.from({ length: 1000 }, (_, index) => ({
+    node_id: node(index),
+    name: 'Ada',
+    held: 0,
+    issued_at: NOW,
+  }));
+  const out: string[] = [];
+  const code = runSellerProfiles([], {
+    stdout: (text) => out.push(text),
+    stderr: () => undefined,
+    now: () => NOW,
+    query: () => rows,
+    execute: () => assert.fail('wrote'),
+  });
+  assert.equal(code, 0);
+  assert.match(out.join(''), /1000 name\(s\); the list stops at 1,000 rows/);
 });

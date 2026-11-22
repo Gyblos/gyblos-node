@@ -9,7 +9,12 @@ import { isMain } from '@gyblos/runtime';
 
 import { GITHUB_CLAIM_STATES, type GithubClaimState } from '../src/constants';
 import { githubClaims as table } from '../src/schema';
-import { compileSql, wranglerD1 } from './wrangler-d1';
+import {
+  cellText as cell,
+  compileSql,
+  cellTime as time,
+  wranglerQuery,
+} from './wrangler-d1';
 
 // Rows listed at most; the newest claims first within each state.
 const MAX_ROWS = 1000;
@@ -48,11 +53,6 @@ export function githubClaimsSql(state: GithubClaimState | undefined) {
   );
 }
 
-const time = (value: unknown) =>
-  typeof value === 'number' ? new Date(value).toISOString() : '-';
-const cell = (value: unknown) =>
-  typeof value === 'string' && value ? value : '-';
-
 export function runGithubClaims(argv: readonly string[], io: ClaimsIo) {
   let values: { state?: string; remote?: boolean };
   try {
@@ -89,21 +89,6 @@ export function runGithubClaims(argv: readonly string[], io: ClaimsIo) {
   }
   io.stdout(`${rows.length} claim(s)\n`);
   return 0;
-}
-
-// `wrangler d1 execute --json` prints one result set per statement.
-function wranglerQuery(sql: string, remote: boolean): unknown[] {
-  const output = wranglerD1(sql, {
-    target: remote ? '--remote' : '--local',
-    json: true,
-  });
-  const parsed: unknown = JSON.parse(output);
-  const first: unknown = Array.isArray(parsed) ? parsed[0] : undefined;
-  const results: unknown =
-    first && typeof first === 'object'
-      ? Reflect.get(first, 'results')
-      : undefined;
-  return Array.isArray(results) ? results : [];
 }
 
 if (isMain(import.meta.url))

@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNotNull, lt } from 'drizzle-orm';
 
 import { parseSellerName } from '@gyblos/protocol/profile-claim';
 
+import { SELLER_PROFILE } from './constants';
 import { createD1Orm, type D1Database, type D1Row } from './d1-client';
 import {
   sellerProfileTombstone,
@@ -12,8 +13,8 @@ import { sellerProfiles } from './schema';
 import { jsonTextValues } from './sqlite-expressions';
 import { integer, text } from './uptime-d1';
 
-const HELD = 1;
-const OPEN = 0;
+const HELD = SELLER_PROFILE.held;
+const OPEN = SELLER_PROFILE.open;
 
 function unexpected(): never {
   throw new TypeError('Unexpected seller profile row.');

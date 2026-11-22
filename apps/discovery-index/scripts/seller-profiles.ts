@@ -4,15 +4,20 @@ import { desc, eq, isNotNull, or } from 'drizzle-orm';
 
 import { isMain } from '@gyblos/runtime';
 
-import { REGISTRATION } from '../src/constants';
+import { REGISTRATION, SELLER_PROFILE } from '../src/constants';
 import { sellerProfiles as table } from '../src/schema';
-import { compileSql, wranglerD1 } from './wrangler-d1';
+import {
+  cellText,
+  cellTime,
+  compileSql,
+  wranglerD1,
+  wranglerQuery,
+} from './wrangler-d1';
 
-const MAX_ROWS = 1000;
-const HELD = 1;
-const OPEN = 0;
+const HELD = SELLER_PROFILE.held;
+const OPEN = SELLER_PROFILE.open;
 const USAGE =
-  'usage: pnpm index:seller-profiles [--hold <NodeId> | --release <NodeId>] [--remote]\n';
+  'usage: pnpm index:seller-profiles [--remote]\n       pnpm index:seller-profiles --hold <NodeId> --local|--remote\n       pnpm index:seller-profiles --release <NodeId> --local|--remote\n';
 
 export interface SellerProfilesIo {
   stdout: (text: string) => void;
@@ -34,7 +39,7 @@ export function sellerProfilesSql() {
       .from(table)
       .where(or(isNotNull(table.name), eq(table.held, HELD)))
       .orderBy(desc(table.issuedAt))
-      .limit(MAX_ROWS),
+      .limit(SELLER_PROFILE.maxListedRows),
   );
 }
 
@@ -62,11 +67,6 @@ export function releaseSql(nodeId: string) {
   );
 }
 
-const time = (value: unknown) =>
-  typeof value === 'number' ? new Date(value).toISOString() : '-';
-const cell = (value: unknown) =>
-  typeof value === 'string' && value ? value : '-';
-
 function list(io: SellerProfilesIo, remote: boolean) {
   const rows = io.query(sellerProfilesSql(), remote);
   io.stdout('node\tname\theld\tissuedAt\n');
@@ -75,14 +75,18 @@ function list(io: SellerProfilesIo, remote: boolean) {
       row && typeof row === 'object' ? Reflect.get(row, key) : undefined;
     io.stdout(
       [
-        cell(field('node_id')),
-        cell(field('name')),
+        cellText(field('node_id')),
+        cellText(field('name')),
         field('held') === HELD ? 'yes' : 'no',
-        time(field('issued_at')),
+        cellTime(field('issued_at')),
       ].join('\t') + '\n',
     );
   }
-  io.stdout(`${rows.length} name(s)\n`);
+  io.stdout(
+    rows.length >= SELLER_PROFILE.maxListedRows
+      ? `${rows.length} name(s); the list stops at 1,000 rows\n`
+      : `${rows.length} name(s)\n`,
+  );
   return 0;
 }
 
@@ -94,11 +98,14 @@ function parse(argv: readonly string[]) {
         hold: { type: 'string' },
         release: { type: 'string' },
         remote: { type: 'boolean' },
+        local: { type: 'boolean' },
       },
     });
     const target = values.hold ?? values.release;
+    const targets = [values.local, values.remote].filter(Boolean).length;
     if (
       positionals.length > 0 ||
+      (target === undefined ? values.local === true : targets !== 1) ||
       (values.hold !== undefined && values.release !== undefined) ||
       (target !== undefined && !REGISTRATION.nodeId.test(target))
     )
@@ -119,31 +126,22 @@ export function runSellerProfiles(
     return 1;
   }
   const remote = values.remote === true;
+  const database = remote ? 'remote' : 'local';
   if (values.hold !== undefined) {
     io.execute(holdSql(values.hold, io.now()), remote);
-    io.stdout(`Held: ${values.hold} shows no name until released.\n`);
+    io.stdout(
+      `Held in the ${database} database: ${values.hold} shows no name until released.\n`,
+    );
     return 0;
   }
   if (values.release !== undefined) {
     io.execute(releaseSql(values.release), remote);
-    io.stdout(`Released: ${values.release} may set a name again.\n`);
+    io.stdout(
+      `Released in the ${database} database: ${values.release} may set a name again.\n`,
+    );
     return 0;
   }
   return list(io, remote);
-}
-
-function wranglerQuery(sql: string, remote: boolean): unknown[] {
-  const output = wranglerD1(sql, {
-    target: remote ? '--remote' : '--local',
-    json: true,
-  });
-  const parsed: unknown = JSON.parse(output);
-  const first: unknown = Array.isArray(parsed) ? parsed[0] : undefined;
-  const results: unknown =
-    first && typeof first === 'object'
-      ? Reflect.get(first, 'results')
-      : undefined;
-  return Array.isArray(results) ? results : [];
 }
 
 if (isMain(import.meta.url))

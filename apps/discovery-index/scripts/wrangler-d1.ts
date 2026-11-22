@@ -103,3 +103,22 @@ export function wranglerD1(
     throw new Error('Wrangler could not run the D1 command.');
   }
 }
+
+export const cellTime = (value: unknown) =>
+  typeof value === 'number' ? new Date(value).toISOString() : '-';
+export const cellText = (value: unknown) =>
+  typeof value === 'string' && value ? value : '-';
+
+export function wranglerQuery(sql: string, remote: boolean): unknown[] {
+  const output = wranglerD1(sql, {
+    target: remote ? '--remote' : '--local',
+    json: true,
+  });
+  const parsed: unknown = JSON.parse(output);
+  const first: unknown = Array.isArray(parsed) ? parsed[0] : undefined;
+  const results: unknown =
+    first && typeof first === 'object'
+      ? Reflect.get(first, 'results')
+      : undefined;
+  return Array.isArray(results) ? results : [];
+}
