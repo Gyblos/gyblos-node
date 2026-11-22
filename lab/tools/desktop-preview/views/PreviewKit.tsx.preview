@@ -1,5 +1,5 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { CaretRight, Check, Copy, Info, Minus, Plus, Wallet, Warning } from '@phosphor-icons/react';
+import { CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
 import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
@@ -528,10 +528,22 @@ function PreviewMainnetFunds() {
       {address && (
         <CopyField id="preview-mainnet-address" label="Buyer wallet address" value={address} actionLabel="Copy address" onCopy={() => void navigator.clipboard.writeText(address)} />
       )}
-      <div className="preview-fund-options">
-        <span>PayPal <small className="ui-help-text">Choose PayPal in Usage &amp; payments</small></span>
-        <span>Card <Tag>Soon</Tag></span>
-      </div>
+      <ul className="preview-method-list">
+        <li className="preview-method-row" aria-label="PayPal">
+          <span className="ui-icon-tile" aria-hidden="true"><PaypalLogo size={18} /></span>
+          <div className="preview-method-copy">
+            <span className="preview-method-name"><h3>PayPal</h3><Tag tone={TONE.WARNING}>Demo</Tag></span>
+            <span className="ui-help-text">Choose PayPal in Usage &amp; payments.</span>
+          </div>
+        </li>
+        <li className="preview-method-row" aria-label="Card">
+          <span className="ui-icon-tile" aria-hidden="true"><CreditCard size={18} /></span>
+          <div className="preview-method-copy">
+            <span className="preview-method-name"><h3>Card</h3><Tag>Soon</Tag></span>
+            <span className="ui-help-text">Card top-ups are planned; nothing is connected yet.</span>
+          </div>
+        </li>
+      </ul>
     </div>
   );
 }

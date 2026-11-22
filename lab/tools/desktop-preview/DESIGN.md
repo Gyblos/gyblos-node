@@ -50,7 +50,7 @@ in the same change. Agents load this through the
 This table governs the mockup. `CodeBlock`, `DetailSummary`, `Tag`,
 `statusTone`, `FilterChips`, `Delta`, `Savings`, `SegmentedBar`, `StatGrid`,
 `Panel`, `TableRow`, `AmountEditor`, `CompactAmount`, `PreviewAnswerSkeleton`,
-`Notice` and `Switch`
+`Notice`, `Switch` and `PreviewFundsDialog`
 exist only in the preview views until a port is approved; shipped desktop code
 follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 
@@ -61,6 +61,7 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 | Pick among 2-5 visible options    | `FilterChips` (counts) or `ChoiceCard` (`./UI`)                                                                             | ad-hoc pill rows                                       |
 | Turn a global setting on or off   | `Switch` in a settings row                                                                                                  | checkbox or custom toggle                              |
 | Text field, label, help, error    | `FormField` + `FormInput` (`./Form`)                                                                                        | bare `<input>` and `<label>`                           |
+| Add funds dialog                  | `PreviewFundsDialog` with a `FUNDS_HOST`, opened by `openPreviewFunds(host)`; faucet on Testnet only                        | per-view Add funds modals                              |
 | Copy a value (key, URL)           | `CopyField` (`./Form`)                                                                                                      | input plus a separate copy button                      |
 | Code, commands, config files      | `CodeBlock` with `language` and `title`                                                                                     | `<pre>` or `.ui-code-block`                            |
 | USDC amount input                 | `AmountEditor` / `CompactAmount` (`./PreviewKit`)                                                                           | number inputs with custom steppers                     |

@@ -124,8 +124,8 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
                   : PREVIEW_COPY.pinnedNoReplacement(unavailable.name)}
               </Notice>
             )}
-            <div className="preview-route" data-pinned={Boolean(choice.pinned)}>
-              <span className="preview-route-icon" aria-hidden="true">
+            <div className="preview-route" data-tone={choice.pinned ? TONE.INFO : TONE.NEUTRAL}>
+              <span className="ui-icon-tile" aria-hidden="true">
                 {choice.pinned ? <PushPin size={16} weight="fill" /> : <Shuffle size={16} />}
               </span>
               <span className="preview-route-copy">

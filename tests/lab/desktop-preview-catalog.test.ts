@@ -23,9 +23,19 @@ void test('Add funds offers the faucet on Testnet only, from chat and Usage & pa
 
 void test('the seller table uses the shared pagination and a pinned-seller summary', async () => {
   const row = await view('ModelRow.tsx.preview');
+  const kit = await view('PreviewKit.tsx.preview');
+  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const design = await readFile(new URL('DESIGN.md', preview), 'utf8');
   assert.match(row, /<Pagination\b/);
   assert.doesNotMatch(row, /preview-pager/);
-  assert.match(row, /className="preview-route"/);
+  assert.match(row, /className="preview-route" data-tone=/);
+  assert.match(row, /className="ui-icon-tile"/);
+  assert.doesNotMatch(
+    css,
+    /\.preview-route-icon|\.preview-fund-options|--accent\) \d+%, var\(--panel/,
+  );
+  assert.match(kit, /className="preview-method-list"/);
+  assert.match(design, /PreviewFundsDialog/);
   assert.match(row, /aria-pressed=\{pinned === s\.id\}/);
 });
 
