@@ -1,5 +1,10 @@
-import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  parseAutoPrices,
+  type BuyerSellerChoice,
+} from '@gyblos/protocol/buyer-api';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
+import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
 import { controlAtomic } from '@gyblos/protocol/control-validation';
 
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
@@ -66,7 +71,11 @@ async function referenceAction(
 }
 export interface ManagedBuyerPorts {
   start(): Promise<void>;
-  configure?(maxAtomic: string, policyId?: string): Promise<void>;
+  configure?(
+    maxAtomic: string,
+    policyId?: string,
+    autoPrices?: TokenPricesV2 | null,
+  ): Promise<void>;
   changing?(): boolean;
   review?: Parameters<X402Budget['review']>[0];
 }
@@ -114,6 +123,19 @@ async function selectedOffer(
     id: string,
   ) => BuyerSellerChoice | undefined | Promise<BuyerSellerChoice | undefined>,
 ) {
+  if (input.auto === true) {
+    if (
+      'freeOnly' in input ||
+      'offerId' in input ||
+      !policy ||
+      input.policyId !== policy.policyId
+    )
+      throw new PaidSellerLimitError(
+        'Select Auto again for the current buyer.',
+      );
+    if (policy.maxAtomic === '0') return undefined;
+    return policy.paidAuto ? BUYER_API.AUTO : OFFER_PRICING_KINDS.FREE;
+  }
   if (input.freeOnly === true) {
     if (input.offerId || !policy || input.policyId !== policy.policyId)
       throw new PaidSellerLimitError('Select the free model again.');
@@ -152,7 +174,11 @@ function configureAction(
   const maxAtomic = controlAtomic(input.maxAtomic);
   if (maxAtomic === '0')
     throw new PaidSellerLimitError('Enter a positive maximum per response.');
-  return managed.configure(maxAtomic, input.policyId).then(() => true);
+  if (input.autoPrices === undefined)
+    return managed.configure(maxAtomic, input.policyId).then(() => true);
+  const rates =
+    input.autoPrices === null ? null : parseAutoPrices(input.autoPrices);
+  return managed.configure(maxAtomic, input.policyId, rates).then(() => true);
 }
 async function checkPayment(
   budget: X402Budget,

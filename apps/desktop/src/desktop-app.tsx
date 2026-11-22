@@ -262,6 +262,26 @@ export function DesktopApp() {
     const timer = setTimeout(() => setToast(''), DEMO_ACCOUNT.TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
+  function chooseAuto() {
+    const policy = x402.state.policy;
+    if (!policy) return;
+    const listing = networkModels.find((item) => item.name === policy.model);
+    if (!listing) return;
+    setModel({
+      id: 'auto/' + policy.model,
+      automatic: true,
+      name: policy.model,
+      image: listing.image,
+      family: 'Auto',
+      context: listing.context,
+      category: listing.category,
+      providers: listing.providers,
+      input: 0,
+      output: 0,
+      free: !policy.paidAuto || policy.maxAtomic === '0',
+    });
+    setConfirmedPolicy(policy.policyId);
+  }
   function choose(next: Model) {
     if (paymentMethod === PAYMENT_METHOD.PAYPAL) return;
     if (
@@ -414,6 +434,7 @@ export function DesktopApp() {
               models={chatModels}
               confirmedPolicy={confirmedPolicy}
               onDefaultModel={() => setModel(MODELS[0])}
+              onAutoModel={chooseAuto}
               onSelectModel={(id) => {
                 const next = chatModels.find((item) => item.id === id);
                 if (next) choose(next);
@@ -430,6 +451,15 @@ export function DesktopApp() {
               canSelect={canSelectPreviewModel(paymentMethod)}
               onSelect={choose}
               catalog={announcements}
+              networkModels={networkModels}
+              auto={
+                x402.state.policy && {
+                  buyerModel: x402.state.policy.model,
+                  paid: !!x402.state.policy.paidAuto,
+                  selected: !!model.automatic,
+                  choose: chooseAuto,
+                }
+              }
             />
           )}
           {view === UI_VIEW.CONNECT &&

@@ -19,7 +19,14 @@ export interface BuyerDesktopOptions {
   preparePaidChat?: () => Promise<void>;
   desktopPolicy?: Pick<
     BuyerApiPolicy,
-    'network' | 'mint' | 'payer' | 'maxAtomic' | 'depositAtomic' | 'lifetimeMs'
+    | 'network'
+    | 'mint'
+    | 'payer'
+    | 'maxAtomic'
+    | 'depositAtomic'
+    | 'lifetimeMs'
+    | 'paidAuto'
+    | 'autoPrices'
   >;
 }
 export function configuredBuyerAccess(
@@ -27,6 +34,7 @@ export function configuredBuyerAccess(
   role: RoleConfig | undefined,
   token: string | undefined,
   session?: BuyerSelectionConfig['session'],
+  paidAuto?: true,
 ): BuyerDesktopOptions {
   return {
     token,
@@ -37,6 +45,7 @@ export function configuredBuyerAccess(
               depositAtomic: session.depositAtomic,
               lifetimeMs: session.lifetimeMs,
             }),
+            ...(paidAuto && { paidAuto, autoPrices: request.priceCeilings }),
             network: request.network,
             mint: request.asset,
             payer: role.buyer,

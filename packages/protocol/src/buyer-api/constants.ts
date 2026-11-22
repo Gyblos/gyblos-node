@@ -4,6 +4,8 @@ export const BUYER_API = {
   PAID_PREPARATION_PATH: '/v1/gyblos/prepare-paid-chat',
   PAID_PREPARATION_HEADER: 'gyblos-paid-preparation',
   CHANNEL_CHAT_PATH: '/v1/gyblos/channel-chat',
+  AUTO: 'auto',
+  AUTO_FIELD: 'gyblos_auto',
   FREE_ONLY_FIELD: 'gyblos_free_only',
   OPENING_INTENT_FIELD: 'gyblos_opening_intent',
   SELLER_CHOICE_FIELD: 'gyblos_seller_choice',

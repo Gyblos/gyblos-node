@@ -9,16 +9,8 @@ import {
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
+import { AutoSettingsError, withAutoPrices } from './auto-settings';
 import { BUYER_SELECTION } from './constants';
-import { parseBuyerSelectionConfig } from './selection-config';
-
-class AutoSettingsError extends Error {}
-
-function record(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new AutoSettingsError('Invalid buyer settings.');
-  return Object.fromEntries(Object.entries(value));
-}
 
 async function configure(args: string[]) {
   const disable = args.length === 1 && args[0] === 'off';
@@ -41,27 +33,7 @@ async function configure(args: string[]) {
     const data = await readPrivateFile(path, BUYER_SELECTION.maxConfigBytes);
     if (!data) throw new AutoSettingsError('Missing buyer settings.');
     const value: unknown = JSON.parse(data);
-    const config = parseBuyerSelectionConfig(value);
-    if (!config.discovery?.open || config.sellers.length || config.pinnedNodeId)
-      throw new AutoSettingsError(
-        'Auto needs an open-discovery buyer without a pinned or configured seller.',
-      );
-    if (!disable && (!config.session || config.request.maxAtomic === '0'))
-      throw new AutoSettingsError(
-        'Set a positive maximum per response and a channel policy before enabling paid Auto.',
-      );
-    const raw = record(value);
-    const discovery = record(raw.discovery);
-    if (disable) delete discovery.paidAuto;
-    else discovery.paidAuto = true;
-    const next = {
-      ...raw,
-      discovery,
-      ...(prices && {
-        request: { ...record(raw.request), priceCeilings: prices },
-      }),
-    };
-    parseBuyerSelectionConfig(next);
+    const next = withAutoPrices(value, prices ?? null);
     await lock.verify();
     await writePrivateFile(
       path,

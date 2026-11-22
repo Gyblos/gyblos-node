@@ -1,10 +1,12 @@
 // Bounded host-side responses from the owner-authenticated loopback buyer.
 import { HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
+import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import {
   BUYER_API,
   type BuyerApiPolicy,
   type BuyerSellerChoice,
 } from '@gyblos/protocol/buyer-api';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
 import { desktopBuyerFailure } from './buyer-error';
 import type { X402Budget } from './x402-budget';
@@ -13,6 +15,30 @@ import {
   PaidSellerLimitError,
   paidSellerLimitNotice,
 } from './x402-model';
+
+export type DesktopSellerChoice =
+  BuyerSellerChoice | typeof OFFER_PRICING_KINDS.FREE | typeof BUYER_API.AUTO;
+export function policyForSeller(
+  policy: BuyerApiPolicy,
+  choice?: BuyerSellerChoice,
+): BuyerApiPolicy {
+  if (!choice) return policy;
+  return {
+    ...policy,
+    model: choice.modelId,
+    maxTokens: Math.min(
+      choice.contextTokens,
+      policy.maxTokens,
+      BATCH_CHANNEL.maxOutputTokens,
+    ),
+  };
+}
+export function sellerFields(choice?: DesktopSellerChoice) {
+  if (choice === OFFER_PRICING_KINDS.FREE)
+    return { [BUYER_API.FREE_ONLY_FIELD]: true };
+  if (choice === BUYER_API.AUTO) return { [BUYER_API.AUTO_FIELD]: true };
+  return choice && { [BUYER_API.SELLER_CHOICE_FIELD]: choice };
+}
 
 export async function readJson(response: Response, allowError = false) {
   if ((!response.ok && !allowError) || !response.body)
@@ -107,14 +133,18 @@ export function buyerEndpoint(input: unknown) {
 }
 
 export function validateChoice(
-  choice: BuyerSellerChoice | undefined,
+  choice: BuyerSellerChoice | typeof BUYER_API.AUTO | undefined,
   policy: BuyerApiPolicy,
   current: Awaited<ReturnType<X402Budget['summary']>>,
 ) {
   if (choice) {
-    if (choice.expiresAt <= Date.now())
+    if (typeof choice === 'object' && choice.expiresAt <= Date.now())
       throw new Error('Seller listing expired');
-    const notice = paidSellerLimitNotice(policy, current, choice.modelId);
+    const notice = paidSellerLimitNotice(
+      policy,
+      current,
+      typeof choice === 'object' ? choice.modelId : policy.model,
+    );
     if (notice) throw new PaidSellerLimitError(notice);
   }
 }

@@ -282,6 +282,7 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
   const token = 'synthetic-local-buyer-token';
   const host = await startFreeBuyerHttp(
     async (_input, _signal, _delta, route) => {
+      assert.equal(route?.sellerChoice, undefined);
       const request = routedRequest(paid, route);
       caps.push(
         [
@@ -297,7 +298,12 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
         execution: OFFER_PRICING_KINDS.FREE,
       };
     },
-    { selection: paid.selection, maxTokens: 10, sellerChoice: true },
+    {
+      selection: paid.selection,
+      maxTokens: 10,
+      sellerChoice: true,
+      paidAuto: true,
+    },
     {
       port: 0,
       token,
@@ -306,6 +312,9 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
         mint: DEVNET_USDC,
         payer: '11111111111111111111111111111111',
         maxAtomic: paid.maxAtomic,
+        depositAtomic: '1000000',
+        lifetimeMs: 3600000,
+        paidAuto: true,
       },
     },
   );
@@ -322,6 +331,13 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
       undefined,
       OFFER_PRICING_KINDS.FREE,
     );
+    const auto = await client.send(
+      'auto-turn',
+      'choose automatically',
+      undefined,
+      BUYER_API.AUTO,
+    );
+    assert.equal(auto.summary.records.at(-1)?.free, true);
     const result = await fetch(host.url, {
       method: 'POST',
       headers: {
@@ -334,7 +350,7 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
       }),
     });
     assert.equal(result.ok, true);
-    assert.deepEqual(caps, ['0/0/0', '100/123/456']);
+    assert.deepEqual(caps, ['0/0/0', '100/123/456', '100/123/456']);
   } finally {
     await client.close();
     await host.close();

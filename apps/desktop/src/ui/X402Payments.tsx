@@ -14,6 +14,7 @@ import {
   x402BudgetInput,
   x402Explorer,
 } from '../x402-model';
+import { AutoSellerSettings } from './AutoSellerSettings';
 import { BUTTON_VARIANT } from './constants';
 import { DataCell, DataTable } from './DataTable';
 import { CopyField, FormActions, FormField, FormInput } from './Form';
@@ -48,6 +49,13 @@ export function X402Payments({
         <h2>Chat budget · x402</h2>
         <Badge>Solana devnet</Badge>
       </div>
+      {policy && (
+        <AutoSellerSettings
+          key={policy.policyId}
+          buyer={buyer}
+          policy={policy}
+        />
+      )}
       {!policy && <X402Connection buyer={buyer} />}
       {activePolicy && (
         <div className="ui-form">

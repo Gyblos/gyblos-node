@@ -9,6 +9,7 @@ import { priceRange } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { NetworkCatalogPanel, useNetworkCatalog } from './NetworkCatalog';
+import { NetworkSellerMenu } from './NetworkSellerMenu';
 import {
   Badge,
   Button,
@@ -24,7 +25,16 @@ export function Models({
   canSelect,
   onSelect,
   catalog,
+  networkModels,
+  auto,
 }: {
+  networkModels: readonly CatalogModel[];
+  auto: {
+    buyerModel: string;
+    paid: boolean;
+    selected: boolean;
+    choose(): void;
+  } | null;
   selected: string;
   canSelect: boolean;
   onSelect(model: CatalogModel): void;
@@ -37,6 +47,9 @@ export function Models({
     setNetwork(false);
     onSelect(offer);
   }
+  const offers = networkModels.filter((model) =>
+    matchesCatalog(model, query, filter),
+  );
   return (
     <PagePanel>
       <div className="ui-toolbar">
@@ -58,23 +71,42 @@ export function Models({
           }}
         />
         <Button onClick={() => setNetwork(true)}>Find network models</Button>
-        <Badge>Preview</Badge>
+        {!canSelect && <Badge>Preview</Badge>}
       </div>
       <List label="Model catalog">
-        {MODELS.filter((model) => matchesCatalog(model, query, filter)).map(
-          (model) => (
-            <ModelRow
-              key={model.id}
-              model={model}
-              selected={selected}
-              canSelect={canSelect}
-              onSelect={onSelect}
-            />
-          ),
+        {canSelect && (
+          <NetworkSellerMenu
+            models={offers}
+            selected={selected}
+            automatic={!!auto?.selected}
+            buyerModel={auto?.buyerModel ?? ''}
+            paid={!!auto?.paid}
+            onAuto={() => auto?.choose()}
+            onSelect={(id) => {
+              const offer = offers.find((row) => row.id === id);
+              if (offer) chooseOffer(offer);
+            }}
+          />
         )}
-        {!MODELS.some((model) => matchesCatalog(model, query, filter)) && (
-          <p className="ui-list-empty">No models match your search.</p>
+        {canSelect && !offers.length && (
+          <p className="ui-list-empty">No network offers match your search.</p>
         )}
+        {!canSelect &&
+          MODELS.filter((model) => matchesCatalog(model, query, filter)).map(
+            (model) => (
+              <ModelRow
+                key={model.id}
+                model={model}
+                selected={selected}
+                canSelect={canSelect}
+                onSelect={onSelect}
+              />
+            ),
+          )}
+        {!canSelect &&
+          !MODELS.some((model) => matchesCatalog(model, query, filter)) && (
+            <p className="ui-list-empty">No models match your search.</p>
+          )}
       </List>
       {!canSelect && (
         <p className="ui-help-text">

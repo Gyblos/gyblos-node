@@ -350,3 +350,28 @@ void test('an explicit free chat under a paid policy cannot spend or change API 
   assert.equal((await ledger.summary()).records.at(-1)?.free, true);
   await client.close();
 });
+
+void test('desktop Auto sends the model without pinning a seller and records its channel approval', async () => {
+  const ledger = budget();
+  let sends = 0;
+  const client = new X402Client(ledger, async (url, options) => {
+    if (options?.method !== 'POST')
+      return Response.json({
+        ...policy,
+        paidAuto: true,
+        depositAtomic: '1000000',
+        lifetimeMs: 3600000,
+      });
+    assert.equal(new URL(String(url)).pathname, BUYER_API.CHANNEL_CHAT_PATH);
+    const request = JSON.parse(String(options.body));
+    assert.equal(request[BUYER_API.AUTO_FIELD], true);
+    assert.equal(request[BUYER_API.SELLER_CHOICE_FIELD], undefined);
+    sends++;
+    return Response.json(reply());
+  });
+  await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+  await client.send('automatic', 'test', undefined, 'auto');
+  assert.equal(sends, 1);
+  assert.equal((await ledger.summary()).spentAtomic, '30');
+  await client.close();
+});

@@ -6,6 +6,7 @@ import { Dropdown } from './Dropdown';
 import { priceRange, usdPerMtok } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
+import { NetworkSellerMenu } from './NetworkSellerMenu';
 import { Badge, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
@@ -32,6 +33,7 @@ export function ModelDropdown({
   showBrowse = true,
   networkOnly = false,
   contextLabel,
+  auto,
 }: {
   model: ModelOption;
   models: readonly ModelOption[];
@@ -42,6 +44,7 @@ export function ModelDropdown({
   showBrowse?: boolean;
   networkOnly?: boolean;
   contextLabel?: string;
+  auto?: { buyerModel: string; paid: boolean; choose(): void };
 }) {
   const network =
     networkOnly ||
@@ -58,7 +61,9 @@ export function ModelDropdown({
         <>
           <ModelImage artwork={model.image} name={model.name} />
           {model.name}
-          {contextLabel ? (
+          {model.automatic ? (
+            <Badge>Auto</Badge>
+          ) : contextLabel ? (
             <Badge>Local</Badge>
           ) : network &&
             !models.some((item) => item.id === model.id) ? null : model.free ? (
@@ -83,22 +88,37 @@ export function ModelDropdown({
             : filtered.slice(0, MENU_GEOMETRY.QUICK_MODELS);
         return (
           <>
-            {options.map((item) => (
-              <MenuItem
-                key={item.id}
-                role="menuitemradio"
-                checked={item.id === model.id}
-                label={item.name}
-                detail={contextLabel ?? modelDetail(item)}
-                badge={item.free ? <Badge>Free</Badge> : undefined}
-                leading={<ModelImage artwork={item.image} name={item.name} />}
-                trailing={item.id === model.id && <Check size={16} />}
-                onClick={() => {
+            {auto ? (
+              <NetworkSellerMenu
+                models={options}
+                selected={model.id}
+                automatic={!!model.automatic}
+                buyerModel={auto.buyerModel}
+                paid={auto.paid}
+                onAuto={auto.choose}
+                onSelect={(id) => {
                   close();
-                  onSelect(item.id);
+                  onSelect(id);
                 }}
               />
-            ))}
+            ) : (
+              options.map((item) => (
+                <MenuItem
+                  key={item.id}
+                  role="menuitemradio"
+                  checked={item.id === model.id}
+                  label={item.name}
+                  detail={contextLabel ?? modelDetail(item)}
+                  badge={item.free ? <Badge>Free</Badge> : undefined}
+                  leading={<ModelImage artwork={item.image} name={item.name} />}
+                  trailing={item.id === model.id && <Check size={16} />}
+                  onClick={() => {
+                    close();
+                    onSelect(item.id);
+                  }}
+                />
+              ))
+            )}
             {!options.length && (
               <p className="dropdown-note" role="status">
                 No models found

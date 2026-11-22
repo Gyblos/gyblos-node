@@ -1,10 +1,15 @@
+import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
+
 // Coordinates one local-buyer startup and zero-only permission; it never retries a prompt.
 import type { X402Budget } from './x402-budget';
 import type { X402Client } from './x402-client';
 import { PaidSellerLimitError } from './x402-model';
 
 interface Service {
-  start(maxAtomic?: string): Promise<{ url: string; token: string }>;
+  start(
+    maxAtomic?: string,
+    autoPrices?: TokenPricesV2 | null,
+  ): Promise<{ url: string; token: string }>;
   stop(): Promise<void>;
   close(): Promise<void>;
 }
@@ -59,11 +64,12 @@ async function connectManaged(
   budget: X402Budget,
   check: () => void,
   maxAtomic?: string,
+  autoPrices?: TokenPricesV2 | null,
 ) {
   if ((await budget.summary()).blocked)
     throw new Error('Spending needs review');
   check();
-  const connection = await service.start(maxAtomic);
+  const connection = await service.start(maxAtomic, autoPrices);
   try {
     check();
     const connectedPolicy = await client.connect(
@@ -74,6 +80,13 @@ async function connectManaged(
     if (
       maxAtomic !== undefined &&
       (connectedPolicy.maxAtomic !== maxAtomic ||
+        (autoPrices === null && connectedPolicy.paidAuto) ||
+        (autoPrices &&
+          (!connectedPolicy.paidAuto ||
+            connectedPolicy.autoPrices?.inputAtomicPerMtok !==
+              autoPrices.inputAtomicPerMtok ||
+            connectedPolicy.autoPrices.outputAtomicPerMtok !==
+              autoPrices.outputAtomicPerMtok)) ||
         !connectedPolicy.depositAtomic ||
         !connectedPolicy.lifetimeMs)
     )
@@ -119,7 +132,11 @@ export function automaticBuyer(
       return ready;
     },
     changing: () => change !== null,
-    configure(maxAtomic: string, policyId?: string) {
+    configure(
+      maxAtomic: string,
+      policyId?: string,
+      autoPrices?: TokenPricesV2 | null,
+    ) {
       check();
       if (change)
         throw new PaidSellerLimitError(
@@ -135,7 +152,14 @@ export function automaticBuyer(
         owned = undefined;
         await service.stop();
         check();
-        owned = await connectManaged(service, client, budget, check, maxAtomic);
+        owned = await connectManaged(
+          service,
+          client,
+          budget,
+          check,
+          maxAtomic,
+          autoPrices,
+        );
         ready = Promise.resolve();
       };
       change = update().finally(() => {

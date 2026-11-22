@@ -4,12 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
-import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
-import {
-  BUYER_API,
-  type BuyerApiPolicy,
-  type BuyerSellerChoice,
-} from '@gyblos/protocol/buyer-api';
+import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import type { BuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_CHAT_ROLES,
@@ -22,9 +17,12 @@ import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
   buyerEndpoint,
+  policyForSeller,
   readJson,
+  sellerFields,
   validateChoice,
   waitForPaidBuyer,
+  type DesktopSellerChoice,
 } from './x402-http';
 import { DESKTOP_X402, PaidSellerLimitError, x402Policy } from './x402-model';
 import {
@@ -34,25 +32,9 @@ import {
 } from './x402-reply';
 import { readBuyerStream } from './x402-stream';
 
-export type DesktopSellerChoice =
-  BuyerSellerChoice | typeof OFFER_PRICING_KINDS.FREE;
-function policyForSeller(
-  policy: BuyerApiPolicy,
-  choice?: BuyerSellerChoice,
-): BuyerApiPolicy {
-  if (!choice) return policy;
-  return {
-    ...policy,
-    model: choice.modelId,
-    maxTokens: Math.min(
-      choice.contextTokens,
-      policy.maxTokens,
-      BATCH_CHANNEL.maxOutputTokens,
-    ),
-  };
-}
 export { buyerEndpoint } from './x402-http';
 export { parseBuyerReply } from './x402-reply';
+export type { DesktopSellerChoice } from './x402-http';
 export class X402Client {
   private connection: {
     url: URL;
@@ -265,12 +247,15 @@ export class X402Client {
       throw new Error(
         'Buyer policy changed. Finish the previous budget before authorizing another.',
       );
+    const seller = typeof choice === 'object' ? choice : undefined;
+    if (choice === BUYER_API.AUTO && !connection.policy.paidAuto)
+      throw new PaidSellerLimitError('Enable paid Auto in Payments first.');
     validateChoice(choice, connection.policy, current);
     await waitForPaidBuyer(
       connection,
       this.request,
       external,
-      choice?.expiresAt,
+      seller?.expiresAt,
     );
     const intent =
       choice && connection.managed && this.budget.opening
@@ -281,7 +266,7 @@ export class X402Client {
       choice ? connection.policy : undefined,
       intent,
     );
-    const policy = policyForSeller(reserved, choice);
+    const policy = policyForSeller(reserved, seller);
     let sent = false;
     try {
       external.throwIfAborted();
@@ -338,9 +323,7 @@ export class X402Client {
           'if-match': '"' + policy.policyId + '"',
         },
         body: JSON.stringify({
-          ...(choice === OFFER_PRICING_KINDS.FREE
-            ? { [BUYER_API.FREE_ONLY_FIELD]: true }
-            : choice && { [BUYER_API.SELLER_CHOICE_FIELD]: choice }),
+          ...sellerFields(choice),
           ...(intent && { [BUYER_API.OPENING_INTENT_FIELD]: intent }),
           model: policy.model,
           messages: [{ role: FREE_CHAT_ROLES.USER, content: prompt }],
@@ -370,12 +353,21 @@ export class X402Client {
     const reply = parseBuyerReply(body, policy);
     if (choice === OFFER_PRICING_KINDS.FREE && !reply.free)
       throw new Error('The seller did not return a free response.');
-    if (choice && choice !== OFFER_PRICING_KINDS.FREE && !reply.sessionApproval)
+    if (
+      choice &&
+      choice !== OFFER_PRICING_KINDS.FREE &&
+      !(choice === BUYER_API.AUTO && reply.free) &&
+      !reply.sessionApproval
+    )
       throw new Error('Missing channel approval');
     const summary =
       choice === OFFER_PRICING_KINDS.FREE
         ? await this.budget.recordFree(id, policy)
-        : await this.budget.complete(id, reply, choice?.modelId);
+        : await this.budget.complete(
+            id,
+            reply,
+            typeof choice === 'object' ? choice.modelId : undefined,
+          );
     signal.throwIfAborted();
     const metrics = buyerReplyMetrics(reply, policy, responseMs);
     return { text: reply.text, model: policy.model, summary, metrics };

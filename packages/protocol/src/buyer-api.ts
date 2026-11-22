@@ -1,5 +1,6 @@
 // Validates the public configuration of an authenticated local buyer, never keys or signed payloads.
 import { BUYER_API } from './buyer-api/constants';
+import type { TokenPricesV2 } from './control-types';
 
 export {
   parseBuyerSellerChoice,
@@ -16,6 +17,8 @@ export interface BuyerApiPolicy {
   model: string;
   maxTokens: number;
   maxAtomic: string;
+  paidAuto?: true;
+  autoPrices?: TokenPricesV2;
   depositAtomic?: string;
   lifetimeMs?: number;
   network: string;
@@ -28,6 +31,21 @@ export function buyerAtomic(value: unknown): value is string {
     value.length <= BUYER_API.MAX_ATOMIC_DIGITS &&
     /^(0|[1-9][0-9]*)$/.test(value)
   );
+}
+export function parseAutoPrices(value: unknown): TokenPricesV2 {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('inputAtomicPerMtok' in value) ||
+    !('outputAtomicPerMtok' in value) ||
+    !buyerAtomic(value.inputAtomicPerMtok) ||
+    !buyerAtomic(value.outputAtomicPerMtok)
+  )
+    throw new Error('Invalid Auto price limits');
+  return {
+    inputAtomicPerMtok: value.inputAtomicPerMtok,
+    outputAtomicPerMtok: value.outputAtomicPerMtok,
+  };
 }
 export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
   if (!input || typeof input !== 'object')
@@ -44,6 +62,7 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
     !Number.isSafeInteger(value.maxTokens) ||
     value.maxTokens <= 0 ||
     !buyerAtomic(value.maxAtomic) ||
+    (value.paidAuto !== undefined && value.paidAuto !== true) ||
     typeof value.network !== 'string' ||
     value.network.length > BUYER_API.MAX_MODEL_LENGTH ||
     typeof value.mint !== 'string' ||
@@ -58,11 +77,15 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
       : parseTerms(value);
   return {
     ...session,
+    ...(value.autoPrices !== undefined && {
+      autoPrices: parseAutoPrices(value.autoPrices),
+    }),
     version: BUYER_API.VERSION,
     policyId: value.policyId,
     model: value.model,
     maxTokens: value.maxTokens,
     maxAtomic: value.maxAtomic,
+    ...(value.paidAuto === true && { paidAuto: true }),
     network: value.network,
     mint: value.mint,
     payer: value.payer,

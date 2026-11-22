@@ -9,6 +9,7 @@ import {
   BUYER_SIDECAR,
   isBuyerSessionConfigFailure,
 } from '@gyblos/protocol/buyer-api';
+import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
 import { isReceiptUploadAppVersion } from '@gyblos/protocol/receipt-upload';
 
 import { BuyerSessionRequired } from './buyer-error';
@@ -174,16 +175,22 @@ export class ManagedBuyer {
       home: string,
       relayToken: string | undefined,
       maxAtomic?: string,
+      autoPrices?: TokenPricesV2 | null,
     ) => BuyerWorker,
     private readonly onExit: () => void,
     private readonly startMs: number = DESKTOP_X402.START_MS,
     private readonly stopMs: number = DESKTOP_X402.STOP_MS,
   ) {}
-  async start(home: string, relayToken?: string, maxAtomic?: string) {
+  async start(
+    home: string,
+    relayToken?: string,
+    maxAtomic?: string,
+    autoPrices?: TokenPricesV2 | null,
+  ) {
     if (this.closed || this.running)
       throw new Error('A buyer is already running');
     const operation = supervise(
-      this.fork(home, relayToken, maxAtomic),
+      this.fork(home, relayToken, maxAtomic, autoPrices),
       () => {
         this.running = null;
         this.onExit();

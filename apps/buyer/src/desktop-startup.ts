@@ -12,6 +12,7 @@ import {
   type BuyerInitOptions,
 } from '@gyblos/node/buyer-init';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
 import { controlAtomic } from '@gyblos/protocol/control-validation';
 import {
   acquireProcessLock,
@@ -19,6 +20,7 @@ import {
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
+import { withAutoPrices } from './auto-settings';
 import { BUYER_SELECTION } from './constants';
 import { parseBuyerSelectionConfig } from './selection-config';
 
@@ -43,6 +45,7 @@ async function configureDesktopPolicy(
   options: BuyerInitOptions,
   path: string,
   maximum: string,
+  autoPrices?: TokenPricesV2 | null,
 ) {
   const lock = await acquireProcessLock(
     rolePathIn(options.environment, P2P_ROLES.BUYER, ROLE_FILES.buyerInitLock),
@@ -66,12 +69,14 @@ async function configureDesktopPolicy(
       request: { ...raw.request, maxAtomic: maximum },
       session: desktopSession(raw),
     };
-    parseBuyerSelectionConfig(updated);
+    const next =
+      autoPrices === undefined ? updated : withAutoPrices(updated, autoPrices);
+    parseBuyerSelectionConfig(next);
     await lock.verify();
     options.signal?.throwIfAborted();
     await writePrivateFile(
       path,
-      JSON.stringify(updated, null, 2) + '\n',
+      JSON.stringify(next, null, 2) + '\n',
       BUYER_SELECTION.maxConfigBytes,
     );
   } finally {
@@ -81,6 +86,7 @@ async function configureDesktopPolicy(
 export async function prepareDesktopBuyer(
   options: BuyerInitOptions,
   maximum?: string,
+  autoPrices?: TokenPricesV2 | null,
 ): Promise<void> {
   options.signal?.throwIfAborted();
   if (maximum !== undefined && controlAtomic(maximum) === '0')
@@ -88,7 +94,7 @@ export async function prepareDesktopBuyer(
   const current = await checkBuyerInit(options.environment);
   if (!current.exists) await initializeBuyer(buyerInitDefaults(), options);
   if (maximum !== undefined)
-    await configureDesktopPolicy(options, current.path, maximum);
+    await configureDesktopPolicy(options, current.path, maximum, autoPrices);
 }
 
 // The caller owns transport creation. Ordinary starts preserve existing settings.
@@ -96,8 +102,9 @@ export async function startDesktopBuyer<Host>(
   options: BuyerInitOptions,
   start: (options: { port: number }) => Promise<Host>,
   maximum?: string,
+  autoPrices?: TokenPricesV2 | null,
 ): Promise<Host> {
-  await prepareDesktopBuyer(options, maximum);
+  await prepareDesktopBuyer(options, maximum, autoPrices);
   options.signal?.throwIfAborted();
   return start({ port: PORTS.desktopBuyer });
 }

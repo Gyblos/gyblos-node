@@ -70,3 +70,24 @@ void test('desktop repairs an undersized deposit after confirmation and keeps in
   await assert.rejects(prepareDesktopBuyer(options, '20000'));
   assert.equal(await readFile(f.path, 'utf8'), corrupted);
 });
+
+void test('Payments turns shared paid Auto on and off with exact prices and preserves the channel policy', async (t) => {
+  const f = await home();
+  t.after(() => rm(f.directory, { recursive: true, force: true }));
+  const options = {
+    environment: f.environment,
+    prepareRole: async () => role(),
+  };
+  await prepareDesktopBuyer(options);
+  const before = JSON.parse(await readFile(f.path, 'utf8'));
+  const rates = { inputAtomicPerMtok: '52000', outputAtomicPerMtok: '208000' };
+  await prepareDesktopBuyer(options, '10000', rates);
+  const enabled = JSON.parse(await readFile(f.path, 'utf8'));
+  assert.equal(enabled.discovery.paidAuto, true);
+  assert.deepEqual(enabled.request.priceCeilings, rates);
+  assert.deepEqual(enabled.session, before.session);
+  await prepareDesktopBuyer(options, '10000', null);
+  const disabled = JSON.parse(await readFile(f.path, 'utf8'));
+  assert.equal(disabled.discovery.paidAuto, undefined);
+  assert.deepEqual(disabled.request, enabled.request);
+});
