@@ -11,6 +11,10 @@ export const BATCH_SESSION_DEFAULTS = {
   // shown yet, and how often, before answering unavailable.
   openingConfirmMs: 30 * 1000,
   openingConfirmPollMs: 2 * 1000,
+  // How long a buyer waits for OPEN: the seller's opening window (observe, settle and verify the voucher,
+  // each within operationMs, plus openingConfirmMs) and a margin for the transport. Dropping the
+  // connection earlier loses the reply to an opening the seller still completes.
+  openMs: (3 * 20 + 30 + 10) * 1000,
   maxOpeningConfirmMs: 120 * 1000,
   maxPendingOperations: 32,
   maxSessions: 16,
