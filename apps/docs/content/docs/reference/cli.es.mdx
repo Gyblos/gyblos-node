@@ -132,10 +132,9 @@ la lee al arrancar, así que reinícialo después (mira
 ## seller verify github [#verificar-github]
 
 `seller verify github USER` muestra a los compradores qué cuenta de GitHub opera este vendedor. El
-vendedor ya debe estar registrado o publicando. Hace falta un gist público de `USER` que contenga la
-línea `gyblos-node=NODEID`; luego la clave del nodo firma una declaración con la cuenta y el gist, y el
+vendedor ya debe estar registrado o publicando. Hace falta un gist de `USER` con un archivo llamado `gyblos-proof.txt` que contenga la línea `gyblos-node=NODEID` (también sirve un gist no listado; su id se publica igual); luego la clave del nodo firma una declaración con la cuenta y el gist, y el
 índice revisa el gist por su cuenta. Si la CLI de GitHub (`gh`) tiene la sesión iniciada como `USER`, el
-comando crea el gist. Si no, imprime el texto para pegar en un gist público nuevo en gist.github.com y pide
+comando crea el gist. Si no, imprime el texto para poner en un archivo llamado `gyblos-proof.txt` en un gist nuevo en gist.github.com y pide
 la dirección del gist, o la toma de `--gist`. Rechaza un gist de otra cuenta.
 
 Guarda su avance en el directorio del vendedor y en cada ejecución revisa primero el índice y el gist, así

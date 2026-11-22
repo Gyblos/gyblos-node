@@ -454,23 +454,28 @@ pnpm gyblos seller verify github --cancel
 
 `seller verify github` shows buyers which GitHub account runs this seller. It
 needs a seller the index already knows (registered with `seller register`, or
-publishing). The binding has two public halves that anyone can re-check: a
-**public** gist owned by `<user>` that contains the line `gyblos-node=<NodeId>`,
-and a claim signed by the node key naming the account and the gist, which the
-discovery index checks ([discovery-index.md](discovery-index.md#github-claims)).
+publishing). The binding has two public halves that anyone can re-check: a gist
+owned by `<user>` with a file named `gyblos-proof.txt` that contains the line
+`gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its id,
+so the proof is public either way), and a claim signed by the node key naming
+the account and the gist, which the discovery index checks
+([discovery-index.md](discovery-index.md#github-claims)).
 
 1. The account is lowercased and checked (letters, digits and single hyphens, at
    most 39 characters).
 2. The gist: `--gist` if given; otherwise the one this home saved earlier, or
    the one the index already holds for this account. Failing that, if the GitHub
-   CLI (`gh`) is installed and signed in as `<user>`, it creates the public
-   gist; if not, the command prints the text to paste into a new public gist at
-   gist.github.com and asks for its URL on a terminal (or, without a terminal,
-   tells you to run it again with `--gist`). A gist URL naming another owner is
-   refused (`VERIFY_GIST_OWNER_MISMATCH`).
-3. It reads the gist's raw text at `<user>`'s own URL and stops with
-   `VERIFY_PROOF_MISSING` or `VERIFY_GIST_NOT_FOUND` when the proof line is not
-   there yet.
+   CLI (`gh`) is installed and signed in as `<user>`, it reuses the proof gist
+   an earlier, interrupted run made (found by its description, which names the
+   NodeId) or creates one; a failing `gh` ends with `VERIFY_GH_FAILED` and never
+   prints its error text. If `gh` is signed in as another account the command
+   says so. Otherwise it prints the text to put in a file named
+   `gyblos-proof.txt` in a new gist at gist.github.com and asks for its URL on a
+   terminal (or, without a terminal, tells you to run it again with `--gist`). A
+   gist URL naming another owner is refused (`VERIFY_GIST_OWNER_MISMATCH`).
+3. It reads that file's raw text at `<user>`'s own URL, by the same rule as the
+   index and stops with `VERIFY_PROOF_MISSING` or `VERIFY_GIST_NOT_FOUND` when
+   the proof line is not there yet.
 4. It signs the claim with the node key and sends it to the index, which checks
    the gist itself. `Verified` exits 0. Anything else exits 1 with the state and
    what to do: `GIST_NOT_FOUND`, `NODE_ID_MISSING`, or `GITHUB_UNAVAILABLE` (the
@@ -484,7 +489,10 @@ discovery index checks ([discovery-index.md](discovery-index.md#github-claims)).
 Progress (account, gist id and last step) is saved in
 `<GYBLOS_HOME>/seller/github-verification.json`, owner-only and written
 atomically. Each run first asks the index and reads the gist, so stopping it
-with Ctrl+C at any point is safe: the next run skips what is done. A finished
+with Ctrl+C at any point is safe: nothing is signed or sent after Ctrl+C (exit
+130), and the next run skips what is done. A saved gist that is no longer on
+GitHub is dropped, so a plain rerun makes a new one. Failures lead with a
+sentence saying what to do and end with the static code in brackets. A finished
 verification run again just says `Already verified`.
 
 `--status` prints the index's view: account, gist URL, state, reason and when it

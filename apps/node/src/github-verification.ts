@@ -148,14 +148,18 @@ export async function checkGist(
   account: string,
   gist: string,
   nodeId: string,
+  stop?: AbortSignal,
 ): Promise<GistCheck> {
   try {
     const response = await fetcher(
-      `${VERIFY_GITHUB.gistRawOrigin}/${account}/${gist}/raw`,
+      `${VERIFY_GITHUB.gistRawOrigin}/${account}/${gist}/raw/${IDENTITY_CLAIM.proofFile}`,
       {
         method: 'GET',
         redirect: 'manual',
-        signal: AbortSignal.timeout(VERIFY_GITHUB.gistTimeoutMs),
+        signal: AbortSignal.any([
+          AbortSignal.timeout(VERIFY_GITHUB.gistTimeoutMs),
+          ...(stop ? [stop] : []),
+        ]),
       },
     );
     if (response.status !== HTTP_STATUS.ok) {

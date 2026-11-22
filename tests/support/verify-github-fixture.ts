@@ -19,7 +19,7 @@ export const NOW = 1_800_000_000_000;
 export const gistUrl = (account = ACCOUNT, gist = GIST) =>
   `https://gist.github.com/${account}/${gist}`;
 export const rawUrl = (account = ACCOUNT, gist = GIST) =>
-  `https://gist.githubusercontent.com/${account}/${gist}/raw`;
+  `https://gist.githubusercontent.com/${account}/${gist}/raw/gyblos-proof.txt`;
 
 // A seller home whose role names a node key written beside it (32 seed bytes, owner-only).
 export function withKeyedHome(use: (home: Home) => Promise<void>) {
@@ -82,7 +82,11 @@ export async function verifyRun(
   home: Home,
   args: string[],
   state: World,
-  options: { prompt?: (question: string) => Promise<string> } = {},
+  options: {
+    prompt?: (question: string) => Promise<string>;
+    interrupt?: AbortSignal;
+    ghFails?: string;
+  } = {},
 ) {
   const requests: { url: string; init: RequestInit }[] = [];
   const created: string[] = [];
@@ -101,6 +105,7 @@ export async function verifyRun(
       stderr += text;
     },
     prompt: options.prompt,
+    interrupt: options.interrupt,
     verify: {
       now: () => (clock += 1000),
       sleep: async (ms) => {
@@ -110,6 +115,7 @@ export async function verifyRun(
         login: async () => state.ghLogin,
         find: async (description) => state.ghGists?.get(description),
         create: async (content, description) => {
+          if (options.ghFails) throw new Error(options.ghFails);
           created.push(content);
           descriptions.push(description);
           // The new gist is listed from now on, as on GitHub.

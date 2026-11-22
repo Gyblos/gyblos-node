@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
+import { IDENTITY_CLAIM } from '@gyblos/protocol/identity-claim';
 
 import { VERIFY_GITHUB } from './constants';
 
@@ -31,7 +32,9 @@ function gh(args: readonly string[]) {
         windowsHide: true,
         encoding: 'utf8',
       },
-      (error, stdout) => (error ? fail(error) : done(stdout)),
+      // gh's own message can carry paths and server text: callers get a static error only.
+      (error, stdout) =>
+        error ? fail(new Error('GitHub CLI command failed.')) : done(stdout),
     );
   });
 }
@@ -68,7 +71,8 @@ export const githubCli: GistTool = {
   async create(content, description) {
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-gist-'));
     try {
-      const file = join(directory, VERIFY_GITHUB.gistFile);
+      // The proof file name every verifier reads.
+      const file = join(directory, IDENTITY_CLAIM.proofFile);
       await writeFile(file, content, { mode: FILE_MODES.privateFile });
       const output = await gh([
         'gist',

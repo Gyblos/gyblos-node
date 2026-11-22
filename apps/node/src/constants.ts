@@ -229,7 +229,6 @@ export const LOG_ROLES = {
 export const VERIFY_GITHUB = {
   gistWebOrigin: 'https://gist.github.com',
   gistRawOrigin: 'https://gist.githubusercontent.com',
-  gistFile: 'gyblos-node.txt',
   // The gist's description, followed by the NodeId, so a gist made before an interruption is found again.
   gistDescription: 'Gyblos node verification',
   // Public gists of the signed-in account that `gh gist list` reads when looking for that gist.
@@ -272,5 +271,6 @@ export const VERIFY_ERRORS = {
   CONFIG_INVALID: 'VERIFY_CONFIG_INVALID',
   STATE_FAILED: 'VERIFY_STATE_FAILED',
   SIGNING_FAILED: 'VERIFY_SIGNING_FAILED',
+  GH_FAILED: 'VERIFY_GH_FAILED',
   NOT_VERIFIED: 'VERIFY_NOT_VERIFIED',
 } as const;

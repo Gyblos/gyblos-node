@@ -84,6 +84,7 @@ void test('verify github: without the CLI it prints the text, takes --gist or a 
     );
     assert.equal(stuck.created.length, 0);
     assert.ok(stuck.stdout.includes(githubProofLine(home.nodeId)));
+    assert.match(stuck.stdout, /one file named gyblos-proof\.txt/);
     assert.match(stuck.stderr, /--gist <gist URL>`\. \[VERIFY_NO_GIST\]$/m);
     assert.equal(stuck.posted.length, 0);
     const other = await verifyRun(

@@ -13,7 +13,10 @@ import {
   type GithubClaimAnswer,
   type GithubClaimView,
 } from '@gyblos/discovery-http';
-import { githubProofLine } from '@gyblos/protocol/identity-claim';
+import {
+  githubProofLine,
+  IDENTITY_CLAIM,
+} from '@gyblos/protocol/identity-claim';
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
@@ -51,6 +54,7 @@ import {
   REASON_TEXT,
   saveProgress,
   statusOf,
+  stopped,
   type Session,
   type VerifyOptions,
   type VerifySystem,
@@ -65,6 +69,7 @@ export interface VerifyContext {
   stderr: (text: string) => void;
   fetch?: DiscoveryFetch;
   prompt?: Prompt;
+  interrupt?: AbortSignal;
   verify?: VerifyOptions;
 }
 
@@ -117,22 +122,27 @@ async function gistByCli(session: Session, account: string) {
     );
   if (login !== account) return undefined;
   const description = gistDescription(session.nodeId);
-  const existing = await tool.find(description);
-  if (existing) {
+  try {
+    const existing = await tool.find(description);
+    if (existing) {
+      output.stdout(
+        `Using your existing proof gist ${gistWebUrl(account, existing)}\n`,
+      );
+      return { id: existing, source: GIST_SOURCES.CREATED };
+    }
     output.stdout(
-      `Using your existing proof gist ${gistWebUrl(account, existing)}\n`,
+      `Creating a public gist as ${account} with the GitHub CLI...\n`,
     );
-    return { id: existing, source: GIST_SOURCES.CREATED };
+    const url = await tool.create(proofText(session.nodeId), description);
+    return parseGist(output, account, url, GIST_SOURCES.CREATED);
+  } catch {
+    // gh's error text can carry local paths and server detail; only the code is shown.
+    return fail(
+      output,
+      VERIFY_ERRORS.GH_FAILED,
+      `The GitHub CLI could not create the gist. Create it yourself at ${VERIFY_GITHUB.gistWebOrigin}, then run \`gyblos seller verify github ${account} --gist <gist URL>\``,
+    );
   }
-  output.stdout(
-    `Creating a public gist as ${account} with the GitHub CLI...\n`,
-  );
-  return parseGist(
-    output,
-    account,
-    await tool.create(proofText(session.nodeId), description),
-    GIST_SOURCES.CREATED,
-  );
 }
 
 // The gist to use: --gist, the saved one, the index's for this account (unless the last run found it gone),
@@ -155,7 +165,7 @@ async function gistFor(
   const byCli = await gistByCli(session, account);
   if (byCli) return byCli;
   output.stdout(
-    `Create a PUBLIC gist at ${VERIFY_GITHUB.gistWebOrigin} while signed in as ${account}, with this text:\n\n${proofText(session.nodeId)}\n`,
+    `Create a gist at ${VERIFY_GITHUB.gistWebOrigin} while signed in as ${account}, with one file named ${IDENTITY_CLAIM.proofFile} holding this text:\n\n${proofText(session.nodeId)}\n`,
   );
   if (!session.system.prompt)
     return fail(
@@ -242,15 +252,24 @@ async function verify(
   } catch (error) {
     return indexFailure(session, error);
   }
+  const saved = await readProgress(environment, nodeId);
+  // A replacement gist saved for this account is still to be sent, even while the index shows the old
+  // one verified.
+  const replacement =
+    saved?.account === account &&
+    saved.step === VERIFY_STEPS.GIST &&
+    saved.gist !== null &&
+    saved.gist !== view?.gist;
   if (
     given === undefined &&
+    !replacement &&
     view?.account === account &&
     view.state === GITHUB_CLAIM_STATES.VERIFIED
   )
     return alreadyVerified(session, account, view.gist);
-  const saved = await readProgress(environment, nodeId);
   const gist = await gistFor(session, account, given, saved, view);
   if (typeof gist === 'number') return gist;
+  if (session.system.interrupt?.aborted) return stopped(session);
   if (
     !(await saveProgress(session, {
       account,
@@ -259,7 +278,14 @@ async function verify(
     }))
   )
     return EXIT.failure;
-  const found = await checkGist(session.system.fetch, account, gist.id, nodeId);
+  const found = await checkGist(
+    session.system.fetch,
+    account,
+    gist.id,
+    nodeId,
+    session.system.interrupt,
+  );
+  if (session.system.interrupt?.aborted) return stopped(session);
   const url = gistWebUrl(account, gist.id);
   // A gist made moments ago may not be served yet; the index checks it anyway.
   if (found === GIST_CHECKS.NOT_FOUND && gist.source !== GIST_SOURCES.CREATED)
@@ -322,6 +348,7 @@ export async function verifyCommand(
     ...context.verify,
     fetch: context.fetch ?? ((input, init) => fetch(input, init)),
     prompt: context.prompt,
+    interrupt: context.interrupt,
   };
   const parsed = parseVerify(args);
   const [provider, user, ...rest] = parsed?.positionals ?? [];

@@ -40,11 +40,25 @@ import type { SellerOutput } from './seller-home';
 export interface VerifyOptions {
   gist?: GistTool;
   now?: () => number;
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: (ms: number, stop?: AbortSignal) => Promise<void>;
 }
 export interface VerifySystem extends VerifyOptions {
   fetch: DiscoveryFetch;
   prompt?: Prompt;
+  // Ctrl+C on the terminal: stops waits and requests, and nothing is signed or sent after it.
+  interrupt?: AbortSignal;
+}
+
+// The operator pressed Ctrl+C.
+export class Interrupted extends Error {}
+export function stopIfInterrupted(session: Session) {
+  if (session.system.interrupt?.aborted) throw new Interrupted();
+}
+export function stopped(session: Session) {
+  session.output.stderr(
+    'Stopped. Nothing more was sent; run the same command again to continue.\n',
+  );
+  return EXIT.interrupted;
 }
 
 const AGAIN = 'Run the same command again';
@@ -112,6 +126,12 @@ export function fail(output: SellerOutput, code: string, message: string) {
 class SigningFailed extends Error {}
 
 export function indexFailure(session: Session, error: unknown) {
+  if (
+    error instanceof Interrupted ||
+    (error instanceof DiscoveryError &&
+      error.code === DISCOVERY_ERROR_CODES.CANCELLED)
+  )
+    return stopped(session);
   if (error instanceof SigningFailed)
     return fail(
       session.output,
@@ -194,6 +214,7 @@ export async function post(
   let resigned = false;
   let waited = false;
   for (;;) {
+    stopIfInterrupted(session);
     const signed = await signClaim(session, sign, account, gist, issuedAt);
     let answer: GithubClaimAnswer;
     try {
@@ -202,6 +223,7 @@ export async function post(
         signed,
         fetch: session.system.fetch,
         timeoutMs: VERIFY_GITHUB.indexTimeoutMs,
+        signal: session.system.interrupt,
       });
     } catch (error) {
       if (
@@ -226,12 +248,27 @@ export async function post(
     session.output.stdout(
       `The index checked this seller moments ago; waiting ${wait} s to ask again (Ctrl+C is safe).\n`,
     );
-    await (session.system.sleep ?? sleep)(wait * VERIFY_GITHUB.msPerSecond);
+    await (session.system.sleep ?? sleep)(
+      wait * VERIFY_GITHUB.msPerSecond,
+      session.system.interrupt,
+    );
     issuedAt = Math.max(session.now(), issuedAt + 1);
   }
 }
 
-const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+// Ends early when interrupted; the loop's check then stops before anything is signed.
+const sleep = (ms: number, stop?: AbortSignal) =>
+  new Promise<void>((done) => {
+    const timer = setTimeout(done, ms);
+    stop?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        done();
+      },
+      { once: true },
+    );
+  });
 
 export async function lookUp(session: Session) {
   return fetchGithubClaim({
@@ -239,6 +276,7 @@ export async function lookUp(session: Session) {
     nodeId: session.nodeId,
     fetch: session.system.fetch,
     timeoutMs: VERIFY_GITHUB.indexTimeoutMs,
+    signal: session.system.interrupt,
   });
 }
 
