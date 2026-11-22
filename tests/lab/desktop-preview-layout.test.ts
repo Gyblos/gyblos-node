@@ -35,6 +35,14 @@ void test('the sidebar splits into an icon rail and a conversation panel with pi
   assert.doesNotMatch(kit, /preview-agents-entry" aria-current/);
   const activity = await read('views/ActivitySessions.tsx.preview');
   assert.match(activity, /!previewConversationRemoved\(match\.chat\.id\)/);
+  for (const file of [
+    'views/SpendingHistory.tsx.preview',
+    'views/Activity.tsx.preview',
+    'views/ActivitySessionDetails.tsx.preview',
+  ]) {
+    assert.match(await read(file), /previewConversationRemoved\(/, file);
+  }
+  assert.match(kit, /'\[aria-label="Search conversations"\]'/);
 });
 
 void test('the title bar adds a conversation menu and a details panel for the chat', async () => {

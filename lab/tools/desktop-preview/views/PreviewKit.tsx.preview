@@ -960,7 +960,8 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
       </header>
       {searching && (
         <SearchField label="Search conversations" placeholder="Search conversations" value={search} onValueChange={setSearch} autoFocus
-          onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setSearching(false); setSearch(''); } }} />
+          onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setSearching(false); setSearch('');
+            requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[aria-label="Search conversations"]')?.focus()); } }} />
       )}
       <div className="preview-chat-groups">
         {groups.map((group) => (
