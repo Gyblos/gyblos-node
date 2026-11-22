@@ -69,7 +69,7 @@ for (const kind of KINDS) {
     await index.name(node);
     assert.equal((await index.read(node.nodeId)).status, 200);
     index.revoked.add(node.nodeId);
-    await expectError(await index.read(node.nodeId), 404, 'NOT_FOUND');
+    await expectError(await index.read(node.nodeId), 404, 'NO_PROFILE');
     assert.equal(
       (await index.network()).nodes.some(
         (listed: { nodeId: string }) => listed.nodeId === node.nodeId,
@@ -100,7 +100,7 @@ for (const kind of KINDS) {
       name: null,
     });
     assert.equal((await made.profiles.get(node.nodeId))?.held, true);
-    await expectError(await index.read(node.nodeId), 404, 'NOT_FOUND');
+    await expectError(await index.read(node.nodeId), 404, 'NO_PROFILE');
     assert.equal((await index.network()).nodes[0].name, null);
   });
 

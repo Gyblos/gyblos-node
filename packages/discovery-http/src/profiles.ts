@@ -10,6 +10,7 @@ import {
   DISCOVERY_LIMITS,
   DISCOVERY_PATHS,
   HTTP_STATUS,
+  INDEX_WIRE_ERRORS,
   REGISTRATION_FORMAT,
   STATUS_ERROR_MAP,
 } from './constants';
@@ -118,8 +119,17 @@ export async function fetchSellerProfile(
   };
   return withDeadline(request, async (response, aborted) => {
     if (response.status === CONFIG_HTTP_STATUS.notFound) {
-      response.body?.cancel().catch(() => {});
-      return null;
+      const missing = await readJson(
+        response,
+        DISCOVERY_LIMITS.maxClaimResponseBytes,
+        aborted,
+      ).catch(() => undefined);
+      if (
+        isPlainObject(missing, ['error']) &&
+        missing.error === INDEX_WIRE_ERRORS.NO_PROFILE
+      )
+        return null;
+      failStatus(response, DISCOVERY_ERROR_CODES.HTTP_STATUS);
     }
     if (response.status !== HTTP_STATUS.OK)
       failStatus(

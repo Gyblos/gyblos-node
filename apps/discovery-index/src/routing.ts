@@ -65,6 +65,7 @@ export interface Read {
   body: () => Promise<string | null>;
   // The cache key; by default the request URL.
   key?: string;
+  missing?: IndexErrorCode;
 }
 export function cachedRead(
   settings: IndexSettings,
@@ -78,13 +79,17 @@ export function cachedRead(
       if (error instanceof IndexError) return rejection(context, error.code);
       throw error;
     }
-    const { body, key = context.req.url } = parsed;
+    const {
+      body,
+      key = context.req.url,
+      missing = INDEX_ERRORS.NOT_FOUND,
+    } = parsed;
     const cached = await cachedPage(settings.cache, key);
     if (cached) return cached;
     if (!(await readAllowed(context)))
       return rejection(context, INDEX_ERRORS.RATE_LIMITED);
     const text = await body();
-    if (text === null) return rejection(context, INDEX_ERRORS.NOT_FOUND);
+    if (text === null) return rejection(context, missing);
     const response = context.body(text, INDEX_STATUS.OK, {
       [INDEX_HEADERS.CONTENT_TYPE]: INDEX_HEADER_VALUES.JSON,
       [INDEX_HEADERS.CACHE_CONTROL]: INDEX_HEADER_VALUES.SELLERS_CACHE,

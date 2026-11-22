@@ -54,6 +54,7 @@ export const INDEX_WIRE_ERRORS = {
   INVALID_CLAIM: 'INVALID_CLAIM',
   UNKNOWN_NODE: 'UNKNOWN_NODE',
   PROFILE_HELD: 'PROFILE_HELD',
+  NO_PROFILE: 'NO_PROFILE',
 } as const;
 
 export const INDEX_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> = new Map(

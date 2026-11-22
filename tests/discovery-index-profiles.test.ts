@@ -78,7 +78,7 @@ for (const kind of KINDS) {
       await index.profiles.get(node.nodeId),
       sellerProfileTombstone(node.nodeId, index.clock.now),
     );
-    await expectError(await index.read(node.nodeId), 404, 'NOT_FOUND');
+    await expectError(await index.read(node.nodeId), 404, 'NO_PROFILE');
     await expectError(await index.post(first), 409, 'STALE_CLAIM');
     assert.equal((await index.network()).nodes[0].name, null);
     index.clock.now += 1;
@@ -191,7 +191,12 @@ for (const kind of KINDS) {
     const index = await profileHarness(kind);
     if (!index) return context.skip('node:sqlite unavailable');
     const nodeId = 'ab'.repeat(32);
-    await expectError(await index.read(nodeId), 404, 'NOT_FOUND');
+    await expectError(await index.read(nodeId), 404, 'NO_PROFILE');
+    await expectError(
+      await index.call(`/v1/profiles/${nodeId}`),
+      404,
+      'NOT_FOUND',
+    );
     for (const path of ['AB'.repeat(32), 'ab'.repeat(31), `${nodeId}?x=1`]) {
       const response = await index.read(path);
       assert.equal(response.headers.get('Access-Control-Allow-Origin'), '*');

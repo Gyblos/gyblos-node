@@ -57,7 +57,7 @@ interface NameSession {
 }
 
 const USAGE =
-  'Usage: gyblos seller name "<name>"\n       gyblos seller name --clear\n       gyblos seller name --status\n';
+  'Usage: gyblos seller name "<name>"\n       gyblos seller name -- "-<name>"   (for a name that starts with -)\n       gyblos seller name --clear\n       gyblos seller name --status\n';
 class SigningFailed extends Error {}
 
 function indexFailure(session: NameSession, error: unknown) {

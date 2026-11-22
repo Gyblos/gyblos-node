@@ -1,4 +1,7 @@
-import { DISCOVERY_ERROR_CODES } from '@gyblos/discovery-http';
+import {
+  DISCOVERY_ERROR_CODES,
+  type DiscoveryErrorCode,
+} from '@gyblos/discovery-http';
 import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import {
   PROFILE_CLAIM,
@@ -28,7 +31,10 @@ export const ISSUE_TEXT: Readonly<Record<SellerNameIssue, string>> = {
   [SELLER_NAME_ISSUES.RESERVED]: `A seller name may not contain ${RESERVED.slice(0, -1).join(', ')} or ${RESERVED.at(-1)}, even with other letter cases, digits for letters, spaces or punctuation`,
 };
 
-const INDEX_HINTS: ReadonlyMap<string, string> = new Map([
+const INDEX_HINTS: ReadonlyMap<DiscoveryErrorCode, string> = new Map<
+  DiscoveryErrorCode,
+  string
+>([
   [
     DISCOVERY_ERROR_CODES.UNKNOWN_NODE,
     `The index does not know this seller yet. Register it with \`gyblos seller register\`, or start it with publishing on, then ${AGAIN}`,
@@ -78,7 +84,7 @@ function clockNote(gapSeconds: number | null) {
   return ` (this computer's clock is ${Math.abs(gapSeconds)} s ${gapSeconds > 0 ? 'ahead of' : 'behind'} the index)`;
 }
 
-export function indexHint(code: string, gapSeconds: number | null) {
+export function indexHint(code: DiscoveryErrorCode, gapSeconds: number | null) {
   const ahead =
     gapSeconds !== null &&
     gapSeconds * MS_PER_SECOND > CONTROL_LIMITS.clockSkewMs;

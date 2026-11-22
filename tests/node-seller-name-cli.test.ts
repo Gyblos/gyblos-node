@@ -112,7 +112,7 @@ void test('seller name --status reads the index view, or says there is none', as
     assert.match(shown.stdout, /not verified/i);
     assert.equal(shown.posted.length, 0);
     const none = await nameRun(home, ['--status'], () =>
-      json(404, { error: 'NOT_FOUND' }),
+      json(404, { error: 'NO_PROFILE' }),
     );
     assert.equal(none.code, 0, none.stderr);
     assert.match(none.stdout, /No public name/);
@@ -168,6 +168,7 @@ void test('seller name refuses bad usage', async () => {
       const run = await nameRun(home, args, () => assert.fail('fetched'));
       assert.equal(run.code, 1, args.join(' '));
       assert.match(run.stderr, /Usage: gyblos seller name/);
+      assert.match(run.stderr, /gyblos seller name -- "-<name>"/);
     }
   });
 });
@@ -183,6 +184,7 @@ void test('seller name is listed in the CLI help', async () => {
   });
   assert.equal(code, 0);
   assert.match(stdout, /gyblos seller name "<name>" \| --clear \| --status/);
+  assert.match(stdout, /-- before a name that starts with -/);
 });
 
 const dated = (status: number, body: unknown, offsetMs: number) =>
@@ -284,5 +286,16 @@ void test('seller name prints the verify tip as a container command inside Docke
       run.stdout,
       /docker compose exec seller gyblos seller verify github/,
     );
+  });
+});
+
+void test('seller name --status says when the index does not take seller names yet', async () => {
+  await withKeyedHome(async (home) => {
+    const run = await nameRun(home, ['--status'], () =>
+      json(404, { error: 'NOT_FOUND' }),
+    );
+    assert.equal(run.code, 1);
+    assert.match(run.stderr, /does not take seller names yet/);
+    assert.match(run.stderr, /\[DISCOVERY_HTTP_STATUS\]\n$/);
   });
 });

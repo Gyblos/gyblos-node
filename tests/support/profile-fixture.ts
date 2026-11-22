@@ -135,6 +135,7 @@ export async function profileHarness(
   return {
     db,
     clock,
+    call,
     revoked,
     profiles,
     registrations,

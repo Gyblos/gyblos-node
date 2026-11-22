@@ -7,12 +7,20 @@ import {
   fetchSellerProfile,
   submitSellerProfile,
 } from '@gyblos/discovery-http';
-import type { SignedProfileClaim } from '@gyblos/protocol/profile-claim';
+import {
+  PROFILE_CLAIM,
+  type SignedProfileClaim,
+} from '@gyblos/protocol/profile-claim';
 
 const BASE = 'https://discovery.gyblos.com/v1';
 const NODE = 'ab'.repeat(32);
 const SIGNED: SignedProfileClaim = {
-  claim: { schemaVersion: 1, nodeId: NODE, name: 'Ada Lovelace', issuedAt: 1 },
+  claim: {
+    schemaVersion: PROFILE_CLAIM.schemaVersion,
+    nodeId: NODE,
+    name: 'Ada Lovelace',
+    issuedAt: 1,
+  },
   signature: '00'.repeat(64),
 };
 const reply = (status: number, body: unknown) => async () =>
@@ -165,10 +173,21 @@ void test('a profile is read back, a 404 is none and a bad NodeId is refused bef
     await fetchSellerProfile({
       baseUrl: BASE,
       nodeId: NODE,
-      fetch: reply(404, { error: 'NOT_FOUND' }),
+      fetch: reply(404, { error: 'NO_PROFILE' }),
     }),
     null,
   );
+  for (const body of [{ error: 'NOT_FOUND' }, 'not json'])
+    assert.equal(
+      await code(
+        fetchSellerProfile({
+          baseUrl: BASE,
+          nodeId: NODE,
+          fetch: reply(404, body),
+        }),
+      ),
+      DISCOVERY_ERROR_CODES.HTTP_STATUS,
+    );
   assert.equal(
     await code(
       fetchSellerProfile({

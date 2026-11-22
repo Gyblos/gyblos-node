@@ -548,16 +548,17 @@ It then signs the name with the node key and sends it to `discovery.url`
 take up to 10 seconds to show it. Setting a name needs a seller the index
 already knows, as for GitHub verification (`DISCOVERY_UNKNOWN_NODE` otherwise).
 `--clear` signs an empty name, so the index stops showing one. `--status` prints
-the name the index holds and when it was set, or that there is none. Index
-refusals end with the static code in brackets. `DISCOVERY_STALE_CLAIM` means
-this computer's clock may be behind or a newer name was already sent;
-`DISCOVERY_CLAIM_REJECTED` mentions the clock only when it is more than 5
-seconds ahead of the index. When the index's answer has a `Date` header, clock
-messages add the gap in seconds. `DISCOVERY_PROFILE_HELD` means an index
-operator removed the name; `DISCOVERY_HTTP_STATUS` on an index without the route
-says it does not take seller names yet. Nothing is stored locally. The command
-prints public identifiers only (NodeId, the name and the index origin), never a
-key or the home location. With Docker, run it as
+the name the index holds and when it was set, or that there is none (on an index
+without seller names it ends with `DISCOVERY_HTTP_STATUS`). Index refusals end
+with the static code in brackets. `DISCOVERY_STALE_CLAIM` means this computer's
+clock may be behind or a newer name was already sent; `DISCOVERY_CLAIM_REJECTED`
+mentions the clock only when it is more than 5 seconds ahead of the index. When
+the index's answer has a `Date` header, clock messages add the gap in seconds.
+`DISCOVERY_PROFILE_HELD` means an index operator removed the name;
+`DISCOVERY_HTTP_STATUS` on an index without the route says it does not take
+seller names yet. Nothing is stored locally. The command prints public
+identifiers only (NodeId, the name and the index origin), never a key or the
+home location. With Docker, run it as
 `docker compose exec seller gyblos seller name "<name>"`.
 
 ### Docker
