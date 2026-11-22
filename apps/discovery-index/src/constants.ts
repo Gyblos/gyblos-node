@@ -282,28 +282,39 @@ export type GithubClaimState =
   (typeof GITHUB_CLAIM_STATES)[keyof typeof GITHUB_CLAIM_STATES];
 // Static outcome codes of a gist check. Only the first two are ever stored; an outage keeps the state.
 export const GITHUB_CLAIM_REASONS = {
-  // The raw URL answered 404 or 410: no such gist, or the account does not own it.
+  // Any status but 200, 429 or 5xx, redirects included (a renamed account redirects): no such gist,
+  // or the account does not own it.
   GIST_NOT_FOUND: 'GIST_NOT_FOUND',
   // The gist exists but its first GITHUB_CLAIM.maxGistBytes hold no proof line for the NodeId.
   NODE_ID_MISSING: 'NODE_ID_MISSING',
-  // Timeout, network error or any other status, redirects included: inconclusive.
+  // 429, 5xx, a timeout or a network error: inconclusive.
   GITHUB_UNAVAILABLE: 'GITHUB_UNAVAILABLE',
+  // POST answer only: the NodeId's gist was fetched less than GITHUB_CLAIM.minFetchIntervalMs ago, so
+  // the claim was stored unchecked; the scheduled run or a later POST checks it.
+  CHECK_DEFERRED: 'CHECK_DEFERRED',
 } as const;
 export type GithubClaimReason =
   (typeof GITHUB_CLAIM_REASONS)[keyof typeof GITHUB_CLAIM_REASONS];
+// The reasons a stored claim can carry.
+export type StoredGithubClaimReason =
+  | typeof GITHUB_CLAIM_REASONS.GIST_NOT_FOUND
+  | typeof GITHUB_CLAIM_REASONS.NODE_ID_MISSING;
 export const GITHUB_CLAIM = {
   // A signed claim is a few hundred bytes.
   maxBodyBytes: 1024,
-  // How old a claim may be when it arrives. Cancelling deletes the row, so this bounds a replay of
-  // an older signed claim after a cancel.
+  // How old a claim may be when it arrives. A cancel keeps the NodeId's newest issuedAt, so an older
+  // signed claim is never replayed; this also bounds a claim's delivery delay.
   maxAgeMs: 60_000,
   gistOrigin: 'https://gist.githubusercontent.com',
   fetchTimeoutMs: 3000,
   maxGistBytes: 16_384,
+  // At most one gist fetch per NodeId per interval from POSTs, reserved atomically in storage.
+  minFetchIntervalMs: 60_000,
   // The scheduled run rechecks claims last checked this long ago, at most `recheckBatch` per run.
   recheckAfterMs: 6 * 60 * 60 * 1000,
   recheckBatch: 25,
-  // Statuses of the raw gist URL that conclude a check.
+  // Statuses of the raw gist URL: 200 is read; 429 and 5xx are inconclusive; any other is not found.
   found: 200,
-  missing: [404, 410],
+  rateLimited: 429,
+  serverError: 500,
 } as const;

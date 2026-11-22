@@ -1,6 +1,7 @@
 // Owns the gist check behind a seller GitHub claim. The raw URL gist.githubusercontent.com/<account>/
 // <gist>/raw answers 200 only when <account> owns the gist, so ownership needs no GitHub API or token.
-// No redirect is followed, the wait and the bytes read are bounded, and nothing is logged or echoed.
+// The account name is matched case-insensitively; claims carry it lowercase. No redirect is followed (a
+// redirect is not found), the wait and the bytes read are bounded, and nothing is logged or echoed.
 import { githubProofLine } from '@gyblos/protocol/identity-claim';
 
 import {
@@ -10,8 +11,14 @@ import {
 } from './constants';
 
 export type GistFetch = (url: string, init: RequestInit) => Promise<Response>;
+// Null when the proof was found.
+export type GistOutcome = Exclude<
+  GithubClaimReason,
+  typeof GITHUB_CLAIM_REASONS.CHECK_DEFERRED
+> | null;
 
-const missing: ReadonlySet<number> = new Set(GITHUB_CLAIM.missing);
+const inconclusive = (status: number) =>
+  status === GITHUB_CLAIM.rateLimited || status >= GITHUB_CLAIM.serverError;
 
 // At most `maxBytes` of the body. When it was cut, the last (possibly partial) line is dropped, so a
 // cut can only hide a proof line, never make one.
@@ -48,7 +55,7 @@ async function readPrefix(response: Response, maxBytes: number) {
 export async function checkGist(
   fetcher: GistFetch,
   claim: { nodeId: string; account: string; gist: string },
-): Promise<GithubClaimReason | null> {
+): Promise<GistOutcome> {
   const url = `${GITHUB_CLAIM.gistOrigin}/${claim.account}/${claim.gist}/raw`;
   try {
     const response = await fetcher(url, {
@@ -58,9 +65,9 @@ export async function checkGist(
     });
     if (response.status !== GITHUB_CLAIM.found) {
       await response.body?.cancel().catch(() => undefined);
-      return missing.has(response.status)
-        ? GITHUB_CLAIM_REASONS.GIST_NOT_FOUND
-        : GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE;
+      return inconclusive(response.status)
+        ? GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE
+        : GITHUB_CLAIM_REASONS.GIST_NOT_FOUND;
     }
     const proof = githubProofLine(claim.nodeId);
     const text = await readPrefix(response, GITHUB_CLAIM.maxGistBytes);

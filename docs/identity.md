@@ -44,8 +44,9 @@ the claim. The signing domain is `gyblos/identity-claim/v1\n`.
 
 Anyone can re-check the binding: verify the signature with the NodeId, then
 fetch `https://gist.githubusercontent.com/<account>/<gist>/raw`, which answers
-only when the account owns the gist, and look for the proof line. The discovery
-index does this for sellers it knows and publishes the result
+only when the account owns the gist (the account name is matched
+case-insensitively), and look for the proof line. The discovery index does this
+for sellers it knows and publishes the result
 ([discovery-index.md](discovery-index.md#github-claims)).
 
 A GitHub claim is a public label, not buyer trust: it is not the 8004 binding

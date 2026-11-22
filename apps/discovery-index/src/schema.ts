@@ -1,6 +1,6 @@
 // Owns discovery's typed tables, keys, indexes and checks. Historical D1 migrations retain
 // physical WITHOUT ROWID layout; these declarations perform no client initialization or I/O.
-import { between, eq, gte, inArray } from 'drizzle-orm';
+import { between, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   check,
   index,
@@ -208,8 +208,8 @@ export const githubClaims = sqliteTable(
   'discovery_github_claims',
   {
     nodeId: text('node_id').primaryKey(),
-    account: text('account').notNull(),
-    gist: text('gist').notNull(),
+    account: text('account'),
+    gist: text('gist'),
     issuedAt: integer('issued_at').notNull(),
     state: text('state', {
       enum: [
@@ -217,10 +217,11 @@ export const githubClaims = sqliteTable(
         GITHUB_CLAIM_STATES.VERIFIED,
         GITHUB_CLAIM_STATES.LOST,
       ],
-    }).notNull(),
+    }),
     reason: text('reason'),
     checkedAt: integer('checked_at'),
     verifiedAt: integer('verified_at'),
+    lastFetchAt: integer('last_fetch_at'),
   },
   (table) => [
     index('discovery_github_claims_by_check').on(table.checkedAt),
@@ -230,7 +231,10 @@ export const githubClaims = sqliteTable(
     ),
     check(
       'discovery_github_claims_state',
-      inArray(table.state, Object.values(GITHUB_CLAIM_STATES)),
+      sql`${or(
+        isNull(table.state),
+        inArray(table.state, Object.values(GITHUB_CLAIM_STATES)),
+      )}`,
     ),
   ],
 );

@@ -6,7 +6,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { GITHUB_CLAIM } from '@gyblos/discovery-index/constants';
-import type { GithubClaimRow } from '@gyblos/discovery-index/github-claim-store';
+import {
+  githubClaimTombstone,
+  type GithubClaimRow,
+} from '@gyblos/discovery-index/github-claim-store';
 import { recheckGithubClaims } from '@gyblos/discovery-index/github-claims';
 import { checkGist } from '@gyblos/discovery-index/github-gist';
 import { scheduledRecheck } from '@gyblos/discovery-index/worker';
@@ -44,10 +47,10 @@ function row(index: number, patch: Partial<GithubClaimRow> = {}) {
   } satisfies GithubClaimRow;
 }
 
-void test('only 404 and 410 say the gist is missing; any other status or a network error is inconclusive', async () => {
-  assert.equal(await outcome({ status: 404 }), 'GIST_NOT_FOUND');
-  assert.equal(await outcome({ status: 410 }), 'GIST_NOT_FOUND');
-  for (const status of [301, 302, 403, 429, 500, 503])
+void test('only 429, 5xx and network errors are inconclusive; any other status, redirects included, is not found', async () => {
+  for (const status of [301, 302, 307, 400, 403, 404, 410])
+    assert.equal(await outcome({ status }), 'GIST_NOT_FOUND', `${status}`);
+  for (const status of [429, 500, 502, 503])
     assert.equal(await outcome({ status }), 'GITHUB_UNAVAILABLE', `${status}`);
   assert.equal(await outcome('throw'), 'GITHUB_UNAVAILABLE');
 });
@@ -157,10 +160,64 @@ for (const kind of CLAIM_KINDS) {
       verifiedAt: T0,
     });
     assert.deepEqual({ ...(await claims.get(stored.nodeId)) }, newer);
-    await claims.remove(stored.nodeId, newer.issuedAt);
-    assert.ok(await claims.get(stored.nodeId));
-    await claims.remove(stored.nodeId, newer.issuedAt + 1);
-    assert.equal(await claims.get(stored.nodeId), null);
+    // A cancel keeps a tombstone: no older claim replaces it, it is never due and never recorded.
+    const tombstone = githubClaimTombstone(stored.nodeId, newer.issuedAt + 1);
+    assert.equal(
+      await claims.put(githubClaimTombstone(stored.nodeId, newer.issuedAt)),
+      false,
+    );
+    assert.equal(await claims.put(tombstone), true);
+    assert.equal(await claims.put(newer), false);
+    await claims.record(stored.nodeId, tombstone.issuedAt, {
+      state: 'verified',
+      reason: null,
+      checkedAt: now,
+      verifiedAt: now,
+    });
+    assert.deepEqual({ ...(await claims.get(stored.nodeId)) }, tombstone);
+    assert.deepEqual(await claims.due(now * 2, 10), []);
+    assert.deepEqual(await claims.verified(10), []);
+  });
+
+  void test(`recheck (${kind}): a fetch is reserved at most once per NodeId per interval, across claims`, async (context) => {
+    const made = await claimStoreOf(kind);
+    if (!made) return context.skip('node:sqlite unavailable');
+    const { claims } = made;
+    const interval = GITHUB_CLAIM.minFetchIntervalMs;
+    const first = row(1);
+    await claims.put(first);
+    assert.equal(
+      await claims.reserveFetch(first.nodeId, T0 + 1, T0, interval),
+      false,
+    );
+    assert.equal(
+      await claims.reserveFetch(first.nodeId, T0, T0, interval),
+      true,
+    );
+    const next = row(1, { issuedAt: T0 + 1, gist: 'ab'.repeat(10) });
+    await claims.put(next);
+    assert.equal(
+      await claims.reserveFetch(
+        next.nodeId,
+        next.issuedAt,
+        T0 + interval - 1,
+        interval,
+      ),
+      false,
+    );
+    assert.equal(
+      await claims.reserveFetch(
+        next.nodeId,
+        next.issuedAt,
+        T0 + interval,
+        interval,
+      ),
+      true,
+    );
+    assert.equal(
+      await claims.reserveFetch(row(2).nodeId, T0, T0, interval),
+      false,
+    );
   });
 }
 

@@ -1,7 +1,8 @@
 // Owns seller GitHub claims at the index: POST /v1/identity/github admits a node-signed claim from a
 // seller the index knows, stores it and checks its gist; the scheduled run rechecks old checks; GET
 // /v1/identity/github/<nodeId> reads one. The claim is never part of a public record. States move only
-// on conclusive checks: an outage keeps the state and moves checked_at alone.
+// on conclusive checks: an outage keeps the state and moves checked_at alone. A cancel keeps a
+// tombstone, and POSTs fetch a NodeId's gist at most once per GITHUB_CLAIM.minFetchIntervalMs.
 import { CONTROL_CODES, CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import { verifyIdentityClaim } from '@gyblos/protocol/identity-claim';
 
@@ -16,12 +17,13 @@ import {
   type GithubClaimState,
 } from './constants';
 import { indexFail, protocolStep } from './errors';
-import type {
-  GithubCheck,
-  GithubClaimRow,
-  GithubClaimStore,
+import {
+  githubClaimTombstone,
+  type GithubCheck,
+  type GithubClaimRow,
+  type GithubClaimStore,
 } from './github-claim-store';
-import { checkGist, type GistFetch } from './github-gist';
+import { checkGist, type GistFetch, type GistOutcome } from './github-gist';
 import type { RegistrationStore } from './registration-store';
 import type { DiscoveryStorage } from './storage';
 
@@ -42,7 +44,7 @@ export interface GithubClaimResult {
 // The stored state after a check whose outcome is `reason` (null: proof found).
 export function nextCheck(
   row: GithubCheck,
-  reason: GithubClaimReason | null,
+  reason: GistOutcome,
   now: number,
 ): GithubCheck {
   if (reason === null)
@@ -111,12 +113,15 @@ export async function submitGithubClaim(
   if (stored && stored.issuedAt >= claim.issuedAt)
     indexFail(INDEX_ERRORS.STALE_CLAIM);
   if (claim.account === null || claim.gist === null) {
-    await claims.remove(claim.nodeId, claim.issuedAt);
+    if (!(await claims.put(githubClaimTombstone(claim.nodeId, claim.issuedAt))))
+      indexFail(INDEX_ERRORS.STALE_CLAIM);
     return { state: null, reason: null };
   }
   // The same account and gist keep their state (idempotent); a new binding starts over.
   const same =
-    stored?.account === claim.account && stored.gist === claim.gist
+    stored?.state != null &&
+    stored.account === claim.account &&
+    stored.gist === claim.gist
       ? stored
       : null;
   const row: GithubClaimRow = {
@@ -130,6 +135,14 @@ export async function submitGithubClaim(
     verifiedAt: same?.verifiedAt ?? null,
   };
   if (!(await claims.put(row))) indexFail(INDEX_ERRORS.STALE_CLAIM);
+  const reserved = await claims.reserveFetch(
+    row.nodeId,
+    row.issuedAt,
+    now,
+    GITHUB_CLAIM.minFetchIntervalMs,
+  );
+  if (!reserved)
+    return { state: row.state, reason: GITHUB_CLAIM_REASONS.CHECK_DEFERRED };
   return check(claims, context.fetch, row, now);
 }
 
@@ -158,13 +171,13 @@ export function parseGithubClaimPath(url: string, nodeId: string | undefined) {
   return nodeId;
 }
 
-// The public view of one claim, or null (404) when the NodeId has none.
+// The public view of one claim, or null (404) when the NodeId has none or cancelled it.
 export async function githubClaimPage(
   claims: GithubClaimStore,
   nodeId: string,
 ): Promise<string | null> {
   const row = await claims.get(nodeId);
-  if (!row) return null;
+  if (!row || row.state === null) return null;
   const { account, gist, state, reason, checkedAt, verifiedAt } = row;
   return JSON.stringify({
     nodeId,

@@ -4,20 +4,16 @@
 // published without a registration (allowlist or open mode) is listed while seen within the last 30
 // days. A revoked NodeId is listed only while it is online, exactly as /v1/sellers lists it. Takes no
 // parameters; cached like a sellers page. Built only from records the index verified and from its own
-// registrations; no IP, contact, owner or country is returned. Each node also carries `github`: the
-// account and state of its GitHub claim, or null; only `verified` means the gist proof was found.
+// registrations; no IP, contact, owner or country is returned. Each node also carries `github`: its
+// verified GitHub account, or null; unproven claims are read only through GET /v1/identity/github.
 import {
   INDEX_ERRORS,
   NETWORK,
   NETWORK_STATES,
-  type GithubClaimState,
   type NetworkState,
 } from './constants';
 import { indexFail } from './errors';
-import type {
-  GithubClaimStore,
-  GithubClaimSummary,
-} from './github-claim-store';
+import type { GithubClaimStore } from './github-claim-store';
 import type { RegistrationStore } from './registration-store';
 import type { CatalogStatusRow, DiscoveryStorage } from './storage';
 import { reportedHour, type Sighting } from './uptime';
@@ -28,7 +24,7 @@ interface NetworkNode {
   firstSeenAt: number | null;
   lastSeenAt: number | null;
   models: string[];
-  github: { account: string; state: GithubClaimState } | null;
+  github: { account: string } | null;
 }
 
 const RANK: Record<NetworkState, number> = {
@@ -46,7 +42,7 @@ function nodeOf(
   nodeId: string,
   sighting: Sighting | undefined,
   catalog: CatalogStatusRow | undefined,
-  github: GithubClaimSummary | undefined,
+  account: string | undefined,
 ): NetworkNode {
   const state = catalog?.online
     ? NETWORK_STATES.ONLINE
@@ -59,7 +55,7 @@ function nodeOf(
     firstSeenAt: sighting?.firstAt ?? null,
     lastSeenAt: sighting?.lastAt ?? null,
     models: catalog?.online ? catalog.models : [],
-    github: github ? { account: github.account, state: github.state } : null,
+    github: account === undefined ? null : { account },
   };
 }
 
@@ -81,9 +77,9 @@ async function knownNodes(
     registrations?.registered(NETWORK.maxNodes) ?? { active: [], revoked: [] },
     storage.sightings(reportedHour(now), NETWORK.maxNodes),
     storage.catalogStatus(now, NETWORK.maxNodes, NETWORK.maxModelRows),
-    claims?.list(NETWORK.maxNodes) ?? [],
+    claims?.verified(NETWORK.maxNodes) ?? [],
   ]);
-  const claimed = new Map(github.map((row) => [row.nodeId, row]));
+  const claimed = new Map(github.map((row) => [row.nodeId, row.account]));
   const revoked = new Set(registered.revoked);
   const seen = new Map(sightings.map((row) => [row.nodeId, row]));
   const stored = new Map(catalogs.rows.map((row) => [row.nodeId, row]));
