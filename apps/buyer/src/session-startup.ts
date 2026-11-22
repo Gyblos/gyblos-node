@@ -1,12 +1,10 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { batchSessionPathsIn } from '@gyblos/config/home';
 import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
-import { finalizedUnchargedRequest } from '@gyblos/payments-upto/batch-session';
 import { withBatchOutputLimit } from '@gyblos/protocol/batch-channel';
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -106,16 +104,6 @@ async function executePaidSession(
   };
   await recordApiKeyPayment(permission, payment);
   return { ...result.value, payment };
-}
-function freeExecutionGuard(
-  manager: ReturnType<typeof makeManager>,
-  sending?: () => void,
-) {
-  return () => {
-    if ('checkBeforeExternalExecution' in manager)
-      manager.checkBeforeExternalExecution();
-    sending?.();
-  };
 }
 async function preferChannel(
   selectionRoute: SelectionRoute | undefined,
@@ -220,7 +208,11 @@ function freeSessionExecution(
         winner,
         current,
         onDelta,
-        freeExecutionGuard(manager, sending),
+        () => {
+          if ('checkBeforeExternalExecution' in manager)
+            manager.checkBeforeExternalExecution();
+          sending?.();
+        },
       ),
     );
 }
@@ -355,28 +347,17 @@ export async function startSessionQuoteRuntime(
     if (router?.activeRequests()) return sessionFail(SESSION_CODES.BUSY);
     return run();
   };
+  const buyer = role.buyer;
   const execute = sessionExecutor(
     context,
     options,
     manager,
     state,
-    role.buyer,
+    buyer,
     router,
   );
   return {
-    confirmUnchargedKey: router
-      ? undefined
-      : async (ref, scope) => {
-          await inspect(() =>
-            manager.reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
-          );
-          return finalizedUnchargedRequest(
-            batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
-            ref,
-            scope,
-            context.endpoint.id().toString(),
-          );
-        },
+    confirmUnchargedKey: manager.confirmUnchargedKey,
     sellerChoice: true,
     reconcilePool: router
       ? () => checkDesktopPool(manager, () => router.activeRequests() > 0)

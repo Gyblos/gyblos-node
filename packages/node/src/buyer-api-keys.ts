@@ -42,6 +42,7 @@ export type ConfirmUnchargedKey = (
   scope: BuyerKeyScope,
 ) => Promise<boolean>;
 export class BuyerApiKeys {
+  private proof?: Promise<void>;
   private failed = false;
   private closed = false;
   private queue: Promise<unknown> = Promise.resolve();
@@ -217,7 +218,14 @@ export class BuyerApiKeys {
     });
     this.active.delete(id);
   }
-  async reconcileAbandoned() {
+  reconcileAbandoned() {
+    if (!this.proof)
+      this.proof = this.recoverUncharged().finally(() => {
+        this.proof = undefined;
+      });
+    return this.proof;
+  }
+  private async recoverUncharged() {
     const prove = this.confirmUncharged;
     const [orphan] = this.state.pending;
     if (

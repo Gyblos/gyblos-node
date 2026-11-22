@@ -5,7 +5,7 @@ import { SESSION_STATES } from '@gyblos/protocol/payment-session';
 import { blockCharge } from './batch-block-state';
 import { batchSessionObserver } from './batch-session-observer';
 import { readBatchRecord } from './batch-session-state';
-import type { BatchPaths } from './batch-session-types';
+import type { BatchPaths, BatchRecord } from './batch-session-types';
 import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export async function finalizedRequestCharge(
@@ -77,16 +77,19 @@ export async function finalizedRequestCharge(
   return { chargeAtomic: String(charge), transaction: confirmed.transaction };
 }
 
-export async function finalizedUnchargedRequest(
-  paths: BatchPaths,
-  ref: { requestId: string; maxAtomic: string; sellerNodeId: string },
+interface KeyReservation {
+  requestId: string;
+  maxAtomic: string;
+  sellerNodeId: string;
+}
+function uncharged(
+  record: BatchRecord | undefined,
+  ref: KeyReservation,
   scope: BuyerKeyScope,
   buyerNodeId: string,
 ) {
-  const record = await readBatchRecord(paths);
   if (
-    !record?.settlement ||
-    record.state !== SESSION_STATES.CLOSED ||
+    !record?.channelId ||
     record.terms.buyer !== scope.payer ||
     record.terms.network !== scope.network ||
     record.terms.mint !== scope.mint ||
@@ -94,8 +97,7 @@ export async function finalizedUnchargedRequest(
     record.terms.sellerNodeId !== ref.sellerNodeId ||
     record.history?.some((entry) =>
       Object.hasOwn(entry.requests, ref.requestId),
-    ) ||
-    record.settlement.chargedAtomic !== record.cumulativeAtomic
+    )
   )
     return false;
   const target = record.requests[ref.requestId];
@@ -120,5 +122,30 @@ export async function finalizedUnchargedRequest(
     if (!item.accepted || !item.bill) return false;
     total += BigInt(item.bill.chargedAtomic);
   }
-  return total === BigInt(record.settlement.chargedAtomic);
+  return total === BigInt(record.cumulativeAtomic);
+}
+export async function finalizedUnchargedRequest(
+  paths: BatchPaths,
+  ref: KeyReservation,
+  scope: BuyerKeyScope,
+  buyerNodeId: string,
+  observe: () => Promise<unknown>,
+) {
+  let record = await readBatchRecord(paths);
+  if (!record || !uncharged(record, ref, scope, buyerNodeId)) return false;
+  if (!record.settlement) {
+    const channel = record.channelId;
+    await observe();
+    record = await readBatchRecord(paths);
+    if (
+      record?.channelId !== channel ||
+      !uncharged(record, ref, scope, buyerNodeId)
+    )
+      return false;
+  }
+  return (
+    record?.state === SESSION_STATES.CLOSED &&
+    !!record.settlement?.transaction &&
+    record.settlement.chargedAtomic === record.cumulativeAtomic
+  );
 }

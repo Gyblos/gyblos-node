@@ -6,7 +6,12 @@ import test from 'node:test';
 import { BUYER_SELECTION, PAID_BUYER } from '@gyblos/buyer/constants';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { batchSessionPathsIn, rolePathIn } from '@gyblos/config';
-import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
+import { buyerApiKeyPathsIn } from '@gyblos/config/home';
+import type { BuyerApiKeyQuote } from '@gyblos/node/buyer-api-keys';
+import {
+  finalizedUnchargedRequest,
+  inspectBatchSession,
+} from '@gyblos/payments-upto/batch-session';
 import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
@@ -53,8 +58,9 @@ async function buyerClient(
   assert.equal(created.status, 200, await created.clone().text());
   const key = parseBuyerApiKeysReply(await created.json()).created;
   assert.ok(key);
-  const ask = (maxTokens?: number) =>
+  const ask = (maxTokens?: number, signal?: AbortSignal) =>
     request(host.buyer().url, {
+      signal,
       method: 'POST',
       headers: {
         authorization: 'Bearer ' + key.secret,
@@ -174,6 +180,40 @@ void test(
     );
     assert.ok(existing?.snapshot.channelId);
     const channelId = existing.snapshot.channelId;
+    const ledger: { pending: BuyerApiKeyQuote[] } = JSON.parse(
+      await readFile(buyerApiKeyPathsIn(process.env).state, 'utf8'),
+    );
+    const [binding] = ledger.pending;
+    assert.ok(binding);
+    let observations = 0;
+    const identity = {
+      payer: existing.terms.buyer,
+      mint: existing.terms.mint,
+      network: existing.terms.network,
+    };
+    const confirm = (candidate: BuyerApiKeyQuote) =>
+      finalizedUnchargedRequest(
+        batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+        candidate,
+        identity,
+        existing.terms.buyerNodeId,
+        async () => {
+          observations++;
+        },
+      );
+    assert.equal(
+      await confirm({ ...binding, sellerNodeId: '0'.repeat(64) }),
+      false,
+    );
+    assert.equal(
+      await confirm({ ...binding, requestId: '0'.repeat(32) }),
+      false,
+    );
+    assert.equal(await confirm({ ...binding, maxAtomic: '1' }), false);
+    assert.equal(observations, 0);
+    assert.equal(await confirm(binding), false);
+    assert.equal(observations, 1);
+
     host.finance.settled.set(channelId, {
       channelId,
       chargedAtomic: paid.approvedAtomic,
@@ -185,5 +225,50 @@ void test(
     assert.equal(after.blocked, false);
     assert.equal(after.keys[0]?.reservedAtomic, '0');
     assert.equal(after.keys[0]?.spentAtomic, paid.approvedAtomic);
+  },
+);
+
+void test(
+  'an overflowing or cancelled single-channel waiter never runs or holds delegated funds',
+  {
+    skip: NATIVE_CAPABILITY.transportSkip,
+  },
+  async (t) => {
+    const request = globalThis.fetch;
+    const started = Promise.withResolvers<void>();
+    const host = await sessionProductHost(undefined, undefined, {
+      meter: paidAcceptanceMeter,
+      observe: () => started.resolve(),
+    });
+    t.after(host.close);
+    const { ask, owner } = await buyerClient(host, request);
+    host.engine.hold();
+    const active = ask(64);
+    try {
+      await started.promise;
+      const cancel = new AbortController();
+      const competing = [ask(64, cancel.signal), ask(64, cancel.signal)];
+      const done = Promise.allSettled(competing);
+      const overflow = await Promise.race(competing);
+      assert.equal(overflow.status, 429);
+      cancel.abort();
+      const results = await done;
+      assert.equal(
+        results.filter((answer) => answer.status === 'rejected').length,
+        1,
+      );
+    } finally {
+      host.engine.release();
+    }
+    const served = await active;
+    assert.equal(served.status, 200, await served.clone().text());
+    const snapshot = parseBuyerApiKeysReply(
+      await (
+        await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
+      ).json(),
+    ).snapshot;
+    assert.equal(snapshot.keys[0]?.reservedAtomic, '0');
+    assert.equal(host.engine.attempts(), 1);
+    assert.equal(host.finance.approvals(), 1);
   },
 );

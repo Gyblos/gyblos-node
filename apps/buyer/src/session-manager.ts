@@ -2,6 +2,7 @@
 import type { AsyncLocalStorage } from 'node:async_hooks';
 
 import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import type { ConfirmUnchargedKey } from '@gyblos/node/buyer-api-keys';
 import {
   createBuyerSessionManager,
   type BuyerSessionOptions,
@@ -14,6 +15,7 @@ import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   batchSessionTerminal,
+  finalizedUnchargedRequest,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
@@ -24,6 +26,7 @@ import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
+import { PAID_BUYER_HTTP_MS } from './constants';
 import {
   permitsWinner,
   relayAllowed,
@@ -235,12 +238,23 @@ export function makeManager(
             ),
         })
       : createBuyerSessionManager(common);
+  const confirmUnchargedKey: ConfirmUnchargedKey = async (ref, scope) => {
+    return finalizedUnchargedRequest(
+      batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+      ref,
+      scope,
+      context.endpoint.id().toString(),
+      () => manager.reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
+    );
+  };
   const loadMeter = sessionMeter(prepared.config.request.maxAtomic, options);
   const check = createSessionPreflight(loadMeter, policy, () =>
     context.endpoint.id().toString(),
   );
   return {
     ...manager,
+    confirmUnchargedKey:
+      policy.totalDepositAtomic === undefined ? confirmUnchargedKey : undefined,
     previousSeller: () =>
       previousSeller(policy.totalDepositAtomic, common.inspect),
     preparePaidChat: async () => {
