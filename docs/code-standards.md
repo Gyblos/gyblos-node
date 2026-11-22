@@ -115,6 +115,23 @@ file paths). Fixed operational values live in the owning module or its
 `constants.ts`; config is not a place for unrelated constants. Dependency
 versions come from manifests and the lockfile.
 
+## D1 migrations
+
+The Cloudflare Workers with D1 (`apps/discovery-index`,
+`apps/metrics-collector`) declare their tables once in Drizzle
+(`src/schema*.ts`). Migrations are generated with drizzle-kit from that schema:
+`pnpm index:db:generate --name <change>` or
+`pnpm collector:db:generate --name <change>`. Never write migration SQL by hand,
+never edit or rename a migration that has been applied, and apply migrations to
+the remote databases only with founder approval. The hand-written `0001`–`0007`
+files of each app predate drizzle-kit and stay byte-for-byte unchanged.
+
+Commit the generated `.sql` file together with `migrations/meta/` (journal and
+snapshot). `pnpm lint` runs `drizzle-kit check`, and
+`tests/drizzle-migrations.test.ts` fails when `schema.ts` changed without a
+generated migration. Schema checks inline their values (`.inlineParams()`),
+since a bound parameter would be written to the migration as `?`.
+
 ## Errors and external boundaries
 
 - New package errors use typed codes from their owning catalog. Plain `Error`

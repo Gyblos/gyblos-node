@@ -23,6 +23,7 @@ Dependency direction is protocol → core → inference/adapters → node → ap
 - `lab/`: validation outside product (`harness`, `tools`; `evidence` is historical). "Gate" is a lab word only: no product code, route, variable, message or product script uses it.
 - Product never imports `lab/`, `tests/` or `tooling/`. Import other workspaces by name through explicit `exports`; relative imports stay inside one package.
 - Dependency patches are a last resort: each lives in `patches/` (pnpm `patchedDependencies`), changes nothing unless explicitly used, is justified next to its entry in `pnpm-workspace.yaml` with its upstream status, and is removed when the dependency supports the change.
+- D1 migrations (`apps/discovery-index`, `apps/metrics-collector`) are generated with drizzle-kit from `schema.ts` (`pnpm index:db:generate` / `pnpm collector:db:generate`); never write migration SQL by hand, never edit an applied migration, and apply remotely only with founder approval ([docs/code-standards.md](docs/code-standards.md#d1-migrations)).
 - No import-time initialization: handlers, timers and state start in lifecycle/entry functions (`tests/entrypoint-inertness.test.ts`).
 
 ## Commands
@@ -33,7 +34,7 @@ Node 24.22.1+ and the pnpm version pinned in `package.json`.
 pnpm install --frozen-lockfile
 pnpm check          # typecheck + lint + test:all; run before every PR
 pnpm typecheck      # includes tests and the desktop renderer
-pnpm lint           # eslint + prettier --check + tooling:test + skills:check + boundaries
+pnpm lint           # eslint + prettier --check + tooling:test + skills:check + boundaries + db:check
 pnpm test           # product suites tests/*.test.ts and packages/*/test (required checks)
 pnpm test:lab       # lab suites tests/lab/
 pnpm tooling:test   # boundary checker and lint rule tests
