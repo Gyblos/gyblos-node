@@ -249,7 +249,9 @@ export function makeManager(
     prepareChoice: (expiresAt: number, signal: AbortSignal) =>
       prepareChosenMeter(expiresAt, loadMeter, signal),
     async preflight(...args: Parameters<typeof check>) {
-      state.meter = await check(...args);
+      // A declared quote loads no meter; keep the one a recounted quote loaded.
+      const meter = await check(...args);
+      if (meter) state.meter = meter;
     },
   };
 }

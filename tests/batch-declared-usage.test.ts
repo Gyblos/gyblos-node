@@ -98,6 +98,25 @@ void test('a provider count above the byte bound is billed only up to it, and ap
   );
 });
 
+void test('a provider count above maxTokens still delivers the answer, billed within the bounds', async (t) => {
+  // The request allows 100 output tokens; the provider reports 110 for a two-byte answer.
+  const f = await blockProduct({
+    offer: declaredSeller(110, 'ok'),
+    declared: true,
+  });
+  t.after(f.close);
+  const value = await f.buyer.execute(
+    await f.offers.quote(1, DECLARED),
+    input(f.offers),
+  );
+  assert.equal(value.text, 'ok');
+  const ceiling = 'ok'.length + FREE_METERING.declaredTemplateTokens;
+  assert.equal(
+    f.f.buyer.snapshot().cumulativeAtomic,
+    String(chargeV2({ input: 7, output: ceiling }, PRICES)),
+  );
+});
+
 void test('a recounted offer still requires the buyer recount', async (t) => {
   const f = await blockProduct();
   t.after(f.close);
