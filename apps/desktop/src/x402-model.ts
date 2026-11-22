@@ -51,6 +51,15 @@ export function emptyX402(): X402Summary {
     records: [],
   };
 }
+export function chatBudgetReady(
+  active: boolean,
+  selectedOffer: boolean,
+  freeOnly: boolean,
+  automatic: boolean,
+  maximum: string,
+) {
+  return active || selectedOffer || freeOnly || (automatic && maximum !== '0');
+}
 export function paidSellerLimitNotice(
   policy: BuyerApiPolicy | null,
   budget: X402Summary,
@@ -93,6 +102,16 @@ export function x402Policy(input: unknown) {
   const policy = parseBuyerApiPolicy(input);
   if (policy.network !== DEVNET)
     throw new Error('Only Solana devnet is supported');
+  return policy;
+}
+export function spendingPolicy(input: unknown) {
+  const {
+    autoRoutes: _routes,
+    autoPrices: _prices,
+    paidAuto: _auto,
+    totalDepositAtomic: _poolLimit,
+    ...policy
+  } = x402Policy(input);
   return policy;
 }
 export function x402Explorer(transaction: string) {
@@ -145,7 +164,7 @@ function parseRecord(input: unknown): X402Record {
     chargeAtomic: record.chargeAtomic,
     transaction: record.transaction,
     free: record.free,
-    policy: x402Policy(record.policy),
+    policy: spendingPolicy(record.policy),
   };
 }
 export function parseX402Summary(input: unknown): X402Summary {
@@ -162,7 +181,7 @@ export function parseX402Summary(input: unknown): X402Summary {
     value.records.length > DESKTOP_X402.MAX_RECORDS
   )
     throw new Error('Invalid session');
-  const policy = value.policy === null ? null : x402Policy(value.policy);
+  const policy = value.policy === null ? null : spendingPolicy(value.policy);
   const records: X402Record[] = value.records.map(parseRecord);
   if (
     BigInt(value.spentAtomic) > BigInt(value.limitAtomic) ||
@@ -242,6 +261,7 @@ export function x402BudgetInput(
   return String(atomic);
 }
 export interface X402Result {
+  canCheckChannels?: true;
   summary: X402Summary;
   policy: BuyerApiPolicy | null;
   reply?: { text: string; model: string; metrics?: ResponseMetrics };
@@ -267,6 +287,7 @@ export function parseX402Result(input: unknown): X402Result {
   if (!input || typeof input !== 'object') throw new Error('Buyer unavailable');
   const value = input as Record<string, unknown>;
   const result: X402Result = {
+    ...(value.canCheckChannels === true && { canCheckChannels: true }),
     summary: parseX402Summary(value.summary),
     policy: value.policy === null ? null : x402Policy(value.policy),
   };

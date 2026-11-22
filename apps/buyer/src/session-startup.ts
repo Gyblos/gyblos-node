@@ -35,6 +35,7 @@ import {
 import { classifyPaidError } from './session-errors';
 import { makeManager, type SessionState } from './session-manager';
 import {
+  checkDesktopPool,
   checkPaidSellerRequest,
   endpointToken,
   type BuyerStartupOptions,
@@ -321,6 +322,9 @@ export async function startSessionQuoteRuntime(
   };
   return {
     sellerChoice: true,
+    reconcilePool: router
+      ? () => checkDesktopPool(manager, () => router.activeRequests() > 0)
+      : undefined,
     preparePaidChat:
       options.preparePaidTokenizer && prepared.config.request.maxAtomic !== '0'
         ? manager.preparePaidChat

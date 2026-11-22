@@ -19,6 +19,7 @@ import {
 } from './batch-pool-store';
 import type {
   BatchBuyerPool,
+  BatchPoolEntry,
   BatchPoolOptions,
   PoolRow,
 } from './batch-pool-types';
@@ -62,6 +63,42 @@ export async function inspectBatchPool(
       return { ...row, stored };
     }),
   );
+}
+export function poolFundingPending(row: BatchPoolEntry) {
+  return (
+    !row.stored ||
+    row.uncertain ||
+    row.requestId !== null ||
+    row.stored.pending ||
+    (row.stored.recoverable &&
+      row.stored.snapshot.state !== SESSION_STATES.CLOSED)
+  );
+}
+export async function poolAllowsSellerDeposit(
+  paths: BatchPoolOptions['paths'],
+  sellerNodeId: string,
+  total: string,
+  deposit: string,
+) {
+  const entries = await inspectBatchPool(paths);
+  if (entries.some(poolFundingPending)) return false;
+  const unfunded = new Set(
+    entries
+      .filter((row) => row.stored?.notCreated)
+      .map((row) => row.terms.sellerNodeId),
+  );
+  const funds = budget(entries, total, unfunded);
+  if (BigInt(funds.committedAtomic) > BigInt(total)) return false;
+  const existing = entries.find(
+    (row) => row.terms.sellerNodeId === sellerNodeId,
+  );
+  if (
+    existing &&
+    !existing.stored?.notCreated &&
+    !existing.stored?.openingReturned
+  )
+    return existing.stored?.empty === true;
+  return BigInt(funds.availableAtomic) >= BigInt(deposit);
 }
 interface PoolContext {
   options: BatchPoolOptions;

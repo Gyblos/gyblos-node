@@ -62,6 +62,7 @@ export type BuyerExecutionFactory = (context: {
   ): Promise<ChatResult>;
   sellerChoice?: boolean;
   preparePaidChat?: () => Promise<void>;
+  reconcilePool?: () => Promise<void>;
   token?: string;
   apiKeys?: BuyerApiKeys;
   requestMs?: number;
@@ -191,23 +192,21 @@ async function closeBuyerResources(
 
 function buyerHttp(
   run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'],
-  {
-    request,
-    models,
-    session,
-  }: Awaited<ReturnType<typeof buyerSelection>>['config'],
+  config: Awaited<ReturnType<typeof buyerSelection>>['config'],
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
   diagnostics?: DiagnosticSink,
   contextTokens?: FreeBuyerDependencies['contextTokens'],
 ) {
+  const { request, models, session, discovery } = config;
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
       (input, signal, _onDelta, model, permission) =>
         run(input, signal, undefined, model, permission),
       {
         sellerChoice: execution?.sellerChoice,
+        paidAuto: discovery?.paidAuto,
         selection: request.selection,
         maxTokens: request.maxTokens,
         ...(models ? { models } : {}),
@@ -220,10 +219,17 @@ function buyerHttp(
         stream: run,
         apiKeys: execution?.apiKeys,
         diagnostics,
-        ...configuredBuyerAccess(request, role, execution?.token, session),
+        ...configuredBuyerAccess(
+          request,
+          role,
+          execution?.token,
+          session,
+          config,
+        ),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
         preparePaidChat: execution?.preparePaidChat,
+        reconcilePool: execution?.reconcilePool,
       },
     ),
   );

@@ -11,6 +11,7 @@ import {
 } from '@gyblos/config/network';
 import { fundingHandlers } from '@gyblos/desktop/funding-handlers';
 import {
+  autoFundingAvailable,
   depositShortfall,
   FUNDING,
   sellerResponseLimit,
@@ -271,6 +272,93 @@ void test('an empty wallet can select B against the refund from a single channel
   await rig.seller().close();
   await rig.buyer.reconcile(rig.sellerOptions.observe);
   assert.deepEqual(await read(), { replacementAtomic: '19960' });
+});
+
+void test('a pooled buyer keeps its full deposit for B before migrating its legacy channel with A', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t);
+  assert.equal(
+    await switchingCredit(
+      environment,
+      {
+        ...policy,
+        totalDepositAtomic: '20000',
+        depositAtomic: rig.terms.depositAtomic,
+      },
+      { ...seller, nodeId: '56'.repeat(32) },
+    ),
+    null,
+  );
+});
+
+void test('another seller needs a full deposit of shared authority even when the wallet is funded', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t, '10000');
+  const credit = await switchingCredit(
+    environment,
+    {
+      ...policy,
+      totalDepositAtomic: '15000',
+      depositAtomic: rig.terms.depositAtomic,
+    },
+    { ...seller, nodeId: '56'.repeat(32) },
+  );
+  assert.deepEqual(credit, { poolLimited: true });
+  assert.equal(
+    autoFundingAvailable(
+      { ...policy, depositAtomic: rig.terms.depositAtomic },
+      [
+        {
+          network: DEVNET,
+          payer: policy.payer,
+          balanceAtomic: '10000',
+          channelRemainingAtomic: null,
+          faucetAvailable: true,
+          ...credit,
+        },
+      ],
+    ),
+    FUNDING.channelLimit,
+  );
+});
+
+void test('an unreadable pool cannot approve a seller from the wallet balance alone', async (t) => {
+  const { policy, seller } = await fundedChannel(t);
+  const service = fundingHandlers({
+    accepts: () => true,
+    policy: () => ({
+      ...policy,
+      payer,
+      network: DEVNET,
+      mint: DEVNET_USDC,
+      totalDepositAtomic: '20000',
+    }),
+    rpcUrl: async () => 'https://example.invalid',
+    balance: async () => '20000',
+    resolveOffer: () => seller,
+    remaining: async () => null,
+    switching: async () => {
+      throw new Error('unreadable');
+    },
+    copy: () => {},
+    open: async () => {},
+  });
+  assert.equal(
+    await service.balance({ sender: {}, senderFrame: {} }, ['56'.repeat(32)]),
+    null,
+  );
+});
+void test('a settled and spent channel of the same pooled seller cannot authorize a new deposit', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t, '10000');
+  rig.time(rig.terms.expiresAt);
+  await rig.seller().close();
+  await rig.buyer.reconcile(rig.sellerOptions.observe);
+  assert.deepEqual(
+    await switchingCredit(
+      environment,
+      { ...policy, depositAtomic: '10000', totalDepositAtomic: '10000' },
+      seller,
+    ),
+    { poolLimited: true },
+  );
 });
 
 void test('a subminimum replacement is exposed as a reduced ceiling, never as available escrow', async (t) => {

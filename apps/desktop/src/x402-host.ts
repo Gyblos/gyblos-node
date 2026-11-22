@@ -45,10 +45,15 @@ function managedBuyer(
     app.isPackaged ? app.getVersion() : undefined,
   );
   const service = new ManagedBuyer(
-    (_home, _token, maxAtomic) =>
+    (_home, _token, maxAtomic, autoPrices) =>
       utilityProcess.fork(
         join(directory, DESKTOP_X402.SERVICE_FILE),
-        maxAtomic === undefined ? [] : [maxAtomic],
+        maxAtomic === undefined
+          ? []
+          : [
+              maxAtomic,
+              ...(autoPrices === undefined ? [] : [JSON.stringify(autoPrices)]),
+            ],
         {
           cwd: profile,
           stdio: 'ignore',
@@ -59,7 +64,8 @@ function managedBuyer(
   );
   const managed = automaticBuyer(
     {
-      start: (maxAtomic) => service.start(profile, undefined, maxAtomic),
+      start: (maxAtomic, autoPrices) =>
+        service.start(profile, undefined, maxAtomic, autoPrices),
       stop: () => service.stop(),
       close: () => service.close(),
     },
