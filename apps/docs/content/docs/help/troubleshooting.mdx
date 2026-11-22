@@ -111,7 +111,6 @@ refuses a file that validates, run doctor. Defaults and ranges are in the
 | `FEE_PAYER_UNFUNDED`                                                                                      | Below 0.01 devnet SOL. A zero balance fails the check if token accounts are missing. See [Get paid](/en/sellers/get-paid)                                       |
 | `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE`, `PAYMENT_ACCOUNTS_MISSING`, `PAYMENT_ACCOUNTS_UNCHECKED`           | Send devnet SOL to the `fee payer` address that `gyblos doctor` prints, then retry; startup creates the token accounts. `UNCHECKED` means the RPC didn't answer |
 | `PAYMENT_ACCOUNTS_UNUSABLE`                                                                               | A payout or fee token account is frozen or isn't a token account. Don't start a priced offer; ask in the [Gyblos Telegram](https://t.me/gyblos)                 |
-| `SELLER_PAID_METERING_UNRECOUNTED`                                                                        | Only `qwen3:0.6b` can be priced. Make other models free                                                                                                         |
 
 ## The engine or relay is unavailable [#engine-or-relay-unavailable]
 

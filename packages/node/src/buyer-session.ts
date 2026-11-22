@@ -4,6 +4,7 @@ import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { recountSessionInput } from '@gyblos/core/session-input';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
 import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
+import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
@@ -152,6 +153,7 @@ async function openCurrent<Remote extends BatchDestination>(
       host: createBuyerBatchSession({
         ...options,
         preparation,
+        declared: quote?.offer.meteringMode === CONTROL_METERING_MODES.DECLARED,
         terms,
         buyer: financial,
         destination,

@@ -50,6 +50,7 @@
     "./node-config-limits": "./src/node-config-limits.ts",
     "./free-execution": "./src/free-execution.ts",
     "./free-meter": "./src/free-meter.ts",
+    "./declared-usage": "./src/declared-usage.ts",
     "./free-router": "./src/free-router.ts",
     "./paypal-inference": "./src/paypal-inference.ts",
     "./paypal-session": "./src/paypal-session.ts",

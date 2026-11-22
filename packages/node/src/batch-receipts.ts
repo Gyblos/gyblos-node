@@ -99,7 +99,7 @@ export function publishSessionReceipt(
     record: {
       ...evidence.context,
       engineKind: options.engineKind,
-      metering: CONTROL_METERING_MODES.RECOUNTED,
+      metering: request.quote.offer.meteringMode,
       usage: { ...result.usage, reasoningTokens: null },
       sizes: receiptTextSizes(
         conversationText(request.input.messages),

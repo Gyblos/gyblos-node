@@ -51,7 +51,8 @@ export function matchPaidReceipt(
   if (
     record.pricing.kind !== OFFER_PRICING_KINDS.PAID ||
     record.outcome !== RECEIPT_OUTCOMES.COMPLETED ||
-    record.metering !== CONTROL_METERING_MODES.RECOUNTED ||
+    (record.metering !== CONTROL_METERING_MODES.RECOUNTED &&
+      record.metering !== CONTROL_METERING_MODES.DECLARED) ||
     canonicalJson(record.pricing) !== canonicalJson(payment.pricing) ||
     record.amountAtomic !== payment.amountAtomic ||
     record.feeAtomic !== payment.feeAtomic

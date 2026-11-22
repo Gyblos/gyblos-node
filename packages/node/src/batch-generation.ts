@@ -51,8 +51,7 @@ export function batchLiveOffer(
     live.offer.kind !== OFFER_PRICING_KINDS.PAID ||
     canonicalJson(live.model) !== canonicalJson(offer.model) ||
     canonicalJson(live.capabilities) !== canonicalJson(offer.capabilities) ||
-    live.meter.mode !== CONTROL_METERING_MODES.RECOUNTED ||
-    offer.meteringMode !== CONTROL_METERING_MODES.RECOUNTED ||
+    live.meter.mode !== offer.meteringMode ||
     offer.reasoning !== REASONING_LEVELS.OFF ||
     !live.offer.reasoning.includes(offer.reasoning)
   )

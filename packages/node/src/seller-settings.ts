@@ -24,10 +24,7 @@ import { readStartupConfig } from './node-config-file';
 import { sellerLimits, type SellerLimits } from './node-config-limits';
 import { pricePerMtokToAtomicPerMtok } from './node-config-price';
 import { resolveNodeConfig } from './node-config-resolve';
-import {
-  recountsWithPinnedTokenizer,
-  type SellerCatalogOffer,
-} from './seller-offer';
+import { type SellerCatalogOffer } from './seller-offer';
 
 export interface SellerSettings {
   diagnostics?: NodeConfig['diagnostics'];
@@ -105,9 +102,8 @@ function offerSettings(
   if (pricing.kind === OFFER_PRICING_KINDS.PAID) {
     if (!environment.paidSelling)
       return refuse(NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE);
-    // Paid charges are what the buyer can recount; a provider's declared usage is not.
-    if (!recountsWithPinnedTokenizer(offer.model))
-      return refuse(NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED);
+    // Any servable model can be sold: the engine recounts it with a pinned tokenizer or declares its
+    // provider's usage, which the buyer bounds by bytes.
     return {
       offer: {
         modelId: offer.model.id,

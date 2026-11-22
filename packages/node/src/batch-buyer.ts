@@ -51,6 +51,7 @@ function createContext<Remote extends BatchDestination>(
   if (options.endpoint.id().toString() !== terms.buyerNodeId)
     return batchFail(PAID_EXECUTION_CODES.PEER);
   const blockMode =
+    !options.declared &&
     isBlockBuyer(options.buyer) &&
     (options.buyer.usesBlocks() ||
       (!options.buyer.snapshot().channelId &&

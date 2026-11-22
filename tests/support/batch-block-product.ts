@@ -57,6 +57,10 @@ export async function blockProduct(
     // false runs the same paid session without blocks (no stable-prefix meter, no block transport).
     blocks?: boolean;
     route?: RouteProbe;
+    // Adjusts the seller's live offer after the block engine is set, e.g. to declare usage.
+    offer?: (offers: Awaited<ReturnType<typeof batchOfferFixture>>) => void;
+    // The buyer learned from the quote that the seller declares usage, as buyer-session tells it.
+    declared?: boolean;
   } = {},
 ) {
   const f = await sessionRig({
@@ -66,6 +70,7 @@ export async function blockProduct(
   });
   const offers = await batchOfferFixture(f.terms, f.owner, f.now);
   configureBlockEngine(offers);
+  options.offer?.(offers);
   const service = createSellerBatchSession({
     telemetry: options.telemetry,
     receipts: options.receipts,
@@ -76,7 +81,13 @@ export async function blockProduct(
     blockTargetTokens: 2,
   });
   const blocks = options.blocks ?? true;
-  const wire = await batchLoopback(service, f.terms, blocks, options.route);
+  // A real Iroh server takes blocks from the protocol the buyer asks for; this loopback fixes it up front.
+  const wire = await batchLoopback(
+    service,
+    f.terms,
+    blocks && !options.declared,
+    options.route,
+  );
   const buyer = createBuyerBatchSession({
     ...wire,
     terms: f.terms,
@@ -89,6 +100,7 @@ export async function blockProduct(
     verify: async () => {},
     observe: f.sellerOptions.observe,
     receipt: options.receipt,
+    declared: options.declared,
   });
   return {
     f,

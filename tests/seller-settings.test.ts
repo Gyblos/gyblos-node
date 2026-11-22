@@ -157,7 +157,7 @@ void test('paid offers fail closed with the offer position unless paid selling i
     );
 });
 
-void test('with paid selling wired, a recounted paid offer lists the seller price', () => {
+void test('with paid selling wired, recounted and declared paid offers list the seller price', () => {
   const settings = sellerSettings(
     served({ pricing: POC_PRICE }),
     {},
@@ -166,26 +166,26 @@ void test('with paid selling wired, a recounted paid offer lists the seller pric
     },
   );
   assert.deepEqual(settings.offers[0]!.offer, PAID_LISTING);
-  // A model without the pinned public tokenizer cannot be recounted, so it cannot be sold.
-  rejects(
-    NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED,
-    () =>
-      sellerSettings(
-        fileConfig(
-          BASE +
-            offer({
-              model: 'acme/chat-small',
-              engine:
-                '{ kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", context_tokens = 131072 }',
-              pricing: POC_PRICE,
-              extra: 'custom = true\nreasoning = ["off"]',
-            }),
-        ),
-        { UPSTREAM_API_KEY: 'synthetic' },
-        { paidSelling: true },
-      ),
-    0,
+  // A model without a pinned public tokenizer is sold on the usage its provider declares; the buyer
+  // bounds that bill by bytes (declared-usage.ts).
+  const declared = sellerSettings(
+    fileConfig(
+      BASE +
+        offer({
+          model: 'acme/chat-small',
+          engine:
+            '{ kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", context_tokens = 131072 }',
+          pricing: POC_PRICE,
+          extra: 'custom = true\nreasoning = ["off"]',
+        }),
+    ),
+    { UPSTREAM_API_KEY: 'synthetic' },
+    { paidSelling: true },
   );
+  assert.deepEqual(declared.offers[0]!.offer, {
+    ...PAID_LISTING,
+    modelId: 'acme/chat-small',
+  });
 });
 
 void test('offers the daemon cannot serve fail closed with a static code', () => {

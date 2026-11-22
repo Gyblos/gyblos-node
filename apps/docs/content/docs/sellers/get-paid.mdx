@@ -18,9 +18,10 @@ Reusable channels support conversations with tools.
 ## Prerequisites [#requirements]
 
 - A registered seller ([Register and publish](/en/sellers/register-publish)).
-- The installer's **Qwen3 0.6B** offer. A buyer must be able to recount a priced model's tokens with its
-  public tokenizer, and only `qwen3:0.6b` qualifies. Any other priced model stops startup with
-  `SELLER_PAID_METERING_UNRECOUNTED`.
+- An offer for any model your engine serves. For `qwen3:0.6b` the buyer recounts the tokens with the
+  model's public tokenizer. For any other model you are paid the usage your provider reports, and the
+  buyer only approves a bill that the text's size allows: never more tokens than bytes, and never past the
+  answer's maximum. A larger bill is not paid.
 - The seller's payment keys, which the installer creates: the **owner** receives your USDC and the
   **fee payer** pays the transaction costs. What each key does, and how to back them up, is in
   [Identity and backups](/en/sellers/identity#keys).
