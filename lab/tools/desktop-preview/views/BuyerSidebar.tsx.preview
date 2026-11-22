@@ -8,16 +8,15 @@ const RAIL = [
 export function BuyerSidebar(props: Props) {
   const current = props.view === UI_VIEW.ACTIVITY ? UI_VIEW.PAYMENTS : props.view;
   const rail = (view: View, label: string, icon: ReactNode) => (
-    <Button
+    <IconButton
       key={view}
-      className="ui-icon-button preview-rail-item"
-      aria-label={label}
-      title={label}
+      className="preview-rail-item"
+      label={label}
       aria-current={current === view ? 'page' : undefined}
       onClick={() => props.navigate(view)}
     >
       {icon}
-    </Button>
+    </IconButton>
   );
   return (
     <aside id="app-sidebar" className="sidebar buyer-sidebar">

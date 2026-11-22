@@ -10,6 +10,7 @@ import { transformCodeSamples } from './brand-code';
 import { replaceEach, replaceOnce } from './brand-replace';
 import brand from './brand.json' with { type: 'json' };
 import * as funds from './funds-build';
+import * as layout from './layout-build';
 import { previewModels } from './models-build';
 
 export { brand };
@@ -201,10 +202,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
         "import { PageBody } from './ui/PageBody';\nimport { PreviewChatDetails, PreviewStatusBar } from './ui/PreviewKit';\n",
       ],
       ['<UpdateNotice />', ''],
-      [
-        '          <div className="chat-root" hidden={view !== UI_VIEW.CHAT}>\n',
-        '          {view === UI_VIEW.CHAT && contextOpen && <PreviewChatDetails chat={chatController} onClose={() => setContextOpen(false)} />}\n          <div className="chat-root" hidden={view !== UI_VIEW.CHAT}>\n',
-      ],
+      ...layout.APP_LAYOUT_REWRITES,
       [
         '        systemStatus={\n          <SystemStatus\n            state={network.state}\n            onRetry={network.retry}\n            onPayments={() => navigate(UI_VIEW.PAYMENTS)}\n          />\n        }\n',
         '',
@@ -242,7 +240,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const start = source.indexOf('export function BuyerSidebar(');
     if (start < 0) throw new Error('Missing sidebar review hook');
     return (
-      "import { PreviewConversationPanel } from './PreviewKit';\n" +
+      "import { PreviewConversationPanel } from './PreviewKit';\nimport { IconButton } from './UI';\n" +
       source.slice(0, start) +
       readFileSync(
         new URL('./views/BuyerSidebar.tsx.preview', import.meta.url),
@@ -253,7 +251,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
   if (target === `${base}/src/ui/WindowTitlebar.tsx`)
     return replaceEach(
       replaceOnce(
-        "import { PREVIEW_EVENT, PREVIEW_NETWORKS, PreviewConversationMenu, usePreviewNetwork, usePreviewSetting } from './PreviewKit';\n" +
+        "import { PREVIEW_EVENT, PREVIEW_NETWORKS, PreviewConversationMenu, usePreviewConversationTitle, usePreviewNetwork, usePreviewSetting } from './PreviewKit';\n" +
           source +
           readFileSync(
             new URL('./views/NetworkSwitch.tsx.preview', import.meta.url),
@@ -262,20 +260,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
         '{props.children}',
         '<PreviewNetwork />{props.children}',
       ),
-      [
-        [
-          'data-platform={platform}',
-          "data-platform={platform}\n      data-fullscreen={new URLSearchParams(location.search).get('fullscreen') === '1' || undefined}",
-        ],
-        [
-          '{props.route.current === UI_VIEW.CONNECT && (',
-          '{props.route.current === UI_VIEW.CHAT && <PreviewConversationMenu chat={props.chat} />}\n        {(props.route.current === UI_VIEW.CONNECT || props.route.current === UI_VIEW.CHAT) && (',
-        ],
-        [
-          "props.contextOpen\n                ? 'Hide connection context'\n                : 'Show connection context'",
-          "props.route.current === UI_VIEW.CHAT\n                ? props.contextOpen ? 'Hide conversation details' : 'Show conversation details'\n                : props.contextOpen ? 'Hide connection context' : 'Show connection context'",
-        ],
-      ],
+      layout.TITLEBAR_REWRITES,
     );
   if (target === `${base}/src/ui/BuyerAgentSetup.tsx`)
     return (

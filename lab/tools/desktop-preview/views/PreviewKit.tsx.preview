@@ -264,6 +264,13 @@ export function PreviewKitShowcase() {
   const usd = (value: number) => value.toFixed(3) + ' USDC';
   return (
     <div className="pk-showcase">
+      <Panel title="Agents and conversation state">
+        <div className="pk-row">
+          <PreviewAgentLogos />
+          <PreviewChatState state="running" />
+          <PreviewChatState state="unread" />
+        </div>
+      </Panel>
       <Panel title="Tags">
         <div className="pk-row">
           <Tag tone={TONE.SUCCESS} pill>Free</Tag>
@@ -830,11 +837,18 @@ function togglePin(id: string) {
 function markUnread(id: string) {
   updateConversations((state) => (state.unread.includes(id) ? {} : { unread: [...state.unread, id] }));
 }
+export function previewConversationRemoved(id: string) {
+  return readConversations().removed.includes(id);
+}
 function markRead(id: string) {
   updateConversations((state) => (state.unread.includes(id) ? { unread: without(state.unread, id) } : {}));
 }
 
 type ChatSessionItem = ReturnType<ChatController['getSnapshot']>['sessions'][number];
+export function usePreviewConversationTitle(session: ChatSessionItem | undefined) {
+  const { titles } = usePreviewConversations();
+  return session ? conversationTitle(session, titles) : '';
+}
 function conversationTitle(session: ChatSessionItem, titles: Record<string, string>) {
   return titles[session.id] ?? (session.messages.length ? session.title : session.draft.trim() || session.title);
 }
@@ -905,7 +919,7 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
         <Plus size={16} aria-hidden="true" />
         <span>New chat</span>
       </Button>
-      <Button className="ui-nav-row preview-agents-entry" aria-current={view === UI_VIEW.CONNECT ? 'page' : undefined} onClick={onConnect}>
+      <Button className="ui-nav-row preview-agents-entry" onClick={onConnect}>
         <PreviewAgentLogos />
         <span>Connect agents</span>
       </Button>
@@ -945,7 +959,8 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
         </Dropdown>
       </header>
       {searching && (
-        <SearchField label="Search conversations" placeholder="Search conversations" value={search} onValueChange={setSearch} autoFocus />
+        <SearchField label="Search conversations" placeholder="Search conversations" value={search} onValueChange={setSearch} autoFocus
+          onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setSearching(false); setSearch(''); } }} />
       )}
       <div className="preview-chat-groups">
         {groups.map((group) => (
@@ -997,6 +1012,9 @@ export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
   const state = usePreviewConversations();
   const [dialog, setDialog] = useState<ConversationDialog | null>(null);
   const [name, setName] = useState('');
+  useEffect(() => {
+    if (dialog === CONVERSATION_DIALOG.RENAME) document.getElementById('preview-conversation-name')?.focus();
+  }, [dialog]);
   const session = sessions.find((item) => item.id === activeId);
   if (!session?.messages.length) return null;
   const title = conversationTitle(session, state.titles);
@@ -1079,7 +1097,10 @@ export function PreviewChatDetails({ chat, onClose }: { chat: ChatController; on
     <aside className="ui-context-panel preview-chat-details" aria-label="Conversation details">
       <header className="ui-context-heading">
         <h2>Details</h2>
-        <IconButton label="Close details" onClick={onClose}>
+        <IconButton label="Close details" onClick={() => {
+          onClose();
+          requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[aria-label="Show conversation details"]')?.focus());
+        }}>
           <X size={16} aria-hidden="true" />
         </IconButton>
       </header>

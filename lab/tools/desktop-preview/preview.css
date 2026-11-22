@@ -3702,11 +3702,10 @@ html .app.desktop-frame :is(.preview-model-menu, .preview-seller-flyout) {
 
 html .app.desktop-frame {
   --compact-navigation-width: 296px;
-  --pk-rail-width: 56px;
 }
 html .app.desktop-frame > .buyer-sidebar {
   display: grid;
-  grid-template-columns: var(--pk-rail-width) minmax(0, 1fr);
+  grid-template-columns: var(--navigation-rail-width) minmax(0, 1fr);
   gap: 0;
   padding: 0;
   overflow: hidden;
@@ -3718,18 +3717,17 @@ html .app.desktop-frame .preview-rail {
   gap: var(--space-1);
   min-height: 0;
   padding: var(--space-2) 0 var(--space-3);
-  border-inline-end: 1px solid var(--line);
 }
 .desktop-frame .preview-rail-spacer {
   flex: 1;
 }
 .desktop-frame .preview-rail-item {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-control);
   color: var(--muted);
 }
-.desktop-frame .preview-rail-item[aria-current='page'] {
+html .app.desktop-frame .preview-rail-item.ui-icon-button[aria-current='page'] {
   background: color-mix(in srgb, var(--ink) 10%, transparent);
   color: var(--ink);
 }
@@ -3744,13 +3742,8 @@ html .app.desktop-frame .preview-rail {
 .desktop-frame.sidebar-collapsed .preview-chat-panel {
   display: none;
 }
-@media (max-width: 899px) {
-  .desktop-frame .preview-chat-panel {
-    display: none;
-  }
-  html .app.desktop-frame > .buyer-sidebar {
-    grid-template-columns: var(--pk-rail-width);
-  }
+html .app.desktop-frame.sidebar-collapsed > .buyer-sidebar {
+  grid-template-columns: var(--navigation-rail-width);
 }
 .desktop-frame .preview-agents-entry .preview-connect-logos .preview-tool-logo {
   width: 20px;
@@ -3774,7 +3767,7 @@ html .app.desktop-frame .preview-rail {
 .desktop-frame .preview-chat-panel-head {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
   margin-top: var(--space-3);
   padding-inline-start: var(--space-2);
 }
@@ -3842,7 +3835,7 @@ html .app.desktop-frame .preview-rail {
   flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
 }
 .desktop-frame .preview-chat-state[data-state='unread'] {
   background: var(--pk-info);
@@ -3857,11 +3850,6 @@ html .app.desktop-frame .preview-rail {
 @keyframes pk-spin {
   to {
     rotate: 360deg;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .desktop-frame .preview-chat-state[data-state='running'] {
-    animation: none;
   }
 }
 .desktop-frame .content[data-layout='chat']:has(> .preview-chat-details) {

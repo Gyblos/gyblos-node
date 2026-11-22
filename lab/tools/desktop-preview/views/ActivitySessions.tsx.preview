@@ -17,6 +17,7 @@ import type { ActivityView } from './useActivity';
 import type { X402View } from './useX402';
 
 import { USAGE_PERIOD, previousUsageTotals, measuredMetric, usageReport, type UsageEvent, type UsagePeriod, type UsageSource } from '../../../../lab/tools/desktop-preview/usage';
+import { previewConversationRemoved } from './PreviewKit';
 
 declare global {
   interface Window {
@@ -48,7 +49,7 @@ export function ActivitySessions({ conversations, activity, x402, onOpenChat, on
       at: record.at, source: 'Chat',
       tokens: metrics?.inputTokens != null && metrics.outputTokens != null
         ? metrics.inputTokens + metrics.outputTokens : null,
-      ...(match && {open: () => onOpenChat(match.chat.id)}),
+      ...(match && !previewConversationRemoved(match.chat.id) && {open: () => onOpenChat(match.chat.id)}),
     });
   }
   const sessions = new Set(activity.state?.sessions.map(session => session.id));

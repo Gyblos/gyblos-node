@@ -38,6 +38,7 @@ import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
 import { accountBudgetSnapshot, accountLimitError } from './account-budget';
+import { previewChatSeed } from './chat-seed';
 import { PREVIEW } from './constants';
 import { exampleKeys } from './example-keys';
 import { previewFunding } from './funding';
@@ -150,18 +151,7 @@ export function createPreviewHost(
     exampleChat(title, crypto.randomUUID());
     conversations.newChat(crypto.randomUUID());
   }
-  Object.assign(window, {
-    previewChatSeed: {
-      ages: Object.fromEntries(
-        seeded.map((id, index) => [
-          id,
-          [4, 1, 0, 2, 3, 5, 8, 12, 20][index] ?? 0,
-        ]),
-      ),
-      pinned: seeded.slice(0, 1),
-      unread: seeded.slice(2, 3),
-    },
-  });
+  Object.assign(window, { previewChatSeed: previewChatSeed(seeded) });
   exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
   let archive = projectChatArchive(conversations.getSnapshot());
 
