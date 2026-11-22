@@ -34,6 +34,7 @@
     "index:db:generate": "pnpm --filter @gyblos/discovery-index db:generate",
     "collector:db:generate": "pnpm --filter @gyblos/metrics-collector db:generate",
     "db:check": "pnpm --filter @gyblos/discovery-index --filter @gyblos/metrics-collector db:check",
+    "db:hashes": "node --import tsx tooling/d1-migrations.ts hashes",
     "node:start": "node --import tsx apps/node/src/bin.ts start",
     "paypal:sandbox": "node --import tsx apps/node/src/paypal-main.ts",
     "gyblos": "node --import tsx apps/node/src/bin.ts",

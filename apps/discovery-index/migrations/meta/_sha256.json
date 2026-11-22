@@ -1,0 +1,9 @@
+{
+  "0001_discovery_index.sql": "cdf12d641b8fa81a51dee7af3d16555566cf5122005c55aa1671db1f0acfe72f",
+  "0002_listing_indexes.sql": "f83e8e09f1e60cbb90e07c5727f51b732c0f6848be2f9846abe3fd56acdd7325",
+  "0003_registrations.sql": "ee95354a78c2766a2572631ca0e2ff77b731d2e1436802bdcbee27245e4c12ad",
+  "0004_uptime.sql": "0a25e4b27821bb1a5982f451e72a3f35bf979a0bc8390b8c66dc2a7d23e07ccf",
+  "0005_node_publish_quota.sql": "e3ff68db8e899c4df12eebb6dd18ae092f431a61f4b671280905edc6f3b2a7a1",
+  "0006_presence_version.sql": "d516c6042b102d2e1a2401876fea113076f113e3a0a88d42223259236dbf44c1",
+  "0007_github_claims.sql": "bbc78cb453a2520aa44a8f6e80b276ee440bb54637640d059b7734df2b126e05"
+}
