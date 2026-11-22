@@ -9,6 +9,7 @@ import {
 import {
   PROFILE_CLAIM,
   SELLER_NAME_ISSUES,
+  SELLER_NAME_SCRIPTS,
   type SellerNameIssue,
 } from './profile-claim/constants';
 import { bytesHex, hexBytes } from './public-validation';
@@ -40,6 +41,76 @@ const refused = (issue: SellerNameIssue): SellerNameResult => ({
   issue,
 });
 
+const SCRIPT_PATTERNS = SELLER_NAME_SCRIPTS.map(
+  (script) =>
+    [script, new RegExp(`\\p{Script_Extensions=${script}}`, 'u')] as const,
+);
+const SHARED_SCRIPTS: readonly string[] = PROFILE_CLAIM.sharedScripts;
+
+function scriptsOf(character: string) {
+  return SCRIPT_PATTERNS.filter(([, pattern]) => pattern.test(character)).map(
+    ([script]) => script,
+  );
+}
+
+function oneScript(name: string) {
+  const sets = [...name]
+    .filter((character) => PROFILE_CLAIM.letterOrMark.test(character))
+    .map(scriptsOf)
+    .filter(
+      (scripts) => !scripts.some((script) => SHARED_SCRIPTS.includes(script)),
+    );
+  if (sets.some((scripts) => scripts.length === 0)) return false;
+  const groups: (readonly string[])[] = [...new Set(sets.flat())].map(
+    (script) => [script],
+  );
+  groups.push(...PROFILE_CLAIM.scriptGroups);
+  return (
+    sets.length === 0 ||
+    groups.some((group) =>
+      sets.every((scripts) => scripts.some((script) => group.includes(script))),
+    )
+  );
+}
+
+const LOOKALIKES: Readonly<Record<string, string>> =
+  PROFILE_CLAIM.skeletonLetters;
+
+function skeleton(text: string) {
+  return text
+    .normalize(PROFILE_CLAIM.skeletonNormalization)
+    .replace(PROFILE_CLAIM.marks, '')
+    .toLowerCase()
+    .replace(PROFILE_CLAIM.separators, '')
+    .replace(
+      PROFILE_CLAIM.skeletonPattern,
+      (character) => LOOKALIKES[character] ?? character,
+    );
+}
+
+function reserved(name: string) {
+  const shape = skeleton(name);
+  return PROFILE_CLAIM.reservedWords.some((word) =>
+    shape.includes(skeleton(word)),
+  );
+}
+
+function badMarks(name: string) {
+  return (
+    PROFILE_CLAIM.strayMark.test(name) ||
+    new RegExp(`\\p{M}{${PROFILE_CLAIM.maxMarksInRow + 1}}`, 'u').test(name)
+  );
+}
+
+function badCharacters(name: string) {
+  return (
+    !PROFILE_CLAIM.allowed.test(name) ||
+    !PROFILE_CLAIM.letterOrNumber.test(name) ||
+    PROFILE_CLAIM.modifierLetter.test(name) ||
+    PROFILE_CLAIM.lookalikeLetter.test(name)
+  );
+}
+
 export function parseSellerName(value: unknown): SellerNameResult {
   if (typeof value !== 'string') return refused(SELLER_NAME_ISSUES.CHARACTERS);
   if (value.length > PROFILE_CLAIM.maxInputCharacters)
@@ -47,6 +118,8 @@ export function parseSellerName(value: unknown): SellerNameResult {
   const normalized = value.normalize(PROFILE_CLAIM.normalization);
   if (PROFILE_CLAIM.forbidden.test(normalized))
     return refused(SELLER_NAME_ISSUES.CHARACTERS);
+  if (PROFILE_CLAIM.forbiddenMarks.test(normalized))
+    return refused(SELLER_NAME_ISSUES.MARKS);
   const name = normalized.replace(PROFILE_CLAIM.spaces, ' ').trim();
   const characters = [...name].length;
   if (
@@ -54,13 +127,10 @@ export function parseSellerName(value: unknown): SellerNameResult {
     characters > PROFILE_CLAIM.maxNameCharacters
   )
     return refused(SELLER_NAME_ISSUES.LENGTH);
-  if (
-    !PROFILE_CLAIM.allowed.test(name) ||
-    !PROFILE_CLAIM.letterOrNumber.test(name)
-  )
-    return refused(SELLER_NAME_ISSUES.CHARACTERS);
-  if (name.toLowerCase().includes(PROFILE_CLAIM.reservedWord))
-    return refused(SELLER_NAME_ISSUES.RESERVED);
+  if (badCharacters(name)) return refused(SELLER_NAME_ISSUES.CHARACTERS);
+  if (badMarks(name)) return refused(SELLER_NAME_ISSUES.MARKS);
+  if (!oneScript(name)) return refused(SELLER_NAME_ISSUES.SCRIPTS);
+  if (reserved(name)) return refused(SELLER_NAME_ISSUES.RESERVED);
   return { ok: true, name };
 }
 

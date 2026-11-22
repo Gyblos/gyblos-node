@@ -112,8 +112,6 @@ void test('check marks, emoji, symbols, controls and invisible characters are re
     'Ada @home',
     'Ada/Lab',
     'Ada <b>',
-    'Ada\u0338',
-    'Ada\u20dd',
     'Ada\u202eabc',
     'Ada\u202d',
     'Ada\u2066x\u2069',
@@ -164,7 +162,111 @@ void test('a seller name containing the reserved word is refused in any case or 
     'gyblos_1',
   ])
     assert.equal(issueOf(input), SELLER_NAME_ISSUES.RESERVED, input);
-  assert.equal(accepted('Gyb los'), 'Gyb los');
+});
+
+void test('names in many writing systems, with their marks, are accepted', () => {
+  for (const name of [
+    'Zoë',
+    'Nodo Santiago',
+    'नमस\u094dत\u0947',
+    'স\u09cdব\u09beগতম',
+    'வணக\u0bcdகம\u0bcd',
+    'สมศ\u0e31กด\u0e34\u0e4c',
+    'م\u064fح\u064eم\u064e\u0651د',
+    'ש\u05b8\u05c1לו\u05b9ם',
+    '한국',
+    'ありがとう',
+    'ラーメン',
+    '東京ノード',
+    '佐藤さん',
+    '김민수 金',
+    'Ṣọ\u0300lá',
+    'Ελλάδα',
+    'Москва 7',
+  ])
+    assert.equal(accepted(name), name.normalize('NFKC'), name);
+});
+
+void test('marks must follow a letter or a mark, at most three in a row, and never enclose or overlay', () => {
+  for (const input of [
+    '\u0301Ada',
+    'Ada \u0301',
+    'Ada1\u0301',
+    "Ada'\u0301",
+    'Ada-\u0301',
+    'x\u0300\u0301\u0302\u0303',
+    'Ada\u20dd',
+    'Ada\u20e3',
+    'Ada\u20d2',
+    'Ada\u0334',
+    'Ada\u0338',
+    'Ada\u0488',
+  ])
+    assert.equal(
+      issueOf(input),
+      SELLER_NAME_ISSUES.MARKS,
+      JSON.stringify(input),
+    );
+  assert.equal(accepted('x\u0300\u0301\u0302'), 'x\u0300\u0301\u0302');
+});
+
+void test('letters from more than one writing system are refused, except Chinese with kana, Hangul or Bopomofo', () => {
+  for (const input of [
+    'G\u0443blos',
+    'gybl\u03bfs',
+    'Ada \u0410da',
+    'Ada \u05e9\u05dc\u05d5\u05dd',
+    '\ua4d6\ua4ec Ada',
+    '\u13a0da',
+    'Ada \u6771',
+    '\u3042\ud55c',
+  ])
+    assert.equal(
+      issueOf(input),
+      SELLER_NAME_ISSUES.SCRIPTS,
+      JSON.stringify(input),
+    );
+});
+
+void test('modifier letters, small capitals and check-like letters are refused', () => {
+  for (const input of [
+    'Ada\u02c7',
+    'Ada\u02b9',
+    '\u0262\u028f\u0299\u029f\u1d0f\ua731',
+    'Ada \u0262',
+    '\u2c71',
+    'Ada \u2c71',
+    'Ada \u2c74',
+    'Ada \u1d00',
+  ])
+    assert.equal(
+      issueOf(input),
+      SELLER_NAME_ISSUES.CHARACTERS,
+      JSON.stringify(input),
+    );
+});
+
+void test('reserved words are refused on a skeleton that ignores case, separators and look-alike digits', () => {
+  for (const input of [
+    'GYBL0S',
+    'g.yblos',
+    'gyb los',
+    'gy-blos',
+    "g'yblos",
+    'gyb_los',
+    'GYBL05',
+    'gybıos',
+    'gybǀos',
+    'Ver1fied',
+    'verified seller',
+    'VERIFIED',
+    'Verificado',
+    'Official',
+    'oficial',
+    '0fficial',
+    'Gybìos',
+  ])
+    assert.equal(issueOf(input), SELLER_NAME_ISSUES.RESERVED, input);
 });
 
 void test('a seller name that is not a string is refused', () => {
@@ -270,7 +372,7 @@ void test('profile claim vectors match independent canonical bytes and OpenSSL s
     ),
   ) as { domain: string; cases: { signed: unknown; signingHex: string }[] };
   assert.equal(data.domain, PROFILE_CLAIM.domain);
-  assert.equal(data.cases.length, 3);
+  assert.equal(data.cases.length, 4);
   for (const vector of data.cases) {
     const signed = await verifyProfileClaim(vector.signed);
     assert.deepEqual(signed, vector.signed);

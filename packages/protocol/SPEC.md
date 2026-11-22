@@ -1865,15 +1865,36 @@ safe integer, milliseconds). `name` is `null`, which clears the node's name, or
 a name already in the canonical form `parseSellerName` returns; any other value
 is `INVALID`.
 
-`parseSellerName` is the one rule every producer and verifier uses. It takes at
-most 256 UTF-16 code units, applies NFKC, refuses any control, format, private
-use, surrogate, unassigned, line or paragraph separator or default-ignorable
-character (bidi controls, zero-width characters, variation selectors, Hangul
-fillers), turns each run of space separators into one space and trims the ends.
-The result has 1 to 32 code points, holds only Unicode letters, numbers, spaces
-and `-`, `_`, `.`, `'`, with at least one letter or number, and does not contain
-`gyblos` in any letter case. Emoji, symbols (such as check marks) and combining
-marks are refused. Issues are `length`, `characters` or `reserved`.
+`parseSellerName` is the one rule every producer and verifier uses. In order:
+
+1. The input is a string of at most 256 UTF-16 code units; it is NFKC-normalized.
+2. Any control, format, private use, surrogate, unassigned, line or paragraph
+   separator or default-ignorable character (bidi controls, zero-width
+   characters, variation selectors, Hangul fillers) is `characters`. Any
+   enclosing mark (`\p{Me}`), combining overlay (U+0334 to U+0338) or combining
+   mark for symbols (U+20D0 to U+20FF) is `marks`.
+3. Each run of space separators becomes one space and the ends are trimmed. The
+   result must have 1 to 32 code points (`length`).
+4. It may hold only letters (`\p{L}`), nonspacing and spacing marks (`\p{Mn}`,
+   `\p{Mc}`), numbers (`\p{N}`), spaces and `-`, `_`, `.`, `'`, with at least
+   one letter or number. Modifier letters (`\p{Lm}`, such as `ˇ`) are refused,
+   except the CJK iteration mark `々` and the katakana prolonged sound mark `ー`;
+   so are small capital letters (such as `ɢ ʏ ʙ ʟ ᴏ ꜱ`) and the check-like
+   letters U+2C71 `ⱱ` and U+2C74 `ⱴ` (`characters`). Emoji and symbols, such as
+   check marks, are never letters.
+5. A mark must follow a letter or another mark (never at the start, after a
+   space, a digit or punctuation), with at most 3 marks in a row (`marks`).
+6. Every letter and mark must share one script by its Unicode
+   Script_Extensions; characters whose extensions include Common or Inherited
+   are always allowed. Han may be mixed with Hiragana and Katakana, with Hangul
+   or with Bopomofo. Anything else is `scripts`, so Cyrillic, Greek, Lisu or
+   Cherokee look-alikes cannot be mixed into a Latin name.
+7. On a skeleton of the name (NFD with marks removed, lowercase, without
+   spaces, `_`, `.`, `'` and `-`, with `0` read as `o`, `5` as `s`, and `1`,
+   `i`, `ı` and `ǀ` all read as `l`) it must not contain the skeleton of
+   `gyblos`, `verified`, `verificado`, `official` or `oficial` (`reserved`).
+
+Issues are `length`, `characters`, `marks`, `scripts` or `reserved`.
 
 The name is self-chosen: it is not unique, and nothing verifies it. This
 contract owns shape and the node signature only; freshness and replay (keeping
