@@ -451,19 +451,16 @@ function subscribeUpdate(listener: () => void) {
   };
 }
 const readUpdate = () => availableUpdate;
-/** One shared poll of the host update bridge (synthetic in the preview): the newer version, or null. */
 function usePreviewUpdate(): string | null {
   return useSyncExternalStore(subscribeUpdate, readUpdate);
 }
 const NewerVersion = createContext<string | null>(null);
-/** The version newer than the installed one, as shown by the status bar; null when up to date. */
 export function usePreviewNewerVersion(): string | null {
   return useContext(NewerVersion);
 }
 export function openPreviewUpdate() {
   window.dispatchEvent(new Event(PREVIEW_EVENT.UPDATE));
 }
-/** The one "new version" affordance: an info pill that opens the update dialog. */
 export function PreviewUpdateButton({ version, onClick }: { version: string; onClick(): void }) {
   return (
     <Button className="pk-update" onClick={onClick}>
@@ -508,7 +505,6 @@ function PreviewUpdateDialog({
     </Modal>
   );
 }
-/** Bottom bar of the desktop window: system status on the left, update and version on the right. */
 export function PreviewStatusBar({ status, version }: { status: ReactNode; version: string }) {
   const available = usePreviewUpdate();
   const footer = useRef<HTMLElement>(null);
