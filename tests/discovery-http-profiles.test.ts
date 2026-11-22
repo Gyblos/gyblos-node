@@ -232,3 +232,18 @@ void test('a held name reads as PROFILE_HELD, and another 403 as an HTTP status'
     DISCOVERY_ERROR_CODES.HTTP_STATUS,
   );
 });
+
+void test('a 404 whose body does not arrive in time is a timeout, not an old index', async () => {
+  assert.equal(
+    await code(
+      fetchSellerProfile({
+        baseUrl: BASE,
+        nodeId: NODE,
+        timeoutMs: 20,
+        fetch: async () =>
+          new Response(new ReadableStream({ start() {} }), { status: 404 }),
+      }),
+    ),
+    DISCOVERY_ERROR_CODES.TIMEOUT,
+  );
+});

@@ -140,6 +140,21 @@ for (const kind of KINDS) {
     assert.deepEqual(await profiles.get(high), sellerProfileTombstone(high, 3));
     assert.deepEqual(await profiles.get(low), row(low, 'Amy', 2));
   });
+  void test(`seller profile (${kind}): a seller only seen, with no registration or stored catalog, is listed without its name`, async (context) => {
+    const index = await profileHarness(kind);
+    if (!index) return context.skip('node:sqlite unavailable');
+    const node = indexNode();
+    await index.publish(node);
+    await index.name(node);
+    index.clock.now += 11 * 60_000;
+    await index.publish(indexNode());
+    const listed = (await index.network()).nodes.find(
+      (entry: { nodeId: string }) => entry.nodeId === node.nodeId,
+    );
+    assert.equal(listed?.state, 'offline');
+    assert.equal(listed?.name, null);
+    await expectError(await index.read(node.nodeId), 404, 'NO_PROFILE');
+  });
 }
 
 void test('seller profile (sqlite-d1): a stored row with a name outside the rule fails closed', async (context) => {

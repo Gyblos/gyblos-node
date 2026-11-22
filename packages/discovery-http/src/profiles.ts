@@ -19,6 +19,7 @@ import { readClaimBody, SIGNATURE_HEX } from './github-claims';
 import {
   failStatus,
   indexUrl,
+  isDeadlineError,
   isPlainObject,
   readJson,
   timeoutOf,
@@ -122,7 +123,10 @@ export async function fetchSellerProfile(
         response,
         DISCOVERY_LIMITS.maxClaimResponseBytes,
         aborted,
-      ).catch(() => undefined);
+      ).catch((error: unknown) => {
+        if (isDeadlineError(error)) throw error;
+        return undefined;
+      });
       const wire = isPlainObject(refusal, ['error']) ? refusal.error : null;
       if (
         response.status === CONFIG_HTTP_STATUS.notFound &&

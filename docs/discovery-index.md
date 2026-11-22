@@ -380,10 +380,12 @@ is `400 INVALID_QUERY`):
   before migration `0007` is applied), every `github` is `null`, `truncated` is
   `true` and the route still answers. `name` is the seller's
   [display name](#seller-names), or `null` when it has none; it is self-chosen
-  and never verified. Names are read only for the NodeIds the page lists. If the
-  names read fails (for example before migration `0009` is applied), every
-  `name` is `null`, `truncated` is `true` and the route still answers. No owner,
-  contact, country or IP is returned.
+  and never verified. Names are read only for the NodeIds the page lists that
+  the index still knows (an active registration or a stored catalog, the same
+  rule as `GET /v1/profile/<NodeId>`); a seller listed only from its sightings
+  shows `name: null`. If the names read fails (for example before migration
+  `0009` is applied), every `name` is `null`, `truncated` is `true` and the
+  route still answers. No owner, contact, country or IP is returned.
 - **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
   NodeId. `counts` cover every listed seller. The `nodes` list stops before the
   answer would exceed 1 MiB.

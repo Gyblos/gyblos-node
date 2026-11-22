@@ -90,13 +90,18 @@ async function verifiedClaims(claims: GithubClaimStore | undefined) {
 
 async function withNames(
   nodes: NetworkNode[],
+  eligible: ReadonlySet<string>,
   profiles: SellerProfileStore | undefined,
 ) {
   let rows: { nodeId: string; name: string }[] = [];
   let read = true;
   if (profiles)
     try {
-      rows = await profiles.names(nodes.map((node) => node.nodeId));
+      rows = await profiles.names(
+        nodes
+          .map((node) => node.nodeId)
+          .filter((nodeId) => eligible.has(nodeId)),
+      );
     } catch {
       read = false;
     }
@@ -140,7 +145,11 @@ async function knownNodes(
         !revoked.has(node.nodeId) || node.state === NETWORK_STATES.ONLINE,
     )
     .sort(compareNodes);
-  const names = await withNames(listed, profiles);
+  const eligible = new Set([
+    ...registered.active,
+    ...catalogs.rows.map((row) => row.nodeId),
+  ]);
+  const names = await withNames(listed, eligible, profiles);
   // A source that filled its cap may have left sellers (or online models or claims) out of the answer.
   const complete =
     catalogs.complete &&
