@@ -186,8 +186,8 @@ your machine.
 **What your machine sends.** The command signs the claim with the node key and sends it to the index:
 your NodeId, the account, the gist id and the time. It also reads the same gist file from your machine (and,
 when that file is missing, the gist's bare raw URL, to tell a wrong file name from a missing gist), so
-GitHub sees your IP address. When it has no gist yet (no `--gist`, none saved and none at the index) and
-the GitHub CLI (`gh`) is installed, it first asks GitHub through `gh` which account `gh` is signed in as,
+GitHub sees your IP address. When it has no gist it can reuse for that account (no `--gist`, none saved for that account and none at
+the index, or the saved one was found deleted) and the GitHub CLI (`gh`) is installed, it first asks GitHub through `gh` which account `gh` is signed in as,
 even if it then doesn't use `gh`. When that is the account you named, it uses your signed-in GitHub
 session to list your public gists and create the proof gist. `gyblos seller status --online`
 and `--status` ask the index for your claim by NodeId.
@@ -197,10 +197,10 @@ and `--status` ask the index for your claim by NodeId.
 
 **Remove it.** Run `gyblos seller verify github --cancel`. The index stops showing the account, the GET
 route answers `404`, and the command deletes the progress file. The index keeps only your NodeId, the signed time of
-the cancel and the time of the last read of your gist that a claim asked for (scheduled checks don't change
-it), and never serves them. The cancel's time makes the index refuse any older claim, so an old claim can't
-be sent again; the time of that read keeps a new claim from making the index read GitHub more than once a minute.
-The gist stays on GitHub: delete it yourself.
+the cancel and the time a claim last reserved a read of your gist, written before the index contacts
+GitHub, even if it then reads nothing (scheduled checks don't change it), and never serves them. The cancel's time makes the index refuse any older claim, so an old claim can't
+be sent again; the time of that reservation keeps a new claim from making the index read GitHub more than once a minute.
+The gist stays on GitHub: delete it yourself, or, if other sellers share it, remove only this seller's line.
 Copies that others made while it was public are outside Gyblos's control.
 
 ## Solana devnet [#solana]

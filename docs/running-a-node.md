@@ -453,18 +453,22 @@ pnpm gyblos seller verify github --cancel
 ```
 
 `seller verify github` shows buyers which GitHub account runs this seller. It
-needs a seller the index already knows: registered (`seller register`) or
-currently publishing (unregistered sellers are known only while their catalog is
-stored, and catalogs expire after 10 minutes). The binding has two halves: a
-gist owned by `<user>` with a file named `gyblos-proof.txt` that contains the
-line `gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its
-id, so the proof is public either way), and a claim signed by the node key
-naming the account and the gist, which the discovery index checks
+needs a seller the index already knows: registered (`seller register`) or with a
+catalog the index still stores. A catalog stops being listed 10 minutes after
+the last publish, but the index removes expired catalogs only when it prunes, so
+an unregistered seller may stay eligible for a while; only registration or
+ongoing publishing is reliable. The binding has two halves: a gist owned by
+`<user>` with a file named `gyblos-proof.txt` that contains the line
+`gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its id,
+so the proof is public either way), and a claim signed by the node key naming
+the account and the gist, which the discovery index checks
 ([discovery-index.md](discovery-index.md#github-claims)). Anyone can re-check
 the gist; the index does not keep or serve the signature. One `gyblos-proof.txt`
 may hold several sellers' proof lines, one per line; only its first 16 KiB
-(about 200 lines) is read, and a line beyond that is ignored: its seller turns
-`lost` if it was verified before and otherwise stays `pending`.
+(about 200 lines) is read. The command reads the same part before it sends a
+claim, so a line beyond it stops the command with `VERIFY_PROOF_MISSING` and no
+claim is sent; a line that moves there after verification turns the seller
+`lost` at the next check.
 
 1. The account is lowercased and checked (letters, digits and single hyphens, at
    most 39 characters).
@@ -505,9 +509,11 @@ verification run again just says `Already verified`.
 check attempt (which may be one GitHub did not answer) and, while verified,
 since when. `--cancel` signs a cancel claim, so the index stops linking the
 seller to the account, and removes the progress file. The gist stays on GitHub;
-delete it yourself. Only `verified` means the index found the proof. The command
-prints public identifiers only (NodeId, account, gist URL and the index origin),
-never a key or the home location.
+delete it yourself, or, when other sellers share it, remove only this seller's
+line, since deleting it turns their links `lost` at their next check. Only
+`verified` means the index found the proof. The command prints public
+identifiers only (NodeId, account, gist URL and the index origin), never a key
+or the home location.
 
 ### Docker
 

@@ -113,8 +113,9 @@ logs or screenshots of the registration prompt. Ask for help in the [Gyblos Tele
 ## Verify your GitHub account [#verify-github]
 
 You can show buyers which GitHub account runs your seller. This is optional. The index must already know
-your seller: it must be registered, or currently publishing its models. `gyblos seller status --online`
-shows `listed in the index` in its `discovery` line while the seller is publishing. The link has two parts: a
+your seller: it must be registered, or have published its models so the index keeps their catalog. The
+index can keep a catalog for a while after the seller stops publishing, even when it is no longer listed,
+but don't count on that: register the seller or keep it publishing. The link has two parts: a
 gist owned by your GitHub account with a file named `gyblos-proof.txt` that contains the line
 `gyblos-node=NODEID`, and a claim signed by your node key that names the account and the gist. The
 discovery index checks the signature when it receives the claim, and checks the gist itself, with no GitHub
@@ -213,7 +214,9 @@ that failed.
   `gyblos-node=NODEID` line. With `gh`, the command makes one gist per seller. By hand, the simplest is one
   gist: add each seller's line, on its own line, to the same `gyblos-proof.txt` and pass that gist to each
   seller with `--gist`. Removing a line from the shared file affects only that seller. The index reads only the first 16 KiB
-  of the file, about 200 lines: a line beyond that is ignored, so its seller is not found: `lost` if it was verified before, otherwise it stays `pending`.
+  of the file, about 200 lines, and the command reads the same part before it sends a claim. If a seller's
+  line is beyond that, the command stops with `VERIFY_PROOF_MISSING` and sends nothing; if the line moves
+  there after the seller was verified, the next check turns it `lost`.
 
 ### Check the state [#github-check]
 
@@ -238,7 +241,9 @@ gyblos seller verify github --cancel
 ```
 
 The index stops linking your seller to the account and the command removes its progress file. The gist
-stays on GitHub: delete it yourself at [gist.github.com](https://gist.github.com) if you no longer want it.
+stays on GitHub: delete it yourself at [gist.github.com](https://gist.github.com) if you no longer want it. If
+other sellers share that gist, remove only this seller's line instead: deleting the gist turns their links
+`lost` at their next check.
 
 ### Common errors [#github-errors]
 

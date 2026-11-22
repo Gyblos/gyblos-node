@@ -115,9 +115,9 @@ del rol, recibos, logs completos ni capturas del aviso de registro. Pide ayuda e
 ## Verifica tu cuenta de GitHub [#verificar-github]
 
 Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. El índice ya tiene que
-conocer tu vendedor: tiene que estar registrado, o estar publicando sus modelos en este momento.
-`gyblos seller status --online` muestra `listed in the index` en su línea `discovery` mientras el vendedor
-publica. El vínculo tiene dos
+conocer tu vendedor: tiene que estar registrado, o haber publicado sus modelos para que el índice guarde su
+catálogo. El índice puede guardar un catálogo un tiempo después de que el vendedor deja de publicar, aunque ya
+no aparezca en la lista, pero no cuentes con eso: registra el vendedor o mantenlo publicando. El vínculo tiene dos
 partes: un gist de tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea
 `gyblos-node=NODEID`, y una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El
 índice de descubrimiento revisa la firma cuando recibe la declaración, y revisa el gist por su cuenta, sin
@@ -217,7 +217,9 @@ aunque haya fallado.
   `gyblos-node=NODEID`. Con `gh`, el comando crea un gist por vendedor. A mano, lo más simple es un solo gist:
   agrega la línea de cada vendedor, cada una en su propio renglón, al mismo `gyblos-proof.txt` y pasa ese gist
   a cada vendedor con `--gist`. Si quitas una línea del archivo compartido, solo afecta a ese vendedor. El índice lee solo los
-  primeros 16 KiB del archivo, unas 200 líneas: una línea más allá se ignora, así que su vendedor no se encuentra: pasa a `lost` si ya estaba verificado y, si no, sigue en `pending`.
+  primeros 16 KiB del archivo, unas 200 líneas, y el comando lee esa misma parte antes de enviar una
+  declaración. Si la línea de un vendedor queda más allá, el comando se detiene con `VERIFY_PROOF_MISSING` y no
+  envía nada; si la línea queda ahí después de que el vendedor se verificó, la siguiente revisión lo pasa a `lost`.
 
 ### Comprueba el estado [#comprobar-github]
 
@@ -243,7 +245,9 @@ gyblos seller verify github --cancel
 ```
 
 El índice deja de vincular tu vendedor con la cuenta y el comando borra su archivo de avance. El gist sigue en
-GitHub: bórralo tú en [gist.github.com](https://gist.github.com) si ya no lo quieres.
+GitHub: bórralo tú en [gist.github.com](https://gist.github.com) si ya no lo quieres. Si otros vendedores
+usan ese mismo gist, quita solo la línea de este vendedor: si borras el gist, sus vínculos pasan a `lost` en
+su siguiente revisión.
 
 ### Errores comunes [#errores-github]
 

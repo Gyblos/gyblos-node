@@ -191,8 +191,8 @@ consultas vienen del índice, no de tu equipo.
 **Qué envía tu equipo.** El comando firma la declaración con la llave del nodo y la envía al índice: tu
 NodeId, la cuenta, el id del gist y la hora. También lee el mismo archivo del gist desde tu equipo (y, si ese
 archivo falta, la dirección raw del gist sin nombre de archivo, para distinguir un nombre de archivo equivocado de
-un gist que no existe), así que GitHub ve tu dirección IP. Cuando aún no tiene gist (sin `--gist`, sin uno guardado y sin uno en el
-índice) y la CLI de GitHub (`gh`) está instalada, primero le pregunta a GitHub a través de `gh` con qué cuenta
+un gist que no existe), así que GitHub ve tu dirección IP. Cuando no tiene un gist que pueda reutilizar para esa cuenta (sin `--gist`, sin uno guardado para esa cuenta y sin uno en el
+índice, o el guardado resultó borrado) y la CLI de GitHub (`gh`) está instalada, primero le pregunta a GitHub a través de `gh` con qué cuenta
 tiene `gh` la sesión iniciada, aunque después no use `gh`. Cuando es la cuenta que indicaste, usa tu sesión de
 GitHub para listar tus gists públicos y crear el gist de prueba. `gyblos seller status --online` y
 `--status` le piden tu declaración al índice por tu NodeId.
@@ -202,11 +202,12 @@ GitHub para listar tus gists públicos y crear el gist de prueba. `gyblos seller
 
 **Cómo quitarlo.** Ejecuta `gyblos seller verify github --cancel`. El índice deja de mostrar la cuenta, la
 ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tu NodeId, la hora
-firmada de la cancelación y la hora de la última lectura de tu gist que pidió una declaración (las
-revisiones programadas no la cambian), y nunca los muestra. La hora de la cancelación hace que el
+firmada de la cancelación y la hora en que una declaración reservó por última vez una lectura de tu gist,
+que se escribe antes de que el índice contacte a GitHub, aunque después no lea nada (las revisiones
+programadas no la cambian), y nunca los muestra. La hora de la cancelación hace que el
 índice rechace cualquier declaración más vieja, así que nadie puede volver a enviar una declaración vieja; la
-hora de esa lectura evita que una declaración nueva haga que el índice lea GitHub más de una vez por minuto. El gist sigue en GitHub: bórralo
-tú. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
+hora de esa reserva evita que una declaración nueva haga que el índice lea GitHub más de una vez por minuto. El gist sigue en GitHub: bórralo
+tú o, si otros vendedores lo usan, quita solo la línea de este vendedor. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
 
 ## Solana devnet [#solana]
 
