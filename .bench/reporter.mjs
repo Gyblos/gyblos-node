@@ -14,6 +14,7 @@ export default async function* (source) {
   if(type==='test:summary'&&!d.file) yield 'COUNTS '+JSON.stringify(d.counts)+'\n';
  }
  const timings=readdirSync(process.env.PROFILE_DIR).map(f=>JSON.parse(readFileSync(process.env.PROFILE_DIR+'/'+f)));
+ if (!timings.length || files.length!==timings.length) throw Error('Missing process profiles: '+timings.length+'/'+files.length);
  yield 'CPU '+availableParallelism()+'\n';
  for(const t of timings)yield 'TIMING '+JSON.stringify(t)+'\n';
  for(const f of files)yield 'FILE '+JSON.stringify(f)+'\n';

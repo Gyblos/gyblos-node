@@ -6,4 +6,5 @@ patterns=['tests/*.test.ts','packages/*/test/**/*.test.ts'] if suite=='test' els
 args=['node','--import',str(tmp/'mark.cjs'),'--import','tsx','--test','--test-reporter='+str(tmp/'reporter.mjs')]
 if mode!='candidate':args+=['--test-shard='+shard+'/'+('3' if suite=='test' else '2')]+patterns
 else:args+=json.loads((tmp/'plan.json').read_text())[suite][int(shard)-1]
-sys.exit(subprocess.call(args))
+os.environ['PROFILE_PARENT']=str(os.getpid())
+os.execvp(args[0],args)
