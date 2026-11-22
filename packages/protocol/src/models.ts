@@ -140,7 +140,7 @@ export const MODEL_CATALOG: readonly Readonly<CatalogModel>[] = Object.freeze([
     reasoning: THINKING_SWITCH,
   }),
   entry(MODEL_IDS.QWEN3_4B, {
-    aliases: ['qwen3:4b'],
+    // Ollama's bare qwen3:4b tag may name the 2507 build, which has another template; no alias.
     tokenizer: qwen3('4B', '1cfa9a7208912126459214e8b04321603b3df60c'),
     reasoning: THINKING_SWITCH,
   }),

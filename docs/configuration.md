@@ -385,11 +385,11 @@ start succeeds.
 
 ### Engine compatibility
 
-| Engine      | Allowed `url`                                                                                                     | Required keys                   | Usage counted by                                                   | Readiness check                                            |
-| ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `ollama`    | `http://127.0.0.1:PORT/` or `http://[::1]:PORT/`, no path                                                         | none; no `api_key_env`          | The pinned public tokenizer                                        | Warmup generation and memory check                         |
-| `openai`    | API base ending in its version: `https://...` on any host, or `http://127.0.0.1:PORT/v1` / `http://[::1]:PORT/v1` | `context_tokens`                | The pinned tokenizer for Qwen3 0.6B; the provider for other models | Loopback: warmup and memory check. Remote: lists the model |
-| `anthropic` | API root without `/v1` (`https://api.anthropic.com`), or a literal loopback proxy                                 | `api_key_env`, `context_tokens` | The provider, input including cached prompt tokens                 | `GET /v1/models/{model}`, even on loopback                 |
+| Engine      | Allowed `url`                                                                                                     | Required keys                   | Usage counted by                                                               | Readiness check                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `ollama`    | `http://127.0.0.1:PORT/` or `http://[::1]:PORT/`, no path                                                         | none; no `api_key_env`          | The pinned public tokenizer                                                    | Warmup generation and memory check                         |
+| `openai`    | API base ending in its version: `https://...` on any host, or `http://127.0.0.1:PORT/v1` / `http://[::1]:PORT/v1` | `context_tokens`                | The pinned Qwen3 tokenizer for the Qwen3 family; the provider for other models | Loopback: warmup and memory check. Remote: lists the model |
+| `anthropic` | API root without `/v1` (`https://api.anthropic.com`), or a literal loopback proxy                                 | `api_key_env`, `context_tokens` | The provider, input including cached prompt tokens                             | `GET /v1/models/{model}`, even on loopback                 |
 
 Every engine refuses plain `http` to `localhost`, `host.docker.internal` or any
 host other than a literal loopback address, and a URL with a query or fragment,

@@ -230,6 +230,11 @@ async function generate(
             input.maxTokens,
           stream: true,
           stream_options: { include_usage: true },
+          // A recountable model is a Qwen3 hybrid served with thinking off, as the recount renders it;
+          // vLLM, SGLang and llama.cpp take this switch, and Qwen3 servers would otherwise think.
+          ...(settings.recountable
+            ? { chat_template_kwargs: { enable_thinking: false } }
+            : {}),
         }),
         signal,
       },

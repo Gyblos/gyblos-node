@@ -36,14 +36,18 @@ const CONTEXT = 32_768;
 
 function engineAt(
   base: string,
-  options: { apiKey?: string; generationTimeoutMs?: number } = {},
+  options: {
+    apiKey?: string;
+    generationTimeoutMs?: number;
+    recountable?: boolean;
+  } = {},
 ): Engine {
   return createOpenAiEngine(
     {
       base,
       model: FAKE_OPENAI_MODEL,
       contextTokens: CONTEXT,
-      recountable: false,
+      recountable: options.recountable ?? false,
       ...(options.apiKey ? { apiKey: options.apiKey } : {}),
     },
     fetch,
@@ -108,6 +112,20 @@ void test('engine-openai streams one user message with the upstream model, max_t
       max_tokens: 8,
       stream: true,
       stream_options: { include_usage: true },
+    });
+  }));
+
+void test('engine-openai asks a recountable Qwen3 server to keep thinking off, as the recount renders it', () =>
+  withServer(stream(COMPLETE), async (server) => {
+    await engineAt(server.base, { recountable: true }).generate({
+      prompt: 'synthetic',
+      maxTokens: 8,
+    });
+    const request = server.seen.find((seen) =>
+      seen.url.endsWith('/chat/completions'),
+    )!;
+    assert.deepEqual(JSON.parse(request.body).chat_template_kwargs, {
+      enable_thinking: false,
     });
   }));
 

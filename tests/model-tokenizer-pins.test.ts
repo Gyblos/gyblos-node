@@ -38,7 +38,6 @@ void test('every Qwen3 hybrid model pins the recount tokenizer and is recountabl
 void test('Ollama tags resolve to the catalog models', () => {
   for (const [tag, id] of [
     ['qwen3:1.7b', MODEL_IDS.QWEN3_1_7B],
-    ['qwen3:4b', MODEL_IDS.QWEN3_4B],
     ['qwen3:8b', MODEL_IDS.QWEN3_8B],
     ['qwen3:14b', MODEL_IDS.QWEN3_14B],
     ['qwen3:32b', MODEL_IDS.QWEN3_32B],

@@ -1158,8 +1158,8 @@ sent, and nothing on this channel authorizes payment.
 
 Every quote carries the offer's metering mode:
 
-- **Recounted**: the model's public tokenizer is pinned (Qwen3 0.6B). The seller
-  counts the prompt and output with it, as the buyer can.
+- **Recounted**: the model's public tokenizer is pinned (the Qwen3 family). The
+  seller counts the prompt and output with it, as the buyer can.
 - **Declared**: any other model, served through the `openai` or `anthropic`
   engine. The usage is the provider's, which the buyer cannot check. The seller
   therefore:
