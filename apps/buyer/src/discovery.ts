@@ -233,7 +233,7 @@ const conversationSellers = (config: BuyerSelectionConfig) =>
   );
 const cryptoRandom = () =>
   randomInt(BUYER_SELECTION.randomRange) / BUYER_SELECTION.randomRange;
-async function configuredIdentities(
+async function verifiedConfiguredSellers(
   config: BuyerSelectionConfig,
   options: DiscoverOptions,
   signal: AbortSignal,
@@ -250,7 +250,7 @@ async function configuredIdentities(
       accepted.push(seller);
     signal.throwIfAborted();
   }
-  return new Map(accepted.map((seller) => [seller.nodeId, seller]));
+  return accepted;
 }
 export async function discoverBuyerSellers(
   config: BuyerSelectionConfig & { discovery: BuyerDiscoveryConfig },
@@ -262,7 +262,8 @@ export async function discoverBuyerSellers(
     AbortSignal.timeout(options.timeoutMs ?? BUYER_DISCOVERY.timeoutMs),
     ...(options.signal ? [options.signal] : []),
   ]);
-  const identities = await configuredIdentities(config, options, signal);
+  const accepted = await verifiedConfiguredSellers(config, options, signal);
+  const identities = new Map(accepted.map((seller) => [seller.nodeId, seller]));
   // Sellers known only from the index (open discovery), each with a verified registered identity.
   const run: OpenRun = {
     discovered: new Map(),
