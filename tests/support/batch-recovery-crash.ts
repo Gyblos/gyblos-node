@@ -86,6 +86,7 @@ export async function batchRecoveryCrash() {
   ): Promise<unknown> {
     if (method === CRASH_CALLS.SIGN) return signing(args, cut, pause);
     if (method === CRASH_CALLS.ADMIT) {
+      if (cut === CRASH_CUTS.OPEN_INFLIGHT) await pause();
       await financial.seller().open(text(args[0]));
       if (cut === CRASH_CUTS.OPEN_INCLUDED) await pause();
       return null;
@@ -98,11 +99,13 @@ export async function batchRecoveryCrash() {
     if (method === CRASH_CALLS.EPOCH)
       return { absoluteSlot: vm.slot(), blockHeight: vm.height() };
     if (method === CRASH_CALLS.OLDEST) return vm.history.oldestSlot;
-    if (method === CRASH_CALLS.ACCOUNT)
+    if (method === CRASH_CALLS.ACCOUNT) {
+      if (cut === CRASH_CUTS.RECOVERY_LOCKED) await pause();
       return {
         context: { slot: vm.slot() },
         value: await vm.accountInfo(address(text(args[0])), vm.network),
       };
+    }
     if (method === CRASH_CALLS.HISTORY) {
       const config = crashObject(args[1]);
       assert.ok(typeof config.limit === 'number');
@@ -134,6 +137,11 @@ export async function batchRecoveryCrash() {
       };
     }
     if (method === CRASH_CALLS.SEND) {
+      if (
+        cut === CRASH_CUTS.CLOSE_INFLIGHT ||
+        cut === CRASH_CUTS.REFUND_INFLIGHT
+      )
+        await pause();
       const sent = await vm.signer.sendTransaction(text(args[0]), vm.network);
       if (
         cut === CRASH_CUTS.CLOSE_INCLUDED ||

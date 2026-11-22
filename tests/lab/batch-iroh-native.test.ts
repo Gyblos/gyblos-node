@@ -200,7 +200,9 @@ void test(
       await f.financial.vm.balance(f.financial.terms.buyer),
       f.financial.before.buyer - 120n,
     );
+    const settledSends = f.financial.vm.sends();
     assert.equal((await f.buyer().reconcile())?.chargedAtomic, '120');
+    assert.equal(f.financial.vm.sends(), settledSends);
   },
 );
 void test(

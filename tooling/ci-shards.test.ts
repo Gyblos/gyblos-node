@@ -32,3 +32,15 @@ void test('new files fill remaining capacity after assigning the measured files'
     measured,
   );
 });
+
+void test('ordinary PRs omit only the retired buyer crash scenarios before balancing', () => {
+  const active = 'tests/lab/batch-recovery-crash.test.ts';
+  const historical = [
+    'tests/lab/channel-crash-native.test.ts',
+    'tests/lab/channel-crash-boundaries.test.ts',
+  ];
+  const files = [active, ...historical];
+  const weights = new Map<string, number>();
+  assert.deepEqual(assignShards(files, weights, 2, true).flat(), [active]);
+  assert.deepEqual(assignShards(files, weights, 2).flat().sort(), files.sort());
+});

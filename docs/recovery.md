@@ -66,15 +66,19 @@ terminal marker and keep blocking.
 
 ## Offline abrupt-exit acceptance
 
-The native crash suites test this recovery offline (see
-[tests/README.md](../tests/README.md)). They run the real payment client,
-journal, withdrawal and reconciliation modules in a child process, kill it at
-checkpoints, signatures, inclusion and resolution, then reopen the same home
-without deleting a journal or lock. A parent process holds the payment-channel
-program in LiteSVM and the synthetic wallet keys; an accepted send can land
-after the child dies.
+The batch crash suite tests reusable-channel recovery offline (see
+[tests/README.md](../tests/README.md)). It runs the batch buyer, journal,
+withdrawal and reconciliation modules in a child process, kills it at
+checkpoints before dispatch, in flight and after inclusion, then reopens the
+same home without deleting a journal or lock. A parent process holds the
+payment-channel program in LiteSVM and the synthetic wallet keys; an accepted
+send can land after the child dies.
 
-What they don't prove:
+The older per-request buyer has separate crash suites. Ordinary code PRs into
+develop run the batch suites. Full CI and local lab runs also exercise the
+retired buyer adapter.
+
+What these tests don't prove:
 
 - The node's devnet startup, a deployed binary, network finality or public RPC
   behavior. The suites use the SDK's testnet identifier and contact no network;

@@ -1,10 +1,18 @@
 // Balance the current test inventory using historical file durations from Linux CI.
+const retiredBuyerCrashFiles = new Set([
+  'tests/lab/channel-crash-native.test.ts',
+  'tests/lab/channel-crash-boundaries.test.ts',
+]);
+
 export function assignShards(
   files: readonly string[],
   durations: ReadonlyMap<string, number>,
   count: number,
+  ordinaryPr = false,
 ): string[][] {
-  const paths = [...new Set(files)].sort();
+  const paths = [...new Set(files)]
+    .filter((path) => !ordinaryPr || !retiredBuyerCrashFiles.has(path))
+    .sort();
   const measured = paths
     .flatMap((path) => durations.get(path) ?? [])
     .sort((a, b) => a - b);
