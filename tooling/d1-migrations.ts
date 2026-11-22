@@ -1,43 +1,18 @@
-// Runs drizzle-kit generate for a D1 Worker and records each new migration file's SHA-256 once in
-// migrations/meta/_sha256.json, so tests/drizzle-migrations.test.ts rejects any later edit.
-// Recorded hashes are never rewritten; an unfilled `--custom` placeholder is left unrecorded.
+// Runs drizzle-kit generate for a D1 Worker, then records new migration hashes
+// (d1-migration-hashes.ts); `hashes` records filled custom migrations of every D1 Worker.
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { recordMigrationHashes } from './d1-migration-hashes';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const D1_APPS = ['apps/discovery-index', 'apps/metrics-collector'] as const;
-const CUSTOM_PLACEHOLDER =
-  '-- Custom SQL migration file, put your code below! --';
-const MANIFEST = join('migrations', 'meta', '_sha256.json');
-
-const text = (path: string) =>
-  readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
 
 function record(appDir: string) {
-  const manifestPath = join(appDir, MANIFEST);
-  const recorded: Record<string, string> = JSON.parse(text(manifestPath));
-  const added: string[] = [];
-  const migrationsDir = join(appDir, 'migrations');
-  for (const file of readdirSync(migrationsDir)
-    .filter((name) => name.endsWith('.sql'))
-    .sort()) {
-    if (file in recorded) continue;
-    const sql = text(join(migrationsDir, file));
-    if (sql.trim() === CUSTOM_PLACEHOLDER) {
-      console.log(
-        `${file}: write its data statements, then run pnpm db:hashes to record it.`,
-      );
-      continue;
-    }
-    recorded[file] = createHash('sha256').update(sql).digest('hex');
-    added.push(file);
-  }
-  writeFileSync(manifestPath, `${JSON.stringify(recorded, null, 2)}\n`);
-  for (const file of added) console.log(`Recorded ${file}.`);
+  for (const file of recordMigrationHashes(appDir))
+    console.log(`Recorded ${file}.`);
 }
 
 function generate(appDir: string, drizzleArguments: string[]) {
