@@ -75,12 +75,12 @@ void test('the title bar adds a conversation menu and a details panel for the ch
   );
   assert.match(
     css,
-    /> \.app-body \{[^}]*border-start-start-radius: var\(--radius-panel\);/,
+    /> \.app-body \{[^}]*border-start-start-radius: var\(--pk-radius-sheet\);/,
   );
   assert.doesNotMatch(css, /--pk-side-width/);
   assert.match(
     css,
-    /\.preview-chat-panel \{[^}]*border-inline-start: 1px solid var\(--line\);[^}]*border-end-start-radius: var\(--radius-panel\);/s,
+    /\.preview-chat-panel \{[^}]*border-inline-start: 1px solid var\(--line\);[^}]*border-end-start-radius: var\(--pk-radius-sheet\);/s,
   );
   assert.match(
     css,
@@ -115,4 +115,68 @@ void test('the title bar adds a conversation menu and a details panel for the ch
   const design = await read('DESIGN.md');
   assert.match(design, /PreviewConversationPanel/);
   assert.match(design, /PreviewChatDetails/);
+});
+
+void test('?density=compact is a comparison mode that leaves the default view unchanged', async () => {
+  const [browser, css, kit, settings] = await Promise.all([
+    read('browser.ts'),
+    read('preview.css'),
+    read('views/PreviewKit.tsx.preview'),
+    read('views/Settings.tsx.preview'),
+  ]);
+  assert.match(browser, /get\('density'\) === 'compact'/);
+  assert.match(browser, /dataset\.density = 'compact'/);
+  assert.match(browser, /compact && !query\.has\('font'\)/);
+  const tokens =
+    /html\[data-density='compact'\] \.app\.desktop-frame \{([^}]*)\}/.exec(
+      css,
+    )?.[1] ?? '';
+  for (const token of [
+    '--radius-control: 6px;',
+    '--radius-option: 6px;',
+    '--pk-radius-menu: 8px;',
+    '--radius-panel: 10px;',
+    '--pk-radius-sheet: 16px;',
+    '--control-size: 28px;',
+    '--pk-row-height: 30px;',
+    '--pk-comfort-padding: 20px;',
+  ])
+    assert.ok(tokens.includes(token), token);
+  assert.match(css, /--pk-radius-sheet: var\(--radius-panel\);/);
+  assert.match(css, /border-start-start-radius: var\(--pk-radius-sheet\);/);
+  assert.match(
+    css,
+    /html\[data-density='compact'\][^{]*\{[^}]*transition-duration: 150ms;/,
+  );
+  assert.match(
+    css,
+    /prefers-reduced-motion: reduce\) \{\s*html\[data-density='compact'\]/,
+  );
+  for (const name of [
+    'previewCompact',
+    'previewIcon',
+    'Kbd',
+    'showPreviewToast',
+    'PreviewToaster',
+    'PreviewSkeletonRows',
+    'PreviewEmptyLine',
+  ])
+    assert.match(
+      kit,
+      new RegExp('export (function|const) ' + name + '\\b'),
+      name,
+    );
+  assert.match(kit, /previewCompact\(\) \? 1000 : 1600/);
+  assert.match(kit, /size: 16, weight: 'bold'/);
+  assert.match(
+    kit,
+    /aria-keyshortcuts=\{previewCompact\(\) \? PREVIEW_SHORTCUT\.NEW_CHAT\.aria/,
+  );
+  assert.match(kit, /NEW_CHAT: \{ key: 'n', label: '⌘N', aria: 'Meta\+N' \}/);
+  assert.match(kit, /SEARCH: \{ key: 'k', label: '⌘K', aria: 'Meta\+K' \}/);
+  assert.match(kit, /showPreviewToast\('Conversation deleted'\)/);
+  assert.match(
+    settings,
+    /<Section title="Appearance" icon=\{<PreviewSectionIcon icon=\{Palette\} \/>\}>/,
+  );
 });
