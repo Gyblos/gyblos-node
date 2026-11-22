@@ -1,10 +1,12 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+import { batchSessionPathsIn } from '@gyblos/config/home';
 import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import { finalizedUnchargedRequest } from '@gyblos/payments-upto/batch-session';
 import { withBatchOutputLimit } from '@gyblos/protocol/batch-channel';
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -47,6 +49,7 @@ import {
   prepareChosenSeller,
   verifyChosenOffer,
 } from './session-seller-choice';
+import { singleSessionExecutor } from './session-serial';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
 
@@ -352,7 +355,28 @@ export async function startSessionQuoteRuntime(
     if (router?.activeRequests()) return sessionFail(SESSION_CODES.BUSY);
     return run();
   };
+  const execute = sessionExecutor(
+    context,
+    options,
+    manager,
+    state,
+    role.buyer,
+    router,
+  );
   return {
+    confirmUnchargedKey: router
+      ? undefined
+      : async (ref, scope) => {
+          await inspect(() =>
+            manager.reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
+          );
+          return finalizedUnchargedRequest(
+            batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+            ref,
+            scope,
+            context.endpoint.id().toString(),
+          );
+        },
     sellerChoice: true,
     reconcilePool: router
       ? () => checkDesktopPool(manager, () => router.activeRequests() > 0)
@@ -364,14 +388,7 @@ export async function startSessionQuoteRuntime(
     token,
     requestMs: PAID_BUYER_HTTP_MS,
     classify: classifyPaidError,
-    execute: sessionExecutor(
-      context,
-      options,
-      manager,
-      state,
-      role.buyer,
-      router,
-    ),
+    execute: router ? execute : singleSessionExecutor(execute),
     chat: (url) => ({
       ...ownedChat(
         prepared.config.request.selection.modelId,
