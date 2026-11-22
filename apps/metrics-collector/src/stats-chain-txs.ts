@@ -64,7 +64,9 @@ function parseLimit(value: string | null): number | undefined {
   if (value === null) return CHAIN_TX_PAGE.defaultLimit;
   if (!LIMIT.test(value)) return undefined;
   const limit = Number(value);
-  return limit <= CHAIN_TX_PAGE.maxLimit ? limit : undefined;
+  return limit <= CHAIN_TX_PAGE.maxLimit && limit !== CHAIN_TX_PAGE.defaultLimit
+    ? limit
+    : undefined;
 }
 
 export function parseChainTxQuery(
@@ -72,7 +74,11 @@ export function parseChainTxQuery(
 ): ChainTxQuery | undefined {
   const keys = [...params.keys()];
   const canonical = PARAM_ORDER.filter((key) => keys.includes(key));
-  if (keys.join('&') !== canonical.join('&')) return undefined;
+  if (
+    keys.length !== canonical.length ||
+    keys.some((key, index) => key !== canonical[index])
+  )
+    return undefined;
   const limit = parseLimit(params.get(PARAMS.LIMIT));
   const text = params.get(PARAMS.BEFORE);
   const before = text === null ? null : parseCursor(text);

@@ -231,6 +231,9 @@ void test('a malformed, unknown or repeated query parameter answers 400 INVALID_
     `?before=100-${sig('A')}-00`,
     `?before=100-${sig('A')}-01`,
     `?limit=4&before=100-${sig('A')}-0`,
+    '?=ignored',
+    `?before=100-${sig('A')}-0&=x`,
+    '?limit=25',
   ]) {
     const { status, cache, body } = await get(app, query);
     assert.equal(status, 400, query);
@@ -350,4 +353,38 @@ void test('a channel with thousands of settles still answers a page quickly and 
   assert.equal(body.transactions.length, 50);
   assert.ok(body.transactions.every((row) => row.amountAtomic === '10'));
   assert.ok(elapsed < 3000, `${elapsed} ms`);
+});
+
+void test('a page without settles reads no settle history of its channels', async () => {
+  const database = createCollectorD1();
+  channel(database, 'G', { mint: DEVNET_USDC });
+  tx(database, sig('Open'), 1000, 1, { slot: 1 });
+  instruction(database, sig('Open'), 0, 'open', 'G', { amount: '100000000' });
+  database.raw.exec('BEGIN');
+  for (let i = 1; i <= 40000; i += 1) {
+    tx(database, sig(`S${i}`), 1000 + i, 1, { slot: 1 + i });
+    instruction(database, sig(`S${i}`), 0, 'settle', 'G', {
+      cumulative: String(i),
+    });
+  }
+  database.raw.exec('COMMIT');
+  const { app } = collector(database);
+  const timed = async (query: string) => {
+    const started = performance.now();
+    const answer = await get(app, query);
+    return { ...answer, ms: performance.now() - started };
+  };
+  const newest = await timed('?limit=2');
+  assert.deepEqual(
+    newest.body.transactions.map((row) => row.amountAtomic),
+    ['1', '1'],
+  );
+  const deposits = await timed(`?before=2-${sig('S1')}-0`);
+  assert.deepEqual(summary(deposits.body.transactions), [
+    [sig('Open'), 0, 'open', 'G', '100000000'],
+  ]);
+  assert.ok(
+    deposits.ms < newest.ms / 4,
+    `${deposits.ms} ms vs ${newest.ms} ms`,
+  );
 });

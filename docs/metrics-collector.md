@@ -464,15 +464,17 @@ a distribute the index read pays the Gyblos treasury; see
 [Gyblos traffic is a claim](#chain-index)), newest first by slot, then
 signature, then instruction index. It reads the chain index tables only, never
 writes, and takes no day range. It first selects the page's rows, then computes
-amounts for those rows only. Query parameters, each at most once and in this
-order:
+amounts for those rows only, reading settle history only for channels with a
+settle on the page and only up to the page's newest slot. Query parameters, each
+at most once and in this order:
 
 - `before`: the `next` cursor of the previous page,
   `<slot>-<signature>-<instructionIndex>`;
-- `limit`: rows per page, 1 to 50, default 25.
+- `limit`: rows per page, 1 to 50; omit it for the default of 25.
 
-Numbers are canonical (`0` or no leading zero). Any other parameter, a repeated
-one, another order, a `limit` outside 1 to 50 or a malformed cursor answers
+Numbers are canonical (`0` or no leading zero). Any other parameter (an unnamed
+one included), a repeated one, another order, `limit=25` (the default is sent by
+omitting it), a `limit` outside 1 to 50 or a malformed cursor answers
 `400 INVALID_QUERY`, so each page has one cache key. Caching, the read budget
 and `503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
 

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lte, max, sql } from 'drizzle-orm';
 
 import { DEVNET_USDC } from '@gyblos/config/network';
 
@@ -72,7 +72,11 @@ function settleIncrements(
   orm: CollectorDatabase,
   page: ReturnType<typeof pageKeys>,
 ) {
-  const pageChannels = orm.select({ channel: page.channel }).from(page);
+  const pageChannels = orm
+    .select({ channel: page.channel })
+    .from(page)
+    .where(inArray(page.kind, SETTLING));
+  const newestSlot = orm.select({ slot: max(page.slot) }).from(page);
   const deposits = orm
     .select({
       channel: ins.channel,
@@ -107,6 +111,7 @@ function settleIncrements(
         isNotNull(chainTxs.blockTime),
         eq(chainChannels.mint, DEVNET_USDC),
         inArray(ins.channel, pageChannels),
+        lte(chainTxs.slot, newestSlot),
       ),
     )
     .as('settles');
