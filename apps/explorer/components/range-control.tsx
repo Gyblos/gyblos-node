@@ -3,9 +3,10 @@
 // Owns the date range control in the header: a segmented control over the preset spans. A choice
 // navigates to the same page with `?range=<days>`, so the server renders that range and the link can
 // be shared.
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 
+import { rangeSwitchHref } from '../lib/chain-txs-shape';
 import { RANGE } from '../lib/constants';
 import type { RangeDays } from '../lib/range';
 import { SegmentedControl } from './board/segmented-control';
@@ -17,7 +18,7 @@ const OPTIONS = RANGE.presets.map((days) => ({
 
 export function RangeControl({ days }: { days: RangeDays }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   return (
     <div className={pending ? 'opacity-60 transition-opacity' : undefined}>
@@ -27,12 +28,9 @@ export function RangeControl({ days }: { days: RangeDays }) {
         selected={days}
         onChange={(next) =>
           startTransition(() =>
-            router.push(
-              next === RANGE.defaultDays
-                ? pathname
-                : `${pathname}?${RANGE.param}=${next}`,
-              { scroll: false },
-            ),
+            router.push(rangeSwitchHref(searchParams.toString(), next), {
+              scroll: false,
+            }),
           )
         }
       />

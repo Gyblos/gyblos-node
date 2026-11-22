@@ -6,6 +6,7 @@ import {
   CHAIN_TX_LABELS,
   chainTxsQuery,
   parseChainTxs,
+  rangeSwitchHref,
   sellerOwners,
   txCursor,
   txPageHref,
@@ -63,7 +64,7 @@ const distribute = (): ChainTx => parsed().transactions[0]!;
 
 void test('the explorer knows exactly the collector instruction kinds and page bounds', () => {
   assert.deepEqual([...CHAIN_TX_KINDS], Object.values(CHAIN_INSTRUCTIONS));
-  assert.ok(CHAIN_TXS.pageSize <= CHAIN_TX_PAGE.maxLimit);
+  assert.equal(CHAIN_TXS.param, CHAIN_TX_PAGE.params.BEFORE);
   assert.deepEqual(CHAIN_TX_LABELS, {
     open: 'Deposit',
     top_up: 'Top-up',
@@ -81,7 +82,7 @@ void test('the collector query the explorer sends is the canonical one the colle
     const query = chainTxsQuery(before);
     const params = new URLSearchParams(query);
     assert.ok(parseChainTxQuery(params), query);
-    assert.equal(params.get('limit'), String(CHAIN_TXS.pageSize));
+    assert.equal(params.get('limit'), null);
     assert.equal(params.get('before'), before);
   }
 });
@@ -99,11 +100,13 @@ void test('channel transactions are checked at the boundary and amounts stay exa
     blockTime: Date.UTC(2026, 10, 20, 14, 2, 30),
     kind: 'distribute',
     channel: 'ChannelAddress1111',
-    payee: 'FeePayer1111',
     recipients: ['SellerOwner', TREASURY],
     amount: 1_500_000n,
   });
   assert.equal(page.transactions[1]!.amount, null);
+  const withoutPayee = answer();
+  Reflect.deleteProperty(withoutPayee.transactions[0]!, 'payee');
+  assert.ok(!('payee' in parseChainTxs(withoutPayee).transactions[0]!));
   type Body = ReturnType<typeof answer>;
   const broken = (edit: (body: Body) => void) => {
     const body = answer();
@@ -200,10 +203,7 @@ void test('the seller is only the listed, unique owner of the channel payout rec
     ),
     null,
   );
-  assert.equal(
-    credited({ ...distribute(), recipients: [], payee: 'SellerOwner' }),
-    null,
-  );
+  assert.equal(credited({ ...distribute(), recipients: [] }), null);
   assert.equal(
     credited({ ...distribute(), recipients: ['Other', 'SellerOwner'] }),
     null,
@@ -223,4 +223,18 @@ void test('pager links keep the range and carry the cursor', () => {
   assert.equal(txPageHref(RANGE.defaultDays, CURSOR), `/?before=${CURSOR}`);
   assert.equal(txPageHref(7, CURSOR), `/?range=7&before=${CURSOR}`);
   assert.equal(txPageHref(90, null), '/?range=90');
+});
+
+void test('switching the date range keeps a valid transaction page', () => {
+  assert.equal(
+    rangeSwitchHref(`before=${CURSOR}`, 7),
+    `/?range=7&before=${CURSOR}`,
+  );
+  assert.equal(
+    rangeSwitchHref(`range=7&before=${CURSOR}`, RANGE.defaultDays),
+    `/?before=${CURSOR}`,
+  );
+  assert.equal(rangeSwitchHref('range=7', 90), '/?range=90');
+  assert.equal(rangeSwitchHref('range=7&before=bad', RANGE.defaultDays), '/');
+  assert.equal(rangeSwitchHref('', 7), '/?range=7');
 });

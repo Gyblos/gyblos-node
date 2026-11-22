@@ -43,7 +43,6 @@ export interface ChainTx {
   blockTime: number | null;
   kind: ChainTxKind;
   channel: string;
-  payee: string | null;
   recipients: string[];
   amount: bigint | null;
 }
@@ -80,7 +79,6 @@ function transaction(value: unknown): ChainTx {
     ),
     kind: kind(source.kind),
     channel: text(source.channel, 'tx.channel'),
-    payee: nullable(source.payee, (present) => text(present, 'tx.payee')),
     recipients: list(source.recipients, 'tx.recipients').map((owner) =>
       text(owner, 'tx.recipient'),
     ),
@@ -107,7 +105,6 @@ export function parseChainTxs(value: unknown): Omit<ChainTxPage, 'error'> {
 export function chainTxsQuery(before: string | null) {
   const params = new URLSearchParams();
   if (before) params.set(CHAIN_TXS.param, before);
-  params.set('limit', String(CHAIN_TXS.pageSize));
   return params.toString();
 }
 
@@ -168,3 +165,6 @@ export function txPageHref(days: RangeDays, before: string | null) {
   const query = params.toString();
   return query ? `/?${query}` : '/';
 }
+
+export const rangeSwitchHref = (search: string, days: RangeDays) =>
+  txPageHref(days, txCursor(new URLSearchParams(search).get(CHAIN_TXS.param)));

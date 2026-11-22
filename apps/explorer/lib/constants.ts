@@ -88,7 +88,6 @@ export const DISPLAY = {
 
 export const CHAIN_TXS = {
   param: 'before',
-  pageSize: 25,
 } as const;
 
 // The date range control: preset spans of UTC days ending today. The collector answers at most 92 days
