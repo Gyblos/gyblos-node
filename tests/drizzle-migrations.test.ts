@@ -85,16 +85,26 @@ const described = ({ id, prevId, _meta, ...rest }: Record<string, unknown>) => {
   return rest;
 };
 
-// True when SQL names no schema or database-level statement outside strings and comments. One
-// left-to-right pass, so `'--'` in a string or an apostrophe in a comment cannot hide a statement.
+// True when SQL names no schema or database-level statement outside strings, quoted identifiers and
+// comments. One left-to-right pass, so `--` or a quote inside any of them cannot hide a statement.
 const dataOnly = (sql: string) =>
   !/\b(create|alter|drop|pragma|reindex|vacuum|attach|detach)\b/i.test(
-    sql.replaceAll(/'(?:[^']|'')*'|--[^\n]*|\/\*[\s\S]*?\*\//g, ' '),
+    sql.replaceAll(
+      /'(?:[^']|'')*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\]|--[^\n]*|\/\*[\s\S]*?\*\//g,
+      ' ',
+    ),
   );
 
 void test('the data-only check sees DDL hidden behind a string that looks like a comment', () => {
   assert.equal(dataOnly("UPDATE t SET a = '--'; DROP TABLE x;"), false);
   assert.equal(dataOnly("-- it's a backfill\nDROP TABLE x; -- '"), false);
+  for (const hidden of [
+    'SELECT 1 AS "--"; DROP TABLE x;',
+    'SELECT 1 AS `a--`; DROP TABLE x;',
+    'SELECT 1 AS [--]; DROP TABLE x;',
+    'SELECT 1 AS "it\'s"; DROP TABLE x; -- \'',
+  ])
+    assert.equal(dataOnly(hidden), false, hidden);
   for (const statement of [
     'PRAGMA foreign_keys = OFF;',
     'REINDEX t;',
@@ -106,6 +116,10 @@ void test('the data-only check sees DDL hidden behind a string that looks like a
 });
 
 void test('the data-only check accepts data statements with comments and strings', () => {
+  assert.equal(
+    dataOnly('UPDATE "drop" SET "create" = 1, `alter` = 2, [pragma] = 3;'),
+    true,
+  );
   assert.equal(
     dataOnly(
       "-- Custom SQL migration file, put your code below! --\nUPDATE t SET note = 'drop -- create' WHERE id = 1; /* backfill */\nDELETE FROM u WHERE a = 'it''s';",
