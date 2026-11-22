@@ -1,6 +1,6 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
 import { ArrowCircleUp, CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
-import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
@@ -461,7 +461,22 @@ export function PreviewUpdateButton({ version, onClick }: { version: string; onC
     </Button>
   );
 }
-function PreviewUpdateDialog({ current, available, close }: { current: string; available: string; close(): void }) {
+function PreviewUpdateDialog({
+  current,
+  available,
+  close,
+  restoreFocus,
+}: {
+  current: string;
+  available: string;
+  close(): void;
+  restoreFocus?: () => void;
+}) {
+  const restore = useRef(restoreFocus);
+  useEffect(() => () => {
+    const focus = restore.current;
+    if (focus) requestAnimationFrame(focus);
+  }, []);
   return (
     <Modal title={'Gyblos ' + available} description="A new desktop version is available." size="sm" close={close}>
       <p className="ui-help-text">
@@ -485,24 +500,44 @@ function PreviewUpdateDialog({ current, available, close }: { current: string; a
 /** Bottom bar of the desktop window: system status on the left, update and version on the right. */
 export function PreviewStatusBar({ status, version }: { status: ReactNode; version: string }) {
   const available = usePreviewUpdate();
+  const footer = useRef<HTMLElement>(null);
   const [open, setOpen] = useState(false);
+  const [chained, setChained] = useState(false);
   useEffect(() => {
-    const show = () => setOpen(true);
+    const show = () => {
+      setChained(true);
+      setOpen(true);
+    };
     window.addEventListener(PREVIEW_EVENT.UPDATE, show);
     return () => window.removeEventListener(PREVIEW_EVENT.UPDATE, show);
   }, []);
   const newer = available && available !== version ? available : null;
   return (
     <>
-      <footer className="preview-status-bar" aria-label="App status">
+      <footer ref={footer} className="preview-status-bar" aria-label="App status">
         <NewerVersion.Provider value={newer}>{status}</NewerVersion.Provider>
         <span className="preview-status-end">
-          {newer && <PreviewUpdateButton version={newer} onClick={() => setOpen(true)} />}
+          {newer && (
+            <PreviewUpdateButton
+              version={newer}
+              onClick={() => {
+                setChained(false);
+                setOpen(true);
+              }}
+            />
+          )}
           <span className="preview-version">Gyblos {version}</span>
         </span>
       </footer>
       <MotionPresence>
-        {open && newer && <PreviewUpdateDialog current={version} available={newer} close={() => setOpen(false)} />}
+        {open && newer && (
+          <PreviewUpdateDialog
+            current={version}
+            available={newer}
+            close={() => setOpen(false)}
+            restoreFocus={chained ? () => footer.current?.querySelector<HTMLElement>('.preview-status-trigger')?.focus() : undefined}
+          />
+        )}
       </MotionPresence>
     </>
   );

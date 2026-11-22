@@ -646,6 +646,7 @@ html .app.desktop-frame .preview-status-trigger {
   align-items: center;
   gap: 6px;
   height: 20px;
+  min-height: 20px;
   min-width: 0;
   padding: 0 8px;
   border: 0;
@@ -664,6 +665,7 @@ html .app.desktop-frame .pk-update {
   align-items: center;
   gap: 6px;
   height: 20px;
+  min-height: 20px;
   padding: 0 8px;
   border: 0;
   border-radius: var(--radius-badge);

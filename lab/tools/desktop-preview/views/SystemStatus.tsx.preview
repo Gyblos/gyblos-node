@@ -61,12 +61,17 @@ export function SystemStatus({ state, onRetry, onPayments }: { state: LocalNodeS
     ? TONE.DANGER
     : issues.length
       ? TONE.WARNING
-      : state === LOCAL_NODE_STATE.READY
+      : state === LOCAL_NODE_STATE.READY && wallet.status !== WALLET_STATUS.LOADING
         ? TONE.SUCCESS
         : TONE.INFO;
   const summary = issues.length > 1
     ? issues.length + ' items need attention'
-    : (issues[0]?.summary ?? (state === LOCAL_NODE_STATE.READY ? 'All systems ready' : LOCAL_NODE_LABELS[state]));
+    : (issues[0]?.summary ??
+      (state !== LOCAL_NODE_STATE.READY
+        ? LOCAL_NODE_LABELS[state]
+        : wallet.status === WALLET_STATUS.LOADING
+          ? 'Loading wallet'
+          : 'All systems ready'));
   return (
     <>
       <Button
