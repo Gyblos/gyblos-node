@@ -172,8 +172,20 @@ void test('?density=compact is a comparison mode that leaves the default view un
     kit,
     /aria-keyshortcuts=\{previewCompact\(\) \? PREVIEW_SHORTCUT\.NEW_CHAT\.aria/,
   );
-  assert.match(kit, /NEW_CHAT: \{ key: 'n', label: '⌘N', aria: 'Meta\+N' \}/);
-  assert.match(kit, /SEARCH: \{ key: 'k', label: '⌘K', aria: 'Meta\+K' \}/);
+  assert.match(kit, /NEW_CHAT: \{ label: '⌘N', aria: 'Meta\+N' \}/);
+  assert.match(kit, /MODELS: \{ label: '⌘K', aria: 'Meta\+K' \}/);
+  assert.doesNotMatch(kit, /addEventListener\('keydown', onKey\)/);
+  const details = await read('views/UsdcApiKeyDetails.tsx.preview');
+  assert.match(
+    details,
+    /if \(result && !result\.error\) showPreviewToast\('API key revoked'\)/,
+  );
+  const sidebar = await read('views/BuyerSidebar.tsx.preview');
+  assert.match(sidebar, /shortcut: PREVIEW_SHORTCUT\.MODELS/);
+  assert.match(
+    settings,
+    /else if \(previewCompact\(\)\) params\.set\('font', 'instrument-sans'\)/,
+  );
   assert.match(kit, /showPreviewToast\('Conversation deleted'\)/);
   assert.match(
     settings,
