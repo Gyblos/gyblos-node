@@ -171,16 +171,12 @@ async function checkPoolBudget<Remote extends BatchDestination>(
   existing: BatchPoolEntry | undefined,
   terms: BatchPoolEntry['terms'],
 ) {
-  const budget = await pool.budget();
+  const { totalDepositAtomic, depositAtomic } = state.options.policy;
+  const { committedAtomic, availableAtomic } = await pool.budget();
   if (
-    BigInt(budget.committedAtomic) >
-    BigInt(
-      state.options.policy.totalDepositAtomic ??
-        state.options.policy.depositAtomic,
-    )
+    BigInt(committedAtomic) > BigInt(totalDepositAtomic ?? depositAtomic) ||
+    (!existing && BigInt(availableAtomic) < BigInt(terms.depositAtomic))
   )
-    throw new UnsentChannelLimitError(terms.sellerNodeId);
-  if (!existing && BigInt(budget.availableAtomic) < BigInt(terms.depositAtomic))
     throw new UnsentChannelLimitError(terms.sellerNodeId);
 }
 async function execute<Remote extends BatchDestination>(
@@ -218,11 +214,10 @@ async function execute<Remote extends BatchDestination>(
         !existing?.stored?.openingReturned) ||
       (state.options.now() >= terms.expiresAt &&
         !existing?.stored?.openingPending)
-    )
-      throw new UnsentChannelRequestError(
-        terms.sellerNodeId,
-        new PaymentSessionError(SESSION_CODES.CLOSED),
-      );
+    ) {
+      const cause = new PaymentSessionError(SESSION_CODES.CLOSED);
+      throw new UnsentChannelRequestError(terms.sellerNodeId, cause);
+    }
     await checkPoolBudget(state, pool, existing, terms);
     return {
       terms,
