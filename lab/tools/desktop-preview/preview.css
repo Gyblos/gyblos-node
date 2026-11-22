@@ -615,7 +615,6 @@ html .app.desktop-frame .modal .network-status-copy strong {
   margin: 4px 0 0;
 }
 
-/* Status bar: system status on the left, update and version on the right. */
 html .app.desktop-frame {
   grid-template-rows: var(--shell-header-height) minmax(0, 1fr) var(
       --pk-status-bar
