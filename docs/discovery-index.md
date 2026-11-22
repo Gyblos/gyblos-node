@@ -600,10 +600,16 @@ and snapshots. Its baseline, `0007_snapshot.json`, describes the schema after
 file is `0008_<change>.sql`. Wrangler applies `.sql` files only, records them by
 file name, and therefore applies only the new ones.
 
-Drizzle cannot declare the tables' `WITHOUT ROWID` layout. A change SQLite
-cannot make with `ALTER TABLE` (for example making a column nullable) makes
-drizzle-kit rebuild the table as an ordinary rowid table; a test rejects that,
-and such a change needs a founder decision first.
+Drizzle cannot declare the tables' `WITHOUT ROWID` layout, so tables created by
+generated migrations are ordinary rowid tables. A change SQLite cannot make with
+`ALTER TABLE` (for example making a column nullable) makes drizzle-kit rebuild a
+baseline table as a rowid table; a test rejects that, and such a change needs a
+founder decision first. Never run drizzle-kit `push`, `pull` or `introspect`
+against the D1 database: they would rebuild every table the same way (the config
+has no credentials). A data-only change (`UPDATE`, `DELETE`, backfill) is the
+one exception to generated SQL:
+`pnpm index:db:generate --custom --name <change>` creates the journaled file,
+whose body holds only reviewed data statements.
 
 Apply a migration before deploying code that needs it, and apply it to the
 remote database only with founder approval. Each migration adds tables, columns

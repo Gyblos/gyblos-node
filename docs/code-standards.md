@@ -132,6 +132,22 @@ snapshot). `pnpm lint` runs `drizzle-kit check`, and
 generated migration. Schema checks inline their values (`.inlineParams()`),
 since a bound parameter would be written to the migration as `?`.
 
+The single exception to generated SQL is a data-only change (an `UPDATE`,
+`DELETE` or backfill that drizzle-kit cannot derive): create it with
+`pnpm index:db:generate --custom --name <change>` (or the collector script), so
+drizzle-kit numbers and journals it, and write only data statements in its body.
+It is reviewed like code, and a test rejects schema statements (`CREATE`,
+`ALTER`, `DROP`) in it. Schema changes are always generated.
+
+- Tables created by generated migrations are ordinary rowid tables; Drizzle
+  cannot declare the `WITHOUT ROWID` layout of the hand-written baseline tables.
+  A change that makes drizzle-kit rebuild a baseline table is rejected by a test
+  and needs a founder decision.
+- Never run `drizzle-kit push`, `pull` or `introspect` against the D1 databases:
+  they would rebuild every table and drop `WITHOUT ROWID`. The configs carry no
+  credentials. Only `generate` plus `wrangler d1 migrations apply` change D1,
+  and `--remote` only with founder approval.
+
 ## Errors and external boundaries
 
 - New package errors use typed codes from their owning catalog. Plain `Error`
