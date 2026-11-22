@@ -58,6 +58,7 @@ type CommentOptions = {
   hashMarker?: string;
   adjacentHash?: boolean;
   powershell?: boolean;
+  python?: boolean;
   lineMarkers: string[];
 };
 type SourceCommentStats = { comments: number; lines: number };
@@ -146,7 +147,8 @@ function delimitedCommentRanges(
       continue;
     }
     if (
-      (character === "'" && !/[a-z0-9]/i.test(text[index - 1] ?? '')) ||
+      (character === "'" &&
+        (options.python || !/[a-z0-9]/i.test(text[index - 1] ?? ''))) ||
       character === '"' ||
       (!options.powershell && character === '`')
     ) {
@@ -193,7 +195,7 @@ function delimitedCommentRanges(
   return ranges;
 }
 
-function commentRanges(text: string, path: string): CommentRange[] {
+export function commentRanges(text: string, path: string): CommentRange[] {
   const extension = sourceExtension(path);
   if (TYPESCRIPT_EXTENSIONS.has(extension))
     return typescriptCommentRanges(text, path);
@@ -226,6 +228,7 @@ function commentRanges(text: string, path: string): CommentRange[] {
     });
   return delimitedCommentRanges(text, {
     blockMarkers: [],
+    python: extension === '.py',
     adjacentHash: extension === '.py' || extension === '.toml',
     hashMarker: '#',
     lineMarkers: [],
@@ -359,9 +362,13 @@ async function run(): Promise<void> {
   );
 }
 
-void run().catch((error: unknown) => {
-  console.error(
-    error instanceof Error ? error.message : 'Comment budget check failed.',
-  );
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+)
+  void run().catch((error: unknown) => {
+    console.error(
+      error instanceof Error ? error.message : 'Comment budget check failed.',
+    );
+    process.exitCode = 1;
+  });
