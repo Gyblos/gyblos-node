@@ -114,11 +114,14 @@ del rol, recibos, logs completos ni capturas del aviso de registro. Pide ayuda e
 
 ## Verifica tu cuenta de GitHub [#verificar-github]
 
-Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. Tu vendedor tiene que
-estar registrado o publicando. El vínculo tiene dos partes públicas que cualquiera puede comprobar: un gist de
-tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea `gyblos-node=NODEID`, y
-una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El índice de descubrimiento
-revisa el gist por su cuenta, sin ningún token de GitHub.
+Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. El índice ya tiene que
+conocer tu vendedor: tiene que estar registrado, o haber publicado antes sus modelos en el índice. No necesita
+estar en línea, y activar la publicación no basta hasta que el vendedor haya publicado. El vínculo tiene dos
+partes: un gist de tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea
+`gyblos-node=NODEID`, y una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El
+índice de descubrimiento revisa la firma cuando recibe la declaración, y revisa el gist por su cuenta, sin
+ningún token de GitHub. Cualquiera puede revisar el gist, pero el índice no guarda ni publica la declaración
+firmada, así que la vista pública muestra el resultado del índice, no una firma que otros puedan comprobar.
 
 Una cuenta verificada es una etiqueta pública. No demuestra la calidad de tus respuestas ni el código que
 ejecuta tu vendedor. El nombre de tu cuenta de GitHub y el gist pasan a ser públicos: mira qué se comparte en
@@ -151,7 +154,6 @@ la dirección del gist.
 
 Si `gh` no está instalada, o tiene la sesión iniciada con otra cuenta (el comando lo dice), el comando no la usa
 y muestra los pasos de abajo. La imagen de Docker no incluye `gh`, así que un vendedor Docker sigue los pasos de abajo.
-La imagen de Docker no incluye `gh`, así que un vendedor Docker sigue los pasos de abajo.
 
 ### Sin la CLI de GitHub [#verificar-github-a-mano]
 
@@ -193,7 +195,7 @@ del vendedor y se salta lo que ya está hecho.
 
 | Estado     | Qué significa                                                                                                                                                                                                                                                                   |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verified` | En la última revisión, el índice encontró la línea de prueba en tu gist. Los compradores ven la cuenta y el gist en la lista de la red del índice.                                                                                                                              |
+| `verified` | La última revisión que GitHub respondió encontró la línea de prueba en tu gist. Los compradores ven la cuenta y el gist en la lista de la red del índice.                                                                                                                       |
 | `pending`  | El índice tiene tu declaración, pero aún no encontró la prueba. No aparece en la lista de la red, pero cualquiera puede leerla en `GET /v1/identity/github/<NodeId>`. El índice revisa de nuevo cada 6 horas más o menos, durante 7 días; después, ejecuta el comando otra vez. |
 | `lost`     | La cuenta estaba verificada, pero la última revisión no encontró la prueba: el gist, el archivo o la línea ya no están, o la cuenta cambió de nombre. Los compradores ya no la ven.                                                                                             |
 
@@ -203,14 +205,16 @@ estado: `pending` sigue en `pending` y `verified` sigue en `verified`.
 ### Bueno saber [#github-bueno-saber]
 
 - **El índice revisó hace un momento.** El comando muestra `waiting N s to ask again (Ctrl+C is safe)` y
-  vuelve a preguntar una vez por su cuenta. Si la espera es de más de 2 minutos, se detiene y te dice que lo
-  ejecutes otra vez más tarde.
+  vuelve a preguntar una vez por su cuenta. Espera una sola vez: si la espera es de más de 2 minutos, o el
+  índice responde lo mismo después de esa espera, se detiene y te dice que lo ejecutes otra vez más tarde.
 - **Cambiar la cuenta o el gist.** Ejecuta el comando otra vez con el nuevo `USER`, o con `--gist` y el nuevo
   gist. La declaración vuelve a `pending` hasta que el índice revise el nuevo gist.
 - **No borres el gist.** El índice lo revisa otra vez cada 6 horas más o menos. Si borras el gist, cambias el
   nombre del archivo o quitas la línea, el estado pasa a `lost`.
-- **Varios vendedores.** Una cuenta de GitHub puede verificar varios vendedores. Cada vendedor tiene su propio
-  NodeId, así que necesita su propio gist.
+- **Varios vendedores.** Una cuenta de GitHub puede verificar varios vendedores, cada uno con su propia línea
+  `gyblos-node=NODEID`. Con `gh`, el comando crea un gist por vendedor. A mano, lo más simple es un solo gist:
+  agrega la línea de cada vendedor, cada una en su propio renglón, al mismo `gyblos-proof.txt` y pasa ese gist
+  a cada vendedor con `--gist`. Si quitas una línea del archivo compartido, solo ese vendedor pasa a `lost`.
 
 ### Comprueba el estado [#comprobar-github]
 
@@ -219,9 +223,14 @@ gyblos seller verify github --status
 gyblos seller status --online
 ```
 
-`--status` muestra la cuenta, la dirección del gist, el estado, el motivo y cuándo revisó el índice por última
-vez. `gyblos seller status --online` muestra el mismo vínculo en su línea `github`. En un vendedor Docker, pon
-`docker compose exec seller` delante de los dos.
+`--status` muestra la cuenta, la dirección del gist, el estado, el motivo, cuándo intentó revisar el índice
+por última vez y, mientras está `verified`, desde cuándo. El último intento puede ser uno en que GitHub no
+respondió, así que no es la última vez que se encontró la prueba.
+
+`gyblos seller status --online` muestra la cuenta y el estado en su línea `github`, y la dirección del gist
+solo mientras está `verified`. Solo le pregunta al índice cuando la publicación está activada y el vendedor
+ofrece al menos un modelo; si no, la línea no aparece. En un vendedor Docker, pon `docker compose exec seller`
+delante de los dos.
 
 ### Quita el vínculo [#quitar-github]
 
@@ -243,9 +252,9 @@ Cada error empieza con una frase que dice qué hacer y termina con un código en
 | `VERIFY_GIST_OWNER_MISMATCH`                            | El gist es de otra cuenta de GitHub. Crea el gist con la sesión iniciada como `USER`.                                                                                                        |
 | `VERIFY_GIST_NOT_FOUND`                                 | GitHub no tiene ese gist para `USER`: revisa la dirección y el nombre de usuario. Si borraste el gist, ejecuta el comando otra vez para crear uno nuevo, o pasa otra dirección con `--gist`. |
 | `VERIFY_NOT_VERIFIED` con `could not reach GitHub`      | El índice no pudo llegar a GitHub. Tu declaración mantiene su estado. Ejecuta el comando otra vez en unos minutos.                                                                           |
-| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento y la espera es de más de 2 minutos. Ejecuta el comando otra vez pasado el tiempo que muestra.                                                   |
+| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento, y la espera es de más de 2 minutos o el índice seguía diciéndolo después de la única espera. Ejecuta el comando otra vez en un minuto.         |
 | `VERIFY_GH_FAILED`                                      | La CLI de GitHub no pudo crear el gist. Créalo a mano y ejecuta el comando con `--gist`.                                                                                                     |
-| `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish) o publícalo.                                                                                         |
+| `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish), o publica sus modelos una vez.                                                                      |
 | `DISCOVERY_STALE_CLAIM`                                 | El índice tiene una declaración más nueva de este vendedor. El comando ya probó una vez más. Revisa el reloj de este equipo y ejecuta el comando otra vez.                                   |
 | `DISCOVERY_RATE_LIMITED`                                | El índice recibió demasiados intentos. Espera un minuto y ejecuta el comando otra vez.                                                                                                       |
 | `VERIFY_ACCOUNT_INVALID`                                | Eso no es un nombre de usuario de GitHub. Usa letras, números y guiones sueltos, con 39 caracteres como máximo.                                                                              |

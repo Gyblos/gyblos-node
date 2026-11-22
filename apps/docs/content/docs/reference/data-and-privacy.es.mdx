@@ -176,7 +176,7 @@ Vincular una cuenta de GitHub a tu vendedor es opcional. No se envía nada salvo
 
 **Qué se vuelve público.** El índice publica tu declaración en `GET /v1/identity/github/<NodeId>`: tu
 NodeId, el nombre de tu cuenta de GitHub, el id del gist, el estado (`pending`, `verified` o `lost`), el
-motivo del último resultado, cuándo revisó el índice por última vez y desde cuándo la cuenta está
+motivo del último resultado, cuándo intentó revisar el índice por última vez (aunque GitHub no respondiera) y desde cuándo la cuenta está
 verificada. Cualquiera puede leerla, sea cual sea el estado. Mientras el estado es `verified`, la lista de la
 red (`/v1/network`) también muestra la cuenta y el gist junto a tu vendedor. El gist en sí es público en
 GitHub. Un gist secreto también sirve, pero su id se publica, así que trátalo como público.
@@ -191,17 +191,21 @@ consultas vienen del índice, no de tu equipo.
 **Qué envía tu equipo.** El comando firma la declaración con la llave del nodo y la envía al índice: tu
 NodeId, la cuenta, el id del gist y la hora. También lee el mismo archivo del gist desde tu equipo (y, si ese
 archivo falta, la dirección raw del gist sin nombre de archivo, para distinguir un nombre de archivo equivocado de
-un gist que no existe), así que GitHub ve tu dirección IP. Si usas la CLI de GitHub (`gh`), esta usa tu sesión de GitHub para leer el nombre
-de tu cuenta, listar tus gists públicos y crear el gist de prueba. `gyblos seller status --online` y
+un gist que no existe), así que GitHub ve tu dirección IP. Cuando aún no tiene gist (sin `--gist`, sin uno guardado y sin uno en el
+índice) y la CLI de GitHub (`gh`) está instalada, primero le pregunta a GitHub a través de `gh` con qué cuenta
+tiene `gh` la sesión iniciada, aunque después no use `gh`. Cuando es la cuenta que indicaste, usa tu sesión de
+GitHub para listar tus gists públicos y crear el gist de prueba. `gyblos seller status --online` y
 `--status` le piden tu declaración al índice por tu NodeId.
 
 **En tu equipo.** El comando guarda su avance (una versión del formato, tu NodeId, la cuenta, el id del gist y el último paso) en
 `github-verification.json`, dentro de la carpeta `seller/` del home del vendedor. Solo tú puedes leerlo.
 
 **Cómo quitarlo.** Ejecuta `gyblos seller verify github --cancel`. El índice deja de mostrar la cuenta, la
-ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tu NodeId, la hora de
-la cancelación y la hora de su última lectura de tu gist, y nunca los muestra; así nadie puede volver a enviar
-una declaración vieja. El gist sigue en GitHub: bórralo
+ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tu NodeId, la hora
+firmada de la cancelación y la hora en que una declaración enviada usó por última vez su turno para leer tu
+gist (las revisiones programadas no la cambian), y nunca los muestra. La hora de la cancelación hace que el
+índice rechace cualquier declaración más vieja, así que nadie puede volver a enviar una declaración vieja; la
+hora del turno evita que una declaración nueva haga que el índice lea GitHub más de una vez por minuto. El gist sigue en GitHub: bórralo
 tú. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
 
 ## Solana devnet [#solana]

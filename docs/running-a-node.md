@@ -453,13 +453,16 @@ pnpm gyblos seller verify github --cancel
 ```
 
 `seller verify github` shows buyers which GitHub account runs this seller. It
-needs a seller the index already knows (registered with `seller register`, or
-publishing). The binding has two public halves that anyone can re-check: a gist
-owned by `<user>` with a file named `gyblos-proof.txt` that contains the line
-`gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its id,
-so the proof is public either way), and a claim signed by the node key naming
-the account and the gist, which the discovery index checks
-([discovery-index.md](discovery-index.md#github-claims)).
+needs a seller the index already knows: an active registration
+(`seller register`) or a catalog the index has stored; it need not be online,
+and `publish = true` alone is not enough until a catalog was published. The
+binding has two halves: a gist owned by `<user>` with a file named
+`gyblos-proof.txt` that contains the line `gyblos-node=<NodeId>` (an unlisted
+gist works too: the index publishes its id, so the proof is public either way),
+and a claim signed by the node key naming the account and the gist, which the
+discovery index checks ([discovery-index.md](discovery-index.md#github-claims)).
+Anyone can re-check the gist; the index does not keep or serve the signature.
+One `gyblos-proof.txt` may hold several sellers' proof lines, one per line.
 
 1. The account is lowercased and checked (letters, digits and single hyphens, at
    most 39 characters).
@@ -481,10 +484,11 @@ the account and the gist, which the discovery index checks
    what to do: `GIST_NOT_FOUND`, `NODE_ID_MISSING`, or `GITHUB_UNAVAILABLE` (the
    claim stays pending; run it again later). When the index checked this seller
    less than a minute ago (`CHECK_DEFERRED`), a wait of up to 2 minutes is
-   waited out once and the claim sent again; a longer one is reported. A
-   `DISCOVERY_STALE_CLAIM` answer is re-signed once with a newer time. A
-   `DISCOVERY_UNKNOWN_NODE` refusal means the index does not know the seller
-   yet: register or publish first.
+   waited out once and the claim sent again; a longer wait, or a second
+   `CHECK_DEFERRED` after that wait, is reported. A `DISCOVERY_STALE_CLAIM`
+   answer is re-signed once with a newer time. A `DISCOVERY_UNKNOWN_NODE`
+   refusal means the index does not know the seller yet: register or publish
+   first.
 
 Progress (account, gist id and last step) is saved in
 `<GYBLOS_HOME>/seller/github-verification.json`, owner-only and written
@@ -495,12 +499,13 @@ GitHub is dropped, so a plain rerun makes a new one. Failures lead with a
 sentence saying what to do and end with the static code in brackets. A finished
 verification run again just says `Already verified`.
 
-`--status` prints the index's view: account, gist URL, state, reason and when it
-was last checked. `--cancel` signs a cancel claim, so the index stops linking
-the seller to the account, and removes the progress file. The gist stays on
-GitHub; delete it yourself. Only `verified` means the index found the proof. The
-command prints public identifiers only (NodeId, account, gist URL and the index
-origin), never a key or the home location.
+`--status` prints the index's view: account, gist URL, state, reason, the last
+check attempt (which may be one GitHub did not answer) and, while verified,
+since when. `--cancel` signs a cancel claim, so the index stops linking the
+seller to the account, and removes the progress file. The gist stays on GitHub;
+delete it yourself. Only `verified` means the index found the proof. The command
+prints public identifiers only (NodeId, account, gist URL and the index origin),
+never a key or the home location.
 
 ### Docker
 

@@ -387,8 +387,7 @@ is `400 INVALID_QUERY`):
 
 ## GitHub claims
 
-A seller can show which GitHub account runs it. The binding has two halves, and
-anyone can re-check both:
+A seller can show which GitHub account runs it. The binding has two halves:
 
 1. a claim signed by the node key: "my GitHub account is `account`, and gist
    `gist` proves it" (the [identity claim](identity.md#github-account-claim) in
@@ -401,7 +400,9 @@ same way, and the index publishes the gist id, so the proof is public either
 way.
 
 The claim is a separate message. It is never part of a public record, so record
-parsers and older nodes are unaffected.
+parsers and older nodes are unaffected. The index checks its signature on
+submission but does not keep or serve it: anyone can re-check the gist half from
+the published account and gist, not the signature half.
 
 **Trust only `verified`.** A client must treat an account as proven only when
 `state === 'verified'`. `pending` and `lost` accounts are unproven claims by the
@@ -498,9 +499,11 @@ else is `400 INVALID_QUERY`) answers:
 }
 ```
 
-A NodeId without a claim, or whose claim was cancelled, is `404 NOT_FOUND`.
-`/v1/network` carries the account and gist of every verified claim
-([Network](#network)).
+`checkedAt` is the last check attempt, including one where GitHub did not
+answer; `verifiedAt` is when the current verified run began. The answer carries
+no signed claim or signature (they are not stored). A NodeId without a claim, or
+whose claim was cancelled, is `404 NOT_FOUND`. `/v1/network` carries the account
+and gist of every verified claim ([Network](#network)).
 
 ### Recheck
 

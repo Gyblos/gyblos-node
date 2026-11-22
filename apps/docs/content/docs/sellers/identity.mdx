@@ -112,11 +112,14 @@ logs or screenshots of the registration prompt. Ask for help in the [Gyblos Tele
 
 ## Verify your GitHub account [#verify-github]
 
-You can show buyers which GitHub account runs your seller. This is optional. Your seller must already be
-registered or publishing. The link has two public parts that anyone can check: a gist owned by your GitHub
-account with a file named `gyblos-proof.txt` that contains the line `gyblos-node=NODEID`, and a claim signed
-by your node key that names the account and the gist. The discovery index checks the gist itself, with no
-GitHub token.
+You can show buyers which GitHub account runs your seller. This is optional. The index must already know
+your seller: it must be registered, or have published its models to the index before. It doesn't need to be
+online, and turning publishing on isn't enough until the seller has published. The link has two parts: a
+gist owned by your GitHub account with a file named `gyblos-proof.txt` that contains the line
+`gyblos-node=NODEID`, and a claim signed by your node key that names the account and the gist. The
+discovery index checks the signature when it receives the claim, and checks the gist itself, with no GitHub
+token. Anyone can check the gist, but the index doesn't keep or publish the signed claim, so the public
+view shows the index's result, not a signature others can check.
 
 A verified account is a public label. It doesn't prove the quality of your answers or the code your seller
 runs. Your GitHub account name and gist become public: see what is shared in
@@ -189,7 +192,7 @@ and skips what is done.
 
 | State      | What it means                                                                                                                                                                                                                                               |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verified` | At the last check the index found the proof line in your gist. Buyers see the account and the gist in the index's network list.                                                                                                                             |
+| `verified` | The last check GitHub answered found the proof line in your gist. Buyers see the account and the gist in the index's network list.                                                                                                                          |
 | `pending`  | The index has your claim but hasn't found the proof yet. It isn't shown in the network list, but anyone can read it at `GET /v1/identity/github/<NodeId>`. The index checks again about every 6 hours, for up to 7 days; after that, run the command again. |
 | `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.                                                                                            |
 
@@ -199,13 +202,16 @@ Only `verified` means the proof was found. When GitHub doesn't answer, the claim
 ### Good to know [#github-good-to-know]
 
 - **The index checked moments ago.** The command prints `waiting N s to ask again (Ctrl+C is safe)` and asks
-  once more by itself. If the wait is longer than 2 minutes, it stops and tells you to run it again later.
+  once more by itself. It waits only once: if the wait is longer than 2 minutes, or the index answers the
+  same after that wait, it stops and tells you to run it again later.
 - **Change the account or the gist.** Run the command again with the new `USER`, or with `--gist` and the new
   gist. The claim goes back to `pending` until the index checks the new gist.
 - **Keep the gist.** The index checks it again about every 6 hours. If you delete the gist, rename its file or
   remove the line, the state becomes `lost`.
-- **Several sellers.** One GitHub account can verify several sellers. Each seller has its own NodeId, so it
-  needs its own gist.
+- **Several sellers.** One GitHub account can verify several sellers, each with its own
+  `gyblos-node=NODEID` line. With `gh`, the command makes one gist per seller. By hand, the simplest is one
+  gist: add each seller's line, on its own line, to the same `gyblos-proof.txt` and pass that gist to each
+  seller with `--gist`. Removing a line from the shared file makes only that seller `lost`.
 
 ### Check the state [#github-check]
 
@@ -214,9 +220,13 @@ gyblos seller verify github --status
 gyblos seller status --online
 ```
 
-`--status` shows the account, the gist address, the state, the reason and when the index last checked.
-`gyblos seller status --online` shows the same link in its `github` line. For a Docker seller, put
-`docker compose exec seller` in front of both.
+`--status` shows the account, the gist address, the state, the reason, when the index last tried to check
+and, while `verified`, since when. The last try can be one where GitHub didn't answer, so it isn't the last
+time the proof was found.
+
+`gyblos seller status --online` shows the account and state in its `github` line, and the gist address only
+while `verified`. It asks the index only when publishing is on and the seller lists at least one model;
+otherwise the line is missing. For a Docker seller, put `docker compose exec seller` in front of both.
 
 ### Remove it [#github-remove]
 
@@ -238,9 +248,9 @@ Each error starts with a sentence that says what to do and ends with a code in b
 | `VERIFY_GIST_OWNER_MISMATCH`                             | The gist belongs to another GitHub account. Create the gist while signed in as `USER`.                                                                                          |
 | `VERIFY_GIST_NOT_FOUND`                                  | GitHub has no such gist for `USER`: check the address and the user name. If the gist was deleted, run the command again to make a new one, or pass a new address with `--gist`. |
 | `VERIFY_NOT_VERIFIED` with `could not reach GitHub`      | The index couldn't reach GitHub. Your claim keeps its current state. Run the command again in a few minutes.                                                                    |
-| `VERIFY_NOT_VERIFIED` with `checked this seller moments` | The index checked your seller moments ago and the wait is longer than 2 minutes. Run the command again after the time it shows.                                                 |
+| `VERIFY_NOT_VERIFIED` with `checked this seller moments` | The index checked your seller moments ago, and the wait is longer than 2 minutes or the index still said so after the one wait. Run the command again in a minute.              |
 | `VERIFY_GH_FAILED`                                       | The GitHub CLI couldn't create the gist. Create it by hand and run the command with `--gist`.                                                                                   |
-| `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) or publish first.                                                                              |
+| `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) it, or publish its models once, first.                                                         |
 | `DISCOVERY_STALE_CLAIM`                                  | The index holds a newer claim from this seller. The command already tried once more. Check this computer's clock, then run the command again.                                   |
 | `DISCOVERY_RATE_LIMITED`                                 | The index got too many attempts. Wait a minute and run the command again.                                                                                                       |
 | `VERIFY_ACCOUNT_INVALID`                                 | That is not a GitHub user name. Use letters, digits and single hyphens, at most 39 characters.                                                                                  |
