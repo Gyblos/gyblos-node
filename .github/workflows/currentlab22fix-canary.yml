@@ -1,0 +1,254 @@
+name: CurrentLab22Fix canary
+permissions:
+  contents: read
+concurrency:
+  group: currentlab22fix-canary-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+      windows_full: ${{ steps.diff.outputs.windows_full }}
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+        ref: ae48686907b2e72c021c083e3842fb0c86bd18d2
+    - run: bash .github/scripts/test-ci-changes.sh
+    - id: diff
+      env:
+        EVENT: ${{ github.event_name }}
+        BASE: ${{ github.event.pull_request.base.sha }}
+        TARGET: ${{ github.base_ref }}
+      run: printf 'code=true\nwindows_full=false\n' >> "$GITHUB_OUTPUT"
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+        ref: ae48686907b2e72c021c083e3842fb0c86bd18d2
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm comments:check
+      env:
+        COMMENT_BASE_SHA: c8f50c2e5d39bdcfc3f0e6ee71ef5bbac32ed82b
+    - run: pnpm exec prettier --check .
+    - run: pnpm docs:build
+    - run: pnpm docs:test
+    - run: node --import tsx --test "tests/docs-*.test.ts"
+  static:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+        ref: ae48686907b2e72c021c083e3842fb0c86bd18d2
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm typecheck
+    - run: pnpm lint
+      env:
+        COMMENT_BASE_SHA: c8f50c2e5d39bdcfc3f0e6ee71ef5bbac32ed82b
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+        - 1
+        - 2
+        - 3
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: ae48686907b2e72c021c083e3842fb0c86bd18d2
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - run: node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/3 "tests/*.test.ts" "packages/*/test/**/*.test.ts"
+  lab:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+        - 1
+        - 2
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: ae48686907b2e72c021c083e3842fb0c86bd18d2
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - if: matrix.shard == 1
+      name: Select ordinary lab files and load identical test fixtures
+      run: 'echo ''ZGlmZiAtLWdpdCBhLy5naXRodWIvYnVuLWZzLW9ic2VydmVyLm1qcyBiLy5naXRodWIvYnVuLWZzLW9ic2VydmVyLm1qcwpuZXcgZmlsZSBtb2RlIDEwMDY0NAppbmRleCAwMDAwMDAwMDAuLmMyOTk2NzAzNgotLS0gL2Rldi9udWxsCisrKyBiLy5naXRodWIvYnVuLWZzLW9ic2VydmVyLm1qcwpAQCAtMCwwICsxLDExIEBACisvLyBGb3J3YXJkIHRoZSB0d28gbmFtZWQgZmlsZXN5c3RlbSBleHBvcnRzIHRvIHRoZSBsaXZlIG1ldGhvZHMgcGF0Y2hlZCBieSB0aGUgZmF1bHQtaW5qZWN0aW9uIHRlc3RzLgoraW1wb3J0IGZpbGVzeXN0ZW0gZnJvbSAnbm9kZTpmcy9wcm9taXNlcyc7CisKK2ltcG9ydCB7IG1vY2sgfSBmcm9tICdidW46dGVzdCc7CisKK21vY2subW9kdWxlKCdub2RlOmZzL3Byb21pc2VzJywgKCkgPT4gKHsKKyAgLi4uZmlsZXN5c3RlbSwKKyAgZGVmYXVsdDogZmlsZXN5c3RlbSwKKyAgb3BlbjogKC4uLmFyZ3MpID0+IGZpbGVzeXN0ZW0ub3BlbiguLi5hcmdzKSwKKyAgcmVuYW1lOiAoLi4uYXJncykgPT4gZmlsZXN5c3RlbS5yZW5hbWUoLi4uYXJncyksCit9KSk7CmRpZmYgLS1naXQgYS90ZXN0cy9sYWIvYWNjZXB0YW5jZS1yZXZpZXctcmVncmVzc2lvbnMudGVzdC50cyBiL3Rlc3RzL2xhYi9hY2NlcHRhbmNlLXJldmlldy1yZWdyZXNzaW9ucy50ZXN0LnRzCmluZGV4IDg0Mzg2MDMzMS4uZTA3M2JmOGViIDEwMDY0NAotLS0gYS90ZXN0cy9sYWIvYWNjZXB0YW5jZS1yZXZpZXctcmVncmVzc2lvbnMudGVzdC50cworKysgYi90ZXN0cy9sYWIvYWNjZXB0YW5jZS1yZXZpZXctcmVncmVzc2lvbnMudGVzdC50cwpAQCAtMTAsNiArMTAsNyBAQCBpbXBvcnQgeyBBQ0NFUFRBTkNFX0NPREVTIH0gZnJvbSAnQGd5Ymxvcy9sYWItaGFybmVzcy9hY2NlcHRhbmNlL2NvbnN0YW50cyc7CiBpbXBvcnQgeyBDT05UUk9MX0NPREVTIH0gZnJvbSAnQGd5Ymxvcy9wcm90b2NvbC9jb25zdGFudHMnOwogCiBpbXBvcnQgeyBhY2NlcHRhbmNlUmVwbGF5IH0gZnJvbSAnLi4vc3VwcG9ydC9hY2NlcHRhbmNlLXJlcGxheSc7CitpbXBvcnQgeyBidW5GaXh0dXJlTG9hZGVyIH0gZnJvbSAnLi4vc3VwcG9ydC9idW4tbG9hZGVyLWZpeHR1cmUnOwogaW1wb3J0IHsgTkFUSVZFX1RFU1RfT1BUSU9OUyB9IGZyb20gJy4uL3N1cHBvcnQvbmF0aXZlLXJ1bnRpbWUnOwogCiBjb25zdCBSRUdSRVNTSU9OX1RJTUVPVVRfTVMgPSAxNTAwMDsKQEAgLTIzLDcgKzI0LDE1IEBAIGZ1bmN0aW9uIGNoaWxkKAogICBpbnRlcmNlcHRlZDogcmVhZG9ubHkgeyBuYW1lOiBzdHJpbmc7IG1vZHVsZTogc3RyaW5nIH1bXSA9IFtdLAogKSB7CiAgIGNvbnN0IGFyZ3M6IHN0cmluZ1tdID0gW107Ci0gIGlmIChpbnRlcmNlcHRlZC5sZW5ndGgpIHsKKyAgaWYgKGludGVyY2VwdGVkLmxlbmd0aCAmJiBwcm9jZXNzLnZlcnNpb25zLmJ1bikgeworICAgIHNvdXJjZSA9CisgICAgICBidW5GaXh0dXJlTG9hZGVyKAorICAgICAgICBpbnRlcmNlcHRlZC5tYXAoKGVudHJ5KSA9PiAoeworICAgICAgICAgIC4uLmVudHJ5LAorICAgICAgICAgIGFjdHVhbDogaW1wb3J0Lm1ldGEucmVzb2x2ZShlbnRyeS5uYW1lKSwKKyAgICAgICAgfSkpLAorICAgICAgKSArIHNvdXJjZTsKKyAgfSBlbHNlIGlmIChpbnRlcmNlcHRlZC5sZW5ndGgpIHsKICAgICBjb25zdCB3cmFwcGVycyA9IGludGVyY2VwdGVkLm1hcCgoZW50cnkpID0+ICh7CiAgICAgICBuYW1lOiBlbnRyeS5uYW1lLAogICAgICAgdXJsOiAnZGF0YTp0ZXh0L2phdmFzY3JpcHQsJyArIGVuY29kZVVSSUNvbXBvbmVudChlbnRyeS5tb2R1bGUpLApkaWZmIC0tZ2l0IGEvdGVzdHMvbGFiL2lkZW50aXR5LWFjY2VwdGFuY2UudGVzdC50cyBiL3Rlc3RzL2xhYi9pZGVudGl0eS1hY2NlcHRhbmNlLnRlc3QudHMKaW5kZXggYjIzYzE5NWZkLi5lODI1YWI3ZTEgMTAwNjQ0Ci0tLSBhL3Rlc3RzL2xhYi9pZGVudGl0eS1hY2NlcHRhbmNlLnRlc3QudHMKKysrIGIvdGVzdHMvbGFiL2lkZW50aXR5LWFjY2VwdGFuY2UudGVzdC50cwpAQCAtMiw2ICsyLDcgQEAKIGltcG9ydCBhc3NlcnQgZnJvbSAnbm9kZTphc3NlcnQvc3RyaWN0JzsKIGltcG9ydCB0ZXN0IGZyb20gJ25vZGU6dGVzdCc7CiAKK2ltcG9ydCB7IGJ1bkZpeHR1cmVMb2FkZXIgfSBmcm9tICcuLi9zdXBwb3J0L2J1bi1sb2FkZXItZml4dHVyZSc7CiBpbXBvcnQgeyBOQVRJVkVfVEVTVF9PUFRJT05TIH0gZnJvbSAnLi4vc3VwcG9ydC9uYXRpdmUtcnVudGltZSc7CiAKIHZvaWQgdGVzdCgnaWRlbnRpdHkgYWNjZXB0YW5jZSBDTEkgcmVmdXNlcyBvcGVyYXRpb25hbCBvdmVycmlkZXMgYW5kIG5ldmVyIHJlZmxlY3RzIHJhdyBmYWlsdXJlcycsIGFzeW5jICgpID0+IHsKQEAgLTEzMiwxMyArMTMzLDIwIEBAIHZvaWQgdGVzdCgnaWRlbnRpdHkgYWNjZXB0YW5jZSBDTEkgcmVwb3J0cyB1bmF2YWlsYWJsZSBuYXRpdmUgdHJhbnNwb3J0IHdpdGhvdXQKICAgY29uc3QgcmVzdWx0ID0gc3Bhd25TeW5jKAogICAgIHByb2Nlc3MuZXhlY1BhdGgsCiAgICAgWwotICAgICAgJy0taW1wb3J0JywKLSAgICAgICdkYXRhOnRleHQvamF2YXNjcmlwdCwnICsgZW5jb2RlVVJJQ29tcG9uZW50KGJvb3RzdHJhcCksCisgICAgICAuLi4ocHJvY2Vzcy52ZXJzaW9ucy5idW4KKyAgICAgICAgPyBbXQorICAgICAgICA6IFsKKyAgICAgICAgICAgICctLWltcG9ydCcsCisgICAgICAgICAgICAnZGF0YTp0ZXh0L2phdmFzY3JpcHQsJyArIGVuY29kZVVSSUNvbXBvbmVudChib290c3RyYXApLAorICAgICAgICAgIF0pLAogICAgICAgJy0taW1wb3J0JywKICAgICAgICd0c3gnLAogICAgICAgJy0taW5wdXQtdHlwZT1tb2R1bGUnLAogICAgICAgJy0tZXZhbCcsCi0gICAgICAiY29uc3Qge21haW59PWF3YWl0IGltcG9ydCgnQGd5Ymxvcy9sYWItaGFybmVzcy9jbGkvaWRlbnRpdHktYWNjZXB0YW5jZScpO3Byb2Nlc3MuZXhpdENvZGU9YXdhaXQgbWFpbihbXSk7IiwKKyAgICAgIChwcm9jZXNzLnZlcnNpb25zLmJ1bgorICAgICAgICA/IGJ1bkZpeHR1cmVMb2FkZXIoW3sgbmFtZTogJ0BudW1iZXIwL2lyb2gnLCBtb2R1bGU6IHJlcGxhY2VtZW50IH1dKQorICAgICAgICA6ICcnKSArCisgICAgICAgICJjb25zdCB7bWFpbn09YXdhaXQgaW1wb3J0KCdAZ3libG9zL2xhYi1oYXJuZXNzL2NsaS9pZGVudGl0eS1hY2NlcHRhbmNlJyk7cHJvY2Vzcy5leGl0Q29kZT1hd2FpdCBtYWluKFtdKTsiLAogICAgIF0sCiAgICAgewogICAgICAgZW5jb2Rpbmc6ICd1dGY4JywKZGlmZiAtLWdpdCBhL3Rlc3RzL3N1cHBvcnQvYnVuLWNoaWxkLWxvYWRlci5tanMgYi90ZXN0cy9zdXBwb3J0L2J1bi1jaGlsZC1sb2FkZXIubWpzCm5ldyBmaWxlIG1vZGUgMTAwNjQ0CmluZGV4IDAwMDAwMDAwMC4uYjA4ZjYwMGQ1Ci0tLSAvZGV2L251bGwKKysrIGIvdGVzdHMvc3VwcG9ydC9idW4tY2hpbGQtbG9hZGVyLm1qcwpAQCAtMCwwICsxLDUwIEBACisvLyBTeW50aGV0aWMgbW9kdWxlIHJlcGxhY2VtZW50cyBmb3IgaXNvbGF0ZWQgQnVuIGNoaWxkcmVuLiBQcm9kdWN0aW9uIG1vZHVsZXMgcnVuIG5vcm1hbGx5IG91dHNpZGUgdGhlIHNlbGVjdGVkIGltcG9ydHMuCitpbXBvcnQgeyByZWFkRmlsZVN5bmMgfSBmcm9tICdub2RlOmZzJzsKK2ltcG9ydCB7IGZpbGVVUkxUb1BhdGggfSBmcm9tICdub2RlOnVybCc7CisKK2ltcG9ydCB7IHBsdWdpbiwgcmVzb2x2ZVN5bmMgfSBmcm9tICdidW4nOworCitleHBvcnQgZnVuY3Rpb24gaW5zdGFsbEZpeHR1cmVzKHJ1bGVzLCBwYXJlbnRVcmwpIHsKKyAgcGx1Z2luKHsKKyAgICBuYW1lOiAnYWNjZXB0YW5jZSBmaXh0dXJlIG1vZHVsZXMnLAorICAgIHNldHVwKGJ1aWxkKSB7CisgICAgICBmdW5jdGlvbiBpbnRlcmNlcHQocGF0aCwgbG9hZCkgeworICAgICAgICBidWlsZC5vbkxvYWQoCisgICAgICAgICAgeyBmaWx0ZXI6IG5ldyBSZWdFeHAoJ14nICsgUmVnRXhwLmVzY2FwZShwYXRoKSArICckJykgfSwKKyAgICAgICAgICBsb2FkLAorICAgICAgICApOworICAgICAgfQorICAgICAgaWYgKHBhcmVudFVybCkgeworICAgICAgICBjb25zdCBwYXRoID0gZmlsZVVSTFRvUGF0aChwYXJlbnRVcmwpOworICAgICAgICBpbnRlcmNlcHQocGF0aCwgKCkgPT4geworICAgICAgICAgIGxldCBjb250ZW50cyA9IHJlYWRGaWxlU3luYyhwYXRoLCAndXRmOCcpOworICAgICAgICAgIGZvciAoY29uc3QgcnVsZSBvZiBydWxlcykgeworICAgICAgICAgICAgY29uc3Qgc3BlY2lmaWVyID0gIiciICsgcnVsZS5uYW1lICsgIiciOworICAgICAgICAgICAgaWYgKCFjb250ZW50cy5pbmNsdWRlcyhzcGVjaWZpZXIpKQorICAgICAgICAgICAgICB0aHJvdyBuZXcgRXJyb3IoJ01pc3NpbmcgZml4dHVyZSBpbXBvcnQnKTsKKyAgICAgICAgICAgIGNvbnN0IHJlcGxhY2VtZW50ID0KKyAgICAgICAgICAgICAgJ2RhdGE6dGV4dC9qYXZhc2NyaXB0O2Jhc2U2NCwnICsKKyAgICAgICAgICAgICAgQnVmZmVyLmZyb20ocnVsZS5tb2R1bGUpLnRvU3RyaW5nKCdiYXNlNjQnKTsKKyAgICAgICAgICAgIGNvbnRlbnRzID0gY29udGVudHMucmVwbGFjZUFsbCgKKyAgICAgICAgICAgICAgc3BlY2lmaWVyLAorICAgICAgICAgICAgICBKU09OLnN0cmluZ2lmeShyZXBsYWNlbWVudCksCisgICAgICAgICAgICApOworICAgICAgICAgIH0KKyAgICAgICAgICByZXR1cm4geyBjb250ZW50cywgbG9hZGVyOiAndHMnIH07CisgICAgICAgIH0pOworICAgICAgICByZXR1cm47CisgICAgICB9CisgICAgICBmb3IgKGNvbnN0IHJ1bGUgb2YgcnVsZXMpIHsKKyAgICAgICAgY29uc3QgcGF0aCA9IHJ1bGUuYWN0dWFsCisgICAgICAgICAgPyBmaWxlVVJMVG9QYXRoKHJ1bGUuYWN0dWFsKQorICAgICAgICAgIDogcmVzb2x2ZVN5bmMocnVsZS5uYW1lLCBwcm9jZXNzLmN3ZCgpKTsKKyAgICAgICAgLy8gQSBzZXBhcmF0ZSBtb2R1bGUgVVJMIGxldHMgdGhlIHdyYXBwZXIgZGVsZWdhdGUgdG8gdGhlIHJlYWwgaW1wbGVtZW50YXRpb24uCisgICAgICAgIGNvbnN0IGNvbnRlbnRzID0gcnVsZS5tb2R1bGUucmVwbGFjZUFsbCgKKyAgICAgICAgICAiJyIgKyBydWxlLm5hbWUgKyAiJyIsCisgICAgICAgICAgSlNPTi5zdHJpbmdpZnkocGF0aCArICc/Zml4dHVyZS1vcmlnaW5hbCcpLAorICAgICAgICApOworICAgICAgICBpbnRlcmNlcHQocGF0aCwgKCkgPT4gKHsgY29udGVudHMsIGxvYWRlcjogJ2pzJyB9KSk7CisgICAgICB9CisgICAgfSwKKyAgfSk7Cit9CmRpZmYgLS1naXQgYS90ZXN0cy9zdXBwb3J0L2J1bi1sb2FkZXItZml4dHVyZS50cyBiL3Rlc3RzL3N1cHBvcnQvYnVuLWxvYWRlci1maXh0dXJlLnRzCm5ldyBmaWxlIG1vZGUgMTAwNjQ0CmluZGV4IDAwMDAwMDAwMC4uN2RiOGQ3ODUzCi0tLSAvZGV2L251bGwKKysrIGIvdGVzdHMvc3VwcG9ydC9idW4tbG9hZGVyLWZpeHR1cmUudHMKQEAgLTAsMCArMSw5IEBACisvLyBDaGlsZC1vbmx5IHNvdXJjZSB0aGF0IGluc3RhbGxzIHRoZSBzYW1lIHN5bnRoZXRpYyBsb2FkZXIgc3Vic3RpdHV0aW9ucyBvbiBCdW4uCitleHBvcnQgZnVuY3Rpb24gYnVuRml4dHVyZUxvYWRlcigKKyAgbW9kdWxlczogcmVhZG9ubHkgeyBuYW1lOiBzdHJpbmc7IG1vZHVsZTogc3RyaW5nOyBhY3R1YWw/OiBzdHJpbmcgfVtdLAorICBwYXJlbnQ/OiBzdHJpbmcsCispIHsKKyAgY29uc3QgbG9hZGVyID0gbmV3IFVSTCgnLi9idW4tY2hpbGQtbG9hZGVyLm1qcycsIGltcG9ydC5tZXRhLnVybCkuaHJlZjsKKyAgcmV0dXJuIGBpbXBvcnQge2luc3RhbGxGaXh0dXJlc30gZnJvbSAke0pTT04uc3RyaW5naWZ5KGxvYWRlcil9OworICAgIGluc3RhbGxGaXh0dXJlcygke0pTT04uc3RyaW5naWZ5KG1vZHVsZXMpfSwgJHtKU09OLnN0cmluZ2lmeShwYXJlbnQpfSk7YDsKK30KZGlmZiAtLWdpdCBhL3Rlc3RzL2xhYi9mcmVlLWFjY2VwdGFuY2UudGVzdC50cyBiL3Rlc3RzL2xhYi9mcmVlLWFjY2VwdGFuY2UudGVzdC50cwppbmRleCA2MDVmMzFkYjguLjZhZjA3NzI4YyAxMDA2NDQKLS0tIGEvdGVzdHMvbGFiL2ZyZWUtYWNjZXB0YW5jZS50ZXN0LnRzCisrKyBiL3Rlc3RzL2xhYi9mcmVlLWFjY2VwdGFuY2UudGVzdC50cwpAQCAtMiw2ICsyLDcgQEAKIGltcG9ydCBhc3NlcnQgZnJvbSAnbm9kZTphc3NlcnQvc3RyaWN0JzsKIGltcG9ydCB0ZXN0IGZyb20gJ25vZGU6dGVzdCc7CiAKK2ltcG9ydCB7IGJ1bkZpeHR1cmVMb2FkZXIgfSBmcm9tICcuLi9zdXBwb3J0L2J1bi1sb2FkZXItZml4dHVyZSc7CiBpbXBvcnQgeyBOQVRJVkVfQ0FQQUJJTElUWSB9IGZyb20gJy4uL3N1cHBvcnQvbmF0aXZlLXJ1bnRpbWUnOwogCiB2b2lkIHRlc3QoJ2ZyZWUgYWNjZXB0YW5jZSByZWZ1c2VzIGFsbCBvcGVyYXRpb25hbCBvdmVycmlkZXMgYmVmb3JlIHJ1bm5pbmcgYW5kIHNhbml0aXplcyBmYWlsdXJlcycsIGFzeW5jICgpID0+IHsKQEAgLTE0MywxMiArMTQ0LDEyIEBAIHZvaWQgdGVzdCgnZnJlZSBhY2NlcHRhbmNlIENMSSByZXBvcnRzIHVuYXZhaWxhYmxlIG5hdGl2ZSB0cmFuc3BvcnQgd2l0aG91dCBhbnkKICAgY29uc3QgcmVzdWx0ID0gc3Bhd25TeW5jKAogICAgIHByb2Nlc3MuZXhlY1BhdGgsCiAgICAgWwotICAgICAgJy0taW1wb3J0JywKLSAgICAgICdkYXRhOnRleHQvamF2YXNjcmlwdCwnICsgZW5jb2RlVVJJQ29tcG9uZW50KGJvb3RzdHJhcCksCisgICAgICAuLi4ocHJvY2Vzcy52ZXJzaW9ucy5idW4gPyBbXSA6IFsnLS1pbXBvcnQnLCAnZGF0YTp0ZXh0L2phdmFzY3JpcHQsJyArIGVuY29kZVVSSUNvbXBvbmVudChib290c3RyYXApXSksCiAgICAgICAnLS1pbXBvcnQnLAogICAgICAgJ3RzeCcsCiAgICAgICAnLS1pbnB1dC10eXBlPW1vZHVsZScsCiAgICAgICAnLS1ldmFsJywKKyAgICAgIChwcm9jZXNzLnZlcnNpb25zLmJ1biA/IGJ1bkZpeHR1cmVMb2FkZXIoW3sgbmFtZTogJ0BudW1iZXIwL2lyb2gnLCBtb2R1bGU6IHJlcGxhY2VtZW50IH1dKSA6ICcnKSArCiAgICAgICAiY29uc3Qge21haW59PWF3YWl0IGltcG9ydCgnQGd5Ymxvcy9sYWItaGFybmVzcy9jbGkvZnJlZS1hY2NlcHRhbmNlJyk7cHJvY2Vzcy5leGl0Q29kZT1hd2FpdCBtYWluKFtdKTsiLAogICAgIF0sCiAgICAgewo='' | base64 -d > "$RUNNER_TEMP/fixture.patch"
+
+        git apply "$RUNNER_TEMP/fixture.patch"
+
+        node --input-type=module -e "import {assignShards} from ''./tooling/ci-shards.ts''; import {globSync,readFileSync} from ''node:fs''; console.log(JSON.stringify(assignShards(globSync(''tests/lab/**/*.test.ts''),new Map(Object.entries(JSON.parse(readFileSync(''tooling/ci-shard-durations.json'')))),2,true)[0]))" > "$RUNNER_TEMP/shard.json"
+
+        cat "$RUNNER_TEMP/shard.json" '
+    - if: matrix.shard == 1
+      name: Install pinned Bun canary
+      working-directory: ${{ runner.temp }}
+      run: 'curl -fsSL --retry 3 -o bun.tgz https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.5-canary.20261122.1.tgz
+
+        echo ''4580f353f7de5a9870692a845b7f06b7ce54c7c8ffc9965fd75debf75d648b123cc450b42a197704115e1d587f49687b168c8794b724baacb3046b2c897039f2  bun.tgz'' | sha512sum -c -
+
+        tar -xzf bun.tgz package/bin/bun
+
+        package/bin/bun --revision
+
+        echo "$RUNNER_TEMP/package/bin" >> "$GITHUB_PATH" '
+    - if: matrix.shard == 1
+      name: Run selected files with Bun canary
+      run: 'echo ''IiIiUnVuIHRoZSBQUiBzaGFyZCB3aXRoIE5vZGUncyBwZXItZmlsZSBwcm9jZXNzIGlzb2xhdGlvbiBhbmQgcGFyYWxsZWxpc20uIiIiCmZyb20gY29uY3VycmVudC5mdXR1cmVzIGltcG9ydCBUaHJlYWRQb29sRXhlY3V0b3IKaW1wb3J0IGpzb24KaW1wb3J0IG9zCmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aAppbXBvcnQgc3VicHJvY2VzcwppbXBvcnQgeG1sLmV0cmVlLkVsZW1lbnRUcmVlIGFzIEVUCgpyb290ID0gUGF0aChvcy5lbnZpcm9uWydSVU5ORVJfVEVNUCddKQpmaWxlcyA9IGpzb24ubG9hZHMoKHJvb3QgLyAnc2hhcmQuanNvbicpLnJlYWRfdGV4dCgpKQphc3NlcnQgbGVuKGZpbGVzKSA9PSBsZW4oc2V0KGZpbGVzKSkgPT0gNDEKCmRlZiBydW4oZmlsZSk6CiAgICB4bWwgPSByb290IC8gKFBhdGgoZmlsZSkubmFtZSArICcueG1sJykKICAgIHByZWxvYWRzID0gewogICAgICAgICdodHRwLW11bHRpc2VsbGVyLWFjY2VwdGFuY2UudGVzdC50cyc6ICcuLy5naXRodWIvYnVuLWh0dHAtb2JzZXJ2ZXIubWpzJywKICAgICAgICAncmVjZWlwdC1vYnNlcnZhdGlvbi50ZXN0LnRzJzogJy4vLmdpdGh1Yi9idW4tZnMtb2JzZXJ2ZXIubWpzJywKICAgICAgICAnYmF0Y2gtb3BlbmluZy1hYnNlbmNlLXJlc3RhcnQudGVzdC50cyc6ICcuLy5naXRodWIvYnVuLWZzLW9ic2VydmVyLm1qcycsCiAgICB9CiAgICBvYnNlcnZlciA9IHByZWxvYWRzLmdldChQYXRoKGZpbGUpLm5hbWUpCiAgICBwcmVsb2FkID0gWyctLXByZWxvYWQnLCBvYnNlcnZlcl0gaWYgb2JzZXJ2ZXIgZWxzZSBbXQogICAgdHJ5OgogICAgICAgIHByb2MgPSBzdWJwcm9jZXNzLnJ1bihbJ2J1bicsICd0ZXN0JywgKnByZWxvYWQsICctLXRpbWVvdXQ9NjAwMDAwJywgJy0tcmVwb3J0ZXI9anVuaXQnLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgJy0tcmVwb3J0ZXItb3V0ZmlsZScsIHN0cih4bWwpLCAnLi8nK2ZpbGVdLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjYXB0dXJlX291dHB1dD1UcnVlLCB0ZXh0PVRydWUsIGVycm9ycz0ncmVwbGFjZScsIHRpbWVvdXQ9MzYwKQogICAgICAgIGNvZGUgPSBwcm9jLnJldHVybmNvZGUKICAgIGV4Y2VwdCBzdWJwcm9jZXNzLlRpbWVvdXRFeHBpcmVkOgogICAgICAgIGNvZGUgPSAxMjQKICAgIGNhc2VzID0gW10KICAgIGlmIHhtbC5leGlzdHMoKToKICAgICAgICBmb3IgY2FzZSBpbiBFVC5wYXJzZSh4bWwpLml0ZXIoJ3Rlc3RjYXNlJyk6CiAgICAgICAgICAgIHN0YXR1cyA9IG5leHQoKHRhZyBmb3IgdGFnIGluICgnZmFpbHVyZScsJ2Vycm9yJywnc2tpcHBlZCcpIGlmIGNhc2UuZmluZCh0YWcpIGlzIG5vdCBOb25lKSwncGFzcycpCiAgICAgICAgICAgIGNhc2VzLmFwcGVuZChbY2FzZS5nZXQoJ25hbWUnKSxzdGF0dXNdKQogICAgcHJpbnQoJ0ZJTEVfUkVTVUxUICcranNvbi5kdW1wcyhkaWN0KGZpbGU9ZmlsZSxjb2RlPWNvZGUsY2FzZXM9Y2FzZXMpKSxmbHVzaD1UcnVlKQogICAgaWYgY29kZSBhbmQgY29kZSAhPSAxMjQ6CiAgICAgICAgaW1wb3J0IHJlCiAgICAgICAgIyBEaWFnbm9zdGljIGNhdGVnb3JpZXMgb25seTsgbm8gY2FwdHVyZWQgYXBwbGljYXRpb24gZGF0YSBvciBzdGFjayB0cmFjZXMuCiAgICAgICAgZXJyb3JzID0gcmUuZmluZGFsbChyJyg/bSleXHMqKD86ZXJyb3J8KD86VHlwZXxBc3NlcnRpb258UmVmZXJlbmNlfFN5bnRheClFcnJvcikoPzogXFtbQS1aX10rXF0pPzogKFteXG5dKyknLHByb2Muc3RkZXJyKQogICAgICAgIHByaW50KCdFUlJPUl9UWVBFUyAnK2pzb24uZHVtcHMoW3hbOjEzMF0gZm9yIHggaW4gZGljdC5mcm9ta2V5cyhlcnJvcnMpIGlmIG5vdCBhbnkoYyBpbiB4IGZvciBjIGluICdAL1xce30nKV1bOjRdKSxmbHVzaD1UcnVlKQogICAgcmV0dXJuIGNvZGUKCndpdGggVGhyZWFkUG9vbEV4ZWN1dG9yKGludChvcy5lbnZpcm9uWydXT1JLRVJTJ10pKSBhcyBwb29sOgogICAgY29kZXMgPSBsaXN0KHBvb2wubWFwKHJ1bixmaWxlcykpCnJhaXNlIFN5c3RlbUV4aXQoaW50KGFueShjb2RlcykpKQo='' | base64 -d > "$RUNNER_TEMP/bench.py"
+
+        export WORKERS=$(node -p "Math.max(1,require(''node:os'').availableParallelism()-1)")
+
+        python3 "$RUNNER_TEMP/bench.py"'
+    - run: node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/2 "tests/lab/**/*.test.ts"
+      env:
+        ORDINARY_LAB_PR: ${{ needs.changes.outputs.windows_full == 'false' }}
+      if: matrix.shard != 1
+  build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: ae48686907b2e72c021c083e3842fb0c86bd18d2
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm desktop:build
+    - name: Build the packaged seller for linux-x64
+      run: 'pnpm build:native --version 0.0.0-ci.1 --target linux-x64 --out "$RUNNER_TEMP/native"
+
+        tar -xzf "$RUNNER_TEMP/native/gyblos-0.0.0-ci.1-linux-x64.tar.gz" -C "$RUNNER_TEMP"
+
+        test "$("$RUNNER_TEMP/gyblos-0.0.0-ci.1-linux-x64/bin/gyblos" --version)" = 0.0.0-ci.1
+
+        '
+  windows-package:
+    needs: changes
+    if: needs.changes.outputs.windows_full == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: ae48686907b2e72c021c083e3842fb0c86bd18d2
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm build:native --version 0.0.0-ci.1 --target win32-x64 --out dist/windows
+    - run: pnpm build:npm --version 0.0.0-ci.1 --target win32-x64 --archives dist/windows --out dist/windows
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: windows-package
+        path: dist/windows
+        retention-days: 1
+        if-no-files-found: error
+  windows:
+    needs:
+    - changes
+    - windows-package
+    if: '!cancelled() && needs.changes.result == ''success'' && needs.changes.outputs.code == ''true'' && ((needs.changes.outputs.windows_full == ''true'' && needs.windows-package.result == ''success'') || (needs.changes.outputs.windows_full == ''false'' && needs.windows-package.result == ''skipped''))'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: ae48686907b2e72c021c083e3842fb0c86bd18d2
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - name: Desktop seller selection and channel chat
+      run: node --import tsx --test tests/desktop-network-catalog-paid.test.ts tests/desktop-buyer-stream-loopback.test.ts
+    - if: needs.changes.outputs.windows_full == 'true'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      with:
+        name: windows-package
+        path: ${{ runner.temp }}/windows-package
+    - if: needs.changes.outputs.windows_full == 'false'
+      run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-service.test.ts
+    - if: needs.changes.outputs.windows_full == 'true'
+      run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts tests/windows-service.test.ts tests/windows-task.test.ts tests/windows-install.test.ts
+      env:
+        GYBLOS_WINDOWS_PACKAGE: ${{ runner.temp }}/windows-package
+        GYBLOS_WINDOWS_VERSION: 0.0.0-ci.1
+    - run: node --import tsx --test tests/lab/seller-daemon-files.test.ts tests/free-execution-iroh.test.ts tests/iroh-transport.test.ts tests/node-startup-failure.test.ts
+  check:
+    if: always()
+    needs:
+    - changes
+    - docs
+    - static
+    - test
+    - lab
+    - build
+    - windows-package
+    - windows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - env:
+        CODE: ${{ needs.changes.outputs.code }}
+        FULL: ${{ needs.changes.outputs.windows_full }}
+        WINDOWS: ${{ needs.windows.result }}
+        PACKAGE: ${{ needs.windows-package.result }}
+        RESULTS: ${{ join(needs.*.result, ' ') }}
+      run: "case \"$CODE/$FULL/$WINDOWS/$PACKAGE\" in\n  true/true/success/success | true/false/success/skipped | false/false/skipped/skipped) ;;\n  *) echo \"Unexpected Windows check results\"; exit 1 ;;\nesac\nfor result in $RESULTS; do\n  case \"$result\" in\n    success | skipped) ;;\n    *) echo \"A CI part ended with: $result\"; exit 1 ;;\n  esac\ndone\n"
+'on':
+  push:
+    branches:
+    - codex/bench-pr-canary-lab1-fixture-n22
