@@ -45,7 +45,6 @@ export type EngineReadinessPolicy =
     }
   | { warmup: null; localResources: false };
 
-// The policy the remote engine plugins (openai, anthropic) give an engine outside this machine.
 // The model name an API engine asks its server for: upstream_model when set, else the name the operator
 // wrote (a catalog alias such as Ollama's qwen3:8b tag), never only the catalog id it resolves to.
 export function upstreamModelName({ model, engine }: SellerEngineOffer) {
@@ -54,6 +53,7 @@ export function upstreamModelName({ model, engine }: SellerEngineOffer) {
   );
 }
 
+// The policy the remote engine plugins (openai, anthropic) give an engine outside this machine.
 export const REMOTE_READINESS = {
   warmup: null,
   localResources: false,

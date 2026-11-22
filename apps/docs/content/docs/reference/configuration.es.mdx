@@ -109,7 +109,7 @@ el vendedor arranque, y solo se publican las ofertas listas.
 | Campo                    | Regla                                                                                                                                                |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`                  | ID o alias del catálogo, como `qwen3:0.6b`; un ID fuera del catálogo necesita `custom = true`                                                        |
-| `custom`                 | Booleano; no puede ser `true` para un modelo del catálogo                                                                                            |
+| `custom`                 | Booleano; en un modelo del catálogo se ignora, con la advertencia `CUSTOM_MODEL_NOW_IN_CATALOG`                                                      |
 | `reasoning`              | Niveles distintos entre `off`, `low`, `medium`, `high`; por defecto los del catálogo, o `off`. El vendedor solo sirve `["off"]`                      |
 | `engine.kind`            | Obligatorio: `ollama`, `openai` o `anthropic`                                                                                                        |
 | `engine.url`             | URL base obligatoria; HTTPS, o HTTP para loopback o `host.docker.internal`; consulta [Motores](#compatibilidad-de-motores-al-iniciar)                |

@@ -276,10 +276,14 @@ async function generate(
           'content-type': 'application/json',
           accept: 'text/event-stream',
         },
-        // No thinking parameter: offers list reasoning "off", and thinking is off unless asked for.
+        // Offers list reasoning "off". Claude thinks only when asked; a Qwen3 hybrid (recounted) thinks by
+        // default behind a Messages API, so it is told not to (Ollama and Anthropic honor this).
         body: JSON.stringify({
           model: settings.model,
           max_tokens: input.maxTokens,
+          ...(settings.recountable === true
+            ? { thinking: { type: 'disabled' } }
+            : {}),
           ...(system === undefined ? {} : { system }),
           messages: anthropicTurns(turns),
           ...anthropicTools(input.tools, input.toolChoice),

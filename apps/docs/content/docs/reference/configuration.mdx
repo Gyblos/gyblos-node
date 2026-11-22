@@ -108,7 +108,7 @@ ready offers are published.
 | Field                    | Rule                                                                                                                         |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | `model`                  | Catalog ID or alias, such as `qwen3:0.6b`; an ID outside the catalog needs `custom = true`                                   |
-| `custom`                 | Boolean; must not be `true` for a catalog model                                                                              |
+| `custom`                 | Boolean; on a catalog model it is ignored, with the warning `CUSTOM_MODEL_NOW_IN_CATALOG`                                    |
 | `reasoning`              | Distinct levels from `off`, `low`, `medium`, `high`; defaults to the catalog's, or `off`. The seller serves `["off"]` only   |
 | `engine.kind`            | Required: `ollama`, `openai` or `anthropic`                                                                                  |
 | `engine.url`             | Required base URL; HTTPS, or HTTP for loopback or `host.docker.internal`; see [Engines](#engine-compatibility-at-startup)    |

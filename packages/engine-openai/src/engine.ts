@@ -1,4 +1,4 @@
-// OpenAI-compatible chat completions (vLLM, LM Studio, llama.cpp, OpenRouter, OpenAI) as the protocol
+// OpenAI-compatible chat completions (vLLM, LM Studio, llama.cpp, Ollama's /v1, OpenRouter, OpenAI) as the protocol
 // Engine port: one user message to the configured upstream model, streamed with the provider's usage.
 // Identity is the model name only. The optional API key travels only in the Authorization header of
 // requests to the offer's base URL, which never follow redirects. Failures follow the Engine port

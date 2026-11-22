@@ -1,5 +1,5 @@
 // The anthropic engine plugin: which offers it serves (an API key, https anywhere or a literal loopback
-// proxy at the API root, reasoning off), declared usage, readiness by describing the model (never
+// proxy at the API root, reasoning off), declared usage (recounted for the Qwen3 catalog models), readiness by describing the model (never
 // generating, even on loopback) and where its key goes. Offline, synthetic values.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

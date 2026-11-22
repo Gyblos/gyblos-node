@@ -233,31 +233,23 @@
           ]
         },
         {
-          "oneOf": [
-            {
-              "properties": {
-                "model": {
+          "if": {
+            "properties": {
+              "model": {
+                "not": {
                   "$ref": "#/definitions/catalogModel"
-                },
-                "custom": {
-                  "const": false
-                }
-              }
-            },
-            {
-              "required": ["custom"],
-              "properties": {
-                "model": {
-                  "not": {
-                    "$ref": "#/definitions/catalogModel"
-                  }
-                },
-                "custom": {
-                  "const": true
                 }
               }
             }
-          ]
+          },
+          "then": {
+            "required": ["custom"],
+            "properties": {
+              "custom": {
+                "const": true
+              }
+            }
+          }
         }
       ],
       "properties": {
@@ -268,7 +260,7 @@
           "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]*(/[a-zA-Z0-9][a-zA-Z0-9._:-]*)*$"
         },
         "custom": {
-          "description": "Required (true) for a model outside the catalog.",
+          "description": "Required (true) for a model outside the catalog. On a catalog model it is ignored with the warning CUSTOM_MODEL_NOW_IN_CATALOG.",
           "type": "boolean"
         },
         "engine": {

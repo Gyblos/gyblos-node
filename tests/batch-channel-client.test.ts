@@ -273,6 +273,7 @@ void test('batch OPEN waits for its own opening deadline, longer than other oper
 
 void test('the default OPEN deadline covers the seller opening window', () => {
   const { operationMs, openingConfirmMs, openMs } = BATCH_SESSION_DEFAULTS;
-  // Observe, settle and verify the voucher, each bounded by operationMs, plus the confirmation window.
-  assert.ok(openMs >= 3 * operationMs + openingConfirmMs);
+  // Verify the first deposit, observe, settle and verify the voucher, each bounded by operationMs, plus
+  // the confirmation window (packages/payments-upto/src/batch-session-seller.ts openSeller).
+  assert.ok(openMs > 4 * operationMs + openingConfirmMs);
 });
