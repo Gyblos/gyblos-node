@@ -90,6 +90,7 @@ export function nextCheck(
     reason: check.reason,
     verifiedAt: check.verifiedAt,
     checkedAt: now,
+    verdictAt: now,
     nextCheckAt: abandoned(row, check, now)
       ? null
       : now + GITHUB_CLAIM.recheckAfterMs,
@@ -108,7 +109,7 @@ async function check(
   const outcome = await checkGist(fetcher, row);
   const next = nextCheck(row, outcome, now);
   if (outcome !== GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE) {
-    if (await claims.record(row.nodeId, row.issuedAt, row.checkedAt, next))
+    if (await claims.record(row.nodeId, row.issuedAt, row.verdictAt, next))
       return { state: next.state, reason: next.reason };
   } else await claims.touch(row.nodeId, row.issuedAt, now, next.nextCheckAt);
   // Another check landed first, or an outage left the stored state as it is: answer what is stored.
@@ -177,6 +178,7 @@ export async function submitGithubClaim(
     state: same?.state ?? GITHUB_CLAIM_STATES.PENDING,
     reason: same?.reason ?? null,
     checkedAt: same?.checkedAt ?? null,
+    verdictAt: same?.verdictAt ?? null,
     verifiedAt: same?.verifiedAt ?? null,
     nextCheckAt: now,
   };

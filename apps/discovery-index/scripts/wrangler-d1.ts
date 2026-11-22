@@ -1,6 +1,9 @@
 // Owns what the operator scripts share: the pinned Wrangler, the D1 database name, compile-only Drizzle
 // rendering (Wrangler takes SQL text, not bind parameters) and the one `wrangler d1 execute` call.
-import { execFileSync } from 'node:child_process';
+import {
+  execFileSync,
+  type ExecFileSyncOptionsWithStringEncoding,
+} from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,11 +65,22 @@ export function wranglerLaunch(
   );
 }
 
+// Runs a program and returns its stdout; tests replace it.
+export type RunProgram = (
+  file: string,
+  args: readonly string[],
+  options: ExecFileSyncOptionsWithStringEncoding,
+) => string | null;
+
 // Runs one SQL command through Wrangler. `target` is `--remote` or `--local`; with `json`, Wrangler's
-// JSON output is returned, otherwise its stdout is discarded.
+// JSON output is returned, otherwise its stdout is discarded. A failed launch or run throws a static
+// error: Node's own error repeats the whole command line, SQL values (such as an invite's contact)
+// included. Wrangler's own messages still reach this terminal and may quote the statement.
 export function wranglerD1(
   sql: string,
   { target, json }: { target: '--remote' | '--local'; json: boolean },
+  run: RunProgram = (file, args, options) =>
+    execFileSync(file, [...args], options),
 ): string {
   const launch = wranglerLaunch(process.platform, process.execPath, [
     'd1',
@@ -77,10 +91,15 @@ export function wranglerD1(
     '--command',
     sql,
   ]);
-  const output = execFileSync(launch.file, launch.args, {
-    cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
-    stdio: ['ignore', json ? 'pipe' : 'ignore', 'inherit'],
-    encoding: 'utf8',
-  });
-  return output ?? '';
+  try {
+    return (
+      run(launch.file, launch.args, {
+        cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
+        stdio: ['ignore', json ? 'pipe' : 'ignore', 'inherit'],
+        encoding: 'utf8',
+      }) ?? ''
+    );
+  } catch {
+    throw new Error('Wrangler could not run the D1 command.');
+  }
 }

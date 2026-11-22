@@ -43,6 +43,7 @@ function row(index: number, patch: Partial<GithubClaimRow> = {}) {
     state: 'pending',
     reason: null,
     checkedAt: null,
+    verdictAt: null,
     verifiedAt: null,
     nextCheckAt: T0,
     ...patch,
@@ -122,6 +123,7 @@ for (const kind of CLAIM_KINDS) {
         state: 'lost',
         reason: 'GIST_NOT_FOUND',
         checkedAt: now,
+        verdictAt: now,
         verifiedAt: T0,
         nextCheckAt: now + GITHUB_CLAIM.recheckAfterMs,
       },
@@ -211,6 +213,7 @@ for (const kind of CLAIM_KINDS) {
       state: 'verified',
       reason: null,
       checkedAt: T0 + 20,
+      verdictAt: T0 + 20,
       verifiedAt: T0 + 20,
       nextCheckAt: T0 + 20 + GITHUB_CLAIM.recheckAfterMs,
     } as const;
@@ -220,6 +223,7 @@ for (const kind of CLAIM_KINDS) {
       state: 'pending',
       reason: 'GIST_NOT_FOUND',
       checkedAt: T0 + 10,
+      verdictAt: T0 + 10,
       verifiedAt: null,
       nextCheckAt: T0 + 10,
     });

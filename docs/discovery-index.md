@@ -474,9 +474,11 @@ is `null` while `verified` (an outage never shows a reason on a verified claim);
 `GIST_NOT_FOUND` or `NODE_ID_MISSING` after a conclusive miss; and
 `GITHUB_UNAVAILABLE` only when an outage hits a `pending` claim. A `lost` claim
 keeps its miss reason through an outage. A check records only onto the claim it
-started for. A conclusive result is written only while the row it was computed
-from is unchanged, so a result from an older snapshot never replaces a newer
-one; an inconclusive result only moves `checkedAt` forward (and sets the pending
+started for. A conclusive result is written only while no other conclusive
+result landed since the row it was computed from (an internal `verdict_at`
+version that inconclusive checks never change), so a result from an older
+snapshot never replaces a newer one and an earlier timeout never blocks it; an
+inconclusive result only moves `checkedAt` forward (and sets the pending
 reason), never the state or `verifiedAt`.
 
 ### Reading a claim
@@ -520,17 +522,20 @@ tombstones: NodeId, account, gist, state, reason, `issuedAt` and `checkedAt`,
 newest first within each state, at most 1000 rows. It is read-only and runs
 `wrangler d1 execute --json` (through npm's npx script under the same Node.js,
 so it works the same on Windows, macOS and Linux; on macOS and Linux without npm
-beside Node.js it uses `npx` on `PATH`, still without a shell) against the local
-database, or the remote one with `--remote` (a maintainer action).
+beside Node.js it uses `npx` on `PATH`, still without a shell; a failed launch
+or run reports a static error, never the command line or its SQL, while
+Wrangler's own messages still reach the terminal and may quote the statement)
+against the local database, or the remote one with `--remote` (a maintainer
+action).
 
 ### What is stored
 
 Table `discovery_github_claims` (migration `0007_github_claims.sql`), one row
 per NodeId: `node_id`, `account`, `gist`, `issued_at`, `state` (`pending`,
-`verified` or `lost`), `reason`, `checked_at`, `verified_at`, `last_fetch_at`
-and `next_check_at` (indexed). A tombstone keeps `node_id`, `issued_at` and
-`last_fetch_at`, with every other column `NULL`. The signature is checked and
-not kept. No IP or request data is stored or logged.
+`verified` or `lost`), `reason`, `checked_at`, `verdict_at`, `verified_at`,
+`last_fetch_at` and `next_check_at` (indexed). A tombstone keeps `node_id`,
+`issued_at` and `last_fetch_at`, with every other column `NULL`. The signature
+is checked and not kept. No IP or request data is stored or logged.
 
 ## Storage
 

@@ -18,6 +18,7 @@ const row = (index: number) => ({
   state: 'pending' as const,
   reason: null,
   checkedAt: null,
+  verdictAt: null,
   verifiedAt: null,
   nextCheckAt: T0,
 });

@@ -14,12 +14,17 @@ export interface GithubCheck {
   state: GithubClaimState;
   reason: StoredGithubClaimReason | null;
   checkedAt: number | null;
+  // When the last conclusive check started; inconclusive checks never change it. Never served.
+  verdictAt: number | null;
   verifiedAt: number | null;
   // Never served. Null: not scheduled (an abandoned pending claim; a new POST checks it).
   nextCheckAt: number | null;
 }
-// A finished check: `checkedAt` is the time the check started.
-export type RecordedCheck = GithubCheck & { checkedAt: number };
+// A finished conclusive check: `checkedAt` and `verdictAt` are the time the check started.
+export type RecordedCheck = GithubCheck & {
+  checkedAt: number;
+  verdictAt: number;
+};
 
 export interface GithubClaimRow extends GithubCheck {
   nodeId: string;
@@ -37,6 +42,7 @@ export interface GithubClaimTombstone {
   state: null;
   reason: null;
   checkedAt: null;
+  verdictAt: null;
   verifiedAt: null;
   nextCheckAt: null;
 }
@@ -54,6 +60,7 @@ export function githubClaimTombstone(
     state: null,
     reason: null,
     checkedAt: null,
+    verdictAt: null,
     verifiedAt: null,
     nextCheckAt: null,
   };
@@ -73,8 +80,9 @@ export interface GithubClaimStore {
     intervalMs: number,
   ): Promise<number>;
   // Records a conclusive check of the claim issued at `issuedAt`, computed from the snapshot whose
-  // checked_at was `seen`: written only while that snapshot is still current, so a newer claim or a check
-  // that landed meanwhile is never replaced. Resolves whether it wrote.
+  // verdict_at was `seen`: written only while no other conclusive check has landed since, so a newer claim
+  // or verdict is never replaced (an inconclusive check in between does not block it). checked_at only
+  // moves forward. Resolves whether it wrote.
   record(
     nodeId: string,
     issuedAt: number,
@@ -133,9 +141,16 @@ export function createMemoryGithubClaimStore(): GithubClaimStore {
         current &&
         isClaim(current) &&
         current.issuedAt === issuedAt &&
-        current.checkedAt === seen
+        current.verdictAt === seen
       ) {
-        entries.set(nodeId, { ...current, ...check });
+        entries.set(nodeId, {
+          ...current,
+          ...check,
+          checkedAt: Math.max(
+            current.checkedAt ?? check.checkedAt,
+            check.checkedAt,
+          ),
+        });
         return true;
       }
       return false;

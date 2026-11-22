@@ -56,6 +56,7 @@ function storedClaim(row: D1Row): StoredGithubClaim {
         row.gist,
         row.reason,
         row.checkedAt,
+        row.verdictAt,
         row.verifiedAt,
         row.nextCheckAt,
       ].some((value) => value !== null)
@@ -71,6 +72,7 @@ function storedClaim(row: D1Row): StoredGithubClaim {
     state: stateOf(row.state),
     reason: reasonOf(row.reason),
     checkedAt: nullableInteger(row.checkedAt),
+    verdictAt: nullableInteger(row.verdictAt),
     verifiedAt: nullableInteger(row.verifiedAt),
     nextCheckAt: nullableInteger(row.nextCheckAt),
   };
@@ -83,6 +85,7 @@ const claimColumns = {
   state: githubClaims.state,
   reason: githubClaims.reason,
   checkedAt: githubClaims.checkedAt,
+  verdictAt: githubClaims.verdictAt,
   verifiedAt: githubClaims.verifiedAt,
   nextCheckAt: githubClaims.nextCheckAt,
 };
@@ -143,7 +146,8 @@ function unscheduleQuery(database: DiscoveryDatabase, nodeId: unknown) {
     .where(eq(githubClaims.nodeId, text(nodeId)));
 }
 
-// Writes a conclusive check only while the snapshot it was computed from (its checked_at) is current.
+// Writes a conclusive check only while no other verdict landed since its snapshot (verdict_at); checked_at
+// only moves forward.
 function recordQuery(
   database: DiscoveryDatabase,
   nodeId: string,
@@ -153,15 +157,18 @@ function recordQuery(
 ) {
   return database
     .update(githubClaims)
-    .set(check)
+    .set({
+      ...check,
+      checkedAt: laterTime(githubClaims.checkedAt, check.checkedAt),
+    })
     .where(
       and(
         eq(githubClaims.nodeId, nodeId),
         eq(githubClaims.issuedAt, issuedAt),
         isNotNull(githubClaims.state),
         seen === null
-          ? isNull(githubClaims.checkedAt)
-          : eq(githubClaims.checkedAt, seen),
+          ? isNull(githubClaims.verdictAt)
+          : eq(githubClaims.verdictAt, seen),
       ),
     )
     .returning({ nodeId: githubClaims.nodeId });

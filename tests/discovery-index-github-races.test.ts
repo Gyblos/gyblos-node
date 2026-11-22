@@ -28,6 +28,7 @@ const row: GithubClaimRow = {
   state: 'pending',
   reason: null,
   checkedAt: null,
+  verdictAt: null,
   verifiedAt: null,
   nextCheckAt: T0,
 };
@@ -134,5 +135,28 @@ for (const kind of CLAIM_KINDS) {
     const stored = await index.claims.get(node.nodeId);
     assert.equal(stored?.state, 'verified');
     assert.deepEqual(answer, { ok: true, state: 'verified', reason: null });
+  });
+
+  void test(`github claim races (${kind}): an earlier timeout does not block a later-landing verification`, async (context) => {
+    const made = await claimStoreOf(kind);
+    if (!made) return context.skip('node:sqlite unavailable');
+    const { claims } = made;
+    await claims.put(row);
+    const verifying = held();
+    const timingOut = held();
+    // Both read the same never-checked snapshot; the timeout lands first and moves checked_at.
+    const first = recheckGithubClaims(claims, verifying.fetcher, T0 + 10);
+    const second = recheckGithubClaims(claims, timingOut.fetcher, T0 + 20);
+    await new Promise((done) => setImmediate(done));
+    timingOut.release(new Error('timeout'));
+    await second;
+    verifying.release(proof());
+    await first;
+    const stored = await claims.get(NODE);
+    assert.equal(stored?.state, 'verified');
+    assert.equal(stored?.verifiedAt, T0 + 10);
+    assert.equal(stored?.reason, null);
+    // checked_at never moves backwards.
+    assert.equal(stored?.checkedAt, T0 + 20);
   });
 }
