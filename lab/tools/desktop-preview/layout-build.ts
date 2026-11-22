@@ -1,4 +1,3 @@
-// Preview layout rewrites: title bar conversation menu and the chat details panel.
 export const TITLEBAR_REWRITES: [string, string][] = [
   [
     '  const title =\n',

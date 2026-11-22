@@ -1,4 +1,3 @@
-// Synthetic conversation metadata for the mockup: day ages, one pinned and one unread chat.
 const AGE_DAYS: Record<number, number> = {
   0: 4,
   1: 1,
