@@ -69,5 +69,12 @@ export function matchPaidReceipt(
         ),
       )
     : '0';
-  if (record.amountAtomic !== charge) return controlFail(CONTROL_CODES.POLICY);
+  // A declared bill is capped at the request's maxAtomic, so it can be below the price of its usage.
+  const declared = record.metering === CONTROL_METERING_MODES.DECLARED;
+  if (
+    declared
+      ? BigInt(record.amountAtomic) > BigInt(charge)
+      : record.amountAtomic !== charge
+  )
+    return controlFail(CONTROL_CODES.POLICY);
 }

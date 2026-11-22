@@ -108,6 +108,7 @@ void test('paid buyer signs only independently matched usage and authorization f
     context: f.context,
     observed: f.observed,
     payment: f.payment,
+    metering: CONTROL_METERING_MODES.RECOUNTED,
   };
   assert.equal(
     (await buildPaidBuyerReceipt(input)).verdict,
@@ -123,21 +124,38 @@ void test('paid buyer signs only independently matched usage and authorization f
     { code: CONTROL_CODES.POLICY },
   );
 });
-void test('paid seller policy refuses incomplete or estimated execution and inconsistent amounts', () => {
+void test('paid seller policy refuses incomplete execution and inconsistent amounts; a declared bill may be capped', () => {
   const f = fixture();
-  for (const record of [
-    { ...f.record, metering: CONTROL_METERING_MODES.DECLARED },
-    {
-      ...f.record,
-      outcome: RECEIPT_OUTCOMES.FAILED,
-      code: FREE_EXECUTION_CODES.ENGINE,
-      finishReason: null,
-    },
-  ])
-    assert.throws(
-      () => buildPaidSellerReceipt({ record, payment: f.payment }),
-      { code: CONTROL_CODES.POLICY },
-    );
+  assert.throws(
+    () =>
+      buildPaidSellerReceipt({
+        record: {
+          ...f.record,
+          outcome: RECEIPT_OUTCOMES.FAILED,
+          code: FREE_EXECUTION_CODES.ENGINE,
+          finishReason: null,
+        },
+        payment: f.payment,
+      }),
+    { code: CONTROL_CODES.POLICY },
+  );
+  // A declared bill is capped at the request's maxAtomic: below the price of its usage, never above it.
+  const declared = { ...f.record, metering: CONTROL_METERING_MODES.DECLARED };
+  assert.equal(
+    buildPaidSellerReceipt({
+      record: declared,
+      payment: { ...f.payment, amountAtomic: '11' },
+    }).amountAtomic,
+    '11',
+  );
+  assert.throws(
+    () =>
+      buildPaidSellerReceipt({
+        record: declared,
+        payment: { ...f.payment, amountAtomic: '13' },
+      }),
+    { code: CONTROL_CODES.POLICY },
+  );
   assert.throws(
     () =>
       buildPaidSellerReceipt({
@@ -194,6 +212,7 @@ void test('a valid seller signature never lets changed receipt fields reach the 
           context: f.context,
           observed: f.observed,
           payment: f.payment,
+          metering: CONTROL_METERING_MODES.RECOUNTED,
         },
         async (bytes) => {
           signed++;
@@ -220,7 +239,13 @@ void test('paid buyer requires independently recounted tokens and refuses unknow
   ]) {
     await assert.rejects(
       createPaidBuyerReceipt(
-        { seller, context: f.context, observed, payment: f.payment },
+        {
+          seller,
+          context: f.context,
+          observed,
+          payment: f.payment,
+          metering: CONTROL_METERING_MODES.RECOUNTED,
+        },
         signer,
       ),
       { code: CONTROL_CODES.POLICY },
@@ -233,6 +258,7 @@ void test('paid buyer requires independently recounted tokens and refuses unknow
         context: f.context,
         observed: f.observed,
         payment: { ...f.payment, settled: true },
+        metering: CONTROL_METERING_MODES.RECOUNTED,
       },
       signer,
     ),
@@ -251,6 +277,7 @@ void test('paid buyer refuses a valid receipt whose amount differs from its own 
         context: f.context,
         observed: f.observed,
         payment: { ...f.payment, amountAtomic: '11' },
+        metering: CONTROL_METERING_MODES.RECOUNTED,
       },
       async (bytes) => {
         signed++;
@@ -288,7 +315,13 @@ void test('paid verification snapshots caller-owned financial fields before cryp
   const f = fixture();
   const seller = await signSellerReceipt(f.expected, f.seller.sign);
   const pending = createPaidBuyerReceipt(
-    { seller, context: f.context, observed: f.observed, payment: f.payment },
+    {
+      seller,
+      context: f.context,
+      observed: f.observed,
+      payment: f.payment,
+      metering: CONTROL_METERING_MODES.RECOUNTED,
+    },
     f.buyer.sign,
   );
   f.payment.amountAtomic = '999';

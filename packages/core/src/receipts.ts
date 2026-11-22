@@ -1,6 +1,7 @@
 // Constructs signed usage attestations from supplied evidence; payment authorization is not chain settlement.
 import {
   CONTROL_CODES,
+  CONTROL_METERING_MODES,
   OFFER_PRICING_KINDS,
   RECEIPT,
   RECEIPT_VERDICTS,
@@ -70,14 +71,22 @@ export async function createFreeSellerReceipt(
   const record = buildFreeSellerReceipt(value);
   return { seller: await signSellerReceipt(record, signer) };
 }
+function paidMetering(value: unknown) {
+  return value === CONTROL_METERING_MODES.RECOUNTED ||
+    value === CONTROL_METERING_MODES.DECLARED
+    ? value
+    : controlFail();
+}
 async function prepareBuyerReceipt(value: unknown, paid = false) {
   const input = controlObject(value, [
     'seller',
     'context',
     'observed',
-    ...(paid ? ['payment'] : []),
+    ...(paid ? ['payment', 'metering'] : []),
   ]);
   const payment = paid ? receiptPayment(input.payment) : undefined;
+  // The metering the buyer's quote named: a seller cannot relabel a declared sale as recounted.
+  const metering = paid ? paidMetering(input.metering) : undefined;
   const context = receiptContext(input.context);
   // Parse observations now, before yielding; replace this valid digest with the seller signing digest below.
   const snapshot = parseBuyerReceipt({
@@ -97,7 +106,10 @@ async function prepareBuyerReceipt(value: unknown, paid = false) {
     !sameReceiptContext(context, receiptContextFromRecord(record))
   )
     return controlFail(CONTROL_CODES.POLICY);
-  if (payment) matchPaidReceipt(record, payment);
+  if (payment) {
+    if (record.metering !== metering) return controlFail(CONTROL_CODES.POLICY);
+    matchPaidReceipt(record, payment);
+  }
   const disputed = observedDisputes(record, snapshot.observed);
   if (
     payment &&

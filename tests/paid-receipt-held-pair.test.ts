@@ -68,6 +68,7 @@ async function paidPairFixture() {
       amountAtomic: record.amountAtomic,
       feeAtomic: record.feeAtomic,
     },
+    metering: record.metering,
   };
   return {
     f,

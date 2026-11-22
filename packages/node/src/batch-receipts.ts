@@ -57,6 +57,7 @@ export function sessionReceiptEvidence(
 ): BuyerReceiptEvidence {
   const offer = request.quote.offer;
   return {
+    metering: offer.meteringMode,
     context: {
       requestId: request.requestId,
       requestDigest,
@@ -99,7 +100,7 @@ export function publishSessionReceipt(
     record: {
       ...evidence.context,
       engineKind: options.engineKind,
-      metering: request.quote.offer.meteringMode,
+      metering: evidence.metering!,
       usage: { ...result.usage, reasoningTokens: null },
       sizes: receiptTextSizes(
         conversationText(request.input.messages),

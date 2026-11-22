@@ -18,6 +18,7 @@ import {
   RECEIPT_CHANNEL,
   RECEIPT_CHANNEL_CODES,
   RECEIPT_CHANNEL_METHODS,
+  type ControlMeteringMode,
 } from '@gyblos/protocol/constants';
 import type { BuyerReceiptV1, ReceiptV1 } from '@gyblos/protocol/receipt';
 import {
@@ -39,6 +40,8 @@ export interface BuyerReceiptEvidence {
   context: ReceiptExecutionContext;
   observed: BuyerReceiptV1['observed'];
   payment?: PaidReceiptPayment;
+  // The paid quote's metering, bound into the buyer's half.
+  metering?: ControlMeteringMode;
 }
 async function receiptQuery(
   client: ReturnType<typeof createReceiptTransport<EndpointAddr>>,
