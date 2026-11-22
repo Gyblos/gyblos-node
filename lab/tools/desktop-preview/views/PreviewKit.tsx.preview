@@ -717,13 +717,13 @@ export function previewShortcut(shortcut: PreviewShortcut) {
   return { label: shortcut.label.replace('⌘', 'Ctrl+'), aria: shortcut.aria.replace('Meta', 'Control') };
 }
 export function Kbd({ children }: { children: string }) {
-  return <kbd className="pk-kbd">{children}</kbd>;
+  return <kbd className="pk-kbd" aria-hidden="true">{children}</kbd>;
 }
 export function PreviewSkeletonRows({ count }: { count: number }) {
   return (
-    <span className="pk-skeleton-rows" aria-hidden="true">
+    <span className="pk-skeleton-rows" role="status" aria-label="Loading conversations">
       {Array.from({ length: count }, (_, index) => (
-        <i key={index} />
+        <i key={index} aria-hidden="true" />
       ))}
     </span>
   );
@@ -1114,6 +1114,7 @@ export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
             {previewCompact() && (
               <MenuItem
                 label="New chat"
+                aria-keyshortcuts={previewShortcut(PREVIEW_SHORTCUT.NEW_CHAT).aria}
                 leading={<Plus {...previewIcon(14)} aria-hidden="true" />}
                 trailing={<Kbd>{previewShortcut(PREVIEW_SHORTCUT.NEW_CHAT).label}</Kbd>}
                 onClick={() => {
