@@ -145,10 +145,13 @@ function advanceInQuote(scanner: Scanner): void {
 
 function skipPowershellHereString(scanner: Scanner): boolean {
   const { text, index } = scanner;
-  const open = POWERSHELL_HERE_STRING.exec(text.slice(index, index + 3));
+  const open = POWERSHELL_HERE_STRING.exec(
+    text.slice(index, lineEnd(text, index) + 1),
+  );
   if (!scanner.options.powershell || !open) return false;
-  const close = text.indexOf('\n' + (open[1] ?? '') + '@', index);
-  scanner.index = close < 0 ? index + 1 : close + 3;
+  const closer = '\n' + (open[1] ?? '') + '@';
+  const close = text.indexOf(closer, index);
+  scanner.index = close < 0 ? index + 1 : close + closer.length;
   return true;
 }
 
