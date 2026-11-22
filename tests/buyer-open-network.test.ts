@@ -240,3 +240,62 @@ void test('a winner resolving after cancellation cannot escape either selection 
     assert.equal(run.calls.length, 1);
   }
 });
+
+void test('Auto discovers a paid seller at the effective key and tariff ceilings without a pin', async () => {
+  const base = config(0, true);
+  const auto = parseBuyerSelectionConfig({
+    ...base,
+    discovery: { ...base.discovery, paidAuto: true },
+  });
+  const selection = recorder([async () => 'eligible seller']);
+  const bounded = { ...request, maxAtomic: '9' };
+  assert.equal(
+    await selectConfiguredThenOpen(
+      auto,
+      bounded,
+      new AbortController().signal,
+      selection.select,
+    ),
+    'eligible seller',
+  );
+  assert.deepEqual(selection.calls, [
+    { request: bounded, route: { open: true } },
+  ]);
+});
+
+void test('paid automatic discovery requires open discovery and a channel policy', () => {
+  const base = config(1, false);
+  assert.throws(() =>
+    parseBuyerSelectionConfig({
+      ...base,
+      discovery: { ...base.discovery, paidAuto: true },
+    }),
+  );
+  assert.throws(() =>
+    parseBuyerSelectionConfig({
+      ...base,
+      session: undefined,
+      request: { ...base.request, ...FREE },
+      discovery: { ...base.discovery, open: true, paidAuto: true },
+    }),
+  );
+});
+
+void test('Auto never spends on a free key and rejects an existing seller pin', async () => {
+  const base = config(0, true);
+  const auto = parseBuyerSelectionConfig({
+    ...base,
+    discovery: { ...base.discovery, paidAuto: true },
+  });
+  const rec = recorder([async () => 'free']);
+  await selectConfiguredThenOpen(
+    auto,
+    { ...request, maxAtomic: '0' },
+    new AbortController().signal,
+    rec.select,
+  );
+  assert.deepEqual(rec.calls[0]?.request.priceCeilings, FREE.priceCeilings);
+  assert.throws(() =>
+    parseBuyerSelectionConfig({ ...auto, pinnedNodeId: sellerNodeId }),
+  );
+});

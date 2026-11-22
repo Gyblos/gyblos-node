@@ -85,8 +85,8 @@ interface OpenRun {
   now: number;
 }
 
-// A seller the index lists but this buyer never configured, admitted only under open discovery (on the
-// free path, which passes the relay), only when its NodeId is registered to the catalog's owner, only
+// A seller the index lists but this buyer never configured, admitted only under open discovery,
+// only when its NodeId is registered to the catalog's owner, only
 // while the candidate list has room (the configured sellers come first), never one this request
 // excluded, and within the lookup and process bounds. It is dialed through the configured relay, never an
 // index address.

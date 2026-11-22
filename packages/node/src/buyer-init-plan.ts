@@ -52,8 +52,8 @@ export interface BuyerInitPlan {
     manualTrust: false;
   }[];
   // `open`: no seller was named, so the buyer uses any seller the index lists whose 8004 identity checks
-  // out, for free requests.
-  discovery: { baseUrl: string; open?: true };
+  // out, within the authorized prices.
+  discovery: { baseUrl: string; open?: true; paidAuto?: true };
   identity: { rpcUrl: string };
 }
 export class BuyerInitError extends Error {
@@ -207,7 +207,17 @@ export function buildBuyerInit(input: unknown): BuyerInitPlan {
       sellers: nodeId
         ? [{ owner, nodeId, relayUrl, directAddresses: [], manualTrust: false }]
         : [],
-      discovery: nodeId ? { baseUrl } : { baseUrl, open: true },
+      discovery: nodeId
+        ? { baseUrl }
+        : {
+            baseUrl,
+            open: true,
+            ...(policy.maxAtomic !== '0' &&
+              (policy.priceCeilings.inputAtomicPerMtok !== '0' ||
+                policy.priceCeilings.outputAtomicPerMtok !== '0') && {
+                paidAuto: true as const,
+              }),
+          },
       identity: { rpcUrl: read(BUYER_INIT_FIELDS.RPC_URL) },
     };
   } catch (error) {

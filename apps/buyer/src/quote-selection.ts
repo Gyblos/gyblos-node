@@ -1,7 +1,3 @@
-// Which sellers the automatic buyer asks: its configured sellers first, at the request's own ceilings.
-// With open discovery, a request no configured seller takes (none configured, or none available) goes to
-// the registered sellers the index lists, for free only: automatic paid execution pays configured sellers
-// alone.
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 
 import { FreeSelectionFailure } from './free-execution';
@@ -9,6 +5,18 @@ import type { BuyerSelectionConfig } from './selection-config';
 
 type Request = BuyerSelectionConfig['request'];
 
+export function openDiscoveryRequest(
+  request: Request,
+  paidAuto?: boolean,
+): Request {
+  return paidAuto && request.maxAtomic !== '0'
+    ? request
+    : {
+        ...request,
+        maxAtomic: '0',
+        priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+      };
+}
 export async function selectConfiguredThenOpen<Winner>(
   config: Pick<BuyerSelectionConfig, 'sellers' | 'discovery'>,
   request: Request,
@@ -33,11 +41,7 @@ export async function selectConfiguredThenOpen<Winner>(
     });
   signal.throwIfAborted();
   const winner = await select(
-    {
-      ...request,
-      maxAtomic: '0',
-      priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
-    },
+    openDiscoveryRequest(request, config.discovery?.paidAuto),
     { open: true },
   );
   signal.throwIfAborted();
