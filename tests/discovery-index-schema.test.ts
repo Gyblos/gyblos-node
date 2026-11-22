@@ -73,7 +73,9 @@ void test('discovery ORM schema owns every migrated secondary index, its uniquen
           return column.name;
         }),
       }))
-      .sort((left, right) => left.name.localeCompare(right.name));
+      .sort((left, right) =>
+        left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
+      );
     assert.deepEqual(declared, actual, config.name);
   }
 });

@@ -136,7 +136,9 @@ void test('the typed schema matches the migrated tables, keys and indexes with t
             return column.name;
           }),
         }))
-        .sort((left, right) => left.name.localeCompare(right.name)),
+        .sort((left, right) =>
+          left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
+        ),
       `${table.name} indexes`,
     );
     const uniques = database.raw
