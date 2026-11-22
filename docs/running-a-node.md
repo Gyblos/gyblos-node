@@ -1029,7 +1029,8 @@ With an OpenAI SDK, set `baseURL` (`base_url` in Python) to
 > `api-token` and start it again; `pnpm buyer:free` needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
-network or asset not devnet USDC), `BUYER_PAID_MODEL_UNSUPPORTED`,
+network or asset not devnet USDC), `BUYER_PAID_MODEL_UNSUPPORTED` (a recounted
+quote for a model other than `qwen3-0.6b`; declared quotes buy any model),
 `BUYER_PAID_MODELS_UNSUPPORTED` (the explicit paid entry `startPaidBuyer` serves
 only `request.selection`; the automatic buyer serves the `models` list),
 `BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,

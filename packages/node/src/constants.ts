@@ -49,8 +49,6 @@ export const NODE_ERROR_CODES = {
   SELLER_OFFER_API_KEY_UNSAFE: 'SELLER_OFFER_API_KEY_UNSAFE',
   SELLER_OFFERS_MISSING: 'SELLER_OFFERS_MISSING',
   SELLER_PAID_EXECUTION_UNAVAILABLE: 'SELLER_PAID_EXECUTION_UNAVAILABLE',
-  // A paid offer whose usage cannot be recounted with the model's pinned public tokenizer.
-  SELLER_PAID_METERING_UNRECOUNTED: 'SELLER_PAID_METERING_UNRECOUNTED',
   // The payment server pays to its own fee payer, charges another fee or uses another network.
   SELLER_PAYMENT_DESCRIPTION_INVALID: 'SELLER_PAYMENT_DESCRIPTION_INVALID',
   // A paid offer on a seller role set up without a payout and payment keys.

@@ -442,9 +442,9 @@ Buyers pay the seller's price plus the protocol fee (`PROTOCOL_FEE` in
 `@gyblos/config`, 4% on devnet), rounded up. Startup accepts a paid offer only
 when:
 
-- Usage is recounted with the model's pinned public tokenizer
-  (`SELLER_PAID_METERING_UNRECOUNTED` otherwise). Only the catalog model
-  `qwen3-0.6b` has one.
+- Its engine meters it: recounted with the model's pinned public tokenizer (only
+  the catalog model `qwen3-0.6b` has one), or the provider's declared usage,
+  which the buyer accepts only within the request's byte bounds.
 - The seller role was set up with a payout and payment keys
   (`SELLER_PAYMENT_ROLE_MISSING` otherwise), and the payout is neither the fee
   payer nor the authorizer key (`SELLER_PAYMENT_DESCRIPTION_INVALID`).
@@ -468,7 +468,6 @@ transaction fees. See [payment sessions](payment-sessions.md).
 | `SELLER_OFFER_API_KEY_MISSING`        | `api_key_env` is required, or names an unset or empty variable                                                                        |
 | `SELLER_OFFER_API_KEY_UNSAFE`         | `api_key_env` names a `GYBLOS_*` variable or the relay token's variable                                                               |
 | `SELLER_PAID_EXECUTION_UNAVAILABLE`   | A paid offer, but the caller wired no payment server (a library caller of `@gyblos/node`)                                             |
-| `SELLER_PAID_METERING_UNRECOUNTED`    | A paid offer whose usage cannot be recounted with the pinned tokenizer                                                                |
 | `SELLER_PAYMENT_ROLE_MISSING`         | A paid offer on a role without a payout and payment keys                                                                              |
 | `SELLER_PAYMENT_DESCRIPTION_INVALID`  | The payout is the fee payer or authorizer key                                                                                         |
 | `SELLER_PAYMENT_NETWORK_MISMATCH`     | The role's RPC is not devnet                                                                                                          |

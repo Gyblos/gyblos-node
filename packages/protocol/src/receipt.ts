@@ -17,7 +17,11 @@ import type {
 import { sign, signingBytes, type Signer } from './signing';
 
 export type * from './receipt-types';
-export { parseBuyerReceipt, parseSellerReceipt } from './receipt-parser';
+export {
+  parseBuyerReceipt,
+  parseSellerReceipt,
+  receiptMember,
+} from './receipt-parser';
 export async function sellerReceiptDigest(
   value: SellerReceiptV1,
 ): Promise<string> {

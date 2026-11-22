@@ -90,9 +90,12 @@ For seller fees and channel closure, see
   They don't prevent, refund or penalize it.
 - Model pins check local artifacts only. The buyer can't verify the remote
   seller's model or the correctness of an answer.
-- Only the pinned Qwen3 0.6B engine is validated end to end, and only
-  `qwen3:0.6b` can be priced, because a priced model needs a public tokenizer
-  the buyer can recount with.
+- Only the pinned Qwen3 0.6B engine is validated end to end. Any model can be
+  priced, but only `qwen3:0.6b` is recounted with its public tokenizer. Other
+  models bill the provider's declared usage, which the buyer bounds by bytes: an
+  inflated count inside those bounds is accepted, up to the request's
+  `maxTokens` and `maxAtomic`. Each tool call adds its own allowance to the
+  output bound, so many tool calls raise it further.
 - Streaming acceptance runs synthetic engines over native loopback. It doesn't
   establish real-model or production streaming performance.
 - The seller's 1.5 GiB memory reserve is an admission policy, not a guarantee.

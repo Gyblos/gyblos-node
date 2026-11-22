@@ -20,7 +20,10 @@ import { ReceiptChannelError } from '@gyblos/protocol/receipt-channel';
 import { conversationText, recordedFinishReason } from '@gyblos/protocol/tools';
 
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
-import type { BuyerReceiptEvidence } from './receipt-buyer';
+import type {
+  BuyerReceiptEvidence,
+  PaidBuyerReceiptEvidence,
+} from './receipt-buyer';
 import type { PaidSellerReceiptOptions } from './receipt-seller';
 
 export function sessionReceiptPayment(
@@ -54,9 +57,10 @@ export function sessionReceiptEvidence(
   payment: PaidReceiptPayment,
   first: number | null,
   total: number,
-): BuyerReceiptEvidence {
+): PaidBuyerReceiptEvidence {
   const offer = request.quote.offer;
   return {
+    metering: offer.meteringMode,
     context: {
       requestId: request.requestId,
       requestDigest,
@@ -99,7 +103,7 @@ export function publishSessionReceipt(
     record: {
       ...evidence.context,
       engineKind: options.engineKind,
-      metering: CONTROL_METERING_MODES.RECOUNTED,
+      metering: evidence.metering,
       usage: { ...result.usage, reasoningTokens: null },
       sizes: receiptTextSizes(
         conversationText(request.input.messages),
