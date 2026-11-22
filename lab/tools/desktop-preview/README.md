@@ -78,6 +78,9 @@ newer version. The button opens a dialog; nothing is downloaded and no release
 page is opened. Open `review=system-status` to start with the checklist open,
 combined with `node-state=error` or `backup=needed`.
 
+Add `density=compact` to any screen to compare the compact density described in
+[DESIGN.md](DESIGN.md#density); it also switches to Inter unless `font` is set.
+
 ## Validation and limits
 
 Run `node --import tsx --test "tests/lab/desktop-preview*.test.ts"` for the

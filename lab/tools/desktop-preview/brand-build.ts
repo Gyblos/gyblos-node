@@ -12,6 +12,7 @@ import brand from './brand.json' with { type: 'json' };
 import * as funds from './funds-build';
 import * as layout from './layout-build';
 import { previewModels } from './models-build';
+import { withSectionIcon } from './section-build';
 
 export { brand };
 const moduleId = (value: string) => value.replaceAll('\\', '/');
@@ -39,6 +40,8 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'utf8',
       );
   }
+  if (target === `${base}/src/ui/Management.tsx`)
+    return withSectionIcon(source);
   if (target === `${base}/src/ui/ServiceLogo.tsx`)
     return replaceOnce(
       replaceOnce(

@@ -1,5 +1,5 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { ArrowCircleUp, CaretRight, Check, Copy, CreditCard, DotsThree, FunnelSimple, Info, MagnifyingGlass, Minus, PaypalLogo, PencilSimple, Plus, PushPin, Trash, Wallet, Warning, X } from '@phosphor-icons/react';
+import { ArrowCircleUp, CaretRight, ChatCircle, Check, Copy, CreditCard, DotsThree, FunnelSimple, Info, MagnifyingGlass, Minus, PaypalLogo, PencilSimple, Plus, PushPin, Trash, Wallet, Warning, X, type Icon, type IconWeight } from '@phosphor-icons/react';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
@@ -159,7 +159,7 @@ export function CodeBlock({ code, language, title, onCopy, copyDisabled = false 
   const tokens = useMemo(() => highlightCode(code, language), [code, language]);
   useEffect(() => {
     if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 1600);
+    const timer = setTimeout(() => setCopied(false), previewCompact() ? 1000 : 1600);
     return () => clearTimeout(timer);
   }, [copied]);
   useEffect(() => setCopied(false), [code]);
@@ -180,7 +180,7 @@ export function CodeBlock({ code, language, title, onCopy, copyDisabled = false 
           }}
         >
           {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-          <span aria-hidden="true">{copied ? 'Copied' : 'Copy'}</span>
+          {!(copied && previewCompact()) && <span aria-hidden="true">{copied ? 'Copied' : 'Copy'}</span>}
         </button>
       </figcaption>
       <pre tabIndex={0}>
@@ -423,6 +423,7 @@ export function usePreviewSetting<K extends keyof PreviewSettings>(key: K) {
 export function setPreviewSetting<K extends keyof PreviewSettings>(key: K, value: PreviewSettings[K]) {
   window.previewSettings = { ...settingsState(), [key]: value };
   settingsListeners.forEach((listener) => listener());
+  showPreviewToast('Settings saved');
 }
 export function previewSetting<K extends keyof PreviewSettings>(key: K) {
   return settingsState()[key];
@@ -536,6 +537,7 @@ export function PreviewStatusBar({ status, version }: { status: ReactNode; versi
           <span className="preview-version">Gyblos {version}</span>
         </span>
       </footer>
+      <PreviewToaster />
       <MotionPresence>
         {open && newer && (
           <PreviewUpdateDialog
@@ -698,6 +700,73 @@ export function PreviewAnswerSkeleton() {
       <i />
       <i />
     </span>
+  );
+}
+
+export const previewCompact = () => document.documentElement.dataset.density === 'compact';
+export function previewIcon(size: number): { size: number; weight?: IconWeight } {
+  return previewCompact() ? { size: 16, weight: 'bold' } : { size };
+}
+export const PREVIEW_SHORTCUT = {
+  NEW_CHAT: { key: 'n', label: '⌘N', aria: 'Meta+N' },
+  SEARCH: { key: 'k', label: '⌘K', aria: 'Meta+K' },
+} as const;
+export function Kbd({ children }: { children: string }) {
+  return <kbd className="pk-kbd">{children}</kbd>;
+}
+export function PreviewSkeletonRows({ count }: { count: number }) {
+  return (
+    <span className="pk-skeleton-rows" aria-hidden="true">
+      {Array.from({ length: count }, (_, index) => (
+        <i key={index} />
+      ))}
+    </span>
+  );
+}
+export function PreviewEmptyLine({ icon: Glyph, children }: { icon: Icon; children: string }) {
+  if (!previewCompact()) return <p className="ui-help-text">{children}</p>;
+  return (
+    <p className="pk-empty-line">
+      <Glyph {...previewIcon(16)} aria-hidden="true" />
+      {children}
+    </p>
+  );
+}
+export function PreviewSectionIcon({ icon: Glyph }: { icon: Icon }) {
+  return previewCompact() ? <Glyph className="pk-section-icon" {...previewIcon(16)} aria-hidden="true" /> : null;
+}
+
+type PreviewToast = { id: number; text: string };
+let toast: PreviewToast | null = null;
+const toastListeners = new Set<() => void>();
+function subscribeToast(listener: () => void) {
+  toastListeners.add(listener);
+  return () => toastListeners.delete(listener);
+}
+function publishToast(next: PreviewToast | null) {
+  toast = next;
+  toastListeners.forEach((listener) => listener());
+}
+export function showPreviewToast(text: string) {
+  if (previewCompact()) publishToast({ id: (toast?.id ?? 0) + 1, text });
+}
+export function PreviewToaster() {
+  const current = useSyncExternalStore(subscribeToast, () => toast);
+  useEffect(() => {
+    if (!current) return;
+    const timer = setTimeout(() => publishToast(null), 2400);
+    return () => clearTimeout(timer);
+  }, [current]);
+  if (!previewCompact()) return null;
+  return (
+    <div className="pk-toast-region" role="status" aria-live="polite">
+      {current && (
+        <span key={current.id} className="pk-toast">
+          <Check {...previewIcon(14)} aria-hidden="true" />
+          {current.text}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -879,6 +948,22 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('All chats');
+  useEffect(() => {
+    if (!previewCompact()) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === PREVIEW_SHORTCUT.NEW_CHAT.key && !loading) {
+        event.preventDefault();
+        onNewChat();
+      } else if (key === PREVIEW_SHORTCUT.SEARCH.key && !collapsed) {
+        event.preventDefault();
+        setSearching(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [loading, collapsed, onNewChat]);
   const running = useRef(new Set<string>());
   useEffect(() => {
     const now = new Set(sessions.filter((session) => session.run || session.paypalRun).map((session) => session.id));
@@ -908,7 +993,14 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
   ].filter((group) => group.items.length);
   return (
     <section className="preview-chat-panel" aria-label="Conversations" inert={collapsed} aria-hidden={collapsed || undefined}>
-      <Button className="ui-nav-row preview-new-chat" aria-label="New chat" disabled={loading} onClick={onNewChat}>
+      <Button
+        className="ui-nav-row preview-new-chat"
+        aria-label="New chat"
+        title={previewCompact() ? 'New chat ' + PREVIEW_SHORTCUT.NEW_CHAT.label : undefined}
+        aria-keyshortcuts={previewCompact() ? PREVIEW_SHORTCUT.NEW_CHAT.aria : undefined}
+        disabled={loading}
+        onClick={onNewChat}
+      >
         <Plus size={16} aria-hidden="true" />
         <span>New chat</span>
       </Button>
@@ -920,6 +1012,8 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
         <h2 className="ui-sidebar-section-title">Chats</h2>
         <IconButton
           label={searching ? 'Close search' : 'Search conversations'}
+          title={previewCompact() && !searching ? 'Search conversations ' + PREVIEW_SHORTCUT.SEARCH.label : undefined}
+          aria-keyshortcuts={previewCompact() && !searching ? PREVIEW_SHORTCUT.SEARCH.aria : undefined}
           aria-pressed={searching}
           onClick={() => {
             setSearching(!searching);
@@ -987,11 +1081,14 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
             })}
           </section>
         ))}
-        {!groups.length && (
-          <p className="ui-help-text">
-            {loading ? 'Loading conversations…' : query || filter !== 'All chats' ? 'No conversations found.' : 'Your conversations will appear here.'}
-          </p>
-        )}
+        {!groups.length &&
+          (loading && previewCompact() ? (
+            <PreviewSkeletonRows count={5} />
+          ) : (
+            <PreviewEmptyLine icon={loading ? ChatCircle : query || filter !== 'All chats' ? MagnifyingGlass : ChatCircle}>
+              {loading ? 'Loading conversations…' : query || filter !== 'All chats' ? 'No conversations found.' : 'Your conversations will appear here.'}
+            </PreviewEmptyLine>
+          ))}
       </div>
     </section>
   );
@@ -1020,24 +1117,39 @@ export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
     if (next) chat.openChat(next.id);
     else chat.newChat(crypto.randomUUID());
     setDialog(null);
+    showPreviewToast('Conversation deleted');
   };
   return (
     <>
       <Dropdown label="Conversation actions" iconOnly className="preview-conversation-menu" trigger={<DotsThree size={16} weight="bold" aria-hidden="true" />}>
         {(close) => (
           <>
-            <MenuItem label={pinned ? 'Unpin' : 'Pin'} leading={<PushPin size={14} aria-hidden="true" />} onClick={() => { togglePin(session.id); close(); }} />
-            <MenuItem label="Rename…" leading={<PencilSimple size={14} aria-hidden="true" />} onClick={() => { setName(title); setDialog(CONVERSATION_DIALOG.RENAME); close(); }} />
+            {previewCompact() && (
+              <MenuItem
+                label="New chat"
+                leading={<Plus {...previewIcon(14)} aria-hidden="true" />}
+                trailing={<Kbd>{PREVIEW_SHORTCUT.NEW_CHAT.label}</Kbd>}
+                onClick={() => {
+                  chat.newChat(crypto.randomUUID());
+                  close();
+                }}
+              />
+            )}
+            <MenuItem label={pinned ? 'Unpin' : 'Pin'} leading={<PushPin {...previewIcon(14)} aria-hidden="true" />} onClick={() => { togglePin(session.id); close(); }} />
+            <MenuItem label="Rename…" leading={<PencilSimple {...previewIcon(14)} aria-hidden="true" />} onClick={() => { setName(title); setDialog(CONVERSATION_DIALOG.RENAME); close(); }} />
             <MenuItem
               label="Copy as Markdown"
-              leading={<Copy size={14} aria-hidden="true" />}
+              leading={<Copy {...previewIcon(14)} aria-hidden="true" />}
               onClick={() => {
                 const text = '# ' + title + '\n\n' + session.messages.map((message) => (message.role === 'user' ? '**You:** ' : '**Gyblos:** ') + message.text).join('\n\n');
-                void navigator.clipboard.writeText(text).catch(() => undefined);
+                void navigator.clipboard
+                  .writeText(text)
+                  .then(() => showPreviewToast('Copied as Markdown'))
+                  .catch(() => undefined);
                 close();
               }}
             />
-            <MenuItem label="Delete…" leading={<Trash size={14} aria-hidden="true" />} onClick={() => { setDialog(CONVERSATION_DIALOG.DELETE); close(); }} />
+            <MenuItem label="Delete…" leading={<Trash {...previewIcon(14)} aria-hidden="true" />} onClick={() => { setDialog(CONVERSATION_DIALOG.DELETE); close(); }} />
           </>
         )}
       </Dropdown>
@@ -1051,6 +1163,7 @@ export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
                 const next = name.trim();
                 if (next) updateConversations((current) => ({ titles: { ...current.titles, [session.id]: next } }));
                 setDialog(null);
+                if (next) showPreviewToast('Conversation renamed');
               }}
             >
               <FormField label="Name" htmlFor="preview-conversation-name">

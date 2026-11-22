@@ -80,6 +80,7 @@ html
 
 /* All mockup routes use the same actions. Selection, navigation and submit controls keep their roles. */
 html .app.desktop-frame {
+  --pk-radius-sheet: var(--radius-panel);
   --preview-button-surface: color-mix(in srgb, var(--ink) 12%, var(--panel));
   --preview-button-hover: color-mix(in srgb, var(--ink) 20%, var(--panel));
 }
@@ -2818,8 +2819,8 @@ html .app.desktop-frame > .app-body {
   overflow: hidden;
   border: 1px solid var(--line);
   border-inline-end: 0;
-  border-start-start-radius: var(--radius-panel);
-  border-end-start-radius: var(--radius-panel);
+  border-start-start-radius: var(--pk-radius-sheet);
+  border-end-start-radius: var(--pk-radius-sheet);
   background: var(--bg);
 }
 
@@ -3804,7 +3805,7 @@ html .app.desktop-frame .preview-rail-item.ui-icon-button[aria-current='page'] {
   padding: var(--space-2) var(--space-3) var(--space-3);
   border-block-end: 1px solid var(--line);
   border-inline-start: 1px solid var(--line);
-  border-end-start-radius: var(--radius-panel);
+  border-end-start-radius: var(--pk-radius-sheet);
   background: var(--pk-side);
 }
 .desktop-frame.sidebar-collapsed .preview-chat-panel {
@@ -3962,4 +3963,184 @@ html .app.desktop-frame .preview-chat-pin[aria-pressed='true'] {
   font-size: 13px;
   font-weight: 500;
   text-align: end;
+}
+
+html[data-density='compact'] .app.desktop-frame {
+  --radius-control: 6px;
+  --radius-option: 6px;
+  --pk-radius-menu: 8px;
+  --radius-panel: 10px;
+  --pk-radius-sheet: 16px;
+  --control-size: 28px;
+  --pk-row-height: 30px;
+  --pk-comfort-padding: 20px;
+  --navigation-row-height: var(--pk-row-height);
+  --ui-font: 13px;
+  --ui-detail: 12px;
+  font-size: var(--ui-font);
+}
+html[data-density='compact'] .app.desktop-frame .compact-dropdown {
+  border-radius: var(--pk-radius-menu);
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .compact-dropdown
+  .dropdown-row {
+  min-height: var(--pk-row-height);
+  padding-block: 4px;
+  font-size: var(--ui-font);
+  line-height: 18px;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .content
+  .ui-data-table
+  :is(th, td) {
+  height: 32px;
+  padding-block: 3px;
+  font-size: var(--ui-font);
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .content
+  .ui-data-table
+  .ui-button {
+  --control-size: 24px;
+  height: var(--control-size);
+  min-height: var(--control-size);
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .content
+  .ui-data-table
+  .ui-button:has(> svg:only-child) {
+  width: var(--control-size);
+  min-width: var(--control-size);
+}
+html[data-density='compact'] .app.desktop-frame .content .ui-data-table th {
+  font-size: var(--ui-detail);
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .content
+  .preview-settings-rows {
+  padding: 4px var(--pk-comfort-padding);
+}
+html[data-density='compact'] .app.desktop-frame .modal .ui-form {
+  gap: var(--pk-comfort-padding);
+}
+html[data-density='compact'] .app.desktop-frame .ui-section-title h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+html[data-density='compact'] .app.desktop-frame .pk-section-icon {
+  flex: none;
+  color: var(--muted);
+}
+html[data-density='compact']
+  .app.desktop-frame
+  :is(
+    .ui-button,
+    .ui-input,
+    .ui-search,
+    .ui-choice,
+    .dropdown-row,
+    .ui-nav-row
+  ) {
+  transition-property:
+    background-color, border-color, color, box-shadow, outline-color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+html .app.desktop-frame .pk-kbd {
+  margin-inline-start: auto;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+}
+html .app.desktop-frame .pk-empty-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--pk-comfort-padding);
+  color: var(--muted);
+  font-size: var(--ui-font);
+}
+html .app.desktop-frame .pk-empty-line svg {
+  flex: none;
+}
+html .app.desktop-frame .pk-skeleton-rows {
+  display: grid;
+  gap: 6px;
+  padding-block: 4px;
+}
+html .app.desktop-frame .pk-skeleton-rows i {
+  display: block;
+  height: 24px;
+  border-radius: var(--radius-option);
+  background: linear-gradient(
+    90deg,
+    var(--line) 0%,
+    color-mix(in srgb, var(--ink) 16%, transparent) 50%,
+    var(--line) 100%
+  );
+  background-size: 200% 100%;
+  animation: preview-shimmer 1.4s ease-in-out infinite;
+}
+html .app.desktop-frame .pk-skeleton-rows i:nth-child(even) {
+  width: 72%;
+}
+html .app.desktop-frame .pk-toast-region {
+  position: fixed;
+  inset-inline: 0;
+  bottom: calc(var(--pk-status-bar) + var(--space-3));
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+html .app.desktop-frame .pk-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--pk-radius-menu);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: var(--ui-font);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 18%, transparent);
+  animation: pk-toast-in 150ms ease-out;
+}
+html .app.desktop-frame .pk-toast svg {
+  color: var(--pk-success);
+}
+@keyframes pk-toast-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-density='compact']
+    .app.desktop-frame
+    :is(
+      .ui-button,
+      .ui-input,
+      .ui-search,
+      .ui-choice,
+      .dropdown-row,
+      .ui-nav-row
+    ) {
+    transition-duration: 0ms;
+  }
+  html .app.desktop-frame :is(.pk-toast, .pk-skeleton-rows i) {
+    animation: none;
+  }
 }

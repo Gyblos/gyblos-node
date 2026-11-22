@@ -12,7 +12,7 @@ import { BUTTON_VARIANT, UI_VIEW } from './constants';
 import { CopyField, FormActions } from './Form';
 import { Facts, Pair } from './Management';
 import { Modal } from './Modal';
-import { PREVIEW_COPY, usePreviewSetting } from './PreviewKit';
+import { PREVIEW_COPY, showPreviewToast, usePreviewSetting } from './PreviewKit';
 import { Badge, Button } from './UI';
 import type { useUsdcApiKeys } from './useUsdcApiKeys';
 
@@ -87,7 +87,9 @@ export function RevokeConfirmation({
           className="preview-destructive"
           onClick={() => {
             close();
-            void run({ action: USDC_API_ACTION.REVOKE, id });
+            void run({ action: USDC_API_ACTION.REVOKE, id }).then(() =>
+              showPreviewToast('API key revoked'),
+            );
           }}
         >
           Revoke key
