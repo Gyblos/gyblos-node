@@ -630,7 +630,8 @@ html .app.desktop-frame > .preview-status-bar {
   min-width: 0;
   padding: 0 8px;
   border-start-start-radius: var(--radius-panel);
-  background: var(--pk-rail);
+  border-start-end-radius: var(--radius-panel);
+  background: var(--pk-side);
   color: var(--muted);
   font-size: 12px;
 }
