@@ -787,7 +787,6 @@ export function AmountEditor({ id, label, value, onChange, unit, presets, empty,
   );
 }
 
-/** Overlapping logos of the coding tools a Gyblos API key connects. */
 export function PreviewAgentLogos() {
   return (
     <span className="preview-connect-logos" aria-hidden="true">
@@ -855,7 +854,6 @@ function dayGroup(days: number): (typeof DAY_GROUPS)[number] {
 const CHAT_FILTERS = ['All chats', 'Unread', 'Pinned'] as const;
 type ChatFilter = (typeof CHAT_FILTERS)[number];
 
-/** Running spinner or unread dot beside a conversation title. */
 function PreviewChatState({ state }: { state: 'running' | 'unread' }) {
   return (
     <span
@@ -867,7 +865,6 @@ function PreviewChatState({ state }: { state: 'running' | 'unread' }) {
   );
 }
 
-/** Conversation panel beside the rail: new chat, connect agents, then pinned and dated conversations. */
 export function PreviewConversationPanel({ chat, view, collapsed, loading, onNewChat, onOpenChat, onConnect }: {
   chat: ChatController;
   view: View;
@@ -1003,7 +1000,6 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
 const CONVERSATION_DIALOG = { RENAME: 'rename', DELETE: 'delete' } as const;
 type ConversationDialog = (typeof CONVERSATION_DIALOG)[keyof typeof CONVERSATION_DIALOG];
 
-/** Title bar menu for the open conversation: pin, rename, copy as Markdown, delete (preview-only state). */
 export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
   const { sessions, activeId } = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
   const state = usePreviewConversations();
@@ -1080,7 +1076,6 @@ export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
   );
 }
 
-/** Side panel with the open conversation's model, seller, tokens, spend and latency. */
 export function PreviewChatDetails({ chat, onClose }: { chat: ChatController; onClose(): void }) {
   const { sessions, activeId } = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
   const session = sessions.find((item) => item.id === activeId);

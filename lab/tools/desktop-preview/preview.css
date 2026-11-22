@@ -2729,7 +2729,6 @@ html .app.desktop-frame .pk-chips button:focus-visible {
   }
 }
 
-/* Window frame: sidebar, title bar and status bar share one surface; the content sits on it as an inset sheet. */
 html .app.desktop-frame > .buyer-sidebar {
   background: var(--pk-side);
   border-inline-end: 0;
