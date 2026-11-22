@@ -17,6 +17,7 @@ import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
   buyerEndpoint,
+  policyForRoute,
   policyForSeller,
   readJson,
   sellerFields,
@@ -186,6 +187,7 @@ export class X402Client {
     prompt: string,
     onDelta?: (text: string) => void,
     choice?: DesktopSellerChoice,
+    route?: NonNullable<BuyerApiPolicy['autoRoutes']>[number],
   ) {
     if (this.busy || this.closed || !this.connection)
       return Promise.reject(new Error('Local buyer is unavailable'));
@@ -203,6 +205,7 @@ export class X402Client {
       controller.signal,
       onDelta,
       choice,
+      route,
     );
     this.pending = work;
     return work.finally(() => {
@@ -219,6 +222,7 @@ export class X402Client {
     external: AbortSignal,
     onDelta?: (text: string) => void,
     choice?: DesktopSellerChoice,
+    route?: NonNullable<BuyerApiPolicy['autoRoutes']>[number],
   ) {
     const current = await this.budget.summary();
     external.throwIfAborted();
@@ -234,7 +238,7 @@ export class X402Client {
         connection,
         id,
         prompt,
-        { ...connection.policy, maxAtomic: '0' },
+        { ...policyForRoute(connection.policy, route), maxAtomic: '0' },
         external,
         onDelta,
         choice,
@@ -248,9 +252,7 @@ export class X402Client {
         'Buyer policy changed. Finish the previous budget before authorizing another.',
       );
     const seller = typeof choice === 'object' ? choice : undefined;
-    if (choice === BUYER_API.AUTO && !connection.policy.paidAuto)
-      throw new PaidSellerLimitError('Enable paid Auto in Payments first.');
-    validateChoice(choice, connection.policy, current);
+    validateChoice(choice, connection.policy, current, route?.modelId);
     await waitForPaidBuyer(
       connection,
       this.request,
@@ -266,7 +268,11 @@ export class X402Client {
       choice ? connection.policy : undefined,
       intent,
     );
-    const policy = policyForSeller(reserved, seller);
+    const policy = policyForRoute(
+      policyForSeller(reserved, seller),
+      route,
+      choice === BUYER_API.AUTO,
+    );
     let sent = false;
     try {
       external.throwIfAborted();

@@ -11,6 +11,7 @@ import {
 } from '@gyblos/config/network';
 import { fundingHandlers } from '@gyblos/desktop/funding-handlers';
 import {
+  autoFundingAvailable,
   depositShortfall,
   FUNDING,
   sellerResponseLimit,
@@ -282,5 +283,28 @@ void test('a subminimum replacement is exposed as a reduced ceiling, never as av
       { ...seller, nodeId: '56'.repeat(32) },
     ),
     { replacementAtomic: '960' },
+  );
+});
+
+void test('Auto checks reusable channel funds before asking for a new deposit', () => {
+  const policy = { payer, maxAtomic: '10000', depositAtomic: '1000000' };
+  const zero = {
+    payer,
+    network: DEVNET,
+    balanceAtomic: '0',
+    channelRemainingAtomic: null,
+    faucetAvailable: true,
+  };
+  assert.equal(autoFundingAvailable(policy, [zero]), false);
+  assert.equal(
+    autoFundingAvailable(policy, [
+      zero,
+      { ...zero, channelRemainingAtomic: '15000' },
+    ]),
+    true,
+  );
+  assert.equal(
+    autoFundingAvailable(policy, [{ ...zero, balanceAtomic: null }]),
+    null,
   );
 });

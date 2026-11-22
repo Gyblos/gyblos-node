@@ -44,7 +44,11 @@ export function ModelDropdown({
   showBrowse?: boolean;
   networkOnly?: boolean;
   contextLabel?: string;
-  auto?: { buyerModel: string; paid: boolean; choose(): void };
+  auto?: {
+    buyerModels: readonly string[];
+    paid: boolean;
+    choose(name: string): void;
+  };
 }) {
   const network =
     networkOnly ||
@@ -93,7 +97,7 @@ export function ModelDropdown({
                 models={options}
                 selected={model.id}
                 automatic={!!model.automatic}
-                buyerModel={auto.buyerModel}
+                buyerModels={auto.buyerModels}
                 paid={auto.paid}
                 onAuto={auto.choose}
                 onSelect={(id) => {

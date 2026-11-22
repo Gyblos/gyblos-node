@@ -32,6 +32,31 @@ export function sellerResponseLimit(
     deposit
   );
 }
+export function autoFundingAvailable(
+  policy: { payer: string; depositAtomic?: string; maxAtomic: string },
+  observations: readonly (BuyerFunding | null)[],
+) {
+  const deposit = policy.depositAtomic;
+  if (!deposit || !observations.length) return null;
+  const capacity = observations.map((item) => {
+    if (!item || item.payer !== policy.payer) return null;
+    const escrow = item.channelRemainingAtomic ?? item.switchingAtomic;
+    if (escrow != null && BigInt(escrow) >= BigInt(policy.maxAtomic))
+      return true;
+    if (escrow != null) return false;
+    if (
+      item.replacementAtomic !== undefined &&
+      BigInt(item.replacementAtomic) < BigInt(policy.maxAtomic)
+    )
+      return false;
+    if (item.balanceAtomic === null) return null;
+    return (
+      BigInt(item.balanceAtomic) >= BigInt(item.replacementAtomic ?? deposit)
+    );
+  });
+  if (capacity.includes(true)) return true;
+  return capacity.includes(null) ? null : false;
+}
 export function depositShortfall(balanceAtomic: string, depositAtomic: string) {
   const difference =
     BigInt(controlAtomic(depositAtomic)) - BigInt(controlAtomic(balanceAtomic));

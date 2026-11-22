@@ -191,18 +191,14 @@ async function closeBuyerResources(
 
 function buyerHttp(
   run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'],
-  {
-    request,
-    models,
-    session,
-    discovery,
-  }: Awaited<ReturnType<typeof buyerSelection>>['config'],
+  config: Awaited<ReturnType<typeof buyerSelection>>['config'],
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
   diagnostics?: DiagnosticSink,
   contextTokens?: FreeBuyerDependencies['contextTokens'],
 ) {
+  const { request, models, session, discovery } = config;
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
       (input, signal, _onDelta, model, permission) =>
@@ -227,7 +223,7 @@ function buyerHttp(
           role,
           execution?.token,
           session,
-          discovery?.paidAuto,
+          config,
         ),
         requestMs: execution?.requestMs,
         classify: execution?.classify,

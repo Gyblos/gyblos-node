@@ -18,6 +18,21 @@ import {
 
 export type DesktopSellerChoice =
   BuyerSellerChoice | typeof OFFER_PRICING_KINDS.FREE | typeof BUYER_API.AUTO;
+export function policyForRoute(
+  policy: BuyerApiPolicy,
+  route?: NonNullable<BuyerApiPolicy['autoRoutes']>[number],
+  paid = false,
+) {
+  if (!route) return policy;
+  return {
+    ...policy,
+    model: route.id,
+    maxTokens: paid
+      ? Math.min(route.maxTokens, BATCH_CHANNEL.maxOutputTokens)
+      : route.maxTokens,
+  };
+}
+
 export function policyForSeller(
   policy: BuyerApiPolicy,
   choice?: BuyerSellerChoice,
@@ -136,14 +151,17 @@ export function validateChoice(
   choice: BuyerSellerChoice | typeof BUYER_API.AUTO | undefined,
   policy: BuyerApiPolicy,
   current: Awaited<ReturnType<X402Budget['summary']>>,
+  model = policy.model,
 ) {
   if (choice) {
+    if (choice === BUYER_API.AUTO && !policy.paidAuto)
+      throw new PaidSellerLimitError('Enable paid Auto in Payments first.');
     if (typeof choice === 'object' && choice.expiresAt <= Date.now())
       throw new Error('Seller listing expired');
     const notice = paidSellerLimitNotice(
       policy,
       current,
-      typeof choice === 'object' ? choice.modelId : policy.model,
+      typeof choice === 'object' ? choice.modelId : model,
     );
     if (notice) throw new PaidSellerLimitError(notice);
   }

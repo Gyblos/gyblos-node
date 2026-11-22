@@ -11,7 +11,7 @@ import { X402_ACTION } from '../x402/constants';
 import { Button } from './UI';
 import type { X402View } from './useX402';
 
-export function AutoSellerSettings({
+function useAutoSettings({
   buyer,
   policy,
 }: {
@@ -62,6 +62,38 @@ export function AutoSellerSettings({
       result?.error ?? (result?.policy ? '' : 'Could not save Auto settings.'),
     );
   }
+  return {
+    enabled,
+    setEnabled,
+    maximum,
+    setMaximum,
+    input,
+    setInput,
+    output,
+    setOutput,
+    error,
+    save,
+  };
+}
+export function AutoSellerSettings({
+  buyer,
+  policy,
+}: {
+  buyer: X402View;
+  policy: BuyerApiPolicy;
+}) {
+  const {
+    enabled,
+    setEnabled,
+    maximum,
+    setMaximum,
+    input,
+    setInput,
+    output,
+    setOutput,
+    error,
+    save,
+  } = useAutoSettings({ buyer, policy });
   return (
     <details className="ui-form">
       <summary>
@@ -82,33 +114,33 @@ export function AutoSellerSettings({
       </label>
       {enabled && (
         <div className="ui-form">
-          <label>
-            Maximum per response (USDC)
-            <input
-              className="ui-input"
-              inputMode="decimal"
-              value={maximum}
-              onChange={(event) => setMaximum(event.target.value)}
-            />
-          </label>
-          <label>
-            Maximum input price (USDC / 1M tokens)
-            <input
-              className="ui-input"
-              inputMode="decimal"
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-            />
-          </label>
-          <label>
-            Maximum output price (USDC / 1M tokens)
-            <input
-              className="ui-input"
-              inputMode="decimal"
-              value={output}
-              onChange={(event) => setOutput(event.target.value)}
-            />
-          </label>
+          {[
+            {
+              label: 'Maximum per response (USDC)',
+              value: maximum,
+              change: setMaximum,
+            },
+            {
+              label: 'Maximum input price (USDC / 1M tokens)',
+              value: input,
+              change: setInput,
+            },
+            {
+              label: 'Maximum output price (USDC / 1M tokens)',
+              value: output,
+              change: setOutput,
+            },
+          ].map((field) => (
+            <label key={field.label}>
+              {field.label}
+              <input
+                className="ui-input"
+                inputMode="decimal"
+                value={field.value}
+                onChange={(event) => field.change(event.target.value)}
+              />
+            </label>
+          ))}
         </div>
       )}
       <Button

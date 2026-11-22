@@ -24,6 +24,19 @@ import { Pagination } from './Pagination';
 import { Badge, Button } from './UI';
 import type { X402View } from './useX402';
 
+function useCopyPolicy(buyer: X402View, policyId?: string) {
+  const [copyError, setCopyError] = useState('');
+  const copy = (
+    action: typeof X402_ACTION.COPY_PAYER | typeof X402_ACTION.COPY_MINT,
+  ) => {
+    void buyer
+      .run({ action, policyId })
+      .then((result) =>
+        setCopyError(result && !result.error ? '' : 'Copy unavailable'),
+      );
+  };
+  return { copyError, copy };
+}
 export function X402Payments({
   buyer,
   onChat,
@@ -33,23 +46,14 @@ export function X402Payments({
 }) {
   const { summary, policy } = buyer.state;
   const activePolicy = effectiveX402Policy(summary, policy);
-  const [copyError, setCopyError] = useState('');
-  const copy = (
-    action: typeof X402_ACTION.COPY_PAYER | typeof X402_ACTION.COPY_MINT,
-  ) => {
-    void buyer
-      .run({ action, policyId: activePolicy?.policyId })
-      .then((result) =>
-        setCopyError(result && !result.error ? '' : 'Copy unavailable'),
-      );
-  };
+  const { copyError, copy } = useCopyPolicy(buyer, activePolicy?.policyId);
   return (
     <section className="ui-form" aria-label="x402 chat budget">
       <div className="ui-toolbar">
         <h2>Chat budget · x402</h2>
         <Badge>Solana devnet</Badge>
       </div>
-      {policy && (
+      {!!policy?.autoRoutes?.length && (
         <AutoSellerSettings
           key={policy.policyId}
           buyer={buyer}

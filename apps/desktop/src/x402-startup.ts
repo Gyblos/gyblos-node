@@ -147,6 +147,10 @@ export function automaticBuyer(
         check();
         assertConfigurableBudget(await budget.summary());
         check();
+        if (autoPrices !== undefined && !client.policy()?.autoRoutes?.length)
+          throw new PaidSellerLimitError(
+            'This buyer does not support changing Auto in Payments.',
+          );
         client.disconnectForPolicyChange(owned, policyId);
         ready = null;
         owned = undefined;

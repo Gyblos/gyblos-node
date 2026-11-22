@@ -1,9 +1,10 @@
 import {
   BUYER_API,
   parseAutoPrices,
+  type BuyerApiPolicy,
   type BuyerSellerChoice,
 } from '@gyblos/protocol/buyer-api';
-import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
+import { MODEL_IDS, OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
 import { controlAtomic } from '@gyblos/protocol/control-validation';
 
@@ -87,6 +88,7 @@ function sendResponse(
   prompt: string,
   progress?: (value: X402Progress) => void,
   choice?: DesktopSellerChoice,
+  route?: NonNullable<BuyerApiPolicy['autoRoutes']>[number],
 ) {
   return client.send(
     id,
@@ -101,6 +103,7 @@ function sendResponse(
         }
       : undefined,
     choice,
+    route,
   );
 }
 function buyerAction(owner: Owner, event: Sender, args: readonly unknown[]) {
@@ -133,8 +136,17 @@ async function selectedOffer(
       throw new PaidSellerLimitError(
         'Select Auto again for the current buyer.',
       );
+    const route = policy.autoRoutes?.find(
+      (item) => item.modelId === input.model,
+    );
+    if (!route)
+      throw new PaidSellerLimitError(
+        'This buyer cannot serve the selected model.',
+      );
     if (policy.maxAtomic === '0') return undefined;
-    return policy.paidAuto ? BUYER_API.AUTO : OFFER_PRICING_KINDS.FREE;
+    return policy.paidAuto && route.modelId === MODEL_IDS.QWEN3_0_6B
+      ? BUYER_API.AUTO
+      : OFFER_PRICING_KINDS.FREE;
   }
   if (input.freeOnly === true) {
     if (input.offerId || !policy || input.policyId !== policy.policyId)
@@ -158,6 +170,25 @@ async function selectedOffer(
       'Select the seller again to confirm the current channel terms.',
     );
   return selected;
+}
+async function selectionFor(
+  client: X402Client,
+  input: Record<string, unknown>,
+  resolve?: Parameters<typeof selectedOffer>[2],
+) {
+  const policy = client.policy();
+  const selected = await selectedOffer(policy, input, resolve);
+  if (client.policy()?.policyId !== policy?.policyId)
+    throw new PaidSellerLimitError(
+      'The buyer changed. Select the model again.',
+    );
+  return {
+    selected,
+    route:
+      input.auto === true
+        ? policy?.autoRoutes?.find((item) => item.modelId === input.model)
+        : undefined,
+  };
 }
 function configureAction(
   managed: ManagedBuyerPorts | undefined,
@@ -225,8 +256,8 @@ export function createX402Handlers(
         x402Id(input.id) &&
         typeof input.prompt === 'string'
       ) {
-        const selected = await selectedOffer(
-          client.policy(),
+        const { selected, route } = await selectionFor(
+          client,
           input,
           resolveOffer,
         );
@@ -238,6 +269,7 @@ export function createX402Handlers(
           input.prompt,
           progress,
           selected,
+          route,
         );
         return {
           ...(await summary()),

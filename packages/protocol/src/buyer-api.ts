@@ -19,6 +19,7 @@ export interface BuyerApiPolicy {
   maxAtomic: string;
   paidAuto?: true;
   autoPrices?: TokenPricesV2;
+  autoRoutes?: { id: string; modelId: string; maxTokens: number }[];
   depositAtomic?: string;
   lifetimeMs?: number;
   network: string;
@@ -31,6 +32,26 @@ export function buyerAtomic(value: unknown): value is string {
     value.length <= BUYER_API.MAX_ATOMIC_DIGITS &&
     /^(0|[1-9][0-9]*)$/.test(value)
   );
+}
+function autoRoute(input: unknown) {
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    !('id' in input) ||
+    typeof input.id !== 'string' ||
+    !input.id ||
+    input.id.length > BUYER_API.MAX_MODEL_LENGTH ||
+    !('modelId' in input) ||
+    typeof input.modelId !== 'string' ||
+    !input.modelId ||
+    input.modelId.length > BUYER_API.MAX_MODEL_LENGTH ||
+    !('maxTokens' in input) ||
+    typeof input.maxTokens !== 'number' ||
+    !Number.isSafeInteger(input.maxTokens) ||
+    input.maxTokens < 1
+  )
+    throw new Error('Invalid Auto model');
+  return { id: input.id, modelId: input.modelId, maxTokens: input.maxTokens };
 }
 export function parseAutoPrices(value: unknown): TokenPricesV2 {
   if (
@@ -62,6 +83,7 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
     !Number.isSafeInteger(value.maxTokens) ||
     value.maxTokens <= 0 ||
     !buyerAtomic(value.maxAtomic) ||
+    (value.autoRoutes !== undefined && !Array.isArray(value.autoRoutes)) ||
     (value.paidAuto !== undefined && value.paidAuto !== true) ||
     typeof value.network !== 'string' ||
     value.network.length > BUYER_API.MAX_MODEL_LENGTH ||
@@ -77,6 +99,9 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
       : parseTerms(value);
   return {
     ...session,
+    ...(Array.isArray(value.autoRoutes) && {
+      autoRoutes: value.autoRoutes.map(autoRoute),
+    }),
     ...(value.autoPrices !== undefined && {
       autoPrices: parseAutoPrices(value.autoPrices),
     }),

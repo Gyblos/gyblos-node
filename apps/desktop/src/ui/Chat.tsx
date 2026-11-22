@@ -93,7 +93,7 @@ type Props = {
   onSelectModel: (id: string) => void;
   confirmedPolicy?: string;
   onDefaultModel?: () => void;
-  onAutoModel?: () => void;
+  onAutoModel?: (name: string) => void;
   onBrowseModels: () => void;
   onReviewPaypal: () => void;
   onAuthorize: () => DemoAuthorizationStatus;
@@ -470,7 +470,11 @@ export function Chat({
               freeOnly: true,
               policyId: x402.state.policy?.policyId,
             }),
-            ...(model.automatic && { auto: true, policyId: confirmedPolicy }),
+            ...(model.automatic && {
+              auto: true,
+              model: model.name,
+              policyId: confirmedPolicy,
+            }),
             ...(model.offerId && {
               offerId: model.offerId,
               policyId: confirmedPolicy,
@@ -728,7 +732,10 @@ export function Chat({
                 auto={
                   usingX402 && x402?.state.policy && onAutoModel
                     ? {
-                        buyerModel: x402.state.policy.model,
+                        buyerModels:
+                          x402.state.policy.autoRoutes?.map(
+                            (route) => route.modelId,
+                          ) ?? [],
                         paid: !!x402.state.policy.paidAuto,
                         choose: onAutoModel,
                       }

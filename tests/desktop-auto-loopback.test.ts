@@ -85,6 +85,19 @@ void test('initial desktop status enables free HTTP chat and presents the actual
     assert.equal(initial.summary.active, true);
     assert.equal(initial.policy?.maxAtomic, '0');
     assert.equal(calls, 0);
+    const unavailable = await handle(event, [
+      {
+        action: X402_ACTION.CONFIGURE_PAID,
+        policyId: initial.policy?.policyId,
+        maxAtomic: '10000',
+        autoPrices: {
+          inputAtomicPerMtok: '52000',
+          outputAtomicPerMtok: '208000',
+        },
+      },
+    ]);
+    assert.match(unavailable.error ?? '', /does not support changing Auto/);
+    assert.equal(client.policy()?.policyId, initial.policy?.policyId);
     const chat = new ChatController('synthetic-conversation');
     const model = {
       id: 'synthetic-desktop-model',

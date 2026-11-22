@@ -27,6 +27,7 @@ export interface BuyerDesktopOptions {
     | 'lifetimeMs'
     | 'paidAuto'
     | 'autoPrices'
+    | 'autoRoutes'
   >;
 }
 export function configuredBuyerAccess(
@@ -34,7 +35,10 @@ export function configuredBuyerAccess(
   role: RoleConfig | undefined,
   token: string | undefined,
   session?: BuyerSelectionConfig['session'],
-  paidAuto?: true,
+  config?: Pick<
+    BuyerSelectionConfig,
+    'discovery' | 'identity' | 'models' | 'sellers' | 'pinnedNodeId'
+  >,
 ): BuyerDesktopOptions {
   return {
     token,
@@ -45,7 +49,26 @@ export function configuredBuyerAccess(
               depositAtomic: session.depositAtomic,
               lifetimeMs: session.lifetimeMs,
             }),
-            ...(paidAuto && { paidAuto, autoPrices: request.priceCeilings }),
+            ...(config?.discovery?.open &&
+              config.identity &&
+              !config.pinnedNodeId &&
+              !config.sellers.length && {
+                autoPrices: request.priceCeilings,
+                autoRoutes: config.models?.map(
+                  ({ id, selection, maxTokens }) => ({
+                    id,
+                    modelId: selection.modelId,
+                    maxTokens,
+                  }),
+                ) ?? [
+                  {
+                    id: request.selection.modelId,
+                    modelId: request.selection.modelId,
+                    maxTokens: request.maxTokens,
+                  },
+                ],
+                ...(config.discovery.paidAuto && { paidAuto: true }),
+              }),
             network: request.network,
             mint: request.asset,
             payer: role.buyer,
