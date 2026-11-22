@@ -321,6 +321,12 @@ export async function startSessionQuoteRuntime(
   };
   return {
     sellerChoice: true,
+    reconcilePool: router
+      ? async () => {
+          if (router.activeRequests() || (await manager.unresolved()))
+            return sessionFail(SESSION_CODES.UNVERIFIED);
+        }
+      : undefined,
     preparePaidChat:
       options.preparePaidTokenizer && prepared.config.request.maxAtomic !== '0'
         ? manager.preparePaidChat

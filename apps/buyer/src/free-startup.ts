@@ -62,6 +62,7 @@ export type BuyerExecutionFactory = (context: {
   ): Promise<ChatResult>;
   sellerChoice?: boolean;
   preparePaidChat?: () => Promise<void>;
+  reconcilePool?: () => Promise<void>;
   token?: string;
   apiKeys?: BuyerApiKeys;
   requestMs?: number;
@@ -228,6 +229,7 @@ function buyerHttp(
         requestMs: execution?.requestMs,
         classify: execution?.classify,
         preparePaidChat: execution?.preparePaidChat,
+        reconcilePool: execution?.reconcilePool,
       },
     ),
   );

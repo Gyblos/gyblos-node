@@ -77,6 +77,46 @@ export async function readJson(response: Response, allowError = false) {
   const value: unknown = JSON.parse(text);
   return value;
 }
+async function buyerPolicyAction(
+  connection: { url: URL; token: string; policy: BuyerApiPolicy },
+  request: typeof fetch,
+  path:
+    | typeof BUYER_API.RECONCILE_POOL_PATH
+    | typeof BUYER_API.PAID_PREPARATION_PATH,
+  signal: AbortSignal,
+) {
+  const response = await request(new URL(path, connection.url), {
+    method: 'POST',
+    redirect: 'error',
+    signal,
+    headers: {
+      authorization: 'Bearer ' + connection.token,
+      'if-match': '"' + connection.policy.policyId + '"',
+    },
+  });
+  await response.body?.cancel();
+  return response.status;
+}
+export async function reconcileBuyerPool(
+  connection: { url: URL; token: string; policy: BuyerApiPolicy },
+  expected: BuyerApiPolicy,
+  request: typeof fetch,
+) {
+  const { policy } = connection;
+  if (
+    policy.payer !== expected.payer ||
+    policy.mint !== expected.mint ||
+    policy.network !== expected.network
+  )
+    throw new Error('Buyer connection changed');
+  const status = await buyerPolicyAction(
+    connection,
+    request,
+    BUYER_API.RECONCILE_POOL_PATH,
+    AbortSignal.timeout(DESKTOP_X402.REQUEST_MS),
+  );
+  if (status !== HTTP_STATUS.noContent) throw new Error('Unconfirmed payment');
+}
 // The response must come from the same buyer process that will receive the later chat.
 export async function waitForPaidBuyer(
   connection: {
@@ -91,31 +131,21 @@ export async function waitForPaidBuyer(
 ) {
   if (!connection.preparesPaidChat || connection.policy.maxAtomic === '0')
     return;
-  const response = await request(
-    new URL(BUYER_API.PAID_PREPARATION_PATH, connection.url),
-    {
-      method: 'POST',
-      redirect: 'error',
-      signal: AbortSignal.any([
-        external,
-        AbortSignal.timeout(DESKTOP_X402.REQUEST_MS),
-      ]),
-      headers: {
-        authorization: 'Bearer ' + connection.token,
-        'if-match': '"' + connection.policy.policyId + '"',
-      },
-    },
+  const status = await buyerPolicyAction(
+    connection,
+    request,
+    BUYER_API.PAID_PREPARATION_PATH,
+    AbortSignal.any([external, AbortSignal.timeout(DESKTOP_X402.REQUEST_MS)]),
   );
-  await response.body?.cancel();
   external.throwIfAborted();
-  if (response.status === HTTP_STATUS.noContent) {
+  if (status === HTTP_STATUS.noContent) {
     if (expiresAt !== undefined && expiresAt <= Date.now())
       throw new PaidSellerLimitError(
         'The selected seller or terms changed. Refresh the listing before sending.',
       );
     return;
   }
-  if (response.status === HTTP_STATUS.serviceUnavailable)
+  if (status === HTTP_STATUS.serviceUnavailable)
     throw desktopBuyerFailure(
       {
         code: BUYER_API.TOKENIZER_UNAVAILABLE,

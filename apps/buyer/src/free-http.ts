@@ -244,11 +244,13 @@ export function freeBuyerHandler(
   apiKeys?: BuyerApiKeys,
   diagnostics?: DiagnosticSink,
   preparePaidChat?: () => Promise<void>,
+  reconcilePool?: () => Promise<void>,
 ) {
   const desktop = createDesktopApi(
     desktopPolicy,
     authorize !== undefined,
     preparePaidChat,
+    reconcilePool,
   );
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   const observe = httpDiagnostics(diagnostics);
@@ -339,6 +341,7 @@ export async function startFreeBuyerHttp(
       options.apiKeys,
       options.diagnostics,
       options.preparePaidChat,
+      options.reconcilePool,
     ),
   );
   await new Promise<void>((resolve, reject) => {

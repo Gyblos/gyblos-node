@@ -16,6 +16,7 @@ import type { BuyerSelectionConfig } from './selection-config';
 
 export interface BuyerDesktopOptions {
   token?: string;
+  reconcilePool?: () => Promise<void>;
   preparePaidChat?: () => Promise<void>;
   desktopPolicy?: Pick<
     BuyerApiPolicy,
@@ -156,7 +157,8 @@ async function prepareRequest(
     !owner ||
     request.headers.origin !== undefined ||
     !policy ||
-    policy.maxAtomic === '0' ||
+    (policy.maxAtomic === '0' &&
+      request.url !== BUYER_API.RECONCILE_POOL_PATH) ||
     !prepare
   ) {
     response.writeHead(HTTP_STATUS.forbidden).end();
@@ -187,6 +189,7 @@ export function createDesktopApi(
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
   preparePaidChat?: () => Promise<void>,
+  reconcilePool?: () => Promise<void>,
 ) {
   return {
     async handled(
@@ -194,13 +197,14 @@ export function createDesktopApi(
       response: ServerResponse,
       owner: boolean,
     ) {
-      if (request.url === BUYER_API.PAID_PREPARATION_PATH) {
+      const reconcile = request.url === BUYER_API.RECONCILE_POOL_PATH;
+      if (reconcile || request.url === BUYER_API.PAID_PREPARATION_PATH) {
         await prepareRequest(
           request,
           response,
           policy,
           authenticated && owner,
-          preparePaidChat,
+          reconcile ? reconcilePool : preparePaidChat,
         );
         return true;
       }

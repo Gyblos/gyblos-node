@@ -21,6 +21,7 @@ import {
   policyForRoute,
   policyForSeller,
   readJson,
+  reconcileBuyerPool,
   sellerFields,
   validateChoice,
   waitForPaidBuyer,
@@ -121,6 +122,12 @@ export class X402Client {
     } finally {
       this.busy = false;
     }
+  }
+  async reconcileReviewedPool(expected: BuyerApiPolicy) {
+    const connection = this.connection;
+    if (!connection?.managed || !connection.policy.totalDepositAtomic) return;
+    await reconcileBuyerPool(connection, expected, this.request);
+    if (this.connection !== connection) throw new Error('Unconfirmed payment');
   }
   manageApiKeys(command?: BuyerApiKeyCommand) {
     if (!this.connection || this.closed || (command && this.busy))
