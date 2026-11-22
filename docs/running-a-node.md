@@ -453,16 +453,17 @@ pnpm gyblos seller verify github --cancel
 ```
 
 `seller verify github` shows buyers which GitHub account runs this seller. It
-needs a seller the index already knows: an active registration
-(`seller register`) or a catalog the index has stored; it need not be online,
-and `publish = true` alone is not enough until a catalog was published. The
-binding has two halves: a gist owned by `<user>` with a file named
-`gyblos-proof.txt` that contains the line `gyblos-node=<NodeId>` (an unlisted
-gist works too: the index publishes its id, so the proof is public either way),
-and a claim signed by the node key naming the account and the gist, which the
-discovery index checks ([discovery-index.md](discovery-index.md#github-claims)).
-Anyone can re-check the gist; the index does not keep or serve the signature.
-One `gyblos-proof.txt` may hold several sellers' proof lines, one per line.
+needs a seller the index already knows: registered (`seller register`) or
+currently publishing (unregistered sellers are known only while their catalog is
+stored, and catalogs expire after 10 minutes). The binding has two halves: a
+gist owned by `<user>` with a file named `gyblos-proof.txt` that contains the
+line `gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its
+id, so the proof is public either way), and a claim signed by the node key
+naming the account and the gist, which the discovery index checks
+([discovery-index.md](discovery-index.md#github-claims)). Anyone can re-check
+the gist; the index does not keep or serve the signature. One `gyblos-proof.txt`
+may hold several sellers' proof lines, one per line; only its first 16 KiB
+(about 200 lines) is read, and a line beyond that is ignored.
 
 1. The account is lowercased and checked (letters, digits and single hyphens, at
    most 39 characters).
@@ -487,8 +488,8 @@ One `gyblos-proof.txt` may hold several sellers' proof lines, one per line.
    waited out once and the claim sent again; a longer wait, or a second
    `CHECK_DEFERRED` after that wait, is reported. A `DISCOVERY_STALE_CLAIM`
    answer is re-signed once with a newer time. A `DISCOVERY_UNKNOWN_NODE`
-   refusal means the index does not know the seller yet: register or publish
-   first.
+   refusal means the index does not know the seller yet: register it, or publish
+   its models, first.
 
 Progress (account, gist id and last step) is saved in
 `<GYBLOS_HOME>/seller/github-verification.json`, owner-only and written

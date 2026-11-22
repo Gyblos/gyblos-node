@@ -115,8 +115,9 @@ del rol, recibos, logs completos ni capturas del aviso de registro. Pide ayuda e
 ## Verifica tu cuenta de GitHub [#verificar-github]
 
 Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. El índice ya tiene que
-conocer tu vendedor: tiene que estar registrado, o haber publicado antes sus modelos en el índice. No necesita
-estar en línea, y activar la publicación no basta hasta que el vendedor haya publicado. El vínculo tiene dos
+conocer tu vendedor: tiene que estar registrado, o estar publicando sus modelos en este momento.
+`gyblos seller status --online` muestra `listed in the index` en su línea `discovery` mientras el vendedor
+publica. El vínculo tiene dos
 partes: un gist de tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea
 `gyblos-node=NODEID`, y una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El
 índice de descubrimiento revisa la firma cuando recibe la declaración, y revisa el gist por su cuenta, sin
@@ -214,7 +215,8 @@ estado: `pending` sigue en `pending` y `verified` sigue en `verified`.
 - **Varios vendedores.** Una cuenta de GitHub puede verificar varios vendedores, cada uno con su propia línea
   `gyblos-node=NODEID`. Con `gh`, el comando crea un gist por vendedor. A mano, lo más simple es un solo gist:
   agrega la línea de cada vendedor, cada una en su propio renglón, al mismo `gyblos-proof.txt` y pasa ese gist
-  a cada vendedor con `--gist`. Si quitas una línea del archivo compartido, solo ese vendedor pasa a `lost`.
+  a cada vendedor con `--gist`. Si quitas una línea del archivo compartido, solo ese vendedor pasa a `lost`. El índice lee solo los
+  primeros 16 KiB del archivo, unas 200 líneas: una línea más allá se ignora y su vendedor pasa a `lost`.
 
 ### Comprueba el estado [#comprobar-github]
 
@@ -229,7 +231,8 @@ respondió, así que no es la última vez que se encontró la prueba.
 
 `gyblos seller status --online` muestra la cuenta y el estado en su línea `github`, y la dirección del gist
 solo mientras está `verified`. Solo le pregunta al índice cuando la publicación está activada y el vendedor
-ofrece al menos un modelo; si no, la línea no aparece. En un vendedor Docker, pon `docker compose exec seller`
+ofrece al menos un modelo; si no, la línea no aparece, por ejemplo en un vendedor registrado con la publicación
+desactivada: usa `gyblos seller verify github --status`. En un vendedor Docker, pon `docker compose exec seller`
 delante de los dos.
 
 ### Quita el vínculo [#quitar-github]
@@ -254,7 +257,7 @@ Cada error empieza con una frase que dice qué hacer y termina con un código en
 | `VERIFY_NOT_VERIFIED` con `could not reach GitHub`      | El índice no pudo llegar a GitHub. Tu declaración mantiene su estado. Ejecuta el comando otra vez en unos minutos.                                                                           |
 | `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento, y la espera es de más de 2 minutos o el índice seguía diciéndolo después de la única espera. Ejecuta el comando otra vez en un minuto.         |
 | `VERIFY_GH_FAILED`                                      | La CLI de GitHub no pudo crear el gist. Créalo a mano y ejecuta el comando con `--gist`.                                                                                                     |
-| `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish), o publica sus modelos una vez.                                                                      |
+| `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish), o publica sus modelos.                                                                              |
 | `DISCOVERY_STALE_CLAIM`                                 | El índice tiene una declaración más nueva de este vendedor. El comando ya probó una vez más. Revisa el reloj de este equipo y ejecuta el comando otra vez.                                   |
 | `DISCOVERY_RATE_LIMITED`                                | El índice recibió demasiados intentos. Espera un minuto y ejecuta el comando otra vez.                                                                                                       |
 | `VERIFY_ACCOUNT_INVALID`                                | Eso no es un nombre de usuario de GitHub. Usa letras, números y guiones sueltos, con 39 caracteres como máximo.                                                                              |

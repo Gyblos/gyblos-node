@@ -113,8 +113,8 @@ logs or screenshots of the registration prompt. Ask for help in the [Gyblos Tele
 ## Verify your GitHub account [#verify-github]
 
 You can show buyers which GitHub account runs your seller. This is optional. The index must already know
-your seller: it must be registered, or have published its models to the index before. It doesn't need to be
-online, and turning publishing on isn't enough until the seller has published. The link has two parts: a
+your seller: it must be registered, or currently publishing its models. `gyblos seller status --online`
+shows `listed in the index` in its `discovery` line while the seller is publishing. The link has two parts: a
 gist owned by your GitHub account with a file named `gyblos-proof.txt` that contains the line
 `gyblos-node=NODEID`, and a claim signed by your node key that names the account and the gist. The
 discovery index checks the signature when it receives the claim, and checks the gist itself, with no GitHub
@@ -211,7 +211,8 @@ Only `verified` means the proof was found. When GitHub doesn't answer, the claim
 - **Several sellers.** One GitHub account can verify several sellers, each with its own
   `gyblos-node=NODEID` line. With `gh`, the command makes one gist per seller. By hand, the simplest is one
   gist: add each seller's line, on its own line, to the same `gyblos-proof.txt` and pass that gist to each
-  seller with `--gist`. Removing a line from the shared file makes only that seller `lost`.
+  seller with `--gist`. Removing a line from the shared file makes only that seller `lost`. The index reads only the first 16 KiB
+  of the file, about 200 lines: a line beyond that is ignored and its seller becomes `lost`.
 
 ### Check the state [#github-check]
 
@@ -226,7 +227,8 @@ time the proof was found.
 
 `gyblos seller status --online` shows the account and state in its `github` line, and the gist address only
 while `verified`. It asks the index only when publishing is on and the seller lists at least one model;
-otherwise the line is missing. For a Docker seller, put `docker compose exec seller` in front of both.
+otherwise the line is missing, for example on a registered seller with publishing off: use
+`gyblos seller verify github --status` instead. For a Docker seller, put `docker compose exec seller` in front of both.
 
 ### Remove it [#github-remove]
 
@@ -250,7 +252,7 @@ Each error starts with a sentence that says what to do and ends with a code in b
 | `VERIFY_NOT_VERIFIED` with `could not reach GitHub`      | The index couldn't reach GitHub. Your claim keeps its current state. Run the command again in a few minutes.                                                                    |
 | `VERIFY_NOT_VERIFIED` with `checked this seller moments` | The index checked your seller moments ago, and the wait is longer than 2 minutes or the index still said so after the one wait. Run the command again in a minute.              |
 | `VERIFY_GH_FAILED`                                       | The GitHub CLI couldn't create the gist. Create it by hand and run the command with `--gist`.                                                                                   |
-| `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) it, or publish its models once, first.                                                         |
+| `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) it, or publish its models, first.                                                              |
 | `DISCOVERY_STALE_CLAIM`                                  | The index holds a newer claim from this seller. The command already tried once more. Check this computer's clock, then run the command again.                                   |
 | `DISCOVERY_RATE_LIMITED`                                 | The index got too many attempts. Wait a minute and run the command again.                                                                                                       |
 | `VERIFY_ACCOUNT_INVALID`                                 | That is not a GitHub user name. Use letters, digits and single hyphens, at most 39 characters.                                                                                  |
