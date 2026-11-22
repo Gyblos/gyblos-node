@@ -129,6 +129,8 @@ void test('a claim view is read back, 404 is none, and a foreign or malformed vi
     reason: 'GIST_NOT_FOUND',
     checkedAt: 5,
     verifiedAt: 1,
+    issuedAt: SIGNED.claim.issuedAt,
+    signature: SIGNED.signature,
   };
   const urls: string[] = [];
   assert.deepEqual(
@@ -143,6 +145,23 @@ void test('a claim view is read back, 404 is none, and a foreign or malformed vi
     view,
   );
   assert.deepEqual(urls, [`${BASE}/identity/github/${NODE}`]);
+  assert.deepEqual(
+    await fetchGithubClaim({
+      baseUrl: BASE,
+      nodeId: NODE,
+      fetch: reply(200, { ...view, signature: null }),
+    }),
+    { ...view, signature: null },
+  );
+  const { issuedAt: _issuedAt, signature: _signature, ...older } = view;
+  assert.deepEqual(
+    await fetchGithubClaim({
+      baseUrl: BASE,
+      nodeId: NODE,
+      fetch: reply(200, older),
+    }),
+    { ...older, issuedAt: null, signature: null },
+  );
   assert.equal(
     await fetchGithubClaim({
       baseUrl: BASE,
@@ -155,6 +174,10 @@ void test('a claim view is read back, 404 is none, and a foreign or malformed vi
     { ...view, nodeId: 'cd'.repeat(32) },
     { ...view, state: 'odd' },
     { ...view, extra: 1 },
+    { ...view, issuedAt: null },
+    { ...view, issuedAt: undefined },
+    { ...view, signature: 'AB'.repeat(64) },
+    { ...view, signature: 'ab'.repeat(63) },
     // Terminal control data and newlines in index fields never reach the caller.
     { ...view, account: 'octo\u001b[2Jcat' },
     { ...view, account: 'octo\ncat' },

@@ -38,6 +38,7 @@ import {
 export const GIST = '0123456789abcdef0123456789abcdef';
 export const OTHER_GIST = 'fedcba9876543210fedc';
 export const ACCOUNT = 'octo-cat';
+export const SIGNATURE = 'ab'.repeat(64);
 
 // What the fake GitHub answers: a status and body, or a thrown network error.
 export type GistAnswer = { status: number; body?: string } | 'throw';

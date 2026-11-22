@@ -236,6 +236,7 @@ export const githubClaims = sqliteTable(
     verifiedAt: integer('verified_at'),
     lastFetchAt: integer('last_fetch_at'),
     nextCheckAt: integer('next_check_at'),
+    signature: text('signature'),
   },
   (table) => [
     index('discovery_github_claims_by_next_check').on(table.nextCheckAt),

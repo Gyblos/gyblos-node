@@ -177,7 +177,7 @@ Vincular una cuenta de GitHub a tu vendedor es opcional. No se envía nada salvo
 **Qué se vuelve público.** El índice publica tu declaración en `GET /v1/identity/github/<NodeId>`: tu
 NodeId, el nombre de tu cuenta de GitHub, el id del gist, el estado (`pending`, `verified` o `lost`), el
 motivo del último resultado, cuándo intentó revisar el índice por última vez (aunque GitHub no respondiera) y desde cuándo estuvo verificada por última vez
-(se sigue mostrando después de pasar a `lost`). Cualquiera puede leerla, sea cual sea el estado. Mientras el estado es `verified`, la lista de la
+(se sigue mostrando después de pasar a `lost`), y la hora en que tu nodo firmó la declaración junto con su firma, para que cualquiera pueda comprobarla sin confiar en el índice. Cualquiera puede leerla, sea cual sea el estado. Mientras el estado es `verified`, la lista de la
 red (`/v1/network`) también muestra la cuenta y el gist junto a tu vendedor. El gist en sí es público en
 GitHub. Un gist secreto también sirve, pero su id se publica, así que trátalo como público.
 

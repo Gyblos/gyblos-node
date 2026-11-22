@@ -31,12 +31,14 @@ export interface GithubClaimRow extends GithubCheck {
   account: string;
   gist: string;
   issuedAt: number;
+  signature: string | null;
 }
 
 // A cancel: only the NodeId's newest issuedAt is kept, so an older signed claim cannot be replayed.
 export interface GithubClaimTombstone {
   nodeId: string;
   issuedAt: number;
+  signature: null;
   account: null;
   gist: null;
   state: null;
@@ -55,6 +57,7 @@ export function githubClaimTombstone(
   return {
     nodeId,
     issuedAt,
+    signature: null,
     account: null,
     gist: null,
     state: null,

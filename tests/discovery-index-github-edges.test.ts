@@ -10,6 +10,7 @@ import {
   CLAIM_KINDS,
   claimHarness,
   GIST,
+  SIGNATURE,
   signedClaim,
 } from './support/github-claim-fixture';
 
@@ -32,6 +33,7 @@ for (const kind of CLAIM_KINDS) {
       account: ACCOUNT,
       gist: GIST,
       issuedAt: now,
+      signature: SIGNATURE,
       state: 'verified',
       reason: null,
       checkedAt: now,
