@@ -593,7 +593,7 @@
   "examples/openai-reseller.toml": 8,
   "examples/seller-daemon.toml": 16,
   "examples/seller-docker.toml": 12,
-  "install.ps1": 62,
+  "install.ps1": 57,
   "install.sh": 109,
   "lab/harness/scripts/batch-channel-check.ts": 2,
   "lab/harness/src/acceptance/buyer.ts": 1,

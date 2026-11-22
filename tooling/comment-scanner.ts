@@ -43,6 +43,9 @@ type CommentOptions = {
   powershell?: boolean;
   python?: boolean;
   shell?: boolean;
+  yaml?: boolean;
+  noQuotes?: boolean;
+  singleQuoteEscapes?: boolean;
   lineMarkers: string[];
 };
 type Scanner = {
@@ -68,6 +71,8 @@ const HEREDOC_LOOKAHEAD = 256;
 const HERE_STRING = '<<<';
 const ARITHMETIC_OPEN = '((';
 const ARITHMETIC_CLOSE = '))';
+const SHELL_COMMENT_PREFIX = /[\s;|&(]/;
+const POWERSHELL_HERE_STRING = /^@(['"])\r?\n/;
 const HEREDOC = /^<<-?[ \t]*\\?(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
 
 function sourceExtension(path: string): string {
@@ -112,7 +117,7 @@ function advanceInQuote(scanner: Scanner): void {
   const character = text[scanner.index];
   const escape = options.powershell
     ? quote === '"' && character === '`'
-    : character === '\\';
+    : character === '\\' && (quote !== "'" || options.singleQuoteEscapes);
   if (escape) {
     scanner.index += 2;
     return;
@@ -122,6 +127,10 @@ function advanceInQuote(scanner: Scanner): void {
     (quoteLength === 1 ||
       text.slice(scanner.index, scanner.index + quoteLength) ===
         quote.repeat(quoteLength));
+  if (options.yaml && character === '\n') {
+    scanner.quote = '';
+    return;
+  }
   if (!closes) {
     scanner.index += 1;
     return;
@@ -134,14 +143,24 @@ function advanceInQuote(scanner: Scanner): void {
   scanner.index += quoteLength;
 }
 
+function skipPowershellHereString(scanner: Scanner): boolean {
+  const { text, index } = scanner;
+  const open = POWERSHELL_HERE_STRING.exec(text.slice(index, index + 3));
+  if (!scanner.options.powershell || !open) return false;
+  const close = text.indexOf('\n' + (open[1] ?? '') + '@', index);
+  scanner.index = close < 0 ? index + 1 : close + 3;
+  return true;
+}
+
 function opensQuote(scanner: Scanner): boolean {
   const { text, options, index } = scanner;
   const character = text[index] ?? '';
+  if (options.noQuotes) return false;
   const opens =
     (character === "'" &&
       (options.python || !/[a-z0-9]/i.test(text[index - 1] ?? ''))) ||
     character === '"' ||
-    (!options.powershell && character === '`');
+    (!options.powershell && !options.yaml && character === '`');
   if (!opens) return false;
   scanner.quote = character;
   scanner.quoteLength =
@@ -179,7 +198,7 @@ function shellSyntax(scanner: Scanner): boolean {
   const arithmetic = text.startsWith(ARITHMETIC_OPEN, index)
     ? text.indexOf(ARITHMETIC_CLOSE, index + ARITHMETIC_OPEN.length)
     : -1;
-  if (arithmetic >= 0) {
+  if (arithmetic >= 0 && arithmetic < lineEnd(text, index)) {
     scanner.index = arithmetic + ARITHMETIC_CLOSE.length;
     return true;
   }
@@ -213,7 +232,11 @@ function takeComment(scanner: Scanner): boolean {
   const hash =
     options.hashMarker !== undefined &&
     text[index] === options.hashMarker &&
-    (options.adjacentHash || index === 0 || /\s/.test(text[index - 1] ?? ''));
+    (options.adjacentHash ||
+      index === 0 ||
+      (options.shell ? SHELL_COMMENT_PREFIX : /\s/).test(
+        text[index - 1] ?? '',
+      ));
   if (!hash && !options.lineMarkers.some((m) => text.startsWith(m, index)))
     return false;
   const end = lineEnd(text, index);
@@ -239,6 +262,7 @@ function delimitedCommentRanges(
     if (scanner.quote.length > 0) advanceInQuote(scanner);
     else if (
       !shellSyntax(scanner) &&
+      !skipPowershellHereString(scanner) &&
       !opensQuote(scanner) &&
       !takeComment(scanner)
     )
@@ -251,7 +275,7 @@ function addedPatchLines(text: string): string {
   return text
     .split('\n')
     .map((line) =>
-      line.startsWith('+') && !line.startsWith('+++')
+      line.startsWith('+') && !line.startsWith('+++ ')
         ? ' ' + line.slice(1)
         : ' '.repeat(line.length),
     )
@@ -264,6 +288,7 @@ export function commentRanges(text: string, path: string): CommentRange[] {
     return typescriptCommentRanges(text, path);
   if (extension === '.patch')
     return delimitedCommentRanges(addedPatchLines(text), {
+      singleQuoteEscapes: true,
       blockMarkers: [{ start: '/*', end: '*/' }],
       lineMarkers: ['//'],
     });
@@ -279,6 +304,7 @@ export function commentRanges(text: string, path: string): CommentRange[] {
     });
   if (extension === '.html' || extension === '.svg')
     return delimitedCommentRanges(text, {
+      noQuotes: true,
       blockMarkers: [{ start: '<!--', end: '-->' }],
       lineMarkers: [],
     });
@@ -297,6 +323,8 @@ export function commentRanges(text: string, path: string): CommentRange[] {
   return delimitedCommentRanges(text, {
     blockMarkers: [],
     python: extension === '.py',
+    singleQuoteEscapes: extension === '.py',
+    yaml: extension === '.yaml' || extension === '.yml',
     shell: SHELL_EXTENSIONS.has(extension),
     adjacentHash: extension === '.py' || extension === '.toml',
     hashMarker: '#',

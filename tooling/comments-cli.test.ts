@@ -125,3 +125,34 @@ void test('renamed files compare old text with the old file type', () => {
     [],
   );
 });
+
+void test('quoting edge cases hide no following comments', () => {
+  const cases: [string, string][] = [
+    ["$t = @'\nmachine's\n# data\n'@\n# actual", 'a.ps1'],
+    ['echo hi;# actual', 'a.sh'],
+    ["echo 'C:\\'\n# actual", 'a.sh'],
+    ["p: 'C:\\'\n# actual", 'a.yml'],
+    ["d: '90s style\n# actual", 'a.yml'],
+    ['body: use `x\n# actual', 'a.yml'],
+    ["<em>Bob</em>'s\n<!-- actual -->", 'a.html'],
+    ['((cd a) || true)\n# actual\nx=$(f $(g))', 'a.sh'],
+    ['+++i; // actual', 'x.patch'],
+  ];
+  for (const [text, path] of cases)
+    assert.deepEqual(
+      commentTexts(text, path).filter((comment) => comment.includes('actual')),
+      [
+        path === 'a.html'
+          ? '<!-- actual -->'
+          : text
+              .slice(
+                text.lastIndexOf(
+                  text.includes('// actual') ? '// actual' : '# actual',
+                ),
+              )
+              .split('\n')[0],
+      ],
+      path + ': ' + JSON.stringify(text),
+    );
+  assert.deepEqual(commentTexts("$t = @'\n# data\n'@", 'a.ps1'), []);
+});
