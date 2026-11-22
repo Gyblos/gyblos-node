@@ -1,6 +1,15 @@
 // Owns discovery's typed tables, keys, indexes and checks. Historical D1 migrations retain
 // physical WITHOUT ROWID layout; these declarations perform no client initialization or I/O.
-import { between, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
+import {
+  between,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import {
   check,
   index,
@@ -21,6 +30,9 @@ import {
 } from './constants';
 import { nullableTextLength, textLength } from './sqlite-expressions';
 
+const literalCheck = (name: string, value: SQL) =>
+  check(name, value.inlineParams());
+
 const nodeIdCharacters =
   PUBLIC_RECORD_LIMITS.publicKeyBytes *
   PUBLIC_RECORD_LIMITS.hexCharactersPerByte;
@@ -37,11 +49,11 @@ export const nodes = sqliteTable(
   },
   (table) => [
     index('discovery_nodes_by_retain').on(table.retainUntil),
-    check(
+    literalCheck(
       'discovery_nodes_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
-    check('discovery_nodes_sequence', gte(table.lastSequence, 1)),
+    literalCheck('discovery_nodes_sequence', gte(table.lastSequence, 1)),
   ],
 );
 export const catalogs = sqliteTable(
@@ -125,15 +137,15 @@ export const invites = sqliteTable(
     nodeId: text('node_id'),
   },
   (table) => [
-    check(
+    literalCheck(
       'discovery_invites_hash',
       eq(textLength(table.inviteHash), REGISTRATION.inviteHashCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_invites_contact',
       between(textLength(table.contact), 1, REGISTRATION.maxContactCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_invites_node_id',
       nullableTextLength(table.nodeId, nodeIdCharacters),
     ),
@@ -153,15 +165,15 @@ export const registrations = sqliteTable(
     registeredAt: integer('registered_at').notNull(),
   },
   (table) => [
-    check(
+    literalCheck(
       'discovery_registrations_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_registrations_status',
       inArray(table.status, Object.values(REGISTRATION_STATUS)),
     ),
-    check(
+    literalCheck(
       'discovery_registrations_country',
       nullableTextLength(table.country, REGISTRATION.countryCharacters),
     ),
@@ -175,7 +187,7 @@ export const uptimeNodes = sqliteTable(
     firstAt: integer('first_at').notNull(),
   },
   (table) => [
-    check(
+    literalCheck(
       'discovery_uptime_nodes_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
@@ -193,11 +205,11 @@ export const uptimeSlots = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.nodeId, table.hour] }),
     index('discovery_uptime_by_hour').on(table.hour),
-    check(
+    literalCheck(
       'discovery_uptime_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_uptime_slots',
       between(table.slots, 1, 2 ** UPTIME.slotsPerHour - 1),
     ),
@@ -227,11 +239,11 @@ export const githubClaims = sqliteTable(
   },
   (table) => [
     index('discovery_github_claims_by_next_check').on(table.nextCheckAt),
-    check(
+    literalCheck(
       'discovery_github_claims_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_github_claims_state',
       sql`${or(
         isNull(table.state),

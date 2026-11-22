@@ -37,7 +37,9 @@ function checkParameters(params: D1Value[]) {
 
 export function createCollectorD1(): SqliteD1 {
   const raw = new DatabaseSync(':memory:');
-  for (const file of readdirSync(MIGRATIONS).sort())
+  for (const file of readdirSync(MIGRATIONS)
+    .filter((name) => name.endsWith('.sql'))
+    .sort())
     raw.exec(readFileSync(new URL(file, MIGRATIONS), 'utf8'));
   const log: SqliteD1['log'] = [];
   let batches = 0;
