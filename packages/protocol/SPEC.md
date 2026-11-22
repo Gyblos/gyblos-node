@@ -40,6 +40,7 @@ Signed records and envelopes outside the Iroh channels:
 | Receipt upload envelope     | v1 (v2 contract only, not wired) | `receipt-upload-v1.json`, `receipt-upload-v2.json` | [v1](#receipt-upload-envelope-v1), [v2](#receipt-upload-envelope-v2)                                 |
 | Observation upload envelope | v1                               | `observation-upload-v1.json`                       | [Observation upload envelope v1](#observation-upload-envelope-v1)                                    |
 | Identity claim              | v1                               | `identity-claim-v1.json`                           | [Identity claim v1](#identity-claim-v1)                                                              |
+| Profile claim               | v1                               | `profile-claim-v1.json`                            | [Profile claim v1](#profile-claim-v1)                                                                |
 
 ## Contents
 
@@ -62,6 +63,7 @@ Signed records and envelopes outside the Iroh channels:
 - [Receipt upload envelope v2](#receipt-upload-envelope-v2)
 - [Observation upload envelope v1](#observation-upload-envelope-v1)
 - [Identity claim v1](#identity-claim-v1)
+- [Profile claim v1](#profile-claim-v1)
 
 ## Canonical JSON and signing bytes
 
@@ -1849,3 +1851,32 @@ on a line of its own, the proof line `gyblos-node=<nodeId>` (`githubProofLine`).
 node signature only; checking the gist, freshness and replay (keeping the newest
 `issuedAt` per node) belong to the verifier, such as the discovery index. It is
 not part of any public discovery record, so record parsers are unchanged.
+
+## Profile claim v1
+
+`@gyblos/protocol/profile-claim` defines a seller's optional public display
+name. The signed object is `{ claim, signature }`: `signature` is hex Ed25519 by
+`claim.nodeId` over the prefix `gyblos/profile-claim/v1\n` (real LF). Vectors
+are `vectors/profile-claim-v1.json`.
+
+`claim` has exactly the fields `schemaVersion` (`1`; any other value is
+`VERSION`), `nodeId` (64 lowercase hex), `name` and `issuedAt` (a non-negative
+safe integer, milliseconds). `name` is `null`, which clears the node's name, or
+a name already in the canonical form `parseSellerName` returns; any other value
+is `INVALID`.
+
+`parseSellerName` is the one rule every producer and verifier uses. It takes at
+most 256 UTF-16 code units, applies NFKC, refuses any control, format, private
+use, surrogate, unassigned, line or paragraph separator or default-ignorable
+character (bidi controls, zero-width characters, variation selectors, Hangul
+fillers), turns each run of space separators into one space and trims the ends.
+The result has 1 to 32 code points, holds only Unicode letters, numbers, spaces
+and `-`, `_`, `.`, `'`, with at least one letter or number, and does not contain
+`gyblos` in any letter case. Emoji, symbols (such as check marks) and combining
+marks are refused. Issues are `length`, `characters` or `reserved`.
+
+The name is self-chosen: it is not unique, and nothing verifies it. This
+contract owns shape and the node signature only; freshness and replay (keeping
+the newest `issuedAt` per node) belong to the verifier, such as the discovery
+index. It is not part of any public discovery record or offer, so record and
+offer parsers are unchanged.
