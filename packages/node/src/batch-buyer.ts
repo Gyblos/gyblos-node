@@ -56,38 +56,42 @@ function createContext<Remote extends BatchDestination>(
     (options.buyer.usesBlocks() ||
       (!options.buyer.snapshot().channelId &&
         typeof options.meter.stablePrefix === 'function'));
-  const client = createBatchChannelClient(
-    options.endpoint,
-    options.destination,
-    terms.sellerNodeId,
-    { ...options.transport, now: options.now, blocks: blockMode },
-  );
-  const rpc: BuyerBatchContext<Remote>['rpc'] = async (
-    method,
-    params,
-    signal,
-    onDelta,
-    blocks,
-  ) => {
-    const request = parseBatchChannelRequest({
-      version: BATCH_CHANNEL.version,
-      requestId: randomBytes(PAYMENT_SESSION.requestIdBytes).toString('hex'),
+  // One client per protocol. A channel that checkpoints keeps a second, whole-response client for the
+  // requests that cannot (a declared offer has no tokenizer to certify prefixes).
+  const transport = (blocks: boolean) => {
+    const client = createBatchChannelClient(
+      options.endpoint,
+      options.destination,
+      terms.sellerNodeId,
+      { ...options.transport, now: options.now, blocks },
+    );
+    const rpc: BuyerBatchContext<Remote>['rpc'] = async (
       method,
       params,
-    });
-    const reply = await client.exchange(request, signal, onDelta, blocks);
-    if (!reply.result) return batchFail();
-    return reply.result;
-  };
-  return {
-    blockMode,
-    options,
-    terms,
-    client,
-    active: false,
-    lifetime: new AbortController(),
-    rpc,
-    approve: async (bill, voucher, signal) => {
+      signal,
+      onDelta,
+      blockClient,
+    ) => {
+      const request = parseBatchChannelRequest({
+        version: BATCH_CHANNEL.version,
+        requestId: randomBytes(PAYMENT_SESSION.requestIdBytes).toString('hex'),
+        method,
+        params,
+      });
+      const reply = await client.exchange(
+        request,
+        signal,
+        onDelta,
+        blockClient,
+      );
+      if (!reply.result) return batchFail();
+      return reply.result;
+    };
+    const approve: BuyerBatchContext<Remote>['approve'] = async (
+      bill,
+      voucher,
+      signal,
+    ) => {
       const snapshot = batchBuyerSnapshot(
         await rpc(BATCH_METHODS.APPROVE, { bill, voucher }, signal),
         voucher.channelId,
@@ -97,8 +101,26 @@ function createContext<Remote extends BatchDestination>(
         snapshot.reservedAtomic !== '0'
       )
         return batchFail(SESSION_CODES.BINDING);
+    };
+    return { client, rpc, approve };
+  };
+  const primary = transport(blockMode);
+  let whole: ReturnType<typeof transport> | undefined;
+  const context: BuyerBatchContext<Remote> = {
+    blockMode,
+    options,
+    terms,
+    ...primary,
+    active: false,
+    lifetime: new AbortController(),
+    clients: () => [primary.client, ...(whole ? [whole.client] : [])],
+    wholeResponse: () => {
+      if (!blockMode) return context;
+      whole ??= transport(false);
+      return { ...context, ...whole, blockMode: false };
     },
   };
+  return context;
 }
 async function exclusive<T, Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
@@ -254,10 +276,11 @@ export function createBuyerBatchSession<Remote extends BatchDestination>(
         signal,
         false,
       ),
-    disconnect: () => {
+    disconnect: async () => {
       context.lifetime.abort();
-      return context.client.close();
+      await Promise.all(context.clients().map((client) => client.close()));
     },
-    settled: () => context.client.settled(),
+    settled: () =>
+      Promise.all(context.clients().map((client) => client.settled())),
   };
 }

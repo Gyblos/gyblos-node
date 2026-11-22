@@ -52,6 +52,10 @@ export interface BuyerBatchContext<Remote extends BatchDestination> {
   >;
   active: boolean;
   lifetime: AbortController;
+  // Every client this channel opened, to close and settle together.
+  clients: () => BuyerBatchContext<Remote>['client'][];
+  // The same channel over the whole-response protocol: itself unless it checkpoints.
+  wholeResponse: () => BuyerBatchContext<Remote>;
   rpc: (
     method: import('@gyblos/protocol/batch-channel').BatchMethod,
     params: unknown,

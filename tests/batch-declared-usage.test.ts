@@ -24,7 +24,11 @@ import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import { SESSION_BLOCKS } from '@gyblos/protocol/session-blocks';
 
-import { blockProduct, blockTestMeter } from './support/batch-block-product';
+import {
+  blockProduct,
+  blockTestMeter,
+  configureBlockEngine,
+} from './support/batch-block-product';
 import type { batchOfferFixture } from './support/batch-iroh-offer';
 import { batchLoopback } from './support/batch-loopback';
 import { multisellerLoopback } from './support/multiseller-session';
@@ -114,6 +118,74 @@ void test('a provider count above maxTokens still delivers the answer, billed wi
   assert.equal(
     f.f.buyer.snapshot().cumulativeAtomic,
     String(chargeV2({ input: 7, output: ceiling }, PRICES)),
+  );
+});
+
+void test('a declared sale follows a checkpointed one from the same seller on the same channel', async (t) => {
+  // One seller lists recounted Qwen (sold with checkpoints) and a declared API model; the buyer keeps one
+  // channel per seller, so the declared request must not be refused for the blocks the channel used.
+  const f = await blockProduct({ perConnection: true });
+  t.after(f.close);
+  const recounted = await f.buyer.execute(
+    await f.offers.quote(1),
+    f.offers.input,
+  );
+  assert.equal(recounted.text.length > 0, true);
+  const channelId = f.f.buyer.snapshot().channelId;
+  const afterBlocks = BigInt(f.f.buyer.snapshot().cumulativeAtomic);
+  declaredSeller(4)(f.offers);
+  const value = await f.buyer.execute(
+    await f.offers.quote(2, DECLARED),
+    input(f.offers),
+  );
+  assert.equal(value.text, 'hola mundo');
+  assert.equal(f.f.buyer.snapshot().channelId, channelId);
+  assert.equal(
+    BigInt(f.f.buyer.snapshot().cumulativeAtomic) - afterBlocks,
+    chargeV2({ input: 7, output: 4 }, PRICES),
+  );
+  // And back to checkpoints on the same channel.
+  configureBlockEngine(f.offers);
+  f.offers.live.meteringMode = CONTROL_METERING_MODES.RECOUNTED;
+  await f.buyer.execute(await f.offers.quote(3), f.offers.input);
+  assert.equal(f.f.buyer.snapshot().channelId, channelId);
+});
+
+void test('a declared approval lost on a checkpointing channel is recovered without replaying the prompt', async (t) => {
+  const f = await blockProduct({ perConnection: true });
+  t.after(f.close);
+  await f.buyer.execute(await f.offers.quote(1), f.offers.input);
+  const afterBlocks = BigInt(f.f.buyer.snapshot().cumulativeAtomic);
+  declaredSeller(4)(f.offers);
+  const original = f.service.exchange.bind(f.service);
+  let lost = true;
+  t.mock.method(
+    f.service,
+    'exchange',
+    async (...args: Parameters<typeof original>) => {
+      const reply = await original(...args);
+      if (lost && args[0].method === 'approve') {
+        lost = false;
+        batchFail(SESSION_CODES.UNAVAILABLE);
+      }
+      return reply;
+    },
+  );
+  await assert.rejects(
+    f.buyer.execute(await f.offers.quote(2, DECLARED), input(f.offers)),
+    { code: SESSION_CODES.UNAVAILABLE },
+  );
+  const generated = f.offers.generations();
+  assert.equal(await f.buyer.recoverApproval(), true);
+  assert.equal(f.offers.generations(), generated);
+  const charged = chargeV2({ input: 7, output: 4 }, PRICES);
+  assert.equal(
+    BigInt(f.f.buyer.snapshot().cumulativeAtomic) - afterBlocks,
+    charged,
+  );
+  assert.equal(
+    BigInt(f.f.seller().snapshot().cumulativeAtomic) - afterBlocks,
+    charged,
   );
 });
 

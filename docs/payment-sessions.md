@@ -251,7 +251,9 @@ Routing adds no free-first preference and no reasoning downgrade.
 A paid request also needs a devnet payment RPC (`BUYER_PAYMENT_NETWORK_MISMATCH`
 otherwise). A declared offer (no pinned tokenizer) bills the provider's usage:
 the buyer approves it only within the request's byte bounds
-(`declared-usage.ts`) and runs it without blocks.
+(`declared-usage.ts`) and runs it without blocks. On a channel that already
+checkpoints recounted requests with the same seller, it runs over the
+whole-response protocol on that same channel, so no new deposit is needed.
 
 Selection errors:
 

@@ -61,6 +61,9 @@ export async function blockProduct(
     offer?: (offers: Awaited<ReturnType<typeof batchOfferFixture>>) => void;
     // The buyer learned from the quote that the seller declares usage, as buyer-session tells it.
     declared?: boolean;
+    // The seller serves each connection in the protocol it asks for, as Iroh does, so one channel can
+    // carry block and whole-response requests.
+    perConnection?: boolean;
   } = {},
 ) {
   const f = await sessionRig({
@@ -85,7 +88,7 @@ export async function blockProduct(
   const wire = await batchLoopback(
     service,
     f.terms,
-    blocks && !options.declared,
+    options.perConnection ? 'alpn' : blocks && !options.declared,
     options.route,
   );
   const buyer = createBuyerBatchSession({
@@ -106,6 +109,7 @@ export async function blockProduct(
     f,
     buyer,
     offers,
+    service,
     wire,
     async close() {
       await buyer.disconnect();

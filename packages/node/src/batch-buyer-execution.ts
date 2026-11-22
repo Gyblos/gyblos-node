@@ -30,7 +30,6 @@ import {
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import { runBuyerBlocks } from './batch-block-buyer';
-import { isBlockBuyer } from './batch-block-ports';
 import { executeOpenedBatchBuyer } from './batch-buyer-opened';
 import type { BuyerBatchContext } from './batch-buyer-types';
 import {
@@ -107,22 +106,22 @@ function verifyOpeningTime(
   if (now >= expiresAt) return batchFail(SESSION_CODES.LIMIT);
 }
 export async function runBuyerBatch<Remote extends BatchDestination>(
-  context: BuyerBatchContext<Remote>,
+  channel: BuyerBatchContext<Remote>,
   value: SignedOfferV2,
   data: FreeExecutionBuildInput,
   signal: AbortSignal,
   onDelta?: (text: string) => Promise<void>,
 ) {
-  const { options, terms, rpc } = context;
   const quote = {
     offer: parseOfferV2(value.offer),
     signature: parseOfferSignatureV2(value.signature),
   };
-  // Blocks certify prefixes with the model's tokenizer; a declared offer has none, so it runs whole.
+  // Blocks certify prefixes with the model's tokenizer; a declared offer has none, so it runs whole, over
+  // the whole-response protocol even on a channel that checkpoints other requests.
   const declared = quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED;
-  if (declared && isBlockBuyer(options.buyer) && options.buyer.usesBlocks())
-    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
-  const blockMode = context.blockMode && !declared;
+  const context = declared ? channel.wholeResponse() : channel;
+  const { options, terms, rpc } = context;
+  const blockMode = context.blockMode;
   if (blockMode && typeof options.meter.stablePrefix !== 'function')
     return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   const { input } = recountSessionInput(quote, data, context.options.meter);
