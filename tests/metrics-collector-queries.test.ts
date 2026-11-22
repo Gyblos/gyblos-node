@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { Column, is } from 'drizzle-orm';
 import { getTableConfig, SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 
 import { COLLECTOR_LIMITS } from '@gyblos/metrics-collector/constants';
@@ -73,7 +74,7 @@ void test('one upload costs one read and one batch whose size does not grow per 
     );
 });
 
-void test('the typed schema matches the migrated tables, keys and indexes', () => {
+void test('the typed schema matches the migrated tables, keys and indexes with their columns and uniqueness', () => {
   const database = createCollectorD1();
   const tables = Object.values(schema).map((table) => getTableConfig(table));
   const migrated = database
@@ -113,13 +114,29 @@ void test('the typed schema matches the migrated tables, keys and indexes', () =
     assert.deepEqual(primary, declared, `${table.name} primary key`);
     const indexes = database.raw
       .prepare(
-        "SELECT name FROM pragma_index_list(?) WHERE origin = 'c' ORDER BY name",
+        'SELECT name, "unique" FROM pragma_index_list(?) WHERE origin = \'c\' ORDER BY name',
       )
       .all(table.name)
-      .map((index) => index.name);
+      .map((index) => ({
+        name: String(index.name),
+        unique: index.unique === 1,
+        columns: database.raw
+          .prepare('SELECT name FROM pragma_index_info(?) ORDER BY seqno')
+          .all(String(index.name))
+          .map((column) => column.name),
+      }));
     assert.deepEqual(
       indexes,
-      table.indexes.map((index) => index.config.name).sort(),
+      table.indexes
+        .map(({ config: index }) => ({
+          name: index.name,
+          unique: index.unique,
+          columns: index.columns.map((column) => {
+            assert.ok(is(column, Column), index.name);
+            return column.name;
+          }),
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name)),
       `${table.name} indexes`,
     );
     const uniques = database.raw
