@@ -136,11 +136,7 @@ export function registerDesktopX402(
     (url) => shell.openExternal(url),
     {
       ...managed,
-      review: async (ref, policy) => {
-        const result = await reviewDesktopCharge(environment, ref, policy);
-        if (result) await client.reconcileReviewedPool(policy);
-        return result;
-      },
+      review: (ref, policy) => reviewDesktopCharge(environment, ref, policy),
     },
     (value) => clipboard.writeText(value),
     (progress) =>

@@ -214,8 +214,26 @@ function configureAction(
 async function checkPayment(
   budget: X402Budget,
   review: NonNullable<ManagedBuyerPorts['review']>,
+  client: X402Client,
 ) {
-  if (!(await budget.review(review))) throw new Error('Unconfirmed payment');
+  let reviewed: BuyerApiPolicy | undefined;
+  const confirmed = await budget.review(async (ref, policy) => {
+    reviewed = policy;
+    return review(ref, policy);
+  });
+  if (!confirmed) throw new Error('Unconfirmed payment');
+  const scope = reviewed ?? client.policy();
+  if (scope) {
+    try {
+      await client.reconcileReviewedPool(scope);
+    } catch {
+      throw new PaidSellerLimitError(
+        reviewed
+          ? 'This payment is confirmed. Check channel status in Payments before spending again.'
+          : 'Channel status is still uncertain. Check again after settlement.',
+      );
+    }
+  }
 }
 export function createX402Handlers(
   client: X402Client,
@@ -314,7 +332,7 @@ async function manageBuyer(
     await managed.start();
     return true;
   } else if (action === X402_ACTION.REVIEW && managed?.review) {
-    await checkPayment(budget, managed.review);
+    await checkPayment(budget, managed.review, client);
     return true;
   }
   return false;

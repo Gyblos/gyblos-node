@@ -34,6 +34,9 @@ void test('review reconciles a settled interrupted pool row before selecting the
   const interrupted = rig.request(2, '100');
   await pool.begin(id, interrupted.requestId);
   await rig.buyer.begin(interrupted);
+  await rig.seller().reserve(interrupted, rig.terms.buyerNodeId);
+  const bill = await rig.seller().finish(interrupted.requestId, '10');
+  await rig.buyer.approve(bill, '10');
   const token = 'synthetic-buyer-owner-token';
   const host = await startFreeBuyerHttp(
     async () => assert.fail('unexpected inference'),

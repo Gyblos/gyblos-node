@@ -19,6 +19,7 @@ import {
 } from './batch-pool-store';
 import type {
   BatchBuyerPool,
+  BatchPoolEntry,
   BatchPoolOptions,
   PoolRow,
 } from './batch-pool-types';
@@ -63,6 +64,16 @@ export async function inspectBatchPool(
     }),
   );
 }
+export function poolFundingPending(row: BatchPoolEntry) {
+  return (
+    !row.stored ||
+    row.uncertain ||
+    row.requestId !== null ||
+    row.stored.pending ||
+    (row.stored.recoverable &&
+      row.stored.snapshot.state !== SESSION_STATES.CLOSED)
+  );
+}
 export async function poolAllowsSellerDeposit(
   paths: BatchPoolOptions['paths'],
   sellerNodeId: string,
@@ -70,17 +81,7 @@ export async function poolAllowsSellerDeposit(
   deposit: string,
 ) {
   const entries = await inspectBatchPool(paths);
-  if (
-    entries.some(
-      (row) =>
-        !row.ready ||
-        row.uncertain ||
-        row.requestId !== null ||
-        row.stored?.pending ||
-        row.stored?.recoverable,
-    )
-  )
-    return false;
+  if (entries.some(poolFundingPending)) return false;
   const unfunded = new Set(
     entries
       .filter((row) => row.stored?.notCreated)

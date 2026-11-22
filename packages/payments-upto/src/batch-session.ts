@@ -36,6 +36,7 @@ export {
   openBatchBuyerPool,
   inspectBatchPool,
   poolAllowsSellerDeposit,
+  poolFundingPending,
 } from './batch-pool';
 export type {
   BatchBuyerPool,
