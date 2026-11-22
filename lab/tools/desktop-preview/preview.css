@@ -629,7 +629,6 @@ html .app.desktop-frame > .preview-status-bar {
   gap: 12px;
   min-width: 0;
   padding: 0 8px;
-  border-top: 1px solid var(--line);
   background: var(--pk-side);
   color: var(--muted);
   font-size: 12px;
@@ -2584,8 +2583,7 @@ html .app.desktop-frame .preview-pin[aria-pressed='true'] {
   --pk-danger: var(--error);
   --pk-info: color-mix(in srgb, var(--accent) 70%, var(--ink));
   --pk-neutral: var(--muted);
-  --pk-side: color-mix(in srgb, var(--panel) 80%, var(--bg));
-  --pk-side-width: var(--compact-navigation-width);
+  --pk-side: var(--panel);
   --pk-radius-tag: 6px;
   --pk-menu-motion: 150ms;
   --pk-status-bar: 28px;
@@ -2731,15 +2729,7 @@ html .app.desktop-frame .pk-chips button:focus-visible {
   }
 }
 
-/* Sidebar surface: one step lighter than the content and reaching the top, under the macOS controls. */
-.desktop-frame.sidebar-collapsed {
-  --pk-side-width: 56px;
-}
-@media (max-width: 899px) {
-  .desktop-frame {
-    --pk-side-width: 56px;
-  }
-}
+/* Window frame: sidebar, title bar and status bar share one surface; the content sits on it as an inset sheet. */
 html .app.desktop-frame > .buyer-sidebar {
   background: var(--pk-side);
   border-inline-end: 0;
@@ -2747,17 +2737,20 @@ html .app.desktop-frame > .buyer-sidebar {
 html .app.desktop-frame > .buyer-sidebar::after {
   display: none;
 }
+html .app.desktop-frame {
+  background: var(--pk-side);
+}
 html .app.desktop-frame > .ui-window-chrome {
   border-bottom: 0;
-  background:
-    linear-gradient(var(--line), var(--line)) right bottom /
-      calc(100% - var(--pk-side-width)) 1px no-repeat,
-    linear-gradient(
-      90deg,
-      var(--pk-side) var(--pk-side-width),
-      var(--bg) var(--pk-side-width)
-    );
-  transition: background-size var(--motion-enter) var(--motion-push-ease);
+  background: var(--pk-side);
+}
+html .app.desktop-frame > .app-body {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-inline-end: 0;
+  border-start-start-radius: var(--radius-panel);
+  border-end-start-radius: var(--radius-panel);
+  background: var(--bg);
 }
 
 /* One native select treatment: interface-size text, padded chevron away from the edge. */

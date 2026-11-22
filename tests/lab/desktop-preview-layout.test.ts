@@ -69,6 +69,11 @@ void test('the title bar adds a conversation menu and a details panel for the ch
     /max-width: 899px\) \{\n  \.desktop-frame \.preview-chat-panel/,
   );
   assert.match(css, /\.preview-chat-state\[data-state='running'\]/);
+  assert.match(
+    css,
+    /> \.app-body \{[^}]*border-start-start-radius: var\(--radius-panel\);/,
+  );
+  assert.doesNotMatch(css, /--pk-side-width/);
   const design = await read('DESIGN.md');
   assert.match(design, /PreviewConversationPanel/);
   assert.match(design, /PreviewChatDetails/);
