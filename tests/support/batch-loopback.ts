@@ -32,6 +32,9 @@ export async function batchLoopback(
   const sockets = new Set<Socket>();
   const running = new Set<Promise<void>>();
   let connections = 0;
+  // Iroh admits one data connection per buyer whichever batch protocol it asks for
+  // (TRANSPORT_LIMITS.maxPeerConnections); with per-connection protocols, a second live one is refused.
+  let live = 0;
   const peers = new Map<
     number,
     ReturnType<typeof batchDeferred<AbortController>>
@@ -98,6 +101,10 @@ export async function batchLoopback(
     async connect(_destination, alpn) {
       connections++;
       const port = portFor(alpn);
+      if (blocks === 'alpn' && live > 0)
+        throw new Error('Synthetic admission refused a second data connection');
+      live++;
+      let open = true;
       const closed = batchDeferred<void>();
       const owned = new Set<Socket>();
       const controllers = new Set<AbortController>();
@@ -106,6 +113,8 @@ export async function batchLoopback(
         paths: () => [],
         closed: () => closed.promise,
         close() {
+          if (open) live--;
+          open = false;
           for (const controller of controllers) controller.abort();
           for (const socket of owned) socket.destroy();
           closed.resolve();

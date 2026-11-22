@@ -120,8 +120,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   // the whole-response protocol even on a channel that checkpoints other requests.
   const declared = quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED;
   const context = declared ? channel.wholeResponse() : channel;
-  const { options, terms, rpc } = context;
-  const blockMode = context.blockMode;
+  const { options, terms, rpc, blockMode } = context;
   if (blockMode && typeof options.meter.stablePrefix !== 'function')
     return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   const { input } = recountSessionInput(quote, data, context.options.meter);

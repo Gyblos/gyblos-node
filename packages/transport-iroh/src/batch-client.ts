@@ -377,6 +377,11 @@ export function createBatchChannelClient<Remote extends BatchDestination>(
       onDelta?: (text: string) => Promise<void>,
       blocks?: BatchBlockClient,
     ) => exchange(state, value, signal, onDelta, blocks),
+    // Lets the seller admit another connection from this buyer (one data connection per peer); the
+    // next exchange reconnects. Callers release only an idle client.
+    release() {
+      drop(state);
+    },
     async close() {
       state.lifetime.abort();
       drop(state);
