@@ -34,6 +34,25 @@ type SourceCommentStats = { comments: number; lines: number };
 type BudgetRecord = Record<string, number>;
 type Git = (args: string[]) => string;
 
+function isScannedPath(path: string): boolean {
+  return (
+    path.length > 0 &&
+    (!path.includes('/') || SOURCE_ROOTS.has(path.split('/')[0] ?? '')) &&
+    !path.includes('/evidence/') &&
+    isSourceFile(path)
+  );
+}
+
+export function renamedBaseComments(
+  text: string,
+  previous: string,
+  path: string,
+): string[] {
+  return isScannedPath(previous) && isScannedPath(path)
+    ? commentTexts(text, previous)
+    : [];
+}
+
 function sourceFiles(): string[] {
   const paths = execFileSync(
     'git',
@@ -42,13 +61,7 @@ function sourceFiles(): string[] {
   );
   return paths
     .split('\0')
-    .filter(
-      (path) =>
-        path &&
-        (!path.includes('/') || SOURCE_ROOTS.has(path.split('/')[0] ?? '')) &&
-        !path.includes('/evidence/') &&
-        isSourceFile(path),
-    )
+    .filter(isScannedPath)
     .sort()
     .map((path) => resolve(ROOT, path));
 }
@@ -100,12 +113,15 @@ async function newCommentProblems(
   const problems: string[] = [];
   for (const [path, previous] of changedSources(git, base)) {
     if (!stats.has(path)) continue;
-    const before = previous ? git(['show', base + ':' + previous]) : '';
+    const before = previous
+      ? renamedBaseComments(
+          git(['show', base + ':' + previous]),
+          previous,
+          path,
+        )
+      : [];
     const after = await readFile(resolve(ROOT, path), 'utf8');
-    for (const comment of addedComments(
-      commentTexts(before, path),
-      commentTexts(after, path),
-    ))
+    for (const comment of addedComments(before, commentTexts(after, path)))
       problems.push(`${path}: new comment ${JSON.stringify(comment)}`);
   }
   return problems;

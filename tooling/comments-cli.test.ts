@@ -4,10 +4,11 @@ import test from 'node:test';
 import {
   addedComments,
   commentRanges,
+  commentTexts,
   isSourceFile,
   physicalLineCount,
 } from './comment-scanner';
-import { commentBase } from './comments-cli';
+import { commentBase, renamedBaseComments } from './comments-cli';
 
 void test('Python string prefixes keep embedded hashes inside the string', () => {
   for (const prefix of ['', 'r', 'b', 'f', 'fr']) {
@@ -101,4 +102,26 @@ void test('the comparison base falls back to upstream develop on forks', () => {
   assert.equal(commentBase({}, git({ 'upstream/develop': 'b' })), 'b');
   assert.equal(commentBase({ COMMENT_BASE_SHA: 'c' }, git({})), 'c');
   assert.throws(() => commentBase({}, git({})), /upstream\/develop/);
+});
+
+void test('arithmetic shifts and unterminated heredocs hide no comments', () => {
+  for (const text of ['x=$((a << b))\n# actual', 'echo shift <<B\n# actual'])
+    assert.deepEqual(commentTexts(text, 'a.sh'), ['# actual']);
+});
+
+void test('backslash-quoted heredoc tags are heredocs', () => {
+  assert.deepEqual(commentTexts('cat <<\\EOF\n# body\nEOF\n# actual', 'a.sh'), [
+    '# actual',
+  ]);
+});
+
+void test('renamed files compare old text with the old file type', () => {
+  assert.deepEqual(
+    renamedBaseComments('const a = <div />; // kept', 'x.tsx', 'x.ts'),
+    ['// kept'],
+  );
+  assert.deepEqual(
+    renamedBaseComments('# smuggled\necho hi', 'notes.txt', 'notes.sh'),
+    [],
+  );
 });

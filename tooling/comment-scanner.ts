@@ -66,7 +66,9 @@ const SHELL_EXTENSIONS = new Set([
 const TRIPLE_QUOTE = 3;
 const HEREDOC_LOOKAHEAD = 256;
 const HERE_STRING = '<<<';
-const HEREDOC = /^<<-?[ \t]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
+const ARITHMETIC_OPEN = '((';
+const ARITHMETIC_CLOSE = '))';
+const HEREDOC = /^<<-?[ \t]*\\?(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
 
 function sourceExtension(path: string): string {
   const basename = path.split(/[\\/]/).at(-1) ?? '';
@@ -155,12 +157,13 @@ function skipHeredocBodies(scanner: Scanner): void {
   const { text } = scanner;
   let index = scanner.index + 1;
   for (const tag of scanner.heredocs) {
-    while (index < text.length) {
+    let found = false;
+    while (!found && index < text.length) {
       const end = lineEnd(text, index);
-      const line = text.slice(index, end).trim();
+      found = text.slice(index, end).trim() === tag;
       index = end + 1;
-      if (line === tag) break;
     }
+    if (!found) index = scanner.index + 1;
   }
   scanner.heredocs = [];
   scanner.index = Math.min(index, text.length);
@@ -171,6 +174,13 @@ function shellSyntax(scanner: Scanner): boolean {
   const { text, index } = scanner;
   if (text[index] === '\\') {
     scanner.index += 2;
+    return true;
+  }
+  const arithmetic = text.startsWith(ARITHMETIC_OPEN, index)
+    ? text.indexOf(ARITHMETIC_CLOSE, index + ARITHMETIC_OPEN.length)
+    : -1;
+  if (arithmetic >= 0) {
+    scanner.index = arithmetic + ARITHMETIC_CLOSE.length;
     return true;
   }
   if (text.startsWith(HERE_STRING, index)) {
