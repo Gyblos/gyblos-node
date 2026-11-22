@@ -16,6 +16,7 @@ import { desktopBuyerFailure } from './buyer-error';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
+  assertFreeBudget,
   buyerEndpoint,
   policyForRoute,
   policyForSeller,
@@ -227,13 +228,7 @@ export class X402Client {
     const current = await this.budget.summary();
     external.throwIfAborted();
     if (choice === OFFER_PRICING_KINDS.FREE) {
-      if (
-        !current.available ||
-        current.blocked ||
-        current.records.some((item) => item.id === id) ||
-        current.records.length >= DESKTOP_X402.MAX_RECORDS
-      )
-        throw new Error('Chat history is unavailable or needs review.');
+      assertFreeBudget(current, id);
       return this.executeReserved(
         connection,
         id,

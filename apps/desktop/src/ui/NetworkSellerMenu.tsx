@@ -64,7 +64,9 @@ export function NetworkSellerMenu({
               detail={
                 paid && name === MODEL_IDS.QWEN3_0_6B
                   ? 'Choose a seller within your limits'
-                  : 'Free offers only · Enable paid offers in Payments'
+                  : name === MODEL_IDS.QWEN3_0_6B
+                    ? 'Free offers only · Enable paid offers in Payments'
+                    : 'Free offers only'
               }
               checked={automatic && selected === 'auto/' + name}
               trailing={automatic && selected === 'auto/' + name && <Check />}

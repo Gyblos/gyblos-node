@@ -147,6 +147,18 @@ export function buyerEndpoint(input: unknown) {
   return url;
 }
 
+export function assertFreeBudget(
+  current: Awaited<ReturnType<X402Budget['summary']>>,
+  id: string,
+) {
+  if (
+    !current.available ||
+    current.blocked ||
+    current.records.some((item) => item.id === id) ||
+    current.records.length >= DESKTOP_X402.MAX_RECORDS
+  )
+    throw new Error('Chat history is unavailable or needs review.');
+}
 export function validateChoice(
   choice: BuyerSellerChoice | typeof BUYER_API.AUTO | undefined,
   policy: BuyerApiPolicy,

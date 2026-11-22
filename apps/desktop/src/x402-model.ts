@@ -95,6 +95,15 @@ export function x402Policy(input: unknown) {
     throw new Error('Only Solana devnet is supported');
   return policy;
 }
+export function spendingPolicy(input: unknown) {
+  const {
+    autoRoutes: _routes,
+    autoPrices: _prices,
+    paidAuto: _auto,
+    ...policy
+  } = x402Policy(input);
+  return policy;
+}
 export function x402Explorer(transaction: string) {
   if (!x402Signature(transaction)) throw new Error('Invalid transaction');
   return DESKTOP_X402.EXPLORER + transaction + '?cluster=devnet';
@@ -145,7 +154,7 @@ function parseRecord(input: unknown): X402Record {
     chargeAtomic: record.chargeAtomic,
     transaction: record.transaction,
     free: record.free,
-    policy: x402Policy(record.policy),
+    policy: spendingPolicy(record.policy),
   };
 }
 export function parseX402Summary(input: unknown): X402Summary {
@@ -162,7 +171,7 @@ export function parseX402Summary(input: unknown): X402Summary {
     value.records.length > DESKTOP_X402.MAX_RECORDS
   )
     throw new Error('Invalid session');
-  const policy = value.policy === null ? null : x402Policy(value.policy);
+  const policy = value.policy === null ? null : spendingPolicy(value.policy);
   const records: X402Record[] = value.records.map(parseRecord);
   if (
     BigInt(value.spentAtomic) > BigInt(value.limitAtomic) ||

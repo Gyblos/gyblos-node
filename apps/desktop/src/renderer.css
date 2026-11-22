@@ -229,7 +229,7 @@
 }
 @media (min-width: 720px) {
   .compact-dropdown:has(.seller-menu-choices) {
-    width: min(36rem, 90vw);
+    --seller-menu-width: 36rem;
   }
   .compact-dropdown .seller-menu-model:has(.seller-menu-choices) {
     display: grid;

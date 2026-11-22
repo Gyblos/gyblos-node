@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { getBase58Decoder, isSignature } from '@solana/kit';
 
+import { X402Budget } from '@gyblos/desktop/x402-budget';
 import {
   buyerEndpoint,
   parseBuyerReply,
@@ -373,5 +374,39 @@ void test('desktop Auto sends the model without pinning a seller and records its
   await client.send('automatic', 'test', undefined, 'auto');
   assert.equal(sends, 1);
   assert.equal((await ledger.summary()).spentAtomic, '30');
+  await client.close();
+});
+
+void test('an approved Auto charge fits the spending journal independently of the network model catalog', async () => {
+  const ledger = new X402Budget({
+    read: async () => undefined,
+    write: async (text) => {
+      if (Buffer.byteLength(text) > 4000)
+        throw new Error('Synthetic journal limit');
+      assert.ok(!text.includes('autoRoutes'));
+    },
+  });
+  const autoRoutes = Array.from({ length: 32 }, (_, i) => ({
+    id: 'local-model-' + i,
+    modelId: 'network-model-' + i,
+    maxTokens: 32,
+  }));
+  const client = new X402Client(ledger, async (_url, options) =>
+    options?.method === 'POST'
+      ? Response.json(reply())
+      : Response.json({
+          ...policy,
+          depositAtomic: '1000000',
+          lifetimeMs: 3600000,
+          paidAuto: true,
+          autoRoutes,
+        }),
+  );
+  await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+  await client.send('bounded-auto', 'test', undefined, BUYER_API.AUTO);
+  const state = await ledger.summary();
+  assert.equal(state.blocked, false);
+  assert.equal(state.spentAtomic, '30');
+  assert.equal(client.policy()?.autoRoutes?.length, 32);
   await client.close();
 });

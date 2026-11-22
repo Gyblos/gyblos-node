@@ -65,12 +65,23 @@ function useAutoSettings({
   return {
     enabled,
     setEnabled,
-    maximum,
-    setMaximum,
-    input,
-    setInput,
-    output,
-    setOutput,
+    fields: [
+      {
+        label: 'Maximum per response (USDC)',
+        value: maximum,
+        change: setMaximum,
+      },
+      {
+        label: 'Maximum input price (USDC / 1M tokens)',
+        value: input,
+        change: setInput,
+      },
+      {
+        label: 'Maximum output price (USDC / 1M tokens)',
+        value: output,
+        change: setOutput,
+      },
+    ],
     error,
     save,
   };
@@ -82,18 +93,10 @@ export function AutoSellerSettings({
   buyer: X402View;
   policy: BuyerApiPolicy;
 }) {
-  const {
-    enabled,
-    setEnabled,
-    maximum,
-    setMaximum,
-    input,
-    setInput,
-    output,
-    setOutput,
-    error,
-    save,
-  } = useAutoSettings({ buyer, policy });
+  const { enabled, setEnabled, fields, error, save } = useAutoSettings({
+    buyer,
+    policy,
+  });
   return (
     <details className="ui-form">
       <summary>
@@ -114,23 +117,7 @@ export function AutoSellerSettings({
       </label>
       {enabled && (
         <div className="ui-form">
-          {[
-            {
-              label: 'Maximum per response (USDC)',
-              value: maximum,
-              change: setMaximum,
-            },
-            {
-              label: 'Maximum input price (USDC / 1M tokens)',
-              value: input,
-              change: setInput,
-            },
-            {
-              label: 'Maximum output price (USDC / 1M tokens)',
-              value: output,
-              change: setOutput,
-            },
-          ].map((field) => (
+          {fields.map((field) => (
             <label key={field.label}>
               {field.label}
               <input
