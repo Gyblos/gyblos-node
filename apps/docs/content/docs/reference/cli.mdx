@@ -34,6 +34,7 @@ Replace `COMMAND` with a command from the table below. The examples on this page
 | `gyblos seller init`                        | See [`seller init`](#init-flags-for-a-native-checkout) | 0 written; 1 failure; 130 prompt cancelled           |
 | `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`          | 0 success; 1 failure                                 |
 | `gyblos seller service uninstall`           | `--dry-run`                                            | 0 success; 1 failure                                 |
+| `gyblos seller service restart`             | `--dry-run`                                            | 0 success; 1 failure or not installed                |
 | `gyblos logs`                               | See [`logs`](#local-operational-logs)                  | 0 read completed; 1 usage error or unreadable data   |
 
 There is no `gyblos stop`, and no general `--home`, `--relay`, `--rpc-url` or `--discovery-url` flag.
@@ -118,10 +119,10 @@ command-line argument. It asks before it signs and submits a devnet registration
 doesn't change `config.toml` or publish. Read [Register and publish](/en/sellers/register-publish) before
 you run it.
 
-`seller rpc` shows the origin of the Solana RPC the seller uses. `seller rpc set` reads the URL from
-`GYBLOS_RPC_URL` or an interactive terminal, never from an argument, saves it only after it answers as
+`seller rpc` shows the origin of the Solana RPC the seller uses. `seller rpc set` asks for the URL on an
+interactive terminal (a script without one sets `GYBLOS_RPC_URL`), never takes it as an argument, saves it only after it answers as
 devnet, and changes nothing else; `seller rpc reset` goes back to the public devnet RPC. The seller reads
-it at startup, so restart it afterwards (see [Change the RPC of an installed seller](/en/sellers/beta-guide#change-rpc)).
+it at startup, so restart it afterwards with `gyblos seller service restart` (see [Change the RPC of an installed seller](/en/sellers/beta-guide#change-rpc)).
 
 ## seller init [#init-flags-for-a-native-checkout]
 

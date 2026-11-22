@@ -55,6 +55,8 @@ export interface ServiceLocation {
   files?: string[];
   disable: string[][];
   reload: string[][];
+  // Restarts the installed service in place, keeping its definition, config path and limits.
+  restart: string[][];
 }
 
 export interface ServicePlan extends ServiceLocation {
@@ -239,6 +241,11 @@ export function serviceLocation(
       path,
       disable: [['launchctl', 'bootout', `gui/${uid}`, path]],
       reload: [],
+      // bootout stops the agent gracefully (SIGTERM, as uninstall does); kickstart -k would kill it.
+      restart: [
+        ['launchctl', 'bootout', `gui/${uid}`, path],
+        ['launchctl', 'bootstrap', `gui/${uid}`, path],
+      ],
     };
   }
   return {
@@ -249,6 +256,7 @@ export function serviceLocation(
     ),
     disable: [['systemctl', '--user', 'disable', '--now', SERVICE.unit]],
     reload: [['systemctl', '--user', 'daemon-reload']],
+    restart: [['systemctl', '--user', 'restart', SERVICE.unit]],
   };
 }
 
