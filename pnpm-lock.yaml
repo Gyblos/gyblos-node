@@ -137,6 +137,9 @@ importers:
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
+      '@typescript-eslint/parser':
+        specifier: 8.72.2
+        version: 8.72.2(eslint@9.39.1(jiti@2.7.0))(typescript@5.9.3)
       dependency-cruiser:
         specifier: 18.7.2
         version: 18.7.2

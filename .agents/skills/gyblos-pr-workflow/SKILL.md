@@ -40,7 +40,7 @@ Behavior changes and moves go in separate PRs.
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
-pnpm lint            # includes prettier --check, tooling:test, boundaries
+pnpm lint            # includes comments:check, prettier --check, tooling:test, boundaries
 pnpm test
 pnpm test:lab
 pnpm tooling:test
@@ -82,7 +82,7 @@ End with one verdict: READY, READY AFTER P2, or NOT READY.
 Focus lines, one per reviewer:
 
 - **Structure:** "Check layer placement and ownership against AGENTS.md and
-  `tooling/boundaries/config.ts`, package exports, module headers, canonical
+  `tooling/boundaries/config.ts`, package exports, comment budgets, canonical
   values (`docs/code-standards.md`), doc accuracy and links, file moves with
   history."
 - **Behavior equivalence:** "Diff against the merge base. For refactors, prove
