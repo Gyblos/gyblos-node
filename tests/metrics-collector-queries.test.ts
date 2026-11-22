@@ -1,6 +1,6 @@
 // Protects the collector's D1 cost model and schema: one read and one bounded batch per upload, with no
 // statement per receipt beyond chunking (no N+1), every statement under D1's bound-parameter limit,
-// and a typed ORM schema that matches the real migration, checks included.
+// and a typed ORM schema that matches the real migration.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
