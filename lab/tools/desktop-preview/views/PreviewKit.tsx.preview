@@ -458,7 +458,7 @@ export function PreviewComposerTab({
           <>
             <Info size={15} weight="fill" aria-hidden="true" />
             <p role="status">{PREVIEW_COPY.fallbackNext(free.name)}</p>
-            <Button variant={BUTTON_VARIANT.PRIMARY} onClick={openPreviewFunds}>
+            <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => openPreviewFunds()}>
               Add funds
             </Button>
           </>
@@ -473,7 +473,7 @@ export function PreviewComposerTab({
                 {free.name === funds.model.name ? 'Use a free seller' : 'Use ' + free.name}
               </Button>
             )}
-            <Button variant={BUTTON_VARIANT.PRIMARY} onClick={openPreviewFunds}>
+            <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => openPreviewFunds()}>
               Add funds
             </Button>
           </>

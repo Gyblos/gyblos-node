@@ -9,6 +9,7 @@ const view = (name: string) => readFile(new URL(name, views), 'utf8');
 void test('Add funds offers the faucet on Testnet only, from chat and Usage & payments', async () => {
   const kit = await view('PreviewKit.tsx.preview');
   assert.match(kit, /export function PreviewFundsDialog\(/);
+  assert.doesNotMatch(kit, /onClick=\{openPreviewFunds\}/);
   assert.match(
     kit,
     /network === 'Testnet' \? <AddBuyerFunds \/> : <PreviewMainnetFunds \/>/,
