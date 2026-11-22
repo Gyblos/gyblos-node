@@ -8,6 +8,7 @@
     "./board-delta": "./components/board/delta.ts",
     "./board-hovered": "./components/board/hovered.ts",
     "./chain-shape": "./lib/chain-shape.ts",
+    "./chain-txs-shape": "./lib/chain-txs-shape.ts",
     "./collector-shape": "./lib/collector-shape.ts",
     "./constants": "./lib/constants.ts",
     "./discovery": "./lib/discovery.ts",

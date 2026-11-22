@@ -25,7 +25,7 @@ export function SectionTitle({
   meta,
 }: {
   title: string;
-  meta?: string;
+  meta?: ReactNode;
 }) {
   return (
     <div className="mt-10 mb-4 flex flex-wrap items-baseline justify-between gap-2">

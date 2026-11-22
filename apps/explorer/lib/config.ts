@@ -14,3 +14,9 @@ export const NETWORKS = [
 
 export const explorerAddressUrl = (address: string) =>
   `https://explorer.solana.com/address/${address}?cluster=devnet`;
+
+export const explorerTxUrl = (signature: string) =>
+  `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+
+export const PAYMENT_PROGRAM_SOURCE_URL =
+  'https://github.com/solana-foundation/payment-channels';

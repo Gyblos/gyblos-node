@@ -213,6 +213,12 @@ a Solana explorer. Buyers and the desktop app also read the 8004 agent registry 
 (by default `https://api.devnet.solana.com`) to check each seller's identity. The RPC provider sees
 those requests and your IP address.
 
+The Gyblos explorer (`explorer.gyblos.com`) lists the on-chain transactions of channels whose opening
+carries a Gyblos memo, newest first: time, instruction type, channel, USDC amount and signature, from
+the metrics collector's public `GET /v1/stats/chain/txs`. When a channel pays the owner address that a
+listed seller publishes in the discovery index, the row shows that seller's NodeId, so your NodeId is
+linked to the channels that paid you and to the amounts.
+
 ## Update checks [#update-checks]
 
 - **Desktop app:** at startup and every five minutes, it asks the GitHub API for the latest desktop

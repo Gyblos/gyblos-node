@@ -12,12 +12,13 @@ Gyblos is an open market where anyone can sell, buy or give away AI inference. T
 - Amounts are USDC, computed from exact atomic units. Times are UTC.
 - "Gyblos" channel figures come from payment channels whose opening transaction carries a Gyblos memo. That label is self-declared by whoever opens the channel.
 - A seller is online when it has a live signed presence in the discovery index, offline when it was seen before but has none now, and not published when it was never seen or withdrew its catalog.
+- Channel transactions list each instruction of Gyblos payment channels on chain, newest first, with a link to the Solana explorer (`?before=<cursor>` pages to older ones). The seller is the NodeId of a listed seller whose owner address the channel pays; otherwise the row says "Unknown payee".
 - The page shows the last 7, 30 or 90 days (`?range=7`, `?range=30`, `?range=90`); 30 is the default.
 
 ## Public data sources
 
 - [Discovery index](https://discovery.gyblos.com/v1/models): models offered now; `/v1/sellers?model=<id>` lists live sellers, `/v1/uptime?node=<NodeId>` a seller's uptime, and `/v1/network` every registered seller's online, offline or not-published state.
-- [Metrics collector](https://collector.gyblos.com/v1/stats/network): daily network totals; `/v1/stats/models` per model and `/v1/stats/chain` on-chain settlements. Each takes `from` and `to` as `YYYY-MM-DD`, at most 92 days.
+- [Metrics collector](https://collector.gyblos.com/v1/stats/network): daily network totals; `/v1/stats/models` per model and `/v1/stats/chain` on-chain settlements. Each takes `from` and `to` as `YYYY-MM-DD`, at most 92 days. `/v1/stats/chain/txs` lists Gyblos channel transactions, newest first, paged with `before` and `limit`.
 
 ## More about Gyblos
 

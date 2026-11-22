@@ -217,6 +217,13 @@ montos en un explorador de Solana. Los compradores y la app de escritorio tambi�
 agentes 8004 mediante un RPC de Solana (por defecto `https://api.devnet.solana.com`) para comprobar la
 identidad de cada vendedor. El proveedor del RPC ve esas consultas y tu dirección IP.
 
+El explorador de Gyblos (`explorer.gyblos.com`) lista las transacciones en cadena de los canales cuya
+apertura lleva un memo de Gyblos, de la más reciente a la más antigua: hora, tipo de instrucción, canal,
+monto en USDC y firma, desde la ruta pública `GET /v1/stats/chain/txs` del recolector de métricas. Cuando
+un canal paga a la dirección del dueño que un vendedor listado publica en el índice de descubrimiento, la
+fila muestra el NodeId de ese vendedor, así que tu NodeId queda vinculado a los canales que te pagaron y a
+los montos.
+
 ## Búsqueda de actualizaciones [#búsqueda-de-actualizaciones]
 
 - **App de escritorio:** al iniciar y cada cinco minutos, pregunta a la API de GitHub por la última
