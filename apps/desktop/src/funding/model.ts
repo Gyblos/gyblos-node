@@ -1,4 +1,5 @@
 // Public payment funding facts. Unknown observations are distinct from confirmed zero.
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { DEVNET } from '@gyblos/config/network';
 import {
   controlAddress,
@@ -8,6 +9,7 @@ import {
 
 export const FUNDING = {
   balance: 'desktop:buyer-funding',
+  channelLimit: 'channel-limit',
   copy: 'desktop:copy-funding-address',
   faucet: 'desktop:open-devnet-faucet',
   circle: 'https://faucet.circle.com/',
@@ -43,19 +45,22 @@ export function autoFundingAvailable(
     const escrow = item.channelRemainingAtomic ?? item.switchingAtomic;
     if (escrow != null && BigInt(escrow) >= BigInt(policy.maxAtomic))
       return true;
-    if (escrow != null) return false;
+    if (escrow != null) return FUNDING.channelLimit;
     if (
       item.replacementAtomic !== undefined &&
-      BigInt(item.replacementAtomic) < BigInt(policy.maxAtomic)
+      (BigInt(item.replacementAtomic) < BigInt(policy.maxAtomic) ||
+        BigInt(item.replacementAtomic) <
+          BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic))
     )
-      return false;
+      return FUNDING.channelLimit;
     if (item.balanceAtomic === null) return null;
     return (
       BigInt(item.balanceAtomic) >= BigInt(item.replacementAtomic ?? deposit)
     );
   });
   if (capacity.includes(true)) return true;
-  return capacity.includes(null) ? null : false;
+  if (capacity.includes(null)) return null;
+  return capacity.includes(false) ? false : FUNDING.channelLimit;
 }
 export function depositShortfall(balanceAtomic: string, depositAtomic: string) {
   const difference =

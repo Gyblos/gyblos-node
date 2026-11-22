@@ -81,6 +81,15 @@ void test('Payments turns shared paid Auto on and off with exact prices and pres
   await prepareDesktopBuyer(options);
   const before = JSON.parse(await readFile(f.path, 'utf8'));
   const rates = { inputAtomicPerMtok: '52000', outputAtomicPerMtok: '208000' };
+  await assert.rejects(
+    prepareDesktopBuyer(
+      options,
+      String(BigInt(before.session.depositAtomic) + 1n),
+      rates,
+    ),
+    /deposit/i,
+  );
+  assert.deepEqual(JSON.parse(await readFile(f.path, 'utf8')), before);
   await prepareDesktopBuyer(options, '10000', rates);
   const enabled = JSON.parse(await readFile(f.path, 'utf8'));
   assert.equal(enabled.discovery.paidAuto, true);

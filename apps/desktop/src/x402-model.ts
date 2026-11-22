@@ -51,6 +51,15 @@ export function emptyX402(): X402Summary {
     records: [],
   };
 }
+export function chatBudgetReady(
+  active: boolean,
+  selectedOffer: boolean,
+  freeOnly: boolean,
+  automatic: boolean,
+  maximum: string,
+) {
+  return active || selectedOffer || freeOnly || (automatic && maximum !== '0');
+}
 export function paidSellerLimitNotice(
   policy: BuyerApiPolicy | null,
   budget: X402Summary,

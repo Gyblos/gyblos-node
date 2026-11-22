@@ -71,7 +71,13 @@ async function configureDesktopPolicy(
     };
     const next =
       autoPrices === undefined ? updated : withAutoPrices(updated, autoPrices);
-    parseBuyerSelectionConfig(next);
+    const config = parseBuyerSelectionConfig(next);
+    if (
+      autoPrices &&
+      config.session &&
+      BigInt(maximum) > BigInt(config.session.depositAtomic)
+    )
+      throw new Error('The maximum per response exceeds the channel deposit.');
     await lock.verify();
     options.signal?.throwIfAborted();
     await writePrivateFile(

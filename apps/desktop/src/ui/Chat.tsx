@@ -30,7 +30,11 @@ import {
   paypalDollars,
   type PaymentMethod,
 } from '../paypal-model';
-import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
+import {
+  chatBudgetReady,
+  paidSellerLimitNotice,
+  X402_ACTION,
+} from '../x402-model';
 import { activityDate, sessionOutcome } from './activity-presentation';
 import { chatNetworkOptions, modelArtwork } from './announced-models';
 import type { ChatController } from './chat-controller';
@@ -185,10 +189,13 @@ export function Chat({
   const x402Ready =
     x402 &&
     !!x402.state.policy &&
-    (x402.state.summary.active ||
-      !!model.offerId ||
-      model.automatic ||
-      freeOnly) &&
+    chatBudgetReady(
+      x402.state.summary.active,
+      !!model.offerId,
+      !!freeOnly,
+      !!model.automatic,
+      x402.state.policy.maxAtomic,
+    ) &&
     !x402.state.summary.blocked &&
     !x402.busy &&
     (freeOnly ||

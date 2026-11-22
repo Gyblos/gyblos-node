@@ -295,6 +295,12 @@ void test('Auto checks reusable channel funds before asking for a new deposit', 
     channelRemainingAtomic: null,
     faucetAvailable: true,
   };
+  assert.equal(
+    autoFundingAvailable({ ...policy, maxAtomic: '1' }, [
+      { ...zero, balanceAtomic: '1000000', replacementAtomic: '10' },
+    ]),
+    FUNDING.channelLimit,
+  );
   assert.equal(autoFundingAvailable(policy, [zero]), false);
   assert.equal(
     autoFundingAvailable(policy, [

@@ -7,7 +7,7 @@ import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import manifest from '../package.json';
 import { WINDOW_CHROME } from './constants';
-import { autoFundingAvailable } from './funding/model';
+import { autoFundingAvailable, FUNDING } from './funding/model';
 import {
   canSelectPreviewModel,
   canSwitchPaymentMethod,
@@ -306,7 +306,9 @@ export function DesktopApp() {
         setToast(
           available === false
             ? 'Add devnet USDC to open a channel.'
-            : 'Could not confirm channel funds. Check Payments and try again.',
+            : available === FUNDING.channelLimit
+              ? 'Channel capacity cannot cover this response. Review Payments.'
+              : 'Could not confirm channel funds. Check Payments and try again.',
         );
         navigate(UI_VIEW.PAYMENTS);
         if (available === false) setModal(UI_DIALOG.ADD_FUNDS);

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
+import { chatBudgetReady } from '@gyblos/desktop/x402-model';
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
 
 import { budget, policy, reply, token } from './support/desktop-paid-chat';
@@ -64,4 +65,10 @@ void test('an approved Auto charge fits the spending journal independently of th
   assert.equal(state.spentAtomic, '30');
   assert.equal(client.policy()?.autoRoutes?.length, 32);
   await client.close();
+});
+
+void test('Auto on a zero-limit buyer needs its free chat permission before sending', () => {
+  assert.equal(chatBudgetReady(false, false, false, true, '0'), false);
+  assert.equal(chatBudgetReady(true, false, false, true, '0'), true);
+  assert.equal(chatBudgetReady(false, false, false, true, '10000'), true);
 });

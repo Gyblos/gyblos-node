@@ -1,3 +1,4 @@
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
 
 // Coordinates one local-buyer startup and zero-only permission; it never retries a prompt.
@@ -150,6 +151,17 @@ export function automaticBuyer(
         if (autoPrices !== undefined && !client.policy()?.autoRoutes?.length)
           throw new PaidSellerLimitError(
             'This buyer does not support changing Auto in Payments.',
+          );
+        if (
+          autoPrices &&
+          BigInt(maxAtomic) >
+            BigInt(
+              client.policy()?.depositAtomic ??
+                BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
+            )
+        )
+          throw new PaidSellerLimitError(
+            'The maximum per response exceeds the channel deposit.',
           );
         client.disconnectForPolicyChange(owned, policyId);
         ready = null;
