@@ -35,37 +35,38 @@ function pageKeys(
   before: ChainTxCursor | null,
   rows: number,
 ) {
-  return orm
-    .select({
-      signature: ins.signature,
-      instructionIndex: ins.instructionIndex,
-      slot: chainTxs.slot,
-      blockTime: chainTxs.blockTime,
-      kind: ins.kind,
-      channel: ins.channel,
-      payee: chainChannels.payee,
-      recipientsJson: chainChannels.recipientsJson,
-      mint: chainChannels.mint,
-      depositAtomic: ins.amountAtomic,
-      cumulativeAtomic: ins.cumulativeAtomic,
-    })
-    .from(ins)
-    .innerJoin(chainTxs, eq(chainTxs.signature, ins.signature))
-    .innerJoin(chainChannels, eq(chainChannels.channel, ins.channel))
-    .where(
-      and(
-        eq(chainChannels.gyblos, 1),
-        eq(chainTxs.failed, 0),
-        before ? earlierThan(before) : undefined,
-      ),
-    )
-    .orderBy(
-      desc(chainTxs.slot),
-      desc(ins.signature),
-      desc(ins.instructionIndex),
-    )
-    .limit(rows)
-    .as('page');
+  return orm.$with('page').as(
+    orm
+      .select({
+        signature: ins.signature,
+        instructionIndex: ins.instructionIndex,
+        slot: chainTxs.slot,
+        blockTime: chainTxs.blockTime,
+        kind: ins.kind,
+        channel: ins.channel,
+        payee: chainChannels.payee,
+        recipientsJson: chainChannels.recipientsJson,
+        mint: chainChannels.mint,
+        depositAtomic: ins.amountAtomic,
+        cumulativeAtomic: ins.cumulativeAtomic,
+      })
+      .from(ins)
+      .innerJoin(chainTxs, eq(chainTxs.signature, ins.signature))
+      .innerJoin(chainChannels, eq(chainChannels.channel, ins.channel))
+      .where(
+        and(
+          eq(chainChannels.gyblos, 1),
+          eq(chainTxs.failed, 0),
+          before ? earlierThan(before) : undefined,
+        ),
+      )
+      .orderBy(
+        desc(chainTxs.slot),
+        desc(ins.signature),
+        desc(ins.instructionIndex),
+      )
+      .limit(rows),
+  );
 }
 
 function settleIncrements(
@@ -143,6 +144,7 @@ export function chainTxReader(database: D1Database): ChainTxReader {
       const page = pageKeys(orm, before, rows);
       const settles = settleIncrements(orm, page);
       return orm
+        .with(page)
         .select({
           signature: page.signature,
           instructionIndex: page.instructionIndex,
