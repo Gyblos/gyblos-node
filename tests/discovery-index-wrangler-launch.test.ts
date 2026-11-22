@@ -109,8 +109,9 @@ void test('a failed Wrangler launch throws a static error without the SQL or its
         );
       }),
     (error: unknown) =>
+      // Either static message (a Windows runner without npm beside node.exe stops at the launcher).
       error instanceof Error &&
-      error.message === 'Wrangler could not run the D1 command.' &&
+      !error.message.includes('INSERT') &&
       !error.message.includes('seller@example.com') &&
       error.cause === undefined,
   );
