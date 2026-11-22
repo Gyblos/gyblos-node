@@ -211,8 +211,8 @@ Only `verified` means the proof was found. When GitHub doesn't answer, the claim
 - **Several sellers.** One GitHub account can verify several sellers, each with its own
   `gyblos-node=NODEID` line. With `gh`, the command makes one gist per seller. By hand, the simplest is one
   gist: add each seller's line, on its own line, to the same `gyblos-proof.txt` and pass that gist to each
-  seller with `--gist`. Removing a line from the shared file makes only that seller `lost`. The index reads only the first 16 KiB
-  of the file, about 200 lines: a line beyond that is ignored and its seller becomes `lost`.
+  seller with `--gist`. Removing a line from the shared file affects only that seller. The index reads only the first 16 KiB
+  of the file, about 200 lines: a line beyond that is ignored, so its seller is not found: `lost` if it was verified before, otherwise it stays `pending`.
 
 ### Check the state [#github-check]
 

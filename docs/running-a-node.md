@@ -463,7 +463,8 @@ naming the account and the gist, which the discovery index checks
 ([discovery-index.md](discovery-index.md#github-claims)). Anyone can re-check
 the gist; the index does not keep or serve the signature. One `gyblos-proof.txt`
 may hold several sellers' proof lines, one per line; only its first 16 KiB
-(about 200 lines) is read, and a line beyond that is ignored.
+(about 200 lines) is read, and a line beyond that is ignored: its seller turns
+`lost` if it was verified before and otherwise stays `pending`.
 
 1. The account is lowercased and checked (letters, digits and single hyphens, at
    most 39 characters).

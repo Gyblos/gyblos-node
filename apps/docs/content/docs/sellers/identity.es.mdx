@@ -215,8 +215,8 @@ estado: `pending` sigue en `pending` y `verified` sigue en `verified`.
 - **Varios vendedores.** Una cuenta de GitHub puede verificar varios vendedores, cada uno con su propia línea
   `gyblos-node=NODEID`. Con `gh`, el comando crea un gist por vendedor. A mano, lo más simple es un solo gist:
   agrega la línea de cada vendedor, cada una en su propio renglón, al mismo `gyblos-proof.txt` y pasa ese gist
-  a cada vendedor con `--gist`. Si quitas una línea del archivo compartido, solo ese vendedor pasa a `lost`. El índice lee solo los
-  primeros 16 KiB del archivo, unas 200 líneas: una línea más allá se ignora y su vendedor pasa a `lost`.
+  a cada vendedor con `--gist`. Si quitas una línea del archivo compartido, solo afecta a ese vendedor. El índice lee solo los
+  primeros 16 KiB del archivo, unas 200 líneas: una línea más allá se ignora, así que su vendedor no se encuentra: pasa a `lost` si ya estaba verificado y, si no, sigue en `pending`.
 
 ### Comprueba el estado [#comprobar-github]
 
