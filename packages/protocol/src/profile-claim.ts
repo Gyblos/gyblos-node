@@ -55,7 +55,11 @@ function scriptsOf(character: string) {
 
 function oneScript(name: string) {
   const sets = [...name]
-    .filter((character) => PROFILE_CLAIM.letterOrMark.test(character))
+    .filter(
+      (character) =>
+        PROFILE_CLAIM.scriptChecked.test(character) &&
+        !PROFILE_CLAIM.asciiDigit.test(character),
+    )
     .map(scriptsOf)
     .filter(
       (scripts) => !scripts.some((script) => SHARED_SCRIPTS.includes(script)),
@@ -75,15 +79,19 @@ function oneScript(name: string) {
 
 const LOOKALIKES: Readonly<Record<string, string>> =
   PROFILE_CLAIM.skeletonLetters;
+const LOOKALIKE_PATTERN = new RegExp(
+  `[${Object.keys(LOOKALIKES).join('')}]`,
+  'gu',
+);
 
 function skeleton(text: string) {
   return text
-    .normalize(PROFILE_CLAIM.skeletonNormalization)
+    .normalize(PROFILE_CLAIM.decomposition)
     .replace(PROFILE_CLAIM.marks, '')
     .toLowerCase()
     .replace(PROFILE_CLAIM.separators, '')
     .replace(
-      PROFILE_CLAIM.skeletonPattern,
+      LOOKALIKE_PATTERN,
       (character) => LOOKALIKES[character] ?? character,
     );
 }
@@ -98,7 +106,9 @@ function reserved(name: string) {
 function badMarks(name: string) {
   return (
     PROFILE_CLAIM.strayMark.test(name) ||
-    new RegExp(`\\p{M}{${PROFILE_CLAIM.maxMarksInRow + 1}}`, 'u').test(name)
+    new RegExp(`\\p{M}{${PROFILE_CLAIM.maxMarksInRow + 1}}`, 'u').test(
+      name.normalize(PROFILE_CLAIM.decomposition),
+    )
   );
 }
 
@@ -115,7 +125,9 @@ export function parseSellerName(value: unknown): SellerNameResult {
   if (typeof value !== 'string') return refused(SELLER_NAME_ISSUES.CHARACTERS);
   if (value.length > PROFILE_CLAIM.maxInputCharacters)
     return refused(SELLER_NAME_ISSUES.LENGTH);
-  const normalized = value.normalize(PROFILE_CLAIM.normalization);
+  const normalized = value
+    .normalize(PROFILE_CLAIM.normalization)
+    .replace(PROFILE_CLAIM.apostrophes, PROFILE_CLAIM.apostrophe);
   if (PROFILE_CLAIM.forbidden.test(normalized))
     return refused(SELLER_NAME_ISSUES.CHARACTERS);
   if (PROFILE_CLAIM.forbiddenMarks.test(normalized))
