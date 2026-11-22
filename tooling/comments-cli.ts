@@ -4,13 +4,8 @@ import { readFile, realpath } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  addedComments,
-  commentRanges,
-  commentTexts,
-  isSourceFile,
-  physicalLineCount,
-} from './comment-scanner';
+import { addedComments, physicalLineCount } from './comment-lines';
+import { commentRanges, commentTexts, isSourceFile } from './comment-scanner';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const BUDGET_PATH = resolve(ROOT, 'tooling/source-comment-budget.json');
@@ -71,7 +66,7 @@ export function commentBase(
   git: Git,
 ): string {
   if (env.COMMENT_BASE_SHA) return env.COMMENT_BASE_SHA;
-  for (const ref of ['origin/develop', 'upstream/develop']) {
+  for (const ref of ['upstream/develop', 'origin/develop']) {
     try {
       return git(['merge-base', 'HEAD', ref]).trim();
     } catch {
@@ -83,7 +78,7 @@ export function commentBase(
   );
 }
 
-function changedSources(git: Git, base: string): [string, string?][] {
+export function changedSources(git: Git, base: string): [string, string?][] {
   const fields = git(['diff', '--name-status', '-z', '-M', base, '--']).split(
     '\0',
   );
@@ -102,6 +97,13 @@ function changedSources(git: Git, base: string): [string, string?][] {
       ]);
     index += CHANGE_FIELDS;
   }
+  for (const path of git([
+    'ls-files',
+    '--others',
+    '--exclude-standard',
+    '-z',
+  ]).split('\0'))
+    if (path) changed.push([path, undefined]);
   return changed;
 }
 

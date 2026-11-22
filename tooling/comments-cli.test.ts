@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { addedComments, physicalLineCount } from './comment-lines';
+import { commentRanges, commentTexts, isSourceFile } from './comment-scanner';
 import {
-  addedComments,
-  commentRanges,
-  commentTexts,
-  isSourceFile,
-  physicalLineCount,
-} from './comment-scanner';
-import { commentBase, renamedBaseComments } from './comments-cli';
+  changedSources,
+  commentBase,
+  renamedBaseComments,
+} from './comments-cli';
 
 void test('Python string prefixes keep embedded hashes inside the string', () => {
   for (const prefix of ['', 'r', 'b', 'f', 'fr']) {
@@ -61,7 +60,7 @@ void test('desktop preview views are scanned as TSX', () => {
 
 void test('dependency patches count comments on added lines only', () => {
   const text =
-    'diff --git a/x.js b/x.js\n+++ b/x.js\n // context comment\n-// removed\n+const a = 1; // added\n+/** doc */\n';
+    'diff --git a/x.js b/x.js\n+++ b/x.js\n@@ -1,2 +1,3 @@\n // context comment\n-// removed\n+const a = 1; // added\n+/** doc */\n';
   assert.equal(isSourceFile('patches/x@1.0.0.patch'), true);
   assert.deepEqual(
     commentRanges(text, 'patches/x@1.0.0.patch').map((range) =>
@@ -136,7 +135,7 @@ void test('quoting edge cases hide no following comments', () => {
     ['body: use `x\n# actual', 'a.yml'],
     ["<em>Bob</em>'s\n<!-- actual -->", 'a.html'],
     ['((cd a) || true)\n# actual\nx=$(f $(g))', 'a.sh'],
-    ['+++i; // actual', 'x.patch'],
+    ['@@ -1 +1 @@\n+++i; // actual', 'x.patch'],
   ];
   for (const [text, path] of cases)
     assert.deepEqual(
@@ -155,4 +154,65 @@ void test('quoting edge cases hide no following comments', () => {
       path + ': ' + JSON.stringify(text),
     );
   assert.deepEqual(commentTexts("$t = @'\n# data\n'@", 'a.ps1'), []);
+});
+
+void test('forks prefer upstream develop over a stale origin develop', () => {
+  const git = (args: string[]) =>
+    ({ 'origin/develop': 'old\n', 'upstream/develop': 'new\n' })[
+      args.at(-1) ?? ''
+    ] ?? '';
+  assert.equal(commentBase({}, git), 'new');
+});
+
+void test('heredoc delimiters use the whole word and bash whitespace rules', () => {
+  assert.deepEqual(
+    commentTexts('cat <<END-TEXT\nbody\nEND-TEXT\n# actual', 'a.sh'),
+    ['# actual'],
+  );
+  assert.deepEqual(
+    commentTexts('cat <<EOF\n  EOF\n# data\nEOF\n# actual', 'a.sh'),
+    ['# actual'],
+  );
+  assert.deepEqual(
+    commentTexts('cat <<-EOF\n# data\n\tEOF\n# actual', 'a.sh'),
+    ['# actual'],
+  );
+  assert.deepEqual(
+    commentTexts('run: |\n  cat <<EOF\n  # data\n  EOF\n  # actual', 'a.yml'),
+    ['# actual'],
+  );
+});
+
+void test('patch edits inside unchanged block comments are comments', () => {
+  const before =
+    '@@ -1,3 +1,3 @@\n /**\n- * old text\n+ * old text\n  */\n const a = 1;\n';
+  const after =
+    '@@ -1,3 +1,3 @@\n /**\n- * old text\n+ * new text\n  */\n const a = 1;\n';
+  assert.equal(commentRanges(after, 'x.patch').length, 1);
+  assert.deepEqual(
+    addedComments(
+      commentTexts(before, 'x.patch'),
+      commentTexts(after, 'x.patch'),
+    ),
+    commentTexts(after, 'x.patch'),
+  );
+  assert.deepEqual(
+    commentTexts('@@ -1 +1,2 @@\n // context only\n+const b = 2;\n', 'x.patch'),
+    [],
+  );
+});
+
+void test('untracked files are compared as new files', () => {
+  const git = (args: string[]) =>
+    args[0] === 'ls-files' ? 'scripts/new.sh\0' : 'M\0install.sh\0';
+  assert.deepEqual(changedSources(git, 'base'), [
+    ['install.sh', 'install.sh'],
+    ['scripts/new.sh', undefined],
+  ]);
+});
+
+void test('a block comment cut by a patch hunk ends with the hunk', () => {
+  const text =
+    '@@ -1 +1,2 @@\n /**\n+ * added\ndiff --git a/y.js b/y.js\n@@ -1 +1 @@\n+const c = 3; // next\n';
+  assert.deepEqual(commentTexts(text, 'x.patch'), ['/** + * added', '// next']);
 });

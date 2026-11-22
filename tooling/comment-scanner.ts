@@ -2,6 +2,8 @@ import { extname } from 'node:path';
 
 import { parseForESLint } from '@typescript-eslint/parser';
 
+import { lineIndex, lineStarts, type CommentRange } from './comment-lines';
+
 const SOURCE_EXTENSIONS = new Set([
   '.cjs',
   '.css',
@@ -35,7 +37,7 @@ const TYPESCRIPT_EXTENSIONS = new Set([
   '.tsx',
 ]);
 
-export type CommentRange = { start: number; end: number };
+export type { CommentRange };
 type CommentOptions = {
   blockMarkers: { start: string; end: string }[];
   hashMarker?: string;
@@ -54,7 +56,7 @@ type Scanner = {
   index: number;
   quote: string;
   quoteLength: number;
-  heredocs: string[];
+  heredocs: { tag: string; dash: boolean }[];
   ranges: CommentRange[];
 };
 
@@ -73,7 +75,12 @@ const ARITHMETIC_OPEN = '((';
 const ARITHMETIC_CLOSE = '))';
 const SHELL_COMMENT_PREFIX = /[\s;|&(]/;
 const POWERSHELL_HERE_STRING = /^@(['"])\r?\n/;
-const HEREDOC = /^<<-?[ \t]*\\?(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
+const PATCH_OPTIONS: CommentOptions = {
+  singleQuoteEscapes: true,
+  blockMarkers: [{ start: '/*', end: '*/' }],
+  lineMarkers: ['//'],
+};
+const HEREDOC = /^<<(-?)[ \t]*(?:\\?(['"])([^'"\n]+)\2|\\?([^\s;|&<>()'"]+))/;
 
 function sourceExtension(path: string): string {
   const basename = path.split(/[\\/]/).at(-1) ?? '';
@@ -175,14 +182,20 @@ function opensQuote(scanner: Scanner): boolean {
   return true;
 }
 
+function heredocLine(scanner: Scanner, line: string, dash: boolean): string {
+  const text = line.replace(/\r$/, '');
+  if (scanner.options.yaml) return text.trim();
+  return dash ? text.replace(/^\t+/, '') : text;
+}
+
 function skipHeredocBodies(scanner: Scanner): void {
   const { text } = scanner;
   let index = scanner.index + 1;
-  for (const tag of scanner.heredocs) {
+  for (const { tag, dash } of scanner.heredocs) {
     let found = false;
     while (!found && index < text.length) {
       const end = lineEnd(text, index);
-      found = text.slice(index, end).trim() === tag;
+      found = heredocLine(scanner, text.slice(index, end), dash) === tag;
       index = end + 1;
     }
     if (!found) index = scanner.index + 1;
@@ -211,7 +224,10 @@ function shellSyntax(scanner: Scanner): boolean {
   }
   const heredoc = HEREDOC.exec(text.slice(index, index + HEREDOC_LOOKAHEAD));
   if (heredoc) {
-    scanner.heredocs.push(heredoc[2] ?? '');
+    scanner.heredocs.push({
+      tag: heredoc[3] ?? heredoc[4] ?? '',
+      dash: heredoc[1] === '-',
+    });
     scanner.index += heredoc[0].length;
     return true;
   }
@@ -274,27 +290,55 @@ function delimitedCommentRanges(
   return scanner.ranges;
 }
 
-function addedPatchLines(text: string): string {
-  return text
-    .split('\n')
-    .map((line) =>
-      line.startsWith('+') && !line.startsWith('+++ ')
-        ? ' ' + line.slice(1)
-        : ' '.repeat(line.length),
-    )
-    .join('\n');
+function patchTargetText(text: string): { text: string; added: boolean[] } {
+  let inHunk = false;
+  const added: boolean[] = [];
+  const lines = text.split('\n').map((line) => {
+    if (line.startsWith('@@')) inHunk = true;
+    else if (line.startsWith('diff --git')) inHunk = false;
+    const target = inHunk && (line.startsWith('+') || line.startsWith(' '));
+    added.push(inHunk && line.startsWith('+'));
+    return target ? ' ' + line.slice(1) : ' '.repeat(line.length);
+  });
+  return { text: lines.join('\n'), added };
+}
+
+function patchCommentRanges(text: string): CommentRange[] {
+  const target = patchTargetText(text);
+  const starts = lineStarts(text);
+  const ranges: CommentRange[] = [];
+  let hunkStart = -1;
+  for (let line = 0; line <= starts.length; line += 1) {
+    const start = starts[line] ?? text.length;
+    const boundary =
+      line === starts.length ||
+      text.startsWith('@@', start) ||
+      text.startsWith('diff --git', start);
+    if (!boundary) continue;
+    if (hunkStart >= 0)
+      for (const range of delimitedCommentRanges(
+        target.text.slice(hunkStart, start),
+        PATCH_OPTIONS,
+      ))
+        ranges.push({
+          start: range.start + hunkStart,
+          end: range.end + hunkStart,
+        });
+    hunkStart = text.startsWith('@@', start) ? lineEnd(text, start) : -1;
+  }
+  return ranges.filter((range) => {
+    const last = lineIndex(starts, Math.max(range.start, range.end - 1));
+    for (let line = lineIndex(starts, range.start); line <= last; line += 1)
+      if (target.added[line]) return true;
+    return false;
+  });
 }
 
 export function commentRanges(text: string, path: string): CommentRange[] {
   const extension = sourceExtension(path);
   if (TYPESCRIPT_EXTENSIONS.has(extension))
     return typescriptCommentRanges(text, path);
-  if (extension === '.patch')
-    return delimitedCommentRanges(addedPatchLines(text), {
-      singleQuoteEscapes: true,
-      blockMarkers: [{ start: '/*', end: '*/' }],
-      lineMarkers: ['//'],
-    });
+  if (extension === '.patch') return patchCommentRanges(text);
   if (extension === '.css')
     return delimitedCommentRanges(text, {
       blockMarkers: [{ start: '/*', end: '*/' }],
@@ -335,49 +379,8 @@ export function commentRanges(text: string, path: string): CommentRange[] {
   }).filter((range) => range.start !== 0 || !text.startsWith('#!'));
 }
 
-function lineIndex(starts: number[], position: number): number {
-  let low = 0;
-  let high = starts.length - 1;
-  while (low < high) {
-    const middle = (low + high + 1) >> 1;
-    if ((starts[middle] ?? 0) <= position) low = middle;
-    else high = middle - 1;
-  }
-  return low;
-}
-
-export function physicalLineCount(
-  text: string,
-  ranges: CommentRange[],
-): number {
-  const starts = [0];
-  for (let index = 0; index < text.length; index += 1)
-    if (text[index] === '\n') starts.push(index + 1);
-  const lines = new Set<number>();
-  for (const { start, end } of ranges) {
-    let last = end - 1;
-    while (last > start && /[\r\n]/.test(text[last] ?? '')) last -= 1;
-    const final = lineIndex(starts, last);
-    for (let line = lineIndex(starts, start); line <= final; line += 1)
-      lines.add(line);
-  }
-  return lines.size;
-}
-
 export function commentTexts(text: string, path: string): string[] {
   return commentRanges(text, path).map((range) =>
     text.slice(range.start, range.end).replace(/\s+/g, ' ').trim(),
   );
-}
-
-export function addedComments(before: string[], after: string[]): string[] {
-  const remaining = new Map<string, number>();
-  for (const comment of before)
-    remaining.set(comment, (remaining.get(comment) ?? 0) + 1);
-  return after.filter((comment) => {
-    const count = remaining.get(comment) ?? 0;
-    if (count === 0) return true;
-    remaining.set(comment, count - 1);
-    return false;
-  });
 }
