@@ -39,6 +39,7 @@ Signed records and envelopes outside the Iroh channels:
 | Usage receipts              | v1 (free), v2 (paid)             | `receipt-v1.json`, `receipt-v2.json`               | [Usage receipts v1](#usage-receipts-v1), [Paid receipt/v2](#paid-receiptv2-signed-channel-reference) |
 | Receipt upload envelope     | v1 (v2 contract only, not wired) | `receipt-upload-v1.json`, `receipt-upload-v2.json` | [v1](#receipt-upload-envelope-v1), [v2](#receipt-upload-envelope-v2)                                 |
 | Observation upload envelope | v1                               | `observation-upload-v1.json`                       | [Observation upload envelope v1](#observation-upload-envelope-v1)                                    |
+| Identity claim              | v1                               | `identity-claim-v1.json`                           | [Identity claim v1](#identity-claim-v1)                                                              |
 
 ## Contents
 
@@ -60,6 +61,7 @@ Signed records and envelopes outside the Iroh channels:
 - [Receipt upload envelope v1](#receipt-upload-envelope-v1)
 - [Receipt upload envelope v2](#receipt-upload-envelope-v2)
 - [Observation upload envelope v1](#observation-upload-envelope-v1)
+- [Identity claim v1](#identity-claim-v1)
 
 ## Canonical JSON and signing bytes
 
@@ -1826,3 +1828,24 @@ demand or observed latency. The signed object is `{ upload, signature }`:
 This contract owns shape, bounds and the signature only. Each event is copied
 through canonical JSON and not interpreted here; the collector validates event
 semantics with core's telemetry projection.
+
+## Identity claim v1
+
+`@gyblos/protocol/identity-claim` defines how a node names an external account
+it controls. The signed object is `{ claim, signature }`: `signature` is hex
+Ed25519 by `claim.nodeId` over the prefix `gyblos/identity-claim/v1\n` (real
+LF). Vectors are `vectors/identity-claim-v1.json`.
+
+`claim` has exactly the fields `schemaVersion` (`1`; any other value is
+`VERSION`), `kind` (`github`), `nodeId` (64 lowercase hex), `account`, `gist` and
+`issuedAt` (a non-negative safe integer, milliseconds). `account` is a lowercase
+GitHub login (`^[a-z0-9](?:-?[a-z0-9])*$`, at most 39 characters) and `gist` a lowercase hex gist
+id of 20 to 32 characters. Both are set, or both are `null`, which cancels the
+node's claim; anything else is `INVALID`.
+
+The claim is one half of a two-way binding. The other half is a gist owned by
+`account` whose file `gyblos-proof.txt` (`IDENTITY_CLAIM.proofFile`) contains,
+on a line of its own, the proof line `gyblos-node=<nodeId>` (`githubProofLine`). This contract owns shape and the
+node signature only; checking the gist, freshness and replay (keeping the newest
+`issuedAt` per node) belong to the verifier, such as the discovery index. It is
+not part of any public discovery record, so record parsers are unchanged.

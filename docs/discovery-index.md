@@ -9,25 +9,28 @@ index: a Cloudflare Worker built with Hono and served at
 `verifyPublicV2`); the app keeps no copy of the record rules.
 
 This page is the contributor reference: endpoints, publish modes, security
-model, caching, uptime and storage. Deploying the Worker, applying remote
-migrations, changing its secrets and issuing invite codes are maintainer
-procedures kept outside the repository, and each needs founder approval.
+model, caching, uptime, seller GitHub claims and storage. Deploying the Worker,
+applying remote migrations, changing its secrets and issuing invite codes are
+maintainer procedures kept outside the repository, and each needs founder
+approval.
 
 ## Endpoints
 
 Routes sit at the root of the index host. The client base URL is
 `https://discovery.gyblos.com/v1` (`DISCOVERY_INDEX_URL` in `@gyblos/config`).
 
-| Route                              | Purpose                                                                                      |
-| ---------------------------------- | -------------------------------------------------------------------------------------------- |
-| `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                |
-| `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                   |
-| `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                 |
-| `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).           |
-| `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                    |
-| `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).       |
-| `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes). |
-| `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.    |
+| Route                              | Purpose                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                   |
+| `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                      |
+| `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                    |
+| `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).              |
+| `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                       |
+| `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).          |
+| `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes).    |
+| `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.       |
+| `POST /v1/identity/github`         | Submit a node-signed GitHub claim; the index checks its gist ([GitHub claims](#github-claims)). |
+| `GET /v1/identity/github/<NodeId>` | One seller's GitHub claim and the state of its last check.                                      |
 
 Common behavior:
 
@@ -39,11 +42,12 @@ Common behavior:
 - **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
-  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network` and `/v1/health`
-  carry `Access-Control-Allow-Origin: *` on every status, errors included. A
-  `200` from `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions` or
-  `/v1/network` carries `Cache-Control: public, max-age=10`; everything else
-  carries `Cache-Control: no-store`.
+  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/health` and
+  `/v1/identity/github/<NodeId>` carry `Access-Control-Allow-Origin: *` on every
+  status, errors included. A `200` from `/v1/sellers`, `/v1/models`,
+  `/v1/uptime`, `/v1/versions`, `/v1/network` or `/v1/identity/github/<NodeId>`
+  carries `Cache-Control: public, max-age=10`; everything else carries
+  `Cache-Control: no-store`.
 
 ## Publish modes
 
@@ -218,14 +222,16 @@ Rate limits:
 
 ## Caching
 
-- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`
-  and `/v1/network` keep `200` answers in the Workers Cache API
-  (`caches.default`, per Cloudflare location) for 10 seconds, matching their
-  `max-age`. Keys are normalized:
+- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`,
+  `/v1/network` and `/v1/identity/github/<NodeId>` keep `200` answers in the
+  Workers Cache API (`caches.default`, per Cloudflare location) for 10 seconds,
+  matching their `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
   - models and network: the route alone;
-  - uptime: `?node=<NodeId>`, however the query was spelled.
+  - uptime: `?node=<NodeId>`, however the query was spelled;
+  - GitHub claims: the route and the NodeId. A claim's new state can therefore
+    take up to 10 seconds to show at a location that cached the old one.
 
   Invalid queries are rejected before the cache. Errors and publishes are never
   cached. Cached answers get the same CORS, `noindex` and `nosniff` headers as
@@ -312,21 +318,27 @@ is `400 INVALID_QUERY`):
       "state": "online",
       "firstSeenAt": 1762473600000,
       "lastSeenAt": 1763078400000,
-      "models": ["qwen3-0.6b"]
+      "models": ["qwen3-0.6b"],
+      "github": {
+        "account": "octo-cat",
+        "gist": "0123456789abcdef0123456789abcdef"
+      }
     },
     {
       "nodeId": "…",
       "state": "offline",
       "firstSeenAt": 1762473600000,
       "lastSeenAt": 1762990000000,
-      "models": []
+      "models": [],
+      "github": null
     },
     {
       "nodeId": "…",
       "state": "unpublished",
       "firstSeenAt": null,
       "lastSeenAt": null,
-      "models": []
+      "models": [],
+      "github": null
     }
   ],
   "truncated": false,
@@ -351,20 +363,179 @@ is `400 INVALID_QUERY`):
   presence now.
 - **Fields.** `firstSeenAt` and `lastSeenAt` are the [uptime](#uptime) sightings
   (`lastSeenAt` is `null` when none falls within the last 30 days). `models`
-  lists the catalog's model ids while `online`, and is empty otherwise. No
-  owner, contact, country or IP is returned.
+  lists the catalog's model ids while `online`, and is empty otherwise. `github`
+  is `{ account, gist }` when the seller's [GitHub claim](#github-claims) is
+  `verified`, so a client can link the proof gist, and `null` otherwise; a
+  `pending` or `lost` claim is read only through
+  `GET /v1/identity/github/<NodeId>`. If the claims read fails (for example
+  before migration `0007` is applied), every `github` is `null`, `truncated` is
+  `true` and the route still answers. No owner, contact, country or IP is
+  returned.
 - **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
   NodeId. `counts` cover every listed seller. The `nodes` list stops before the
   answer would exceed 1 MiB.
 - **Bounds.** Each source (active and revoked registrations, sightings, stored
-  catalogs) is read up to `maxNodes` rows by NodeId, and online models up to
-  20,000 rows. `truncated` is `true` when the list stopped at the size limit or
-  a source filled its cap, so sellers, counts or models may be incomplete.
+  catalogs, verified GitHub claims) is read up to `maxNodes` rows by NodeId, and
+  online models up to 20,000 rows. `truncated` is `true` when the list stopped
+  at the size limit or a source filled its cap, so sellers, counts or models may
+  be incomplete.
 - **Cost.** One cache miss reads each source once. A NodeId's last sighting is
   its newest hourly uptime row, one primary-key lookup per tracked NodeId.
 - In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
   publishing from new NodeIds, as with uptime; the caps bound them, but the
   public counts are not Sybil resistant.
+
+## GitHub claims
+
+A seller can show which GitHub account runs it. The binding has two halves, and
+anyone can re-check both:
+
+1. a claim signed by the node key: "my GitHub account is `account`, and gist
+   `gist` proves it" (the [identity claim](identity.md#github-account-claim) in
+   `@gyblos/protocol/identity-claim`);
+2. a gist owned by that account with a file named `gyblos-proof.txt` that
+   contains, on a line of its own, `gyblos-node=<NodeId>`.
+
+An unlisted (secret) gist is accepted by design: GitHub serves its raw file the
+same way, and the index publishes the gist id, so the proof is public either
+way.
+
+The claim is a separate message. It is never part of a public record, so record
+parsers and older nodes are unaffected.
+
+**Trust only `verified`.** A client must treat an account as proven only when
+`state === 'verified'`. `pending` and `lost` accounts are unproven claims by the
+node. A verified claim proves that the GitHub account and the node key agreed at
+the last check; it says nothing about the code the seller runs, the quality of
+its answers or who controls the account later.
+
+**Ownership check.** The index reads
+`https://gist.githubusercontent.com/<account>/<gist>/raw/gyblos-proof.txt` (only
+that file, so a gist with several files works). GitHub answers that URL only
+when `<account>` owns the gist; for any other account name it answers `404`. The
+account name is matched case-insensitively, and claims carry it lowercase. The
+index therefore needs no GitHub API call or token. It follows no redirect, waits
+at most 3 seconds and reads at most the first 16 KiB; a line cut at that bound
+never counts.
+
+### Submitting a claim
+
+`POST /v1/identity/github` takes `{"claim":{…},"signature":"<128 hex>"}` (JSON,
+at most 1024 bytes). The index checks, in this order:
+
+1. Per-IP and publish rate limits (`429 RATE_LIMITED`), then content type, size
+   (`413 PAYLOAD_TOO_LARGE`) and the strict claim shape (`400 INVALID_CLAIM`).
+2. The node signature over the claim (`400 INVALID_SIGNATURE`).
+3. `issuedAt`: at most 5 seconds ahead of the index's clock
+   (`400 INVALID_CLAIM`) and at most 60 seconds old (`409 STALE_CLAIM`).
+4. `issuedAt` must be newer than the stored claim's or cancel's
+   (`409 STALE_CLAIM`), so a signed claim cannot be replayed.
+5. A new binding needs a seller the index knows: an active registration or a
+   stored catalog. Any other is `403 UNKNOWN_NODE`. A cancel does not, so a
+   NodeId the index no longer knows can still withdraw its claim.
+
+A cancel (`account` and `gist` both `null`) replaces the claim with a tombstone
+that keeps only the NodeId and `issuedAt`, and answers
+`200 {"ok":true,"state":null,"reason":null}`. A cancel from a NodeId with
+nothing stored that the index does not know writes nothing. Any other claim is
+stored and its gist checked at once:
+`200 {"ok":true,"state":"verified","reason":null}`. The answer's `reason` is the
+stored one after the check (see [States](#states)). Re-posting the same account
+and gist keeps the stored state; a new account or gist starts over as `pending`.
+
+POSTs fetch a NodeId's gist at most once a minute. The slot is reserved
+atomically in storage (`last_fetch_at`, kept across claims and cancels), because
+the index's rate-limit bindings count per IP, not per NodeId, and the publish
+quota belongs to records. A claim posted inside that minute is stored without a
+check and answers
+`200 {"ok":true,"state":"<stored>","reason":"CHECK_DEFERRED","retryAfter":<seconds>}`.
+`retryAfter` is when a new POST may fetch again; the stored claim is also due
+for the next scheduled run, at most 10 minutes later.
+
+Without the claims store or fetcher (no D1 binding) both claim routes answer
+`503 DISCOVERY_UNAVAILABLE`.
+
+### States
+
+| Check outcome                                                        | Outcome code         | New state                                                     |
+| -------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------- |
+| Proof line found                                                     | none                 | `verified`; `verifiedAt` is set when a verified streak begins |
+| Any status but `200`, `403`, `429`, `451` or `5xx`, redirects too    | `GIST_NOT_FOUND`     | `lost` if this binding was ever verified, else `pending`      |
+| `200` without the proof line                                         | `NODE_ID_MISSING`    | `lost` if this binding was ever verified, else `pending`      |
+| `403`, `429`, `451`, `5xx`, a timeout or a network error (an outage) | `GITHUB_UNAVAILABLE` | Unchanged; `checkedAt` moves                                  |
+
+A redirect, such as the one a renamed account leaves, counts as not found, so
+the claim turns `lost`. `403` and `429` are GitHub limiting the index, and `451`
+is a legal block that may apply only where the request ran, so all three are
+outages rather than evidence.
+
+The stored `reason`, which the GET and POST answers carry, follows the state: it
+is `null` while `verified` (an outage never shows a reason on a verified claim);
+`GIST_NOT_FOUND` or `NODE_ID_MISSING` after a conclusive miss; and
+`GITHUB_UNAVAILABLE` only when an outage hits a `pending` claim. A `lost` claim
+keeps its miss reason through an outage. A check records only onto the claim it
+started for. A conclusive result is written only while no other conclusive
+result landed since the row it was computed from (an internal `verdict_at`
+version that inconclusive checks never change), so a result from an older
+snapshot never replaces a newer one and an earlier timeout never blocks it; an
+inconclusive result only moves `checkedAt` forward (and sets the pending
+reason), never the state or `verifiedAt`.
+
+### Reading a claim
+
+`GET /v1/identity/github/<NodeId>` (lowercase NodeId, no query string; anything
+else is `400 INVALID_QUERY`) answers:
+
+```json
+{
+  "nodeId": "…",
+  "account": "octo-cat",
+  "gist": "0123456789abcdef0123456789abcdef",
+  "state": "verified",
+  "reason": null,
+  "checkedAt": 1763078400000,
+  "verifiedAt": 1763078400000
+}
+```
+
+A NodeId without a claim, or whose claim was cancelled, is `404 NOT_FOUND`.
+`/v1/network` carries the account and gist of every verified claim
+([Network](#network)).
+
+### Recheck
+
+The Worker's cron trigger (`*/10 * * * *` in `wrangler.jsonc`) runs one bounded
+batch: at most 25 claims whose next check is due, earliest first, one gist at a
+time. A check schedules the next one 6 hours later. A claim still `pending` and
+never verified 7 days after its `issuedAt` is no longer scheduled; it stays
+readable, and a new POST (a newer `issuedAt`) checks it again. A storage
+failure, such as a missing table, ends the run and logs the single static line
+`DISCOVERY_GITHUB_RECHECK_FAILED` (no request, IP or claim data); every write is
+conditional, so nothing stored is lost. A malformed row is unscheduled and
+skipped, so it never blocks the batch.
+
+### Operator view
+
+`pnpm index:github-claims [--state pending|verified|lost] [--remote]`
+(`apps/discovery-index/scripts/github-claims.ts`) lists claims, without
+tombstones: NodeId, account, gist, state, reason, `issuedAt` and `checkedAt`,
+newest first within each state, at most 1000 rows. It is read-only and runs
+`wrangler d1 execute --json` (through npm's npx script under the same Node.js,
+so it works the same on Windows, macOS and Linux; on macOS and Linux without npm
+beside Node.js it uses `npx` on `PATH`, still without a shell; a failed launch
+or run reports a static error, never the command line or its SQL, while
+Wrangler's own messages still reach the terminal and may quote the statement)
+against the local database, or the remote one with `--remote` (a maintainer
+action).
+
+### What is stored
+
+Table `discovery_github_claims` (migration `0007_github_claims.sql`), one row
+per NodeId: `node_id`, `account`, `gist`, `issued_at`, `state` (`pending`,
+`verified` or `lost`), `reason`, `checked_at`, `verdict_at`, `verified_at`,
+`last_fetch_at` and `next_check_at` (indexed). A tombstone keeps `node_id`,
+`issued_at` and `last_fetch_at`, with every other column `NULL`. The signature
+is checked and not kept. No IP or request data is stored or logged.
 
 ## Storage
 
@@ -374,11 +545,12 @@ is `400 INVALID_QUERY`):
 - `src/schema.ts` declares every table, column, key, secondary index and check
   constraint, including registrations and uptime. Schema changes start there;
   tests check its metadata against the migrations.
-- `storage-queries.ts`, `storage-writes.ts`, `registration-queries.ts` and
-  `uptime-d1.ts` build every query through Drizzle. `d1-client.ts` runs only
-  ORM-generated statements and native transactional batches. The admin script
-  uses the same schema and mutation builders, rendered through Drizzle's SQLite
-  dialect because the Wrangler CLI takes SQL rather than bind parameters.
+- `storage-queries.ts`, `storage-writes.ts`, `registration-queries.ts`,
+  `uptime-d1.ts` and `github-claim-store-d1.ts` build every query through
+  Drizzle. `d1-client.ts` runs only ORM-generated statements and native
+  transactional batches. The admin script uses the same schema and mutation
+  builders, rendered through Drizzle's SQLite dialect because the Wrangler CLI
+  takes SQL rather than bind parameters.
 - A publish is one D1 batch (one transaction) that admits the high-water mark
   and NodeId quota together before writing the record. A failed batch rolls both
   back.
@@ -399,6 +571,7 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 | `INDEXED BY`             | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it. |
 | `(VALUES (1))`           | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.       |
 | Two-argument `min`/`max` | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.    |
+| `coalesce`               | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL` in the same write.                              |
 | `CASE`                   | No conditional builder; quota resets and uptime admission use it atomically.                                                    |
 | `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
 | Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
@@ -414,6 +587,7 @@ Migrations, applied in order:
 | `0004_uptime.sql`             | Uptime tables.                                                                          |
 | `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it).            |
 | `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index. |
+| `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.     |
 
 Apply a migration before deploying code that needs it. Each migration adds
 tables, columns (with defaults) or indexes; `0002` also drops one unused index.

@@ -1,15 +1,8 @@
 // Owns founder-only invite/revoke/restore commands. Drizzle compiles mutations for Wrangler;
 // the index exposes no admin route. Codes are printed once and only their hashes reach D1.
 // --dry-run prints compiled SQL without executing a remote command.
-import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-
-import type { SQLWrapper } from 'drizzle-orm';
-import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
-import { drizzle } from 'drizzle-orm/sqlite-proxy';
 
 import { isMain } from '@gyblos/runtime';
 
@@ -18,15 +11,12 @@ import {
   REGISTRATION_STATUS,
   type RegistrationStatus,
 } from '../src/constants';
-import type { DiscoveryDatabase } from '../src/d1-client';
 import {
   createInviteQuery,
   setRegistrationStatusQuery,
 } from '../src/registration-queries';
-import * as schema from '../src/schema';
+import { compileSql, wranglerD1 } from './wrangler-d1';
 
-const WRANGLER = 'wrangler@4.151.1';
-const DATABASE = 'gyblos-discovery';
 // RFC 4648 base32 in lowercase: five bits per character out of eight-bit bytes.
 const BASE32 = {
   alphabet: 'abcdefghijklmnopqrstuvwxyz234567',
@@ -91,7 +81,7 @@ function invite(args: readonly string[], output: AdminIo) {
   const now = output.now();
   const expiresAt = now + Number(days) * REGISTRATION.dayMs;
   output.execute(
-    compileMutation((database) =>
+    compileSql((database) =>
       createInviteQuery(database, {
         inviteHash: hash,
         contact,
@@ -121,7 +111,7 @@ function setStatus(
     return 1;
   }
   output.execute(
-    compileMutation((database) =>
+    compileSql((database) =>
       setRegistrationStatusQuery(database, nodeId, status),
     ),
   );
@@ -131,20 +121,6 @@ function setStatus(
       : `Restored ${nodeId}: it may publish again (no effect if it was never registered).\n`,
   );
   return 0;
-}
-
-// Wrangler accepts a SQL command rather than bind parameters. Drizzle's dialect safely renders
-// its bound values; this compilation-only client fails if a query is accidentally executed here.
-function compileMutation(build: (database: DiscoveryDatabase) => SQLWrapper) {
-  const database = drizzle(
-    async () => {
-      throw new TypeError('Admin queries must be compiled before execution.');
-    },
-    { schema },
-  );
-  return new SQLiteSyncDialect().sqlToQuery(
-    build(database).getSQL().inlineParams(),
-  ).sql;
 }
 
 export function runAdmin(argv: readonly string[], output: AdminIo) {
@@ -161,14 +137,7 @@ export function runAdmin(argv: readonly string[], output: AdminIo) {
 }
 
 function wranglerExecute(sql: string) {
-  execFileSync(
-    'npx',
-    [WRANGLER, 'd1', 'execute', DATABASE, '--remote', '--command', sql],
-    {
-      cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
-      stdio: ['ignore', 'ignore', 'inherit'],
-    },
-  );
+  wranglerD1(sql, { target: '--remote', json: false });
 }
 
 if (isMain(import.meta.url)) {

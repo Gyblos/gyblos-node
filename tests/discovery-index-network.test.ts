@@ -38,6 +38,7 @@ interface NetworkNode {
   firstSeenAt: number | null;
   lastSeenAt: number | null;
   models: string[];
+  github: { account: string; gist: string } | null;
 }
 
 async function setup(
@@ -150,6 +151,7 @@ for (const kind of STORE_KINDS) {
       firstSeenAt: clock.now,
       lastSeenAt: clock.now,
       models: [OTHER_MODEL, MODEL].sort(),
+      github: null,
     });
     // A seller the index admitted without a registration (allowlist or open) is listed once seen.
     assert.equal(byNode.get(listed.nodeId)?.state, 'online');
@@ -159,6 +161,7 @@ for (const kind of STORE_KINDS) {
       firstSeenAt: firstSeen,
       lastSeenAt: awaySeen,
       models: [],
+      github: null,
     });
     assert.deepEqual(byNode.get(silent.nodeId), {
       nodeId: silent.nodeId,
@@ -166,6 +169,7 @@ for (const kind of STORE_KINDS) {
       firstSeenAt: null,
       lastSeenAt: null,
       models: [],
+      github: null,
     });
     // Withdrawn ("unpublish"): not offline, the seller chose to leave.
     assert.equal(byNode.get(withdrawn.nodeId)?.state, 'unpublished');
@@ -219,6 +223,7 @@ for (const kind of STORE_KINDS) {
         firstSeenAt: firstSeen,
         lastSeenAt: null,
         models: [],
+        github: null,
       },
     ]);
   });
@@ -276,6 +281,7 @@ void test('network: a source that fills its cap marks the answer truncated', asy
       await networkPage(
         { ...empty, ...storage },
         registrations,
+        undefined,
         10,
         DISCOVERY_INDEX_LIMITS.maxResponseBytes,
       ),

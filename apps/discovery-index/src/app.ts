@@ -4,10 +4,9 @@ import { Hono, type Context, type Next } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 
 import { SELLER_VERSION } from '@gyblos/protocol/constants';
-import { ipKey } from '@gyblos/runtime/ip-key';
 
 import { isJsonContentType } from './body';
-import { cachedPage, sellersCacheKey, storePage } from './cache';
+import { sellersCacheKey } from './cache';
 import {
   DISCOVERY_INDEX_LIMITS,
   DISCOVERY_LIMITERS,
@@ -18,78 +17,53 @@ import {
   INDEX_ROUTES,
   INDEX_STATUS,
   LOOPBACK_HOSTS,
+  PUBLIC_READ_PREFIXES,
   PUBLIC_READ_ROUTES,
-  READ_LIMIT_KEY,
   REDEEM_RESULTS,
   REGISTRATION,
   REGISTRATION_STATUS,
-  type DiscoveryLimiterName,
-  type IndexErrorCode,
   type RedeemResult,
 } from './constants';
-import { IndexError, statusOf } from './errors';
-import { allowed, type ResolvedLimiters } from './limits';
+import { IndexError } from './errors';
+import { githubClaimRoutes } from './github-claim-routes';
+import { allowed } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
 import { networkPage, parseNetworkQuery } from './network';
 import { acceptRecord, type PublishContext } from './publish';
 import { publishModeOf } from './publishers';
 import type { RegistrationStore } from './registration-store';
 import { registerSeller, type RegistryReader } from './registrations';
+import {
+  cachedRead,
+  clientAllowed,
+  clientKey,
+  readAllowed,
+  rejection,
+  type IndexContext,
+  type IndexEnv,
+} from './routing';
 import { parseSellersQuery, sellersPage } from './sellers';
 import {
   settingsOf,
   type DiscoveryIndexOptions,
   type IndexSettings,
 } from './settings';
-import type { DiscoveryStorage } from './storage';
 import { parseUptimeQuery, uptimePage } from './uptime';
 import { versionsPage } from './versions';
 
 export type { ResponseCache } from './cache';
 export type { DiscoveryIndexOptions } from './settings';
 
-interface IndexVariables {
-  storage: DiscoveryStorage;
-  limiters: ResolvedLimiters;
-  // Read before bodyLimit, which replaces the raw request and with it Cloudflare's `cf` data.
-  country: unknown;
-}
-interface IndexEnv {
-  Variables: IndexVariables;
-}
-type IndexContext = Context<IndexEnv>;
-
-function rejection(context: Context, code: IndexErrorCode) {
-  if (code === INDEX_ERRORS.RATE_LIMITED)
-    context.header(
-      INDEX_HEADERS.RETRY_AFTER,
-      INDEX_HEADER_VALUES.RETRY_AFTER_SECONDS,
-    );
-  return context.json({ error: code }, statusOf(code));
-}
-
-function clientKey(context: Context) {
-  return ipKey(context.req.header(INDEX_HEADERS.CLIENT_IP));
-}
-
-function clientAllowed(context: IndexContext, name: DiscoveryLimiterName) {
-  return allowed(context.get('limiters')[name], clientKey(context));
-}
-
-// One budget for storage reads per Cloudflare location, shared by every client.
-function readAllowed(context: IndexContext) {
-  return allowed(
-    context.get('limiters')[DISCOVERY_LIMITERS.READ],
-    READ_LIMIT_KEY,
-  );
-}
-
 function finishHeaders(context: Context) {
   const headers = context.res.headers;
   if (!headers.has(INDEX_HEADERS.CACHE_CONTROL))
     headers.set(INDEX_HEADERS.CACHE_CONTROL, INDEX_HEADER_VALUES.NO_STORE);
   const read = context.req.method === 'GET' || context.req.method === 'HEAD';
-  if (read && PUBLIC_READ_ROUTES.has(context.req.path))
+  const path = context.req.path;
+  const publicRead =
+    PUBLIC_READ_ROUTES.has(path) ||
+    PUBLIC_READ_PREFIXES.some((prefix) => path.startsWith(prefix));
+  if (read && publicRead)
     headers.set(INDEX_HEADERS.CORS_ORIGIN, INDEX_HEADER_VALUES.ANY_ORIGIN);
   headers.set(INDEX_HEADERS.ROBOTS, INDEX_HEADER_VALUES.NOINDEX);
   headers.set(INDEX_HEADERS.CONTENT_TYPE_OPTIONS, INDEX_HEADER_VALUES.NOSNIFF);
@@ -202,51 +176,6 @@ function requestCountry(context: IndexContext): unknown {
   return cf && typeof cf === 'object' ? Reflect.get(cf, 'country') : undefined;
 }
 
-// A public read with no paging: parsed first, then served from the cache or, within the read budget,
-// from storage. A null body is 404.
-interface Read {
-  body: () => Promise<string | null>;
-  // The cache key; by default the request URL.
-  key?: string;
-}
-function cachedRead(
-  settings: IndexSettings,
-  read: (context: IndexContext) => Promise<Read>,
-) {
-  return async (context: IndexContext) => {
-    let parsed: Read;
-    try {
-      parsed = await read(context);
-    } catch (error) {
-      if (error instanceof IndexError) return rejection(context, error.code);
-      throw error;
-    }
-    const { body, key = context.req.url } = parsed;
-    const cached = await cachedPage(settings.cache, key);
-    if (cached) return cached;
-    if (!(await readAllowed(context)))
-      return rejection(context, INDEX_ERRORS.RATE_LIMITED);
-    const text = await body();
-    if (text === null) return rejection(context, INDEX_ERRORS.NOT_FOUND);
-    const response = context.body(text, INDEX_STATUS.OK, {
-      [INDEX_HEADERS.CONTENT_TYPE]: INDEX_HEADER_VALUES.JSON,
-      [INDEX_HEADERS.CACHE_CONTROL]: INDEX_HEADER_VALUES.SELLERS_CACHE,
-    });
-    await inBackground(context, storePage(settings.cache, key, response));
-    return response;
-  };
-}
-
-// Hands work to the Workers execution context when there is one, else awaits it.
-function inBackground(context: IndexContext, task: Promise<void>) {
-  try {
-    context.executionCtx.waitUntil(task);
-    return Promise.resolve();
-  } catch {
-    return task;
-  }
-}
-
 // The public reads with a body: sellers pages, the model list, seller uptime and the network.
 function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
   app.get(
@@ -316,6 +245,7 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
           networkPage(
             context.get('storage'),
             settings.registrations,
+            settings.claims,
             settings.now(),
             settings.maxResponseBytes,
           ),
@@ -368,6 +298,7 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
       registrationHandler(settings, registrations, registry),
     );
   readRoutes(app, settings);
+  githubClaimRoutes(app, settings);
   // Reports the publish mode only, never the allowlisted or registered NodeIds.
   app.get(INDEX_ROUTES.HEALTH, async (context) => {
     const records = await settings.records.read(

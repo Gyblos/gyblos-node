@@ -77,6 +77,8 @@
     "./vectors/receipt-upload-v2.json": "./vectors/receipt-upload-v2.json",
     "./vectors/receipt-v2.json": "./vectors/receipt-v2.json",
     "./observation-upload": "./src/observation-upload.ts",
-    "./vectors/observation-upload-v1.json": "./vectors/observation-upload-v1.json"
+    "./vectors/observation-upload-v1.json": "./vectors/observation-upload-v1.json",
+    "./identity-claim": "./src/identity-claim.ts",
+    "./vectors/identity-claim-v1.json": "./vectors/identity-claim-v1.json"
   }
 }

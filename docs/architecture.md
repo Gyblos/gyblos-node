@@ -220,6 +220,9 @@ precedence and scoped binding decisions without SDKs or I/O. The node's
 composes registry reads with it. Opt-in buyer admission uses these APIs;
 explicit manual trust remains available. See
 [identity.md](identity.md#read-only-resolution-and-trust-policy).
+`@gyblos/protocol/identity-claim` owns the node-signed GitHub account claim; the
+discovery index checks its gist and publishes the result, and no trust policy
+reads it ([identity.md](identity.md#github-account-claim)).
 
 ## Local data
 

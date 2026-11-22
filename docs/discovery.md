@@ -442,4 +442,6 @@ its publish mode; clients must not rely on it.
 
 The reference index also serves `GET /uptime?node=<NodeId>`, a public uptime
 report built from the presences it accepted. It is not part of the contract a
-client relies on; see [discovery-index.md](discovery-index.md#uptime).
+client relies on; see [discovery-index.md](discovery-index.md#uptime). It also
+accepts and serves seller GitHub claims under `/identity/github`, outside the
+client contract; see [discovery-index.md](discovery-index.md#github-claims).
