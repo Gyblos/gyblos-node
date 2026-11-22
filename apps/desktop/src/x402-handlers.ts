@@ -235,6 +235,13 @@ async function checkPayment(
     }
   }
 }
+async function buyerStatus(client: X402Client, budget: X402Budget) {
+  return {
+    ...(client.canCheckChannels() && { canCheckChannels: true as const }),
+    summary: await budget.summary(),
+    policy: client.policy(),
+  };
+}
 export function createX402Handlers(
   client: X402Client,
   budget: X402Budget,
@@ -249,11 +256,7 @@ export function createX402Handlers(
     id: string,
   ) => BuyerSellerChoice | undefined | Promise<BuyerSellerChoice | undefined>,
 ) {
-  const summary = async () => ({
-    ...(client.canCheckChannels() && { canCheckChannels: true as const }),
-    summary: await budget.summary(),
-    policy: client.policy(),
-  });
+  const summary = () => buyerStatus(client, budget);
   return async (
     event: Sender,
     args: readonly unknown[],
