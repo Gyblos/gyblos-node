@@ -214,7 +214,7 @@ void test('untracked files are compared as new files', () => {
 void test('a block comment cut by a patch hunk ends with the hunk', () => {
   const text =
     '@@ -1 +1,2 @@\n /**\n+ * added\ndiff --git a/y.js b/y.js\n@@ -1 +1 @@\n+const c = 3; // next\n';
-  assert.deepEqual(commentTexts(text, 'x.patch'), ['/** + * added', '// next']);
+  assert.deepEqual(commentTexts(text, 'x.patch'), ['/** * added', '// next']);
 });
 
 void test('YAML anchors, ANSI-C quotes and patch regex quotes', () => {
@@ -245,5 +245,55 @@ void test('multi-line YAML strings and patch templates keep trailing comments', 
       'a.patch',
     ),
     ['// actual'],
+  );
+});
+
+void test('second Devin pass on the scanner', () => {
+  assert.deepEqual(
+    commentTexts(
+      'description: "First line\n  # literal\n  second" # actual',
+      'a.yml',
+    ),
+    ['# actual'],
+  );
+  assert.deepEqual(
+    commentTexts("a { content: 'Don\\'t!'; } /* actual */", 'a.css'),
+    ['/* actual */'],
+  );
+  assert.deepEqual(
+    commentTexts("a { content: 'Don\\'t /* literal */'; }", 'a.css'),
+    [],
+  );
+  assert.deepEqual(
+    commentTexts('<div data-t="<!-- x -->"></div><!-- actual -->', 'a.html'),
+    ['<!-- actual -->'],
+  );
+  assert.deepEqual(
+    commentTexts("printf '%s' https://e.test/?x=1\\&#part\n# actual", 'a.sh'),
+    ['# actual'],
+  );
+  assert.deepEqual(
+    commentTexts('url: https://e.test/?x=1&#part\n# actual', 'a.yml'),
+    ['# actual'],
+  );
+  assert.deepEqual(
+    commentTexts(
+      "@@ -1,3 +1,3 @@\n const q = /^'/;\n+const e = true; // actual\n",
+      'a.patch',
+    ),
+    ['// actual'],
+  );
+  assert.deepEqual(
+    commentTexts('cat <<EOF\\\n  | sed -n p\n# payload\nEOF\n# actual', 'a.sh'),
+    ['# actual'],
+  );
+  const patch = (removed: string) =>
+    '@@ -1,3 +1,3 @@\n /**\n- * ' + removed + '\n+ * Current wording\n  */\n';
+  assert.deepEqual(
+    addedComments(
+      commentTexts(patch('Old wording'), 'x.patch'),
+      commentTexts(patch('Revised upstream wording'), 'x.patch'),
+    ),
+    [],
   );
 });

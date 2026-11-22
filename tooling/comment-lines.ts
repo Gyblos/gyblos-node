@@ -1,5 +1,10 @@
 export type CommentRange = { start: number; end: number };
 
+export function lineEnd(text: string, index: number): number {
+  const end = text.indexOf('\n', index);
+  return end < 0 ? text.length : end;
+}
+
 export function lineStarts(text: string): number[] {
   const starts = [0];
   for (let index = 0; index < text.length; index += 1)

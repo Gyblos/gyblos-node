@@ -2,7 +2,8 @@ import { extname } from 'node:path';
 
 import { parseForESLint } from '@typescript-eslint/parser';
 
-import { lineIndex, lineStarts, type CommentRange } from './comment-lines';
+import { lineEnd, type CommentRange } from './comment-lines';
+import { patchCommentRanges, patchTargetText } from './comment-patch';
 
 const SOURCE_EXTENSIONS = new Set([
   '.cjs',
@@ -47,7 +48,7 @@ type CommentOptions = {
   shell?: boolean;
   yaml?: boolean;
   lineQuotes?: boolean;
-  noQuotes?: boolean;
+  html?: boolean;
   singleQuoteEscapes?: boolean;
   lineMarkers: string[];
 };
@@ -58,6 +59,7 @@ type Scanner = {
   quote: string;
   quoteLength: number;
   quoteEscapes: boolean;
+  inTag: boolean;
   heredocs: { tag: string; dash: boolean }[];
   ranges: CommentRange[];
 };
@@ -83,7 +85,7 @@ const PATCH_OPTIONS: CommentOptions = {
   blockMarkers: [{ start: '/*', end: '*/' }],
   lineMarkers: ['//'],
 };
-const HEREDOC = /^<<(-?)[ \t]*(?:\\?(['"])([^'"\n]+)\2|\\?([^\s;|&<>()'"]+))/;
+const HEREDOC = /^<<(-?)[ \t]*(?:\\?(['"])([^'"\n]+)\2|\\?([^\s;|&<>()'"\\]+))/;
 
 function sourceExtension(path: string): string {
   const basename = path.split(/[\\/]/).at(-1) ?? '';
@@ -115,11 +117,6 @@ function typescriptCommentRanges(text: string, path: string): CommentRange[] {
       (comment) => text.slice(comment.range[0], comment.range[0] + 2) !== '#!',
     )
     .map((comment) => ({ start: comment.range[0], end: comment.range[1] }));
-}
-
-function lineEnd(text: string, index: number): number {
-  const end = text.indexOf('\n', index);
-  return end < 0 ? text.length : end;
 }
 
 function advanceInQuote(scanner: Scanner): void {
@@ -168,7 +165,12 @@ function skipPowershellHereString(scanner: Scanner): boolean {
 function opensQuote(scanner: Scanner): boolean {
   const { text, options, index } = scanner;
   const character = text[index] ?? '';
-  if (options.noQuotes) return false;
+  if (options.html) {
+    if (character === '<' && /[a-z/]/i.test(text[index + 1] ?? ''))
+      scanner.inTag = true;
+    else if (character === '>') scanner.inTag = false;
+    if (!scanner.inTag) return false;
+  }
   const opens =
     (character === "'" &&
       (options.python || !/[a-z0-9]/i.test(text[index - 1] ?? ''))) ||
@@ -259,10 +261,11 @@ function takeComment(scanner: Scanner): boolean {
     text[index] === options.hashMarker &&
     (options.adjacentHash ||
       index === 0 ||
-      ((options.shell && !options.yaml) || options.powershell
+      (((options.shell && !options.yaml) || options.powershell
         ? SHELL_COMMENT_PREFIX
         : /\s/
-      ).test(text[index - 1] ?? ''));
+      ).test(text[index - 1] ?? '') &&
+        (/\s/.test(text[index - 1] ?? '') || text[index - 2] !== '\\')));
   if (!hash && !options.lineMarkers.some((m) => text.startsWith(m, index)))
     return false;
   const end = lineEnd(text, index);
@@ -282,6 +285,7 @@ function delimitedCommentRanges(
     quote: '',
     quoteLength: 1,
     quoteEscapes: false,
+    inTag: false,
     heredocs: [],
     ranges: [],
   };
@@ -298,57 +302,17 @@ function delimitedCommentRanges(
   return scanner.ranges;
 }
 
-function patchTargetText(text: string): { text: string; added: boolean[] } {
-  let inHunk = false;
-  const added: boolean[] = [];
-  const lines = text.split('\n').map((line) => {
-    if (line.startsWith('@@')) inHunk = true;
-    else if (line.startsWith('diff --git')) inHunk = false;
-    const target = inHunk && (line.startsWith('+') || line.startsWith(' '));
-    added.push(inHunk && line.startsWith('+'));
-    return target ? ' ' + line.slice(1) : ' '.repeat(line.length);
-  });
-  return { text: lines.join('\n'), added };
-}
-
-function patchCommentRanges(text: string): CommentRange[] {
-  const target = patchTargetText(text);
-  const starts = lineStarts(text);
-  const ranges: CommentRange[] = [];
-  let hunkStart = -1;
-  for (let line = 0; line <= starts.length; line += 1) {
-    const start = starts[line] ?? text.length;
-    const boundary =
-      line === starts.length ||
-      text.startsWith('@@', start) ||
-      text.startsWith('diff --git', start);
-    if (!boundary) continue;
-    if (hunkStart >= 0)
-      for (const range of delimitedCommentRanges(
-        target.text.slice(hunkStart, start),
-        PATCH_OPTIONS,
-      ))
-        ranges.push({
-          start: range.start + hunkStart,
-          end: range.end + hunkStart,
-        });
-    hunkStart = text.startsWith('@@', start) ? lineEnd(text, start) : -1;
-  }
-  return ranges.filter((range) => {
-    const last = lineIndex(starts, Math.max(range.start, range.end - 1));
-    for (let line = lineIndex(starts, range.start); line <= last; line += 1)
-      if (target.added[line]) return true;
-    return false;
-  });
-}
-
 export function commentRanges(text: string, path: string): CommentRange[] {
   const extension = sourceExtension(path);
   if (TYPESCRIPT_EXTENSIONS.has(extension))
     return typescriptCommentRanges(text, path);
-  if (extension === '.patch') return patchCommentRanges(text);
+  if (extension === '.patch')
+    return patchCommentRanges(text, (hunk) =>
+      delimitedCommentRanges(hunk, PATCH_OPTIONS),
+    );
   if (extension === '.css')
     return delimitedCommentRanges(text, {
+      singleQuoteEscapes: true,
       blockMarkers: [{ start: '/*', end: '*/' }],
       lineMarkers: [],
     });
@@ -359,7 +323,7 @@ export function commentRanges(text: string, path: string): CommentRange[] {
     });
   if (extension === '.html' || extension === '.svg')
     return delimitedCommentRanges(text, {
-      noQuotes: true,
+      html: true,
       blockMarkers: [{ start: '<!--', end: '-->' }],
       lineMarkers: [],
     });
@@ -388,7 +352,9 @@ export function commentRanges(text: string, path: string): CommentRange[] {
 }
 
 export function commentTexts(text: string, path: string): string[] {
+  const source =
+    sourceExtension(path) === '.patch' ? patchTargetText(text).text : text;
   return commentRanges(text, path).map((range) =>
-    text.slice(range.start, range.end).replace(/\s+/g, ' ').trim(),
+    source.slice(range.start, range.end).replace(/\s+/g, ' ').trim(),
   );
 }
