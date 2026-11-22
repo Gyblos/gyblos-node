@@ -274,6 +274,22 @@ void test('an empty wallet can select B against the refund from a single channel
   assert.deepEqual(await read(), { replacementAtomic: '19960' });
 });
 
+void test('a pooled buyer keeps its full deposit for B before migrating its legacy channel with A', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t);
+  assert.equal(
+    await switchingCredit(
+      environment,
+      {
+        ...policy,
+        pooledChannels: true,
+        depositAtomic: rig.terms.depositAtomic,
+      },
+      { ...seller, nodeId: '56'.repeat(32) },
+    ),
+    null,
+  );
+});
+
 void test('a subminimum replacement is exposed as a reduced ceiling, never as available escrow', async (t) => {
   const { rig, environment, policy, seller } = await fundedChannel(t);
   assert.deepEqual(

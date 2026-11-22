@@ -25,6 +25,7 @@ export interface BuyerDesktopOptions {
     | 'maxAtomic'
     | 'depositAtomic'
     | 'lifetimeMs'
+    | 'pooledChannels'
     | 'paidAuto'
     | 'autoPrices'
     | 'autoRoutes'
@@ -48,6 +49,9 @@ export function configuredBuyerAccess(
             ...(session && {
               depositAtomic: session.depositAtomic,
               lifetimeMs: session.lifetimeMs,
+              ...(session.totalDepositAtomic !== undefined && {
+                pooledChannels: true,
+              }),
             }),
             ...(config?.discovery?.open &&
               config.identity &&

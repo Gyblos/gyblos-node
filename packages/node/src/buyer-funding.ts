@@ -103,6 +103,7 @@ export async function switchingCredit(
   policy: BuyerApiPolicy,
   seller: BuyerSellerChoice,
 ) {
+  if (policy.pooledChannels) return null;
   const pool = batchPoolPathsIn(environment);
   if ((await inspectBatchPool(pool, { includeLegacy: false })).length)
     return null;
