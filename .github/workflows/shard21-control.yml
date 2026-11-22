@@ -1,4 +1,4 @@
-name: Shard21 profile-b
+name: Shard21 control
 on:
   push:
     branches: [codex/bench-history-shards-21]
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: shard21-profile-b-${{ github.ref }}
+  group: shard21-control-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -123,7 +123,7 @@ jobs:
           node-version: 24.22.1
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: python "$RUNNER_TEMP/runner.py" profile-b test ${{ matrix.shard }}
+      - run: python "$RUNNER_TEMP/runner.py" control test ${{ matrix.shard }}
 
   # `pnpm test:lab` split by file; the pattern matches its script in package.json.
   lab:
@@ -154,7 +154,7 @@ jobs:
           node-version: 24.22.1
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: python "$RUNNER_TEMP/runner.py" profile-b lab ${{ matrix.shard }}
+      - run: python "$RUNNER_TEMP/runner.py" control lab ${{ matrix.shard }}
 
   build:
     needs: changes
