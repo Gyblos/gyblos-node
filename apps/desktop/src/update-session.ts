@@ -1,4 +1,3 @@
-// Coordinates update reads and renderer polling without owning downloads or installation.
 import { DESKTOP_UPDATE } from './constants';
 import type { DesktopUpdate } from './update-check';
 

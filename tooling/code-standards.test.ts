@@ -69,6 +69,11 @@ void test('standards lint rejects layout, opaque names and nonlocal relative imp
     await rules('export function run() {}\ninterface Later {}'),
     [],
   );
+  assert.ok(
+    (await rules('// explanation\nexport const value = 1;')).includes(
+      'gyblos/no-new-comments',
+    ),
+  );
   assert.deepEqual(await rules('const hidden = 1;'), []);
   assert.ok(
     (await rules('const value = { limit: 1 } as { limit: number };')).includes(
