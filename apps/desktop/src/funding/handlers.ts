@@ -18,6 +18,13 @@ interface FundingPorts {
   rpcUrl(policy: BuyerApiPolicy): Promise<string | null>;
   balance(payer: string, url: string): Promise<string | null>;
   resolveOffer(id: string): BuyerSellerChoice | undefined;
+  switching?(
+    policy: BuyerApiPolicy,
+    seller: BuyerSellerChoice,
+  ): Promise<Pick<
+    BuyerFunding,
+    'switchingAtomic' | 'replacementAtomic'
+  > | null>;
   remaining(
     policy: BuyerApiPolicy,
     seller: BuyerSellerChoice,
@@ -38,26 +45,26 @@ function coalesceBalance(read: FundingPorts['balance']) {
     return result;
   };
 }
+async function fundingSource(ports: FundingPorts, event: Sender) {
+  if (!ports.accepts(event)) return null;
+  const policy = ports.policy();
+  if (!policy || policy.network !== DEVNET || policy.mint !== DEVNET_USDC)
+    return null;
+  const url = await ports.rpcUrl(policy);
+  const current = () => {
+    const latest = ports.policy();
+    return (
+      ports.accepts(event) &&
+      latest?.policyId === policy.policyId &&
+      latest.payer === policy.payer &&
+      latest.network === policy.network &&
+      latest.mint === policy.mint
+    );
+  };
+  return url && current() ? { policy, url, current } : null;
+}
 export function fundingHandlers(ports: FundingPorts) {
   const sharedBalance = coalesceBalance(ports.balance);
-  async function source(event: Sender) {
-    if (!ports.accepts(event)) return null;
-    const policy = ports.policy();
-    if (!policy || policy.network !== DEVNET || policy.mint !== DEVNET_USDC)
-      return null;
-    const url = await ports.rpcUrl(policy);
-    const current = () => {
-      const latest = ports.policy();
-      return (
-        ports.accepts(event) &&
-        latest?.policyId === policy.policyId &&
-        latest.payer === policy.payer &&
-        latest.network === policy.network &&
-        latest.mint === policy.mint
-      );
-    };
-    return url && current() ? { policy, url, current } : null;
-  }
   async function action(
     event: Sender,
     args: readonly unknown[],
@@ -65,7 +72,7 @@ export function fundingHandlers(ports: FundingPorts) {
   ) {
     if (args.length !== 1 || typeof args[0] !== 'string') return false;
     try {
-      const target = await source(event);
+      const target = await fundingSource(ports, event);
       if (!target || target.policy.payer !== args[0]) return false;
       if (kind === FUNDING.copy) ports.copy(target.policy.payer);
       else {
@@ -88,7 +95,7 @@ export function fundingHandlers(ports: FundingPorts) {
     ): Promise<BuyerFunding | null> {
       if (args.length > 1) return null;
       try {
-        const target = await source(event);
+        const target = await fundingSource(ports, event);
         if (!target) return null;
         const seller = args.length
           ? ports.resolveOffer(controlHex(args[0]))
@@ -99,6 +106,10 @@ export function fundingHandlers(ports: FundingPorts) {
             ? ports.remaining(target.policy, seller).catch(() => null)
             : null,
         ]);
+        const switching =
+          seller && channelRemainingAtomic === null
+            ? await ports.switching?.(target.policy, seller).catch(() => null)
+            : null;
         return target.current()
           ? {
               payer: target.policy.payer,
@@ -106,6 +117,7 @@ export function fundingHandlers(ports: FundingPorts) {
               balanceAtomic,
               faucetAvailable: balanceAtomic !== null,
               channelRemainingAtomic,
+              ...switching,
             }
           : null;
       } catch {

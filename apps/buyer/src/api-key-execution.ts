@@ -1,5 +1,8 @@
 // Attributes only verified buyer outcomes to a delegated key; failed/unknown paid work keeps its reservation.
-import { UnsentChannelPeerError } from '@gyblos/node/batch-buyer';
+import {
+  DeclinedChannelRequest,
+  UnsentChannelPeerError,
+} from '@gyblos/node/batch-buyer';
 import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
@@ -61,6 +64,12 @@ export async function executeApiKeySession<T>(
   try {
     return await execute();
   } catch (error) {
+    if (
+      error instanceof DeclinedChannelRequest &&
+      error.nodeId === nodeId &&
+      operation?.reserved()
+    )
+      await operation.complete('0', BUYER_KEY_CHARGE.SETTLED);
     // Only locally proven unsent requests release their matching reservation.
     if (
       (error instanceof UnsentSellerBusyError ||

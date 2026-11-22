@@ -32,6 +32,7 @@ import {
 } from './free-selection';
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
+import { restoredSellerAddress } from './seller-address';
 import {
   createSessionPreflight,
   prepareChosenMeter,
@@ -129,16 +130,35 @@ function sessionDestination(
       policy.totalDepositAtomic === undefined
     )
       return sessionFail(SESSION_CODES.BINDING);
-    return sellerAddress(
-      seller ??
-        selected ?? {
-          owner: terms.owner,
-          nodeId: terms.sellerNodeId,
-          relayUrl: null,
-          directAddresses: [],
-        },
-      relayOnly,
-    );
+    const known = seller ?? selected;
+    return known
+      ? sellerAddress(known, relayOnly)
+      : restoredSellerAddress(terms.sellerNodeId, terms.owner, relayOnly);
+  };
+}
+function desktopPermissions(
+  state: SessionState,
+): Pick<
+  BuyerSessionOptions<ReturnType<typeof sellerAddress>>,
+  'financialPermission' | 'switchingAllowed' | 'onDeclined' | 'beforeInference'
+> {
+  return {
+    financialPermission(run) {
+      const id = state.openingIntent?.getStore();
+      return id ? desktopOpening(process.env).whileArmed(id, run) : run();
+    },
+    switchingAllowed: async () => {
+      const intent = state.openingIntent?.getStore();
+      return !!intent && desktopOpening(process.env).armed(intent);
+    },
+    onDeclined: async () => {
+      const intent = state.openingIntent?.getStore();
+      if (intent) await desktopOpening(process.env).declined(intent);
+    },
+    beforeInference: async (_id, ref) => {
+      const intent = state.openingIntent?.getStore();
+      if (intent) await desktopOpening(process.env).consume(intent, ref);
+    },
   };
 }
 export function makeManager(
@@ -152,10 +172,7 @@ export function makeManager(
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
     policy,
-    beforeInference: async () => {
-      const intent = state.openingIntent?.getStore();
-      if (intent) await desktopOpening(process.env).consume(intent);
-    },
+    ...desktopPermissions(state),
     openingSupportsBlocks:
       (policy.totalDepositAtomic !== undefined
         ? options.pool

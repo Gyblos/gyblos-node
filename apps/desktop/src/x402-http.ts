@@ -1,9 +1,18 @@
 // Bounded host-side responses from the owner-authenticated loopback buyer.
 import { HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
-import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  type BuyerApiPolicy,
+  type BuyerSellerChoice,
+} from '@gyblos/protocol/buyer-api';
 
 import { desktopBuyerFailure } from './buyer-error';
-import { DESKTOP_X402, PaidSellerLimitError } from './x402-model';
+import type { X402Budget } from './x402-budget';
+import {
+  DESKTOP_X402,
+  PaidSellerLimitError,
+  paidSellerLimitNotice,
+} from './x402-model';
 
 export async function readJson(response: Response, allowError = false) {
   if ((!response.ok && !allowError) || !response.body)
@@ -95,4 +104,17 @@ export function buyerEndpoint(input: unknown) {
       'Use the local buyer URL at http://127.0.0.1:port/v1/chat/completions',
     );
   return url;
+}
+
+export function validateChoice(
+  choice: BuyerSellerChoice | undefined,
+  policy: BuyerApiPolicy,
+  current: Awaited<ReturnType<X402Budget['summary']>>,
+) {
+  if (choice) {
+    if (choice.expiresAt <= Date.now())
+      throw new Error('Seller listing expired');
+    const notice = paidSellerLimitNotice(policy, current, choice.modelId);
+    if (notice) throw new PaidSellerLimitError(notice);
+  }
 }

@@ -86,6 +86,7 @@ export interface SessionSeller {
   dispose(): Promise<void>;
 }
 export interface SessionBuyer {
+  releaseDeclined?(channelId: string, request: SessionRequest): Promise<void>;
   openingRecovery?: {
     claim(): Promise<boolean>;
     pending(): boolean;

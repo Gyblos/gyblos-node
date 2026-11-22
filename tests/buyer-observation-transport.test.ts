@@ -212,3 +212,25 @@ void test('transaction token balances reject oversized numeric strings before re
       .send(),
   );
 });
+
+void test('buyer RPC retries a throttled observation with the same request', async () => {
+  const bodies: string[] = [];
+  const rpc = createBuyerObservationRpc(
+    'https://synthetic.invalid',
+    async (_url, init) => {
+      bodies.push(String(init.body));
+      if (bodies.length === 1)
+        return new Response(null, {
+          status: 429,
+          headers: { 'retry-after': '0' },
+        });
+      return Response.json({
+        jsonrpc: '2.0',
+        id: JSON.parse(bodies[0]!).id,
+        result: 'synthetic-genesis',
+      });
+    },
+  );
+  assert.equal(await rpc.getGenesisHash().send(), 'synthetic-genesis');
+  assert.deepEqual(bodies, [bodies[0], bodies[0]]);
+});

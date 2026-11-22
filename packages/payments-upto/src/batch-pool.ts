@@ -184,12 +184,21 @@ async function resolve(
     (record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] === record.channelId
       ? row.requestId
       : undefined);
+  const declined =
+    row.requestId !== null &&
+    record.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST] ===
+      row.requestId &&
+    !Object.hasOwn(record.requests, row.requestId);
   const unsent =
     checking === row.requestId &&
     typeof checking === 'string' &&
     !Object.hasOwn(record.requests, checking) &&
     Object.keys(record.pending).every(
-      (key) => key === BATCH_BUYER_CHECKPOINTS.OPENING_SENT,
+      (key) =>
+        key === BATCH_BUYER_CHECKPOINTS.OPENING_SENT ||
+        (unsentRequestId !== undefined &&
+          key === BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST &&
+          record.pending[key] !== unsentRequestId),
     ) &&
     (pristine ||
       (record.state === SESSION_STATES.OPEN &&
@@ -197,6 +206,7 @@ async function resolve(
   if (
     !closed &&
     !notCreated &&
+    !declined &&
     !unsent &&
     (row.uncertain || row.requestId !== null) &&
     !accepted &&
@@ -274,7 +284,12 @@ export async function openBatchBuyerPool(
         const record = await poolChild(options.paths, row);
         if (batchOpeningAbsent(record))
           return sessionFail(SESSION_CODES.CLOSED);
-        if (row.requestId !== null || Object.hasOwn(record.requests, requestId))
+        if (
+          row.requestId !== null ||
+          record.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST] ===
+            requestId ||
+          Object.hasOwn(record.requests, requestId)
+        )
           return sessionFail(SESSION_CODES.UNVERIFIED);
         await store.update((next) => {
           const row = next.entries.find(

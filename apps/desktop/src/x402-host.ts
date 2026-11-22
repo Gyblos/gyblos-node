@@ -12,6 +12,7 @@ import {
 } from 'electron';
 
 import { desktopX402Paths } from '@gyblos/config/home';
+import { reviewDesktopCharge } from '@gyblos/node/buyer-funding';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   acquireProcessLock,
@@ -118,7 +119,8 @@ export function registerDesktopX402(
     window,
     environment,
     () => client.policy(),
-    resolveOffer,
+    () => client.managed(),
+    resolveOffer.resolve,
   );
   const owner = frameOwner(window);
   const handle = createX402Handlers(
@@ -126,14 +128,17 @@ export function registerDesktopX402(
     budget,
     owner,
     (url) => shell.openExternal(url),
-    managed,
+    {
+      ...managed,
+      review: (ref, policy) => reviewDesktopCharge(environment, ref, policy),
+    },
     (value) => clipboard.writeText(value),
     (progress) =>
       window.webContents.mainFrame.send(
         DESKTOP_X402.PROGRESS_CHANNEL,
         progress,
       ),
-    resolveOffer,
+    resolveOffer.current,
   );
   const apiKeys = createUsdcApiHandlers(
     client,

@@ -15,7 +15,12 @@ import type {
 import type { BuyerReceiptEvidence } from './receipt-buyer';
 
 export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
-  beforeInference?(requestId: string): Promise<void>;
+  financialPermission?<T>(run: () => Promise<T>): Promise<T>;
+  onDeclined?(): Promise<void>;
+  beforeInference?(
+    requestId: string,
+    ref: import('./desktop-opening').DesktopRequestBinding,
+  ): Promise<void>;
   preparation?: import('./buyer-channel-prepare').PreparedChannel;
   receipt?: (
     evidence: BuyerReceiptEvidence,

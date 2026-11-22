@@ -3,6 +3,7 @@ import { HTTP_STATUS } from '@gyblos/config';
 import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import {
+  DeclinedChannelRequest,
   UnsentChannelPeerError,
   UnsentOpeningError,
 } from '@gyblos/node/batch-buyer';
@@ -64,6 +65,8 @@ export function classifyPaidError(error: unknown): ChatErrorView | undefined {
     error instanceof UnsentChannelPeerError
   )
     return unavailable(error.code, true);
+  if (error instanceof DeclinedChannelRequest)
+    return unavailable(error.code, false);
   const keyError = buyerApiKeyErrorView(error);
   if (keyError) return keyError;
   if (

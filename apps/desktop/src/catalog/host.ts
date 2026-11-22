@@ -59,6 +59,15 @@ export function registerNetworkCatalog(
   ipcMain.handle(NETWORK_CATALOG.LOOKUP_CHANNEL, (event, ...args: unknown[]) =>
     handlers.lookup(event, args),
   );
-  return (offerId: string) =>
+  const resolve = (offerId: string) =>
     catalog.resolve(offerId) ?? search.resolve(offerId);
+  return {
+    resolve,
+    async current(offerId: string) {
+      const found = resolve(offerId);
+      if (found) return found;
+      await catalog.browse();
+      return resolve(offerId);
+    },
+  };
 }

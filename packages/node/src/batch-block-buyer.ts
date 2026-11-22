@@ -28,6 +28,7 @@ import {
   publishBuyerSessionReceipt,
   sessionReceiptPayment,
 } from './batch-receipts';
+import { verifyDecline } from './buyer-declined-request';
 import { bounded } from './buyer-operation';
 
 function blockCallbacks<Remote extends BatchDestination>(
@@ -119,16 +120,20 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
     baseAtomic,
     check,
   );
-  const result = await context.rpc(
-    BATCH_METHODS.EXECUTE,
-    request,
-    signal,
-    async (text) => {
-      if (text) first ??= Math.floor(performance.now() - started);
-      await onDelta?.(text);
-    },
-    callbacks,
-  );
+  const result = await context
+    .rpc(
+      BATCH_METHODS.EXECUTE,
+      request,
+      signal,
+      async (text) => {
+        if (text) first ??= Math.floor(performance.now() - started);
+        await onDelta?.(text);
+      },
+      callbacks,
+    )
+    .catch((error: unknown) =>
+      verifyDecline(context, pending, request.channelId, signal, error),
+    );
   check();
   if (
     !('bill' in result) ||

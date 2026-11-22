@@ -35,6 +35,7 @@ import {
   sessionReceiptPayment,
 } from './batch-receipts';
 import { executeBatchBuyer } from './batch-session';
+import { verifyDecline } from './buyer-declined-request';
 import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 
@@ -137,17 +138,8 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   signal.throwIfAborted();
   const channelId = options.buyer.snapshot().channelId;
   const request = buildBatchExecutionRequest(channelId, quote, input);
-  const open = async (payload: string) => {
-    const snapshot = await recoverBuyerOpening(
-      options.buyer,
-      () => openBuyerChannel(context, request, signal, payload),
-      verify,
-      signal,
-    );
-    await options.beforeInference?.(quote.offer.requestId);
-    signal.throwIfAborted();
-    return snapshot;
-  };
+  const open = (payload: string) =>
+    openVerified(context, request, verify, signal, payload);
   if (context.blockMode) {
     await verify(signal);
     await open(await options.buyer.open());
@@ -200,6 +192,8 @@ async function runBuyerSession<Remote extends BatchDestination>(
             if (text) first ??= Math.floor(performance.now() - started);
             await onDelta?.(text);
           },
+        ).catch((error: unknown) =>
+          verifyDecline(context, pending, request.channelId, signal, error),
         );
         if (!('bill' in result)) return batchFail();
         billed = result.bill;
@@ -223,4 +217,35 @@ async function runBuyerSession<Remote extends BatchDestination>(
       Math.floor(performance.now() - started),
     );
   return generated;
+}
+
+async function openVerified<Remote extends BatchDestination>(
+  context: BuyerBatchContext<Remote>,
+  request: Parameters<typeof openBuyerChannel>[1],
+  verify: (signal: AbortSignal) => Promise<void>,
+  signal: AbortSignal,
+  payload: string,
+) {
+  const { options, terms } = context;
+  const channelId = request.channelId;
+
+  const snapshot = await recoverBuyerOpening(
+    options.buyer,
+    () => {
+      const send = () => openBuyerChannel(context, request, signal, payload);
+      return options.financialPermission
+        ? options.financialPermission(send)
+        : send();
+    },
+    verify,
+    signal,
+  );
+  await options.beforeInference?.(request.requestId, {
+    requestId: request.requestId,
+    channelId,
+    sellerNodeId: terms.sellerNodeId,
+    baseAtomic: options.buyer.snapshot().cumulativeAtomic,
+  });
+  signal.throwIfAborted();
+  return snapshot;
 }

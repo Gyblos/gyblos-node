@@ -25,6 +25,22 @@ export function sameBatchParties(
   );
 }
 
+export function compatibleBuyerGeneration(
+  previous: PaymentSessionTerms,
+  next: PaymentSessionTerms,
+) {
+  return sameBatchParties(
+    {
+      ...previous,
+      owner: next.owner,
+      sellerNodeId: next.sellerNodeId,
+      authorizer: next.authorizer,
+      payTo: next.payTo,
+      feePayer: next.feePayer,
+    },
+    next,
+  );
+}
 export function parseBatchHistory(
   value: unknown,
   terms: PaymentSessionTerms,
@@ -56,7 +72,11 @@ export function parseBatchHistory(
       channels.has(entry.channelId) ||
       entry.terms.expiresAt <= expiresAt ||
       entry.terms.expiresAt >= terms.expiresAt ||
-      !sameBatchParties(entry.terms, terms)
+      !(
+        sameBatchParties(entry.terms, terms) ||
+        ((entry.settlement || batchOpeningAbsent(entry)) &&
+          compatibleBuyerGeneration(entry.terms, terms))
+      )
     )
       return sessionFail(SESSION_CODES.BINDING);
     expiresAt = entry.terms.expiresAt;

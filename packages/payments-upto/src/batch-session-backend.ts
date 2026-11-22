@@ -33,7 +33,7 @@ import { waitBatch } from './batch-session-wait';
 import { createBuyerObservationRpc } from './buyer-observation-transport';
 import { BATCH_OPENING_LIMITS } from './constants';
 import { assertFeeWire, limitedFeePayer } from './fee-payer';
-import { rateLimitedFacilitatorRpc, rateLimitedFetch } from './rpc-rate-limit';
+import { rateLimitedFacilitatorRpc } from './rpc-rate-limit';
 import { verifyPaymentNetwork } from './seller-network';
 
 interface Options {
@@ -64,6 +64,7 @@ export function openBatchBuyerBackend(
       expectedChannelId: string,
       terms: PaymentSessionTerms,
       totalBudgetAtomic: string,
+      switchSeller = false,
     ) {
       if (options.payer.address !== terms.buyer)
         return sessionFail(SESSION_CODES.BINDING);
@@ -78,6 +79,7 @@ export function openBatchBuyerBackend(
         expectedChannelId,
         terms,
         totalBudgetAtomic,
+        switchSeller,
         now: options.now ?? Date.now,
         observe: oldObserver.settlement,
       });
@@ -207,12 +209,7 @@ export function openBatchSellerBackend(
       )
         return sessionFail(SESSION_CODES.BINDING);
       const existing = await compatible(options, terms);
-      const rpc =
-        options.rpc ??
-        createBuyerObservationRpc(
-          options.rpcUrl,
-          rateLimitedFetch(globalThis.fetch),
-        );
+      const rpc = options.rpc ?? createBuyerObservationRpc(options.rpcUrl);
       await verifyPaymentNetwork(rpc, terms.network);
       const facilitator = batchFacilitatorFor(signer, terms);
       // A new session, or an empty preparation taking its slot back, proves its opening first.

@@ -123,3 +123,22 @@ function positiveTotal(value: unknown) {
   if (total === '0') return sessionFail();
   return total;
 }
+
+export function replacementTerms(
+  policy: BuyerSessionPolicy,
+  now: () => number,
+  quote: SignedOfferV2,
+  priorSpentAtomic?: string,
+) {
+  const authority =
+    BigInt(policy.depositAtomic) - BigInt(priorSpentAtomic ?? '0');
+  return (spent: string) =>
+    newSessionTerms(
+      quote,
+      {
+        ...policy,
+        depositAtomic: String(authority - BigInt(spent)),
+      },
+      now(),
+    );
+}
