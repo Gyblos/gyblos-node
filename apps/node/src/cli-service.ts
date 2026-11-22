@@ -42,8 +42,8 @@ import {
 import { readEnvironmentFile } from './service-environment';
 import {
   launchAgentLoaded,
+  waitForAgentUnload,
   waitForTaskStop,
-  waitUntilStopped,
   windowsTaskRunning,
 } from './service-restart';
 import { servicePipe, stopWindowsService } from './service-run';
@@ -358,12 +358,11 @@ async function restart(
     const [stop, ...start] = location.restart;
     await system.run(stop!);
     try {
-      await waitUntilStopped(() =>
-        system.launchAgentLoaded(`gui/${uid}/${SERVICE.label}`),
-      );
+      await waitForAgentUnload(system, `gui/${uid}/${SERVICE.label}`);
       await runAll(start, system, output);
     } catch {
-      output.stderr(`launchctl bootstrap gui/${uid} ${location.path}\n`);
+      // Service paths never contain quotes (UNSAFE_PATH), so single quotes keep a home with spaces whole.
+      output.stderr(`launchctl bootstrap gui/${uid} '${location.path}'\n`);
       throw new ServiceError(SERVICE_ERRORS.RESTART_INCOMPLETE);
     }
   } else await runAll(location.restart, system, output);

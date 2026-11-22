@@ -4,7 +4,6 @@
 import assert from 'node:assert/strict';
 import {
   chmod,
-  mkdir,
   readFile,
   rename,
   rm,
@@ -17,7 +16,6 @@ import test from 'node:test';
 
 import { DIAGNOSTICS } from '@gyblos/config';
 import { runCli } from '@gyblos/node-app/cli';
-import { type ServiceSystem } from '@gyblos/node-app/cli-service';
 import {
   SERVICE_ERRORS,
   SERVICE_KINDS,
@@ -27,23 +25,19 @@ import {
   DEFAULT_MEMORY_MAX,
   memoryBytes,
   ServiceError,
-  serviceLocation,
   servicePlan,
   type ServiceInput,
 } from '@gyblos/node-app/service';
 import { parseEnvironmentFile } from '@gyblos/node-app/service-environment';
-import { waitForTaskStop } from '@gyblos/node-app/service-restart';
-import { taskScriptHome } from '@gyblos/node-app/service-windows';
 
+import { freeToml, scenario, withOllama } from './support/doctor-fixture';
 import {
-  freeToml,
-  scenario,
-  withOllama,
-  type Fixture,
-} from './support/doctor-fixture';
-import { FAKE_SECRET } from './support/node-config-fixtures';
+  fakeSystem,
+  readySeller,
+  RELAY_SECRET,
+  service,
+} from './support/service-cli';
 
-const RELAY_SECRET = `${FAKE_SECRET}-relay-token-value`;
 const INPUT: ServiceInput = {
   kind: SERVICE_KINDS.SYSTEMD_USER,
   nodePath: '/opt/node24/bin/node',
@@ -180,61 +174,6 @@ void test('the environment file accepts only lines systemd and sh read alike, an
     refused(`${name}=x`, SERVICE_ERRORS.ENVIRONMENT_RESERVED);
 });
 
-function fakeSystem(run: Fixture, platform: NodeJS.Platform = 'linux') {
-  const commands: string[][] = [];
-  const system: ServiceSystem = {
-    platform,
-    uid: process.getuid?.() ?? 1000,
-    accountHome: join(run.root, 'account'),
-    nodePath: '/opt/node24/bin/node',
-    repository: join(run.root, 'repo'),
-    run: async (argv) => {
-      commands.push([...argv]);
-      return 0;
-    },
-    windowsUser: async () => 'S-1-5-21-1-2-3-1001',
-    stopWindowsService: async () => {
-      commands.push(['stop-windows-service']);
-      return true;
-    },
-    windowsTaskRunning: async () => false,
-    launchAgentLoaded: async () => false,
-  };
-  return { system, commands };
-}
-
-async function service(
-  run: Fixture,
-  args: string[],
-  system: ServiceSystem,
-  env: Record<string, string> = {},
-) {
-  let output = '';
-  const code = await runCli(['seller', 'service', ...args], {
-    env: { GYBLOS_HOME: run.home, ...env },
-    cwd: run.root,
-    stdout: (text) => {
-      output += text;
-    },
-    stderr: (text) => {
-      output += text;
-    },
-    doctor: { tokenizer: async () => undefined },
-    service: system,
-  });
-  assert.equal(output.includes(RELAY_SECRET), false, output);
-  return { code, output };
-}
-
-async function readySeller(run: Fixture) {
-  await withOllama(run);
-  await writeFile(join(run.root, 'config.toml'), freeToml(run));
-  const environment = join(run.home, 'seller.env');
-  await writeFile(environment, `GYBLOS_RELAY_TOKEN=${RELAY_SECRET}\n`);
-  await chmod(environment, 0o600);
-  return environment;
-}
-
 void test('install refuses when the service environment would fail doctor, writing and running nothing', () =>
   scenario({ free: true }, async (run) => {
     await withOllama(run);
@@ -363,125 +302,4 @@ void test('service flags are refused outside `seller service`', async () => {
   });
   assert.equal(code, 1);
   assert.match(output, /Usage:/);
-});
-
-void test('restart keeps the installed unit and its limits; without a service it says so', () =>
-  scenario({ free: true }, async (run) => {
-    await readySeller(run);
-    const { system, commands } = fakeSystem(run);
-    const missing = await service(run, ['restart'], system);
-    assert.equal(missing.code, 1);
-    assert.match(missing.output, /Not installed/);
-    assert.equal(
-      (await service(run, ['install', '--memory', '3G'], system)).code,
-      0,
-    );
-    const path = join(
-      run.root,
-      'account/.config/systemd/user/gyblos-seller.service',
-    );
-    const before = await readFile(path, 'utf8');
-    commands.length = 0;
-    const restarted = await service(run, ['restart'], system);
-    assert.equal(restarted.code, 0, restarted.output);
-    assert.deepEqual(commands, [
-      ['systemctl', '--user', 'restart', 'gyblos-seller.service'],
-    ]);
-    assert.equal(await readFile(path, 'utf8'), before);
-  }));
-
-void test('each platform restarts its service in place: launchd bootout then bootstrap, Windows graceful stop then run', () => {
-  const plist = '/Users/synthetic/Library/LaunchAgents/com.gyblos.seller.plist';
-  assert.deepEqual(
-    serviceLocation(SERVICE_KINDS.LAUNCHD, '/Users/synthetic', 501).restart,
-    [
-      ['launchctl', 'bootout', 'gui/501', plist],
-      ['launchctl', 'bootstrap', 'gui/501', plist],
-    ],
-  );
-  const task = serviceLocation(
-    SERVICE_KINDS.SCHEDULED_TASK,
-    'C:\\Users\\synthetic',
-    0,
-  ).restart;
-  assert.equal(task.length, 1);
-  assert.deepEqual(task[0]!.slice(0, 3), ['schtasks.exe', '/Run', '/TN']);
-});
-
-void test('Windows waits for the stopped task to end before running it again, within a bound', async () => {
-  const states = [true, true, false];
-  const asked: string[] = [];
-  const system = {
-    windowsTaskRunning: async (task: string) => {
-      asked.push(task);
-      return states.shift() ?? false;
-    },
-  };
-  await waitForTaskStop(system, 'Gyblos\\Seller-abc', {
-    waitMs: 1000,
-    pollMs: 1,
-  });
-  assert.equal(asked.length, 3);
-  await assert.rejects(
-    waitForTaskStop(
-      { windowsTaskRunning: async () => true },
-      'Gyblos\\Seller-abc',
-      { waitMs: 5, pollMs: 1 },
-    ),
-    (error) =>
-      error instanceof ServiceError &&
-      error.code === SERVICE_ERRORS.COMMAND_FAILED,
-  );
-});
-
-void test('macOS restart stops the agent gracefully with bootout, waits until it is gone, then bootstraps it', () =>
-  scenario({ free: true }, async (run) => {
-    await readySeller(run);
-    const { system, commands } = fakeSystem(run, 'darwin');
-    const plist = join(
-      run.root,
-      'account/Library/LaunchAgents/com.gyblos.seller.plist',
-    );
-    await mkdir(join(run.root, 'account/Library/LaunchAgents'), {
-      recursive: true,
-    });
-    await writeFile(plist, '<plist/>');
-    system.run = async (argv) => {
-      commands.push([...argv]);
-      return argv[1] === 'bootout' ? 1 : 0;
-    };
-    const loaded = [true, true, false];
-    system.launchAgentLoaded = async (target) => {
-      commands.push(['loaded?', target]);
-      return loaded.shift() ?? false;
-    };
-    const restarted = await service(run, ['restart'], system);
-    assert.equal(restarted.code, 0, restarted.output);
-    const target = `gui/${system.uid}/com.gyblos.seller`;
-    assert.deepEqual(commands, [
-      ['launchctl', 'bootout', `gui/${system.uid}`, plist],
-      ['loaded?', target],
-      ['loaded?', target],
-      ['loaded?', target],
-      ['launchctl', 'bootstrap', `gui/${system.uid}`, plist],
-    ]);
-    assert.equal(
-      commands.some((command) => command.includes('kickstart')),
-      false,
-    );
-  }));
-
-void test('Windows reads the seller home the installed task runs, not the invoking shell', () => {
-  const script = [
-    '@echo off',
-    'rem Gyblos seller service, started by the scheduled task Gyblos\\Seller-abc.',
-    '"C:\\Program Files\\Gyblos\\gyblos.exe" service-run --home "D:\\Seller" --config "D:\\Seller\\config.toml"',
-    '',
-  ].join('\r\n');
-  assert.equal(taskScriptHome(script), 'D:\\Seller');
-  assert.equal(taskScriptHome('@echo off\r\n'), undefined);
-  assert.equal(
-    taskScriptHome('x --home "relative\\path" --config "C:\\c.toml"'),
-    undefined,
-  );
 });
