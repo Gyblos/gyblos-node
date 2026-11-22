@@ -3907,7 +3907,7 @@ html .app.desktop-frame .preview-chat-pin {
   background: transparent;
 }
 .desktop-frame .preview-chat-row:is(:hover, :focus-within) .preview-chat-pin,
-.desktop-frame .preview-chat-pin[aria-pressed='true'] {
+html .app.desktop-frame .preview-chat-pin[aria-pressed='true'] {
   opacity: 1;
 }
 .desktop-frame .preview-chat-state {
