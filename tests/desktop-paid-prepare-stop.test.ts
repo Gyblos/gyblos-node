@@ -129,6 +129,7 @@ void test('only the owner can prepare paid chat, with the current policy and an 
     {
       port: 0,
       apiKeys: keys,
+      reconcilePool: async () => {},
       token,
       desktopPolicy: { ...scope, maxAtomic: '100' },
       preparePaidChat: async () => {
@@ -145,6 +146,15 @@ void test('only the owner can prepare paid chat, with the current policy and an 
     metadata.headers.get(BUYER_API.PAID_PREPARATION_HEADER),
     BUYER_API.PAID_PREPARATION_PATH,
   );
+  assert.equal(
+    metadata.headers.get(BUYER_API.RECONCILE_POOL_HEADER),
+    BUYER_API.RECONCILE_POOL_PATH,
+  );
+  const delegated = await fetch(new URL(BUYER_API.STATUS_PATH, host.url), {
+    headers: { authorization: 'Bearer ' + key.secret },
+  });
+  assert.equal(delegated.headers.get(BUYER_API.RECONCILE_POOL_HEADER), null);
+  await delegated.body?.cancel();
   const { policyId } = await metadata.json();
   const url = new URL(BUYER_API.PAID_PREPARATION_PATH, host.url);
   const headers = {

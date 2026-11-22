@@ -250,6 +250,7 @@ export function createX402Handlers(
   ) => BuyerSellerChoice | undefined | Promise<BuyerSellerChoice | undefined>,
 ) {
   const summary = async () => ({
+    ...(client.canCheckChannels() && { canCheckChannels: true as const }),
     summary: await budget.summary(),
     policy: client.policy(),
   });

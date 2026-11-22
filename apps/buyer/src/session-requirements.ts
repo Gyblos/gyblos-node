@@ -22,10 +22,14 @@ import {
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 import type { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { FREE_BUYER_STARTUP, PAID_BUYER } from './constants';
+import {
+  FREE_BUYER_STARTUP,
+  PAID_BUYER,
+  PAID_BUYER_HTTP_MS,
+} from './constants';
 import { refuse } from './free-startup';
 import { paidToken } from './paid-token';
 import { UnsentSellerChoiceError } from './seller-choice-error';
@@ -172,4 +176,16 @@ export function createSessionPreflight(
     input: Parameters<typeof recountSessionInput>[1],
     signal: AbortSignal,
   ) => unsentSessionPreflight(check(quote, input), signal);
+}
+
+export async function checkDesktopPool(
+  manager: {
+    reconcile(signal: AbortSignal): Promise<unknown>;
+    unresolved(): Promise<boolean>;
+  },
+  busy: () => boolean,
+) {
+  if (busy()) return sessionFail(SESSION_CODES.BUSY);
+  await manager.reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS));
+  if (await manager.unresolved()) return sessionFail(SESSION_CODES.UNVERIFIED);
 }

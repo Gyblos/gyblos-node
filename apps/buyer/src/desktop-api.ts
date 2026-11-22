@@ -102,6 +102,7 @@ function metadataRequest(
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
   preparePaidChat: boolean,
+  reconcilePool: boolean,
 ) {
   if (!authenticated || request.headers.origin !== undefined) return false;
   const path = request.url?.split('?')[0];
@@ -110,6 +111,9 @@ function metadataRequest(
       .writeHead(HTTP_STATUS.ok, {
         'content-type': 'application/json',
         'cache-control': 'no-store',
+        ...(reconcilePool && {
+          [BUYER_API.RECONCILE_POOL_HEADER]: BUYER_API.RECONCILE_POOL_PATH,
+        }),
         ...(preparePaidChat && {
           [BUYER_API.PAID_PREPARATION_HEADER]: BUYER_API.PAID_PREPARATION_PATH,
         }),
@@ -214,6 +218,7 @@ export function createDesktopApi(
         policy,
         authenticated,
         !!preparePaidChat && owner,
+        !!reconcilePool && owner,
       );
     },
     accepts(request: IncomingMessage, json: boolean) {

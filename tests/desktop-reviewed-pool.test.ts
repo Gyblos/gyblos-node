@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
+import { checkDesktopPool } from '@gyblos/buyer/session-requirements';
 import { batchPoolPathsIn } from '@gyblos/config/home';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
+import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import {
   openBatchBuyerPool,
   poolAllowsSellerDeposit,
@@ -13,6 +15,7 @@ import {
 import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import { sessionRig } from './support/batch-session';
+import { multisellerLoopback } from './support/multiseller-session';
 
 void test('review reconciles a settled interrupted pool row before selecting the next paid seller', async (t) => {
   const rig = await sessionRig({ depositAtomic: '10000' });
@@ -70,7 +73,7 @@ void test('review reconciles a settled interrupted pool row before selecting the
   const client = new X402Client(
     new X402Budget({ read: async () => undefined, write: async () => {} }),
   );
-  await client.connect(host.url, token, true);
+  await client.connect(host.url, token);
   const policy = client.policy();
   assert.ok(policy);
   await assert.rejects(client.reconcileReviewedPool(policy));
@@ -79,5 +82,28 @@ void test('review reconciles a settled interrupted pool row before selecting the
   await rig.seller().close();
   assert.equal(await next(), false);
   await client.reconcileReviewedPool(policy);
+  assert.equal(await next(), true);
+});
+
+void test('checking a clean pool credits an expired seller refund before selecting another seller', async (t) => {
+  const fixture = await multisellerLoopback('15000');
+  const manager = createBuyerSessionPool(fixture.options);
+  t.after(async () => {
+    await manager.close();
+    await fixture.close();
+  });
+  const offer = fixture.offers[0]!;
+  await manager.execute(await offer.quote(1), offer.input, t.signal);
+  const next = () =>
+    poolAllowsSellerDeposit(
+      fixture.paths,
+      fixture.b.terms.sellerNodeId,
+      '15000',
+      '10000',
+    );
+  fixture.a.time(fixture.a.terms.expiresAt);
+  await fixture.a.seller().close();
+  assert.equal(await next(), false);
+  await checkDesktopPool(manager, () => false);
   assert.equal(await next(), true);
 });

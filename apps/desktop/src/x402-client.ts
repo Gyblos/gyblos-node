@@ -44,6 +44,7 @@ export class X402Client {
     token: string;
     managed: boolean;
     preparesPaidChat: boolean;
+    reconcilesPool: boolean;
     policy: BuyerApiPolicy;
   } | null = null;
   private busy = false;
@@ -114,6 +115,9 @@ export class X402Client {
         token,
         managed,
         policy,
+        reconcilesPool:
+          response.headers.get(BUYER_API.RECONCILE_POOL_HEADER) ===
+          BUYER_API.RECONCILE_POOL_PATH,
         preparesPaidChat:
           response.headers.get(BUYER_API.PAID_PREPARATION_HEADER) ===
           BUYER_API.PAID_PREPARATION_PATH,
@@ -123,9 +127,12 @@ export class X402Client {
       this.busy = false;
     }
   }
+  canCheckChannels() {
+    return this.connection?.reconcilesPool === true;
+  }
   async reconcileReviewedPool(expected: BuyerApiPolicy) {
     const connection = this.connection;
-    if (!connection?.managed || !connection.policy.totalDepositAtomic) return;
+    if (!connection?.reconcilesPool) return;
     await reconcileBuyerPool(connection, expected, this.request);
     if (this.connection !== connection) throw new Error('Unconfirmed payment');
   }
