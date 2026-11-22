@@ -18,12 +18,15 @@ import {
   type SellerNameIssue,
 } from '@gyblos/protocol/profile-claim';
 
-import { urlOrigin } from './cli-format';
+import { URL_HIDDEN } from './cli-format';
 import { commandsFor } from './cli-next';
 import {
   clockGapSeconds,
+  HELD_STATUS,
+  HIDE_DELAY,
   indexHint,
   ISSUE_TEXT,
+  QUOTE_HINT,
   SHOW_DELAY,
   TERMINAL_HINT,
   UNVERIFIED,
@@ -104,7 +107,7 @@ async function signed(session: NameSession, name: string | null) {
 }
 
 async function send(session: NameSession, name: string | null) {
-  const where = `seller ${session.nodeId} in ${urlOrigin(session.baseUrl)}`;
+  const where = `seller ${session.nodeId} in ${indexPlace(session.baseUrl)}`;
   let answer: { name: string | null };
   try {
     answer = await submitSellerProfile({
@@ -126,14 +129,14 @@ async function send(session: NameSession, name: string | null) {
   const unverified = commandsFor(runMode(session.output.env), UNVERIFIED);
   session.output.stdout(
     name === null
-      ? `Name cleared: ${where} shows no name. ${SHOW_DELAY}.\n`
+      ? `Name cleared: ${where} shows no name. ${HIDE_DELAY}.\n`
       : `Name set: ${where} shows "${name}". ${SHOW_DELAY}.\n  ${unverified}.\n`,
   );
   return EXIT.ok;
 }
 
 async function status(session: NameSession) {
-  const where = `seller ${session.nodeId} in ${urlOrigin(session.baseUrl)}`;
+  const where = `seller ${session.nodeId} in ${indexPlace(session.baseUrl)}`;
   try {
     const view = await fetchSellerProfile({
       baseUrl: session.baseUrl,
@@ -149,7 +152,22 @@ async function status(session: NameSession) {
     );
     return EXIT.ok;
   } catch (error) {
+    if (
+      error instanceof DiscoveryError &&
+      error.code === DISCOVERY_ERROR_CODES.PROFILE_HELD
+    ) {
+      session.output.stdout(`${HELD_STATUS}: ${where}.\n`);
+      return EXIT.ok;
+    }
     return indexFailure(session, error);
+  }
+}
+
+function indexPlace(baseUrl: string) {
+  try {
+    return `the index at ${new URL(baseUrl).host}`;
+  } catch {
+    return URL_HIDDEN;
   }
 }
 
@@ -198,7 +216,8 @@ export async function nameCommand(
           ? NAME_ERRORS.RESERVED
           : NAME_ERRORS.INVALID,
         ISSUE_TEXT[checked.issue] +
-          (SELLER_NAME.garbled.test(parsed.name) ? TERMINAL_HINT : ''),
+          (SELLER_NAME.garbled.test(parsed.name) ? TERMINAL_HINT : '') +
+          (SELLER_NAME.quoteMarks.test(parsed.name) ? QUOTE_HINT : ''),
       );
     name = checked.name;
   }

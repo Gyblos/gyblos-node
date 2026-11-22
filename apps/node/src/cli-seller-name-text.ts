@@ -2,7 +2,6 @@ import {
   DISCOVERY_ERROR_CODES,
   type DiscoveryErrorCode,
 } from '@gyblos/discovery-http';
-import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import {
   PROFILE_CLAIM,
   SELLER_NAME_ISSUES,
@@ -18,6 +17,11 @@ const RESERVED = PROFILE_CLAIM.reservedWords.map((word) => `"${word}"`);
 export const UNVERIFIED =
   'Names are chosen by each seller: they are not verified and not unique. Only `gyblos seller verify github` verifies who runs a seller';
 export const SHOW_DELAY = `The index may take up to ${SELLER_NAME.showDelaySeconds} seconds to show it`;
+export const HIDE_DELAY = `The index may take up to ${SELLER_NAME.showDelaySeconds} seconds to stop showing it`;
+export const QUOTE_HINT =
+  ". Use a straight apostrophe ' instead of other quote marks";
+export const HELD_STATUS =
+  'An index operator removed the public name of this seller, and a new one cannot be set until the operator allows it';
 export const TERMINAL_HINT =
   '. If you typed letters that show here as ?, your terminal did not send them as UTF-8: on Windows, use Windows Terminal or PowerShell 7';
 
@@ -73,7 +77,13 @@ const INDEX_HINTS: ReadonlyMap<DiscoveryErrorCode, string> = new Map<
   ],
 ]);
 
-const MS_PER_SECOND = 1000;
+function duration(seconds: number) {
+  const { secondsShownUpTo, minutesShownUpTo, secondsPerMinute } = SELLER_NAME;
+  if (seconds <= secondsShownUpTo) return `${seconds} s`;
+  const minutes = Math.round(seconds / secondsPerMinute);
+  if (minutes <= minutesShownUpTo) return `${minutes} min`;
+  return `${Math.round(minutes / secondsPerMinute)} h`;
+}
 
 function clockNote(gapSeconds: number | null) {
   if (
@@ -81,24 +91,25 @@ function clockNote(gapSeconds: number | null) {
     Math.abs(gapSeconds) < SELLER_NAME.clockNoteSeconds
   )
     return '';
-  return ` (this computer's clock is ${Math.abs(gapSeconds)} s ${gapSeconds > 0 ? 'ahead of' : 'behind'} the index)`;
+  return ` (this computer's clock is ${duration(Math.abs(gapSeconds))} ${gapSeconds > 0 ? 'ahead of' : 'behind'} the index)`;
 }
 
 export function indexHint(code: DiscoveryErrorCode, gapSeconds: number | null) {
   const ahead =
-    gapSeconds !== null &&
-    gapSeconds * MS_PER_SECOND > CONTROL_LIMITS.clockSkewMs;
+    gapSeconds !== null && gapSeconds >= SELLER_NAME.aheadNoteSeconds;
   if (code === DISCOVERY_ERROR_CODES.CLAIM_REJECTED && ahead)
-    return `The index refused the signed time on this name: this computer's clock is ${gapSeconds} s ahead of the index. Turn on automatic time, then ${AGAIN}`;
+    return `The index refused the signed time on this name: this computer's clock is ${duration(gapSeconds)} ahead of the index. Turn on automatic time, then ${AGAIN}`;
   const hint = INDEX_HINTS.get(code) ?? RETRY_LATER;
-  return code === DISCOVERY_ERROR_CODES.STALE_CLAIM
-    ? hint.replace('. Turn on', `${clockNote(gapSeconds)}. Turn on`)
-    : hint;
+  if (code !== DISCOVERY_ERROR_CODES.STALE_CLAIM) return hint;
+  const note = clockNote(gapSeconds);
+  return hint
+    .replace('may be behind', note && ahead ? 'may be wrong' : 'may be behind')
+    .replace('. Turn on', `${note}. Turn on`);
 }
 
 export function clockGapSeconds(date: string | null, now: number) {
   const server = date === null ? Number.NaN : Date.parse(date);
   return Number.isFinite(server)
-    ? Math.round((now - server) / MS_PER_SECOND)
+    ? Math.round((now - server) / SELLER_NAME.msPerSecond)
     : null;
 }

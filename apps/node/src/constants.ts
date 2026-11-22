@@ -308,5 +308,11 @@ export const SELLER_NAME = {
   indexTimeoutMs: 15_000,
   showDelaySeconds: 10,
   clockNoteSeconds: 2,
+  aheadNoteSeconds: 3,
+  secondsShownUpTo: 120,
+  minutesShownUpTo: 120,
+  secondsPerMinute: 60,
+  msPerSecond: 1000,
   garbled: /[?\ufffd]/,
+  quoteMarks: /[\u2018\u201b\u2032`\u00b4]/,
 } as const;

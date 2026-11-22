@@ -54,7 +54,8 @@ void test('seller name signs the normalized name, posts it to the index and prin
     assert.equal(signed.claim.name, 'Ada Lovelace');
     assert.match(run.stdout, /Ada Lovelace/);
     assert.match(run.stdout, new RegExp(home.nodeId));
-    assert.match(run.stdout, /https:\/\/discovery\.gyblos\.com/);
+    assert.match(run.stdout, /the index at discovery\.gyblos\.com/);
+    assert.doesNotMatch(run.stdout, /hidden/);
     assert.match(run.stdout, /not verified/i);
     assert.equal(run.stdout.includes(signed.signature), false);
   });
@@ -76,6 +77,7 @@ void test('seller name --clear signs a null name', async () => {
     const signed = await verifyProfileClaim(run.posted[0]);
     assert.equal(signed.claim.name, null);
     assert.match(run.stdout, /cleared/i);
+    assert.match(run.stdout, /up to 10 seconds to stop showing it/);
   });
 });
 
@@ -297,5 +299,44 @@ void test('seller name --status says when the index does not take seller names y
     assert.equal(run.code, 1);
     assert.match(run.stderr, /does not take seller names yet/);
     assert.match(run.stderr, /\[DISCOVERY_HTTP_STATUS\]\n$/);
+  });
+});
+
+void test('seller name --status says when an operator removed the name', async () => {
+  await withKeyedHome(async (home) => {
+    const run = await nameRun(home, ['--status'], () =>
+      json(403, { error: 'PROFILE_HELD' }),
+    );
+    assert.equal(run.code, 0, run.stderr);
+    assert.match(run.stdout, /operator removed/);
+  });
+});
+
+void test('seller name says the clock may be wrong when it is ahead, in minutes or hours for large gaps', async () => {
+  await withKeyedHome(async (home) => {
+    const ahead = await nameRun(home, ['Ada'], () =>
+      dated(409, { error: 'STALE_CLAIM' }, -600_000),
+    );
+    assert.match(ahead.stderr, /clock may be wrong/);
+    assert.match(ahead.stderr, /10 min ahead/);
+    const hours = await nameRun(home, ['Ada'], () =>
+      dated(409, { error: 'STALE_CLAIM' }, 3 * 3_600_000),
+    );
+    assert.match(hours.stderr, /clock may be behind/);
+    assert.match(hours.stderr, /3 h behind/);
+    const slightly = await nameRun(home, ['Ada'], () =>
+      dated(400, { error: 'INVALID_CLAIM' }, -3_500),
+    );
+    assert.match(slightly.stderr, /signed time/);
+  });
+});
+
+void test('seller name suggests a straight apostrophe for other quote marks', async () => {
+  await withKeyedHome(async (home) => {
+    const run = await nameRun(home, ['O\u2018Brien'], () =>
+      assert.fail('fetched'),
+    );
+    assert.equal(run.code, 1);
+    assert.match(run.stderr, /straight apostrophe '/);
   });
 });
