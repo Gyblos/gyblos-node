@@ -366,9 +366,15 @@ void test('every preview dialog opens and closes with one shared motion and an o
   const build = await readFile(new URL('brand-build.ts', preview), 'utf8');
   assert.match(
     build,
-    /origin\?: 'center' \| 'top' \| 'bottom' \| 'left' \| 'right';/,
+    /const MODAL_ORIGIN = \{\\n  CENTER: 'center',\\n  TOP: 'top',\\n  BOTTOM: 'bottom',\\n  LEFT: 'left',\\n  RIGHT: 'right',\\n\} as const;/,
   );
-  assert.match(build, /data-origin=\{origin \?\? 'center'\}/);
+  assert.match(
+    build,
+    /export type ModalOrigin = \(typeof MODAL_ORIGIN\)\[keyof typeof MODAL_ORIGIN\];/,
+  );
+  assert.match(build, /origin\?: ModalOrigin;/);
+  assert.match(build, /data-origin=\{origin \?\? MODAL_ORIGIN\.CENTER\}/);
+  assert.equal(build.match(/'center'/g)?.length, 1);
   const css = await readFile(new URL('preview.css', preview), 'utf8');
   for (const origin of ['top', 'bottom', 'left', 'right'])
     assert.match(

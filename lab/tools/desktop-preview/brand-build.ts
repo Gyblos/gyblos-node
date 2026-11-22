@@ -82,14 +82,15 @@ export function transformBrand(source: string, id: string, desktop: string) {
   }
   if (target === `${base}/src/ui/Modal.tsx`) {
     const props = replaceOnce(
-      source,
+      "import { MODAL_ORIGIN, type ModalOrigin } from './constants';\n" +
+        source,
       '  compact = false,',
       '  compact = false,\n  size,\n  origin,',
     );
     const typed = replaceOnce(
       props,
       '  compact?: boolean;',
-      "  compact?: boolean;\n  size?: 'sm' | 'md' | 'lg';\n  origin?: 'center' | 'top' | 'bottom' | 'left' | 'right';",
+      "  compact?: boolean;\n  size?: 'sm' | 'md' | 'lg';\n  origin?: ModalOrigin;",
     );
     const restoring = replaceOnce(
       typed,
@@ -99,7 +100,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     return replaceOnce(
       restoring,
       '      ref={ref}',
-      "      data-size={compact ? undefined : (size ?? 'md')}\n      data-origin={origin ?? 'center'}\n      ref={ref}",
+      "      data-size={compact ? undefined : (size ?? 'md')}\n      data-origin={origin ?? MODAL_ORIGIN.CENTER}\n      ref={ref}",
     );
   }
   if (target === `${base}/src/ui/UI.tsx`) {
@@ -226,14 +227,17 @@ export function transformBrand(source: string, id: string, desktop: string) {
     );
   }
   if (target === `${base}/src/ui/constants.ts`)
-    return replaceOnce(
+    return (
       replaceOnce(
-        source,
-        "{ name: UI_VIEW.ACTIVITY, label: 'Activity' }",
-        "{ name: UI_VIEW.ACTIVITY, label: 'Usage & payments' }",
-      ),
-      "{ name: UI_VIEW.PAYMENTS, label: 'Payments' }",
-      "{ name: UI_VIEW.PAYMENTS, label: 'Usage & payments' }",
+        replaceOnce(
+          source,
+          "{ name: UI_VIEW.ACTIVITY, label: 'Activity' }",
+          "{ name: UI_VIEW.ACTIVITY, label: 'Usage & payments' }",
+        ),
+        "{ name: UI_VIEW.PAYMENTS, label: 'Payments' }",
+        "{ name: UI_VIEW.PAYMENTS, label: 'Usage & payments' }",
+      ) +
+      "\nexport const MODAL_ORIGIN = {\n  CENTER: 'center',\n  TOP: 'top',\n  BOTTOM: 'bottom',\n  LEFT: 'left',\n  RIGHT: 'right',\n} as const;\nexport type ModalOrigin = (typeof MODAL_ORIGIN)[keyof typeof MODAL_ORIGIN];\n"
     );
   if (target === `${base}/src/ui/BuyerSidebar.tsx`) {
     const start = source.indexOf('export function BuyerSidebar(');
