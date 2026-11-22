@@ -137,12 +137,13 @@ y comprueba el estado.
 
 Además de atender a los compradores, una versión publicada del vendedor contacta con estos servicios:
 
-| Destino                                           | Qué envía                                                                                                                 | Cómo desactivarlo         |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| Recolector de métricas (`collector.gyblos.com`)   | Recibos firmados: NodeIds, dueño, modelo, recuento de tokens, tiempos, resultado e importe, nunca preguntas ni respuestas | No se puede desactivar    |
-| Recolector de métricas (`collector.gyblos.com`)   | Observaciones de telemetría, sin contenido                                                                                | `GYBLOS_OBSERVATIONS=off` |
-| Índice de descubrimiento (`discovery.gyblos.com`) | Tu identidad pública, tu modelo y tu oferta, mientras publicas                                                            | `sh install.sh unpublish` |
-| GitHub                                            | Una consulta del último release, solo cuando ejecutas `gyblos seller status`                                              | `GYBLOS_UPDATE_CHECK=0`   |
+| Destino                                           | Qué envía                                                                                                                 | Cómo desactivarlo                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Recolector de métricas (`collector.gyblos.com`)   | Recibos firmados: NodeIds, dueño, modelo, recuento de tokens, tiempos, resultado e importe, nunca preguntas ni respuestas | No se puede desactivar                 |
+| Recolector de métricas (`collector.gyblos.com`)   | Observaciones de telemetría, sin contenido                                                                                | `GYBLOS_OBSERVATIONS=off`              |
+| Índice de descubrimiento (`discovery.gyblos.com`) | Tu identidad pública, tu modelo y tu oferta, mientras publicas                                                            | `sh install.sh unpublish`              |
+| Índice de descubrimiento (`discovery.gyblos.com`) | Tu cuenta de GitHub y el gist de prueba, solo cuando ejecutas `gyblos seller verify github`                               | `gyblos seller verify github --cancel` |
+| GitHub                                            | Una consulta del último release, solo cuando ejecutas `gyblos seller status`                                              | `GYBLOS_UPDATE_CHECK=0`                |
 
 Para desactivar las observaciones, añade `GYBLOS_OBSERVATIONS=off` a `seller.env` en un editor privado y
 aplícalo como cualquier [cambio de entorno](#aplica-cambios-de-configuración-o-entorno). `GYBLOS_UPDATE_CHECK=0`

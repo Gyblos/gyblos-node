@@ -133,12 +133,13 @@ seller lost its engine connection, run `docker compose restart seller`, then che
 
 Besides serving buyers, a release build of the seller contacts these services:
 
-| Destination                                | What it sends                                                                                              | Turn it off               |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------- |
-| Metrics collector (`collector.gyblos.com`) | Signed receipts: NodeIds, owner, model, token counts, timing, outcome and charge, never prompts or answers | Cannot be turned off      |
-| Metrics collector (`collector.gyblos.com`) | Telemetry observations, content-free                                                                       | `GYBLOS_OBSERVATIONS=off` |
-| Discovery index (`discovery.gyblos.com`)   | Your public identity, model and offer, while you publish                                                   | `sh install.sh unpublish` |
-| GitHub                                     | One request for the latest release, only when you run `gyblos seller status`                               | `GYBLOS_UPDATE_CHECK=0`   |
+| Destination                                | What it sends                                                                                              | Turn it off                            |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Metrics collector (`collector.gyblos.com`) | Signed receipts: NodeIds, owner, model, token counts, timing, outcome and charge, never prompts or answers | Cannot be turned off                   |
+| Metrics collector (`collector.gyblos.com`) | Telemetry observations, content-free                                                                       | `GYBLOS_OBSERVATIONS=off`              |
+| Discovery index (`discovery.gyblos.com`)   | Your public identity, model and offer, while you publish                                                   | `sh install.sh unpublish`              |
+| Discovery index (`discovery.gyblos.com`)   | Your GitHub account and proof gist, only when you run `gyblos seller verify github`                        | `gyblos seller verify github --cancel` |
+| GitHub                                     | One request for the latest release, only when you run `gyblos seller status`                               | `GYBLOS_UPDATE_CHECK=0`                |
 
 To turn off observations, add `GYBLOS_OBSERVATIONS=off` to `seller.env` in a private editor, then apply it
 like any [environment change](#apply-configuration-or-environment-changes). `GYBLOS_UPDATE_CHECK=0` must be

@@ -112,6 +112,128 @@ Nunca envíes `seller.env`, códigos de invitación, volcados del entorno, la sa
 del rol, recibos, logs completos ni capturas del aviso de registro. Pide ayuda en el
 [Telegram de Gyblos](https://t.me/gyblos).
 
+## Verifica tu cuenta de GitHub [#verificar-github]
+
+Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. Tu vendedor tiene que
+estar registrado o publicando. El vínculo tiene dos partes públicas que cualquiera puede comprobar: un gist de
+tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea `gyblos-node=NODEID`, y
+una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El índice de descubrimiento
+revisa el gist por su cuenta, sin ningún token de GitHub.
+
+Una cuenta verificada es una etiqueta pública. No demuestra la calidad de tus respuestas ni el código que
+ejecuta tu vendedor. El nombre de tu cuenta de GitHub y el gist pasan a ser públicos: mira qué se comparte en
+[Datos y privacidad](/es/reference/data-and-privacy#github). Todas las opciones están en la
+[referencia de la CLI](/es/reference/cli#verificar-github).
+
+En los comandos de abajo, cambia `USER` por tu nombre de usuario de GitHub. En un vendedor Docker, ejecútalos
+desde `~/gyblos-seller` con `docker compose exec seller` delante, como se muestra.
+
+### Con la CLI de GitHub [#verificar-github-con-gh]
+
+Si la CLI de GitHub (`gh`) está instalada y con la sesión iniciada como `USER`, el comando crea el gist por ti:
+
+1. Inicia sesión en `gh` con la misma cuenta, si aún no lo hiciste:
+
+   ```sh
+   gh auth login
+   ```
+
+2. Ejecuta:
+
+   ```sh
+   gyblos seller verify github USER
+   ```
+
+El comando crea un gist público con la descripción `Gyblos node verification NODEID` y el archivo
+`gyblos-proof.txt`, firma la declaración y la envía al índice. Si una ejecución anterior se cortó, usa el gist
+que esa ejecución creó. Cuando funciona, muestra `Verified: GitHub account USER is linked to seller NODEID.` y
+la dirección del gist.
+
+Si `gh` tiene la sesión iniciada con otra cuenta, el comando lo dice, no lo usa y muestra los pasos de abajo.
+La imagen de Docker no incluye `gh`, así que un vendedor Docker sigue los pasos de abajo.
+
+### Sin la CLI de GitHub [#verificar-github-a-mano]
+
+1. Ejecuta el comando:
+
+   ```sh
+   gyblos seller verify github USER
+   ```
+
+   En un vendedor Docker:
+
+   ```sh
+   cd ~/gyblos-seller
+   docker compose exec seller gyblos seller verify github USER
+   ```
+
+2. Muestra el texto para el archivo de prueba. Se ve así, con el NodeId de tu vendedor:
+
+   ```text
+   This GitHub account runs the Gyblos seller below.
+   gyblos-node=NODEID
+   ```
+
+3. Abre [gist.github.com](https://gist.github.com) con la sesión iniciada como `USER`. Ponle al archivo
+   exactamente el nombre `gyblos-proof.txt`, pega el texto y crea el gist. Sirve un gist público o uno secreto;
+   la dirección de un gist secreto igual se vuelve pública a través del índice.
+4. Copia la dirección del gist desde el navegador y pégala cuando el comando pida `Gist URL`.
+
+Si el comando no puede preguntar, o lo cerraste, pasa tú la dirección:
+
+```sh
+gyblos seller verify github USER --gist GIST_URL
+```
+
+Puedes detener el comando con Ctrl+C en cualquier momento y ejecutarlo de nuevo: guarda su avance en el home
+del vendedor y se salta lo que ya está hecho.
+
+### Qué significa cada estado [#estados-github]
+
+| Estado     | Qué significa                                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verified` | En la última revisión, el índice encontró la línea de prueba en tu gist. Los compradores ven la cuenta y el gist en la lista de la red del índice.                                                   |
+| `pending`  | El índice tiene tu declaración, pero aún no encontró la prueba. Los compradores no la ven. El índice revisa de nuevo cada 6 horas más o menos, durante 7 días; después, ejecuta el comando otra vez. |
+| `lost`     | La cuenta estaba verificada, pero la última revisión no encontró la prueba: el gist, el archivo o la línea ya no están, o la cuenta cambió de nombre. Los compradores ya no la ven.                  |
+
+Solo `verified` significa que se encontró la prueba. Cuando GitHub no responde, el índice mantiene el estado
+que tenía.
+
+### Comprueba el estado [#comprobar-github]
+
+```sh
+gyblos seller verify github --status
+gyblos seller status --online
+```
+
+`--status` muestra la cuenta, la dirección del gist, el estado, el motivo y cuándo revisó el índice por última
+vez. `gyblos seller status --online` muestra el mismo vínculo en su línea `github`. En un vendedor Docker, pon
+`docker compose exec seller` delante de los dos.
+
+### Quita el vínculo [#quitar-github]
+
+```sh
+gyblos seller verify github --cancel
+```
+
+El índice deja de vincular tu vendedor con la cuenta y el comando borra su archivo de avance. El gist sigue en
+GitHub: bórralo tú en [gist.github.com](https://gist.github.com) si ya no lo quieres.
+
+### Errores comunes [#errores-github]
+
+Cada error empieza con una frase que dice qué hacer y termina con un código entre corchetes.
+
+| Código                                                  | Qué pasó y qué hacer                                                                                                                                                                         |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VERIFY_PROOF_FILE_MISSING`                             | El gist existe, pero no tiene un archivo llamado `gyblos-proof.txt`. Cambia el nombre del archivo en el gist a ese nombre exacto y ejecuta el comando otra vez.                              |
+| `VERIFY_PROOF_MISSING`                                  | El archivo no contiene `gyblos-node=NODEID` de este vendedor. Agrega la línea sola en su renglón y ejecuta el comando otra vez.                                                              |
+| `VERIFY_GIST_OWNER_MISMATCH`                            | El gist es de otra cuenta de GitHub. Crea el gist con la sesión iniciada como `USER`.                                                                                                        |
+| `VERIFY_GIST_NOT_FOUND`                                 | GitHub no tiene ese gist para `USER`: revisa la dirección y el nombre de usuario. Si borraste el gist, ejecuta el comando otra vez para crear uno nuevo, o pasa otra dirección con `--gist`. |
+| `VERIFY_NOT_VERIFIED` con `could not reach GitHub`      | El índice no pudo llegar a GitHub. Tu declaración sigue en `pending`. Ejecuta el comando otra vez en unos minutos.                                                                           |
+| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace menos de un minuto. Ejecuta el comando otra vez en un minuto.                                                                                              |
+| `VERIFY_GH_FAILED`                                      | La CLI de GitHub no pudo crear el gist. Créalo a mano y ejecuta el comando con `--gist`.                                                                                                     |
+| `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish) o publícalo.                                                                                         |
+
 ## Privacidad [#datos-del-comprador-y-privacidad-de-red]
 
 Un motor local procesa los mensajes de los compradores en tu equipo; no los guardes ni los compartas. Un
