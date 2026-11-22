@@ -87,9 +87,9 @@ export function RevokeConfirmation({
           className="preview-destructive"
           onClick={() => {
             close();
-            void run({ action: USDC_API_ACTION.REVOKE, id }).then(() =>
-              showPreviewToast('API key revoked'),
-            );
+            void run({ action: USDC_API_ACTION.REVOKE, id }).then((result) => {
+              if (result && !result.error) showPreviewToast('API key revoked');
+            });
           }}
         >
           Revoke key

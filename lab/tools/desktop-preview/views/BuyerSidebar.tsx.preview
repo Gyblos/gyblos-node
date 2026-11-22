@@ -1,17 +1,19 @@
 const RAIL = [
   { view: UI_VIEW.CHAT, label: 'Chat', icon: <SidebarActionIcon kind={SIDEBAR_ACTION.CHAT} /> },
-  { view: UI_VIEW.MODELS, label: 'Models', icon: <SidebarIcon name={UI_VIEW.MODELS} /> },
+  { view: UI_VIEW.MODELS, label: 'Models', icon: <SidebarIcon name={UI_VIEW.MODELS} />, shortcut: PREVIEW_SHORTCUT.MODELS },
   { view: UI_VIEW.CONNECT, label: 'Connections', icon: <SidebarActionIcon kind={SIDEBAR_ACTION.LINK} /> },
   { view: UI_VIEW.PAYMENTS, label: 'Usage & payments', icon: <SidebarActionIcon kind={SIDEBAR_ACTION.WALLET} /> },
 ] as const;
 
 export function BuyerSidebar(props: Props) {
   const current = props.view === UI_VIEW.ACTIVITY ? UI_VIEW.PAYMENTS : props.view;
-  const rail = (view: View, label: string, icon: ReactNode) => (
+  const rail = (view: View, label: string, icon: ReactNode, shortcut?: (typeof PREVIEW_SHORTCUT)[keyof typeof PREVIEW_SHORTCUT]) => (
     <IconButton
       key={view}
       className="preview-rail-item"
       label={label}
+      title={shortcut && previewCompact() ? label + ' ' + previewShortcut(shortcut).label : undefined}
+      aria-keyshortcuts={shortcut && previewCompact() ? previewShortcut(shortcut).aria : undefined}
       aria-current={current === view ? 'page' : undefined}
       onClick={() => props.navigate(view)}
     >
@@ -21,7 +23,7 @@ export function BuyerSidebar(props: Props) {
   return (
     <aside id="app-sidebar" className="sidebar buyer-sidebar">
       <nav aria-label="Main navigation" className="preview-rail">
-        {RAIL.map((item) => rail(item.view, item.label, item.icon))}
+        {RAIL.map((item) => rail(item.view, item.label, item.icon, 'shortcut' in item ? item.shortcut : undefined))}
         <span className="preview-rail-spacer" />
         {rail(UI_VIEW.SETTINGS, 'Settings', <SidebarActionIcon kind={SIDEBAR_ACTION.SETTINGS} />)}
       </nav>

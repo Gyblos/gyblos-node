@@ -708,9 +708,14 @@ export function previewIcon(size: number): { size: number; weight?: IconWeight }
   return previewCompact() ? { size: 16, weight: 'bold' } : { size };
 }
 export const PREVIEW_SHORTCUT = {
-  NEW_CHAT: { key: 'n', label: '⌘N', aria: 'Meta+N' },
-  SEARCH: { key: 'k', label: '⌘K', aria: 'Meta+K' },
+  NEW_CHAT: { label: '⌘N', aria: 'Meta+N' },
+  MODELS: { label: '⌘K', aria: 'Meta+K' },
 } as const;
+type PreviewShortcut = (typeof PREVIEW_SHORTCUT)[keyof typeof PREVIEW_SHORTCUT];
+export function previewShortcut(shortcut: PreviewShortcut) {
+  if (navigator.platform.startsWith('Mac')) return shortcut;
+  return { label: shortcut.label.replace('⌘', 'Ctrl+'), aria: shortcut.aria.replace('Meta', 'Control') };
+}
 export function Kbd({ children }: { children: string }) {
   return <kbd className="pk-kbd">{children}</kbd>;
 }
@@ -948,22 +953,6 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('All chats');
-  useEffect(() => {
-    if (!previewCompact()) return;
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) return;
-      const key = event.key.toLowerCase();
-      if (key === PREVIEW_SHORTCUT.NEW_CHAT.key && !loading) {
-        event.preventDefault();
-        onNewChat();
-      } else if (key === PREVIEW_SHORTCUT.SEARCH.key && !collapsed) {
-        event.preventDefault();
-        setSearching(true);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [loading, collapsed, onNewChat]);
   const running = useRef(new Set<string>());
   useEffect(() => {
     const now = new Set(sessions.filter((session) => session.run || session.paypalRun).map((session) => session.id));
@@ -996,8 +985,8 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
       <Button
         className="ui-nav-row preview-new-chat"
         aria-label="New chat"
-        title={previewCompact() ? 'New chat ' + PREVIEW_SHORTCUT.NEW_CHAT.label : undefined}
-        aria-keyshortcuts={previewCompact() ? PREVIEW_SHORTCUT.NEW_CHAT.aria : undefined}
+        title={previewCompact() ? 'New chat ' + previewShortcut(PREVIEW_SHORTCUT.NEW_CHAT).label : undefined}
+        aria-keyshortcuts={previewCompact() ? previewShortcut(PREVIEW_SHORTCUT.NEW_CHAT).aria : undefined}
         disabled={loading}
         onClick={onNewChat}
       >
@@ -1012,8 +1001,6 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
         <h2 className="ui-sidebar-section-title">Chats</h2>
         <IconButton
           label={searching ? 'Close search' : 'Search conversations'}
-          title={previewCompact() && !searching ? 'Search conversations ' + PREVIEW_SHORTCUT.SEARCH.label : undefined}
-          aria-keyshortcuts={previewCompact() && !searching ? PREVIEW_SHORTCUT.SEARCH.aria : undefined}
           aria-pressed={searching}
           onClick={() => {
             setSearching(!searching);
@@ -1085,7 +1072,7 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
           (loading && previewCompact() ? (
             <PreviewSkeletonRows count={5} />
           ) : (
-            <PreviewEmptyLine icon={loading ? ChatCircle : query || filter !== 'All chats' ? MagnifyingGlass : ChatCircle}>
+            <PreviewEmptyLine icon={!loading && (query || filter !== 'All chats') ? MagnifyingGlass : ChatCircle}>
               {loading ? 'Loading conversations…' : query || filter !== 'All chats' ? 'No conversations found.' : 'Your conversations will appear here.'}
             </PreviewEmptyLine>
           ))}
@@ -1128,7 +1115,7 @@ export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
               <MenuItem
                 label="New chat"
                 leading={<Plus {...previewIcon(14)} aria-hidden="true" />}
-                trailing={<Kbd>{PREVIEW_SHORTCUT.NEW_CHAT.label}</Kbd>}
+                trailing={<Kbd>{previewShortcut(PREVIEW_SHORTCUT.NEW_CHAT).label}</Kbd>}
                 onClick={() => {
                   chat.newChat(crypto.randomUUID());
                   close();

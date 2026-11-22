@@ -243,7 +243,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const start = source.indexOf('export function BuyerSidebar(');
     if (start < 0) throw new Error('Missing sidebar review hook');
     return (
-      "import { PreviewConversationPanel } from './PreviewKit';\nimport { IconButton } from './UI';\n" +
+      "import { PREVIEW_SHORTCUT, PreviewConversationPanel, previewCompact, previewShortcut } from './PreviewKit';\nimport { IconButton } from './UI';\n" +
       source.slice(0, start) +
       readFileSync(
         new URL('./views/BuyerSidebar.tsx.preview', import.meta.url),

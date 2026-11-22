@@ -170,7 +170,7 @@ void test('?density=compact is a comparison mode that leaves the default view un
   assert.match(kit, /size: 16, weight: 'bold'/);
   assert.match(
     kit,
-    /aria-keyshortcuts=\{previewCompact\(\) \? PREVIEW_SHORTCUT\.NEW_CHAT\.aria/,
+    /aria-keyshortcuts=\{previewCompact\(\) \? previewShortcut\(PREVIEW_SHORTCUT\.NEW_CHAT\)\.aria/,
   );
   assert.match(kit, /NEW_CHAT: \{ label: '⌘N', aria: 'Meta\+N' \}/);
   assert.match(kit, /MODELS: \{ label: '⌘K', aria: 'Meta\+K' \}/);

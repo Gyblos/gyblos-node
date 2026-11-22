@@ -17,6 +17,7 @@ import {
   PREVIEW_COPY,
   PREVIEW_EVENT,
   PreviewKitShowcase,
+  previewCompact,
   PreviewSectionIcon,
   READY_SELLER_MODES,
   SELLER_MODES,
@@ -31,6 +32,7 @@ const FONTS = ['Instrument Sans', 'Inter'] as const;
 function chooseFont(font: (typeof FONTS)[number]) {
   const params = new URLSearchParams(location.search);
   if (font === 'Inter') params.set('font', 'inter');
+  else if (previewCompact()) params.set('font', 'instrument-sans');
   else params.delete('font');
   location.search = params.toString();
 }

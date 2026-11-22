@@ -122,16 +122,16 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 
 Compact density adds these shared pieces; each renders the default markup, or nothing, without `?density=compact`:
 
-| Need                                 | Use                                                                              |
-| ------------------------------------ | -------------------------------------------------------------------------------- |
-| Loading list                         | `PreviewSkeletonRows` with `count`                                               |
-| Empty list or search                 | `PreviewEmptyLine` with an `icon` and one line of text                           |
-| Settings header icon                 | `Section` `icon` with `PreviewSectionIcon`                                       |
-| Menu or header glyph                 | `previewIcon(size)`: 16 px with a 1.5 px stroke (`bold`) in compact density      |
-| Keyboard shortcut in a menu or label | `Kbd` with `PREVIEW_SHORTCUT` (`⌘N` new chat, `⌘K` search conversations)         |
-| Confirm a save or delete             | `showPreviewToast(text)`; `PreviewToaster` is mounted once by `PreviewStatusBar` |
+| Need                                 | Use                                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Loading list                         | `PreviewSkeletonRows` with `count`                                                             |
+| Empty list or search                 | `PreviewEmptyLine` with an `icon` and one line of text                                         |
+| Settings header icon                 | `Section` `icon` with `PreviewSectionIcon`                                                     |
+| Menu or header glyph                 | `previewIcon(size)`: 16 px with a 1.5 px stroke (`bold`) in compact density                    |
+| Keyboard shortcut in a menu or label | `Kbd` with `previewShortcut(PREVIEW_SHORTCUT.*)` (`⌘N` new chat, `⌘K` Models; Ctrl+ off macOS) |
+| Confirm a save or delete             | `showPreviewToast(text)`; `PreviewToaster` is mounted once by `PreviewStatusBar`               |
 
-Open `?screen=design-system` (Settings → Preview components) to review them all.
+Open `?screen=design-system` (Settings → Preview components) to review them all; the compact pieces above appear on their screens with `?density=compact`.
 
 ## Density
 
@@ -150,7 +150,7 @@ given.
   stroke set.
 - Hover and focus transitions take 150 ms (none with reduced motion). Copy shows
   ✓ for 1 s. Saving or deleting shows a toast. Loading lists show skeleton rows.
-  New chat (`⌘N`) and conversation search (`⌘K`) show their shortcut in tooltips
+  New chat (`⌘N`) and Models (`⌘K`), the desktop app's existing shortcuts, show them in tooltips
   and the conversation "…" menu.
 
 ## Type
