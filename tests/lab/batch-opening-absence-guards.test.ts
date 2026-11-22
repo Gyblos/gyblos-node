@@ -215,6 +215,33 @@ void test('changed original opening bytes never become absence evidence', async 
   assert.equal(rig.signs(), 0);
   assert.equal(rig.financial.vm.sends(), 0);
 });
+interface OpenedJournal {
+  channelId: string;
+  terms: { payTo: string };
+  opening: { channelConfig: { salt: string } };
+}
+for (const [name, change] of [
+  [
+    'channel',
+    (record: OpenedJournal) => (record.channelId = record.terms.payTo),
+  ],
+  [
+    'configuration',
+    (record: OpenedJournal) => (record.opening.channelConfig.salt += '1'),
+  ],
+] as const)
+  void test(`an opened journal with another ${name} never becomes absence evidence`, async (t) => {
+    const rig = await batchAbsenceRig(t);
+    const record = await rig.read();
+    assert.ok(record.opening);
+    change(record);
+    await rig.write(record);
+    rig.financial.vm.expire();
+    await assert.rejects(rig.recover());
+    assert.deepEqual(await rig.read(), record);
+    assert.equal(rig.signs(), 0);
+    assert.equal(rig.financial.vm.sends(), 0);
+  });
 void test('an actually created channel follows close and refund instead of no-deposit release', async (t) => {
   const { batchRecoveryRig } = await import('../support/batch-recovery');
   const rig = await batchRecoveryRig(t);
