@@ -82,6 +82,10 @@ void test('the title bar adds a conversation menu and a details panel for the ch
     css,
     /\.preview-chat-panel \{[^}]*border-inline-start: 1px solid var\(--line\);[^}]*border-end-start-radius: var\(--radius-panel\);/s,
   );
+  assert.match(
+    css,
+    /\.sidebar-collapsed,\s*html \.app\.desktop-frame\.sidebar-collapsed > \.ui-window-chrome \{\s*background: var\(--pk-rail\);/,
+  );
   assert.doesNotMatch(
     css,
     /> \.preview-status-bar \{[^}]*border-start-(start|end)-radius/s,

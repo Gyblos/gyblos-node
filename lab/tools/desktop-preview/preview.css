@@ -3814,6 +3814,10 @@ html .app.desktop-frame .preview-rail-item.ui-icon-button[aria-current='page'] {
 html .app.desktop-frame.sidebar-collapsed > .buyer-sidebar {
   grid-template-columns: var(--navigation-rail-width);
 }
+html .app.desktop-frame.sidebar-collapsed,
+html .app.desktop-frame.sidebar-collapsed > .ui-window-chrome {
+  background: var(--pk-rail);
+}
 .desktop-frame .preview-agents-entry .preview-connect-logos .preview-tool-logo {
   width: 20px;
   height: 20px;
